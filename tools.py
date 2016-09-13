@@ -54,7 +54,7 @@ class App:
             if book['comments']: continue
             if book['tags']: continue
             if book['isbn']: continue
-            if int(book['id']) < 4416: continue
+            if int(book['id']) < 5347: continue
             print self.fmt%("Todo", book['id'], self.total, book['isbn'], book['title'])
             self.do_book_update(book['id'])
 

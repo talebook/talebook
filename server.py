@@ -17,6 +17,5 @@ sys.executables_location = os.environ.get('CALIBRE_EXECUTABLES_PATH', '/usr/bin'
 
 import webserver
 sys.template_location = os.path.dirname(webserver.__file__)
-print sys.template_location
 
 sys.exit(webserver.main())
