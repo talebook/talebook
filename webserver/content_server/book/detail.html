@@ -1,0 +1,188 @@
+{% extends "content_server/base.html" %}
+{% block msgbar %}
+<div id="id_edit_tip" class="hidden col-md-12">
+    <div class="alert alert-warning alert-dismissible" role="alert">
+        <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button>
+        <strong>{{ gettext("You are now in Edit Mode!") }}</strong>
+        <p>{{ gettext("Click the title fields (or other), edit and it will auto save.") }}</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="center-block">
+            <h1 class="text-center book-edit" data-meta="title">{{book.title}}</h1>
+        </div>
+
+        <div class="media">
+            <img class="col-sm-5 col-md-5 media-object center-block" src="{{IMG}}/get/thumb_300_420/{{book.id}}.jpg?t={{book.timestamp}}" alt="...">
+            <div class="media-body">
+                <p class="lead">
+
+                <span class="field-name">{{ gettext("Author: ") }}</span>
+                <span class="hidden book-edit" data-meta="authors">{{book.author_sort}}</span>
+                <a id="id_authors" class="meta-link" href="/author/{{book.author_sort|urlencode}}">{{book.author_sort}}</a><br/>
+
+                {% if book.publisher %}
+                <span class="field-name">{{ gettext("Publisher: ") }}</span>
+                <span class="hidden book-edit" data-meta="publisher">{{book.publisher}}</span>
+                <a id="id_publisher" class="meta-link" href="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a><br/>
+                {% endif %}
+
+                {% if book.series %}
+                <span class="field-name">{{ gettext("Series: ") }}</span>
+                <span class="book-edit" data-meta="series">{{book.series}}</span><br/>
+                {% endif %}
+
+                {% if book.pubdate %}
+                <span class="field-name">{{ gettext("Date: ") }}</span>
+                <span class="book-edit" data-meta="pubdate">{{book.pubdate|day}}</span><br/>
+                {% endif %}
+
+                {% if book.language %}
+                <span class="field-name">{{ gettext("Language: ") }}</span>
+                <span class="book-edit" data-meta="language">{{book.language}}</span><br/>
+                {% endif %}
+
+                {% if book.isbn %}
+                <span class="field-name">{{ gettext("ISBN: ") }}</span>
+                <span class="book-edit" data-meta="isbn">{{book.isbn}}</span><br/>
+                {% endif %}
+
+                <span class="field-name">{{ gettext("Rate: ") }}</span>
+                <span style="display: inline-block;font-size:65%"><input type="number" class="rating"
+                    onchange="update_rating(this, {{book.id}})"
+                    value="{%if book.rating%}{{book.rating}}{%endif%}"
+                    data-min=0 data-max=10 data-size="xs" ></span><br/>
+
+                {% if book.tags %}
+                <span class="field-name">{{ gettext("Tags: ") }}</span>
+                <span class="hidden book-edit" data-meta="tags">{{book.tags|join(" / ")}}</span>
+                <span id="id_tags" class="meta-link">
+                {% for tag in book.tags %}
+                <a href="/tag/{{tag|urlencode}}">{{tag}}</a>
+                {% if not loop.last %} / {% endif %}
+                {% endfor%}
+                </span>
+                <br/>
+                {% endif %}
+
+                </p>
+            </div>
+        </div>
+        <p>&nbsp;</p>
+
+        <span class="legend">{{ gettext("Abstract") }}</span>
+        <p id="book-comments" class="book-edit" style="text-indent:2em;" data-meta="comments">{{book.comments|replace("\n", "<br/>")}}</p>
+        <p>&nbsp;</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block sidebar %}
+<div class="col-md-12">
+    <span class="legend">{{ gettext("Push") }}</span>
+    <div class="list-group">
+        <a href="#" class="list-group-item" onclick="return jQuery('#id_push_dialog').modal()"><span class="glyphicon glyphicon-phone"></span> {{ gettext("Kindle") }}</a>
+        <a href="#" class="hidden list-group-item"><span class="glyphicon glyphicon-cloud"></span> {{ gettext("Email...") }}</a>
+    </div>
+
+    <span class="legend">{{ gettext("Read") }}</span>
+    <div class="list-group">
+        <a class="list-group-item" rel="nofollow" href="/book/{{book.id}}/read"><span class="glyphicon glyphicon-book"></span> {{ gettext("Read online") }}</a>
+        {% for format, size in sizes %}
+        <a href="http://files.talebook.org/book/{{book.id}}.{{format}}" class="list-group-item"><span class="glyphicon glyphicon-save"></span> <span class="badge">{{size//1024}} KB</span> {{format}}</a>
+        {% endfor %}
+    </div>
+
+    {% if request.user.admin %}
+    <span class="legend">{{ gettext("Edit") }}</span>
+    <div class="list-group">
+        <a href="#" onclick="return bind_book_editable({{book.id}})" class="list-group-item"><span class="glyphicon glyphicon-cog"></span> {{ gettext("Manual edit") }}</a>
+        <a href="#" class="list-group-item" onclick="return jQuery('#id_update_dialog').modal()"><span class="glyphicon glyphicon-refresh"></span> <span class="badge">Douban</span> {{ gettext("Auto update") }}</a>
+    </div>
+
+    <span class="legend">{{ gettext("Admin") }}</span>
+    <div class="list-group">
+        <a href="/book/{{book.id}}/delete" class="btn btn-danger btn-block"><span class="glyphicon glyphicon-remove"></span> {{ gettext("Delete") }}</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+{% block content_footer %}
+<!-- UY BEGIN -->
+<div id="uyan_frame"></div>
+<script type="text/javascript" src="http://v2.uyan.cc/code/uyan.js?uid=1852657"></script>
+<!-- UY END -->
+{% endblock %}
+{% block footer %}
+<!-- Modal -->
+<div class="modal fade" id="id_push_dialog" tabindex="-1" role="dialog" aria-labelledby="id_push_dialogLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title" id="id_push_dialogLabel">{{ gettext("Push to kindle") }}</h4>
+            </div>
+            <form onsubmit="save_email()" class="form-horizontal" role="form" action="/book/{{book.id}}/push" method="POST">
+                <div class="modal-body ">
+                    <div class="form-group">
+                        <p class="col-sm-12 text-center help-block">&nbsp;</p>
+                        <label for="id_push_email" class="col-sm-2 control-label">{{ gettext("Email") }}</label>
+                        <div class="col-sm-9">
+                            <input type="email" class="form-control" name="mail_to" id="id_push_email" value="{{request.user_extra.kindle_email}}" placeholder="Enter email">
+                        </div>
+                        <p class="col-sm-12 text-center help-block">
+                        {{ gettext("<br/>Please add to your Kindle Mail List: ") }}<strong>{{smtp_username}}</strong></strong> 
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Push</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="id_update_dialog" tabindex="-1" role="dialog" aria-labelledby="id_update_dialogLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title">{{ gettext("Sync metadata from douban.com") }}</h4>
+            </div>
+            <div class="modal-body ">
+                <h3 class="text-danger">慎重操作！</h3>
+                <p>使用本书的标题信息去豆瓣数据库里搜索图书信息，并选取最匹配的一本书的信息，填充到书库中，更新书籍信息和封面。（但是，书籍文件中的内容依然是旧的。）</p>
+                <p>注意：某些情况下会导致书籍信息丢失，例如是国家和谐的书籍。</p>
+            </div>
+            <div class="modal-footer">
+                <form class="form-horizontal" role="form" action="/book/{{book.id}}/update" method="POST">
+                    <input type="number" class="hidden" name="exam_id" value="{{book.id}}">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">更新</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block meta %}
+<meta name="Keywords" content="{{ title }} {% for format, size in sizes %}{{ format }} {% endfor %} 下载 推送 kindle" />
+{% if book.comments %}
+<meta name="description" content=" {{ book.comments|striptags|replace("\n", "")|replace('"', '') }}" />
+{% endif %}
+{% endblock %}
+
+{% block script %}
+<script>
+jQuery(document).ready( load_email );
+</script>
+{% endblock %}
+

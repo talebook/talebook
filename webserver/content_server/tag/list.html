@@ -1,0 +1,13 @@
+{% extends "content_server/base.html" %}
+{% block content %}
+<span class="legend">{{title}}</span>
+
+{% for id, name, count in tags %}
+<div class="col-sm-3 col-xs-6"><a href="/tag/{{name|urlencode}}">{{name}}</a><span class="text-muted">({{count}})</span></div>
+{% endfor %}
+
+{% endblock %}
+
+{% block sidebar %}
+{% include "content_server/sidebar/basic.html" %}
+{% endblock %}

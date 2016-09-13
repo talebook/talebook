@@ -1,0 +1,14 @@
+{{#name}}
+<li>
+<label id="label_{{name}}">{{i18n}}<br/><span>{{name}}</span></label>
+<input id="{{name}}" name="{{name}}" class="keyboardInput" type="text"  placeholder="{{shortcut}}" value="{{shortcut}}" aria-labelledbyxxx="label_{{name}}" aria-label="{{i18n}}" title="{{i18n}}"></input>
+<button class="resetKey captureKeyboardShortcut" role="button" data-key="{{name}}"  title="{{strings.i18n_reset_key}} ({{def}})" aria-label="{{strings.i18n_reset_key}} ({{def}})"><span aria-hidden="true">&#8855;</span></button>
+<span id="duplicate_keyboard_shortcut" aria-hidden="true">{{strings.i18n_duplicate_keyboard_shortcut}}</span>
+<span id="invalid_keyboard_shortcut" aria-hidden="true">{{strings.i18n_invalid_keyboard_shortcut}}</span>
+</li>
+{{/name}}
+{{^name}}
+<li id="resetAllKeys{{id}}" class="resetAllKeys">
+<button class="resetKey" role="button"  title="{{strings.i18n_reset_key_all}}" aria-label="{{strings.i18n_reset_key_all}}"><span aria-hidden="true">{{strings.i18n_reset_key_all}}  &#8855;</span></button>
+</li>
+{{/name}}
