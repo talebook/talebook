@@ -135,8 +135,9 @@ def should_login(func):
     @wraps(func)
     def do(*args, **kwargs):
         uid = cherrypy.request.user_id
-        url = '/login?'+urlencode({'from':cherrypy.request.wsgi_environ['REQUEST_URI']})
+        scheme = request.headers.get('X-Scheme', request.scheme)
         url = '/login'
+        url = scheme + "://" + cherrypy.config['site_domain'] + '/login?'+urlencode({'from':cherrypy.request.wsgi_environ['REQUEST_URI']})
         cherrypy.session['next'] = cherrypy.request.wsgi_environ['REQUEST_URI']
         if not uid: raise cherrypy.HTTPRedirect(url, 302)
         return func(*args, **kwargs)
@@ -239,9 +240,10 @@ class HtmlServer(object):
         db = self.db
         request = cherrypy.request
         hostname = request.headers['Host']
-        scheme = request.headers.get('X-Scheme', request.scheme)
-        M = scheme + "://js.talebook.org/static/m"
-        IMG = scheme + "://img.talebook.org"
+        M = "//" + cherrypy.config['js_domain'] + "/static/m"
+        IMG = "//" + cherrypy.config['img_domain']
+        READ = "//" + cherrypy.config['read_domain']
+        FILE = "//" + cherrypy.config['file_domain']
         vals = dict(*args, **kwargs)
         vals.update( vars() )
         uid = cherrypy.request.user_id

@@ -93,7 +93,7 @@
     <div class="list-group">
         <a class="list-group-item" rel="nofollow" href="/book/{{book.id}}/read"><span class="glyphicon glyphicon-book"></span> {{ gettext("Read online") }}</a>
         {% for format, size in sizes %}
-        <a href="http://files.talebook.org/book/{{book.id}}.{{format}}" class="list-group-item"><span class="glyphicon glyphicon-save"></span> <span class="badge">{{size//1024}} KB</span> {{format}}</a>
+        <a href="{{FILE}}/book/{{book.id}}.{{format}}" class="list-group-item"><span class="glyphicon glyphicon-save"></span> <span class="badge">{{size//1024}} KB</span> {{format}}</a>
         {% endfor %}
     </div>
 

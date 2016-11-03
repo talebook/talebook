@@ -173,8 +173,7 @@ class LibraryServer(AuthServer, HtmlServer, XMLServer, OPDSServer, Cache):
 
         cherrypy.config.update({
             'log.screen'             : opts.develop,
-            'engine.autoreload_on'   : getattr(opts,
-                                        'auto_reload', False),
+            'engine.autoreload_on'   : getattr(opts, 'auto_reload', False),
             'tools.log_headers.on'   : opts.develop,
             'tools.encode.encoding'  : 'UTF-8',
             'checker.on'             : opts.develop,
@@ -184,6 +183,11 @@ class LibraryServer(AuthServer, HtmlServer, XMLServer, OPDSServer, Cache):
             'server.socket_timeout'  : opts.timeout,  # seconds
             'server.thread_pool'     : opts.thread_pool,  # number of threads
             'server.shutdown_timeout': st,  # minutes
+            'js_domain'              : 'js.talebook.org',
+            'img_domain'             : 'img.talebook.org',
+            'site_domain'            : 'www.talebook.org',
+            'read_domain'            : 'read.talebook.org',
+            'file_domain'            : 'files.talebook.org',
             'tools.sessions.on' : True,
             #'tools.sessions.storage_type': 'ram',
             'tools.sessions.domain': "talebook.org",
