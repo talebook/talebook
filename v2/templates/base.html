@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="{{language}}">
+    <head>
+        <script type="text/javascript">
+            var _speedMark = new Date();
+        </script>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, target-densitydpi=device-dpi" />
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+        <meta name="Keywords" content="在线阅读 电子书 下载 推送 kindle epub mobi" />
+        <meta name="description" content="这是个安静读书的地方。在线阅读Epub/Mobi/Pdf/Azw3等格式的电子书，也支持下载或推送到Kindle设备里。" />
+        <meta property="qc:admins" content="24654762376414527736727" />
+        <link href="{{static_url("css/bootstrap.min.css")}}" rel="stylesheet">
+        <link href="{{static_url("css/star-rating.css")}}" rel="stylesheet">
+        <link href="{{static_url("css/calibre.css")}}" rel="stylesheet">
+        <!- [if IE]><script src="{{static_url("js/respond.js")}}"></script><![endif]->
+        <title>{% if title %}{{title}} - {%endif%}云端书架</title>
+        {% block meta %}{% endblock %}
+        <style>
+body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, 'Heiti SC', sans-serif; }
+.navbar-icon { float: right }
+
+@media (min-width: 768px) {
+.navbar-icon { display: none }
+}
+
+        </style>
+    </head>
+
+    <body>
+        <nav class="navbar navbar-default" role="navigation">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                {% if request.user %}
+                <a class="navbar-brand navbar-icon" href="/user">
+                        <img style="margin-top:-6px;height:32px;width:32px" src={{request.user.avatar}}></img>
+                </a>
+                {% else %}
+                <a class="navbar-brand navbar-icon" href="/login"><span class="glyphicon glyphicon-user"></span></a>
+                {% endif %}
+                <a class="navbar-brand logo" href="/">云书架</a>
+            </div>
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav">
+                    <li {%if not nav %}class="active"{%endif%} ><a href="/">{{ _("Library")}}</a></li>
+                    <li {%if nav == "user" %}class="active"{%endif%} ><a href="/user">{{ _("Myself")}}</a></li>
+                    <li {%if nav == "about" %}class="active"{%endif%} ><a href="/about">{{ _("About")}}</a></li>
+                </ul>
+                <form class="hidden-xs navbar-form navbar-left" action="/search" role="search">
+                    <div class="form-group">
+                        <input type="text" name="name" class="form-control" placeholder='{{ _("keyword, book title") }}'>
+                    </div>
+                    <button type="submit" class="btn btn-default">{{ _("Search") }}</button>
+                </form>
+                <ul class="nav navbar-nav navbar-right">
+                    {% if request.user %}
+                    <li>
+                        <img class="hidden-xs" style="margin-top:9px;height:32px;width:32px" src={{request.user.avatar}}></img>
+                    </li>
+                    <li role="presentation" class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+                            {{ request.user.username }}<span class="caret"></span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a href="/setting"><span class="glyphicon glyphicon-cog"></span> {{ _("Settings") }}</a></li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="/logout"><span class="glyphicon glyphicon-cog"></span> {{ _("Sign Out") }}</a></li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li><a  class="navbar-brand" href="/login"><span class="glyphicon glyphicon-user"></span> {{ _("Sign In") }}</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </nav>
+        <div class="container">
+            <div class="row">
+                {% for v in messages %}
+                <div class="alert alert-{{v.status}} alert-dismissible" role="alert">
+                    <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                    {{ v.msg }}
+                </div>
+                {% endfor %}
+
+                {% block msgbar %}{% endblock %}
+            </div>
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="visible-xs-block">
+                        <div class="row">
+                            <form class="form-inline" action="/search" role="search">
+                                <div class="form-group col-xs-9">
+                                    <input type="text" name="name" class="input-lg form-control" placeholder='{{ _("keyword, book title") }}'>
+                                </div>
+                                <div id='navbar-btn-search' class="col-xs-3">
+                                    <button type="submit" class="btn-lg btn btn-info btn-block">{{ _("Search") }}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% block content %}{% endblock %}
+                </div>
+
+
+
+
+                <!-- sidebar -->
+                <div class="col-md-4">
+                    <div class="row">
+                    {% block sidebar %}{% endblock %}
+                    </div>
+                </div>
+
+                <div class="col-md-12 footer">
+                    <div class="row">
+                        <div class="col-md-8">
+                            {% block content_footer %}{% endblock %}
+                        </div>
+                    </div>
+                    <p>
+                    {{ _("Power by <a href='//www.calibre-ebook.com'>Calibre</a>.") }}
+                    {{ _("Develop by Kovid Goyal and Rex Liao.<br/>") }}
+                    {{ _("Thanks to all contributors.") }}
+                    <a target="_blank" href="http://shang.qq.com/wpa/qunwpa?idkey=850f55ba2f019ad83c5df4d60f31f0b5db2b856b40b03ed6cfe698be5b4455e3"><img border="0" src="//pub.idqqimg.com/wpa/images/group.png" alt="kindle阅读" title="kindle阅读"></a>
+                    <br/>粤ICP备14073162号
+                    </p>
+                </div>
+                <p>&nbsp;</p>
+            </div>
+            </div>
+        </div>
+
+        {% block footer %}{% endblock %}
+        <script src="{{static_url("js/jquery-1.11.1.min.js")}}"></script>
+        <script src="{{static_url("js/bootstrap.min.js")}}"></script>
+        <script src="{{static_url("js/spin.min.js")}}"></script>
+        <script src="{{static_url("js/holder.js")}}"></script>
+        <script src="{{static_url("js/star-rating.min.js")}}"></script>
+        <script src="{{static_url("js/jquery.editable.min.js")}}"></script>
+        <script src="{{static_url("js/jquery.cookie-1.4.1.min.js")}}"></script>
+        <script src="{{static_url("js/calibre.js")}}"></script>
+        <script>
+            (function() {
+                if (! window.console ) {
+                    window.console = {};
+                    window.console.log = function() { };
+                }
+                if ( ! Object.keys ) {
+                    Object.keys = function() { return [] };
+                }
+            }())
+            jQuery(".rating").rating({showClear: false, showCaption: false});
+        </script>
+        {% block script %}{% endblock %}
+        <script type="text/javascript" src="//tajs.qq.com/stats?sId=29043744" charset="UTF-8"></script>
+    </body>
+</html>

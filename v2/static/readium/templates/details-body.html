@@ -1,0 +1,27 @@
+<div class="details-body">
+    <button type="button" class="close" data-dismiss="modal"  tabindex="1000" title="{{strings.i18n_close}} {{strings.i18n_details}}" aria-label="{{strings.i18n_close}} {{strings.i18n_details}}"><span aria-hidden="true">&times;</span></button>
+    <div class="offscreenText">Details Start</div>
+    <div class="modal-cover-wrap">
+        {{#data.coverHref}}
+        <img class="details-cover-image img-responsive" src="{{ data.coverHref }}" alt="ePUB cover">
+        {{/data.coverHref}}
+        {{^data.coverHref}}
+        <div class="no-cover" style="background-image: url('{{data.noCoverBackground}}')"><p>{{data.title}}</p></div>
+        {{/data.coverHref}}
+        <div class="buttons">
+            <button tabindex="1000" class="btn btn-default read" data-dismiss="modal" data-book="{{data.rootUrl}}" type="button">{{strings.i18n_read}}</button>
+            <button tabindex="1000" class="btn btn-danger delete" data-dismiss="modal" type="button">{{strings.i18n_delete}}</button>
+        </div>
+    </div>
+    <div class='modal-book-info'>
+        <h3 class='modal-title'>{{ data.title }}</h3>
+        <div class='modal-detail'>{{strings.i18n_author}}{{data.author}}</div>
+        <div class='modal-detail'>{{strings.i18n_publisher}}{{data.publisher}}</div>
+        <div class='modal-detail'>{{strings.i18n_pub_date}}{{data.pubdate}}</div>
+        <div class='modal-detail'>{{strings.i18n_modified_date}}{{data.modified_date}}</div>
+        <div class='modal-detail'>{{strings.i18n_id}}{{data.id}}</div>
+        <div class='modal-detail'>{{strings.i18n_epub_version}}{{data.epub_version}}</div>        
+    </div>
+
+    <div class="offscreenText">Details End</div>
+</div>

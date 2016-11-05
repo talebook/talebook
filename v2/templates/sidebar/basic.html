@@ -1,0 +1,41 @@
+<div class="col-md-12">
+    <span class="legend">{{ _("Recent Updates") }}</span>
+    <div class="alert alert-warning text-center" role="alert">
+        2016年02月更新：增加用户主页，修复阅读器BUG<br/>
+        2015年11月更新：导入kindleren.com近8G书籍<br/>
+        2015年10月更新：支持在线阅读功能
+    </div>
+
+    <span class="legend">{{ _("Category") }}</span>
+    <div class="list-group">
+        <a href="/book"     class="list-group-item {% if category == "books"      %}active{% endif %}"><span class="badge">{{db.count()}}</span> {{ _("All Books") }}</a>
+        <a href="/pub"      class="list-group-item {% if category == "publishers" %}active{% endif %}"><span class="badge">{{db.all_publishers()|length}}</span> {{ _("Publisher") }}</a>
+        <a href="/author"   class="list-group-item {% if category == "authors"    %}active{% endif %}"><span class="badge">{{db.all_authors()|length}}</span> {{ _("Authors") }}</a>
+        <a href="/tag"      class="list-group-item {% if category == "tags"       %}active{% endif %}"><span class="badge">{{db.all_tags()|length}}</span> {{ _("Tags") }}</a>
+        <a href="/recent"   class="list-group-item {% if category == "recents"    %}active{% endif %}">{{ _("Recents") }}</a>
+        <a href="/rating"   class="list-group-item {% if category == "ratings"    %}active{% endif %}">{{ _("Ratings") }}</a>
+    </div>
+
+    <span class="legend">{{ _("Download") }}</span>
+    <div class="list-group">
+        <a href="https://github.com/talebook/calibre-webserver" class="list-group-item">{{ _("Source Code") }}</a>
+        <a href="https://github.com/talebook/talebook-library" class="list-group-item">{{ _("Books Library") }}</a>
+    </div>
+
+    <span class="legend">{{ _("Help") }}</span>
+    <div class="list-group">
+        <a href="/blog" target="_blank" class="list-group-item"> {{ _("Blog") }}</a>
+        <a href="#" class="list-group-item"><span class="pull-right">1.4.13</span> {{ _("System Version") }}</a>
+        <a href="#" class="list-group-item"><span class="pull-right">{{db.last_modified()|day}}</span> {{ _("Last Update") }}</a>
+    </div>
+
+    <span class="legend">{{ _("Upload Book") }}</span>
+    <div class="list-group">
+        <a class="btn btn-primary btn-block" href="/book/add"><span class="glyphicon glyphicon-cloud-upload"></span> {{ _("Upload Book") }}</a>
+        {% if request.admin_user %}
+        <a class="btn btn-danger btn-block" href="/admin">管理员入口</a>
+        {% endif %}
+    </div>
+
+
+</div>

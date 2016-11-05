@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="shortcut icon" href="{{IMG}}/get/thumb_144_144/{{book.id}}.png" />
+    <link rel="apple-touch-icon" href="{{IMG}}/get/thumb_144_144/{{book.id}}.png" />
+    <link rel="apple-touch-icon-precomposed" href="{{IMG}}/get/thumb_144_144/{{book.id}}.png" />
+
+    <link rel="stylesheet" type="text/css" href="{{static_url("readium/css/bootstrap.css")}}">
+    <link rel="stylesheet" type="text/css" href="{{static_url("readium/css/viewer.css")}}">
+    <link rel="stylesheet" type="text/css" href="{{static_url("readium/css/readium_js.css")}}">
+    <title>{{book.title}}</title>
+
+    <script>
+        var i18n_url = "/static/readium/";
+        var base_url = "{{static_url("readium/lib/")}}";
+        var epub_url = "{{static_url(epub_dir)}}";
+    </script>
+    <script type="text/javascript" src="{{static_url("js/jquery-1.11.1.min.js")}}"></script>
+    <script type="text/javascript" src="{{static_url("readium/lib/require.js")}}" data-main="{{static_url("readium/lib/ReadiumViewerLite.js")}}"></script>
+    <script type="text/javascript" src="{{static_url("readium/require_config.js")}}"></script>
+    <style>
+        @media (max-width: 480px) {
+            h2.book-title-header {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                width: 70%;
+                left: 52px;
+                margin-top: 12px;
+                text-align: left;
+            }
+            .navbar .btn-group {
+                display: block;
+            }
+        }
+        #msg {
+            margin-top: 100px;
+            font-size: 150%;
+        }
+    </style>
+
+    <!-- This is all application-specific HTML -->
+    <body>
+        <nav class="navbar" role="banner"></nav>
+        <div id="app-container">
+        <p class="text-center" id="msg">正在加载书籍</p>
+        </div>
+
+        <script>
+            require.config({
+                config : {
+                    'EpubReader' : {
+                        'annotationCssUrl': "{{static_url("readium/css/annotations.css")}}",
+                        'jsLibRoot': "{{static_url("readium/lib/thirdparty")}}",
+                        'useSimpleLoader' : false // the cloud reader cannot pre-process HTML content documents and may need to load zipped EPUBs too.
+                    }
+                }
+            });
+            function start_reader() {
+                if ( location.search.indexOf("stop=1") > 0 ) {
+                    return;
+                }
+                require(['jquery', 'EpubReader'], function($, EpubReader){
+                    EpubReader.loadUI({epub: epub_url});
+                });
+            }
+
+            check_count = 120;
+            function check_ready() {
+                check_count -= 1;
+                if ( check_count < 1 ) {
+                    $("#msg").html("系统异常，请联系管理员 admin@talebook.org");
+                    return;
+                }
+                $.ajax({
+                    url: epub_url + "/META-INF/container.xml?"+Math.random(),
+                    success: function(data) {
+                        $("#msg").html("解压完毕，正在打开阅读界面");
+                        start_reader();
+                    },
+                    error: function(xhr) {
+                        $("#msg").html("首次阅读，服务器正在解压书籍，请等待约2分钟<br>"+check_count);
+                        setTimeout(function(){ check_ready() }, 1000);
+                    }
+                });
+            }
+
+            $(document).ready(function(){
+                check_ready();
+            });
+
+        </script>
+        <script type="text/javascript" src="//tajs.qq.com/stats?sId=29043744" charset="UTF-8"></script>
+    </body>
+</html>

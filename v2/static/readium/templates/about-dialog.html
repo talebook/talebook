@@ -1,0 +1,25 @@
+<div class="modal fade" id="about-dialog" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-body">
+      	<div class="splash-logo">
+      		<img src="images/about_readium_logo.png">
+      	</div>
+
+      	<div class="about-message">
+	      	<span>{{{strings.i18n_html_readium_tm_a_project}}}</span>
+      	</div>
+      	<div>
+			     <img src="images/partner_logos.png">
+		    </div>
+        <h4 style="color:#111155">{{{strings.gethelp}}}</h4>
+        <div class="version">{{viewer.chromeVersion}}</div>
+        <div class="version-details">
+        <div><a target="_blank" href="https://github.com/readium/readium-js-viewer/tree/{{viewer.sha}}">readium-js-viewer@{{viewer.sha}}</a>{{^viewer.clean}}<span class="local-changes-alert">(with local changes)</span>{{/viewer.clean}}</div>
+          <div><a target="_blank" href="https://github.com/readium/readium-js/tree{{readium.sha}}">readium-js@{{readium.sha}}</a>{{^readium.clean}}<span class="local-changes-alert">(with local changes)</span>{{/readium.clean}}</div>
+          <div><a target="_blank" href="https://github.com/readium/readium-shared-js/tree/{{sharedJs.sha}}">readium-shared-js@{{sharedJs.sha}}</a>{{^sharedJs.clean}}<span class="local-changes-alert">(with local changes)</span>{{/sharedJs.clean}}</div>
+        </div>
+      </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->

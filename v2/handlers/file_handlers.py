@@ -1,0 +1,151 @@
+#!/usr/bin/python
+#-*- coding: UTF-8 -*-
+
+
+import re, os, logging, sys, time
+from tornado import web
+from tornado.options import define, options
+from gettext import gettext as _
+
+from calibre import fit_image, guess_type
+from calibre.utils.filenames import ascii_filename
+from calibre.utils.magick.draw import (save_cover_data_to, Image,
+        thumbnail as generate_thumbnail)
+from calibre.ebooks.metadata.opf2 import metadata_to_opf
+from calibre.ebooks.metadata.meta import get_metadata
+from calibre.ebooks.metadata.meta import set_metadata
+from calibre.library.save_to_disk import find_plugboard
+
+from base_handlers import BaseHandler
+from settings import settings
+
+class ImageHandler(BaseHandler):
+    def get(self, fmt, id, **kwargs):
+        self.write( self.get_data(fmt, id, **kwargs) )
+
+    def get_data(self, fmt, id, **kwargs):
+        'Serves files, covers, thumbnails, metadata from the calibre database'
+        try:
+            id = int(id)
+        except ValueError:
+            id = id.rpartition('_')[-1].partition('.')[0]
+            match = re.search(r'\d+', id)
+            if not match: raise web.HTTPError(404, 'id:%s not an integer'%id)
+            id = int(match.group())
+        if not self.db.has_id(id): raise web.HTTPError(404, 'id:%d does not exist in database'%id)
+        if fmt == 'thumb' or fmt.startswith('thumb_'):
+            try:
+                width, height = map(int, fmt.split('_')[1:])
+            except:
+                width, height = 60, 80
+            return self.get_cover(id, thumbnail=True, thumb_width=width, thumb_height=height)
+        if fmt == 'cover': return self.get_cover(id)
+        if fmt == 'opf': return self.get_metadata_as_opf(id)
+        return self.get_format(id, fmt)
+
+    # Actually get content from the database {{{
+    def get_cover(self, id, thumbnail=False, thumb_width=60, thumb_height=80):
+        try:
+            self.set_header( 'Content-Type', 'image/jpeg')
+            cover = self.db.cover(id, index_is_id=True)
+            if cover is None:
+                cover = self.default_cover
+                updated = self.build_time
+            else:
+                updated = self.db.cover_last_modified(id, index_is_id=True)
+            self.set_header( 'Last-Modified', self.last_modified(updated) )
+
+            if thumbnail:
+                return generate_thumbnail(cover,
+                        width=thumb_width, height=thumb_height)[-1]
+
+            img = Image()
+            img.load(cover)
+            width, height = img.size
+            scaled, width, height = fit_image(width, height,
+                thumb_width if thumbnail else self.max_cover_width,
+                thumb_height if thumbnail else self.max_cover_height)
+            if not scaled:
+                return cover
+            return save_cover_data_to(img, 'img.jpg', return_data=True,
+                    resize_to=(width, height))
+        except Exception as err:
+            import traceback
+            logging.error('Failed to generate cover:')
+            logging.error(traceback.print_exc())
+            raise web.HTTPError(404, 'Failed to generate cover: %r'%err)
+
+    def get_metadata_as_opf(self, id_):
+        self.set_header( 'Content-Type', 'application/oebps-package+xml; charset=UTF-8' )
+        mi = self.db.get_metadata(id_, index_is_id=True)
+        data = metadata_to_opf(mi)
+        self.set_header( 'Last-Modified', self.last_modified(mi.last_modified) )
+        return data
+
+    def get_format(self, id, format):
+        format = format.upper()
+        fm = self.db.format_metadata(id, format, allow_cache=False)
+        if not fm:
+            raise web.HTTPError(404, 'book: %d does not have format: %s'%(id, format))
+        mi = newmi = self.db.get_metadata(id, index_is_id=True)
+        self.set_header( 'Last-Modified', self.last_modified(max(fm['mtime'], mi.last_modified)) )
+        fmt = self.db.format(id, format, index_is_id=True, as_file=True, mode='rb')
+        if fmt is None:
+            raise web.HTTPError(404, 'book: %d does not have format: %s'%(id, format))
+        mt = guess_type('dummy.'+format.lower())[0]
+        if mt is None:
+            mt = 'application/octet-stream'
+        self.set_header( 'Content-Type', mt )
+
+        if format == 'EPUB':
+            # Get the original metadata
+            # Get any EPUB plugboards for the content server
+            plugboards = self.db.prefs.get('plugboards', {})
+            cpb = find_plugboard(plugboard_content_server_value,
+                                 'epub', plugboards)
+            if cpb:
+                # Transform the metadata via the plugboard
+                newmi = mi.deepcopy_metadata()
+                newmi.template_to_attribute(mi, cpb)
+
+        if format in ('MOBI', 'EPUB'):
+            # Write the updated file
+            from calibre.ebooks.metadata.meta import set_metadata
+            set_metadata(fmt, newmi, format.lower())
+            fmt.seek(0)
+
+        fmt.seek(0, 2)
+        self.set_header( 'Content-Lenght', fmt.tell() )
+        fmt.seek(0)
+
+        au = authors_to_string(newmi.authors if newmi.authors else
+                [_('Unknown')])
+        title = newmi.title if newmi.title else _('Unknown')
+        fname = u'%s - %s_%s.%s'%(title[:30], au[:30], id, format.lower())
+        fname = ascii_filename(fname).replace('"', '_')
+        self.set_header( 'Content-Disposition',
+                b'attachment; filename="%s"'%fname )
+        return fmt
+
+    # Utility methods {{{
+    def last_modified(self, updated):
+        '''
+        Generates a locale independent, english timestamp from a datetime
+        object
+        '''
+        lm = updated.strftime('day, %d month %Y %H:%M:%S GMT')
+        day ={0:'Sun', 1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat'}
+        lm = lm.replace('day', day[int(updated.strftime('%w'))])
+        month = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul',
+                 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
+        return lm.replace('month', month[updated.month])
+
+
+def routes():
+    return [
+        (r'/get/(.*)/(.*)', ImageHandler),
+        (r"/extract/(.*)", web.StaticFileHandler,
+            dict(path=settings['extract_path'])),
+    ]
+
+

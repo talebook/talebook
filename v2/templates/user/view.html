@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+
+{% set history = user.extra.read_history %}
+<div class="col-sm-12"><span class="legend">{{ _("Read History") }}</span> </div>
+<div class="col-sm-12">
+    {% if history %}
+    {% for book in history[:12] %}
+    <div class="col-xs-4 col-sm-3 col-md-2">
+        <a href="/book/{{book.id}}"><img class="center-block history-book-img" src="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg" alt="cover"/></a>
+        <h5><a class="text-center history-book-title" href="/book/{{book.id}}">{{book.title}}</a></h5>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>{{ _("No history to show.") }}</p> 
+    {% endif %}
+</div>
+<div class="clearfix"></div>
+
+{% set history = user.extra.visit_history %}
+<div class="col-sm-12"><span class="legend">{{ _("Visit History") }}</span> </div>
+<div class="col-sm-12">
+    {% if history %}
+    {% for book in history[:12] %}
+    <div class="col-xs-4 col-sm-3 col-md-2">
+        <a href="/book/{{book.id}}"><img class="center-block history-book-img" src="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg" alt="cover"/></a>
+        <h5><a class="text-center history-book-title" href="/book/{{book.id}}">{{book.title}}</a></h5>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p>{{ _("No history to show.") }}</p> 
+    {% endif %}
+</div>
+<div class="clearfix"></div>
+
+</div>
+{% endblock %}
+
+{% block sidebar %}
+{% include "sidebar/basic.html" %}
+{% endblock %}

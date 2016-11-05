@@ -1,0 +1,424 @@
+{ "about": {
+    "message": "Über Readium"
+    },
+    "preview": {
+        "message": "Vorschau"
+    },
+    "list_view": {
+        "message": "Listenansicht"
+    },
+    "thumbnail_view": {
+        "message": "Kachelansicht"
+    },
+    "view_library": {
+        "message": "Bibliothek"
+    },
+    "highlight_selection": {
+        "message": "Ausgewählten Text hervorheben"
+    },
+    "toc": {
+        "message": "Inhaltsverzeichnis"
+    },
+    "settings": {
+        "message": "Einstellungen"
+    },
+    "enter_fullscreen": {
+        "message": "Vollbildmodus"
+    },
+    "exit_fullscreen": {
+        "message": "Vollbildmodus verlassen"
+    },
+    "chrome_extension_name": {
+        "message": "Readium"
+    },
+    "chrome_extension_description": {
+        "message": "Ein Leseprogramm für EPUB3 Bücher."
+    },
+    "ok" : {
+        "message" : "Ok"
+    },
+    "i18n_readium_library": {
+        "message": "Readium Bibliothek"
+    },
+    "i18n_loading": {
+        "message": "Bibliothek wird geladen"
+    },
+    "i18n_readium_options": {
+        "message": "Readium Einstellungen:"
+    },
+    "i18n_save_changes": {
+        "message": "Änderungen speichern"
+    },
+    "i18n_close": {
+        "message": "Schließen"
+    },
+    "i18n_keyboard_shortcuts": {
+        "message": "Funktionstasten"
+    },
+    "i18n_keyboard_reload": {
+        "message": "Bitte laden Sie die Seite im Browser neu, damit die Änderungen der Tastaturkürzel wirksam werden."
+    },
+    "i18n_reset_key": {
+        "message": "Taste zurücksetzen"
+    },
+    "i18n_reset_key_all": {
+        "message": "Alle Funktionstasten auf Standard zurücksetzen"
+    },
+    "i18n_duplicate_keyboard_shortcut": {
+        "message": "Doppelbelegung"
+    },
+    "i18n_invalid_keyboard_shortcut": {
+        "message": "Nicht zulässig"
+    },
+    "i18n_paginate_all": {
+        "message": "Fließtext des EPUB Inhalts paginieren"
+    },
+    "i18n_automatically": {
+        "message": "*.epub URLs automatisch in Readium öffnen"
+    },
+    "i18n_show_warning": {
+        "message": "Warnhinweise beim Entpacken von EPUB Dateien anzeigen"
+    },
+    "i18n_details": {
+        "message": "Details"
+    },
+    "i18n_read": {
+        "message": "Lesen"
+    },
+    "i18n_delete": {
+        "message": "Löschen"
+    },
+    "i18n_are_you_sure": {
+        "message": "Möchten Sie diese Datei wirklich unwiderruflich löschen?"
+    },
+    "delete_dlg_title": {
+        "message": "Löschen bestätigen"
+    },
+
+    "i18n_auto_page_turn_enable": {
+        "message": "Automatisches Umblättern einschalten"
+    },
+    "i18n_auto_page_turn_disable": {
+        "message": "Automatisches Umblättern ausschalten"
+    },
+
+    "i18n_playback_scroll_enable": {
+        "message": "Scrollen während der Wiedergabe"
+    },
+    "i18n_playback_scroll_disable": {
+        "message": "Kein Scrollen während der Wiedergabe"
+    },
+    "i18n_audio_touch_enable": {
+        "message": "Touch-to-play einschalten"
+    },
+    "i18n_audio_touch_disable": {
+        "message": "Touch-to-play ausschalten"
+    },
+    "i18n_audio_highlight_default": {
+        "message": "Standard"
+    },
+    "i18n_audio_highlight": {
+        "message": "Hervorhebungsfarbe"
+    },
+
+    "delete_progress_title": {
+        "message": "Löschen wird ausgeführt"
+    },
+    "delete_progress_message": {
+        "message": "Löschen"
+    },
+    "migrate_dlg_title": {
+        "message": "Bücher migrieren"
+    },
+    "migrate_dlg_message": {
+        "message": "Daten werden geladen..."
+    },
+    "migrating": {
+        "message": "Migrieren..."
+    },
+    "replace_dlg_title": {
+        "message": "Konflikt festgestellt"
+    },
+    "replace_dlg_message": {
+        "message": "Soll das bestehende EPUB wirklich ersetzt werden?"
+    },
+    "import_dlg_title": {
+        "message": "EPUB importieren"
+    },
+    "import_dlg_message": {
+        "message": "EPUB Inhalt überprüfen..."
+    },
+    "storing_file": {
+        "message": "Datei speichern"
+    },
+    "err_unknown": {
+        "message": "Unbekannter Fehler. Für Details öffnen Sie die Konsole."
+    },
+    "err_storage": {
+        "message": "Zugriff auf Dateispeicher nicht möglich."
+    },
+    "err_epub_corrupt": {
+        "message": "Ungültiges oder beschädigtes EPUB Paket"
+    },
+    "err_dlg_title": {
+        "message": "Unerwarteter Fehler"
+    },
+    "replace" : {
+        "message": "Ersetzen"
+    },
+    "i18n_author": {
+        "message": "Autor: "
+    },
+    "i18n_publisher": {
+        "message": "Verlag: "
+    },
+    "i18n_source": {
+        "message": "Quelle: "
+    },
+    "i18n_pub_date": {
+        "message": "Veröffentlicht am: "
+    },
+    "i18n_modified_date": {
+        "message": "Zuletzt geändert am: "
+    },
+    "i18n_id": {
+        "message": "ID: "
+    },
+    "i18n_epub_version": {
+        "message": "EPUB Version: "
+    },
+    "i18n_created_at": {
+        "message": "Erstellt am: "
+    },
+    "i18n_format": {
+        "message": "Format: "
+    },
+    "i18n_added": {
+        "message": "Hinzugefügt am: "
+    },
+    "i18n_unknown": {
+        "message": "Unbekannt"
+    },
+    "i18n_sorry": {
+        "message": "Das aktuelle EPUB enthält für diesen Inhalt keine Media Overlays."
+    },
+    "i18n_add_items": {
+        "message": "Füge Werke zur Bibliothek hinzu."
+    },
+    "i18n_extracting": {
+        "message": "Entpacke: "
+    },
+    "i18n_add_book_to_readium_library": {
+        "message": "Buch zur Readium Bibliothek hinzufügen:"
+    },
+    "i18n_add_book": {
+        "message": "Buch hinzufügen"
+    },
+    "i18n_cancel": {
+        "message": "Abbrechen"
+    },
+    "i18n_from_the_web": {
+        "message": "Internet:"
+    },
+    "i18n_from_local_file": {
+        "message": "Lokale Datei:"
+    },
+    "i18n_enter_a_url": {
+        "message": "URL einer .epub Datei eingeben"
+    },
+    "i18n_unpacked_directory": {
+        "message": "Entpacktes Verzeichnis:"
+    },
+    "i18n_validate": {
+        "message": "Prüfe:"
+    },
+    "i18n_confirm_that_this_book": {
+        "message": "Bestätigung, dass dieses Buch mit EPUB Standards übereinstimmt"
+    },
+    "i18n_single_pages": {
+        "message": "Einzelseiten"
+    },
+    "i18n_double_pages": {
+        "message": "Doppelseiten"
+    },
+    "i18n_save_settings": {
+        "message": "Einstellungen speichern"
+    },
+    "i18n_font_size": {
+        "message": "Schriftgröße"
+    },
+    "i18n_margins": {
+        "message": "Rand"
+    },
+    "i18n_text_and_background_color": {
+        "message": "Text- und Hintergrundfarbe"
+    },
+    "i18n_author_theme": {
+        "message": "Vorgabe des Autors"
+    },
+    "i18n_black_and_white": {
+        "message": "Schwarzweiss"
+    },
+    "i18n_arabian_nights": {
+        "message": "Arabian Nights"
+    },
+    "i18n_sands_of_dune": {
+        "message": "Sands of Dune"
+    },
+    "i18n_ballard_blues": {
+        "message": "Ballard Blues"
+    },
+    "i18n_vancouver_mist": {
+        "message": "Vancouver Mist"
+    },
+    "i18n_display_format": {
+        "message": "Anzeigeformat"
+    },
+    "i18n_spread_auto": {
+        "message": "Automatisch"
+    },
+    "i18n_scroll_mode": {
+        "message": "Scroll Modus"
+    },
+    "i18n_scroll_mode_auto": {
+        "message": "Automatisch"
+    },
+    "i18n_scroll_mode_doc": {
+        "message": "Dokument"
+    },
+    "i18n_scroll_mode_continuous": {
+        "message": "Kontinuierlich"
+    },
+
+    "i18n_page_transition": {
+        "message": "Umblätter-Effekt"
+    },
+    "i18n_page_transition_none": {
+        "message": "Keiner"
+    },
+    "i18n_page_transition_fade": {
+        "message": "Fade"
+    },
+    "i18n_page_transition_slide": {
+        "message": "Slide"
+    },
+    "i18n_page_transition_swoosh": {
+        "message": "Swoosh"
+    },
+    "i18n_page_transition_butterfly": {
+        "message": "Butterfly"
+    },
+    "i18n_html_readium_tm_a_project": {
+        "message": "Readium für Chrome ist die Chrome Browser Erweiterung basierend auf ReadiumJS, einem Open-Source Lesesystem und einer JavaScript Bibliothek zur Darstellung von EPUB® Veröffentlichungen in Web-Browsern. ReadiumJS ist ein Projekt der Readium Foundation (Readium.org). Wenn Sie mehr darüber erfahren möchten oder das Projekt unterstützen wollen, besuchen Sie bitte die <a href=\"http://readium.org/\">Projekt Homepage</a>."
+
+    },
+    "gethelp": {
+        "message": "Falls Sie auf Probleme stoßen, Fragen haben oder \"Hallo\" sagen möchten, besuchen Sie <a href=\"http://idpf.org/forums/readium\">unser Forum</a>."
+    },
+    "i18n_toolbar": {
+        "message": "Werkzeugleiste"
+    },
+    "i18n_toolbar_show": {
+        "message": "Werkzeugleiste anzeigen"
+    },
+    "i18n_toolbar_hide": {
+        "message": "Werkzeugleiste ausblenden"
+    },
+    "i18n_audio_play": {
+        "message": "Audio - Abspielen"
+    },
+    "i18n_audio_pause": {
+        "message": "Audio - Pause"
+    },
+    "i18n_audio_play_background": {
+        "message": "Hintergrundaudio ein"
+    },
+    "i18n_audio_pause_background": {
+        "message": "Hintergrundaudio aus"
+    },
+    "i18n_audio_previous": {
+        "message": "Vorige Audiophrase"
+    },
+    "i18n_audio_next": {
+        "message": "Nächste Audiophrase"
+    },
+    "i18n_audio_volume": {
+        "message": "Lautstärke"
+    },
+    "i18n_audio_volume_increase": {
+        "message": "Lautstärke erhöhen"
+    },
+    "i18n_audio_volume_decrease": {
+        "message": "Lautstärke verringern"
+    },
+    "i18n_audio_time": {
+        "message": "Audio - Zeitmarke"
+    },
+    "i18n_audio_mute": {
+        "message": "Audio ausschalten"
+    },
+    "i18n_audio_unmute": {
+        "message": "Audio einschalten"
+    },
+    "i18n_audio_expand": {
+        "message": "Erweiterte Audio-Steuerung anzeigen"
+    },
+    "i18n_audio_collapse": {
+        "message": "Erweiterte Audio-Steuerung ausblenden"
+    },
+    "i18n_audio_esc": {
+        "message": "Aktuellen Audio-Bereich verlassen"
+    },
+    "i18n_audio_rate": {
+        "message": "Audio - Wiedergabegeschwindigkeit"
+    },
+    "i18n_audio_rate_increase": {
+        "message": "Audio - Wiedergabegeschwindigkeit erhöhen"
+    },
+    "i18n_audio_rate_decrease": {
+        "message": "Audio - Wiedergabegeschwindigkeit verringern"
+    },
+    "i18n_audio_rate_reset": {
+        "message": "Audio - Wiedergabegeschwindigkeit zurücksetzen"
+    },
+    "i18n_audio_skip_disable": {
+        "message": "Audio - Überspringen unterbinden "
+    },
+    "i18n_audio_skip_enable": {
+        "message": "Audio - Überspringen ermöglichen"
+    },
+    "i18n_audio_sync": {
+        "message": "Text-Audio-Synchronisation"
+    },
+    "i18n_audio_sync_default": {
+        "message": "Nach Vorgabe"
+    },
+    "i18n_audio_sync_word": {
+        "message": "Wort"
+    },
+    "i18n_audio_sync_sentence": {
+        "message": "Satz"
+    },
+    "i18n_audio_sync_paragraph": {
+        "message": "Absatz"
+    },
+    "i18n_page_previous": {
+        "message": "Vorige Seite"
+    },
+    "i18n_page_next": {
+        "message": "Nächste Seite"
+    },
+    "chrome_accept_languages": {
+        "message": "$CHROME$ akzeptiert $languages$ Sprachen",
+        "placeholders": {
+            "chrome": {
+                "content": "Chrome",
+                "example": "Chrome"
+            },
+            "languages": {
+                "content": "$1",
+                "example": "en-US,ja,sr,de,zh_CN"
+            }
+        }
+    }
+}
