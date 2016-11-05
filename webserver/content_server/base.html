@@ -55,6 +55,11 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                     <li {%if nav == "user" %}class="active"{%endif%} ><a href="/user">{{ gettext("Myself")}}</a></li>
                     <li ><a target="_blank" href="/blog">{{ gettext("Blog")}}</a></li>
                     <li {%if nav == "about" %}class="active"{%endif%} ><a href="/about">{{ gettext("About")}}</a></li>
+                    <li class="visible-xs-block">
+                        {% if request.user %} <a href="/setting">{{ gettext("Settings") }}</a>
+                        {% else %}<a href="/login"> {{ gettext("Sign In") }}</a>
+                        {% endif %}
+                    </li>
                 </ul>
                 <form class="hidden-xs navbar-form navbar-left" action="/search" role="search">
                     <div class="form-group">
@@ -62,7 +67,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                     </div>
                     <button type="submit" class="btn btn-default">{{ gettext("Search") }}</button>
                 </form>
-                <ul class="nav navbar-nav navbar-right">
+                <ul class="hidden-xs nav navbar-nav navbar-right">
                     {% if request.user %}
                     <li>
                         <img class="hidden-xs" style="margin-top:9px;height:32px;width:32px" src={{request.user.avatar}}></img>
@@ -94,7 +99,8 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
             </div>
             <div class="row">
                 <div class="col-md-8">
-                    <div class="visible-xs-block">
+                    <!--
+                    <div class="hide visible-xs-block">
                         <div class="row">
                             <form class="form-inline" action="/search" role="search">
                                 <div class="form-group col-xs-9">
@@ -106,6 +112,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                             </form>
                         </div>
                     </div>
+                    -->
                     {% block content %}{% endblock %}
                 </div>
 

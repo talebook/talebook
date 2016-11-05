@@ -336,7 +336,7 @@ class HtmlServer(object):
         ids = self.search_for_books('')
         if not ids:
             raise cherrypy.HTTPError(404, 'This library has no books')
-        random_ids = random.sample(ids, 4)
+        random_ids = random.sample(ids, 8)
         random_books = self.db.get_data_as_dict(ids=random_ids)
         ids.sort()
         new_ids = random.sample(ids[-40:], 8)
