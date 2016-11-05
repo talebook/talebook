@@ -134,11 +134,12 @@ def ttl_dead(func):
 def should_login(func):
     @wraps(func)
     def do(*args, **kwargs):
-        uid = cherrypy.request.user_id
-        scheme = request.headers.get('X-Scheme', request.scheme)
+        req = cherrypy.request
+        uid = req.user_id
+        scheme = req.headers.get('X-Scheme', req.scheme)
         url = '/login'
-        url = scheme + "://" + cherrypy.config['site_domain'] + '/login?'+urlencode({'from':cherrypy.request.wsgi_environ['REQUEST_URI']})
-        cherrypy.session['next'] = cherrypy.request.wsgi_environ['REQUEST_URI']
+        url = scheme + "://" + cherrypy.config['site_domain'] + '/login?'+urlencode({'from': req.wsgi_environ['REQUEST_URI']})
+        cherrypy.session['next'] = req.wsgi_environ['REQUEST_URI']
         if not uid: raise cherrypy.HTTPRedirect(url, 302)
         return func(*args, **kwargs)
     return do
@@ -240,6 +241,7 @@ class HtmlServer(object):
         db = self.db
         request = cherrypy.request
         hostname = request.headers['Host']
+        scheme = request.headers.get('X-Scheme', request.scheme)
         M = "//" + cherrypy.config['js_domain'] + "/static/m"
         IMG = "//" + cherrypy.config['img_domain']
         READ = "//" + cherrypy.config['read_domain']
