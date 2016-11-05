@@ -11,6 +11,7 @@ from calibre import fit_image, guess_type
 from calibre.utils.filenames import ascii_filename
 from calibre.utils.magick.draw import (save_cover_data_to, Image,
         thumbnail as generate_thumbnail)
+from calibre.ebooks.metadata import authors_to_string
 from calibre.ebooks.metadata.opf2 import metadata_to_opf
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre.ebooks.metadata.meta import set_metadata
@@ -110,7 +111,6 @@ class ImageHandler(BaseHandler):
 
         if format in ('MOBI', 'EPUB'):
             # Write the updated file
-            from calibre.ebooks.metadata.meta import set_metadata
             set_metadata(fmt, newmi, format.lower())
             fmt.seek(0)
 

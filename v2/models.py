@@ -59,7 +59,8 @@ class Reader(Base, SQLAlchemyMixin):
         if social_user.provider == 'douban-oauth2':
             self.avatar = "//img3.doubanio.com/icon/u%s.jpg" % social_user.uid
         else:
-            url = social_user.extra_data.get('profile_image_url', '')
+            anyone = "http://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
+            url = social_user.extra_data.get('profile_image_url', anyone)
             self.avatar = url.replace("http://q.qlogo.cn", "//q.qlogo.cn")
 
     def is_active(self):

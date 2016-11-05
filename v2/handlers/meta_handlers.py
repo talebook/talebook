@@ -77,7 +77,7 @@ class AuthorBooksUpdate(ListHandler):
         ids = self.db.get_books_for_category(category, author_id)
         for book_id in list(ids)[:40]:
             self.do_book_update(book_id)
-        raise self.redirect('/author/%s'%name, 302)
+        self.redirect('/author/%s'%name, 302)
 
 class PubBooksUpdate(ListHandler):
     def post(self, name):
@@ -91,7 +91,7 @@ class PubBooksUpdate(ListHandler):
             ids = [ b['id'] for b in books if not b['publisher'] ]
         for book_id in list(ids)[:40]:
             self.do_book_update(book_id)
-        raise self.redirect('/pub/%s'%name, 302)
+        self.redirect('/pub/%s'%name, 302)
 
 class RatingList(ListHandler):
     def get(self):

@@ -49,7 +49,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
             </div>
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
                 <ul class="nav navbar-nav">
-                    <li {%if not nav %}class="active"{%endif%} ><a href="/">{{ _("Library")}}</a></li>
+                    <li {%if not nav or nav == "index" %}class="active"{%endif%} ><a href="/">{{ _("Library")}}</a></li>
                     <li {%if nav == "user" %}class="active"{%endif%} ><a href="/user">{{ _("Myself")}}</a></li>
                     <li {%if nav == "about" %}class="active"{%endif%} ><a href="/about">{{ _("About")}}</a></li>
                 </ul>
@@ -93,6 +93,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
             </div>
             <div class="row">
                 <div class="col-md-8">
+                    {% if nav != "index" %}
                     <div class="visible-xs-block">
                         <div class="row">
                             <form class="form-inline" action="/search" role="search">
@@ -105,10 +106,10 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                             </form>
                         </div>
                     </div>
+                    {% endif %}
                     {% block content %}{% endblock %}
+                    <div class="clearfix"></div>
                 </div>
-
-
 
 
                 <!-- sidebar -->
@@ -117,7 +118,8 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                     {% block sidebar %}{% endblock %}
                     </div>
                 </div>
-
+            </div>
+            <div class="row">
                 <div class="col-md-12 footer">
                     <div class="row">
                         <div class="col-md-8">

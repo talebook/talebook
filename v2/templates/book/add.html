@@ -4,6 +4,7 @@
 
 <div class="col-md-8 col-md-offset-2">
 <form action="/book/upload" class="form" role="form" method="post" enctype="multipart/form-data">
+    {{ xsrf_form_html() }}
     <div class="form-group">
         <label class="sr-only" for="exampleInputEmail2">{{ _("Select ebook files") }}</label>
         <input type="file" class="form-control" id="id_ebook_file" name="ebook_file" placeholder="{{ _("Select ebook file") }}">

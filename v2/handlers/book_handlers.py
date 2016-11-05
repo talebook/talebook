@@ -2,7 +2,13 @@
 #-*- coding: UTF-8 -*-
 
 import logging
+import douban
+import subprocess
 from base_handlers import *
+
+from calibre.ebooks.metadata import authors_to_string
+from calibre.ebooks.conversion.plumber import Plumber
+from calibre.customize.conversion import OptionRecommendation, DummyReporter
 
 BOOKNAV = (
 (
@@ -69,7 +75,8 @@ def background(func):
             except:
                 import traceback, logging
                 logging.error('Failed to run background task:')
-                loggin.error(traceback.format_exc())
+                logging.error(traceback.format_exc())
+                logging.error("cmd: %s %s %s" % (func, args, kwargs))
 
         t = threading.Thread(name='worker', target=worker)
         t.setDaemon(True)
@@ -81,10 +88,11 @@ def background(func):
 class Index(BaseHandler):
     def get(self):
         import random
+        nav = "index"
         title = _('All books')
         ids = self.cache.search_for_books('')
-        if not ids: raise web.HTTPError(404, 'This library has no books')
-        random_ids = random.sample(ids, 4)
+        if not ids: raise web.HTTPError(404, reason = _('This library has no books'))
+        random_ids = random.sample(ids, 8)
         random_books = self.db.get_data_as_dict(ids=random_ids)
         ids.sort()
         new_ids = random.sample(ids[-40:], 8)
@@ -101,7 +109,7 @@ class BookDetail(BaseHandler):
         book_id = int(id)
         books = self.db.get_data_as_dict(ids=[book_id])
         if not books:
-            raise web.HTTPError(404, 'book not found')
+            raise web.HTTPError(404, reason = _("Sorry, book not found") )
         book = books[0]
         self.user_history('visit_history', book)
         try: sizes = [ (f, self.db.sizeof_format(book['id'], f, index_is_id=True)) for f in book['available_formats'] ]
@@ -117,7 +125,7 @@ class BookUpdate(BaseHandler):
             raise web.HTTPError(403, 'Book exam id error')
 
         book_id = self.do_book_update(id)
-        raise self.redirect('/book/%d'%book_id, 302)
+        self.redirect('/book/%d'%book_id)
 
     def do_book_update(self, id):
         book_id = int(id)
@@ -137,15 +145,15 @@ class BookRating(BaseHandler):
     def post(self, id):
         rating = self.get_argument("rating", None)
         try:
-            r = int(rating)
+            r = float(rating)
         except:
-            return json.dumps({'ecode': 2, 'msg': _("rating vlaue error!")})
+            return {'ecode': 2, 'msg': _("rating vlaue error!")}
 
         book_id = int(id)
         mi = self.db.get_metadata(book_id, index_is_id=True)
         mi.rating = r
         self.db.set_metadata(book_id, mi)
-        return json.dumps({'ecode': 0, 'msg': _('update rating success')})
+        return {'ecode': 0, 'msg': _('update rating success')}
 
 class BookEdit(BaseHandler):
     @json_response
@@ -153,24 +161,24 @@ class BookEdit(BaseHandler):
         field = self.get_argument("field", None)
         content = self.get_argument("content", None)
         if not field or not content:
-            return json.dumps({'ecode': 1, 'msg': _("arguments error")})
+            return {'ecode': 1, 'msg': _("arguments error")}
 
         book_id = int(id)
         mi = self.db.get_metadata(book_id, index_is_id=True)
         #if not mi.has_key(field):
-            #return json.dumps({'ecode': 1, 'msg': _("field not support")})
+            #return {'ecode': 1, 'msg': _("field not support")}
         if field == 'pubdate':
             try:
                 content = datetime.datetime.strptime(content, "%Y-%m-%d")
             except:
-                return json.dumps({'ecode': 2, 'msg': _("date format error!")})
+                return {'ecode': 2, 'msg': _("date format error!")}
         elif field == 'authors':
             content = [content]
         elif field == 'tags':
             content = content.replace(" ", "").split("/")
         mi.set(field, content)
         self.db.set_metadata(book_id, mi)
-        return json.dumps({'ecode': 0, 'msg': _("edit OK")})
+        return {'ecode': 0, 'msg': _("edit OK")}
 
 class BookDelete(BaseHandler):
     def get(self, id):
@@ -180,10 +188,10 @@ class BookDelete(BaseHandler):
     def post(self, id):
         if not self.is_admin():
             self.add_msg('danger', _("Delete forbiden"))
-            raise self.redirect("/book/%s"%id, 302)
+            self.redirect("/book/%s"%id)
         else:
             self.db.delete_book(int(id))
-            raise self.redirect("/book", 302)
+            self.redirect("/book")
 
 class BookDownload(BaseHandler):
     @web.authenticated
@@ -195,7 +203,7 @@ class BookDownload(BaseHandler):
         book = books[0]
         self.user_history('download_history', book)
         if 'fmt_%s'%fmt not in book:
-            raise web.HTTPError(404, '%s not found'%(fmt))
+            raise web.HTTPError(404, reason = _('%s not found'%(fmt)) )
         path = book['fmt_%s'%fmt]
         att = u'attachment; filename="%d-%s.%s"' % (book['id'], book['title'], fmt)
         f = open(path, 'rb')
@@ -250,7 +258,7 @@ class BookUpload(BaseHandler):
 
         import re
         from calibre.ebooks.metadata import MetaInformation
-        postfile = self.request.files['ebook_file']
+        postfile = self.request.files['ebook_file'][0]
         name = postfile['filename']
         name = re.sub(r'[\x80-\xFF]+', convert, name)
         logging.error('upload name = ' + repr(name))
@@ -275,14 +283,14 @@ class BookUpload(BaseHandler):
         books = self.db.books_with_same_title(mi)
         if books:
             book_id = books.pop()
-            raise self.redirect('/book/%d'%book_id)
+            self.redirect('/book/%d'%book_id)
 
         fpaths = [fpath]
         self.generate_books(mi, fpath, fmt)
         book_id = self.db.import_book(mi, fpaths )
         self.user_history('upload_history', {'id': book_id, 'title': mi.title})
         self.add_msg('success', _("import books success"))
-        raise self.redirect('/book/%d'%book_id)
+        self.redirect('/book/%d'%book_id)
 
     @background
     def generate_books(self, mi, fpath, fmt):
@@ -300,7 +308,7 @@ class BookRead(BaseHandler):
         book_id = int(id)
         books = self.db.get_data_as_dict(ids=[book_id])
         if not books:
-            raise web.HTTPError(404, _("Sorry, book not found") )
+            raise web.HTTPError(404, reason = _("Sorry, book not found") )
         book = books[0]
         self.user_history('read_history', book)
 
@@ -312,7 +320,7 @@ class BookRead(BaseHandler):
                 self.extract_book(book, fpath, fmt)
                 return self.html_page('book/read.html', vars())
         self.add_msg('success', _("Sorry, online-reader do not support this book."))
-        raise self.redirect('/book/%d'%book_id)
+        self.redirect('/book/%d'%book_id)
 
     @background
     def extract_book(self, book, fpath, fmt):
@@ -346,30 +354,30 @@ class BookRead(BaseHandler):
 class BookPush(BaseHandler):
     @web.authenticated
     def post(self, id):
-        main_to = self.get_argument("mail_to", None)
+        mail_to = self.get_argument("mail_to", None)
         if not mail_to:
-            raise self.redirect("/setting", 302)
+            self.redirect("/setting")
 
         book_id = int(id)
         books = self.db.get_data_as_dict(ids=[book_id])
         if not books:
-            raise web.HTTPError(404, _("Sorry, book not found") )
+            raise web.HTTPError(404, reason = _("Sorry, book not found") )
         book = books[0]
         self.user_history('push_history', book)
 
         # check format
-        for fmt in ['mobi', 'azw', 'pdf']:
+        for fmt in ['mobi', 'azw', 'azw3', 'pdf']:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
                 self.do_send_mail(book, mail_to, fmt, fpath)
                 self.add_msg( "success", _("Server is pushing book."))
-                raise self.redirect("/book/%d"%book['id'], 302)
+                self.redirect("/book/%d"%book['id'])
         # we do no have formats for kindle
         if 'fmt_epub' not in book:
-            raise web.HTTPError(404, _("Sorry, there's no available format for kindle"))
+            raise web.HTTPError(404, reason = _("Sorry, there's no available format for kindle"))
         self.convert_book(book, mail_to)
         self.add_msg( "success", _("Server is pushing book."))
-        raise self.redirect("/book/%d"%book['id'], 302)
+        self.redirect("/book/%d"%book['id'])
 
     @background
     def convert_book(self, book, mail_to=None):
@@ -404,7 +412,7 @@ class BookPush(BaseHandler):
         mail_body = _('We Send this book to your kindle.')
         status = msg = ""
         try:
-            logging.error('send %(title)s to %(mail_to)s' % vars())
+            logging.info('send %(title)s to %(mail_to)s' % vars())
             msg = create_mail(mail_from, mail_to, mail_subject,
                     text = mail_body, attachment_data = body,
                     attachment_type = mt, attachment_name = fname
@@ -416,7 +424,7 @@ class BookPush(BaseHandler):
                     )
             status = "success"
             msg = _('%(title)s: Send to kindle success!! email: %(mail_to)s') % vars()
-            logging.error(msg)
+            logging.info(msg)
         except:
             import traceback
             logging.error('Failed to send to kindle:')

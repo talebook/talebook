@@ -66,13 +66,18 @@ def init_calibre():
         sys.stderr.write( "\n" )
         sys.exit(2)
 
+def disable_ssl_verify():
+    import ssl
+    ssl._create_default_https_context = ssl._create_unverified_context
+
 def make_app():
     init_calibre()
+    disable_ssl_verify()
 
     import handlers, cache
     from calibre.db.legacy import LibraryDatabase
 
-    auth_db_path = settings['SQLALCHEMY_DATABASE_URI']
+    auth_db_path = settings['user_database']
     logging.debug("Init library with [%s]" % options.with_library)
     logging.debug("Init AuthDB  with [%s]" % auth_db_path )
     logging.debug("Init Static  with [%s]" % settings['static_path'] )
@@ -82,10 +87,15 @@ def make_app():
     Base = declarative_base()
     engine = create_engine(auth_db_path, echo=False)
     session = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
-    logging.debug("session = %s" % session)
     init_social(Base, session, settings)
 
     load_calibre_translations()
+
+    try:
+        import local_settings
+        settings.update(local_settings.settings)
+    except:
+        pass
 
     settings.update({
         "cache": cache,

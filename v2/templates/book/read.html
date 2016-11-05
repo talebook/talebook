@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="{{RES}}/static/readium/" />
 
     <link rel="shortcut icon" href="{{IMG}}/get/thumb_144_144/{{book.id}}.png" />
     <link rel="apple-touch-icon" href="{{IMG}}/get/thumb_144_144/{{book.id}}.png" />
@@ -14,9 +15,9 @@
     <title>{{book.title}}</title>
 
     <script>
-        var i18n_url = "/static/readium/";
-        var base_url = "{{static_url("readium/lib/")}}";
-        var epub_url = "{{static_url(epub_dir)}}";
+        var i18n_url = "{{RES}}/static/readium/";
+        var base_url = "{{RES}}/static/readium/lib/";
+        var epub_url = "{{RES}}{{epub_dir}}";
     </script>
     <script type="text/javascript" src="{{static_url("js/jquery-1.11.1.min.js")}}"></script>
     <script type="text/javascript" src="{{static_url("readium/lib/require.js")}}" data-main="{{static_url("readium/lib/ReadiumViewerLite.js")}}"></script>

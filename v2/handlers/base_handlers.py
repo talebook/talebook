@@ -23,12 +23,6 @@ from calibre.utils.logging import Log
 from calibre.utils.filenames import ascii_filename
 from calibre.utils.magick.draw import (save_cover_data_to, Image,
         thumbnail as generate_thumbnail)
-from calibre.ebooks.metadata.opf2 import metadata_to_opf
-from calibre.ebooks.metadata.meta import set_metadata
-from calibre.ebooks.metadata import authors_to_string
-from calibre.ebooks.conversion.plumber import Plumber
-from calibre.library.caches import SortKeyGenerator
-from calibre.library.save_to_disk import find_plugboard
 from calibre.customize.conversion import OptionRecommendation, DummyReporter
 
 # import douban
@@ -41,7 +35,7 @@ def day_format(value, format='%Y-%m-%d'):
     except: return "1990-01-01"
 
 def json_response(func):
-    def do(self, *args, **kwrags):
+    def do(self, *args, **kwargs):
         rsp = func(self, *args, **kwargs)
         self.write( rsp )
         return
@@ -63,18 +57,22 @@ class BaseHandler(web.RequestHandler):
         return self.get_secure_cookie('user_id')
 
     def get_current_user(self):
-        admin_id = self.get_secure_cookie("admin_id")
-        if admin_id:
-            self.admin_user = self.session.query(Reader).get(int(admin_id))
-            logging.debug("Query admin_user %s" % self.admin_user)
-
+        user = None
         user_id = self.user_id()
         if user_id:
             user = self.session.query(Reader).get(int(user_id))
-            logging.debug("Query User [%s]" % user)
-            return user
 
-    def is_admin():
+        admin_id = self.get_secure_cookie("admin_id")
+        if admin_id:
+            self.admin_user = self.session.query(Reader).get(int(admin_id))
+        elif user and user.is_admin():
+            self.admin_user = user
+
+        logging.debug("Query User [%s]" % user)
+        logging.debug("Query admin_user [%s]" % self.admin_user)
+        return user
+
+    def is_admin(self):
         if self.admin_user: return True
         return self.current_user.is_admin()
 
@@ -139,9 +137,11 @@ class BaseHandler(web.RequestHandler):
         request = self.request
         request.user = self.current_user
         request.user_extra = {}
+        request.admin_user = self.admin_user
         if self.user_id():
             request.user_extra = self.current_user.extra
-        hostname = request.headers['Host']
+        if not request.user.avatar:
+            request.user.avatar = "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
         IMG = self.settings.get('img_domain', "")
         vals = dict(*args, **kwargs)
         vals.update( vars() )

@@ -2,6 +2,7 @@
 #-*- coding: UTF-8 -*-
 
 from tornado import web
+from models import Reader
 from base_handlers import BaseHandler
 
 class Done(BaseHandler):
@@ -10,7 +11,7 @@ class Done(BaseHandler):
 
 class Login(BaseHandler):
     def get(self):
-        self.set_secure_cookie("user_id", "4")
+        url = self.get_argument("url", "")
         return self.html_page('login.html', vars())
 
 class Logout(BaseHandler):
@@ -38,7 +39,7 @@ class SettingSave(BaseHandler):
             self.add_msg("success", _("Settings saved."))
         else:
             self.add_msg("info", _("Nothing changed."))
-        raise self.redirect('/setting', 302)
+        self.redirect('/setting', 302)
 
 class UserView(BaseHandler):
     @web.authenticated
@@ -51,18 +52,18 @@ class AdminView(BaseHandler):
     @web.authenticated
     def get(self):
         if not self.is_admin():
-            raise self.redirect('/', 302)
-        users = self.request.db.query(Reader).order_by(Reader.access_time.desc()).all()
+            self.redirect('/', 302)
+        users = self.session.query(Reader).order_by(Reader.access_time.desc()).all()
         return self.html_page('admin/view.html', vars())
 
 class AdminSet(BaseHandler):
     @web.authenticated
-    def post(self):
+    def get(self):
         user_id = self.get_argument("user_id", None)
         if user_id and self.is_admin():
             self.set_secure_cookie("admin_id", self.user_id())
             self.set_secure_cookie("user_id", user_id)
-        raise self.redirect('/', 302)
+        self.redirect('/', 302)
 
 
 def routes():
