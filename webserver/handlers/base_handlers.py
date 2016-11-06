@@ -147,8 +147,11 @@ class BaseHandler(web.RequestHandler):
         request.admin_user = self.admin_user
         if self.user_id():
             request.user_extra = self.current_user.extra
-        if request.user and not request.user.avatar:
-            request.user.avatar = "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
+        if request.user:
+            if not request.user.avatar:
+                request.user.avatar = "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
+            else:
+                request.user.avatar = request.user.avatar.replace("http://", "//")
         IMG = self.static_host
         vals = dict(*args, **kwargs)
         vals.update( vars() )

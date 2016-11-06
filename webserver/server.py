@@ -105,7 +105,7 @@ def make_app():
 def main():
     tornado.options.parse_command_line()
     app = make_app()
-    http_server = tornado.httpserver.HTTPServer(app)
+    http_server = tornado.httpserver.HTTPServer(app, xheaders=True)
     http_server.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()
 
