@@ -52,6 +52,13 @@ class BaseHandler(web.RequestHandler):
         self.build_time = fromtimestamp(os.stat(path).st_mtime)
         self.default_cover = open(path, 'rb').read()
         self.admin_user = None
+        self.static_host = self.settings.get("static_host", "")
+        if self.static_host:
+            self.static_host = self.request.protocol + "://" + self.static_host
+
+    def static_url(self, path, **kwargs):
+        url = super(BaseHandler, self).static_url(path, **kwargs)
+        return self.static_host + url
 
     def user_id(self):
         return self.get_secure_cookie('user_id')
@@ -142,7 +149,7 @@ class BaseHandler(web.RequestHandler):
             request.user_extra = self.current_user.extra
         if request.user and not request.user.avatar:
             request.user.avatar = "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
-        IMG = self.settings.get('img_domain', "")
+        IMG = self.static_host
         vals = dict(*args, **kwargs)
         vals.update( vars() )
         del vals['self']

@@ -4,8 +4,7 @@
 import os
 
 settings = {
-    # "img_domain"    : "//www.talebook.org",
-    # "static_url_prefix" : "//www.talebook.org;8080/static",
+    # "static_host"   : "js.talebook.org",
     "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
     "template_path" : os.path.join(os.path.dirname(__file__), "templates"),
     "extract_path"  : "/data/books/extract/",
