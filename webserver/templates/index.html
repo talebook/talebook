@@ -5,7 +5,7 @@
 <div class="row hidden-xs">
     {% for book in random_books %}
     <div class="col-xs-6 col-sm-3" style='padding: 0px'>
-        <a href="/book/{{book.id}}"><img class="center-block random-book-img" src="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg" alt="cover"/></a>
+        <a href="/book/{{book.id}}"><img class="lazy center-block random-book-img" data-original="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg" alt="cover"/></a>
             <div class="caption">
                 <span><input type="number" class="rating"
                     onchange="update_rating(this, {{book.id}});"
@@ -31,7 +31,7 @@
     <div class="carousel-inner" role="listbox">
         {% for book in random_books %}
         <div class="item {%if loop.first%}active{%endif%}">
-            <a href="/book/{{book.id}}"><img class="center-block" style='width: auto; height:420px' src="{{IMG}}/get/thumb_600_840/{{book.id}}.jpg" alt="{{book.title}}"/></a>
+            <a href="/book/{{book.id}}"><img class="lazy center-block" style='width: auto; height:420px' data-original="{{IMG}}/get/thumb_600_840/{{book.id}}.jpg" alt="{{book.title}}"/></a>
         </div>
         {%endfor%}
     </div>
@@ -53,7 +53,7 @@
     {% for book in new_books %}
     <div class="col-sm-6">
         <div class="media new-book">
-            <a class="pull-left" href="/book/{{book.id}}"><img class="center-block new-book-img media-object" src="{{IMG}}/get/thumb_68_90/{{book.id}}.jpg" alt="cover"/></a>
+            <a class="pull-left" href="/book/{{book.id}}"><img class="lazy center-block new-book-img media-object" data-original="{{IMG}}/get/thumb_68_90/{{book.id}}.jpg" alt="cover"/></a>
             <div class="media-body">
                 <h4 class="media-heading"><a class="book-title" href="/book/{{book.id}}">{{book.title}}</a></h4>
                 <p>
@@ -91,6 +91,43 @@ $('#carousel-books').hammer().on('swipeleft', function(){
 });
 $('#carousel-books').hammer().on('swiperight', function(){
     $(this).carousel('prev');
+});
+
+function load_image(image) {
+    // prevents the loaded image if it is already loaded
+    image = $(image);
+    var src = image.data('original');
+
+    if (typeof src !== "undefined" && src != "") {
+        image.attr('src', src)
+        image.data('original', '');
+    }
+}
+
+var cHeight = 0;
+$('#carousel-books').on('slide.bs.carousel', function(e) {
+    var nextImage = null;
+
+    activeItem = $('.active.item', this);
+    load_image(activeItem.find("img")[0] );
+
+    if (e.direction == 'left'){
+        nextImage = activeItem.next('.item').find('img');
+    } else {
+        if (activeItem.index() == 0){
+            nextImage = $('img:last', activeItem.parent());
+        } else {
+            nextImage = activeItem.prev('.item').find('img');
+        }
+    }
+
+    // prevents the slide decrease in height
+    if (cHeight == 0) {
+        cHeight = $(this).height();
+        activeItem.next('.item').height(cHeight);
+    }
+    load_image(nextImage);
+
 });
 </script>
 {% endblock %}

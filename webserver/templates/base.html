@@ -148,6 +148,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
         <script src="{{static_url("js/jquery.editable.min.js")}}"></script>
         <script src="{{static_url("js/jquery.cookie-1.4.1.min.js")}}"></script>
         <script src="{{static_url("js/calibre.js")}}"></script>
+        <script src="{{static_url("js/jquery.lazyload.min.js")}}"></script>
         <script>
             (function() {
                 if (! window.console ) {
@@ -158,6 +159,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                     Object.keys = function() { return [] };
                 }
             }())
+            $("img.lazy").lazyload();
             jQuery(".rating").rating({showClear: false, showCaption: false});
         </script>
         {% block script %}{% endblock %}
