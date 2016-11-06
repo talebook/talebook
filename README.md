@@ -1,4 +1,8 @@
 # my-calibre-server
-clone from calibre build-in web server, rewrite in Tornado
+A simple books library management website. Use Calibre as backend.
+
+See a running instance of my books:
+
 http://www.talebook.org
+
 

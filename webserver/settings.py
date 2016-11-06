@@ -12,7 +12,7 @@ settings = {
     "cookie_secret" : "cookie_secret",
     "login_url"     : "/login",
     "xsrf_cookies"  : False,
-    "user_database" : 'sqlite:////data/books/tornado.db',
+    "user_database" : 'sqlite:////data/books/develop.db',
 
     "SOCIAL_AUTH_LOGIN_URL"          : '/',
     "SOCIAL_AUTH_LOGIN_REDIRECT_URL" : '/done/',
