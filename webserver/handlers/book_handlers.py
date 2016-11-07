@@ -232,15 +232,17 @@ class RecentBook(ListHandler):
     def get(self):
         title = _('Recent updates') % vars()
         category = "recents"
-        ids = self.search_for_books('')
+        ids = self.cache.search_for_books('')
         books = self.db.get_data_as_dict(ids=ids)
         return self.render_book_list(books, vars());
 
 class SearchBook(ListHandler):
-    def get(self, name=None):
+    def get(self):
+        name = self.get_argument("name", None)
         title = _('Search for: %(name)s') % vars()
-        ids = self.search_for_books(name)
+        ids = self.cache.search_for_books(name)
         books = self.db.get_data_as_dict(ids=ids)
+        search_query = name
         return self.render_book_list(books, vars());
 
 class BookAdd(BaseHandler):

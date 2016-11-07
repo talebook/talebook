@@ -65,7 +65,7 @@ class PubBooks(ListHandler):
             ids = self.db.get_books_for_category(category, publisher_id)
             books = self.db.get_data_as_dict(ids=ids)
         else:
-            ids = self.search_for_books('')
+            ids = self.cache.search_for_books('')
             books = self.db.get_data_as_dict(ids=ids)
             books = [ b for b in books if not b['publisher'] ]
         return self.render_book_list(books, vars());
@@ -86,7 +86,7 @@ class PubBooksUpdate(ListHandler):
         if publisher_id:
             ids = self.db.get_books_for_category(category, publisher_id)
         else:
-            ids = self.search_for_books('')
+            ids = self.cache.search_for_books('')
             books = self.db.get_data_as_dict(ids=ids)
             ids = [ b['id'] for b in books if not b['publisher'] ]
         for book_id in list(ids)[:40]:

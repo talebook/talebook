@@ -55,7 +55,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                 </ul>
                 <form class="hidden-xs navbar-form navbar-left" action="/search" role="search">
                     <div class="form-group">
-                        <input type="text" name="name" class="form-control" placeholder='{{ _("keyword, book title") }}'>
+                        <input type="text" name="name" class="form-control" placeholder='{{ _("keyword, book title") }}' value="{{search_query}}" >
                     </div>
                     <button type="submit" class="btn btn-default">{{ _("Search") }}</button>
                 </form>
@@ -98,7 +98,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                         <div class="row">
                             <form class="form-inline" action="/search" role="search">
                                 <div class="form-group col-xs-9">
-                                    <input type="text" name="name" class="input-lg form-control" placeholder='{{ _("keyword, book title") }}'>
+                                    <input type="text" name="name" class="input-lg form-control" placeholder='{{ _("keyword, book title") }}' value="{{search_query}}" >
                                 </div>
                                 <div id='navbar-btn-search' class="col-xs-3">
                                     <button type="submit" class="btn-lg btn btn-info btn-block">{{ _("Search") }}</button>
