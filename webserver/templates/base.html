@@ -16,7 +16,9 @@
         <link href="{{static_url("css/star-rating.css")}}" rel="stylesheet">
         <link href="{{static_url("css/calibre.css")}}" rel="stylesheet">
         <!- [if IE]><script src="{{static_url("js/respond.js")}}"></script><![endif]->
+        {% block title %}
         <title>{% if title %}{{title}} - {%endif%}奇异书屋</title>
+        {% endblock %}
         {% block meta %}{% endblock %}
         <style>
 body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, 'Heiti SC', sans-serif; }
