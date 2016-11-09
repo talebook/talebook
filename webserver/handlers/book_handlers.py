@@ -263,7 +263,7 @@ class BookUpload(BaseHandler):
         postfile = self.request.files['ebook_file'][0]
         name = postfile['filename']
         name = re.sub(r'[\x80-\xFF]+', convert, name)
-        logging.error('upload name = ' + repr(name))
+        logging.error('upload book name = ' + repr(name))
         fmt = os.path.splitext(name)[1]
         fmt = fmt[1:] if fmt else None
         if not fmt:
@@ -273,7 +273,8 @@ class BookUpload(BaseHandler):
         # save file
         data = postfile['body']
         fpath = "/tmp/" + name
-        open(fpath, "wb").write(data)
+        with open(fpath, "wb") as f:
+            f.write(data)
 
         # read ebook meta
         stream = open(fpath, 'rb')

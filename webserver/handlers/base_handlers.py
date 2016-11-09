@@ -75,8 +75,8 @@ class BaseHandler(web.RequestHandler):
         elif user and user.is_admin():
             self.admin_user = user
 
-        logging.debug("Query User [%s]" % user)
-        logging.debug("Query admin_user [%s]" % self.admin_user)
+        logging.debug("Query User [%s-%s]" % (user_id, user))
+        logging.debug("Query admin_user [%s-%s]" % (admin_id, self.admin_user) )
         return user
 
     def is_admin(self):
@@ -116,13 +116,13 @@ class BaseHandler(web.RequestHandler):
 
     def create_template_loader(self, template_path):
         """ 根据template_path创建相对应的Jinja2 Environment """
-        logging.debug("create template env for [%s]" % template_path)
         temp_path = template_path
         if isinstance(template_path, (list, tuple)):
             temp_path = template_path[0]
 
         env = BaseHandler._path_to_env.get(temp_path)
         if not env:
+            logging.debug("create template env for [%s]" % template_path)
             _loader = FileSystemLoader(template_path)
             env = Environment(loader=_loader)
             env.filters['day'] = day_format
