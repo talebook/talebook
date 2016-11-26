@@ -81,8 +81,9 @@ def make_app():
 
     Base = declarative_base()
     engine = create_engine(auth_db_path, echo=False)
-    session = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=True))
+    session = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
     init_social(Base, session, settings)
+    models.bind_session(session)
 
     load_calibre_translations()
 

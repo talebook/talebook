@@ -49,6 +49,7 @@ class BaseHandler(web.RequestHandler):
 
     def initialize(self):
         self.session = self.settings['session']
+        self.session.close()
         self.cache = self.settings['cache']
         self.db = self.cache.db
         path = self.settings['static_path'] + '/img/default_cover.jpg'
@@ -78,8 +79,8 @@ class BaseHandler(web.RequestHandler):
         elif user and user.is_admin():
             self.admin_user = user
 
-        logging.debug("Query User [%s-%s]" % (user_id, user))
-        logging.debug("Query admin_user [%s-%s]" % (admin_id, self.admin_user) )
+        logging.debug("Query User [%s %s ]" % (user_id, user))
+        logging.debug("Query admin_user [%s %s ]" % (admin_id, self.admin_user) )
         return user
 
     def is_admin(self):
@@ -110,8 +111,7 @@ class BaseHandler(web.RequestHandler):
         extra[action] = history[:200]
         user = self.current_user
         user.extra.update(extra)
-        self.session.add(user)
-        self.session.commit()
+        user.save()
 
     def get_template_path(self):
         """ 获取模板路径 """
@@ -148,9 +148,8 @@ class BaseHandler(web.RequestHandler):
         request.user = self.current_user
         request.user_extra = {}
         request.admin_user = self.admin_user
-        if self.user_id():
-            request.user_extra = self.current_user.extra
         if request.user:
+            request.user_extra = self.current_user.extra
             if not request.user.avatar:
                 request.user.avatar = "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
             else:

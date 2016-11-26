@@ -1,12 +1,22 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
+import datetime
+import logging
 from tornado import web
 from models import Reader
 from base_handlers import BaseHandler
 
 class Done(BaseHandler):
     def get(self):
+        user = self.get_current_user()
+        user.save()
+        if user and not user.extra:
+            socials = user.social_auth.all()
+            if socials:
+                logging.debug("init new user %s" % user.username)
+                user.init(socials[0])
+                user.save()
         self.redirect('/')
 
 class Login(BaseHandler):
@@ -17,6 +27,7 @@ class Login(BaseHandler):
 class Logout(BaseHandler):
     def get(self):
         self.set_secure_cookie("user_id", "")
+        self.set_secure_cookie("admin_id", "")
         self.redirect('/')
 
 class SettingView(BaseHandler):
@@ -26,13 +37,14 @@ class SettingView(BaseHandler):
 
 class SettingSave(BaseHandler):
     @web.authenticated
-    def post(self, **kwargs):
+    def post(self):
         user = self.current_user
         modify = user.extra
         for key in ['kindle_email']:
-            if key in kwargs:
-                modify[key] = kwargs[key]
+            if key in self.request.arguments:
+                modify[key] = self.get_argument(key)
         if modify:
+            logging.debug(modify)
             user.extra.update(modify)
             user.update_time = datetime.datetime.now()
             user.save()

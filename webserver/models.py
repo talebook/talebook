@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
+import logging
 import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
@@ -9,6 +10,10 @@ from social.storage.sqlalchemy_orm import SQLAlchemyUserMixin
 from sqlalchemy.ext.mutable import Mutable
 
 Base = declarative_base()
+def bind_session(session):
+    def _session(self):
+        return session
+    Base._session = classmethod(_session)
 
 class MutableDict(Mutable, dict):
     @classmethod
@@ -53,7 +58,6 @@ class Reader(Base, SQLAlchemyMixin):
         self.access_time = datetime.datetime.now()
         self.extra = {"kindle_email": ""}
         self.init_avatar(social_user)
-        self.save()
 
     def init_avatar(self, social_user):
         if social_user.provider == 'douban-oauth2':
