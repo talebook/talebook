@@ -409,10 +409,10 @@ class BookPush(BaseHandler):
         if mt is None:
             mt = 'application/octet-stream'
 
-        # send mail
+        # send mail: 必须是英文，否则amazon无法正确处理
         mail_from = tweaks['smtp_username']
-        mail_subject = _('Book from Calibre: %(title)s') % vars()
-        mail_body = _('We Send this book to your kindle.')
+        mail_subject = _('Enjoy the book: %(title)s') % vars()
+        mail_body = ('We Send this book to your kindle. Just enjoy reading it.')
         status = msg = ""
         try:
             logging.info('send %(title)s to %(mail_to)s' % vars())
