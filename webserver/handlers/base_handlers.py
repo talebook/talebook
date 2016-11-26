@@ -44,6 +44,9 @@ def json_response(func):
 class BaseHandler(web.RequestHandler):
     _path_to_env = {}
 
+    def head(self, *args, **kwargs):
+        return self.get(*args, **kwargs)
+
     def initialize(self):
         self.session = self.settings['session']
         self.cache = self.settings['cache']
