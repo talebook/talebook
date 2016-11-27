@@ -58,6 +58,14 @@ class UserView(BaseHandler):
     def get(self):
         nav = "user"
         user = self.current_user
+        output = {}
+        for key in ['read_history', 'visit_history']:
+            ids = [ b['id'] for b in user.extra[key]][:24]
+            books = self.db.get_data_as_dict(ids=ids)
+            orders = dict( zip(ids, range(100)) )
+            books.sort(lambda x,y: cmp(orders.get(x['id']), orders.get(y['id'])))
+            output[key] = books[:12]
+
         return self.html_page('user/view.html', vars())
 
 class AdminView(BaseHandler):

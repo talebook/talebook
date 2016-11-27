@@ -2,7 +2,7 @@
 {% block content %}
 <div class="row">
 
-{% set history = user.extra.read_history %}
+{% set history = output.read_history %}
 <div class="col-sm-12"><span class="legend">{{ _("Read History") }}</span> </div>
 <div class="col-sm-12">
     {% if history %}
@@ -18,7 +18,7 @@
 </div>
 <div class="clearfix"></div>
 
-{% set history = user.extra.visit_history %}
+{% set history = output.visit_history %}
 <div class="col-sm-12"><span class="legend">{{ _("Visit History") }}</span> </div>
 <div class="col-sm-12">
     {% if history %}
