@@ -14,6 +14,8 @@ def bind_session(session):
     def _session(self):
         return session
     Base._session = classmethod(_session)
+    SQLAlchemyMixin._session = classmethod(_session)
+    logging.error("Bind modles._session()")
 
 class MutableDict(Mutable, dict):
     @classmethod

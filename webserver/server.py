@@ -71,7 +71,7 @@ def make_app():
         import local_settings
         settings.update(local_settings.settings)
     except Exception as e:
-        pass
+        logging.error(e)
 
     init_calibre()
 
