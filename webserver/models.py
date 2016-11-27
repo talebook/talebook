@@ -8,6 +8,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from social.storage.sqlalchemy_orm import JSONType, SQLAlchemyMixin
 from social.storage.sqlalchemy_orm import SQLAlchemyUserMixin
 from sqlalchemy.ext.mutable import Mutable
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 def bind_session(session):
@@ -15,7 +16,7 @@ def bind_session(session):
         return session
     Base._session = classmethod(_session)
     SQLAlchemyMixin._session = classmethod(_session)
-    logging.error("Bind modles._session()")
+    logging.info("Bind modles._session()")
 
 class MutableDict(Mutable, dict):
     @classmethod
@@ -75,6 +76,27 @@ class Reader(Base, SQLAlchemyMixin):
     def is_admin(self):
         return self.admin
 
-def user_syncdb():
+class Message(Base, SQLAlchemyMixin):
+    __tablename__ = 'messages'
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200))
+    status = Column(String(100))
+    unread = Column(Boolean, default=True)
+    create_time = Column(DateTime)
+    update_time = Column(DateTime)
+    data = Column(MutableDict.as_mutable(JSONType), default={})
+
+    reader_id = Column(Integer, ForeignKey("readers.id"))
+    reader = relationship(Reader, backref="messages")
+
+    def __init__(self, user_id, status, msg):
+        super(Message, self).__init__()
+        self.reader_id = user_id
+        self.status = status
+        self.create_time = datetime.datetime.now()
+        self.update_time = datetime.datetime.now()
+        self.data = {'message': msg}
+
+def user_syncdb(engine):
     Base.metadata.create_all(engine)
 

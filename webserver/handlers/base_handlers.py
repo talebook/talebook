@@ -26,7 +26,7 @@ from calibre.utils.magick.draw import (save_cover_data_to, Image,
 from calibre.customize.conversion import OptionRecommendation, DummyReporter
 
 # import douban
-from models import Reader
+from models import Reader, Message
 
 messages = defaultdict(list)
 
@@ -91,9 +91,17 @@ class BaseHandler(web.RequestHandler):
         self.set_secure_cookie('user_id', str(user.id))
 
     def add_msg(self, status, msg):
-        global messages
-        uid = self.user_id()
-        messages[uid].append( {'status': status, 'msg': msg})
+        m = Message(self.user_id(), status, msg)
+        if m.reader_id:
+            m.save()
+
+    def pop_messages(self):
+        if not self.current_user: return []
+        messages = self.current_user.messages
+        for m in messages:
+            self.session.delete(m)
+        self.session.commit()
+        return messages
 
     def user_history(self, action, book):
         if not self.user_id(): return
@@ -142,18 +150,19 @@ class BaseHandler(web.RequestHandler):
         return t.render(**namespace)
 
     def html_page(self, template, *args, **kwargs):
-        global messages
         db = self.db
         request = self.request
         request.user = self.current_user
         request.user_extra = {}
         request.admin_user = self.admin_user
+        messages = self.pop_messages()
         if request.user:
             request.user_extra = self.current_user.extra
             if not request.user.avatar:
                 request.user.avatar = "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
             else:
                 request.user.avatar = request.user.avatar.replace("http://", "//")
+
         IMG = self.static_host
         vals = dict(*args, **kwargs)
         vals.update( vars() )

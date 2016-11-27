@@ -125,7 +125,7 @@ class BookUpdate(BaseHandler):
             raise web.HTTPError(403, 'Book exam id error')
 
         book_id = self.do_book_update(id)
-        self.redirect('/book/%d'%book_id)
+        return self.redirect('/book/%d'%book_id)
 
     def do_book_update(self, id):
         book_id = int(id)
@@ -286,14 +286,14 @@ class BookUpload(BaseHandler):
         books = self.db.books_with_same_title(mi)
         if books:
             book_id = books.pop()
-            self.redirect('/book/%d'%book_id)
+            return self.redirect('/book/%d'%book_id)
 
         fpaths = [fpath]
         self.generate_books(mi, fpath, fmt)
         book_id = self.db.import_book(mi, fpaths )
         self.user_history('upload_history', {'id': book_id, 'title': mi.title})
         self.add_msg('success', _("import books success"))
-        self.redirect('/book/%d'%book_id)
+        return self.redirect('/book/%d'%book_id)
 
     @background
     def generate_books(self, mi, fpath, fmt):
@@ -359,7 +359,7 @@ class BookPush(BaseHandler):
     def post(self, id):
         mail_to = self.get_argument("mail_to", None)
         if not mail_to:
-            self.redirect("/setting")
+            return self.redirect("/setting")
 
         book_id = int(id)
         books = self.db.get_data_as_dict(ids=[book_id])
@@ -374,7 +374,8 @@ class BookPush(BaseHandler):
             if fpath:
                 self.do_send_mail(book, mail_to, fmt, fpath)
                 self.add_msg( "success", _("Server is pushing book."))
-                self.redirect("/book/%d"%book['id'])
+                return self.redirect("/book/%d"%book['id'])
+
         # we do no have formats for kindle
         if 'fmt_epub' not in book:
             raise web.HTTPError(404, reason = _("Sorry, there's no available format for kindle"))
@@ -411,22 +412,22 @@ class BookPush(BaseHandler):
 
         # send mail: 必须是英文，否则amazon无法正确处理
         mail_from = tweaks['smtp_username']
-        mail_subject = _('Enjoy the book: %(title)s') % vars()
-        mail_body = ('We Send this book to your kindle. Just enjoy reading it.')
+        mail_subject = _('Enjoy the book!') % vars()
+        mail_body = ('We Send book [%(title)s] to your kindle. Just enjoy reading it.' % vars())
         status = msg = ""
         try:
             logging.info('send %(title)s to %(mail_to)s' % vars())
-            msg = create_mail(mail_from, mail_to, mail_subject,
+            mail = create_mail(mail_from, mail_to, mail_subject,
                     text = mail_body, attachment_data = body,
                     attachment_type = mt, attachment_name = fname
                     )
-            sendmail(msg, from_=mail_from, to=[mail_to], timeout=30,
+            sendmail(mail, from_=mail_from, to=[mail_to], timeout=30,
                     relay=tweaks['smtp_server'],
                     username=tweaks['smtp_username'],
                     password=tweaks['smtp_password']
                     )
             status = "success"
-            msg = _('%(title)s: Send to kindle success!! email: %(mail_to)s') % vars()
+            msg = _('Send [%(title)s] to [%(mail_to)s] success!!') % vars()
             logging.info(msg)
         except:
             import traceback

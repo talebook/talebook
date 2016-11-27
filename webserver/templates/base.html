@@ -87,7 +87,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                 {% for v in messages %}
                 <div class="alert alert-{{v.status}} alert-dismissible" role="alert">
                     <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-                    {{ v.msg }}
+                    {{ v.data.message }}
                 </div>
                 {% endfor %}
 
