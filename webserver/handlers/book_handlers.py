@@ -413,7 +413,7 @@ class BookPush(BaseHandler):
         # send mail: 必须是英文，否则amazon无法正确处理
         mail_from = tweaks['smtp_username']
         mail_subject = _('Enjoy the book!') % vars()
-        mail_body = ('We Send book [%(title)s] to your kindle. Just enjoy reading it.' % vars())
+        mail_body = ('We Send this book to your kindle. Just enjoy reading it. ' % vars())
         status = msg = ""
         try:
             logging.info('send %(title)s to %(mail_to)s' % vars())
