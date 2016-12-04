@@ -7,7 +7,7 @@ import sys
 import logging
 import requests
 
-books_dir = "/data/books/download/feng.com/"
+books_dir = "/data/books/download/weiphone.com/"
 done_path = "/data/books/download/done.txt"
 
 site = 'http://bbs.feng.com'
@@ -64,7 +64,7 @@ def visit_thread(tid, name):
 
 def visit_board():
     path = "/thread-htm-fid-224-page-%d.html"
-    for idx in range(1, 2):
+    for idx in range(0, 1):
         rsp = get(path % idx)
         for tid, name in re.findall(re_thread, rsp.text):
             visit_thread(tid, name)
