@@ -397,30 +397,20 @@ class BookPush(BaseHandler):
 
     @background
     def do_send_mail(self, book, mail_to, fmt, fpath):
-        body = open(fpath).read()
-
         # read meta info
         author = authors_to_string(book['authors'] if book['authors'] else [_('Unknown')])
         title = book['title'] if book['title'] else _("No Title")
         fname = u'%s - %s.%s'%(title, author, fmt)
-        fname = ascii_filename(fname).replace('"', '_')
+        fdata = open(fpath).read()
 
-        # content type
-        mt = guess_type('dummy.'+fmt)[0]
-        if mt is None:
-            mt = 'application/octet-stream'
-
-        # send mail: 必须是英文，否则amazon无法正确处理
         mail_from = tweaks['smtp_username']
-        mail_subject = _('Enjoy the book!') % vars()
-        mail_body = ('We Send this book to your kindle. Just enjoy reading it. ' % vars())
+        mail_subject = _('奇异书屋：推送给您一本书《%(title)s》') % vars()
+        mail_body = _(u'为您奉上一本《%(title)s》, 欢迎常来访问奇异书屋！http://www.talebook.org' % vars())
         status = msg = ""
         try:
             logging.info('send %(title)s to %(mail_to)s' % vars())
-            mail = create_mail(mail_from, mail_to, mail_subject,
-                    text = mail_body, attachment_data = body,
-                    attachment_type = mt, attachment_name = fname
-                    )
+            mail = self.create_mail(mail_from, mail_to, mail_subject,
+                    mail_body, fdata, fname)
             sendmail(mail, from_=mail_from, to=[mail_to], timeout=30,
                     relay=tweaks['smtp_server'],
                     username=tweaks['smtp_username'],
@@ -437,6 +427,38 @@ class BookPush(BaseHandler):
             msg = traceback.format_exc()
         self.add_msg(status, msg)
         return
+
+    def create_mail(self, sender, to, subject, body, attachment_data, attachment_name):
+        from email.header import Header
+        from email.utils import formatdate
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.application import MIMEApplication
+        def get_md5(s):
+            import hashlib
+            md5 = hashlib.md5()
+            md5.update(s)
+            return md5.hexdigest()
+
+        mail = MIMEMultipart()
+        mail['From'] = sender
+        mail['To'] = to
+        mail['Subject'] = Header(subject, 'utf-8')
+        mail['Date'] = formatdate(localtime=True)
+        mail['Message-ID'] = '<tencent_%s@qq.com>' % get_md5(mail.as_string())
+        mail.preamble = 'You will not see this in a MIME-aware mail reader.\n'
+
+        if body is not None:
+            msg = MIMEText(body, 'plain', 'utf-8')
+            mail.attach(msg)
+
+        if attachment_data is not None:
+            name = Header(attachment_name, 'utf-8').encode()
+            msg = MIMEApplication(attachment_data, 'octet-stream', charset='utf-8', name=name)
+            msg.add_header('Content-Disposition', 'attachment', filename=name)
+            mail.attach(msg)
+        return mail.as_string()
+
 
 
 def routes():
