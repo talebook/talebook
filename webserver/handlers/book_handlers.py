@@ -206,10 +206,10 @@ class BookDownload(BaseHandler):
             raise web.HTTPError(404, reason = _('%s not found'%(fmt)) )
         path = book['fmt_%s'%fmt]
         att = u'attachment; filename="%d-%s.%s"' % (book['id'], book['title'], fmt)
-        f = open(path, 'rb')
-        self.write( path )
         self.set_header('Content-Disposition', att.encode('UTF-8'))
         self.set_header('Content-Type', 'application/octet-stream')
+        f = open(path, 'rb').read()
+        self.write( f )
 
 class BookList(ListHandler):
     def get(self):

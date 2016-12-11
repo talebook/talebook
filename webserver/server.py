@@ -31,8 +31,8 @@ define("path-bin", default="/usr/bin", type=str,
 define("with-library", default=settings['with_library'], type=str,
         help=_('Path to the library folder to serve with the content server.'))
 
-define("syncdb", default=False, type=bool,
-        help=_('Create all tables'))
+define("syncdb", default=False, type=bool, help=_('Create all tables'))
+define("test", default=False, type=bool, help=_('run testcase'))
 
 def load_calibre_translations():
     from tornado import locale
@@ -98,6 +98,12 @@ def make_app():
     if options.syncdb:
         models.user_syncdb(engine)
         sys.exit(0)
+
+    if options.test:
+        from test import email
+        email.do_send_mail()
+        sys.exit(0)
+
 
     settings.update({
         "cache": cache,
