@@ -85,8 +85,11 @@
 <div class="col-md-12">
     <span class="legend">{{ _("Push") }}</span>
     <div class="list-group">
+        {% if request.user %}
         <a href="#" class="list-group-item" onclick="return jQuery('#id_push_dialog').modal()"><span class="glyphicon glyphicon-phone"></span> {{ _("Kindle") }}</a>
-        <a href="#" class="hidden list-group-item"><span class="glyphicon glyphicon-cloud"></span> {{ _("Email...") }}</a>
+        {% else %}
+        <a href="/login" class="list-group-item" ><span class="glyphicon glyphicon-phone"></span> {{ _("Kindle") }}</a>
+        {% endif %}
     </div>
 
     <span class="legend">{{ _("Read") }}</span>
