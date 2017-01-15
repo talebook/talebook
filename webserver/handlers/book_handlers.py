@@ -369,7 +369,7 @@ class BookPush(BaseHandler):
         self.user_history('push_history', book)
 
         # check format
-        for fmt in ['mobi', 'azw', 'azw3', 'pdf']:
+        for fmt in ['mobi', 'azw', 'pdf']:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
                 self.do_send_mail(book, mail_to, fmt, fpath)
@@ -377,7 +377,7 @@ class BookPush(BaseHandler):
                 return self.redirect("/book/%d"%book['id'])
 
         # we do no have formats for kindle
-        if 'fmt_epub' not in book:
+        if 'fmt_epub' not in book or 'fmt_azw3' not in book:
             raise web.HTTPError(404, reason = _("Sorry, there's no available format for kindle"))
         self.convert_book(book, mail_to)
         self.add_msg( "success", _("Server is pushing book."))
