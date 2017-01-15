@@ -377,7 +377,7 @@ class BookPush(BaseHandler):
                 return self.redirect("/book/%d"%book['id'])
 
         # we do no have formats for kindle
-        if 'fmt_epub' not in book or 'fmt_azw3' not in book:
+        if 'fmt_epub' not in book and 'fmt_azw3' not in book:
             raise web.HTTPError(404, reason = _("Sorry, there's no available format for kindle"))
         self.convert_book(book, mail_to)
         self.add_msg( "success", _("Server is pushing book."))
