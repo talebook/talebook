@@ -52,7 +52,7 @@ class DoubanBookApi(object):
             if b['title'] != title and b['title']+":"+b['subtitle'] != title: continue
             if not author: return b
             if self.author(b) == author: return b
-        if len(books) == 1: return books[0]
+        #if len(books) == 1: return books[0]
         if not select: return False
 
         print ("\nSearch: <<%s>>, %s" % (title, author))
