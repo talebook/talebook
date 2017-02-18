@@ -23,9 +23,11 @@
         <style>
 body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, 'Heiti SC', sans-serif; }
 .navbar-icon { float: right }
+#navbar-btn-search { padding: 6px 14px; }
 
 @media (min-width: 768px) {
 .navbar-icon { display: none }
+.navbar-collapse { float: left }
 }
 
         </style>
@@ -33,35 +35,54 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
 
     <body>
         <nav class="navbar navbar-default" role="navigation">
+            <!-- phone default navbar -->
             <div class="navbar-header">
-                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
-                    <span class="sr-only">Toggle navigation</span>
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#menu-box">
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
+
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#search-box" id='navbar-btn-search'>
+                    <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+                </button>
+
                 {% if request.user %}
                 <a class="navbar-brand navbar-icon" href="/user">
-                        <img style="margin-top:-6px;height:32px;width:32px" src={{request.user.avatar}}></img>
+                    <img style="margin-top:-6px;height:32px;width:32px" src={{request.user.avatar}}></img>
                 </a>
                 {% else %}
-                <a class="navbar-brand navbar-icon" href="/login"><span class="glyphicon glyphicon-user"></span></a>
+                <a class="navbar-brand navbar-icon" href="/login">
+                    <span class="glyphicon glyphicon-user"></span>
+                </a>
                 {% endif %}
+
                 <a class="navbar-brand logo" href="/">奇异书屋</a>
             </div>
-            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+
+            <div class="collapse navbar-collapse" id="menu-box">
                 <ul class="nav navbar-nav">
                     <li {%if not nav or nav == "index" %}class="active"{%endif%} ><a href="/">{{ _("Library")}}</a></li>
                     <li {%if nav == "user" %}class="active"{%endif%} ><a href="/user">{{ _("Myself")}}</a></li>
                     <li {%if nav == "about" %}class="active"{%endif%} ><a href="/about">{{ _("About")}}</a></li>
                 </ul>
-                <form class="hidden-xs navbar-form navbar-left" action="/search" role="search">
-                    <div class="form-group">
-                        <input type="text" name="name" class="form-control" placeholder='{{ _("keyword, book title") }}' value="{{search_query}}" >
+            </div>
+
+            <div class="collapse navbar-collapse" id='search-box' >
+                <form style="margin:10px auto" class="form-inline" action="/search" role="search">
+                    <div class="input-group">
+                        <input type="text" name="name" class="form-control" value="{{search_query}}" >
+                        <span class="input-group-btn">
+                            <button class="btn btn-default" type="submit">
+                                <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+                            </button>
+                        </span>
                     </div>
-                    <button type="submit" class="btn btn-default">{{ _("Search") }}</button>
                 </form>
-                <ul class="nav navbar-nav navbar-right">
+            </div>
+
+            <div class="collapse navbar-collapse navbar-right" id="user-box">
+                <ul class="hidden-xs nav navbar-nav">
                     {% if request.user %}
                     <li>
                         <img class="hidden-xs" style="margin-top:9px;height:32px;width:32px" src={{request.user.avatar}}></img>
@@ -82,6 +103,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                 </ul>
             </div>
         </nav>
+
         <div class="container">
             <div class="row">
                 {% for v in messages %}
@@ -95,20 +117,6 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
             </div>
             <div class="row">
                 <div class="col-md-8">
-                    {% if nav != "index" %}
-                    <div class="visible-xs-block">
-                        <div class="row">
-                            <form class="form-inline" action="/search" role="search">
-                                <div class="form-group col-xs-9">
-                                    <input type="text" name="name" class="input-lg form-control" placeholder='{{ _("keyword, book title") }}' value="{{search_query}}" >
-                                </div>
-                                <div id='navbar-btn-search' class="col-xs-3">
-                                    <button type="submit" class="btn-lg btn btn-info btn-block">{{ _("Search") }}</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    {% endif %}
                     {% block content %}{% endblock %}
                     <div class="clearfix"></div>
                 </div>

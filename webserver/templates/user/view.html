@@ -2,6 +2,18 @@
 {% block content %}
 <div class="row">
 
+<div class="col-sm-12 clearfix">
+    <img style="margin: 0 10px; height:64px; width:64px; float:left;" src={{request.user.avatar}}></img>
+    <div>
+        <p style=" margin-top:5px">
+        <span style="font-size:25px">{{ request.user.username }}</span>
+        <br/>
+        <a href="/setting"> {{ _("Settings") }}</a> | <a href="/logout"> {{ _("Sign Out") }}</a>
+        <br/>
+        </p>
+    </div>
+</div>
+
 {% set history = output.read_history %}
 <div class="col-sm-12"><span class="legend">{{ _("Read History") }}</span> </div>
 <div class="col-sm-12">
