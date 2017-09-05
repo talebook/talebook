@@ -334,6 +334,7 @@ class BookRead(BaseHandler):
             subprocess.call(["chmod", "a+rx", "-R", fdir + "/META-INF"])
             return
 
+        new_path = ""
         if fmt != "epub":
             new_fmt = "epub"
             new_path = '/tmp/calibre-tmp-%s-%s.%s'%(book['id'], int(time.time()), new_fmt)
@@ -350,7 +351,7 @@ class BookRead(BaseHandler):
         logging.error('extract book: %s' % fpath)
         subprocess.call(["unzip", fpath, "-d", fdir])
         subprocess.call(["chmod", "a+rx", "-R", fdir+ "/META-INF"])
-        subprocess.call(["rm", fpath])
+        if new_path: subprocess.call(["rm", new_fpath])
         return
 
 
