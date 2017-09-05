@@ -18,7 +18,8 @@ headers = {
 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.87 Safari/537.36',
 }
 
-re_thread    = r'''<a href="forum.php\?mod=viewthread&tid=([0-9]*).* onclick=.* class="s xst">(.*)</a>'''
+#re_thread    = r'''<a href="forum.php\?mod=viewthread&tid=([0-9]*).* onclick=.* class="s xst">(.*)</a>'''
+re_thread    = r'''<a href="read-htm-tid-([0-9]*).html" onclick=.* class="s xst">(.*)</a>'''
 re_attchment = r'''get=jQuery.get\('(plugin.php.*)',{},function.*html....>(.*)</a>'''
 re_download  = r'''href="(/plugin.php[^"]*attach)"'''
 formats = ['epub', 'mobi', 'azw3', 'azw']
@@ -66,6 +67,7 @@ def visit_board():
     path = "/thread-htm-fid-224-page-%d.html"
     for idx in range(0, 1):
         rsp = get(path % idx)
+        logging.debug(rsp)
         for tid, name in re.findall(re_thread, rsp.text):
             visit_thread(tid, name)
         open(done_path, "w").write("\n".join(done_urls))
@@ -78,7 +80,7 @@ if __name__ == "__main__":
     logging.basicConfig(
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S',
-            level = logging.INFO
+            level = logging.DEBUG
             )
     sys.exit(main())
 
