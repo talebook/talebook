@@ -6,6 +6,7 @@ import douban
 import subprocess
 from base_handlers import *
 
+from settings import settings
 from calibre.ebooks.metadata import authors_to_string
 from calibre.ebooks.conversion.plumber import Plumber
 from calibre.customize.conversion import OptionRecommendation, DummyReporter
@@ -319,7 +320,7 @@ class BookRead(BaseHandler):
         for fmt in ['epub', 'mobi', 'azw', 'azw3', 'txt']:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
-                epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/extract")
+                epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/extract/")
                 self.extract_book(book, fpath, fmt)
                 return self.html_page('book/read.html', vars())
         self.add_msg('success', _("Sorry, online-reader do not support this book."))
