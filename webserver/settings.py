@@ -7,6 +7,8 @@ settings = {
     # "static_host"   : "js.talebook.org",
     "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
     "template_path" : os.path.join(os.path.dirname(__file__), "templates"),
+    "convert_path"  : "/data/books/convert/",
+    "upload_path"   : "/data/books/upload/",
     "extract_path"  : "/data/books/extract/",
     "with_library"  : "/data/books/library/",
     "cookie_secret" : "cookie_secret",

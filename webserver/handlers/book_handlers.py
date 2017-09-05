@@ -272,7 +272,7 @@ class BookUpload(BaseHandler):
 
         # save file
         data = postfile['body']
-        fpath = "/tmp/" + name
+        fpath = os.path.join(settings['upload_path'], name)
         with open(fpath, "wb") as f:
             f.write(data)
 
@@ -319,7 +319,7 @@ class BookRead(BaseHandler):
         for fmt in ['epub', 'mobi', 'azw', 'azw3', 'txt']:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
-                epub_dir = os.path.dirname(fpath).replace("/data/books/library", "/extract")
+                epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/extract")
                 self.extract_book(book, fpath, fmt)
                 return self.html_page('book/read.html', vars())
         self.add_msg('success', _("Sorry, online-reader do not support this book."))
@@ -327,7 +327,7 @@ class BookRead(BaseHandler):
 
     @background
     def extract_book(self, book, fpath, fmt):
-        fdir = os.path.dirname(fpath).replace("/data/books/library", "/data/books/extract")
+        fdir = os.path.dirname(fpath).replace(settings['with_library'], settings['extract_path'])
         subprocess.call(['mkdir', '-p', fdir])
         #fdir = os.path.dirname(fpath) + "/extract"
         if os.path.isfile(fdir+"/META-INF/container.xml"):
@@ -337,7 +337,7 @@ class BookRead(BaseHandler):
         new_path = ""
         if fmt != "epub":
             new_fmt = "epub"
-            new_path = '/tmp/calibre-tmp-%s-%s.%s'%(book['id'], int(time.time()), new_fmt)
+            new_path = os.path.join(settings["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
             logging.error('convert book: %s => %s' % ( fpath, new_path));
             log = Log()
             plumber = Plumber(fpath, new_path, log)
@@ -387,7 +387,7 @@ class BookPush(BaseHandler):
     @background
     def convert_book(self, book, mail_to=None):
         fmt = 'mobi'
-        fpath = '/tmp/%s.%s' % (ascii_filename(book['title']), fmt)
+        fpath = os.path.join(settings['convert_path'], '%s.%s' % (ascii_filename(book['title']), fmt) )
         log = Log()
         plumber = Plumber(book['fmt_epub'], fpath, log)
         plumber.run()
