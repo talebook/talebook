@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: calibre\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2017-02-18 11:18+0800\n"
+"POT-Creation-Date: 2017-09-09 02:01+0800\n"
 "PO-Revision-Date: 2014-07-11 02:34+0000\n"
 "Last-Translator: Kovid Goyal <kovid@kovidgoyal.net>\n"
 "Language-Team: Chinese (China) (http://www.transifex.com/projects/p/calibre/"
@@ -19,190 +19,130 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: /data/calibre/src/calibre/library/server/xml.py:79
-#: /data/calibre/src/calibre/library/server/html.py:521
-#: /data/calibre/src/calibre/library/server/html.py:745
-#: /data/calibre/src/calibre/library/server/html.py:947
-#: /data/calibre/src/calibre/library/server/html.py:948
-#: /data/calibre/src/calibre/library/server/opds.py:161
-#: /data/calibre/src/calibre/library/server/opds.py:164
+#: /usr/lib/calibre/calibre/library/server/opds.py:130
+#, python-format
+msgid "%d books"
+msgstr "%d 本书"
+
+#: /usr/lib/calibre/calibre/library/server/opds.py:130
+#, python-format
+msgid "%d book"
+msgstr "%d本书"
+
+#: /usr/lib/calibre/calibre/library/server/opds.py:153
+#, python-format
+msgid "%d items"
+msgstr "%d项"
+
+#: /usr/lib/calibre/calibre/library/server/opds.py:161
+#: /usr/lib/calibre/calibre/library/server/opds.py:164
+#: /usr/lib/calibre/calibre/library/server/xml.py:79
+#: /usr/lib/calibre/calibre/library/server/html.py:521
+#: /usr/lib/calibre/calibre/library/server/html.py:745
+#: /usr/lib/calibre/calibre/library/server/html.py:947
+#: /usr/lib/calibre/calibre/library/server/html.py:948
 msgid "Unknown"
 msgstr "未知"
 
-#: /data/calibre/src/calibre/library/server/html.py:104
-msgid "Invalid CSRF Token. Please refresh the web page."
-msgstr "安全访问令牌无效，请刷新再访问"
-
-#: /data/calibre/src/calibre/library/server/html.py:130
-msgid "Please re-visit the web page."
-msgstr "请刷新再访问"
-
-#: /data/calibre/src/calibre/library/server/html.py:287
-msgid "Settings saved."
-msgstr "账户设置保存成功。"
-
-#: /data/calibre/src/calibre/library/server/html.py:289
-msgid "Nothing changed."
-msgstr "设置信息无更新。"
-
-#: /data/calibre/src/calibre/library/server/html.py:320
+#: /usr/lib/calibre/calibre/library/server/opds.py:171
 #, python-format
-msgid "Search for: %(name)s"
-msgstr "%(name)s的搜索结果"
+msgid "RATING: %s<br />"
+msgstr "星级： %s<br />"
 
-#: /data/calibre/src/calibre/library/server/html.py:331
-#: /data/calibre/src/calibre/library/server/html.py:344
-msgid "All books"
-msgstr "全部书籍"
-
-#: /data/calibre/src/calibre/library/server/html.py:361
-msgid "Recent updates"
-msgstr "近期更新"
-
-#: /data/calibre/src/calibre/library/server/html.py:423
-msgid "rating vlaue error!"
-msgstr "评分值错误"
-
-#: /data/calibre/src/calibre/library/server/html.py:429
-msgid "update rating success"
-msgstr "评分更新成功"
-
-#: /data/calibre/src/calibre/library/server/html.py:441
-msgid "date format error!"
-msgstr "日期格式错误！"
-
-#: /data/calibre/src/calibre/library/server/html.py:448
-msgid "edit OK"
-msgstr "编辑成功"
-
-#: /data/calibre/src/calibre/library/server/html.py:454
-msgid "Delete forbiden"
-msgstr "无权执行删除操作"
-
-#: /data/calibre/src/calibre/library/server/html.py:479
-#: /data/calibre/resources/content_server/sidebar/basic.html:31
-#: /data/calibre/resources/content_server/sidebar/basic.html:33
-#: /data/calibre/resources/content_server/book/add.html:20
-msgid "Upload Book"
-msgstr "添加书籍"
-
-#: /data/calibre/src/calibre/library/server/html.py:532
-msgid "import books success"
-msgstr "成功添加书籍"
-
-#: /data/calibre/src/calibre/library/server/html.py:546
-msgid "All tags"
-msgstr "标签列表"
-
-#: /data/calibre/src/calibre/library/server/html.py:559
+#: /usr/lib/calibre/calibre/library/server/opds.py:174
 #, python-format
-msgid "Books of tag: %(name)s"
-msgstr "带有\"%(name)s\"标签的书籍"
+msgid "TAGS: %s<br />"
+msgstr "标签：%s<br />"
 
-#: /data/calibre/src/calibre/library/server/html.py:569
-msgid "All authors"
-msgstr "所有作者"
-
-#: /data/calibre/src/calibre/library/server/html.py:578
+#: /usr/lib/calibre/calibre/library/server/opds.py:179
 #, python-format
-msgid "Books of author: %(name)s"
-msgstr "%(name)s作者的书籍"
+msgid "SERIES: %(series)s [%(sidx)s]<br />"
+msgstr "丛书：%(series)s [%(sidx)s]<br />"
 
-#: /data/calibre/src/calibre/library/server/html.py:599
-msgid "All publishers"
-msgstr "所有出版社"
+#: /usr/lib/calibre/calibre/library/server/opds.py:234
+#: /usr/share/calibre/content_server/base.html:54
+#: /data/code/my-calibre-server/webserver/templates/base.html:65
+msgid "Library"
+msgstr "书库"
 
-#: /data/calibre/src/calibre/library/server/html.py:606
+#: /usr/lib/calibre/calibre/library/server/opds.py:279
+msgid "Books in your library"
+msgstr "书库中的书籍"
+
+#: /usr/lib/calibre/calibre/library/server/opds.py:285
+msgid "By "
+msgstr "分类 "
+
+#: /usr/lib/calibre/calibre/library/server/opds.py:286
+msgid "Books sorted by "
+msgstr "书籍整理 "
+
+#: /usr/lib/calibre/calibre/library/server/opds.py:410
+#: /usr/lib/calibre/calibre/library/server/opds.py:602
+msgid "Newest"
+msgstr "最新"
+
+#: /usr/lib/calibre/calibre/library/server/opds.py:410
+#: /usr/lib/calibre/calibre/library/server/opds.py:603
+msgid "Title"
+msgstr "书名"
+
+#: /usr/lib/calibre/calibre/library/server/opds.py:411
+#: /usr/lib/calibre/calibre/library/server/opds.py:497
 #, python-format
-msgid "Books of publisher: %(name)s"
-msgstr "%(name)s出版的书籍"
+msgid "By %s"
+msgstr ""
 
-#: /data/calibre/src/calibre/library/server/html.py:634
-msgid "All ratings"
-msgstr "评分列表"
+#: /usr/lib/calibre/calibre/library/server/opds.py:440
+#, python-brace-format
+msgid "By {0} :: {1}"
+msgstr ""
 
-#: /data/calibre/src/calibre/library/server/html.py:642
-#, python-format
-msgid "Books of rating: %(name)s"
-msgstr "%(name)s星书籍"
+#: /usr/lib/calibre/calibre/library/server/opds.py:602
+msgid "Date"
+msgstr "日期"
 
-#: /data/calibre/src/calibre/library/server/html.py:661
-#: /data/calibre/src/calibre/library/server/html.py:685
-msgid "Sorry, book not found"
-msgstr "抱歉，该书不存在"
-
-#: /data/calibre/src/calibre/library/server/html.py:670
-#: /data/calibre/src/calibre/library/server/html.py:676
-msgid "Server is pushing book."
-msgstr "后台正在推送了~"
-
-#: /data/calibre/src/calibre/library/server/html.py:674
-msgid "Sorry, there's no available format for kindle"
-msgstr "抱歉，该书无可用于kindle阅读的格式"
-
-#: /data/calibre/src/calibre/library/server/html.py:696
-msgid "Sorry, online-reader do not support this book."
-msgstr "抱歉，在线阅读器暂不支持该格式的书籍"
-
-#: /data/calibre/src/calibre/library/server/html.py:746
-msgid "No Title"
-msgstr "无题"
-
-#: /data/calibre/src/calibre/library/server/html.py:757
-#, python-format
-msgid "Book from Calibre: %(title)s"
-msgstr "云书架推送《%(title)s》"
-
-#: /data/calibre/src/calibre/library/server/html.py:758
-msgid "We Send this book to your kindle."
-msgstr "祝您阅读愉快"
-
-#: /data/calibre/src/calibre/library/server/html.py:772
-#, python-format
-msgid "%(title)s: Send to kindle success!! email: %(mail_to)s"
-msgstr "《%(title)s》已经发送给%(mail_to)s！"
-
-#: /data/calibre/src/calibre/library/server/__init__.py:21
+#: /usr/lib/calibre/calibre/library/server/__init__.py:21
 msgid "Settings to control the calibre content server"
 msgstr "Calibre 内容服务器控制设定"
 
-#: /data/calibre/src/calibre/library/server/__init__.py:25
+#: /usr/lib/calibre/calibre/library/server/__init__.py:25
 #, python-format
 msgid "The port on which to listen. Default is %default"
 msgstr "监听端口号。默认为 %default"
 
-#: /data/calibre/src/calibre/library/server/__init__.py:27
+#: /usr/lib/calibre/calibre/library/server/__init__.py:27
 #, python-format
 msgid "The server timeout in seconds. Default is %default"
 msgstr "服务器超时秒数。默认为 %default"
 
-#: /data/calibre/src/calibre/library/server/__init__.py:29
+#: /usr/lib/calibre/calibre/library/server/__init__.py:29
 #, python-format
 msgid "The max number of worker threads to use. Default is %default"
 msgstr "同时工作线程最大值。默认为 %default"
 
-#: /data/calibre/src/calibre/library/server/__init__.py:31
+#: /usr/lib/calibre/calibre/library/server/__init__.py:31
 msgid "Set a password to restrict access. By default access is unrestricted."
 msgstr "是定密码限制访问。默认访问为无限制。"
 
-#: /data/calibre/src/calibre/library/server/__init__.py:33
+#: /usr/lib/calibre/calibre/library/server/__init__.py:33
 #, python-format
 msgid "Username for access. By default, it is: %default"
 msgstr "访问用用户名。默认为 %default"
 
-#: /data/calibre/src/calibre/library/server/__init__.py:37
+#: /usr/lib/calibre/calibre/library/server/__init__.py:37
 #, python-format
 msgid "The maximum size for displayed covers. Default is %default."
 msgstr "显示封面最大大小。默认为 %default。"
 
-#: /data/calibre/src/calibre/library/server/__init__.py:39
+#: /usr/lib/calibre/calibre/library/server/__init__.py:39
 msgid ""
 "The maximum number of matches to return per OPDS query. This affects Stanza, "
 "WordPlayer, etc. integration."
 msgstr ""
 "每次 OPDS 请求所返回的匹配数。此设置影响 Stanza、WordPlayer 等程序整合。"
 
-#: /data/calibre/src/calibre/library/server/__init__.py:43
+#: /usr/lib/calibre/calibre/library/server/__init__.py:43
 #, python-format
 msgid ""
 "Group items in categories such as author/tags by first letter when there are "
@@ -210,85 +150,13 @@ msgid ""
 "disable grouping."
 msgstr ""
 
-#: /data/calibre/src/calibre/library/server/__init__.py:48
+#: /usr/lib/calibre/calibre/library/server/__init__.py:48
 msgid ""
 "Prefix to prepend to all URLs. Useful for reverseproxying to this server "
 "from Apache/nginx/etc."
 msgstr "所有 URL 的前缀。用于 Apache/nginx 等反向代理。"
 
-#: /data/calibre/src/calibre/library/server/opds.py:130
-#, python-format
-msgid "%d books"
-msgstr "%d 本书"
-
-#: /data/calibre/src/calibre/library/server/opds.py:130
-#, python-format
-msgid "%d book"
-msgstr "%d本书"
-
-#: /data/calibre/src/calibre/library/server/opds.py:153
-#, python-format
-msgid "%d items"
-msgstr "%d项"
-
-#: /data/calibre/src/calibre/library/server/opds.py:171
-#, python-format
-msgid "RATING: %s<br />"
-msgstr "星级： %s<br />"
-
-#: /data/calibre/src/calibre/library/server/opds.py:174
-#, python-format
-msgid "TAGS: %s<br />"
-msgstr "标签：%s<br />"
-
-#: /data/calibre/src/calibre/library/server/opds.py:179
-#, python-format
-msgid "SERIES: %(series)s [%(sidx)s]<br />"
-msgstr "丛书：%(series)s [%(sidx)s]<br />"
-
-#: /data/calibre/src/calibre/library/server/opds.py:234
-#: /data/calibre/resources/content_server/base.html:54
-msgid "Library"
-msgstr "书库"
-
-#: /data/calibre/src/calibre/library/server/opds.py:279
-msgid "Books in your library"
-msgstr "书库中的书籍"
-
-#: /data/calibre/src/calibre/library/server/opds.py:285
-msgid "By "
-msgstr "分类 "
-
-#: /data/calibre/src/calibre/library/server/opds.py:286
-msgid "Books sorted by "
-msgstr "书籍整理 "
-
-#: /data/calibre/src/calibre/library/server/opds.py:410
-#: /data/calibre/src/calibre/library/server/opds.py:602
-msgid "Newest"
-msgstr "最新"
-
-#: /data/calibre/src/calibre/library/server/opds.py:410
-#: /data/calibre/src/calibre/library/server/opds.py:603
-msgid "Title"
-msgstr "书名"
-
-#: /data/calibre/src/calibre/library/server/opds.py:411
-#: /data/calibre/src/calibre/library/server/opds.py:497
-#, python-format
-msgid "By %s"
-msgstr ""
-
-#: /data/calibre/src/calibre/library/server/opds.py:440
-#, python-brace-format
-msgid "By {0} :: {1}"
-msgstr ""
-
-#: /data/calibre/src/calibre/library/server/opds.py:602
-msgid "Date"
-msgstr "日期"
-
-#: /data/calibre/src/calibre/library/server/main.py:41
+#: /usr/lib/calibre/calibre/library/server/main.py:41
 msgid ""
 "[options]\n"
 "\n"
@@ -309,15 +177,15 @@ msgstr ""
 "\n"
 "OPDS 界面会通过 BonJour 自动推送广告。\n"
 
-#: /data/calibre/src/calibre/library/server/main.py:53
+#: /usr/lib/calibre/calibre/library/server/main.py:53
 msgid "Path to the library folder to serve with the content server"
 msgstr "内容服务器上书库目录路径"
 
-#: /data/calibre/src/calibre/library/server/main.py:55
+#: /usr/lib/calibre/calibre/library/server/main.py:55
 msgid "Write process PID to the specified file"
 msgstr "写入进行 PID 到指定的文件"
 
-#: /data/calibre/src/calibre/library/server/main.py:59
+#: /usr/lib/calibre/calibre/library/server/main.py:59
 msgid ""
 "Specifies a virtual library to be used for this invocation. This option "
 "overrides any per-library settings specified in the GUI. For compatibility, "
@@ -326,299 +194,539 @@ msgid ""
 "value specified in the GUI (if any) will be used."
 msgstr ""
 
-#: /data/calibre/src/calibre/library/server/main.py:66
+#: /usr/lib/calibre/calibre/library/server/main.py:66
 msgid ""
 "Auto reload server when source code changes. May not work in all "
 "environments."
 msgstr "源代码改变后自动重载服务器。可能不适用所有环境。"
 
-#: /data/calibre/resources/content_server/user/view.html:6
-msgid "Read History"
-msgstr "阅读进度"
+#: /usr/lib/calibre/calibre/library/server/html.py:104
+msgid "Invalid CSRF Token. Please refresh the web page."
+msgstr "安全访问令牌无效，请刷新再访问"
 
-#: /data/calibre/resources/content_server/user/view.html:16
-#: /data/calibre/resources/content_server/user/view.html:32
-msgid "No history to show."
-msgstr "没有记录"
+#: /usr/lib/calibre/calibre/library/server/html.py:130
+msgid "Please re-visit the web page."
+msgstr "请刷新再访问"
 
-#: /data/calibre/resources/content_server/user/view.html:22
-msgid "Visit History"
-msgstr "浏览记录"
+#: /usr/lib/calibre/calibre/library/server/html.py:287
+msgid "Settings saved."
+msgstr "账户设置保存成功。"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:2
-msgid "Recent Updates"
-msgstr "最新功能"
+#: /usr/lib/calibre/calibre/library/server/html.py:289
+msgid "Nothing changed."
+msgstr "设置信息无更新。"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:9
-msgid "Category"
-msgstr "分类浏览"
+#: /usr/lib/calibre/calibre/library/server/html.py:320
+#, python-format
+msgid "Search for: %(name)s"
+msgstr "%(name)s的搜索结果"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:11
-msgid "All Books"
-msgstr "所有书籍"
+#: /usr/lib/calibre/calibre/library/server/html.py:331
+#: /usr/lib/calibre/calibre/library/server/html.py:344
+msgid "All books"
+msgstr "全部书籍"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:12
-msgid "Publisher"
-msgstr "出版"
+#: /usr/lib/calibre/calibre/library/server/html.py:361
+msgid "Recent updates"
+msgstr "近期更新"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:13
-msgid "Authors"
-msgstr "作者"
+#: /usr/lib/calibre/calibre/library/server/html.py:423
+msgid "rating vlaue error!"
+msgstr "评分值错误"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:14
-msgid "Tags"
-msgstr "标签"
+#: /usr/lib/calibre/calibre/library/server/html.py:429
+msgid "update rating success"
+msgstr "评分更新成功"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:15
-msgid "Recents"
-msgstr "最近更新"
+#: /usr/lib/calibre/calibre/library/server/html.py:441
+msgid "date format error!"
+msgstr "日期格式错误！"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:16
-msgid "Ratings"
-msgstr "全部评分"
+#: /usr/lib/calibre/calibre/library/server/html.py:448
+msgid "edit OK"
+msgstr "编辑成功"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:19
-msgid "Download"
-msgstr "下载"
+#: /usr/lib/calibre/calibre/library/server/html.py:454
+msgid "Delete forbiden"
+msgstr "无权执行删除操作"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:21
-msgid "Source Code"
-msgstr "站点源码"
+#: /usr/lib/calibre/calibre/library/server/html.py:479
+#: /usr/share/calibre/content_server/book/add.html:20
+#: /usr/share/calibre/content_server/sidebar/basic.html:31
+#: /usr/share/calibre/content_server/sidebar/basic.html:33
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:9
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:11
+#: /data/code/my-calibre-server/webserver/templates/book/add.html:21
+msgid "Upload Book"
+msgstr "添加书籍"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:22
-msgid "Books Library"
-msgstr "书库打包"
+#: /usr/lib/calibre/calibre/library/server/html.py:532
+msgid "import books success"
+msgstr "成功添加书籍"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:25
-msgid "Help"
-msgstr "帮助"
+#: /usr/lib/calibre/calibre/library/server/html.py:546
+msgid "All tags"
+msgstr "标签列表"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:27
-msgid "System Version"
-msgstr "系统版本"
+#: /usr/lib/calibre/calibre/library/server/html.py:559
+#, python-format
+msgid "Books of tag: %(name)s"
+msgstr "带有\"%(name)s\"标签的书籍"
 
-#: /data/calibre/resources/content_server/sidebar/basic.html:28
-msgid "Last Update"
-msgstr "最后更新"
+#: /usr/lib/calibre/calibre/library/server/html.py:569
+msgid "All authors"
+msgstr "所有作者"
 
-#: /data/calibre/resources/content_server/login.html:12
-msgid "Please Sign in by Social Account:"
-msgstr "请使用以下第三方账号登录："
+#: /usr/lib/calibre/calibre/library/server/html.py:578
+#, python-format
+msgid "Books of author: %(name)s"
+msgstr "%(name)s作者的书籍"
 
-#: /data/calibre/resources/content_server/rating/list.html:7
-msgid "Stars "
-msgstr "星 "
+#: /usr/lib/calibre/calibre/library/server/html.py:599
+msgid "All publishers"
+msgstr "所有出版社"
 
-#: /data/calibre/resources/content_server/book/list.html:6
-#: /data/calibre/resources/content_server/book/list.html:15
-msgid "Sort by: "
-msgstr "排序："
+#: /usr/lib/calibre/calibre/library/server/html.py:606
+#, python-format
+msgid "Books of publisher: %(name)s"
+msgstr "%(name)s出版的书籍"
 
-#: /data/calibre/resources/content_server/book/list.html:7
-#: /data/calibre/resources/content_server/book/list.html:16
-msgid "title"
-msgstr "书名"
+#: /usr/lib/calibre/calibre/library/server/html.py:634
+msgid "All ratings"
+msgstr "评分列表"
 
-#: /data/calibre/resources/content_server/book/list.html:8
-#: /data/calibre/resources/content_server/book/list.html:17
-msgid "date"
-msgstr "出版"
+#: /usr/lib/calibre/calibre/library/server/html.py:642
+#, python-format
+msgid "Books of rating: %(name)s"
+msgstr "%(name)s星书籍"
 
-#: /data/calibre/resources/content_server/book/list.html:9
-#: /data/calibre/resources/content_server/book/list.html:18
-msgid "rating"
-msgstr "评分"
+#: /usr/lib/calibre/calibre/library/server/html.py:661
+#: /usr/lib/calibre/calibre/library/server/html.py:685
+msgid "Sorry, book not found"
+msgstr "抱歉，该书不存在"
 
-#: /data/calibre/resources/content_server/book/list.html:10
-#: /data/calibre/resources/content_server/book/list.html:19
-msgid "timestamp"
-msgstr "更新"
+#: /usr/lib/calibre/calibre/library/server/html.py:670
+#: /usr/lib/calibre/calibre/library/server/html.py:676
+msgid "Server is pushing book."
+msgstr "后台正在推送了~"
 
-#: /data/calibre/resources/content_server/book/list.html:40
-msgid "Prev"
-msgstr "前页"
+#: /usr/lib/calibre/calibre/library/server/html.py:674
+msgid "Sorry, there's no available format for kindle"
+msgstr "抱歉，该书无可用于kindle阅读的格式"
 
-#: /data/calibre/resources/content_server/book/list.html:51
-msgid "Next"
-msgstr "后页"
+#: /usr/lib/calibre/calibre/library/server/html.py:696
+msgid "Sorry, online-reader do not support this book."
+msgstr "抱歉，在线阅读器暂不支持该格式的书籍"
 
-#: /data/calibre/resources/content_server/book/add.html:8
-msgid "Select ebook files"
-msgstr "选择电子书文件"
+#: /usr/lib/calibre/calibre/library/server/html.py:746
+msgid "No Title"
+msgstr "无题"
 
-#: /data/calibre/resources/content_server/book/add.html:14
-msgid "Generate both .epub and .mobi formats"
-msgstr "自动生成 .ebpu 和 .mobi 格式"
+#: /usr/lib/calibre/calibre/library/server/html.py:757
+#, python-format
+msgid "Book from Calibre: %(title)s"
+msgstr "云书架推送《%(title)s》"
 
-#: /data/calibre/resources/content_server/book/detail.html:6
+#: /usr/lib/calibre/calibre/library/server/html.py:758
+msgid "We Send this book to your kindle."
+msgstr "祝您阅读愉快"
+
+#: /usr/lib/calibre/calibre/library/server/html.py:772
+#, python-format
+msgid "%(title)s: Send to kindle success!! email: %(mail_to)s"
+msgstr "《%(title)s》已经发送给%(mail_to)s！"
+
+#: /usr/share/calibre/content_server/book/detail.html:6
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:6
 msgid "You are now in Edit Mode!"
 msgstr "您已进入编辑模式！"
 
-#: /data/calibre/resources/content_server/book/detail.html:7
+#: /usr/share/calibre/content_server/book/detail.html:7
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:7
 msgid "Click the title fields (or other), edit and it will auto save."
 msgstr "双击书籍标题（或其他标红字段），即可编辑；编辑完毕后会自动保存。"
 
-#: /data/calibre/resources/content_server/book/detail.html:24
+#: /usr/share/calibre/content_server/book/detail.html:24
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:24
 msgid "Author: "
 msgstr "作者："
 
-#: /data/calibre/resources/content_server/book/detail.html:29
+#: /usr/share/calibre/content_server/book/detail.html:29
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:29
 msgid "Publisher: "
 msgstr "出版："
 
-#: /data/calibre/resources/content_server/book/detail.html:35
+#: /usr/share/calibre/content_server/book/detail.html:35
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:35
 msgid "Series: "
 msgstr "系列："
 
-#: /data/calibre/resources/content_server/book/detail.html:40
+#: /usr/share/calibre/content_server/book/detail.html:40
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:40
 msgid "Date: "
 msgstr "日期："
 
-#: /data/calibre/resources/content_server/book/detail.html:45
+#: /usr/share/calibre/content_server/book/detail.html:45
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:50
 msgid "Language: "
 msgstr "语言："
 
-#: /data/calibre/resources/content_server/book/detail.html:50
+#: /usr/share/calibre/content_server/book/detail.html:50
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:55
 msgid "ISBN: "
 msgstr "ISBN："
 
-#: /data/calibre/resources/content_server/book/detail.html:54
+#: /usr/share/calibre/content_server/book/detail.html:54
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:70
 msgid "Rate: "
 msgstr "评分："
 
-#: /data/calibre/resources/content_server/book/detail.html:61
+#: /usr/share/calibre/content_server/book/detail.html:61
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:77
 msgid "Tags: "
 msgstr "标签："
 
-#: /data/calibre/resources/content_server/book/detail.html:77
+#: /usr/share/calibre/content_server/book/detail.html:77
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:93
 msgid "Abstract"
 msgstr "简介"
 
-#: /data/calibre/resources/content_server/book/detail.html:86
-#: /data/calibre/resources/content_server/setting/view.html:12
+#: /usr/share/calibre/content_server/book/detail.html:86
+#: /usr/share/calibre/content_server/setting/view.html:12
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:102
+#: /data/code/my-calibre-server/webserver/templates/setting/view.html:12
 msgid "Push"
 msgstr "推送"
 
-#: /data/calibre/resources/content_server/book/detail.html:88
+#: /usr/share/calibre/content_server/book/detail.html:88
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:105
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:107
 msgid "Kindle"
 msgstr "Kindle"
 
-#: /data/calibre/resources/content_server/book/detail.html:89
+#: /usr/share/calibre/content_server/book/detail.html:89
 msgid "Email..."
 msgstr "电子邮件..."
 
-#: /data/calibre/resources/content_server/book/detail.html:92
+#: /usr/share/calibre/content_server/book/detail.html:92
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:111
 msgid "Read"
 msgstr "阅读"
 
-#: /data/calibre/resources/content_server/book/detail.html:94
+#: /usr/share/calibre/content_server/book/detail.html:94
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:113
 msgid "Read online"
 msgstr "在线阅读"
 
-#: /data/calibre/resources/content_server/book/detail.html:101
+#: /usr/share/calibre/content_server/book/detail.html:101
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:120
 msgid "Edit"
 msgstr "编辑"
 
-#: /data/calibre/resources/content_server/book/detail.html:103
+#: /usr/share/calibre/content_server/book/detail.html:103
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:122
 msgid "Manual edit"
 msgstr "手动编辑"
 
-#: /data/calibre/resources/content_server/book/detail.html:104
+#: /usr/share/calibre/content_server/book/detail.html:104
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:123
 msgid "Auto update"
 msgstr "自动更新"
 
-#: /data/calibre/resources/content_server/book/detail.html:107
+#: /usr/share/calibre/content_server/book/detail.html:107
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:126
 msgid "Admin"
 msgstr "管理"
 
-#: /data/calibre/resources/content_server/book/detail.html:109
+#: /usr/share/calibre/content_server/book/detail.html:109
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:128
 msgid "Delete"
 msgstr "删除"
 
-#: /data/calibre/resources/content_server/book/detail.html:127
+#: /usr/share/calibre/content_server/book/detail.html:127
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:146
 msgid "Push to kindle"
 msgstr "推送Kindle"
 
-#: /data/calibre/resources/content_server/book/detail.html:133
+#: /usr/share/calibre/content_server/book/detail.html:133
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:152
 msgid "Email"
 msgstr "电子邮件"
 
-#: /data/calibre/resources/content_server/book/detail.html:138
+#: /usr/share/calibre/content_server/book/detail.html:138
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:157
 msgid "<br/>Please add to your Kindle Mail List: "
 msgstr "<br/>请将本站的发件人地址加入Kindle的电子邮箱列表："
 
-#: /data/calibre/resources/content_server/book/detail.html:157
+#: /usr/share/calibre/content_server/book/detail.html:157
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:176
 msgid "Sync metadata from douban.com"
-msgstr ""
+msgstr "从豆瓣网同步书籍信息"
 
-#: /data/calibre/resources/content_server/setting/view.html:16
-msgid "Kindle email address"
-msgstr "Kindle地址"
+#: /usr/share/calibre/content_server/book/list.html:6
+#: /usr/share/calibre/content_server/book/list.html:15
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:6
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:15
+msgid "Sort by: "
+msgstr "排序："
 
-#: /data/calibre/resources/content_server/setting/view.html:24
-msgid "Management"
-msgstr "在线管理"
+#: /usr/share/calibre/content_server/book/list.html:7
+#: /usr/share/calibre/content_server/book/list.html:16
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:7
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:16
+msgid "title"
+msgstr "书名"
 
-#: /data/calibre/resources/content_server/setting/view.html:30
-msgid "Allow online ebook management"
-msgstr "允许在线书籍管理"
+#: /usr/share/calibre/content_server/book/list.html:8
+#: /usr/share/calibre/content_server/book/list.html:17
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:8
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:17
+msgid "date"
+msgstr "出版"
 
-#: /data/calibre/resources/content_server/setting/view.html:36
-msgid "Allow delete ebook"
-msgstr "允许删除书籍"
+#: /usr/share/calibre/content_server/book/list.html:9
+#: /usr/share/calibre/content_server/book/list.html:18
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:9
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:18
+msgid "rating"
+msgstr "评分"
 
-#: /data/calibre/resources/content_server/setting/view.html:43
-msgid "Save Setting"
-msgstr "保存设置"
+#: /usr/share/calibre/content_server/book/list.html:10
+#: /usr/share/calibre/content_server/book/list.html:19
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:10
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:19
+msgid "timestamp"
+msgstr "更新"
 
-#: /data/calibre/resources/content_server/index.html:3
+#: /usr/share/calibre/content_server/book/list.html:40
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:40
+msgid "Prev"
+msgstr "前页"
+
+#: /usr/share/calibre/content_server/book/list.html:51
+#: /data/code/my-calibre-server/webserver/templates/book/list.html:51
+msgid "Next"
+msgstr "后页"
+
+#: /usr/share/calibre/content_server/book/add.html:8
+#: /data/code/my-calibre-server/webserver/templates/book/add.html:9
+msgid "Select ebook files"
+msgstr "选择电子书文件"
+
+#: /usr/share/calibre/content_server/book/add.html:14
+#: /data/code/my-calibre-server/webserver/templates/book/add.html:15
+msgid "Generate both .epub and .mobi formats"
+msgstr "自动生成 .ebpu 和 .mobi 格式"
+
+#: /usr/share/calibre/content_server/index.html:4
+#: /data/code/my-calibre-server/webserver/templates/index.html:8
 msgid "Random Books"
 msgstr "推荐阅读"
 
-#: /data/calibre/resources/content_server/index.html:19
+#: /usr/share/calibre/content_server/index.html:51
+#: /data/code/my-calibre-server/webserver/templates/index.html:55
 msgid "New Books"
 msgstr "新书推荐"
 
-#: /data/calibre/resources/content_server/base.html:55
+#: /usr/share/calibre/content_server/base.html:55
+#: /data/code/my-calibre-server/webserver/templates/base.html:66
 msgid "Myself"
 msgstr "我的"
 
-#: /data/calibre/resources/content_server/base.html:56
+#: /usr/share/calibre/content_server/base.html:56
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:36
 msgid "Blog"
 msgstr "博客"
 
-#: /data/calibre/resources/content_server/base.html:57
+#: /usr/share/calibre/content_server/base.html:57
+#: /data/code/my-calibre-server/webserver/templates/base.html:67
 msgid "About"
 msgstr "关于"
 
-#: /data/calibre/resources/content_server/base.html:63
-#: /data/calibre/resources/content_server/base.html:104
-msgid "Search"
-msgstr "搜索"
-
-#: /data/calibre/resources/content_server/base.html:75
+#: /usr/share/calibre/content_server/base.html:59
+#: /usr/share/calibre/content_server/base.html:80
+#: /data/code/my-calibre-server/webserver/templates/user/view.html:11
+#: /data/code/my-calibre-server/webserver/templates/base.html:95
 msgid "Settings"
 msgstr "账号设置"
 
-#: /data/calibre/resources/content_server/base.html:77
-msgid "Sign Out"
-msgstr "退出账号"
-
-#: /data/calibre/resources/content_server/base.html:81
+#: /usr/share/calibre/content_server/base.html:60
+#: /usr/share/calibre/content_server/base.html:86
+#: /data/code/my-calibre-server/webserver/templates/base.html:101
 msgid "Sign In"
 msgstr "登录"
 
-#: /data/calibre/resources/content_server/base.html:129
-msgid "Power by <a href='{{scheme}}://www.calibre-ebook.com'>Calibre</a>."
-msgstr ""
+#: /usr/share/calibre/content_server/base.html:68
+#: /usr/share/calibre/content_server/base.html:110
+msgid "Search"
+msgstr "搜索"
 
-#: /data/calibre/resources/content_server/base.html:130
+#: /usr/share/calibre/content_server/base.html:82
+#: /data/code/my-calibre-server/webserver/templates/user/view.html:11
+#: /data/code/my-calibre-server/webserver/templates/base.html:97
+msgid "Sign Out"
+msgstr "退出账号"
+
+#: /usr/share/calibre/content_server/base.html:136
+msgid "Power by <a href='{{scheme}}://www.calibre-ebook.com'>Calibre</a>."
+msgstr "本站基于<a href='{{scheme}}://www.calibre-ebook.com'>Calibre</a>构建，"
+
+#: /usr/share/calibre/content_server/base.html:137
 msgid "Develop by Kovid Goyal and Rex Liao.<br/>"
 msgstr ""
 
-#: /data/calibre/resources/content_server/base.html:131
+#: /usr/share/calibre/content_server/base.html:138
 msgid "Thanks to all contributors."
-msgstr ""
+msgstr "感谢开源界的力量。"
+
+#: /usr/share/calibre/content_server/login.html:12
+#: /data/code/my-calibre-server/webserver/templates/login.html:12
+msgid "Please Sign in by Social Account:"
+msgstr "请使用以下第三方账号登录："
+
+#: /usr/share/calibre/content_server/setting/view.html:16
+#: /data/code/my-calibre-server/webserver/templates/setting/view.html:16
+msgid "Kindle email address"
+msgstr "Kindle地址"
+
+#: /usr/share/calibre/content_server/setting/view.html:24
+#: /data/code/my-calibre-server/webserver/templates/setting/view.html:24
+msgid "Management"
+msgstr "在线管理"
+
+#: /usr/share/calibre/content_server/setting/view.html:30
+#: /data/code/my-calibre-server/webserver/templates/setting/view.html:30
+msgid "Allow online ebook management"
+msgstr "允许在线书籍管理"
+
+#: /usr/share/calibre/content_server/setting/view.html:36
+#: /data/code/my-calibre-server/webserver/templates/setting/view.html:36
+msgid "Allow delete ebook"
+msgstr "允许删除书籍"
+
+#: /usr/share/calibre/content_server/setting/view.html:43
+#: /data/code/my-calibre-server/webserver/templates/setting/view.html:43
+msgid "Save Setting"
+msgstr "保存设置"
+
+#: /usr/share/calibre/content_server/user/view.html:6
+#: /data/code/my-calibre-server/webserver/templates/user/view.html:18
+msgid "Read History"
+msgstr "阅读进度"
+
+#: /usr/share/calibre/content_server/user/view.html:16
+#: /usr/share/calibre/content_server/user/view.html:32
+#: /data/code/my-calibre-server/webserver/templates/user/view.html:28
+#: /data/code/my-calibre-server/webserver/templates/user/view.html:44
+msgid "No history to show."
+msgstr "没有记录"
+
+#: /usr/share/calibre/content_server/user/view.html:22
+#: /data/code/my-calibre-server/webserver/templates/user/view.html:34
+msgid "Visit History"
+msgstr "浏览记录"
+
+#: /usr/share/calibre/content_server/rating/list.html:7
+#: /data/code/my-calibre-server/webserver/templates/rating/list.html:7
+msgid "Stars "
+msgstr "星 "
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:2
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:2
+msgid "Recent Updates"
+msgstr "最新功能"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:9
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:18
+msgid "Category"
+msgstr "分类浏览"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:11
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:20
+msgid "All Books"
+msgstr "所有书籍"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:12
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:21
+msgid "Publisher"
+msgstr "出版"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:13
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:22
+msgid "Authors"
+msgstr "作者"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:14
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:23
+msgid "Tags"
+msgstr "标签"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:15
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:24
+msgid "Recents"
+msgstr "最近更新"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:16
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:25
+msgid "Ratings"
+msgstr "全部评分"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:19
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:28
+msgid "Download"
+msgstr "下载"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:21
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:30
+msgid "Source Code"
+msgstr "站点源码"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:22
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:31
+msgid "Books Library"
+msgstr "书库打包"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:25
+msgid "Help"
+msgstr "帮助"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:27
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:37
+msgid "System Version"
+msgstr "系统版本"
+
+#: /usr/share/calibre/content_server/sidebar/basic.html:28
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:38
+msgid "Last Update"
+msgstr "最后更新"
+
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:34
+msgid "Information"
+msgstr "信息"
+
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:39
+msgid "All User Count"
+msgstr "全部用户数"
+
+#: /data/code/my-calibre-server/webserver/templates/sidebar/basic.html:40
+msgid "Hot User Count"
+msgstr "活跃用户数"
+
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:45
+msgid "Collector: "
+msgstr "整理："
+
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:60
+msgid "Site: "
+msgstr "链接："
+
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:64
+msgid "Visits: "
+msgstr "热度："
+
+#: /data/code/my-calibre-server/webserver/templates/book/detail.html:67
+msgid "Downloads: "
+msgstr "下载："
 
 #~ msgid "Send to kindle success!! email: %(mail_to)s"
 #~ msgstr "成功发送给Kindle！ 目标邮箱是 %(mail_to)s"

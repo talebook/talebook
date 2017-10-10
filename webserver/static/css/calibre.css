@@ -108,6 +108,6 @@ a>img.history-book-img {
 .field-name {
     text-align: right;
     display: inline-block;
-    width: 72px;
+    min-width: 72px;
 }
 

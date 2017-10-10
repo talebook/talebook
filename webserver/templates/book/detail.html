@@ -38,7 +38,12 @@
 
                 {% if book.pubdate %}
                 <span class="field-name">{{ _("Date: ") }}</span>
-                <span class="book-edit" data-meta="pubdate">{{book.pubdate|day}}</span><br/>
+                <span >{{book.pubdate|day}}</span><br/>
+                {% endif %}
+
+                {% if book.timestamp %}
+                <span class="field-name">{{ _("Collector: ") }}</span>
+                <span >{% if book.collector %}{{book.collector.username}}{% endif %}, {{book.timestamp|day}}</span><br/>
                 {% endif %}
 
                 {% if book.language %}
@@ -50,6 +55,17 @@
                 <span class="field-name">{{ _("ISBN: ") }}</span>
                 <span class="book-edit" data-meta="isbn">{{book.isbn}}</span><br/>
                 {% endif %}
+
+                {% if book.website %}
+                <span class="field-name">{{ _("Site: ") }}</span>
+                <span >{{book.website|website|safe}}</span><br/>
+                {% endif %}
+
+                <span class="field-name">{{ _("Visits: ") }}</span>
+                <span >{{book.count_visit}}</span><br/>
+
+                <span class="field-name">{{ _("Downloads: ") }}</span>
+                <span >{{book.count_download}}</span><br/>
 
                 <span class="field-name">{{ _("Rate: ") }}</span>
                 <span style="display: inline-block;font-size:65%"><input type="number" class="rating"
@@ -117,7 +133,7 @@
 {% block content_footer %}
 <!-- UY BEGIN -->
 <div id="uyan_frame"></div>
-<script type="text/javascript" src="http://v2.uyan.cc/code/uyan.js?uid=1852657"></script>
+<script async type="text/javascript" src="http://v2.uyan.cc/code/uyan.js?uid=1852657"></script>
 <!-- UY END -->
 {% endblock %}
 {% block footer %}
@@ -179,7 +195,7 @@
 {% block meta %}
 <meta name="Keywords" content="{{ title }} {% for format, size in sizes %}{{ format }} {% endfor %} 下载 推送 kindle" />
 {% if book.comments %}
-<meta name="description" content=" {{ book.comments|striptags|replace("\n", "")|replace('"', '') }}" />
+<meta name="description" content=" {{ book.comments|striptags|replace("\n", "")|replace('\"', '') }}" />
 {% endif %}
 {% endblock %}
 

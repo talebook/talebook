@@ -2,7 +2,7 @@
 #-*- coding: UTF-8 -*-
 
 
-import re, os, logging, sys, time
+import re, os, logging, sys, time, datetime
 from tornado import web, locale
 from tornado.options import define, options
 from jinja2 import Environment, FileSystemLoader
@@ -26,13 +26,27 @@ from calibre.utils.magick.draw import (save_cover_data_to, Image,
 from calibre.customize.conversion import OptionRecommendation, DummyReporter
 
 # import douban
-from models import Reader, Message
+from models import Reader, Message, Item
 
 messages = defaultdict(list)
 
 def day_format(value, format='%Y-%m-%d'):
     try: return value.strftime(format)
     except: return "1990-01-01"
+
+def website_format(value):
+    links = []
+    for link in value.split(";"):
+        if link.startswith("douban://"):
+            douban_id = link.split("//")[-1]
+            links.append( u"<a target='_blank' href='https://book.douban.com/subject/%s/'>豆瓣</a> " % douban_id )
+        elif link.startswith("isbn://"):
+            douban_id = link.split("//")[-1]
+            links.append( u"<a target='_blank' href='https://book.douban.com/isbn/%s/'>豆瓣</a> " % douban_id )
+        elif link.startswith("http://"):
+            links.append( u"<a target='_blank' href='%s'>参考链接</a> " % link )
+    return ";".join(links)
+
 
 def json_response(func):
     def do(self, *args, **kwargs):
@@ -137,6 +151,7 @@ class BaseHandler(web.RequestHandler):
             _loader = FileSystemLoader(template_path)
             env = Environment(loader=_loader)
             env.filters['day'] = day_format
+            env.filters['website'] = website_format
             #env.globals['gettext'] = _
             BaseHandler._path_to_env[temp_path] = env
         return env
@@ -163,15 +178,56 @@ class BaseHandler(web.RequestHandler):
             else:
                 request.user.avatar = request.user.avatar.replace("http://", "//")
 
+        last_week = datetime.datetime.now() - datetime.timedelta(days=7)
+        count_hot_users = self.session.query(Reader).filter(Reader.access_time > last_week).count()
+        count_all_users = self.session.query(Reader).count()
+
         IMG = self.static_host
         vals = dict(*args, **kwargs)
         vals.update( vars() )
         del vals['self']
         self.write( self.render_string(template, **vals) )
 
+    def get_books(self, *args, **kwargs):
+        _ts = time.time()
+        books = self.db.get_data_as_dict(*args, **kwargs)
+        logging.debug("[%5d ms] select books from library  (count = %d)"
+                % ( int(1000*(time.time() - _ts)), len(books) ) )
+
+        item = Item()
+        empty_item = item.to_dict()
+        empty_item['collector'] = self.session.query(Reader).order_by(Reader.id).first()
+        ids = [ book['id'] for book in books ]
+        items = self.session.query(Item).filter(Item.book_id.in_(ids)).all()
+        maps = {}
+        for b in items:
+            d = b.to_dict()
+            c = b.collector.to_dict() if b.collector else empty_item['collector']
+            d['collector'] = c
+            maps[b.book_id] = d
+        for book in books:
+            book.update( maps.get(book['id'], empty_item) )
+        logging.debug("[%5d ms] select books from database (count = %d)"
+                % ( int(1000*(time.time() - _ts)), len(books) ) )
+        return books
+
+    def count_increase(self, book_id, **kwargs):
+        try:
+            item = self.session.query(Item).filter(Item.book_id == book_id).one()
+        except:
+            item = Item()
+            item.book_id = book_id
+
+        item.count_guest += kwargs.get('count_guest', 0)
+        item.count_visit += kwargs.get('count_visit', 0)
+        item.count_download += kwargs.get('count_download', 0)
+        item.save()
+
+
+
 class ListHandler(BaseHandler):
-    def do_sort(self, items, field, order):
-        items.sort(cmp=lambda x,y: cmp(x[field], y[field]), reverse=not order)
+    def do_sort(self, items, field, ascending):
+        items.sort(cmp=lambda x,y: cmp(x[field], y[field]), reverse=not ascending)
 
     def sort_books(self, items, field):
         self.do_sort(items, 'title', True)

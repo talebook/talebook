@@ -6,29 +6,6 @@
         2015年10月更新：支持在线阅读功能
     </div>
 
-    <span class="legend">{{ _("Category") }}</span>
-    <div class="list-group">
-        <a href="/book"     class="list-group-item {% if category == "books"      %}active{% endif %}"><span class="badge">{{db.count()}}</span> {{ _("All Books") }}</a>
-        <a href="/pub"      class="list-group-item {% if category == "publishers" %}active{% endif %}"><span class="badge">{{db.all_publishers()|length}}</span> {{ _("Publisher") }}</a>
-        <a href="/author"   class="list-group-item {% if category == "authors"    %}active{% endif %}"><span class="badge">{{db.all_authors()|length}}</span> {{ _("Authors") }}</a>
-        <a href="/tag"      class="list-group-item {% if category == "tags"       %}active{% endif %}"><span class="badge">{{db.all_tags()|length}}</span> {{ _("Tags") }}</a>
-        <a href="/recent"   class="list-group-item {% if category == "recents"    %}active{% endif %}">{{ _("Recents") }}</a>
-        <a href="/rating"   class="list-group-item {% if category == "ratings"    %}active{% endif %}">{{ _("Ratings") }}</a>
-    </div>
-
-    <span class="legend">{{ _("Download") }}</span>
-    <div class="list-group">
-        <a href="https://github.com/talebook/my-calibre-server" class="list-group-item">{{ _("Source Code") }}</a>
-        <a href="https://github.com/talebook/talebook-library" class="list-group-item">{{ _("Books Library") }}</a>
-    </div>
-
-    <span class="legend">{{ _("Help") }}</span>
-    <div class="list-group">
-        <a href="/blog" target="_blank" class="list-group-item"> {{ _("Blog") }}</a>
-        <a href="#" class="list-group-item"><span class="pull-right">1.4.13</span> {{ _("System Version") }}</a>
-        <a href="#" class="list-group-item"><span class="pull-right">{{db.last_modified()|day}}</span> {{ _("Last Update") }}</a>
-    </div>
-
     <span class="legend">{{ _("Upload Book") }}</span>
     <div class="list-group">
         <a class="btn btn-primary btn-block" href="/book/add"><span class="glyphicon glyphicon-cloud-upload"></span> {{ _("Upload Book") }}</a>
@@ -37,5 +14,31 @@
         {% endif %}
     </div>
 
+
+    <span class="legend">{{ _("Category") }}</span>
+    <div class="list-group">
+        <a href="/book"     class="list-group-item {% if category == "books"      %}active{% endif %}"><span class="badge">{{db.count()}}</span> {{ _("All Books") }}</a>
+        <a href="/pub"      class="list-group-item {% if category == "publishers" %}active{% endif %}"><span class="badge">{{db.all_publishers()|length}}</span> {{ _("Publisher") }}</a>
+        <a href="/author"   class="list-group-item {% if category == "authors"    %}active{% endif %}"><span class="badge">{{db.all_authors()|length}}</span> {{ _("Authors") }}</a>
+        <a href="/tag"      class="list-group-item {% if category == "tags"       %}active{% endif %}"><span class="badge">{{db.all_tags()|length}}</span> {{ _("Tags") }}</a>
+        <a href="/recent"   class="list-group-item {% if category == "recents"    %}active{% endif %}">{{ _("Recents") }}</a>
+        <a href="/rating"   class="list-group-item {% if category == "ratings"    %}active{% endif %}">{{ _("Ratings") }}</a>
+        <a href="/hot"      class="list-group-item {% if category == "hot"        %}active{% endif %}">{{ _("Visits") }}</a>
+    </div>
+
+    <span class="legend">{{ _("Download") }}</span>
+    <div class="list-group">
+        <a href="https://github.com/talebook/my-calibre-server" class="list-group-item">{{ _("Source Code") }}</a>
+        <a href="https://github.com/talebook/talebook-library" class="list-group-item">{{ _("Books Library") }}</a>
+    </div>
+
+    <span class="legend">{{ _("Information") }}</span>
+    <div class="list-group">
+        <a href="/blog" target="_blank" class="list-group-item"> {{ _("Blog") }}</a>
+        <a href="#" class="list-group-item"><span class="pull-right">1.4.13</span> {{ _("System Version") }}</a>
+        <a href="#" class="list-group-item"><span class="pull-right">{{db.last_modified()|day}}</span> {{ _("Last Update") }}</a>
+        <a href="#" class="list-group-item"><span class="pull-right">{{count_all_users}}</span> {{ _("All User Count") }}</a>
+        <a href="#" class="list-group-item"><span class="pull-right">{{count_hot_users}}</span> {{ _("Hot User Count") }}</a>
+    </div>
 
 </div>

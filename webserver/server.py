@@ -49,7 +49,7 @@ def load_calibre_translations():
             except:
                 pass
         locale._use_gettext = True
-        locale.set_default_locale("en_US")
+        locale.set_default_locale("zh_CN")
 
 
 def init_calibre():
@@ -84,6 +84,7 @@ def make_app():
     logging.debug("Init library with [%s]" % options.with_library)
     logging.debug("Init AuthDB  with [%s]" % auth_db_path )
     logging.debug("Init Static  with [%s]" % settings['static_path'] )
+    logging.debug("Init LANG    with [%s]" % P('localization/locales.zip') )
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = cache.Cache(book_db)
 
@@ -121,6 +122,8 @@ def main():
     http_server = tornado.httpserver.HTTPServer(app, xheaders=True)
     http_server.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()
+    from flask.ext.sqlalchemy import _EngineDebuggingSignalEvents
+    _EngineDebuggingSignalEvents(engine, app.import_name).register()
 
 if __name__ == "__main__":
     sys.path.append( os.path.dirname(__file__) )

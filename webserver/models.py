@@ -18,6 +18,10 @@ def bind_session(session):
     SQLAlchemyMixin._session = classmethod(_session)
     logging.info("Bind modles._session()")
 
+def to_dict(self):
+    return {c.name: getattr(self, c.name, None) for c in self.__table__.columns}
+Base.to_dict = to_dict
+
 class MutableDict(Mutable, dict):
     @classmethod
     def coerce(cls, key, value):
@@ -96,6 +100,26 @@ class Message(Base, SQLAlchemyMixin):
         self.create_time = datetime.datetime.now()
         self.update_time = datetime.datetime.now()
         self.data = {'message': msg}
+
+class Item(Base, SQLAlchemyMixin):
+    __tablename__ = "items"
+
+    book_id = Column(Integer, default=0, primary_key=True)
+    count_guest = Column(Integer, default=0, nullable=False)
+    count_visit = Column(Integer, default=0, nullable=False)
+    count_download = Column(Integer, default=0, nullable=False)
+    website = Column(String(255), default="", nullable=False)
+
+    collector_id = Column(Integer, ForeignKey("readers.id"))
+    collector = relationship(Reader, backref="items")
+
+    def __init__(self):
+        super(Item, self).__init__()
+        self.count_guest = 0
+        self.count_visit = 0
+        self.count_download = 0
+        self.collector_id = 1
+
 
 def user_syncdb(engine):
     Base.metadata.create_all(engine)

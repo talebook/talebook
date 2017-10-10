@@ -94,10 +94,10 @@ class Index(BaseHandler):
         ids = self.cache.search_for_books('')
         if not ids: raise web.HTTPError(404, reason = _('This library has no books'))
         random_ids = random.sample(ids, 8)
-        random_books = self.db.get_data_as_dict(ids=random_ids)
+        random_books = self.get_books(ids=random_ids)
         ids.sort()
         new_ids = random.sample(ids[-40:], 8)
-        new_books = self.db.get_data_as_dict(ids=new_ids)
+        new_books = self.get_books(ids=new_ids)
         return self.html_page('index.html', vars())
 
 class About(BaseHandler):
@@ -108,15 +108,18 @@ class About(BaseHandler):
 class BookDetail(BaseHandler):
     def get(self, id):
         book_id = int(id)
-        books = self.db.get_data_as_dict(ids=[book_id])
+        books = self.get_books(ids=[book_id])
         if not books:
             raise web.HTTPError(404, reason = _("Sorry, book not found") )
         book = books[0]
+        book_id = book['id']
         self.user_history('visit_history', book)
-        try: sizes = [ (f, self.db.sizeof_format(book['id'], f, index_is_id=True)) for f in book['available_formats'] ]
+        try: sizes = [ (f, self.db.sizeof_format(book_id, f, index_is_id=True)) for f in book['available_formats'] ]
         except: sizes = []
         title = book['title']
         smtp_username = tweaks['smtp_username']
+        if self.user_id(): self.count_increase(book_id, count_visit=1)
+        else: self.count_increase(book_id, count_guest=1)
         return self.html_page('book/detail.html', vars())
 
 class BookUpdate(BaseHandler):
@@ -154,6 +157,8 @@ class BookRating(BaseHandler):
         mi = self.db.get_metadata(book_id, index_is_id=True)
         mi.rating = r
         self.db.set_metadata(book_id, mi)
+        if self.user_id(): self.count_increase(book_id, count_visit=1)
+        else: self.count_increase(book_id, count_guest=1)
         return {'ecode': 0, 'msg': _('update rating success')}
 
 class BookEdit(BaseHandler):
@@ -200,9 +205,10 @@ class BookDownload(BaseHandler):
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))
         book_id = int(id)
-        books = self.db.get_data_as_dict(ids=[book_id])
+        books = self.get_books(ids=[book_id])
         book = books[0]
         self.user_history('download_history', book)
+        self.count_increase(book_id, count_download=1)
         if 'fmt_%s'%fmt not in book:
             raise web.HTTPError(404, reason = _('%s not found'%(fmt)) )
         path = book['fmt_%s'%fmt]
@@ -226,7 +232,7 @@ class BookList(ListHandler):
 
         return self.html_page('book/all.html', vars())
         ids = self.search_cache('')
-        books = self.db.get_data_as_dict(ids=ids)
+        books = self.get_books(ids=ids)
         return self.render_book_list(books, vars());
 
 class RecentBook(ListHandler):
@@ -234,7 +240,7 @@ class RecentBook(ListHandler):
         title = _('Recent updates') % vars()
         category = "recents"
         ids = self.cache.search_for_books('')
-        books = self.db.get_data_as_dict(ids=ids)
+        books = self.get_books(ids=ids)
         return self.render_book_list(books, vars());
 
 class SearchBook(ListHandler):
@@ -242,11 +248,33 @@ class SearchBook(ListHandler):
         name = self.get_argument("name", None)
         title = _('Search for: %(name)s') % vars()
         ids = self.cache.search_for_books(name)
-        books = self.db.get_data_as_dict(ids=ids)
+        books = self.get_books(ids=ids)
         search_query = name
         return self.render_book_list(books, vars());
 
+class HotBook(ListHandler):
+    def get(self):
+        title = _('Hot Books')
+        db_items = self.session.query(Item).order_by(Item.count_visit.desc())
+        count = db_items.count()
+        start = self.get_argument("start", 0)
+        try: start = int(start)
+        except: start = 0
+        delta = 20
+        page_max = count / delta
+        page_now = start / delta
+        pages = []
+        for p in range(page_now-4, page_now+4):
+            if 0 <= p and p <= page_max:
+                pages.append(p)
+        items = db_items.limit(delta).offset(start).all()
+        ids = [ item.book_id for item in items ]
+        books = self.get_books(ids=ids)
+        self.do_sort(books, 'count_visit', False)
+        return self.html_page('book/list.html', vars())
+
 class BookAdd(BaseHandler):
+    @web.authenticated
     def get(self):
         title = _('Upload Book')
         return self.html_page('book/add.html', vars())
@@ -294,6 +322,10 @@ class BookUpload(BaseHandler):
         book_id = self.db.import_book(mi, fpaths )
         self.user_history('upload_history', {'id': book_id, 'title': mi.title})
         self.add_msg('success', _("import books success"))
+        item = Item()
+        item.book_id = book_id
+        item.collector_id = self.user_id()
+        item.save()
         return self.redirect('/book/%d'%book_id)
 
     @background
@@ -310,11 +342,12 @@ class BookRead(BaseHandler):
     @web.authenticated
     def get(self, id):
         book_id = int(id)
-        books = self.db.get_data_as_dict(ids=[book_id])
+        books = self.get_books(ids=[book_id])
         if not books:
             raise web.HTTPError(404, reason = _("Sorry, book not found") )
         book = books[0]
         self.user_history('read_history', book)
+        self.count_increase(book_id, count_download=1)
 
         # check format
         for fmt in ['epub', 'mobi', 'azw', 'azw3', 'txt']:
@@ -364,11 +397,12 @@ class BookPush(BaseHandler):
             return self.redirect("/setting")
 
         book_id = int(id)
-        books = self.db.get_data_as_dict(ids=[book_id])
+        books = self.get_books(ids=[book_id])
         if not books:
             raise web.HTTPError(404, reason = _("Sorry, book not found") )
         book = books[0]
         self.user_history('push_history', book)
+        self.count_increase(book_id, count_download=1)
 
         # check format
         for fmt in ['mobi', 'azw', 'pdf']:
@@ -469,6 +503,7 @@ def routes():
         ( r'/about',                About        ),
         ( r'/search',               SearchBook   ),
         ( r'/recent',               RecentBook   ),
+        ( r'/hot',                  HotBook      ),
         ( r'/book',                 BookList     ),
         ( r'/book/add',             BookAdd      ),
         ( r'/book/upload',          BookUpload   ),
