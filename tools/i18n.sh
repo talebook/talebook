@@ -8,7 +8,7 @@ D="`calibre-debug  --paths | grep CALIBRE_RESOURCES_PATH | awk -F= '{ print $2 }
 T=`mktemp -d`
 cd $T
 find "$C/library/server/" -name '*.py' > POTFILES.python.in
-find "$D/content_server/" "$ROOT_DIR" -name '*.html' > POTFILES.html.in
+find "$D/content_server/" "$ROOT_DIR/" -name '*.html' > POTFILES.html.in
 
 xgettext --from-code UTF-8 -f POTFILES.python.in -o message.pot
 xgettext --from-code UTF-8 -f POTFILES.html.in -o message.pot -j -L Python
@@ -18,6 +18,8 @@ msgmerge --update --no-fuzzy-matching --backup=off $P message.pot
 vi $P
 mkdir zh_CN
 msgfmt $P -o zh_CN/messages.mo
-7za a "$D/resources/localization/locales.zip" zh_CN/messages.mo
+f="$D/resources/localization/locales.zip" && test -f "$f" && 7za a "$f" zh_CN/messages.mo
+f="$D/localization/locales.zip" && test -f "$f" && 7za a "$f" zh_CN/messages.mo
+#7za a "$D/resources/localization/locales.zip" zh_CN/messages.mo
 rm -rf $T
 

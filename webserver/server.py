@@ -81,10 +81,10 @@ def make_app():
     from calibre.db.legacy import LibraryDatabase
 
     auth_db_path = settings['user_database']
-    logging.debug("Init library with [%s]" % options.with_library)
-    logging.debug("Init AuthDB  with [%s]" % auth_db_path )
-    logging.debug("Init Static  with [%s]" % settings['static_path'] )
-    logging.debug("Init LANG    with [%s]" % P('localization/locales.zip') )
+    logging.info("Init library with [%s]" % options.with_library)
+    logging.info("Init AuthDB  with [%s]" % auth_db_path )
+    logging.info("Init Static  with [%s]" % settings['static_path'] )
+    logging.info("Init LANG    with [%s]" % P('localization/locales.zip') )
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = cache.Cache(book_db)
 
