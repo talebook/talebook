@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: calibre\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2017-10-10 13:28+0800\n"
+"POT-Creation-Date: 2017-10-10 14:33+0800\n"
 "PO-Revision-Date: 2014-07-11 02:34+0000\n"
 "Last-Translator: Kovid Goyal <kovid@kovidgoyal.net>\n"
 "Language-Team: Chinese (China) (http://www.transifex.com/projects/p/calibre/"
@@ -254,8 +254,8 @@ msgstr "无权执行删除操作"
 #: /usr/share/calibre/content_server/book/add.html:20
 #: /usr/share/calibre/content_server/sidebar/basic.html:31
 #: /usr/share/calibre/content_server/sidebar/basic.html:33
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:9
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:11
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:10
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:12
 #: /root/my-calibre-server/webserver/templates/book/add.html:21
 msgid "Upload Book"
 msgstr "添加书籍"
@@ -534,7 +534,7 @@ msgid "Myself"
 msgstr "我的"
 
 #: /usr/share/calibre/content_server/base.html:56
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:37
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:38
 msgid "Blog"
 msgstr "博客"
 
@@ -637,52 +637,52 @@ msgid "Recent Updates"
 msgstr "最新功能"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:9
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:18
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:19
 msgid "Category"
 msgstr "分类浏览"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:11
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:20
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:21
 msgid "All Books"
 msgstr "所有书籍"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:12
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:21
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:22
 msgid "Publisher"
 msgstr "出版"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:13
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:22
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:23
 msgid "Authors"
 msgstr "作者"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:14
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:23
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:24
 msgid "Tags"
 msgstr "标签"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:15
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:24
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:25
 msgid "Recents"
 msgstr "最近更新"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:16
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:25
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:26
 msgid "Ratings"
 msgstr "全部评分"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:19
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:29
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:30
 msgid "Download"
 msgstr "下载"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:21
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:31
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:32
 msgid "Source Code"
 msgstr "站点源码"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:22
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:32
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:33
 msgid "Books Library"
 msgstr "书库打包"
 
@@ -691,30 +691,34 @@ msgid "Help"
 msgstr "帮助"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:27
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:38
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:39
 msgid "System Version"
 msgstr "系统版本"
 
 #: /usr/share/calibre/content_server/sidebar/basic.html:28
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:39
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:40
 msgid "Last Update"
 msgstr "最后更新"
 
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:26
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:27
 msgid "Visits"
 msgstr "热度榜单"
 
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:35
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:36
 msgid "Information"
 msgstr "信息"
 
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:40
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:41
 msgid "All User Count"
 msgstr "全部用户数"
 
-#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:41
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:42
 msgid "Hot User Count"
 msgstr "活跃用户数"
+
+#: /root/my-calibre-server/webserver/templates/sidebar/basic.html:45
+msgid "Wechat"
+msgstr "关注公众号"
 
 #: /root/my-calibre-server/webserver/templates/book/detail.html:45
 msgid "Collector: "
