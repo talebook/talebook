@@ -96,7 +96,7 @@ class Index(BaseHandler):
         random_ids = random.sample(ids, 8)
         random_books = self.get_books(ids=random_ids)
         ids.sort()
-        new_ids = random.sample(ids[-40:], 8)
+        new_ids = random.sample(ids[-40:], 10)
         new_books = self.get_books(ids=new_ids)
         return self.html_page('index.html', vars())
 
