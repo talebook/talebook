@@ -43,6 +43,7 @@ class SettingSave(BaseHandler):
         for key in ['kindle_email']:
             if key in self.request.arguments:
                 modify[key] = self.get_argument(key)
+                user.email = self.get_argument(key)
         if modify:
             logging.debug(modify)
             user.extra.update(modify)
