@@ -99,6 +99,7 @@ class BaseHandler(web.RequestHandler):
 
     def is_admin(self):
         if self.admin_user: return True
+        if not self.current_user: return False
         return self.current_user.is_admin()
 
     def login_user(self, user):

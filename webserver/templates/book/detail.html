@@ -98,6 +98,7 @@
 {% endblock %}
 
 {% block sidebar %}
+{% if book.is_public %}
 <div class="col-md-12">
     <span class="legend">{{ _("Push") }}</span>
     <div class="list-group">
@@ -129,12 +130,19 @@
     </div>
     {% endif %}
 </div>
+{% else %}
+<div class="col-md-12">
+    <span class="legend">{{ _("Push") }}</span>
+    <div class="alert alert-warning text-center" role="alert">
+        应本书版权方要求，该书籍已下架。
+    </div>
+{% endif %}
 {% endblock %}
 {% block content_footer %}
-<!-- UY BEGIN -->
-<div id="uyan_frame"></div>
-<script async type="text/javascript" src="http://v2.uyan.cc/code/uyan.js?uid=1852657"></script>
-<!-- UY END -->
+<!-- UYAN HOT COMMENT BEGIN -->
+<div id="uyan_hotcmt_unit"></div>
+<script type="text/javascript" src="http://v2.uyan.cc/code/uyan.js?uid=1852657"></script> <!-- 如果已经过加载此行JS，即可不用重复加载 -->
+<!-- UYAN HOT COMMENT END -->
 {% endblock %}
 {% block footer %}
 <!-- Modal -->

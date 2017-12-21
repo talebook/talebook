@@ -113,6 +113,15 @@ class BookDetail(BaseHandler):
             raise web.HTTPError(404, reason = _("Sorry, book not found") )
         book = books[0]
         book_id = book['id']
+        book['is_public'] = True
+        if book['publisher'] in (u'中信出版社') or u'吴晓波' in book['authors']:
+            uid = self.user_id()
+            cid = book['collector']['id']
+            if not uid or str(uid) != str(cid):
+                book['is_public'] = False
+                #raise web.HTTPError(403, reason = _("Sorry, this book is not available(%d != %s)") % (cid, uid) )
+        if self.is_admin():
+            book['is_public'] = True
         self.user_history('visit_history', book)
         try: sizes = [ (f, self.db.sizeof_format(book_id, f, index_is_id=True)) for f in book['available_formats'] ]
         except: sizes = []
