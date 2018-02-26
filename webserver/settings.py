@@ -28,7 +28,7 @@ settings = {
 
     # See: http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28
     'smtp_server'                      : "smtp.talebook.org",
-    'smtp_username'                    : "talebook@foxmail.com",
+    'smtp_username'                    : "sender@talebook.org",
     'smtp_password'                    : "password",
 
     # See: https://developers.douban.com/apikey/

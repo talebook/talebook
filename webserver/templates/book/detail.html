@@ -51,10 +51,10 @@
                 <span class="book-edit" data-meta="language">{{book.language}}</span><br/>
                 {% endif %}
 
-                {% if book.isbn %}
                 <span class="field-name">{{ _("ISBN: ") }}</span>
-                <span class="book-edit" data-meta="isbn">{{book.isbn}}</span><br/>
-                {% endif %}
+                <span class="book-edit" data-meta="isbn">
+                {% if book.isbn %} {{book.isbn}} {% else %} 暂无 {% endif %}
+                </span><br/>
 
                 {% if book.website %}
                 <span class="field-name">{{ _("Site: ") }}</span>

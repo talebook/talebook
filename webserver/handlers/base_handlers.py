@@ -11,12 +11,10 @@ from collections import defaultdict
 from gettext import gettext as _
 from cache import Cache
 
-from calibre.utils.config import tweaks
 import social.apps.tornado_app.handlers
 
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre import fit_image, guess_type
-from calibre.utils.config import tweaks
 from calibre.utils.date import fromtimestamp
 from calibre.utils.smtp import sendmail, create_mail
 from calibre.utils.logging import Log
@@ -254,6 +252,14 @@ class ListHandler(BaseHandler):
                 pages.append(p)
         books = all_books[start:start+delta]
         vars_.update(vars())
+        if self.get_argument("fmt", 0) == "json":
+            self.write( {
+                "total": len(books),
+                "books": [
+                    {k:v for k,v in b.items() if k in ["id", "title", "author", "comments"]} for b in books
+                ],
+            })
+            return
         return self.html_page('book/list.html', vars_)
 
 

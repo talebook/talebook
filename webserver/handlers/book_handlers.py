@@ -114,7 +114,7 @@ class BookDetail(BaseHandler):
         book = books[0]
         book_id = book['id']
         book['is_public'] = True
-        if book['publisher'] in (u'中信出版社') or u'吴晓波' in book['authors']:
+        if ( book['publisher'] and book['publisher'] in (u'中信出版社') ) or u'吴晓波' in list(book['authors']):
             uid = self.user_id()
             cid = book['collector']['id']
             if not uid or str(uid) != str(cid):
@@ -126,7 +126,7 @@ class BookDetail(BaseHandler):
         try: sizes = [ (f, self.db.sizeof_format(book_id, f, index_is_id=True)) for f in book['available_formats'] ]
         except: sizes = []
         title = book['title']
-        smtp_username = tweaks['smtp_username']
+        smtp_username = settings['smtp_username']
         if self.user_id(): self.count_increase(book_id, count_visit=1)
         else: self.count_increase(book_id, count_guest=1)
         return self.html_page('book/detail.html', vars())
@@ -433,7 +433,10 @@ class BookPush(BaseHandler):
         fmt = 'mobi'
         fpath = os.path.join(settings['convert_path'], '%s.%s' % (ascii_filename(book['title']), fmt) )
         log = Log()
-        plumber = Plumber(book['fmt_epub'], fpath, log)
+        old_path = None
+        for f in ['txt', 'azw3', 'epub']: old_path = book.get('fmt_%s' %f, old_path)
+        #old_path = book.get('fmt_epub', book.get('fmt_txt'])
+        plumber = Plumber(old_path, fpath, log)
         plumber.run()
         self.db.add_format(book['id'], fmt, open(fpath, "rb"), index_is_id=True)
         if mail_to:
@@ -442,13 +445,19 @@ class BookPush(BaseHandler):
 
     @background
     def do_send_mail(self, book, mail_to, fmt, fpath):
+        try:
+            import local_settings
+            settings.update(local_settings.settings)
+        except Exception as e:
+            logging.error("read local_settings fail")
+            pass
         # read meta info
         author = authors_to_string(book['authors'] if book['authors'] else [_('Unknown')])
         title = book['title'] if book['title'] else _("No Title")
         fname = u'%s - %s.%s'%(title, author, fmt)
         fdata = open(fpath).read()
 
-        mail_from = tweaks['smtp_username']
+        mail_from = settings['smtp_username']
         mail_subject = _('奇异书屋：推送给您一本书《%(title)s》') % vars()
         mail_body = _(u'为您奉上一本《%(title)s》, 欢迎常来访问奇异书屋！http://www.talebook.org' % vars())
         status = msg = ""
@@ -457,9 +466,9 @@ class BookPush(BaseHandler):
             mail = self.create_mail(mail_from, mail_to, mail_subject,
                     mail_body, fdata, fname)
             sendmail(mail, from_=mail_from, to=[mail_to], timeout=30,
-                    relay=tweaks['smtp_server'],
-                    username=tweaks['smtp_username'],
-                    password=tweaks['smtp_password']
+                    relay=settings['smtp_server'],
+                    username=settings['smtp_username'],
+                    password=settings['smtp_password']
                     )
             status = "success"
             msg = _('Send [%(title)s] to [%(mail_to)s] success!!') % vars()

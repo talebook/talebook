@@ -3,6 +3,7 @@
 
 from tornado import web
 from base_handlers import BaseHandler, ListHandler
+from calibre.utils.filenames import ascii_filename
 
 
 class TagList(ListHandler):
