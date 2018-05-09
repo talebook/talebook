@@ -51,7 +51,7 @@
                 <span class="book-edit" data-meta="language">{{book.language}}</span><br/>
                 {% endif %}
 
-                <span class="field-name">ISBN: </span>
+                <span class="field-name">ISBN： </span>
                 <span class="book-edit" data-meta="isbn">
                 {% if book.isbn %} {{book.isbn}} {% else %} 暂无 {% endif %}
                 </span><br/>
@@ -91,7 +91,11 @@
         <p>&nbsp;</p>
 
         <span class="legend">简介</span>
+        {% if book.comments %}
         <p id="book-comments" class="book-edit" style="text-indent:2em;" data-meta="comments">{{book.comments|replace("\n", "<br/>")}}</p>
+        {% else %}
+        <p id="book-comments" class="book-edit" style="text-indent:2em;" data-meta="comments">暂无简介</p>
+        {% endif %}
         <p>&nbsp;</p>
     </div>
 </div>
