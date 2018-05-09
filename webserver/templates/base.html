@@ -62,9 +62,9 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
 
             <div class="collapse navbar-collapse" id="menu-box">
                 <ul class="nav navbar-nav">
-                    <li {%if not nav or nav == "index" %}class="active"{%endif%} ><a href="/">{{ _("Library")}}</a></li>
-                    <li {%if nav == "user" %}class="active"{%endif%} ><a href="/user">{{ _("Myself")}}</a></li>
-                    <li {%if nav == "about" %}class="active"{%endif%} ><a href="/about">{{ _("About")}}</a></li>
+                    <li {%if not nav or nav == "index" %}class="active"{%endif%} ><a href="/">书库</a></li>
+                    <li {%if nav == "user" %}class="active"{%endif%} ><a href="/user">我的</a></li>
+                    <li {%if nav == "about" %}class="active"{%endif%} ><a href="/about">关注</a></li>
                 </ul>
             </div>
 
@@ -92,13 +92,13 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                             {{ request.user.username }}<span class="caret"></span>
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a href="/setting"><span class="glyphicon glyphicon-cog"></span> {{ _("Settings") }}</a></li>
+                            <li><a href="/setting"><span class="glyphicon glyphicon-cog"></span> 账号设置</a></li>
                             <li role="separator" class="divider"></li>
-                            <li><a href="/logout"><span class="glyphicon glyphicon-cog"></span> {{ _("Sign Out") }}</a></li>
+                            <li><a href="/logout"><span class="glyphicon glyphicon-cog"></span> 退出账号</a></li>
                         </ul>
                     </li>
                     {% else %}
-                    <li><a  class="navbar-brand" href="/login"><span class="glyphicon glyphicon-user"></span> {{ _("Sign In") }}</a></li>
+                    <li><a  class="navbar-brand" href="/login"><span class="glyphicon glyphicon-user"></span> 登录</a></li>
                     {% endif %}
                 </ul>
             </div>

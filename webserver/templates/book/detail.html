@@ -3,8 +3,8 @@
 <div id="id_edit_tip" class="hidden col-md-12">
     <div class="alert alert-warning alert-dismissible" role="alert">
         <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button>
-        <strong>{{ _("You are now in Edit Mode!") }}</strong>
-        <p>{{ _("Click the title fields (or other), edit and it will auto save.") }}</p>
+        <strong>您已进入编辑模式！</strong>
+        <p>双击书籍标题（或其他标红字段），即可编辑；编辑完毕后会自动保存。</p>
     </div>
 </div>
 {% endblock %}
@@ -21,64 +21,64 @@
             <div class="media-body">
                 <p class="lead">
 
-                <span class="field-name">{{ _("Author: ") }}</span>
+                <span class="field-name">作者：</span>
                 <span class="hidden book-edit" data-meta="authors">{{book.author_sort}}</span>
                 <a id="id_authors" class="meta-link" href="/author/{{book.author_sort|urlencode}}">{{book.author_sort}}</a><br/>
 
                 {% if book.publisher %}
-                <span class="field-name">{{ _("Publisher: ") }}</span>
+                <span class="field-name">出版：</span>
                 <span class="hidden book-edit" data-meta="publisher">{{book.publisher}}</span>
-                <a id="id_publisher" class="meta-link" href="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a><br/>
+                <a id="id_publisher" class="meta-link" href2="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a><br/>
                 {% endif %}
 
                 {% if book.series %}
-                <span class="field-name">{{ _("Series: ") }}</span>
+                <span class="field-name">系列：</span>
                 <span class="book-edit" data-meta="series">{{book.series}}</span><br/>
                 {% endif %}
 
                 {% if book.pubdate %}
-                <span class="field-name">{{ _("Date: ") }}</span>
+                <span class="field-name">日期：</span>
                 <span >{{book.pubdate|day}}</span><br/>
                 {% endif %}
 
                 {% if book.timestamp %}
-                <span class="field-name">{{ _("Collector: ") }}</span>
+                <span class="field-name">整理：</span>
                 <span >{% if book.collector %}{{book.collector.username}}{% endif %}, {{book.timestamp|day}}</span><br/>
                 {% endif %}
 
                 {% if book.language %}
-                <span class="field-name">{{ _("Language: ") }}</span>
+                <span class="field-name">语言：</span>
                 <span class="book-edit" data-meta="language">{{book.language}}</span><br/>
                 {% endif %}
 
-                <span class="field-name">{{ _("ISBN: ") }}</span>
+                <span class="field-name">ISBN: </span>
                 <span class="book-edit" data-meta="isbn">
                 {% if book.isbn %} {{book.isbn}} {% else %} 暂无 {% endif %}
                 </span><br/>
 
                 {% if book.website %}
-                <span class="field-name">{{ _("Site: ") }}</span>
+                <span class="field-name">链接：</span>
                 <span >{{book.website|website|safe}}</span><br/>
                 {% endif %}
 
-                <span class="field-name">{{ _("Visits: ") }}</span>
+                <span class="field-name">热度：</span>
                 <span >{{book.count_visit}}</span><br/>
 
-                <span class="field-name">{{ _("Downloads: ") }}</span>
+                <span class="field-name">下载：</span>
                 <span >{{book.count_download}}</span><br/>
 
-                <span class="field-name">{{ _("Rate: ") }}</span>
+                <span class="field-name">评分：</span>
                 <span style="display: inline-block;font-size:65%"><input type="number" class="rating"
                     onchange="update_rating(this, {{book.id}})"
                     value="{%if book.rating%}{{book.rating}}{%endif%}"
                     data-min=0 data-max=10 data-size="xs" ></span><br/>
 
                 {% if book.tags %}
-                <span class="field-name">{{ _("Tags: ") }}</span>
+                <span class="field-name">标签：</span>
                 <span class="hidden book-edit" data-meta="tags">{{book.tags|join(" / ")}}</span>
                 <span id="id_tags" class="meta-link">
                 {% for tag in book.tags %}
-                <a href="/tag/{{tag|urlencode}}">{{tag}}</a>
+                <a href2="/tag/{{tag|urlencode}}">{{tag}}</a>
                 {% if not loop.last %} / {% endif %}
                 {% endfor%}
                 </span>
@@ -90,7 +90,7 @@
         </div>
         <p>&nbsp;</p>
 
-        <span class="legend">{{ _("Abstract") }}</span>
+        <span class="legend">简介</span>
         <p id="book-comments" class="book-edit" style="text-indent:2em;" data-meta="comments">{{book.comments|replace("\n", "<br/>")}}</p>
         <p>&nbsp;</p>
     </div>
@@ -100,39 +100,39 @@
 {% block sidebar %}
 {% if book.is_public %}
 <div class="col-md-12">
-    <span class="legend">{{ _("Push") }}</span>
+    <span class="legend">推送</span>
     <div class="list-group">
         {% if request.user %}
-        <a href="#" class="list-group-item" onclick="return jQuery('#id_push_dialog').modal()"><span class="glyphicon glyphicon-phone"></span> {{ _("Kindle") }}</a>
+        <a href="#" class="list-group-item" onclick="return jQuery('#id_push_dialog').modal()"><span class="glyphicon glyphicon-phone"></span> Kindle</a>
         {% else %}
-        <a href="/login" class="list-group-item" ><span class="glyphicon glyphicon-phone"></span> {{ _("Kindle") }}</a>
+        <a href="/login" class="list-group-item" ><span class="glyphicon glyphicon-phone"></span> Kindle</a>
         {% endif %}
     </div>
 
-    <span class="legend">{{ _("Read") }}</span>
+    <span class="legend">阅读</span>
     <div class="list-group">
-        <a class="list-group-item" rel="nofollow" href="/book/{{book.id}}/read"><span class="glyphicon glyphicon-book"></span> {{ _("Read online") }}</a>
+        <a class="list-group-item" rel="nofollow" href="/book/{{book.id}}/read"><span class="glyphicon glyphicon-book"></span> 在线阅读</a>
         {% for format, size in sizes %}
         <a href="/book/{{book.id}}.{{format}}" class="list-group-item"><span class="glyphicon glyphicon-save"></span> <span class="badge">{{size//1024}} KB</span> {{format}}</a>
         {% endfor %}
     </div>
 
     {% if request.user.admin %}
-    <span class="legend">{{ _("Edit") }}</span>
+    <span class="legend">编辑</span>
     <div class="list-group">
-        <a href="#" onclick="return bind_book_editable({{book.id}})" class="list-group-item"><span class="glyphicon glyphicon-cog"></span> {{ _("Manual edit") }}</a>
-        <a href="#" class="list-group-item" onclick="return jQuery('#id_update_dialog').modal()"><span class="glyphicon glyphicon-refresh"></span> <span class="badge">Douban</span> {{ _("Auto update") }}</a>
+        <a href="#" onclick="return bind_book_editable({{book.id}})" class="list-group-item"><span class="glyphicon glyphicon-cog"></span> 手动编辑</a>
+        <a href="#" class="list-group-item" onclick="return jQuery('#id_update_dialog').modal()"><span class="glyphicon glyphicon-refresh"></span> <span class="badge">Douban</span> 自动更新</a>
     </div>
 
-    <span class="legend">{{ _("Admin") }}</span>
+    <span class="legend">管理</span>
     <div class="list-group">
-        <a href="/book/{{book.id}}/delete" class="btn btn-danger btn-block"><span class="glyphicon glyphicon-remove"></span> {{ _("Delete") }}</a>
+        <a href="/book/{{book.id}}/delete" class="btn btn-danger btn-block"><span class="glyphicon glyphicon-remove"></span> 删除</a>
     </div>
     {% endif %}
 </div>
 {% else %}
 <div class="col-md-12">
-    <span class="legend">{{ _("Push") }}</span>
+    <span class="legend">推送</span>
     <div class="alert alert-warning text-center" role="alert">
         应本书版权方要求，该书籍已下架。
     </div>
@@ -151,18 +151,18 @@
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-                <h4 class="modal-title" id="id_push_dialogLabel">{{ _("Push to kindle") }}</h4>
+                <h4 class="modal-title" id="id_push_dialogLabel">推送Kindle</h4>
             </div>
             <form onsubmit="save_email()" class="form-horizontal" role="form" action="/book/{{book.id}}/push" method="POST">
                 <div class="modal-body ">
                     <div class="form-group">
                         <p class="col-sm-12 text-center help-block">&nbsp;</p>
-                        <label for="id_push_email" class="col-sm-2 control-label">{{ _("Email") }}</label>
+                        <label for="id_push_email" class="col-sm-2 control-label">Email</label>
                         <div class="col-sm-9">
                             <input type="email" class="form-control" name="mail_to" id="id_push_email" value="{{request.user_extra.kindle_email}}" placeholder="Enter email">
                         </div>
                         <p class="col-sm-12 text-center help-block">
-                        {{ _("<br/>Please add to your Kindle Mail List: ") }}<strong>{{smtp_username}}</strong></strong> 
+                        <br/>请将本站的发件人地址加入Kindle的电子邮箱列表：<strong>{{smtp_username}}</strong></strong> 
                         </p>
                     </div>
                 </div>
@@ -181,7 +181,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-                <h4 class="modal-title">{{ _("Sync metadata from douban.com") }}</h4>
+                <h4 class="modal-title">从豆瓣网同步书籍信息</h4>
             </div>
             <div class="modal-body ">
                 <h3 class="text-danger">慎重操作！</h3>

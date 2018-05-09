@@ -112,6 +112,7 @@ class BookDetail(BaseHandler):
         if not books:
             raise web.HTTPError(404, reason = _("Sorry, book not found") )
         book = books[0]
+        logging.error("%s", repr(book))
         book_id = book['id']
         book['is_public'] = True
         if ( book['publisher'] and book['publisher'] in (u'中信出版社') ) or u'吴晓波' in list(book['authors']):

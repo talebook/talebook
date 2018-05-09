@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 from social.apps.tornado_app.models import init_social
-from social.apps.tornado_app.routes import SOCIAL_AUTH_ROUTES
+from social_tornado.routes import SOCIAL_AUTH_ROUTES
 from settings import settings
 
 

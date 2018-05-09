@@ -6,19 +6,19 @@
 <form action="/book/upload" class="form" role="form" method="post" enctype="multipart/form-data">
     {{ xsrf_form_html() }}
     <div class="form-group">
-        <label class="sr-only" for="exampleInputEmail2">{{ _("Select ebook files") }}</label>
-        <input type="file" class="form-control" id="id_ebook_file" name="ebook_file" placeholder="{{ _("Select ebook file") }}">
+        <label class="sr-only" for="exampleInputEmail2">选择电子书文件</label>
+        <input type="file" class="form-control" id="id_ebook_file" name="ebook_file" placeholder="选择电子书文件">
     </div>
 
     <div class="hide checkbox">
         <label>
-            <input name="generate_fmt" checked=checked type="checkbox"> {{ _("Generate both .epub and .mobi formats") }}
+            <input name="generate_fmt" checked=checked type="checkbox"> 自动生成 .ebpu 和 .mobi 格式
         </label>
     </div>
 
     <br/>
     <div class="col-md-4 col-md-offset-4">
-    <button class="btn btn-primary" type="submit">{{ _("Upload Book") }}</button>
+    <button class="btn btn-primary" type="submit">添加书籍</button>
     </div>
 </form>
 </div>

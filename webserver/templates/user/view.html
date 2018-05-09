@@ -8,14 +8,14 @@
         <p style=" margin-top:5px">
         <span style="font-size:25px">{{ request.user.username }}</span>
         <br/>
-        <a href="/setting"> {{ _("Settings") }}</a> | <a href="/logout"> {{ _("Sign Out") }}</a>
+        <a href="/setting"> 账号设置</a> | <a href="/logout"> 退出账号</a>
         <br/>
         </p>
     </div>
 </div>
 
 {% set history = output.read_history %}
-<div class="col-sm-12"><span class="legend">{{ _("Read History") }}</span> </div>
+<div class="col-sm-12"><span class="legend">阅读进度</span> </div>
 <div class="col-sm-12">
     {% if history %}
     {% for book in history[:12] %}
@@ -25,13 +25,13 @@
     </div>
     {% endfor %}
     {% else %}
-    <p>{{ _("No history to show.") }}</p> 
+    <p>没有记录</p> 
     {% endif %}
 </div>
 <div class="clearfix"></div>
 
 {% set history = output.visit_history %}
-<div class="col-sm-12"><span class="legend">{{ _("Visit History") }}</span> </div>
+<div class="col-sm-12"><span class="legend">浏览记录</span> </div>
 <div class="col-sm-12">
     {% if history %}
     {% for book in history[:12] %}
@@ -41,7 +41,7 @@
     </div>
     {% endfor %}
     {% else %}
-    <p>{{ _("No history to show.") }}</p> 
+    <p>没有记录</p> 
     {% endif %}
 </div>
 <div class="clearfix"></div>
