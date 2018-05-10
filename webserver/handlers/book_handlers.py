@@ -90,9 +90,9 @@ class Index(BaseHandler):
     def get(self):
         import random
         nav = "index"
-        title = _('All books')
+        title = _(u'全部书籍')
         ids = self.cache.search_for_books('')
-        if not ids: raise web.HTTPError(404, reason = _('This library has no books'))
+        if not ids: raise web.HTTPError(404, reason = _(u'本书库暂无藏书'))
         random_ids = random.sample(ids, 8)
         random_books = self.get_books(ids=random_ids)
         ids.sort()
@@ -110,7 +110,7 @@ class BookDetail(BaseHandler):
         book_id = int(id)
         books = self.get_books(ids=[book_id])
         if not books:
-            raise web.HTTPError(404, reason = _("Sorry, book not found") )
+            raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
         book = books[0]
         logging.error("%s", repr(book))
         book_id = book['id']
@@ -120,7 +120,6 @@ class BookDetail(BaseHandler):
             cid = book['collector']['id']
             if not uid or str(uid) != str(cid):
                 book['is_public'] = False
-                #raise web.HTTPError(403, reason = _("Sorry, this book is not available(%d != %s)") % (cid, uid) )
         if self.is_admin():
             book['is_public'] = True
         self.user_history('visit_history', book)
@@ -161,7 +160,7 @@ class BookRating(BaseHandler):
         try:
             r = float(rating)
         except:
-            return {'ecode': 2, 'msg': _("rating vlaue error!")}
+            return {'ecode': 2, 'msg': _(u"评星无效")}
 
         book_id = int(id)
         mi = self.db.get_metadata(book_id, index_is_id=True)
@@ -169,7 +168,7 @@ class BookRating(BaseHandler):
         self.db.set_metadata(book_id, mi)
         if self.user_id(): self.count_increase(book_id, count_visit=1)
         else: self.count_increase(book_id, count_guest=1)
-        return {'ecode': 0, 'msg': _('update rating success')}
+        return {'ecode': 0, 'msg': _(u'更新成功')}
 
 class BookEdit(BaseHandler):
     @json_response
@@ -177,24 +176,22 @@ class BookEdit(BaseHandler):
         field = self.get_argument("field", None)
         content = self.get_argument("content", None)
         if not field or not content:
-            return {'ecode': 1, 'msg': _("arguments error")}
+            return {'ecode': 1, 'msg': _(u"参数错误")}
 
         book_id = int(id)
         mi = self.db.get_metadata(book_id, index_is_id=True)
-        #if not mi.has_key(field):
-            #return {'ecode': 1, 'msg': _("field not support")}
         if field == 'pubdate':
             try:
                 content = datetime.datetime.strptime(content, "%Y-%m-%d")
             except:
-                return {'ecode': 2, 'msg': _("date format error!")}
+                return {'ecode': 2, 'msg': _(u"日期格式错误，应为 2018-05-10 这种格式")}
         elif field == 'authors':
             content = [content]
         elif field == 'tags':
             content = content.replace(" ", "").split("/")
         mi.set(field, content)
         self.db.set_metadata(book_id, mi)
-        return {'ecode': 0, 'msg': _("edit OK")}
+        return {'ecode': 0, 'msg': _(u"更新成功")}
 
 class BookDelete(BaseHandler):
     def get(self, id):
@@ -203,7 +200,7 @@ class BookDelete(BaseHandler):
     @web.authenticated
     def post(self, id):
         if not self.is_admin():
-            self.add_msg('danger', _("Delete forbiden"))
+            self.add_msg('danger', _(u"无权限操作"))
             self.redirect("/book/%s"%id)
         else:
             self.db.delete_book(int(id))
@@ -220,7 +217,7 @@ class BookDownload(BaseHandler):
         self.user_history('download_history', book)
         self.count_increase(book_id, count_download=1)
         if 'fmt_%s'%fmt not in book:
-            raise web.HTTPError(404, reason = _('%s not found'%(fmt)) )
+            raise web.HTTPError(404, reason = _(u'%s格式无法下载'%(fmt)) )
         path = book['fmt_%s'%fmt]
         att = u'attachment; filename="%d-%s.%s"' % (book['id'], book['title'], fmt)
         self.set_header('Content-Disposition', att.encode('UTF-8'))
@@ -230,7 +227,7 @@ class BookDownload(BaseHandler):
 
 class BookList(ListHandler):
     def get(self):
-        title = _('All books')
+        title = _(u'全部书籍')
         category_name = 'books'
         tags = self.db.all_tags_with_count()
         tagmap = dict( (v[1], v[2]) for v in tags )
@@ -247,7 +244,7 @@ class BookList(ListHandler):
 
 class RecentBook(ListHandler):
     def get(self):
-        title = _('Recent updates') % vars()
+        title = _(u'新书推荐') % vars()
         category = "recents"
         ids = self.cache.search_for_books('')
         books = self.get_books(ids=ids)
@@ -256,7 +253,7 @@ class RecentBook(ListHandler):
 class SearchBook(ListHandler):
     def get(self):
         name = self.get_argument("name", None)
-        title = _('Search for: %(name)s') % vars()
+        title = _(u'搜索：%(name)s') % vars()
         ids = self.cache.search_for_books(name)
         books = self.get_books(ids=ids)
         search_query = name
@@ -264,8 +261,8 @@ class SearchBook(ListHandler):
 
 class HotBook(ListHandler):
     def get(self):
-        title = _('Hot Books')
-        db_items = self.session.query(Item).order_by(Item.count_visit.desc())
+        title = _(u'热度榜单')
+        db_items = self.session.query(Item).filter(Item.count_visit > 1 ).order_by(Item.count_download.desc())
         count = db_items.count()
         start = self.get_argument("start", 0)
         try: start = int(start)
@@ -286,7 +283,7 @@ class HotBook(ListHandler):
 class BookAdd(BaseHandler):
     @web.authenticated
     def get(self):
-        title = _('Upload Book')
+        title = _(u'添加书籍')
         return self.html_page('book/add.html', vars())
 
 
@@ -320,7 +317,7 @@ class BookUpload(BaseHandler):
         mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
         if fmt.lower() == "txt":
             mi.title = name.replace(".txt", "")
-            mi.authors = [_('Unknown')]
+            mi.authors = [_(u'佚名')]
         logging.error('upload mi = ' + repr(mi.title))
         books = self.db.books_with_same_title(mi)
         if books:
@@ -331,7 +328,7 @@ class BookUpload(BaseHandler):
         self.generate_books(mi, fpath, fmt)
         book_id = self.db.import_book(mi, fpaths )
         self.user_history('upload_history', {'id': book_id, 'title': mi.title})
-        self.add_msg('success', _("import books success"))
+        self.add_msg('success', _(u"导入书籍成功！"))
         item = Item()
         item.book_id = book_id
         item.collector_id = self.user_id()
@@ -354,7 +351,7 @@ class BookRead(BaseHandler):
         book_id = int(id)
         books = self.get_books(ids=[book_id])
         if not books:
-            raise web.HTTPError(404, reason = _("Sorry, book not found") )
+            raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
         book = books[0]
         self.user_history('read_history', book)
         self.count_increase(book_id, count_download=1)
@@ -366,7 +363,7 @@ class BookRead(BaseHandler):
                 epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/extract/")
                 self.extract_book(book, fpath, fmt)
                 return self.html_page('book/read.html', vars())
-        self.add_msg('success', _("Sorry, online-reader do not support this book."))
+        self.add_msg('success', _(u"抱歉，在线阅读器暂不支持该格式的书籍"))
         self.redirect('/book/%d'%book_id)
 
     @background
@@ -409,7 +406,7 @@ class BookPush(BaseHandler):
         book_id = int(id)
         books = self.get_books(ids=[book_id])
         if not books:
-            raise web.HTTPError(404, reason = _("Sorry, book not found") )
+            raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
         book = books[0]
         self.user_history('push_history', book)
         self.count_increase(book_id, count_download=1)
@@ -419,14 +416,14 @@ class BookPush(BaseHandler):
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
                 self.do_send_mail(book, mail_to, fmt, fpath)
-                self.add_msg( "success", _("Server is pushing book."))
+                self.add_msg( "success", _(u"服务器正在推送……"))
                 return self.redirect("/book/%d"%book['id'])
 
         # we do no have formats for kindle
         if 'fmt_epub' not in book and 'fmt_azw3' not in book and 'fmt_txt' not in book:
-            raise web.HTTPError(404, reason = _("Sorry, there's no available format for kindle"))
+            raise web.HTTPError(404, reason = _(u"抱歉，该书无可用于kindle阅读的格式"))
         self.convert_book(book, mail_to)
-        self.add_msg( "success", _("Server is pushing book."))
+        self.add_msg( "success", _(u"后台正在推送了~"))
         self.redirect("/book/%d"%book['id'])
 
     @background
@@ -453,8 +450,8 @@ class BookPush(BaseHandler):
             logging.error("read local_settings fail")
             pass
         # read meta info
-        author = authors_to_string(book['authors'] if book['authors'] else [_('Unknown')])
-        title = book['title'] if book['title'] else _("No Title")
+        author = authors_to_string(book['authors'] if book['authors'] else [_(u'佚名')])
+        title = book['title'] if book['title'] else _(u"无名书籍")
         fname = u'%s - %s.%s'%(title, author, fmt)
         fdata = open(fpath).read()
 
@@ -472,7 +469,7 @@ class BookPush(BaseHandler):
                     password=settings['smtp_password']
                     )
             status = "success"
-            msg = _('Send [%(title)s] to [%(mail_to)s] success!!') % vars()
+            msg = _('[%(title)s] 已成功发送至Kindle邮箱 [%(mail_to)s] !!') % vars()
             logging.info(msg)
         except:
             import traceback

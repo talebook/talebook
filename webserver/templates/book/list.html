@@ -22,9 +22,9 @@
 
 {% for book in books %}
     <div class="media list-book">
-        <a class="pull-left" href="/book/{{book.id}}"><img class="lazy list-book-img media-object" data-original="{{IMG}}/get/thumb_105_145/{{book.id}}.jpg" ></a>
+        <a class="pull-left" target="_blank" href="/book/{{book.id}}"><img class="lazy list-book-img media-object" data-original="{{IMG}}/get/thumb_105_145/{{book.id}}.jpg" ></a>
         <div class="media-body">
-            <h4 class="media-heading"><a href="/book/{{book.id}}">{{book.title}}</a></h4>
+            <h4 class="media-heading"><a target="_blank" href="/book/{{book.id}}">{{book.title}}</a></h4>
             <p>
                 <a href="/author/{{book.author_sort|urlencode}}">{{book.authors|join(", ")}}</a> /
                 <a href2="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a> /

@@ -56,9 +56,13 @@
                 {% if book.isbn %} {{book.isbn}} {% else %} 暂无 {% endif %}
                 </span><br/>
 
-                {% if book.website %}
                 <span class="field-name">链接：</span>
+                {% if book.website %}
                 <span >{{book.website|website|safe}}</span><br/>
+                {% elif book.isbn %}
+                <span ><a target="_blank" href="https://book.douban.com/isbn/{{book.isbn}}/">豆瓣</a></span><br/>
+                {% else %}
+                暂无<br/>
                 {% endif %}
 
                 <span class="field-name">热度：</span>
