@@ -24,11 +24,7 @@ class TagBooks(ListHandler):
     def get(self, name):
         title = _('Books of tag: %(name)s') % vars()
         category = "tags"
-        tag_id = self.cache.get_item_id(category, name)
-        ids = books = []
-        if tag_id:
-            ids = self.db.get_books_for_category(category, tag_id)
-            books = self.db.get_data_as_dict(ids=ids)
+        books = self.get_item_books(category, name)
         return self.render_book_list(books, vars());
 
 class AuthorList(ListHandler):
@@ -44,11 +40,7 @@ class AuthorBooks(ListHandler):
     def get(self, name):
         title = _('Books of author: %(name)s') % vars()
         category = "authors"
-        ids = books = []
-        author_id = self.cache.get_item_id(category, name)
-        if author_id:
-            ids = self.db.get_books_for_category(category, author_id)
-            books = self.db.get_data_as_dict(ids=ids)
+        books = self.get_item_books(category, name)
         return self.render_book_list(books, vars());
 
 class PubList(ListHandler):
@@ -62,12 +54,7 @@ class PubBooks(ListHandler):
     def get(self, name):
         title = _('Books of publisher: %(name)s') % vars()
         category = "publisher"
-        publisher_id = self.cache.get_item_id(category, name)
-        ids = books = []
-        if publisher_id:
-            ids = self.cache.books_for_field(category, publisher_id)
-            #ids = self.db.get_books_for_category(category, publisher_id)
-            books = self.db.get_data_as_dict(ids=ids)
+        books = self.get_item_books(category, name)
         return self.render_book_list(books, vars());
 
 class AuthorBooksUpdate(ListHandler):
@@ -105,11 +92,7 @@ class RatingBooks(ListHandler):
     def get(self, name):
         title = _('Books of rating: %(name)s') % vars()
         category = "rating"
-        ids = books = []
-        rating_id = self.db.get_rating_id(name)
-        if rating_id:
-            ids = self.db.get_books_for_category(category, rating_id)
-            books = self.db.get_data_as_dict(ids=ids)
+        books = self.get_item_books(category, name)
         return self.render_book_list(books, vars());
 
 def routes():

@@ -16,7 +16,7 @@ from calibre.ebooks.metadata.meta import get_metadata
 from calibre import fit_image, guess_type
 from calibre.utils.date import fromtimestamp
 from calibre.utils.smtp import sendmail, create_mail
-from calibre.utils.logging import Log
+from calibre.utils.logging import Log, FileStream
 from calibre.utils.filenames import ascii_filename
 from calibre.utils.magick.draw import (save_cover_data_to, Image,
         thumbnail as generate_thumbnail)
@@ -239,6 +239,14 @@ class BaseHandler(web.RequestHandler):
         return start
 
 class ListHandler(BaseHandler):
+    def get_item_books(self, category, name):
+        ids = books = []
+        item_id = self.cache.get_item_id(category, name)
+        if item_id:
+            ids = self.db.get_books_for_category(category, item_id)
+            books = self.db.get_data_as_dict(ids=ids)
+        return books
+
     def do_sort(self, items, field, ascending):
         items.sort(cmp=lambda x,y: cmp(x[field], y[field]), reverse=not ascending)
 

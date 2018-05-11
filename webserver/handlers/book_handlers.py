@@ -356,6 +356,7 @@ class BookRead(BaseHandler):
         for fmt in ['epub', 'mobi', 'azw', 'azw3', 'txt']:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
+                # epub_dir is for javascript
                 epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/extract/")
                 self.extract_book(book, fpath, fmt)
                 return self.html_page('book/read.html', vars())
@@ -376,7 +377,10 @@ class BookRead(BaseHandler):
             new_fmt = "epub"
             new_path = os.path.join(settings["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
             logging.error('convert book: %s => %s' % ( fpath, new_path));
+            progress_file = os.path.join(settings['convert_path'], 'progress-%s.%s.log' % (book['id'], fmt) )
+            logging.info("CONVERT: progress file = %s" % progress_file)
             log = Log()
+            log.outputs = [FileStream(open(progress_file, "w", 0))]
             plumber = Plumber(fpath, new_path, log)
             recommendations = [ ('flow_size', 15, OptionRecommendation.HIGH) ]
             plumber.merge_ui_recommendations(recommendations)
@@ -426,7 +430,10 @@ class BookPush(BaseHandler):
     def convert_book(self, book, mail_to=None):
         fmt = 'mobi'
         fpath = os.path.join(settings['convert_path'], '%s.%s' % (ascii_filename(book['title']), fmt) )
+        progress_file = os.path.join(settings['convert_path'], 'progress-%s.%s.log' % (book['id'], fmt) )
+        logging.info("CONVERT: progress file = %s" % progress_file)
         log = Log()
+        log.outputs = [FileStream(open(progress_file, "w", 0))]
         old_path = None
         for f in ['txt', 'azw3', 'epub']: old_path = book.get('fmt_%s' %f, old_path)
         #old_path = book.get('fmt_epub', book.get('fmt_txt'])
