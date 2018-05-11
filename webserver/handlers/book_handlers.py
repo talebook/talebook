@@ -91,7 +91,7 @@ class Index(BaseHandler):
         import random
         nav = "index"
         title = _(u'全部书籍')
-        ids = self.cache.search_for_books('')
+        ids = list(self.cache.search(''))
         if not ids: raise web.HTTPError(404, reason = _(u'本书库暂无藏书'))
         random_ids = random.sample(ids, 8)
         random_books = self.get_books(ids=random_ids)
@@ -112,7 +112,6 @@ class BookDetail(BaseHandler):
         if not books:
             raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
         book = books[0]
-        logging.error("%s", repr(book))
         book_id = book['id']
         book['is_public'] = True
         if ( book['publisher'] and book['publisher'] in (u'中信出版社') ) or u'吴晓波' in list(book['authors']):
@@ -229,8 +228,7 @@ class BookList(ListHandler):
     def get(self):
         title = _(u'全部书籍')
         category_name = 'books'
-        tags = self.db.all_tags_with_count()
-        tagmap = dict( (v[1], v[2]) for v in tags )
+        tagmap = self.all_tags_with_count()
         navs = []
         for h1, tags in BOOKNAV:
             tags = list( (v, tagmap.get(v, 0)) for v in tags )
@@ -246,7 +244,7 @@ class RecentBook(ListHandler):
     def get(self):
         title = _(u'新书推荐') % vars()
         category = "recents"
-        ids = self.cache.search_for_books('')
+        ids = self.cache.search('')
         books = self.get_books(ids=ids)
         return self.render_book_list(books, vars());
 
@@ -254,7 +252,7 @@ class SearchBook(ListHandler):
     def get(self):
         name = self.get_argument("name", None)
         title = _(u'搜索：%(name)s') % vars()
-        ids = self.cache.search_for_books(name)
+        ids = self.cache.search(name)
         books = self.get_books(ids=ids)
         search_query = name
         return self.render_book_list(books, vars());
@@ -264,9 +262,7 @@ class HotBook(ListHandler):
         title = _(u'热度榜单')
         db_items = self.session.query(Item).filter(Item.count_visit > 1 ).order_by(Item.count_download.desc())
         count = db_items.count()
-        start = self.get_argument("start", 0)
-        try: start = int(start)
-        except: start = 0
+        start = self.get_argument_start()
         delta = 20
         page_max = count / delta
         page_now = start / delta

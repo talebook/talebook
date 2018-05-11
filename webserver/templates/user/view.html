@@ -6,7 +6,7 @@
     <img style="margin: 0 10px; height:64px; width:64px; float:left;" src={{request.user.avatar}}></img>
     <div>
         <p style=" margin-top:5px">
-        <span style="font-size:25px">{{ request.user.username }}</span>
+        <span style="font-size:25px">{{request.user.id}} - {{ request.user.username }}</span>
         <br/>
         <a href="/setting"> 账号设置</a> | <a href="/logout"> 退出账号</a>
         <br/>

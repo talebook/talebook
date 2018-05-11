@@ -30,6 +30,20 @@
     </tr>
     {% endfor %}
 </table>
+<ul class="pagination">
+    <li {% if page_now == 0 %}class="disabled"{%endif%}><a href="?sort={{sort}}&start={{page_now*delta-delta}}">&laquo; 前页</a></li>
+
+    {% for p in pages %}
+    <li {%if page_now == p %}class="active"{%endif%}><a href="?sort={{sort}}&start={{p*delta}}">{{p+1}}</a></li>
+    {% endfor %}
+
+    {% if page_max not in pages %}
+    <li class="disabled"><a href="#">...</a></li>
+    <li><a href="?sort={{sort}}&start={{page_max*delta}}">{{page_max+1}}</a></li>
+    {% endif %}
+
+    <li {% if page_now == page_max %}class="disabled"{%endif%}><a href="?sort={{sort}}&start={{page_now*delta+delta}}">后页 &raquo;</a></li>
+</ul>
 </div>
 <div>
 {% endblock %}

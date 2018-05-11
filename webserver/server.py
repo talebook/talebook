@@ -78,7 +78,7 @@ def make_app():
 
     init_calibre()
 
-    import handlers, cache
+    import handlers
     from calibre.db.legacy import LibraryDatabase
 
     auth_db_path = settings['user_database']
@@ -87,7 +87,7 @@ def make_app():
     logging.info("Init Static  with [%s]" % settings['static_path'] )
     logging.info("Init LANG    with [%s]" % P('localization/locales.zip') )
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
-    cache = cache.Cache(book_db)
+    cache = book_db.new_api
 
     Base = declarative_base()
     engine = create_engine(auth_db_path, echo=False)
@@ -108,6 +108,7 @@ def make_app():
 
 
     settings.update({
+        "legacy": book_db,
         "cache": cache,
         "session": session,
         })

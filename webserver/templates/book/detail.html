@@ -28,7 +28,7 @@
                 {% if book.publisher %}
                 <span class="field-name">出版：</span>
                 <span class="hidden book-edit" data-meta="publisher">{{book.publisher}}</span>
-                <a id="id_publisher" class="meta-link" href2="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a><br/>
+                <a id="id_publisher" class="meta-link" href="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a><br/>
                 {% endif %}
 
                 {% if book.series %}
@@ -66,12 +66,13 @@
                 {% endif %}
 
                 <span class="field-name">热度：</span>
-                <span >{{book.count_visit}}</span><br/>
+                <span >{{book.count_visit}} 分</span><br/>
 
                 <span class="field-name">下载：</span>
-                <span >{{book.count_download}}</span><br/>
+                <span >{{book.count_download}} 次</span><br/>
 
                 <span class="field-name">评分：</span>
+                {% if book.rating %} {{book.rating}} 分 {% else %} 暂无评分 {% endif %}
                 <span style="display: inline-block;font-size:65%"><input type="number" class="rating"
                     onchange="update_rating(this, {{book.id}})"
                     value="{%if book.rating%}{{book.rating}}{%endif%}"
@@ -82,7 +83,7 @@
                 <span class="hidden book-edit" data-meta="tags">{{book.tags|join(" / ")}}</span>
                 <span id="id_tags" class="meta-link">
                 {% for tag in book.tags %}
-                <a href2="/tag/{{tag|urlencode}}">{{tag}}</a>
+                <a href="/tag/{{tag|urlencode}}">{{tag}}</a>
                 {% if not loop.last %} / {% endif %}
                 {% endfor%}
                 </span>

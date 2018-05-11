@@ -6,15 +6,26 @@ import logging
 from tornado import web
 from models import Reader
 from base_handlers import BaseHandler
+import json
 
 class Done(BaseHandler):
+    def get_sa(self, user):
+        social = user.social_auth.all()
+        if not social: return ""
+        return dict(social[0].extra_data)
+
     def get(self):
         user = self.get_current_user()
-        user.save()
+        sa = self.get_sa(user)
+        if sa:
+            user.username = sa['username']
+            user.save()
+        logging.info("LOGIN: %d - %s - %s" % ( user.id, user.username, sa))
+
         if user and not user.extra:
             socials = user.social_auth.all()
             if socials:
-                logging.debug("init new user %s" % user.username)
+                logging.info("init new user %s, info=%s" % (user.username, socials))
                 user.init(socials[0])
                 user.save()
         self.redirect('/')
@@ -74,7 +85,17 @@ class AdminView(BaseHandler):
     def get(self):
         if not self.is_admin():
             self.redirect('/', 302)
-        users = self.session.query(Reader).order_by(Reader.access_time.desc()).all()
+        items = self.session.query(Reader).order_by(Reader.access_time.desc())
+        count = items.count()
+        delta = 20
+        start = self.get_argument_start()
+        page_max = count / delta
+        page_now = start / delta
+        pages = []
+        for p in range(page_now-4, page_now+4):
+            if 0 <= p and p <= page_max:
+                pages.append(p)
+        users = items.limit(delta).offset(start).all()
         return self.html_page('admin/view.html', vars())
 
 class AdminSet(BaseHandler):

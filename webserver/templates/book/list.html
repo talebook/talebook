@@ -27,10 +27,9 @@
             <h4 class="media-heading"><a target="_blank" href="/book/{{book.id}}">{{book.title}}</a></h4>
             <p>
                 <a href="/author/{{book.author_sort|urlencode}}">{{book.authors|join(", ")}}</a> /
-                <a href2="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a> /
+                <a href="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a> /
                 {{book.pubdate|day}} /
                 {{book.count_download}} 次下载
-                <br/>
                 <br/>
                 <span class="brief">{% if book.comments %}{{book.comments|striptags}}{%endif%}</span>
             </p>

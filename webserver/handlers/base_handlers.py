@@ -9,7 +9,6 @@ from jinja2 import Environment, FileSystemLoader
 from functools import wraps
 from collections import defaultdict
 from gettext import gettext as _
-from cache import Cache
 
 import social.apps.tornado_app.handlers
 
@@ -62,8 +61,8 @@ class BaseHandler(web.RequestHandler):
     def initialize(self):
         self.session = self.settings['session']
         self.session.close()
-        self.cache = self.settings['cache']
-        self.db = self.cache.db
+        self.db = self.settings['legacy']
+        self.cache = self.db.new_api
         path = self.settings['static_path'] + '/img/default_cover.jpg'
         self.build_time = fromtimestamp(os.stat(path).st_mtime)
         self.default_cover = open(path, 'rb').read()
@@ -222,7 +221,22 @@ class BaseHandler(web.RequestHandler):
         item.count_download += kwargs.get('count_download', 0)
         item.save()
 
+    def search_for_books(self, query):
+        return self.db.search_getting_ids(
+                (query or '').strip(), self.search_restriction,
+                sort_results=False, use_virtual_library=False)
 
+    def all_tags_with_count(self):
+        sql = 'SELECT tags.name, count(distinct book) as count FROM tags left join books_tags_link on tags.id = books_tags_link.tag group by tags.id'
+        tags = dict( (i[0], i[1]) for i in self.cache.backend.conn.get(sql) )
+        return tags
+
+    def get_argument_start(self):
+        start = self.get_argument("start", 0)
+        try: start = int(start)
+        except: start = 0
+        if start < 0: start = 0
+        return start
 
 class ListHandler(BaseHandler):
     def do_sort(self, items, field, ascending):
@@ -238,10 +252,8 @@ class ListHandler(BaseHandler):
         return None
 
     def render_book_list(self, all_books, vars_):
-        start = self.get_argument("start", 0)
+        start = self.get_argument_start()
         sort = self.get_argument("sort", "timestamp")
-        try: start = int(start)
-        except: start = 0
         self.sort_books(all_books, sort)
         delta = 20
         page_max = len(all_books) / delta
