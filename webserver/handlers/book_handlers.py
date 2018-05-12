@@ -137,7 +137,6 @@ class BookRefer(BaseHandler):
         book_id = int(id)
         mi = self.db.get_metadata(book_id, index_is_id=True)
         title = re.sub(u'[(（].*', "", mi.title)
-        logging.info("Query: %s - %s - %s" % (title, mi.author_sort, mi.isbn))
 
         api = douban.DoubanBookApi(copy_image=False)
         # first, search title

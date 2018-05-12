@@ -245,7 +245,6 @@ class ListHandler(BaseHandler):
     def get_item_books(self, category, name):
         ids = books = []
         item_id = self.cache.get_item_id(category, name)
-        logging.info(u"Query [%s]: [%s] => [%s]" % (category, name, item_id))
         if item_id:
             ids = self.db.get_books_for_category(category, item_id)
             books = self.db.get_data_as_dict(ids=ids)

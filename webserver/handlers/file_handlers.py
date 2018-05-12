@@ -150,7 +150,6 @@ class ProxyImageHandler(BaseHandler):
 
     def get(self):
         url = self.get_argument("url")
-        logging.error(url)
 
         import urllib2, requests
         p = urllib2.urlparse.urlparse(url)
