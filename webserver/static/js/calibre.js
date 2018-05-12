@@ -43,6 +43,21 @@ function bind_book_editable(book_id) {
     $(".book-edit").addClass("book-edit-orig");
 }
 
+function book_choose_refer(book_id){
+    $('#id_update_dialog').modal();
+    $.ajax({
+        url: "/book/"+book_id+"/refer",
+        type: "GET",
+        dataType: "html",
+        success: function(rsp){
+            $("#id_update_dialog_body").html( rsp );
+        },
+        error: function(){
+            $("#id_update_dialog_body").html( "搜索失败" );
+        }
+    });
+}
+
 function update_rating(where, book_id) {
     r = $(where).val();
     $.ajax({

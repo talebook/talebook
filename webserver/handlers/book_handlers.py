@@ -3,6 +3,7 @@
 
 import logging
 import douban
+import baike
 import subprocess
 from base_handlers import *
 
@@ -130,26 +131,57 @@ class BookDetail(BaseHandler):
         else: self.count_increase(book_id, count_guest=1)
         return self.html_page('book/detail.html', vars())
 
-class BookUpdate(BaseHandler):
-    def post(self, id):
-        exam_id = self.get_argument("exam_id", None)
-        if exam_id != id:
-            raise web.HTTPError(403, 'Book exam id error')
-
-        book_id = self.do_book_update(id)
-        return self.redirect('/book/%d'%book_id)
-
-    def do_book_update(self, id):
+class BookRefer(BaseHandler):
+    @web.authenticated
+    def get(self, id):
         book_id = int(id)
         mi = self.db.get_metadata(book_id, index_is_id=True)
-        douban_mi = douban.get_douban_metadata(mi)
-        if not douban_mi:
-            return book_id
+        title = re.sub(u'[(（].*', "", mi.title)
+        logging.info("Query: %s - %s - %s" % (title, mi.author_sort, mi.isbn))
+
+        api = douban.DoubanBookApi(copy_image=False)
+        # first, search title
+        books = api.get_books_by_title(title, mi.author_sort)
+        if mi.isbn and mi.isbn != baike.BAIKE_ISBN:
+            if mi.isbn not in [ b.get('isbn13', "xxx") for b in books ]:
+                book = api.get_book_by_isbn(mi.isbn)
+                # alwayse put ISBN book in TOP1
+                if book: books.insert(0, book)
+        books = [ api._metadata(b) for b in books ]
+
+        # append baidu book
+        api = baike.BaiduBaikeApi(copy_image=False)
+        book = api.get_book(title)
+        if book: books.append( book )
+        return self.html_page('book/refer.html', vars())
+
+
+class BookReferSet(BaseHandler):
+    @web.authenticated
+    def post(self, id, isbn):
+        book_id = int(id)
+        if not isbn.isdigit():
+            raise web.HTTPError(400, reason = _(u'ISBN参数错误') )
+        mi = self.db.get_metadata(book_id, index_is_id=True)
+        if not mi:
+            raise web.HTTPError(404, reason = _(u'书籍不存在') )
+        if not self.is_admin():
+            raise web.HTTPError(403, reason = _(u'无权限'))
+
+        if isbn == baike.BAIKE_ISBN:
+            api = baike.BaiduBaikeApi(copy_image=True)
+            refer_mi = api.get_book(mi.title)
+        else:
+            mi.isbn = isbn
+            api = douban.DoubanBookApi(copy_image=True)
+            refer_mi = api.get_book(mi)
+
         if mi.cover_data[0]:
-            douban_mi.cover_data = None
-        mi.smart_update(douban_mi, replace_metadata=True)
+            refer_mi.cover_data = None
+        mi.smart_update(refer_mi, replace_metadata=True)
         self.db.set_metadata(book_id, mi)
-        return book_id
+        return self.redirect('/book/%d'%book_id)
+
 
 
 class BookRating(BaseHandler):
@@ -250,7 +282,7 @@ class RecentBook(ListHandler):
 
 class SearchBook(ListHandler):
     def get(self):
-        name = self.get_argument("name", None)
+        name = self.get_argument("name", "")
         title = _(u'搜索：%(name)s') % vars()
         ids = self.cache.search(name)
         books = self.get_books(ids=ids)
@@ -372,25 +404,30 @@ class BookRead(BaseHandler):
             subprocess.call(["chmod", "a+rx", "-R", fdir + "/META-INF"])
             return
 
+        progress_file = open(self.get_path_progress(book['id']), "w", 0)
         new_path = ""
         if fmt != "epub":
             new_fmt = "epub"
             new_path = os.path.join(settings["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
             logging.error('convert book: %s => %s' % ( fpath, new_path));
-            progress_file = os.path.join(settings['convert_path'], 'progress-%s.%s.log' % (book['id'], fmt) )
-            logging.info("CONVERT: progress file = %s" % progress_file)
             log = Log()
-            log.outputs = [FileStream(open(progress_file, "w", 0))]
+            log.outputs = [FileStream(progress_file)]
             plumber = Plumber(fpath, new_path, log)
             recommendations = [ ('flow_size', 15, OptionRecommendation.HIGH) ]
             plumber.merge_ui_recommendations(recommendations)
-            plumber.run()
+            try:
+                plumber.run()
+            except Exception as e:
+                progress_file.write(u"\n%s\n" % e)
+                progress_file.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
+                self.add_msg("danger", u'文件格式转换失败，请在QQ群里联系管理员.')
+                return
             self.db.add_format(book['id'], new_fmt, open(new_path, "rb"), index_is_id=True)
             fpath = new_path
 
         # extract to dir
         logging.error('extract book: %s' % fpath)
-        subprocess.call(["unzip", fpath, "-d", fdir])
+        subprocess.call(["unzip", fpath, "-d", fdir], stdout=progress_file)
         subprocess.call(["chmod", "a+rx", "-R", fdir+ "/META-INF"])
         if new_path: subprocess.call(["rm", new_fpath])
         return
@@ -430,15 +467,21 @@ class BookPush(BaseHandler):
     def convert_book(self, book, mail_to=None):
         fmt = 'mobi'
         fpath = os.path.join(settings['convert_path'], '%s.%s' % (ascii_filename(book['title']), fmt) )
-        progress_file = os.path.join(settings['convert_path'], 'progress-%s.%s.log' % (book['id'], fmt) )
-        logging.info("CONVERT: progress file = %s" % progress_file)
+        progress_file = open(self.get_path_progress(book['id']), "w", 0)
         log = Log()
-        log.outputs = [FileStream(open(progress_file, "w", 0))]
+        log.outputs = [FileStream(progress_file)]
         old_path = None
         for f in ['txt', 'azw3', 'epub']: old_path = book.get('fmt_%s' %f, old_path)
         #old_path = book.get('fmt_epub', book.get('fmt_txt'])
         plumber = Plumber(old_path, fpath, log)
         plumber.run()
+        try:
+            plumber.run()
+        except Exception as e:
+            progress_file.write("\n%s\n" % e)
+            progress_file.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
+            self.add_msg("danger", u'文件格式转换失败，请在QQ群里联系管理员.')
+            return
         self.db.add_format(book['id'], fmt, open(fpath, "rb"), index_is_id=True)
         if mail_to:
             self.do_send_mail(book, mail_to, fmt, fpath)
@@ -526,12 +569,13 @@ def routes():
         ( r'/book',                 BookList     ),
         ( r'/book/add',             BookAdd      ),
         ( r'/book/upload',          BookUpload   ),
+        ( r'/book/([0-9]+)',        BookDetail   ),
         ( r'/book/([0-9]+)/delete', BookDelete   ),
         ( r'/book/([0-9]+)/edit',   BookEdit     ),
-        ( r'/book/([0-9]+)/update', BookUpdate   ),
         ( r'/book/([0-9]+)/rating', BookRating   ),
         ( r'/book/([0-9]+)\.(.+)',  BookDownload ),
         ( r'/book/([0-9]+)/push',   BookPush     ),
         ( r'/book/([0-9]+)/read',   BookRead     ),
-        ( r'/book/([0-9]+)',        BookDetail   ),
+        ( r'/book/([0-9]+)/refer',  BookRefer    ),
+        ( r'/book/([0-9]+)/refer/set/([0-9]{13})$',  BookReferSet),
         ]

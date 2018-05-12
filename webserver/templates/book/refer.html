@@ -1,0 +1,32 @@
+
+{% if books %}
+<p>请选择最匹配的记录复制为本书的描述信息</p>
+<style>.refer .comments {height: 100px; overflow: hidden; text-overflow: ellipsis; }</style>
+<table class='table refer'>
+    {% for book in books %}
+    <tr>
+        <td style='vertical-align: middle; width: 100px;'>
+            <img style='height: 120px; max-width: 90px;' class="thumbnail" src="/pcover?url={{book.cover_url|urlencode}}" />
+        </td>
+        <td>
+            <p>
+                <span class="label label-success">{{book.source}}</span>
+                <a target='_blank' href="{{book.website}}#">{{book.title}}</a> - {{book.author_sort}}</h4>
+            </p>
+            <p class='comments' >
+            {{book.publisher}} (ISBN:{{book.isbn}}) <br/>
+            <small> {% if book.comments %}{{book.comments|striptags}}{%endif%}</small>
+            </p>
+        </td>
+
+        <td style='vertical-align: middle'>
+            <form class="form-horizontal" role="form" action="/book/{{book_id}}/refer/set/{{book.isbn}}" method="POST">
+                <button type="submit" class="btn btn-sm btn-success">设置</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p>暂未搜索到相关条目</p>
+{% endif %}

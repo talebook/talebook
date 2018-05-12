@@ -140,12 +140,62 @@ class ImageHandler(BaseHandler):
                  8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
         return lm.replace('month', month[updated.month])
 
+class ProxyImageHandler(BaseHandler):
+    def is_whitelist(self, host):
+        whitelist = ["doubanio.com", "bdstatic.com"]
+        for w in whitelist:
+            if host.endswith(w):
+                return True
+        return False
+
+    def get(self):
+        url = self.get_argument("url")
+        logging.error(url)
+
+        import urllib2, requests
+        p = urllib2.urlparse.urlparse(url)
+        if not self.is_whitelist(p.netloc):
+            self.write("yoho")
+            return
+
+        headers = {
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36",
+                "Referer": url,
+                }
+        r = requests.get(url, headers=headers)
+        for k,v in r.headers.items():
+            self.set_header(k, v)
+        self.write(r.content)
+        return
+
+class RobotHandler(BaseHandler):
+    def get(self):
+        f = os.path.join(settings['static_path'], "robots.txt")
+        self.write( open(f) )
+
+class ProgressHandler(BaseHandler):
+    def get(self, id):
+        book_id = int(id)
+        path = self.get_path_progress(book_id)
+        if not os.path.exists(path):
+            raise web.HTTPError(404, reason_ = 'nothing')
+        txt = open(path).read()
+        for hidden in self.settings.values():
+            if isinstance(hidden, (str, unicode)):
+                txt.replace(hidden, "XXX")
+        self.write(txt)
+
 
 def routes():
     return [
         (r'/get/(.*)/(.*)', ImageHandler),
-        (r"/extract/(.*)", web.StaticFileHandler,
+        (r'/pcover',        ProxyImageHandler),
+        (r'/progress/([0-9]+)',  ProgressHandler),
+        (r"/extract/(.*)",  web.StaticFileHandler,
             dict(path=settings['extract_path'])),
+        (r"/robots.txt",    web.StaticFileHandler,
+            dict(path=settings['static_path'])),
     ]
 
 

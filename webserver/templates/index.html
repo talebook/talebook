@@ -9,7 +9,7 @@
 <div class="row hidden-xs">
     {% for book in random_books %}
     <div class="col-xs-6 col-sm-3" style='padding: 0px'>
-        <a href="/book/{{book.id}}"><img class="lazy center-block random-book-img" data-original="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg" alt="cover"/></a>
+        <a href="/book/{{book.id}}"><img class="lazy center-block random-book-img" data-original="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg?t={{book.timestamp}}" alt="cover"/></a>
             <div class="caption">
                 <span><input type="number" class="rating"
                     onchange="update_rating(this, {{book.id}});"
@@ -35,7 +35,7 @@
     <div class="carousel-inner" role="listbox">
         {% for book in random_books %}
         <div class="item {%if loop.first%}active{%endif%}">
-            <a href="/book/{{book.id}}"><img class="lazy center-block" style='width: auto; height:420px' data-original="{{IMG}}/get/thumb_600_840/{{book.id}}.jpg" alt="{{book.title}}"/></a>
+            <a href="/book/{{book.id}}"><img class="lazy center-block" style='width: auto; height:420px' data-original="{{IMG}}/get/thumb_600_840/{{book.id}}.jpg?t={{book.timestamp}}" alt="{{book.title}}"/></a>
         </div>
         {%endfor%}
     </div>
@@ -57,12 +57,13 @@
     {% for book in new_books %}
     <div class="col-sm-6">
         <div class="media new-book">
-            <a class="pull-left" href="/book/{{book.id}}"><img class="lazy center-block new-book-img media-object" data-original="{{IMG}}/get/thumb_68_90/{{book.id}}.jpg" alt="cover"/></a>
+            <a class="pull-left" href="/book/{{book.id}}"><img class="lazy center-block new-book-img media-object" data-original="{{IMG}}/get/thumb_68_90/{{book.id}}.jpg?t={{book.timestamp}}" alt="cover"/></a>
             <div class="media-body">
                 <h4 class="media-heading"><a class="book-title" href="/book/{{book.id}}">{{book.title}}</a></h4>
                 <p>
-                {{book.authors|join(",")}}<br/>
-                {{book.publisher}} / {{book.pubdate|day}}<br/>
+                <a href="/author/{{book.author_sort|urlencode}}">{{book.authors|join(", ")}}</a> /
+                <a href="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a> /
+                {{book.pubdate|day}}<br/>
                 </p>
             </div>
             <div>

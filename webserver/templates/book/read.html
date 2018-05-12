@@ -18,6 +18,7 @@
         var i18n_url = "{{RES}}/static/readium/";
         var base_url = "{{RES}}/static/readium/lib/";
         var epub_url = "{{RES}}{{epub_dir}}";
+        var progress_url = "/progress/{{book_id}}";
     </script>
     <script type="text/javascript" src="{{static_url("js/jquery-1.11.1.min.js")}}"></script>
     <script type="text/javascript" src="{{static_url("readium/lib/require.js")}}" data-main="{{static_url("readium/lib/ReadiumViewerLite.js")}}"></script>
@@ -41,6 +42,12 @@
             margin-top: 100px;
             font-size: 150%;
         }
+        #progress {
+            width: 640px;
+            overflow-y: scroll;
+            margin: 0 auto;
+            min-height: 320px;
+        }
     </style>
 
     <!-- This is all application-specific HTML -->
@@ -48,6 +55,7 @@
         <nav class="navbar" role="banner"></nav>
         <div id="app-container">
         <p class="text-center" id="msg">正在加载书籍</p>
+        <pre id="progress"></pre>
         </div>
 
         <script>
@@ -69,11 +77,31 @@
                 });
             }
 
-            check_count = 120;
+            function load_progress(){
+                $.ajax({
+                    url: progress_url,
+                    success: function(html){
+                        if (html == window.progress ){
+                            return; 
+                        }
+                        $("#progress").html( html );
+                        window.progress = html;
+                        if ( html.search(/\[FINISH\]/) > 1 ) {
+                            window.check_count = 0;
+                        }
+                    },
+                    error: function(){
+                        $("#progress").hide();
+                    }
+                });
+            }
+
+            window.check_count = 120;
             function check_ready() {
-                check_count -= 1;
-                if ( check_count < 1 ) {
-                    $("#msg").html("系统异常，请联系管理员 admin@talebook.org");
+                load_progress();
+                window.check_count -= 1;
+                if ( window.check_count < 1 ) {
+                    $("#msg").html("系统异常，请在QQ群里联系管理员");
                     return;
                 }
                 $.ajax({
@@ -83,7 +111,7 @@
                         start_reader();
                     },
                     error: function(xhr) {
-                        $("#msg").html("首次阅读，服务器正在解压书籍，请等待约2分钟<br>"+check_count);
+                        $("#msg").html("首次阅读，服务器正在解压书籍，请等待约2分钟<br>"+window.check_count);
                         setTimeout(function(){ check_ready() }, 1000);
                     }
                 });

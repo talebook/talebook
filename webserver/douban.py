@@ -5,12 +5,8 @@ __license__   = 'GPL v3'
 __copyright__ = '2014, Rex Liao <talebook@foxmail.com>'
 __docformat__ = 'restructuredtext en'
 
-import datetime, json, logging, re
-
-from calibre.utils.magick.draw import Image
+import os, re, json, logging, datetime
 from urllib import urlopen
-from cStringIO import StringIO
-from calibre.ebooks.metadata.book.base import Metadata
 
 REMOVES = [
         re.compile(u'^\([^)]*\)\s*'),
@@ -18,7 +14,12 @@ REMOVES = [
         re.compile(u'^【[^】]*】\s*'),
         re.compile(u'^（[^）]*）\s*')
         ]
+
 class DoubanBookApi(object):
+    def __init__(self, copy_image=True, manual_select=False):
+        self.copy_image = copy_image
+        self.manual_select = manual_select
+
     def author(self, book):
         author = book['author']
         if not author: return None
@@ -36,7 +37,7 @@ class DoubanBookApi(object):
             return None
         return rsp
 
-    def get_book_by_title(self, title, author=None, select=False):
+    def get_books_by_title(self, title, author=None):
         API_SEARCH = "https://api.douban.com/v2/book/search?apikey=052c9ac15e9870500f85d0441bc950f0&q=%s"
         q = title + " " + author if author else title
         url = API_SEARCH % (q.encode('UTF-8'))
@@ -45,16 +46,19 @@ class DoubanBookApi(object):
             logging.error("******** douban API error: %d-%s **********" % (rsp['code'], rsp['msg']) )
             return None
 
-        books = rsp['books']
+        return rsp['books']
+
+    def get_book_by_title(self, title, author=None):
+        books = self.get_book_by_title(title, author)
         if not books: return None
         for b in books:
             if not b['author']: b['author'] = b['translator']
             if b['title'] != title and b['title']+":"+b['subtitle'] != title: continue
             if not author: return b
             if self.author(b) == author: return b
-        #if len(books) == 1: return books[0]
-        if not select: return False
 
+        # for console tools
+        if not self.manual_select: return None
         print ("\nSearch: <<%s>>, %s" % (title, author))
         for idx, b in enumerate(books):
             t = b['title']
@@ -75,21 +79,33 @@ class DoubanBookApi(object):
                 continue
         return None
 
-    def get_metadata(self, md, select):
+    def get_book(self, md):
+        return self.get_metadata(md)
+
+    def get_metadata(self, md):
         book = None
         if md.isbn:
             book = self.get_book_by_isbn(md.isbn)
         if not book:
-            book = self.get_book_by_title(md.title, md.author_sort, select)
+            book = self.get_book_by_title(md.title, md.author_sort)
         if not book:
             return None
+        return self._metadata(book)
+
+    def _metadata(self, book):
+        authors = []
+        if book['author']:
+            for author in book['author']:
+                for r in REMOVES:
+                    author = r.sub("", author)
+                authors.append( author )
+        if not authors: authors = [ u'佚名' ]
+
+        from calibre.ebooks.metadata.book.base import Metadata
+        from cStringIO import StringIO
         mi = Metadata(book['title'])
-        mi.authors     = book['author']
-        mi.author_sort = mi.authors[0] if mi.authors else None
-        if mi.author_sort:
-            for r in REMOVES:
-                mi.author_sort = r.sub("", mi.author_sort)
-            mi.authors[0] = mi.author_sort
+        mi.authors     = authors
+        mi.author_sort = mi.authors[0]
         mi.publisher   = book['publisher']
         mi.comments    = book['summary']
         mi.isbn        = book.get('isbn13', None)
@@ -100,12 +116,16 @@ class DoubanBookApi(object):
         mi.douban_id   = book['id']
         mi.douban_author_intro = book['author_intro']
         mi.douban_subtitle = book.get('subtitle', None)
+        mi.website     = "https://book.douban.com/isbn/%s" % mi.isbn
+        mi.source      = u'豆瓣'
 
-        img_url = book['images']['large']
-        img_fmt = img_url.split(".")[-1]
-        img = StringIO(urlopen(img_url).read())
-        mi.cover_data = (img_fmt, img)
-        #logging.error("=================\ndouban metadata:\n%s" % mi)
+        mi.cover_url = book['images']['large']
+        if self.copy_image:
+            img = StringIO(urlopen(mi.cover_url).read())
+            img_fmt = mi.cover_url.split(".")[-1]
+            mi.cover_data = (img_fmt, img)
+
+        logging.debug("=================\ndouban metadata:\n%s" % mi)
         return mi
 
 def get_douban_metadata(mi):

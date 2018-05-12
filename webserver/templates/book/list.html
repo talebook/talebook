@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<span class="legend visible-xs-block">{{title}}</span>
+<span class="legend visible-xs-block">{{title}}, 共{{count}}条结果</span>
 <div class="visible-xs-block">
         <div class="well">
             排序：
@@ -10,7 +10,7 @@
             {% if sort != "timestamp" %}<a href="?sort=timestamp&start={{start}}&name={{name}}">{% endif %}更新{% if sort != "timestamp" %}</a>{% endif%}
         </div>
 </div>
-<span class="legend hidden-xs">{{title}}
+<span class="legend hidden-xs">{{title}}, 共{{count}}条结果
         <div class="sorter pull-right">
             排序：
             {% if sort != "title" %}<a href="?sort=title&start={{start}}&name={{name}}">{% endif %}书名{% if sort != "title" %}</a>{% endif%} /
@@ -22,7 +22,7 @@
 
 {% for book in books %}
     <div class="media list-book">
-        <a class="pull-left" target="_blank" href="/book/{{book.id}}"><img class="lazy list-book-img media-object" data-original="{{IMG}}/get/thumb_105_145/{{book.id}}.jpg" ></a>
+        <a class="pull-left" target="_blank" href="/book/{{book.id}}"><img class="lazy list-book-img media-object" data-original="{{IMG}}/get/thumb_105_145/{{book.id}}.jpg?t={{book.timestamp}}" ></a>
         <div class="media-body">
             <h4 class="media-heading"><a target="_blank" href="/book/{{book.id}}">{{book.title}}</a></h4>
             <p>
@@ -38,18 +38,18 @@
 {% endfor %}
 
 <ul class="pagination">
-    <li {% if page_now == 0 %}class="disabled"{%endif%}><a href="?sort={{sort}}&start={{page_now*delta-delta}}">&laquo; 前页</a></li>
+    <li {% if page_now == 0 %}class="disabled"{%endif%}><a href="?sort={{sort}}&start={{page_now*delta-delta}}&name={{name}}">&laquo; 前页</a></li>
 
     {% for p in pages %}
-    <li {%if page_now == p %}class="active"{%endif%}><a href="?sort={{sort}}&start={{p*delta}}">{{p+1}}</a></li>
+    <li {%if page_now == p %}class="active"{%endif%}><a href="?sort={{sort}}&start={{p*delta}}&name={{name}}">{{p+1}}</a></li>
     {% endfor %}
 
     {% if page_max not in pages %}
     <li class="disabled"><a href="#">...</a></li>
-    <li><a href="?sort={{sort}}&start={{page_max*delta}}">{{page_max+1}}</a></li>
+    <li><a href="?sort={{sort}}&start={{page_max*delta}}&name={{name}}">{{page_max+1}}</a></li>
     {% endif %}
 
-    <li {% if page_now == page_max %}class="disabled"{%endif%}><a href="?sort={{sort}}&start={{page_now*delta+delta}}">后页 &raquo;</a></li>
+    <li {% if page_now == page_max %}class="disabled"{%endif%}><a href="?sort={{sort}}&start={{page_now*delta+delta}}&name={{name}}">后页 &raquo;</a></li>
 </ul>
 {% endblock %}
 

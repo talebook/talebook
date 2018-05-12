@@ -60,7 +60,7 @@ class Reader(Base, SQLAlchemyMixin):
     extra = Column(MutableDict.as_mutable(JSONType), default={})
 
     def init(self, social_user):
-        self.username = social_user.extra_data['user_name']
+        self.username = social_user.extra_data['username']
         self.create_time = datetime.datetime.now()
         self.update_time = datetime.datetime.now()
         self.access_time = datetime.datetime.now()

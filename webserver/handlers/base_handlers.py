@@ -238,10 +238,14 @@ class BaseHandler(web.RequestHandler):
         if start < 0: start = 0
         return start
 
+    def get_path_progress(self, book_id):
+        return os.path.join(self.settings['convert_path'], 'progress-%s.log' % book_id)
+
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):
         ids = books = []
         item_id = self.cache.get_item_id(category, name)
+        logging.info(u"Query [%s]: [%s] => [%s]" % (category, name, item_id))
         if item_id:
             ids = self.db.get_books_for_category(category, item_id)
             books = self.db.get_data_as_dict(ids=ids)
@@ -264,7 +268,8 @@ class ListHandler(BaseHandler):
         sort = self.get_argument("sort", "timestamp")
         self.sort_books(all_books, sort)
         delta = 20
-        page_max = len(all_books) / delta
+        count = len(all_books)
+        page_max = (count-1) / delta
         page_now = start / delta
         pages = []
         for p in range(page_now-4, page_now+4):
@@ -274,7 +279,7 @@ class ListHandler(BaseHandler):
         vars_.update(vars())
         if self.get_argument("fmt", 0) == "json":
             self.write( {
-                "total": len(books),
+                "total": count,
                 "books": [
                     {k:v for k,v in b.items() if k in ["id", "title", "author", "comments"]} for b in books
                 ],

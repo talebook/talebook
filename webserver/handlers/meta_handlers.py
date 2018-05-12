@@ -9,7 +9,7 @@ from calibre.utils.filenames import ascii_filename
 
 class TagList(ListHandler):
     def get(self):
-        title = _('All tags')
+        title = u'全部标签'
         category = "tags"
         tags = self.all_tags_with_count()
         hot_tags = []
@@ -22,14 +22,14 @@ class TagList(ListHandler):
 
 class TagBooks(ListHandler):
     def get(self, name):
-        title = _('Books of tag: %(name)s') % vars()
+        title = _(u'含有"%(name)s"标签的书籍') % vars()
         category = "tags"
         books = self.get_item_books(category, name)
         return self.render_book_list(books, vars());
 
 class AuthorList(ListHandler):
     def get(self):
-        title = _('All authors')
+        title = u'全部作者'
         category = "authors"
         authors = self.db.all_authors()
         authors.sort(cmp=lambda x,y: cmp(ascii_filename(x[1]).lower(), ascii_filename(y[1]).lower()))
@@ -38,21 +38,21 @@ class AuthorList(ListHandler):
 
 class AuthorBooks(ListHandler):
     def get(self, name):
-        title = _('Books of author: %(name)s') % vars()
+        title = _(u'%(name)s编著的书籍') % vars()
         category = "authors"
         books = self.get_item_books(category, name)
         return self.render_book_list(books, vars());
 
 class PubList(ListHandler):
     def get(self):
-        title = _('All publishers')
+        title = u'全部出版社'
         category = "publisher"
         publishers = self.cache.get_id_map(category).items()
         return self.html_page('publisher/list.html', vars())
 
 class PubBooks(ListHandler):
     def get(self, name):
-        title = _('Books of publisher: %(name)s') % vars()
+        title = _(u'%(name)s出版的书籍') % vars()
         category = "publisher"
         books = self.get_item_books(category, name)
         return self.render_book_list(books, vars());
@@ -82,7 +82,7 @@ class PubBooksUpdate(ListHandler):
 
 class RatingList(ListHandler):
     def get(self):
-        title = _('All ratings')
+        title = u'全部评分'
         category = "rating"
         ratings = self.cache.get_id_map(category).items()
         ratings.sort(cmp=lambda x,y: cmp(x[1], y[1]))
@@ -90,9 +90,9 @@ class RatingList(ListHandler):
 
 class RatingBooks(ListHandler):
     def get(self, name):
-        title = _('Books of rating: %(name)s') % vars()
+        title = _('评分为%(name)s星的书籍') % vars()
         category = "rating"
-        books = self.get_item_books(category, name)
+        books = self.get_item_books(category, int(name))
         return self.render_book_list(books, vars());
 
 def routes():
