@@ -20,7 +20,7 @@
     {% if history %}
     {% for book in history[:12] %}
     <div class="col-xs-4 col-sm-3 col-md-2">
-        <a href="/book/{{book.id}}"><img class="center-block history-book-img" src="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg" alt="cover"/></a>
+        <a href="/book/{{book.id}}"><img class="center-block history-book-img" src="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg?t={{book.timestamp}}" alt="cover"/></a>
         <h5><a class="text-center history-book-title" href="/book/{{book.id}}">{{book.title}}</a></h5>
     </div>
     {% endfor %}
@@ -36,7 +36,7 @@
     {% if history %}
     {% for book in history[:12] %}
     <div class="col-xs-4 col-sm-3 col-md-2">
-        <a href="/book/{{book.id}}"><img class="center-block history-book-img" src="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg" alt="cover"/></a>
+        <a href="/book/{{book.id}}"><img class="center-block history-book-img" src="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg?t={{book.timestamp}}" alt="cover"/></a>
         <h5><a class="text-center history-book-title" href="/book/{{book.id}}">{{book.title}}</a></h5>
     </div>
     {% endfor %}
