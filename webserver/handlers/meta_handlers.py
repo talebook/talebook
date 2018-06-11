@@ -32,7 +32,7 @@ class AuthorList(ListHandler):
         title = u'全部作者'
         category = "authors"
         authors = self.db.all_authors()
-        authors.sort(cmp=lambda x,y: cmp(ascii_filename(x[1]).lower(), ascii_filename(y[1]).lower()))
+        #authors.sort(cmp=lambda x,y: cmp(ascii_filename(x[1]).lower(), ascii_filename(y[1]).lower()))
         authors.sort(cmp=lambda x,y: cmp(x[1], y[1]))
         return self.html_page('author/list.html', vars())
 

@@ -231,6 +231,11 @@ class BaseHandler(web.RequestHandler):
         tags = dict( (i[0], i[1]) for i in self.cache.backend.conn.get(sql) )
         return tags
 
+    def books_by_timestamp(self):
+        sql = 'SELECT id, timestamp FROM books order by timestamp desc';
+        ids =  [ v[0] for v in self.cache.backend.conn.get(sql) ]
+        return ids
+
     def get_argument_start(self):
         start = self.get_argument("start", 0)
         try: start = int(start)
@@ -262,10 +267,11 @@ class ListHandler(BaseHandler):
             self.do_sort(items, field, ascending)
         return None
 
-    def render_book_list(self, all_books, vars_):
+    def render_book_list(self, all_books, vars_, ids=None):
         start = self.get_argument_start()
         sort = self.get_argument("sort", "timestamp")
-        self.sort_books(all_books, sort)
+
+        if ids: all_books = ids
         delta = 20
         count = len(all_books)
         page_max = (count-1) / delta
@@ -274,7 +280,12 @@ class ListHandler(BaseHandler):
         for p in range(page_now-4, page_now+4):
             if 0 <= p and p <= page_max:
                 pages.append(p)
-        books = all_books[start:start+delta]
+
+        if ids:
+            books = self.get_books(ids=ids[start:start+delta])
+        else:
+            self.sort_books(all_books, sort)
+            books = all_books[start:start+delta]
         vars_.update(vars())
         if self.get_argument("fmt", 0) == "json":
             self.write( {

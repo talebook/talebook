@@ -216,7 +216,7 @@ class BookEdit(BaseHandler):
             except:
                 return {'ecode': 2, 'msg': _(u"日期格式错误，应为 2018-05-10 这种格式")}
         elif field == 'authors':
-            content = [content]
+            content = content.split(";")
         elif field == 'tags':
             content = content.replace(" ", "").split("/")
         mi.set(field, content)
@@ -267,21 +267,20 @@ class BookList(ListHandler):
             navs.append( (h1, tags) )
 
         return self.html_page('book/all.html', vars())
-        ids = self.search_cache('')
-        books = self.get_books(ids=ids)
-        return self.render_book_list(books, vars());
 
 class RecentBook(ListHandler):
     def get(self):
         title = _(u'新书推荐') % vars()
         category = "recents"
-        ids = self.cache.search('')
-        books = self.get_books(ids=ids)
-        return self.render_book_list(books, vars());
+        ids = self.books_by_timestamp()
+        return self.render_book_list([], vars(), ids=ids);
 
 class SearchBook(ListHandler):
     def get(self):
         name = self.get_argument("name", "")
+        if not name.strip():
+            raise web.HTTPError(403, reason = _(u"请输入搜索关键字") )
+
         title = _(u'搜索：%(name)s') % vars()
         ids = self.cache.search(name)
         books = self.get_books(ids=ids)
