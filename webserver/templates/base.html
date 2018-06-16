@@ -131,24 +131,21 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                     </div>
                 </div>
             </div>
-            <div class="row">
-                <div class="col-md-12 footer">
-                    <div class="row">
-                        <div class="col-md-8">
-                            {% block content_footer %}{% endblock %}
-                        </div>
-                    </div>
-                    <p>
-                    本站基于<a href='//www.calibre-ebook.com'>Calibre</a>构建，感谢开源界的力量。本站所有资源搜集于互联网，如有侵权，请邮件联系。
-                    <br/>粤ICP备14073162号
-                    <br/>
-                    <a target="_blank" href="//shang.qq.com/wpa/qunwpa?idkey=850f55ba2f019ad83c5df4d60f31f0b5db2b856b40b03ed6cfe698be5b4455e3"><img border="0" src="//pub.idqqimg.com/wpa/images/group.png" alt="kindle阅读" title="kindle阅读"></a>
-                    </p>
-                </div>
-                <p>&nbsp;</p>
-            </div>
-            </div>
         </div>
+        <div class="col-md-12 footer">
+            <div class="row">
+                <div class="col-md-8">
+                    {% block content_footer %}{% endblock %}
+                </div>
+            </div>
+            <p>
+            本站基于<a href='//www.calibre-ebook.com'>Calibre</a>构建，感谢开源界的力量。本站所有资源搜集于互联网，如有侵权，请邮件联系。
+            <br/>粤ICP备14073162号
+            <br/>
+            <a target="_blank" href="//shang.qq.com/wpa/qunwpa?idkey=850f55ba2f019ad83c5df4d60f31f0b5db2b856b40b03ed6cfe698be5b4455e3"><img border="0" src="//pub.idqqimg.com/wpa/images/group.png" alt="kindle阅读" title="kindle阅读"></a>
+            </p>
+        </div>
+        <p>&nbsp;</p>
 
         {% block footer %}{% endblock %}
         <script src="{{static_url("js/jquery-1.11.1.min.js")}}"></script>

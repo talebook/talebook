@@ -11,21 +11,17 @@
 
     <span class="legend">&nbsp;</span>
     <div class="row">
-        <div class="col-xs-12">
+        <div class="col-xs-6">
             <!--扫描二维码（或搜索 love-talebook）添加微信公众号，读书更方便！-->
-            <img style="width:50%" class="center-block" src="{{static_url("img/wechat.jpg")}}" atl="wechat: love-talebook" />
+            <img style="width:160px" class="center-block" src="{{static_url("img/wechat.jpg")}}" atl="wechat: love-talebook" />
             <p class='text-center'>微信公众号</p>
         </div>
+        <div class="col-xs-6">
+            <!--扫描二维码（或搜索 love-talebook）添加微信公众号，读书更方便！-->
+            <img style="width:160px" class="center-block" src="{{static_url("img/qq.png")}}" atl="wechat: love-talebook" />
+            <p class='text-center'>QQ读书群</p>
+        </div>
     </div>
-
-    <span class="legend">添加书籍</span>
-    <div class="list-group">
-        <a class="btn btn-primary btn-block" href="/book/add"><span class="glyphicon glyphicon-cloud-upload"></span> 添加书籍</a>
-        {% if request.admin_user %}
-        <a class="btn btn-danger btn-block" href="/admin">管理员入口</a>
-        {% endif %}
-    </div>
-
 
     <span class="legend">分类浏览</span>
     <div class="list-group">
@@ -53,5 +49,14 @@
         <a href="#_" class="list-group-item"><span class="pull-right">{{count_all_users}}</span> 全部用户数</a>
         <a href="#_" class="list-group-item"><span class="pull-right">{{count_hot_users}}</span> 活跃用户数</a>
     </div>
+
+    <span class="legend">添加书籍</span>
+    <div class="list-group">
+        <a class="btn btn-primary btn-block" href="/book/add"><span class="glyphicon glyphicon-cloud-upload"></span> 添加书籍</a>
+        {% if request.admin_user %}
+        <a class="btn btn-danger btn-block" href="/admin">管理员入口</a>
+        {% endif %}
+    </div>
+
 
 </div>

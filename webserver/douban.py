@@ -146,5 +146,14 @@ def select_douban_metadata(mi):
         logging.error(traceback.format_exc())
         return None
 
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 2:
+        print("%s BOOK-TITLE" % sys.argv[0])
+        exit(0)
+    api = DoubanBookApi()
+    books = api.get_books_by_title(sys.argv[1].decode('UTF-8'))
+    from pprint import pprint
+    pprint(books)
 
 

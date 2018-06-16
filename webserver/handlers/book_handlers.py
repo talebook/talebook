@@ -94,11 +94,11 @@ class Index(BaseHandler):
         title = _(u'全部书籍')
         ids = list(self.cache.search(''))
         if not ids: raise web.HTTPError(404, reason = _(u'本书库暂无藏书'))
-        random_ids = random.sample(ids, 8)
-        random_books = self.get_books(ids=random_ids)
+        random_ids = random.sample(ids, 8*3)
+        random_books = [ b for b in self.get_books(ids=random_ids) if b['cover'] ][:8]
         ids.sort()
-        new_ids = random.sample(ids[-40:], 10)
-        new_books = self.get_books(ids=new_ids)
+        new_ids = random.sample(ids[-80:], 20)
+        new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] and b['comments'] ][:10]
         return self.html_page('index.html', vars())
 
 class About(BaseHandler):
@@ -140,7 +140,7 @@ class BookRefer(BaseHandler):
 
         api = douban.DoubanBookApi(copy_image=False)
         # first, search title
-        books = api.get_books_by_title(title, mi.author_sort)
+        books = api.get_books_by_title(title)
         if mi.isbn and mi.isbn != baike.BAIKE_ISBN:
             if mi.isbn not in [ b.get('isbn13', "xxx") for b in books ]:
                 book = api.get_book_by_isbn(mi.isbn)
@@ -204,7 +204,7 @@ class BookEdit(BaseHandler):
     @json_response
     def get(self, id):
         field = self.get_argument("field", None)
-        content = self.get_argument("content", None)
+        content = self.get_argument("content", "").strip()
         if not field or not content:
             return {'ecode': 1, 'msg': _(u"参数错误")}
 
@@ -216,7 +216,8 @@ class BookEdit(BaseHandler):
             except:
                 return {'ecode': 2, 'msg': _(u"日期格式错误，应为 2018-05-10 这种格式")}
         elif field == 'authors':
-            content = content.split(";")
+            content = list(set([ v.strip() for v in content.split(";") if v.strip() ]))
+            mi.set('author_sort', content[0])
         elif field == 'tags':
             content = content.replace(" ", "").split("/")
         mi.set(field, content)

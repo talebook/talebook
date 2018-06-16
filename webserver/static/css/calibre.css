@@ -34,8 +34,12 @@ border-bottom: 1px solid #e5e5e5;
 }
 .book-title {
     display: block;
-    height: 2.1em;
+    height: 1.1em;
     overflow-y: hidden
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    text-overflow: clip;
 }
 
 .history-book-title {
