@@ -10,7 +10,7 @@ from functools import wraps
 from collections import defaultdict
 from gettext import gettext as _
 
-import social.apps.tornado_app.handlers
+import social_tornado.handlers
 
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre import fit_image, guess_type

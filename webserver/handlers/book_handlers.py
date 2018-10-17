@@ -97,8 +97,9 @@ class Index(BaseHandler):
         random_ids = random.sample(ids, 8*3)
         random_books = [ b for b in self.get_books(ids=random_ids) if b['cover'] ][:8]
         ids.sort()
-        new_ids = random.sample(ids[-80:], 20)
-        new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] and b['comments'] ][:10]
+        new_ids = random.sample(ids[-300:], 20)
+        #new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] and b['comments'] ][:10]
+        new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] ][:10]
         return self.html_page('index.html', vars())
 
 class About(BaseHandler):
@@ -428,7 +429,7 @@ class BookRead(BaseHandler):
         logging.error('extract book: %s' % fpath)
         subprocess.call(["unzip", fpath, "-d", fdir], stdout=progress_file)
         subprocess.call(["chmod", "a+rx", "-R", fdir+ "/META-INF"])
-        if new_path: subprocess.call(["rm", new_fpath])
+        if new_path: subprocess.call(["rm", new_path])
         return
 
 

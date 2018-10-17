@@ -20,10 +20,10 @@ settings = {
     "SOCIAL_AUTH_LOGIN_REDIRECT_URL" : '/done/',
     "SOCIAL_AUTH_USER_MODEL"         : 'models.Reader',
     "SOCIAL_AUTH_AUTHENTICATION_BACKENDS" : (
-        'social.backends.douban.DoubanOAuth',
-        'social.backends.douban.DoubanOAuth2',
-        'social.backends.qq.QQOAuth2',
-        'social.backends.weibo.WeiboOAuth2',
+        'social_core.backends.douban.DoubanOAuth',
+        'social_core.backends.douban.DoubanOAuth2',
+        'social_core.backends.qq.QQOAuth2',
+        'social_core.backends.weibo.WeiboOAuth2',
     ),
 
     # See: http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28

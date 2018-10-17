@@ -13,8 +13,8 @@ from gettext import GNUTranslations
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
-from social.apps.tornado_app.models import init_social
-from social_tornado.routes import SOCIAL_AUTH_ROUTES
+from social_tornado.models import init_social
+from social_routes import SOCIAL_AUTH_ROUTES
 from settings import settings
 
 

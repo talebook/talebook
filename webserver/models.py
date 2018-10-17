@@ -5,8 +5,7 @@ import logging
 import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from social.storage.sqlalchemy_orm import JSONType, SQLAlchemyMixin
-from social.storage.sqlalchemy_orm import SQLAlchemyUserMixin
+from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin, SQLAlchemyUserMixin
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import relationship
 
