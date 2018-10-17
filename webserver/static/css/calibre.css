@@ -1,15 +1,15 @@
 
 .legend, legend {
-    margin-top: 10px;
-display: block;
-width: 100%;
-padding: 0;
-margin-bottom: 20px;
-font-size: 21px;
-line-height: inherit;
-color: #333;
-border: 0;
-border-bottom: 1px solid #e5e5e5;
+    margin-top: 20px;
+    display: block;
+    width: 100%;
+    padding: 0;
+    margin-bottom: 20px;
+    font-size: 21px;
+    line-height: inherit;
+    color: #333;
+    border: 0;
+    border-bottom: 1px solid #e5e5e5;
 }
 .sorter {
     margin-top: 10px;
@@ -34,8 +34,8 @@ border-bottom: 1px solid #e5e5e5;
 }
 .book-title {
     display: block;
-    height: 1.1em;
-    overflow-y: hidden
+    height: 1em;
+    overflow-y: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -46,7 +46,7 @@ border-bottom: 1px solid #e5e5e5;
     font-size: 85%;
     display: block;
     height: 2.1em;
-    overflow-y: hidden
+    overflow-y: hidden;
 }
 
 a>img.random-book-img {
@@ -81,10 +81,10 @@ a>img.history-book-img {
 }
 
 .new-book .book-comments {
-    text-indent: 2em;
+    /*text-indent: 2em;*/
     overflow: hidden;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
     text-overflow: clip;
     margin-top: 6px;

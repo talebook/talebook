@@ -5,10 +5,10 @@
 <table class='table refer'>
     {% for book in books %}
     <tr>
-        <td style='vertical-align: middle; width: 100px;'>
-            <img style='height: 120px; max-width: 90px;' class="thumbnail" src="/pcover?url={{book.cover_url|urlencode}}" />
+        <td style='vertical-align: middle; padding: 8px 0px;'>
+            <img style='height: 120px; max-width: 90px;' src="/pcover?url={{book.cover_url|urlencode}}" />
         </td>
-        <td>
+        <td style='vertical-align: middle; padding: 8px 0px;'>
             <p>
                 <span class="label label-success">{{book.source}}</span>
                 <a target='_blank' href="{{book.website}}#">{{book.title}}</a> - {{book.author_sort}}</h4>
@@ -19,7 +19,7 @@
             </p>
         </td>
 
-        <td style='vertical-align: middle'>
+        <td style='vertical-align: middle; padding: 8px 0px;'>
             <form class="form-horizontal" role="form" action="/book/{{book_id}}/refer/set/{{book.isbn}}" method="POST">
                 <button type="submit" class="btn btn-sm btn-success">设置</button>
             </form>

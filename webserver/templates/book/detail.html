@@ -13,11 +13,13 @@
 <div class="row">
     <div class="col-md-12">
         <div class="center-block">
-            <h1 class="text-center book-edit" data-meta="title">{{book.title}}</h1>
+            <legend><h2 class="text-center book-edit" data-meta="title">{{book.title}}</h2></legend>
         </div>
 
         <div class="media">
-            <img class="col-sm-5 col-md-5 media-object center-block" src="{{IMG}}/get/thumb_300_420/{{book.id}}.jpg?t={{book.timestamp}}" alt="...">
+            <div class="col-sm-5 col-md-5 center-block">
+            <img class="media-object" style="max-width: 99%"  src="{{IMG}}/get/thumb_300_420/{{book.id}}.jpg?t={{book.timestamp}}" alt="...">
+            </div>
             <div class="media-body">
                 <p class="lead">
 
@@ -151,9 +153,11 @@
 
 {% block content_footer %}
 <!-- CHANGYAN COMMENT BEGIN -->
+<!--
 <div id="SOHUCS" sid="{{book.id}}" ></div>
 <style>#SOHUCS #SOHU_MAIN .module-mobile-cmt-header { background-color: inherit; } </style>
 <script id="changyan_mobile_js" charset="utf-8" type="text/javascript" src="//changyan.sohu.com/upload/mobile/wap-js/changyan_mobile.js?client_id=cytBSrHjj&conf=prod_8d13f02a29950a434ddf28fd051b732f"></script>
+-->
 <!-- CHANGYAN COMMENT END -->
 {% endblock %}
 

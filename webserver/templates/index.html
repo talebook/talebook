@@ -9,13 +9,13 @@
 <div class="row hidden-xs">
     {% for book in random_books %}
     <div class="col-xs-6 col-sm-3" style='padding: 0px'>
-        <a href="/book/{{book.id}}"><img class="lazy center-block random-book-img" data-original="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg?t={{book.timestamp}}" alt="cover"/></a>
+        <a target="_blank" href="/book/{{book.id}}"><img class="lazy center-block random-book-img" data-original="{{IMG}}/get/thumb_155_220/{{book.id}}.jpg?t={{book.timestamp}}" alt="cover"/></a>
             <div class="caption">
                 <span><input type="number" class="rating"
                     onchange="update_rating(this, {{book.id}});"
                     value="{%if book.rating%}{{book.rating}}{%endif%}"
                     data-min=0 data-max=10 data-size="xs" ></span>
-                <h5><a class="text-center book-title" href="/book/{{book.id}}">{{book.title}}</a></h5>
+                <h5><a target="_blank" class="text-center book-title" href="/book/{{book.id}}">{{book.title}}</a></h5>
             </div>
     </div>
     {% endfor %}
@@ -57,17 +57,17 @@
     {% for book in new_books %}
     <div class="col-sm-6">
         <div class="media new-book">
-            <a class="pull-left" href="/book/{{book.id}}"><img class="lazy center-block new-book-img media-object" data-original="{{IMG}}/get/thumb_68_90/{{book.id}}.jpg?t={{book.timestamp}}" alt="cover"/></a>
+            <a class="pull-left" target="_blank" href="/book/{{book.id}}"><img class="lazy center-block new-book-img media-object" data-original="{{IMG}}/get/thumb_68_90/{{book.id}}.jpg?t={{book.timestamp}}" alt="cover"/></a>
             <div class="media-body">
-                <h4 class="media-heading"><a class="book-title" href="/book/{{book.id}}">{{book.title}}</a></h4>
-                <p>
-                <a href="/author/{{book.author_sort|urlencode}}">{{book.authors|join(", ")}}</a> /
-                <a href="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a>
+                <h4 class="media-heading"><a class="book-title" target="_blank" href="/book/{{book.id}}">{{book.title}}</a></h4>
+                <p class="book-comments">
+                <a target="_blank" href="/author/{{book.author_sort|urlencode}}">{{book.authors|join(", ")}}</a>
+                {% if book.publisher %}/ <a target="_blank" href="/pub/{{book.publisher|urlencode}}">{{book.publisher}}</a>{%endif%}
                 <br/>
+                {% if book.comments %}{{book.comments|striptags}}{%else%}点击浏览详情{%endif%}
                 </p>
             </div>
             <div>
-                <p class="book-comments">{% if book.comments %}{{book.comments|striptags}}{%endif%}</p>
             </div>
         </div>
     </div>

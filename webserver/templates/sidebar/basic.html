@@ -9,20 +9,6 @@
     </div>
 -->
 
-    <span class="legend">&nbsp;</span>
-    <div class="row">
-        <div class="col-xs-6">
-            <!--扫描二维码（或搜索 love-talebook）添加微信公众号，读书更方便！-->
-            <img style="width:160px" class="center-block" src="{{static_url("img/wechat.jpg")}}" atl="wechat: love-talebook" />
-            <p class='text-center'>微信公众号</p>
-        </div>
-        <div class="col-xs-6">
-            <!--扫描二维码（或搜索 love-talebook）添加微信公众号，读书更方便！-->
-            <img style="width:160px" class="center-block" src="{{static_url("img/qq.png")}}" atl="wechat: love-talebook" />
-            <p class='text-center'>QQ读书群</p>
-        </div>
-    </div>
-
     <span class="legend">分类浏览</span>
     <div class="list-group">
         <a href="/book"     class="list-group-item {% if category == "books"      %}active{% endif %}"><span class="badge">{{db.count()}}</span> 所有书籍</a>
@@ -49,6 +35,18 @@
         <a href="#_" class="list-group-item"><span class="pull-right">{{count_all_users}}</span> 全部用户数</a>
         <a href="#_" class="list-group-item"><span class="pull-right">{{count_hot_users}}</span> 活跃用户数</a>
     </div>
+
+    <div class="row">
+        <div class="col-xs-6">
+            <img style="width:100%" class="center-block" src="{{static_url("img/wechat.jpg")}}" atl="wechat: love-talebook" />
+            <p class='text-center'>微信公众号</p>
+        </div>
+        <div class="col-xs-6">
+            <img style="width:100%" class="center-block" src="{{static_url("img/qq.png")}}" atl="wechat: love-talebook" />
+            <p class='text-center'>QQ读书群</p>
+        </div>
+    </div>
+
 
     <span class="legend">添加书籍</span>
     <div class="list-group">
