@@ -27,9 +27,7 @@ class DoubanBookApi(object):
         return author
 
     def get_book_by_isbn(self, isbn):
-        API_SEARCH = "https://api.douban.com/v2/book/isbn/%s?apikey=04f64a310943d5d80ee2de931bcb8188"
-        API_SEARCH = "https://api.douban.com/v2/book/isbn/%s?apikey=0f3f80e12f8f119a2dbe82a38ead34ce"
-        API_SEARCH = "https://api.douban.com/v2/book/isbn/%s?apikey=05d8205c45d62eb011886114d1828c10"
+        API_SEARCH = "https://api.douban.com/v2/book/isbn/%s"
         url = API_SEARCH % isbn
         rsp = json.loads(urlopen(url).read())
         if 'code' in rsp and rsp['code'] != 0:
@@ -38,7 +36,7 @@ class DoubanBookApi(object):
         return rsp
 
     def get_books_by_title(self, title, author=None):
-        API_SEARCH = "https://api.douban.com/v2/book/search?apikey=052c9ac15e9870500f85d0441bc950f0&q=%s"
+        API_SEARCH = "https://api.douban.com/v2/book/search?q=%s"
         q = title + " " + author if author else title
         url = API_SEARCH % (q.encode('UTF-8'))
         rsp = json.loads(urlopen(url).read())
