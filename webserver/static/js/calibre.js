@@ -19,7 +19,7 @@ function bind_book_editable(book_id) {
                 console.log(field + " ==> " + data.content);
                 $.ajax({
                     url: "/book/"+book_id+"/edit",
-                    type: 'get',
+                    type: 'POST',
                     data: {field: field, content: data.content },
                     dataType: 'json',
                     success: function(rsp) {

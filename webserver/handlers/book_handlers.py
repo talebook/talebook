@@ -203,7 +203,7 @@ class BookRating(BaseHandler):
 
 class BookEdit(BaseHandler):
     @json_response
-    def get(self, id):
+    def post(self, id):
         field = self.get_argument("field", None)
         content = self.get_argument("content", "").strip()
         if not field or not content:
