@@ -244,7 +244,7 @@ class BaseHandler(web.RequestHandler):
         return start
 
     def get_path_progress(self, book_id):
-        return os.path.join(self.settings['convert_path'], 'progress-%s.log' % book_id)
+        return os.path.join(self.settings['progress_path'], 'progress-%s.log' % book_id)
 
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):

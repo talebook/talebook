@@ -25,7 +25,8 @@ class BaiduBaikeApi:
         from baidubaike import Page
         try:
             return Page(title)
-        except:
+        except Exception as e:
+            logging.error(e)
             return None
 
     def _metadata(self, baike):
@@ -65,7 +66,9 @@ class BaiduBaikeApi:
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
     api = BaiduBaikeApi()
-    print api.get_baike_metadata(self, u'法神重生')
+    print api.get_book(u'法神重生')
+    print api.get_book(u'开放的智力：知乎采铜自选集')
 
 

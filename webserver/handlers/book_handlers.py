@@ -387,11 +387,11 @@ class BookRead(BaseHandler):
         # check format
         for fmt in ['epub', 'mobi', 'azw', 'azw3', 'txt']:
             fpath = book.get("fmt_%s" % fmt, None)
-            if fpath:
-                # epub_dir is for javascript
-                epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/extract/")
-                self.extract_book(book, fpath, fmt)
-                return self.html_page('book/read.html', vars())
+            if not fpath: continue
+            # epub_dir is for javascript
+            epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/extract/")
+            self.extract_book(book, fpath, fmt)
+            return self.html_page('book/read.html', vars())
         self.add_msg('success', _(u"抱歉，在线阅读器暂不支持该格式的书籍"))
         self.redirect('/book/%d'%book_id)
 
@@ -410,6 +410,7 @@ class BookRead(BaseHandler):
             new_fmt = "epub"
             new_path = os.path.join(settings["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
             logging.error('convert book: %s => %s' % ( fpath, new_path));
+            os.chdir('/tmp/')
             log = Log()
             log.outputs = [FileStream(progress_file)]
             plumber = Plumber(fpath, new_path, log)
@@ -427,6 +428,8 @@ class BookRead(BaseHandler):
 
         # extract to dir
         logging.error('extract book: %s' % fpath)
+        os.chdir(fdir)
+        progress_file.write(u"Dir: %s\n" % fdir)
         subprocess.call(["unzip", fpath, "-d", fdir], stdout=progress_file)
         subprocess.call(["chmod", "a+rx", "-R", fdir+ "/META-INF"])
         if new_path: subprocess.call(["rm", new_path])
