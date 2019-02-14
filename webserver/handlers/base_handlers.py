@@ -164,11 +164,13 @@ class BaseHandler(web.RequestHandler):
         return t.render(**namespace)
 
     def json_page(self, template, vals):
-        m = template.split(".html")[0].replace("/", ".")
+        p = template.split(".html")[0].replace("/", ".")
         try:
-            p = getattr(__import__("jsons." + m), m)
-            p = reload(p)
-            self.write( p.json_output(self, vals) )
+            m = __import__("jsons."+p)
+            for pp in p.split("."):
+                m = getattr(m, pp)
+            m = reload(m)
+            self.write( m.json_output(self, vals) )
         except Exception as e:
             import traceback
             logging.error(traceback.format_exc())
