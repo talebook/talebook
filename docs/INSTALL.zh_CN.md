@@ -23,13 +23,15 @@ mkdir /data/books/{library,extract,upload,convert,progress}
 cd /data/release/www/calibre.talebook.org/
 git clone https://github.com/talebook/my-calibre-server.git
 ```
-
+注意：如果要修改访问域名，可以不调整代码目录，只调整nginx中的配置即可。
 
 填写配置
 ============
 ## 申请社交网站应用账号
 在配置文件中，可以看到有相关的配置信息：
-``/data/release/www/calibre.talebook.org/my-calibre-server/webserver/settings.py``
+```
+/data/release/www/calibre.talebook.org/my-calibre-server/webserver/settings.py
+```
 
 ## QQ邮箱推送
 进入[网址](http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28), 申请SMTP账号，用于给Kindle推送。
@@ -78,6 +80,6 @@ nginx -s start
 
 访问
 ===============
-打开 http://web_server_ip:8000/ 测试python启动是否正常；
-打开 https://web_server_ip/ 测试nginx启动是否正常
+* 打开 http://web_server_ip:8000/ 测试python启动是否正常；
+* 打开 https://web_server_ip/ 测试nginx启动是否正常
 
