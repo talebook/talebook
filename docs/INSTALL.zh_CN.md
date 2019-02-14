@@ -22,10 +22,23 @@ mkdir -p /data/release/www/calibre.talebook.org/
 mkdir /data/books/{library,extract,upload,convert,progress}
 cd /data/release/www/calibre.talebook.org/
 git clone https://github.com/talebook/my-calibre-server.git
-cd /data/books/
-git clone https://github.com/talebook/talebook-library.git
+
 ```
 注意：如果要修改访问域名，可以不调整代码目录，只调整nginx中的配置即可。
+
+创建基础书库
+===========
+请事先准备30本书籍。
+使用以下命令创建书库：
+```
+calibredb add --library-path=/data/books/library/  -r  书籍目录
+```
+
+或者可以从github下载talebook.org的书库（非常非常大，会很慢）
+```
+git clone https://github.com/talebook/talebook-library.git /data/books/library
+```
+
 
 填写配置
 ============
