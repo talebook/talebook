@@ -14,7 +14,7 @@ sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy tornado 
 * /data/books/: 作为书库目录
 * /data/release/www/calibre.talebook.org/: 作为代码目录
 
-部署代码
+部署代码和书库
 ==========
 ```
 mkdir -p /data/books/
@@ -22,6 +22,8 @@ mkdir -p /data/release/www/calibre.talebook.org/
 mkdir /data/books/{library,extract,upload,convert,progress}
 cd /data/release/www/calibre.talebook.org/
 git clone https://github.com/talebook/my-calibre-server.git
+cd /data/books/
+git clone https://github.com/talebook/talebook-library.git
 ```
 注意：如果要修改访问域名，可以不调整代码目录，只调整nginx中的配置即可。
 
@@ -61,6 +63,13 @@ git clone https://github.com/talebook/my-calibre-server.git
 'SOCIAL_AUTH_QQ_KEY'               : '',
 'SOCIAL_AUTH_QQ_SECRET'            : '',
 ```
+
+创建DB
+=============
+```
+python /data/release/www/calibre.talebook.org/my-calibre-server/server.py --syncdb
+```
+
 
 启动服务
 =============
