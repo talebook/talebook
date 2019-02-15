@@ -6,7 +6,7 @@
 
 ## 依赖包
 ```
-sudo apt-get install python2.7 calibre python-pip nginx-extra unzip
+sudo apt-get install python2.7 calibre python-pip nginx-extras unzip supervisor sqlite3 git
 sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy tornado Baidubaike jinja
 ```
 
