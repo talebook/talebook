@@ -21,7 +21,7 @@ mkdir -p /data/log/
 mkdir -p /data/release/www/calibre.talebook.org/
 mkdir -p /data/books/{library,extract,upload,convert,progress}
 cd /data/release/www/calibre.talebook.org/
-git clone https://github.com/talebook/my-calibre-server.git
+git clone https://github.com/talebook/my-calibre-webserver.git
 
 ```
 注意：如果要修改访问域名，可以不调整代码目录，只调整nginx中的配置即可。
@@ -45,7 +45,7 @@ git clone https://github.com/talebook/talebook-library.git /data/books/library
 ## 申请社交网站应用账号
 在配置文件中，可以看到有相关的配置信息：
 ```
-/data/release/www/calibre.talebook.org/my-calibre-server/webserver/settings.py
+/data/release/www/calibre.talebook.org/my-calibre-webserver/webserver/settings.py
 ```
 
 ## QQ邮箱推送
@@ -80,7 +80,7 @@ git clone https://github.com/talebook/talebook-library.git /data/books/library
 创建DB
 =============
 ```
-python /data/release/www/calibre.talebook.org/my-calibre-server/server.py --syncdb
+python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --syncdb
 ```
 
 配置单用户模式（可选）

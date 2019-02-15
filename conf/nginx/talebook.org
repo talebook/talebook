@@ -64,7 +64,7 @@ server {
     ssl_certificate_key ssl/img.talebook.org.key;
 
     expires    30d;
-    root       /data/release/www/calibre.talebook.org/my-calibre-server/webserver/;
+    root       /data/release/www/calibre.talebook.org/my-calibre-webserver/webserver/;
     access_log /var/log/nginx/img.talebook.org-access.log;
     error_log  /var/log/nginx/img.talebook.org-error.log;
     add_header Access-Control-Allow-Origin *;
@@ -98,7 +98,7 @@ server {
     ssl_certificate_key ssl/js.talebook.org.key;
 
     expires    30d;
-    root       /data/release/www/calibre.talebook.org/my-calibre-server/webserver/;
+    root       /data/release/www/calibre.talebook.org/my-calibre-webserver/webserver/;
     access_log /var/log/nginx/js.talebook.org-access.log;
     error_log  /var/log/nginx/js.talebook.org-error.log;
     add_header Access-Control-Allow-Origin *;
