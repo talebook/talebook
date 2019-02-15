@@ -6,8 +6,8 @@
 
 ## 依赖包
 ```
-sudo apt-get install calibre python-pip nginx-extra
-sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy tornado Baidubaike
+sudo apt-get install calibre python-pip nginx-extra unzip
+sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy tornado Baidubaike jinja
 ```
 
 ## 部署目录
@@ -17,9 +17,9 @@ sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy tornado 
 部署代码和书库
 ==========
 ```
-mkdir -p /data/books/
+mkdir -p /data/log/
 mkdir -p /data/release/www/calibre.talebook.org/
-mkdir /data/books/{library,extract,upload,convert,progress}
+mkdir -p /data/books/{library,extract,upload,convert,progress}
 cd /data/release/www/calibre.talebook.org/
 git clone https://github.com/talebook/my-calibre-server.git
 
@@ -81,6 +81,20 @@ git clone https://github.com/talebook/talebook-library.git /data/books/library
 =============
 ```
 python /data/release/www/calibre.talebook.org/my-calibre-server/server.py --syncdb
+```
+
+配置单用户模式（可选）
+=============
+连接用户DB ```sqlite3 /data/books/develop.db``` ，然后创建默认用户：
+```
+insert into readers(id, username, active, extra ) values(1, "User", 1, "{}");
+```
+修改登录```webserver/handlers/user_handlers.py```中的Login函数为自动使用默认用户：
+```
+class Login(BaseHandler):
+    def get(self):
+        self.set_secure_cookie("user_id", "1")
+        self.redirect('/')
 ```
 
 
