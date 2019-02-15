@@ -1,4 +1,4 @@
-my-calibre-server
+My Calibre WebServer
 ====================
 A simple books library management website. Use Calibre as backend.
 
