@@ -72,8 +72,8 @@ def make_app():
     try:
         import local_settings
         settings.update(local_settings.settings)
+        logging.info("loading local_settings.py")
     except Exception as e:
-        logging.error("read local_settings fail")
         pass
 
     init_calibre()
