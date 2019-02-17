@@ -204,6 +204,18 @@ class BaseHandler(web.RequestHandler):
         else:
             self.write( self.render_string(template, **vals) )
 
+    def get_book(self, book_id):
+        books = self.get_books(ids=[int(book_id)])
+        if not books:
+            raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
+        return books[0]
+
+    def is_book_owner(self, book_id, user_id):
+        query = self.session.query(Item)
+        query = query.filter(Item.book_id == book_id)
+        query = query.filter(Item.collector_id == user_id)
+        return (query.count() > 0)
+
     def get_books(self, *args, **kwargs):
         _ts = time.time()
         books = self.db.get_data_as_dict(*args, **kwargs)

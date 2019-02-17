@@ -128,11 +128,13 @@
         {% endfor %}
     </div>
 
-    {% if request.user.admin %}
+    {% if book.is_owner %}
     <span class="legend">编辑</span>
     <div class="list-group">
-        <a href="#" class="list-group-item" onclick="return book_choose_refer({{book.id}});"><span class="glyphicon glyphicon-refresh"></span> <span class="badge">Douban</span> 自动更新</a>
+        <a href="#" class="list-group-item" onclick="return book_choose_refer({{book.id}});"><span class="glyphicon glyphicon-refresh"></span> <span class="badge">Douban</span> 更新书籍信息</a>
+        {% if request.user.admin %}
         <a href="#" onclick="return bind_book_editable({{book.id}})" class="list-group-item"><span class="glyphicon glyphicon-cog"></span> 手动编辑</a>
+        {% endif %}
     </div>
 
     <span class="legend">管理</span>

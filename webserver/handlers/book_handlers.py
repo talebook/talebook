@@ -94,11 +94,10 @@ class Index(BaseHandler):
         title = _(u'全部书籍')
         ids = list(self.cache.search(''))
         if not ids: raise web.HTTPError(404, reason = _(u'本书库暂无藏书'))
-        random_ids = random.sample(ids, 8*3)
+        random_ids = random.sample(ids, min(8*3, len(ids)))
         random_books = [ b for b in self.get_books(ids=random_ids) if b['cover'] ][:8]
         ids.sort()
-        new_ids = random.sample(ids[-300:], 20)
-        #new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] and b['comments'] ][:10]
+        new_ids = random.sample(ids[-300:], min(20, len(ids)))
         new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] ][:10]
         return self.html_page('index.html', vars())
 
@@ -109,17 +108,15 @@ class About(BaseHandler):
 
 class BookDetail(BaseHandler):
     def get(self, id):
-        book_id = int(id)
-        books = self.get_books(ids=[book_id])
-        if not books:
-            raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
-        book = books[0]
+        book = self.get_book(id)
         book_id = book['id']
+
+        uid = self.user_id()
+        cid = book['collector']['id']
+        book['is_owner'] = ( uid and str(uid) == str(cid) )
         book['is_public'] = True
         if ( book['publisher'] and book['publisher'] in (u'中信出版社') ) or u'吴晓波' in list(book['authors']):
-            uid = self.user_id()
-            cid = book['collector']['id']
-            if not uid or str(uid) != str(cid):
+            if not book['is_owner']:
                 book['is_public'] = False
         if self.is_admin():
             book['is_public'] = True
@@ -153,6 +150,7 @@ class BookRefer(BaseHandler):
         api = baike.BaiduBaikeApi(copy_image=False)
         book = api.get_book(title)
         if book: books.append( book )
+        self.set_header("Cache-control", "no-cache")
         return self.html_page('book/refer.html', vars())
 
 
@@ -165,12 +163,13 @@ class BookReferSet(BaseHandler):
         mi = self.db.get_metadata(book_id, index_is_id=True)
         if not mi:
             raise web.HTTPError(404, reason = _(u'书籍不存在') )
-        if not self.is_admin():
+        if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
             raise web.HTTPError(403, reason = _(u'无权限'))
 
+        title = re.sub(u'[(（].*', "", mi.title)
         if isbn == baike.BAIKE_ISBN:
             api = baike.BaiduBaikeApi(copy_image=True)
-            refer_mi = api.get_book(mi.title)
+            refer_mi = api.get_book(title)
         else:
             mi.isbn = isbn
             api = douban.DoubanBookApi(copy_image=True)
@@ -231,21 +230,25 @@ class BookDelete(BaseHandler):
 
     @web.authenticated
     def post(self, id):
-        if not self.is_admin():
-            self.add_msg('danger', _(u"无权限操作"))
-            self.redirect("/book/%s"%id)
-        else:
-            self.db.delete_book(int(id))
+        book = self.get_book(id)
+        book_id = book['id']
+        cid = book['collector']['id']
+
+        if self.is_admin() or self.is_book_owner(book_id, cid):
+            self.db.delete_book( book_id )
+            self.add_msg('success', _(u"删除完毕"))
             self.redirect("/book")
+        else:
+            self.add_msg('danger', _(u"无权限操作"))
+            self.redirect("/book/%s"%book_id)
 
 class BookDownload(BaseHandler):
     @web.authenticated
     def get(self, id, fmt):
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))
-        book_id = int(id)
-        books = self.get_books(ids=[book_id])
-        book = books[0]
+        book = self.get_book(id)
+        book_id = book['id']
         self.user_history('download_history', book)
         self.count_increase(book_id, count_download=1)
         if 'fmt_%s'%fmt not in book:
@@ -353,7 +356,6 @@ class BookUpload(BaseHandler):
             return self.redirect('/book/%d'%book_id)
 
         fpaths = [fpath]
-        self.generate_books(mi, fpath, fmt)
         book_id = self.db.import_book(mi, fpaths )
         self.user_history('upload_history', {'id': book_id, 'title': mi.title})
         self.add_msg('success', _(u"导入书籍成功！"))
@@ -361,6 +363,8 @@ class BookUpload(BaseHandler):
         item.book_id = book_id
         item.collector_id = self.user_id()
         item.save()
+
+        self.generate_books(mi, fpath, fmt)
         return self.redirect('/book/%d'%book_id)
 
     @background
@@ -376,11 +380,8 @@ class BookUpload(BaseHandler):
 class BookRead(BaseHandler):
     @web.authenticated
     def get(self, id):
-        book_id = int(id)
-        books = self.get_books(ids=[book_id])
-        if not books:
-            raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
-        book = books[0]
+        book = self.get_book(id)
+        book_id = book['id']
         self.user_history('read_history', book)
         self.count_increase(book_id, count_download=1)
 
@@ -443,11 +444,9 @@ class BookPush(BaseHandler):
         if not mail_to:
             return self.redirect("/setting")
 
-        book_id = int(id)
-        books = self.get_books(ids=[book_id])
-        if not books:
-            raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
-        book = books[0]
+        book = self.get_book(id)
+        book_id = book['id']
+
         self.user_history('push_history', book)
         self.count_increase(book_id, count_download=1)
 
