@@ -56,45 +56,35 @@ git clone https://github.com/talebook/talebook-library.git /data/books/library
 'smtp_password'                    : "password",
 ```
 
-## 豆瓣登录(已废弃，豆瓣已不再提供登录服务)
-进入[网址](https://developers.douban.com/apikey/)，申请豆瓣登录服务账号，填写到配置文件中。
-```
-'SOCIAL_AUTH_DOUBAN_OAUTH2_KEY'    : '',
-'SOCIAL_AUTH_DOUBAN_OAUTH2_SECRET' : '',
-```
-
-## 微博登录
-```
-进入[网址](http://open.weibo.com/developers), 申请微博登录服务账号，填写到配置中。
-'SOCIAL_AUTH_WEIBO_KEY'            : '',
-'SOCIAL_AUTH_WEIBO_SECRET'         : '',
-```
-
-## QQ登录
-进入[网址](https://connect.qq.com/), 申请QQ登录服务账号，填写到配置中。
-```
-'SOCIAL_AUTH_QQ_KEY'               : '',
-'SOCIAL_AUTH_QQ_SECRET'            : '',
-```
-
 创建DB
 =============
 ```
 python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --syncdb
 ```
 
-配置单用户模式（可选）
+配置用户登录功能
 =============
-连接用户DB ```sqlite3 /data/books/develop.db``` ，然后创建默认用户：
+根据自己的诉求，可以配置为个人自用，或者允许网友使用社交网站账号登录。
+
+## 配置自动登录（个人自用）
+如果只是用于个人书籍、不会提供互联网服务的话，可以配置自动登录，免去社交网站的用户登录。
+在```setttings.py```中找到 __auto_login__ 选项，将其设置为1。
 ```
-insert into readers(id, username, active, extra ) values(1, "User", 1, "{}");
+'auto_login': 1
 ```
-修改登录```webserver/handlers/user_handlers.py```中的Login函数为自动使用默认用户：
+
+## 微博登录（多用户使用）
 ```
-class Login(BaseHandler):
-    def get(self):
-        self.set_secure_cookie("user_id", "1")
-        self.redirect('/')
+进入[网址](http://open.weibo.com/developers), 申请微博登录服务账号，填写到配置中。
+'SOCIAL_AUTH_WEIBO_KEY'            : '',
+'SOCIAL_AUTH_WEIBO_SECRET'         : '',
+```
+
+## QQ登录（多用户使用）
+进入[网址](https://connect.qq.com/), 申请QQ登录服务账号，填写到配置中。
+```
+'SOCIAL_AUTH_QQ_KEY'               : '',
+'SOCIAL_AUTH_QQ_SECRET'            : '',
 ```
 
 
