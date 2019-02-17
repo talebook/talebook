@@ -2,11 +2,11 @@
 部署方法
 ===========
 ## 环境
-常见Linux环境均可部署；主要是依赖Python、Sqlite。这里选择 Ubuntu 16.04.5 LTS 进行部署
+常见Linux环境均可部署；主要是依赖Python2.7（calibre依赖该版本）、Sqlite。这里选择 Ubuntu 16.04.5 LTS 进行部署
 
 ## 依赖包
 ```
-sudo apt-get install calibre python-pip nginx-extra unzip
+sudo apt-get install python2.7 calibre python-pip nginx-extras unzip supervisor sqlite3 git
 sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy tornado Baidubaike jinja
 ```
 
