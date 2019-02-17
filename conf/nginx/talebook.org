@@ -1,18 +1,11 @@
 
 upstream tornado {
     server 127.0.0.1:8000;
-# server 127.0.0.1:8001;
 }
 
-#limit_req_zone $binary_remote_addr zone=allips:10m rate=100r/m;
-#limit_req_status 403;
-
 server {
-    listen 80 fastopen=3;
+    listen 80;
     server_name www.talebook.org;
-    location /qcloud_cdn.html {
-        root /tmp/;
-    }
     return 301 https://www.talebook.org$request_uri;
 }
 
@@ -24,110 +17,34 @@ server {
     ssl_certificate     ssl/www.talebook.org.crt;
     ssl_certificate_key ssl/www.talebook.org.key;
 
-    #limit_req zone=allips burst=5 nodelay;
-    deny 119.123.64.210;
-
-    location /blog {
-        try_files $uri $uri/ /blog/index.php?$args;
-    }
-
-    location /files {
-        root /data/release/www/talebook.org/htdocs/;
-    }
-
-    location ^~ /mdig {
-        rewrite /mdig(.*) http://mdig.talebook.org$1;
-    }
-
-    location ^~ /google3c3c77942a651fa3.html {
-        root /data/release/www/talebook.org/htdocs/;
-    }
-
-
-    location ~ \.php$ {
-        fastcgi_pass    unix:/var/run/php5-fpm.sock;
-        fastcgi_index   index.php;
-        fastcgi_param   SCRIPT_FILENAME  $document_root$fastcgi_script_name;
-        include         fastcgi_params;
-    }
-
-    include talebook.org_params;
-}
-
-server {
-    listen 80;
-    listen 443 ssl;
-    server_name img.talebook.org;
-
-    ssl on;
-    ssl_certificate     ssl/img.talebook.org.crt;
-    ssl_certificate_key ssl/img.talebook.org.key;
-
-    expires    30d;
-    root       /data/release/www/calibre.talebook.org/my-calibre-webserver/webserver/;
-    access_log /var/log/nginx/img.talebook.org-access.log;
-    error_log  /var/log/nginx/img.talebook.org-error.log;
-    add_header Access-Control-Allow-Origin *;
+    index index.php index.html index.htm;
+    root /var/www/talebook.org/htdocs/;
+    add_header  Access-Control-Allow-Origin *;
+    access_log  /var/log/nginx/www.talebook.org-access.log;
+    error_log   /var/log/nginx/www.talebook.org-error.log;
 
     location = /favicon.ico {
         rewrite .* /static/img/favicon.ico;
     }
 
-    location = /nocache.txt {
-        add_header Cache-Control no-cache,no-store,max-age=0,must-revalidate;
-        return 200 "no-cache:$remote_addr\n";
+    location ^~ /static/ {
+        root /data/release/www/calibre.talebook.org/my-calibre-webserver/webserver/;
+        if ($query_string) { expires max; }
     }
 
-    location /himawari8/img/D531106 {
-        proxy_pass http://himawari8-dl.nict.go.jp;
-        proxy_set_header Host "himawari8-dl.nict.go.jp";
+    location / {
+        proxy_pass       http://tornado;
+        proxy_set_header Host      $http_host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Scheme $scheme;
-        proxy_set_header Connection "";
-        proxy_http_version 1.1;
+        proxy_set_header X-Scheme  $scheme;
+        proxy_redirect   off;
+        access_log       /var/log/nginx/calibre.talebook.org-access.log;
+        error_log        /var/log/nginx/calibre.talebook.org-error.log;
     }
+
+    location ~ /\.ht {
+        deny all;
+    }
+
 }
-
-server {
-    listen 80;
-    listen 443 ssl;
-    server_name js.talebook.org;
-
-    ssl on;
-    ssl_certificate     ssl/js.talebook.org.crt;
-    ssl_certificate_key ssl/js.talebook.org.key;
-
-    expires    30d;
-    root       /data/release/www/calibre.talebook.org/my-calibre-webserver/webserver/;
-    access_log /var/log/nginx/js.talebook.org-access.log;
-    error_log  /var/log/nginx/js.talebook.org-error.log;
-    add_header Access-Control-Allow-Origin *;
-
-    location = /favicon.ico {
-        rewrite .* /static/img/favicon.ico;
-    }
-
-    location = /nocache.txt {
-        add_header Cache-Control no-cache,no-store,max-age=0,must-revalidate;
-        return 200 "no-cache:$remote_addr\n";
-    }
-
-    location /get/ {
-        proxy_pass http://tornado;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Scheme $scheme;
-        proxy_redirect off;
-    }
-}
-
-server {
-    listen 80;
-    listen 443 ssl;
-
-    server_name talebook.org *.talebook.org;
-
-    rewrite ^(.*)$ $scheme://www.talebook.org$1 permanent;
-}
-
 
