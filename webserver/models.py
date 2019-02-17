@@ -58,6 +58,11 @@ class Reader(Base, SQLAlchemyMixin):
     access_time = Column(DateTime)
     extra = Column(MutableDict.as_mutable(JSONType), default={})
 
+    def init_default_user(self):
+        class DefaultUserInfo:
+            extra_data = {'username': _(u'默认用户')}
+        self.init(DefaultUserInfo())
+
     def init(self, social_user):
         self.username = social_user.extra_data['username']
         self.create_time = datetime.datetime.now()
@@ -67,12 +72,9 @@ class Reader(Base, SQLAlchemyMixin):
         self.init_avatar(social_user)
 
     def init_avatar(self, social_user):
-        if social_user.provider == 'douban-oauth2':
-            self.avatar = "//img3.doubanio.com/icon/u%s.jpg" % social_user.uid
-        else:
-            anyone = "http://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
-            url = social_user.extra_data.get('profile_image_url', anyone)
-            self.avatar = url.replace("http://q.qlogo.cn", "//q.qlogo.cn")
+        anyone = "http://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
+        url = social_user.extra_data.get('profile_image_url', anyone)
+        self.avatar = url.replace("http://q.qlogo.cn", "//q.qlogo.cn")
 
     def is_active(self):
         return self.active

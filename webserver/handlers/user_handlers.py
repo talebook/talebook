@@ -28,11 +28,32 @@ class Done(BaseHandler):
                 logging.info("init new user %s, info=%s" % (user.username, socials))
                 user.init(socials[0])
                 user.save()
-        self.redirect('/')
+
+        url = self.get_secure_cookie('login_redirect')
+        if not url: url = "/"
+        self.redirect( url )
 
 class Login(BaseHandler):
+    def auto_login(self):
+        auto = int(self.settings.get('auto_login', 0))
+        if not auto: return False
+
+        logging.info("Auto login as user %s" % auto)
+        self.set_secure_cookie("user_id", str(auto))
+        user = self.session.query(Reader).get(auto)
+        if not user:
+            logging.info("Init default auto login user")
+            user = Reader(id=auto)
+            user.init_default_user()
+            user.save()
+        self.add_msg("success", _("自动登录成功。"))
+        return True
+
     def get(self):
-        url = self.get_argument("url", "")
+        url = self.get_argument("next", "/")
+        self.set_secure_cookie("login_redirect", url)
+        if self.auto_login():
+            return self.redirect( url )
         return self.html_page('login.html', vars())
 
 class Logout(BaseHandler):

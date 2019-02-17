@@ -17,6 +17,9 @@ settings = {
     "xsrf_cookies"  : False,
     "user_database" : 'sqlite:////data/books/develop.db',
 
+    # Set this if you don't need any user management
+    #"auto_login"    : 1,
+
     "SOCIAL_AUTH_LOGIN_URL"          : '/',
     "SOCIAL_AUTH_LOGIN_REDIRECT_URL" : '/done/',
     "SOCIAL_AUTH_USER_MODEL"         : 'models.Reader',

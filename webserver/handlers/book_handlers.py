@@ -110,10 +110,7 @@ class BookDetail(BaseHandler):
     def get(self, id):
         book = self.get_book(id)
         book_id = book['id']
-
-        uid = self.user_id()
-        cid = book['collector']['id']
-        book['is_owner'] = ( uid and str(uid) == str(cid) )
+        book['is_owner'] = self.is_book_owner(book_id, self.user_id())
         book['is_public'] = True
         if ( book['publisher'] and book['publisher'] in (u'中信出版社') ) or u'吴晓波' in list(book['authors']):
             if not book['is_owner']:

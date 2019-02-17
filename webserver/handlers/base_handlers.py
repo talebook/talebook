@@ -211,6 +211,9 @@ class BaseHandler(web.RequestHandler):
         return books[0]
 
     def is_book_owner(self, book_id, user_id):
+        auto = int(self.settings.get('auto_login', 0))
+        if auto: return True
+
         query = self.session.query(Item)
         query = query.filter(Item.book_id == book_id)
         query = query.filter(Item.collector_id == user_id)

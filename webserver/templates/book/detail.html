@@ -116,7 +116,7 @@
         {% if request.user %}
         <a href="#" class="list-group-item" onclick="return jQuery('#id_push_dialog').modal()"><span class="glyphicon glyphicon-phone"></span> Kindle</a>
         {% else %}
-        <a href="/login" class="list-group-item" ><span class="glyphicon glyphicon-phone"></span> Kindle</a>
+        <a href="/login?next={{request.uri|urlencode}}" class="list-group-item" ><span class="glyphicon glyphicon-phone"></span> Kindle</a>
         {% endif %}
     </div>
 
