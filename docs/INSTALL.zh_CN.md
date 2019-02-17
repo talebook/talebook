@@ -4,18 +4,17 @@
 ## 环境
 常见Linux环境均可部署；主要是依赖Python2.7（calibre依赖该版本）、Sqlite。这里选择 Ubuntu 16.04.5 LTS 进行部署
 
-## 依赖包
+## 部署目录
+* /data/books/: 作为书库目录
+* /data/release/www/calibre.talebook.org/: 作为代码目录
+
+## 安装依赖包
 ```
 sudo apt-get install python2.7 calibre python-pip nginx-extras unzip supervisor sqlite3 git
 sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy tornado Baidubaike jinja
 ```
 
-## 部署目录
-* /data/books/: 作为书库目录
-* /data/release/www/calibre.talebook.org/: 作为代码目录
-
-部署代码和书库
-==========
+## 部署代码
 注意：如果要修改访问域名，可以不调整代码目录，只调整nginx中的配置即可。
 各个目录的配置项，都可以在配置文件```webserver/settings.py```找到，可以根据自己的需求进行调整。
 ```
@@ -27,8 +26,10 @@ git clone https://github.com/talebook/my-calibre-webserver.git
 
 ```
 
-创建基础书库
+创建基础书库和DB
 ===========
+
+## 创建书库
 请事先准备30本书籍。
 使用以下命令创建书库：
 ```
@@ -40,17 +41,19 @@ calibredb add --library-path=/data/books/library/  -r  书籍目录
 git clone https://github.com/talebook/talebook-library.git /data/books/library
 ```
 
-创建DB
-=============
+## 创建DB
+执行以下命令，创建程序DB。
 ```
 python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --syncdb
 ```
 
 
-配置Kindle推送
+配置Kindle推送功能
 ============
-## QQ邮箱推送
-进入[网址](http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28), 申请SMTP账号，用于给Kindle推送。
+## 使用QQ邮箱推送
+进入[QQ邮箱网址](http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28), 申请SMTP账号，用于给Kindle推送。
+
+填写到```webserver/settings.py```配置文件中下述字段里：
 ```
 'smtp_server'                      : "smtp.talebook.org",
 'smtp_username'                    : "sender@talebook.org",
@@ -63,7 +66,7 @@ python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --s
 
 ## 配置自动登录（个人自用）
 如果只是用于个人书籍、不会提供互联网服务的话，可以配置自动登录，免去社交网站的用户登录。
-在```setttings.py```中找到 __auto_login__ 选项，将其设置为1。
+在```webserver/settings.py```中找到 __auto_login__ 选项，将其设置为1。
 ```
 'auto_login': 1
 ```
@@ -71,15 +74,15 @@ python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --s
 ## 申请社交网站应用账号（多用户使用）
 在配置文件```webserver/settings.py```中，可以看到有相关的配置信息：
 
-### 微博登录
+### 允许微博登录
+进入[微博开发者网址](http://open.weibo.com/developers), 申请微博登录服务账号，填写到配置中。
 ```
-进入[网址](http://open.weibo.com/developers), 申请微博登录服务账号，填写到配置中。
 'SOCIAL_AUTH_WEIBO_KEY'            : '',
 'SOCIAL_AUTH_WEIBO_SECRET'         : '',
 ```
 
-### QQ登录
-进入[网址](https://connect.qq.com/), 申请QQ登录服务账号，填写到配置中。
+### 允许QQ登录
+进入[QQ互联登录网址](https://connect.qq.com/), 申请QQ登录服务账号，填写到配置中。
 ```
 'SOCIAL_AUTH_QQ_KEY'               : '',
 'SOCIAL_AUTH_QQ_SECRET'            : '',
@@ -114,14 +117,16 @@ sudo nginx -s start
 问题排查
 ===============
 * supervisord启动失败
+
 如果有调整过supervisord里面的配置（例如端口、目录），一定要执行```sudo supervisorctl reload all```重新读取配置，不然是不会生效的，可能会导致启动失败。
 
 如果提示```calibre:tornado-8000: ERROR(spawn error)```，那么说明环境没配置正确。
-请打开日志文件```/data/log/my-calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last):```提示的错误原因。
+请打开日志文件```/data/log/my-calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last)```提示的错误原因。
 
 * 网站能打开，但是提示```500: internal server error```
+
 这种情况，一般是服务运行时出现异常，常见原因有目录权限没有配置正常、数据库没创建好、或者触发了某个代码BUG。
 
-请打开日志文件```/data/log/my-calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last):```提示的错误原因，并提issue联系开发者排查。
+请打开日志文件```/data/log/my-calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last)```提示的错误原因，并提issue联系开发者排查。
 
 
