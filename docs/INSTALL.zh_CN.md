@@ -16,6 +16,8 @@ sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy tornado 
 
 部署代码和书库
 ==========
+注意：如果要修改访问域名，可以不调整代码目录，只调整nginx中的配置即可。
+各个目录的配置项，都可以在配置文件```webserver/settings.py```找到，可以根据自己的需求进行调整。
 ```
 mkdir -p /data/log/
 mkdir -p /data/release/www/calibre.talebook.org/
@@ -24,7 +26,6 @@ cd /data/release/www/calibre.talebook.org/
 git clone https://github.com/talebook/my-calibre-webserver.git
 
 ```
-注意：如果要修改访问域名，可以不调整代码目录，只调整nginx中的配置即可。
 
 创建基础书库
 ===========
@@ -39,27 +40,21 @@ calibredb add --library-path=/data/books/library/  -r  书籍目录
 git clone https://github.com/talebook/talebook-library.git /data/books/library
 ```
 
+创建DB
+=============
+```
+python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --syncdb
+```
 
-填写配置
+
+配置Kindle推送
 ============
-## 申请社交网站应用账号
-在配置文件中，可以看到有相关的配置信息：
-```
-/data/release/www/calibre.talebook.org/my-calibre-webserver/webserver/settings.py
-```
-
 ## QQ邮箱推送
 进入[网址](http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28), 申请SMTP账号，用于给Kindle推送。
 ```
 'smtp_server'                      : "smtp.talebook.org",
 'smtp_username'                    : "sender@talebook.org",
 'smtp_password'                    : "password",
-```
-
-创建DB
-=============
-```
-python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --syncdb
 ```
 
 配置用户登录功能
@@ -73,14 +68,17 @@ python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --s
 'auto_login': 1
 ```
 
-## 微博登录（多用户使用）
+## 申请社交网站应用账号（多用户使用）
+在配置文件```webserver/settings.py```中，可以看到有相关的配置信息：
+
+### 微博登录
 ```
 进入[网址](http://open.weibo.com/developers), 申请微博登录服务账号，填写到配置中。
 'SOCIAL_AUTH_WEIBO_KEY'            : '',
 'SOCIAL_AUTH_WEIBO_SECRET'         : '',
 ```
 
-## QQ登录（多用户使用）
+### QQ登录
 进入[网址](https://connect.qq.com/), 申请QQ登录服务账号，填写到配置中。
 ```
 'SOCIAL_AUTH_QQ_KEY'               : '',
@@ -93,20 +91,37 @@ python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --s
 ## 配置supervisord
 如果前面过程中，修改过代码目录路径，那么将 ``conf/supervisor/calibre-webserver.conf`` 中的路径调整一下，放到 ``/etc/supervisor/conf.d/`` 中。
 
+启动命令如下：
+```
+sudo supervisorctl reload all
+sudo supervisorctl restart all
+```
 
 ## 配置NGINX
 将 ``conf/nginx/talebook.org`` 中的域名修改为自己的网站域名，并放置到nginx的配置目录中。
 
-
-## 启动
+启动命令如下：
 ```
-sudo supervisorctl reload all
-sudo supervisorctl restart all
-sud onginx -s start
+sudo nginx -s start
 ```
 
 访问
 ===============
 * 打开 http://web_server_ip:8000/ 测试python启动是否正常；
 * 打开 https://web_server_ip/ 测试nginx启动是否正常
+
+
+问题排查
+===============
+* supervisord启动失败
+如果有调整过supervisord里面的配置（例如端口、目录），一定要执行```sudo supervisorctl reload all```重新读取配置，不然是不会生效的，可能会导致启动失败。
+
+如果提示```calibre:tornado-8000: ERROR(spawn error)```，那么说明环境没配置正确。
+请打开日志文件```/data/log/my-calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last):```提示的错误原因。
+
+* 网站能打开，但是提示```500: internal server error```
+这种情况，一般是服务运行时出现异常，常见原因有目录权限没有配置正常、数据库没创建好、或者触发了某个代码BUG。
+
+请打开日志文件```/data/log/my-calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last):```提示的错误原因，并提issue联系开发者排查。
+
 
