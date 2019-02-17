@@ -110,8 +110,9 @@ class Login(BaseHandler):
 
 ## 启动
 ```
-supervisorctl restart all
-nginx -s start
+sudo supervisorctl reload all
+sudo supervisorctl restart all
+sud onginx -s start
 ```
 
 访问
