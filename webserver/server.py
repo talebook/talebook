@@ -32,7 +32,7 @@ define("with-library", default=settings['with_library'], type=str,
         help=_('Path to the library folder to serve with the content server.'))
 
 define("syncdb", default=False, type=bool, help=_('Create all tables'))
-define("test", default=False, type=bool, help=_('run testcase'))
+define("testmail", default=False, type=bool, help=_('run testcase'))
 
 def load_calibre_translations():
     from tornado import locale
@@ -89,6 +89,15 @@ def make_app():
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
 
+    # 按字母作为第一级目录，解决书库子目录太多的问题
+    old_construct_path_name = cache.backend.construct_path_name
+    def new_construct_path_name(*args, **kwargs):
+        s = old_construct_path_name(*args, **kwargs)
+        ns = s[0] + "/" + s
+        logging.debug("new str = %s" % ns)
+        return ns
+    cache.backend.construct_path_name = new_construct_path_name
+
     Base = declarative_base()
     engine = create_engine(auth_db_path, echo=False)
     session = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
@@ -101,11 +110,10 @@ def make_app():
         models.user_syncdb(engine)
         sys.exit(0)
 
-    if options.test:
+    if options.testmail:
         from test import email
         email.do_send_mail()
         sys.exit(0)
-
 
     settings.update({
         "legacy": book_db,
