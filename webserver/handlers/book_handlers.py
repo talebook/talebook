@@ -346,7 +346,7 @@ class BookUpload(BaseHandler):
         if fmt.lower() == "txt":
             mi.title = name.replace(".txt", "")
             mi.authors = [_(u'佚名')]
-        logging.error('upload mi = ' + repr(mi.title))
+        logging.info('upload mi.title = ' + repr(mi.title))
         books = self.db.books_with_same_title(mi)
         if books:
             book_id = books.pop()
@@ -360,19 +360,7 @@ class BookUpload(BaseHandler):
         item.book_id = book_id
         item.collector_id = self.user_id()
         item.save()
-
-        self.generate_books(mi, fpath, fmt)
         return self.redirect('/book/%d'%book_id)
-
-    @background
-    def generate_books(self, mi, fpath, fmt):
-        # convert another format
-        new_fmt = {'epub': 'mobi', 'mobi': 'epub'}.get(fmt, "epub")
-        new_path = '/tmp/calibre-tmp.'+new_fmt
-        log = Log()
-        plumber = Plumber(fpath, new_path, log)
-        plumber.run()
-        self.db.add_books([new_path], [new_fmt], mi, add_duplicates=False)
 
 class BookRead(BaseHandler):
     @web.authenticated
