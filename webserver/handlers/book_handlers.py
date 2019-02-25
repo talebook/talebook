@@ -400,7 +400,7 @@ class BookRead(BaseHandler):
             log = Log()
             log.outputs = [FileStream(progress_file)]
             plumber = Plumber(fpath, new_path, log)
-            recommendations = [ ('flow_size', 15, OptionRecommendation.HIGH) ]
+            recommendations = [ ('flow_size', 0, OptionRecommendation.HIGH) ] # Set to 0 to disable size based splitting.
             plumber.merge_ui_recommendations(recommendations)
             try:
                 plumber.run()
