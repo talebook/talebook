@@ -89,7 +89,7 @@ def make_app():
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
 
-    # 按字母作为第一级目录，解决书库子目录太多的问题
+    # hook 1: 按字母作为第一级目录，解决书库子目录太多的问题
     old_construct_path_name = cache.backend.construct_path_name
     def new_construct_path_name(*args, **kwargs):
         s = old_construct_path_name(*args, **kwargs)
@@ -97,6 +97,16 @@ def make_app():
         logging.debug("new str = %s" % ns)
         return ns
     cache.backend.construct_path_name = new_construct_path_name
+
+    # hook 2: don't force GUI
+    from calibre import gui2
+    old_must_use_qt = gui2.must_use_qt
+    def new_must_use_qt(headless=True):
+        try:
+            old_must_use_qt(headless)
+        except:
+            pass
+    gui2.must_use_qt = new_must_use_qt
 
     Base = declarative_base()
     engine = create_engine(auth_db_path, echo=False)
