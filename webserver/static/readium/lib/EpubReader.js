@@ -25,7 +25,7 @@ define(['module','jquery', 'bootstrap', 'URIjs', 'Readium', 'Spinner', 'storage/
             wasFixed = readium.reader.isCurrentViewFixedLayout();
             var metadata = options.metadata;
 
-            $('<h2 class="book-title-header"></h2>').insertAfter('.navbar').text(metadata.title);
+            $('<h2 class="book-title-header"></h2>').insertBefore('.navbar').text(metadata.title);
 
         
             $("#left-page-btn").unbind("click");
