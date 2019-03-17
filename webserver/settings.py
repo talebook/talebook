@@ -26,6 +26,7 @@ settings = {
     "SOCIAL_AUTH_AUTHENTICATION_BACKENDS" : (
         'social_core.backends.qq.QQOAuth2',
         'social_core.backends.weibo.WeiboOAuth2',
+        'social_core.backends.github.GithubOAuth2',
     ),
 
     # See: http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28
@@ -40,5 +41,9 @@ settings = {
     # See: https://connect.qq.com/
     'SOCIAL_AUTH_QQ_KEY'               : '',
     'SOCIAL_AUTH_QQ_SECRET'            : '',
+
+    # See: https://github.com/settings/applications/new
+    'SOCIAL_AUTH_GITHUB_KEY'           : '',
+    'SOCIAL_AUTH_GITHUB_SECRET'        : '',
 }
 
