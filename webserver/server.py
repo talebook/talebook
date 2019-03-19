@@ -76,10 +76,12 @@ def make_app():
     except Exception as e:
         pass
 
+
     init_calibre()
 
     import handlers
     from calibre.db.legacy import LibraryDatabase
+    from calibre.utils.date import fromtimestamp
 
     auth_db_path = settings['user_database']
     logging.info("Init library with [%s]" % options.with_library)
@@ -88,6 +90,7 @@ def make_app():
     logging.info("Init LANG    with [%s]" % P('localization/locales.zip') )
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
+
 
     # hook 1: 按字母作为第一级目录，解决书库子目录太多的问题
     old_construct_path_name = cache.backend.construct_path_name
@@ -108,11 +111,12 @@ def make_app():
             pass
     gui2.must_use_qt = new_must_use_qt
 
+    # build sql session factory
     Base = declarative_base()
     engine = create_engine(auth_db_path, echo=False)
-    session = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
-    init_social(Base, session, settings)
-    models.bind_session(session)
+    ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
+    init_social(Base, ScopedSession, settings)
+    models.bind_session(ScopedSession)
 
     load_calibre_translations()
 
@@ -125,12 +129,16 @@ def make_app():
         email.do_send_mail()
         sys.exit(0)
 
+    path = settings['static_path'] + '/img/default_cover.jpg'
     settings.update({
         "legacy": book_db,
         "cache": cache,
-        "session": session,
+        "ScopedSession": ScopedSession ,
+        "build_time": fromtimestamp(os.stat(path).st_mtime),
+        "default_cover": open(path, 'rb').read(),
         })
 
+    logging.info("Now, Running...")
     return web.Application(
             SOCIAL_AUTH_ROUTES + handlers.routes(),
             **settings)

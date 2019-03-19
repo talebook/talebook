@@ -28,6 +28,7 @@ from models import Reader, Message, Item
 
 messages = defaultdict(list)
 
+
 def day_format(value, format='%Y-%m-%d'):
     try: return value.strftime(format)
     except: return "1990-01-01"
@@ -60,17 +61,20 @@ class BaseHandler(web.RequestHandler):
         return self.get(*args, **kwargs)
 
     def initialize(self):
-        self.session = self.settings['session']
-        self.session.close()
+        ScopedSession = self.settings['ScopedSession']
+        self.session = ScopedSession() # new sql session
         self.db = self.settings['legacy']
         self.cache = self.db.new_api
-        path = self.settings['static_path'] + '/img/default_cover.jpg'
-        self.build_time = fromtimestamp(os.stat(path).st_mtime)
-        self.default_cover = open(path, 'rb').read()
+        self.build_time = self.settings['build_time']
+        self.default_cover = self.settings['default_cover']
         self.admin_user = None
         self.static_host = self.settings.get("static_host", "")
         if self.static_host:
             self.static_host = self.request.protocol + "://" + self.static_host
+
+    def on_finish(self):
+        ScopedSession = self.settings['ScopedSession']
+        ScopedSession.remove()
 
     def static_url(self, path, **kwargs):
         url = super(BaseHandler, self).static_url(path, **kwargs)
@@ -191,8 +195,10 @@ class BaseHandler(web.RequestHandler):
                 request.user.avatar = request.user.avatar.replace("http://", "//")
 
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
-        count_hot_users = self.session.query(Reader).filter(Reader.access_time > last_week).count()
-        count_all_users = self.session.query(Reader).count()
+
+        from sqlalchemy import func
+        count_all_users = self.session.query(func.count(Reader.id)).scalar()
+        count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
 
         IMG = self.static_host
         vals = dict(*args, **kwargs)
