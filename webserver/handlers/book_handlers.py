@@ -78,13 +78,31 @@ def background(func):
                 import traceback, logging
                 logging.error('Failed to run background task:')
                 logging.error(traceback.format_exc())
-                logging.error("cmd: %s %s %s" % (func, args, kwargs))
 
         t = threading.Thread(name='worker', target=worker)
         t.setDaemon(True)
         t.start()
-        #_q.put( (func, args, kwargs) )
     return run
+
+def do_ebook_convert(old_path, new_path, log_path):
+    '''convert book, and block, and wait'''
+    args = ['ebook-convert', old_path, new_path]
+    if new_path.lower().endswith(".epub"): args += ['--flow-size', '0']
+
+    log = open(log_path, "w", 0)
+    p = subprocess.Popen(args, stdout=log, stderr=subprocess.PIPE)
+    err = ""
+    while p.poll() == None:
+        _, e = p.communicate()
+        err += e
+    logging.info("ebook-convert finish: %s" % new_path)
+
+    if err:
+        log.write(err)
+        log.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
+        log.close()
+        return (False, err)
+    return (True, "")
 
 
 class Index(BaseHandler):
@@ -390,35 +408,31 @@ class BookRead(BaseHandler):
             subprocess.call(["chmod", "a+rx", "-R", fdir + "/META-INF"])
             return
 
-        progress_file = open(self.get_path_progress(book['id']), "w", 0)
+        progress_file = self.get_path_progress(book['id'])
         new_path = ""
         if fmt != "epub":
             new_fmt = "epub"
             new_path = os.path.join(settings["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
             logging.error('convert book: %s => %s' % ( fpath, new_path));
             os.chdir('/tmp/')
-            log = Log()
-            log.outputs = [FileStream(progress_file)]
-            plumber = Plumber(fpath, new_path, log)
-            recommendations = [ ('flow_size', 0, OptionRecommendation.HIGH) ] # Set to 0 to disable size based splitting.
-            plumber.merge_ui_recommendations(recommendations)
-            try:
-                plumber.run()
-            except Exception as e:
-                progress_file.write(u"\n%s\n" % e)
-                progress_file.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
+
+            ok, err = do_ebook_convert(fpath, new_path, progress_file)
+            if not ok:
                 self.add_msg("danger", u'文件格式转换失败，请在QQ群里联系管理员.')
                 return
+
             self.db.add_format(book['id'], new_fmt, open(new_path, "rb"), index_is_id=True)
             fpath = new_path
 
         # extract to dir
         logging.error('extract book: %s' % fpath)
         os.chdir(fdir)
-        progress_file.write(u"Dir: %s\n" % fdir)
-        subprocess.call(["unzip", fpath, "-d", fdir], stdout=progress_file)
+        log = open(progress_file, "a")
+        log.write(u"Dir: %s\n" % fdir)
+        subprocess.call(["unzip", fpath, "-d", fdir], stdout=log)
         subprocess.call(["chmod", "a+rx", "-R", fdir+ "/META-INF"])
         if new_path: subprocess.call(["rm", new_path])
+        log.close()
         return
 
 
@@ -452,26 +466,21 @@ class BookPush(BaseHandler):
 
     @background
     def convert_book(self, book, mail_to=None):
-        fmt = 'mobi'
-        fpath = os.path.join(settings['convert_path'], '%s.%s' % (ascii_filename(book['title']), fmt) )
-        progress_file = open(self.get_path_progress(book['id']), "w", 0)
-        log = Log()
-        log.outputs = [FileStream(progress_file)]
+        new_fmt = 'mobi'
+        new_path = os.path.join(settings['convert_path'], '%s.%s' % (ascii_filename(book['title']), new_fmt) )
+        progress_file = self.get_path_progress(book['id'])
+
         old_path = None
         for f in ['txt', 'azw3', 'epub']: old_path = book.get('fmt_%s' %f, old_path)
-        #old_path = book.get('fmt_epub', book.get('fmt_txt'])
-        plumber = Plumber(old_path, fpath, log)
-        plumber.run()
-        try:
-            plumber.run()
-        except Exception as e:
-            progress_file.write("\n%s\n" % e)
-            progress_file.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
+
+        ok, err = do_ebook_convert(old_path, new_path, progress_file)
+        if not ok:
             self.add_msg("danger", u'文件格式转换失败，请在QQ群里联系管理员.')
             return
-        self.db.add_format(book['id'], fmt, open(fpath, "rb"), index_is_id=True)
+
+        self.db.add_format(book['id'], new_fmt, open(new_path, "rb"), index_is_id=True)
         if mail_to:
-            self.do_send_mail(book, mail_to, fmt, fpath)
+            self.do_send_mail(book, mail_to, new_fmt, new_path)
         return
 
     @background
