@@ -11,7 +11,7 @@
 ## 安装依赖包
 ```
 sudo apt-get install python2.7 calibre python-pip nginx-extras unzip supervisor sqlite3 git
-sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy tornado Baidubaike jinja
+sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy "tornado<6.0" Baidubaike jinja
 ```
 
 ## 部署代码
