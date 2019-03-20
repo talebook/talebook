@@ -11,7 +11,6 @@ from tornado.options import define, options
 from gettext import gettext as _
 from gettext import GNUTranslations
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 from social_tornado.models import init_social
 from social_routes import SOCIAL_AUTH_ROUTES
@@ -112,13 +111,10 @@ def make_app():
     gui2.must_use_qt = new_must_use_qt
 
     # build sql session factory
-    Base = declarative_base()
     engine = create_engine(auth_db_path, echo=False)
     ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
-    init_social(Base, ScopedSession, settings)
     models.bind_session(ScopedSession)
-
-    load_calibre_translations()
+    init_social(models.Base, ScopedSession, settings)
 
     if options.syncdb:
         models.user_syncdb(engine)
@@ -138,6 +134,7 @@ def make_app():
         "default_cover": open(path, 'rb').read(),
         })
 
+    load_calibre_translations()
     logging.info("Now, Running...")
     return web.Application(
             SOCIAL_AUTH_ROUTES + handlers.routes(),
