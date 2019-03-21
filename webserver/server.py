@@ -68,14 +68,6 @@ def init_calibre():
         sys.exit(2)
 
 def make_app():
-    try:
-        import local_settings
-        settings.update(local_settings.settings)
-        logging.info("loading local_settings.py")
-    except Exception as e:
-        pass
-
-
     init_calibre()
 
     import handlers

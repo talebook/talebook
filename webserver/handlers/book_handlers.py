@@ -135,6 +135,7 @@ class BookDetail(BaseHandler):
                 book['is_public'] = False
         if self.is_admin():
             book['is_public'] = True
+            book['is_owner'] = True
         self.user_history('visit_history', book)
         try: sizes = [ (f, self.db.sizeof_format(book_id, f, index_is_id=True)) for f in book['available_formats'] ]
         except: sizes = []
@@ -151,10 +152,10 @@ class BookRefer(BaseHandler):
         mi = self.db.get_metadata(book_id, index_is_id=True)
         title = re.sub(u'[(（].*', "", mi.title)
 
-        api = douban.DoubanBookApi(copy_image=False)
+        api = douban.DoubanBookApi(settings['douban_apikey'], copy_image=False)
         # first, search title
         books = api.get_books_by_title(title)
-        if mi.isbn and mi.isbn != baike.BAIKE_ISBN:
+        if books and mi.isbn and mi.isbn != baike.BAIKE_ISBN:
             if mi.isbn not in [ b.get('isbn13', "xxx") for b in books ]:
                 book = api.get_book_by_isbn(mi.isbn)
                 # alwayse put ISBN book in TOP1
@@ -187,7 +188,7 @@ class BookReferSet(BaseHandler):
             refer_mi = api.get_book(title)
         else:
             mi.isbn = isbn
-            api = douban.DoubanBookApi(copy_image=True)
+            api = douban.DoubanBookApi(settings['douban_apikey'], copy_image=True)
             refer_mi = api.get_book(mi)
 
         if mi.cover_data[0]:
@@ -485,12 +486,6 @@ class BookPush(BaseHandler):
 
     @background
     def do_send_mail(self, book, mail_to, fmt, fpath):
-        try:
-            import local_settings
-            settings.update(local_settings.settings)
-        except Exception as e:
-            logging.error("read local_settings fail")
-            pass
         # read meta info
         author = authors_to_string(book['authors'] if book['authors'] else [_(u'佚名')])
         title = book['title'] if book['title'] else _(u"无名书籍")

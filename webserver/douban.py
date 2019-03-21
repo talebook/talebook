@@ -2,10 +2,10 @@
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 
 __license__   = 'GPL v3'
-__copyright__ = '2014, Rex Liao <talebook@foxmail.com>'
+__copyright__ = '2014, Rex<talebook@foxmail.com>'
 __docformat__ = 'restructuredtext en'
 
-import os, re, json, logging, datetime
+import os, re, sys, json, logging, datetime, requests
 from urllib import urlopen
 
 REMOVES = [
@@ -15,8 +15,16 @@ REMOVES = [
         re.compile(u'^（[^）]*）\s*')
         ]
 
+CHROME_HEADERS = {
+        'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.6',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36',
+        }
+
+
 class DoubanBookApi(object):
-    def __init__(self, copy_image=True, manual_select=False):
+    def __init__(self, apikey, copy_image=True, manual_select=False):
+        self.apikey = apikey
         self.copy_image = copy_image
         self.manual_select = manual_select
 
@@ -29,17 +37,18 @@ class DoubanBookApi(object):
     def get_book_by_isbn(self, isbn):
         API_SEARCH = "https://api.douban.com/v2/book/isbn/%s"
         url = API_SEARCH % isbn
-        rsp = json.loads(urlopen(url).read())
+        args = {'apikey': self.apikey}
+        rsp = requests.get(url, headers=CHROME_HEADERS, params=args).json()
         if 'code' in rsp and rsp['code'] != 0:
             logging.error("******** douban API error: %d-%s **********" % (rsp['code'], rsp['msg']) )
             return None
         return rsp
 
     def get_books_by_title(self, title, author=None):
-        API_SEARCH = "https://api.douban.com/v2/book/search?q=%s"
+        url = "https://api.douban.com/v2/book/search"
         q = title + " " + author if author else title
-        url = API_SEARCH % (q.encode('UTF-8'))
-        rsp = json.loads(urlopen(url).read())
+        args = {'apikey': self.apikey, 'q': q.encode('UTF-8') }
+        rsp = requests.get(url, headers=CHROME_HEADERS, params=args).json()
         if 'code' in rsp and rsp['code'] != 0:
             logging.error("******** douban API error: %d-%s **********" % (rsp['code'], rsp['msg']) )
             return None
@@ -145,11 +154,13 @@ def select_douban_metadata(mi):
         return None
 
 if __name__ == "__main__":
-    import sys
     if len(sys.argv) != 2:
         print("%s BOOK-TITLE" % sys.argv[0])
         exit(0)
-    api = DoubanBookApi()
+
+    logging.basicConfig(level=logging.DEBUG)
+    from settings import settings
+    api = DoubanBookApi(settings['douban_apikey'])
     books = api.get_books_by_title(sys.argv[1].decode('UTF-8'))
     from pprint import pprint
     pprint(books)
