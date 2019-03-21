@@ -155,6 +155,7 @@ class BookRefer(BaseHandler):
         api = douban.DoubanBookApi(settings['douban_apikey'], copy_image=False)
         # first, search title
         books = api.get_books_by_title(title)
+        books = [] if books == None else books
         if books and mi.isbn and mi.isbn != baike.BAIKE_ISBN:
             if mi.isbn not in [ b.get('isbn13', "xxx") for b in books ]:
                 book = api.get_book_by_isbn(mi.isbn)
