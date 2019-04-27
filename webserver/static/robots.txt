@@ -1,3 +1,6 @@
 User-agent: *
 Disallow: /login
 
+User-agent: SemrushBot
+Disallow: /
+
