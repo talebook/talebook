@@ -182,6 +182,7 @@ class BaseHandler(web.RequestHandler):
             self.write( {"error": "json func error"} )
 
     def html_page(self, template, *args, **kwargs):
+        self.set_header('Cache-Control', 'max-age=0')
         db = self.db
         request = self.request
         request.user = self.current_user
