@@ -54,7 +54,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                     <img style="margin-top:-6px;height:32px;width:32px" src={{request.user.avatar}}></img>
                 </a>
                 {% else %}
-                <a class="navbar-brand navbar-icon" href="/login?next={{request.uri|urlencode}}">
+                <a class="navbar-brand navbar-icon" href="/login">
                     <span class="glyphicon glyphicon-user"></span>
                 </a>
                 {% endif %}
@@ -100,7 +100,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                         </ul>
                     </li>
                     {% else %}
-                    <li><a  class="navbar-brand" href="/login?next={{request.uri|urlencode}}"><span class="glyphicon glyphicon-user"></span> 登录</a></li>
+                    <li><a  class="navbar-brand" href="/login"><span class="glyphicon glyphicon-user"></span> 登录</a></li>
                     {% endif %}
                 </ul>
             </div>

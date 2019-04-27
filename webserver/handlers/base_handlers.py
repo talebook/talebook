@@ -9,6 +9,7 @@ from jinja2 import Environment, FileSystemLoader
 from functools import wraps
 from collections import defaultdict
 from gettext import gettext as _
+from urlparse import urlparse
 import json
 
 import social_tornado.handlers
@@ -284,6 +285,13 @@ class BaseHandler(web.RequestHandler):
 
     def get_path_progress(self, book_id):
         return os.path.join(self.settings['progress_path'], 'progress-%s.log' % book_id)
+
+    def get_save_referer(self, default="/"):
+        referer = self.request.headers.get('referer', default)
+        parts = urlparse(referer)
+        if parts.netloc != self.request.host:
+            return default
+        return referer
 
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):

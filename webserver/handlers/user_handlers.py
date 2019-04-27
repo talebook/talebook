@@ -8,28 +8,35 @@ from models import Reader
 from base_handlers import BaseHandler
 import json
 
+COOKIE_REDIRECT = "login_redirect"
+
 class Done(BaseHandler):
-    def get_sa(self, user):
-        social = user.social_auth.all()
-        if not social: return ""
-        return dict(social[0].extra_data)
+    def update_userinfo(self):
+        if int(self.settings.get('auto_login', 0)): return
+
+        user = self.get_current_user()
+        socials = user.social_auth.all()
+        if not socials: return
+
+        info = dict(socials[0].extra_data)
+        logging.info("LOGIN: %d - %s - %s" % ( user.id, user.username, info))
+
+        if not user.extra:
+            logging.info("init new user %s, info=%s" % (user.username, socials))
+            user.init(socials[0])
+
+        if user.username != info['username']:
+            logging.info("username needs update to [%s]" % info['username'])
+            user.username = info['username']
+
+        self.access_time = datetime.datetime.now()
+        user.extra['login_ip'] = self.request.remote_ip
+        user.save()
 
     def get(self):
-        user = self.get_current_user()
-        sa = self.get_sa(user)
-        if sa:
-            user.username = sa['username']
-            user.save()
-        logging.info("LOGIN: %d - %s - %s" % ( user.id, user.username, sa))
-
-        if user and not user.extra:
-            socials = user.social_auth.all()
-            if socials:
-                logging.info("init new user %s, info=%s" % (user.username, socials))
-                user.init(socials[0])
-                user.save()
-
-        url = self.get_secure_cookie('login_redirect')
+        self.update_userinfo()
+        url = self.get_secure_cookie(COOKIE_REDIRECT)
+        self.clear_cookie(COOKIE_REDIRECT)
         if not url: url = "/"
         self.redirect( url )
 
@@ -50,8 +57,9 @@ class Login(BaseHandler):
         return True
 
     def get(self):
-        url = self.get_argument("next", "/")
-        self.set_secure_cookie("login_redirect", url)
+        url = self.get_save_referer()
+        self.clear_cookie("next")
+        self.set_secure_cookie(COOKIE_REDIRECT, url)
         if self.auto_login():
             return self.redirect( url )
         return self.html_page('login.html', vars())
@@ -60,7 +68,8 @@ class Logout(BaseHandler):
     def get(self):
         self.set_secure_cookie("user_id", "")
         self.set_secure_cookie("admin_id", "")
-        self.redirect('/')
+        url = self.get_save_referer()
+        self.redirect(url)
 
 class SettingView(BaseHandler):
     def get(self, **kwrags):
