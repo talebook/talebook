@@ -4,27 +4,32 @@
 <div class="col-md-12">
 <table class="table">
     <tr>
-        <th>User</th>
-        <th>Platform</th>
-        <th>Login Time</th>
-        <th>Login IP</th>
-        <th>Info</th>
-        <th>Action</th>
+        <th>ID</th>
+        <th>用户名</th>
+        <th>来源平台</th>
+        <th>注册时间</th>
+        <th>登录时间</th>
+        <th>登录IP</th>
+        <th>简述</th>
+        <th>操作</th>
     </tr>
     {% for user in users %}
     <tr>
+        <td>{{user.id}}</td>
         <td>
             <img src='{{user.avatar}}' height=32 width=32 />
             {{user.username}}
         </td>
         <td>{{user.social_auth[0].provider}}</td>
-        <td>{{user.access_time}}</td>
+        <td>{% if user.create_time %}{{user.create_time.strftime("%Y-%m-%d %H:%M:%S")}}{% endif %}</td>
+        <td>{% if user.access_time %}{{user.access_time.strftime("%Y-%m-%d %H:%M:%S")}}{% endif %}</td>
         <td>{{user.extra.login_ip}}</td>
         <td>
-            {% if user.extra.read_history %} read({{user.extra.read_history|length}}) {% endif %}
-            {% if user.extra.push_history %} push({{user.extra.push_history|length}}) {% endif %}
-            {% if user.extra.visit_history %} visit({{user.extra.visit_history|length}}) {% endif %}
-            {% if user.extra.download_history %} download({{user.extra.download_history|length}}) {% endif %}
+            {% if user.extra.visit_history    %} {{user.extra.visit_history|length}}访问    {% endif %}
+            {% if user.extra.read_history     %} {{user.extra.read_history|length}}阅读     {% endif %}
+            {% if user.extra.push_history     %} {{user.extra.push_history|length}}推送     {% endif %}
+            {% if user.extra.download_history %} {{user.extra.download_history|length}}下载 {% endif %}
+            {% if user.extra.upload_history   %} {{user.extra.upload_history|length}}上传   {% endif %}
         </td>
         <td>
             <a class="btn" href="/admin/set?user_id={{user.id}}">Enter</a>
@@ -33,18 +38,23 @@
     {% endfor %}
 </table>
 <ul class="pagination">
-    <li {% if page_now == 0 %}class="disabled"{%endif%}><a href="?sort={{sort}}&start={{page_now*delta-delta}}">&laquo; 前页</a></li>
+    {% if 0 not in pages %}
+    <li><a href="?sort={{sort}}">1</a></li>
+    {% if 1 not in pages %}
+    <li class="disabled"><a href="#">...</a></li>
+    {% endif %}
+    {% endif %}
 
     {% for p in pages %}
     <li {%if page_now == p %}class="active"{%endif%}><a href="?sort={{sort}}&start={{p*delta}}">{{p+1}}</a></li>
     {% endfor %}
 
     {% if page_max not in pages %}
+    {% if page_max -1 not in pages %}
     <li class="disabled"><a href="#">...</a></li>
+    {% endif %}
     <li><a href="?sort={{sort}}&start={{page_max*delta}}">{{page_max+1}}</a></li>
     {% endif %}
-
-    <li {% if page_now == page_max %}class="disabled"{%endif%}><a href="?sort={{sort}}&start={{page_now*delta+delta}}">后页 &raquo;</a></li>
 </ul>
 </div>
 <div>
