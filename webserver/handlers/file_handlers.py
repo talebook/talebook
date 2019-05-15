@@ -59,17 +59,8 @@ class ImageHandler(BaseHandler):
             if thumbnail:
                 return generate_thumbnail(cover,
                         width=thumb_width, height=thumb_height)[-1]
-
-            img = Image()
-            img.load(cover)
-            width, height = img.size
-            scaled, width, height = fit_image(width, height,
-                thumb_width if thumbnail else self.max_cover_width,
-                thumb_height if thumbnail else self.max_cover_height)
-            if not scaled:
+            else:
                 return cover
-            return save_cover_data_to(img, 'img.jpg', return_data=True,
-                    resize_to=(width, height))
         except Exception as err:
             import traceback
             logging.error('Failed to generate cover:')
