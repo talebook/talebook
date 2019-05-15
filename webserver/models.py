@@ -64,7 +64,7 @@ class Reader(Base, SQLAlchemyMixin):
         self.init(DefaultUserInfo())
 
     def init(self, social_user):
-        self.username = social_user.extra_data['username']
+        self.username = self.get_social_username(social_user)
         self.create_time = datetime.datetime.now()
         self.update_time = datetime.datetime.now()
         self.access_time = datetime.datetime.now()
@@ -75,6 +75,22 @@ class Reader(Base, SQLAlchemyMixin):
         anyone = "http://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
         url = social_user.extra_data.get('profile_image_url', anyone)
         self.avatar = url.replace("http://q.qlogo.cn", "//q.qlogo.cn")
+
+        if social_user.provider == "github":
+            self.avatar = "https://avatars.githubusercontent.com/u/%s" % social_user.extra_data['id']
+
+    def get_social_username(self, si):
+        for k in ['username', 'login']:
+            if k in si.extra_data:
+                return si.extra_data[k]
+        return "%s_%s" % (si.provider, si.uid)
+
+    def check_and_update(self, social_user):
+        name = self.get_social_username(social_user)
+        if self.username != name:
+            logging.info("userid[%s] username needs update to [%s]" % (self.id, name) )
+            self.username = name
+
 
     def is_active(self):
         return self.active

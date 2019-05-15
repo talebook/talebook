@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
+import time
 import datetime
 import logging
 from tornado import web
@@ -14,26 +15,28 @@ class Done(BaseHandler):
     def update_userinfo(self):
         if int(self.settings.get('auto_login', 0)): return
 
-        user = self.get_current_user()
+        user_id = self.get_secure_cookie('user_id')
+        user = self.session.query(Reader).get(int(user_id)) if user_id else None
+        if not user: return
         socials = user.social_auth.all()
         if not socials: return
 
-        info = dict(socials[0].extra_data)
+        si = socials[0]
+        info = dict(si.extra_data)
         logging.info("LOGIN: %d - %s - %s" % ( user.id, user.username, info))
 
         if not user.extra:
-            logging.info("init new user %s, info=%s" % (user.username, socials))
-            user.init(socials[0])
+            logging.info("init new user %s, info=%s" % (user.username, si))
+            user.init(si)
 
-        if user.username != info['username']:
-            logging.info("username needs update to [%s]" % info['username'])
-            user.username = info['username']
-
+        user.check_and_update(si)
         self.access_time = datetime.datetime.now()
         user.extra['login_ip'] = self.request.remote_ip
         user.save()
 
     def get(self):
+        login_time = int(time.time())
+        self.set_secure_cookie("lt", str(login_time))
         self.update_userinfo()
         url = self.get_secure_cookie(COOKIE_REDIRECT)
         self.clear_cookie(COOKIE_REDIRECT)
@@ -122,7 +125,7 @@ class AdminView(BaseHandler):
         page_max = count / delta
         page_now = start / delta
         pages = []
-        for p in range(page_now-4, page_now+4):
+        for p in range(page_now-2, page_now+3):
             if 0 <= p and p <= page_max:
                 pages.append(p)
         users = items.limit(delta).offset(start).all()

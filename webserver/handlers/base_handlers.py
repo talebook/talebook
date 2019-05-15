@@ -82,13 +82,14 @@ class BaseHandler(web.RequestHandler):
         return self.static_host + url
 
     def user_id(self):
+        login_time = self.get_secure_cookie("lt")
+        if not login_time or int(login_time) < int(time.time()) - 7*86400:
+            return None
         return self.get_secure_cookie('user_id')
 
     def get_current_user(self):
-        user = None
         user_id = self.user_id()
-        if user_id:
-            user = self.session.query(Reader).get(int(user_id))
+        user = self.session.query(Reader).get(int(user_id)) if user_id else None
 
         admin_id = self.get_secure_cookie("admin_id")
         if admin_id:
@@ -325,12 +326,13 @@ class ListHandler(BaseHandler):
         page_max = (count-1) / delta
         page_now = start / delta
         pages = []
-        for p in range(page_now-4, page_now+4):
+        for p in range(page_now-3, page_now+3):
             if 0 <= p and p <= page_max:
                 pages.append(p)
 
         if ids:
             books = self.get_books(ids=ids[start:start+delta])
+            self.sort_books(books, sort)
         else:
             self.sort_books(all_books, sort)
             books = all_books[start:start+delta]

@@ -319,7 +319,7 @@ class HotBook(ListHandler):
         page_max = count / delta
         page_now = start / delta
         pages = []
-        for p in range(page_now-4, page_now+4):
+        for p in range(page_now-3, page_now+3):
             if 0 <= p and p <= page_max:
                 pages.append(p)
         items = db_items.limit(delta).offset(start).all()
