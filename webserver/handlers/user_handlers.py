@@ -56,6 +56,8 @@ class Login(BaseHandler):
             user = Reader(id=auto)
             user.init_default_user()
             user.save()
+        login_time = int(time.time())
+        self.set_secure_cookie("lt", str(login_time))
         self.add_msg("success", _("自动登录成功。"))
         return True
 

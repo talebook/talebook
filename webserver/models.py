@@ -61,6 +61,9 @@ class Reader(Base, SQLAlchemyMixin):
     def init_default_user(self):
         class DefaultUserInfo:
             extra_data = {'username': _(u'默认用户')}
+            provider = 'qq'
+            uid = 123456789
+
         self.init(DefaultUserInfo())
 
     def init(self, social_user):
