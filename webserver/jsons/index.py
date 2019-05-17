@@ -31,7 +31,7 @@ def book(host, b):
 def json_output(self, vals):
     host = "https://" + self.request.host
     data = {
-        "title": "奇异书屋",
+        "title": self.settings['site_title'],
         "random_books_count": len(vals['random_books']),
         "new_books_count": len(vals['new_books']),
         "random_books": [ book(host, b) for b in vals['random_books'] ],

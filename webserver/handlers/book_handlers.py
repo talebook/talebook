@@ -493,9 +493,10 @@ class BookPush(BaseHandler):
         fname = u'%s - %s.%s'%(title, author, fmt)
         fdata = open(fpath).read()
 
+        site_title = self.settings['site_title']
         mail_from = settings['smtp_username']
-        mail_subject = _('奇异书屋：推送给您一本书《%(title)s》') % vars()
-        mail_body = _(u'为您奉上一本《%(title)s》, 欢迎常来访问奇异书屋！http://www.talebook.org' % vars())
+        mail_subject = _('%(site_title)s：推送给您一本书《%(title)s》') % vars()
+        mail_body = _(u'为您奉上一本《%(title)s》, 欢迎常来访问%(site_title)s！http://www.talebook.org' % vars())
         status = msg = ""
         try:
             logging.info('send %(title)s to %(mail_to)s' % vars())

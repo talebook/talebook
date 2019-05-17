@@ -205,6 +205,7 @@ class BaseHandler(web.RequestHandler):
 
         IMG = self.static_host
         vals = dict(*args, **kwargs)
+        SITE_TITLE = self.settings['site_title']
 
         vals.update( vars() )
         del vals['self']

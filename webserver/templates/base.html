@@ -17,7 +17,7 @@
         <link href="{{static_url("css/calibre.css")}}" rel="stylesheet">
         <!- [if IE]><script src="{{static_url("js/respond.js")}}"></script><![endif]->
         {% block title %}
-        <title>{% if title %}{{title}} - {%endif%}奇异书屋</title>
+        <title>{% if title %}{{title}} - {%endif%}{{SITE_TITLE}}</title>
         {% endblock %}
         {% block meta %}{% endblock %}
         <style>
@@ -59,7 +59,7 @@ body {font-family: 'PingFang SC', 'Source Han Sans CN', 'Microsoft YaHei', 'Helv
                 </a>
                 {% endif %}
 
-                <a class="navbar-brand logo" href="/">奇异书屋</a>
+                <a class="navbar-brand logo" href="/">{{SITE_TITLE}}</a>
             </div>
 
             <div class="collapse navbar-collapse" id="menu-box">
