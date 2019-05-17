@@ -22,7 +22,7 @@ mkdir -p /data/log/
 mkdir -p /data/release/www/calibre.talebook.org/
 mkdir -p /data/books/{library,extract,upload,convert,progress}
 cd /data/release/www/calibre.talebook.org/
-git clone https://github.com/talebook/my-calibre-webserver.git
+git clone https://github.com/talebook/calibre-webserver.git
 
 ```
 
@@ -44,7 +44,7 @@ git clone https://github.com/talebook/talebook-library.git /data/books/library
 ## 创建DB
 执行以下命令，创建程序DB。
 ```
-python /data/release/www/calibre.talebook.org/my-calibre-webserver/server.py --syncdb
+python /data/release/www/calibre.talebook.org/calibre-webserver/server.py --syncdb
 ```
 
 
@@ -121,12 +121,12 @@ sudo nginx -s start
 如果有调整过supervisord里面的配置（例如端口、目录），一定要执行```sudo supervisorctl reload all```重新读取配置，不然是不会生效的，可能会导致启动失败。
 
 如果提示```calibre:tornado-8000: ERROR(spawn error)```，那么说明环境没配置正确。
-请打开日志文件```/data/log/my-calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last)```提示的错误原因。
+请打开日志文件```/data/log/calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last)```提示的错误原因。
 
 * 网站能打开，但是提示```500: internal server error```
 
 这种情况，一般是服务运行时出现异常，常见原因有目录权限没有配置正常、数据库没创建好、或者触发了某个代码BUG。
 
-请打开日志文件```/data/log/my-calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last)```提示的错误原因，并提issue联系开发者排查。
+请打开日志文件```/data/log/calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last)```提示的错误原因，并提issue联系开发者排查。
 
 

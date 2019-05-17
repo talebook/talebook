@@ -4,10 +4,10 @@
 import os
 
 settings = {
-    # "static_host"   : "js.talebook.org",
+    #"static_host"   : "cdn.talebook.org",
     "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
     "template_path" : os.path.join(os.path.dirname(__file__), "templates"),
-    "progress_path"  : "/data/books/progress/",
+    "progress_path" : "/data/books/progress/",
     "convert_path"  : "/data/books/convert/",
     "upload_path"   : "/data/books/upload/",
     "extract_path"  : "/data/books/extract/",
@@ -33,7 +33,7 @@ settings = {
     'smtp_server'                      : "smtp.talebook.org",
     'smtp_username'                    : "sender@talebook.org",
     'smtp_password'                    : "password",
-    'douban_apikey'                    : "default-apikey",
+    'douban_apikey'                    : "0df993c66c0c636e29ecbb5344252a4a",
 
     # See: http://open.weibo.com/developers
     'SOCIAL_AUTH_WEIBO_KEY'            : '',

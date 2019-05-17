@@ -28,7 +28,7 @@ server {
     }
 
     location ^~ /static/ {
-        root /data/release/www/calibre.talebook.org/my-calibre-webserver/webserver/;
+        root /data/release/www/calibre.talebook.org/calibre-webserver/webserver/;
         if ($query_string) { expires max; }
     }
 
