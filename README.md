@@ -14,7 +14,7 @@ https://www.talebook.org
 * 借助[Readium.js](https://github.com/readium/readium-js-viewer) 库，支持了网页在线阅读电子书。
 * 支持从百度百科、豆瓣搜索并导入书籍基础信息。
 
-部署比较简答，可以参考[安装文档](documents/INSTALL.zh_CN.md)
+部署比较简答，可以参考[安装文档](document/INSTALL.zh_CN.md)
 
 或者，直接访问我的在线书库，有大约两万本藏书。https://www.talebook.org
 
