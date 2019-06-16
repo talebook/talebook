@@ -1,0 +1,72 @@
+<template>
+    <v-layout align-start row wrap >
+        <v-flex xs12 >
+            <h2>{{title}}</h2>
+            <v-divider class="book-list-legend"></v-divider>
+        </v-flex>
+
+        <v-flex xs12>
+            <book-cards :books="books"></book-cards>
+        </v-flex>
+
+        <v-flex xs12 fill-height>
+            <div class="text-xs-center book-pager">
+                <v-pagination
+                 v-model="page"
+                 :length="page_cnt"
+                 :total-visible="7"
+                 circle
+                 ></v-pagination>
+            </div>
+        </v-flex>
+    </v-layout>
+</template>
+
+<script>
+import BookCards from "../components/BookCards.vue";
+export default {
+    components: {
+        BookCards,
+    },
+    computed: {
+        page_cnt: function() {
+            return 1 + parseInt(this.total/this.page_size);
+        },
+    },
+    data: () => ({
+        title: "",
+        page: 1,
+        books: [],
+        total: 0,
+        page_size: 20,
+    }),
+    created() {
+            this.$store.commit('loading');
+        var url = this.$route.fullPath;
+        if ( url != this.$route.path ) {
+            url += "&fmt=json";
+        } else {
+            url += "?fmt=json";
+        }
+        fetch("https://www.talebook.org" + url)
+        .then(rsp => rsp.json())
+        .then(rsp => {
+            this.title = rsp.title;
+            this.books = rsp.books;
+            this.total = rsp.total
+                this.$store.commit('loaded');
+        })
+    },
+  }
+</script>
+
+<style scoped>
+.book-list-legend {
+    margin-top: 6px;
+    margin-bottom: 16px;
+}
+.book-pager {
+    margin-top: 30px;
+}
+
+</style>

@@ -1,38 +1,34 @@
 <template>
-  <v-app>
-    <v-toolbar app>
-      <v-toolbar-title class="headline text-uppercase">
-        <span>Vuetify</span>
-        <span class="font-weight-light">MATERIAL DESIGN</span>
-      </v-toolbar-title>
-      <v-spacer></v-spacer>
-      <v-btn
-        flat
-        href="https://github.com/vuetifyjs/vuetify/releases/latest"
-        target="_blank"
-      >
-        <span class="mr-2">Latest Release</span>
-      </v-btn>
-    </v-toolbar>
-
-    <v-content>
-      <HelloWorld/>
-    </v-content>
-  </v-app>
+    <v-app>
+        <app-header v-if="$store.state.nav"></app-header>
+        <v-content>
+            <v-container fluid fill-height>
+                <v-layout row wrap align-center justify-center v-show="$store.state.loading" >
+                    <v-flex >
+                        <div class="text-xs-center">
+                            <v-progress-circular indeterminate color="primary" ></v-progress-circular>
+                        </div>
+                    </v-flex>
+                </v-layout>
+                <router-view v-show="! $store.state.loading" ></router-view>
+            </v-container>
+        </v-content>
+        <app-footer v-if="$store.state.nav"></app-footer>
+    </v-app>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld'
-
+import AppHeader from "./components/AppHeader.vue"
+import AppFooter from "./components/AppFooter.vue"
 export default {
-  name: 'App',
-  components: {
-    HelloWorld
-  },
-  data () {
-    return {
-      //
+    name: 'App',
+    components: {
+        AppHeader,
+        AppFooter,
+    },
+    data () {
+        return {
+        }
     }
-  }
 }
 </script>
