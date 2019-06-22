@@ -75,7 +75,7 @@
             <v-card-actions>
                 <v-btn color="" @click="e1 = 1" >上一步</v-btn>
                 <v-spacer></v-spacer>
-                <v-btn color="primary">完成设置</v-btn>
+                <v-btn @click="do_install" color="primary">完成设置</v-btn>
             </v-card-actions>
         </v-stepper-content>
     </v-stepper-items>
@@ -90,7 +90,7 @@
 <script>
 export default {
     created() {
-        this.$store.commit("puremode");
+        this.$store.commit("puremode", true);
     },
     data: () => ({
         e1: 1,
@@ -103,6 +103,13 @@ export default {
         enable_github: false,
         drawer: null
     }),
+    methods: {
+        do_install: function() {
+            alert("Test, Install success!");
+            this.$store.commit("puremode", false);
+            this.$router.push("/");
+        },
+    },
 
 }
 </script>

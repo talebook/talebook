@@ -48,7 +48,7 @@
             <v-btn icon> <v-icon>notifications</v-icon> </v-btn>
             <v-btn icon large>
                 <v-avatar size="32px">
-                    <img src="https://q.qlogo.cn/qqapp/101187047/D7B5E27D5440740246E23C8E981E22A2/40" >
+                    <img :src="$store.state.user.avatar" >
                 </v-avatar>
             </v-btn>
         </v-toolbar>

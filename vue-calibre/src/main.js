@@ -18,23 +18,29 @@ import BookList   from './pages/BookList.vue'
 import Login      from './pages/Login.vue'
 import MetaList   from './pages/MetaList.vue'
 import Settings   from './pages/Settings.vue'
+import Welcome    from './pages/Welcome.vue'
+import NotFound   from './pages/NotFound.vue'
 
 Vue.config.productionTip = false
 
 const router = new VueRouter({
     mode: 'history',
     routes: [
-        { path: '/', component: Index },
-        { path: '/install', component: Install },
-        { path: '/recent', component: BookList },
-        { path: '/hot', component: BookList },
+        { path: '/',         component: Index    },
+        { path: '/all',      component: NotFound },
+        { path: '/install',  component: Install  },
+        { path: '/recent',   component: BookList },
+        { path: '/hot',      component: BookList },
+        { path: '/settings', component: Settings },
+        { path: '/welcome',  component: Welcome  },
+        { path: '/login',    component: Login    },
+
         { path: '/book/:bookid(\\d+)', component: BookDetail },
         { path: '/book/:bookid(\\d+)/read', component: BookRead },
         { path: '/:meta(pub|tag|author|rating)', component: MetaList },
         { path: '/:meta(pub|tag|author|rating)/:name', component: BookList },
-        { path: '/settings', component: Settings },
-        { path: '/login', component: Login },
-        { path: '.*', component: Install },
+
+        { path: '*', component: NotFound },
     ]
 })
 
@@ -42,7 +48,11 @@ const store = new Vuex.Store({
     state: {
         nav: true,
         loading: false,
-        count: 0
+        count: 0,
+        user: {
+            avatar: "https://q.qlogo.cn/qqapp/101187047/D7B5E27D5440740246E23C8E981E22A2/40",
+            nickname: "",
+        },
     },
     mutations: {
         loading(state) {
@@ -51,11 +61,18 @@ const store = new Vuex.Store({
         loaded(state) {
             state.loading = false;
         },
-        puremode(state) {
-            state.nav = false;
+        puremode(state, pure) {
+            if ( pure ) {
+                state.nav = false;
+            } else {
+                state.nav = true;
+            }
         },
-        increment (state) {
+        increment(state) {
             state.count++
+        },
+        login(state, user) {
+            state.user = user;
         },
     }
 })

@@ -1,5 +1,5 @@
 <template>
-    <v-layout row wrap justify-center >
+    <v-layout row wrap align-start fill-height>
         <v-flex md12>
             <v-card>
                 <v-card-actions>

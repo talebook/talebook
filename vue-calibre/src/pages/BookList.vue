@@ -9,12 +9,12 @@
             <book-cards :books="books"></book-cards>
         </v-flex>
 
-        <v-flex xs12 fill-height>
+        <v-flex xs12>
             <div class="text-xs-center book-pager">
                 <v-pagination
                  v-model="page"
                  :length="page_cnt"
-                 :total-visible="7"
+                 :total-visible="page_visible"
                  circle
                  ></v-pagination>
             </div>
@@ -31,6 +31,13 @@ export default {
     computed: {
         page_cnt: function() {
             return 1 + parseInt(this.total/this.page_size);
+        },
+        page_visible: function() {
+            if ( this.$vuetify.breakpoint.smAndUp ) {
+                return 7;
+            } else {
+                return 5;
+            }
         },
     },
     data: () => ({

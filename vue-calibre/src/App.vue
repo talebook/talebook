@@ -3,7 +3,7 @@
         <app-header v-if="$store.state.nav"></app-header>
         <v-content>
             <v-container fluid fill-height>
-                <v-layout row wrap align-center justify-center v-show="$store.state.loading" >
+                <v-layout v-show="$store.state.loading" row wrap align-center justify-center>
                     <v-flex >
                         <div class="text-xs-center">
                             <v-progress-circular indeterminate color="primary" ></v-progress-circular>
