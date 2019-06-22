@@ -1,25 +1,25 @@
 <template>
-    <v-layout row wrap align-start fill-height>
-        <v-flex md12>
+    <v-layout row wrap align-start>
+        <v-flex xs12>
             <v-card>
                 <v-card-actions>
-                    <v-btn flat color="purple" > <v-icon>email</v-icon> Push Kindle - {{$store.state.loading}}</v-btn>
+                    <v-btn flat color="purple"><v-icon>email</v-icon> Push Kindle</v-btn>
                     <v-btn flat > <v-icon>import_contacts</v-icon> Read Online</v-btn>
                     <v-spacer></v-spacer>
-                    <v-btn icon> <v-icon>cloud_download</v-icon> </v-btn>
-                    <v-btn icon> <v-icon>thumb_up</v-icon> </v-btn>
-                    <v-btn icon> <v-icon>share</v-icon> </v-btn>
-                    <v-btn icon @click="show = !show">
+                    <v-btn class="hidden-xs-only" icon> <v-icon>cloud_download</v-icon> </v-btn>
+                    <v-btn class="hidden-xs-only" icon> <v-icon>thumb_up</v-icon> </v-btn>
+                    <v-btn class="hidden-xs-only" icon> <v-icon>share</v-icon> </v-btn>
+                    <v-btn class="hidden-xs-only" icon @click="show = !show">
                         <v-icon>{{ show ? 'keyboard_arrow_down' : 'keyboard_arrow_up' }}</v-icon>
                     </v-btn>
                 </v-card-actions>
 
                 <v-layout row wrap >
-                    <v-flex d-flex xs4>
+                    <v-flex d-flex xs12 sm4>
                         <v-img class="book-img" :src="book.img" height="500px" contain ></v-img>
                     </v-flex>
-                    <v-flex xs8>
-                        <v-card-text align-left>
+                    <v-flex xs12 sm8>
+                        <v-card-text align-left class="small-tags">
                             <div>
                             <h2>{{book.title}}</h2>
                             <span color="grey--text">{{book.author}}著</span>
@@ -97,11 +97,11 @@ export default {
 
 <style>
 .book-img {
-    margin-left: 16px;
     /*
+    margin-left: 16px;
+    box-shadow: 1px 1px 1px rgba(0,0,0,0.12);
     box-shadow: 0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12);
     */
-    box-shadow: 1px 1px 1px rgba(0,0,0,0.12);
 }
 .align-right {
     text-align: right;
@@ -109,6 +109,20 @@ export default {
 .book-footer {
     padding-top: 0px;
     padding-bottom: 3px;
+}
+
+@media only screen and (max-width: 959px) {
+    .small-tags .v-btn__content {
+        font-size: 12px;
+    }
+  .small-tags i {
+      font-size: 16px;
+  }
+  .small-tags .v-btn--small {
+      min-width: 40px;
+      padding: 0 8px 0 4px;
+      margin: 3px 2px;
+  }
 }
 
 </style>
