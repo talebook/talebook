@@ -320,9 +320,10 @@ class ListHandler(BaseHandler):
     def render_book_list(self, all_books, vars_, ids=None):
         start = self.get_argument_start()
         sort = self.get_argument("sort", "timestamp")
+        size = self.get_argument("size", 30)
+        delta = min(size, 100)
 
         if ids: all_books = ids
-        delta = 20
         count = len(all_books)
         page_max = (count-1) / delta
         page_now = start / delta
@@ -338,14 +339,6 @@ class ListHandler(BaseHandler):
             self.sort_books(all_books, sort)
             books = all_books[start:start+delta]
         vars_.update(vars())
-        if self.get_argument("fmt", 0) == "json":
-            self.write( {
-                "total": count,
-                "books": [
-                    {k:v for k,v in b.items() if k in ["id", "title", "author", "comments"]} for b in books
-                ],
-            })
-            return
         return self.html_page('book/list.html', vars_)
 
 
