@@ -1,0 +1,51 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg">
+<defs >
+<font id="MaterialIcons" horiz-adv-x="512" ><font-face
+    font-family="Material Icons"
+    units-per-em="512"
+    panose-1="2 0 5 3 0 0 0 0 0 0"
+    ascent="512"
+    descent="0"
+    alphabetic="0" />
+<glyph unicode="0" d="" />
+<glyph unicode="1" d="" />
+<glyph unicode="2" d="" />
+<glyph unicode="3" d="" />
+<glyph unicode="4" d="" />
+<glyph unicode="5" d="" />
+<glyph unicode="6" d="" />
+<glyph unicode="7" d="" />
+<glyph unicode="8" d="" />
+<glyph unicode="9" d="" />
+<glyph unicode="_" d="" />
+<glyph unicode="a" d="" />
+<glyph unicode="b" d="" />
+<glyph unicode="c" d="" />
+<glyph unicode="d" d="" />
+<glyph unicode="e" d="" />
+<glyph unicode="f" d="" />
+<glyph unicode="g" d="" />
+<glyph unicode="h" d="" />
+<glyph unicode="i" d="" />
+<glyph unicode="j" d="" />
+<glyph unicode="k" d="" />
+<glyph unicode="l" d="" />
+<glyph unicode="m" d="" />
+<glyph unicode="n" d="" />
+<glyph unicode="o" d="" />
+<glyph unicode="p" d="" />
+<glyph unicode="q" d="" />
+<glyph unicode="r" d="" />
+<glyph unicode="s" d="" />
+<glyph unicode="t" d="" />
+<glyph unicode="u" d="" />
+<glyph unicode="v" d="" />
+<glyph unicode="w" d="" />
+<glyph unicode="x" d="" />
+<glyph unicode="y" d="" />
+<glyph unicode="z" d="" />
+</font>
+</defs>
+</svg>
