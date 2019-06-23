@@ -144,15 +144,19 @@ class AdminSet(BaseHandler):
 
 
 def routes():
-    return                     [
-            (r'/done/',        Done),
-            (r"/login",        Login),
-            (r'/logout',       Logout),
-            (r'/setting',      SettingView),
-            (r'/setting/save', SettingSave),
-            (r'/user',         UserView),
-            (r'/admin',        AdminView),
-            (r'/admin/set',    AdminSet),
+    return  [
+            (r'/api/user/index',        UserView),
+            (r"/api/user/sign_in",      Login),
+            (r'/api/user/sign_up',      Logout),
+            (r'/api/user/sign_out',     Logout),
+            (r'/api/user/setting',      SettingView),
+            (r'/api/user/setting/save', SettingSave),
+            (r'/api/done/',             Done),
+
+            (r'/api/sys/index',         AdminView),
+            (r'/api/sys/settings',      AdminSet),
+            (r'/api/sys/users',         AdminSet),
+            (r'/api/sys/messages',      AdminSet),
     ]
 
 
