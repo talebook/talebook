@@ -170,6 +170,10 @@ class BaseHandler(web.RequestHandler):
         return t.render(**namespace)
 
     def json_page(self, template, vals):
+        origin = self.request.headers.get('origin', '*')
+        self.set_header('Access-Control-Allow-Origin', origin)
+        self.set_header('Access-Control-Allow-Credentials', 'true')
+        self.set_header('Cache-Control', 'max-age=0')
         p = template.split(".html")[0].replace("/", ".")
         try:
             m = __import__("jsons."+p)

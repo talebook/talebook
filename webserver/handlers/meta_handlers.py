@@ -97,15 +97,15 @@ class RatingBooks(ListHandler):
 
 def routes():
     return [
-        ( r'/author',             AuthorList        ),
-        ( r'/author/(.*)',        AuthorBooks       ),
-        ( r'/author/(.*)/update', AuthorBooksUpdate ),
-        ( r'/tag',                TagList           ),
-        ( r'/tag/(.*)',           TagBooks          ),
-        ( r'/pub',                PubList           ),
-        ( r'/pub/(.*)',           PubBooks          ),
-        ( r'/pub/(.*)/update',    PubBooksUpdate    ),
-        ( r'/rating',             RatingList        ),
-        ( r'/rating/(.*)',        RatingBooks       ),
+        ( r'/api/author',             AuthorList        ),
+        ( r'/api/author/(.*)',        AuthorBooks       ),
+        ( r'/api/author/(.*)/update', AuthorBooksUpdate ),
+        ( r'/api/tag',                TagList           ),
+        ( r'/api/tag/(.*)',           TagBooks          ),
+        ( r'/api/pub',                PubList           ),
+        ( r'/api/pub/(.*)',           PubBooks          ),
+        ( r'/api/pub/(.*)/update',    PubBooksUpdate    ),
+        ( r'/api/rating',             RatingList        ),
+        ( r'/api/rating/(.*)',        RatingBooks       ),
         ]
 
