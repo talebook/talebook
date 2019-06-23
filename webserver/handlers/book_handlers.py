@@ -90,6 +90,8 @@ def do_ebook_convert(old_path, new_path, log_path):
     if new_path.lower().endswith(".epub"): args += ['--flow-size', '0']
 
     log = open(log_path, "w", 0)
+    cmd = " ".join( "'%s'" % v for v in args)
+    logging.info("CMD: %s" % cmd )
     p = subprocess.Popen(args, stdout=log, stderr=subprocess.PIPE)
     err = ""
     while p.poll() == None:
@@ -107,16 +109,23 @@ def do_ebook_convert(old_path, new_path, log_path):
 
 class Index(BaseHandler):
     def get(self):
+        max_random = 30
+        max_recent = 30
+        cnt_random = min(int(self.get_argument("random", 8)), max_random)
+        cnt_recent = min(int(self.get_argument("recent", 10)), max_recent)
+
         import random
         nav = "index"
         title = _(u'全部书籍')
         ids = list(self.cache.search(''))
         if not ids: raise web.HTTPError(404, reason = _(u'本书库暂无藏书'))
-        random_ids = random.sample(ids, min(8*3, len(ids)))
-        random_books = [ b for b in self.get_books(ids=random_ids) if b['cover'] ][:8]
+        random_ids = random.sample(ids, min(max_random, len(ids)))
+        random_books = [ b for b in self.get_books(ids=random_ids) if b['cover'] ]
+        random_books = random_books[:cnt_random]
         ids.sort()
-        new_ids = random.sample(ids[-300:], min(20, len(ids)))
-        new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] ][:10]
+        new_ids = random.sample(ids[-300:], min(max_recent, len(ids)))
+        new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] ]
+        new_books = new_books[:cnt_recent]
         return self.html_page('index.html', vars())
 
 class About(BaseHandler):
@@ -315,7 +324,7 @@ class HotBook(ListHandler):
         db_items = self.session.query(Item).filter(Item.count_visit > 1 ).order_by(Item.count_download.desc())
         count = db_items.count()
         start = self.get_argument_start()
-        delta = 20
+        delta = 30
         page_max = count / delta
         page_now = start / delta
         pages = []
@@ -512,7 +521,7 @@ class BookPush(BaseHandler):
             logging.info(msg)
         except:
             import traceback
-            logging.error('Failed to send to kindle:')
+            logging.error('Failed to send to kindle: %s' % mail_to)
             logging.error(traceback.format_exc())
             status = "danger"
             msg = traceback.format_exc()
