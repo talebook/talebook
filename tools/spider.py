@@ -7,21 +7,22 @@ import sys
 import logging
 import requests
 
-books_dir = "/data/books/download/weiphone.com/"
-done_path = "/data/books/download/done.txt"
+books_dir = "/data1/download/weiphone.com/"
+done_path = "/data1/download/done.txt"
 
-site = 'http://bbs.feng.com'
+site = 'https://bbs.feng.com'
 headers = {
 'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.6',
 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-'Referer': 'http://bbs.feng.com/thread-htm-fid-224-page-1.html',
+'Referer': 'https://bbs.feng.com/thread-htm-fid-224-page-1.html',
 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.87 Safari/537.36',
 }
 
 #re_thread    = r'''<a href="forum.php\?mod=viewthread&tid=([0-9]*).* onclick=.* class="s xst">(.*)</a>'''
 re_thread    = r'''<a href="read-htm-tid-([0-9]*).html" onclick=.* class="s xst">(.*)</a>'''
 re_attchment = r'''get=jQuery.get\('(plugin.php.*)',{},function.*html....>(.*)</a>'''
-re_download  = r'''href="(/plugin.php[^"]*attach)"'''
+#re_download  = r'''href="(/plugin.php[^"]*attach)"'''
+re_download  = r'''<a href="([^"]*download.php?aid=[^"]*)"'''
 formats = ['epub', 'mobi', 'azw3', 'azw']
 
 done_urls = set( line.strip() for line in open(done_path).readlines() )
@@ -33,6 +34,7 @@ def get(path):
 
 def download(path, name):
     rsp = get(path)
+    '''https://bbs.feng.com/tencentdownload.php?aid=14535549&amp;key=55d41fd0c175192fd05bbeb308cedf27'''
     for link in re.findall(re_download, rsp.text):
         aids = re.findall(r'aid=([0-9]*)', link)
         aid = aids[0] if aids else "aid"
@@ -58,6 +60,9 @@ def visit_thread(tid, name):
         done_urls.add(path)
     rsp = get(path)
     attchments = re.findall(re_attchment, rsp.text)
+    if not attachments:
+        logging.error("No attachment in %s" % path)
+        return
     for path, name in attchments:
         for f in formats:
             if name.endswith(f):
