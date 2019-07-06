@@ -128,14 +128,17 @@ direction: rtl;
 .book-title-header{
   position: absolute;
   top: 0px;
-  width: 100%;
+  left: 48px;
+  /*width: 100%;*/
   text-align: center;
   color: #eee;
   font-weight: normal;
   font-size: 1.0em;
   letter-spacing: 0.5em;
   text-transform: uppercase;
-  margin: 15px 0px 0px 0px;
+  margin: 12px 96px 0px 0px;
+  overflow-y: hidden;
+  height: 1em;
   z-index: 999;
   font-family: serif;
 }
