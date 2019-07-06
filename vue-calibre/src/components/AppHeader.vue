@@ -30,16 +30,13 @@
 
         <v-toolbar color="blue" dark fixed app :clipped-left="$vuetify.breakpoint.lgAndUp" dense >
             <v-toolbar-side-icon @click.stop="sidebar = !sidebar"></v-toolbar-side-icon>
-            <v-toolbar-title style="width: 300px" class="ml-0 pl-3">
-                <span class="hidden-sm-and-down">
-                    <v-btn flat href="/">
+                    <v-btn flat class='btn-home' href="/">
                         <v-avatar tile size="24px">
                         <v-img src="https://cdn.vuetifyjs.com/images/logos/logo.svg" alt="Vuetify" ></v-img>
                         </v-avatar>
-                        奇异书屋
+                        奇异书屋{{$vuetify.breakpoint.name}}
                     </v-btn>
-                </span>
-            </v-toolbar-title>
+            <v-spacer></v-spacer>
             <v-text-field flat solo-inverted hide-details prepend-inner-icon="search"
                       label="Search" class="hidden-sm-and-down">
             </v-text-field>
@@ -111,7 +108,11 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
+
+.btn-home {
+    padding: 0;
+}
 
 .link-friend {
     text-align: center;

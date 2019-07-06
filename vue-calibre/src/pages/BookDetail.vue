@@ -15,14 +15,14 @@
                 </v-card-actions>
 
                 <v-layout row wrap >
-                    <v-flex d-flex xs12 sm4>
-                        <v-img class="book-img" :src="book.img" height="500px" contain ></v-img>
+                    <v-flex d-flex xs12 sm4 md4>
+                        <v-img class="book-img" :src="book.img" height2="500px" contain ></v-img>
                     </v-flex>
-                    <v-flex xs12 sm8>
+                    <v-flex xs12 sm8 md8>
                         <v-card-text align-left class="small-tags">
                             <div>
                             <h2>{{book.title}}</h2>
-                            <span color="grey--text">{{book.author}}著</span>
+                            <span color="grey--text">{{book.author}}著，{{pub_year}}年版</span>
                             </div>
                             <br/>
                             <div>
@@ -41,11 +41,10 @@
                                 </v-btn>
                                 </template>
                             </div>
-                            <div class="">
-                                <br/>
-                                <p v-if="book.comments" v-html="book.comments"></p>
-                                <p  v-else>点击浏览详情</p>
-                            </div>
+                        </v-card-text>
+                        <v-card-text>
+                            <p v-if="book.comments" v-html="book.comments"></p>
+                            <p  v-else>点击浏览详情</p>
                         </v-card-text>
                         <v-slide-y-transition>
                             <v-card-text v-show="show">
@@ -69,6 +68,12 @@ export default {
     components: {
     },
     computed: {
+        pub_year: function() {
+            if ( this.book === null ) {
+                return "";
+            }
+            return this.book.pubdate.split("-")[0];
+        },
     },
     data: () => ({
         book: null,
@@ -81,8 +86,7 @@ export default {
         fetch_book() {
             this.$store.commit('loading');
             var bookid = this.$route.params.bookid;
-            var url = "https://www.talebook.org/book/" + bookid + "?fmt=json";
-            fetch(url)
+            this.backend("/book/" + bookid + "?fmt=json")
             .then( rsp => rsp.json() )
             .then( book => {
                 book.img = book.cover_large_url;

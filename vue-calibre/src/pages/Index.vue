@@ -41,12 +41,7 @@ export default {
     },
     created() {
         this.$store.commit('loading');
-        var url = "https://www.talebook.org/?random=12&recent=12&fmt=json";
-        fetch(url, {
-            credentials: 'include',
-            mode: "cors",
-            redirect: "follow",
-        })
+        this.backend("/index?random=12&recent=12&fmt=json")
         .then(rsp => rsp.json() )
         .then(data => {
             this.rsp = data;

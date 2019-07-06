@@ -35,8 +35,7 @@ export default {
     created() {
         this.$store.commit('loading');
         var meta = this.$route.params.meta;
-        var url = "https://www.talebook.org/"+meta+"?fmt=json";
-        fetch(url)
+        this.backend("/"+meta+"?fmt=json")
         .then(rsp => rsp.json())
         .then(rsp => {
             this.title = rsp.title;

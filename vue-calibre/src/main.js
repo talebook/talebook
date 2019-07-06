@@ -9,6 +9,9 @@ import Vuetify from 'vuetify/lib'
 import 'vuetify/src/stylus/app.styl'
 Vue.use(Vuetify, { iconfont: 'md' })
 
+import calibre from './calibre.js'
+Vue.use(calibre, {api: "http://beta.talebook.org/api"})
+
 import App        from './App.vue'
 import Index      from './pages/Index.vue'
 import Install    from './pages/Install.vue'

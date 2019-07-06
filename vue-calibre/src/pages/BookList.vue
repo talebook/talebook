@@ -55,7 +55,7 @@ export default {
         } else {
             url += "?fmt=json";
         }
-        fetch("https://www.talebook.org" + url)
+        this.backend(url)
         .then(rsp => rsp.json())
         .then(rsp => {
             this.title = rsp.title;
