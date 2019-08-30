@@ -16,7 +16,7 @@ import App        from './App.vue'
 import Index      from './pages/Index.vue'
 import Install    from './pages/Install.vue'
 import BookDetail from './pages/BookDetail.vue'
-import BookRead   from './pages/BookRead.vue'
+//import BookRead   from './pages/BookRead.vue'
 import BookList   from './pages/BookList.vue'
 import Login      from './pages/Login.vue'
 import MetaList   from './pages/MetaList.vue'
@@ -39,7 +39,7 @@ const router = new VueRouter({
         { path: '/login',    component: Login    },
 
         { path: '/book/:bookid(\\d+)', component: BookDetail },
-        { path: '/book/:bookid(\\d+)/read', component: BookRead },
+        //{ path: '/book/:bookid(\\d+)/read', component: BookRead },
         { path: '/:meta(pub|tag|author|rating)', component: MetaList },
         { path: '/:meta(pub|tag|author|rating)/:name', component: BookList },
 
