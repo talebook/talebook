@@ -1,0 +1,44 @@
+<div class="modal fade" id="add-epub-dialog" tabindex="-1" role="dialog" aria-labelledby="add-epub-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+
+                <button id="closeAddEpubCross" type="button" class="close" data-dismiss="modal" tabindex="999" title="{{strings.i18n_close}} {{strings.i18n_add_book}}" aria-label="{{strings.i18n_close}} {{strings.i18n_add_book}}"><span aria-hidden="true">&times;</span></button>
+
+                <h4 class="modal-title" id="add-epub-label">{{strings.i18n_add_book}}</h4>
+            </div>
+            <div class="modal-body">
+                <form class="form-horizontal" role="form">
+                {{#canHandleUrl}}
+                <div class="form-group">
+                    <label id="add1" class="control-label col-sm-5">{{strings.i18n_from_the_web}}</label>
+                    <div class="col-sm-7">
+                        <input tabindex="1000" type="text" id="url-upload" class="form-control" placeholder="{{strings.i18n_enter_a_url}}" aria-labelledby="add1">
+                    </div>
+                </div>
+                {{/canHandleUrl}}
+                <div id="epub-upload-div" class="form-group">
+                    <label id="add2" class="control-label col-sm-5">{{strings.i18n_from_local_file}}</label>
+                    <div class="col-sm-7">
+                        <input tabindex="1000" type="file" id="epub-upload" class="form-control" aria-labelledby="add2" role="button">
+                    </div>
+                </div>
+                {{#canHandleDirectory}}
+                <div class="form-group">
+                    <label id="add3" class="control-label col-sm-5">{{strings.i18n_unpacked_directory}}</label>
+                    <div class="col-sm-7">
+                        <input tabindex="1000" type="file" id="dir-upload" webkitdirectory="" mozdirectory="" directory="" class="form-control" aria-labelledby="add3"  role="button">
+                    </div>
+                </div>
+                {{/canHandleDirectory}}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button tabindex="1000" type="button" class="btn btn-default add-book" data-dismiss="modal" disabled="disabled">{{strings.i18n_add_book}}</button>
+                <button tabindex="1000" type="button" class="btn btn-primary" data-dismiss="modal">{{strings.i18n_cancel}}</button>
+            </div>
+        </div>
+        <!-- /.modal-content --> 
+    </div><!-- /.modal-dialog -->
+</div>
+<!-- /.modal -->

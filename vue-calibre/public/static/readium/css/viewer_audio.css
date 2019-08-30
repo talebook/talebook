@@ -1,0 +1,573 @@
+#audioplayer.expanded-audio
+{
+  background: #4d4d4d;
+  box-shadow: 0px 1px 5px #333;
+  border-radius: 0px;
+
+  margin-bottom: 0px;
+
+    min-height: 130px;
+    border-bottom: 2px solid #888;
+}
+
+.navbar .btn-group #audioplayer .btn{
+  border: none;
+  border-radius: 0px;
+  user-select:none;
+  -webkit-user-select: none;
+}
+
+#audioplayer {
+    background: #4d4d4d;
+    float: left;
+    position: relative;
+    border-right: 2px solid #888;
+    border-left: 2px solid #888;
+    display: none;
+}
+
+#audioplayer button[disabled],
+#audioplayer input[disabled] {
+    opacity: 0.3;
+}
+
+#audioplayer.isPlaying {
+    background-color: #000000;
+}
+#audioplayer.isPlaying > .btn,
+#audioplayer.isPlaying #audioResponsive > .btn
+{
+    background-color: #000000;
+}
+
+#btn-expand-audio > .glyphicon,
+#btn-collapse-audio > .glyphicon
+{
+    color: #808080;
+}
+
+#audioplayer:not(.expanded-audio) > #btn-collapse-audio {
+    display: none;
+}
+
+#audioplayer.expanded-audio > #btn-expand-audio {
+    display: none;
+}
+
+#audioExpanded
+{
+    display: none;
+}
+
+
+
+#backgroundAudioTrack-div
+{
+    display: inline-block;
+    float: left;
+}
+#backgroundAudioTrack-div.none
+{
+    display: none;
+}
+
+#backgroundAudioTrack-div:not(.isPlaying) > #backgroundAudioTrack-button-pause
+{
+    display: none;
+}
+#backgroundAudioTrack-div.isPlaying > #backgroundAudioTrack-button-play
+{
+    display: none;
+}
+
+#audioplayer.expanded-audio > #audioExpanded
+{
+    display: block;
+    min-height: 36px;
+    background-color: #4d4d4d;
+}
+
+#audioplayer:not(.isPlaying) > #btn-pause-audio {
+    display: none;
+}
+
+#audioplayer.isPlaying > #btn-play-audio {
+    display: none;
+}
+
+#btn-audio-volume-mute > .glyphicon,
+#btn-audio-volume-unmute > .glyphicon
+{
+    margin: 0;
+    padding: 0;
+}
+
+#btn-audio-volume-mute,
+#btn-audio-volume-unmute
+{
+    padding-right: 0.2em;
+    padding-left: 0.2em;
+}
+#volume-range-slider
+{
+    width: 10em;
+    padding-left: 0;
+    margin-left: 0;
+}
+#btn-audio-volume-mute,
+#btn-audio-volume-unmute {
+  width: 30px;
+}
+
+#audioplayer:not(.no-volume) #btn-audio-volume-unmute {
+    display: none;
+}
+#audioplayer.no-volume #btn-audio-volume-mute {
+    display: none;
+}
+
+#icon-skip-off,
+#icon-touch-off,
+#icon-auto-page-turn-off,
+#icon-playback-scroll-off
+{
+    color: red;
+}
+#icon-skip-on,
+#icon-touch-on,
+#icon-auto-page-turn-on,
+#icon-playback-scroll-on
+{
+    color: green;
+}
+
+#audioplayer:not(.no-touch) #btn-touch-audio-enable {
+    display: none;
+}
+#audioplayer.no-touch #btn-touch-audio-disable {
+    display: none;
+}
+
+#audioplayer:not(.skip) > #audioExpanded #btn-skip-audio-disable {
+    display: none;
+}
+#audioplayer.skip > #audioExpanded #btn-skip-audio-enable {
+    display: none;
+}
+
+#audioplayer:not(.autoPageTurn) > #audioExpanded #btn-auto-page-turn-disable {
+    display: none;
+}
+#audioplayer.autoPageTurn > #audioExpanded #btn-auto-page-turn-enable {
+    display: none;
+}
+
+#audioplayer:not(.playScroll) > #audioExpanded #btn-playback-scroll-disable {
+    display: none;
+}
+#audioplayer.playScroll > #audioExpanded #btn-playback-scroll-enable {
+    display: none;
+}
+
+#icon-touch-on-hand,
+#icon-touch-off-hand {
+    margin-right: -0.4em;
+}
+
+
+#audioResponsive
+{
+    display: inline-block;
+}
+
+/* Issues with thumb :(
+#rate-range-slider
+{
+    position: relative;
+    top: 2px;
+}
+*/
+
+#btn-audio-rate > .glyphicon
+{
+    margin: 0;
+    padding: 0;
+}
+
+#btn-audio-rate
+{
+    margin-left: 0;
+    margin-right: 0;
+    
+    padding-right: 0.2em;
+    padding-left: 0.2em;
+}
+#rate-range-slider
+{
+    padding-left: 0;
+    margin-left: 0;
+    width: 6em;
+}
+#btn-audio-rate {
+  width: 30px;
+}
+
+
+#volume-range-slider
+{
+    position: relative;
+    top: 3px;
+}
+
+#app-navbar #time-range-slider
+{
+    box-shadow: none !important;
+}
+
+#volume-range-slider,
+#time-range-slider,
+#rate-range-slider,
+#font-size-input,
+#margin-size-input
+{
+    -webkit-appearance: slider-horizontal;
+    -webkit-appearance: none;
+    
+    background-color: #484848;
+    border-radius: 8px;
+    border: 1px solid #383838;
+    
+    cursor: pointer;
+}
+
+#volume-range-slider::-moz-range-track,
+#time-range-slider::-moz-range-track,
+#rate-range-slider::-moz-range-track,
+#font-size-input::-moz-range-track,
+#margin-size-input::-moz-range-track
+{    
+    background-color: #484848;
+    border-radius: 8px;
+    border: 1px solid #383838;
+    
+    cursor: pointer;
+}
+,
+
+#volume-range-slider:active,
+#time-range-slider:active,
+#rate-range-slider:active,
+#font-size-input:active,
+#margin-size-input:active
+{
+    -webkit-appearance: none;
+    
+    box-shadow: 0 0 0 5px #6fb5f1;
+}
+
+#volume-range-slider::-webkit-slider-thumb,
+#time-range-slider::-webkit-slider-thumb,
+#rate-range-slider::-webkit-slider-thumb,
+#font-size-input::-webkit-slider-thumb,
+#margin-size-input::-webkit-slider-thumb
+{
+    -webkit-appearance: none;
+
+    background-color: #ddd;
+    
+    width: 10px;
+    height: 10px;
+    
+    border-radius: 4px;
+}
+
+#volume-range-slider::-moz-range-thumb,
+#time-range-slider::-moz-range-thumb,
+#rate-range-slider::-moz-range-thumb,
+#font-size-input::-moz-range-thumb,
+#margin-size-input::-moz-range-thumb
+{
+    background-color: #ddd;
+    
+    width: 10px;
+    height: 10px;
+    
+    border-radius: 4px;
+}
+
+#rate-range-slider-label
+{
+    font-family: monospace;
+    font-size: 90%;
+    font-weight: bold;
+    
+    padding: 0;
+    margin: 0;
+    
+    color: white;
+    
+    position: absolute;
+    margin-top: 0.6em;
+    margin-left: 0.2em;
+}
+
+#time-range-slider
+{
+    display: block;
+    width: 100%;
+
+    border-left: 10px solid #4d4d4d;
+    border-right: 10px solid #4d4d4d;
+}
+#time-range-slider::-moz-range-track
+{
+    border-left: 10px solid #4d4d4d;
+    border-right: 10px solid #4d4d4d;
+}
+
+
+#time-range-slider::-moz-range-thumb
+{
+    height: 18px;
+}
+#time-range-slider::-webkit-slider-thumb
+{
+    height: 18px;
+}
+
+#time-range-slider::after
+{
+    position: absolute;
+
+    font-family: monospace;
+    font-size: 90%;
+    font-weight: bold;
+    
+    padding: 0.4em;
+    padding-top: 0.01em;
+    padding-bottom: 0.01em;
+
+    margin: 0;
+    
+    min-width: 3em;
+    margin-left: -3em;
+    
+    text-align: left;
+    
+    color: white;
+
+    content: attr(data-value)"%";
+}
+
+/*
+#volume-range-slider:active::-webkit-slider-thumb
+{
+border: 1px solid #0940fd;
+box-shadow: 0 0 0 1px #6fb5f1;
+}
+#volume-range-slider:active::-moz-range-thumb
+{
+border: 1px solid #0940fd;
+box-shadow: 0 0 0 1px #6fb5f1;
+}
+*/
+
+#audio-block
+{
+    display: block;
+}
+
+#mo-sync-form
+{
+    display: inline-block;
+    margin-left: 6em;
+}
+
+#mo-sync-form > input[type="radio"]
+{
+    font-size: 50%;
+    opacity: 0;
+    /* display: none; 
+    z-index: -1;
+    visibility: hidden;*/
+}
+
+#mo-sync-form > input[type="radio"] + label
+{
+    font-family: sans-serif;
+    font-size: 84%;
+    font-weight: normal;
+    
+    margin: 0;
+    margin-left: -1.5em;
+    margin-right: 0.5em;
+    
+    padding: 0;
+    padding-top: 0.1em;
+    padding-left: 0.2em;
+    padding-right: 0.2em;
+    
+    display: inline-block;
+    
+    color: #e1e1e1;
+    background: #484848;
+    border: 1px solid #383838;
+    border-radius: 0.5em;
+}
+
+#mo-sync-form > input[type="radio"]#mo-sync-default + label
+{
+    padding-top: 0.05em;
+    padding-bottom: 0.05em;
+    padding-left: 0.4em;
+    padding-right: 0.4em;
+}
+
+#mo-sync-form > input[type="radio"]:not([disabled]):checked + label
+{
+    color: black;
+    background: #e1e1e1;
+}
+
+#mo-sync-form > input[type="radio"]:not([disabled]) + label
+{
+    cursor: pointer;
+}
+#mo-sync-form > input[type="radio"][disabled] + label
+{
+    color: black;
+}
+
+
+
+#btn-esc-audio > .glyphicon,
+#btn-skip-audio-enable > .glyphicon,
+#btn-skip-audio-disable > .glyphicon,
+#btn-auto-page-turn-enable > .glyphicon,
+#btn-auto-page-turn-disable > .glyphicon,
+#btn-playback-scroll-enable > .glyphicon,
+#btn-playback-scroll-disable > .glyphicon
+{
+    margin: 0;
+    padding: 0;
+}
+
+#btn-esc-audio,
+#btn-skip-audio-enable,
+#btn-skip-audio-disable,
+#btn-auto-page-turn-enable,
+#btn-auto-page-turn-disable,
+#btn-playback-scroll-enable,
+#btn-playback-scroll-disable
+{
+    display: inline-block;
+    
+    padding-left: 0.2em;
+    padding-right: 0.2em;
+    
+    width: 30px;
+}
+
+#btn-esc-audio
+{
+    margin-left: 0em;
+}
+
+#mo-highlighters
+{
+    background-color: #4d4d4d;
+    
+    display: inline-block;
+    
+    margin: 0;
+    margin-right: 0em;
+    
+    padding: 0.5em;
+    padding-right: 0;
+}
+.btn-mo-highlighter
+{
+    font-family: sans-serif !important;
+    font-size: 90% !important;
+    font-weight: normal !important;
+    
+    width: 30px !important;
+    height: 20px !important;
+    
+    padding: 0;
+    
+    margin: 0;
+    margin-left: 0.2em;
+    margin-right: 0.2em;
+    
+    text-align: center;
+    border-radius: 0.4em !important;
+
+    border: 1px solid #383838 !important;
+}
+
+.btn-mo-highlighter[aria-selected=true]
+{
+    border: 1px solid white !important;
+    box-shadow: 0px 0px 0.4em black;
+}
+
+#mo-highlighter-0
+{
+    width: 60px !important;
+    
+    background-color: #4d4d4d !important;
+    color: #e1e1e1 !important;
+}
+#mo-highlighter-1
+{
+    background-color: yellow !important;
+    color: black !important;
+}
+#mo-highlighter-2
+{
+    background-color: black !important;
+    color: white !important;
+}
+#mo-highlighter-3
+{
+    background-color: orange !important;
+    color: black !important;
+}
+#mo-highlighter-4
+{
+    background-color: blue !important;
+    color: white !important;
+}
+#mo-highlighter-5
+{
+    background-color: magenta !important;
+    color: black !important;
+}
+#mo-highlighter-6
+{
+    background-color: #00FF00 !important;
+    color: black !important;
+}
+
+@media (max-width:768px) {
+
+    #mo-highlighter-0
+    {
+        width: 30px !important;
+        content: ' ';
+    }
+    #mo-sync-form
+    {
+        margin-left: 2em;
+    }
+    #audioResponsive
+    {
+        display: none;
+    }
+    #audioplayer.expanded-audio > #audioResponsive
+    {
+        display: block;
+        width: 100%;
+    }
+}

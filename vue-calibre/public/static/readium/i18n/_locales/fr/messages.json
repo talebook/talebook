@@ -1,0 +1,273 @@
+{
+  "chrome_extension_name": {
+    "message": "Readium"
+  },
+  "chrome_extension_description": {
+    "message": "Un lecteur de livres numériques EPUB3."
+  },
+  "i18n_readium_library" : {
+    "message" : "Bibliothèque Readium"
+  },
+  "i18n_loading" : {
+    "message" : "Chargement de la bibliothèque"
+  },
+  "i18n_readium_options" : {
+    "message" : "Options de Readium :"
+  },
+  "i18n_save_changes" : {
+    "message" : "Enregistrer les changements"
+  },
+  "i18n_close" : {
+    "message" : "Fermer"
+  },
+  "i18n_keyboard_shortcuts" : {
+    "message" : "Raccourcis clavier"
+  },
+  "i18n_keyboard_reload" : {
+    "message" : "Veuillez recharger la page pour que les raccourcis clavier prennent effet."
+  },
+  "i18n_reset_key" : {
+    "message" : "Réinitialiser le raccourci clavier par défaut"
+  },
+  "i18n_reset_key_all" : {
+    "message" : "Réinitialiser tous les raccourcis clavier par défaut"
+  },
+  "i18n_duplicate_keyboard_shortcut" : {
+    "message" : "DUPLIQUE"
+  },
+  "i18n_invalid_keyboard_shortcut" : {
+    "message" : "INVALIDE"
+  },
+  "i18n_paginate_all" : {
+    "message" : "Paginer tout le contenu des EPUB recomposables"
+  },
+  "i18n_automatically" : {
+    "message" : "Ouvrir automatiquement les urls *.epub dans Readium"
+  },
+  "i18n_show_warning" : {
+    "message" : "Montrer les messages d'avertissement pendant la décompression des fichiers EPUB"
+  },
+  "i18n_details" : {
+    "message" : "Détails"
+  },
+  "i18n_read" : {
+    "message" : "Lire"
+  },
+  "i18n_delete" : {
+    "message" : "Supprimer"
+  },
+  "i18n_author" : {
+    "message" : "Auteur : "
+  },
+  "i18n_publisher" : {
+    "message" : "Éditeur : "
+  },
+  "i18n_source" : {
+    "message" : "Source : "
+  },
+  "i18n_pub_date" : {
+    "message" : "Date de publication :  "
+  },
+  "i18n_modified_date" : {
+    "message" : "Date de modification : "
+  },
+  "i18n_id" : {
+    "message" : "ID: "
+  },
+  "i18n_epub_version" : {
+    "message" : "version de l'EPUB : "
+  },
+  "i18n_created_at" : {
+    "message" : "Ajouté le : "
+  },
+  "i18n_format" : {
+    "message" : "Format : "
+  },
+  "i18n_added" : {
+    "message" : "Ajouté le : "
+  },
+  "i18n_unknown" : {
+    "message" : "Inconnu"
+  },
+  "i18n_sorry" : {
+    "message" : "Désolé, l'EPUB actuel ne contient pas de média associé (media overlay) pour ce contenu"
+  },
+  "i18n_add_items" : {
+    "message" : "Ajoutez des articles à votre bibliothèque ici !"
+  },
+  "i18n_extracting" : {
+    "message" : "extraction : "
+  },
+  "i18n_are_you_sure" : {
+    "message" : "Voulez-vous vraiment supprimer "
+  },
+  "i18n_add_book_to_readium_library" : {
+    "message" : "Ajoutez un livre à la bibliothèque de Readium :"
+  },
+  "i18n_add_book" : {
+    "message" : "Ajouter un livre"
+  },
+  "i18n_cancel" : {
+    "message" : "Annuler"
+  },
+  "i18n_from_the_web" : {
+    "message" : "À partir du Web :"
+  },
+  "i18n_from_local_file" : {
+    "message" : "À partir d'un fichier local :"
+  },
+  "i18n_enter_a_url" : {
+    "message" : "Entrez l'URL d'un fichier .epub"
+  },
+  "i18n_unpacked_directory" : {
+    "message" : "Répertoire non-compressé :"
+  },
+  "i18n_validate" : {
+    "message" : "Valider :"
+  },
+  "i18n_confirm_that_this_book" : {
+    "message" : "Confirmer que ce livre est conforme aux standards EPUB"
+  },
+  "i18n_single_pages" : {
+    "message" : "Pages simples"
+  },
+  "i18n_double_pages" : {
+    "message" : "Doubles-pages"
+  },
+  "i18n_save_settings" : {
+    "message" : "Enregistrer"
+  },
+  "i18n_font_size" : {
+    "message" : "TAILLE DE LA POLICE"
+  },
+  "i18n_margins" : {
+    "message" : "MARGES"
+  },
+  "i18n_text_and_background_color" : {
+    "message" : "COULEUR DU TEXTE ET DU FOND"
+  },
+  "i18n_black_and_white" : {
+    "message" : "Noir et Blanc"
+  },
+  "i18n_arabian_nights" : {
+    "message" : "Mille et une Nuits"
+  },
+  "i18n_sands_of_dune" : {
+    "message" : "Sables de Dune"
+  },
+  "i18n_ballard_blues" : {
+    "message" : "Le Blues de Ballard"
+  },
+  "i18n_vancouver_mist" : {
+    "message" : "Le Brouillard de Vancouver"
+  },
+  "i18n_display_format" : {
+    "message" : "FORMAT D'AFFICHAGE"
+  },
+  "i18n_scroll_mode" : {
+    "message" : "MODE DE DÉFILEMENT"
+  },
+  "i18n_scroll_mode_auto" : {
+    "message" : "Auto"
+  },
+  "i18n_scroll_mode_doc" : {
+    "message" : "Document"
+  },
+  "i18n_scroll_mode_continuous" : {
+    "message" : "Continu"
+  },
+  "i18n_html_readium_tm_a_project" : {
+    "message" : "Readium pour Chrome est l'extension du navigateur Chrome de ReadiumJS, un système de lecture open-source et une librairie JavaScript pour afficher des documents EPUB® dans les navigateurs web. ReadiumJS est un projet de la fondation Readium (Readium.org). Pour en savoir plus ou pour contribuer, visiter la <a href=\"http://readium.org/projects/readiumjs\">page d'accueil du projet</a>."
+  },
+  "i18n_audio_play" : {
+    "message" : "Jouer"
+  },
+  "i18n_audio_pause" : {
+    "message" : "Pauser"
+  },
+  "i18n_audio_previous" : {
+    "message" : "Phrase audio précédente"
+  },
+  "i18n_audio_next" : {
+    "message" : "Phrase audio suivante"
+  },
+  "i18n_audio_volume" : {
+    "message" : "Ajustement du volume audio"
+  },
+  "i18n_audio_time" : {
+    "message" : "Contrôle du curseur temporel audio"
+  },
+  "i18n_audio_mute" : {
+    "message" : "Silence audio"
+  },
+  "i18n_audio_unmute" : {
+    "message" : "Restaurer le volume audio"
+  },
+  "i18n_audio_expand" : {
+    "message" : "Afficher les contrôles audio avancés"
+  },
+  "i18n_audio_collapse" : {
+    "message" : "Fermer les contrôles audio avancés"
+  },
+  "i18n_audio_esc" : {
+    "message" : "Échapper le contexte audio actuel"
+  },
+  "i18n_audio_rate" : {
+    "message" : "Vitesse de lecture audio"
+  },
+  "i18n_audio_rate_reset" : {
+    "message" : "Retour à la vitesse normale de lecture audio"
+  },
+  "i18n_audio_skip_disable" : {
+    "message" : "Désactiver la 'skippabilité'"
+  },
+  "i18n_audio_skip_enable" : {
+    "message" : "Activer la 'skippabilité'"
+  },
+  "i18n_audio_touch_enable" : {
+    "message" : "Activer la fonction 'toucher pour jouer'"
+  },
+  "i18n_audio_touch_disable" : {
+    "message" : "Désactiver la fonction 'toucher pour jouer'"
+  },
+  "i18n_audio_highlight_default" : {
+    "message" : "défaut"
+  },
+  "i18n_audio_highlight" : {
+    "message" : "Couleur audio"
+  },
+  "i18n_audio_sync" : {
+    "message" : "Granularité de synchronisation texte / audio"
+  },
+  "i18n_audio_sync_default" : {
+    "message" : "Défaut"
+  },
+  "i18n_audio_sync_word" : {
+    "message" : "Mot"
+  },
+  "i18n_audio_sync_sentence" : {
+    "message" : "Phrase"
+  },
+  "i18n_audio_sync_paragraph" : {
+    "message" : "Paragraphe"
+  },
+  "i18n_page_previous" : {
+    "message" : "Page précédente"
+  },
+  "i18n_page_next" : {
+    "message" : "Page suivante"
+  },
+  "chrome_accept_languages": {
+    "message": "$CHROME$ accepts $languages$ languages",
+    "placeholders": {
+      "chrome": {
+        "content": "Chrome",
+        "example": "Chrome"
+      },
+      "languages": {
+        "content": "$1",
+        "example": "en-US,fr,ja,de"
+      }
+    }
+  }
+}

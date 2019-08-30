@@ -1,0 +1,165 @@
+{
+  "chrome_extension_name": {
+    "message": "Readium"
+  },
+  "chrome_extension_description": {
+    "message": "EPUB3ブックリーダ"
+  },
+  "i18n_readium_library" : {
+    "message" : "Readiumライブラリ"
+  },
+  "i18n_loading" : {
+    "message" : "Loading Library"
+  },
+  "i18n_readium_options" : {
+    "message" : "Readiumオプション:"
+  },
+  "i18n_save_changes" : {
+    "message" : "変更を保存"
+  },
+  "i18n_close" : {
+    "message" : "閉じる"
+  },
+  "i18n_paginate_all" : {
+    "message" : "リフロー可能なEPUBコンテンツをすべてページネートする"
+  },
+  "i18n_automatically" : {
+    "message" : "URLが*.epubなら自動でReadiumで開く"
+  },
+  "i18n_show_warning" : {
+    "message" : "EPUBファイルを展開する際には警告メッセージを表示する"
+  },
+  "i18n_details" : {
+    "message" : "詳細"
+  },
+  "i18n_read" : {
+    "message" : "読む"
+  },
+  "i18n_delete" : {
+    "message" : "削除"
+  },
+  "i18n_author" : {
+    "message" : "著者: "
+  },
+  "i18n_publisher" : {
+    "message" : "出版社: "
+  },
+  "i18n_source" : {
+    "message" : "ソース: "
+  },
+  "i18n_pub_date" : {
+    "message" : "出版日時: "
+  },
+  "i18n_modified_date" : {
+    "message" : "更新日時: "
+  },
+  "i18n_id" : {
+    "message" : "ID: "
+  },
+  "i18n_epub_version" : {
+    "message" : "EPUBバージョン: "
+  },
+  "i18n_created_at" : {
+    "message" : "追加日時: "
+  },
+  "i18n_format" : {
+    "message" : "フォーマット: "
+  },
+  "i18n_added" : {
+    "message" : "追加日時: "
+  },
+  "i18n_unknown" : {
+    "message" : "不明"
+  },
+  "i18n_sorry" : {
+    "message" : "現在のEPUBにはこのコンテンツのメディアオーバーレイが含まれていません"
+  },
+  "i18n_add_items" : {
+    "message" : "ここをクリックして本を登録します!"
+  },
+  "i18n_extracting" : {
+    "message" : "展開しています: "
+  },
+  "i18n_are_you_sure" : {
+    "message" : "本を削除します: "
+  },
+  "i18n_add_book_to_readium_library" : {
+    "message" : "Readiumライブラリに本を追加します:"
+  },
+  "i18n_add_book" : {
+    "message" : "本の追加"
+  },
+  "i18n_cancel" : {
+    "message" : "キャンセル"
+  },
+  "i18n_from_the_web" : {
+    "message" : "Webから:"
+  },
+  "i18n_from_local_file" : {
+    "message" : "ローカルファイルから:"
+  },
+  "i18n_enter_a_url" : {
+    "message" : ".epubファイルのURLを入力してください"
+  },
+  "i18n_unpacked_directory" : {
+    "message" : "パッケージ化されていないフォルダ:"
+  },
+  "i18n_validate" : {
+    "message" : "検証（バリデート）:"
+  },
+  "i18n_confirm_that_this_book" : {
+    "message" : "この本がEPUB仕様に準拠していることを確認する"
+  },
+  "i18n_single_pages" : {
+    "message" : "単ページ"
+  },
+  "i18n_double_pages" : {
+    "message" : "ダブル"
+  },
+  "i18n_save_settings" : {
+    "message" : "設定を保存する"
+  },
+  "i18n_font_size" : {
+    "message" : "文字サイズ"
+  },
+  "i18n_margins" : {
+    "message" : "マージン"
+  },
+  "i18n_text_and_background_color" : {
+    "message" : "文字色と背景色"
+  },
+  "i18n_black_and_white" : {
+    "message" : "白背景に黒文字"
+  },
+  "i18n_arabian_nights" : {
+    "message" : "アラビアンナイト"
+  },
+  "i18n_sands_of_dune" : {
+    "message" : "砂丘の砂"
+  },
+  "i18n_ballard_blues" : {
+    "message" : "バラード ブルース"
+  },
+  "i18n_vancouver_mist" : {
+    "message" : "バンクーバーの霧"
+  },
+  "i18n_display_format" : {
+    "message" : "表示形式"
+  },
+  "i18n_html_readium_tm_a_project" : {
+    "message" : "Readium<sup>TM</sup>とは, International Digital Publishing Forum (IDPF) と支援企業によるプロジェクトで, EPUB&reg; 出版のためのシステムとレンダリングエンジンのオープンソースリファレンスです。詳しくは、<a href=\"http://readium.org/\">プロジェクトホームページ</a>をご覧ください。これまでは<a href=\"http://evidentpoint.com/\">Evident Point</a>と<a href=\"http://www.bluefirereader.com/\">Bluefire Productions</a>がプロジェクト開発をリードしてきました。 コントリビュートするには<a href=\"https://github.com/readium/readium-js-viewer\">githubレポジトリ</a>をご覧ください。"
+  },
+  "chrome_accept_languages": {
+    "message": "$CHROME$ accepts $languages$ languages",
+    "placeholders": {
+      "chrome": {
+        "content": "Chrome",
+        "example": "Chrome"
+      },
+      "languages": {
+        "content": "$1",
+        "example": "en-US,ja,sr,de"
+      }
+    }
+  }
+}
