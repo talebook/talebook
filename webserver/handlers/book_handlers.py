@@ -392,7 +392,7 @@ class BookUpload(BaseHandler):
         return self.redirect('/book/%d'%book_id)
 
 class BookRead(BaseHandler):
-    @web.authenticated
+    #@web.authenticated
     def get(self, id):
         book = self.get_book(id)
         book_id = book['id']
@@ -404,7 +404,7 @@ class BookRead(BaseHandler):
             fpath = book.get("fmt_%s" % fmt, None)
             if not fpath: continue
             # epub_dir is for javascript
-            epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/extract/")
+            epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/get/extract/")
             self.extract_book(book, fpath, fmt)
             return self.html_page('book/read.html', vars())
         self.add_msg('success', _(u"抱歉，在线阅读器暂不支持该格式的书籍"))
@@ -576,7 +576,8 @@ def routes():
         ( r'/api/book/([0-9]+)/rating', BookRating   ),
         ( r'/api/book/([0-9]+)\.(.+)',  BookDownload ),
         ( r'/api/book/([0-9]+)/push',   BookPush     ),
-        ( r'/api/book/([0-9]+)/read',   BookRead     ),
         ( r'/api/book/([0-9]+)/refer',  BookRefer    ),
         ( r'/api/book/([0-9]+)/refer/set/([0-9]{13})$',  BookReferSet),
+
+        ( r'/read/([0-9]+)',            BookRead     ),
         ]

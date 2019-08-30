@@ -3,16 +3,37 @@
         <v-flex xs12>
             <v-card>
                 <v-card-actions>
-                    <v-btn flat color="purple"><v-icon>email</v-icon> Push Kindle</v-btn>
-                    <v-btn flat > <v-icon>import_contacts</v-icon> Read Online</v-btn>
+                    <v-btn flat @click="dialog_kindle = !dialog_kindle" color="purple"><v-icon>email</v-icon> Push Kindle</v-btn>
+                    <v-btn flat :href="'/read/'+book.id" :target="_blank"> <v-icon>import_contacts</v-icon> Read Online</v-btn>
                     <v-spacer></v-spacer>
-                    <v-btn class="hidden-xs-only" icon> <v-icon>cloud_download</v-icon> </v-btn>
+                    <v-btn flat class="hidden-xs-only" v-for="file in book.files"><v-icon>cloud_download</v-icon>{{file[0]}}</v-btn>
                     <v-btn class="hidden-xs-only" icon> <v-icon>thumb_up</v-icon> </v-btn>
                     <v-btn class="hidden-xs-only" icon> <v-icon>share</v-icon> </v-btn>
                     <v-btn class="hidden-xs-only" icon @click="show = !show">
                         <v-icon>{{ show ? 'keyboard_arrow_down' : 'keyboard_arrow_up' }}</v-icon>
                     </v-btn>
                 </v-card-actions>
+
+                <v-dialog v-model="dialog_kindle" persistent >
+                    <v-card>
+                        <v-card-title class="headline">Use Google's location service?</v-card-title>
+                        <v-card-text>
+                            <v-container>
+                                <v-row>
+                                    <v-col cols="12">
+                                        <v-text-field label="Email*" required></v-text-field>
+                                    </v-col>
+                                </v-row>
+                            </v-container>
+                            <small>* 请先将本站邮箱加入到Kindle发件人中</small>
+                        </v-card-text>
+                        <v-card-actions>
+                            <div class="flex-grow-1"></div>
+                            <v-btn color="green darken-1" text @click="dialog_kindle = false">Disagree</v-btn>
+                            <v-btn color="green darken-1" text @click="dialog_kindle = false">Agree</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
 
                 <v-layout row wrap >
                     <v-flex d-flex xs12 sm4 md4>
@@ -21,7 +42,7 @@
                     <v-flex xs12 sm8 md8>
                         <v-card-text align-left class="small-tags">
                             <div>
-                            <h2>{{book.title}}</h2>
+                            <h1>{{book.title}}</h1>
                             <span color="grey--text">{{book.author}}著，{{pub_year}}年版</span>
                             </div>
                             <br/>
@@ -46,11 +67,6 @@
                             <p v-if="book.comments" v-html="book.comments"></p>
                             <p  v-else>点击浏览详情</p>
                         </v-card-text>
-                        <v-slide-y-transition>
-                            <v-card-text v-show="show">
-                                {{book}}
-                            </v-card-text>
-                        </v-slide-y-transition>
                     </v-flex>
                 </v-layout>
                 <v-card-text class="align-right book-footer" >
@@ -58,6 +74,11 @@
                     {{book.collector}} @ {{book.timestamp}}
                     </span>
                 </v-card-text>
+                <v-slide-y-transition>
+                    <v-card-text v-show="show">
+                        {{book}}
+                    </v-card-text>
+                </v-slide-y-transition>
             </v-card>
         </v-flex>
     </v-layout>
@@ -78,6 +99,7 @@ export default {
     data: () => ({
         book: null,
         show: false,
+        dialog_kindle: false,
     }),
     created() {
         this.fetch_book();
