@@ -13,7 +13,12 @@ def fmt(b, host, img):
         if not v: v = default
         return v
 
-    collector = b.get('collector', {}).get('username', None)
+    collector = b.get('collector', None)
+    if isinstance(collector, dict):
+        collector = collector.get("username", None)
+    elif collector:
+        collector = collector.username
+
     try:
         pubdate = b['pubdate'].strftime("%Y-%m-%d")
     except:

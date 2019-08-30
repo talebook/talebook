@@ -180,9 +180,9 @@ class ProgressHandler(BaseHandler):
 def routes():
     return [
         (r'/get/(.*)/(.*)', ImageHandler),
-        (r'/pcover',        ProxyImageHandler),
-        (r'/progress/([0-9]+)',  ProgressHandler),
-        (r"/extract/(.*)",  web.StaticFileHandler,
+        (r'/get/pcover',        ProxyImageHandler),
+        (r'/get/progress/([0-9]+)',  ProgressHandler),
+        (r"/get/extract/(.*)",  web.StaticFileHandler,
             dict(path=settings['extract_path'])),
         (r"/robots.txt",    web.StaticFileHandler,
             dict(path=settings['static_path'])),

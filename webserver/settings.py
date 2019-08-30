@@ -4,7 +4,7 @@
 import os
 
 settings = {
-    #"static_host"   : "cdn.talebook.org",
+    "static_host"   : "beta.talebook.org",
     "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
     "template_path" : os.path.join(os.path.dirname(__file__), "templates"),
     "progress_path" : "/data/books/progress/",
