@@ -1,8 +1,8 @@
 <template>
     <v-footer color="blue" class="white--text" app>
-        <span>&nbsp;talebook.org</span>
+        <span>&nbsp;读万卷书,行万里路</span>
         <v-spacer></v-spacer>
-        <span>&copy; 2015 - 2019&nbsp;</span>
+        <span><a href="https://github.com/talebook/calibre-webserver">Github</a>&nbsp;</span>
     </v-footer>
 </template>
 
