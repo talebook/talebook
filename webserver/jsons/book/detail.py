@@ -44,6 +44,7 @@ def json_output(self, vals):
         'series':          get('series',    None),
         'language':        get('language',  None),
         'isbn':            get('isbn',      None),
+        'files':           vals['sizes'],
 
         "img":             img+"/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
         "cover_large_url": img+"/get/thumb_600_840/%(id)s.jpg?t=%(timestamp)s" % b,
