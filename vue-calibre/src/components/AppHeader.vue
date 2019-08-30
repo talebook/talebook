@@ -64,8 +64,8 @@ export default {
         right: null,
         items: [
             { heading: '分类浏览' },
-            { icon: 'contacts', text: '所有数据', href: '/all' },
-            { icon: 'history', text: '出版社', href: '/pub' },
+            { icon: 'contacts', text: '所有书籍(19786)', href: '/nav' },
+            { icon: 'history', text: '出版社(123)', href: '/pub' },
             { icon: 'content_copy', text: '作者', href: '/author' },
             { icon: 'content_copy', text: '标签', href: '/tag' },
             { icon: 'content_copy', text: '全部评分', href: '/rating' },

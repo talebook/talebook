@@ -17,6 +17,7 @@ import Index      from './pages/Index.vue'
 import Install    from './pages/Install.vue'
 import BookDetail from './pages/BookDetail.vue'
 //import BookRead   from './pages/BookRead.vue'
+import BookNav    from './pages/BookNav.vue'
 import BookList   from './pages/BookList.vue'
 import Login      from './pages/Login.vue'
 import MetaList   from './pages/MetaList.vue'
@@ -30,7 +31,7 @@ const router = new VueRouter({
     mode: 'history',
     routes: [
         { path: '/',         component: Index    },
-        { path: '/all',      component: NotFound },
+        { path: '/nav',      component: BookNav  },
         { path: '/install',  component: Install  },
         { path: '/recent',   component: BookList },
         { path: '/hot',      component: BookList },

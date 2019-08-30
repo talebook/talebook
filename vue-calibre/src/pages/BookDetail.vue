@@ -6,7 +6,7 @@
                     <v-btn flat @click="dialog_kindle = !dialog_kindle" color="purple"><v-icon>email</v-icon> Push Kindle</v-btn>
                     <v-btn flat :href="'/read/'+book.id" :target="_blank"> <v-icon>import_contacts</v-icon> Read Online</v-btn>
                     <v-spacer></v-spacer>
-                    <v-btn flat class="hidden-xs-only" v-for="file in book.files"><v-icon>cloud_download</v-icon>{{file[0]}}</v-btn>
+                    <v-btn flat class="hidden-xs-only" v-for="file in book.files" :key="file[0]"><v-icon>cloud_download</v-icon>{{file[0]}}</v-btn>
                     <v-btn class="hidden-xs-only" icon> <v-icon>thumb_up</v-icon> </v-btn>
                     <v-btn class="hidden-xs-only" icon> <v-icon>share</v-icon> </v-btn>
                     <v-btn class="hidden-xs-only" icon @click="show = !show">

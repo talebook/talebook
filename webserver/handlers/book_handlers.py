@@ -286,7 +286,7 @@ class BookDownload(BaseHandler):
         f = open(path, 'rb').read()
         self.write( f )
 
-class BookList(ListHandler):
+class BookNav(ListHandler):
     def get(self):
         title = _(u'全部书籍')
         category_name = 'books'
@@ -297,7 +297,7 @@ class BookList(ListHandler):
             #tags.sort( lambda x,y: cmp(y[1], x[1]) )
             navs.append( (h1, tags) )
 
-        return self.html_page('book/all.html', vars())
+        return self.html_page('book/nav.html', vars())
 
 class RecentBook(ListHandler):
     def get(self):
@@ -567,7 +567,7 @@ def routes():
         ( r'/api/search',               SearchBook   ),
         ( r'/api/recent',               RecentBook   ),
         ( r'/api/hot',                  HotBook      ),
-        ( r'/api/book',                 BookList     ),
+        ( r'/api/book/nav',             BookNav      ),
         ( r'/api/book/add',             BookAdd      ),
         ( r'/api/book/upload',          BookUpload   ),
         ( r'/api/book/([0-9]+)',        BookDetail   ),
