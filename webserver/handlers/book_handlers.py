@@ -448,11 +448,15 @@ class BookRead(BaseHandler):
 
 
 class BookPush(BaseHandler):
-    @web.authenticated
+    #@web.authenticated
+    @json_response
     def post(self, id):
+        if not self.current_user:
+            return {'err': 'user.not_login', 'msg': _(u'请先登录')}
+
         mail_to = self.get_argument("mail_to", None)
         if not mail_to:
-            return self.redirect("/setting")
+            return {'err': 'params.error', 'msg': _(u'参数错误')}
 
         book = self.get_book(id)
         book_id = book['id']
@@ -465,15 +469,14 @@ class BookPush(BaseHandler):
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
                 self.do_send_mail(book, mail_to, fmt, fpath)
-                self.add_msg( "success", _(u"服务器正在推送……"))
-                return self.redirect("/book/%d"%book['id'])
+                return {'err': 'ok', 'msg': _(u"服务器正在推送……")}
 
         # we do no have formats for kindle
         if 'fmt_epub' not in book and 'fmt_azw3' not in book and 'fmt_txt' not in book:
-            raise web.HTTPError(404, reason = _(u"抱歉，该书无可用于kindle阅读的格式"))
+            return {'err': 'book.no_format_for_kindle', 'msg': _(u"抱歉，该书无可用于kindle阅读的格式") }
         self.convert_book(book, mail_to)
-        self.add_msg( "success", _(u"后台正在推送了~"))
-        self.redirect("/book/%d"%book['id'])
+        #self.add_msg( "success", _(u"后台正在推送了~"))
+        return {'err': 'ok', 'msg': _(u'服务器正在转换格式并推送……')}
 
     @background
     def convert_book(self, book, mail_to=None):

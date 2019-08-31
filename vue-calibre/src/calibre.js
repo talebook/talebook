@@ -1,19 +1,22 @@
 export default {
-    install(Vue, options)
-    {
+    install(Vue, options) {
         var api = window.location.origin + "/api";
         if ( options !== undefined ) {
             if ( options.api !== undefined ) {
                 api = options.api;
             }
         }
-        Vue.prototype.backend = function(url) {
+        Vue.prototype.backend = function(url, options) {
             var full_url = api + url;
-            return fetch(full_url, {
-                credentials: 'include',
+            var args = {
                 mode: "cors",
                 redirect: "follow",
-            })
+                credentials: 'include',
+            }
+            if ( options !== undefined ) {
+                Object.assign(args, options);
+            }
+            return fetch(full_url, args);
         }
     }
 }

@@ -16,10 +16,10 @@ import App        from './App.vue'
 import Index      from './pages/Index.vue'
 import Install    from './pages/Install.vue'
 import BookDetail from './pages/BookDetail.vue'
-//import BookRead   from './pages/BookRead.vue'
 import BookNav    from './pages/BookNav.vue'
 import BookList   from './pages/BookList.vue'
 import Login      from './pages/Login.vue'
+import Logout     from './pages/Logout.vue'
 import MetaList   from './pages/MetaList.vue'
 import Settings   from './pages/Settings.vue'
 import Welcome    from './pages/Welcome.vue'
@@ -33,14 +33,15 @@ const router = new VueRouter({
         { path: '/',         component: Index    },
         { path: '/nav',      component: BookNav  },
         { path: '/install',  component: Install  },
+        { path: '/search',   component: BookList },
         { path: '/recent',   component: BookList },
         { path: '/hot',      component: BookList },
         { path: '/settings', component: Settings },
         { path: '/welcome',  component: Welcome  },
         { path: '/login',    component: Login    },
+        { path: '/logout',   component: Logout   },
 
         { path: '/book/:bookid(\\d+)', component: BookDetail },
-        //{ path: '/book/:bookid(\\d+)/read', component: BookRead },
         { path: '/:meta(pub|tag|author|rating)', component: MetaList },
         { path: '/:meta(pub|tag|author|rating)/:name', component: BookList },
 
@@ -54,9 +55,13 @@ const store = new Vuex.Store({
         loading: false,
         count: 0,
         user: {
-            avatar: "https://q.qlogo.cn/qqapp/101187047/D7B5E27D5440740246E23C8E981E22A2/40",
+            is_admin: false,
+            is_login: false,
             nickname: "",
+            kindle_email: "",
+            avatar: "",
         },
+        sys: {},
     },
     mutations: {
         loading(state) {
@@ -75,8 +80,9 @@ const store = new Vuex.Store({
         increment(state) {
             state.count++
         },
-        login(state, user) {
-            state.user = user;
+        login(state, data) {
+            state.sys = data.sys;
+            state.user = data.user;
         },
     }
 })

@@ -6,7 +6,7 @@ import datetime
 import logging
 from tornado import web
 from models import Reader
-from base_handlers import BaseHandler
+from base_handlers import BaseHandler, json_response
 import json
 
 COOKIE_REDIRECT = "login_redirect"
@@ -142,13 +142,83 @@ class AdminSet(BaseHandler):
             self.set_secure_cookie("user_id", user_id)
         self.redirect('/', 302)
 
+class SignIn(BaseHandler):
+    @json_response
+    def post(self):
+            username = self.get_argument("username", None)
+            password = self.get_argument("password", None)
+            if not username or not password:
+                return {'err': 'params.invalid', 'msg': _(u'用户名或密码无效')}
+            user = self.session.query(Reader).filter(Reader.username==username).first()
+            if not user:
+                return {'err': 'params.no_user', 'msg': _(u'无此用户')}
+            self.set_secure_cookie('user_id', str(user.id))
+            self.set_secure_cookie("lt", str(int(time.time())))
+            return {'err': 'ok', 'msg': 'ok'}
+
+class SignOut(BaseHandler):
+    @json_response
+    def get(self):
+        self.set_secure_cookie("user_id", "")
+        self.set_secure_cookie("admin_id", "")
+        url = self.get_save_referer()
+        return {'err': 'ok', 'msg': _(u'你已成功退出登录。')}
+
+class UserInfo(BaseHandler):
+    @json_response
+    def get(self):
+        db = self.db
+
+        from sqlalchemy import func
+        last_week = datetime.datetime.now() - datetime.timedelta(days=7)
+        count_all_users = self.session.query(func.count(Reader.id)).scalar()
+        count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
+
+        user = self.current_user
+
+        rsp = {
+                "sys": {
+                    "books":      db.count(),
+                    "tags":       len( db.all_tags()       ),
+                    "authors":    len( db.all_authors()    ),
+                    "publishers": len( db.all_publishers() ),
+                    "mtime":      db.last_modified().strftime("%Y-%m-%d"),
+                    "users":      count_all_users,
+                    "active":     count_hot_users,
+                    "version":    "1.4.13",
+                    "title":      self.settings['site_title'],
+                    "friends": [
+                        { "text": u"奇异书屋", "href": "https://www.talebook.org" },
+                        { "text": u"芒果读书", "href": "http://diumx.com/" },
+                        { "text": u"陈芸书屋", "href": "https://book.killsad.top/" },
+                    ],
+                },
+                "user": {
+                    "avatar": "https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif",
+                    "is_login": (user != None),
+                    "is_admin": (self.admin_user != None),
+                    "nickname": user.username if user else "",
+                    "kindle_email": "",
+                }
+            }
+
+        #messages = self.pop_messages()
+        if user:
+            if user.extra:
+                rsp['user']['kindle_email'] = user.extra.get("kindle_email", "")
+            if user.avatar:
+                rsp['user']['avatar'] = user.avatar.replace("http://", "https://")
+        return rsp
+
 
 def routes():
     return  [
+            (r'/api/user/info',         UserInfo),
+
             (r'/api/user/index',        UserView),
-            (r"/api/user/sign_in",      Login),
+            (r"/api/user/sign_in",      SignIn),
             (r'/api/user/sign_up',      Logout),
-            (r'/api/user/sign_out',     Logout),
+            (r'/api/user/sign_out',     SignOut),
             (r'/api/user/setting',      SettingView),
             (r'/api/user/setting/save', SettingSave),
             (r'/api/done/',             Done),

@@ -4,33 +4,28 @@
             <v-card>
                 <v-card-actions>
                     <v-btn flat @click="dialog_kindle = !dialog_kindle" color="purple"><v-icon>email</v-icon> Push Kindle</v-btn>
-                    <v-btn flat :href="'/read/'+book.id" :target="_blank"> <v-icon>import_contacts</v-icon> Read Online</v-btn>
+                    <v-btn flat :href="'/read/'+bookid" target="_blank"> <v-icon>import_contacts</v-icon> Read Online</v-btn>
                     <v-spacer></v-spacer>
                     <v-btn flat class="hidden-xs-only" v-for="file in book.files" :key="file[0]"><v-icon>cloud_download</v-icon>{{file[0]}}</v-btn>
                     <v-btn class="hidden-xs-only" icon> <v-icon>thumb_up</v-icon> </v-btn>
                     <v-btn class="hidden-xs-only" icon> <v-icon>share</v-icon> </v-btn>
-                    <v-btn class="hidden-xs-only" icon @click="show = !show">
-                        <v-icon>{{ show ? 'keyboard_arrow_down' : 'keyboard_arrow_up' }}</v-icon>
+                    <v-btn class="hidden-xs-only" icon @click="debug = !debug">
+                        <v-icon>{{ debug ? 'keyboard_arrow_down' : 'keyboard_arrow_up' }}</v-icon>
                     </v-btn>
                 </v-card-actions>
 
-                <v-dialog v-model="dialog_kindle" persistent >
+                <v-dialog v-model="dialog_kindle" persistent width="300">
                     <v-card>
-                        <v-card-title class="headline">Use Google's location service?</v-card-title>
+                        <v-card-title class="headline">推送到Kindle</v-card-title>
                         <v-card-text>
-                            <v-container>
-                                <v-row>
-                                    <v-col cols="12">
-                                        <v-text-field label="Email*" required></v-text-field>
-                                    </v-col>
-                                </v-row>
-                            </v-container>
+                            <p>填写Kindle收件人邮箱地址：</p>
+                            <v-text-field v-model="mail_to" label="Email*" required></v-text-field>
                             <small>* 请先将本站邮箱加入到Kindle发件人中</small>
                         </v-card-text>
                         <v-card-actions>
-                            <div class="flex-grow-1"></div>
-                            <v-btn color="green darken-1" text @click="dialog_kindle = false">Disagree</v-btn>
-                            <v-btn color="green darken-1" text @click="dialog_kindle = false">Agree</v-btn>
+                            <v-btn color="" text @click="dialog_kindle = false">取消</v-btn>
+                            <v-spacer></v-spacer>
+                            <v-btn color="primary" text @click="sendto_kindle">发送</v-btn>
                         </v-card-actions>
                     </v-card>
                 </v-dialog>
@@ -75,13 +70,28 @@
                     </span>
                 </v-card-text>
                 <v-slide-y-transition>
-                    <v-card-text v-show="show">
+                    <v-card-text v-show="debug">
                         {{book}}
                     </v-card-text>
                 </v-slide-y-transition>
             </v-card>
+
+            <v-dialog v-model="dialog_msg" persistent width="300">
+                <v-card>
+                    <v-card-text>
+                        <v-alert outline v-model="dialog_msg" :type="alert_type">
+                            {{alert_msg}}
+                        </v-alert>
+                    </v-card-text>
+                    <v-card-text align="center">
+                        <v-btn small @click="dialog_msg = false">关闭</v-btn>
+                    </v-card-text>
+                </v-card>
+            </v-dialog>
         </v-flex>
+
     </v-layout>
+
 </template>
 
 <script>
@@ -97,11 +107,17 @@ export default {
         },
     },
     data: () => ({
-        book: null,
-        show: false,
+        bookid: 0,
+        book: {'id': 0, 'files': [], 'tags': [], 'pubdate': ''},
+        debug: false,
+        mail_to: "",
         dialog_kindle: false,
+        dialog_msg: false,
+        alert_msg: "please login",
+        alert_type: "error",
     }),
     created() {
+        this.bookid = this.$route.params.bookid;
         this.fetch_book();
     },
     methods: {
@@ -115,6 +131,22 @@ export default {
                 book.tags = book.tags.split("/").map( m => m.trim() );
                 this.book = book;
                 this.$store.commit('loaded');
+            });
+        },
+        sendto_kindle() {
+            var bookid = this.$route.params.bookid;
+            this.backend("/book/"+bookid+"/push", {
+                method: "POST",
+                body: "mail_to="+this.mail_to,
+                headers: {
+                    'Content-Type': "application/x-www-form-urlencoded",
+                },
+            }).then( rsp => rsp.json() )
+            .then( rsp => {
+                this.alert_msg = rsp.msg;
+                this.alert_type = ( rsp.err == 'ok' )?  "success": "error";
+                this.dialog_msg = true;
+                this.dialog_kindle = false;
             });
         }
     },

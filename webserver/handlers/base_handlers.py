@@ -89,6 +89,7 @@ class BaseHandler(web.RequestHandler):
 
     def get_current_user(self):
         user_id = self.user_id()
+        logging.debug("[User]: user_id = %s" % user_id)
         user = self.session.query(Reader).get(int(user_id)) if user_id else None
 
         admin_id = self.get_secure_cookie("admin_id")
@@ -97,8 +98,8 @@ class BaseHandler(web.RequestHandler):
         elif user and user.is_admin():
             self.admin_user = user
 
-        logging.debug("Query User [%s %s ]" % (user_id, user))
-        logging.debug("Query admin_user [%s %s ]" % (admin_id, self.admin_user) )
+        logging.debug("[User]: User  Query(%s) = %s" % (user_id, user))
+        logging.debug("[User]: Admin Query(%s) = %s" % (admin_id, self.admin_user) )
         return user
 
     def is_admin(self):
