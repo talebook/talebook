@@ -4,7 +4,7 @@
             <p class="page-title">随便推荐{{$store.state.avatar}}</p>
         </v-flex>
         <v-flex xs6 sm4 md2 v-for="(book,idx) in random_books" :key="'rec'+idx+book.id" class="book-card">
-            <v-card flat :href="book.href" >
+            <v-card flat :to="book.href" >
                 <v-img :src="book.img" height="240px" contain > </v-img>
             </v-card>
         </v-flex>
@@ -40,6 +40,7 @@ export default {
         },
     },
     created() {
+        this.$store.commit('navbar', true);
         this.$store.commit('loading');
         this.backend("/index?random=12&recent=12&fmt=json")
         .then(rsp => rsp.json() )

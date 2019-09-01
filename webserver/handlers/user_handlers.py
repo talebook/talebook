@@ -145,16 +145,16 @@ class AdminSet(BaseHandler):
 class SignIn(BaseHandler):
     @json_response
     def post(self):
-            username = self.get_argument("username", None)
-            password = self.get_argument("password", None)
-            if not username or not password:
-                return {'err': 'params.invalid', 'msg': _(u'用户名或密码无效')}
-            user = self.session.query(Reader).filter(Reader.username==username).first()
-            if not user:
-                return {'err': 'params.no_user', 'msg': _(u'无此用户')}
-            self.set_secure_cookie('user_id', str(user.id))
-            self.set_secure_cookie("lt", str(int(time.time())))
-            return {'err': 'ok', 'msg': 'ok'}
+        username = self.get_argument("username", None)
+        password = self.get_argument("password", None)
+        if not username or not password:
+            return {'err': 'params.invalid', 'msg': _(u'用户名或密码无效')}
+        user = self.session.query(Reader).filter(Reader.username==username).first()
+        if not user:
+            return {'err': 'params.no_user', 'msg': _(u'无此用户')}
+        self.set_secure_cookie('user_id', str(user.id))
+        self.set_secure_cookie("lt", str(int(time.time())))
+        return {'err': 'ok', 'msg': 'ok'}
 
 class SignOut(BaseHandler):
     @json_response
@@ -163,6 +163,22 @@ class SignOut(BaseHandler):
         self.set_secure_cookie("admin_id", "")
         url = self.get_save_referer()
         return {'err': 'ok', 'msg': _(u'你已成功退出登录。')}
+
+class UserMessages(BaseHandler):
+    @json_response
+    def get(self):
+        db = self.db
+        user = self.current_user
+        rsp = {
+                'err': 'ok',
+                "messages": [],
+            }
+
+        if user:
+            for msg in user.messages:
+                msg['data'] = json.loads(msg['data'])
+                rsp['messages'].append(msg)
+        return rsp
 
 class UserInfo(BaseHandler):
     @json_response
@@ -177,6 +193,7 @@ class UserInfo(BaseHandler):
         user = self.current_user
 
         rsp = {
+                'err': 'ok',
                 "sys": {
                     "books":      db.count(),
                     "tags":       len( db.all_tags()       ),
@@ -199,10 +216,9 @@ class UserInfo(BaseHandler):
                     "is_admin": (self.admin_user != None),
                     "nickname": user.username if user else "",
                     "kindle_email": "",
-                }
+                },
             }
 
-        #messages = self.pop_messages()
         if user:
             if user.extra:
                 rsp['user']['kindle_email'] = user.extra.get("kindle_email", "")
@@ -210,10 +226,24 @@ class UserInfo(BaseHandler):
                 rsp['user']['avatar'] = user.avatar.replace("http://", "https://")
         return rsp
 
+class Welcome(BaseHandler):
+    def should_be_invited(self):
+        pass
+
+    @json_response
+    def post(self):
+        code = self.get_argument("invite_code", None)
+        if not code or code != self.settings['INVITE_CODE']:
+            return {'err': 'params.invalid', 'msg': _(u'邀请码无效')}
+        self.mark_invited()
+        return {'err': 'ok', 'msg': 'ok'}
+
 
 def routes():
     return  [
+            (r'/api/welcome',           Welcome),
             (r'/api/user/info',         UserInfo),
+            (r'/api/user/messages',     UserMessages),
 
             (r'/api/user/index',        UserView),
             (r"/api/user/sign_in",      SignIn),

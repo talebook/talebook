@@ -48,21 +48,32 @@ export default {
         page_size: 20,
     }),
     created() {
+        this.init(this.$route);
+    },
+    beforeRouteUpdate(to, from, next) {
+        this.init(to, next);
+    },
+    methods: {
+        init(route, next) {
+            //alert(JSON.stringify(route.params));
+            this.$store.commit('navbar', true);
             this.$store.commit('loading');
-        var url = this.$route.fullPath;
-        if ( url != this.$route.path ) {
-            url += "&fmt=json";
-        } else {
-            url += "?fmt=json";
-        }
-        this.backend(url)
-        .then(rsp => rsp.json())
-        .then(rsp => {
-            this.title = rsp.title;
-            this.books = rsp.books;
-            this.total = rsp.total
+            var url = route.fullPath;
+            if ( url != route.path ) {
+                url += "&fmt=json";
+            } else {
+                url += "?fmt=json";
+            }
+            this.backend(url)
+            .then(rsp => rsp.json())
+            .then(rsp => {
+                this.title = rsp.title;
+                this.books = rsp.books;
+                this.total = rsp.total
                 this.$store.commit('loaded');
-        })
+            })
+            if ( next ) next();
+        },
     },
   }
 </script>

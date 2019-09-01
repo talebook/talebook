@@ -55,13 +55,23 @@ def json_response(func):
         return
     return do
 
+
 class BaseHandler(web.RequestHandler):
     _path_to_env = {}
 
     def head(self, *args, **kwargs):
         return self.get(*args, **kwargs)
 
+    def mark_invited(self):
+        self.set_secure_cookie("invited", str(int(time.time())))
+
+    def should_be_invited(self):
+        t = self.get_secure_cookie("invited")
+        if not t or int(float(t)) < int(time.time()) - 7*86400:
+            raise web.HTTPError(403, reason = _(u'无权访问'))
+
     def initialize(self):
+        self.should_be_invited()
         ScopedSession = self.settings['ScopedSession']
         self.session = ScopedSession() # new sql session
         self.db = self.settings['legacy']
@@ -233,6 +243,7 @@ class BaseHandler(web.RequestHandler):
         query = query.filter(Item.book_id == book_id)
         query = query.filter(Item.collector_id == user_id)
         return (query.count() > 0)
+
 
     def get_books(self, *args, **kwargs):
         _ts = time.time()

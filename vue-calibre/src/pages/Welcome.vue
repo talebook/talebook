@@ -7,8 +7,8 @@
             </v-toolbar>
             <v-card-text>
                 <v-form>
-                    <v-text-field id="password" prepend-icon="lock" name="password"
-                        label="Password" type="password" :error="err" :error-messages="err_msg" :loading="loading"></v-text-field>
+                    <v-text-field id="code" prepend-icon="lock" name="code" v-model="invite_code" required
+                        label="邀请码" type="password" :error="err" :error-messages="err_msg" :loading="loading"></v-text-field>
                 </v-form>
             </v-card-text>
 
@@ -26,25 +26,35 @@
 <script>
 export default {
     created() {
-        this.$store.commit("puremode", true);
+        this.$store.commit('navbar', false);
+        this.$store.commit('loaded');
     },
     data: () => ({
         err: false,
         err_msg: "",
         loading: false,
+        invite_code: "",
     }),
     methods: {
         welcome_login: function() {
             this.loading = true;
-            if ( ! this.err ) {
-                this.err = true;
-                this.err_msg = "这里是登录错误的提示。开发测试，请再点一次！";
-            } else {
-                this.err = false;
-                this.$router.push("/");
-                this.$store.commit("puremode", false);
-            }
-            this.loading = false;
+            var data = new URLSearchParams();
+            data.append('invite_code', this.invite_code);
+            this.backend("/welcome", {
+                method: 'POST',
+                body: data,
+            }).then( rsp => rsp.json() )
+            .then( rsp => {
+                this.loading = false;
+                if ( rsp.err != 'ok' ) {
+                    this.err = true;
+                    this.err_msg = rsp.msg;
+                } else {
+                    this.err = false;
+                    this.$router.push("/");
+                    this.$store.commit("puremode", false);
+                }
+            });
         },
     },
 }

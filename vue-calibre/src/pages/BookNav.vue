@@ -3,10 +3,10 @@
         <template v-for="nav in navs">
         <v-flex :key="nav.legend">
             <h2>{{nav.legend}}</h2>
-            <v-chip v-for="item in nav.tags" @click="$router.push('/tag/'+item.name)" :key="item.name" outline :color="item.count != 0 ? 'primary': 'default'" >
+            <v-btn round small v-for="item in nav.tags" :to="'/tag/'+item.name" :key="item.name" outline :color="item.count != 0 ? 'primary': 'grey'" >
                 {{item.name}}
                 <span v-if="item.count">&nbsp;({{item.count}})</span>
-            </v-chip>
+            </v-btn>
         </v-flex>
         </template>
     </v-layout>
@@ -22,6 +22,7 @@ export default {
         navs: [],
     }),
     created() {
+        this.$store.commit('navbar', true);
         this.$store.commit('loading');
         this.backend("/book/nav?fmt=json")
         .then(rsp => rsp.json())

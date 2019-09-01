@@ -51,8 +51,8 @@ const router = new VueRouter({
 
 const store = new Vuex.Store({
     state: {
-        nav: true,
-        loading: false,
+        nav: false,
+        loading: true,
         count: 0,
         user: {
             is_admin: false,
@@ -77,6 +77,9 @@ const store = new Vuex.Store({
                 state.nav = true;
             }
         },
+        navbar(state, nav) {
+            state.nav = nav;
+        },
         increment(state) {
             state.count++
         },
@@ -90,6 +93,6 @@ const store = new Vuex.Store({
 window.app = new Vue({
     router,
     store,
-    render: h => h(App)
+    render: h => h(App),
 }).$mount('#app')
 

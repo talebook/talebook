@@ -53,7 +53,10 @@
 </template>
 
 <script>
-  export default {
+export default {
+    created()  {
+        this.$store.commit('navbar', true);
+    },
     data: () => ({
         tab_active: "user",
         show1: false,

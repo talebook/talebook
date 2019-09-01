@@ -42,17 +42,17 @@
                             </div>
                             <br/>
                             <div>
-                                <v-btn round small dark color="indigo" :href="'/author/'+book.author" >
+                                <v-btn round small dark color="indigo" :to="'/author/'+book.author" >
                                     <v-icon>face</v-icon>{{book.author}}
                                 </v-btn>
-                                <v-btn round small dark color="indigo" :href="'/pub/'+book.publisher" >
+                                <v-btn round small dark color="indigo" :to="'/pub/'+book.publisher" >
                                     <v-icon>group</v-icon>{{book.publisher}}
                                 </v-btn>
                                 <v-btn round small dark color="grey" v-if="book.isbn" >
                                     <v-icon>explore</v-icon>ISBN-{{book.isbn}}
                                 </v-btn>
                                 <template v-for="tag in book.tags" >
-                                <v-btn round small dark color="grey" :key="tag" v-if="tag" :href="'/tag/'+tag" >
+                                <v-btn round small dark color="grey" :key="tag" v-if="tag" :to="'/tag/'+tag" >
                                     <v-icon>loyalty</v-icon> {{tag}}
                                 </v-btn>
                                 </template>
@@ -117,13 +117,18 @@ export default {
         alert_type: "error",
     }),
     created() {
-        this.bookid = this.$route.params.bookid;
-        this.fetch_book();
+        this.init(this.$route);
+    },
+    beforeRouteLeave(to, from, next) {
+        this.init(to, next);
     },
     methods: {
-        fetch_book() {
+        init(route, next) {
+            alert(JSON.stringify(route.params));
+            this.$store.commit('navbar', true);
+            this.bookid = route.params.bookid;
             this.$store.commit('loading');
-            var bookid = this.$route.params.bookid;
+            var bookid = route.params.bookid;
             this.backend("/book/" + bookid + "?fmt=json")
             .then( rsp => rsp.json() )
             .then( book => {
@@ -132,6 +137,7 @@ export default {
                 this.book = book;
                 this.$store.commit('loaded');
             });
+            if ( next ) next();
         },
         sendto_kindle() {
             var bookid = this.$route.params.bookid;

@@ -10,14 +10,14 @@
                     <v-list-tile v-for="(links, cidx) in chunk(item.links, 2)" :key="'chunk'+cidx">
                         <v-layout row wrap>
                             <v-flex xs6 v-for="link in links" :key="link.href" >
-                                <v-btn flat :href="link.href">{{link.text}}</v-btn>
+                                <v-btn flat :to="link.href">{{link.text}}</v-btn>
                             </v-flex>
                         </v-layout>
                     </v-list-tile>
                     </template>
 
                     <!-- 导航菜单 -->
-                    <v-list-tile v-else :key="item.text" :href="item.href">
+                    <v-list-tile v-else :key="item.text" :to="item.href" >
                         <v-list-tile-action>
                             <v-icon>{{ item.icon }}</v-icon>
                         </v-list-tile-action>
@@ -36,7 +36,7 @@
 
         <v-toolbar color="blue" dark fixed app :clipped-left="$vuetify.breakpoint.lgAndUp" dense >
             <v-toolbar-side-icon @click.stop="sidebar = !sidebar"></v-toolbar-side-icon>
-                    <v-btn flat class='btn-home' href="/">
+                    <v-btn flat class='btn-home' to="/">
                         <v-avatar tile size="24px">
                         <v-img src="https://cdn.vuetifyjs.com/images/logos/logo.svg" alt="Vuetify" ></v-img>
                         </v-avatar>
@@ -49,15 +49,29 @@
             </v-text-field>
             </form>
             <v-spacer></v-spacer>
-            <v-btn icon> <v-icon>apps</v-icon> </v-btn>
-            <v-btn icon> <v-icon>notifications</v-icon> </v-btn>
+            <v-menu offset-y>
+                <template v-slot:activator="{on}">
+                <v-btn icon> <v-icon>notifications</v-icon> </v-btn>
+                </template>
+                <v-list>
+                    <template v-if="messages">
+                    <v-list-tile v-for="msg in messages" :key="msg.id">
+                        <v-list-tile-title>{{msg.message}}</v-list-tile-title>
+                    </v-list-tile>
+                    </template>
+                    <v-list-tile v-else>
+                        <v-list-tile-title> 暂无消息 </v-list-tile-title>
+                    </v-list-tile>
+                </v-list>
+            </v-menu>
+
 
             <v-menu offset-y v-if="user.is_login">
                 <template v-slot:activator="{on}">
                 <v-btn v-on="on" icon large ><v-avatar size="32px"><img :src="user.avatar" ></v-avatar></v-btn>
                 </template>
                 <v-list>
-                    <v-list-tile :href="(user.is_login)?'':'/login'" >
+                    <v-list-tile to="(user.is_login)?'':'/login'" >
                         <v-list-tile-avatar>
                             <img :src="user.avatar">
                         </v-list-tile-avatar>
@@ -68,29 +82,28 @@
                     </v-list-tile>
                 </v-list>
                 <v-list>
-
                     <v-divider></v-divider>
-                    <v-list-tile href="/user/view">
+                    <v-list-tile to="/user/view">
                         <v-list-tile-action><v-icon>contacts</v-icon></v-list-tile-action>
                         <v-list-tile-title> 用户中心 </v-list-tile-title>
                     </v-list-tile>
-                    <v-list-tile href="/user/history">
+                    <v-list-tile to="/user/history">
                         <v-list-tile-action><v-icon>history</v-icon></v-list-tile-action>
                         <v-list-tile-title> 阅读记录 </v-list-tile-title>
                     </v-list-tile>
-                    <v-list-tile href="http://github.com">
+                    <v-list-tile to="http://github.com">
                         <v-list-tile-action><v-icon>sms_failed</v-icon></v-list-tile-action>
                         <v-list-tile-title> 反馈 </v-list-tile-title>
                     </v-list-tile>
                     <v-divider></v-divider>
 
-                    <v-list-tile href="/logout">
+                    <v-list-tile to="/logout">
                         <v-list-tile-action><v-icon>exit_to_app</v-icon></v-list-tile-action>
                         <v-list-tile-title> 退出 </v-list-tile-title>
                     </v-list-tile>
                 </v-list>
             </v-menu>
-            <v-btn v-else href="/login" color="indigo accent-4">
+            <v-btn v-else to="/login" color="indigo accent-4">
                 <v-icon>account_circle</v-icon> 请登录
             </v-btn>
 
@@ -104,7 +117,14 @@ export default {
     },
     created() {
         this.sidebar = this.$vuetify.breakpoint.lgAndUp;
-        this.backend('/user/info').then(rsp=>rsp.json()) .then( rsp => {
+        this.backend('/user/messages').then(rsp=>rsp.json()).then(rsp => {
+            if ( rsp.err == 'ok' ) {
+                this.messages = rsp.messages;
+            }
+        });
+        this.backend('/user/info')
+        .then(rsp=>rsp.json())
+        .then(rsp => {
             this.$store.commit('login', rsp);
             this.sysinfo = rsp.sys;
             this.user = rsp.user;
@@ -129,6 +149,9 @@ export default {
                 { icon: 'help', text: '系统版本' },
             ]);
             this.items = nav_items;
+        }).catch(error => {
+            if ( error ) { 1 + 2 }
+            this.$router.push("/welcome");
         });
     },
     data: () => ({
@@ -143,6 +166,7 @@ export default {
             active: 198,
             title: 'Calibre',
         },
+        messages: [],
     }),
     methods: {
         chunk: function(arr, len) {

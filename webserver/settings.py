@@ -47,6 +47,7 @@ settings = {
     # See: https://github.com/settings/applications/new
     'SOCIAL_AUTH_GITHUB_KEY'           : '',
     'SOCIAL_AUTH_GITHUB_SECRET'        : '',
+    'INVITE_CODE':      'beta',
 }
 
 try:

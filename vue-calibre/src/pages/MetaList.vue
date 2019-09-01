@@ -1,7 +1,7 @@
 <template>
     <v-layout wrap >
         <v-flex>
-            <v-chip v-for="item in items" @click="$router.push(item.href)" :key="item.name" outline color="primary" >
+            <v-chip v-for="item in items" :to="item.href" :key="item.name" outline color="primary" >
                 {{item.name}}
                 <span v-if="item.count">&nbsp;({{item.count}})</span>
             </v-chip>
@@ -33,17 +33,26 @@ export default {
         page_size: 20,
     }),
     created() {
-        this.$store.commit('loading');
-        var meta = this.$route.params.meta;
-        this.backend("/"+meta+"?fmt=json")
-        .then(rsp => rsp.json())
-        .then(rsp => {
-            this.title = rsp.title;
-            this.data = rsp.items;
-            this.$store.commit('loaded');
-        })
+        this.init(this.$route);
     },
-
+    beforeRouteUpdate(to, from, next) {
+        this.init(to, next);
+    },
+    methods: {
+        init(route, next) {
+            this.$store.commit('navbar', true);
+            this.$store.commit('loading');
+            var meta = route.params.meta;
+            this.backend("/"+meta+"?fmt=json")
+            .then(rsp => rsp.json())
+            .then(rsp => {
+                this.title = rsp.title;
+                this.data = rsp.items;
+                this.$store.commit('loaded');
+            })
+            if ( next ) next()
+        },
+    },
 }
 </script>
 

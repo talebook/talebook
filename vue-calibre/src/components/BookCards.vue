@@ -1,7 +1,7 @@
 <template>
     <v-layout row wrap>
     <v-flex xs12 sm6 md4 v-for="(book,idx) in render_books" :key="idx+'-books-'+book.id" class="book-card">
-        <v-card :href="book.href">
+        <v-card :to="book.href" >
             <v-layout>
                 <v-flex xs3>
                     <v-img :src="book.img" :aspect-ratio="11/15" ></v-img>
