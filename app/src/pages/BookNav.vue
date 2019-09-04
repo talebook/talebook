@@ -1,15 +1,15 @@
 <template>
-    <v-layout wrap >
+    <v-row>
         <template v-for="nav in navs">
-        <v-flex :key="nav.legend">
+        <v-col :key="nav.legend">
             <h2>{{nav.legend}}</h2>
-            <v-btn round small v-for="item in nav.tags" :to="'/tag/'+item.name" :key="item.name" outline :color="item.count != 0 ? 'primary': 'grey'" >
+            <v-btn rounded small v-for="item in nav.tags" :to="'/tag/'+item.name" :key="item.name" outlined :color="item.count != 0 ? 'primary': 'grey'" >
                 {{item.name}}
                 <span v-if="item.count">&nbsp;({{item.count}})</span>
             </v-btn>
-        </v-flex>
+        </v-col>
         </template>
-    </v-layout>
+    </v-row>
 </template>
 
 <script>

@@ -1,8 +1,8 @@
 <template>
-<v-layout align-center justify-center>
-    <v-flex xs12 sm8 md4>
+<v-row align-center justify=center>
+    <v-col xs=12 sm=8 md=4>
         <v-card class="elevation-12">
-            <v-card-title align-center >奇异书屋安装指引</v-card-title>
+            <v-card-title align-center >calibre-webserver: 安装指引</v-card-title>
 
 <v-stepper v-model="e1">
     <v-stepper-header>
@@ -83,14 +83,15 @@
 
 
         </v-card>
-    </v-flex>
-</v-layout>
+    </v-col>
+</v-row>
 </template>
 
 <script>
 export default {
     created() {
-        this.$store.commit("puremode", true);
+        this.$store.commit("navbar", false);
+        this.$store.commit("loaded", true);
     },
     data: () => ({
         e1: 1,
@@ -106,7 +107,7 @@ export default {
     methods: {
         do_install: function() {
             alert("Test, Install success!");
-            this.$store.commit("puremode", false);
+            this.$store.commit("navbar", true);
             this.$router.push("/");
         },
     },

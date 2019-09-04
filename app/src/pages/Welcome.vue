@@ -1,6 +1,6 @@
 <template>
-<v-layout align-center justify-center>
-    <v-flex xs12 sm8 md6>
+<v-row justify=center class='fill-center'>
+    <v-col xs=12 sm=8 md=6>
         <v-card class="elevation-12">
             <v-toolbar dark color="primary">
             <v-toolbar-title align-center >请输入访问密码</v-toolbar-title>
@@ -19,8 +19,8 @@
             </v-card-actions>
 
         </v-card>
-    </v-flex>
-</v-layout>
+    </v-col>
+</v-row>
 </template>
 
 <script>

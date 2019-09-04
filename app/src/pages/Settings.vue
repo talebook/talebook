@@ -1,6 +1,6 @@
 <template>
-    <v-layout row wrap >
-        <v-flex xs10 offset-xs1 >
+    <v-row>
+        <v-col xs=10 offset-xs1 >
 
     <v-tabs v-model="tab_active" color="primary" dark slider-color="yellow" >
         <v-tab key="system" ripple>系统设置</v-tab>
@@ -48,8 +48,8 @@
             <div class="text-xs-center">
                 <v-btn color="primary" @click="save_settings">保存</v-btn>
             </div>
-        </v-flex>
-    </v-layout>
+        </v-col>
+    </v-row>
 </template>
 
 <script>

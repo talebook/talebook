@@ -1,15 +1,16 @@
 <template>
-    <v-layout align-start row wrap >
-        <v-flex xs12 >
+    <div>
+    <v-row >
+        <v-col cols=12 align="baseline">
             <h2>{{title}}</h2>
             <v-divider class="book-list-legend"></v-divider>
-        </v-flex>
+        </v-col>
 
-        <v-flex xs12>
+        <v-col>
             <book-cards :books="books"></book-cards>
-        </v-flex>
+        </v-col>
 
-        <v-flex xs12>
+        <v-col cols=12 align="end" >
             <div class="text-xs-center book-pager">
                 <v-pagination
                  v-model="page"
@@ -18,8 +19,9 @@
                  circle
                  ></v-pagination>
             </div>
-        </v-flex>
-    </v-layout>
+        </v-col>
+    </v-row>
+    </div>
 </template>
 
 <script>
@@ -33,6 +35,8 @@ export default {
             return 1 + parseInt(this.total/this.page_size);
         },
         page_visible: function() {
+            var cnt = 1 + parseInt(this.total/this.page_size);
+            if ( cnt < 7 ) { return cnt; }
             if ( this.$vuetify.breakpoint.smAndUp ) {
                 return 7;
             } else {
@@ -50,12 +54,12 @@ export default {
     created() {
         this.init(this.$route);
     },
-    beforeRouteUpdate(to, from, next) {
-        this.init(to, next);
+    beforeRouteEnter(to, from, next) {
+        next(vm => { vm.init(to) });
     },
     methods: {
         init(route, next) {
-            //alert(JSON.stringify(route.params));
+            //alert(JSON.stringify(route));
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
             var url = route.fullPath;

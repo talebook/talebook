@@ -6,8 +6,8 @@ import Vuex from 'vuex'
 Vue.use(Vuex)
 
 import Vuetify from 'vuetify/lib'
-import 'vuetify/src/stylus/app.styl'
-Vue.use(Vuetify, { iconfont: 'md' })
+import 'vuetify/dist/vuetify.min.css'
+Vue.use(Vuetify)
 
 import calibre from './calibre.js'
 Vue.use(calibre, {api: "http://beta.talebook.org/api"})
@@ -90,7 +90,15 @@ const store = new Vuex.Store({
     }
 })
 
+const vuetify_opts = {
+    icons: {
+        iconfont: 'mdi'
+    },
+}
+
+
 window.app = new Vue({
+    vuetify: new Vuetify(vuetify_opts),
     router,
     store,
     render: h => h(App),

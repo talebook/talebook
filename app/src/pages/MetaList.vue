@@ -1,12 +1,12 @@
 <template>
-    <v-layout wrap >
-        <v-flex>
-            <v-chip v-for="item in items" :to="item.href" :key="item.name" outline color="primary" >
+    <v-row>
+        <v-col>
+            <v-chip v-for="item in items" :to="item.href" :key="item.name" outlined color="primary" >
                 {{item.name}}
                 <span v-if="item.count">&nbsp;({{item.count}})</span>
             </v-chip>
-        </v-flex>
-    </v-layout>
+        </v-col>
+    </v-row>
 </template>
 
 <script>
@@ -35,7 +35,12 @@ export default {
     created() {
         this.init(this.$route);
     },
+    beforeRouteEnter(to, from, next) {
+        console.log("Enter", to);
+        next();
+    },
     beforeRouteUpdate(to, from, next) {
+        console.log("Update", to);
         this.init(to, next);
     },
     methods: {

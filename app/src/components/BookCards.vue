@@ -1,12 +1,12 @@
 <template>
-    <v-layout row wrap>
-    <v-flex xs12 sm6 md4 v-for="(book,idx) in render_books" :key="idx+'-books-'+book.id" class="book-card">
+    <v-row>
+    <v-col cols=12 xs=12 sm=6 md=4 v-for="(book,idx) in render_books" :key="idx+'-books-'+book.id" class="book-card">
         <v-card :to="book.href" >
-            <v-layout>
-                <v-flex xs3>
+            <v-row>
+                <v-col cols=3 class='col-book-img'>
                     <v-img :src="book.img" :aspect-ratio="11/15" ></v-img>
-                </v-flex>
-                <v-flex xs9>
+                </v-col>
+                <v-col cols=9 class='col-book-info'>
                     <v-card-text align-left>
                         <div class="book-title">{{book.title}}</div>
                         <div class="book-comments">
@@ -14,11 +14,11 @@
                             <p  v-else>点击浏览详情</p>
                         </div>
                     </v-card-text>
-                </v-flex>
-            </v-layout>
+                </v-col>
+            </v-row>
         </v-card>
-    </v-flex>
-    </v-layout>
+    </v-col>
+    </v-row>
 </template>
 
 <script>
@@ -77,6 +77,14 @@ export default {
 .new-legend {
     margin-top: 30px;
     margin-bottom: 20px;
+}
+.col-book-img {
+    padding: 0 0 0 12px;
+}
+.col-book-info {
+    padding: 0 12px 0 0;
+    margin-left: -6px;
+    margin-top: -6px;
 }
 
 </style>

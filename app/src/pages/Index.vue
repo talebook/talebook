@@ -1,22 +1,21 @@
 <template>
-    <v-layout wrap >
-        <v-flex md12>
-            <p class="page-title">随便推荐{{$store.state.avatar}}</p>
-        </v-flex>
-        <v-flex xs6 sm4 md2 v-for="(book,idx) in random_books" :key="'rec'+idx+book.id" class="book-card">
-            <v-card flat :to="book.href" >
-                <v-img :src="book.img" height="240px" contain > </v-img>
+    <v-row>
+        <v-col cols=12>
+            <p class="page-title">随便推荐(size={{$vuetify.breakpoint.name}})</p>
+        </v-col>
+        <v-col cols=6 xs=6 sm=4 md=2 v-for="(book,idx) in random_books" :key="'rec'+idx+book.id" class="book-card">
+            <v-card :to="book.href" >
+                <v-img :src="book.img" :aspect-ratio="11/15" height="240px" contain > </v-img>
             </v-card>
-        </v-flex>
-
-        <v-flex xs12 >
+        </v-col>
+        <v-col cols=12>
             <v-divider class="new-legend"></v-divider>
-            <p class="page-title">新书推荐-{{$vuetify.breakpoint.name}}</p>
-        </v-flex>
-        <v-flex>
+            <p class="page-title">新书推荐</p>
+        </v-col>
+        <v-col cols=12>
             <book-cards :books="recent_books"></book-cards>
-        </v-flex>
-    </v-layout>
+        </v-col>
+    </v-row>
 </template>
 
 <script>

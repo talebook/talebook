@@ -1,4 +1,4 @@
-# vue-calibre
+# app
 
 ## Project setup
 ```
