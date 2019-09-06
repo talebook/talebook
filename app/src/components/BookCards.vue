@@ -7,7 +7,7 @@
                     <v-img :src="book.img" :aspect-ratio="11/15" ></v-img>
                 </v-col>
                 <v-col cols=9 class='col-book-info'>
-                    <v-card-text align-left>
+                    <v-card-text class="pb-0" align-left>
                         <div class="book-title">{{book.title}}</div>
                         <div class="book-comments">
                             <p v-if="book.comments" v-html="book.comments"></p>
@@ -58,7 +58,7 @@ export default {
     /*text-indent: 2em;*/
     overflow: hidden;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     text-overflow: clip;
     margin-top: 6px;
@@ -66,6 +66,7 @@ export default {
 }
 .book-comments p {
     font-size: small;
+    margin-bottom: 0px;
 }
 .book-card {
     padding: 6px;

@@ -30,13 +30,15 @@
             </v-dialog>
 
             <v-card>
-                <v-card-actions>
-                    <v-btn outlined @click="dialog_kindle = !dialog_kindle" color="purple"><v-icon>email</v-icon> 推送Kindle</v-btn>
-                    <v-btn outlined :href="'/read/'+bookid" target="_blank"> <v-icon>import_contacts</v-icon> 在线阅读</v-btn>
+                <v-toolbar flat dense color="white">
+                    <v-btn color="primary" outlined class="mr-2 d-flex d-sm-flex" @click="dialog_kindle = !dialog_kindle" ><v-icon>email</v-icon> 推送</v-btn>
+                    <v-btn color="" outlined class="mr-2 d-flex d-sm-flex" :href="'/read/'+bookid" target="_blank"> <v-icon>import_contacts</v-icon> 阅读</v-btn>
                     <v-spacer></v-spacer>
+
+                    <!-- download -->
                     <v-menu left offset-y>
                         <template v-slot:activator="{on}">
-                            <v-btn v-on="on" small fab dark color="orange"><v-icon>get_app</v-icon></v-btn>
+                            <v-btn v-on="on" icon small fab ><v-icon>get_app</v-icon></v-btn>
                         </template>
                         <v-list>
                             <v-list-item :key="file[0]" v-for="file in book.files">
@@ -45,26 +47,33 @@
                             </v-list-item>
                         </v-list>
                     </v-menu>
-                    <v-btn small fab dark color="orange"> <v-icon>thumb_up</v-icon> </v-btn>
-                    <v-btn small fab dark color="orange"> <v-icon>share</v-icon> </v-btn>
 
-                    <v-menu v-if="!book.is_owner" offset-y>
+                    <!-- Edit -->
+                    <v-menu left offset-y>
                         <template v-slot:activator="{on}">
-                            <v-btn v-on="on" small text><v-icon>more_vert</v-icon></v-btn>
+                            <v-btn v-if="book.is_owner" v-on="on" icon small fab><v-icon>build</v-icon></v-btn>
                         </template>
                         <v-list>
                             <v-list-item :to="'/book/'+bookid+'/edit'"> <v-icon>settings_applications</v-icon> 编辑元数据 </v-list-item>
                             <v-list-item> <v-icon>apps</v-icon> 从豆瓣更新信息</v-list-item>
-                            <v-divider></v-divider>
-                            <v-list-item> <v-icon>apps</v-icon> 删除此书</v-list-item>
                         </v-list>
                     </v-menu>
-                </v-card-actions>
+
+                    <v-btn class="d-none" icon small fab > <v-icon>thumb_up</v-icon> </v-btn>
+                    <v-btn class="d-none" icon small fab > <v-icon>share</v-icon> </v-btn>
+
+                    <v-menu v-if="book.is_owner" offset-y>
+                        <template v-slot:activator="{on}">
+                            <v-btn v-on="on" icon small fab><v-icon>more_vert</v-icon></v-btn>
+                        </template>
+                        <v-list>
+                            <v-list-item> <v-icon>delete_forever</v-icon> 删除此书</v-list-item>
+                            </div>
+                        </v-list>
+                    </v-menu>
+                </v-toolbar>
                 <v-row>
-                    <v-col cols=12 sm=4>
-                        <!--
-                        <v-img class="book-img" :src="book.img" :aspect-ratio="11/15" max-height="500px" contain ></v-img>
-                        -->
+                    <v-col class="ma-auto" cols=8 sm=4>
                         <v-img class="book-img" :src="book.img" :aspect-ratio="11/15" max-height="500px" contain ></v-img>
                     </v-col>
                     <v-col cols=12 sm=8>
@@ -83,13 +92,13 @@
                                 </template>
                                 <v-chip rounded small dark color="indigo" :to="'/pub/'+book.publisher" >
                                     <v-icon>group</v-icon>
-                                    {{book.publisher}}
+                                    出版：{{book.publisher}}
                                 </v-chip>
                                 <v-chip rounded small dark color="indigo" v-if="book.series" >
                                     <v-icon>explore</v-icon>丛书: {{book.series}}
                                 </v-chip>
                                 <v-chip rounded small dark color="grey" v-if="book.isbn" >
-                                    <v-icon>explore</v-icon>ISBN-{{book.isbn}}
+                                    <v-icon>explore</v-icon>ISBN：{{book.isbn}}
                                 </v-chip>
                                 <template v-for="tag in book.tags" >
                                 <v-chip rounded small dark color="grey" :key="tag" v-if="tag" :to="'/tag/'+tag" >

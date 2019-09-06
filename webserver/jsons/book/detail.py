@@ -41,15 +41,17 @@ def json_output(self, vals):
         'tags'            : ' / '.join(b['tags']),
         'author_sort'     : get('author_sort'),
         'publisher'       : get('publisher'),
-        'comments'        : get('comments',                                     _(u'暂无简介') ),
-        'series'          : get('series',                                       None),
-        'language'        : get('language',                                     None),
-        'isbn'            : get('isbn',                                         None),
+        'comments'        : get('comments',_(u'暂无简介') ),
+        'series'          : get('series',None),
+        'language'        : get('language',None),
+        'isbn'            : get('isbn',None),
         'files'           : vals['sizes'],
+        'is_public'       : b['is_public'],
+        'is_owner'        : b['is_owner'],
 
-        "img"             : img+"/get/cover/%(id)s.jpg?t=%(timestamp)s"         %              b,
-        "cover_large_url" : img+"/get/thumb_600_840/%(id)s.jpg?t=%(timestamp)s" %              b,
-        "cover_url"       : img+"/get/thumb_155_220/%(id)s.jpg?t=%(timestamp)s" %              b,
+        "img"             : img+"/get/cover/%(id)s.jpg?t=%(timestamp)s"         % b,
+        "cover_large_url" : img+"/get/thumb_600_840/%(id)s.jpg?t=%(timestamp)s" % b,
+        "cover_url"       : img+"/get/thumb_155_220/%(id)s.jpg?t=%(timestamp)s" % b,
         }
     return d
 

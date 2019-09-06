@@ -10,9 +10,18 @@
                     <v-text-field prepend-icon="person" v-model="username" label="用户名" type="text"></v-text-field>
                     <v-text-field prepend-icon="lock" v-model="password" label="密码" type="password" id="password" ></v-text-field>
                 </v-form>
-                <div align="center">
-                <v-btn large rounded color="primary" @click="do_login">登录</v-btn>
-                </div>
+                <v-row>
+                    <v-col>
+                        <div align="center">
+                            <v-btn large rounded color="orange" to="/signup">注册</v-btn>
+                        </div>
+                    </v-col>
+                    <v-col>
+                        <div align="center">
+                            <v-btn large rounded color="primary" @click="do_login">登录</v-btn>
+                        </div>
+                    </v-col>
+                </v-row>
             </v-card-text>
 
             <v-card-text v-if="login_with_social">

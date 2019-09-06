@@ -38,7 +38,7 @@
 
             <v-toolbar-title class="mr-12 align-center" >
                 <v-app-bar-nav-icon @click.stop="sidebar = !sidebar"><v-icon>menu</v-icon></v-app-bar-nav-icon>
-                <v-btn text dark to="/"><span class="title">{{sysinfo.title}}</span></v-btn>
+                {{sysinfo.title}}(size={{$vuetify.breakpoint.name}})
             </v-toolbar-title>
             <v-spacer></v-spacer>
 
@@ -130,6 +130,7 @@ export default {
             this.user = rsp.user;
             var sys = rsp.sys;
             var nav_items = [
+                { icon: 'home',         href:'/',       text: '首页',         },
                 { heading: '分类浏览' },
                 { icon: 'contacts',     href:'/nav',    text: '所有书籍', count: sys.books      },
                 { icon: 'history',      href:'/pub',    text: '出版社',   count: sys.publishers },
@@ -151,8 +152,11 @@ export default {
             this.items = nav_items;
             this.loaded = true;
         }).catch(error => {
-            if ( error ) { 1 + 2 }
-            this.$router.push("/welcome");
+            error || error;
+            //if ( error ) { 1 + 2 }
+            var next = this.$router.fullPath;
+            next = next ? "?next="+next : "";
+            this.$router.push("/welcome"+next);
         });
     },
     data: () => ({

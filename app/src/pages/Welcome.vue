@@ -6,8 +6,8 @@
             <v-toolbar-title align-center >请输入访问密码</v-toolbar-title>
             </v-toolbar>
             <v-card-text>
-                <v-form>
-                    <v-text-field id="code" prepend-icon="lock" name="code" v-model="invite_code" required
+                <v-form @submit.prevent="welcome_login" >
+                    <v-text-field prepend-icon="lock" v-model="invite_code" required
                         label="邀请码" type="password" :error="err" :error-messages="err_msg" :loading="loading"></v-text-field>
                 </v-form>
             </v-card-text>
@@ -30,6 +30,8 @@ export default {
         this.$store.commit('loaded');
     },
     data: () => ({
+        valid: true,
+        form: null,
         err: false,
         err_msg: "",
         loading: false,
@@ -51,7 +53,7 @@ export default {
                     this.err_msg = rsp.msg;
                 } else {
                     this.err = false;
-                    this.$router.push("/");
+                    this.$router.push(this.$route.query.next || "/");
                     this.$store.commit("puremode", false);
                 }
             });
