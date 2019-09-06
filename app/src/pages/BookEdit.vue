@@ -1,0 +1,182 @@
+<template>
+    <v-row align=start>
+        <v-col cols=12>
+            <v-dialog v-model="dialog_msg" persistent width="300">
+                <v-card>
+                    <v-card-text>
+                        <v-alert outlined v-model="dialog_msg" :type="alert_type">
+                            {{alert_msg}}
+                        </v-alert>
+                    </v-card-text>
+                    <v-card-text align="center">
+                        <v-btn small @click="dialog_msg = false">关闭</v-btn>
+                    </v-card-text>
+                </v-card>
+            </v-dialog>
+
+            <v-card>
+                <v-toolbar dark color="primary">
+                    <v-toolbar-title align-center >Edit Book</v-toolbar-title>
+                </v-toolbar>
+                <v-card-text class="pa-0 pa-md-2">
+                    <v-form>
+                        <v-container>
+                            <v-row>
+                                <v-col cols=12 md=6>
+                                    <v-text-field label="Book Title" v-model="book.title">{{book.title}}</v-text-field>
+                                </v-col>
+                                <v-col cols=12 md=6>
+                                    <!-- AUTHORS -->
+                                    <v-combobox v-model="book.authors" :items="book.authors" label="Book authors" :search-input.sync="author_input" hide-selected multiple small-chips>
+                                        <template v-slot:no-data>
+                                            <v-list-item>
+                                                <span v-if="! author_input">请输入新的标签名称</span>
+                                                <div v-else>
+                                                    <span class="subheading">添加标签</span>
+                                                    <v-chip color="green lighten-3" label small rounded> {{ author_input }} </v-chip>
+                                                </div>
+                                            </v-list-item>
+                                        </template>
+                                        <!-- author chip & close -->
+                                        <template v-slot:selection="{ attrs, item, parent, selected }">
+                                            <v-chip v-bind="attrs" color="green lighten-3" :input-value="selected" label small >
+                                                <span class="pr-2"> {{ item }} </span>
+                                                <v-icon small @click="parent.selectItem(item)" >close</v-icon>
+                                            </v-chip>
+                                        </template>
+                                    </v-combobox>
+                                </v-col>
+                                <v-col cols=12 md=6>
+                                    <v-text-field label="Book PUblisher" v-model="book.publisher">{{book.publisher}}</v-text-field>
+                                </v-col>
+                                <v-col cols=12 md=6>
+                                    <v-text-field label="Book PUBDATE" v-model="book.pubdate">{{book.pubdate}}</v-text-field>
+                                </v-col>
+                                <v-col cols=12 md=6>
+                                    <v-text-field label="Book ISBN" v-model="book.isbn">{{book.isbn}}</v-text-field>
+                                </v-col>
+
+                                <v-col cols=12 md=6>
+                                    <v-text-field label="Book Series" v-model="book.series">{{book.series}}</v-text-field>
+                                </v-col>
+
+                                <v-col cols=12>
+                                    <!-- TAGS -->
+                                    <v-combobox v-model="book.tags" :items="book.tags" label="Book Tags" :search-input.sync="tag_input" hide-selected multiple small-chips>
+                                        <template v-slot:no-data>
+                                            <v-list-item>
+                                                <span v-if="! tag_input">请输入新的标签名称</span>
+                                                <div v-else>
+                                                    <span class="subheading">添加标签</span>
+                                                    <v-chip color="green lighten-3" label small rounded> {{ tag_input }} </v-chip>
+                                                </div>
+                                            </v-list-item>
+                                        </template>
+                                        <!-- tag chip & close -->
+                                        <template v-slot:selection="{ attrs, item, parent, selected }">
+                                            <v-chip v-bind="attrs" color="green lighten-3" :input-value="selected" label small >
+                                                <span class="pr-2"> {{ item }} </span>
+                                                <v-icon small @click="parent.selectItem(item)" >close</v-icon>
+                                            </v-chip>
+                                        </template>
+                                    </v-combobox>
+                                </v-col>
+                                <v-col cols="12">
+                                    <v-textarea outlined rows="20" label="Book Comments" v-model="book.comments" :value="book.comments" ></v-textarea>
+                                </v-col>
+                            </v-row>
+                        </v-container>
+
+                    </v-form>
+                </v-card-text>
+            </v-card>
+        </v-col>
+    </v-row>
+</template>
+
+<script>
+export default {
+    components: {
+    },
+    computed: {
+        pub_year: function() {
+            if ( this.book === null ) {
+                return "";
+            }
+            return this.book.pubdate.split("-")[0];
+        },
+    },
+    data: () => ({
+        bookid: 0,
+        book: {'id': 0, 'files': [], 'tags': [], 'pubdate': ''},
+        author_input: null,
+        tag_input: null,
+        debug: false,
+        mail_to: "",
+        dialog_kindle: false,
+        dialog_msg: false,
+        alert_msg: "please login",
+        alert_type: "error",
+    }),
+    created() {
+        this.init(this.$route);
+    },
+    beforeRouteUpdate(to, from, next) {
+        this.init(to, next);
+    },
+    methods: {
+        init(route, next) {
+            this.$store.commit('navbar', true);
+            this.bookid = route.params.bookid;
+            this.$store.commit('loading');
+            var bookid = route.params.bookid;
+            this.backend("/book/" + bookid + "?fmt=json")
+            .then( rsp => rsp.json() )
+            .then( book => {
+                book.img = book.cover_large_url;
+                book.tags = book.tags.split("/").map( m => m.trim() );
+                this.book = book;
+                this.$store.commit('loaded');
+            });
+            if ( next ) next();
+        },
+        sendto_kindle() {
+            var bookid = this.$route.params.bookid;
+            this.backend("/book/"+bookid+"/push", {
+                method: "POST",
+                body: "mail_to="+this.mail_to,
+                headers: {
+                    'Content-Type': "application/x-www-form-urlencoded",
+                },
+            }).then( rsp => rsp.json() )
+            .then( rsp => {
+                this.alert_msg = rsp.msg;
+                this.alert_type = ( rsp.err == 'ok' )?  "success": "error";
+                this.dialog_msg = true;
+                this.dialog_kindle = false;
+            });
+        }
+    },
+}
+</script>
+
+<style>
+.book-img {
+    /*
+    margin-left: 16px;
+    box-shadow: 1px 1px 1px rgba(0,0,0,0.12);
+    box-shadow: 0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12);
+    */
+}
+.align-right {
+    text-align: right;
+}
+.book-footer {
+    padding-top: 0px;
+    padding-bottom: 3px;
+}
+.tag-chips a {
+    margin: 4px 2px;
+}
+
+</style>

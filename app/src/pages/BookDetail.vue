@@ -39,7 +39,7 @@
                             <v-btn v-on="on" small fab dark color="orange"><v-icon>get_app</v-icon></v-btn>
                         </template>
                         <v-list>
-                            <v-list-item v-for="file in book.files">
+                            <v-list-item :key="file[0]" v-for="file in book.files">
                                 <v-icon>get_app</v-icon>
                                 下载{{file[0]}}格式({{parseInt(file[1]/1024)}} KB)
                             </v-list-item>
@@ -53,7 +53,7 @@
                             <v-btn v-on="on" small text><v-icon>more_vert</v-icon></v-btn>
                         </template>
                         <v-list>
-                            <v-list-item> <v-icon>settings_applications</v-icon> 编辑元数据 </v-list-item>
+                            <v-list-item :to="'/book/'+bookid+'/edit'"> <v-icon>settings_applications</v-icon> 编辑元数据 </v-list-item>
                             <v-list-item> <v-icon>apps</v-icon> 从豆瓣更新信息</v-list-item>
                             <v-divider></v-divider>
                             <v-list-item> <v-icon>apps</v-icon> 删除此书</v-list-item>
@@ -75,13 +75,18 @@
                             </div>
                             <br/>
                             <div class='tag-chips'>
-                                <v-chip rounded small dark color="indigo" :to="'/author/'+book.author" >
+                                <template v-for="author in book.authors">
+                                <v-chip rounded small dark color="indigo" :to="'/author/'+author" :key="author">
                                     <v-icon>face</v-icon>
-                                    {{book.author}}
+                                    {{author}}
                                 </v-chip>
+                                </template>
                                 <v-chip rounded small dark color="indigo" :to="'/pub/'+book.publisher" >
                                     <v-icon>group</v-icon>
                                     {{book.publisher}}
+                                </v-chip>
+                                <v-chip rounded small dark color="indigo" v-if="book.series" >
+                                    <v-icon>explore</v-icon>丛书: {{book.series}}
                                 </v-chip>
                                 <v-chip rounded small dark color="grey" v-if="book.isbn" >
                                     <v-icon>explore</v-icon>ISBN-{{book.isbn}}

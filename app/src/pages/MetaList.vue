@@ -36,11 +36,9 @@ export default {
         this.init(this.$route);
     },
     beforeRouteEnter(to, from, next) {
-        console.log("Enter", to);
         next();
     },
     beforeRouteUpdate(to, from, next) {
-        console.log("Update", to);
         this.init(to, next);
     },
     methods: {

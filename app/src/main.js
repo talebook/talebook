@@ -16,6 +16,7 @@ import App        from './App.vue'
 import Index      from './pages/Index.vue'
 import Install    from './pages/Install.vue'
 import BookDetail from './pages/BookDetail.vue'
+import BookEdit   from './pages/BookEdit.vue'
 import BookNav    from './pages/BookNav.vue'
 import BookList   from './pages/BookList.vue'
 import Login      from './pages/Login.vue'
@@ -42,6 +43,7 @@ const router = new VueRouter({
         { path: '/logout',   component: Logout   },
 
         { path: '/book/:bookid(\\d+)', component: BookDetail },
+        { path: '/book/:bookid(\\d+)/edit', component: BookEdit },
         { path: '/:meta(pub|tag|author|rating)', component: MetaList },
         { path: '/:meta(pub|tag|author|rating)/:name', component: BookList },
 
