@@ -44,7 +44,7 @@
 
             <form action="/search" method="GET">
             <v-text-field flat solo-inverted hide-details prepend-inner-icon="search"
-                      name="name" label="Search" class="hidden-sm-and-down">
+                      name="name" label="Search" class="d-none d-sm-flex">
             </v-text-field>
             </form>
 
@@ -144,7 +144,7 @@ export default {
                 { links: sys.friends },
             ] : [] ).concat([
                 { heading: '系统管理' },
-                { icon: 'settings', text: '管理入口', href: "/settings" },
+                { icon: 'settings', text: '管理入口', href: "/admin" },
                 { icon: 'settings', text: '安装页面', href: "/install" },
                 { icon: 'settings', text: '入口密码', href: "/welcome" },
                 { icon: 'help', text: '系统版本' },

@@ -23,7 +23,7 @@ import Login      from './pages/Login.vue'
 import Logout     from './pages/Logout.vue'
 import Signup     from './pages/Signup.vue'
 import MetaList   from './pages/MetaList.vue'
-import Settings   from './pages/Settings.vue'
+import Admin      from './pages/Admin.vue'
 import Welcome    from './pages/Welcome.vue'
 import NotFound   from './pages/NotFound.vue'
 
@@ -38,7 +38,7 @@ const router = new VueRouter({
         { path: '/search',   component: BookList },
         { path: '/recent',   component: BookList },
         { path: '/hot',      component: BookList },
-        { path: '/settings', component: Settings },
+        { path: '/admin',    component: Admin },
         { path: '/welcome',  component: Welcome  },
         { path: '/login',    component: Login    },
         { path: '/logout',   component: Logout   },

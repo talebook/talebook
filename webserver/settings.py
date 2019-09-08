@@ -15,7 +15,7 @@ settings = {
     "cookie_secret" : "cookie_secret",
     "login_url"     : "/login",
     "xsrf_cookies"  : False,
-    "user_database" : 'sqlite:////data/books/beta.db',
+    "user_database" : 'sqlite:////data/books/develop.db',
     "site_title"    : u"奇异书屋",
 
     # Set this if you don't need any user management

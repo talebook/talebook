@@ -129,8 +129,8 @@ export default {
     },
     computed: {
         pub_year: function() {
-            if ( this.book === null ) {
-                return "";
+            if ( this.book === null || this.book.pubdate == null) {
+                return "N/A";
             }
             return this.book.pubdate.split("-")[0];
         },

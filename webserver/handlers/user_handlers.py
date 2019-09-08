@@ -113,22 +113,51 @@ class UserView(BaseHandler):
         return self.html_page('user/view.html', vars())
 
 class AdminView(BaseHandler):
-    @web.authenticated
+    #@web.authenticated
+    @json_response
     def get(self):
-        if not self.is_admin():
-            self.redirect('/', 302)
-        items = self.session.query(Reader).order_by(Reader.access_time.desc())
-        count = items.count()
-        delta = 20
-        start = self.get_argument_start()
-        page_max = count / delta
-        page_now = start / delta
-        pages = []
-        for p in range(page_now-2, page_now+3):
-            if 0 <= p and p <= page_max:
-                pages.append(p)
-        users = items.limit(delta).offset(start).all()
-        return self.html_page('admin/view.html', vars())
+        #if not self.is_admin():
+        #    return {'err': 'permission.not_admin', 'msg': _(u'Not Admin')}
+
+        num = max(10, int(self.get_argument("num", 20)))
+        page = max(0, int(self.get_argument("page", 0)))
+        sort = self.get_argument("sort", "access_time")
+        desc = self.get_argument("desc", "desc")
+        logging.debug("num=%d, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
+
+        f = {
+                "id": Reader.id,
+                "access_time": Reader.access_time,
+                "create_time": Reader.create_time,
+                "update_time": Reader.update_time,
+                "username": Reader.username,
+                }.get(sort, Reader.id)
+        if desc == "false":
+            f = f.asc()
+        else:
+            f = f.desc()
+
+        query = self.session.query(Reader).order_by(f)
+        total = query.count()
+        start = page * num
+        items = []
+        for user in query.limit(num).offset(start).all():
+            d = {
+                    'id': user.id,
+                    'username': user.username,
+                    'name': user.name,
+                    'email': user.email,
+                    'avatar': user.avatar,
+                    'is_active': user.is_active(),
+                    'is_admin': user.is_admin(),
+                    'extra': dict(user.extra),
+                    'provider': user.social_auth[0].provider if user.social_auth.count() else "register",
+                    'create_time': user.create_time.strftime("%Y-%m-%d %H:%M:%S") if user.create_time else 'N/A',
+                    'update_time': user.update_time.strftime("%Y-%m-%d %H:%M:%S") if user.update_time else 'N/A',
+                    'access_time': user.access_time.strftime("%Y-%m-%d %H:%M:%S") if user.access_time else 'N/A',
+                    }
+            items.append( d )
+        return {"err": 'ok', "users": {"items": items, "total": total}}
 
 class AdminSet(BaseHandler):
     @web.authenticated
@@ -296,7 +325,7 @@ def routes():
 
             (r'/api/sys/index',         AdminView),
             (r'/api/sys/settings',      AdminSet),
-            (r'/api/sys/users',         AdminSet),
+            (r'/api/sys/users',         AdminView),
             (r'/api/sys/messages',      AdminSet),
     ]
 

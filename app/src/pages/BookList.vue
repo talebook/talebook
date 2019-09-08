@@ -15,7 +15,7 @@
                 <v-pagination
                  v-model="page"
                  :length="page_cnt"
-                 :total-visible="page_visible"
+                 total-visible="7"
                  circle
                  ></v-pagination>
             </div>
