@@ -1,13 +1,10 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
-import time
-import datetime
-import logging
+import time, datetime, logging, re, hashlib, json
 from tornado import web
 from models import Reader
 from base_handlers import BaseHandler, json_response
-import json
 
 COOKIE_REDIRECT = "login_redirect"
 
@@ -142,16 +139,60 @@ class AdminSet(BaseHandler):
             self.set_secure_cookie("user_id", user_id)
         self.redirect('/', 302)
 
+class SignUp(BaseHandler):
+    @json_response
+    def post(self):
+        email = self.get_argument("email", "").strip()
+        nickname = self.get_argument("nickname", "").strip()
+        username = self.get_argument("username", "").strip().lower()
+        password = self.get_argument("password", "").strip()
+        if not nickname or not username or not password:
+            return {'err': 'params.invalid', 'msg': _(u'用户名或密码无效')}
+
+        RE_EMAIL = r'[^@]+@[^@]+\.[^@]+'
+        RE_USERNAME = r'[a-z][a-z0-9_]*'
+        RE_PASSWORD = r'[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};\':",./<>?\|]*'
+        if not re.match(RE_EMAIL, email):
+            return {'err': 'params.email.invalid', 'msg': _(u'Email无效')}
+        if len(username) < 6 or len(username) > 20 or not re.match(RE_USERNAME, username):
+            return {'err': 'params.username.invalid', 'msg': _(u'用户名无效')}
+        if len(password) < 8 or len(password) > 20 or not re.match(RE_PASSWORD, password):
+            return {'err': 'params.password.invalid', 'msg': _(u'用户名无效')}
+
+        user = self.session.query(Reader).filter(Reader.username==username).first()
+        if user:
+            return {'err': 'params.username.exist', 'msg': _(u'用户名已被使用')}
+        user = Reader()
+        user.username = username
+        user.name = nickname
+        user.email = email
+        user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email).hexdigest()
+        user.create_time = datetime.datetime.now()
+        user.update_time = datetime.datetime.now()
+        user.access_time = datetime.datetime.now()
+        user.extra = {"kindle_email": ""}
+        user.set_secure_password(password)
+        try:
+            user.save()
+        except:
+            import traceback
+            logging.error(traceback.format_exc())
+            return {'err': 'db.error', 'msg': _(u'系统异常，请重试或更换注册信息')}
+        return {'err': 'ok'}
+
 class SignIn(BaseHandler):
     @json_response
     def post(self):
-        username = self.get_argument("username", None)
-        password = self.get_argument("password", None)
+        username = self.get_argument("username", "").strip().lower()
+        password = self.get_argument("password", "").strip()
         if not username or not password:
-            return {'err': 'params.invalid', 'msg': _(u'用户名或密码无效')}
+            return {'err': 'params.invalid', 'msg': _(u'用户名或密码错误')}
         user = self.session.query(Reader).filter(Reader.username==username).first()
         if not user:
             return {'err': 'params.no_user', 'msg': _(u'无此用户')}
+        if user.get_secure_password(password) != user.password:
+            return {'err': 'params.invalid', 'msg': _(u'用户名或密码错误')}
+
         self.set_secure_cookie('user_id', str(user.id))
         self.set_secure_cookie("lt", str(int(time.time())))
         return {'err': 'ok', 'msg': 'ok'}
@@ -247,7 +288,7 @@ def routes():
 
             (r'/api/user/index',        UserView),
             (r"/api/user/sign_in",      SignIn),
-            (r'/api/user/sign_up',      Logout),
+            (r'/api/user/sign_up',      SignUp),
             (r'/api/user/sign_out',     SignOut),
             (r'/api/user/setting',      SettingView),
             (r'/api/user/setting/save', SettingSave),

@@ -21,6 +21,7 @@ import BookNav    from './pages/BookNav.vue'
 import BookList   from './pages/BookList.vue'
 import Login      from './pages/Login.vue'
 import Logout     from './pages/Logout.vue'
+import Signup     from './pages/Signup.vue'
 import MetaList   from './pages/MetaList.vue'
 import Settings   from './pages/Settings.vue'
 import Welcome    from './pages/Welcome.vue'
@@ -41,6 +42,7 @@ const router = new VueRouter({
         { path: '/welcome',  component: Welcome  },
         { path: '/login',    component: Login    },
         { path: '/logout',   component: Logout   },
+        { path: '/signup',   component: Signup   },
 
         { path: '/book/:bookid(\\d+)', component: BookDetail },
         { path: '/book/:bookid(\\d+)/edit', component: BookEdit },

@@ -1,13 +1,23 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
-import logging
-import datetime
+import crypt, hashlib, logging, datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin, SQLAlchemyUserMixin
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import relationship
+
+def mksalt():
+    import string, random
+    # for python3, just use: crypt.mksalt(crypt.METHOD_SHA512)
+    saltchars = string.ascii_letters + string.digits + './'
+    salt = []
+    for c in range(32):
+        idx = int(random.random()*10000)%len(saltchars)
+        salt.append( saltchars[idx] )
+    return "".join(salt)
+
 
 Base = declarative_base()
 def bind_session(session):
@@ -53,6 +63,7 @@ class Reader(Base, SQLAlchemyMixin):
     avatar = Column(String(200))
     admin = Column(Boolean, default=False)
     active = Column(Boolean, default=True)
+    salt = Column(String(200))
     create_time = Column(DateTime)
     update_time = Column(DateTime)
     access_time = Column(DateTime)
@@ -73,6 +84,15 @@ class Reader(Base, SQLAlchemyMixin):
         self.access_time = datetime.datetime.now()
         self.extra = {"kindle_email": ""}
         self.init_avatar(social_user)
+
+    def get_secure_password(self, raw_password):
+        p1 = hashlib.sha256(raw_password).hexdigest()
+        p2 = hashlib.sha256(self.salt+p1).hexdigest()
+        return p2
+
+    def set_secure_password(self, raw_password):
+        self.salt = mksalt()
+        self.password = self.get_secure_password(raw_password)
 
     def init_avatar(self, social_user):
         anyone = "http://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"

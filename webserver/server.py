@@ -110,6 +110,7 @@ def make_app():
 
     if options.syncdb:
         models.user_syncdb(engine)
+        logging.info("Create tables into DB")
         sys.exit(0)
 
     if options.testmail:
