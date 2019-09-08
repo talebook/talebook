@@ -68,7 +68,6 @@
                         </template>
                         <v-list>
                             <v-list-item> <v-icon>delete_forever</v-icon> 删除此书</v-list-item>
-                            </div>
                         </v-list>
                     </v-menu>
                 </v-toolbar>

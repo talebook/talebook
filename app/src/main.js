@@ -5,6 +5,8 @@ Vue.use(VueRouter)
 import Vuex from 'vuex'
 Vue.use(Vuex)
 
+import '@mdi/font/css/materialdesignicons.css' // Ensure you are using css-loader
+
 import Vuetify from 'vuetify/lib'
 import 'vuetify/dist/vuetify.min.css'
 Vue.use(Vuetify)
@@ -96,7 +98,7 @@ const store = new Vuex.Store({
 
 const vuetify_opts = {
     icons: {
-        iconfont: 'mdi'
+        iconfont: 'mdi',
     },
 }
 

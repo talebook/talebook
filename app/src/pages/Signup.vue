@@ -43,7 +43,7 @@ export default {
             pass: v => v.length >= 8 || 'Min 8 characters',
             nick: v => v.length >= 2 || 'Min 2 characters',
             email: function (email) {
-                var re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+                var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
                 return re.test(email) || "Invalid email format";
             },
         },
@@ -51,7 +51,6 @@ export default {
     }),
     methods: {
         valid: function(v) {
-            console.log("check password2 valid ?");
             if ( v.length < 8 ) {
                 return 'Min 8 characters';
             }

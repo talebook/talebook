@@ -23,9 +23,6 @@
         Actions
     </template>
     </v-data-table>
-    <div class="text-center pt-2">
-        <v-pagination v-model="page" :length="pageCount" total-visible="6" ></v-pagination>
-    </div>
   </div>
 </template>
 
