@@ -7,9 +7,9 @@
 
                     <!-- 友情链接 -->
                     <template v-else-if="item.links" >
-                    <v-list-item v-for="(links, cidx) in chunk(item.links, 2)" :key="'chunk'+cidx">
+                    <v-list-item dense v-for="(links, cidx) in chunk(item.links, 2)" :key="'chunk'+cidx">
                         <v-row>
-                            <v-col cols=6 v-for="link in links" :key="link.href" >
+                            <v-col class="pa-0" cols=6 v-for="link in links" :key="link.href" >
                                 <v-btn text :to="link.href">{{link.text}}</v-btn>
                             </v-col>
                         </v-row>
@@ -17,16 +17,16 @@
                     </template>
 
                     <!-- 导航菜单 -->
-                    <v-list-item v-else :key="item.text" :to="item.href" >
-                        <v-list-item-action>
-                            <v-icon>{{ item.icon }}</v-icon>
+                    <v-list-item dense v-else :key="item.text" :to="item.href" >
+                        <v-list-item-action class="mt-0 mr-2" dense>
+                            <v-icon class="pa-0 ma-0">{{ item.icon }}</v-icon>
                         </v-list-item-action>
                         <v-list-item-content>
                             <v-list-item-title>
                                 {{ item.text }}
                             </v-list-item-title>
                         </v-list-item-content>
-                        <v-list-item-action v-if="item.count">
+                        <v-list-item-action class="mt-0 mr-2" v-if="item.count">
                             <v-chip small outlined>{{item.count}}</v-chip>
                         </v-list-item-action>
                     </v-list-item>
