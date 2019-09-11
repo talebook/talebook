@@ -18,7 +18,7 @@
 
                     <!-- 导航菜单 -->
                     <v-list-item dense v-else :key="item.text" :to="item.href" >
-                        <v-list-item-action class="mt-0 mr-2" dense>
+                        <v-list-item-action class="mt-1 mb-1 mr-2" dense>
                             <v-icon class="pa-0 ma-0">{{ item.icon }}</v-icon>
                         </v-list-item-action>
                         <v-list-item-content>
@@ -26,7 +26,7 @@
                                 {{ item.text }}
                             </v-list-item-title>
                         </v-list-item-content>
-                        <v-list-item-action class="mt-0 mr-2" v-if="item.count">
+                        <v-list-item-action class="mt-1 mb-1 mr-2" v-if="item.count">
                             <v-chip small outlined>{{item.count}}</v-chip>
                         </v-list-item-action>
                     </v-list-item>
