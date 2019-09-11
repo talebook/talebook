@@ -285,6 +285,7 @@ class UserInfo(BaseHandler):
                     "is_login": (user != None),
                     "is_admin": (self.admin_user != None),
                     "nickname": user.username if user else "",
+                    "email": user.email if user else "",
                     "kindle_email": "",
                 },
             }

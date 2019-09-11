@@ -81,6 +81,7 @@
                             <h1>{{book.title}}</h1>
                             <span color="grey--text">{{book.author}}著，{{pub_year}}年版</span>
                             </div>
+                            <v-rating v-model="book.rating" color="yellow accent-4" length="10" readonly dense small></v-rating>
                             <br/>
                             <div class='tag-chips'>
                                 <template v-for="author in book.authors">
@@ -160,7 +161,6 @@ export default {
             .then( rsp => rsp.json() )
             .then( book => {
                 book.img = book.cover_large_url;
-                book.tags = book.tags.split("/").map( m => m.trim() );
                 this.book = book;
                 this.$store.commit('loaded');
             });

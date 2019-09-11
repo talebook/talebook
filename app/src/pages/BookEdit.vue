@@ -134,7 +134,6 @@ export default {
             .then( rsp => rsp.json() )
             .then( book => {
                 book.img = book.cover_large_url;
-                book.tags = book.tags.split("/").map( m => m.trim() );
                 this.book = book;
                 this.$store.commit('loaded');
             });

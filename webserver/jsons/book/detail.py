@@ -38,7 +38,7 @@ def json_output(self, vals):
         'collector'       : collector,
         'authors'         : b['authors'],
         'author'          : ', '.join(b['authors']),
-        'tags'            : ' / '.join(b['tags']),
+        'tags'            : b['tags'],
         'author_sort'     : get('author_sort'),
         'publisher'       : get('publisher'),
         'comments'        : get('comments',_(u'暂无简介') ),

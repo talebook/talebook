@@ -1,6 +1,6 @@
 <template>
 <v-row justify=center class='fill-center'>
-    <v-col xs=12 sm=8 md=6>
+    <v-col xs=12 sm=8 md=4>
         <v-card class="elevation-12">
             <v-toolbar dark color="primary">
             <v-toolbar-title align-center >请输入访问密码</v-toolbar-title>

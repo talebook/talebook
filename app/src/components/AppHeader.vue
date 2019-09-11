@@ -66,18 +66,18 @@
             </v-menu>
 
 
-            <v-menu offset-y v-if="user.is_login">
+            <v-menu offset-y right v-if="user.is_login">
                 <template v-slot:activator="{on}">
                 <v-btn v-on="on" icon large ><v-avatar size="32px"><img :src="user.avatar" ></v-avatar></v-btn>
                 </template>
-                <v-list>
+                <v-list width=240>
                     <v-list-item to="(user.is_login)?'':'/login'" >
                         <v-list-item-avatar>
                             <img :src="user.avatar">
                         </v-list-item-avatar>
                         <v-list-item-content>
                         <v-list-item-title> {{user.nickname}} </v-list-item-title>
-                        <v-list-item-sub-title> {{user.kindle_email}} </v-list-item-sub-title>
+                        <v-list-item-subtitle> {{user.email}} </v-list-item-subtitle>
                         </v-list-item-content>
                     </v-list-item>
                 </v-list>
