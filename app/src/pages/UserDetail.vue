@@ -13,7 +13,7 @@
             <v-col cols=9><p class="pt-3 mb-0">{{user.username}}</p></v-col>
 
             <v-col cols=3><v-subheader class="pa-0 float-right" >邮箱</v-subheader></v-col>
-            <v-col cols=9><p class="pt-3 mb-0">{{user.email}}</p></v-col>
+            <v-col cols=9><p class="pt-3 mb-0">{{user.email}}<a href='#' @click='send_active_email'>重新发送激活邮件</a></p></v-col>
 
             <v-col cols=3><v-subheader class="pa-0 float-right" >密码</v-subheader></v-col>
             <v-col cols=9>
@@ -47,11 +47,11 @@ export default {
         user: {},
         show_pass: false,
         rules: {
-            pass: v => v.length == 0 || v.length >= 8 || 'Min 8 characters',
-            nick: v => v.length == 0 || v.length >= 2 || 'Min 2 characters',
+            pass: v => v == undefined || v.length == 0 || v.length >= 8 || 'Min 8 characters',
+            nick: v => v == undefined || v.length == 0 || v.length >= 2 || 'Min 2 characters',
             email: function (email) {
                 var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-                return email.length == 0 || re.test(email) || "Invalid email format";
+                return email == undefined || email.length == 0 || re.test(email) || "Invalid email format";
             },
         },
     }),
@@ -86,6 +86,17 @@ export default {
                 } else {
                     this.$store.commit("navbar", true);
                     this.$router.push("/");
+                }
+            });
+        },
+        send_active_email: function() {
+            this.backend('/user/active/send')
+            .then( rsp => rsp.json() )
+            .then( rsp => {
+                if ( rsp.err == 'ok' ) {
+                    this.alert("success", "激活邮件已发出！");
+                } else {
+                    this.alert("danger", rsp.msg);
                 }
             });
         },

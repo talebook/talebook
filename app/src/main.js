@@ -30,6 +30,7 @@ import Welcome    from './pages/Welcome.vue'
 import NotFound   from './pages/NotFound.vue'
 import UserDetail  from './pages/UserDetail.vue'
 import UserHistory from './pages/UserHistory.vue'
+import ActiveSuccess from './pages/ActiveSuccess.vue'
 
 Vue.config.productionTip = false
 
@@ -50,6 +51,7 @@ const router = new VueRouter({
 
         { path: '/user/detail',     component: UserDetail },
         { path: '/user/history',     component: UserHistory },
+        { path: '/active/success',     component: ActiveSuccess },
 
         { path: '/book/:bookid(\\d+)', component: BookDetail },
         { path: '/book/:bookid(\\d+)/edit', component: BookEdit },
@@ -71,6 +73,11 @@ const store = new Vuex.Store({
             nickname: "",
             kindle_email: "",
             avatar: "",
+        },
+        alert: {
+            msg: "",
+            type: "",
+            show: false,
         },
         sys: {},
     },
@@ -97,6 +104,14 @@ const store = new Vuex.Store({
         login(state, data) {
             state.sys = data.sys;
             state.user = data.user;
+        },
+        alert(state, v ) {
+            state.alert.type = v.type;
+            state.alert.msg = v.msg;
+            state.alert.show = true;
+        },
+        close_alert(state) {
+            state.alert.show = false;
         },
     }
 })

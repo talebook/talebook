@@ -55,6 +55,12 @@ def json_response(func):
         return
     return do
 
+def auth(func):
+    def do(self, *args, **kwargs):
+        if not self.current_user:
+            return {'err': 'user.not_login', 'msg': _(u'请先登录')}
+        return func(self, *args, **kwargs)
+    return do
 
 class BaseHandler(web.RequestHandler):
     _path_to_env = {}
@@ -311,6 +317,37 @@ class BaseHandler(web.RequestHandler):
         if parts.netloc != self.request.host:
             return default
         return referer
+
+    def create_mail(self, sender, to, subject, body, attachment_data, attachment_name):
+        from email.header import Header
+        from email.utils import formatdate
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.application import MIMEApplication
+        def get_md5(s):
+            import hashlib
+            md5 = hashlib.md5()
+            md5.update(s)
+            return md5.hexdigest()
+
+        mail = MIMEMultipart()
+        mail['From'] = sender
+        mail['To'] = to
+        mail['Subject'] = Header(subject, 'utf-8')
+        mail['Date'] = formatdate(localtime=True)
+        mail['Message-ID'] = '<tencent_%s@qq.com>' % get_md5(mail.as_string())
+        mail.preamble = 'You will not see this in a MIME-aware mail reader.\n'
+
+        if body is not None:
+            msg = MIMEText(body, 'plain', 'utf-8')
+            mail.attach(msg)
+
+        if attachment_data is not None:
+            name = Header(attachment_name, 'utf-8').encode()
+            msg = MIMEApplication(attachment_data, 'octet-stream', charset='utf-8', name=name)
+            msg.add_header('Content-Disposition', 'attachment', filename=name)
+            mail.attach(msg)
+        return mail.as_string()
 
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):

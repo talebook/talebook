@@ -18,6 +18,9 @@ export default {
             }
             return fetch(full_url, args);
         }
+        Vue.prototype.alert = function(alert_type, alert_msg) {
+            this.$store.commit("alert", {type:alert_type, msg: alert_msg});
+        }
     }
 }
 

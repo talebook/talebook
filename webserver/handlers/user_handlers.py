@@ -5,7 +5,8 @@ import time, datetime, logging, re, hashlib, json
 import tornado.escape
 from tornado import web
 from models import Reader
-from base_handlers import BaseHandler, json_response
+from base_handlers import BaseHandler, json_response, auth
+from calibre.utils.smtp import sendmail, create_mail
 
 COOKIE_REDIRECT = "login_redirect"
 RE_EMAIL = r'[^@]+@[^@]+\.[^@]+'
@@ -208,6 +209,36 @@ class UserUpdate(BaseHandler):
 
 
 class SignUp(BaseHandler):
+    def check_active_code(self, code):
+        username, exam = code.split("-")
+        user = self.session.query(Reader).filter(Reader.username==username).first()
+        if not user or exam != user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S")):
+            raise web.HTTPError(403, reason = _(u'激活码无效'))
+        user.active = True
+        user.save()
+        return self.redirect("/active/success")
+
+    def send_active_email(self, user):
+        site = self.request.protocol + "://" + self.request.host
+        code = user.username + "-" + user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S"))
+        link = site + '/api/user/active/' + code
+        args = {
+                'site_title': self.settings['site_title'],
+                'username': user.username,
+                'active_link': link,
+                }
+        mail_subject = self.settings['SIGNUP_MAIL_TITLE'] % args
+        mail_to = user.email
+        mail_from = self.settings['smtp_username']
+        mail_body = self.settings['SIGNUP_MAIL_CONTENT'] % args
+        mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, None, None)
+        sendmail(mail, from_=mail_from, to=[mail_to], timeout=20,
+                port=465, encryption='SSL',
+                relay=self.settings['smtp_server'],
+                username=self.settings['smtp_username'],
+                password=self.settings['smtp_password']
+                )
+
     @json_response
     def post(self):
         email = self.get_argument("email", "").strip()
@@ -235,6 +266,7 @@ class SignUp(BaseHandler):
         user.create_time = datetime.datetime.now()
         user.update_time = datetime.datetime.now()
         user.access_time = datetime.datetime.now()
+        user.active = False
         user.extra = {"kindle_email": ""}
         user.set_secure_password(password)
         try:
@@ -243,7 +275,27 @@ class SignUp(BaseHandler):
             import traceback
             logging.error(traceback.format_exc())
             return {'err': 'db.error', 'msg': _(u'系统异常，请重试或更换注册信息')}
+        self.send_active_email()
         return {'err': 'ok'}
+
+class UserSendActive(SignUp):
+    @json_response
+    @auth
+    def get(self):
+        self.send_active_email(self.current_user)
+        return {'err': 'ok'}
+
+    def post(self):
+        return self.get()
+
+
+class UserActive(SignUp):
+    def get(self, code):
+        return self.check_active_code(code)
+
+    def post(self, code):
+        return self.check_active_code(code)
+
 
 class SignIn(BaseHandler):
     @json_response
@@ -264,6 +316,7 @@ class SignIn(BaseHandler):
 
 class SignOut(BaseHandler):
     @json_response
+    @auth
     def get(self):
         self.set_secure_cookie("user_id", "")
         self.set_secure_cookie("admin_id", "")
@@ -272,6 +325,7 @@ class SignOut(BaseHandler):
 
 class UserMessages(BaseHandler):
     @json_response
+    @auth
     def get(self):
         db = self.db
         user = self.current_user
@@ -287,7 +341,6 @@ class UserMessages(BaseHandler):
         return rsp
 
 class UserInfo(BaseHandler):
-
     def get_sys_info(self):
         db = self.db
         from sqlalchemy import func
@@ -310,6 +363,7 @@ class UserInfo(BaseHandler):
                     { "text": u"陈芸书屋", "href": "https://book.killsad.top/" },
                 ],
             }
+
     def get_user_info(self, detail):
         user = self.current_user
         d = {
@@ -374,7 +428,7 @@ class Welcome(BaseHandler):
     @json_response
     def post(self):
         code = self.get_argument("invite_code", None)
-        if not code or code != self.settings['INVITE_CODE']:
+        if not code or code not in self.settings['INVITE_CODE']:
             return {'err': 'params.invalid', 'msg': _(u'邀请码无效')}
         self.mark_invited()
         return {'err': 'ok', 'msg': 'ok'}
@@ -391,6 +445,8 @@ def routes():
             (r'/api/user/sign_up',      SignUp),
             (r'/api/user/sign_out',     SignOut),
             (r'/api/user/update',       UserUpdate),
+            (r'/api/user/active/send',  UserSendActive),
+            (r'/api/user/active/(.*)',  UserActive),
 
             (r'/api/user/setting',      SettingView),
             (r'/api/user/setting/save', SettingSave),

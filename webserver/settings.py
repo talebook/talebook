@@ -47,7 +47,14 @@ settings = {
     # See: https://github.com/settings/applications/new
     'SOCIAL_AUTH_GITHUB_KEY'           : '',
     'SOCIAL_AUTH_GITHUB_SECRET'        : '',
-    'INVITE_CODE':      'beta',
+    'INVITE_CODE':      [ 'beta', 'hi' ],
+    'SIGNUP_MAIL_TITLE': u'欢迎注册奇异书屋',
+    'SIGNUP_MAIL_CONTENT': u'''
+Hi, %(username)s！
+欢迎注册%(site_title)s，这里虽然是个小小的图书馆，但是希望你找到所爱。
+点击链接激活你的账号: %(active_link)s
+''',
+
 }
 
 try:

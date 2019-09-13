@@ -514,7 +514,8 @@ class BookPush(BaseHandler):
             logging.info('send %(title)s to %(mail_to)s' % vars())
             mail = self.create_mail(mail_from, mail_to, mail_subject,
                     mail_body, fdata, fname)
-            sendmail(mail, from_=mail_from, to=[mail_to], timeout=30,
+            sendmail(mail, from_=mail_from, to=[mail_to], timeout=20,
+                    port=465, encryption='SSL',
                     relay=settings['smtp_server'],
                     username=settings['smtp_username'],
                     password=settings['smtp_password']
@@ -530,37 +531,6 @@ class BookPush(BaseHandler):
             msg = traceback.format_exc()
         self.add_msg(status, msg)
         return
-
-    def create_mail(self, sender, to, subject, body, attachment_data, attachment_name):
-        from email.header import Header
-        from email.utils import formatdate
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.application import MIMEApplication
-        def get_md5(s):
-            import hashlib
-            md5 = hashlib.md5()
-            md5.update(s)
-            return md5.hexdigest()
-
-        mail = MIMEMultipart()
-        mail['From'] = sender
-        mail['To'] = to
-        mail['Subject'] = Header(subject, 'utf-8')
-        mail['Date'] = formatdate(localtime=True)
-        mail['Message-ID'] = '<tencent_%s@qq.com>' % get_md5(mail.as_string())
-        mail.preamble = 'You will not see this in a MIME-aware mail reader.\n'
-
-        if body is not None:
-            msg = MIMEText(body, 'plain', 'utf-8')
-            mail.attach(msg)
-
-        if attachment_data is not None:
-            name = Header(attachment_name, 'utf-8').encode()
-            msg = MIMEApplication(attachment_data, 'octet-stream', charset='utf-8', name=name)
-            msg.add_header('Content-Disposition', 'attachment', filename=name)
-            mail.attach(msg)
-        return mail.as_string()
 
 
 
