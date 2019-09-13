@@ -209,10 +209,9 @@ class UserUpdate(BaseHandler):
 
 
 class SignUp(BaseHandler):
-    def check_active_code(self, code):
-        username, exam = code.split("-")
+    def check_active_code(self, username, code):
         user = self.session.query(Reader).filter(Reader.username==username).first()
-        if not user or exam != user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S")):
+        if not user or code != user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S")):
             raise web.HTTPError(403, reason = _(u'激活码无效'))
         user.active = True
         user.save()
@@ -220,8 +219,8 @@ class SignUp(BaseHandler):
 
     def send_active_email(self, user):
         site = self.request.protocol + "://" + self.request.host
-        code = user.username + "-" + user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S"))
-        link = site + '/api/user/active/' + code
+        code = user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S"))
+        link = '%s/api/active/%s/%s' % (site, user.username, code)
         args = {
                 'site_title': self.settings['site_title'],
                 'username': user.username,
@@ -275,7 +274,7 @@ class SignUp(BaseHandler):
             import traceback
             logging.error(traceback.format_exc())
             return {'err': 'db.error', 'msg': _(u'系统异常，请重试或更换注册信息')}
-        self.send_active_email()
+        self.send_active_email(user)
         return {'err': 'ok'}
 
 class UserSendActive(SignUp):
@@ -290,11 +289,11 @@ class UserSendActive(SignUp):
 
 
 class UserActive(SignUp):
-    def get(self, code):
-        return self.check_active_code(code)
+    def get(self, username, code):
+        return self.check_active_code(username, code)
 
-    def post(self, code):
-        return self.check_active_code(code)
+    def post(self, username, code):
+        return self.check_active_code(username, code)
 
 
 class SignIn(BaseHandler):
@@ -446,7 +445,8 @@ def routes():
             (r'/api/user/sign_out',     SignOut),
             (r'/api/user/update',       UserUpdate),
             (r'/api/user/active/send',  UserSendActive),
-            (r'/api/user/active/(.*)',  UserActive),
+
+            (r'/api/active/(.*)/(.*)',  UserActive),
 
             (r'/api/user/setting',      SettingView),
             (r'/api/user/setting/save', SettingSave),
