@@ -79,7 +79,9 @@ const store = new Vuex.Store({
             type: "",
             show: false,
         },
-        sys: {},
+        sys: {
+            socials: [],
+        },
     },
     mutations: {
         loading(state) {

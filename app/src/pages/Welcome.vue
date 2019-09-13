@@ -3,7 +3,7 @@
     <v-col xs=12 sm=8 md=4>
         <v-card class="elevation-12">
             <v-toolbar dark color="primary">
-            <v-toolbar-title align-center >请输入访问密码</v-toolbar-title>
+                <v-toolbar-title align-center >请输入访问密码</v-toolbar-title>
             </v-toolbar>
             <v-card-text>
                 <v-form @submit.prevent="welcome_login" >

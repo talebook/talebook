@@ -47,7 +47,19 @@ settings = {
     # See: https://github.com/settings/applications/new
     'SOCIAL_AUTH_GITHUB_KEY'           : '',
     'SOCIAL_AUTH_GITHUB_SECRET'        : '',
+
     'INVITE_CODE':      [ 'beta', 'hi' ],
+    'FRIENDS': [
+        { "text": u"奇异书屋", "href": "https://www.talebook.org" },
+        { "text": u"芒果读书", "href": "http://diumx.com/" },
+        { "text": u"陈芸书屋", "href": "https://book.killsad.top/" },
+    ],
+    'SOCIALS': [
+        { "name": u"Amazon", "action": "amazon" },
+        { "name": u"Github", "action": "github" },
+        { "name": u"微信", "action": "wechat" },
+    ],
+
     'SIGNUP_MAIL_TITLE': u'欢迎注册奇异书屋',
     'SIGNUP_MAIL_CONTENT': u'''
 Hi, %(username)s！

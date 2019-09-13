@@ -8,7 +8,7 @@
                 <v-btn rounded color="green" to="/signup">注册</v-btn>
             </v-toolbar>
             <v-card-text>
-                <v-form>
+                <v-form @submit.prevent="do_login" >
                     <v-text-field prepend-icon="person" v-model="username" label="用户名" type="text"></v-text-field>
                     <v-text-field prepend-icon="lock" v-model="password" label="密码" type="password" id="password" ></v-text-field>
                     <p class="text-right" > <a @click="show_login = !show_login" > 忘记密码?  </a> </p>
@@ -18,15 +18,16 @@
                 </div>
             </v-card-text>
 
-            <v-card-text v-if="login_with_social">
+            <v-card-text v-if="socials.length > 1">
                 <v-divider></v-divider>
                 <div align="center">
                     <br/>
                     <small>使用社交网络账号登录</small>
                     <br/>
-                    <v-btn small outlined href="/api/login/amazon">Amazon</v-btn>
+                    <template v-for="s in socials">
+                    <v-btn small outlined :key="s.name" :href="'/api/login/'+s.action">{{s.name}}</v-btn>
                     &nbsp;
-                    <v-btn small outlined href="/api/login/github">Github</v-btn>
+                    </template>
                 </div>
             </v-card-text>
             <v-alert v-if="alert.msg" :type="alert.type">{{alert.msg}}</v-alert>
@@ -37,7 +38,7 @@
                 <v-toolbar-title>重置密码</v-toolbar-title>
             </v-toolbar>
             <v-card-text v-if="!show_login">
-                <v-form>
+                <v-form @submit.prevent="do_reset">
                     <v-text-field prepend-icon="person" v-model="username" label="用户名" type="text"></v-text-field>
                     <v-text-field prepend-icon="email" v-model="email" label="注册邮箱" type="text" autocomplete="old-email"></v-text-field>
                 </v-form>
@@ -57,12 +58,21 @@ export default {
     created() {
         this.$store.commit("navbar", false);
         this.$store.commit("loaded", true);
+        this.backend('/user/info')
+        .then(rsp=>rsp.json())
+        .then(rsp => {
+            this.$store.commit('login', rsp);
+        });
+    },
+    computed: {
+        socials: function() {
+            return this.$store.state.sys.socials;
+        },
     },
     data: () => ({
         username: "",
         password: "",
         email: "",
-        login_with_social: true,
         show_login: true,
         alert: {
             type: "error",

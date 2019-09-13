@@ -380,8 +380,10 @@ class UserMessages(BaseHandler):
 
 class UserInfo(BaseHandler):
     def get_sys_info(self):
-        db = self.db
         from sqlalchemy import func
+        from version import VERSION
+
+        db = self.db
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
         count_all_users = self.session.query(func.count(Reader.id)).scalar()
         count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
@@ -393,13 +395,10 @@ class UserInfo(BaseHandler):
                 "mtime":      db.last_modified().strftime("%Y-%m-%d"),
                 "users":      count_all_users,
                 "active":     count_hot_users,
-                "version":    "1.4.13",
+                "version":    VERSION,
                 "title":      self.settings['site_title'],
-                "friends": [
-                    { "text": u"奇异书屋", "href": "https://www.talebook.org" },
-                    { "text": u"芒果读书", "href": "http://diumx.com/" },
-                    { "text": u"陈芸书屋", "href": "https://book.killsad.top/" },
-                ],
+                "socials":    self.settings['SOCIALS'],
+                "friends":    self.settings['FRIENDS'],
             }
 
     def get_user_info(self, detail):
