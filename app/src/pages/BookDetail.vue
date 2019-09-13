@@ -41,7 +41,7 @@
                             <v-btn v-on="on" icon small fab ><v-icon>get_app</v-icon></v-btn>
                         </template>
                         <v-list>
-                            <v-list-item :key="file[0]" v-for="file in book.files">
+                            <v-list-item :key="'file-'+file[0]" v-for="file in book.files">
                                 <v-icon>get_app</v-icon>
                                 下载{{file[0]}}格式({{parseInt(file[1]/1024)}} KB)
                             </v-list-item>
@@ -85,7 +85,7 @@
                             <br/>
                             <div class='tag-chips'>
                                 <template v-for="author in book.authors">
-                                <v-chip rounded small dark color="indigo" :to="'/author/'+author" :key="author">
+                                <v-chip rounded small dark color="indigo" :to="'/author/'+author" :key="'author-'+author">
                                     <v-icon>face</v-icon>
                                     {{author}}
                                 </v-chip>
@@ -101,7 +101,7 @@
                                     <v-icon>explore</v-icon>ISBN：{{book.isbn}}
                                 </v-chip>
                                 <template v-for="tag in book.tags" >
-                                <v-chip rounded small dark color="grey" :key="tag" v-if="tag" :to="'/tag/'+tag" >
+                                <v-chip rounded small dark color="grey" :key="'tag-'+tag" v-if="tag" :to="'/tag/'+tag" >
                                     <v-icon>loyalty</v-icon> {{tag}}
                                 </v-chip>
                                 </template>

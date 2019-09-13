@@ -34,22 +34,30 @@
             </v-list>
         </v-navigation-drawer>
 
-        <v-app-bar color="blue" dark fixed app :clipped-left="$vuetify.breakpoint.lgAndUp" dense >
+        <v-app-bar color="blue" dense dark fixed app :clipped-left="$vuetify.breakpoint.lgAndUp" extension-height="64" >
+            <template v-if="btn_search && $vuetify.breakpoint.xs" #extension>
+                <v-text-field class="ma-0 pa-0" hide-details single-line solo-inverted v-model="search" ></v-text-field>
+                &nbsp;
+                <v-btn dark rounded @click="do_search" color="primary">搜索</v-btn>
+            </template>
 
             <v-toolbar-title class="mr-12 align-center" >
                 <v-app-bar-nav-icon @click.stop="sidebar = !sidebar"><v-icon>menu</v-icon></v-app-bar-nav-icon>
-                {{sysinfo.title}}({{$vuetify.breakpoint.name}})
+                {{sysinfo.title}}
             </v-toolbar-title>
-            <v-spacer></v-spacer>
 
-            <form action="/search" method="GET">
-            <v-text-field flat solo-inverted hide-details prepend-inner-icon="search"
-                      name="name" label="Search" class="d-none d-sm-flex">
+            <v-spacer></v-spacer>
+            <template v-if="$vuetify.breakpoint.smAndUp">
+            <v-text-field flat solo-inverted hide-details prepend-inner-icon="search" @keyup.enter="do_search"
+                      v-model="search" name="name" label="Search" class="d-none d-sm-flex">
             </v-text-field>
-            </form>
-
             <v-spacer></v-spacer>
-            <v-menu offset-y v-if="user.is_login">
+            </template>
+
+            <v-btn v-else icon class="d-flex d-sm-none" @click.sync="btn_search = !btn_search"> <v-icon>search</v-icon> </v-btn>
+
+            <template v-if="user.is_login">
+            <v-menu offset-y>
                 <template v-slot:activator="{on}">
                 <v-btn v-on="on" icon> <v-icon>notifications</v-icon> </v-btn>
                 </template>
@@ -65,8 +73,7 @@
                 </v-list>
             </v-menu>
 
-
-            <v-menu offset-y right v-if="user.is_login">
+            <v-menu offset-y right>
                 <template v-slot:activator="{on}">
                 <v-btn v-on="on" class="mr-2" icon large ><v-avatar size="32px"><img :src="user.avatar" ></v-avatar></v-btn>
                 </template>
@@ -103,8 +110,10 @@
                     </v-list-item>
                 </v-list>
             </v-menu>
-            <v-btn v-else to="/login" color="indigo accent-4">
-                <v-icon>account_circle</v-icon> 请登录
+            </template>
+
+            <v-btn v-else class="px-xs-1" to="/login" color="indigo accent-4">
+                <v-icon class="d-none d-sm-flex">account_circle</v-icon> 请登录
             </v-btn>
 
         </v-app-bar>
@@ -165,6 +174,8 @@ export default {
         sidebar: false,
         right: null,
         items: [ ],
+        btn_search: false,
+        search: "",
         sysinfo: {
             version: "v2.1.1",
             update: "2019-06-09",
@@ -183,6 +194,9 @@ export default {
                 r.push( arr.slice(idx, n) );
             }
             return r;
+        },
+        do_search: function() {
+            this.$router.push("/search?name="+this.search).catch(_=>{});
         },
     },
 }

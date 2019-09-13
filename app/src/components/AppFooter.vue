@@ -1,8 +1,8 @@
 <template>
     <v-footer app color="blue" class="white--text" >
-        <span>&nbsp;读万卷书,行万里路</span>
+        <span>&nbsp;读万卷书,行万里路({{$vuetify.breakpoint.name}})</span>
         <v-spacer></v-spacer>
-        <span><a href="https://github.com/talebook/calibre-webserver">Github</a>&nbsp;</span>
+        <span><v-btn small text color="white" href="https://github.com/talebook/calibre-webserver">Github</v-btn>&nbsp;</span>
     </v-footer>
 </template>
 

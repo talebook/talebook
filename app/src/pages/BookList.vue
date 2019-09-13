@@ -57,6 +57,9 @@ export default {
     beforeRouteEnter(to, from, next) {
         next(vm => { vm.init(to) });
     },
+    beforeRouteUpdate(to, from, next) {
+        this.init(to, next);
+    },
     methods: {
         init(route, next) {
             //alert(JSON.stringify(route));
