@@ -52,7 +52,14 @@ settings = {
     'SIGNUP_MAIL_CONTENT': u'''
 Hi, %(username)s！
 欢迎注册%(site_title)s，这里虽然是个小小的图书馆，但是希望你找到所爱。
+
 点击链接激活你的账号: %(active_link)s
+''',
+    'RESET_MAIL_TITLE': u'奇异书屋密码重置',
+    'RESET_MAIL_CONTENT': u'''
+Hi, %(username)s！
+
+你刚刚在网站上提交了密码重置，请妥善保存你的新密码: %(password)s
 ''',
 
 }

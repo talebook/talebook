@@ -313,6 +313,45 @@ class SignIn(BaseHandler):
         self.set_secure_cookie("lt", str(int(time.time())))
         return {'err': 'ok', 'msg': 'ok'}
 
+class UserReset(BaseHandler):
+    @json_response
+    def post(self):
+        email = self.get_argument("email", "").strip().lower()
+        username = self.get_argument("username", "").strip().lower()
+        if not username or not email:
+            return {'err': 'params.invalid', 'msg': _(u'用户名或邮箱错误')}
+        user = self.session.query(Reader).filter(Reader.username==username, Reader.email == email).first()
+        if not user:
+            return {'err': 'params.no_user', 'msg': _(u'无此用户')}
+        p = user.reset_password()
+
+        # send notice email
+        args = {
+                'site_title': self.settings['site_title'],
+                'username': user.username,
+                'password': p,
+                }
+        mail_subject = self.settings['RESET_MAIL_TITLE'] % args
+        mail_to = user.email
+        mail_from = self.settings['smtp_username']
+        mail_body = self.settings['RESET_MAIL_CONTENT'] % args
+        mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, None, None)
+        sendmail(mail, from_=mail_from, to=[mail_to], timeout=20,
+                port=465, encryption='SSL',
+                relay=self.settings['smtp_server'],
+                username=self.settings['smtp_username'],
+                password=self.settings['smtp_password']
+                )
+
+        # do save into db
+        try:
+            user.save()
+            self.add_msg("success", _("你刚刚重置了密码"))
+            return {'err': 'ok'}
+        except:
+            return {'err': 'db.error', 'msg': _(u'系统繁忙')}
+
+
 class SignOut(BaseHandler):
     @json_response
     @auth
@@ -444,6 +483,7 @@ def routes():
             (r'/api/user/sign_up',      SignUp),
             (r'/api/user/sign_out',     SignOut),
             (r'/api/user/update',       UserUpdate),
+            (r'/api/user/reset',        UserReset),
             (r'/api/user/active/send',  UserSendActive),
 
             (r'/api/active/(.*)/(.*)',  UserActive),

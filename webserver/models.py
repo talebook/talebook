@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
-import crypt, hashlib, logging, datetime
+import crypt, hashlib, logging, datetime, time
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin, SQLAlchemyUserMixin
@@ -84,6 +84,12 @@ class Reader(Base, SQLAlchemyMixin):
         self.access_time = datetime.datetime.now()
         self.extra = {"kindle_email": ""}
         self.init_avatar(social_user)
+
+    def reset_password(self):
+        s = "%s%s%s" % (self.username, self.create_time.strftime("%s"), time.time())
+        p = hashlib.md5(s).hexdigest()[:16]
+        self.set_secure_password(p)
+        return p
 
     def get_secure_password(self, raw_password):
         p1 = hashlib.sha256(raw_password).hexdigest()
