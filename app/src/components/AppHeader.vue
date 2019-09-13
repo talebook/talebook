@@ -38,7 +38,7 @@
 
             <v-toolbar-title class="mr-12 align-center" >
                 <v-app-bar-nav-icon @click.stop="sidebar = !sidebar"><v-icon>menu</v-icon></v-app-bar-nav-icon>
-                {{sysinfo.title}}(size={{$vuetify.breakpoint.name}})
+                {{sysinfo.title}}({{$vuetify.breakpoint.name}})
             </v-toolbar-title>
             <v-spacer></v-spacer>
 
@@ -68,10 +68,10 @@
 
             <v-menu offset-y right v-if="user.is_login">
                 <template v-slot:activator="{on}">
-                <v-btn v-on="on" icon large ><v-avatar size="32px"><img :src="user.avatar" ></v-avatar></v-btn>
+                <v-btn v-on="on" class="mr-2" icon large ><v-avatar size="32px"><img :src="user.avatar" ></v-avatar></v-btn>
                 </template>
-                <v-list width=240>
-                    <v-list-item to="(user.is_login)?'':'/login'" >
+                <v-list min-width=240>
+                    <v-list-item>
                         <v-list-item-avatar>
                             <img :src="user.avatar">
                         </v-list-item-avatar>
@@ -83,7 +83,7 @@
                 </v-list>
                 <v-list>
                     <v-divider></v-divider>
-                    <v-list-item to="/user/view">
+                    <v-list-item to="/user/detail">
                         <v-list-item-action><v-icon>contacts</v-icon></v-list-item-action>
                         <v-list-item-title> 用户中心 </v-list-item-title>
                     </v-list-item>

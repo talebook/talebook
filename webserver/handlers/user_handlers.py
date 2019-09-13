@@ -2,11 +2,15 @@
 #-*- coding: UTF-8 -*-
 
 import time, datetime, logging, re, hashlib, json
+import tornado.escape
 from tornado import web
 from models import Reader
 from base_handlers import BaseHandler, json_response
 
 COOKIE_REDIRECT = "login_redirect"
+RE_EMAIL = r'[^@]+@[^@]+\.[^@]+'
+RE_USERNAME = r'[a-z][a-z0-9_]*'
+RE_PASSWORD = r'[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};\':",./<>?\|]*'
 
 class Done(BaseHandler):
     def update_userinfo(self):
@@ -168,6 +172,41 @@ class AdminSet(BaseHandler):
             self.set_secure_cookie("user_id", user_id)
         self.redirect('/', 302)
 
+class UserUpdate(BaseHandler):
+    @json_response
+    def post(self):
+        data = tornado.escape.json_decode(self.request.body)
+        user = self.current_user
+        nickname = data.get('nickname', "").strip()
+        if len(nickname) > 0:
+            if len(nickname) < 3:
+                return {'err': 'params.nickname.invald', 'msg': _(u'昵称无效')}
+            user.name = nickname
+
+        p0 = data.get('password0', "").strip()
+        p1 = data.get('password1', "").strip()
+        p2 = data.get('password2', "").strip()
+        if len(p0) > 0:
+            if user.get_secure_password(p0) != user.password:
+                return {'err': 'params.password.error', 'msg': _(u'密码错误')}
+            if p1 != p2 or len(p1) < 8 or len(p1) > 20 or not re.match(RE_PASSWORD, p1):
+                return {'err': 'params.password.invalid', 'msg': _(u'密码无效')}
+            user.set_secure_password(p1)
+
+        ke = data.get('kindle_email', '').strip()
+        if len(ke) > 0:
+            if not re.match(RE_EMAIL, ke):
+                return {'err': 'params.email.invalid', 'msg': _(u'Kindle地址无效')}
+            user.extra['kindle_email'] = ke
+
+        try:
+            user.save()
+            self.add_msg("success", _("Settings saved."))
+            return {'err': 'ok'}
+        except:
+            return {'err': 'db.error', 'msg': _(u'数据库操作异常，请重试')}
+
+
 class SignUp(BaseHandler):
     @json_response
     def post(self):
@@ -178,9 +217,6 @@ class SignUp(BaseHandler):
         if not nickname or not username or not password:
             return {'err': 'params.invalid', 'msg': _(u'用户名或密码无效')}
 
-        RE_EMAIL = r'[^@]+@[^@]+\.[^@]+'
-        RE_USERNAME = r'[a-z][a-z0-9_]*'
-        RE_PASSWORD = r'[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};\':",./<>?\|]*'
         if not re.match(RE_EMAIL, email):
             return {'err': 'params.email.invalid', 'msg': _(u'Email无效')}
         if len(username) < 6 or len(username) > 20 or not re.match(RE_USERNAME, username):
@@ -251,50 +287,84 @@ class UserMessages(BaseHandler):
         return rsp
 
 class UserInfo(BaseHandler):
-    @json_response
-    def get(self):
-        db = self.db
 
+    def get_sys_info(self):
+        db = self.db
         from sqlalchemy import func
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
         count_all_users = self.session.query(func.count(Reader.id)).scalar()
         count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
-
+        return {
+                "books":      db.count(),
+                "tags":       len( db.all_tags()       ),
+                "authors":    len( db.all_authors()    ),
+                "publishers": len( db.all_publishers() ),
+                "mtime":      db.last_modified().strftime("%Y-%m-%d"),
+                "users":      count_all_users,
+                "active":     count_hot_users,
+                "version":    "1.4.13",
+                "title":      self.settings['site_title'],
+                "friends": [
+                    { "text": u"奇异书屋", "href": "https://www.talebook.org" },
+                    { "text": u"芒果读书", "href": "http://diumx.com/" },
+                    { "text": u"陈芸书屋", "href": "https://book.killsad.top/" },
+                ],
+            }
+    def get_user_info(self, detail):
         user = self.current_user
+        d = {
+            "avatar": "https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif",
+            "is_login": False,
+            "is_admin": False,
+            "nickname": "",
+            "email": "",
+            "kindle_email": "",
+            "extra": {},
+        }
 
+        if not user: return d
+
+        d.update({
+            'is_login': True,
+            'is_admin': user.is_admin(),
+            'is_active': user.is_active(),
+            'nickname': user.name,
+            'username': user.username,
+            'email': user.email,
+            'extra': {},
+            'create_time': user.create_time.strftime("%Y-%m-%d %H:%M:%S")
+            })
+        if user.avatar:
+            d["avatar"] = user.avatar.replace("http://", "https://")
+        if user.extra:
+            d['kindle_email'] = user.extra.get("kindle_email", "")
+            if detail:
+                for k,v in user.extra.items():
+                    if k.endswith("_history"):
+                        ids = [ b['id'] for b in v ][:24]
+                        books = self.db.get_data_as_dict(ids=ids)
+                        show = set([ b['id'] for b in books ])
+                        n = []
+                        for b in v:
+                            if b['id'] not in show: continue
+                            b['img'] = self.static_host+"/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
+                            b['href'] = '/book/%(id)s' % b
+                            n.append( b )
+                        v = n[:12]
+
+                    d['extra'][k] = v
+
+        return d
+
+    @json_response
+    def get(self):
+        detail = self.get_argument("detail", "")
         rsp = {
                 'err': 'ok',
-                "sys": {
-                    "books":      db.count(),
-                    "tags":       len( db.all_tags()       ),
-                    "authors":    len( db.all_authors()    ),
-                    "publishers": len( db.all_publishers() ),
-                    "mtime":      db.last_modified().strftime("%Y-%m-%d"),
-                    "users":      count_all_users,
-                    "active":     count_hot_users,
-                    "version":    "1.4.13",
-                    "title":      self.settings['site_title'],
-                    "friends": [
-                        { "text": u"奇异书屋", "href": "https://www.talebook.org" },
-                        { "text": u"芒果读书", "href": "http://diumx.com/" },
-                        { "text": u"陈芸书屋", "href": "https://book.killsad.top/" },
-                    ],
-                },
-                "user": {
-                    "avatar": "https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif",
-                    "is_login": (user != None),
-                    "is_admin": (self.admin_user != None),
-                    "nickname": user.username if user else "",
-                    "email": user.email if user else "",
-                    "kindle_email": "",
-                },
-            }
-
-        if user:
-            if user.extra:
-                rsp['user']['kindle_email'] = user.extra.get("kindle_email", "")
-            if user.avatar:
-                rsp['user']['avatar'] = user.avatar.replace("http://", "https://")
+                'cdn': self.static_host,
+                'sys': self.get_sys_info() if not detail else {},
+                'user': self.get_user_info(detail)
+                }
         return rsp
 
 class Welcome(BaseHandler):
@@ -320,6 +390,8 @@ def routes():
             (r"/api/user/sign_in",      SignIn),
             (r'/api/user/sign_up',      SignUp),
             (r'/api/user/sign_out',     SignOut),
+            (r'/api/user/update',       UserUpdate),
+
             (r'/api/user/setting',      SettingView),
             (r'/api/user/setting/save', SettingSave),
             (r'/api/done/',             Done),

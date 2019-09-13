@@ -17,6 +17,8 @@
             <v-card>
                 <v-toolbar dark color="primary">
                     <v-toolbar-title align-center >Edit Book</v-toolbar-title>
+                    <v-spacer></v-spacer>
+                    <v-btn>取消</v-btn>
                 </v-toolbar>
                 <v-card-text class="pa-0 pa-md-2">
                     <v-form>
@@ -84,6 +86,8 @@
                                 <v-col cols="12">
                                     <v-textarea outlined rows="20" label="Book Comments" v-model="book.comments" :value="book.comments" ></v-textarea>
                                 </v-col>
+                                <v-divider></v-divider>
+                                <v-btn>保存</v-btn>
                             </v-row>
                         </v-container>
 

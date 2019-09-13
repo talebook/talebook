@@ -28,6 +28,8 @@ import MetaList   from './pages/MetaList.vue'
 import Admin      from './pages/Admin.vue'
 import Welcome    from './pages/Welcome.vue'
 import NotFound   from './pages/NotFound.vue'
+import UserDetail  from './pages/UserDetail.vue'
+import UserHistory from './pages/UserHistory.vue'
 
 Vue.config.productionTip = false
 
@@ -45,6 +47,9 @@ const router = new VueRouter({
         { path: '/login',    component: Login    },
         { path: '/logout',   component: Logout   },
         { path: '/signup',   component: Signup   },
+
+        { path: '/user/detail',     component: UserDetail },
+        { path: '/user/history',     component: UserHistory },
 
         { path: '/book/:bookid(\\d+)', component: BookDetail },
         { path: '/book/:bookid(\\d+)/edit', component: BookEdit },
