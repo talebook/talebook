@@ -4,6 +4,8 @@
 import os
 
 settings = {
+        'installed' : False,
+    "autoreload"    : True,
     "static_host"   : "beta.talebook.org",
     "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
     "template_path" : os.path.join(os.path.dirname(__file__), "templates"),
@@ -30,12 +32,6 @@ settings = {
         'social_core.backends.github.GithubOAuth2',
     ),
 
-    # See: http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28
-    'smtp_server'   : "smtp.talebook.org",
-    'smtp_username' : "sender@talebook.org",
-    'smtp_password' : "password",
-    'douban_apikey' : "0df993c66c0c636e29ecbb5344252a4a",
-
     # See: http://open.weibo.com/developers
     'SOCIAL_AUTH_WEIBO_KEY'            : '',
     'SOCIAL_AUTH_WEIBO_SECRET'         : '',
@@ -48,8 +44,14 @@ settings = {
     'SOCIAL_AUTH_GITHUB_KEY'           : '',
     'SOCIAL_AUTH_GITHUB_SECRET'        : '',
 
-    'INVITE_MODE' : 'NEED_CODE', # 'FREE'
-    'INVITE_CODE' : [ 'beta', 'hi' ],
+    # See: http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28
+    'smtp_server'   : "smtp.talebook.org",
+    'smtp_username' : "sender@talebook.org",
+    'smtp_password' : "password",
+    'douban_apikey' : "0df993c66c0c636e29ecbb5344252a4a",
+
+    'INVITE_MODE'   : 'NEED_CODE', # 'FREE'
+    'INVITE_CODES'  : [ 'beta', 'hi' ],
     'INVITE_MESSAGE': u'''本站为私人图书馆，需输入密码才可进行访问''',
 
     'FRIENDS': [

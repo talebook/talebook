@@ -252,10 +252,10 @@ class SignUp(BaseHandler):
 
         if not re.match(RE_EMAIL, email):
             return {'err': 'params.email.invalid', 'msg': _(u'Email无效')}
-        if len(username) < 6 or len(username) > 20 or not re.match(RE_USERNAME, username):
+        if len(username) < 5 or len(username) > 20 or not re.match(RE_USERNAME, username):
             return {'err': 'params.username.invalid', 'msg': _(u'用户名无效')}
         if len(password) < 8 or len(password) > 20 or not re.match(RE_PASSWORD, password):
-            return {'err': 'params.password.invalid', 'msg': _(u'用户名无效')}
+            return {'err': 'params.password.invalid', 'msg': _(u'密码无效')}
 
         user = self.session.query(Reader).filter(Reader.username==username).first()
         if user:
@@ -467,6 +467,8 @@ class Welcome(BaseHandler):
 
     @json_response
     def get(self):
+        if CONF.get("installed", None) == False:
+            return {'err': 'not_installed'}
         if not self.need_invited():
             return {'err': 'free', 'msg': _(u'无需访问码')}
         return {'err': 'ok', 'msg': CONF['INVITE_MESSAGE']}
@@ -474,10 +476,80 @@ class Welcome(BaseHandler):
     @json_response
     def post(self):
         code = self.get_argument("invite_code", None)
-        if not code or code not in CONF['INVITE_CODE']:
+        if not code or code not in CONF['INVITE_CODES']:
             return {'err': 'params.invalid', 'msg': _(u'访问码无效')}
         self.mark_invited()
         return {'err': 'ok', 'msg': 'ok'}
+
+class AdminSettings(BaseHandler):
+    @json_response
+    @auth
+    def get(self):
+        if not self.admin_user:
+            return {'err': 'permission', 'msg': _(u'无权访问此接口')}
+        return {'err': 'ok', 'data': CONF.dumps()}
+
+    @json_response
+    @auth
+    def post(self):
+        return {'err': 'ok'}
+
+class AdminInstall(BaseHandler):
+    def should_be_invited(self):
+        pass
+
+    @json_response
+    def post(self):
+        if CONF.get("installed", True) != False:
+            return {'err': 'installed', 'msg': _(u'不可重复执行安装操作')}
+
+        code = self.get_argument("code", "").strip()
+        email = self.get_argument("email", "").strip().lower()
+        title = self.get_argument("title", "").strip()
+        invite = self.get_argument("invite", "").strip()
+        username = self.get_argument("username", "").strip().lower()
+        password = self.get_argument("password", "").strip()
+        if not username or not password or not email or not title:
+            return {'err': 'params.invalid', 'msg': _(u'填写的内容有误')}
+        if not re.match(RE_EMAIL, email):
+            return {'err': 'params.email.invalid', 'msg': _(u'Email无效')}
+        if len(username) < 5 or len(username) > 20 or not re.match(RE_USERNAME, username):
+            return {'err': 'params.username.invalid', 'msg': _(u'用户名无效')}
+        if len(password) < 8 or len(password) > 20 or not re.match(RE_PASSWORD, password):
+            return {'err': 'params.password.invalid', 'msg': _(u'密码无效')}
+
+        # 避免重复创建
+        user = self.session.query(Reader).filter(Reader.username==username).first()
+        if not user:
+            user = Reader()
+            user.username = username
+            user.name = username
+            user.email = email
+            user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email).hexdigest()
+            user.create_time = datetime.datetime.now()
+            user.update_time = datetime.datetime.now()
+            user.access_time = datetime.datetime.now()
+            user.active = True
+            user.admin = True
+            user.extra = {"kindle_email": ""}
+            user.set_secure_password(password)
+            try:
+                user.save()
+            except:
+                import traceback
+                logging.error(traceback.format_exc())
+                return {'err': 'db.error', 'msg': _(u'系统异常，请重试或更换注册信息')}
+
+        CONF['site_title'] = title
+        CONF['installed'] = True
+        if invite == "true":
+            CONF['INVITE_MODE'] = 'NEED_CODE'
+            CONF['INVITE_CODES'] = [ code ]
+        else:
+            CONF['INVITE_MODE'] = 'FREE'
+
+        CONF.dumpfile()
+        return {'err': 'ok'}
 
 
 def routes():
@@ -499,6 +571,9 @@ def routes():
             (r'/api/user/setting',      SettingView),
             (r'/api/user/setting/save', SettingSave),
             (r'/api/done/',             Done),
+
+            (r'/api/admin/install',     AdminInstall),
+            (r'/api/admin/settings',    AdminSettings),
 
             (r'/api/sys/index',         AdminView),
             (r'/api/sys/settings',      AdminSet),

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
-import os
+import os, json
 
 class SettingsLoader(dict):
     def __init__(self, *args, **kwargs):
@@ -22,7 +22,7 @@ class SettingsLoader(dict):
             pass
 
     def dumpfile(self):
-        s = "\n".join( '%-30s: %s,' % ("'"+k+"'", repr(v)) for k,v in sorted(s.items()) )
+        s = "\n".join( '%-30s: %s,' % ("'"+k+"'", repr(v)) for k,v in sorted(self.items()) )
         code = u'''#!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
@@ -31,13 +31,17 @@ settings = {
 ''' + s + '''
 }
 '''
-        open("local_settings.py", "w").write(code.encode("UTF-8"))
-        os.remove("local_settings.pyc")
 
-    def loadjson(self, text):
+        py = os.path.join(os.path.dirname(__file__), "local_settings.py")
+        open(py, "w").write(code.encode("UTF-8"))
+        pyc = os.path.join(os.path.dirname(__file__), "local_settings.pyc")
+        try: os.remove(pyc)
+        except: pass
+
+    def loads(self, text):
         self.update( json.loads(text) )
 
-    def dumpjson(self):
+    def dumps(self):
         return json.dumps(self)
 
 _settings = SettingsLoader()

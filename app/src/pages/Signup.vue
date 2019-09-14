@@ -39,7 +39,7 @@ export default {
         failmsg: "",
         validmsg: "",
         rules: {
-            user: v => v.length >= 6 || 'Min 6 characters',
+            user: v => v.length >= 5 || 'Min 6 characters',
             pass: v => v.length >= 8 || 'Min 8 characters',
             nick: v => v.length >= 2 || 'Min 2 characters',
             email: function (email) {

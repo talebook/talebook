@@ -34,6 +34,8 @@ export default {
             this.msg = rsp.msg;
             if ( rsp.err == 'free' ) {
                 this.$router.push(this.$route.query.next || "/");
+            } else if ( rsp.err == 'not_installed' ) {
+                this.$router.push("/install")
             }
         });
     },
