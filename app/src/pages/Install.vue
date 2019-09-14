@@ -68,14 +68,17 @@ export default {
             this.backend('/admin/install', {
                 method: 'POST',
                 body: data,
-            }).then( rsp => rsp.json() )
+            })
             .then( rsp => {
                 if ( rsp.err != 'ok' ) {
                     this.alert("error", rsp.msg);
                 } else {
-                    alert("安装成功，正在跳转到首页")
-                    this.$store.commit("navbar", true);
-                    this.$router.push("/");
+                    this.alert("success", "安装成功，后台正在重启，5秒后自动跳转到首页")
+                    var self = this;
+                    setTimeout(function(){
+                        self.$store.commit("navbar", true);
+                        self.this.$router.push("/");
+                    }, 5000);
                 }
             });
         },

@@ -25,7 +25,6 @@ export default {
         this.$store.commit('navbar', true);
         this.$store.commit('loading');
         this.backend("/book/nav?fmt=json")
-        .then(rsp => rsp.json())
         .then(rsp => {
             this.navs = rsp.navs;
             this.$store.commit('loaded');

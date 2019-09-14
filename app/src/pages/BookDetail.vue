@@ -157,7 +157,6 @@ export default {
             this.$store.commit('loading');
             this.bookid = route.params.bookid;
             this.backend("/book/"+this.bookid+"?fmt=json")
-            .then( rsp => rsp.json() )
             .then( book => {
                 book.img = book.cover_large_url;
                 this.book = book;
@@ -176,8 +175,7 @@ export default {
                 headers: {
                     'Content-Type': "application/x-www-form-urlencoded",
                 },
-            }).then( rsp => rsp.json() )
-            .then( rsp => {
+            }).then( rsp => {
                 this.alert_msg = rsp.msg;
                 this.alert_type = ( rsp.err == 'ok' )?  "success": "error";
                 this.dialog_msg = true;

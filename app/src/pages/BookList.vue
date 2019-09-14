@@ -62,7 +62,6 @@ export default {
     },
     methods: {
         init(route, next) {
-            //alert(JSON.stringify(route));
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
             var url = route.fullPath;
@@ -72,7 +71,6 @@ export default {
                 url += "?fmt=json";
             }
             this.backend(url)
-            .then(rsp => rsp.json())
             .then(rsp => {
                 this.title = rsp.title;
                 this.books = rsp.books;

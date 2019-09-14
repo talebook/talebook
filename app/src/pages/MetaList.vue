@@ -47,7 +47,6 @@ export default {
             this.$store.commit('loading');
             var meta = route.params.meta;
             this.backend("/"+meta+"?fmt=json")
-            .then(rsp => rsp.json())
             .then(rsp => {
                 this.title = rsp.title;
                 this.data = rsp.items;

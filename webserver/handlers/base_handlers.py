@@ -79,10 +79,19 @@ class BaseHandler(web.RequestHandler):
         if self.need_invited():
             t = self.get_secure_cookie("invited")
             if not t or int(float(t)) < int(time.time()) - 7*86400:
-                raise web.HTTPError(403, reason = _(u'无权访问'))
+                raise web.HTTPError(403)
+
+    def should_be_installed(self):
+        if CONF.get("installed", None) == False:
+            self.write( {'err': 'not_installed'} )
+            self.set_status(200)
+            raise web.Finish()
+
+    def prepare(self):
+        self.should_be_installed()
+        self.should_be_invited()
 
     def initialize(self):
-        self.should_be_invited()
         ScopedSession = self.settings['ScopedSession']
         self.session = ScopedSession() # new sql session
         self.db = self.settings['legacy']

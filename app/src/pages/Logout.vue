@@ -33,7 +33,6 @@ export default {
     methods: {
         logout: function() {
             this.backend('/user/sign_out')
-            .then( rsp => rsp.json() )
             .then( rsp => {
                 this.msg = rsp.msg;
             });

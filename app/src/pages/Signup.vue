@@ -69,7 +69,7 @@ export default {
             this.backend('/user/sign_up', {
                 method: 'POST',
                 body: data,
-            }).then( rsp => rsp.json() )
+            })
             .then( rsp => {
                 if ( rsp.err != 'ok' ) {
                     this.failmsg = rsp.msg;

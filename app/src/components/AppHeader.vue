@@ -128,13 +128,13 @@ export default {
     },
     created() {
         this.sidebar = this.$vuetify.breakpoint.lgAndUp;
-        this.backend('/user/messages').then(rsp=>rsp.json()).then(rsp => {
+        this.backend('/user/messages')
+        .then(rsp => {
             if ( rsp.err == 'ok' ) {
                 this.messages = rsp.messages;
             }
         });
         this.backend('/user/info')
-        .then(rsp=>rsp.json())
         .then(rsp => {
             this.$store.commit('login', rsp);
             this.sysinfo = rsp.sys;
@@ -162,12 +162,6 @@ export default {
             ]);
             this.items = nav_items;
             this.loaded = true;
-        }).catch(error => {
-            error || error;
-            //if ( error ) { 1 + 2 }
-            var next = this.$router.fullPath;
-            next = next ? "?next="+next : "";
-            this.$router.push("/welcome"+next);
         });
     },
     data: () => ({

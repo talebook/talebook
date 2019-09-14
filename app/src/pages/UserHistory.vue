@@ -48,7 +48,6 @@ export default {
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
             this.backend("/user/info?detail=1")
-            .then( rsp => rsp.json() )
             .then( rsp => {
                 this.user = rsp.user;
                 this.$store.commit('loaded');

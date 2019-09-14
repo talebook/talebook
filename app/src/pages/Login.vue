@@ -59,7 +59,6 @@ export default {
         this.$store.commit("navbar", false);
         this.$store.commit("loaded", true);
         this.backend('/user/info')
-        .then(rsp=>rsp.json())
         .then(rsp => {
             this.$store.commit('login', rsp);
         });
@@ -87,7 +86,7 @@ export default {
             this.backend('/user/sign_in', {
                 method: 'POST',
                 body: data,
-            }).then( rsp => rsp.json() )
+            })
             .then( rsp => {
                 if ( rsp.err != 'ok' ) {
                     this.alert.type = "error";

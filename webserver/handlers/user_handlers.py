@@ -452,6 +452,9 @@ class UserInfo(BaseHandler):
 
     @json_response
     def get(self):
+        if CONF.get("installed", None) == False:
+            return {'err': 'not_installed'}
+
         detail = self.get_argument("detail", "")
         rsp = {
                 'err': 'ok',
@@ -467,8 +470,6 @@ class Welcome(BaseHandler):
 
     @json_response
     def get(self):
-        if CONF.get("installed", None) == False:
-            return {'err': 'not_installed'}
         if not self.need_invited():
             return {'err': 'free', 'msg': _(u'无需访问码')}
         return {'err': 'ok', 'msg': CONF['INVITE_MESSAGE']}
@@ -497,6 +498,14 @@ class AdminSettings(BaseHandler):
 class AdminInstall(BaseHandler):
     def should_be_invited(self):
         pass
+
+    def should_be_installed(self):
+        pass
+
+    @json_response
+    def get(self):
+        err = 'not_installed' if CONF.get("installed", True) == False else 'intalled'
+        return {'err': err}
 
     @json_response
     def post(self):

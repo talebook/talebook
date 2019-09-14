@@ -29,7 +29,7 @@ export default {
     created() {
         this.$store.commit('navbar', false);
         this.$store.commit('loaded');
-        this.backend('/welcome').then(rsp=>rsp.json())
+        this.backend('/welcome')
         .then(rsp=>{
             this.msg = rsp.msg;
             if ( rsp.err == 'free' ) {
@@ -56,7 +56,7 @@ export default {
             this.backend("/welcome", {
                 method: 'POST',
                 body: data,
-            }).then( rsp => rsp.json() )
+            })
             .then( rsp => {
                 this.loading = false;
                 if ( rsp.err != 'ok' ) {

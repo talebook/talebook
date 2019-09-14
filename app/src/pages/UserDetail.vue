@@ -79,7 +79,7 @@ export default {
             this.backend('/user/update', {
                 method: 'POST',
                 body: JSON.stringify(d),
-            }).then( rsp => rsp.json() )
+            })
             .then( rsp => {
                 if ( rsp.err != 'ok' ) {
                     this.failmsg = rsp.msg;

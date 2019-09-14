@@ -104,8 +104,10 @@ const store = new Vuex.Store({
             state.count++
         },
         login(state, data) {
-            state.sys = data.sys;
-            state.user = data.user;
+            if ( data != undefined ) {
+                state.sys = data.sys;
+                state.user = data.user;
+            }
         },
         alert(state, v ) {
             state.alert.type = v.type;

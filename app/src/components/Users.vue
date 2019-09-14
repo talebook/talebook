@@ -73,7 +73,7 @@ export default {
             if ( sortBy       != undefined ) { data.append('sort', sortBy)       }
             if ( sortDesc     != undefined ) { data.append('desc', sortDesc)     }
             if ( itemsPerPage != undefined ) { data.append('num',  itemsPerPage) }
-            this.backend('/sys/users?'+data.toString()).then(rsp => rsp.json() )
+            this.backend('/sys/users?'+data.toString())
             .then(rsp => {
                 if ( rsp.err != 'ok' ) {
                     this.items = [];
