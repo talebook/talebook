@@ -452,10 +452,8 @@ class BookRead(BaseHandler):
 class BookPush(BaseHandler):
     #@web.authenticated
     @json_response
+    @auth
     def post(self, id):
-        if not self.current_user:
-            return {'err': 'user.not_login', 'msg': _(u'请先登录')}
-
         mail_to = self.get_argument("mail_to", None)
         if not mail_to:
             return {'err': 'params.error', 'msg': _(u'参数错误')}

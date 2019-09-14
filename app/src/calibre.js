@@ -22,14 +22,10 @@ export default {
             return fetch(full_url, args)
                 .then(rsp=>rsp.json())
                 .then(rsp => {
-                    /*
-                    if ( rsp.err != 'ok' ) {
-                        console.log("Req", full_url, "Rsp", rsp);
-                    }
-                    */
                     if ( rsp.err == 'not_installed' ) {
                         self.$router.push("/install").catch(()=>{});
-                        //throw "redirect to install page";
+                    } else if ( rsp.err == 'user.need_login' ) {
+                        self.$router.push("/login").catch(()=>{});
                     }
                     return rsp;
                 })

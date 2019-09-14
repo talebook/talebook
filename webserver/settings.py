@@ -51,9 +51,12 @@ settings = {
     'smtp_password' : "password",
     'douban_apikey' : "0df993c66c0c636e29ecbb5344252a4a",
 
-    'INVITE_MODE'   : 'NEED_CODE', # 'FREE'
-    'INVITE_CODES'  : [ 'beta', 'hi' ],
+    'INVITE_MODE'   : True,
+    'INVITE_CODE'   : 'beta',
     'INVITE_MESSAGE': u'''本站为私人图书馆，需输入密码才可进行访问''',
+
+    'ALLOW_GUEST_PUSH' : False,
+    'ALLOW_GUEST_DOWNLOAD' : False,
 
     'FRIENDS': [
         { "text": u"奇异书屋", "href": "https://www.talebook.org" },

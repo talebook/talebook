@@ -154,11 +154,10 @@ export default {
                 { heading: '友情链接' },
                 { links: sys.friends },
             ] : [] ).concat([
-                { heading: '系统管理' },
-                { icon: 'settings', text: '管理入口', href: "/admin" },
-                { icon: 'settings', text: '安装页面', href: "/install" },
-                { icon: 'settings', text: '入口密码', href: "/welcome" },
-                { icon: 'help', text: '系统版本' },
+                { heading: '系统' },
+                { icon: 'help', text: '系统版本', count: sys.version },
+                { icon: 'thumb_up_alt', text: '源代码', href: "https://github.com/talebook/calibre-webserver", count: "Github" },
+                { icon: 'settings', text: '管理员入口', href: "/admin" },
             ]);
             this.items = nav_items;
             this.loaded = true;

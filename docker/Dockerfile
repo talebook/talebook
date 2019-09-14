@@ -1,11 +1,12 @@
-﻿FROM ubuntu:18.04
+﻿FROM ubuntu:16.04
 MAINTAINER Rex <talebook@foxmail.com>
 
 LABEL Maintainer="Rex <talebook@foxmail.com>"
 LABEL Thanks="oldiy <oldiy2018@gmail.com>"
 
 RUN apt-get update  && \
-	apt-get install bash calibre-bin python-pip unzip supervisor sqlite3 git nginx-extra -y
+	apt-get install bash calibre-bin python-pip unzip supervisor sqlite3 git nginx -y --no-install-recommends
+
 
 RUN pip install jinja2==2.10 social-auth-app-tornado==1.0.0 social-auth-storage-sqlalchemy==1.1.0 tornado==5.1.1 Baidubaike==2.0.1
 

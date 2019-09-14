@@ -59,7 +59,7 @@ def json_response(func):
 def auth(func):
     def do(self, *args, **kwargs):
         if not self.current_user:
-            return {'err': 'user.not_login', 'msg': _(u'请先登录')}
+            return {'err': 'user.need_login', 'msg': _(u'请先登录')}
         return func(self, *args, **kwargs)
     return do
 
@@ -73,7 +73,7 @@ class BaseHandler(web.RequestHandler):
         self.set_secure_cookie("invited", str(int(time.time())))
 
     def need_invited(self):
-        return CONF['INVITE_MODE'].lower() == 'need_code'
+        return (CONF['INVITE_MODE'] == True)
 
     def should_be_invited(self):
         if self.need_invited():

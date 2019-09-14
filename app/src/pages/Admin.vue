@@ -6,7 +6,6 @@
         <v-tabs-slider></v-tabs-slider>
         <v-tab ripple>系统设置</v-tab>
         <v-tab ripple>用户管理</v-tab>
-        <v-tab ripple>消息管理</v-tab>
     </v-tabs>
 
     <v-tabs-items v-model="tab_active">
@@ -15,9 +14,6 @@
         </v-tab-item>
         <v-tab-item >
             <users></users>
-        </v-tab-item>
-        <v-tab-item >
-            <p>Todo: User Manage</p>
         </v-tab-item>
     </v-tabs-items>
 

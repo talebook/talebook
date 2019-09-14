@@ -477,7 +477,7 @@ class Welcome(BaseHandler):
     @json_response
     def post(self):
         code = self.get_argument("invite_code", None)
-        if not code or code not in CONF['INVITE_CODES']:
+        if not code or code != CONF['INVITE_CODE']:
             return {'err': 'params.invalid', 'msg': _(u'访问码无效')}
         self.mark_invited()
         return {'err': 'ok', 'msg': 'ok'}
@@ -488,7 +488,17 @@ class AdminSettings(BaseHandler):
     def get(self):
         if not self.admin_user:
             return {'err': 'permission', 'msg': _(u'无权访问此接口')}
-        return {'err': 'ok', 'data': CONF.dumps()}
+        social = {
+                'select': [],
+                'items': [
+                    {'value': 'qq',     'text': 'QQ'},
+                    {'value': 'amazon', 'text': 'Amazon'},
+                    {'value': 'github', 'text': 'Github'},
+                    {'value': 'weibo',  'text': u'微博'},
+                    {'value': 'wechat', 'text': u'微信'},
+                    ],
+                }
+        return {'err': 'ok', 'settings': CONF, 'social': social}
 
     @json_response
     @auth
@@ -552,10 +562,10 @@ class AdminInstall(BaseHandler):
         CONF['site_title'] = title
         CONF['installed'] = True
         if invite == "true":
-            CONF['INVITE_MODE'] = 'NEED_CODE'
-            CONF['INVITE_CODES'] = [ code ]
+            CONF['INVITE_MODE'] = True
+            CONF['INVITE_CODE'] = code
         else:
-            CONF['INVITE_MODE'] = 'FREE'
+            CONF['INVITE_MODE'] = False
 
         CONF.dumpfile()
         return {'err': 'ok'}
