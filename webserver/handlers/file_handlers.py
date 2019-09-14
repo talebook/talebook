@@ -185,10 +185,15 @@ def routes():
         (r'/get/pcover',            ProxyImageHandler),
         (r'/get/progress/([0-9]+)', ProgressHandler),
         (r"/get/extract/(.*)",      web.StaticFileHandler,
-            dict(path=CONF['extract_path'])),
-        (r"/robots.txt",            web.StaticFileHandler,
-            dict(path=CONF['static_path'])),
+            {"path": CONF['extract_path']} ),
         (r'/get/(.*)/(.*)',         ImageHandler),
+
+        (r"/robots.txt",            web.StaticFileHandler,
+            {"path": CONF['static_path']} ),
+        (r"/(.*)",                    web.StaticFileHandler, {
+            "path": CONF['html_path'],
+            "default_filename": "index.html",
+        }),
     ]
 
 

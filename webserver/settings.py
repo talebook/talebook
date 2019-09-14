@@ -7,6 +7,7 @@ settings = {
         'installed' : False,
     "autoreload"    : True,
     "static_host"   : "beta.talebook.org",
+    "html_path"     : os.path.join(os.path.dirname(__file__), "../app/dist"),
     "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
     "template_path" : os.path.join(os.path.dirname(__file__), "templates"),
     "progress_path" : "/data/books/progress/",

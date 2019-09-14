@@ -12,7 +12,7 @@ import 'vuetify/dist/vuetify.min.css'
 Vue.use(Vuetify)
 
 import calibre from './calibre.js'
-Vue.use(calibre, {api: "http://beta.talebook.org/api"})
+Vue.use(calibre)
 
 import App        from './App.vue'
 import Index      from './pages/Index.vue'

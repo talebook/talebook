@@ -79,6 +79,7 @@ def make_app():
     logging.info("Init library with [%s]" % options.with_library)
     logging.info("Init AuthDB  with [%s]" % auth_db_path )
     logging.info("Init Static  with [%s]" % CONF['static_path'] )
+    logging.info("Init HTML    with [%s]" % CONF['html_path'] )
     logging.info("Init LANG    with [%s]" % P('localization/locales.zip') )
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
