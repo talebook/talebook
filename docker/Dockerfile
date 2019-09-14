@@ -23,7 +23,6 @@ COPY . /data/release/www/calibre.talebook.org/calibre-webserver/
 COPY conf/supervisor/calibre-webserver.conf /etc/supervisor/conf.d/
 
 RUN cd /data/release/www/calibre.talebook.org/calibre-webserver/ && \
-	cp docker/single_user_settings.py webserver/local_settings.py && \
 	calibredb add --library-path=/data/books/library/ -r docker/book/ && \
 	python server.py --syncdb  && \
 	rm -f webserver/*.pyc && \
