@@ -31,10 +31,10 @@ settings = {
     ),
 
     # See: http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28
-    'smtp_server'                      : "smtp.talebook.org",
-    'smtp_username'                    : "sender@talebook.org",
-    'smtp_password'                    : "password",
-    'douban_apikey'                    : "0df993c66c0c636e29ecbb5344252a4a",
+    'smtp_server'   : "smtp.talebook.org",
+    'smtp_username' : "sender@talebook.org",
+    'smtp_password' : "password",
+    'douban_apikey' : "0df993c66c0c636e29ecbb5344252a4a",
 
     # See: http://open.weibo.com/developers
     'SOCIAL_AUTH_WEIBO_KEY'            : '',
@@ -48,7 +48,10 @@ settings = {
     'SOCIAL_AUTH_GITHUB_KEY'           : '',
     'SOCIAL_AUTH_GITHUB_SECRET'        : '',
 
-    'INVITE_CODE':      [ 'beta', 'hi' ],
+    'INVITE_MODE' : 'NEED_CODE', # 'FREE'
+    'INVITE_CODE' : [ 'beta', 'hi' ],
+    'INVITE_MESSAGE': u'''本站为私人图书馆，需输入密码才可进行访问''',
+
     'FRIENDS': [
         { "text": u"奇异书屋", "href": "https://www.talebook.org" },
         { "text": u"芒果读书", "href": "http://diumx.com/" },
@@ -67,6 +70,7 @@ Hi, %(username)s！
 
 点击链接激活你的账号: %(active_link)s
 ''',
+
     'RESET_MAIL_TITLE': u'奇异书屋密码重置',
     'RESET_MAIL_CONTENT': u'''
 Hi, %(username)s！
@@ -75,10 +79,4 @@ Hi, %(username)s！
 ''',
 
 }
-
-try:
-    import local_settings
-    settings.update(local_settings.settings)
-except:
-    pass
 

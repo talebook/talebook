@@ -154,10 +154,9 @@ export default {
     methods: {
         init(route, next) {
             this.$store.commit('navbar', true);
-            this.bookid = route.params.bookid;
             this.$store.commit('loading');
-            var bookid = route.params.bookid;
-            this.backend("/book/" + bookid + "?fmt=json")
+            this.bookid = route.params.bookid;
+            this.backend("/book/"+this.bookid+"?fmt=json")
             .then( rsp => rsp.json() )
             .then( book => {
                 book.img = book.cover_large_url;
@@ -167,8 +166,11 @@ export default {
             if ( next ) next();
         },
         sendto_kindle() {
-            var bookid = this.$route.params.bookid;
-            this.backend("/book/"+bookid+"/push", {
+            if ( ! this.$store.state.user.is_login ) {
+                this.$router.push("/login");
+                return;
+            }
+            this.backend("/book/"+this.bookid+"/push", {
                 method: "POST",
                 body: "mail_to="+this.mail_to,
                 headers: {

@@ -6,9 +6,10 @@
                 <v-toolbar-title align-center >请输入访问密码</v-toolbar-title>
             </v-toolbar>
             <v-card-text>
+                <p class="py-6 body-3 text-center" >{{msg}}</p>
                 <v-form @submit.prevent="welcome_login" >
                     <v-text-field prepend-icon="lock" v-model="invite_code" required
-                        label="邀请码" type="password" :error="err" :error-messages="err_msg" :loading="loading"></v-text-field>
+                        label="访问密码" type="password" :error="err" :error-messages="err_msg" :loading="loading"></v-text-field>
                 </v-form>
             </v-card-text>
 
@@ -28,12 +29,20 @@ export default {
     created() {
         this.$store.commit('navbar', false);
         this.$store.commit('loaded');
+        this.backend('/welcome').then(rsp=>rsp.json())
+        .then(rsp=>{
+            this.msg = rsp.msg;
+            if ( rsp.err == 'free' ) {
+                this.$router.push(this.$route.query.next || "/");
+            }
+        });
     },
     data: () => ({
         valid: true,
         form: null,
         err: false,
         err_msg: "",
+        msg: "本站为私人图书馆，需输入密码才可进行访问",
         loading: false,
         invite_code: "",
     }),

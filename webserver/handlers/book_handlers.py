@@ -7,10 +7,12 @@ import baike
 import subprocess
 from base_handlers import *
 
-from settings import settings
 from calibre.ebooks.metadata import authors_to_string
 from calibre.ebooks.conversion.plumber import Plumber
 from calibre.customize.conversion import OptionRecommendation, DummyReporter
+
+import loader
+CONF = loader.get_settings()
 
 BOOKNAV = (
 (
@@ -149,7 +151,7 @@ class BookDetail(BaseHandler):
         try: sizes = [ (f, self.db.sizeof_format(book_id, f, index_is_id=True)) for f in book['available_formats'] ]
         except: sizes = []
         title = book['title']
-        smtp_username = settings['smtp_username']
+        smtp_username = CONF['smtp_username']
         if self.user_id(): self.count_increase(book_id, count_visit=1)
         else: self.count_increase(book_id, count_guest=1)
         return self.html_page('book/detail.html', vars())
@@ -161,7 +163,7 @@ class BookRefer(BaseHandler):
         mi = self.db.get_metadata(book_id, index_is_id=True)
         title = re.sub(u'[(（].*', "", mi.title)
 
-        api = douban.DoubanBookApi(settings['douban_apikey'], copy_image=False)
+        api = douban.DoubanBookApi(CONF['douban_apikey'], copy_image=False)
         # first, search title
         books = api.get_books_by_title(title)
         books = [] if books == None else books
@@ -198,7 +200,7 @@ class BookReferSet(BaseHandler):
             refer_mi = api.get_book(title)
         else:
             mi.isbn = isbn
-            api = douban.DoubanBookApi(settings['douban_apikey'], copy_image=True)
+            api = douban.DoubanBookApi(CONF['douban_apikey'], copy_image=True)
             refer_mi = api.get_book(mi)
 
         if mi.cover_data[0]:
@@ -365,7 +367,7 @@ class BookUpload(BaseHandler):
 
         # save file
         data = postfile['body']
-        fpath = os.path.join(settings['upload_path'], name)
+        fpath = os.path.join(CONF['upload_path'], name)
         with open(fpath, "wb") as f:
             f.write(data)
 
@@ -404,7 +406,7 @@ class BookRead(BaseHandler):
             fpath = book.get("fmt_%s" % fmt, None)
             if not fpath: continue
             # epub_dir is for javascript
-            epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/get/extract/")
+            epub_dir = os.path.dirname(fpath).replace(CONF['with_library'], "/get/extract/")
             self.extract_book(book, fpath, fmt)
             return self.html_page('book/read.html', vars())
         self.add_msg('success', _(u"抱歉，在线阅读器暂不支持该格式的书籍"))
@@ -412,7 +414,7 @@ class BookRead(BaseHandler):
 
     @background
     def extract_book(self, book, fpath, fmt):
-        fdir = os.path.dirname(fpath).replace(settings['with_library'], settings['extract_path'])
+        fdir = os.path.dirname(fpath).replace(CONF['with_library'], CONF['extract_path'])
         subprocess.call(['mkdir', '-p', fdir])
         #fdir = os.path.dirname(fpath) + "/extract"
         if os.path.isfile(fdir+"/META-INF/container.xml"):
@@ -423,7 +425,7 @@ class BookRead(BaseHandler):
         new_path = ""
         if fmt != "epub":
             new_fmt = "epub"
-            new_path = os.path.join(settings["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
+            new_path = os.path.join(CONF["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
             logging.error('convert book: %s => %s' % ( fpath, new_path));
             os.chdir('/tmp/')
 
@@ -481,7 +483,7 @@ class BookPush(BaseHandler):
     @background
     def convert_book(self, book, mail_to=None):
         new_fmt = 'mobi'
-        new_path = os.path.join(settings['convert_path'], '%s.%s' % (ascii_filename(book['title']), new_fmt) )
+        new_path = os.path.join(CONF['convert_path'], '%s.%s' % (ascii_filename(book['title']), new_fmt) )
         progress_file = self.get_path_progress(book['id'])
 
         old_path = None
@@ -505,8 +507,8 @@ class BookPush(BaseHandler):
         fname = u'%s - %s.%s'%(title, author, fmt)
         fdata = open(fpath).read()
 
-        site_title = self.settings['site_title']
-        mail_from = settings['smtp_username']
+        site_title = CONF['site_title']
+        mail_from = self.ettings['smtp_username']
         mail_subject = _('%(site_title)s：推送给您一本书《%(title)s》') % vars()
         mail_body = _(u'为您奉上一本《%(title)s》, 欢迎常来访问%(site_title)s！http://www.talebook.org' % vars())
         status = msg = ""
@@ -516,9 +518,9 @@ class BookPush(BaseHandler):
                     mail_body, fdata, fname)
             sendmail(mail, from_=mail_from, to=[mail_to], timeout=20,
                     port=465, encryption='SSL',
-                    relay=settings['smtp_server'],
-                    username=settings['smtp_username'],
-                    password=settings['smtp_password']
+                    relay=CONF['smtp_server'],
+                    username=CONF['smtp_username'],
+                    password=CONF['smtp_password']
                     )
             status = "success"
             msg = _('[%(title)s] 已成功发送至Kindle邮箱 [%(mail_to)s] !!') % vars()

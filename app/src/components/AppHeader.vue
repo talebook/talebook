@@ -54,21 +54,23 @@
             <v-spacer></v-spacer>
             </template>
 
-            <v-btn v-else icon class="d-flex d-sm-none" @click.sync="btn_search = !btn_search"> <v-icon>search</v-icon> </v-btn>
+            <v-btn v-else icon class="d-flex d-sm-none" @click="btn_search = !btn_search"> <v-icon>search</v-icon> </v-btn>
 
             <template v-if="user.is_login">
-            <v-menu offset-y>
+            <v-menu offset-y right>
                 <template v-slot:activator="{on}">
                 <v-btn v-on="on" icon> <v-icon>notifications</v-icon> </v-btn>
                 </template>
-                <v-list>
-                    <template v-if="messages">
+                <v-list min-width=120>
+                    <template v-if="messages.length > 0">
                     <v-list-item v-for="msg in messages" :key="msg.id">
                         <v-list-item-title>{{msg.message}}</v-list-item-title>
                     </v-list-item>
                     </template>
                     <v-list-item v-else>
+                        <v-list-item-content>
                         <v-list-item-title> 暂无消息 </v-list-item-title>
+                        </v-list-item-content>
                     </v-list-item>
                 </v-list>
             </v-menu>
@@ -196,7 +198,7 @@ export default {
             return r;
         },
         do_search: function() {
-            this.$router.push("/search?name="+this.search).catch(_=>{});
+            this.$router.push("/search?name="+this.search).catch(err=>{err||err});
         },
     },
 }

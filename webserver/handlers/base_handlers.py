@@ -26,9 +26,10 @@ from calibre.customize.conversion import OptionRecommendation, DummyReporter
 
 # import douban
 from models import Reader, Message, Item
-
 messages = defaultdict(list)
 
+import loader
+CONF = loader.get_settings()
 
 def day_format(value, format='%Y-%m-%d'):
     try: return value.strftime(format)
@@ -71,10 +72,14 @@ class BaseHandler(web.RequestHandler):
     def mark_invited(self):
         self.set_secure_cookie("invited", str(int(time.time())))
 
+    def need_invited(self):
+        return CONF['INVITE_MODE'].lower() == 'need_code'
+
     def should_be_invited(self):
-        t = self.get_secure_cookie("invited")
-        if not t or int(float(t)) < int(time.time()) - 7*86400:
-            raise web.HTTPError(403, reason = _(u'无权访问'))
+        if self.need_invited():
+            t = self.get_secure_cookie("invited")
+            if not t or int(float(t)) < int(time.time()) - 7*86400:
+                raise web.HTTPError(403, reason = _(u'无权访问'))
 
     def initialize(self):
         self.should_be_invited()
@@ -85,7 +90,7 @@ class BaseHandler(web.RequestHandler):
         self.build_time = self.settings['build_time']
         self.default_cover = self.settings['default_cover']
         self.admin_user = None
-        self.static_host = self.settings.get("static_host", "")
+        self.static_host = CONF.get("static_host", "")
         if self.static_host:
             self.static_host = self.request.protocol + "://" + self.static_host
 
@@ -159,7 +164,7 @@ class BaseHandler(web.RequestHandler):
 
     def get_template_path(self):
         """ 获取模板路径 """
-        return self.settings.get('template_path', 'templates')
+        return CONF.get('template_path', 'templates')
 
     def create_template_loader(self, template_path):
         """ 根据template_path创建相对应的Jinja2 Environment """
@@ -226,7 +231,7 @@ class BaseHandler(web.RequestHandler):
 
         IMG = self.static_host
         vals = dict(*args, **kwargs)
-        SITE_TITLE = self.settings['site_title']
+        SITE_TITLE = CONF['site_title']
 
         vals.update( vars() )
         del vals['self']
@@ -242,7 +247,7 @@ class BaseHandler(web.RequestHandler):
         return books[0]
 
     def is_book_owner(self, book_id, user_id):
-        auto = int(self.settings.get('auto_login', 0))
+        auto = int(CONF.get('auto_login', 0))
         if auto: return True
 
         query = self.session.query(Item)
@@ -309,7 +314,7 @@ class BaseHandler(web.RequestHandler):
         return start
 
     def get_path_progress(self, book_id):
-        return os.path.join(self.settings['progress_path'], 'progress-%s.log' % book_id)
+        return os.path.join(CONF['progress_path'], 'progress-%s.log' % book_id)
 
     def get_save_referer(self, default="/"):
         referer = self.request.headers.get('referer', default)

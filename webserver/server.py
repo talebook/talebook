@@ -14,7 +14,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from social_tornado.models import init_social
 from social_routes import SOCIAL_AUTH_ROUTES
-from settings import settings
+import loader
+CONF = loader.get_settings()
 
 
 define("port", default=8080, type=int,
@@ -27,7 +28,7 @@ define("path-plugins", default="/usr/lib/calibre/calibre/plugins", type=str,
         help=_('Path to calibre plugins.'))
 define("path-bin", default="/usr/bin", type=str,
         help=_('Path to calibre binary programs.'))
-define("with-library", default=settings['with_library'], type=str,
+define("with-library", default=CONF['with_library'], type=str,
         help=_('Path to the library folder to serve with the content server.'))
 
 define("syncdb", default=False, type=bool, help=_('Create all tables'))
@@ -74,10 +75,10 @@ def make_app():
     from calibre.db.legacy import LibraryDatabase
     from calibre.utils.date import fromtimestamp
 
-    auth_db_path = settings['user_database']
+    auth_db_path = CONF['user_database']
     logging.info("Init library with [%s]" % options.with_library)
     logging.info("Init AuthDB  with [%s]" % auth_db_path )
-    logging.info("Init Static  with [%s]" % settings['static_path'] )
+    logging.info("Init Static  with [%s]" % CONF['static_path'] )
     logging.info("Init LANG    with [%s]" % P('localization/locales.zip') )
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
@@ -106,7 +107,7 @@ def make_app():
     engine = create_engine(auth_db_path, echo=False)
     ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
     models.bind_session(ScopedSession)
-    init_social(models.Base, ScopedSession, settings)
+    init_social(models.Base, ScopedSession, CONF)
 
     if options.syncdb:
         models.user_syncdb(engine)
@@ -118,8 +119,9 @@ def make_app():
         email.do_send_mail()
         sys.exit(0)
 
-    path = settings['static_path'] + '/img/default_cover.jpg'
-    settings.update({
+    path = CONF['static_path'] + '/img/default_cover.jpg'
+    app_settings = dict(CONF)
+    app_settings.update({
         "legacy": book_db,
         "cache": cache,
         "ScopedSession": ScopedSession ,
@@ -131,7 +133,7 @@ def make_app():
     logging.info("Now, Running...")
     return web.Application(
             SOCIAL_AUTH_ROUTES + handlers.routes(),
-            **settings)
+            **app_settings)
 
 
 def main():

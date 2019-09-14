@@ -8,6 +8,9 @@ from models import Reader
 from base_handlers import BaseHandler, json_response, auth
 from calibre.utils.smtp import sendmail, create_mail
 
+import loader
+CONF = loader.get_settings()
+
 COOKIE_REDIRECT = "login_redirect"
 RE_EMAIL = r'[^@]+@[^@]+\.[^@]+'
 RE_USERNAME = r'[a-z][a-z0-9_]*'
@@ -15,7 +18,7 @@ RE_PASSWORD = r'[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};\':",./<>?\|]*'
 
 class Done(BaseHandler):
     def update_userinfo(self):
-        if int(self.settings.get('auto_login', 0)): return
+        if int(CONF.get('auto_login', 0)): return
 
         user_id = self.get_secure_cookie('user_id')
         user = self.session.query(Reader).get(int(user_id)) if user_id else None
@@ -47,7 +50,7 @@ class Done(BaseHandler):
 
 class Login(BaseHandler):
     def auto_login(self):
-        auto = int(self.settings.get('auto_login', 0))
+        auto = int(CONF.get('auto_login', 0))
         if not auto: return False
 
         logging.info("Auto login as user %s" % auto)
@@ -222,20 +225,20 @@ class SignUp(BaseHandler):
         code = user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S"))
         link = '%s/api/active/%s/%s' % (site, user.username, code)
         args = {
-                'site_title': self.settings['site_title'],
+                'site_title': CONF['site_title'],
                 'username': user.username,
                 'active_link': link,
                 }
-        mail_subject = self.settings['SIGNUP_MAIL_TITLE'] % args
+        mail_subject = CONF['SIGNUP_MAIL_TITLE'] % args
         mail_to = user.email
-        mail_from = self.settings['smtp_username']
-        mail_body = self.settings['SIGNUP_MAIL_CONTENT'] % args
+        mail_from = CONF['smtp_username']
+        mail_body = CONF['SIGNUP_MAIL_CONTENT'] % args
         mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, None, None)
         sendmail(mail, from_=mail_from, to=[mail_to], timeout=20,
                 port=465, encryption='SSL',
-                relay=self.settings['smtp_server'],
-                username=self.settings['smtp_username'],
-                password=self.settings['smtp_password']
+                relay=CONF['smtp_server'],
+                username=CONF['smtp_username'],
+                password=CONF['smtp_password']
                 )
 
     @json_response
@@ -327,20 +330,20 @@ class UserReset(BaseHandler):
 
         # send notice email
         args = {
-                'site_title': self.settings['site_title'],
+                'site_title': CONF['site_title'],
                 'username': user.username,
                 'password': p,
                 }
-        mail_subject = self.settings['RESET_MAIL_TITLE'] % args
+        mail_subject = CONF['RESET_MAIL_TITLE'] % args
         mail_to = user.email
-        mail_from = self.settings['smtp_username']
-        mail_body = self.settings['RESET_MAIL_CONTENT'] % args
+        mail_from = CONF['smtp_username']
+        mail_body = CONF['RESET_MAIL_CONTENT'] % args
         mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, None, None)
         sendmail(mail, from_=mail_from, to=[mail_to], timeout=20,
                 port=465, encryption='SSL',
-                relay=self.settings['smtp_server'],
-                username=self.settings['smtp_username'],
-                password=self.settings['smtp_password']
+                relay=CONF['smtp_server'],
+                username=CONF['smtp_username'],
+                password=CONF['smtp_password']
                 )
 
         # do save into db
@@ -396,9 +399,9 @@ class UserInfo(BaseHandler):
                 "users":      count_all_users,
                 "active":     count_hot_users,
                 "version":    VERSION,
-                "title":      self.settings['site_title'],
-                "socials":    self.settings['SOCIALS'],
-                "friends":    self.settings['FRIENDS'],
+                "title":      CONF['site_title'],
+                "socials":    CONF['SOCIALS'],
+                "friends":    CONF['FRIENDS'],
             }
 
     def get_user_info(self, detail):
@@ -463,10 +466,16 @@ class Welcome(BaseHandler):
         pass
 
     @json_response
+    def get(self):
+        if not self.need_invited():
+            return {'err': 'free', 'msg': _(u'无需访问码')}
+        return {'err': 'ok', 'msg': CONF['INVITE_MESSAGE']}
+
+    @json_response
     def post(self):
         code = self.get_argument("invite_code", None)
-        if not code or code not in self.settings['INVITE_CODE']:
-            return {'err': 'params.invalid', 'msg': _(u'邀请码无效')}
+        if not code or code not in CONF['INVITE_CODE']:
+            return {'err': 'params.invalid', 'msg': _(u'访问码无效')}
         self.mark_invited()
         return {'err': 'ok', 'msg': 'ok'}
 
