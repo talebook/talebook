@@ -55,7 +55,7 @@ export default {
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
             this.meta = route.params.meta;
-            this.backend("/"+this.meta+"?fmt=json")
+            this.backend("/"+this.meta)
             .then(rsp => {
                 this.title = rsp.title;
                 this.data = rsp.items;

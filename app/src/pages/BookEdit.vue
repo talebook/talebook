@@ -134,7 +134,7 @@ export default {
             this.bookid = route.params.bookid;
             this.$store.commit('loading');
             var bookid = route.params.bookid;
-            this.backend("/book/" + bookid + "?fmt=json")
+            this.backend("/book/" + bookid)
             .then( book => {
                 book.img = book.cover_large_url;
                 this.book = book;

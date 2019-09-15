@@ -64,13 +64,7 @@ export default {
         init(route, next) {
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
-            var url = route.fullPath;
-            if ( url != route.path ) {
-                url += "&fmt=json";
-            } else {
-                url += "?fmt=json";
-            }
-            this.backend(url)
+            this.backend(route.fullPath)
             .then(rsp => {
                 this.title = rsp.title;
                 this.books = rsp.books;

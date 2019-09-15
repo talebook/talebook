@@ -52,6 +52,10 @@ def website_format(value):
 def js(func):
     def do(self, *args, **kwargs):
         rsp = func(self, *args, **kwargs)
+        origin = self.request.headers.get('origin', '*')
+        self.set_header('Access-Control-Allow-Origin', origin)
+        self.set_header('Access-Control-Allow-Credentials', 'true')
+        self.set_header('Cache-Control', 'max-age=0')
         self.write( rsp )
         return
     return do
@@ -206,23 +210,6 @@ class BaseHandler(web.RequestHandler):
         namespace.update(kwargs)
         return t.render(**namespace)
 
-    def json_page(self, template, vals):
-        origin = self.request.headers.get('origin', '*')
-        self.set_header('Access-Control-Allow-Origin', origin)
-        self.set_header('Access-Control-Allow-Credentials', 'true')
-        self.set_header('Cache-Control', 'max-age=0')
-        p = template.split(".html")[0].replace("/", ".")
-        try:
-            m = __import__("jsons."+p)
-            for pp in p.split("."):
-                m = getattr(m, pp)
-            m = reload(m)
-            self.write( m.json_output(self, vals) )
-        except Exception as e:
-            import traceback
-            logging.error(traceback.format_exc())
-            self.write( {"error": "json func error"} )
-
     def html_page(self, template, *args, **kwargs):
         self.set_header('Cache-Control', 'max-age=0')
         db = self.db
@@ -250,10 +237,7 @@ class BaseHandler(web.RequestHandler):
 
         vals.update( vars() )
         del vals['self']
-        if self.get_argument("fmt", 0) == "json":
-            self.json_page(template, vals)
-        else:
-            self.write( self.render_string(template, **vals) )
+        self.write( self.render_string(template, **vals) )
 
     def get_book(self, book_id):
         books = self.get_books(ids=[int(book_id)])

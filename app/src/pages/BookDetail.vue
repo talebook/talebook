@@ -186,7 +186,7 @@ export default {
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
             this.bookid = route.params.bookid;
-            this.backend("/book/"+this.bookid+"?fmt=json")
+            this.backend("/book/"+this.bookid)
             .then( rsp => {
                 this.kindle_sender = rsp.kindle_sender;
                 this.book = rsp.book;

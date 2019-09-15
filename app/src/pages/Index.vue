@@ -41,7 +41,7 @@ export default {
     created() {
         this.$store.commit('navbar', true);
         this.$store.commit('loading');
-        this.backend("/index?random=12&recent=12&fmt=json")
+        this.backend("/index?random=12&recent=12")
         .then(data => {
             this.rsp = data;
             if ( data.user !== undefined ) {
