@@ -165,11 +165,6 @@ class Index(BaseHandler):
             "new_books":          [ self.fmt(b) for b in new_books    ],
         }
 
-class About(BaseHandler):
-    def get(self):
-        nav = "about"
-        return self.html_page('about.html', vars())
-
 class BookDetail(BaseHandler):
     @js
     def get(self, id):
@@ -275,8 +270,6 @@ class BookRefer(BaseHandler):
             rsp.append( d )
 
         return {'err': 'ok', 'books': rsp}
-        #self.set_header("Cache-control", "no-cache")
-        #return self.html_page('book/refer.html', vars())
 
     @js
     @auth
@@ -388,17 +381,16 @@ class BookDownload(BaseHandler):
         self.write( f )
 
 class BookNav(ListHandler):
+    @js
     def get(self):
         title = _(u'全部书籍')
         category_name = 'books'
         tagmap = self.all_tags_with_count()
         navs = []
         for h1, tags in BOOKNAV:
-            tags = list( (v, tagmap.get(v, 0)) for v in tags )
-            #tags.sort( lambda x,y: cmp(y[1], x[1]) )
-            navs.append( (h1, tags) )
-
-        return self.html_page('book/nav.html', vars())
+            new_tags = [{'name': v, 'count': tagmap.get(v, 0)} for v in tags]
+            navs.append( {"legend": h1, "tags": new_tags } )
+        return {'err': 'ok', "navs": navs}
 
 class RecentBook(ListHandler):
     def get(self):
@@ -422,6 +414,7 @@ class SearchBook(ListHandler):
 class HotBook(ListHandler):
     def get(self):
         title = _(u'热度榜单')
+        category = 'hot'
         db_items = self.session.query(Item).filter(Item.count_visit > 1 ).order_by(Item.count_download.desc())
         count = db_items.count()
         start = self.get_argument_start()
@@ -436,7 +429,7 @@ class HotBook(ListHandler):
         ids = [ item.book_id for item in items ]
         books = self.get_books(ids=ids)
         self.do_sort(books, 'count_visit', False)
-        return self.html_page('book/list.html', vars())
+        return self.render_book_list(books, vars())
 
 class BookAdd(BaseHandler):
     @web.authenticated

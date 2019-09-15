@@ -48,84 +48,12 @@ class Done(BaseHandler):
         if not url: url = "/"
         self.redirect( url )
 
-class Login(BaseHandler):
-    def auto_login(self):
-        auto = int(CONF.get('auto_login', 0))
-        if not auto: return False
-
-        logging.info("Auto login as user %s" % auto)
-        self.set_secure_cookie("user_id", str(auto))
-        user = self.session.query(Reader).get(auto)
-        if not user:
-            logging.info("Init default auto login user")
-            user = Reader(id=auto)
-            user.init_default_user()
-            user.save()
-        login_time = int(time.time())
-        self.set_secure_cookie("lt", str(login_time))
-        self.add_msg("success", _("自动登录成功。"))
-        return True
-
-    def get(self):
-        url = self.get_save_referer()
-        self.clear_cookie("next")
-        self.set_secure_cookie(COOKIE_REDIRECT, url)
-        if self.auto_login():
-            return self.redirect( url )
-        return self.html_page('login.html', vars())
-
-class Logout(BaseHandler):
-    def get(self):
-        self.set_secure_cookie("user_id", "")
-        self.set_secure_cookie("admin_id", "")
-        url = self.get_save_referer()
-        self.redirect(url)
-
-class SettingView(BaseHandler):
-    def get(self, **kwrags):
-        user = self.current_user
-        return self.html_page('setting/view.html', vars())
-
-class SettingSave(BaseHandler):
-    @web.authenticated
-    def post(self):
-        user = self.current_user
-        modify = user.extra
-        for key in ['kindle_email']:
-            if key in self.request.arguments:
-                modify[key] = self.get_argument(key)
-                user.email = self.get_argument(key)
-        if modify:
-            logging.debug(modify)
-            user.extra.update(modify)
-            user.update_time = datetime.datetime.now()
-            user.save()
-            self.add_msg("success", _("Settings saved."))
-        else:
-            self.add_msg("info", _("Nothing changed."))
-        self.redirect('/setting', 302)
-
-class UserView(BaseHandler):
-    @web.authenticated
-    def get(self):
-        nav = "user"
-        user = self.current_user
-        output = {}
-        for key in ['read_history', 'visit_history']:
-            ids = [ b['id'] for b in user.extra[key]][:24]
-            books = self.db.get_data_as_dict(ids=ids)
-            orders = dict( zip(ids, range(100)) )
-            books.sort(lambda x,y: cmp(orders.get(x['id']), orders.get(y['id'])))
-            output[key] = books[:12]
-
-        return self.html_page('user/view.html', vars())
-
-class AdminView(BaseHandler):
-    #@web.authenticated
+class AdminUsers(BaseHandler):
     @js
+    @auth
     def get(self):
-        #if not self.is_admin():
-        #    return {'err': 'permission.not_admin', 'msg': _(u'Not Admin')}
+        if not self.admin_user:
+            return {'err': 'permission.not_admin', 'msg': _(u'当前用户非管理员')}
 
         num = max(10, int(self.get_argument("num", 20)))
         page = max(0, int(self.get_argument("page", 0)))
@@ -167,8 +95,8 @@ class AdminView(BaseHandler):
             items.append( d )
         return {"err": 'ok', "users": {"items": items, "total": total}}
 
-class AdminSet(BaseHandler):
-    @web.authenticated
+class AdminOwnerMode(BaseHandler):
+    @auth
     def get(self):
         user_id = self.get_argument("user_id", None)
         if user_id and self.is_admin():
@@ -576,7 +504,7 @@ def routes():
             (r'/api/user/info',         UserInfo),
             (r'/api/user/messages',     UserMessages),
 
-            (r'/api/user/index',        UserView),
+            #(r'/api/user/index',        UserView),
             (r"/api/user/sign_in",      SignIn),
             (r'/api/user/sign_up',      SignUp),
             (r'/api/user/sign_out',     SignOut),
@@ -585,18 +513,18 @@ def routes():
             (r'/api/user/active/send',  UserSendActive),
 
             (r'/api/active/(.*)/(.*)',  UserActive),
-
-            (r'/api/user/setting',      SettingView),
-            (r'/api/user/setting/save', SettingSave),
             (r'/api/done/',             Done),
+
+            #(r'/api/user/setting',      SettingView),
+            #(r'/api/user/setting/save', SettingSave),
 
             (r'/api/admin/install',     AdminInstall),
             (r'/api/admin/settings',    AdminSettings),
+            (r'/api/admin/users',       AdminUsers),
 
-            (r'/api/sys/index',         AdminView),
-            (r'/api/sys/settings',      AdminSet),
-            (r'/api/sys/users',         AdminView),
-            (r'/api/sys/messages',      AdminSet),
+            #(r'/api/sys/index',         AdminView),
+            #(r'/api/sys/settings',      AdminSet),
+            #(r'/api/sys/messages',      AdminSet),
     ]
 
 
