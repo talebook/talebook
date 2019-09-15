@@ -16,6 +16,48 @@
                     </v-card-actions>
                 </v-card>
             </v-dialog>
+            <v-dialog v-model="dialog_refer" persistent >
+                <v-card >
+                    <v-toolbar flat dense dark color="primary">
+                        从互联网同步书籍信息
+                        <v-spacer></v-spacer>
+                        <v-btn color="" text @click="dialog_refer = false">取消</v-btn>
+                    </v-toolbar>
+                    <v-card-text class="pa-3 ps-sm-6">
+
+                        <p class="py-6 text-center" v-if="refer_books.length == 0">
+                        <v-progress-circular indeterminate color="primary" ></v-progress-circular>
+                        </p>
+
+
+                        <template v-else>
+                        请选择最匹配的记录复制为本书的描述信息
+                        <book-cards :books="refer_books">
+                            <template #introduce="{book}">
+                                <div class="d-none d-lg-flex">
+                                    <v-chip small v-if="book.author_sort">{{book.author_sort}}</v-chip>
+                                    <v-chip small v-if="book.publisher">{{book.publisher}}</v-chip>
+                                    <v-chip small v-if="book.pubyear">{{book.pubyear}}</v-chip>
+                                </div>
+                            </template>
+                            <template #actions="{book}">
+                                <v-card-actions>
+                                    <v-chip class="mr-1" small v-if="book.author_sort">{{book.author_sort}}</v-chip>
+                                    <v-chip class="mr-1" small v-if="book.publisher">{{book.publisher}}</v-chip>
+                                    <v-chip small v-if="book.pubyear">{{book.pubyear}}</v-chip>
+                                </v-card-actions>
+                                    <v-divider></v-divider>
+                                <v-card-actions>
+                                    <v-chip small dark :to="book.website" :color="book.source=='豆瓣'?'green':'blue'">{{book.source}}</v-chip>
+                                    <v-spacer></v-spacer>
+                                    <v-btn color='primary' small rounded @click="set_refer(book.isbn)" ><v-icon >done</v-icon>设置</v-btn>
+                                </v-card-actions>
+                            </template>
+                        </book-cards>
+                </template>
+                </v-card-text>
+                </v-card>
+            </v-dialog>
             <v-dialog v-model="dialog_msg" persistent width="300">
                 <v-card>
                     <v-card-text>
@@ -55,7 +97,7 @@
                         </template>
                         <v-list>
                             <v-list-item :to="'/book/'+bookid+'/edit'"> <v-icon>settings_applications</v-icon> 编辑元数据 </v-list-item>
-                            <v-list-item> <v-icon>apps</v-icon> 从豆瓣更新信息</v-list-item>
+                            <v-list-item @click="get_refer" > <v-icon>apps</v-icon> 从豆瓣更新信息</v-list-item>
                         </v-list>
                     </v-menu>
 
@@ -124,8 +166,10 @@
 </template>
 
 <script>
+import BookCards from "../components/BookCards.vue";
 export default {
     components: {
+        BookCards,
     },
     computed: {
         pub_year: function() {
@@ -141,9 +185,11 @@ export default {
         debug: false,
         mail_to: "",
         dialog_kindle: false,
+        dialog_refer: false,
         dialog_msg: false,
         alert_msg: "please login",
         alert_type: "error",
+        refer_books: [],
     }),
     created() {
         this.init(this.$route);
@@ -181,7 +227,35 @@ export default {
                 this.dialog_msg = true;
                 this.dialog_kindle = false;
             });
-        }
+        },
+        get_refer() {
+            this.dialog_refer = true;
+            this.backend("/book/"+this.bookid+"/refer")
+            .then( rsp => {
+                this.refer_books = rsp.books.map( b => {
+                    b.href = "";
+                    b.img = '/get/pcover?url='+encodeURIComponent(b.cover_url);
+                    return b;
+                }) ;
+            });
+        },
+        set_refer(isbn) {
+            var data = new URLSearchParams();
+            data.append('isbn', isbn);
+            this.backend("/book/"+this.bookid+"/refer", {
+                method: 'POST',
+                body: data,
+            })
+            .then( rsp => {
+                this.dialog_refer = false;
+                if ( rsp.err == 'ok' ) {
+                    this.alert('success', '设置成功！')
+                } else {
+                    this.alert('error', rsp.msg);
+                }
+                this.init(this.$route);
+            });
+        },
     },
 }
 </script>
@@ -205,4 +279,18 @@ export default {
     margin: 4px 2px;
 }
 
+.book-comments {
+    /*text-indent: 2em;*/
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    text-overflow: clip;
+    margin-top: 6px;
+    text-align: left;
+}
+.book-comments p {
+    font-size: small;
+    margin-bottom: 0px;
+}
 </style>

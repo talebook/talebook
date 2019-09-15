@@ -79,7 +79,9 @@ class BaseHandler(web.RequestHandler):
         if self.need_invited():
             t = self.get_secure_cookie("invited")
             if not t or int(float(t)) < int(time.time()) - 7*86400:
-                raise web.HTTPError(403)
+                self.write( {'err': 'not_invited'} )
+                self.set_status(200)
+                raise web.Finish()
 
     def should_be_installed(self):
         if CONF.get("installed", None) == False:

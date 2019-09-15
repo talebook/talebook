@@ -157,7 +157,8 @@ class BookDetail(BaseHandler):
         return self.html_page('book/detail.html', vars())
 
 class BookRefer(BaseHandler):
-    @web.authenticated
+    @js
+    @auth
     def get(self, id):
         book_id = int(id)
         mi = self.db.get_metadata(book_id, index_is_id=True)
@@ -178,21 +179,31 @@ class BookRefer(BaseHandler):
         api = baike.BaiduBaikeApi(copy_image=False)
         book = api.get_book(title)
         if book: books.append( book )
-        self.set_header("Cache-control", "no-cache")
-        return self.html_page('book/refer.html', vars())
 
+        keys = ['cover_url', 'source', 'website', 'title', 'author_sort' ,'publisher', 'isbn', 'comments']
+        rsp = []
+        for b in books:
+            d = dict( (k,b.get(k, '')) for k in keys )
+            d['pubyear'] = b.pubdate.strftime("%Y") if b.pubdate else ""
+            if not d['comments']: d['comments'] = u'无详细介绍'
+            rsp.append( d )
 
-class BookReferSet(BaseHandler):
-    @web.authenticated
-    def post(self, id, isbn):
+        return {'err': 'ok', 'books': rsp}
+        #self.set_header("Cache-control", "no-cache")
+        #return self.html_page('book/refer.html', vars())
+
+    @js
+    @auth
+    def post(self, id):
+        isbn = self.get_argument("isbn", "error")
         book_id = int(id)
         if not isbn.isdigit():
-            raise web.HTTPError(400, reason = _(u'ISBN参数错误') )
+            return {'err': 'params.isbn.invalid', 'msg': _(u'ISBN参数错误') }
         mi = self.db.get_metadata(book_id, index_is_id=True)
         if not mi:
-            raise web.HTTPError(404, reason = _(u'书籍不存在') )
+            return {'err': 'params.book.invalid', 'msg': _(u'书籍不存在') }
         if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
-            raise web.HTTPError(403, reason = _(u'无权限'))
+            return {'err': 'user.no_permission', 'msg': _(u'无权限') }
 
         title = re.sub(u'[(（].*', "", mi.title)
         if isbn == baike.BAIKE_ISBN:
@@ -207,7 +218,7 @@ class BookReferSet(BaseHandler):
             refer_mi.cover_data = None
         mi.smart_update(refer_mi, replace_metadata=True)
         self.db.set_metadata(book_id, mi)
-        return self.redirect('/book/%d'%book_id)
+        return {'err': 'ok'}
 
 
 
@@ -550,7 +561,6 @@ def routes():
         ( r'/api/book/([0-9]+)\.(.+)',  BookDownload ),
         ( r'/api/book/([0-9]+)/push',   BookPush     ),
         ( r'/api/book/([0-9]+)/refer',  BookRefer    ),
-        ( r'/api/book/([0-9]+)/refer/set/([0-9]{13})$',  BookReferSet),
 
         ( r'/read/([0-9]+)',            BookRead     ),
         ]

@@ -9,6 +9,7 @@
                 <v-col cols=9 class='col-book-info'>
                     <v-card-text class="pb-0" align-left>
                         <div class="book-title">{{book.title}}</div>
+                        <slot name="introduce" :book="book"></slot>
                         <div class="book-comments">
                             <p v-if="book.comments" v-html="book.comments"></p>
                             <p  v-else>点击浏览详情</p>
@@ -16,6 +17,7 @@
                     </v-card-text>
                 </v-col>
             </v-row>
+            <slot name="actions" :book="book"></slot>
         </v-card>
     </v-col>
     </v-row>
@@ -31,7 +33,9 @@ export default {
     computed: {
         render_books: function() {
             return this.books.map( b => {
-                b['href'] = "/book/" + b.id;
+                if ( b['href'] == undefined ) {
+                    b['href'] = "/book/" + b.id;
+                }
                 return b;
             });
         },
