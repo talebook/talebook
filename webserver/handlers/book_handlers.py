@@ -403,13 +403,12 @@ class SearchBook(ListHandler):
     def get(self):
         name = self.get_argument("name", "")
         if not name.strip():
-            raise web.HTTPError(403, reason = _(u"请输入搜索关键字") )
+            return self.write({'err': 'params.invalid', 'msg': _(u"请输入搜索关键字") })
 
         title = _(u'搜索：%(name)s') % vars()
         ids = self.cache.search(name)
-        books = self.get_books(ids=ids)
         search_query = name
-        return self.render_book_list(books, vars());
+        return self.render_book_list(None, vars(), ids);
 
 class HotBook(ListHandler):
     def get(self):

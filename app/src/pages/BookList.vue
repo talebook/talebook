@@ -1,9 +1,9 @@
 <template>
     <div>
     <v-row >
-        <v-col cols=12 align="baseline">
+        <v-col cols=12 align="baseline" >
             <h2>{{title}}</h2>
-            <v-divider class="book-list-legend"></v-divider>
+            <v-divider class="mt-3 mb-0"></v-divider>
         </v-col>
 
         <v-col>
@@ -11,13 +11,10 @@
         </v-col>
 
         <v-col cols=12 align="end" >
+            <v-container class="max-width">
+                <v-pagination v-model="page" :length="page_cnt" circle @input="change_page"></v-pagination>
+            </v-container>
             <div class="text-xs-center book-pager">
-                <v-pagination
-                 v-model="page"
-                 :length="page_cnt"
-                 total-visible="7"
-                 circle
-                 ></v-pagination>
             </div>
         </v-col>
     </v-row>
@@ -31,9 +28,6 @@ export default {
         BookCards,
     },
     computed: {
-        page_cnt: function() {
-            return 1 + parseInt(this.total/this.page_size);
-        },
         page_visible: function() {
             var cnt = 1 + parseInt(this.total/this.page_size);
             if ( cnt < 7 ) { return cnt; }
@@ -49,9 +43,13 @@ export default {
         page: 1,
         books: [],
         total: 0,
-        page_size: 20,
+        page_size: 30,
+        page_cnt: 0,
     }),
     created() {
+        if ( this.$route.query.start != undefined ) {
+            this.page = 1 + parseInt(this.$route.query.start / this.page_size)
+        }
         this.init(this.$route);
     },
     beforeRouteEnter(to, from, next) {
@@ -66,13 +64,26 @@ export default {
             this.$store.commit('loading');
             this.backend(route.fullPath)
             .then(rsp => {
+                if ( rsp.err != 'ok' ) {
+                    this.alert("error", rsp.msg);
+                    return;
+                }
                 this.title = rsp.title;
                 this.books = rsp.books;
                 this.total = rsp.total
+                this.page_cnt = parseInt(this.total/this.page_size);
                 this.$store.commit('loaded');
             })
             if ( next ) next();
         },
+        change_page() {
+            var r = Object.assign({}, this.$route.query);
+            if ( this.page < 1 ) { this.page = 1 }
+            r.start = (this.page - 1) * this.page_size;
+            r.size = this.page_size;
+            //this.alert('success', r);
+            this.$router.push({query: r});
+        }
     },
   }
 </script>

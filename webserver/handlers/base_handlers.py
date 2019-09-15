@@ -309,8 +309,7 @@ class BaseHandler(web.RequestHandler):
         start = self.get_argument("start", 0)
         try: start = int(start)
         except: start = 0
-        if start < 0: start = 0
-        return start
+        return max(0, start)
 
     def get_path_progress(self, book_id):
         return os.path.join(CONF['progress_path'], 'progress-%s.log' % book_id)
@@ -378,25 +377,23 @@ class ListHandler(BaseHandler):
     def render_book_list(self, all_books, vars_, ids=None):
         start = self.get_argument_start()
         sort = self.get_argument("sort", "timestamp")
-        size = self.get_argument("size", 30)
-        delta = min(size, 100)
+        try: size = int(self.get_argument("size"))
+        except: size = 30
+        delta = min(max(size, 30), 100)
 
-        if ids: all_books = ids
-        count = len(all_books)
-        page_max = (count-1) / delta
-        page_now = start / delta
-        pages = []
-        for p in range(page_now-3, page_now+3):
-            if 0 <= p and p <= page_max:
-                pages.append(p)
+        count = 0
+        books = []
 
         if ids:
+            count = len(ids)
             books = self.get_books(ids=ids[start:start+delta])
             self.sort_books(books, sort)
         else:
+            count = len(all_books)
             self.sort_books(all_books, sort)
             books = all_books[start:start+delta]
         return {
+                'err': 'ok',
                 'category': vars_.get('category', None),
                 "title": vars_['title'],
                 "total": count,
