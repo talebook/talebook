@@ -385,6 +385,7 @@ class ListHandler(BaseHandler):
         books = []
 
         if ids:
+            ids = list(ids)
             count = len(ids)
             books = self.get_books(ids=ids[start:start+delta])
             self.sort_books(books, sort)
