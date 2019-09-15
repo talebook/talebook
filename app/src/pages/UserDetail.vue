@@ -91,7 +91,6 @@ export default {
         },
         send_active_email: function() {
             this.backend('/user/active/send')
-            .then( rsp => rsp.json() )
             .then( rsp => {
                 if ( rsp.err == 'ok' ) {
                     this.alert("success", "激活邮件已发出！");
@@ -104,7 +103,6 @@ export default {
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
             this.backend("/user/info?detail=1")
-            .then( rsp => rsp.json() )
             .then( rsp => {
                 rsp.user.password0 = "";
                 rsp.user.password1 = "";

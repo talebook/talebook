@@ -104,7 +104,7 @@ export default {
             this.backend('/user/reset', {
                 method: 'POST',
                 body: data,
-            }).then( rsp => rsp.json() )
+            })
             .then( rsp => {
                 if ( rsp.err == 'ok' ) {
                     this.alert.type = "success";
