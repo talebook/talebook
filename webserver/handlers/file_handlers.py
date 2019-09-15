@@ -170,7 +170,7 @@ class ProgressHandler(BaseHandler):
         book_id = int(id)
         path = self.get_path_progress(book_id)
         if not os.path.exists(path):
-            raise web.HTTPError(404, reason_ = 'nothing')
+            raise web.HTTPError(404, log_message = 'nothing')
         txt = open(path).read()
 
         # erase all settings values from txt content

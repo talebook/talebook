@@ -51,7 +51,7 @@ settings = {
     'smtp_password' : "password",
     'douban_apikey' : "0df993c66c0c636e29ecbb5344252a4a",
 
-    'INVITE_MODE'   : True,
+    'INVITE_MODE'   : False,
     'INVITE_CODE'   : 'beta',
     'INVITE_MESSAGE': u'''本站为私人图书馆，需输入密码才可进行访问''',
 

@@ -2,7 +2,7 @@
     <v-app>
         <app-header v-if="$store.state.nav"></app-header>
         <v-content>
-            <v-container fluid fill-height v-show="$store.state.loading">
+            <v-container fluid fill-height v-if="$store.state.loading">
                 <v-row>
                     <v-col align=center justify=center>
                         <v-progress-circular indeterminate color="primary" ></v-progress-circular>

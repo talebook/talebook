@@ -105,6 +105,10 @@ class BaseHandler(web.RequestHandler):
         if self.static_host:
             self.static_host = self.request.protocol + "://" + self.static_host
 
+        host = CONF.get("static_host", self.request.host)
+        self.cdn_url = self.request.protocol + "://" + host
+        self.base_url = self.request.protocol + "://" + self.request.host
+
     def on_finish(self):
         ScopedSession = self.settings['ScopedSession']
         ScopedSession.remove()
@@ -254,7 +258,7 @@ class BaseHandler(web.RequestHandler):
     def get_book(self, book_id):
         books = self.get_books(ids=[int(book_id)])
         if not books:
-            raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
+            raise web.HTTPError(404, log_message = _(u"抱歉，这本书不存在") )
         return books[0]
 
     def is_book_owner(self, book_id, user_id):

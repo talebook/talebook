@@ -7,7 +7,7 @@
                     <v-card-text>
                         <p>填写Kindle收件人邮箱地址：</p>
                         <v-text-field v-model="mail_to" label="Email*" required></v-text-field>
-                        <small>* 请先将本站邮箱加入到Kindle发件人中</small>
+                        <small>* 请先将本站邮箱加入到Kindle发件人中:<br/>{{kindle_sender}}</small>
                     </v-card-text>
                     <v-card-actions>
                         <v-btn color="" text @click="dialog_kindle = false">取消</v-btn>
@@ -16,21 +16,19 @@
                     </v-card-actions>
                 </v-card>
             </v-dialog>
-            <v-dialog v-model="dialog_refer" persistent >
-                <v-card >
-                    <v-toolbar flat dense dark color="primary">
-                        从互联网同步书籍信息
-                        <v-spacer></v-spacer>
-                        <v-btn color="" text @click="dialog_refer = false">取消</v-btn>
-                    </v-toolbar>
-                    <v-card-text class="pa-3 ps-sm-6">
 
-                        <p class="py-6 text-center" v-if="refer_books.length == 0">
-                        <v-progress-circular indeterminate color="primary" ></v-progress-circular>
-                        </p>
+            <v-card v-if="dialog_refer" >
+                <v-toolbar flat dense dark color="primary">
+                    从互联网同步书籍信息
+                    <v-spacer></v-spacer>
+                    <v-btn color="" text @click="dialog_refer = false">取消</v-btn>
+                </v-toolbar>
+                <v-card-text xclass="pt-3 px-3 px-sm-6">
+                    <p class="py-6 text-center" v-if="refer_books.length == 0">
+                    <v-progress-circular indeterminate color="primary" ></v-progress-circular>
+                    </p>
 
-
-                        <template v-else>
+                    <template v-else>
                         请选择最匹配的记录复制为本书的描述信息
                         <book-cards :books="refer_books">
                             <template #introduce="{book}">
@@ -54,24 +52,11 @@
                                 </v-card-actions>
                             </template>
                         </book-cards>
-                </template>
+                    </template>
                 </v-card-text>
-                </v-card>
-            </v-dialog>
-            <v-dialog v-model="dialog_msg" persistent width="300">
-                <v-card>
-                    <v-card-text>
-                        <v-alert outlined v-model="dialog_msg" :type="alert_type">
-                            {{alert_msg}}
-                        </v-alert>
-                    </v-card-text>
-                    <v-card-text align="center">
-                        <v-btn small @click="dialog_msg = false">关闭</v-btn>
-                    </v-card-text>
-                </v-card>
-            </v-dialog>
+            </v-card>
 
-            <v-card>
+            <v-card v-if="!dialog_refer">
                 <v-toolbar flat dense color="white">
                     <v-btn color="primary" outlined class="mr-2 d-flex d-sm-flex" @click="dialog_kindle = !dialog_kindle" ><v-icon>email</v-icon> 推送</v-btn>
                     <v-btn color="" outlined class="mr-2 d-flex d-sm-flex" :href="'/read/'+bookid" target="_blank"> <v-icon>import_contacts</v-icon> 阅读</v-btn>
@@ -83,9 +68,9 @@
                             <v-btn v-on="on" icon small fab ><v-icon>get_app</v-icon></v-btn>
                         </template>
                         <v-list>
-                            <v-list-item :key="'file-'+file[0]" v-for="file in book.files">
+                            <v-list-item :key="'file-'+file.format" v-for="file in book.files" target="_blank" :href="file.href">
                                 <v-icon>get_app</v-icon>
-                                下载{{file[0]}}格式({{parseInt(file[1]/1024)}} KB)
+                                下载{{file.format}}格式({{parseInt(file.size/1024)}} KB)
                             </v-list-item>
                         </v-list>
                     </v-menu>
@@ -184,11 +169,10 @@ export default {
         book: {'id': 0, 'files': [], 'tags': [], 'pubdate': ''},
         debug: false,
         mail_to: "",
+        kindle_sender: "",
         dialog_kindle: false,
         dialog_refer: false,
         dialog_msg: false,
-        alert_msg: "please login",
-        alert_type: "error",
         refer_books: [],
     }),
     created() {
@@ -203,9 +187,9 @@ export default {
             this.$store.commit('loading');
             this.bookid = route.params.bookid;
             this.backend("/book/"+this.bookid+"?fmt=json")
-            .then( book => {
-                book.img = book.cover_large_url;
-                this.book = book;
+            .then( rsp => {
+                this.kindle_sender = rsp.kindle_sender;
+                this.book = rsp.book;
                 this.$store.commit('loaded');
             });
             if ( next ) next();
@@ -222,10 +206,12 @@ export default {
                     'Content-Type': "application/x-www-form-urlencoded",
                 },
             }).then( rsp => {
-                this.alert_msg = rsp.msg;
-                this.alert_type = ( rsp.err == 'ok' )?  "success": "error";
-                this.dialog_msg = true;
                 this.dialog_kindle = false;
+                if ( rsp.err == 'ok' ) {
+                    this.alert('success', rsp.msg);
+                } else {
+                    this.alert('error', rsp.msg);
+                }
             });
         },
         get_refer() {

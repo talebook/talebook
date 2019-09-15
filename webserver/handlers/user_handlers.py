@@ -215,7 +215,7 @@ class SignUp(BaseHandler):
     def check_active_code(self, username, code):
         user = self.session.query(Reader).filter(Reader.username==username).first()
         if not user or code != user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S")):
-            raise web.HTTPError(403, reason = _(u'激活码无效'))
+            raise web.HTTPError(403, log_message = _(u'激活码无效'))
         user.active = True
         user.save()
         return self.redirect("/active/success")

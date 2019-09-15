@@ -110,6 +110,35 @@ def do_ebook_convert(old_path, new_path, log_path):
 
 
 class Index(BaseHandler):
+    def fmt(self, b):
+        pub = b.get("publisher", None)
+        if not pub: pub = _("Unknown")
+
+        author_sort = b.get('author_sort', None)
+        if not author_sort: author_sort = _("Unknown")
+
+        comments = b.get("comments", None)
+        if not comments: comments = _(u"点击浏览详情")
+
+        cdn = self.cdn_url
+        base = self.base_url
+        return {
+                "id":              b['id'],
+                "title":           b['title'],
+                "rating":          b['rating'],
+                "author":          ", ".join(b['authors']),
+                "authors":         b['authors'],
+                "publisher":       pub,
+                "comments":        comments,
+
+                "img":             cdn+"/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
+                #"cover_large_url": cdn+"/get/thumb_600_840/%(id)s.jpg?t=%(timestamp)s" % b,
+                #"cover_url":       cdn+"/get/thumb_155_220/%(id)s.jpg?t=%(timestamp)s" % b,
+                "author_url":      base+"/author/"+author_sort,
+                "publisher_url":   base+"/pub/"+pub,
+                }
+
+    @js
     def get(self):
         max_random = 30
         max_recent = 30
@@ -128,7 +157,13 @@ class Index(BaseHandler):
         new_ids = random.sample(ids[-300:], min(max_recent, len(ids)))
         new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] ]
         new_books = new_books[:cnt_recent]
-        return self.html_page('index.html', vars())
+
+        return {
+            "random_books_count": len(random_books),
+            "new_books_count":    len(new_books),
+            "random_books":       [ self.fmt(b) for b in random_books ],
+            "new_books":          [ self.fmt(b) for b in new_books    ],
+        }
 
 class About(BaseHandler):
     def get(self):
@@ -136,25 +171,76 @@ class About(BaseHandler):
         return self.html_page('about.html', vars())
 
 class BookDetail(BaseHandler):
+    @js
     def get(self, id):
         book = self.get_book(id)
         book_id = book['id']
         book['is_owner'] = self.is_book_owner(book_id, self.user_id())
         book['is_public'] = True
+        '''
         if ( book['publisher'] and book['publisher'] in (u'中信出版社') ) or u'吴晓波' in list(book['authors']):
             if not book['is_owner']:
                 book['is_public'] = False
+        '''
         if self.is_admin():
             book['is_public'] = True
             book['is_owner'] = True
         self.user_history('visit_history', book)
-        try: sizes = [ (f, self.db.sizeof_format(book_id, f, index_is_id=True)) for f in book['available_formats'] ]
-        except: sizes = []
-        title = book['title']
-        smtp_username = CONF['smtp_username']
+        files = []
+        for fmt in book['available_formats']:
+            try: filesize = self.db.sizeof_format(book_id, fmt, index_is_id=True)
+            except: continue
+            files.append( {
+                'format': fmt,
+                'size': filesize,
+                'href': self.base_url + "/api/book/%s.%s" % (book_id, fmt),
+                })
+
         if self.user_id(): self.count_increase(book_id, count_visit=1)
         else: self.count_increase(book_id, count_guest=1)
-        return self.html_page('book/detail.html', vars())
+
+        b = book
+        def get(k, default=_("Unknown")):
+            v = b.get(k, None)
+            if not v: v = default
+            return v
+
+        collector = b.get('collector', None)
+        if isinstance(collector, dict):
+            collector = collector.get("username", None)
+        elif collector:
+            collector = collector.username
+
+        try: pubdate = b['pubdate'].strftime("%Y-%m-%d")
+        except: pubdate = None
+
+        return {
+                'err': 'ok',
+                'kindle_sender': CONF['smtp_username'],
+                'book': {
+                    'id'              : b['id'],
+                    'title'           : b['title'],
+                    'rating'          : b['rating'],
+                    'count_visit'     : b['count_visit'],
+                    'count_download'  : b['count_download'],
+                    'timestamp'       : b['timestamp'].strftime("%Y-%m-%d"),
+                    'pubdate'         : pubdate,
+                    'collector'       : collector,
+                    'authors'         : b['authors'],
+                    'author'          : ', '.join(b['authors']),
+                    'tags'            : b['tags'],
+                    'author_sort'     : get('author_sort'),
+                    'publisher'       : get('publisher'),
+                    'comments'        : get('comments',_(u'暂无简介') ),
+                    'series'          : get('series',None),
+                    'language'        : get('language',None),
+                    'isbn'            : get('isbn',None),
+                    'files'           : files,
+                    'is_public'       : b['is_public'],
+                    'is_owner'        : b['is_owner'],
+                    "img"             : self.cdn_url+"/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
+                },
+            }
 
 class BookRefer(BaseHandler):
     @js
@@ -282,8 +368,10 @@ class BookDelete(BaseHandler):
             self.redirect("/book/%s"%book_id)
 
 class BookDownload(BaseHandler):
-    @web.authenticated
     def get(self, id, fmt):
+        if not CONF['ALLOW_GUEST_DOWNLOAD'] and not self.current_user:
+            raise web.HTTPError(403, log_message = _(u'请先登录') )
+
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))
         book = self.get_book(id)
@@ -291,7 +379,7 @@ class BookDownload(BaseHandler):
         self.user_history('download_history', book)
         self.count_increase(book_id, count_download=1)
         if 'fmt_%s'%fmt not in book:
-            raise web.HTTPError(404, reason = _(u'%s格式无法下载'%(fmt)) )
+            raise web.HTTPError(404, log_message = _(u'%s格式无法下载'%(fmt)) )
         path = book['fmt_%s'%fmt]
         att = u'attachment; filename="%d-%s.%s"' % (book['id'], book['title'], fmt)
         self.set_header('Content-Disposition', att.encode('UTF-8'))
@@ -461,10 +549,11 @@ class BookRead(BaseHandler):
 
 
 class BookPush(BaseHandler):
-    #@web.authenticated
     @js
-    @auth
     def post(self, id):
+        if not CONF['ALLOW_GUEST_PUSH'] and not self.current_user:
+            return {'err': 'user.need_login', 'msg': _(u'请先登录')}
+
         mail_to = self.get_argument("mail_to", None)
         if not mail_to:
             return {'err': 'params.error', 'msg': _(u'参数错误')}
