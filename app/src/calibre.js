@@ -29,10 +29,13 @@ export default {
                     }
                     return rsp;
                 })
-                .catch( () => {
+                .catch( err => {
+                    console.log(err);
                     next = next ? "?next="+next : "";
-                    this.$router.push("/welcome"+next).catch(()=>{});
-                    throw "redirect to welcome page";
+                    if ( self.$route.path != "/welcome" ) {
+                        this.$router.push("/welcome"+next).catch(()=>{});
+                        throw "redirect to welcome page";
+                    }
                 }) ;
         }
         Vue.prototype.alert = function(alert_type, alert_msg) {
