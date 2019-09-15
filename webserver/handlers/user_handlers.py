@@ -366,7 +366,6 @@ class SignOut(BaseHandler):
 
 class UserMessages(BaseHandler):
     @json_response
-    @auth
     def get(self):
         db = self.db
         user = self.current_user
