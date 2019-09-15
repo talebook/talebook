@@ -3,13 +3,14 @@
 
 import logging
 from tornado import web
-from base_handlers import BaseHandler, ListHandler
+from base_handlers import BaseHandler, ListHandler, js
 from calibre.utils.filenames import ascii_filename
 
 
 class TagList(ListHandler):
+    @js
     def get(self):
-        title = u'全部标签'
+        title = _(u'全部标签')
         category = "tags"
         tags = self.all_tags_with_count()
         hot_tags = []
@@ -18,7 +19,8 @@ class TagList(ListHandler):
             hot_tags.append( (tag_name, tag_count) )
         hot_tags.sort(lambda x,y: cmp(y[1], x[1]))
         tags = hot_tags
-        return self.html_page('tag/list.html', vars())
+        items = [ {"name": x, "count": y} for x,y in tags ]
+        return {"title": title, "items": items }
 
 class TagBooks(ListHandler):
     def get(self, name):
@@ -28,13 +30,14 @@ class TagBooks(ListHandler):
         return self.render_book_list(books, vars());
 
 class AuthorList(ListHandler):
+    @js
     def get(self):
-        title = u'全部作者'
+        title = _(u'全部作者')
         category = "authors"
         authors = self.db.all_authors()
-        #authors.sort(cmp=lambda x,y: cmp(ascii_filename(x[1]).lower(), ascii_filename(y[1]).lower()))
         authors.sort(cmp=lambda x,y: cmp(x[1], y[1]))
-        return self.html_page('author/list.html', vars())
+        items = [ {"id": x, "name": y} for x,y in authors ]
+        return {"title": title, "items": items }
 
 class AuthorBooks(ListHandler):
     def get(self, name):
@@ -44,11 +47,13 @@ class AuthorBooks(ListHandler):
         return self.render_book_list(books, vars());
 
 class PubList(ListHandler):
+    @js
     def get(self):
-        title = u'全部出版社'
+        title = _(u'全部出版社')
         category = "publisher"
         publishers = self.cache.get_id_map(category).items()
-        return self.html_page('publisher/list.html', vars())
+        items = [ {"id": x, "name": y} for x,y in publishers ]
+        return {"title": title, "items": items }
 
 class PubBooks(ListHandler):
     def get(self, name):
@@ -81,12 +86,14 @@ class PubBooksUpdate(ListHandler):
         self.redirect('/pub/%s'%name, 302)
 
 class RatingList(ListHandler):
+    @js
     def get(self):
-        title = u'全部评分'
+        title = _(u'全部评分')
         category = "rating"
         ratings = self.cache.get_id_map(category).items()
         ratings.sort(cmp=lambda x,y: cmp(x[1], y[1]))
-        return self.html_page('rating/list.html', vars())
+        items = [ {"id": x, "name": y} for x,y in ratings ]
+        return {"title": title, "items": items }
 
 class RatingBooks(ListHandler):
     def get(self, name):

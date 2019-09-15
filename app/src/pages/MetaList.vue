@@ -1,7 +1,15 @@
 <template>
     <v-row>
-        <v-col>
-            <v-chip v-for="item in items" :to="item.href" :key="item.name" outlined color="primary" >
+        <template v-if="meta == 'rating'">
+            <v-col cols=4 sm=2 v-for="item in items" :key="item.name" >
+                <v-chip :to="item.href" outlined color="primary" >
+                    {{item.name}}星书籍
+                    <span v-if="item.count">&nbsp;({{item.count}})</span>
+                </v-chip>
+            </v-col>
+        </template >
+        <v-col v-else>
+            <v-chip small class="ma-1" v-for="item in items" :to="item.href" :key="item.name" outlined color="primary" >
                 {{item.name}}
                 <span v-if="item.count">&nbsp;({{item.count}})</span>
             </v-chip>
@@ -26,6 +34,7 @@ export default {
         },
     },
     data: () => ({
+        meta: "",
         title: "",
         page: 0,
         data: [],
@@ -45,8 +54,8 @@ export default {
         init(route, next) {
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
-            var meta = route.params.meta;
-            this.backend("/"+meta+"?fmt=json")
+            this.meta = route.params.meta;
+            this.backend("/"+this.meta+"?fmt=json")
             .then(rsp => {
                 this.title = rsp.title;
                 this.data = rsp.items;

@@ -390,6 +390,7 @@ class ListHandler(BaseHandler):
             self.do_sort(items, field, ascending)
         return None
 
+    @js
     def render_book_list(self, all_books, vars_, ids=None):
         start = self.get_argument_start()
         sort = self.get_argument("sort", "timestamp")
@@ -411,7 +412,59 @@ class ListHandler(BaseHandler):
         else:
             self.sort_books(all_books, sort)
             books = all_books[start:start+delta]
-        vars_.update(vars())
-        return self.html_page('book/list.html', vars_)
+        return {
+                'category': vars_.get('category', None),
+                "title": vars_['title'],
+                "total": count,
+                'books': [ self.fmt(b) for b in books ],
+            }
 
+    def fmt(self, b):
+        def get(k, default=_("Unknown")):
+            v = b.get(k, None)
+            if not v: v = default
+            return v
+
+        collector = b.get('collector', None)
+        if isinstance(collector, dict):
+            collector = collector.get("username", None)
+        elif collector:
+            collector = collector.username
+
+        try: pubdate = b['pubdate'].strftime("%Y-%m-%d")
+        except: pubdate = None
+
+        pub = b.get("publisher", None)
+        if not pub: pub = _("Unknown")
+
+        author_sort = b.get('author_sort', None)
+        if not author_sort: author_sort = _("Unknown")
+
+        comments = b.get("comments", None)
+        if not comments: comments = _(u"点击浏览详情")
+
+        return {
+            'id':              b['id'],
+            'title':           b['title'],
+            'rating':          b['rating'],
+            'count_visit':     get('count_visit', 0),
+            'count_download':  get('count_download', 0),
+            'timestamp':       b['timestamp'].strftime("%Y-%m-%d"),
+            'pubdate':         pubdate,
+            'collector':       collector,
+            'author':          ', '.join(b['authors']),
+            'authors':         b['authors'],
+            'tag':             ' / '.join(b['tags']),
+            'tags':            b['tags'],
+            'author_sort':     get('author_sort'),
+            'publisher':       get('publisher'),
+            'comments':        get('comments',  _(u'暂无简介') ),
+            'series':          get('series',    None),
+            'language':        get('language',  None),
+            'isbn':            get('isbn',      None),
+
+            "img":             self.cdn_url+"/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
+            "author_url":      self.base_url+"/author/"+author_sort,
+            "publisher_url":   self.base_url+"/pub/"+pub,
+            }
 
