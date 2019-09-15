@@ -49,7 +49,7 @@ def website_format(value):
     return ";".join(links)
 
 
-def json_response(func):
+def js(func):
     def do(self, *args, **kwargs):
         rsp = func(self, *args, **kwargs)
         self.write( rsp )

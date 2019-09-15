@@ -212,7 +212,7 @@ class BookReferSet(BaseHandler):
 
 
 class BookRating(BaseHandler):
-    @json_response
+    @js
     def post(self, id):
         rating = self.get_argument("rating", None)
         try:
@@ -229,7 +229,7 @@ class BookRating(BaseHandler):
         return {'ecode': 0, 'msg': _(u'更新成功')}
 
 class BookEdit(BaseHandler):
-    @json_response
+    @js
     def post(self, id):
         field = self.get_argument("field", None)
         content = self.get_argument("content", "").strip()
@@ -451,7 +451,7 @@ class BookRead(BaseHandler):
 
 class BookPush(BaseHandler):
     #@web.authenticated
-    @json_response
+    @js
     @auth
     def post(self, id):
         mail_to = self.get_argument("mail_to", None)

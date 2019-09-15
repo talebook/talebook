@@ -5,7 +5,7 @@ import time, datetime, logging, re, hashlib, json
 import tornado.escape
 from tornado import web
 from models import Reader
-from base_handlers import BaseHandler, json_response, auth
+from base_handlers import BaseHandler, js, auth
 from calibre.utils.smtp import sendmail, create_mail
 
 import loader
@@ -122,7 +122,7 @@ class UserView(BaseHandler):
 
 class AdminView(BaseHandler):
     #@web.authenticated
-    @json_response
+    @js
     def get(self):
         #if not self.is_admin():
         #    return {'err': 'permission.not_admin', 'msg': _(u'Not Admin')}
@@ -177,7 +177,7 @@ class AdminSet(BaseHandler):
         self.redirect('/', 302)
 
 class UserUpdate(BaseHandler):
-    @json_response
+    @js
     def post(self):
         data = tornado.escape.json_decode(self.request.body)
         user = self.current_user
@@ -241,7 +241,7 @@ class SignUp(BaseHandler):
                 password=CONF['smtp_password']
                 )
 
-    @json_response
+    @js
     def post(self):
         email = self.get_argument("email", "").strip()
         nickname = self.get_argument("nickname", "").strip()
@@ -281,7 +281,7 @@ class SignUp(BaseHandler):
         return {'err': 'ok'}
 
 class UserSendActive(SignUp):
-    @json_response
+    @js
     @auth
     def get(self):
         self.send_active_email(self.current_user)
@@ -300,7 +300,7 @@ class UserActive(SignUp):
 
 
 class SignIn(BaseHandler):
-    @json_response
+    @js
     def post(self):
         username = self.get_argument("username", "").strip().lower()
         password = self.get_argument("password", "").strip()
@@ -317,7 +317,7 @@ class SignIn(BaseHandler):
         return {'err': 'ok', 'msg': 'ok'}
 
 class UserReset(BaseHandler):
-    @json_response
+    @js
     def post(self):
         email = self.get_argument("email", "").strip().lower()
         username = self.get_argument("username", "").strip().lower()
@@ -356,7 +356,7 @@ class UserReset(BaseHandler):
 
 
 class SignOut(BaseHandler):
-    @json_response
+    @js
     @auth
     def get(self):
         self.set_secure_cookie("user_id", "")
@@ -365,7 +365,7 @@ class SignOut(BaseHandler):
         return {'err': 'ok', 'msg': _(u'你已成功退出登录。')}
 
 class UserMessages(BaseHandler):
-    @json_response
+    @js
     def get(self):
         db = self.db
         user = self.current_user
@@ -449,7 +449,7 @@ class UserInfo(BaseHandler):
 
         return d
 
-    @json_response
+    @js
     def get(self):
         if CONF.get("installed", None) == False:
             return {'err': 'not_installed'}
@@ -467,13 +467,13 @@ class Welcome(BaseHandler):
     def should_be_invited(self):
         pass
 
-    @json_response
+    @js
     def get(self):
         if not self.need_invited():
             return {'err': 'free', 'msg': _(u'无需访问码')}
         return {'err': 'ok', 'msg': CONF['INVITE_MESSAGE']}
 
-    @json_response
+    @js
     def post(self):
         code = self.get_argument("invite_code", None)
         if not code or code != CONF['INVITE_CODE']:
@@ -482,7 +482,7 @@ class Welcome(BaseHandler):
         return {'err': 'ok', 'msg': 'ok'}
 
 class AdminSettings(BaseHandler):
-    @json_response
+    @js
     @auth
     def get(self):
         if not self.admin_user:
@@ -499,7 +499,7 @@ class AdminSettings(BaseHandler):
                 }
         return {'err': 'ok', 'settings': CONF, 'social': social}
 
-    @json_response
+    @js
     @auth
     def post(self):
         return {'err': 'ok'}
@@ -511,12 +511,12 @@ class AdminInstall(BaseHandler):
     def should_be_installed(self):
         pass
 
-    @json_response
+    @js
     def get(self):
         err = 'not_installed' if CONF.get("installed", True) == False else 'intalled'
         return {'err': err}
 
-    @json_response
+    @js
     def post(self):
         if CONF.get("installed", True) != False:
             return {'err': 'installed', 'msg': _(u'不可重复执行安装操作')}
