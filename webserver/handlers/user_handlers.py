@@ -112,21 +112,11 @@ class AdminUsers(BaseHandler):
             return {'err': 'params.user.not_exist', 'msg': _(u'用户ID错误')}
         if 'active' in data: user.active = data['active']
         if 'admin' in data: user.admin = data['admin']
-        perm = {
-                'LOGIN': Reader.LOGIN,
-                'VIEW': Reader.VIEW,
-                'READ': Reader.READ,
-                'UPLOAD': Reader.UPLOAD,
-                'DOWNLOAD': Reader.DOWNLOAD,
-                }
-        for key, bit in perm.items():
-            if key not in data: continue
-            if user.permission & Reader.SPECIAL == 0:
-                user.permission = Reader.SPECIAL | Reader.LOGIN | Reader.VIEW | Reader.READ | Reader.UPLOAD | Reader.DOWNLOAD
-            if data[key] == True:
-                user.permission |= bit
-            else:
-                user.permission &= ~bit
+
+        p = data.get('permission', "")
+        if not isinstance(p, (str, unicode)):
+            return {'err': 'params.permission.invalid', 'msg': _(u'权限参数不对')}
+        if p: user.set_permission(p)
         user.save()
         return {'err': 'ok'}
 

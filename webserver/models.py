@@ -72,7 +72,7 @@ class Reader(Base, SQLAlchemyMixin):
     avatar = Column(String(200))
     admin = Column(Boolean, default=False)
     active = Column(Boolean, default=True)
-    permission = Column(Integer, default=0)
+    permission = Column(String(100), default='')
     create_time = Column(DateTime)
     update_time = Column(DateTime)
     access_time = Column(DateTime)
@@ -130,14 +130,29 @@ class Reader(Base, SQLAlchemyMixin):
             logging.info("userid[%s] username needs update to [%s]" % (self.id, name) )
             self.username = name
 
-    def has_permission(self, bit):
-        return ( self.permission & SPECIAL == 0 ) or ( self.permission & bit != 0 )
+    def set_permission(self, operations):
+        ALL = 'lvrude'
+        if not isinstance(operations, (str, unicode)): raise 'bug'
+        v = list(self.permission)
+        for p in operations:
+            if p.lower() not in ALL: continue
+            r = p.upper() if p.islower() else p.lower()
+            try: v.remove(r)
+            except: pass
+            v.append( p )
+        self.permission = "".join( sorted(v) )
 
-    def can_login(self):    return self.has_permission(LOGIN)
-    def can_view(self):     return self.has_permission(VIEW)
-    def can_read(self):     return self.has_permission(READ)
-    def can_upload(self):   return self.has_permission(UPLOAD)
-    def can_download(self): return self.has_permission(DOWNLOAD)
+    def has_permission(self, operation, default=True):
+        if operation.lower() in self.permission: return True
+        if operation.upper() in self.permission: return False
+        return default
+
+    def can_login(self):    return self.has_permission('l')
+    def can_view(self):     return self.has_permission('v')
+    def can_read(self):     return self.has_permission('r')
+    def can_upload(self):   return self.has_permission('u')
+    def can_download(self): return self.has_permission('d')
+    def can_editor(self):   return self.has_permission('e', False)
 
 
     def is_active(self):
