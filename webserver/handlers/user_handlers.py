@@ -95,6 +95,41 @@ class AdminUsers(BaseHandler):
             items.append( d )
         return {"err": 'ok', "users": {"items": items, "total": total}}
 
+    @js
+    @auth
+    def post(self):
+        if not self.admin_user:
+            return {'err': 'permission.not_admin', 'msg': _(u'当前用户非管理员')}
+        data = tornado.escape.json_decode(self.request.body)
+        uid = data.get('id', None)
+        if not uid:
+            return {'err': 'params.invalid', 'msg': _(u'参数错误')}
+        del data['id']
+        if not data:
+            return {'err': 'params.fields.invalid', 'msg': _(u'用户配置项参数错误')}
+        user = self.session.query(Reader).filter(Reader.id==uid).first()
+        if not user:
+            return {'err': 'params.user.not_exist', 'msg': _(u'用户ID错误')}
+        if 'active' in data: user.active = data['active']
+        if 'admin' in data: user.admin = data['admin']
+        perm = {
+                'LOGIN': Reader.LOGIN,
+                'VIEW': Reader.VIEW,
+                'READ': Reader.READ,
+                'UPLOAD': Reader.UPLOAD,
+                'DOWNLOAD': Reader.DOWNLOAD,
+                }
+        for key, bit in perm.items():
+            if key not in data: continue
+            if user.permission & Reader.SPECIAL == 0:
+                user.permission = Reader.SPECIAL | Reader.LOGIN | Reader.VIEW | Reader.READ | Reader.UPLOAD | Reader.DOWNLOAD
+            if data[key] == True:
+                user.permission |= bit
+            else:
+                user.permission &= ~bit
+        user.save()
+        return {'err': 'ok'}
+
 class AdminOwnerMode(BaseHandler):
     @auth
     def get(self):
@@ -329,6 +364,7 @@ class UserInfo(BaseHandler):
                 "title":      CONF['site_title'],
                 "socials":    CONF['SOCIALS'],
                 "friends":    CONF['FRIENDS'],
+                "register":   CONF['ALLOW_REGISTER'],
             }
 
     def get_user_info(self, detail):
@@ -430,7 +466,46 @@ class AdminSettings(BaseHandler):
     @js
     @auth
     def post(self):
-        return {'err': 'ok'}
+        data = tornado.escape.json_decode(self.request.body)
+        KEYS = [
+                'ALLOW_GUEST_DOWNLOAD',
+                'ALLOW_GUEST_PUSH',
+                'ALLOW_REGISTER',
+                'FRIENDS',
+                'INVITE_CODE',
+                'INVITE_MESSAGE',
+                'INVITE_MODE',
+                'RESET_MAIL_CONTENT',
+                'RESET_MAIL_TITLE',
+                'SIGNUP_MAIL_CONTENT',
+                'SIGNUP_MAIL_TITLE',
+                'SOCIALS',
+                'autoreload',
+                'cookie_secret',
+                'douban_apikey',
+                'site_title',
+                'smtp_password',
+                'smtp_server',
+                'smtp_username',
+                'static_host',
+                'xsrf_cookies',
+                ]
+
+        args = loader.SettingsLoader()
+        for key in args.keys(): args.pop(key)
+
+        args['installed'] = True
+        for key, val in data.items():
+            if key.startswith("SOCIAL_AUTH"):
+                if key.endswith("_KEY") or key.endswith("_SECRET"):
+                    args[key] = val
+            elif key in KEYS:
+                args[key] = val
+        try:
+            args.dumpfile()
+        except:
+            return {'err': 'file.permission', 'msg': _(u'更新磁盘配置文件失败！请确保配置文件的权限为可写入！')}
+        return {'err': 'ok', 'rsp': args}
 
 class AdminInstall(BaseHandler):
     def should_be_invited(self):

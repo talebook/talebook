@@ -54,20 +54,30 @@ class MutableDict(Mutable, dict):
         return dict.__getitem__(self, key)
 
 class Reader(Base, SQLAlchemyMixin):
+    # 权限位
+    SPECIAL  = 0b00000001 # 未开启说明是默认权限
+    LOGIN    = 0b00000010 # 登录
+    VIEW     = 0b00000100 # 浏览
+    READ     = 0b00001000 # 阅读
+    UPLOAD   = 0b00010000 # 上传
+    DOWNLOAD = 0b00100000 # 下载
+
     __tablename__ = 'readers'
     id = Column(Integer, primary_key=True)
     username = Column(String(200))
     password = Column(String(200), default='')
+    salt = Column(String(200))
     name = Column(String(100))
     email = Column(String(200))
     avatar = Column(String(200))
     admin = Column(Boolean, default=False)
     active = Column(Boolean, default=True)
-    salt = Column(String(200))
+    permission = Column(Integer, default=0)
     create_time = Column(DateTime)
     update_time = Column(DateTime)
     access_time = Column(DateTime)
     extra = Column(MutableDict.as_mutable(JSONType), default={})
+
 
     def init_default_user(self):
         class DefaultUserInfo:
@@ -119,6 +129,15 @@ class Reader(Base, SQLAlchemyMixin):
         if self.username != name:
             logging.info("userid[%s] username needs update to [%s]" % (self.id, name) )
             self.username = name
+
+    def has_permission(self, bit):
+        return ( self.permission & SPECIAL == 0 ) or ( self.permission & bit != 0 )
+
+    def can_login(self):    return self.has_permission(LOGIN)
+    def can_view(self):     return self.has_permission(VIEW)
+    def can_read(self):     return self.has_permission(READ)
+    def can_upload(self):   return self.has_permission(UPLOAD)
+    def can_download(self): return self.has_permission(DOWNLOAD)
 
 
     def is_active(self):

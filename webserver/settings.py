@@ -57,6 +57,7 @@ settings = {
 
     'ALLOW_GUEST_PUSH' : False,
     'ALLOW_GUEST_DOWNLOAD' : False,
+    'ALLOW_REGISTER' : False,
 
     'FRIENDS': [
         { "text": u"奇异书屋", "href": "https://www.talebook.org" },
@@ -64,9 +65,9 @@ settings = {
         { "text": u"陈芸书屋", "href": "https://book.killsad.top/" },
     ],
     'SOCIALS': [
-        { "name": u"Amazon", "action": "amazon" },
-        { "name": u"Github", "action": "github" },
-        { "name": u"微信", "action": "wechat" },
+        { "text": u"Amazon", "value": "amazon" },
+        { "text": u"Github", "value": "github" },
+        { "text": u"微信", "value": "wechat" },
     ],
 
     'SIGNUP_MAIL_TITLE': u'欢迎注册奇异书屋',

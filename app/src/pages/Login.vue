@@ -5,7 +5,7 @@
             <v-toolbar dark color="primary">
                 <v-toolbar-title>欢迎访问</v-toolbar-title>
                 <v-spacer></v-spacer>
-                <v-btn rounded color="green" to="/signup">注册</v-btn>
+                <v-btn v-if="$store.state.sys.register" rounded color="green" to="/signup">注册</v-btn>
             </v-toolbar>
             <v-card-text>
                 <v-form @submit.prevent="do_login" >
@@ -25,7 +25,7 @@
                     <small>使用社交网络账号登录</small>
                     <br/>
                     <template v-for="s in socials">
-                    <v-btn small outlined :key="s.name" :href="'/api/login/'+s.action">{{s.name}}</v-btn>
+                    <v-btn small outlined :key="s.text" :href="'/api/login/'+s.value">{{s.text}}</v-btn>
                     &nbsp;
                     </template>
                 </div>

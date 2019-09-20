@@ -1,31 +1,51 @@
 <template>
     <div>
         <v-card class="my-2 elevation-4" v-for="card in cards" :key="card.title" >
-            <v-card-actions @click="card.show = !card.show">
-                <v-btn icon>
+            <v-card-actions>
+                <v-btn @click="card.show = !card.show" icon>
                     <v-icon>{{ card.show ? 'keyboard_arrow_down' : 'keyboard_arrow_up' }}</v-icon>
                 </v-btn>
-                <v-card-title><span class="subtitle-2">{{card.title}}</span></v-card-title>
+                <p @click="card.show = !card.show" class="cursor-pointer title mb-0"> <span>{{card.title}}</span> </p>
             </v-card-actions>
             <v-card-text v-show="card.show">
+                <p v-if="card.subtitle" class="">{{card.subtitle}}</p>
                 <template v-for="f in card.fields">
-                    <v-checkbox v-if="f.type === 'checkbox' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-checkbox>
-                    <v-textarea v-else-if="f.type === 'textarea' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-textarea>
+                    <v-checkbox small hide-details v-if="f.type === 'checkbox' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-checkbox>
+                    <v-textarea outlined v-else-if="f.type === 'textarea' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-textarea>
                     <v-text-field v-else :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" type="text"></v-text-field>
                 </template>
 
                 <template v-for="g in card.groups" >
-                    <v-checkbox v-model="g.value" :key="g.label" :label="g.label"></v-checkbox>
+                    <v-checkbox small hide-details v-model="g.value" :key="g.label" :label="g.label"></v-checkbox>
                     <template v-if="g.value">
                         <template v-for="f in g.fields">
-                            <v-textarea v-if="f.type === 'textarea' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-textarea>
+                            <v-textarea outlined v-if="f.type === 'textarea' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-textarea>
                             <v-text-field v-else :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" type="text"></v-text-field>
                         </template>
                     </template>
                 </template>
 
+                <template v-if="card.show_friends">
+                    <v-row v-for="(friend, idx) in settings.FRIENDS">
+                        <v-col class='py-0' cols=3>
+                            <v-text-field flat small hide-details single-line v-model="friend.text" label="名称" type="text"></v-text-field>
+                        </v-col>
+                        <v-col class='pa-0' cols=9>
+                            <v-text-field flat small hide-details single-line v-model="friend.href" label="链接" type="text" append-outer-icon="delete" @click:append-outer="alert('success', 'yo')" ></v-text-field>
+                        </v-col>
+                    </v-row>
+                    <v-row>
+                        <v-col align="center">
+                            <v-btn color="primary" @click="settings.FRIENDS.push({text:'', href: ''})"><v-icon>add</v-icon>添加</v-btn>
+                        </v-col>
+                    </v-row>
+
+
+                </template>
+
                 <template v-if="card.show_socials">
-                    <v-combobox v-model="social.select" :items="social.items" label="选择要启用的社交网络账号" hide-selected multiple small-chips>
+                    <p>所启用的社交网络将会在登录页面自动显示按钮。</p>
+                    <v-combobox v-model="settings.SOCIALS" :items="social.items" label="选择要启用的社交网络账号" hide-selected multiple small-chips>
                         <template v-slot:selection="{ attrs, item, parent, selected }">
                             <v-chip v-bind="attrs" color="green lighten-3" :input-value="selected" label small >
                                 <span class="pr-2"> {{ item.text }} </span>
@@ -34,14 +54,14 @@
                         </template>
                     </v-combobox>
                     <v-row v-for="s in social.select" :key="'social-'+s.value" >
-                        <v-col cols=12 sm=2>
-                            <v-subheader class="pa-0" :class="$vuetify.breakpoint.smAndUp?'float-right':''">配置{{s.text}} OAuth</v-subheader>
+                        <v-col class='py-0' cols=2 sm=2>
+                            <v-subheader class="px-0 pt-4" :class="$vuetify.breakpoint.smAndUp?'float-right':''">{{s.text}}</v-subheader>
                         </v-col>
-                        <v-col cols=12 sm=5>
-                            <v-text-field small hide-details solo v-model="settings['SOCIAL_AUTH_'+s.value.toUpperCase()+'_KEY']" label="Key" type="text"></v-text-field>
+                        <v-col class='py-0' cols=3 sm=3>
+                            <v-text-field small hide-details single-line v-model="settings['SOCIAL_AUTH_'+s.value.toUpperCase()+'_KEY']" label="Key" type="text"></v-text-field>
                         </v-col>
-                        <v-col cols=12 sm=5>
-                            <v-text-field small hide-details solo v-model="settings['SOCIAL_AUTH_'+s.value.toUpperCase()+'_SECRET']" label="Secret" type="text"></v-text-field>
+                        <v-col class='py-0' cols=7 sm=7>
+                            <v-text-field small hide-details single-line v-model="settings['SOCIAL_AUTH_'+s.value.toUpperCase()+'_SECRET']" label="Secret" type="text"></v-text-field>
                         </v-col>
                     </v-row>
                 </template>
@@ -77,7 +97,7 @@ export default {
         cards: [
             {
             show: false,
-            title: "基础配置",
+            title: "基础",
             fields: [
                 { icon: "home", key: "site_title", label: "网站标题", },
             ],
@@ -94,7 +114,7 @@ export default {
         },
         {
             show: false,
-            title: "用户权限配置",
+            title: "用户",
             fields: [
                 { icon: "", key: "ALLOW_GUEST_DOWNLOAD", label: "允许任意下载（访客无需注册和登录）", type: 'checkbox' },
                 { icon: "", key: "ALLOW_GUEST_PUSH", label: "允许任意推送Kindle（访客无需注册和登录）", type: 'checkbox' },
@@ -115,13 +135,14 @@ export default {
 
         {
             show: false,
-            title: '配置社交网络登录',
+            title: '社交网络登录',
             fields: [ ],
             show_socials: true,
         },
         {
             show: false,
-            title: "配置邮件服务器（邮箱注册、推送Kindle依赖此配置）",
+            title: "邮件服务",
+            subtitle: '邮箱注册、推送Kindle依赖此配置',
             fields: [
                 { icon: "email", key: "smtp_server", label: "SMTP服务器" },
                 { icon: "person", key: "smtp_username", label: "SMTP用户名" },
@@ -130,11 +151,17 @@ export default {
         },
         {
             show: false,
+            title: '友情链接',
+            fields: [ ],
+            show_friends: true,
+        },
+        {
+            show: false,
             title: "高级配置项",
             fields: [
                 { icon: "home", key: "static_host", label: "CDN域名" },
                 { icon: "lock", key: "cookie_secret", label: "COOKIE随机密钥" },
-                { icon: "", key: "autoreload", label: "开启Tornado自动重载", type: 'checkbox' },
+                { icon: "", key: "autoreload", label: "更新配置后自动重启服务器(首次开启需人工重启)", type: 'checkbox' },
             ],
         },
 
@@ -157,4 +184,10 @@ export default {
     },
   }
 </script>
+
+<style>
+.cursor-pointer {
+    cursor: pointer;
+}
+</style>
 

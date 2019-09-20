@@ -20,7 +20,26 @@
         <span v-if="item.extra.upload_history">   上传{{item.extra.upload_history.length}}本   </span>
     </template>
     <template v-slot:item.actions="{ item }">
-        Actions
+            <v-menu offset-y right>
+                <template v-slot:activator="{on}">
+                <v-btn color="primary" small v-on="on" >操作 <v-icon small>more_vert</v-icon></v-btn>
+                </template>
+                <v-list>
+                    <v-list-item v-if="! item.is_active" @click="setuser(item.id, {'active': true})" >
+                        <v-list-item-title> 免邮箱认证，直接激活账户 </v-list-item-title>
+                    </v-list-item>
+                    <v-list-item v-if="item.is_admin" @click="setuser(item.id, {'admin': false})" >
+                        <v-list-item-title> 取消管理员 </v-list-item-title>
+                    </v-list-item>
+                    <v-list-item v-else @click="setuser(item.id, {'admin': true})" >
+                        <v-list-item-title> 设置为管理员 </v-list-item-title>
+                    </v-list-item>
+                    <v-divider></v-divider>
+                    <v-list-item @click2="setuser(item.id, {'LOGIN': false})" @click="alert('error', '暂未支持该功能，敬请期待后续版本更新')" >
+                        <v-list-item-title><v-icon>delete</v-icon> 禁用账号登陆 </v-list-item-title>
+                    </v-list-item>
+                </v-list>
+            </v-menu>
     </template>
     </v-data-table>
   </div>
@@ -86,7 +105,21 @@ export default {
                 this.total = rsp.users.total;
                 this.loading = false;
             });
-        }
+        },
+        setuser(uid, action) {
+            action.id = uid;
+            this.backend("/admin/users", {
+                body: JSON.stringify(action),
+                method: "POST",
+            })
+            .then(rsp => {
+                if ( rsp.err == 'ok' ) {
+                    this.alert("success", "成功！");
+                } else {
+                    this.alert("error", rsp.msg );
+                }
+            });
+        },
     },
 }
 </script>

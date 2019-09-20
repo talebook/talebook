@@ -21,7 +21,7 @@ class SettingsLoader(dict):
         except:
             pass
 
-    def dumpfile(self):
+    def dumpfile(self, filename="local_settings.py"):
         s = "\n".join( '%-30s: %s,' % ("'"+k+"'", repr(v)) for k,v in sorted(self.items()) )
         code = u'''#!/usr/bin/python
 #-*- coding: UTF-8 -*-
@@ -32,9 +32,9 @@ settings = {
 }
 '''
 
-        py = os.path.join(os.path.dirname(__file__), "local_settings.py")
+        py = os.path.join(os.path.dirname(__file__), filename)
         open(py, "w").write(code.encode("UTF-8"))
-        pyc = os.path.join(os.path.dirname(__file__), "local_settings.pyc")
+        pyc = os.path.join(os.path.dirname(__file__), filename+"c")
         try: os.remove(pyc)
         except: pass
 

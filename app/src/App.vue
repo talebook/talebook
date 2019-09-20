@@ -32,7 +32,6 @@
                 </v-card>
             </v-dialog>
         </v-content>
-        <app-footer v-if="$store.state.nav"></app-footer>
     </v-app>
 </template>
 
