@@ -57,7 +57,7 @@
             <v-btn v-else icon class="d-flex d-sm-none" @click="btn_search = !btn_search"> <v-icon>search</v-icon> </v-btn>
 
             <template v-if="user.is_login">
-            <v-menu offset-y right>
+            <v-menu offset-y right v-if="messages.length > 0">
                 <template v-slot:activator="{on}">
                 <v-btn v-on="on" icon> <v-icon>notifications</v-icon> </v-btn>
                 </template>

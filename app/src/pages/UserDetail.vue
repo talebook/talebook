@@ -13,7 +13,7 @@
             <v-col cols=9><p class="pt-3 mb-0">{{user.username}}</p></v-col>
 
             <v-col cols=3><v-subheader class="pa-0 float-right" >邮箱</v-subheader></v-col>
-            <v-col cols=9><p class="pt-3 mb-0">{{user.email}}<a href='#' @click='send_active_email'>重新发送激活邮件</a></p></v-col>
+            <v-col cols=9><p class="pt-3 mb-0">{{user.email}}<a href='#' v-if="!user.is_active" @click='send_active_email'>重新发送激活邮件</a></p></v-col>
 
             <v-col cols=3><v-subheader class="pa-0 float-right" >密码</v-subheader></v-col>
             <v-col cols=9>
