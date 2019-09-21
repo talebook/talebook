@@ -16,25 +16,26 @@
 
             <v-card>
                 <v-toolbar dark color="primary">
-                    <v-toolbar-title align-center >Edit Book</v-toolbar-title>
+                    <v-toolbar-title align-center >编辑书籍信息</v-toolbar-title>
                     <v-spacer></v-spacer>
-                    <v-btn>取消</v-btn>
+                    <v-btn class='mr-2' color='red' :to="'/book/'+bookid" >取消</v-btn>
+                    <v-btn color='green' @click="save_book">保存</v-btn>
                 </v-toolbar>
                 <v-card-text class="pa-0 pa-md-2">
                     <v-form>
                         <v-container>
                             <v-row>
-                                <v-col cols=12 md=6>
-                                    <v-text-field label="Book Title" v-model="book.title">{{book.title}}</v-text-field>
+                                <v-col class='py-0' cols=12 sm=6>
+                                    <v-text-field label="书名" v-model="book.title">{{book.title}}</v-text-field>
                                 </v-col>
-                                <v-col cols=12 md=6>
+                                <v-col class='py-0' cols=12 sm=6>
                                     <!-- AUTHORS -->
-                                    <v-combobox v-model="book.authors" :items="book.authors" label="Book authors" :search-input.sync="author_input" hide-selected multiple small-chips>
+                                    <v-combobox v-model="book.authors" :items="book.authors" label="作者" :search-input.sync="author_input" hide-selected multiple small-chips>
                                         <template v-slot:no-data>
                                             <v-list-item>
-                                                <span v-if="! author_input">请输入新的标签名称</span>
+                                                <span v-if="! author_input">请输入新的名称</span>
                                                 <div v-else>
-                                                    <span class="subheading">添加标签</span>
+                                                    <span class="subheading">添加</span>
                                                     <v-chip color="green lighten-3" label small rounded> {{ author_input }} </v-chip>
                                                 </div>
                                             </v-list-item>
@@ -48,23 +49,23 @@
                                         </template>
                                     </v-combobox>
                                 </v-col>
-                                <v-col cols=12 md=6>
-                                    <v-text-field label="Book PUblisher" v-model="book.publisher">{{book.publisher}}</v-text-field>
+                                <v-col class='py-0' cols=12 sm=6>
+                                    <v-text-field label="出版社" v-model="book.publisher">{{book.publisher}}</v-text-field>
                                 </v-col>
-                                <v-col cols=12 md=6>
-                                    <v-text-field label="Book PUBDATE" v-model="book.pubdate">{{book.pubdate}}</v-text-field>
+                                <v-col class='py-0' cols=12 sm=6>
+                                    <v-text-field label="出版日期" v-model="book.pubdate">{{book.pubdate}}</v-text-field>
                                 </v-col>
-                                <v-col cols=12 md=6>
-                                    <v-text-field label="Book ISBN" v-model="book.isbn">{{book.isbn}}</v-text-field>
-                                </v-col>
-
-                                <v-col cols=12 md=6>
-                                    <v-text-field label="Book Series" v-model="book.series">{{book.series}}</v-text-field>
+                                <v-col class='py-0' cols=12 sm=6>
+                                    <v-text-field label="ISBN编号" v-model="book.isbn">{{book.isbn}}</v-text-field>
                                 </v-col>
 
-                                <v-col cols=12>
+                                <v-col class='py-0' cols=12 sm=6>
+                                    <v-text-field label="丛书名称" v-model="book.series">{{book.series}}</v-text-field>
+                                </v-col>
+
+                                <v-col class='py-0' cols=12>
                                     <!-- TAGS -->
-                                    <v-combobox v-model="book.tags" :items="book.tags" label="Book Tags" :search-input.sync="tag_input" hide-selected multiple small-chips>
+                                    <v-combobox v-model="book.tags" :items="book.tags" label="标签列表" :search-input.sync="tag_input" hide-selected multiple small-chips>
                                         <template v-slot:no-data>
                                             <v-list-item>
                                                 <span v-if="! tag_input">请输入新的标签名称</span>
@@ -83,11 +84,13 @@
                                         </template>
                                     </v-combobox>
                                 </v-col>
-                                <v-col cols="12">
-                                    <v-textarea outlined rows="20" label="Book Comments" v-model="book.comments" :value="book.comments" ></v-textarea>
+                                <v-col class='py-0' cols="12">
+                                    <v-textarea small outlined rows="15" label="内容简介" v-model="book.comments" :value="book.comments" ></v-textarea>
                                 </v-col>
                                 <v-divider></v-divider>
-                                <v-btn>保存</v-btn>
+                                <v-col align=center cols="12">
+                                <v-btn dark color='green' @click='save_book'>保存</v-btn>
+                                </v-col>
                             </v-row>
                         </v-container>
 
@@ -131,31 +134,29 @@ export default {
     methods: {
         init(route, next) {
             this.$store.commit('navbar', true);
-            this.bookid = route.params.bookid;
             this.$store.commit('loading');
-            var bookid = route.params.bookid;
-            this.backend("/book/" + bookid)
-            .then( book => {
-                book.img = book.cover_large_url;
-                this.book = book;
+
+            this.bookid = this.$route.params.bookid;
+            this.backend("/book/" + this.bookid)
+            .then( rsp => {
+                this.book = rsp.book;
                 this.$store.commit('loaded');
             });
             if ( next ) next();
         },
-        sendto_kindle() {
-            var bookid = this.$route.params.bookid;
-            this.backend("/book/"+bookid+"/push", {
+        save_book() {
+            this.saving = true;
+            this.backend("/book/"+this.bookid+"/edit", {
                 method: "POST",
-                body: "mail_to="+this.mail_to,
-                headers: {
-                    'Content-Type': "application/x-www-form-urlencoded",
-                },
+                body: JSON.stringify(this.book),
             })
             .then( rsp => {
-                this.alert_msg = rsp.msg;
-                this.alert_type = ( rsp.err == 'ok' )?  "success": "error";
-                this.dialog_msg = true;
-                this.dialog_kindle = false;
+                if ( rsp.err == 'ok' ) {
+                    this.alert("success", "保存成功！");
+                    this.$router.push("/book/"+this.bookid);
+                } else {
+                    this.alert("error", rsp.msg);
+                }
             });
         }
     },

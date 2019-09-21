@@ -5,6 +5,7 @@ import logging
 import douban
 import baike
 import subprocess
+import tornado.escape
 from base_handlers import *
 
 from calibre.ebooks.metadata import authors_to_string
@@ -320,27 +321,22 @@ class BookRating(BaseHandler):
 
 class BookEdit(BaseHandler):
     @js
-    def post(self, id):
-        field = self.get_argument("field", None)
-        content = self.get_argument("content", "").strip()
-        if not field or not content:
-            return {'ecode': 1, 'msg': _(u"参数错误")}
+    @auth
+    def post(self, bid):
+        bid = int(bid)
+        data = tornado.escape.json_decode(self.request.body)
+        mi = self.db.get_metadata(bid, index_is_id=True)
+        KEYS = ['authors', 'title', 'comments', 'tags', 'publisher', 'isbn', 'series']
+        for key, val in data.items():
+            if key in KEYS:
+                mi.set(key, val)
+        if 'pubdate' in data:
+            try: content = datetime.datetime.strptime(data['pubdate'], "%Y-%m-%d")
+            except: return {'err': 'params.pudate.invalid', 'msg': _(u'出版日期参数错误，格式应为 2019-05-10') }
+            mi.set('pubdate', content)
 
-        book_id = int(id)
-        mi = self.db.get_metadata(book_id, index_is_id=True)
-        if field == 'pubdate':
-            try:
-                content = datetime.datetime.strptime(content, "%Y-%m-%d")
-            except:
-                return {'ecode': 2, 'msg': _(u"日期格式错误，应为 2018-05-10 这种格式")}
-        elif field == 'authors':
-            content = list(set([ v.strip() for v in content.split(";") if v.strip() ]))
-            mi.set('author_sort', content[0])
-        elif field == 'tags':
-            content = content.replace(" ", "").split("/")
-        mi.set(field, content)
-        self.db.set_metadata(book_id, mi)
-        return {'ecode': 0, 'msg': _(u"更新成功")}
+        self.db.set_metadata(bid, mi)
+        return {'err': 'ok', 'msg': _(u"更新成功")}
 
 class BookDelete(BaseHandler):
     def get(self, id):
