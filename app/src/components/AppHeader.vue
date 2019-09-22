@@ -89,8 +89,6 @@
                         <v-list-item-subtitle> {{user.email}} </v-list-item-subtitle>
                         </v-list-item-content>
                     </v-list-item>
-                </v-list>
-                <v-list>
                     <v-divider></v-divider>
                     <v-list-item to="/user/detail">
                         <v-list-item-action><v-icon>contacts</v-icon></v-list-item-action>
@@ -105,6 +103,14 @@
                         <v-list-item-title> 反馈 </v-list-item-title>
                     </v-list-item>
                     <v-divider></v-divider>
+                    <template v-if="user.is_admin">
+                    <v-divider></v-divider>
+                    <v-list-item to="/admin">
+                        <v-list-item-action><v-icon>mdi-console</v-icon></v-list-item-action>
+                        <v-list-item-title> 管理员入口 </v-list-item-title>
+                    </v-list-item>
+                    <v-divider></v-divider>
+                    </template>
 
                     <v-list-item to="/logout">
                         <v-list-item-action><v-icon>exit_to_app</v-icon></v-list-item-action>
@@ -143,20 +149,20 @@ export default {
             var nav_items = [
                 { icon: 'home',         href:'/',       text: '首页',         },
                 { heading: '分类浏览' },
-                { icon: 'contacts',     href:'/nav',    text: '所有书籍', count: sys.books      },
-                { icon: 'history',      href:'/pub',    text: '出版社',   count: sys.publishers },
-                { icon: 'content_copy', href:'/author', text: '作者',     count: sys.authors    },
-                { icon: 'content_copy', href:'/tag',    text: '标签',     count: sys.tags       },
-                { icon: 'content_copy', href:'/rating', text: '全部评分', },
-                { icon: 'content_copy', href:'/recent', text: '最近更新', },
-                { icon: 'content_copy', href:'/hot',    text: '热度榜单', },
+                { icon: 'widgets',            href:'/nav',    text: '所有书籍', count: sys.books      },
+                { icon: 'mdi-human-greeting', href:'/author', text: '作者',     count: sys.authors    },
+                { icon: 'mdi-home-group',     href:'/pub',    text: '出版社',   count: sys.publishers },
+                { icon: 'mdi-tag-heart',      href:'/tag',    text: '标签',     count: sys.tags       },
+                { icon: 'mdi-star-half',      href:'/rating', text: '全部评分', },
+                { icon: 'mdi-history',        href:'/recent', text: '最近更新', },
+                { icon: 'mdi-trending-up',    href:'/hot',    text: '热度榜单', },
             ].concat(  ( sys.friends.length > 0 ) ? [
                 { heading: '友情链接' },
                 { links: sys.friends },
             ] : [] ).concat([
                 { heading: '系统' },
                 { icon: 'help', text: '系统版本', count: sys.version },
-                { icon: 'thumb_up_alt', text: '源代码', href: "https://github.com/talebook/calibre-webserver", count: "Github" },
+                { icon: 'mdi-xml', text: '源代码', href: "https://github.com/talebook/calibre-webserver", count: "Github" },
                 { icon: 'settings', text: '管理员入口', href: "/admin" },
             ]);
             this.items = nav_items;

@@ -12,6 +12,7 @@
 
             <v-container fluid v-show="!$store.state.loading">
                 <router-view></router-view>
+                <app-footer ></app-footer>
             </v-container>
 
             <v-dialog v-model="$store.state.alert.show" persistent width="300">

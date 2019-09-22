@@ -1,4 +1,5 @@
 <template>
+    <div>
     <v-row>
         <v-col cols=12>
             <p class="ma-0 title">随便推荐</p>
@@ -8,6 +9,8 @@
                 <v-img :src="book.img" :aspect-ratio="4/3" height="240px" > </v-img>
             </v-card>
         </v-col>
+    </v-row>
+    <v-row>
         <v-col cols=12>
             <v-divider class="new-legend"></v-divider>
             <p class="ma-0 title">新书推荐</p>
@@ -16,6 +19,21 @@
             <book-cards :books="recent_books"></book-cards>
         </v-col>
     </v-row>
+    <v-row>
+        <v-col cols=12>
+            <v-divider class="new-legend"></v-divider>
+            <p class="ma-0 title">分类浏览</p>
+        </v-col>
+        <v-col cols=6 sm=4 v-for="nav in navs" :key="nav.text">
+            <v-card>
+                <v-card-text class="px-2 py-3" :to="nav.href">
+                    <v-icon round size=48 class="mr-3" >{{nav.icon}}</v-icon>
+                    <span class="sub-title">{{nav.text}}</span>
+                </v-card-text>
+            </v-card>
+        </v-col>
+    </v-row>
+    </div>
 </template>
 
 <script>
@@ -41,6 +59,14 @@ export default {
     created() {
         this.$store.commit('navbar', true);
         this.$store.commit('loading');
+        this.navs = [
+            { icon: 'widgets',            href:'/nav',    text: '所有书籍', count: this.$store.state.sys.books      },
+            { icon: 'mdi-human-greeting', href:'/author', text: '作者',     count: this.$store.state.sys.authors    },
+            { icon: 'mdi-home-group',     href:'/pub',    text: '出版社',   count: this.$store.state.sys.publishers },
+            { icon: 'mdi-tag-heart',      href:'/tag',    text: '标签',     count: this.$store.state.sys.tags       },
+            { icon: 'mdi-history',        href:'/recent', text: '最近更新', },
+            { icon: 'mdi-trending-up',    href:'/hot',    text: '热度榜单', },
+            ]
         this.backend("/index?random=12&recent=12")
         .then(data => {
             this.rsp = data;
@@ -55,7 +81,9 @@ export default {
             random_books: [],
             new_books: [],
             title: '奇异书屋',
-        }
+        },
+        navs: [
+            ],
     })
 }
 </script>
@@ -92,6 +120,10 @@ export default {
 .new-legend {
     margin-top: 30px;
     margin-bottom: 20px;
+}
+.footer-text {
+    font-size: .8em;
+    color: #888;
 }
 
 </style>
