@@ -60,7 +60,6 @@ export default {
     font-weight: bold;
 }
 .book-comments {
-    /*text-indent: 2em;*/
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 3;

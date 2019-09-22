@@ -21,7 +21,7 @@ export default {
 
             return fetch(full_url, args)
                 .then(rsp=>rsp.json())
-                .catch( err => {
+                .catch( () => {
                     this.alert("error", "服务器故障！请稍后刷新页面重试！");
                     throw "server error";
                 })

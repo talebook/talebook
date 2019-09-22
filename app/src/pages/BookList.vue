@@ -28,15 +28,6 @@ export default {
         BookCards,
     },
     computed: {
-        page_visible: function() {
-            var cnt = 1 + parseInt(this.total/this.page_size);
-            if ( cnt < 7 ) { return cnt; }
-            if ( this.$vuetify.breakpoint.smAndUp ) {
-                return 7;
-            } else {
-                return 5;
-            }
-        },
     },
     data: () => ({
         title: "",
@@ -44,7 +35,7 @@ export default {
         books: [],
         total: 0,
         page_size: 30,
-        page_cnt: 0,
+        page_cnt: 1,
     }),
     created() {
         if ( this.$route.query.start != undefined ) {
@@ -72,6 +63,7 @@ export default {
                 this.books = rsp.books;
                 this.total = rsp.total
                 this.page_cnt = parseInt(this.total/this.page_size);
+                if ( this.page_cnt < 1 ) { this.page_cnt = 1; }
                 this.$store.commit('loaded');
             })
             if ( next ) next();

@@ -26,12 +26,13 @@
                 </template>
 
                 <template v-if="card.show_friends">
-                    <v-row v-for="(friend, idx) in settings.FRIENDS">
+                    <v-row v-for="(friend, idx) in settings.FRIENDS" :key="'friend-'+friend.href">
                         <v-col class='py-0' cols=3>
                             <v-text-field flat small hide-details single-line v-model="friend.text" label="名称" type="text"></v-text-field>
                         </v-col>
                         <v-col class='pa-0' cols=9>
-                            <v-text-field flat small hide-details single-line v-model="friend.href" label="链接" type="text" append-outer-icon="delete" @click:append-outer="alert('success', 'yo')" ></v-text-field>
+                            <v-text-field flat small hide-details single-line v-model="friend.href" label="链接" type="text"
+                                append-outer-icon="delete" @click:append-outer="settings.FRIENDS.splice(idx, 1)" ></v-text-field>
                         </v-col>
                     </v-row>
                     <v-row>
@@ -53,7 +54,7 @@
                             </v-chip>
                         </template>
                     </v-combobox>
-                    <v-row v-for="s in social.select" :key="'social-'+s.value" >
+                    <v-row v-for="s in settings.SOCIALS" :key="'social-'+s.value" >
                         <v-col class='py-0' cols=2 sm=2>
                             <v-subheader class="px-0 pt-4" :class="$vuetify.breakpoint.smAndUp?'float-right':''">{{s.text}}</v-subheader>
                         </v-col>

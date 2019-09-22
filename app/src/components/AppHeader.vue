@@ -43,7 +43,7 @@
 
             <v-toolbar-title class="mr-12 align-center" >
                 <v-app-bar-nav-icon @click.stop="sidebar = !sidebar"><v-icon>menu</v-icon></v-app-bar-nav-icon>
-                {{sysinfo.title}}{{this.$vuetify.breakpoint.name}}
+                <span class="cursor-pointer" @click="$router.push('/')" >{{sysinfo.title}}{{this.$vuetify.breakpoint.name}}</span>
             </v-toolbar-title>
 
             <v-spacer></v-spacer>

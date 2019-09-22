@@ -11,8 +11,11 @@ import Vuetify from 'vuetify/lib'
 import 'vuetify/dist/vuetify.min.css'
 Vue.use(Vuetify)
 
+import VueCookies from 'vue-cookies'
+Vue.use(VueCookies)
+
 import calibre from './calibre.js'
-Vue.use(calibre)
+Vue.use(calibre, {"api": "http://beta.talebook.org/api"})
 
 import App        from './App.vue'
 import Index      from './pages/Index.vue'

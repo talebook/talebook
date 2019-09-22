@@ -57,7 +57,7 @@
             </v-card>
 
             <v-card v-if="!dialog_refer">
-                <v-toolbar flat dense color="white">
+                <v-toolbar flat dense color="white" >
                     <!-- download -->
                     <v-menu left offset-y>
                         <template v-slot:activator="{on}">
@@ -75,12 +75,14 @@
 
 
                     <v-spacer></v-spacer>
-                    <v-btn small color="primary" outlined class="px-1 mr-2 d-flex d-sm-flex" @click="dialog_kindle = !dialog_kindle" ><v-icon>email</v-icon> 推送</v-btn>
-                    <v-btn small color="" outlined class="px-1 mr-2 d-flex d-sm-flex" :href="'/read/'+bookid" target="_blank"> <v-icon>import_contacts</v-icon> 阅读</v-btn>
+                    <v-btn :small="tiny" dark color="green" class="mx-2 d-flex d-sm-flex"
+                            @click="dialog_kindle = !dialog_kindle" ><v-icon left v-if="!tiny">email</v-icon> 推送</v-btn>
+                    <v-btn :small="tiny" dark color="green" class="mx-2 d-flex d-sm-flex"
+                            :href="'/read/'+bookid" target="_blank"> <v-icon left v-if="!tiny">import_contacts</v-icon> 阅读</v-btn>
 
                     <v-menu v-if="book.is_owner" offset-y>
                         <template v-slot:activator="{on}">
-                            <v-btn v-on="on" color='primary' small >管理 <v-icon small>more_vert</v-icon></v-btn>
+                            <v-btn v-on="on" dark color="green" class="ml-2" :small="tiny" >管理 <v-icon small >more_vert</v-icon></v-btn>
                         </template>
                         <v-list>
                             <v-list-item :to="'/book/'+bookid+'/edit'"> <v-icon>settings_applications</v-icon> 编辑书籍信息 </v-list-item>
@@ -155,6 +157,9 @@ export default {
             }
             return this.book.pubdate.split("-")[0];
         },
+        tiny: function() {
+            return this.$vuetify.breakpoint.xsOnly;
+        },
     },
     data: () => ({
         bookid: 0,
@@ -169,6 +174,7 @@ export default {
     }),
     created() {
         this.init(this.$route);
+        this.mail_to = this.$cookies.get("kindle_mail");
     },
     beforeRouteUpdate(to, from, next) {
         this.init(to, next);
@@ -191,6 +197,7 @@ export default {
                 this.$router.push("/login");
                 return;
             }
+            this.$cookies.set("kindle_mail", this.mail_to);
             this.backend("/book/"+this.bookid+"/push", {
                 method: "POST",
                 body: "mail_to="+this.mail_to,
