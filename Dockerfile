@@ -21,12 +21,14 @@ RUN mkdir -p /data/log/  && \
 	mkdir -p /data/release/www/calibre.talebook.org/calibre-webserver/ && \
 	chmod a+w -R /data/log /data/books /data/release
 
-RUN cat docker/setup_nodejs_12.x.sh | bash -
-RUN apt-get install -y nodejs
-RUN cd app && npm install . && npm run dist
-
 COPY . /data/release/www/calibre.talebook.org/calibre-webserver/
 COPY conf/supervisor/calibre-webserver.conf /etc/supervisor/conf.d/
+
+#RUN curl -sL https://deb.nodesource.com/setup_12.x | bash -
+RUN cd /data/release/www/calibre.talebook.org/calibre-webserver/ && \
+    ( cat docker/setup_nodejs_12.x.sh | bash - ) && \
+    apt-get install -y nodejs && \
+    cd app && npm install . && npm run build
 
 RUN cd /data/release/www/calibre.talebook.org/calibre-webserver/ && \
 	calibredb add --library-path=/data/books/library/ -r docker/book/ && \
