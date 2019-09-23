@@ -3,7 +3,12 @@
         <v-col cols=12 class='text-center'>
             <v-divider class='mt-10 mb-3' ></v-divider>
             <p class='mb-0 text-center footer-text' v-html="footer_text"></p>
-            <p> <v-btn small text href="https://github.com/talebook/calibre-webserver">Github</v-btn> </p>
+            <p>
+            <v-btn small text href="https://github.com/talebook/calibre-webserver">Github</v-btn>
+            | <v-btn small text href="https://github.com/talebook/talebook-library">Library</v-btn>
+            | <v-btn small text href="https://hub.docker.com/r/talebook/calibre-webserver">Docker</v-btn>
+            | <v-btn small text href="#">V{{$store.state.sys.version}}</v-btn>
+            </p>
         </v-col>
     </v-row>
 </template>

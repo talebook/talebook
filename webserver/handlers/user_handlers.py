@@ -599,7 +599,6 @@ def routes():
             (r'/api/user/info',         UserInfo),
             (r'/api/user/messages',     UserMessages),
 
-            #(r'/api/user/index',        UserView),
             (r"/api/user/sign_in",      SignIn),
             (r'/api/user/sign_up',      SignUp),
             (r'/api/user/sign_out',     SignOut),
@@ -610,16 +609,9 @@ def routes():
             (r'/api/active/(.*)/(.*)',  UserActive),
             (r'/api/done/',             Done),
 
-            #(r'/api/user/setting',      SettingView),
-            #(r'/api/user/setting/save', SettingSave),
-
             (r'/api/admin/install',     AdminInstall),
             (r'/api/admin/settings',    AdminSettings),
             (r'/api/admin/users',       AdminUsers),
-
-            #(r'/api/sys/index',         AdminView),
-            #(r'/api/sys/settings',      AdminSet),
-            #(r'/api/sys/messages',      AdminSet),
     ]
 
 

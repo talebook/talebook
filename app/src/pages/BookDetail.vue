@@ -115,7 +115,7 @@
                                     <v-icon>group</v-icon>
                                     出版：{{book.publisher}}
                                 </v-chip>
-                                <v-chip rounded small dark color="indigo" v-if="book.series" >
+                                <v-chip rounded small dark color="indigo" v-if="book.series" :to="'/series/'+book.series" >
                                     <v-icon>explore</v-icon>丛书: {{book.series}}
                                 </v-chip>
                                 <v-chip rounded small dark color="grey" v-if="book.isbn" >

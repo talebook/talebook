@@ -36,6 +36,9 @@
                         </v-list-item-action>
                     </v-list-item>
                 </template>
+                <v-list-item>
+                    <v-img class='ma-auto' max-width=128 src="img/qq.png"></v-img>
+                </v-list-item>
             </v-list>
         </v-navigation-drawer>
 
@@ -113,7 +116,7 @@
                         <v-list-item-action><v-icon>history</v-icon></v-list-item-action>
                         <v-list-item-title> 阅读记录 </v-list-item-title>
                     </v-list-item>
-                    <v-list-item to="http://github.com">
+                    <v-list-item target="_blank" href="https://github.com/talebook/calibre-webserver/issues">
                         <v-list-item-action><v-icon>sms_failed</v-icon></v-list-item-action>
                         <v-list-item-title> 反馈 </v-list-item-title>
                     </v-list-item>
@@ -177,9 +180,8 @@ export default {
                 { links: sys.friends, target: "_blank" },
             ] : [] ).concat([
                 { heading: '系统' },
-                { icon: 'help', text: '系统版本', count: sys.version },
-                { icon: 'mdi-xml', text: '源代码', href: "https://github.com/talebook/calibre-webserver", count: "Github" },
-                { icon: 'settings', text: '管理员入口', href: "/admin" },
+                { icon: 'mdi-history', text: '最后更新', href: "https://github.com/talebook/calibre-webserver", count: sys.mtime },
+                { icon: 'mdi-human', text: '用户数', href: "", count: sys.users },
             ]);
             this.items = nav_items;
             this.loaded = true;
