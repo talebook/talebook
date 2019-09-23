@@ -4,7 +4,7 @@
 import time, datetime, logging, re, hashlib, json
 import tornado.escape
 from tornado import web
-from models import Reader
+from models import Reader, Message
 from base_handlers import BaseHandler, js, auth
 from calibre.utils.smtp import sendmail, create_mail
 
@@ -329,9 +329,32 @@ class UserMessages(BaseHandler):
 
         if user:
             for msg in user.messages:
-                msg['data'] = json.loads(msg['data'])
-                rsp['messages'].append(msg)
+                if not msg.unread: continue
+                m = {
+                        'id': msg.id,
+                        'title': msg.title,
+                        'status': msg.status,
+                        'create_time': msg.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+                        'data': msg.data,
+                        }
+                rsp['messages'].append(m)
         return rsp
+
+    @js
+    @auth
+    def post(self):
+        data = tornado.escape.json_decode(self.request.body)
+        if 'id' not in data:
+            return {'err': 'params.invalid', 'msg': _(u'ID错误')}
+        msg = self.session.query(Message).filter(Message.id == data['id']).first()
+        if not msg:
+            return {'err': 'params.not_found', 'msg': _(u'查无此ID') }
+
+        msg.read = True
+        msg.update_time = datetime.datetime.now()
+        msg.save()
+        return {'err': 'ok'}
+
 
 class UserInfo(BaseHandler):
     def get_sys_info(self):
@@ -347,6 +370,7 @@ class UserInfo(BaseHandler):
                 "tags":       len( db.all_tags()       ),
                 "authors":    len( db.all_authors()    ),
                 "publishers": len( db.all_publishers() ),
+                "series":     len( db.all_series()     ),
                 "mtime":      db.last_modified().strftime("%Y-%m-%d"),
                 "users":      count_all_users,
                 "active":     count_hot_users,

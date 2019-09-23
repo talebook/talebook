@@ -1,8 +1,8 @@
 <template>
     <v-app>
-        <app-header v-if="$store.state.nav"></app-header>
+        <app-header v-if="$store.state.nav" ></app-header>
         <v-content>
-            <v-container fluid fill-height v-if="$store.state.loading">
+            <v-container fluid fill-height v-if="$store.state.loading" >
                 <v-row>
                     <v-col align=center justify=center>
                         <v-progress-circular indeterminate color="primary" ></v-progress-circular>
@@ -12,7 +12,7 @@
 
             <v-container fluid v-show="!$store.state.loading">
                 <router-view></router-view>
-                <app-footer ></app-footer>
+                <app-footer v-if="$store.state.nav" ></app-footer>
             </v-container>
 
             <v-dialog v-model="$store.state.alert.show" persistent width="300">
@@ -27,14 +27,14 @@
                     </v-card-text>
                     <v-card-actions>
                         <v-spacer></v-spacer>
-                        <v-btn v-if='$store.state.alert.to' color="primary" @click="$store.commit('close_alert');$router.push($store.state.alert.to)">查看</v-btn>
+                        <v-btn v-if='$store.state.alert.to' color="primary" @click="$store.commit('close_alert');$router.push($store.state.alert.to)">好的</v-btn>
                         <v-btn v-else color="primary" @click="$store.commit('close_alert')">关闭</v-btn>
                         <v-spacer></v-spacer>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
         </v-content>
-        <upload></upload>
+        <upload v-if="$store.state.nav" ></upload>
     </v-app>
 </template>
 

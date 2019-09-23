@@ -59,7 +59,7 @@
             <v-card v-if="!dialog_refer">
                 <v-toolbar flat dense color="white" >
                     <!-- download -->
-                    <v-menu left offset-y>
+                    <v-menu offset-y>
                         <template v-slot:activator="{on}">
                             <v-btn v-on="on" icon small fab ><v-icon>get_app</v-icon></v-btn>
                         </template>
@@ -75,20 +75,20 @@
 
 
                     <v-spacer></v-spacer>
-                    <v-btn :small="tiny" dark color="green" class="mx-2 d-flex d-sm-flex"
+                    <v-btn :small="tiny" dark color="primary" class="mx-2 d-flex d-sm-flex"
                             @click="dialog_kindle = !dialog_kindle" ><v-icon left v-if="!tiny">email</v-icon> 推送</v-btn>
-                    <v-btn :small="tiny" dark color="green" class="mx-2 d-flex d-sm-flex"
+                    <v-btn :small="tiny" dark color="primary" class="mx-2 d-flex d-sm-flex"
                             :href="'/read/'+bookid" target="_blank"> <v-icon left v-if="!tiny">import_contacts</v-icon> 阅读</v-btn>
 
                     <v-menu v-if="book.is_owner" offset-y>
                         <template v-slot:activator="{on}">
-                            <v-btn v-on="on" dark color="green" class="ml-2" :small="tiny" >管理 <v-icon small >more_vert</v-icon></v-btn>
+                            <v-btn v-on="on" dark color="primary" class="ml-2" :small="tiny" >管理 <v-icon small >more_vert</v-icon></v-btn>
                         </template>
                         <v-list>
                             <v-list-item :to="'/book/'+bookid+'/edit'"> <v-icon>settings_applications</v-icon> 编辑书籍信息 </v-list-item>
                             <v-list-item @click="get_refer" > <v-icon>apps</v-icon> 从豆瓣更新信息</v-list-item>
                             <v-divider></v-divider>
-                            <v-list-item> <v-icon>delete_forever</v-icon> 删除此书</v-list-item>
+                            <v-list-item @click='delete_book' > <v-icon>delete_forever</v-icon> 删除此书</v-list-item>
                         </v-list>
                     </v-menu>
                 </v-toolbar>
@@ -186,9 +186,13 @@ export default {
             this.bookid = route.params.bookid;
             this.backend("/book/"+this.bookid)
             .then( rsp => {
-                this.kindle_sender = rsp.kindle_sender;
-                this.book = rsp.book;
-                this.$store.commit('loaded');
+                if ( rsp.err != 'ok' ) {
+                    this.alert("error", rsp.msg, "/");
+                } else {
+                    this.kindle_sender = rsp.kindle_sender;
+                    this.book = rsp.book;
+                    this.$store.commit('loaded');
+                }
             });
             if ( next ) next();
         },
@@ -240,6 +244,19 @@ export default {
                 }
                 this.init(this.$route);
             });
+        },
+        delete_book() {
+            this.backend('/book/'+this.bookid+'/delete', {
+                method: 'POST'
+            })
+            .then( rsp => {
+                if ( rsp.err == 'ok' ) {
+                    this.alert("success", "删除成功");
+                    this.$router.push("/");
+                } else {
+                    this.alert("error", rsp.msg);
+                }
+            })
         },
     },
 }

@@ -242,7 +242,9 @@ class BaseHandler(web.RequestHandler):
     def get_book(self, book_id):
         books = self.get_books(ids=[int(book_id)])
         if not books:
-            raise web.HTTPError(404, log_message = _(u"抱歉，这本书不存在") )
+            self.write( {'err': 'not_found', 'msg': _(u"抱歉，这本书不存在") } )
+            self.set_status(200)
+            raise web.Finish()
         return books[0]
 
     def is_book_owner(self, book_id, user_id):
@@ -299,6 +301,19 @@ class BaseHandler(web.RequestHandler):
         sql = 'SELECT tags.name, count(distinct book) as count FROM tags left join books_tags_link on tags.id = books_tags_link.tag group by tags.id'
         tags = dict( (i[0], i[1]) for i in self.cache.backend.conn.get(sql) )
         return tags
+
+    def get_category_with_count(self, category):
+        field = category
+        if category == 'series': field = 'series'
+
+        sql = '''SELECT %(category)s.id, %(category)s.name, count(distinct book) as count
+        FROM %(category)s left join books_%(category)s_link
+        on %(category)s.id = books_%(category)s_link.%(field)s
+        group by %(category)s.id''' % { 'category': category, 'field': field }
+        logging.debug(sql)
+        rows = self.cache.backend.conn.get(sql)
+        items = [{'id': a, 'name': b, 'count': c} for a,b,c in rows]
+        return items
 
     def books_by_timestamp(self):
         sql = 'SELECT id, timestamp FROM books order by timestamp desc';

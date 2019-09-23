@@ -102,6 +102,25 @@ class RatingBooks(ListHandler):
         books = self.get_item_books(category, int(name))
         return self.render_book_list(books, vars());
 
+class SeriesList(ListHandler):
+    @js
+    def get(self):
+        title = _(u'丛书列表')
+        category = "series"
+        items = []
+        for item in self.get_category_with_count(category):
+            if item['count'] < 2: continue
+            items.append( item )
+        items.sort(cmp=lambda x,y: cmp(y['count'], x['count']))
+        return {"title": title, "items": items }
+
+class SeriesBooks(ListHandler):
+    def get(self, name):
+        title = _('"%(name)s"丛书包含的书籍') % vars()
+        category = "series"
+        books = self.get_item_books(category, name)
+        return self.render_book_list(books, vars());
+
 def routes():
     return [
         ( r'/api/author',             AuthorList        ),
@@ -114,5 +133,7 @@ def routes():
         ( r'/api/pub/(.*)/update',    PubBooksUpdate    ),
         ( r'/api/rating',             RatingList        ),
         ( r'/api/rating/(.*)',        RatingBooks       ),
+        ( r'/api/series',             SeriesList        ),
+        ( r'/api/series/(.*)',        SeriesBooks       ),
         ]
 

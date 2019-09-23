@@ -7,10 +7,15 @@
 
                     <!-- 友情链接 -->
                     <template v-else-if="item.links" >
-                    <v-list-item dense v-for="(links, cidx) in chunk(item.links, 2)" :key="'chunk'+cidx">
+                    <v-list-item dense v-for="(links, cidx) in chunk(item.links, 2)" :key="idx+'chunk'+cidx">
                         <v-row>
                             <v-col class="pa-0" cols=6 v-for="link in links" :key="link.href" >
-                                <v-btn text :to="link.href">{{link.text}}</v-btn>
+                                <v-btn v-if="item.target!=''" text target="_blank" :href="link.href">
+                                    <v-icon v-if="link.icon" left>{{link.icon}}</v-icon> {{link.text}}
+                                </v-btn>
+                                <v-btn v-else text :to="link.href">
+                                    <v-icon v-if="link.icon" left>{{link.icon}}</v-icon> {{link.text}}
+                                </v-btn>
                             </v-col>
                         </v-row>
                     </v-list-item>
@@ -62,15 +67,20 @@
                 <v-btn v-on="on" icon> <v-icon>notifications</v-icon> </v-btn>
                 </template>
                 <v-list min-width=120>
-                    <template v-if="messages.length > 0">
-                    <v-list-item v-for="msg in messages" :key="msg.id">
-                        <v-list-item-title>{{msg.message}}</v-list-item-title>
-                    </v-list-item>
-                    </template>
-                    <v-list-item v-else>
+                    <v-list-item v-for="(msg, idx) in messages" :key="msg.id">
+                        <v-list-item-avatar :xcolor='(msg.status=="success")?"green":"red"' >
+                            <v-icon large color='green' v-if="msg.status == 'success'" >mdi-information</v-icon>
+                            <v-icon large color='read' v-else>mdi-alert</v-icon>
+                        </v-list-item-avatar>
+
                         <v-list-item-content>
-                        <v-list-item-title> 暂无消息 </v-list-item-title>
+                            <v-list-item-title>{{msg.data.message}}</v-list-item-title>
+                            <v-list-item-subtitle>{{msg.create_time}}</v-list-item-subtitle>
                         </v-list-item-content>
+
+                        <v-list-item-action>
+                            <v-btn @click='hidemsg(idx, msg.id)'>好的</v-btn>
+                        </v-list-item-action>
                     </v-list-item>
                 </v-list>
             </v-menu>
@@ -104,12 +114,10 @@
                     </v-list-item>
                     <v-divider></v-divider>
                     <template v-if="user.is_admin">
-                    <v-divider></v-divider>
                     <v-list-item to="/admin">
-                        <v-list-item-action><v-icon>mdi-console</v-icon></v-list-item-action>
+                        <v-list-item-action><v-icon color=red>mdi-console</v-icon></v-list-item-action>
                         <v-list-item-title> 管理员入口 </v-list-item-title>
                     </v-list-item>
-                    <v-divider></v-divider>
                     </template>
 
                     <v-list-item to="/logout">
@@ -153,12 +161,15 @@ export default {
                 { icon: 'mdi-human-greeting', href:'/author', text: '作者',     count: sys.authors    },
                 { icon: 'mdi-home-group',     href:'/pub',    text: '出版社',   count: sys.publishers },
                 { icon: 'mdi-tag-heart',      href:'/tag',    text: '标签',     count: sys.tags       },
-                { icon: 'mdi-star-half',      href:'/rating', text: '全部评分', },
-                { icon: 'mdi-history',        href:'/recent', text: '最近更新', },
+                { target: "", links: [
+                { icon: 'mdi-library-shelves', href:'/series', text: '丛书',     count: sys.series     },
+                { icon: 'mdi-star-half',      href:'/rating', text: '评分', },
                 { icon: 'mdi-trending-up',    href:'/hot',    text: '热度榜单', },
+                { icon: 'mdi-history',        href:'/recent', text: '最近更新', },
+                ]}
             ].concat(  ( sys.friends.length > 0 ) ? [
                 { heading: '友情链接' },
-                { links: sys.friends },
+                { links: sys.friends, target: "_blank" },
             ] : [] ).concat([
                 { heading: '系统' },
                 { icon: 'help', text: '系统版本', count: sys.version },
@@ -197,7 +208,18 @@ export default {
             return r;
         },
         do_search: function() {
-            this.$router.push("/search?name="+this.search).catch(err=>{err||err});
+            this.$router.push("/search?name="+this.search).catch(()=>{});
+        },
+        hidemsg: function(idx, msgid) {
+            this.backend("/user/messages", {
+                method: 'POST',
+                body: JSON.stringify({id: msgid}),
+            })
+            .then( rsp => {
+                if ( rsp.err == 'ok' ) {
+                    this.messages.splice(idx, 1);
+                }
+            });
         },
     },
 }

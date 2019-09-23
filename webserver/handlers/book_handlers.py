@@ -339,22 +339,19 @@ class BookEdit(BaseHandler):
         return {'err': 'ok', 'msg': _(u"更新成功")}
 
 class BookDelete(BaseHandler):
-    def get(self, id):
-        return self.post(id)
-
-    @web.authenticated
+    @js
+    @auth
     def post(self, id):
         book = self.get_book(id)
-        book_id = book['id']
+        bid = book['id']
         cid = book['collector']['id']
 
-        if self.is_admin() or self.is_book_owner(book_id, cid):
-            self.db.delete_book( book_id )
-            self.add_msg('success', _(u"删除完毕"))
-            self.redirect("/book")
+        if self.is_admin() or self.is_book_owner(bid, cid):
+            self.db.delete_book( bid )
+            self.add_msg('success', _(u"删除书籍《%s》") % book['title'] )
+            return {'err': 'ok'}
         else:
-            self.add_msg('danger', _(u"无权限操作"))
-            self.redirect("/book/%s"%book_id)
+            return {'err': 'permission', 'msg': _(u'无权操作')}
 
 class BookDownload(BaseHandler):
     def get(self, id, fmt):
@@ -434,7 +431,8 @@ class BookAdd(BaseHandler):
 
 
 class BookUpload(BaseHandler):
-    @web.authenticated
+    @js
+    @auth
     def post(self):
         def convert(s):
             try: return s.group(0).encode('latin1').decode('utf8')
@@ -442,14 +440,14 @@ class BookUpload(BaseHandler):
 
         import re
         from calibre.ebooks.metadata import MetaInformation
-        postfile = self.request.files['ebook_file'][0]
+        postfile = self.request.files['ebook'][0]
         name = postfile['filename']
         name = re.sub(r'[\x80-\xFF]+', convert, name)
         logging.error('upload book name = ' + repr(name))
         fmt = os.path.splitext(name)[1]
         fmt = fmt[1:] if fmt else None
         if not fmt:
-            return "bad file name: %s" % name
+            return {'err': 'params.filename', 'msg': _(u'文件名不合法') }
         fmt = fmt.lower()
 
         # save file
@@ -468,7 +466,10 @@ class BookUpload(BaseHandler):
         books = self.db.books_with_same_title(mi)
         if books:
             book_id = books.pop()
-            return self.redirect('/book/%d'%book_id)
+            return {'err': 'samebook',
+                    'msg': _(u'已存在同名书籍《%s》' ) % mi.title,
+                    'book_id': book_id,
+                    }
 
         fpaths = [fpath]
         book_id = self.db.import_book(mi, fpaths )
@@ -478,7 +479,7 @@ class BookUpload(BaseHandler):
         item.book_id = book_id
         item.collector_id = self.user_id()
         item.save()
-        return self.redirect('/book/%d'%book_id)
+        return {'err': 'ok', 'book_id': book_id}
 
 class BookRead(BaseHandler):
     #@web.authenticated

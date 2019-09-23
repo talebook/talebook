@@ -8,7 +8,7 @@
                 <v-toolbar flat dense dark color="primary">
                     上传书籍
                     <v-spacer></v-spacer>
-                    <v-btn color="" text @click="dialog = false">取消</v-btn>
+                    <v-btn color="" text @click="dialog = false">关闭</v-btn>
                 </v-toolbar>
                 <v-card-title></v-card-title>
                 <v-card-text>
@@ -19,7 +19,7 @@
                 </v-card-text>
                 <v-card-actions >
                     <v-spacer> </v-spacer>
-                    <v-btn color="primary" @click="do_upload">上传</v-btn>
+                    <v-btn :loading="loading" color="primary" @click="do_upload">上传</v-btn>
                     <v-spacer> </v-spacer>
                 </v-card-actions>
             </v-card>
@@ -30,11 +30,13 @@
 <script>
 export default {
     data: () => ({
+        loading: false,
         dialog: false,
         ebooks: null,
     }),
     methods: {
         do_upload: function() {
+            this.loading = true;
             var data = new FormData();
             data.append("ebook", this.ebooks);
             console.log(this.ebooks);
@@ -43,12 +45,14 @@ export default {
                 body: data,
             })
             .then( rsp => {
+                this.dialog = false;
+                this.loading = false;
                 if ( rsp.err == 'ok' ) {
-                    alert("success", "上传成功！", "/book/"+rsp.book_id);
+                    this.alert("success", "上传成功！", "/book/"+rsp.book_id);
                 } else if ( rsp.err == 'samebook' ) {
                     this.alert("error", rsp.msg, "/book/"+rsp.book_id);
                 } else {
-                    alert("error", rsp.msg);
+                    this.alert("error", rsp.msg);
                 }
             });
         },

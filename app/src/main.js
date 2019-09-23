@@ -58,8 +58,8 @@ const router = new VueRouter({
 
         { path: '/book/:bookid(\\d+)', component: BookDetail },
         { path: '/book/:bookid(\\d+)/edit', component: BookEdit },
-        { path: '/:meta(pub|tag|author|rating)', component: MetaList },
-        { path: '/:meta(pub|tag|author|rating)/:name', component: BookList },
+        { path: '/:meta(pub|tag|author|rating|series)', component: MetaList },
+        { path: '/:meta(pub|tag|author|rating|series)/:name', component: BookList },
 
         { path: '*', component: NotFound },
     ]
