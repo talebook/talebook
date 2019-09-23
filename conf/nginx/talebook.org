@@ -18,7 +18,7 @@ server {
     ssl_certificate_key ssl/www.talebook.org.key;
 
     index index.html;
-    root /data/release/www/calibre.talebook.org/calibre-webserver/app/dist/;
+    root /data/release/www/calibre-webserver/app/dist/;
     access_log  /var/log/nginx/www.talebook.org-access.log;
     error_log   /var/log/nginx/www.talebook.org-error.log;
     add_header  Access-Control-Allow-Origin *;
