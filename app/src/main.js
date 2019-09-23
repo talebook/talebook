@@ -78,6 +78,7 @@ const store = new Vuex.Store({
             avatar: "",
         },
         alert: {
+            to: "",
             msg: "",
             type: "",
             show: false,
@@ -113,6 +114,7 @@ const store = new Vuex.Store({
             }
         },
         alert(state, v ) {
+            state.alert.to = v.to;
             state.alert.type = v.type;
             state.alert.msg = v.msg;
             state.alert.show = true;

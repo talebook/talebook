@@ -24,12 +24,22 @@
             <v-divider class="new-legend"></v-divider>
             <p class="ma-0 title">分类浏览</p>
         </v-col>
-        <v-col cols=6 sm=4 v-for="nav in navs" :key="nav.text">
-            <v-card>
-                <v-card-text class="px-2 py-3" :to="nav.href">
-                    <v-icon round size=48 class="mr-3" >{{nav.icon}}</v-icon>
-                    <span class="sub-title">{{nav.text}}</span>
-                </v-card-text>
+        <v-col cols=12 sm=6 md=4 v-for="nav in navs" :key="nav.text">
+            <v-card outlined>
+                <v-list>
+                    <v-list-item :to="nav.href" >
+                        <v-list-item-avatar large color='primary' >
+                            <v-icon dark >{{nav.icon}}</v-icon>
+                        </v-list-item-avatar>
+                        <v-list-item-content>
+                            <v-list-item-title>{{nav.text}} </v-list-item-title>
+                            <v-list-item-subtitle>{{nav.subtitle}}</v-list-item-subtitle>
+                        </v-list-item-content>
+                        <v-list-item-action>
+                            <v-icon >mdi-arrow-right</v-icon>
+                        </v-list-item-action>
+                    </v-list-item>
+                </v-list>
             </v-card>
         </v-col>
     </v-row>

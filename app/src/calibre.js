@@ -42,8 +42,8 @@ export default {
                     return rsp;
                 })
         }
-        Vue.prototype.alert = function(alert_type, alert_msg) {
-            this.$store.commit("alert", {type:alert_type, msg: alert_msg});
+        Vue.prototype.alert = function(alert_type, alert_msg, alert_to) {
+            this.$store.commit("alert", {type:alert_type, msg: alert_msg, to: alert_to});
         }
     }
 }
