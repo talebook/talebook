@@ -53,7 +53,7 @@
 
             <v-toolbar-title class="mr-12 align-center" >
                 <v-app-bar-nav-icon @click.stop="sidebar = !sidebar"><v-icon>menu</v-icon></v-app-bar-nav-icon>
-                <span class="cursor-pointer" @click="$router.push('/')" >{{sysinfo.title}}{{this.$vuetify.breakpoint.name}}</span>
+                <span class="cursor-pointer" @click="$router.push('/')" >{{sys.title}}{{this.$vuetify.breakpoint.name}}</span>
             </v-toolbar-title>
 
             <v-spacer></v-spacer>
@@ -159,9 +159,10 @@ export default {
         this.backend('/user/info')
         .then(rsp => {
             this.$store.commit('login', rsp);
-            this.sysinfo = rsp.sys;
-            this.user = rsp.user;
             var sys = rsp.sys;
+            this.sys = rsp.sys;
+            this.user = rsp.user;
+            document.title = sys.title;
             var nav_items = [
                 { icon: 'home',         href:'/',       text: '首页',         },
                 { heading: '分类浏览' },
@@ -195,7 +196,7 @@ export default {
         items: [ ],
         btn_search: false,
         search: "",
-        sysinfo: {
+        sys: {
             version: "v2.1.1",
             update: "2019-06-09",
             total: 10855,
