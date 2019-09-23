@@ -15,7 +15,7 @@ import VueCookies from 'vue-cookies'
 Vue.use(VueCookies)
 
 import calibre from './calibre.js'
-Vue.use(calibre, {"api": "http://beta.talebook.org/api"})
+Vue.use(calibre)
 
 import App        from './App.vue'
 import Index      from './pages/Index.vue'
