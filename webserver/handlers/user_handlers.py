@@ -350,7 +350,7 @@ class UserMessages(BaseHandler):
         if not msg:
             return {'err': 'params.not_found', 'msg': _(u'查无此ID') }
 
-        msg.read = True
+        msg.unread = False
         msg.update_time = datetime.datetime.now()
         msg.save()
         return {'err': 'ok'}
@@ -378,7 +378,12 @@ class UserInfo(BaseHandler):
                 "title":      CONF['site_title'],
                 "socials":    CONF['SOCIALS'],
                 "friends":    CONF['FRIENDS'],
-                "register":   CONF['ALLOW_REGISTER'],
+                "footer":     CONF['FOOTER'],
+                "allow": {
+                    "register": CONF['ALLOW_REGISTER'],
+                    "download": CONF['ALLOW_GUEST_DOWNLOAD'],
+                    "push":     CONF['ALLOW_GUEST_PUSH'],
+                    },
             }
 
     def get_user_info(self, detail):
@@ -486,6 +491,7 @@ class AdminSettings(BaseHandler):
                 'ALLOW_GUEST_PUSH',
                 'ALLOW_REGISTER',
                 'FRIENDS',
+                'FOOTER',
                 'INVITE_CODE',
                 'INVITE_MESSAGE',
                 'INVITE_MODE',

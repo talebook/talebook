@@ -98,9 +98,10 @@ export default {
         cards: [
             {
             show: false,
-            title: "基础",
+            title: "基础信息",
             fields: [
                 { icon: "home", key: "site_title", label: "网站标题", },
+                { icon: "mdi-copyright", key: "FOOTER", label: "网站脚注", type: 'textarea' },
             ],
             groups: [
             {

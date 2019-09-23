@@ -41,9 +41,11 @@
 
         <v-app-bar color="blue" dense dark fixed app :clipped-left="$vuetify.breakpoint.lgAndUp" extension-height="64" >
             <template v-if="btn_search && $vuetify.breakpoint.xs" #extension>
-                <v-text-field class="ma-0 pa-0" hide-details single-line solo-inverted v-model="search" ></v-text-field>
-                &nbsp;
-                <v-btn dark rounded @click="do_search" color="primary">搜索</v-btn>
+                <v-form @submit.prevent="do_serach">
+                    <v-text-field class="ma-0 pa-0" hide-details single-line solo-inverted v-model="search" ></v-text-field>
+                    &nbsp;
+                    <v-btn dark rounded @click="do_search" color="primary">搜索</v-btn>
+                </v-form>
             </template>
 
             <v-toolbar-title class="mr-12 align-center" >
@@ -62,24 +64,27 @@
             <v-btn v-else icon class="d-flex d-sm-none" @click="btn_search = !btn_search"> <v-icon>search</v-icon> </v-btn>
 
             <template v-if="user.is_login">
-            <v-menu offset-y right v-if="messages.length > 0">
+            <v-menu offset-y right :close-on-content-click="false" v-if="messages.length > 0">
                 <template v-slot:activator="{on}">
                 <v-btn v-on="on" icon> <v-icon>notifications</v-icon> </v-btn>
                 </template>
-                <v-list min-width=120>
+                <v-list three-line dense width=400>
                     <v-list-item v-for="(msg, idx) in messages" :key="msg.id">
-                        <v-list-item-avatar :xcolor='(msg.status=="success")?"green":"red"' >
+                        <v-list-item-avatar>
                             <v-icon large color='green' v-if="msg.status == 'success'" >mdi-information</v-icon>
-                            <v-icon large color='read' v-else>mdi-alert</v-icon>
+                            <v-icon large color='red' v-else>mdi-alert</v-icon>
                         </v-list-item-avatar>
 
                         <v-list-item-content>
-                            <v-list-item-title>{{msg.data.message}}</v-list-item-title>
-                            <v-list-item-subtitle>{{msg.create_time}}</v-list-item-subtitle>
+                            <p class='body-2'>
+                                {{msg.data.message}}
+                                <br/>
+                                <span>{{msg.create_time}}</span>
+                            </p>
                         </v-list-item-content>
 
                         <v-list-item-action>
-                            <v-btn @click='hidemsg(idx, msg.id)'>好的</v-btn>
+                            <v-btn @click.prevent='hidemsg(idx, msg.id)'>好的</v-btn>
                         </v-list-item-action>
                     </v-list-item>
                 </v-list>

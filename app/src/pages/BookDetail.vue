@@ -59,7 +59,7 @@
             <v-card v-if="!dialog_refer">
                 <v-toolbar flat dense color="white" >
                     <!-- download -->
-                    <v-menu offset-y>
+                    <v-menu offset-y >
                         <template v-slot:activator="{on}">
                             <v-btn v-on="on" icon small fab ><v-icon>get_app</v-icon></v-btn>
                         </template>
@@ -99,7 +99,7 @@
                     <v-col cols=12 sm=8>
                         <v-card-text>
                             <div>
-                            <h1>{{book.title}}</h1>
+                            <p class='title'>{{book.title}}</p>
                             <span color="grey--text">{{book.author}}著，{{pub_year}}年版</span>
                             </div>
                             <v-rating v-model="book.rating" color="yellow accent-4" length="10" readonly dense small></v-rating>
@@ -294,5 +294,8 @@ export default {
 .book-comments p {
     font-size: small;
     margin-bottom: 0px;
+}
+h1.book-detail-title {
+    line-height: inherit;
 }
 </style>

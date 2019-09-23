@@ -85,6 +85,7 @@ const store = new Vuex.Store({
         },
         sys: {
             socials: [],
+            allow: {},
         },
     },
     mutations: {

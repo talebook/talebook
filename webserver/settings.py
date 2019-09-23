@@ -58,6 +58,7 @@ settings = {
     'ALLOW_GUEST_PUSH' : False,
     'ALLOW_GUEST_DOWNLOAD' : False,
     'ALLOW_REGISTER' : False,
+    'FOOTER': '本站基于Calibre构建，感谢开源界的力量。所有资源搜集于互联网，如有侵权请邮件联系。',
 
     'FRIENDS': [
         { "text": u"奇异书屋", "href": "https://www.talebook.org" },

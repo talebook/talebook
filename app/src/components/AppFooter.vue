@@ -2,11 +2,8 @@
     <v-row>
         <v-col cols=12 class='text-center'>
             <v-divider class='mt-10 mb-3' ></v-divider>
-            <p class='text-center footer-text'>
-            <span>{{footer_text}}</span>
-            <br/>
-            <v-btn small text href="https://github.com/talebook/calibre-webserver">Github</v-btn>
-            </p>
+            <p class='mb-0 text-center footer-text' v-html="footer_text"></p>
+            <p> <v-btn small text href="https://github.com/talebook/calibre-webserver">Github</v-btn> </p>
         </v-col>
     </v-row>
 </template>
