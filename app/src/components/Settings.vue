@@ -16,8 +16,8 @@
                 </template>
 
                 <template v-for="g in card.groups" >
-                    <v-checkbox small hide-details v-model="g.value" :key="g.label" :label="g.label"></v-checkbox>
-                    <template v-if="g.value">
+                    <v-checkbox small hide-details v-model="settings[g.key]" :key="g.label" :label="g.label"></v-checkbox>
+                    <template v-if="settings[g.key]">
                         <template v-for="f in g.fields">
                             <v-textarea outlined v-if="f.type === 'textarea' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-textarea>
                             <v-text-field v-else :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" type="text"></v-text-field>
