@@ -77,7 +77,7 @@ export default {
                     var self = this;
                     setTimeout(function(){
                         self.$store.commit("navbar", true);
-                        self.this.$router.push("/");
+                        self.$router.push("/");
                     }, 5000);
                 }
             });

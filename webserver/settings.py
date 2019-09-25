@@ -6,6 +6,7 @@ import os
 settings = {
     'installed'     : False,
     "autoreload"    : True,
+    "xsrf_cookies"  : False,
     "static_host"   : "",
     "html_path"     : os.path.join(os.path.dirname(__file__), "../app/dist"),
     "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
@@ -17,12 +18,8 @@ settings = {
     "with_library"  : "/data/books/library/",
     "cookie_secret" : "cookie_secret",
     "login_url"     : "/login",
-    "xsrf_cookies"  : False,
-    "user_database" : 'sqlite:////data/books/develop.db',
+    "user_database" : 'sqlite:////data/books/calibre-webserver.db',
     "site_title"    : u"奇异书屋",
-
-    # Set this if you don't need any user management
-    #"auto_login"    : 1,
 
     "SOCIAL_AUTH_LOGIN_URL"          : '/',
     "SOCIAL_AUTH_LOGIN_REDIRECT_URL" : '/done/',
@@ -61,9 +58,12 @@ settings = {
     'FOOTER': '本站基于Calibre构建，感谢开源界的力量。所有资源搜集于互联网，如有侵权请邮件联系。',
 
     'FRIENDS': [
-        { "text": u"奇异书屋", "href": "https://www.talebook.org" },
         { "text": u"芒果读书", "href": "http://diumx.com/" },
-        { "text": u"陈芸书屋", "href": "https://book.killsad.top/" },
+        { "text": u"文渊阁",   "href": "https://wenyuange.org/" },
+        { "text": u"苦瓜书盘", "href": "https://www.kgbook.com" },
+        { "text": u"夜读客", "href": "http://www.yeduk.com/" },
+        { "text": u"万千合集", "href": "http://www.hejizhan.com/" },
+        { "text": u"鸠摩搜索", "href": "https://www.jiumodiary.com/" },
     ],
     'SOCIALS': [
         { "text": u"Amazon", "value": "amazon" },

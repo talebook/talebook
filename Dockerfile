@@ -38,10 +38,13 @@ RUN ( curl -sL https://deb.nodesource.com/setup_12.x | bash - ) && \
 RUN cd /data/release/calibre-webserver/app && \
         npm install . && \
         npm run build && \
-        cp dist/index.html ../webserver/templates/index.html && \
         rm -rf node_modules
 
 RUN cd /data/release/calibre-webserver/ && \
+    cp app/dist/index.html webserver/templates/index.html && \
+    touch webserver/settings_auto.py && \
+    chmod a+w webserver/settings_auto.py && \
+    chmod a+w app/dist/index.html && \
 	calibredb add --library-path=/data/books/library/ -r docker/book/ && \
 	python server.py --syncdb  && \
 	rm -f webserver/*.pyc && \
