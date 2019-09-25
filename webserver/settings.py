@@ -4,9 +4,9 @@
 import os
 
 settings = {
-        'installed' : False,
+    'installed'     : False,
     "autoreload"    : True,
-    "static_host"   : "beta.talebook.org",
+    "static_host"   : "",
     "html_path"     : os.path.join(os.path.dirname(__file__), "../app/dist"),
     "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
     "template_path" : os.path.join(os.path.dirname(__file__), "templates"),
@@ -52,11 +52,11 @@ settings = {
     'douban_apikey' : "0df993c66c0c636e29ecbb5344252a4a",
 
     'INVITE_MODE'   : False,
-    'INVITE_CODE'   : 'beta',
+    'INVITE_CODE'   : 'love',
     'INVITE_MESSAGE': u'''本站为私人图书馆，需输入密码才可进行访问''',
 
-    'ALLOW_GUEST_PUSH' : False,
-    'ALLOW_GUEST_DOWNLOAD' : False,
+    'ALLOW_GUEST_PUSH' : True,
+    'ALLOW_GUEST_DOWNLOAD' : True,
     'ALLOW_REGISTER' : False,
     'FOOTER': '本站基于Calibre构建，感谢开源界的力量。所有资源搜集于互联网，如有侵权请邮件联系。',
 

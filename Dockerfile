@@ -19,6 +19,7 @@ RUN pip install \
 
 
 RUN mkdir -p /data/log/  && \
+	mkdir -p /data/log/nginx/  && \
 	mkdir -p /data/books/  && \
 	mkdir -p /data/books/library  && \
 	mkdir -p /data/books/extract  && \
@@ -31,6 +32,8 @@ RUN mkdir -p /data/log/  && \
 COPY . /data/release/calibre-webserver/
 COPY conf/nginx/calibre-webserver.conf /etc/nginx/conf.d/
 COPY conf/supervisor/calibre-webserver.conf /etc/supervisor/conf.d/
+
+RUN rm -f /etc/nginx/sites-enabled/default
 
 RUN ( curl -sL https://deb.nodesource.com/setup_12.x | bash - ) && \
     apt-get install -y nodejs
