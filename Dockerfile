@@ -15,7 +15,7 @@ RUN pip install \
         jinja2==2.10 \
         social-auth-app-tornado==1.0.0 \
         social-auth-storage-sqlalchemy==1.1.0 \
-        tornado==5.1.1 \
+        tornado==5.1.1
 
 
 RUN mkdir -p /data/log/  && \
