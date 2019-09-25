@@ -16,12 +16,18 @@ class SettingsLoader(dict):
             pass
 
         try:
-            import local_settings
-            self.update(local_settings.settings)
+            import settings_auto
+            self.update(settings_auto.settings)
         except:
             pass
 
-    def dumpfile(self, filename="local_settings.py"):
+        try:
+            import settings_manual
+            self.update(settings_manual.settings)
+        except:
+            pass
+
+    def dumpfile(self, filename="settings_auto.py"):
         s = "\n".join( '%-30s: %s,' % ("'"+k+"'", repr(v)) for k,v in sorted(self.items()) )
         code = u'''#!/usr/bin/python
 #-*- coding: UTF-8 -*-
