@@ -18,9 +18,7 @@ RUN pip install \
         tornado==5.1.1
 
 
-RUN mkdir -p /data/log/  && \
-	mkdir -p /data/log/nginx/  && \
-	mkdir -p /data/books/  && \
+RUN mkdir -p /data/log/nginx/ && \
 	mkdir -p /data/books/library  && \
 	mkdir -p /data/books/extract  && \
 	mkdir -p /data/books/upload  && \
@@ -37,7 +35,11 @@ RUN rm -f /etc/nginx/sites-enabled/default
 
 RUN ( curl -sL https://deb.nodesource.com/setup_12.x | bash - ) && \
     apt-get install -y nodejs
-RUN cd app && npm install . && npm run build && rm -rf node_modules
+RUN cd /data/release/calibre-webserver/app && \
+        npm install . && \
+        npm run build && \
+        cp dist/index.html ../webserver/templates/index.html && \
+        rm -rf node_modules
 
 RUN cd /data/release/calibre-webserver/ && \
 	calibredb add --library-path=/data/books/library/ -r docker/book/ && \

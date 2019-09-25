@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
-import time, datetime, logging, re, hashlib, json
+import time, datetime, logging, re, hashlib, json, os
 import tornado.escape
 from tornado import web
 from models import Reader, Message
@@ -521,10 +521,21 @@ class AdminSettings(BaseHandler):
                     args[key] = val
             elif key in KEYS:
                 args[key] = val
+
+        CONF.update( args )
+
+        # update index.html
+        html = self.render_string('index.html', **CONF)
+        page = os.path.join(CONF['html_path'], "index.html")
+        try: open(page, "w").write(html.encode("UTF-8"))
+        except:
+            return {'err': 'file.permission', 'msg': _(u'更新index.html失败！请确保文件的权限为可写入！')}
+
         try:
             args.dumpfile()
         except:
             return {'err': 'file.permission', 'msg': _(u'更新磁盘配置文件失败！请确保配置文件的权限为可写入！')}
+
         return {'err': 'ok', 'rsp': args}
 
 class AdminInstall(BaseHandler):
@@ -590,6 +601,11 @@ class AdminInstall(BaseHandler):
             CONF['INVITE_MODE'] = False
 
         CONF.dumpfile()
+
+        # update index.html
+        html = self.render_string('index.html', **CONF)
+        page = os.path.join(CONF['html_path'], "index.html")
+        open(page, "w").write(html.encode("UTF-8"))
         return {'err': 'ok'}
 
 
