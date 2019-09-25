@@ -44,7 +44,7 @@ git clone https://github.com/talebook/talebook-library.git /data/books/library
 ## 创建DB
 执行以下命令，创建程序DB。
 ```
-python /data/release/www/calibre-webserver/server.py --syncdb
+python /data/release/calibre-webserver/server.py --syncdb
 ```
 
 
