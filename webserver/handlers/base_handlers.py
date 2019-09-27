@@ -268,7 +268,7 @@ class BaseHandler(web.RequestHandler):
         empty_item = item.to_dict()
         empty_item['collector'] = self.session.query(Reader).order_by(Reader.id).first()
         ids = [ book['id'] for book in books ]
-        items = self.session.query(Item).filter(Item.book_id.in_(ids)).all()
+        items = self.session.query(Item).filter(Item.book_id.in_(ids)).all() if ids else []
         maps = {}
         for b in items:
             d = b.to_dict()

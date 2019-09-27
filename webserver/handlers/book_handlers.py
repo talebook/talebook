@@ -300,25 +300,6 @@ class BookRefer(BaseHandler):
         self.db.set_metadata(book_id, mi)
         return {'err': 'ok'}
 
-
-
-class BookRating(BaseHandler):
-    @js
-    def post(self, id):
-        rating = self.get_argument("rating", None)
-        try:
-            r = float(rating)
-        except:
-            return {'ecode': 2, 'msg': _(u"评星无效")}
-
-        book_id = int(id)
-        mi = self.db.get_metadata(book_id, index_is_id=True)
-        mi.rating = r
-        self.db.set_metadata(book_id, mi)
-        if self.user_id(): self.count_increase(book_id, count_visit=1)
-        else: self.count_increase(book_id, count_guest=1)
-        return {'ecode': 0, 'msg': _(u'更新成功')}
-
 class BookEdit(BaseHandler):
     @js
     @auth
@@ -355,7 +336,7 @@ class BookDelete(BaseHandler):
 
 class BookDownload(BaseHandler):
     def get(self, id, fmt):
-        if not CONF['ALLOW_GUEST_DOWNLOAD'] and not self.current_user:
+        if not CONF['ALLOW_GUEST_DOWNLOAD'] or not self.current_user:
             raise web.HTTPError(403, log_message = _(u'请先登录') )
 
         fmt = fmt.lower()
@@ -401,7 +382,7 @@ class SearchBook(ListHandler):
         title = _(u'搜索：%(name)s') % vars()
         ids = self.cache.search(name)
         search_query = name
-        return self.render_book_list(None, vars(), ids);
+        return self.render_book_list([], vars(), ids);
 
 class HotBook(ListHandler):
     def get(self):
@@ -422,13 +403,6 @@ class HotBook(ListHandler):
         books = self.get_books(ids=ids)
         self.do_sort(books, 'count_visit', False)
         return self.render_book_list(books, vars())
-
-class BookAdd(BaseHandler):
-    @web.authenticated
-    def get(self):
-        title = _(u'添加书籍')
-        return self.html_page('book/add.html', vars())
-
 
 class BookUpload(BaseHandler):
     @js
@@ -630,12 +604,10 @@ def routes():
         ( r'/api/recent',               RecentBook   ),
         ( r'/api/hot',                  HotBook      ),
         ( r'/api/book/nav',             BookNav      ),
-        ( r'/api/book/add',             BookAdd      ),
         ( r'/api/book/upload',          BookUpload   ),
         ( r'/api/book/([0-9]+)',        BookDetail   ),
         ( r'/api/book/([0-9]+)/delete', BookDelete   ),
         ( r'/api/book/([0-9]+)/edit',   BookEdit     ),
-        ( r'/api/book/([0-9]+)/rating', BookRating   ),
         ( r'/api/book/([0-9]+)\.(.+)',  BookDownload ),
         ( r'/api/book/([0-9]+)/push',   BookPush     ),
         ( r'/api/book/([0-9]+)/refer',  BookRefer    ),
