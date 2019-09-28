@@ -3,7 +3,7 @@
         <template v-if="meta == 'rating'">
             <v-col cols=4 sm=2 v-for="item in items" :key="item.name" >
                 <v-chip :to="item.href" outlined color="primary" >
-                    {{item.name}}星书籍
+                    {{item.name}}星
                     <span v-if="item.count">&nbsp;({{item.count}})</span>
                 </v-chip>
             </v-col>

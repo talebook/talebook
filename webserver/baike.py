@@ -34,7 +34,7 @@ class BaiduBaikeApi:
         from cStringIO import StringIO
 
         info = baike.get_info()
-        print "\n".join( "%s:\t%s" % v for v in info.items())
+        logging.debug("\n".join( "%s:\t%s" % v for v in info.items()))
 
         mi = Metadata(info['title'])
         plat = "网络小说平台"

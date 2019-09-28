@@ -17,7 +17,7 @@ import social_tornado.handlers
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre import fit_image, guess_type
 from calibre.utils.date import fromtimestamp
-from calibre.utils.smtp import sendmail, create_mail
+from calibre.utils.smtp import create_mail
 from calibre.utils.logging import Log, FileStream
 from calibre.utils.filenames import ascii_filename
 from calibre.utils.magick.draw import (save_cover_data_to, Image,
@@ -119,8 +119,11 @@ class BaseHandler(web.RequestHandler):
         ScopedSession.remove()
 
     def static_url(self, path, **kwargs):
-        url = super(BaseHandler, self).static_url(path, **kwargs)
-        return self.static_host + url
+        if path.endswith("/"):
+            prefix = self.settings.get("static_url_prefix", "/static/")
+            return self.cdn_url + prefix + path
+        else:
+            return self.cdn_url + super(BaseHandler, self).static_url(path, **kwargs)
 
     def user_id(self):
         login_time = self.get_secure_cookie("lt")
@@ -131,7 +134,8 @@ class BaseHandler(web.RequestHandler):
     def get_current_user(self):
         user_id = self.user_id()
         logging.debug("[User]: user_id = %s" % user_id)
-        user = self.session.query(Reader).get(int(user_id)) if user_id else None
+        if user_id: user_id = int(user_id)
+        user = self.session.query(Reader).get(user_id) if user_id else None
 
         admin_id = self.get_secure_cookie("admin_id")
         if admin_id:

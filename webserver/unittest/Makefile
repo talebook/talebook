@@ -1,3 +1,3 @@
 all:
-	python test_app.py #TestMeta
+	python test_app.py #TestUser
 

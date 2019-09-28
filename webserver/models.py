@@ -118,6 +118,9 @@ class Reader(Base, SQLAlchemyMixin):
         if social_user.provider == "github":
             self.avatar = "https://avatars.githubusercontent.com/u/%s" % social_user.extra_data['id']
 
+    def get_active_code(self):
+        return self.get_secure_password(self.create_time.strftime("%Y-%m-%d %H:%M:%S"))
+
     def get_social_username(self, si):
         for k in ['username', 'login']:
             if k in si.extra_data:

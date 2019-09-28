@@ -7,6 +7,7 @@ from tornado import web
 from models import Reader, Message
 from base_handlers import BaseHandler, js, auth
 from calibre.utils.smtp import sendmail, create_mail
+from version import VERSION
 
 import loader
 CONF = loader.get_settings()
@@ -167,7 +168,7 @@ class UserUpdate(BaseHandler):
 class SignUp(BaseHandler):
     def check_active_code(self, username, code):
         user = self.session.query(Reader).filter(Reader.username==username).first()
-        if not user or code != user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S")):
+        if not user or code != user.get_active_code():
             raise web.HTTPError(403, log_message = _(u'激活码无效'))
         user.active = True
         user.save()
@@ -175,7 +176,7 @@ class SignUp(BaseHandler):
 
     def send_active_email(self, user):
         site = self.request.protocol + "://" + self.request.host
-        code = user.get_secure_password(user.create_time.strftime("%Y-%m-%d %H:%M:%S"))
+        code = user.get_active_code()
         link = '%s/api/active/%s/%s' % (site, user.username, code)
         args = {
                 'site_title': CONF['site_title'],
@@ -359,7 +360,6 @@ class UserMessages(BaseHandler):
 class UserInfo(BaseHandler):
     def get_sys_info(self):
         from sqlalchemy import func
-        from version import VERSION
 
         db = self.db
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)

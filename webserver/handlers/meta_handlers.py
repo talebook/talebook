@@ -44,9 +44,12 @@ class MetaList(ListHandler):
         category = meta if meta in ['series', 'publisher'] else meta +'s'
         items = self.get_category_with_count(meta)
         if items:
-            hotline = int(math.log10(len(items)))
-            items = [ v for v in items if v['count'] >= hotline ]
-            items.sort(cmp=lambda x,y: cmp(y['count'], x['count']))
+            if meta == 'rating':
+                items.sort(cmp=lambda x,y: cmp(y['name'], x['name']))
+            else:
+                hotline = int(math.log10(len(items)))
+                items = [ v for v in items if v['count'] >= hotline ]
+                items.sort(cmp=lambda x,y: cmp(y['count'], x['count']))
         return {'meta': meta, "title": title, "items": items }
 
 class MetaBooks(ListHandler):
@@ -60,6 +63,7 @@ class MetaBooks(ListHandler):
                 }
         title = titles.get(meta, _(u'未知')) % vars()
         category = meta+'s' if meta in ['tag', 'author'] else meta
+        if meta in ['rating']: name = int(name)
         books = self.get_item_books(category, name)
         return self.render_book_list(books, vars());
 
