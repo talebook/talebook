@@ -32,7 +32,6 @@ define("with-library", default=CONF['with_library'], type=str,
         help=_('Path to the library folder to serve with the content server.'))
 
 define("syncdb", default=False, type=bool, help=_('Create all tables'))
-define("testmail", default=False, type=bool, help=_('run testcase'))
 
 def load_calibre_translations():
     from tornado import locale
@@ -113,11 +112,6 @@ def make_app():
     if options.syncdb:
         models.user_syncdb(engine)
         logging.info("Create tables into DB")
-        sys.exit(0)
-
-    if options.testmail:
-        from test import email
-        email.do_send_mail()
         sys.exit(0)
 
     path = CONF['static_path'] + '/img/default_cover.jpg'
