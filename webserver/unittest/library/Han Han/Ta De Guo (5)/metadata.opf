@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+        <dc:identifier opf:scheme="calibre" id="calibre_id">5</dc:identifier>
+        <dc:identifier opf:scheme="uuid" id="uuid_id">cca1ed68-8fe5-47d2-bae9-8baaae6a2a43</dc:identifier>
+        <dc:title>他的国</dc:title>
+        <dc:creator opf:file-as="韩寒" opf:role="aut">韩寒</dc:creator>
+        <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (3.21.0) [https://calibre-ebook.com]</dc:contributor>
+        <dc:date>2010-10-26T00:00:00+00:00</dc:date>
+        <dc:description>在你年少时是否曾梦想成为国王？
+　　长大后的你是否还会继续这个英雄梦？
+　　有些人的心里没有很多东西，哪怕是穿过内心的深处挖到肝里也没有。
+　　有没有比兄弟和女人更加重要的情谊？
+　　有没有比飙车时凛冽的风更刺激的逃亡？
+　　纵身跳下，恍惚里终于看见一双双惊讶和肯定的眼神。
+　　画面在人们面前晃过，你的青春是否也只是果园里一块不和谐的石头？
+　　这是一个关于他的国的故事。
+　　野草冲出土壤，它们一百三十五度仰望的天空在哪里……</dc:description>
+        <dc:publisher>epub掌上书苑</dc:publisher>
+        <dc:identifier opf:scheme="ISBN">9787807592099</dc:identifier>
+        <dc:language>en</dc:language>
+        <dc:subject>现代·当代</dc:subject>
+        <meta content="{&quot;韩寒&quot;: &quot;&quot;}" name="calibre:author_link_map"/>
+        <meta content="2019-09-27T18:20:39.295125+00:00" name="calibre:timestamp"/>
+        <meta content="他的国" name="calibre:title_sort"/>
+    </metadata>
+    <guide>
+        <reference href="cover.jpg" title="Cover" type="cover"/>
+    </guide>
+</package>

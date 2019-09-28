@@ -166,15 +166,15 @@ export default {
             var nav_items = [
                 { icon: 'home',         href:'/',       text: '首页',         },
                 { heading: '分类浏览' },
-                { icon: 'widgets',            href:'/nav',    text: '所有书籍', count: sys.books      },
-                { icon: 'mdi-human-greeting', href:'/author', text: '作者',     count: sys.authors    },
-                { icon: 'mdi-home-group',     href:'/pub',    text: '出版社',   count: sys.publishers },
-                { icon: 'mdi-tag-heart',      href:'/tag',    text: '标签',     count: sys.tags       },
+                { icon:   'widgets',             href:'/nav',       text: '所有书籍', count: sys.books      },
+                { icon:   'mdi-home-group',      href:'/publisher', text: '出版社',   count: sys.publishers },
+                { icon:   'mdi-human-greeting',  href:'/author',    text: '作者',     count: sys.authors    },
+                { icon:   'mdi-tag-heart',       href:'/tag',       text: '标签',     count: sys.tags       },
                 { target: "", links: [
-                { icon: 'mdi-library-shelves', href:'/series', text: '丛书',     count: sys.series     },
-                { icon: 'mdi-star-half',      href:'/rating', text: '评分', },
-                { icon: 'mdi-trending-up',    href:'/hot',    text: '热度榜单', },
-                { icon: 'mdi-history',        href:'/recent', text: '最近更新', },
+                { icon:   'mdi-library-shelves', href:'/series',    text: '丛书',     count: sys.series     },
+                { icon:   'mdi-star-half',       href:'/rating',    text: '评分',     },
+                { icon:   'mdi-trending-up',     href:'/hot',       text: '热度榜单', },
+                { icon:   'mdi-history',         href:'/recent',    text: '最近更新', },
                 ]}
             ].concat(  ( sys.friends.length > 0 ) ? [
                 { heading: '友情链接' },

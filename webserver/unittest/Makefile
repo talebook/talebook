@@ -1,3 +1,3 @@
 all:
-	python test_index.py
+	python test_app.py #TestMeta
 

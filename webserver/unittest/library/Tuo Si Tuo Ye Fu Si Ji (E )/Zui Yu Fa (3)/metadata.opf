@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+        <dc:identifier opf:scheme="calibre" id="calibre_id">3</dc:identifier>
+        <dc:identifier opf:scheme="uuid" id="uuid_id">efb147f7-12f7-41a8-8588-f0054421a5f5</dc:identifier>
+        <dc:title>罪与罚</dc:title>
+        <dc:creator opf:file-as="陀思妥耶夫斯基(俄）" opf:role="aut">陀思妥耶夫斯基(俄）</dc:creator>
+        <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (3.21.0) [https://calibre-ebook.com]</dc:contributor>
+        <dc:date>2006-12-21T14:58:14+00:00</dc:date>
+        <dc:publisher>babyshan hcs@fj163.com</dc:publisher>
+        <dc:identifier opf:scheme="MOBI-ASIN">f288d295-bb70-456c-a8b2-a20781d82f52</dc:identifier>
+        <dc:language>eng</dc:language>
+        <dc:subject>lcsh: Novel</dc:subject>
+        <meta content="{&quot;陀思妥耶夫斯基(俄）&quot;: &quot;&quot;}" name="calibre:author_link_map"/>
+        <meta content="2019-09-27T18:20:38.544546+00:00" name="calibre:timestamp"/>
+        <meta content="罪与罚" name="calibre:title_sort"/>
+    </metadata>
+    <guide>
+        <reference href="cover.jpg" title="Cover" type="cover"/>
+    </guide>
+</package>

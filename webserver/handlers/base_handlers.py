@@ -303,14 +303,13 @@ class BaseHandler(web.RequestHandler):
         tags = dict( (i[0], i[1]) for i in self.cache.backend.conn.get(sql) )
         return tags
 
-    def get_category_with_count(self, category):
-        field = category
-        if category == 'series': field = 'series'
-
-        sql = '''SELECT %(category)s.id, %(category)s.name, count(distinct book) as count
-        FROM %(category)s left join books_%(category)s_link
-        on %(category)s.id = books_%(category)s_link.%(field)s
-        group by %(category)s.id''' % { 'category': category, 'field': field }
+    def get_category_with_count(self, field):
+        table = field if field in ['series'] else field +'s'
+        name_column = 'A.rating as name' if field in ['rating'] else 'A.name'
+        args = { 'table': table, 'field': field, 'name_column': name_column }
+        sql = '''SELECT A.id, %(name_column)s, count(distinct book) as count
+        FROM %(table)s as A left join books_%(table)s_link as B
+        on A.id = B.%(field)s group by A.id''' % args
         logging.debug(sql)
         rows = self.cache.backend.conn.get(sql)
         items = [{'id': a, 'name': b, 'count': c} for a,b,c in rows]
@@ -463,6 +462,6 @@ class ListHandler(BaseHandler):
 
             "img":             self.cdn_url+"/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
             "author_url":      self.base_url+"/author/"+author_sort,
-            "publisher_url":   self.base_url+"/pub/"+pub,
+            "publisher_url":   self.base_url+"/publisher/"+pub,
             }
 

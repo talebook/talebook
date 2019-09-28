@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+        <dc:identifier opf:scheme="calibre" id="calibre_id">9</dc:identifier>
+        <dc:identifier opf:scheme="uuid" id="uuid_id">2e604a26-eaef-416e-bfd2-8105eb4f5e60</dc:identifier>
+        <dc:title>彼得·潘</dc:title>
+        <dc:creator opf:file-as="图, 詹姆斯·巴里/孙国双" opf:role="aut">[英] 詹姆斯·巴里/孙国双 图</dc:creator>
+        <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (3.21.0) [https://calibre-ebook.com]</dc:contributor>
+        <dc:date>2011-02-26T00:00:00+00:00</dc:date>
+        <dc:publisher>epub掌上书苑</dc:publisher>
+        <dc:language>zho</dc:language>
+        <meta content="{&quot;[英] 詹姆斯·巴里/孙国双 图&quot;: &quot;&quot;}" name="calibre:author_link_map"/>
+        <meta content="2019-09-27T18:20:41.133559+00:00" name="calibre:timestamp"/>
+        <meta content="彼得·潘" name="calibre:title_sort"/>
+    </metadata>
+    <guide>
+        <reference href="cover.jpg" title="Cover" type="cover"/>
+    </guide>
+</package>

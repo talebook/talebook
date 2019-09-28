@@ -136,7 +136,7 @@ class Index(BaseHandler):
                 #"cover_large_url": cdn+"/get/thumb_600_840/%(id)s.jpg?t=%(timestamp)s" % b,
                 #"cover_url":       cdn+"/get/thumb_155_220/%(id)s.jpg?t=%(timestamp)s" % b,
                 "author_url":      base+"/author/"+author_sort,
-                "publisher_url":   base+"/pub/"+pub,
+                "publisher_url":   base+"/publisher/"+pub,
                 }
 
     @js
@@ -183,7 +183,7 @@ class BookDetail(BaseHandler):
             book['is_owner'] = True
         self.user_history('visit_history', book)
         files = []
-        for fmt in book['available_formats']:
+        for fmt in book.get('available_formats', ""):
             try: filesize = self.db.sizeof_format(book_id, fmt, index_is_id=True)
             except: continue
             files.append( {
@@ -307,7 +307,8 @@ class BookEdit(BaseHandler):
         bid = int(bid)
         data = tornado.escape.json_decode(self.request.body)
         mi = self.db.get_metadata(bid, index_is_id=True)
-        KEYS = ['authors', 'title', 'comments', 'tags', 'publisher', 'isbn', 'series']
+        KEYS = ['authors', 'title', 'comments', 'tags', 'publisher',
+                'isbn', 'series', 'rating', 'language']
         for key, val in data.items():
             if key in KEYS:
                 mi.set(key, val)

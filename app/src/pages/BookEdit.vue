@@ -28,6 +28,9 @@
                                 <v-col class='py-0' cols=12 sm=6>
                                     <v-text-field label="书名" v-model="book.title">{{book.title}}</v-text-field>
                                 </v-col>
+                                <v-col class='py-4' cols=12 sm=6>
+                                    <v-rating label="Rating" v-model="book.rating" color="yellow accent-4" length="10" dense ></v-rating>
+                                </v-col>
                                 <v-col class='py-0' cols=12 sm=6>
                                     <!-- AUTHORS -->
                                     <v-combobox v-model="book.authors" :items="book.authors" label="作者" :search-input.sync="author_input" hide-selected multiple small-chips>
@@ -50,6 +53,9 @@
                                     </v-combobox>
                                 </v-col>
                                 <v-col class='py-0' cols=12 sm=6>
+                                    <v-text-field label="丛书名称" v-model="book.series">{{book.series}}</v-text-field>
+                                </v-col>
+                                <v-col class='py-0' cols=12 sm=6>
                                     <v-text-field label="出版社" v-model="book.publisher">{{book.publisher}}</v-text-field>
                                 </v-col>
                                 <v-col class='py-0' cols=12 sm=6>
@@ -58,10 +64,10 @@
                                 <v-col class='py-0' cols=12 sm=6>
                                     <v-text-field label="ISBN编号" v-model="book.isbn">{{book.isbn}}</v-text-field>
                                 </v-col>
-
                                 <v-col class='py-0' cols=12 sm=6>
-                                    <v-text-field label="丛书名称" v-model="book.series">{{book.series}}</v-text-field>
+                                    <v-text-field label="语言" v-model="book.language">{{book.language}}</v-text-field>
                                 </v-col>
+
 
                                 <v-col class='py-0' cols=12>
                                     <!-- TAGS -->

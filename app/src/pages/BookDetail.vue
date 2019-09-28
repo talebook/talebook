@@ -99,7 +99,7 @@
                     <v-col cols=12 sm=8>
                         <v-card-text>
                             <div>
-                            <p class='title'>{{book.title}}</p>
+                            <p class='title mb-0'>{{book.title}}</p>
                             <span color="grey--text">{{book.author}}著，{{pub_year}}年版</span>
                             </div>
                             <v-rating v-model="book.rating" color="yellow accent-4" length="10" readonly dense small></v-rating>
@@ -111,7 +111,7 @@
                                     {{author}}
                                 </v-chip>
                                 </template>
-                                <v-chip rounded small dark color="indigo" :to="'/pub/'+book.publisher" >
+                                <v-chip rounded small dark color="indigo" :to="'/publisher/'+book.publisher" >
                                     <v-icon>group</v-icon>
                                     出版：{{book.publisher}}
                                 </v-chip>
