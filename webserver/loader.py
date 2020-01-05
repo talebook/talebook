@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
-import os, json
+import os, json, sys, logging
 
 class SettingsLoader(dict):
     def __init__(self, *args, **kwargs):
@@ -15,19 +15,22 @@ class SettingsLoader(dict):
         except:
             pass
 
+        self.settings_path = self.get('settings_path', None)
+        if self.settings_path: sys.path.insert(0, self.settings_path)
+
         try:
-            import settings_auto
-            self.update(settings_auto.settings)
+            import auto
+            self.update(auto.settings)
         except:
             pass
 
         try:
-            import settings_manual
-            self.update(settings_manual.settings)
+            import manual
+            self.update(manual.settings)
         except:
             pass
 
-    def dumpfile(self, filename="settings_auto.py"):
+    def dumpfile(self, filename="auto.py"):
         s = "\n".join( '%-30s: %s,' % ("'"+k+"'", repr(v)) for k,v in sorted(self.items()) )
         code = u'''#!/usr/bin/python
 #-*- coding: UTF-8 -*-
@@ -38,9 +41,12 @@ settings = {
 }
 '''
 
-        py = os.path.join(os.path.dirname(__file__), filename)
+        d = self.settings_path
+        if not d: d = os.path.dirname(__file__)
+        py = os.path.join(d, filename)
+        pyc = os.path.join(d, filename+"c")
+        logging.error("saving settings file: %s" % py)
         open(py, "w").write(code.encode("UTF-8"))
-        pyc = os.path.join(os.path.dirname(__file__), filename+"c")
         try: os.remove(pyc)
         except: pass
 
