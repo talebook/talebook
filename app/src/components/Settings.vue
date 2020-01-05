@@ -14,6 +14,9 @@
                     <v-textarea outlined v-else-if="f.type === 'textarea' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-textarea>
                     <v-text-field v-else :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" type="text"></v-text-field>
                 </template>
+                <template v-for="b in card.buttons">
+                    <v-btn @click="run(b.action)" color="primary"><v-icon>{{b.icon}}</v-icon>{{b.label}}</v-btn>
+                </template>
 
                 <template v-for="g in card.groups" >
                     <v-checkbox small hide-details v-model="settings[g.key]" :key="g.label" :label="g.label"></v-checkbox>
@@ -150,6 +153,9 @@ export default {
                 { icon: "person", key: "smtp_username", label: "SMTP用户名" },
                 { icon: "lock", key: "smtp_password", label: "SMTP密码" },
             ],
+            buttons: [
+                { icon: "email", label: "测试邮件", action: "test_email" },
+            ],
         },
         {
             show: false,
@@ -182,6 +188,25 @@ export default {
                     this.alert('success', '保存成功！可能需要5~10秒钟生效！');
                 }
             });
+        },
+        test_email: function() {
+            var data = new URLSearchParams();
+            data.append('smtp_server', this.settings['smtp_server']);
+            data.append('smtp_username', this.settings['smtp_username']);
+            data.append('smtp_password', this.settings['smtp_password']);
+            this.backend("/admin/testmail", {
+                method: 'POST',
+                body: data,
+            }).then( rsp => {
+                if ( rsp.err != 'ok' ) {
+                    this.alert('error', rsp.msg);
+                } else {
+                    this.alert('success', rsp.msg);
+                }
+            });
+        },
+        run: function(func) {
+            this[func]();
         },
     },
   }

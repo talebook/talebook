@@ -57,6 +57,7 @@ def js(func):
         self.set_header('Access-Control-Allow-Credentials', 'true')
         self.set_header('Cache-Control', 'max-age=0')
         self.write( rsp )
+        self.finish()
         return
     return do
 

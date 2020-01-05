@@ -121,6 +121,34 @@ class AdminUsers(BaseHandler):
         user.save()
         return {'err': 'ok'}
 
+class AdminTestMail(BaseHandler):
+    @js
+    @auth
+    def post(self):
+        mail_server = self.get_argument('smtp_server')
+        mail_username = self.get_argument('smtp_username')
+        mail_password = self.get_argument('smtp_password')
+
+        mail_from = mail_username
+        mail_to = mail_username
+        mail_subject = _(u'Calibre功能验证邮件')
+        mail_body = _(u'这是一封测试邮件，验证邮件参数是否配置正确。')
+
+        mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, None, None)
+        try:
+            sendmail(mail, from_=mail_from, to=[mail_to], timeout=10,
+                port=465, encryption='SSL',
+                relay=mail_server,
+                username=mail_username,
+                password=mail_password
+                )
+            return {'err': 'ok', 'msg': _(u'发送成功')}
+        except Exception as e:
+            import traceback
+            logging.error(traceback.format_exc())
+            return {'err': 'email.server_error', 'msg': str(e)}
+
+
 class AdminOwnerMode(BaseHandler):
     @auth
     def get(self):
@@ -534,6 +562,8 @@ class AdminSettings(BaseHandler):
         try:
             args.dumpfile()
         except:
+            import traceback
+            logging.error(traceback.format_exc())
             return {'err': 'file.permission', 'msg': _(u'更新磁盘配置文件失败！请确保配置文件的权限为可写入！')}
 
         return {'err': 'ok', 'rsp': args}
@@ -628,6 +658,7 @@ def routes():
             (r'/api/admin/install',     AdminInstall),
             (r'/api/admin/settings',    AdminSettings),
             (r'/api/admin/users',       AdminUsers),
+            (r'/api/admin/testmail',    AdminTestMail),
     ]
 
 
