@@ -78,6 +78,8 @@ class Reader(Base, SQLAlchemyMixin):
     access_time = Column(DateTime)
     extra = Column(MutableDict.as_mutable(JSONType), default={})
 
+    def __str__(self):
+        return "<id=%d, username=%s, email=%s>" % (self.id, self.username, self.email)
 
     def init_default_user(self):
         class DefaultUserInfo:
