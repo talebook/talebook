@@ -24,6 +24,7 @@ RUN mkdir -p /data/log/nginx/ && \
 	mkdir -p /data/books/upload  && \
 	mkdir -p /data/books/convert  && \
 	mkdir -p /data/books/progress  && \
+	mkdir -p /data/books/settings && \
 	mkdir -p /data/release/calibre-webserver/ && \
 	chmod a+w -R /data/log /data/books /data/release
 
@@ -42,8 +43,8 @@ RUN cd /data/release/calibre-webserver/app && \
 
 RUN cd /data/release/calibre-webserver/ && \
     cp app/dist/index.html webserver/templates/index.html && \
-    touch webserver/settings_auto.py && \
-    chmod a+w webserver/settings_auto.py && \
+    touch /data/books/settings/auto.py && \
+    chmod a+w /data/books/settings/auto.py && \
     chmod a+w app/dist/index.html && \
 	calibredb add --library-path=/data/books/library/ -r docker/book/ && \
 	python server.py --syncdb  && \
