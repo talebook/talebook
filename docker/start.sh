@@ -5,4 +5,4 @@ if [ ! -d "/data/books" ]; then
 fi
 
 service nginx restart
-exec /usr/bin/supervisord --nodaemon
+/usr/bin/supervisord --nodaemon
