@@ -42,13 +42,20 @@
             </v-list>
         </v-navigation-drawer>
 
-        <v-app-bar color="blue" dense dark fixed app :clipped-left="$vuetify.breakpoint.lgAndUp" extension-height="64" >
+        <v-app-bar class="px-0" color="blue" dense dark fixed app :clipped-left="$vuetify.breakpoint.lgAndUp" extension-height="64" >
             <template v-if="btn_search && $vuetify.breakpoint.xs" #extension>
+                    <v-container fluid>
                 <v-form @submit.prevent="do_serach">
-                    <v-text-field class="ma-0 pa-0" hide-details single-line solo-inverted v-model="search" ></v-text-field>
-                    &nbsp;
-                    <v-btn dark rounded @click="do_search" color="primary">搜索</v-btn>
+                    <v-row>
+                        <v-col cols="9">
+                            <v-text-field class="ma-0 pa-0" hide-details single-line solo-inverted v-model="search" ref="mobile_search" ></v-text-field>
+                        </v-col>
+                        <v-col cols="3">
+                            <v-btn dark rounded @click="do_mobile_search" color="primary">搜索</v-btn>
+                        </v-col>
+                    </v-row>
                 </v-form>
+                    </v-container>
             </template>
 
             <v-toolbar-title class="mr-12 align-center" >
@@ -58,7 +65,7 @@
 
             <v-spacer></v-spacer>
             <template v-if="$vuetify.breakpoint.smAndUp">
-            <v-text-field flat solo-inverted hide-details prepend-inner-icon="search" @keyup.enter="do_search"
+            <v-text-field flat solo-inverted hide-details prepend-inner-icon="search" @keyup.enter="do_search" ref="search"
                       v-model="search" name="name" label="Search" class="d-none d-sm-flex">
             </v-text-field>
             <v-spacer></v-spacer>
@@ -215,8 +222,19 @@ export default {
             }
             return r;
         },
+        do_mobile_search: function() {
+            if ( this.search.trim() != "" ) {
+                this.$router.push("/search?name="+this.search).catch(()=>{});
+            } else {
+                this.$refs.mobile_search.focus();
+            }
+        },
         do_search: function() {
-            this.$router.push("/search?name="+this.search).catch(()=>{});
+            if ( this.search.trim() != "" ) {
+                this.$router.push("/search?name="+this.search).catch(()=>{});
+            } else {
+                this.$refs.search.focus();
+            }
         },
         hidemsg: function(idx, msgid) {
             this.backend("/user/messages", {
