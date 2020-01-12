@@ -18,11 +18,10 @@ https://demo.talebook.org
 
 
 Docker
+![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)
 ===================
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)]
-
-[dockerhub]: https://hub.docker.com/r/talebook/calibre-webserver
+[dockerhub](https://hub.docker.com/r/talebook/calibre-webserver)
 
 ---
 
@@ -35,8 +34,6 @@ Docker
 **感谢 oldiy 制作第一版的Docker镜像，并编写了这么多教程！**
 
 + [ [群晖安装教程](https://odcn.top/2019/02/26/2734/) ]
-
-+ [ [Blog](https://odcn.top) ]
 
 + 加入Telegram讨论组 [[Join](https://t.me/joinchat/H3IoGkcnW6BGo51EJ9Kw5g)]
 
