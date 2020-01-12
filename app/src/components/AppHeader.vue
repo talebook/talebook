@@ -188,7 +188,7 @@ export default {
                 { links: sys.friends, target: "_blank" },
             ] : [] ).concat([
                 { heading: '系统' },
-                { icon: 'mdi-history', text: '最后更新', href: "https://github.com/talebook/calibre-webserver", count: sys.mtime },
+                { icon: 'mdi-history', text: '系统版本', href: "", count: "V"+sys.version },
                 { icon: 'mdi-human', text: '用户数', href: "", count: sys.users },
             ]);
             this.items = nav_items;
