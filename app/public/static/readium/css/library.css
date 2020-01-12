@@ -1,0 +1,236 @@
+
+#app-container{
+	overflow-x: hidden;
+}
+
+#empty-message{
+	display: inline-block;
+	font-size: 28px;
+	width: 200px;
+	margin-right: 60px;
+	margin-top: 30px;
+	font-family: "Source Sans Pro";
+}
+
+#empty-message-arrow{
+	position: absolute;
+	right: 42px;
+	top: 40px;
+}
+
+.library-items{
+	margin: 20px 10px;
+}
+.library-item{
+	position: relative;
+
+    padding-bottom: 20px;
+}
+
+.offscreenText{
+	display:none;
+}
+
+.details{
+	display: none;
+}
+
+.details-body .buttons{
+	position: absolute;
+	bottom: 0px;
+	width: 100%;
+	min-width: 150%;
+	text-align: left;
+}
+
+.no-cover{
+
+    cursor: pointer;
+    	
+	height: 190px;
+	
+	width: 142px;
+	font-size: 19px;
+    
+    
+	display: table;
+    
+    table-layout: fixed;
+    
+	padding: 0;
+	color: white;
+	font-family: serif;
+}
+
+.no-cover p{
+	display: table-cell;
+
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    
+	vertical-align: middle;
+	text-align: center;
+
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+.details-body .no-cover{
+	width: 150px;
+	height: 200px;
+	font-size: 20px;
+}
+
+.modal-cover-wrap img{
+	max-width: 150px;
+	max-height: 200px;
+}
+
+.modal-cover-wrap{
+	position: relative;
+	margin-right: 20px;
+	height: 240px;
+	display: inline-block;
+	max-width: 185px;
+	vertical-align: top;
+}
+.modal-book-info{
+	display: inline-block;
+	vertical-align: top;
+	max-width: 370px;
+}
+.details-body{
+	height: 100%;
+}
+
+.title, .author{
+	/*text-align: center;*/
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-left:5px;
+	font-family: "Source Sans Pro"
+}
+
+.title{
+	margin-top: 5px;
+	margin-bottom: 5px;
+	font-weight: bold;
+	font-size: 16px;
+}
+
+.author{
+	color: #555;
+}
+
+nav #remotestorage-widget, nav #remotestorage-widget .rs-cube {
+	position: static;
+}
+
+/* list view styles */
+body.list-view #app-container{
+	position: relative;
+}
+body.list-view #app-container .library-item{
+	width: 100%;
+	height: 250px;
+	position: static;
+	display: table-row;
+}
+
+body:not(.list-view) #app-container .library-item .info-wrap .no-cover {
+    border: 1px solid #efefef;
+    border-radius: 3px;
+}
+
+body:not(.list-view) #app-container .library-item .info-wrap button {
+    width: 110%;
+}
+
+body.list-view #app-container .library-item .book-info,
+body.list-view #app-container .library-item .info-wrap{
+	display: table-cell;
+	vertical-align: middle;
+}
+
+body.list-view #app-container .library-item .book-info{
+	padding-left: 20px;
+}
+
+body.list-view #app-container .library-item .book-info .title{
+	font-size: 24px;
+	font-weight: normal;
+	text-align: left;
+	white-space: normal;
+}
+body.list-view #app-container .library-item .book-info .author{
+	text-align: left;
+}
+
+/*
+body.list-view #app-container .library-item img{
+	height: 190px;
+	width: 142px;
+	max-width: 142px;
+}
+*/
+
+.has-cover{
+    background-repeat:no-repeat;
+    background-position:center;
+    background-attachment:scroll;
+    
+    background-size:contain;
+
+    -webkit-background-clip:content-box;
+    -webkit-background-origin:content-box;
+}
+
+body.list-view .buttons{
+	margin-top: 10px;
+}
+body.list-view .details{
+	display: inline;
+}
+
+@media (max-width:768px){
+
+	.library-item .book-info{
+		display: none;
+	}
+
+	body.list-view #app-container .library-item .info-wrap{
+		padding-bottom: 0px;
+		padding-left: 0px;
+	}
+}
+
+
+/*.icon-library, .icon-library:active{
+  background-image: url('../images/glyphicons_319_sort.png');
+}
+
+.icon-add-epub, .icon-add-epub:active{
+  background-image: url('../images/glyphicons_432_plus.png');
+}
+
+.icon-thumbnails, .icon-thumbnails:active{
+  background-image: url('../images/glyphicons_156_show_thumbnails.png');
+}
+
+.icon-list-view, .icon-list-view:active{
+  background-image: url('../images/glyphicons_158_show_lines.png');
+}*/
+
+.icon-thumbnails{
+	display:none;
+}
+
+.list-view .icon-thumbnails{
+	display:block;
+}
+
+.list-view .icon-list-view{
+	display:none;
+}
+

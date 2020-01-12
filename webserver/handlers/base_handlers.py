@@ -17,7 +17,7 @@ import social_tornado.handlers
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre import fit_image, guess_type
 from calibre.utils.date import fromtimestamp
-from calibre.utils.smtp import sendmail, create_mail
+from calibre.utils.smtp import create_mail
 from calibre.utils.logging import Log, FileStream
 from calibre.utils.filenames import ascii_filename
 from calibre.utils.magick.draw import (save_cover_data_to, Image,
@@ -26,9 +26,10 @@ from calibre.customize.conversion import OptionRecommendation, DummyReporter
 
 # import douban
 from models import Reader, Message, Item
-
 messages = defaultdict(list)
 
+import loader
+CONF = loader.get_settings()
 
 def day_format(value, format='%Y-%m-%d'):
     try: return value.strftime(format)
@@ -48,11 +49,23 @@ def website_format(value):
     return ";".join(links)
 
 
-def json_response(func):
+def js(func):
     def do(self, *args, **kwargs):
         rsp = func(self, *args, **kwargs)
+        origin = self.request.headers.get('origin', '*')
+        self.set_header('Access-Control-Allow-Origin', origin)
+        self.set_header('Access-Control-Allow-Credentials', 'true')
+        self.set_header('Cache-Control', 'max-age=0')
         self.write( rsp )
+        self.finish()
         return
+    return do
+
+def auth(func):
+    def do(self, *args, **kwargs):
+        if not self.current_user:
+            return {'err': 'user.need_login', 'msg': _(u'请先登录')}
+        return func(self, *args, **kwargs)
     return do
 
 class BaseHandler(web.RequestHandler):
@@ -60,6 +73,30 @@ class BaseHandler(web.RequestHandler):
 
     def head(self, *args, **kwargs):
         return self.get(*args, **kwargs)
+
+    def mark_invited(self):
+        self.set_secure_cookie("invited", str(int(time.time())))
+
+    def need_invited(self):
+        return (CONF['INVITE_MODE'] == True)
+
+    def should_be_invited(self):
+        if self.need_invited():
+            t = self.get_secure_cookie("invited")
+            if not t or int(float(t)) < int(time.time()) - 7*86400:
+                self.write( {'err': 'not_invited'} )
+                self.set_status(200)
+                raise web.Finish()
+
+    def should_be_installed(self):
+        if CONF.get("installed", None) == False:
+            self.write( {'err': 'not_installed'} )
+            self.set_status(200)
+            raise web.Finish()
+
+    def prepare(self):
+        self.should_be_installed()
+        self.should_be_invited()
 
     def initialize(self):
         ScopedSession = self.settings['ScopedSession']
@@ -69,17 +106,25 @@ class BaseHandler(web.RequestHandler):
         self.build_time = self.settings['build_time']
         self.default_cover = self.settings['default_cover']
         self.admin_user = None
-        self.static_host = self.settings.get("static_host", "")
+        self.static_host = CONF.get("static_host", "")
         if self.static_host:
             self.static_host = self.request.protocol + "://" + self.static_host
+
+        host = CONF.get("static_host", "")
+        if not host: host = self.request.host
+        self.cdn_url = self.request.protocol + "://" + host
+        self.base_url = self.request.protocol + "://" + self.request.host
 
     def on_finish(self):
         ScopedSession = self.settings['ScopedSession']
         ScopedSession.remove()
 
     def static_url(self, path, **kwargs):
-        url = super(BaseHandler, self).static_url(path, **kwargs)
-        return self.static_host + url
+        if path.endswith("/"):
+            prefix = self.settings.get("static_url_prefix", "/static/")
+            return self.cdn_url + prefix + path
+        else:
+            return self.cdn_url + super(BaseHandler, self).static_url(path, **kwargs)
 
     def user_id(self):
         login_time = self.get_secure_cookie("lt")
@@ -89,7 +134,9 @@ class BaseHandler(web.RequestHandler):
 
     def get_current_user(self):
         user_id = self.user_id()
-        user = self.session.query(Reader).get(int(user_id)) if user_id else None
+        logging.debug("[User]: user_id = %s" % user_id)
+        if user_id: user_id = int(user_id)
+        user = self.session.query(Reader).get(user_id) if user_id else None
 
         admin_id = self.get_secure_cookie("admin_id")
         if admin_id:
@@ -97,8 +144,8 @@ class BaseHandler(web.RequestHandler):
         elif user and user.is_admin():
             self.admin_user = user
 
-        logging.debug("Query User [%s %s ]" % (user_id, user))
-        logging.debug("Query admin_user [%s %s ]" % (admin_id, self.admin_user) )
+        logging.debug("[User]: User  Query(%s) = %s" % (user_id, user))
+        logging.debug("[User]: Admin Query(%s) = %s" % (admin_id, self.admin_user) )
         return user
 
     def is_admin(self):
@@ -142,7 +189,7 @@ class BaseHandler(web.RequestHandler):
 
     def get_template_path(self):
         """ 获取模板路径 """
-        return self.settings.get('template_path', 'templates')
+        return CONF.get('template_path', 'templates')
 
     def create_template_loader(self, template_path):
         """ 根据template_path创建相对应的Jinja2 Environment """
@@ -169,19 +216,6 @@ class BaseHandler(web.RequestHandler):
         namespace.update(kwargs)
         return t.render(**namespace)
 
-    def json_page(self, template, vals):
-        p = template.split(".html")[0].replace("/", ".")
-        try:
-            m = __import__("jsons."+p)
-            for pp in p.split("."):
-                m = getattr(m, pp)
-            m = reload(m)
-            self.write( m.json_output(self, vals) )
-        except Exception as e:
-            import traceback
-            logging.error(traceback.format_exc())
-            self.write( {"error": "json func error"} )
-
     def html_page(self, template, *args, **kwargs):
         self.set_header('Cache-Control', 'max-age=0')
         db = self.db
@@ -205,29 +239,29 @@ class BaseHandler(web.RequestHandler):
 
         IMG = self.static_host
         vals = dict(*args, **kwargs)
-        SITE_TITLE = self.settings['site_title']
+        SITE_TITLE = CONF['site_title']
 
         vals.update( vars() )
         del vals['self']
-        if self.get_argument("fmt", 0) == "json":
-            self.json_page(template, vals)
-        else:
-            self.write( self.render_string(template, **vals) )
+        self.write( self.render_string(template, **vals) )
 
     def get_book(self, book_id):
         books = self.get_books(ids=[int(book_id)])
         if not books:
-            raise web.HTTPError(404, reason = _(u"抱歉，这本书不存在") )
+            self.write( {'err': 'not_found', 'msg': _(u"抱歉，这本书不存在") } )
+            self.set_status(200)
+            raise web.Finish()
         return books[0]
 
     def is_book_owner(self, book_id, user_id):
-        auto = int(self.settings.get('auto_login', 0))
+        auto = int(CONF.get('auto_login', 0))
         if auto: return True
 
         query = self.session.query(Item)
         query = query.filter(Item.book_id == book_id)
         query = query.filter(Item.collector_id == user_id)
         return (query.count() > 0)
+
 
     def get_books(self, *args, **kwargs):
         _ts = time.time()
@@ -239,7 +273,7 @@ class BaseHandler(web.RequestHandler):
         empty_item = item.to_dict()
         empty_item['collector'] = self.session.query(Reader).order_by(Reader.id).first()
         ids = [ book['id'] for book in books ]
-        items = self.session.query(Item).filter(Item.book_id.in_(ids)).all()
+        items = self.session.query(Item).filter(Item.book_id.in_(ids)).all() if ids else []
         maps = {}
         for b in items:
             d = b.to_dict()
@@ -274,6 +308,18 @@ class BaseHandler(web.RequestHandler):
         tags = dict( (i[0], i[1]) for i in self.cache.backend.conn.get(sql) )
         return tags
 
+    def get_category_with_count(self, field):
+        table = field if field in ['series'] else field +'s'
+        name_column = 'A.rating as name' if field in ['rating'] else 'A.name'
+        args = { 'table': table, 'field': field, 'name_column': name_column }
+        sql = '''SELECT A.id, %(name_column)s, count(distinct book) as count
+        FROM %(table)s as A left join books_%(table)s_link as B
+        on A.id = B.%(field)s group by A.id''' % args
+        logging.debug(sql)
+        rows = self.cache.backend.conn.get(sql)
+        items = [{'id': a, 'name': b, 'count': c} for a,b,c in rows]
+        return items
+
     def books_by_timestamp(self):
         sql = 'SELECT id, timestamp FROM books order by timestamp desc';
         ids =  [ v[0] for v in self.cache.backend.conn.get(sql) ]
@@ -283,11 +329,10 @@ class BaseHandler(web.RequestHandler):
         start = self.get_argument("start", 0)
         try: start = int(start)
         except: start = 0
-        if start < 0: start = 0
-        return start
+        return max(0, start)
 
     def get_path_progress(self, book_id):
-        return os.path.join(self.settings['progress_path'], 'progress-%s.log' % book_id)
+        return os.path.join(CONF['progress_path'], 'progress-%s.log' % book_id)
 
     def get_save_referer(self, default="/"):
         referer = self.request.headers.get('referer', default)
@@ -295,6 +340,37 @@ class BaseHandler(web.RequestHandler):
         if parts.netloc != self.request.host:
             return default
         return referer
+
+    def create_mail(self, sender, to, subject, body, attachment_data, attachment_name):
+        from email.header import Header
+        from email.utils import formatdate
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.application import MIMEApplication
+        def get_md5(s):
+            import hashlib
+            md5 = hashlib.md5()
+            md5.update(s)
+            return md5.hexdigest()
+
+        mail = MIMEMultipart()
+        mail['From'] = sender
+        mail['To'] = to
+        mail['Subject'] = Header(subject, 'utf-8')
+        mail['Date'] = formatdate(localtime=True)
+        mail['Message-ID'] = '<tencent_%s@qq.com>' % get_md5(mail.as_string())
+        mail.preamble = 'You will not see this in a MIME-aware mail reader.\n'
+
+        if body is not None:
+            msg = MIMEText(body, 'plain', 'utf-8')
+            mail.attach(msg)
+
+        if attachment_data is not None:
+            name = Header(attachment_name, 'utf-8').encode()
+            msg = MIMEApplication(attachment_data, 'octet-stream', charset='utf-8', name=name)
+            msg.add_header('Content-Disposition', 'attachment', filename=name)
+            mail.attach(msg)
+        return mail.as_string()
 
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):
@@ -317,28 +393,80 @@ class ListHandler(BaseHandler):
             self.do_sort(items, field, ascending)
         return None
 
+    @js
     def render_book_list(self, all_books, vars_, ids=None):
         start = self.get_argument_start()
         sort = self.get_argument("sort", "timestamp")
-        size = self.get_argument("size", 30)
-        delta = min(size, 100)
+        try: size = int(self.get_argument("size"))
+        except: size = 30
+        delta = min(max(size, 30), 100)
 
-        if ids: all_books = ids
-        count = len(all_books)
-        page_max = (count-1) / delta
-        page_now = start / delta
-        pages = []
-        for p in range(page_now-3, page_now+3):
-            if 0 <= p and p <= page_max:
-                pages.append(p)
+        count = 0
+        books = []
 
         if ids:
+            ids = list(ids)
+            count = len(ids)
             books = self.get_books(ids=ids[start:start+delta])
             self.sort_books(books, sort)
         else:
+            count = len(all_books)
             self.sort_books(all_books, sort)
             books = all_books[start:start+delta]
-        vars_.update(vars())
-        return self.html_page('book/list.html', vars_)
+        return {
+                'err': 'ok',
+                'category': vars_.get('category', None),
+                "title": vars_['title'],
+                "total": count,
+                'books': [ self.fmt(b) for b in books ],
+            }
 
+    def fmt(self, b):
+        def get(k, default=_("Unknown")):
+            v = b.get(k, None)
+            if not v: v = default
+            return v
+
+        collector = b.get('collector', None)
+        if isinstance(collector, dict):
+            collector = collector.get("username", None)
+        elif collector:
+            collector = collector.username
+
+        try: pubdate = b['pubdate'].strftime("%Y-%m-%d")
+        except: pubdate = None
+
+        pub = b.get("publisher", None)
+        if not pub: pub = _("Unknown")
+
+        author_sort = b.get('author_sort', None)
+        if not author_sort: author_sort = _("Unknown")
+
+        comments = b.get("comments", None)
+        if not comments: comments = _(u"点击浏览详情")
+
+        return {
+            'id':              b['id'],
+            'title':           b['title'],
+            'rating':          b['rating'],
+            'count_visit':     get('count_visit', 0),
+            'count_download':  get('count_download', 0),
+            'timestamp':       b['timestamp'].strftime("%Y-%m-%d"),
+            'pubdate':         pubdate,
+            'collector':       collector,
+            'author':          ', '.join(b['authors']),
+            'authors':         b['authors'],
+            'tag':             ' / '.join(b['tags']),
+            'tags':            b['tags'],
+            'author_sort':     get('author_sort'),
+            'publisher':       get('publisher'),
+            'comments':        get('comments',  _(u'暂无简介') ),
+            'series':          get('series',    None),
+            'language':        get('language',  None),
+            'isbn':            get('isbn',      None),
+
+            "img":             self.cdn_url+"/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
+            "author_url":      self.base_url+"/author/"+author_sort,
+            "publisher_url":   self.base_url+"/publisher/"+pub,
+            }
 

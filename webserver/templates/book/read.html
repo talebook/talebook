@@ -18,7 +18,7 @@
         var i18n_url = "{{RES}}/static/readium/";
         var base_url = "{{RES}}/static/readium/lib/";
         var epub_url = "{{RES}}{{epub_dir}}";
-        var progress_url = "/progress/{{book_id}}";
+        var progress_url = "/get/progress/{{book_id}}";
     </script>
     <script type="text/javascript" src="{{static_url("js/jquery-1.11.1.min.js")}}"></script>
     <script type="text/javascript" src="{{static_url("readium/lib/require.js")}}" data-main="{{static_url("readium/lib/ReadiumViewerLite.js")}}"></script>
@@ -64,7 +64,7 @@
                 config : {
                     'EpubReader' : {
                         'annotationCssUrl': "{{static_url("readium/css/annotations.css")}}",
-                        'jsLibRoot': "{{static_url("readium/lib/thirdparty")}}",
+                        'jsLibRoot': "{{static_url("readium/lib/thirdparty/")}}",
                         'useSimpleLoader' : false // the cloud reader cannot pre-process HTML content documents and may need to load zipped EPUBs too.
                     }
                 }

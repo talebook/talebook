@@ -1,61 +1,11 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
-import logging
+import logging, math
 from tornado import web
-from base_handlers import BaseHandler, ListHandler
+from base_handlers import BaseHandler, ListHandler, js
 from calibre.utils.filenames import ascii_filename
 
-
-class TagList(ListHandler):
-    def get(self):
-        title = u'全部标签'
-        category = "tags"
-        tags = self.all_tags_with_count()
-        hot_tags = []
-        for tag_name, tag_count in tags.items():
-            if tag_count < 5: continue
-            hot_tags.append( (tag_name, tag_count) )
-        hot_tags.sort(lambda x,y: cmp(y[1], x[1]))
-        tags = hot_tags
-        return self.html_page('tag/list.html', vars())
-
-class TagBooks(ListHandler):
-    def get(self, name):
-        title = _(u'含有"%(name)s"标签的书籍') % vars()
-        category = "tags"
-        books = self.get_item_books(category, name)
-        return self.render_book_list(books, vars());
-
-class AuthorList(ListHandler):
-    def get(self):
-        title = u'全部作者'
-        category = "authors"
-        authors = self.db.all_authors()
-        #authors.sort(cmp=lambda x,y: cmp(ascii_filename(x[1]).lower(), ascii_filename(y[1]).lower()))
-        authors.sort(cmp=lambda x,y: cmp(x[1], y[1]))
-        return self.html_page('author/list.html', vars())
-
-class AuthorBooks(ListHandler):
-    def get(self, name):
-        title = _(u'%(name)s编著的书籍') % vars()
-        category = "authors"
-        books = self.get_item_books(category, name)
-        return self.render_book_list(books, vars());
-
-class PubList(ListHandler):
-    def get(self):
-        title = u'全部出版社'
-        category = "publisher"
-        publishers = self.cache.get_id_map(category).items()
-        return self.html_page('publisher/list.html', vars())
-
-class PubBooks(ListHandler):
-    def get(self, name):
-        title = _(u'%(name)s出版的书籍') % vars()
-        category = "publisher"
-        books = self.get_item_books(category, name)
-        return self.render_book_list(books, vars());
 
 class AuthorBooksUpdate(ListHandler):
     def post(self, name):
@@ -78,34 +28,51 @@ class PubBooksUpdate(ListHandler):
             ids = [ b['id'] for b in books if not b['publisher'] ]
         for book_id in list(ids)[:40]:
             self.do_book_update(book_id)
-        self.redirect('/pub/%s'%name, 302)
+        self.redirect('/publisher/%s'%name, 302)
 
-class RatingList(ListHandler):
-    def get(self):
-        title = u'全部评分'
-        category = "rating"
-        ratings = self.cache.get_id_map(category).items()
-        ratings.sort(cmp=lambda x,y: cmp(x[1], y[1]))
-        return self.html_page('rating/list.html', vars())
+class MetaList(ListHandler):
+    @js
+    def get(self, meta):
+        titles = {
+                'tag': _(u'全部标签'),
+                'author': _(u'全部作者'),
+                'series': _(u'丛书列表'),
+                'rating': _(u'全部评分'),
+                'publisher': _(u'全部出版社'),
+                }
+        title = titles.get(meta, _(u'未知')) % vars()
+        category = meta if meta in ['series', 'publisher'] else meta +'s'
+        items = self.get_category_with_count(meta)
+        if items:
+            if meta == 'rating':
+                items.sort(cmp=lambda x,y: cmp(y['name'], x['name']))
+            else:
+                hotline = int(math.log10(len(items)))
+                items = [ v for v in items if v['count'] >= hotline ]
+                items.sort(cmp=lambda x,y: cmp(y['count'], x['count']))
+        return {'meta': meta, "title": title, "items": items }
 
-class RatingBooks(ListHandler):
-    def get(self, name):
-        title = _('评分为%(name)s星的书籍') % vars()
-        category = "rating"
-        books = self.get_item_books(category, int(name))
+class MetaBooks(ListHandler):
+    def get(self, meta, name):
+        titles = {
+                'tag': _(u'含有"%(name)s"标签的书籍'),
+                'author': _(u'"%(name)s"编著的书籍'),
+                'series':  _('"%(name)s"丛书包含的书籍'),
+                'rating': _('评分为%(name)s星的书籍'),
+                'publisher':  _(u'"%(name)s"出版的书籍'),
+                }
+        title = titles.get(meta, _(u'未知')) % vars()
+        category = meta+'s' if meta in ['tag', 'author'] else meta
+        if meta in ['rating']: name = int(name)
+        books = self.get_item_books(category, name)
         return self.render_book_list(books, vars());
+
 
 def routes():
     return [
-        ( r'/author',             AuthorList        ),
-        ( r'/author/(.*)',        AuthorBooks       ),
-        ( r'/author/(.*)/update', AuthorBooksUpdate ),
-        ( r'/tag',                TagList           ),
-        ( r'/tag/(.*)',           TagBooks          ),
-        ( r'/pub',                PubList           ),
-        ( r'/pub/(.*)',           PubBooks          ),
-        ( r'/pub/(.*)/update',    PubBooksUpdate    ),
-        ( r'/rating',             RatingList        ),
-        ( r'/rating/(.*)',        RatingBooks       ),
+        ( r'/api/(author|publisher|tag|rating|series)',      MetaList  ),
+        ( r'/api/(author|publisher|tag|rating|series)/(.*)', MetaBooks ),
+        ( r'/api/author/(.*)/update', AuthorBooksUpdate ),
+        ( r'/api/publisher/(.*)/update',    PubBooksUpdate    ),
         ]
 

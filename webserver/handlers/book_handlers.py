@@ -5,12 +5,15 @@ import logging
 import douban
 import baike
 import subprocess
+import tornado.escape
 from base_handlers import *
 
-from settings import settings
 from calibre.ebooks.metadata import authors_to_string
 from calibre.ebooks.conversion.plumber import Plumber
 from calibre.customize.conversion import OptionRecommendation, DummyReporter
+
+import loader
+CONF = loader.get_settings()
 
 BOOKNAV = (
 (
@@ -108,6 +111,35 @@ def do_ebook_convert(old_path, new_path, log_path):
 
 
 class Index(BaseHandler):
+    def fmt(self, b):
+        pub = b.get("publisher", None)
+        if not pub: pub = _("Unknown")
+
+        author_sort = b.get('author_sort', None)
+        if not author_sort: author_sort = _("Unknown")
+
+        comments = b.get("comments", None)
+        if not comments: comments = _(u"点击浏览详情")
+
+        cdn = self.cdn_url
+        base = self.base_url
+        return {
+                "id":              b['id'],
+                "title":           b['title'],
+                "rating":          b['rating'],
+                "author":          ", ".join(b['authors']),
+                "authors":         b['authors'],
+                "publisher":       pub,
+                "comments":        comments,
+
+                "img":             cdn+"/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
+                #"cover_large_url": cdn+"/get/thumb_600_840/%(id)s.jpg?t=%(timestamp)s" % b,
+                #"cover_url":       cdn+"/get/thumb_155_220/%(id)s.jpg?t=%(timestamp)s" % b,
+                "author_url":      base+"/author/"+author_sort,
+                "publisher_url":   base+"/publisher/"+pub,
+                }
+
+    @js
     def get(self):
         max_random = 30
         max_recent = 30
@@ -126,42 +158,95 @@ class Index(BaseHandler):
         new_ids = random.sample(ids[-300:], min(max_recent, len(ids)))
         new_books = [ b for b in self.get_books(ids=new_ids) if b['cover'] ]
         new_books = new_books[:cnt_recent]
-        return self.html_page('index.html', vars())
 
-class About(BaseHandler):
-    def get(self):
-        nav = "about"
-        return self.html_page('about.html', vars())
+        return {
+            "random_books_count": len(random_books),
+            "new_books_count":    len(new_books),
+            "random_books":       [ self.fmt(b) for b in random_books ],
+            "new_books":          [ self.fmt(b) for b in new_books    ],
+        }
 
 class BookDetail(BaseHandler):
+    @js
     def get(self, id):
         book = self.get_book(id)
         book_id = book['id']
         book['is_owner'] = self.is_book_owner(book_id, self.user_id())
         book['is_public'] = True
+        '''
         if ( book['publisher'] and book['publisher'] in (u'中信出版社') ) or u'吴晓波' in list(book['authors']):
             if not book['is_owner']:
                 book['is_public'] = False
+        '''
         if self.is_admin():
             book['is_public'] = True
             book['is_owner'] = True
         self.user_history('visit_history', book)
-        try: sizes = [ (f, self.db.sizeof_format(book_id, f, index_is_id=True)) for f in book['available_formats'] ]
-        except: sizes = []
-        title = book['title']
-        smtp_username = settings['smtp_username']
+        files = []
+        for fmt in book.get('available_formats', ""):
+            try: filesize = self.db.sizeof_format(book_id, fmt, index_is_id=True)
+            except: continue
+            files.append( {
+                'format': fmt,
+                'size': filesize,
+                'href': self.base_url + "/api/book/%s.%s" % (book_id, fmt),
+                })
+
         if self.user_id(): self.count_increase(book_id, count_visit=1)
         else: self.count_increase(book_id, count_guest=1)
-        return self.html_page('book/detail.html', vars())
+
+        b = book
+        def get(k, default=_("Unknown")):
+            v = b.get(k, None)
+            if not v: v = default
+            return v
+
+        collector = b.get('collector', None)
+        if isinstance(collector, dict):
+            collector = collector.get("username", None)
+        elif collector:
+            collector = collector.username
+
+        try: pubdate = b['pubdate'].strftime("%Y-%m-%d")
+        except: pubdate = None
+
+        return {
+                'err': 'ok',
+                'kindle_sender': CONF['smtp_username'],
+                'book': {
+                    'id'              : b['id'],
+                    'title'           : b['title'],
+                    'rating'          : b['rating'],
+                    'count_visit'     : b['count_visit'],
+                    'count_download'  : b['count_download'],
+                    'timestamp'       : b['timestamp'].strftime("%Y-%m-%d"),
+                    'pubdate'         : pubdate,
+                    'collector'       : collector,
+                    'authors'         : b['authors'],
+                    'author'          : ', '.join(b['authors']),
+                    'tags'            : b['tags'],
+                    'author_sort'     : get('author_sort'),
+                    'publisher'       : get('publisher'),
+                    'comments'        : get('comments',_(u'暂无简介') ),
+                    'series'          : get('series',None),
+                    'language'        : get('language',None),
+                    'isbn'            : get('isbn',None),
+                    'files'           : files,
+                    'is_public'       : b['is_public'],
+                    'is_owner'        : b['is_owner'],
+                    "img"             : self.cdn_url+"/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
+                },
+            }
 
 class BookRefer(BaseHandler):
-    @web.authenticated
+    @js
+    @auth
     def get(self, id):
         book_id = int(id)
         mi = self.db.get_metadata(book_id, index_is_id=True)
         title = re.sub(u'[(（].*', "", mi.title)
 
-        api = douban.DoubanBookApi(settings['douban_apikey'], copy_image=False)
+        api = douban.DoubanBookApi(CONF['douban_apikey'], copy_image=False)
         # first, search title
         books = api.get_books_by_title(title)
         books = [] if books == None else books
@@ -176,21 +261,29 @@ class BookRefer(BaseHandler):
         api = baike.BaiduBaikeApi(copy_image=False)
         book = api.get_book(title)
         if book: books.append( book )
-        self.set_header("Cache-control", "no-cache")
-        return self.html_page('book/refer.html', vars())
 
+        keys = ['cover_url', 'source', 'website', 'title', 'author_sort' ,'publisher', 'isbn', 'comments']
+        rsp = []
+        for b in books:
+            d = dict( (k,b.get(k, '')) for k in keys )
+            d['pubyear'] = b.pubdate.strftime("%Y") if b.pubdate else ""
+            if not d['comments']: d['comments'] = u'无详细介绍'
+            rsp.append( d )
 
-class BookReferSet(BaseHandler):
-    @web.authenticated
-    def post(self, id, isbn):
+        return {'err': 'ok', 'books': rsp}
+
+    @js
+    @auth
+    def post(self, id):
+        isbn = self.get_argument("isbn", "error")
         book_id = int(id)
         if not isbn.isdigit():
-            raise web.HTTPError(400, reason = _(u'ISBN参数错误') )
+            return {'err': 'params.isbn.invalid', 'msg': _(u'ISBN参数错误') }
         mi = self.db.get_metadata(book_id, index_is_id=True)
         if not mi:
-            raise web.HTTPError(404, reason = _(u'书籍不存在') )
+            return {'err': 'params.book.invalid', 'msg': _(u'书籍不存在') }
         if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
-            raise web.HTTPError(403, reason = _(u'无权限'))
+            return {'err': 'user.no_permission', 'msg': _(u'无权限') }
 
         title = re.sub(u'[(（].*', "", mi.title)
         if isbn == baike.BAIKE_ISBN:
@@ -198,79 +291,55 @@ class BookReferSet(BaseHandler):
             refer_mi = api.get_book(title)
         else:
             mi.isbn = isbn
-            api = douban.DoubanBookApi(settings['douban_apikey'], copy_image=True)
+            api = douban.DoubanBookApi(CONF['douban_apikey'], copy_image=True)
             refer_mi = api.get_book(mi)
 
         if mi.cover_data[0]:
             refer_mi.cover_data = None
         mi.smart_update(refer_mi, replace_metadata=True)
         self.db.set_metadata(book_id, mi)
-        return self.redirect('/book/%d'%book_id)
-
-
-
-class BookRating(BaseHandler):
-    @json_response
-    def post(self, id):
-        rating = self.get_argument("rating", None)
-        try:
-            r = float(rating)
-        except:
-            return {'ecode': 2, 'msg': _(u"评星无效")}
-
-        book_id = int(id)
-        mi = self.db.get_metadata(book_id, index_is_id=True)
-        mi.rating = r
-        self.db.set_metadata(book_id, mi)
-        if self.user_id(): self.count_increase(book_id, count_visit=1)
-        else: self.count_increase(book_id, count_guest=1)
-        return {'ecode': 0, 'msg': _(u'更新成功')}
+        return {'err': 'ok'}
 
 class BookEdit(BaseHandler):
-    @json_response
-    def post(self, id):
-        field = self.get_argument("field", None)
-        content = self.get_argument("content", "").strip()
-        if not field or not content:
-            return {'ecode': 1, 'msg': _(u"参数错误")}
+    @js
+    @auth
+    def post(self, bid):
+        bid = int(bid)
+        data = tornado.escape.json_decode(self.request.body)
+        mi = self.db.get_metadata(bid, index_is_id=True)
+        KEYS = ['authors', 'title', 'comments', 'tags', 'publisher',
+                'isbn', 'series', 'rating', 'language']
+        for key, val in data.items():
+            if key in KEYS:
+                mi.set(key, val)
+        if 'pubdate' in data:
+            try: content = datetime.datetime.strptime(data['pubdate'], "%Y-%m-%d")
+            except: return {'err': 'params.pudate.invalid', 'msg': _(u'出版日期参数错误，格式应为 2019-05-10') }
+            mi.set('pubdate', content)
 
-        book_id = int(id)
-        mi = self.db.get_metadata(book_id, index_is_id=True)
-        if field == 'pubdate':
-            try:
-                content = datetime.datetime.strptime(content, "%Y-%m-%d")
-            except:
-                return {'ecode': 2, 'msg': _(u"日期格式错误，应为 2018-05-10 这种格式")}
-        elif field == 'authors':
-            content = list(set([ v.strip() for v in content.split(";") if v.strip() ]))
-            mi.set('author_sort', content[0])
-        elif field == 'tags':
-            content = content.replace(" ", "").split("/")
-        mi.set(field, content)
-        self.db.set_metadata(book_id, mi)
-        return {'ecode': 0, 'msg': _(u"更新成功")}
+        self.db.set_metadata(bid, mi)
+        return {'err': 'ok', 'msg': _(u"更新成功")}
 
 class BookDelete(BaseHandler):
-    def get(self, id):
-        return self.post(id)
-
-    @web.authenticated
+    @js
+    @auth
     def post(self, id):
         book = self.get_book(id)
-        book_id = book['id']
+        bid = book['id']
         cid = book['collector']['id']
 
-        if self.is_admin() or self.is_book_owner(book_id, cid):
-            self.db.delete_book( book_id )
-            self.add_msg('success', _(u"删除完毕"))
-            self.redirect("/book")
+        if self.is_admin() or self.is_book_owner(bid, cid):
+            self.db.delete_book( bid )
+            self.add_msg('success', _(u"删除书籍《%s》") % book['title'] )
+            return {'err': 'ok'}
         else:
-            self.add_msg('danger', _(u"无权限操作"))
-            self.redirect("/book/%s"%book_id)
+            return {'err': 'permission', 'msg': _(u'无权操作')}
 
 class BookDownload(BaseHandler):
-    @web.authenticated
     def get(self, id, fmt):
+        if not CONF['ALLOW_GUEST_DOWNLOAD'] or not self.current_user:
+            raise web.HTTPError(403, log_message = _(u'请先登录') )
+
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))
         book = self.get_book(id)
@@ -278,7 +347,7 @@ class BookDownload(BaseHandler):
         self.user_history('download_history', book)
         self.count_increase(book_id, count_download=1)
         if 'fmt_%s'%fmt not in book:
-            raise web.HTTPError(404, reason = _(u'%s格式无法下载'%(fmt)) )
+            raise web.HTTPError(404, log_message = _(u'%s格式无法下载'%(fmt)) )
         path = book['fmt_%s'%fmt]
         att = u'attachment; filename="%d-%s.%s"' % (book['id'], book['title'], fmt)
         self.set_header('Content-Disposition', att.encode('UTF-8'))
@@ -286,18 +355,17 @@ class BookDownload(BaseHandler):
         f = open(path, 'rb').read()
         self.write( f )
 
-class BookList(ListHandler):
+class BookNav(ListHandler):
+    @js
     def get(self):
         title = _(u'全部书籍')
         category_name = 'books'
         tagmap = self.all_tags_with_count()
         navs = []
         for h1, tags in BOOKNAV:
-            tags = list( (v, tagmap.get(v, 0)) for v in tags )
-            #tags.sort( lambda x,y: cmp(y[1], x[1]) )
-            navs.append( (h1, tags) )
-
-        return self.html_page('book/all.html', vars())
+            new_tags = [{'name': v, 'count': tagmap.get(v, 0)} for v in tags]
+            navs.append( {"legend": h1, "tags": new_tags } )
+        return {'err': 'ok', "navs": navs}
 
 class RecentBook(ListHandler):
     def get(self):
@@ -310,17 +378,17 @@ class SearchBook(ListHandler):
     def get(self):
         name = self.get_argument("name", "")
         if not name.strip():
-            raise web.HTTPError(403, reason = _(u"请输入搜索关键字") )
+            return self.write({'err': 'params.invalid', 'msg': _(u"请输入搜索关键字") })
 
         title = _(u'搜索：%(name)s') % vars()
         ids = self.cache.search(name)
-        books = self.get_books(ids=ids)
         search_query = name
-        return self.render_book_list(books, vars());
+        return self.render_book_list([], vars(), ids);
 
 class HotBook(ListHandler):
     def get(self):
         title = _(u'热度榜单')
+        category = 'hot'
         db_items = self.session.query(Item).filter(Item.count_visit > 1 ).order_by(Item.count_download.desc())
         count = db_items.count()
         start = self.get_argument_start()
@@ -335,17 +403,11 @@ class HotBook(ListHandler):
         ids = [ item.book_id for item in items ]
         books = self.get_books(ids=ids)
         self.do_sort(books, 'count_visit', False)
-        return self.html_page('book/list.html', vars())
-
-class BookAdd(BaseHandler):
-    @web.authenticated
-    def get(self):
-        title = _(u'添加书籍')
-        return self.html_page('book/add.html', vars())
-
+        return self.render_book_list(books, vars())
 
 class BookUpload(BaseHandler):
-    @web.authenticated
+    @js
+    @auth
     def post(self):
         def convert(s):
             try: return s.group(0).encode('latin1').decode('utf8')
@@ -353,19 +415,19 @@ class BookUpload(BaseHandler):
 
         import re
         from calibre.ebooks.metadata import MetaInformation
-        postfile = self.request.files['ebook_file'][0]
+        postfile = self.request.files['ebook'][0]
         name = postfile['filename']
         name = re.sub(r'[\x80-\xFF]+', convert, name)
         logging.error('upload book name = ' + repr(name))
         fmt = os.path.splitext(name)[1]
         fmt = fmt[1:] if fmt else None
         if not fmt:
-            return "bad file name: %s" % name
+            return {'err': 'params.filename', 'msg': _(u'文件名不合法') }
         fmt = fmt.lower()
 
         # save file
         data = postfile['body']
-        fpath = os.path.join(settings['upload_path'], name)
+        fpath = os.path.join(CONF['upload_path'], name)
         with open(fpath, "wb") as f:
             f.write(data)
 
@@ -379,7 +441,10 @@ class BookUpload(BaseHandler):
         books = self.db.books_with_same_title(mi)
         if books:
             book_id = books.pop()
-            return self.redirect('/book/%d'%book_id)
+            return {'err': 'samebook',
+                    'msg': _(u'已存在同名书籍《%s》' ) % mi.title,
+                    'book_id': book_id,
+                    }
 
         fpaths = [fpath]
         book_id = self.db.import_book(mi, fpaths )
@@ -389,10 +454,10 @@ class BookUpload(BaseHandler):
         item.book_id = book_id
         item.collector_id = self.user_id()
         item.save()
-        return self.redirect('/book/%d'%book_id)
+        return {'err': 'ok', 'book_id': book_id}
 
 class BookRead(BaseHandler):
-    @web.authenticated
+    #@web.authenticated
     def get(self, id):
         book = self.get_book(id)
         book_id = book['id']
@@ -404,7 +469,7 @@ class BookRead(BaseHandler):
             fpath = book.get("fmt_%s" % fmt, None)
             if not fpath: continue
             # epub_dir is for javascript
-            epub_dir = os.path.dirname(fpath).replace(settings['with_library'], "/extract/")
+            epub_dir = os.path.dirname(fpath).replace(CONF['with_library'], "/get/extract/")
             self.extract_book(book, fpath, fmt)
             return self.html_page('book/read.html', vars())
         self.add_msg('success', _(u"抱歉，在线阅读器暂不支持该格式的书籍"))
@@ -412,7 +477,7 @@ class BookRead(BaseHandler):
 
     @background
     def extract_book(self, book, fpath, fmt):
-        fdir = os.path.dirname(fpath).replace(settings['with_library'], settings['extract_path'])
+        fdir = os.path.dirname(fpath).replace(CONF['with_library'], CONF['extract_path'])
         subprocess.call(['mkdir', '-p', fdir])
         #fdir = os.path.dirname(fpath) + "/extract"
         if os.path.isfile(fdir+"/META-INF/container.xml"):
@@ -423,7 +488,7 @@ class BookRead(BaseHandler):
         new_path = ""
         if fmt != "epub":
             new_fmt = "epub"
-            new_path = os.path.join(settings["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
+            new_path = os.path.join(CONF["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
             logging.error('convert book: %s => %s' % ( fpath, new_path));
             os.chdir('/tmp/')
 
@@ -448,11 +513,14 @@ class BookRead(BaseHandler):
 
 
 class BookPush(BaseHandler):
-    @web.authenticated
+    @js
     def post(self, id):
+        if not CONF['ALLOW_GUEST_PUSH'] and not self.current_user:
+            return {'err': 'user.need_login', 'msg': _(u'请先登录')}
+
         mail_to = self.get_argument("mail_to", None)
         if not mail_to:
-            return self.redirect("/setting")
+            return {'err': 'params.error', 'msg': _(u'参数错误')}
 
         book = self.get_book(id)
         book_id = book['id']
@@ -465,20 +533,19 @@ class BookPush(BaseHandler):
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
                 self.do_send_mail(book, mail_to, fmt, fpath)
-                self.add_msg( "success", _(u"服务器正在推送……"))
-                return self.redirect("/book/%d"%book['id'])
+                return {'err': 'ok', 'msg': _(u"服务器正在推送……")}
 
         # we do no have formats for kindle
         if 'fmt_epub' not in book and 'fmt_azw3' not in book and 'fmt_txt' not in book:
-            raise web.HTTPError(404, reason = _(u"抱歉，该书无可用于kindle阅读的格式"))
+            return {'err': 'book.no_format_for_kindle', 'msg': _(u"抱歉，该书无可用于kindle阅读的格式") }
         self.convert_book(book, mail_to)
-        self.add_msg( "success", _(u"后台正在推送了~"))
-        self.redirect("/book/%d"%book['id'])
+        self.add_msg( "success", _(u"服务器正在推送《%s》到%s") % (book['title'], mail_to) )
+        return {'err': 'ok', 'msg': _(u'服务器正在转换格式并推送……')}
 
     @background
     def convert_book(self, book, mail_to=None):
         new_fmt = 'mobi'
-        new_path = os.path.join(settings['convert_path'], '%s.%s' % (ascii_filename(book['title']), new_fmt) )
+        new_path = os.path.join(CONF['convert_path'], '%s.%s' % (ascii_filename(book['title']), new_fmt) )
         progress_file = self.get_path_progress(book['id'])
 
         old_path = None
@@ -502,8 +569,8 @@ class BookPush(BaseHandler):
         fname = u'%s - %s.%s'%(title, author, fmt)
         fdata = open(fpath).read()
 
-        site_title = self.settings['site_title']
-        mail_from = settings['smtp_username']
+        site_title = CONF['site_title']
+        mail_from = self.ettings['smtp_username']
         mail_subject = _('%(site_title)s：推送给您一本书《%(title)s》') % vars()
         mail_body = _(u'为您奉上一本《%(title)s》, 欢迎常来访问%(site_title)s！http://www.talebook.org' % vars())
         status = msg = ""
@@ -511,10 +578,11 @@ class BookPush(BaseHandler):
             logging.info('send %(title)s to %(mail_to)s' % vars())
             mail = self.create_mail(mail_from, mail_to, mail_subject,
                     mail_body, fdata, fname)
-            sendmail(mail, from_=mail_from, to=[mail_to], timeout=30,
-                    relay=settings['smtp_server'],
-                    username=settings['smtp_username'],
-                    password=settings['smtp_password']
+            sendmail(mail, from_=mail_from, to=[mail_to], timeout=20,
+                    port=465, encryption='SSL',
+                    relay=CONF['smtp_server'],
+                    username=CONF['smtp_username'],
+                    password=CONF['smtp_password']
                     )
             status = "success"
             msg = _('[%(title)s] 已成功发送至Kindle邮箱 [%(mail_to)s] !!') % vars()
@@ -528,56 +596,22 @@ class BookPush(BaseHandler):
         self.add_msg(status, msg)
         return
 
-    def create_mail(self, sender, to, subject, body, attachment_data, attachment_name):
-        from email.header import Header
-        from email.utils import formatdate
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.application import MIMEApplication
-        def get_md5(s):
-            import hashlib
-            md5 = hashlib.md5()
-            md5.update(s)
-            return md5.hexdigest()
-
-        mail = MIMEMultipart()
-        mail['From'] = sender
-        mail['To'] = to
-        mail['Subject'] = Header(subject, 'utf-8')
-        mail['Date'] = formatdate(localtime=True)
-        mail['Message-ID'] = '<tencent_%s@qq.com>' % get_md5(mail.as_string())
-        mail.preamble = 'You will not see this in a MIME-aware mail reader.\n'
-
-        if body is not None:
-            msg = MIMEText(body, 'plain', 'utf-8')
-            mail.attach(msg)
-
-        if attachment_data is not None:
-            name = Header(attachment_name, 'utf-8').encode()
-            msg = MIMEApplication(attachment_data, 'octet-stream', charset='utf-8', name=name)
-            msg.add_header('Content-Disposition', 'attachment', filename=name)
-            mail.attach(msg)
-        return mail.as_string()
-
 
 
 def routes():
     return [
-        ( r'/',                     Index        ),
-        ( r'/about',                About        ),
-        ( r'/search',               SearchBook   ),
-        ( r'/recent',               RecentBook   ),
-        ( r'/hot',                  HotBook      ),
-        ( r'/book',                 BookList     ),
-        ( r'/book/add',             BookAdd      ),
-        ( r'/book/upload',          BookUpload   ),
-        ( r'/book/([0-9]+)',        BookDetail   ),
-        ( r'/book/([0-9]+)/delete', BookDelete   ),
-        ( r'/book/([0-9]+)/edit',   BookEdit     ),
-        ( r'/book/([0-9]+)/rating', BookRating   ),
-        ( r'/book/([0-9]+)\.(.+)',  BookDownload ),
-        ( r'/book/([0-9]+)/push',   BookPush     ),
-        ( r'/book/([0-9]+)/read',   BookRead     ),
-        ( r'/book/([0-9]+)/refer',  BookRefer    ),
-        ( r'/book/([0-9]+)/refer/set/([0-9]{13})$',  BookReferSet),
+        ( r'/api/index',                Index        ),
+        ( r'/api/search',               SearchBook   ),
+        ( r'/api/recent',               RecentBook   ),
+        ( r'/api/hot',                  HotBook      ),
+        ( r'/api/book/nav',             BookNav      ),
+        ( r'/api/book/upload',          BookUpload   ),
+        ( r'/api/book/([0-9]+)',        BookDetail   ),
+        ( r'/api/book/([0-9]+)/delete', BookDelete   ),
+        ( r'/api/book/([0-9]+)/edit',   BookEdit     ),
+        ( r'/api/book/([0-9]+)\.(.+)',  BookDownload ),
+        ( r'/api/book/([0-9]+)/push',   BookPush     ),
+        ( r'/api/book/([0-9]+)/refer',  BookRefer    ),
+
+        ( r'/read/([0-9]+)',            BookRead     ),
         ]

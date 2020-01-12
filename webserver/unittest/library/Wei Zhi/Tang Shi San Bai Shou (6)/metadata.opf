@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+        <dc:identifier opf:scheme="calibre" id="calibre_id">6</dc:identifier>
+        <dc:identifier opf:scheme="uuid" id="uuid_id">4e7dcc6e-0385-4fea-a78a-9896157b9f77</dc:identifier>
+        <dc:title>唐诗三百首</dc:title>
+        <dc:creator opf:file-as="未知" opf:role="aut">未知</dc:creator>
+        <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (3.21.0) [https://calibre-ebook.com]</dc:contributor>
+        <dc:date>2012-08-29T13:09:56+00:00</dc:date>
+        <dc:identifier opf:scheme="MOBI-ASIN">b9112c81-b28a-49d5-a7cf-28b8080237bf</dc:identifier>
+        <dc:language>zho</dc:language>
+        <meta content="{&quot;未知&quot;: &quot;&quot;}" name="calibre:author_link_map"/>
+        <meta content="2019-09-27T18:20:39.638809+00:00" name="calibre:timestamp"/>
+        <meta content="唐诗三百首" name="calibre:title_sort"/>
+    </metadata>
+    <guide>
+        <reference href="cover.jpg" title="Cover" type="cover"/>
+    </guide>
+</package>

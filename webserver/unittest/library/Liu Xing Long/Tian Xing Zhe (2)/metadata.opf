@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+        <dc:identifier opf:scheme="calibre" id="calibre_id">2</dc:identifier>
+        <dc:identifier opf:scheme="uuid" id="uuid_id">5c5c6c7d-6291-408e-b99a-9cf560593ec1</dc:identifier>
+        <dc:title>天行者</dc:title>
+        <dc:creator opf:file-as="刘醒龙" opf:role="aut">刘醒龙</dc:creator>
+        <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (3.21.0) [https://calibre-ebook.com]</dc:contributor>
+        <dc:date>2011-08-21T00:00:00+00:00</dc:date>
+        <dc:description>高考落榜生张英才焦急等待舅舅给他安排工作。身为乡教育站的万站长为两个即将成为民办教师的年轻人分配去向发愁：一个是外甥，一个是旧情人的儿子蓝飞，哪个去盛产男苕女苕深山里的艰苦卓绝的界岭小学呢？
+有文艺爱好的张英才委曲进了山。从此，他融进了民办教师勉力办学的爱与恨、忧与痛。进教室吃粉笔灰的猪，自刻油印课本的学生，辍学打工的优等生叶萌，每天笛声伴奏的升降国旗……单纯热血的张英才体味着严峻的教育现状，也感触、认识三位资深同事：教学、照顾瘫妻之余，承担着十几个寄宿家里的学生吃住管理的老好人余校长；节俭、灵活，一切为转正做准备、一丝不苟进行自己人生计划的副校长邓有米；清高、孤傲，与有瘫痪丈夫的王小兰暗中苦恋多年的教导主任孙四海。他们在深山演绎着寂寞、卑微、五味杂陈的岁月，为实现界岭高考零的突破呕心沥血。</dc:description>
+        <dc:publisher>epub掌上书苑</dc:publisher>
+        <dc:language>zho</dc:language>
+        <dc:subject>现代·当代</dc:subject>
+        <meta content="{&quot;刘醒龙&quot;: &quot;&quot;}" name="calibre:author_link_map"/>
+        <meta content="2019-09-27T18:20:38.229527+00:00" name="calibre:timestamp"/>
+        <meta content="天行者" name="calibre:title_sort"/>
+    </metadata>
+    <guide>
+        <reference href="cover.jpg" title="Cover" type="cover"/>
+    </guide>
+</package>

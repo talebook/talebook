@@ -1,0 +1,194 @@
+<div tabindex="-1" class="modal fade" id="settings-dialog" role="dialog" aria-label="{{strings.settings}}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+           <!-- div class="modal-header">
+            <h4 class="modal-title" id="settings-label">{{strings.settings}}</h4>
+           </div -->
+               
+            <div class="modal-body">
+           <button type="button" class="close" id="closeSettingsCross" data-dismiss="modal" title="{{strings.i18n_close}} {{strings.settings}}" aria-label="{{strings.i18n_close}} {{strings.settings}}"><span aria-hidden="true">&times;</span></button>
+
+           <ul class="nav nav-tabs" role="tablist" aria-owns="tab-butt-main tab-butt-keys">
+             <li class="active" role="presentation"><button id="tab-butt-main"  title="{{strings.settings}}" aria-label="{{strings.settings}}" role='tab' aria-controls="tab-main" data-toggle="tab" data-target="#tab-main">{{strings.settings}}</button></li>
+             <li role="presentation"><button id="tab-butt-keys"  title="{{strings.i18n_keyboard_shortcuts}}" aria-label="{{strings.i18n_keyboard_shortcuts}}" role='tab' aria-controls="tab-keyboard" data-toggle="tab" data-target="#tab-keyboard">{{strings.i18n_keyboard_shortcuts}}</button></li>
+           </ul>
+           
+           
+           <div class="tab-content">
+                <div id="tab-main" class="tab-pane active" role="tabpanel" aria-expanded="true">
+                     
+                <h5 aria-hidden="true">{{strings.preview}}</h5>
+                <div  aria-hidden="true" class="row">
+                    <div data-theme="default-theme" class="col-xs-10 col-xs-offset-1 preview-text default-theme">
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus neque dui, congue a suscipit non, feugiat eu urna. Cras in felis sed orci aliquam sagittis. 
+                    </div>
+                </div>
+
+<!-- button  type="button" title="TESTING" aria-label="TESTING">TESTING DANIEL</button -->
+                
+                    <h5 id="setting-header-font-size" class="setting-header">{{strings.i18n_font_size}}</h5>
+                    <div class="row">
+                        <div class="col-xs-2 icon-scale-down">
+                            <img src="images/glyphicons_115_text_smaller.png" alt="" aria-hidden="true">
+                        </div>
+                        <div class="col-xs-8">
+                            <input  type="range" role="slider" aria-labelledby="setting-header-font-size" id="font-size-input" min="60" aria-value-min="60" aria-valuemin="60" step="10" max="170" aria-value-max="170" aria-valuemax="170" value="100" aria-valuenow="100" aria-value-now="100" aria-valuetext="1em" aria-value-text="1em" title="{{strings.i18n_font_size}}" aria-label="{{strings.i18n_font_size}}" />
+                        </div>
+                        <div class="col-xs-2">
+                            <img src="images/glyphicons_116_text_bigger.png" alt="" aria-hidden="true">
+                        </div>
+                    </div>
+
+                    <h5 id="setting-header-margins-legend" class="setting-header">{{strings.i18n_margins}}</h5>
+                     <div class="row">
+                        <div class="col-xs-2 icon-scale-down">
+                            <img style="height: 32px;" src="images/margin1_off.png" alt="" aria-hidden="true">
+                        </div>
+                        <div class="col-xs-8">
+                            <input  type="range" role="slider" aria-labelledby="setting-header-margins-legend" id="margin-size-input" min="20" aria-value-min="20" aria-valuemin="20" step="20" max="100" aria-value-max="100" aria-valuemax="100" value="20" aria-valuenow="20" aria-value-now="20" aria-valuetext="20" aria-value-text="20" title="{{strings.i18n_margins}}" aria-label="{{strings.i18n_margins}}"/>
+                        </div>
+                        <div class="col-xs-2">
+                            <img style="height: 32px;" src="images/margin4_off.png" alt="" aria-hidden="true">
+                        </div>
+                    </div>
+
+                    <h5 id="setting-header-color-legend" class="setting-header">{{strings.i18n_text_and_background_color}}</h5>
+                    <div role="group" aria-labelledby="setting-header-color-legend" id="theme-radio-group" class="row">
+                        
+                        <button role="button" data-theme="author-theme"  title="{{strings.i18n_author_theme}}" aria-label="{{strings.i18n_author_theme}}" class="col-xs-8 col-xs-offset-2 theme-option author-theme clickable">{{strings.i18n_author_theme}}</button>
+                        
+                        <button role="button" data-theme="default-theme"  title="{{strings.i18n_black_and_white}}" aria-label="{{strings.i18n_black_and_white}}" class="col-xs-8 col-xs-offset-2 theme-option default-theme clickable">{{strings.i18n_black_and_white}}</button>
+                        
+                        <button role="button" data-theme="night-theme"  title="{{strings.i18n_arabian_nights}} [{{keyboard.NightTheme}}]" aria-label="{{strings.i18n_arabian_nights}} [{{keyboard.NightTheme}}]" class="col-xs-8 col-xs-offset-2 theme-option night-theme clickable" >{{strings.i18n_arabian_nights}}</button> <!-- accesskey="{{keyboard.accesskeys.NightTheme}}" -->
+                        
+                        <button role="button" data-theme="parchment-theme"  title="{{strings.i18n_sands_of_dune}}" aria-label="{{strings.i18n_sands_of_dune}}" class="col-xs-8 col-xs-offset-2 theme-option parchment-theme clickable">{{strings.i18n_sands_of_dune}}</button>
+                        
+                        <button role="button" data-theme="ballard-theme"  title="{{strings.i18n_ballard_blues}}" aria-label="{{strings.i18n_ballard_blues}}" class="col-xs-8 col-xs-offset-2 theme-option ballard-theme clickable">{{strings.i18n_ballard_blues}}</button>
+                        
+                        <button role="button" data-theme="vancouver-theme"  title="{{strings.i18n_vancouver_mist}}" aria-label="{{strings.i18n_vancouver_mist}}" class="col-xs-8 col-xs-offset-2 theme-option vancouver-theme clickable">{{strings.i18n_vancouver_mist}}</button>
+                    </div>
+
+                    <h5 id="setting-header-display-legend" class="setting-header">{{strings.i18n_display_format}}</h5>
+                    
+                    <div role="radiogroup" class="row" style="width:100%;text-align:center;" aria-labelledby="setting-header-display-legend">
+
+                        <div role="radio" id="spread-default-option"
+                        style="vertical-align:middle;width:30%;display:inline-block;position:relative;">
+                            <input style=""  name="display-format" value="single" type="radio" id="spread-default-radio"/>
+                            <label style="" for="spread-default-radio" class="underlinedLabel">
+                                {{strings.i18n_spread_auto}}
+                            </label>
+                        </div>
+
+
+                        <div role="radio" id="one-up-option"
+                        style="vertical-align:middle;width:30%;display:inline-block;position:relative;">
+                            
+                            <input  name="display-format" value="single" type="radio" id="single-page-radio" />
+                                            <label for="single-page-radio" class="underlinedLabel">
+                                            <img src="images/ico_singlepage_up.png" alt="{{strings.i18n_display_format}} {{strings.i18n_single_pages}}"/>
+                                            </label>
+                        </div>
+                        <div role="radio" id="two-up-option"
+                        style="vertical-align:middle;width:30%;display:inline-block;position:relative;">
+                            
+                                <input  name="display-format" value="double" type="radio" id="double-page-radio" />
+                                            <label for="double-page-radio" class="underlinedLabel">
+                                            <img src="images/ico_doublepage_up.png" alt="{{strings.i18n_display_format}} {{strings.i18n_double_pages}}">
+                                            </label>
+                        </div>
+                    </div>
+
+                    <h5 id="setting-header-scroll-legend" class="setting-header">{{strings.i18n_scroll_mode}}</h5>
+                    
+                    <div role="radiogroup" class="row" style="width:100%;text-align:center;" aria-labelledby="setting-header-scroll-legend">
+                        
+                        <div role="radio" id="scroll-default-option" style="vertical-align:middle;width:30%;display:inline-block;position:relative;">
+                            <input style=""  name="scrolling" value="single" type="radio" id="scroll-default-radio"/>
+                            <label style="" for="scroll-default-radio" class="underlinedLabel">
+                                {{strings.i18n_scroll_mode_auto}}
+                            </label>
+                        </div>
+                        
+                        <div role="radio" id="scroll-doc-option" style="vertical-align:middle;width:30%;display:inline-block;position:relative;">
+                            <input style=""  name="scrolling" value="single" type="radio" id="scroll-doc-radio"/>
+                            <label style="" for="scroll-doc-radio" class="underlinedLabel">
+                                <span style="font-size:150%;color:#888888;" class="glyphicon glyphicon-file" aria-hidden="true"></span> {{strings.i18n_scroll_mode_doc}}
+                            </label>
+                        </div>
+                        
+                        <div role="radio" id="scroll-continuous-option" style="vertical-align:middle;width:30%;display:inline-block;position:relative;">
+                            <input style=""  name="scrolling" value="single" type="radio" id="scroll-continuous-radio"/>
+                            <label style="" for="scroll-continuous-radio" class="underlinedLabel">
+                                <span style="font-size:150%;color:#888888;" class="glyphicon glyphicon-road" aria-hidden="true"></span> {{strings.i18n_scroll_mode_continuous}}
+                            </label>
+                        </div>
+                        
+                    </div>
+
+                    <h5 hiddenx="hidden" id="setting-header-pageTransition-legend" class="setting-header">{{strings.i18n_page_transition}}</h5>
+                    
+                    <div hiddenx="hidden" role="radiogroup" class="row" style="width:100%;text-align:center;" aria-labelledby="setting-header-pageTransition-legend">
+                        
+                        <div role="radio" id="pageTransition-none-option" style="vertical-align:middle;width:15%;display:inline-block;position:relative;">
+                            <input style=""  name="pageTransition" value="single" type="radio" id="pageTransition-none-radio"/>
+                            <label style="" for="pageTransition-none-radio" class="underlinedLabel">
+                                {{strings.i18n_page_transition_none}}
+                            </label>
+                        </div>
+                        
+                        <div role="radio" id="pageTransition-1-option" style="vertical-align:middle;width:15%;display:inline-block;position:relative;">
+                            <input style=""  name="pageTransition" value="single" type="radio" id="pageTransition-1-radio"/>
+                            <label style="" for="pageTransition-1-radio" class="underlinedLabel">
+                                {{strings.i18n_page_transition_fade}}
+                            </label>
+                        </div>
+                        
+                        <div role="radio" id="pageTransition-2-option" style="vertical-align:middle;width:15%;display:inline-block;position:relative;">
+                            <input style=""  name="pageTransition" value="single" type="radio" id="pageTransition-2-radio"/>
+                            <label style="" for="pageTransition-2-radio" class="underlinedLabel">
+                                {{strings.i18n_page_transition_slide}}
+                            </label>
+                        </div>
+                        
+                        <div role="radio" id="pageTransition-3-option" style="vertical-align:middle;width:15%;display:inline-block;position:relative;">
+                            <input style=""  name="pageTransition" value="single" type="radio" id="pageTransition-3-radio"/>
+                            <label style="" for="pageTransition-3-radio" class="underlinedLabel">
+                                {{strings.i18n_page_transition_swoosh}}
+                            </label>
+                        </div>
+                        
+                        <div role="radio" id="pageTransition-4-option" style="vertical-align:middle;width:15%;display:inline-block;position:relative;">
+                            <input style=""  name="pageTransition" value="single" type="radio" id="pageTransition-4-radio"/>
+                            <label style="" for="pageTransition-4-radio" class="underlinedLabel">
+                                {{strings.i18n_page_transition_butterfly}}
+                            </label>
+                        </div>
+                        
+                        
+                    </div>
+                    
+                    
+                    </div>
+                       <div id="tab-keyboard" class="tab-pane" role="tabpanel">
+
+                    <div class="row" style="position:relative;">
+                        
+                        <div id="invalid_keyboard_shortcut_ALERT"></div>
+                        
+                        <ul id="keyboard-list">
+                        </ul>
+                    </div>
+                     </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="buttClose"  type="button" class="btn btn-default" data-dismiss="modal" title="{{strings.i18n_close}} [{{keyboard.SettingsModalClose}}]" aria-label="{{strings.i18n_close}} [{{keyboard.SettingsModalClose}}]">{{strings.i18n_close}}</button>
+                <button id="buttSave"  type="button" class="btn btn-primary" data-dismiss="modal" title="{{strings.i18n_save_changes}} [{{keyboard.SettingsModalSave}}]" aria-label="{{strings.i18n_save_changes}} [{{keyboard.SettingsModalSave}}]">{{strings.i18n_save_changes}}</button>
+            </div>
+        </div>
+        <!-- /.modal-content -->
+    </div>
+    <!-- /.modal-dialog -->
+</div>

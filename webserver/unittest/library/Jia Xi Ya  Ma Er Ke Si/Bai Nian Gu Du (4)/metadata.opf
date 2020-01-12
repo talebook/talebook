@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+        <dc:identifier opf:scheme="calibre" id="calibre_id">4</dc:identifier>
+        <dc:identifier opf:scheme="uuid" id="uuid_id">74a82b0d-11aa-45c1-b128-306f7ac4e3bb</dc:identifier>
+        <dc:title>百年孤独</dc:title>
+        <dc:creator opf:file-as="马尔克斯, 加西亚" opf:role="aut">加西亚 马尔克斯</dc:creator>
+        <dc:contributor opf:file-as="calibre" opf:role="bkp">calibre (3.21.0) [https://calibre-ebook.com]</dc:contributor>
+        <dc:date>2009-05-27T16:00:00+00:00</dc:date>
+        <dc:description>《百年孤独》1967被称为拉丁美洲魔幻现实主义的代表作。其作者加尔列尔·加西亚·马尔克斯1928一出生于加勒比海岸哥伦比亚的热带小镇阿拉卡塔卡。小说《百年孤独》内容复杂,人物众多,情节离奇,手法新颖。马尔克斯在书中溶汇了南美洲特有的五彩缤纷的文化。他通过描写小镇马孔多的产生、兴盛到衰落、消亡,表现了拉丁美洲令人惊异的疯狂历史。小说以“汇集了不可思议的奇迹和最纯粹的现实生活”荣获1982年诺贝尔文学奖。</dc:description>
+        <dc:publisher>浙江文艺出版社</dc:publisher>
+        <dc:identifier opf:scheme="MOBI-ASIN">bab6302a-b344-4e79-8ef4-c31391cdae81</dc:identifier>
+        <dc:language>zho</dc:language>
+        <meta content="{&quot;加西亚 马尔克斯&quot;: &quot;&quot;}" name="calibre:author_link_map"/>
+        <meta content="2019-09-27T18:20:38.896750+00:00" name="calibre:timestamp"/>
+        <meta content="百年孤独" name="calibre:title_sort"/>
+    </metadata>
+    <guide>
+        <reference href="cover.jpg" title="Cover" type="cover"/>
+    </guide>
+</package>

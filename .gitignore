@@ -50,7 +50,8 @@ coverage.xml
 
 # Django stuff:
 *.log
-webserver/local_settings.py
+webserver/settings_manual.py
+webserver/settings_auto.py
 
 # Flask stuff:
 instance/

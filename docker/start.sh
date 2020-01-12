@@ -1,6 +1,8 @@
 #!/bin/sh
-if [ ! -d "/data/release" ]; then
-  cp -rf /prebuilt/* /data/
+
+if [ ! -d "/data/books" ]; then
+  cp -rf /prebuilt/books/ /data/books/
 fi
 
+service nginx restart
 /usr/bin/supervisord --nodaemon

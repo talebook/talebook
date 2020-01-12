@@ -16,9 +16,10 @@ from calibre.ebooks.metadata.opf2 import metadata_to_opf
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre.ebooks.metadata.meta import set_metadata
 from calibre.library.save_to_disk import find_plugboard
-
 from base_handlers import BaseHandler
-from settings import settings
+
+import loader
+CONF = loader.get_settings()
 
 class ImageHandler(BaseHandler):
     def get(self, fmt, id, **kwargs):
@@ -161,7 +162,7 @@ class ProxyImageHandler(BaseHandler):
 
 class RobotHandler(BaseHandler):
     def get(self):
-        f = os.path.join(settings['static_path'], "robots.txt")
+        f = os.path.join(CONF['static_path'], "robots.txt")
         self.write( open(f) )
 
 class ProgressHandler(BaseHandler):
@@ -169,9 +170,11 @@ class ProgressHandler(BaseHandler):
         book_id = int(id)
         path = self.get_path_progress(book_id)
         if not os.path.exists(path):
-            raise web.HTTPError(404, reason_ = 'nothing')
+            raise web.HTTPError(404, log_message = 'nothing')
         txt = open(path).read()
-        for hidden in self.settings.values():
+
+        # erase all settings values from txt content
+        for hidden in CONF.values():
             if isinstance(hidden, (str, unicode)):
                 txt.replace(hidden, "XXX")
         self.write(txt)
@@ -179,13 +182,18 @@ class ProgressHandler(BaseHandler):
 
 def routes():
     return [
-        (r'/get/(.*)/(.*)', ImageHandler),
-        (r'/pcover',        ProxyImageHandler),
-        (r'/progress/([0-9]+)',  ProgressHandler),
-        (r"/extract/(.*)",  web.StaticFileHandler,
-            dict(path=settings['extract_path'])),
-        (r"/robots.txt",    web.StaticFileHandler,
-            dict(path=settings['static_path'])),
+        (r'/get/pcover',            ProxyImageHandler),
+        (r'/get/progress/([0-9]+)', ProgressHandler),
+        (r"/get/extract/(.*)",      web.StaticFileHandler,
+            {"path": CONF['extract_path']} ),
+        (r'/get/(.*)/(.*)',         ImageHandler),
+
+        (r"/robots.txt",            web.StaticFileHandler,
+            {"path": CONF['static_path']} ),
+        (r"/(.*)",                    web.StaticFileHandler, {
+            "path": CONF['html_path'],
+            "default_filename": "index.html",
+        }),
     ]
 
 

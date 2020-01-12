@@ -2,9 +2,9 @@ My Calibre WebServer
 ====================
 A simple books library management website. Use Calibre as backend.
 
-See a running instance of my books:
+See a running instance of demo:
 
-https://www.talebook.org
+https://demo.talebook.org
 
 简单的图书管理系统
 ===================
@@ -14,9 +14,37 @@ https://www.talebook.org
 * 借助[Readium.js](https://github.com/readium/readium-js-viewer) 库，支持了网页在线阅读电子书。
 * 支持从百度百科、豆瓣搜索并导入书籍基础信息。
 
-部署比较简答，可以参考[安装文档](document/INSTALL.zh_CN.md)
-
-或者，直接访问我的在线书库，有大约两万本藏书。https://www.talebook.org
+部署比较简单，建议采用docker；手动安装请参考[安装文档](document/INSTALL.zh_CN.md)
 
 
-感谢oldiy添加Docker一键部署，可以查看[my-calibre-webserver-docker](https://hub.docker.com/r/oldiy/my-calibre-webserver-docker)
+Docker
+===================
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)]
+
+[dockerhub]: https://hub.docker.com/r/talebook/calibre-webserver
+
+---
+
+执行命令
+
+`docker run -d --name calibre -p 80:80 -v <本机books目录>:/data/books  talebook/calibre-webserver`
+
+---
+
+**感谢 oldiy 制作第一版的Docker镜像，并编写了这么多教程！**
+
++ [ [群晖安装教程](https://odcn.top/2019/02/26/2734/) ]
+
++ [ [Blog](https://odcn.top) ]
+
++ 加入Telegram讨论组 [[Join](https://t.me/joinchat/H3IoGkcnW6BGo51EJ9Kw5g)]
+
+- 更新支持github登录
+
+- 演示地址 [[ Demo ](https://demo.talebook.org)]
+
+- 部分网友站点：[夜读客](https://www.yeduk.com/), [文渊阁](https://wenyuange.org), [网友站点](http://book.bwh.bai-long.cn/)
+
+![](https://github.com/talebook/calibre-webserver/raw/develop/document/screenshot.png)
+
