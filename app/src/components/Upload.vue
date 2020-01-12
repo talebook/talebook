@@ -39,7 +39,6 @@ export default {
             this.loading = true;
             var data = new FormData();
             data.append("ebook", this.ebooks);
-            console.log(this.ebooks);
             this.backend("/book/upload", {
                 method: 'POST',
                 body: data,
