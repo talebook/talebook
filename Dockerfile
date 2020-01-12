@@ -1,8 +1,20 @@
-﻿FROM ubuntu:18.04
+﻿# 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
+FROM node:12-alpine as builder
 MAINTAINER Rex <talebook@foxmail.com>
 
 LABEL Maintainer="Rex <talebook@foxmail.com>"
 LABEL Thanks="oldiy <oldiy2018@gmail.com>"
+
+WORKDIR /tmp/
+COPY . /tmp/
+RUN cd /tmp/app && \
+        npm install . && \
+        npm run build && \
+        rm -rf node_modules
+
+
+# 第二阶段，构建环境
+FROM ubuntu:18.04
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install tzdata && \
@@ -17,45 +29,37 @@ RUN pip install \
         social-auth-storage-sqlalchemy==1.1.0 \
         tornado==5.1.1
 
-
 RUN mkdir -p /data/log/nginx/ && \
-	mkdir -p /data/books/library  && \
-	mkdir -p /data/books/extract  && \
-	mkdir -p /data/books/upload  && \
-	mkdir -p /data/books/convert  && \
-	mkdir -p /data/books/progress  && \
-	mkdir -p /data/books/settings && \
-	mkdir -p /data/release/calibre-webserver/ && \
-	chmod a+w -R /data/log /data/books /data/release
+    mkdir -p /data/books/library  && \
+    mkdir -p /data/books/extract  && \
+    mkdir -p /data/books/upload  && \
+    mkdir -p /data/books/convert  && \
+    mkdir -p /data/books/progress  && \
+    mkdir -p /data/books/settings && \
+    mkdir -p /var/www/calibre-webserver/ && \
+    chmod a+w -R /data/log /data/books /var/www
 
-COPY . /data/release/calibre-webserver/
+COPY . /var/www/calibre-webserver/
 COPY conf/nginx/calibre-webserver.conf /etc/nginx/conf.d/
 COPY conf/supervisor/calibre-webserver.conf /etc/supervisor/conf.d/
+COPY --from=builder /tmp/app/dist/ /var/www/calibre-webserver/app/dist/
 
-RUN rm -f /etc/nginx/sites-enabled/default
-
-RUN ( curl -sL https://deb.nodesource.com/setup_12.x | bash - ) && \
-    apt-get install -y nodejs
-RUN cd /data/release/calibre-webserver/app && \
-        npm install . && \
-        npm run build && \
-        rm -rf node_modules
-
-RUN cd /data/release/calibre-webserver/ && \
+RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
+    cd /var/www/calibre-webserver/ && \
     cp app/dist/index.html webserver/templates/index.html && \
     touch /data/books/settings/auto.py && \
     chmod a+w /data/books/settings/auto.py && \
     chmod a+w app/dist/index.html && \
-	calibredb add --library-path=/data/books/library/ -r docker/book/ && \
-	python server.py --syncdb  && \
-	rm -f webserver/*.pyc && \
-	mkdir -p /prebuilt/books && \
-	mv /data/books /prebuilt/ && \
-	chmod +x /data/release/calibre-webserver/docker/start.sh
+    calibredb add --library-path=/data/books/library/ -r docker/book/ && \
+    python server.py --syncdb  && \
+    rm -f webserver/*.pyc && \
+    mkdir -p /prebuilt/ && \
+    mv /data/* /prebuilt/ && \
+    chmod +x /var/www/calibre-webserver/docker/start.sh
 
 EXPOSE 80
 
-VOLUME ["/data/books"]
+VOLUME ["/data"]
 
-CMD ["/data/release/calibre-webserver/docker/start.sh"]
+CMD ["/var/www/calibre-webserver/docker/start.sh"]
 

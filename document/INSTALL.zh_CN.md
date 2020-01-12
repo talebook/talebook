@@ -6,7 +6,7 @@
 
 ## 部署目录
 * /data/books/: 作为书库目录
-* /data/release/www/: 作为代码目录
+* /var/www/: 作为代码目录
 
 ## 安装依赖包
 ```
@@ -19,9 +19,9 @@ sudo pip install social-auth-app-tornado social-auth-storage-sqlalchemy "tornado
 各个目录的配置项，都可以在配置文件```webserver/settings.py```找到，可以根据自己的需求进行调整。
 ```
 mkdir -p /data/log/
-mkdir -p /data/release/www/
+mkdir -p /var/www/
 mkdir -p /data/books/{library,extract,upload,convert,progress}
-cd /data/release/www/
+cd /var/www/
 git clone https://github.com/talebook/calibre-webserver.git
 
 ```
@@ -44,7 +44,7 @@ git clone https://github.com/talebook/talebook-library.git /data/books/library
 ## 创建DB
 执行以下命令，创建程序DB。
 ```
-python /data/release/calibre-webserver/server.py --syncdb
+python /var/www/calibre-webserver/server.py --syncdb
 ```
 
 
