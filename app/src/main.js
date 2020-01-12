@@ -59,7 +59,7 @@ const router = new VueRouter({
         { path: '/book/:bookid(\\d+)', component: BookDetail },
         { path: '/book/:bookid(\\d+)/edit', component: BookEdit },
         { path: '/:meta(publisher|tag|author|rating|series)', component: MetaList },
-        { path: '/:meta(publisher|lishertag|author|rating|series)/:name', component: BookList },
+        { path: '/:meta(publisher|tag|author|rating|series)/:name', component: BookList },
 
         { path: '*', component: NotFound },
     ]
