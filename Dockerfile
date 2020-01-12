@@ -49,13 +49,13 @@ RUN cd /data/release/calibre-webserver/ && \
 	calibredb add --library-path=/data/books/library/ -r docker/book/ && \
 	python server.py --syncdb  && \
 	rm -f webserver/*.pyc && \
-	mkdir -p /prebuilt/ && \
-	mv /data/* /prebuilt/ && \
-	chmod +x /prebuilt/release/calibre-webserver/docker/start.sh
+	mkdir -p /prebuilt/books && \
+	mv /data/books /prebuilt/ && \
+	chmod +x /data/release/calibre-webserver/docker/start.sh
 
 EXPOSE 80
 
-VOLUME ["/data"]
+VOLUME ["/data/books"]
 
-CMD ["/prebuilt/release/calibre-webserver/docker/start.sh"]
+CMD ["/data/release/calibre-webserver/docker/start.sh"]
 
