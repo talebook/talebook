@@ -8,6 +8,10 @@ class SettingsLoader(dict):
         super(SettingsLoader, self).__init__(*args, **kwargs)
         self.loadfile()
 
+    def clear(self):
+        for key in self.keys():
+            self.pop(key)
+
     def loadfile(self):
         try:
             import settings

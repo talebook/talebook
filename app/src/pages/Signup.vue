@@ -39,8 +39,8 @@ export default {
         failmsg: "",
         validmsg: "",
         rules: {
-            user: v => v.length >= 5 || 'Min 6 characters',
-            pass: v => v.length >= 8 || 'Min 8 characters',
+            user: v => ( 20 >= v.length && v.length >= 5) || '6 ~ 20 characters',
+            pass: v => ( 20 >= v.length && v.length >= 8) || '8 ~ 20 characters',
             nick: v => v.length >= 2 || 'Min 2 characters',
             email: function (email) {
                 var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;

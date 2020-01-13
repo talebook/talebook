@@ -16,6 +16,7 @@
                             <v-text-field required prepend-icon="lock"  v-model="code"    label="访问码"    type="text" autocomplete="new-code" ></v-text-field>
                         </template>
                     </v-form>
+                    <v-alert type="info" v-if="tips" v-html="tips"></v-alert>
                 </v-card-text>
 
                 <v-card-actions>
@@ -42,9 +43,11 @@ export default {
         code: "",
         invite: false,
         title: "Calibre Webserver",
+        tips: "",
+        retry: 20,
         rules: {
-            user: v => v.length >= 5 || 'Min 6 characters',
-            pass: v => v.length >= 8 || 'Min 8 characters',
+            user: v => ( 20 >= v.length && v.length >= 5) || '6 ~ 20 characters',
+            pass: v => ( 20 >= v.length && v.length >= 8) || '8 ~ 20 characters',
             email: function (email) {
                 var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
                 return re.test(email) || "Invalid email format";
@@ -53,6 +56,31 @@ export default {
 
     }),
     methods: {
+        check_install: function() {
+            fetch("/api/index").then( rsp => {
+                if ( rsp.status == 200 ) {
+                    this.tips += "API服务正常<br/>安装成功，跳转到主页";
+                } else {
+                    this.retry -= 1;
+                    if ( this.retry > 0 ) {
+                        setTimeout( () => {
+                            this.check_install();
+                        }, 1000);
+                    } else {
+                        this.tips += "超时，请刷新重试";
+                    }
+                    return;
+                }
+
+                // force refresh index.html
+                fetch("/?r="+Math.random()).then( rsp => {
+                    rsp.text();
+                    this.$store.commit("navbar", true);
+                    this.$router.push("/");
+                });
+
+            });
+        },
         do_install: function() {
             if ( ! this.$refs.form.validate() ) {
                 return false;
@@ -65,6 +93,7 @@ export default {
             data.append('code', this.code);
             data.append('invite', this.invite);
             data.append('title', this.title);
+            this.tips = "正在写入配置文件...";
             this.backend('/admin/install', {
                 method: 'POST',
                 body: data,
@@ -73,11 +102,9 @@ export default {
                 if ( rsp.err != 'ok' ) {
                     this.alert("error", rsp.msg);
                 } else {
-                    this.alert("success", "安装成功，后台正在重启，5秒后自动跳转到首页")
-                    var self = this;
-                    setTimeout(function(){
-                        self.$store.commit("navbar", true);
-                        self.$router.push("/");
+                    this.tips += "配置写入成功！<br/>正在检测服务器...";
+                    setTimeout( () => {
+                        this.check_install();
                     }, 5000);
                 }
             });

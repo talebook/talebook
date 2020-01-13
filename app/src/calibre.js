@@ -20,12 +20,23 @@ export default {
             var next = this.$route.fullPath;
 
             return fetch(full_url, args)
-                .then(rsp=>rsp.json())
-                .catch( () => {
-                    this.alert("error", "服务器故障！请稍后刷新页面重试！");
-                    throw "server error";
+                .then( rsp => {
+                    var msg = "";
+                    if ( rsp.status != 200 ) {
+                        msg = "服务器异常，状态码: " + rsp.status + "<br/>请查阅服务器日志:<br/>calibre-webserver.log";
+                        this.alert("error", msg);
+                        throw msg;
+                    }
+
+                    try {
+                        return rsp.json();
+                    } catch ( err ) {
+                        msg = "服务器异常，响应非JSON<br/>请查阅服务器日志:<br/>calibre-webserver.log";
+                        this.alert("error", msg);
+                        throw msg;
+                    }
                 })
-                .then(rsp => {
+                .then( rsp => {
                     if ( rsp.err == 'not_installed' ) {
                         self.$router.push("/install").catch(()=>{});
                         throw "redirect to install page";

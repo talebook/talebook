@@ -21,9 +21,7 @@
                         <v-toolbar-title align-center></v-toolbar-title>
                     </v-toolbar>
                     <v-card-text class="pt-12" >
-                        <v-alert outlined v-model="$store.state.alert.show" :type="$store.state.alert.type">
-                            {{$store.state.alert.msg}}
-                        </v-alert>
+                        <v-alert outlined v-model="$store.state.alert.show" :type="$store.state.alert.type" v-html="$store.state.alert.msg" ></v-alert>
                     </v-card-text>
                     <v-card-actions>
                         <v-spacer></v-spacer>
