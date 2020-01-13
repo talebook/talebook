@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #-*- coding: UTF-8 -*-
 
-import logging, math
+import logging, math, sys
 from tornado import web
 from base_handlers import BaseHandler, ListHandler, js
 from calibre.utils.filenames import ascii_filename
@@ -33,6 +33,9 @@ class PubBooksUpdate(ListHandler):
 class MetaList(ListHandler):
     @js
     def get(self, meta):
+        SHOW_NUMBER = 300
+        if self.get_argument("show", "") == "all":
+            SHOW_NUMBER = sys.maxint
         titles = {
                 'tag': _(u'全部标签'),
                 'author': _(u'全部作者'),
@@ -43,14 +46,15 @@ class MetaList(ListHandler):
         title = titles.get(meta, _(u'未知')) % vars()
         category = meta if meta in ['series', 'publisher'] else meta +'s'
         items = self.get_category_with_count(meta)
+        count = len(items)
         if items:
             if meta == 'rating':
                 items.sort(cmp=lambda x,y: cmp(y['name'], x['name']))
             else:
-                hotline = int(math.log10(len(items)))
+                hotline = int(math.log10(count)) if count > SHOW_NUMBER else 0
                 items = [ v for v in items if v['count'] >= hotline ]
                 items.sort(cmp=lambda x,y: cmp(y['count'], x['count']))
-        return {'meta': meta, "title": title, "items": items }
+        return {'meta': meta, "title": title, "items": items, 'total': count }
 
 class MetaBooks(ListHandler):
     def get(self, meta, name):

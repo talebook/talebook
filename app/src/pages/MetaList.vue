@@ -13,6 +13,7 @@
                 {{item.name}}
                 <span v-if="item.count">&nbsp;({{item.count}})</span>
             </v-chip>
+            <v-btn v-if="total > items.length" @click="expand()" color="primary" rounded small>显示全部...</v-btn>
         </v-col>
     </v-row>
 </template>
@@ -39,6 +40,7 @@ export default {
         page: 0,
         data: [],
         total: 0,
+        show_all: false,
         page_size: 20,
     }),
     created() {
@@ -55,13 +57,18 @@ export default {
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
             this.meta = route.params.meta;
-            this.backend("/"+this.meta)
+            this.backend("/"+this.meta + (this.show_all?"?show=all":"") )
             .then(rsp => {
                 this.title = rsp.title;
                 this.data = rsp.items;
+                this.total = rsp.total;
                 this.$store.commit('loaded');
             })
             if ( next ) next()
+        },
+        expand() {
+            this.show_all = !this.show_all;
+            this.init(this.$route);
         },
     },
 }
