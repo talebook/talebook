@@ -9,6 +9,11 @@
             </v-card-actions>
             <v-card-text v-show="card.show">
                 <p v-if="card.subtitle" class="">{{card.subtitle}}</p>
+
+                <template v-if="card.tips">
+                    <p v-for="t in card.tips" :key="t.text">{{t.text}} <a v-if="t.link" target="_blank" :href="t.link">链接</a></p>
+                </template>
+
                 <template v-for="f in card.fields">
                     <v-checkbox small hide-details v-if="f.type === 'checkbox' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-checkbox>
                     <v-textarea outlined v-else-if="f.type === 'textarea' " :prepend-icon="f.icon" v-model="settings[f.key]" :key="f.key" :label="f.label" ></v-textarea>
@@ -43,8 +48,6 @@
                             <v-btn color="primary" @click="settings.FRIENDS.push({text:'', href: ''})"><v-icon>add</v-icon>添加</v-btn>
                         </v-col>
                     </v-row>
-
-
                 </template>
 
                 <template v-if="card.show_socials">
@@ -170,6 +173,12 @@ export default {
                 { icon: "home", key: "static_host", label: "CDN域名" },
                 { icon: "lock", key: "cookie_secret", label: "COOKIE随机密钥" },
                 { icon: "", key: "autoreload", label: "更新配置后自动重启服务器(首次开启需人工重启)", type: 'checkbox' },
+            ],
+            tips: [
+                {
+                    text: "若需要调整Logo、调大上传文件的大小，请参阅安装文档的说明。",
+                    link: "https://github.com/talebook/calibre-webserver/blob/master/document/INSTALL.zh_CN.md#%E5%85%B6%E4%BB%96%E9%85%8D%E7%BD%AE",
+                }
             ],
         },
 
