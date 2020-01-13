@@ -4,9 +4,9 @@
         <v-col cols=12>
             <p class="ma-0 title">随便推荐</p>
         </v-col>
-        <v-col cols=6 xs=6 sm=4 md=2 v-for="(book,idx) in random_books" :key="'rec'+idx+book.id" class="book-card">
+        <v-col cols=6 xs=6 sm=4 md=2 lg=1 v-for="(book,idx) in random_books" :key="'rec'+idx+book.id" class="book-card">
             <v-card :to="book.href" class="ma-1">
-                <v-img :src="book.img" :aspect-ratio="4/3" height="240px" > </v-img>
+                <v-img :src="book.img" :aspect-ratio="11/15" > </v-img>
             </v-card>
         </v-col>
     </v-row>
