@@ -116,7 +116,7 @@ def make_app():
         logging.info("Create tables into DB")
         sys.exit(0)
 
-    path = CONF['static_path'] + '/img/default_cover.jpg'
+    path = CONF['static_path'] + '/calibre/default_cover.jpg'
     app_settings = dict(CONF)
     app_settings.update({
         "legacy": book_db,

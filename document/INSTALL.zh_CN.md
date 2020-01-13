@@ -113,6 +113,17 @@ sudo nginx -s start
 * 打开 http://web_server_ip:8000/ 测试python启动是否正常；
 * 打开 https://web_server_ip/ 测试nginx启动是否正常
 
+[进阶]调整logo
+==============
+favicon和导航菜单中的二维码logo，已经内置在了代码目录中。如果需要定制修改这两个文件，需要在docker启动时挂载这两个目录。例如：
+```
+docker run -d --name calibre -p 80:80 -v /data/calibre:/data -v /data/logo:/var/www/calibre-webserver/webserver/static/img/ talebook/calibre-webserver
+```
+
+注意：目录中需要提供两个文件：
+ - favicon.ico: 网站图标文件
+ - qq.png: 二维码图片
+
 
 问题排查
 ===============
