@@ -113,16 +113,29 @@ sudo nginx -s start
 * 打开 http://web_server_ip:8000/ 测试python启动是否正常；
 * 打开 https://web_server_ip/ 测试nginx启动是否正常
 
-[进阶]调整logo
+其他配置
 ==============
-favicon和导航菜单中的二维码logo，已经内置在了代码目录中。如果需要定制修改这两个文件，需要在docker启动时挂载这两个目录。例如：
+
+## Logo
+favicon和导航菜单中的二维码logo，已经内置在了代码目录```/var/www/calibre-webserver/webserver/static/img/```中。
+ - favicon.ico: 网站图标文件
+ - qq.png: 二维码图片
+
+如果需要定制修改这两个文件，请直接将使用新的文件覆盖即可。
+
+若使用docker启动，则需要在docker启动时挂载这两个目录。例如：
 ```
 docker run -d --name calibre -p 80:80 -v /data/calibre:/data -v /data/logo:/var/www/calibre-webserver/webserver/static/img/ talebook/calibre-webserver
 ```
 
-注意：目录中需要提供两个文件：
- - favicon.ico: 网站图标文件
- - qq.png: 二维码图片
+## 上传文件的大小
+默认情况下，系统中配置的文件上传大小为20MB，配置过大可能会消耗更多的系统资源，同时网络传输大文件时容易不稳定导致上传失败。
+
+若需要调整该配置的大小（例如调整为30MB），请修改```/etc/nginx/conf.d/calibre-webserver.conf```:
+```
+client_max_body_size 30m;
+```
+
 
 
 问题排查

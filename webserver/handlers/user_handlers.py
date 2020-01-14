@@ -17,6 +17,8 @@ RE_EMAIL = r'[^@]+@[^@]+\.[^@]+'
 RE_USERNAME = r'[a-z][a-z0-9_]*'
 RE_PASSWORD = r'[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};\':",./<>?\|]*'
 
+
+
 class Done(BaseHandler):
     def update_userinfo(self):
         if int(CONF.get('auto_login', 0)): return
@@ -492,7 +494,34 @@ class Welcome(BaseHandler):
         self.mark_invited()
         return {'err': 'ok', 'msg': 'ok'}
 
-class AdminSettings(BaseHandler):
+class SettingHandler(BaseHandler):
+    def save_extra_settings(self, args):
+        CONF.update( args )
+
+        # update index.html
+        html = self.render_string('index.html', **CONF)
+        html.replace("Calibre Webserver", CONF['site_title'])
+        page = os.path.join(CONF['html_path'], "index.html")
+        try: open(page, "w").write(html.encode("UTF-8"))
+        except:
+            return {'err': 'file.permission',
+                    'msg': _(u'更新index.html失败！请确保文件的权限为可写入！')}
+
+        # don't update running environment for now
+        args['installed'] = True
+        try:
+            args.dumpfile()
+        except:
+            import traceback
+            logging.error(traceback.format_exc())
+            return {'err': 'file.permission',
+                    'msg': _(u'更新磁盘配置文件失败！请确保配置文件的权限为可写入！')}
+
+        # ok, it's safe to update current environment
+        CONF['installed'] = True
+        return {'err': 'ok', 'rsp': args}
+
+class AdminSettings(SettingHandler):
     @js
     @auth
     def get(self):
@@ -540,9 +569,8 @@ class AdminSettings(BaseHandler):
                 ]
 
         args = loader.SettingsLoader()
-        for key in args.keys(): args.pop(key)
+        args.clear()
 
-        args['installed'] = True
         for key, val in data.items():
             if key.startswith("SOCIAL_AUTH"):
                 if key.endswith("_KEY") or key.endswith("_SECRET"):
@@ -550,25 +578,10 @@ class AdminSettings(BaseHandler):
             elif key in KEYS:
                 args[key] = val
 
-        CONF.update( args )
+        return self.save_extra_settings(args)
 
-        # update index.html
-        html = self.render_string('index.html', **CONF)
-        page = os.path.join(CONF['html_path'], "index.html")
-        try: open(page, "w").write(html.encode("UTF-8"))
-        except:
-            return {'err': 'file.permission', 'msg': _(u'更新index.html失败！请确保文件的权限为可写入！')}
 
-        try:
-            args.dumpfile()
-        except:
-            import traceback
-            logging.error(traceback.format_exc())
-            return {'err': 'file.permission', 'msg': _(u'更新磁盘配置文件失败！请确保配置文件的权限为可写入！')}
-
-        return {'err': 'ok', 'rsp': args}
-
-class AdminInstall(BaseHandler):
+class AdminInstall(SettingHandler):
     def should_be_invited(self):
         pass
 
@@ -622,21 +635,16 @@ class AdminInstall(BaseHandler):
                 logging.error(traceback.format_exc())
                 return {'err': 'db.error', 'msg': _(u'系统异常，请重试或更换注册信息')}
 
-        CONF['site_title'] = title
-        CONF['installed'] = True
+        args = loader.SettingsLoader()
+        args.clear()
+
+        args['site_title'] = title
         if invite == "true":
-            CONF['INVITE_MODE'] = True
-            CONF['INVITE_CODE'] = code
+            args['INVITE_MODE'] = True
+            args['INVITE_CODE'] = code
         else:
-            CONF['INVITE_MODE'] = False
-
-        CONF.dumpfile()
-
-        # update index.html
-        html = self.render_string('index.html', **CONF)
-        page = os.path.join(CONF['html_path'], "index.html")
-        open(page, "w").write(html.encode("UTF-8"))
-        return {'err': 'ok'}
+            args['INVITE_MODE'] = False
+        return self.save_extra_settings(args)
 
 
 def routes():

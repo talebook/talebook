@@ -14,7 +14,7 @@ RUN cd /tmp/app && \
 
 
 # 第二阶段，构建环境
-FROM ubuntu:18.04
+FROM debian:jessie
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install tzdata && \
