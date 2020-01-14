@@ -27,7 +27,7 @@ Docker
 
 执行命令
 
-`docker run -d --name calibre -p 80:80 -v <本机books目录>:/data/books  talebook/calibre-webserver`
+`docker run -d --name calibre -p 80:80 -v <本机data目录>:/data  talebook/calibre-webserver`
 
 ---
 
