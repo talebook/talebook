@@ -51,7 +51,11 @@ def website_format(value):
 
 def js(func):
     def do(self, *args, **kwargs):
-        rsp = func(self, *args, **kwargs)
+        try: rsp = func(self, *args, **kwargs)
+        except:
+            import traceback
+            msg = 'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
+            rsp = {'err': 'exception', 'msg': msg}
         origin = self.request.headers.get('origin', '*')
         self.set_header('Access-Control-Allow-Origin', origin)
         self.set_header('Access-Control-Allow-Credentials', 'true')
@@ -80,10 +84,15 @@ class BaseHandler(web.RequestHandler):
     def need_invited(self):
         return (CONF['INVITE_MODE'] == True)
 
+    def invited_code_expired(self):
+        t = self.get_secure_cookie("invited")
+        if not t or int(float(t)) < int(time.time()) - 7*86400:
+            return True
+        return False
+
     def should_be_invited(self):
         if self.need_invited():
-            t = self.get_secure_cookie("invited")
-            if not t or int(float(t)) < int(time.time()) - 7*86400:
+            if self.invited_code_expired():
                 self.write( {'err': 'not_invited'} )
                 self.set_status(200)
                 raise web.Finish()

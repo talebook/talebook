@@ -49,6 +49,9 @@ export default {
                     } else if ( rsp.err == 'user.need_login' ) {
                         self.$router.push("/login").catch(()=>{});
                         throw "redirect to login page";
+                    } else if ( rsp.err == 'exception' ) {
+                        this.alert('error', rsp.msg);
+                        throw "server exception";
                     }
                     return rsp;
                 })

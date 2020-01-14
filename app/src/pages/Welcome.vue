@@ -64,8 +64,7 @@ export default {
                     this.err_msg = rsp.msg;
                 } else {
                     this.err = false;
-                    this.$router.push(this.$route.query.next || "/");
-                    this.$store.commit("puremode", false);
+                    location.reload();
                 }
             });
         },
