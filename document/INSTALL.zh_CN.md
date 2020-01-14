@@ -117,7 +117,7 @@ sudo nginx -s start
 ==============
 
 ## Logo
-favicon和导航菜单中的二维码logo，已经内置在了代码目录```/var/www/calibre-webserver/webserver/static/img/```中。
+favicon和导航菜单中的二维码logo，已经内置在了代码目录```/var/www/calibre-webserver/app/dist/img/```中。
  - favicon.ico: 网站图标文件
  - qq.png: 二维码图片
 
@@ -125,7 +125,7 @@ favicon和导航菜单中的二维码logo，已经内置在了代码目录```/va
 
 若使用docker启动，则需要在docker启动时挂载这两个目录。例如：
 ```
-docker run -d --name calibre -p 80:80 -v /data/calibre:/data -v /data/logo:/var/www/calibre-webserver/webserver/static/img/ talebook/calibre-webserver
+docker run -d --name calibre -p 80:80 -v /data/calibre:/data -v /data/logo:/var/www/calibre-webserver/app/dist/img/ talebook/calibre-webserver
 ```
 
 ## 上传文件的大小
