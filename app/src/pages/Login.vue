@@ -25,7 +25,7 @@
                     <small>使用社交网络账号登录</small>
                     <br/>
                     <template v-for="s in socials">
-                    <v-btn small outlined :key="s.text" :href="'/api/login/'+s.value">{{s.text}}</v-btn>
+                    <v-btn small outlined :key="s.text" :href="'/auth/login/'+s.value">{{s.text}}</v-btn>
                     &nbsp;
                     </template>
                 </div>
