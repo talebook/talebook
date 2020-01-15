@@ -67,9 +67,6 @@ settings = {
         { "text": u"鸠摩搜索", "href": "https://www.jiumodiary.com/" },
     ],
     'SOCIALS': [
-        { "text": u"Amazon", "value": "amazon" },
-        { "text": u"Github", "value": "github" },
-        { "text": u"微信", "value": "wechat" },
     ],
 
     'SIGNUP_MAIL_TITLE': u'欢迎注册奇异书屋',
