@@ -59,7 +59,7 @@ class AdminUsers(BaseHandler):
             return {'err': 'permission.not_admin', 'msg': _(u'当前用户非管理员')}
 
         num = max(10, int(self.get_argument("num", 20)))
-        page = max(0, int(self.get_argument("page", 0)))
+        page = max(0, int(self.get_argument("page", 1)) - 1)
         sort = self.get_argument("sort", "access_time")
         desc = self.get_argument("desc", "desc")
         logging.debug("num=%d, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
