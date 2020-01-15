@@ -13,7 +13,7 @@
                     <v-text-field prepend-icon="lock" v-model="password" label="密码" type="password" id="password" ></v-text-field>
                     <p class="text-right" > <a @click="show_login = !show_login" > 忘记密码?  </a> </p>
                     <div align="center">
-                        <v-btn type="submit" large rounded color="primary" @click="do_login">登录</v-btn>
+                        <v-btn type="submit" large rounded color="primary">登录</v-btn>
                     </div>
                 </v-form>
             </v-card-text>
