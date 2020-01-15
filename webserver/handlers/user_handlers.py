@@ -31,7 +31,7 @@ class Done(BaseHandler):
 
         si = socials[0]
         info = dict(si.extra_data)
-        logging.info("LOGIN: %d - %s - %s" % ( user.id, user.username, info))
+        logging.info("LOGIN: %s - %d - %s" % ( self.request.remote_ip, user.id, user.username))
 
         if not user.extra:
             logging.info("init new user %s, info=%s" % (user.username, si))
@@ -296,8 +296,12 @@ class SignIn(BaseHandler):
         if user.get_secure_password(password) != user.password:
             return {'err': 'params.invalid', 'msg': _(u'用户名或密码错误')}
 
+        logging.info("LOGIN: %s - %d - %s" % ( self.request.remote_ip, user.id, user.username))
         self.set_secure_cookie('user_id', str(user.id))
         self.set_secure_cookie("lt", str(int(time.time())))
+        self.access_time = datetime.datetime.now()
+        user.extra['login_ip'] = self.request.remote_ip
+        user.save()
         return {'err': 'ok', 'msg': 'ok'}
 
 class UserReset(BaseHandler):

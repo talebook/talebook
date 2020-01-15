@@ -6,6 +6,9 @@ export default {
                 api = options.api;
             }
         }
+        Vue.prototype.alert = function(alert_type, alert_msg, alert_to) {
+            this.$store.commit("alert", {type:alert_type, msg: alert_msg, to: alert_to});
+        }
         Vue.prototype.backend = function(url, options) {
             var full_url = api + url;
             var args = {
@@ -24,7 +27,7 @@ export default {
                     var msg = "";
                     if ( rsp.status != 200 ) {
                         msg = "服务器异常，状态码: " + rsp.status + "<br/>请查阅服务器日志:<br/>calibre-webserver.log";
-                        this.alert("error", msg);
+                        self.alert("error", msg);
                         throw msg;
                     }
 
@@ -32,7 +35,7 @@ export default {
                         return rsp.json();
                     } catch ( err ) {
                         msg = "服务器异常，响应非JSON<br/>请查阅服务器日志:<br/>calibre-webserver.log";
-                        this.alert("error", msg);
+                        self.alert("error", msg);
                         throw msg;
                     }
                 })
@@ -43,21 +46,18 @@ export default {
                     } else if ( rsp.err == 'not_invited' ) {
                         next = next ? "?next="+next : "";
                         if ( self.$route.path != "/welcome" ) {
-                            this.$router.push("/welcome"+next).catch(()=>{});
+                            self.$router.push("/welcome"+next).catch(()=>{});
                             throw "redirect to welcome page";
                         }
                     } else if ( rsp.err == 'user.need_login' ) {
                         self.$router.push("/login").catch(()=>{});
                         throw "redirect to login page";
                     } else if ( rsp.err == 'exception' ) {
-                        this.alert('error', rsp.msg);
+                        self.$store.commit("alert", {type:"error", msg: rsp.msg, to: null});
                         throw "server exception";
                     }
                     return rsp;
                 })
-        }
-        Vue.prototype.alert = function(alert_type, alert_msg, alert_to) {
-            this.$store.commit("alert", {type:alert_type, msg: alert_msg, to: alert_to});
         }
     }
 }
