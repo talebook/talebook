@@ -21,7 +21,7 @@
                 <v-toolbar flat dense dark color="primary">
                     从互联网同步书籍信息
                     <v-spacer></v-spacer>
-                    <v-btn color="" text @click="dialog_refer = false">取消</v-btn>
+                    <v-btn color="" outlined text @click="dialog_refer = false">取消</v-btn>
                 </v-toolbar>
                 <v-card-text xclass="pt-3 px-3 px-sm-6">
                     <p class="py-6 text-center" v-if="refer_books.length == 0">
@@ -31,13 +31,6 @@
                     <template v-else>
                         请选择最匹配的记录复制为本书的描述信息
                         <book-cards :books="refer_books">
-                            <template #introduce="{book}">
-                                <div class="d-none d-lg-flex">
-                                    <v-chip small v-if="book.author_sort">{{book.author_sort}}</v-chip>
-                                    <v-chip small v-if="book.publisher">{{book.publisher}}</v-chip>
-                                    <v-chip small v-if="book.pubyear">{{book.pubyear}}</v-chip>
-                                </div>
-                            </template>
                             <template #actions="{book}">
                                 <v-card-actions>
                                     <v-chip class="mr-1" small v-if="book.author_sort">{{book.author_sort}}</v-chip>
