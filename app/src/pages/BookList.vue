@@ -12,7 +12,7 @@
 
         <v-col cols=12 align="end" >
             <v-container class="max-width">
-                <v-pagination v-model="page" :length="page_cnt" circle @input="change_page"></v-pagination>
+                <v-pagination v-if="page_cnt > 0" v-model="page" :length="page_cnt" circle @input="change_page"></v-pagination>
             </v-container>
             <div class="text-xs-center book-pager">
             </div>
@@ -35,7 +35,7 @@ export default {
         books: [],
         total: 0,
         page_size: 30,
-        page_cnt: 1,
+        page_cnt: 0,
     }),
     created() {
         if ( this.$route.query.start != undefined ) {
