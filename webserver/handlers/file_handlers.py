@@ -160,11 +160,6 @@ class ProxyImageHandler(BaseHandler):
         self.write(r.content)
         return
 
-class RobotHandler(BaseHandler):
-    def get(self):
-        f = os.path.join(CONF['static_path'], "robots.txt")
-        self.write( open(f) )
-
 class ProgressHandler(BaseHandler):
     def get(self, id):
         book_id = int(id)
@@ -188,8 +183,6 @@ def routes():
             {"path": CONF['extract_path']} ),
         (r'/get/(.*)/(.*)',         ImageHandler),
 
-        (r"/robots.txt",            web.StaticFileHandler,
-            {"path": CONF['static_path']} ),
         (r"/(.*)",                    web.StaticFileHandler, {
             "path": CONF['html_path'],
             "default_filename": "index.html",
