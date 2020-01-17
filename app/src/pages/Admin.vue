@@ -2,6 +2,7 @@
     <v-row>
         <v-col xs=10 offset-xs1 >
 
+<v-card>
     <v-tabs v-model="tab_active" color="primary" slider-color="yellow" >
         <v-tabs-slider></v-tabs-slider>
         <v-tab ripple>系统设置</v-tab>
@@ -10,12 +11,15 @@
 
     <v-tabs-items v-model="tab_active">
         <v-tab-item >
+            <v-card-text>
             <settings></settings>
+            </v-card-text>
         </v-tab-item>
         <v-tab-item >
             <users></users>
         </v-tab-item>
     </v-tabs-items>
+</v-card>
 
         </v-col>
     </v-row>
