@@ -1,7 +1,7 @@
 <template>
-    <div v-if="loaded">
+    <div >
         <v-navigation-drawer app v-model="sidebar" width="240px" :clipped="$vuetify.breakpoint.lgAndUp" >
-            <v-list dense>
+            <v-list dense v-if="items.length > 0" >
                 <template v-for="(item, idx) in items">
                     <v-subheader v-if="item.heading" :key="idx" >{{ item.heading }}</v-subheader>
 
@@ -58,7 +58,7 @@
                     </v-container>
             </template>
 
-            <v-toolbar-title class="mr-12 align-center" >
+            <v-toolbar-title class="ml-n5 mr-12 align-center" >
                 <v-app-bar-nav-icon @click.stop="sidebar = !sidebar"><v-icon>menu</v-icon></v-app-bar-nav-icon>
                 <span class="cursor-pointer" @click="$router.push('/')" >{{sys.title}}</span>
             </v-toolbar-title>
@@ -66,7 +66,7 @@
             <v-spacer></v-spacer>
             <template v-if="$vuetify.breakpoint.smAndUp">
             <v-text-field flat solo-inverted hide-details prepend-inner-icon="search" @keyup.enter="do_search" ref="search"
-                      v-model="search" name="name" label="Search" class="d-none d-sm-flex">
+                      v-model="search" name="name" label="Search" class="d-none d-sm-flex ml-8">
             </v-text-field>
             <v-spacer></v-spacer>
             </template>
