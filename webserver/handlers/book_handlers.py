@@ -337,7 +337,7 @@ class BookDelete(BaseHandler):
 
 class BookDownload(BaseHandler):
     def get(self, id, fmt):
-        if not CONF['ALLOW_GUEST_DOWNLOAD'] or not self.current_user:
+        if not CONF['ALLOW_GUEST_DOWNLOAD'] and not self.current_user:
             raise web.HTTPError(403, log_message = _(u'请先登录') )
 
         fmt = fmt.lower()
@@ -570,7 +570,7 @@ class BookPush(BaseHandler):
         fdata = open(fpath).read()
 
         site_title = CONF['site_title']
-        mail_from = self.ettings['smtp_username']
+        mail_from = self.settings['smtp_username']
         mail_subject = _('%(site_title)s：推送给您一本书《%(title)s》') % vars()
         mail_body = _(u'为您奉上一本《%(title)s》, 欢迎常来访问%(site_title)s！http://www.talebook.org' % vars())
         status = msg = ""
