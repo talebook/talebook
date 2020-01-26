@@ -338,7 +338,8 @@ class BookDelete(BaseHandler):
 class BookDownload(BaseHandler):
     def get(self, id, fmt):
         if not CONF['ALLOW_GUEST_DOWNLOAD'] and not self.current_user:
-            raise web.HTTPError(403, log_message = _(u'请先登录') )
+            self.redirect('/login')
+            return
 
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))
@@ -347,7 +348,7 @@ class BookDownload(BaseHandler):
         self.user_history('download_history', book)
         self.count_increase(book_id, count_download=1)
         if 'fmt_%s'%fmt not in book:
-            raise web.HTTPError(404, log_message = _(u'%s格式无法下载'%(fmt)) )
+            raise web.HTTPError(404, reason = _(u'%s格式无法下载'%fmt) )
         path = book['fmt_%s'%fmt]
         att = u'attachment; filename="%d-%s.%s"' % (book['id'], book['title'], fmt)
         self.set_header('Content-Disposition', att.encode('UTF-8'))
@@ -472,8 +473,8 @@ class BookRead(BaseHandler):
             epub_dir = os.path.dirname(fpath).replace(CONF['with_library'], "/get/extract/")
             self.extract_book(book, fpath, fmt)
             return self.html_page('book/read.html', vars())
-        self.add_msg('success', _(u"抱歉，在线阅读器暂不支持该格式的书籍"))
-        self.redirect('/book/%d'%book_id)
+
+        raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍") )
 
     @background
     def extract_book(self, book, fpath, fmt):
