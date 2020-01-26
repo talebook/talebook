@@ -22,16 +22,6 @@ define(['jquery', 'Readium'], function($, Readium){
 					callback(versionInfo);
 				}
 			})
-			$.get('.git/HEAD', function(data){
-				var ref = data.substring(5, data.length - 1);
-				$.get('.git/' + ref, function(data){
-					var sha = data.substring(0, data.length - 1);
-					obj.sha = sha;
-					if (obj.version){
-						callback(versionInfo)
-					}
-				})
-			});
 		}
 		
 	}

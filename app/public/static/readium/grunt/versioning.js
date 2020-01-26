@@ -43,21 +43,7 @@ module.exports = function(grunt) {
             });
         }
 
-        // work around a bug in gift that blows it up on a detached head
-        var ref = fs.readFileSync('.git/HEAD', 'utf-8');
-        if (ref.indexOf('ref: ') == 0){
-            myRepo.branch(function(err, head){
-                //console.log(head.name);
-                var sha = head.commit.id;
-                var branchName = head.name;
-
-                buildVersion(branchName, sha);
-            });
-        }
-        else{
-            buildVersion('', ref.substring(0, ref.length - 1));
-        }
-        
+        buildVersion("", "");
     });
 
     grunt.registerTask('updateChromeManifest', function(){
