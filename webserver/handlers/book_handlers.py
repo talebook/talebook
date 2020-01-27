@@ -4,6 +4,7 @@
 import logging
 import douban
 import baike
+import urllib
 import subprocess
 import tornado.escape
 from base_handlers import *
@@ -471,6 +472,7 @@ class BookRead(BaseHandler):
             if not fpath: continue
             # epub_dir is for javascript
             epub_dir = os.path.dirname(fpath).replace(CONF['with_library'], "/get/extract/")
+            epub_dir = urllib.quote( epub_dir )
             self.extract_book(book, fpath, fmt)
             return self.html_page('book/read.html', vars())
 
