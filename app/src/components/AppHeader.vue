@@ -190,6 +190,7 @@ export default {
                 { heading: '系统' },
                 { icon: 'mdi-history', text: '系统版本', href: "", count: "V"+sys.version },
                 { icon: 'mdi-human', text: '用户数', href: "", count: sys.users },
+                { icon: 'mdi-cellphone', text: 'OPDS接口', href: "/opds", count: "OPDS"},
             ]);
             this.items = nav_items;
             this.loaded = true;
