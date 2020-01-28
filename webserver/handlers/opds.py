@@ -28,27 +28,16 @@ from base_handlers import BaseHandler
 import loader
 CONF = loader.get_settings()
 
-BASE_HREFS = {
-        0 : '/stanza',
-        1 : '/opds',
-}
-
-STANZA_FORMATS = frozenset(['epub', 'pdb', 'pdf', 'cbr', 'cbz', 'djvu'])
-
-def url_for(name, version, **kwargs):
+def url_for(name, **kwargs):
+    base_href = '/opds'
     urls = {}
-    for v, base_href in BASE_HREFS.items():
-        ver = str(v)
-        urls['opds_'+ver] = base_href
-        urls['opdst_'+ver] = base_href+'/'
-        urls['opdscategory_'+ver] = base_href+'/category/%(category)s/%(which)s'
-        urls['opdscategorygroup_'+ver] = base_href+'/categorygroup/%(category)s/%(which)s'
-        urls['opdsnavcatalog_'+ver] = base_href+'/navcatalog/%(which)s'
-        urls['opdssearch_'+ver] = base_href+'/search/%(query)s'
-
-    if not name.endswith('_'):
-        name += '_'
-    return urls[name+str(version)] % kwargs
+    urls['opds'] = base_href
+    urls['opdst'] = base_href+'/'
+    urls['opdscategory'] = base_href+'/category/%(category)s/%(which)s'
+    urls['opdscategorygroup'] = base_href+'/categorygroup/%(category)s/%(which)s'
+    urls['opdsnavcatalog'] = base_href+'/navcatalog/%(which)s'
+    urls['opdssearch'] = base_href+'/search/%(query)s'
+    return urls[name] % kwargs
 
 def first_char(item):
     val = getattr(item, 'sort', item.name)
@@ -103,7 +92,7 @@ def AUTHOR(name, uri=None):
 
 SUBTITLE = E.subtitle
 
-def NAVCATALOG_ENTRY(base_href, updated, title, description, query, version=0):
+def NAVCATALOG_ENTRY(base_href, updated, title, description, query):
     href = base_href+'/navcatalog/'+hexlify(query)
     id_ = 'calibre-navcatalog:'+str(hashlib.sha1(href).hexdigest())
     return E.entry(
@@ -143,7 +132,7 @@ def html_to_lxml(raw):
             from calibre.ebooks.oeb.parse_utils import _html4_parse
             return _html4_parse(raw)
 
-def CATALOG_ENTRY(item, item_kind, base_href, version, updated,
+def CATALOG_ENTRY(item, item_kind, base_href, updated,
                   ignore_count=False, add_kind=False):
     id_ = 'calibre:category:'+item.name
     iid = 'N' + item.name
@@ -166,7 +155,7 @@ def CATALOG_ENTRY(item, item_kind, base_href, version, updated,
             link
             )
 
-def CATALOG_GROUP_ENTRY(item, category, base_href, version, updated):
+def CATALOG_GROUP_ENTRY(item, category, base_href, updated):
     id_ = 'calibre:category-group:'+category+':'+item.text
     iid = item.text
     link = NAVLINK(href=base_href + '/' + hexlify(iid))
@@ -178,7 +167,7 @@ def CATALOG_GROUP_ENTRY(item, category, base_href, version, updated):
             link
             )
 
-def ACQUISITION_ENTRY(item, version, db, updated, CFM, CKEYS, prefix):
+def ACQUISITION_ENTRY(item, db, updated, CFM, CKEYS, prefix):
     FM = db.FIELD_MAP
     title = item[FM['title']]
     if not title:
@@ -226,7 +215,7 @@ def ACQUISITION_ENTRY(item, version, db, updated, CFM, CKEYS, prefix):
         extra.append(comments)
     if extra:
         extra = html_to_lxml('\n'.join(extra))
-    idm = 'calibre' if version == 0 else 'uuid'
+    idm = 'uuid'
     id_ = 'urn:%s:%s'%(idm, item[FM['uuid']])
     ans = E.entry(TITLE(title), E.author(E.name(authors)), ID(id_),
             UPDATED(updated))
@@ -240,15 +229,12 @@ def ACQUISITION_ENTRY(item, version, db, updated, CFM, CKEYS, prefix):
             href = prefix + '/api/book/%s.%s?from=opds'%(item[FM['id']], fmt)
             if mt:
                 link = E.link(type=mt, href=href)
-                if version > 0:
-                    link.set('rel', "http://opds-spec.org/acquisition")
+                link.set('rel', "http://opds-spec.org/acquisition")
                 ans.append(link)
     ans.append(E.link(type='image/jpeg', href=prefix+'/get/cover/%s.jpg'%item[FM['id']],
-        rel="x-stanza-cover-image" if version == 0 else
-        "http://opds-spec.org/cover"))
+        rel= "http://opds-spec.org/cover"))
     ans.append(E.link(type='image/jpeg', href=prefix+'/get/cover/%s.jpg'%item[FM['id']],
-        rel="x-stanza-cover-image-thumbnail" if version == 0 else
-        "http://opds-spec.org/thumbnail"))
+        rel= "http://opds-spec.org/thumbnail"))
 
     return ans
 
@@ -259,11 +245,11 @@ default_feed_title = __appname__ + ' ' + _('Library')
 
 class Feed(object):  # {{{
 
-    def __init__(self, id_, updated, version, subtitle=None,
+    def __init__(self, id_, updated, subtitle=None,
             title=None,
             up_link=None, first_link=None, last_link=None,
             next_link=None, previous_link=None):
-        self.base_href = url_for('opds', version)
+        self.base_href = url_for('opds')
 
         self.root = \
             FEED(
@@ -298,14 +284,12 @@ class TopLevel(Feed):  # {{{
     def __init__(self,
             updated,  # datetime object in UTC
             categories,
-            version,
             id_='urn:calibre:main',
             subtitle=_('Books in your library')
             ):
-        Feed.__init__(self, id_, updated, version, subtitle=subtitle)
+        Feed.__init__(self, id_, updated, subtitle=subtitle)
 
-        subc = partial(NAVCATALOG_ENTRY, self.base_href, updated,
-                version=version)
+        subc = partial(NAVCATALOG_ENTRY, self.base_href, updated)
         subcatalogs = [subc(_('By ')+title,
             _('Books sorted by ') + desc, q) for title, desc, q in
             categories]
@@ -315,7 +299,7 @@ class TopLevel(Feed):  # {{{
 
 class NavFeed(Feed):
 
-    def __init__(self, id_, updated, version, offsets, page_url, up_url, title=None):
+    def __init__(self, id_, updated, offsets, page_url, up_url, title=None):
         kwargs = {'up_link': up_url}
         kwargs['first_link'] = page_url
         kwargs['last_link']  = page_url+'?offset=%d'%offsets.last_offset
@@ -327,40 +311,40 @@ class NavFeed(Feed):
                 page_url+'?offset=%d'%offsets.next_offset
         if title:
             kwargs['title'] = title
-        Feed.__init__(self, id_, updated, version, **kwargs)
+        Feed.__init__(self, id_, updated, **kwargs)
 
 class AcquisitionFeed(NavFeed):
 
-    def __init__(self, updated, id_, items, offsets, page_url, up_url, version,
+    def __init__(self, updated, id_, items, offsets, page_url, up_url,
             db, prefix, title=None):
-        NavFeed.__init__(self, id_, updated, version, offsets, page_url, up_url, title=title)
+        NavFeed.__init__(self, id_, updated, offsets, page_url, up_url, title=title)
         CFM = db.field_metadata
         CKEYS = [key for key in sorted(custom_fields_to_display(db),
                                        key=lambda x: sort_key(CFM[x]['name']))]
         for item in items:
-            self.root.append(ACQUISITION_ENTRY(item, version, db, updated,
+            self.root.append(ACQUISITION_ENTRY(item, db, updated,
                                                CFM, CKEYS, prefix))
 
 class CategoryFeed(NavFeed):
 
-    def __init__(self, items, which, id_, updated, version, offsets, page_url, up_url, db, title=None):
-        NavFeed.__init__(self, id_, updated, version, offsets, page_url, up_url, title=title)
+    def __init__(self, items, which, id_, updated, offsets, page_url, up_url, db, title=None):
+        NavFeed.__init__(self, id_, updated, offsets, page_url, up_url, title=title)
         base_href = self.base_href + '/category/' + hexlify(which)
         ignore_count = False
         if which == 'search':
             ignore_count = True
         for item in items:
-            self.root.append(CATALOG_ENTRY(item, item.category, base_href, version,
+            self.root.append(CATALOG_ENTRY(item, item.category, base_href,
                                            updated, ignore_count=ignore_count,
                                            add_kind=which != item.category))
 
 class CategoryGroupFeed(NavFeed):
 
-    def __init__(self, items, which, id_, updated, version, offsets, page_url, up_url, title=None):
-        NavFeed.__init__(self, id_, updated, version, offsets, page_url, up_url, title=title)
+    def __init__(self, items, which, id_, updated, offsets, page_url, up_url, title=None):
+        NavFeed.__init__(self, id_, updated, offsets, page_url, up_url, title=title)
         base_href = self.base_href + '/categorygroup/' + hexlify(which)
         for item in items:
-            self.root.append(CATALOG_GROUP_ENTRY(item, which, base_href, version, updated))
+            self.root.append(CATALOG_GROUP_ENTRY(item, which, base_href, updated))
 
 
 class OpdsHandler(BaseHandler):
@@ -369,29 +353,8 @@ class OpdsHandler(BaseHandler):
         self.set_status(401)
         raise web.Finish()
 
-    def add_routes(self, connect):
-        for version in (0, 1):
-            base_href = BASE_HREFS[version]
-            ver = str(version)
-            connect('opds_'+ver, base_href, self.opds, version=version)
-            connect('opdst_'+ver, base_href+'/', self.opds, version=version)
-            connect('opdsnavcatalog_'+ver, base_href+'/navcatalog/{which}',
-                    self.opds_navcatalog, version=version)
-            connect('opdscategory_'+ver, base_href+'/category/{category}/{which}',
-                    self.opds_category, version=version)
-            connect('opdscategorygroup_'+ver, base_href+'/categorygroup/{category}/{which}',
-                    self.opds_category_group, version=version)
-            connect('opdssearch_'+ver, base_href+'/search/{query}',
-                    self.opds_search, version=version)
-
-    def get_opds_allowed_ids_for_version(self, version):
-        search = '' if version > 0 else ' or '.join(['format:='+x for x in
-            STANZA_FORMATS])
-        ids = self.search_for_books(search)
-        return ids
-
     def get_opds_acquisition_feed(self, ids, offset, page_url, up_url, id_,
-            sort_by='title', ascending=True, version=0, feed_title=None):
+            sort_by='title', ascending=True, feed_title=None):
         idx = self.db.FIELD_MAP['id']
         if not ids:
             raise web.HTTPError(404, reason='No books found')
@@ -404,33 +367,30 @@ class OpdsHandler(BaseHandler):
         self.set_header('Last-Modified', self.last_modified(updated) )
         self.set_header('Content-Type', 'application/atom+xml; profile=opds-catalog')
         return str(AcquisitionFeed(updated, id_, items, offsets,
-                                   page_url, up_url, version, self.db,
+                                   page_url, up_url, self.db,
                                    CONF['url_prefix'], title=feed_title))
 
-    def opds_search(self, query=None, version=0, offset=0):
+    def opds_search(self, query=None, offset=0):
         try:
             offset = int(offset)
-            version = int(version)
         except:
             raise web.HTTPError(404, reason='Not found')
-        if query is None or version not in BASE_HREFS:
+        if query is None:
             raise web.HTTPError(404, reason='Not found')
         try:
             ids = self.search_for_books(query)
         except:
             raise web.HTTPError(404, reason='Search: %r not understood'%query)
-        page_url = url_for('opdssearch', version, query=query)
+        page_url = url_for('opdssearch', query=query)
         return self.get_opds_acquisition_feed(ids, offset, page_url,
-                url_for('opds', version), 'calibre-search:'+query,
-                version=version)
+                url_for('opds'), 'calibre-search:'+query)
 
-    def get_opds_all_books(self, which, page_url, up_url, version=0, offset=0):
+    def get_opds_all_books(self, which, page_url, up_url, offset=0):
         try:
             offset = int(offset)
-            version = int(version)
         except:
             raise web.HTTPError(404, reason='Not found')
-        if which not in ('title', 'newest') or version not in BASE_HREFS:
+        if which not in ('title', 'newest'):
             raise web.HTTPError(404, reason='Not found')
         sort = 'timestamp' if which == 'newest' else 'title'
         ascending = which == 'title'
@@ -439,22 +399,21 @@ class OpdsHandler(BaseHandler):
         ids = list(self.cache.search(''))
         return self.get_opds_acquisition_feed(ids, offset, page_url, up_url,
                 id_='calibre-all:'+sort, sort_by=sort, ascending=ascending,
-                version=version, feed_title=feed_title)
+                feed_title=feed_title)
 
     # Categories {{{
 
-    def opds_category_group(self, category=None, which=None, version=0, offset=0):
+    def opds_category_group(self, category=None, which=None, offset=0):
         try:
             offset = int(offset)
-            version = int(version)
         except:
             raise web.HTTPError(404, reason='Not found')
 
-        if not which or not category or version not in BASE_HREFS:
+        if not which or not category:
             raise web.HTTPError(404, reason='Not found')
 
         categories = self.db.get_categories()
-        page_url = url_for('opdscategorygroup', version, category=category, which=which)
+        page_url = url_for('opdscategorygroup', category=category, which=which)
 
         category = unhexlify(category)
         if category not in categories:
@@ -465,7 +424,7 @@ class OpdsHandler(BaseHandler):
         which = unhexlify(which)
         feed_title = default_feed_title + ' :: ' + (_('By {0} :: {1}').format(category_name, which))
         owhich = hexlify('N'+which)
-        up_url = url_for('opdsnavcatalog', version, which=owhich)
+        up_url = url_for('opdsnavcatalog', which=owhich)
         items = categories[category]
         def belongs(x, which):
             return first_char(x).lower() == which.lower()
@@ -483,33 +442,30 @@ class OpdsHandler(BaseHandler):
         self.set_header('Last-Modified', self.last_modified(updated) )
         self.set_header('Content-Type', 'application/atom+xml; charset=UTF-8')
 
-        return str(CategoryFeed(items, category, id_, updated, version, offsets,
+        return str(CategoryFeed(items, category, id_, updated, offsets,
             page_url, up_url, self.db, title=feed_title))
 
-    def opds_navcatalog(self, which=None, version=0, offset=0):
+    def opds_navcatalog(self, which=None, offset=0):
         try:
             offset = int(offset)
-            version = int(version)
         except:
             raise web.HTTPError(404, reason='Not found')
 
-        if not which or version not in BASE_HREFS:
+        if not which:
             raise web.HTTPError(404, reason='Not found')
 
-        page_url = url_for('opdsnavcatalog', version, which=which)
-        up_url = url_for('opds', version)
+        page_url = url_for('opdsnavcatalog', which=which)
+        up_url = url_for('opds')
         which = unhexlify(which)
         type_ = which[0]
         which = which[1:]
         if type_ == 'O':
-            return self.get_opds_all_books(which, page_url, up_url,
-                    version=version, offset=offset)
+            return self.get_opds_all_books(which, page_url, up_url, offset=offset)
         elif type_ == 'N':
-            return self.get_opds_navcatalog(which, page_url, up_url,
-                    version=version, offset=offset)
+            return self.get_opds_navcatalog(which, page_url, up_url, offset=offset)
         raise web.HTTPError(404, reason='Not found')
 
-    def get_opds_navcatalog(self, which, page_url, up_url, version=0, offset=0):
+    def get_opds_navcatalog(self, which, page_url, up_url, offset=0):
         categories = self.db.get_categories()
         if which not in categories:
             raise web.HTTPError(404, reason='Category %r not found'%which)
@@ -529,7 +485,7 @@ class OpdsHandler(BaseHandler):
             max_items = CONF['max_opds_items']
             offsets = Offsets(offset, max_items, len(items))
             items = list(items)[offsets.offset:offsets.offset+max_items]
-            ans = CategoryFeed(items, which, id_, updated, version, offsets,
+            ans = CategoryFeed(items, which, id_, updated, offsets,
                 page_url, up_url, self.db, title=feed_title)
         else:
             class Group:
@@ -548,7 +504,7 @@ class OpdsHandler(BaseHandler):
             max_items = CONF['max_opds_items']
             offsets = Offsets(offset, max_items, len(items))
             items = items[offsets.offset:offsets.offset+max_items]
-            ans = CategoryGroupFeed(items, which, id_, updated, version, offsets,
+            ans = CategoryGroupFeed(items, which, id_, updated, offsets,
                 page_url, up_url, title=feed_title)
 
         self.set_header('Last-Modified', self.last_modified(updated))
@@ -556,18 +512,17 @@ class OpdsHandler(BaseHandler):
 
         return str(ans)
 
-    def opds_category(self, category=None, which=None, version=0, offset=0):
+    def opds_category(self, category=None, which=None, offset=0):
         try:
             offset = int(offset)
-            version = int(version)
         except:
             raise web.HTTPError(404, reason='Not found')
 
-        if not which or not category or version not in BASE_HREFS:
+        if not which or not category:
             raise web.HTTPError(404, reason='Not found')
-        page_url = url_for('opdscategory', version, which=which,
-                category=category)
-        up_url = url_for('opdsnavcatalog', version, which=category)
+
+        page_url = url_for('opdscategory', which=which, category=category)
+        up_url = url_for('opdsnavcatalog', which=category)
 
         which, category = unhexlify(which), unhexlify(category)
         type_ = which[0]
@@ -595,8 +550,7 @@ class OpdsHandler(BaseHandler):
             except:
                 raise web.HTTPError(404, reason='Search: %r not understood'%which)
             return self.get_opds_acquisition_feed(ids, offset, page_url,
-                    up_url, 'calibre-search:'+which,
-                    version=version)
+                    up_url, 'calibre-search:'+which)
 
         if type_ != 'I':
             raise web.HTTPError(404, reason='Non id categories not supported')
@@ -609,14 +563,11 @@ class OpdsHandler(BaseHandler):
 
         return self.get_opds_acquisition_feed(ids, offset, page_url,
                 up_url, 'calibre-category:'+category+':'+str(which),
-                version=version, sort_by=sort_by)
+                sort_by=sort_by)
 
     # }}}
 
-    def opds(self, version=0):
-        version = int(version)
-        if version not in BASE_HREFS:
-            raise web.HTTPError(404, reason='Not found')
+    def opds(self):
         categories = self.db.get_categories()
         category_meta = self.db.field_metadata
         cats = [
@@ -645,33 +596,33 @@ class OpdsHandler(BaseHandler):
         self.set_header('Last-Modified', self.last_modified(updated))
         self.set_header('Content-Type', 'application/atom+xml; charset=UTF-8')
 
-        feed = TopLevel(updated, cats, version)
+        feed = TopLevel(updated, cats)
 
         return str(feed)
 
 class OpdsIndex(OpdsHandler):
     def get(self):
-        self.write( self.opds(version=1) )
+        self.write( self.opds() )
 
 class OpdsNav(OpdsHandler):
     def get(self, which):
         offset = self.get_argument("offset", 0)
-        self.write( self.opds_navcatalog(which, version=1, offset=offset) )
+        self.write( self.opds_navcatalog(which, offset=offset) )
 
 class OpdsCategory(OpdsHandler):
     def get(self, category, which):
         offset = self.get_argument("offset", 0)
-        self.write( self.opds_category(category, which, version=1, offset=offset) )
+        self.write( self.opds_category(category, which, offset=offset) )
 
 class OpdsCategoryGroup(OpdsHandler):
     def get(self, category, which):
         offset = self.get_argument("offset", 0)
-        self.write( self.opds_category_group(category, which, version=1, offset=offset) )
+        self.write( self.opds_category_group(category, which, offset=offset) )
 
 class OpdsSearch(OpdsHandler):
     def get(self, which):
         offset = self.get_argument("offset", 0)
-        self.write( self.opds_search(which, version=1, offset=offset) )
+        self.write( self.opds_search(which, offset=offset) )
 
 def routes():
     return [
