@@ -337,10 +337,18 @@ class BookDelete(BaseHandler):
             return {'err': 'permission', 'msg': _(u'无权操作')}
 
 class BookDownload(BaseHandler):
+    def send_error_of_not_invited(self):
+        self.set_header("WWW-Authenticate", "Basic")
+        self.set_status(401)
+        raise web.Finish()
+
     def get(self, id, fmt):
+        is_opds = ( self.get_argument("from", "") == "opds" )
         if not CONF['ALLOW_GUEST_DOWNLOAD'] and not self.current_user:
-            self.redirect('/login')
-            return
+            if is_opds:
+                return self.send_error_of_not_invited()
+            else:
+                return self.redirect('/login')
 
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))
@@ -351,7 +359,11 @@ class BookDownload(BaseHandler):
         if 'fmt_%s'%fmt not in book:
             raise web.HTTPError(404, reason = _(u'%s格式无法下载'%fmt) )
         path = book['fmt_%s'%fmt]
-        att = u'attachment; filename="%d-%s.%s"' % (book['id'], book['title'], fmt)
+        book['fmt'] = fmt
+        att = u'attachment; filename="%(id)d-%(title)s.%(fmt)s"' % book
+        if is_opds:
+            att = u'attachment; filename="%(id)d.%(fmt)s"' % book
+
         self.set_header('Content-Disposition', att.encode('UTF-8'))
         self.set_header('Content-Type', 'application/octet-stream')
         f = open(path, 'rb').read()

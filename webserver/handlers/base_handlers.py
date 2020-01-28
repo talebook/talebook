@@ -2,7 +2,7 @@
 #-*- coding: UTF-8 -*-
 
 
-import re, os, logging, sys, time, datetime
+import re, os, logging, sys, time, datetime, base64
 from tornado import web, locale
 from tornado.options import define, options
 from jinja2 import Environment, FileSystemLoader
@@ -84,18 +84,37 @@ class BaseHandler(web.RequestHandler):
     def need_invited(self):
         return (CONF['INVITE_MODE'] == True)
 
-    def invited_code_expired(self):
+    def invited_code_is_ok(self):
         t = self.get_secure_cookie("invited")
-        if not t or int(float(t)) < int(time.time()) - 7*86400:
+        if t and int(float(t)) > int(time.time()) - 7*86400:
             return True
         return False
 
+    def process_auth_header(self):
+        auth_header = self.request.headers.get('Authorization', "")
+        if not auth_header.startswith("Basic "):
+            return False
+        auth_decoded = base64.decodestring(auth_header[6:])
+        username, password = auth_decoded.split(':', 2)
+        user = self.session.query(Reader).filter(Reader.username==username).first()
+        if not user:
+            return False
+        if user.get_secure_password(password) != str(user.password):
+            return False
+        self.mark_invited()
+        self.login_user(user)
+        return True
+
+    def send_error_of_not_invited(self):
+        self.write( {'err': 'not_invited'} )
+        self.set_status(200)
+        raise web.Finish()
+
     def should_be_invited(self):
         if self.need_invited():
-            if self.invited_code_expired():
-                self.write( {'err': 'not_invited'} )
-                self.set_status(200)
-                raise web.Finish()
+            if self.invited_code_is_ok(): return
+            if self.process_auth_header(): return
+            return self.send_error_of_not_invited()
 
     def should_be_installed(self):
         if CONF.get("installed", None) == False:
@@ -164,6 +183,10 @@ class BaseHandler(web.RequestHandler):
 
     def login_user(self, user):
         self.set_secure_cookie('user_id', str(user.id))
+        self.set_secure_cookie("lt", str(int(time.time())))
+        self.access_time = datetime.datetime.now()
+        user.extra['login_ip'] = self.request.remote_ip
+        user.save()
 
     def add_msg(self, status, msg):
         m = Message(self.user_id(), status, msg)
@@ -195,6 +218,33 @@ class BaseHandler(web.RequestHandler):
         user = self.current_user
         user.extra.update(extra)
         user.save()
+
+    def last_modified(self, updated):
+        '''
+        Generates a locale independent, english timestamp from a datetime
+        object
+        '''
+        lm = updated.strftime('day, %d month %Y %H:%M:%S GMT')
+        day ={0:'Sun', 1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat'}
+        lm = lm.replace('day', day[int(updated.strftime('%w'))])
+        month = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul',
+                 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
+        return lm.replace('month', month[updated.month])
+
+    def sort(self, items, field, order):
+        from calibre.library.caches import SortKeyGenerator
+        class CSSortKeyGenerator(SortKeyGenerator):
+            def __init__(self, fields, fm, db_prefs):
+                SortKeyGenerator.__init__(self, fields, fm, None, db_prefs)
+            def __call__(self, record):
+                return self.itervals(record).next()
+
+        field = self.db.data.sanitize_sort_field_name(field)
+        if field not in self.db.field_metadata.sortable_field_keys():
+            raise cherrypy.HTTPError(400, '%s is not a valid sort field'%field)
+        keyg = CSSortKeyGenerator([(field, order)], self.db.field_metadata,
+                                  self.db.prefs)
+        items.sort(key=keyg, reverse=not order)
 
     def get_template_path(self):
         """ 获取模板路径 """
@@ -308,6 +358,7 @@ class BaseHandler(web.RequestHandler):
         item.save()
 
     def search_for_books(self, query):
+        self.search_restriction = ''
         return self.db.search_getting_ids(
                 (query or '').strip(), self.search_restriction,
                 sort_results=False, use_virtual_library=False)

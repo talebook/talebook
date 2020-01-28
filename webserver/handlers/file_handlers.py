@@ -22,6 +22,11 @@ import loader
 CONF = loader.get_settings()
 
 class ImageHandler(BaseHandler):
+    def send_error_of_not_invited(self):
+        self.set_header("WWW-Authenticate", "Basic")
+        self.set_status(401)
+        raise web.Finish()
+
     def get(self, fmt, id, **kwargs):
         self.write( self.get_data(fmt, id, **kwargs) )
 
@@ -118,19 +123,6 @@ class ImageHandler(BaseHandler):
         self.set_header( 'Content-Disposition',
                 b'attachment; filename="%s"'%fname )
         return fmt
-
-    # Utility methods {{{
-    def last_modified(self, updated):
-        '''
-        Generates a locale independent, english timestamp from a datetime
-        object
-        '''
-        lm = updated.strftime('day, %d month %Y %H:%M:%S GMT')
-        day ={0:'Sun', 1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat'}
-        lm = lm.replace('day', day[int(updated.strftime('%w'))])
-        month = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul',
-                 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
-        return lm.replace('month', month[updated.month])
 
 class ProxyImageHandler(BaseHandler):
     def is_whitelist(self, host):

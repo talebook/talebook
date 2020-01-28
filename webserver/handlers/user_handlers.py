@@ -38,14 +38,11 @@ class Done(BaseHandler):
             user.init(si)
 
         user.check_and_update(si)
-        self.access_time = datetime.datetime.now()
-        user.extra['login_ip'] = self.request.remote_ip
-        user.save()
+        return user
 
     def get(self):
-        login_time = int(time.time())
-        self.set_secure_cookie("lt", str(login_time))
-        self.update_userinfo()
+        user = self.update_userinfo()
+        self.login_user(user)
         url = self.get_secure_cookie(COOKIE_REDIRECT)
         self.clear_cookie(COOKIE_REDIRECT)
         if not url: url = "/"
@@ -297,11 +294,7 @@ class SignIn(BaseHandler):
             return {'err': 'params.invalid', 'msg': _(u'用户名或密码错误')}
 
         logging.info("LOGIN: %s - %d - %s" % ( self.request.remote_ip, user.id, user.username))
-        self.set_secure_cookie('user_id', str(user.id))
-        self.set_secure_cookie("lt", str(int(time.time())))
-        self.access_time = datetime.datetime.now()
-        user.extra['login_ip'] = self.request.remote_ip
-        user.save()
+        self.login_user(user)
         return {'err': 'ok', 'msg': 'ok'}
 
 class UserReset(BaseHandler):

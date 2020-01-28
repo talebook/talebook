@@ -18,9 +18,14 @@ settings = {
     "extract_path"  : "/data/books/extract/",
     "with_library"  : "/data/books/library/",
     "cookie_secret" : "cookie_secret",
+    "cookie_expire" : 7*86400,
     "login_url"     : "/login",
     "user_database" : 'sqlite:////data/books/calibre-webserver.db',
     "site_title"    : u"奇异书屋",
+
+    "max_opds_items": 30,
+    "max_opds_ungrouped_items" : 100,
+    "url_prefix": "",
 
     "SOCIAL_AUTH_LOGIN_URL"          : '/',
     "SOCIAL_AUTH_LOGIN_REDIRECT_URL" : '/api/done/',

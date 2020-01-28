@@ -5,15 +5,14 @@ __license__   = 'GPL v3'
 __copyright__ = '2010, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
 
-import hashlib, binascii
+import hashlib, binascii, logging
+from tornado import web, locale
 from functools import partial
 from itertools import repeat
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 from lxml import etree, html
 from lxml.builder import ElementMaker
-import cherrypy
-import routes
 
 from calibre.constants import __appname__
 from calibre.ebooks.metadata import fmt_sidx
@@ -23,6 +22,11 @@ from calibre.library.server.utils import format_tag_string, Offsets
 from calibre import guess_type, prepare_string_for_xml as xml
 from calibre.utils.icu import sort_key
 from calibre.utils.date import as_utc
+from calibre.utils.filenames import ascii_text
+
+from base_handlers import BaseHandler
+import loader
+CONF = loader.get_settings()
 
 BASE_HREFS = {
         0 : '/stanza',
@@ -32,9 +36,29 @@ BASE_HREFS = {
 STANZA_FORMATS = frozenset(['epub', 'pdb', 'pdf', 'cbr', 'cbz', 'djvu'])
 
 def url_for(name, version, **kwargs):
+    urls = {}
+    for v, base_href in BASE_HREFS.items():
+        ver = str(v)
+        urls['opds_'+ver] = base_href
+        urls['opdst_'+ver] = base_href+'/'
+        urls['opdscategory_'+ver] = base_href+'/category/%(category)s/%(which)s'
+        urls['opdscategorygroup_'+ver] = base_href+'/categorygroup/%(category)s/%(which)s'
+        urls['opdsnavcatalog_'+ver] = base_href+'/navcatalog/%(which)s'
+        urls['opdssearch_'+ver] = base_href+'/search/%(query)s'
+
     if not name.endswith('_'):
         name += '_'
-    return routes.url_for(name+str(version), **kwargs)
+    return urls[name+str(version)] % kwargs
+
+def first_char(item):
+    val = getattr(item, 'sort', item.name)
+    if not val:
+        val = 'A'
+    for c in ascii_text(val):
+        if c.isalnum():
+            return c
+    return 'A'
+
 
 def hexlify(x):
     if isinstance(x, unicode):
@@ -213,16 +237,16 @@ def ACQUISITION_ENTRY(item, version, db, updated, CFM, CKEYS, prefix):
         for fmt in formats.split(','):
             fmt = fmt.lower()
             mt = guess_type('a.'+fmt)[0]
-            href = prefix + '/get/%s/%s'%(fmt, item[FM['id']])
+            href = prefix + '/api/book/%s.%s?from=opds'%(item[FM['id']], fmt)
             if mt:
                 link = E.link(type=mt, href=href)
                 if version > 0:
                     link.set('rel', "http://opds-spec.org/acquisition")
                 ans.append(link)
-    ans.append(E.link(type='image/jpeg', href=prefix+'/get/cover/%s'%item[FM['id']],
+    ans.append(E.link(type='image/jpeg', href=prefix+'/get/cover/%s.jpg'%item[FM['id']],
         rel="x-stanza-cover-image" if version == 0 else
         "http://opds-spec.org/cover"))
-    ans.append(E.link(type='image/jpeg', href=prefix+'/get/thumb/%s'%item[FM['id']],
+    ans.append(E.link(type='image/jpeg', href=prefix+'/get/cover/%s.jpg'%item[FM['id']],
         rel="x-stanza-cover-image-thumbnail" if version == 0 else
         "http://opds-spec.org/thumbnail"))
 
@@ -339,7 +363,11 @@ class CategoryGroupFeed(NavFeed):
             self.root.append(CATALOG_GROUP_ENTRY(item, which, base_href, version, updated))
 
 
-class OPDSServer(object):
+class OpdsHandler(BaseHandler):
+    def send_error_of_not_invited(self):
+        self.set_header("WWW-Authenticate", "Basic")
+        self.set_status(401)
+        raise web.Finish()
 
     def add_routes(self, connect):
         for version in (0, 1):
@@ -359,39 +387,38 @@ class OPDSServer(object):
     def get_opds_allowed_ids_for_version(self, version):
         search = '' if version > 0 else ' or '.join(['format:='+x for x in
             STANZA_FORMATS])
-        ids = self.search_cache(search)
+        ids = self.search_for_books(search)
         return ids
 
     def get_opds_acquisition_feed(self, ids, offset, page_url, up_url, id_,
             sort_by='title', ascending=True, version=0, feed_title=None):
         idx = self.db.FIELD_MAP['id']
-        ids &= self.get_opds_allowed_ids_for_version(version)
         if not ids:
-            raise cherrypy.HTTPError(404, 'No books found')
+            raise web.HTTPError(404, reason='No books found')
         items = [x for x in self.db.data.iterall() if x[idx] in ids]
         self.sort(items, sort_by, ascending)
-        max_items = self.opts.max_opds_items
+        max_items = CONF['max_opds_items']
         offsets = Offsets(offset, max_items, len(items))
         items = items[offsets.offset:offsets.offset+max_items]
         updated = self.db.last_modified()
-        cherrypy.response.headers['Last-Modified'] = self.last_modified(updated)
-        cherrypy.response.headers['Content-Type'] = 'application/atom+xml;profile=opds-catalog'
+        self.set_header('Last-Modified', self.last_modified(updated) )
+        self.set_header('Content-Type', 'application/atom+xml; profile=opds-catalog')
         return str(AcquisitionFeed(updated, id_, items, offsets,
                                    page_url, up_url, version, self.db,
-                                   self.opts.url_prefix, title=feed_title))
+                                   CONF['url_prefix'], title=feed_title))
 
     def opds_search(self, query=None, version=0, offset=0):
         try:
             offset = int(offset)
             version = int(version)
         except:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
         if query is None or version not in BASE_HREFS:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
         try:
-            ids = self.search_cache(query)
+            ids = self.search_for_books(query)
         except:
-            raise cherrypy.HTTPError(404, 'Search: %r not understood'%query)
+            raise web.HTTPError(404, reason='Search: %r not understood'%query)
         page_url = url_for('opdssearch', version, query=query)
         return self.get_opds_acquisition_feed(ids, offset, page_url,
                 url_for('opds', version), 'calibre-search:'+query,
@@ -402,14 +429,14 @@ class OPDSServer(object):
             offset = int(offset)
             version = int(version)
         except:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
         if which not in ('title', 'newest') or version not in BASE_HREFS:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
         sort = 'timestamp' if which == 'newest' else 'title'
         ascending = which == 'title'
         feed_title = {'newest':_('Newest'), 'title': _('Title')}.get(which, which)
         feed_title = default_feed_title + ' :: ' + _('By %s') % feed_title
-        ids = self.get_opds_allowed_ids_for_version(version)
+        ids = list(self.cache.search(''))
         return self.get_opds_acquisition_feed(ids, offset, page_url, up_url,
                 id_='calibre-all:'+sort, sort_by=sort, ascending=ascending,
                 version=version, feed_title=feed_title)
@@ -421,18 +448,17 @@ class OPDSServer(object):
             offset = int(offset)
             version = int(version)
         except:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
 
         if not which or not category or version not in BASE_HREFS:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
 
-        categories = self.categories_cache(
-                self.get_opds_allowed_ids_for_version(version))
+        categories = self.db.get_categories()
         page_url = url_for('opdscategorygroup', version, category=category, which=which)
 
         category = unhexlify(category)
         if category not in categories:
-            raise cherrypy.HTTPError(404, 'Category %r not found'%which)
+            raise web.HTTPError(404, reason='Category %r not found'%which)
         category_meta = self.db.field_metadata
         meta = category_meta.get(category, {})
         category_name = meta.get('name', which)
@@ -442,21 +468,20 @@ class OPDSServer(object):
         up_url = url_for('opdsnavcatalog', version, which=owhich)
         items = categories[category]
         def belongs(x, which):
-            return getattr(x, 'sort', x.name).lower().startswith(which.lower())
+            return first_char(x).lower() == which.lower()
+
         items = [x for x in items if belongs(x, which)]
         if not items:
-            raise cherrypy.HTTPError(404, 'No items in group %r:%r'%(category,
-                which))
+            raise web.HTTPError(404, reason='No items in group %r:%r'%(category, which))
         updated = self.db.last_modified()
 
         id_ = 'calibre-category-group-feed:'+category+':'+which
-
-        max_items = self.opts.max_opds_items
+        max_items = CONF['max_opds_items']
         offsets = Offsets(offset, max_items, len(items))
         items = list(items)[offsets.offset:offsets.offset+max_items]
 
-        cherrypy.response.headers['Last-Modified'] = self.last_modified(updated)
-        cherrypy.response.headers['Content-Type'] = 'application/atom+xml'
+        self.set_header('Last-Modified', self.last_modified(updated) )
+        self.set_header('Content-Type', 'application/atom+xml; charset=UTF-8')
 
         return str(CategoryFeed(items, category, id_, updated, version, offsets,
             page_url, up_url, self.db, title=feed_title))
@@ -466,10 +491,11 @@ class OPDSServer(object):
             offset = int(offset)
             version = int(version)
         except:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
 
         if not which or version not in BASE_HREFS:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
+
         page_url = url_for('opdsnavcatalog', version, which=which)
         up_url = url_for('opds', version)
         which = unhexlify(which)
@@ -481,13 +507,12 @@ class OPDSServer(object):
         elif type_ == 'N':
             return self.get_opds_navcatalog(which, page_url, up_url,
                     version=version, offset=offset)
-        raise cherrypy.HTTPError(404, 'Not found')
+        raise web.HTTPError(404, reason='Not found')
 
     def get_opds_navcatalog(self, which, page_url, up_url, version=0, offset=0):
-        categories = self.categories_cache(
-                self.get_opds_allowed_ids_for_version(version))
+        categories = self.db.get_categories()
         if which not in categories:
-            raise cherrypy.HTTPError(404, 'Category %r not found'%which)
+            raise web.HTTPError(404, reason='Category %r not found'%which)
 
         items = categories[which]
         updated = self.db.last_modified()
@@ -498,10 +523,10 @@ class OPDSServer(object):
 
         id_ = 'calibre-category-feed:'+which
 
-        MAX_ITEMS = self.opts.max_opds_ungrouped_items
+        MAX_ITEMS = CONF['max_opds_ungrouped_items']
 
         if len(items) <= MAX_ITEMS:
-            max_items = self.opts.max_opds_items
+            max_items = CONF['max_opds_items']
             offsets = Offsets(offset, max_items, len(items))
             items = list(items)[offsets.offset:offsets.offset+max_items]
             ans = CategoryFeed(items, which, id_, updated, version, offsets,
@@ -511,25 +536,23 @@ class OPDSServer(object):
                 def __init__(self, text, count):
                     self.text, self.count = text, count
 
-            starts = set([])
+            groups = defaultdict(int)
             for x in items:
-                val = getattr(x, 'sort', x.name)
-                if not val:
-                    val = 'A'
-                starts.add(val[0].upper())
-            category_groups = OrderedDict()
-            for x in sorted(starts, key=sort_key):
-                category_groups[x] = len([y for y in items if
-                    getattr(y, 'sort', y.name).startswith(x)])
-            items = [Group(x, y) for x, y in category_groups.items()]
-            max_items = self.opts.max_opds_items
+                c = first_char(x)
+                groups[c.upper()] += 1
+
+            items = []
+            for c in sorted(groups.keys(), key=sort_key):
+                items.append( Group(c, groups[c]) )
+
+            max_items = CONF['max_opds_items']
             offsets = Offsets(offset, max_items, len(items))
             items = items[offsets.offset:offsets.offset+max_items]
             ans = CategoryGroupFeed(items, which, id_, updated, version, offsets,
                 page_url, up_url, title=feed_title)
 
-        cherrypy.response.headers['Last-Modified'] = self.last_modified(updated)
-        cherrypy.response.headers['Content-Type'] = 'application/atom+xml'
+        self.set_header('Last-Modified', self.last_modified(updated))
+        self.set_header('Content-Type', 'application/atom+xml; charset=UTF-8')
 
         return str(ans)
 
@@ -538,10 +561,10 @@ class OPDSServer(object):
             offset = int(offset)
             version = int(version)
         except:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
 
         if not which or not category or version not in BASE_HREFS:
-            raise cherrypy.HTTPError(404, 'Not found')
+            raise web.HTTPError(404, reason='Not found')
         page_url = url_for('opdscategory', version, which=which,
                 category=category)
         up_url = url_for('opdsnavcatalog', version, which=category)
@@ -560,24 +583,23 @@ class OPDSServer(object):
                 # Might be a composite column, where we have the lookup key
                 if not (category in self.db.field_metadata and
                         self.db.field_metadata[category]['datatype'] == 'composite'):
-                    raise cherrypy.HTTPError(404, 'Tag %r not found'%which)
+                    raise web.HTTPError(404, reason='Tag %r not found'%which)
 
-        categories = self.categories_cache(
-                self.get_opds_allowed_ids_for_version(version))
+        categories = self.db.get_categories()
         if category not in categories:
-            raise cherrypy.HTTPError(404, 'Category %r not found'%which)
+            raise web.HTTPError(404, reason='Category %r not found'%which)
 
         if category == 'search':
             try:
-                ids = self.search_cache('search:"%s"'%which)
+                ids = self.search_for_books('search:"%s"'%which)
             except:
-                raise cherrypy.HTTPError(404, 'Search: %r not understood'%which)
+                raise web.HTTPError(404, reason='Search: %r not understood'%which)
             return self.get_opds_acquisition_feed(ids, offset, page_url,
                     up_url, 'calibre-search:'+which,
                     version=version)
 
         if type_ != 'I':
-            raise cherrypy.HTTPError(404, 'Non id categories not supported')
+            raise web.HTTPError(404, reason='Non id categories not supported')
 
         q = category
         if q == 'news':
@@ -594,9 +616,8 @@ class OPDSServer(object):
     def opds(self, version=0):
         version = int(version)
         if version not in BASE_HREFS:
-            raise cherrypy.HTTPError(404, 'Not found')
-        categories = self.categories_cache(
-                self.get_opds_allowed_ids_for_version(version))
+            raise web.HTTPError(404, reason='Not found')
+        categories = self.db.get_categories()
         category_meta = self.db.field_metadata
         cats = [
                 (_('Newest'), _('Date'), 'Onewest'),
@@ -619,14 +640,46 @@ class OPDSServer(object):
                                 category not in custom_fields_to_display(self.db):
                 continue
             cats.append((meta['name'], meta['name'], 'N'+category))
-        updated = self.db.last_modified()
 
-        cherrypy.response.headers['Last-Modified'] = self.last_modified(updated)
-        cherrypy.response.headers['Content-Type'] = 'application/atom+xml'
+        updated = self.db.last_modified()
+        self.set_header('Last-Modified', self.last_modified(updated))
+        self.set_header('Content-Type', 'application/atom+xml; charset=UTF-8')
 
         feed = TopLevel(updated, cats, version)
 
         return str(feed)
 
+class OpdsIndex(OpdsHandler):
+    def get(self):
+        self.write( self.opds(version=1) )
+
+class OpdsNav(OpdsHandler):
+    def get(self, which):
+        offset = self.get_argument("offset", 0)
+        self.write( self.opds_navcatalog(which, version=1, offset=offset) )
+
+class OpdsCategory(OpdsHandler):
+    def get(self, category, which):
+        offset = self.get_argument("offset", 0)
+        self.write( self.opds_category(category, which, version=1, offset=offset) )
+
+class OpdsCategoryGroup(OpdsHandler):
+    def get(self, category, which):
+        offset = self.get_argument("offset", 0)
+        self.write( self.opds_category_group(category, which, version=1, offset=offset) )
+
+class OpdsSearch(OpdsHandler):
+    def get(self, which):
+        offset = self.get_argument("offset", 0)
+        self.write( self.opds_search(which, version=1, offset=offset) )
+
+def routes():
+    return [
+            (r'/opds/?', OpdsIndex),
+            (r'/opds/navcatalog/(.*)', OpdsNav),
+            (r'/opds/category/(.*)/(.*)', OpdsCategory),
+            (r'/opds/categorygroup/(.*)/(.*)', OpdsCategoryGroup),
+            (r'/opds/search/(.*)', OpdsSearch),
+            ]
 
 
