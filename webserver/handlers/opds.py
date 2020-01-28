@@ -57,7 +57,6 @@ def hexlify(x):
 def unhexlify(x):
     return binascii.unhexlify(x).decode('utf-8')
 
-# Vocabulary for building OPDS feeds {{{
 E = ElementMaker(namespace='http://www.w3.org/2005/Atom',
                  nsmap={
                      None   : 'http://www.w3.org/2005/Atom',
@@ -70,13 +69,19 @@ FEED    = E.feed
 TITLE   = E.title
 ID      = E.id
 ICON    = E.icon
+SUBTITLE = E.subtitle
+
+LINK          = partial(E.link,  type='application/atom+xml')
+NAVLINK       = partial(E.link,  type='application/atom+xml;type=feed;profile=opds-catalog')
+START_LINK    = partial(NAVLINK, rel='start')
+UP_LINK       = partial(NAVLINK, rel='up')
+FIRST_LINK    = partial(NAVLINK, rel='first')
+LAST_LINK     = partial(NAVLINK, rel='last')
+NEXT_LINK     = partial(NAVLINK, rel='next', title='Next')
+PREVIOUS_LINK = partial(NAVLINK, rel='previous')
 
 def UPDATED(dt, *args, **kwargs):
     return E.updated(as_utc(dt).strftime('%Y-%m-%dT%H:%M:%S+00:00'), *args, **kwargs)
-
-LINK = partial(E.link, type='application/atom+xml')
-NAVLINK = partial(E.link,
-        type='application/atom+xml;type=feed;profile=opds-catalog')
 
 def SEARCH_LINK(base_href, *args, **kwargs):
     kwargs['rel'] = 'search'
@@ -90,8 +95,6 @@ def AUTHOR(name, uri=None):
         args.append(E.uri(uri))
     return E.author(*args)
 
-SUBTITLE = E.subtitle
-
 def NAVCATALOG_ENTRY(base_href, updated, title, description, query):
     href = base_href+'/navcatalog/'+hexlify(query)
     id_ = 'calibre-navcatalog:'+str(hashlib.sha1(href).hexdigest())
@@ -102,13 +105,6 @@ def NAVCATALOG_ENTRY(base_href, updated, title, description, query):
         E.content(description, type='text'),
         NAVLINK(href=href)
     )
-
-START_LINK = partial(NAVLINK, rel='start')
-UP_LINK = partial(NAVLINK, rel='up')
-FIRST_LINK = partial(NAVLINK, rel='first')
-LAST_LINK  = partial(NAVLINK, rel='last')
-NEXT_LINK  = partial(NAVLINK, rel='next', title='Next')
-PREVIOUS_LINK  = partial(NAVLINK, rel='previous')
 
 def html_to_lxml(raw):
     raw = u'<div>%s</div>'%raw
@@ -239,11 +235,9 @@ def ACQUISITION_ENTRY(item, db, updated, CFM, CKEYS, prefix):
     return ans
 
 
-# }}}
-
 default_feed_title = __appname__ + ' ' + _('Library')
 
-class Feed(object):  # {{{
+class Feed(object):
 
     def __init__(self, id_, updated, subtitle=None,
             title=None,
@@ -277,9 +271,8 @@ class Feed(object):  # {{{
     def __str__(self):
         return etree.tostring(self.root, pretty_print=True, encoding='utf-8',
                 xml_declaration=True)
-    # }}}
 
-class TopLevel(Feed):  # {{{
+class TopLevel(Feed):
 
     def __init__(self,
             updated,  # datetime object in UTC
@@ -295,7 +288,6 @@ class TopLevel(Feed):  # {{{
             categories]
         for x in subcatalogs:
             self.root.append(x)
-# }}}
 
 class NavFeed(Feed):
 
@@ -401,7 +393,6 @@ class OpdsHandler(BaseHandler):
                 id_='calibre-all:'+sort, sort_by=sort, ascending=ascending,
                 feed_title=feed_title)
 
-    # Categories {{{
 
     def opds_category_group(self, category=None, which=None, offset=0):
         try:
@@ -564,8 +555,6 @@ class OpdsHandler(BaseHandler):
         return self.get_opds_acquisition_feed(ids, offset, page_url,
                 up_url, 'calibre-category:'+category+':'+str(which),
                 sort_by=sort_by)
-
-    # }}}
 
     def opds(self):
         categories = self.db.get_categories()
