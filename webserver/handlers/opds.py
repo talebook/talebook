@@ -35,7 +35,7 @@ def url_for(name, **kwargs):
     urls['opdst'] = base_href+'/'
     urls['opdscategory'] = base_href+'/category/%(category)s/%(which)s'
     urls['opdscategorygroup'] = base_href+'/categorygroup/%(category)s/%(which)s'
-    urls['opdsnavcatalog'] = base_href+'/navcatalog/%(which)s'
+    urls['opdsnavcatalog'] = base_href+'/nav/%(which)s'
     urls['opdssearch'] = base_href+'/search/%(query)s'
     return urls[name] % kwargs
 
@@ -96,8 +96,8 @@ def AUTHOR(name, uri=None):
     return E.author(*args)
 
 def NAVCATALOG_ENTRY(base_href, updated, title, description, query):
-    href = base_href+'/navcatalog/'+hexlify(query)
-    id_ = 'calibre-navcatalog:'+str(hashlib.sha1(href).hexdigest())
+    href = base_href+'/nav/'+hexlify(query)
+    id_ = 'calibre-nav:'+str(hashlib.sha1(href).hexdigest())
     return E.entry(
         TITLE(title),
         ID(id_),
@@ -616,7 +616,7 @@ class OpdsSearch(OpdsHandler):
 def routes():
     return [
             (r'/opds/?', OpdsIndex),
-            (r'/opds/navcatalog/(.*)', OpdsNav),
+            (r'/opds/nav/(.*)', OpdsNav),
             (r'/opds/category/(.*)/(.*)', OpdsCategory),
             (r'/opds/categorygroup/(.*)/(.*)', OpdsCategoryGroup),
             (r'/opds/search/(.*)', OpdsSearch),
