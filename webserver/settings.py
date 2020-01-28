@@ -23,7 +23,7 @@ settings = {
     "user_database" : 'sqlite:////data/books/calibre-webserver.db',
     "site_title"    : u"奇异书屋",
 
-    "max_opds_items": 30,
+    "max_opds_items": 50,
     "max_opds_ungrouped_items" : 100,
     "url_prefix": "",
 
