@@ -3,7 +3,7 @@
 
 import logging, math, sys
 from tornado import web
-from base_handlers import BaseHandler, ListHandler, js
+from base import BaseHandler, ListHandler, js
 from calibre.utils.filenames import ascii_filename
 
 

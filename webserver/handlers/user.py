@@ -5,7 +5,7 @@ import time, datetime, logging, re, hashlib, json, os
 import tornado.escape
 from tornado import web
 from models import Reader, Message
-from base_handlers import BaseHandler, js, auth
+from base import BaseHandler, js, auth
 from calibre.utils.smtp import sendmail, create_mail
 from version import VERSION
 

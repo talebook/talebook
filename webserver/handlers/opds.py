@@ -24,7 +24,7 @@ from calibre.utils.icu import sort_key
 from calibre.utils.date import as_utc
 from calibre.utils.filenames import ascii_text
 
-from base_handlers import BaseHandler
+from base import BaseHandler
 import loader
 CONF = loader.get_settings()
 

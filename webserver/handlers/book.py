@@ -7,7 +7,7 @@ import baike
 import urllib
 import subprocess
 import tornado.escape
-from base_handlers import *
+from base import *
 
 from calibre.ebooks.metadata import authors_to_string
 from calibre.ebooks.conversion.plumber import Plumber

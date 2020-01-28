@@ -16,7 +16,7 @@ from calibre.ebooks.metadata.opf2 import metadata_to_opf
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre.ebooks.metadata.meta import set_metadata
 from calibre.library.save_to_disk import find_plugboard
-from base_handlers import BaseHandler
+from base import BaseHandler
 
 import loader
 CONF = loader.get_settings()
