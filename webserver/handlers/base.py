@@ -17,7 +17,7 @@ import social_tornado.handlers
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre import fit_image, guess_type
 from calibre.utils.date import fromtimestamp
-from calibre.utils.smtp import create_mail
+from calibre.utils.smtp import sendmail, create_mail
 from calibre.utils.logging import Log, FileStream
 from calibre.utils.filenames import ascii_filename
 from calibre.utils.magick.draw import (save_cover_data_to, Image,
