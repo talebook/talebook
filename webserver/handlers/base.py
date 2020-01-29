@@ -75,6 +75,18 @@ def auth(func):
 class BaseHandler(web.RequestHandler):
     _path_to_env = {}
 
+    def get_secure_cookie(self, key):
+        if not self.cookies_cache.get(key, ""):
+            self.cookies_cache[key] = super(BaseHandler, self).get_secure_cookie(key)
+        logging.error("get_secure_cookie(%s) = %s" % (key, self.cookies_cache[key]))
+        return self.cookies_cache[key]
+
+    def set_secure_cookie(self, key, val):
+        self.cookies_cache[key] = val
+        super(BaseHandler, self).set_secure_cookie(key, val)
+        logging.error("set_secure_cookie(%s, %s)" % (key, val))
+        return None
+
     def head(self, *args, **kwargs):
         return self.get(*args, **kwargs)
 
@@ -112,9 +124,8 @@ class BaseHandler(web.RequestHandler):
 
     def should_be_invited(self):
         if self.need_invited():
-            if self.invited_code_is_ok(): return
-            if self.process_auth_header(): return
-            return self.send_error_of_not_invited()
+            if not self.invited_code_is_ok():
+                return self.send_error_of_not_invited()
 
     def should_be_installed(self):
         if CONF.get("installed", None) == False:
@@ -123,6 +134,7 @@ class BaseHandler(web.RequestHandler):
             raise web.Finish()
 
     def prepare(self):
+        self.process_auth_header()
         self.should_be_installed()
         self.should_be_invited()
 
@@ -135,6 +147,7 @@ class BaseHandler(web.RequestHandler):
         self.default_cover = self.settings['default_cover']
         self.admin_user = None
         self.static_host = CONF.get("static_host", "")
+        self.cookies_cache = {}
         if self.static_host:
             self.static_host = self.request.protocol + "://" + self.static_host
 

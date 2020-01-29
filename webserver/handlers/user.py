@@ -481,7 +481,7 @@ class Welcome(BaseHandler):
     def get(self):
         if not self.need_invited():
             return {'err': 'free', 'msg': _(u'无需访问码')}
-        if not self.invited_code_expired():
+        if self.invited_code_is_ok():
             return {'err': 'free', 'msg': _(u'已输入访问码')}
         return {'err': 'ok', 'msg': CONF['INVITE_MESSAGE']}
 
