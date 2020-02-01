@@ -126,7 +126,7 @@ def make_app():
         "default_cover": open(path, 'rb').read(),
         })
 
-    load_calibre_translations()
+    #load_calibre_translations()
     logging.info("Now, Running...")
     return web.Application(
             SOCIAL_AUTH_ROUTES + handlers.routes(),
