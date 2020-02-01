@@ -78,13 +78,11 @@ class BaseHandler(web.RequestHandler):
     def get_secure_cookie(self, key):
         if not self.cookies_cache.get(key, ""):
             self.cookies_cache[key] = super(BaseHandler, self).get_secure_cookie(key)
-        logging.error("get_secure_cookie(%s) = %s" % (key, self.cookies_cache[key]))
         return self.cookies_cache[key]
 
     def set_secure_cookie(self, key, val):
         self.cookies_cache[key] = val
         super(BaseHandler, self).set_secure_cookie(key, val)
-        logging.error("set_secure_cookie(%s, %s)" % (key, val))
         return None
 
     def head(self, *args, **kwargs):
@@ -175,7 +173,6 @@ class BaseHandler(web.RequestHandler):
 
     def get_current_user(self):
         user_id = self.user_id()
-        logging.debug("[User]: user_id = %s" % user_id)
         if user_id: user_id = int(user_id)
         user = self.session.query(Reader).get(user_id) if user_id else None
 
@@ -184,9 +181,6 @@ class BaseHandler(web.RequestHandler):
             self.admin_user = self.session.query(Reader).get(int(admin_id))
         elif user and user.is_admin():
             self.admin_user = user
-
-        logging.debug("[User]: User  Query(%s) = %s" % (user_id, user))
-        logging.debug("[User]: Admin Query(%s) = %s" % (admin_id, self.admin_user) )
         return user
 
     def is_admin(self):
