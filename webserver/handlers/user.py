@@ -31,7 +31,6 @@ class Done(BaseHandler):
 
         si = socials[0]
         info = dict(si.extra_data)
-        logging.info("LOGIN: %s - %d - %s" % ( self.request.remote_ip, user.id, user.username))
 
         if not user.extra:
             logging.info("init new user %s, info=%s" % (user.username, si))
@@ -293,7 +292,6 @@ class SignIn(BaseHandler):
         if user.get_secure_password(password) != user.password:
             return {'err': 'params.invalid', 'msg': _(u'用户名或密码错误')}
 
-        logging.info("LOGIN: %s - %d - %s" % ( self.request.remote_ip, user.id, user.username))
         self.login_user(user)
         return {'err': 'ok', 'msg': 'ok'}
 

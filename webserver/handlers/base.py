@@ -175,6 +175,7 @@ class BaseHandler(web.RequestHandler):
         user_id = self.user_id()
         if user_id: user_id = int(user_id)
         user = self.session.query(Reader).get(user_id) if user_id else None
+        logging.debug("Query User(%s) = %s" % (user_id, user))
 
         admin_id = self.get_secure_cookie("admin_id")
         if admin_id:
@@ -189,9 +190,10 @@ class BaseHandler(web.RequestHandler):
         return self.current_user.is_admin()
 
     def login_user(self, user):
+        logging.info("LOGIN: %s - %d - %s" % ( self.request.remote_ip, user.id, user.username))
         self.set_secure_cookie('user_id', str(user.id))
         self.set_secure_cookie("lt", str(int(time.time())))
-        self.access_time = datetime.datetime.now()
+        user.access_time = datetime.datetime.now()
         user.extra['login_ip'] = self.request.remote_ip
         user.save()
 
