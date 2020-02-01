@@ -36,12 +36,16 @@ export default {
         total: 0,
         page_size: 30,
         page_cnt: 0,
+        inited: false,
     }),
     created() {
+        console.log("created");
         if ( this.$route.query.start != undefined ) {
             this.page = 1 + parseInt(this.$route.query.start / this.page_size)
         }
-        this.init(this.$route);
+        if ( !this.inited ) {
+            this.init(this.$route);
+        }
     },
     beforeRouteEnter(to, from, next) {
         next(vm => { vm.init(to) });
@@ -51,6 +55,7 @@ export default {
     },
     methods: {
         init(route, next) {
+            this.inited = true;
             this.$store.commit('navbar', true);
             this.$store.commit('loading');
             this.backend(route.fullPath)
