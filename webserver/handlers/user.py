@@ -635,6 +635,9 @@ class AdminInstall(SettingHandler):
         args = loader.SettingsLoader()
         args.clear()
 
+        import uuid
+        # set a random secret
+        args['cookie_secret'] = uuid.uuid1()
         args['site_title'] = title
         if invite == "true":
             args['INVITE_MODE'] = True
