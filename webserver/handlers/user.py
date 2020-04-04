@@ -637,7 +637,7 @@ class AdminInstall(SettingHandler):
 
         import uuid
         # set a random secret
-        args['cookie_secret'] = uuid.uuid1()
+        args['cookie_secret'] = u"%s" % uuid.uuid1()
         args['site_title'] = title
         if invite == "true":
             args['INVITE_MODE'] = True
