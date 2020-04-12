@@ -39,7 +39,6 @@ export default {
         inited: false,
     }),
     created() {
-        console.log("created");
         if ( this.$route.query.start != undefined ) {
             this.page = 1 + parseInt(this.$route.query.start / this.page_size)
         }

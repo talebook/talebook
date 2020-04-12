@@ -3,7 +3,7 @@
         <v-col cols=12>
             <v-dialog v-model="dialog_kindle" persistent width="300">
                 <v-card>
-                    <v-card-title class="headline">推送到Kindle</v-card-title>
+                    <v-card-title class="">推送到Kindle</v-card-title>
                     <v-card-text>
                         <p>填写Kindle收件人邮箱地址：</p>
                         <v-text-field v-model="mail_to" label="Email*" required></v-text-field>
@@ -17,11 +17,36 @@
                 </v-card>
             </v-dialog>
 
+            <v-dialog v-model="dialog_download" persistent width="300">
+                <v-card>
+                    <v-card-title color="primary" class="">下载书籍</v-card-title>
+                    <v-card-text>
+                        <v-list v-if="book.files.length > 0">
+                            <v-list-item :key="'file-'+file.format" v-for="file in book.files" target="_blank" :href="file.href">
+                                <v-list-item-avatar color='primary' >
+                                    <v-icon dark >get_app</v-icon>
+                                </v-list-item-avatar>
+                                <v-list-item-content>
+                                    <v-list-item-title>{{file.format}}</v-list-item-title>
+                                    <v-list-item-subtitle>{{parseInt(file.size/1024)}} KB</v-list-item-subtitle>
+                                </v-list-item-content>
+                            </v-list-item>
+                        </v-list>
+                        <p v-else><br/>本书暂无可供下载的文件格式 </p>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn text @click="dialog_download = false">关闭</v-btn>
+                        <v-spacer></v-spacer>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
             <v-card v-if="dialog_refer" >
                 <v-toolbar flat dense dark color="primary">
                     从互联网同步书籍信息
                     <v-spacer></v-spacer>
-                    <v-btn color="" outlined text @click="dialog_refer = false">取消</v-btn>
+                    <v-btn outlined text @click="dialog_refer = false">取消</v-btn>
                 </v-toolbar>
                 <v-card-text xclass="pt-3 px-3 px-sm-6">
                     <p class="py-6 text-center" v-if="refer_books.length == 0">
@@ -52,17 +77,7 @@
             <v-card v-if="!dialog_refer">
                 <v-toolbar flat dense color="white" >
                     <!-- download -->
-                    <v-menu offset-y >
-                        <template v-slot:activator="{on}">
-                            <v-btn v-on="on" icon small fab ><v-icon>get_app</v-icon></v-btn>
-                        </template>
-                        <v-list>
-                            <v-list-item :key="'file-'+file.format" v-for="file in book.files" target="_blank" :href="file.href">
-                                <v-icon>get_app</v-icon>
-                                下载{{file.format}}格式({{parseInt(file.size/1024)}} KB)
-                            </v-list-item>
-                        </v-list>
-                    </v-menu>
+                    <v-btn icon small fab @click="dialog_download = true" ><v-icon>get_app</v-icon></v-btn>
                     <v-btn class="d-none" icon small fab > <v-icon>thumb_up</v-icon> </v-btn>
                     <v-btn class="d-none" icon small fab > <v-icon>share</v-icon> </v-btn>
 
@@ -134,6 +149,57 @@
                 </v-card-text>
             </v-card>
         </v-col>
+        <v-col cols=12 sm=6 md=4>
+            <v-card outlined>
+                <v-list>
+                    <v-list-item :href="'/read/'+bookid" >
+                        <v-list-item-avatar large color='primary' >
+                            <v-icon dark >import_contacts</v-icon>
+                        </v-list-item-avatar>
+                        <v-list-item-content>
+                            <v-list-item-title>在线阅读</v-list-item-title>
+                        </v-list-item-content>
+                        <v-list-item-action>
+                            <v-icon >mdi-arrow-right</v-icon>
+                        </v-list-item-action>
+                    </v-list-item>
+                </v-list>
+            </v-card>
+        </v-col>
+        <v-col cols=12 sm=6 md=4>
+            <v-card outlined>
+                <v-list>
+                    <v-list-item @click="dialog_download = !dialog_download" >
+                        <v-list-item-avatar large color='primary' >
+                            <v-icon dark >get_app</v-icon>
+                        </v-list-item-avatar>
+                        <v-list-item-content>
+                            <v-list-item-title>下载</v-list-item-title>
+                        </v-list-item-content>
+                        <v-list-item-action>
+                            <v-icon >mdi-arrow-right</v-icon>
+                        </v-list-item-action>
+                    </v-list-item>
+                </v-list>
+            </v-card>
+        </v-col>
+        <v-col cols=12 sm=6 md=4>
+            <v-card outlined>
+                <v-list>
+                    <v-list-item @click="dialog_kindle = !dialog_kindle" >
+                        <v-list-item-avatar large color='primary' >
+                            <v-icon dark >email</v-icon>
+                        </v-list-item-avatar>
+                        <v-list-item-content>
+                            <v-list-item-title>推送至Kindle</v-list-item-title>
+                        </v-list-item-content>
+                        <v-list-item-action>
+                            <v-icon >mdi-arrow-right</v-icon>
+                        </v-list-item-action>
+                    </v-list-item>
+                </v-list>
+            </v-card>
+        </v-col>
     </v-row>
 </template>
 
@@ -160,6 +226,7 @@ export default {
         debug: false,
         mail_to: "",
         kindle_sender: "",
+        dialog_download: false,
         dialog_kindle: false,
         dialog_refer: false,
         dialog_msg: false,
