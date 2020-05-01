@@ -35,24 +35,6 @@ define("with-library", default=CONF['with_library'], type=str,
 
 define("syncdb", default=False, type=bool, help=_('Create all tables'))
 
-def load_calibre_translations():
-    from tornado import locale
-    tmp = tempfile.mkdtemp()
-    with zipfile.ZipFile( P('localization/locales.zip') ) as zf:
-        trans = {}
-        for name in zf.namelist():
-            if name.endswith(".mo"):
-                trans[name.split("/")[0]] = name
-        for code, zpath in trans.items():
-            try:
-                buf = cStringIO.StringIO(zf.read(zpath))
-                locale._translations[code] = GNUTranslations(buf)
-            except:
-                pass
-        locale._use_gettext = True
-        locale.set_default_locale("zh_CN")
-
-
 def init_calibre():
     path = options.path_calibre
     if path not in sys.path: sys.path.insert(0, path)
@@ -81,7 +63,6 @@ def make_app():
     logging.info("Init AuthDB  with [%s]" % auth_db_path )
     logging.info("Init Static  with [%s]" % CONF['static_path'] )
     logging.info("Init HTML    with [%s]" % CONF['html_path'] )
-    logging.info("Init LANG    with [%s]" % P('localization/locales.zip') )
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
 
@@ -126,7 +107,6 @@ def make_app():
         "default_cover": open(path, 'rb').read(),
         })
 
-    #load_calibre_translations()
     logging.info("Now, Running...")
     return web.Application(
             SOCIAL_AUTH_ROUTES + handlers.routes(),

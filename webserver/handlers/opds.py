@@ -331,8 +331,8 @@ class TopLevel(Feed):
         Feed.__init__(self, id_, updated, subtitle=subtitle)
 
         subc = partial(NAVCATALOG_ENTRY, self.base_href, updated)
-        subcatalogs = [subc(_('By ')+title,
-            _('Books sorted by ') + desc, q) for title, desc, q in
+        subcatalogs = [subc(_(u'By {0}').format(title),
+            _('Books sorted by {0}').format(desc), q) for title, desc, q in
             categories]
         for x in subcatalogs:
             self.root.append(x)
@@ -434,7 +434,7 @@ class OpdsHandler(BaseHandler):
         sort = 'timestamp' if which == 'newest' else 'title'
         ascending = which == 'title'
         feed_title = {'newest':_('Newest'), 'title': _('Title')}.get(which, which)
-        feed_title = default_feed_title + ' :: ' + _('By %s') % feed_title
+        feed_title = default_feed_title + ' :: ' + _('By {0}').format(feed_title)
         ids = list(self.cache.search(''))
         return self.get_opds_acquisition_feed(ids, offset, page_url, up_url,
                 id_='calibre-all:'+sort, sort_by=sort, ascending=ascending,
@@ -513,7 +513,7 @@ class OpdsHandler(BaseHandler):
         category_meta = self.db.field_metadata
         meta = category_meta.get(which, {})
         category_name = meta.get('name', which)
-        feed_title = default_feed_title + ' :: ' + _('By %s') % category_name
+        feed_title = default_feed_title + ' :: ' + _('By {0}').format(category_name)
 
         id_ = 'calibre-category-feed:'+which
 
@@ -616,17 +616,15 @@ class OpdsHandler(BaseHandler):
             except KeyError:
                 return x
         for category in sorted(categories, key=lambda x: sort_key(getter(x))):
-            if len(categories[category]) == 0:
-                continue
-            if category in ('formats', 'identifiers'):
-                continue
+            if len(categories[category]) == 0: continue
+            if category in ('formats', 'identifiers'): continue
             meta = category_meta.get(category, None)
-            if meta is None:
-                continue
+            if meta is None: continue
             if category_meta.is_ignorable_field(category) and \
                                 category not in custom_fields_to_display(self.db):
                 continue
-            cats.append((meta['name'], meta['name'], 'N'+category))
+            name = _(meta['name'])
+            cats.append( (name, name, 'N'+category) )
 
         updated = self.db.last_modified()
         self.set_header('Last-Modified', self.last_modified(updated))

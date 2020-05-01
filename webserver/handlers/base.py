@@ -134,9 +134,20 @@ class BaseHandler(web.RequestHandler):
             raise web.Finish()
 
     def prepare(self):
+        self.set_i18n()
         self.process_auth_header()
         self.should_be_installed()
         self.should_be_invited()
+
+    def set_i18n(self):
+        import gettext
+        accept = self.request.headers.get('Accept-Language', "")
+        langs = [ v.strip().split(";")[0] for v in accept.split(",") if v.strip() ]
+        logging.error("choose lang: %s" % langs)
+        if not langs: langs = ["zh_CN"]
+        lang = gettext.translation('messages', localedir=CONF['i18n_path'], languages=langs, fallback=True)
+        lang.install(unicode=True)
+
 
     def initialize(self):
         ScopedSession = self.settings['ScopedSession']

@@ -554,7 +554,7 @@ class BookPush(BaseHandler):
         if 'fmt_epub' not in book and 'fmt_azw3' not in book and 'fmt_txt' not in book:
             return {'err': 'book.no_format_for_kindle', 'msg': _(u"抱歉，该书无可用于kindle阅读的格式") }
         self.convert_book(book, mail_to)
-        self.add_msg( "success", _(u"服务器正在推送《%s》到%s") % (book['title'], mail_to) )
+        self.add_msg( "success", _(u"服务器正在推送《%(title)s》到%(email)s") % {'title': book['title'], "email": mail_to} )
         return {'err': 'ok', 'msg': _(u'服务器正在转换格式并推送……')}
 
     @background

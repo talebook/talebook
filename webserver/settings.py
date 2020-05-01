@@ -9,6 +9,7 @@ settings = {
     "xsrf_cookies"  : False,
     "static_host"   : "",
     "html_path"     : os.path.join(os.path.dirname(__file__), "../app/dist"),
+    "i18n_path"     : os.path.join(os.path.dirname(__file__), "i18n"),
     "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
     "template_path" : os.path.join(os.path.dirname(__file__), "templates"),
     "settings_path" : "/data/books/settings/",
