@@ -52,10 +52,12 @@ def website_format(value):
 def js(func):
     def do(self, *args, **kwargs):
         try: rsp = func(self, *args, **kwargs)
-        except:
+        except Exception as e:
             import traceback
             msg = 'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
             rsp = {'err': 'exception', 'msg': msg}
+            if isinstance(e, web.Finish):
+                rsp = ""
         origin = self.request.headers.get('origin', '*')
         self.set_header('Access-Control-Allow-Origin', origin)
         self.set_header('Access-Control-Allow-Credentials', 'true')
