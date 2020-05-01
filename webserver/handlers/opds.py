@@ -5,7 +5,7 @@ __license__   = 'GPL v3'
 __copyright__ = '2010, Kovid Goyal <kovid@kovidgoyal.net>'
 __docformat__ = 'restructuredtext en'
 
-import hashlib, binascii, logging
+import hashlib, binascii, logging, sys
 from tornado import web, locale
 from functools import partial
 from itertools import repeat
@@ -17,16 +17,64 @@ from lxml.builder import ElementMaker
 from calibre.constants import __appname__
 from calibre.ebooks.metadata import fmt_sidx
 from calibre.library.comments import comments_to_html
-from calibre.library.server import custom_fields_to_display
-from calibre.library.server.utils import format_tag_string, Offsets
 from calibre import guess_type, prepare_string_for_xml as xml
 from calibre.utils.icu import sort_key
 from calibre.utils.date import as_utc
+from calibre.utils.config import tweaks
 from calibre.utils.filenames import ascii_text
 
 from base import BaseHandler
 import loader
 CONF = loader.get_settings()
+
+def custom_fields_to_display(db):
+    ckeys = set(db.field_metadata.ignorable_field_keys())
+    yes_fields = set(tweaks['content_server_will_display'])
+    no_fields = set(tweaks['content_server_wont_display'])
+    if '*' in yes_fields:
+        yes_fields = ckeys
+    if '*' in no_fields:
+        no_fields = ckeys
+    return frozenset(ckeys & (yes_fields - no_fields))
+
+
+class Offsets(object):
+    'Calculate offsets for a paginated view'
+    def __init__(self, offset, delta, total):
+        if offset < 0:
+            offset = 0
+        if offset >= total:
+            raise cherrypy.HTTPError(404, 'Invalid offset: %r'%offset)
+        last_allowed_index = total - 1
+        last_current_index = offset + delta - 1
+        self.slice_upper_bound = offset+delta
+        self.offset = offset
+        self.next_offset = last_current_index + 1
+        if self.next_offset > last_allowed_index:
+            self.next_offset = -1
+        self.previous_offset = self.offset - delta
+        if self.previous_offset < 0:
+            self.previous_offset = 0
+        self.last_offset = last_allowed_index - delta
+        if self.last_offset < 0:
+            self.last_offset = 0
+
+def format_tag_string(tags, sep, ignore_max=False, no_tag_count=False, joinval=', '):
+    MAX = sys.maxint if ignore_max else tweaks['max_content_server_tags_shown']
+    if tags:
+        tlist = [t.strip() for t in tags.split(sep)]
+    else:
+        tlist = []
+    tlist.sort(key=sort_key)
+    if len(tlist) > MAX:
+        tlist = tlist[:MAX]+['...']
+    if no_tag_count:
+        return joinval.join(tlist) if tlist else ''
+    else:
+        return u'%s:&:%s'%(tweaks['max_content_server_tags_shown'],
+                     joinval.join(tlist)) if tlist else ''
+
+
 
 def url_for(name, **kwargs):
     base_href = '/opds'
@@ -290,7 +338,6 @@ class TopLevel(Feed):
             self.root.append(x)
 
 class NavFeed(Feed):
-
     def __init__(self, id_, updated, offsets, page_url, up_url, title=None):
         kwargs = {'up_link': up_url}
         kwargs['first_link'] = page_url
@@ -357,7 +404,7 @@ class OpdsHandler(BaseHandler):
         items = items[offsets.offset:offsets.offset+max_items]
         updated = self.db.last_modified()
         self.set_header('Last-Modified', self.last_modified(updated) )
-        self.set_header('Content-Type', 'application/atom+xml; profile=opds-catalog')
+        self.set_header('Content-Type', 'application/atom+xml; profile=opds-catalog; charset=UTF-8')
         return str(AcquisitionFeed(updated, id_, items, offsets,
                                    page_url, up_url, self.db,
                                    CONF['url_prefix'], title=feed_title))
