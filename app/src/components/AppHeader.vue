@@ -22,7 +22,7 @@
                     </template>
 
                     <!-- 导航菜单 -->
-                    <v-list-item dense v-else :key="item.text" :to="item.href" >
+                    <v-list-item dense v-else :key="item.text" :to="item.href" :target="item.target">
                         <v-list-item-action class="mt-1 mb-1 mr-2" dense>
                             <v-icon class="pa-0 ma-0">{{ item.icon }}</v-icon>
                         </v-list-item-action>
@@ -190,7 +190,7 @@ export default {
                 { heading: '系统' },
                 { icon: 'mdi-history', text: '系统版本', href: "", count: "V"+sys.version },
                 { icon: 'mdi-human', text: '用户数', href: "", count: sys.users },
-                { icon: 'mdi-cellphone', text: 'OPDS接口', href: "/opds", count: "OPDS"},
+                { icon: 'mdi-cellphone', text: 'OPDS接口', href: "/opds", count: "OPDS", target: "_blank"},
             ]);
             this.items = nav_items;
             this.loaded = true;
