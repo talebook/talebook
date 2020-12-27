@@ -408,6 +408,7 @@ class UserInfo(BaseHandler):
                     "register": CONF['ALLOW_REGISTER'],
                     "download": CONF['ALLOW_GUEST_DOWNLOAD'],
                     "push":     CONF['ALLOW_GUEST_PUSH'],
+                    "read":     CONF['ALLOW_GUEST_READ'],
                     },
             }
 
@@ -543,6 +544,7 @@ class AdminSettings(SettingHandler):
         KEYS = [
                 'ALLOW_GUEST_DOWNLOAD',
                 'ALLOW_GUEST_PUSH',
+                'ALLOW_GUEST_READ',
                 'ALLOW_REGISTER',
                 'FRIENDS',
                 'FOOTER',

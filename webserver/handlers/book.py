@@ -471,8 +471,10 @@ class BookUpload(BaseHandler):
         return {'err': 'ok', 'book_id': book_id}
 
 class BookRead(BaseHandler):
-    #@web.authenticated
     def get(self, id):
+        if not CONF['ALLOW_GUEST_READ'] and not self.current_user:
+            return self.redirect('/login')
+
         book = self.get_book(id)
         book_id = book['id']
         self.user_history('read_history', book)

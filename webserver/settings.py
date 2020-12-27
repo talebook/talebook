@@ -59,6 +59,7 @@ settings = {
     'INVITE_CODE'   : 'love',
     'INVITE_MESSAGE': u'''本站为私人图书馆，需输入密码才可进行访问''',
 
+    'ALLOW_GUEST_READ' : True,
     'ALLOW_GUEST_PUSH' : True,
     'ALLOW_GUEST_DOWNLOAD' : True,
     'ALLOW_REGISTER' : False,
