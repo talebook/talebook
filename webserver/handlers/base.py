@@ -143,7 +143,7 @@ class BaseHandler(web.RequestHandler):
         import gettext
         accept = self.request.headers.get('Accept-Language', "")
         langs = [ v.strip().split(";")[0] for v in accept.split(",") if v.strip() ]
-        logging.error("choose lang: %s" % langs)
+        logging.debug("choose lang: %s" % langs)
         if not langs: langs = ["zh_CN"]
         lang = gettext.translation('messages', localedir=CONF['i18n_path'], languages=langs, fallback=True)
         lang.install(unicode=True)
