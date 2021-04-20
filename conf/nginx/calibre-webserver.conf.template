@@ -8,7 +8,7 @@ server {
     server_name _;
 
     index index.html;
-    client_max_body_size 20m;
+    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
     root /var/www//calibre-webserver/app/dist/;
     access_log  /data/log/nginx/calibre-webserver-access.log;
     error_log   /data/log/nginx/calibre-webserver-error.log;

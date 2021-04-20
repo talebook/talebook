@@ -41,7 +41,7 @@ RUN mkdir -p /data/log/nginx/ && \
     chmod a+w -R /data/log /data/books /var/www
 
 COPY . /var/www/calibre-webserver/
-COPY conf/nginx/calibre-webserver.conf /etc/nginx/conf.d/
+COPY conf/nginx/calibre-webserver.conf.template /etc/nginx/conf.d/
 COPY conf/supervisor/calibre-webserver.conf /etc/supervisor/conf.d/
 COPY --from=builder /tmp/app/dist/ /var/www/calibre-webserver/app/dist/
 
@@ -57,6 +57,8 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     mkdir -p /prebuilt/ && \
     mv /data/* /prebuilt/ && \
     chmod +x /var/www/calibre-webserver/docker/start.sh
+
+ENV NGINX_CLIENT_MAX_BODY_SIZE="20m"
 
 EXPOSE 80
 
