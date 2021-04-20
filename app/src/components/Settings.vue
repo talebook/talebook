@@ -172,6 +172,7 @@ export default {
             title: "高级配置项",
             fields: [
                 { icon: "home", key: "static_host", label: "CDN域名" },
+                { icon: "info", key: "BOOK_NAMES_FORMAT", label: "目录和文件名模式（utf8为保留原始中文，en表示拼音英文）" },
                 { icon: "lock", key: "cookie_secret", label: "COOKIE随机密钥" },
                 { icon: "", key: "autoreload", label: "更新配置后自动重启服务器(首次开启需人工重启)", type: 'checkbox' },
             ],

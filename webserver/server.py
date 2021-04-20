@@ -2,7 +2,7 @@
 #-*- coding: UTF-8 -*-
 
 
-import re, os, logging, sys, time, tempfile, zipfile, cStringIO
+import re, os, logging, sys, time, tempfile, zipfile
 import models
 import tornado.ioloop
 import tornado.httpserver
@@ -51,6 +51,62 @@ def init_calibre():
         sys.stderr.write( "\n" )
         sys.exit(2)
 
+def bind_utf8_book_names(cache):
+    WINDOWS_RESERVED_NAMES = cache.backend.WINDOWS_RESERVED_NAMES
+    def safe_filename(filename):
+        return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "_", filename)  # 替换为下划线
+
+    # the codes is from calibre source code. just change 'ascii_filename' to 'safe_filename'
+    def utf8_construct_path_name(self, book_id, title, author):
+        book_id = ' (%d)' % book_id
+        l = self.PATH_LIMIT - (len(book_id) // 2) - 2
+        author = safe_filename(author)[:l]
+        title  = safe_filename(title.lstrip())[:l].rstrip()
+        if not title:
+            title = 'Unknown'[:l]
+        try:
+            while author[-1] in (' ', '.'):
+                author = author[:-1]
+        except IndexError:
+            author = ''
+        if not author:
+            author = safe_filename(_('Unknown'))
+        if author.upper() in WINDOWS_RESERVED_NAMES:
+            author += 'w'
+        return '%s/%s%s' % (author, title, book_id)
+
+    def utf8_construct_file_name(self, book_id, title, author, extlen):
+        extlen = max(extlen, 14)  # 14 accounts for ORIGINAL_EPUB
+        l = (self.PATH_LIMIT - (extlen // 2) - 2) if iswindows else ((self.PATH_LIMIT - extlen - 2) // 2)
+        if l < 5:
+            raise ValueError('Extension length too long: %d' % extlen)
+        author = safe_filename(author)[:l]
+        title  = safe_filename(title.lstrip())[:l].rstrip()
+        if not title:
+            title = 'Unknown'[:l]
+        name   = title + ' - ' + author
+        while name.endswith('.'):
+            name = name[:-1]
+        if not name:
+            name = safe_filename(_('Unknown'))
+        return name
+
+    cache.backend.construct_path_name = utf8_construct_path_name
+    cache.backend.construct_file_name = utf8_construct_file_name
+    return
+
+
+def bind_topdir_book_names(cache):
+    old_construct_path_name = cache.backend.construct_path_name
+    def new_construct_path_name(*args, **kwargs):
+        s = old_construct_path_name(*args, **kwargs)
+        ns = s[0] + "/" + s
+        logging.debug("new str = %s" % ns)
+        return ns
+
+    cache.backend.construct_path_name = new_construct_path_name
+    return
+
 def make_app():
     init_calibre()
 
@@ -68,13 +124,10 @@ def make_app():
 
 
     # hook 1: 按字母作为第一级目录，解决书库子目录太多的问题
-    old_construct_path_name = cache.backend.construct_path_name
-    def new_construct_path_name(*args, **kwargs):
-        s = old_construct_path_name(*args, **kwargs)
-        ns = s[0] + "/" + s
-        logging.debug("new str = %s" % ns)
-        return ns
-    cache.backend.construct_path_name = new_construct_path_name
+    if CONF['BOOK_NAMES_FORMAT'].lower() == 'utf8':
+        bind_utf8_book_names(cache)
+    else:
+        bind_topdir_book_names(cache)
 
     # hook 2: don't force GUI
     from calibre import gui2

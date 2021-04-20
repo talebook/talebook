@@ -546,6 +546,7 @@ class AdminSettings(SettingHandler):
                 'ALLOW_GUEST_PUSH',
                 'ALLOW_GUEST_READ',
                 'ALLOW_REGISTER',
+                'BOOK_NAMES_FORMAT',
                 'FRIENDS',
                 'FOOTER',
                 'INVITE_CODE',
