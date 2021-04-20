@@ -57,7 +57,7 @@ def bind_utf8_book_names(cache):
         return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "_", filename)  # 替换为下划线
 
     # the codes is from calibre source code. just change 'ascii_filename' to 'safe_filename'
-    def utf8_construct_path_name(self, book_id, title, author):
+    def utf8_construct_path_name(book_id, title, author):
         book_id = ' (%d)' % book_id
         l = self.PATH_LIMIT - (len(book_id) // 2) - 2
         author = safe_filename(author)[:l]
@@ -75,7 +75,7 @@ def bind_utf8_book_names(cache):
             author += 'w'
         return '%s/%s%s' % (author, title, book_id)
 
-    def utf8_construct_file_name(self, book_id, title, author, extlen):
+    def utf8_construct_file_name(book_id, title, author, extlen):
         extlen = max(extlen, 14)  # 14 accounts for ORIGINAL_EPUB
         l = (self.PATH_LIMIT - (extlen // 2) - 2) if iswindows else ((self.PATH_LIMIT - extlen - 2) // 2)
         if l < 5:
