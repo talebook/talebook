@@ -14,17 +14,13 @@ RUN cd /tmp/app && \
 
 
 # 第二阶段，构建环境
-FROM debian:9
-
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install tzdata && \
-    apt-get install python-pip unzip supervisor sqlite3 git nginx python-setuptools curl -y --no-install-recommends && \
-    apt-get install calibre=2.75.1+dfsg-1 -y
+FROM talebook/calibre:2
 
 RUN pip install wheel
 RUN pip install \
         Baidubaike==2.0.1 \
         jinja2==2.10 \
+        social-auth-core==3.3.3 \
         social-auth-app-tornado==1.0.0 \
         social-auth-storage-sqlalchemy==1.1.0 \
         tornado==5.1.1 \
