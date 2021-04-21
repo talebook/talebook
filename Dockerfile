@@ -27,7 +27,7 @@ RUN pip install \
         bs4
 
 # install envsubst
-RUN apt-get update && apt-get install gettext
+RUN apt-get update && apt-get install -y gettext
 
 RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /data/books/library  && \
