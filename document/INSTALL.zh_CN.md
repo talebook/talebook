@@ -131,9 +131,9 @@ docker run -d --name calibre -p 80:80 -v /data/calibre:/data -v /data/logo:/var/
 ## 上传文件的大小
 默认情况下，系统中配置的文件上传大小为20MB，配置过大可能会消耗更多的系统资源，同时网络传输大文件时容易不稳定导致上传失败。
 
-若需要调整该配置的大小（例如调整为30MB），请修改```/etc/nginx/conf.d/calibre-webserver.conf```:
+若需要调整该配置的大小（例如调整为30MB），可以通过调整docker启动的env变量进行设置，变量名称为 ```NGINX_CLIENT_MAX_BODY_SIZE```，例如：
 ```
-client_max_body_size 30m;
+docker run -d --name calibre -p 80:80 -v /data/calibre:/data -e NGINX_CLIENT_MAX_BODY_SIZE=30M talebook/calibre-webserver
 ```
 
 
