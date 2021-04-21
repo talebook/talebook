@@ -52,14 +52,17 @@ def init_calibre():
         sys.exit(2)
 
 def bind_utf8_book_names(cache):
-    WINDOWS_RESERVED_NAMES = frozenset('CON PRN AUX NUL COM1 COM2 COM3 COM4 COM5 COM6 COM7 COM8 COM9 LPT1 LPT2 LPT3 LPT4 LPT5 LPT6 LPT7 LPT8 LPT9'.split())
+    from calibre.constants import iswindows
+    from calibre.db.backend import WINDOWS_RESERVED_NAMES
+
+    PATH_LIMIT = cache.backend.PATH_LIMIT
     def safe_filename(filename):
         return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "_", filename)  # 替换为下划线
 
     # the codes is from calibre source code. just change 'ascii_filename' to 'safe_filename'
     def utf8_construct_path_name(book_id, title, author):
         book_id = ' (%d)' % book_id
-        l = self.PATH_LIMIT - (len(book_id) // 2) - 2
+        l = PATH_LIMIT - (len(book_id) // 2) - 2
         author = safe_filename(author)[:l]
         title  = safe_filename(title.lstrip())[:l].rstrip()
         if not title:
@@ -77,7 +80,7 @@ def bind_utf8_book_names(cache):
 
     def utf8_construct_file_name(book_id, title, author, extlen):
         extlen = max(extlen, 14)  # 14 accounts for ORIGINAL_EPUB
-        l = (self.PATH_LIMIT - (extlen // 2) - 2) if iswindows else ((self.PATH_LIMIT - extlen - 2) // 2)
+        l = (PATH_LIMIT - (extlen // 2) - 2) if iswindows else ((PATH_LIMIT - extlen - 2) // 2)
         if l < 5:
             raise ValueError('Extension length too long: %d' % extlen)
         author = safe_filename(author)[:l]
