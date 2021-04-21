@@ -17,6 +17,6 @@ if [ ! -d "/data/log" ]; then
 fi
 
 CONF=/etc/nginx/conf.d/calibre-webserver.conf
-envsubst < "${CONF}.template" > "${CONF}"
+envsubst '${NGINX_CLIENT_MAX_BODY_SIZE}' < "${CONF}.template" > "${CONF}"
 service nginx restart
 /usr/bin/supervisord --nodaemon

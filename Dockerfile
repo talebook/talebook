@@ -26,6 +26,9 @@ RUN pip install \
         tornado==5.1.1 \
         bs4
 
+# install envsubst
+RUN apt-get update && apt-get install gettext
+
 RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /data/books/library  && \
     mkdir -p /data/books/extract  && \
