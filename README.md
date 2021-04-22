@@ -1,12 +1,12 @@
 My Calibre WebServer
 ====================
-A simple books library management website. Use Calibre as backend.
+A better online books library management website built on Calibre + Vue
 
 See a running instance of demo:
 
 https://demo.talebook.org
 
-简单的图书管理系统
+简单好用的图书管理系统
 ===================
 这是一个基于Calibre的简单的图书管理系统，支持**在线阅读**。主要特点是：
 * 由于Calibre自带的网页太丑太难用，于是独立编写了一个。
@@ -14,14 +14,18 @@ https://demo.talebook.org
 * 借助[Readium.js](https://github.com/readium/readium-js-viewer) 库，支持了网页在线阅读电子书。
 * 支持从百度百科、豆瓣搜索并导入书籍基础信息。
 
-部署比较简单，建议采用docker；手动安装请参考[安装文档](document/INSTALL.zh_CN.md)
+本项目曾用名：calibre-webserver
 
+点此链接可查阅演示网站：
 
-Docker
-![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)
+https://demo.talebook.org
+
+Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)
 ===================
+部署比较简单，建议采用docker；
 
 [dockerhub](https://hub.docker.com/r/talebook/calibre-webserver)
+
 
 ---
 
@@ -30,6 +34,9 @@ Docker
 `docker run -d --name calibre -p 80:80 -v <本机data目录>:/data  talebook/calibre-webserver`
 
 ---
+
+手动安装请参考[安装文档](document/INSTALL.zh_CN.md)
+
 
 **感谢 oldiy 制作第一版的Docker镜像，并编写了这么多教程！**
 
