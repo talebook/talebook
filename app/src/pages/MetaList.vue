@@ -24,7 +24,7 @@ export default {
     },
     computed: {
         page_cnt: function() {
-            return parseInt(this.total/this.page_size);
+            return Math.max(1, Math.ceil(this.total/this.page_size));
         },
         items: function() {
             var prefix = "/" + this.$route.params.meta + "/";

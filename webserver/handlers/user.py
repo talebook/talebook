@@ -86,7 +86,7 @@ class AdminUsers(BaseHandler):
                     'is_active': user.is_active(),
                     'is_admin': user.is_admin(),
                     'extra': dict(user.extra),
-                    'provider': user.social_auth[0].provider if user.social_auth.count() else "register",
+                    'provider': user.social_auth[0].provider if hasattr(user, "social_auth") and user.social_auth.count() else "register",
                     'create_time': user.create_time.strftime("%Y-%m-%d %H:%M:%S") if user.create_time else 'N/A',
                     'update_time': user.update_time.strftime("%Y-%m-%d %H:%M:%S") if user.update_time else 'N/A',
                     'access_time': user.access_time.strftime("%Y-%m-%d %H:%M:%S") if user.access_time else 'N/A',
