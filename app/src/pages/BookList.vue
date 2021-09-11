@@ -66,8 +66,7 @@ export default {
                 this.title = rsp.title;
                 this.books = rsp.books;
                 this.total = rsp.total
-                this.page_cnt = parseInt(this.total/this.page_size);
-                if ( this.page_cnt < 1 ) { this.page_cnt = 1; }
+                this.page_cnt = Math.max(1, Math.ceil(this.total/this.page_size));
                 this.$store.commit('loaded');
             })
             if ( next ) next();
