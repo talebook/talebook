@@ -33,10 +33,10 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 部署比较简单，建议采用docker，镜像地址：[dockerhub](https://hub.docker.com/r/talebook/calibre-webserver)
 
 执行命令
-`docker run -d --name calibre -p <本机端口>:80 -v <本机data目录>:/data talebook/calibre-webserver`
+`docker run -d --name calibre -p <本机端口>:80 -v <本机data目录>:/data talebook/talebook`
 
 例如
-`docker run -d --name calibre -p 8080:80 -v /data/calibre:/data talebook/calibre-webserver`
+`docker run -d --name calibre -p 8080:80 -v /data/calibre:/data talebook/talebook`
 
 ---
 
