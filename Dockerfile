@@ -16,6 +16,8 @@ RUN cd /tmp/app && \
 # 第二阶段，构建环境
 FROM talebook/calibre:2
 
+ARG GIT_VERSION=""
+
 RUN pip install wheel
 RUN pip install \
         Baidubaike==2.0.1 \
@@ -46,6 +48,7 @@ COPY --from=builder /tmp/app/dist/ /var/www/calibre-webserver/app/dist/
 
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     cd /var/www/calibre-webserver/ && \
+    echo "VERSION = \"$GIT_VERSION\"" > webserver/version.py && \
     cp app/dist/index.html webserver/templates/index.html && \
     touch /data/books/settings/auto.py && \
     chmod a+w /data/books/settings/auto.py && \
