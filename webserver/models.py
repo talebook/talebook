@@ -157,7 +157,7 @@ class Reader(Base, SQLAlchemyMixin):
     def can_read(self):     return self.has_permission('r')
     def can_upload(self):   return self.has_permission('u')
     def can_download(self): return self.has_permission('d')
-    def can_editor(self):   return self.has_permission('e', False)
+    def can_edit(self):     return self.has_permission('e')
 
     def is_active(self):
         return self.active

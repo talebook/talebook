@@ -54,6 +54,7 @@ def js(func):
         try: rsp = func(self, *args, **kwargs)
         except Exception as e:
             import traceback
+            logging.error(traceback.format_exc())
             msg = 'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
             rsp = {'err': 'exception', 'msg': msg}
             if isinstance(e, web.Finish):

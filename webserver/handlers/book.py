@@ -356,8 +356,10 @@ class BookDownload(BaseHandler):
             else:
                 return self.redirect('/login')
 
-        if not self.current_user.can_download():
+        if self.current_user and not self.current_user.can_download():
             raise web.HTTPError(403, reason = _(u'此账户无权限下载') )
+        else:
+            logging.debug("user[%s] can download", self.current_user)
 
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))

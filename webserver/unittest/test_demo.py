@@ -22,7 +22,7 @@ def setup_server():
     server.CONF['ALLOW_GUEST_DOWNLOAD'] = False
     server.CONF['progress_path'] = "/tmp/"
     server.CONF['installed'] = True
-    server.CONF['user_database'] = 'sqlite:///users.db'
+    server.CONF['user_database'] = 'sqlite:///demo.db'
     _app = server.make_app()
     #os.path.chdir("..")
 
@@ -253,14 +253,15 @@ class TestUser(TestApp):
                 # forbid
                 user.set_permission('P')
                 d = self.json("/api/book/1/push", method='POST', body='mail_to=unittest@gmail.com')
-                self.assertEqual(d['err'], 'permission')
+                self.assertEqual(d['err'], 'ok') # is admin
+                self.assertEqual(m.call_count, 1)
 
+            with mock_permission() as user:
                 # allow
                 user.set_permission('p')
                 d = self.json("/api/book/1/push", method='POST', body='mail_to=unittest@gmail.com')
                 self.assertEqual(d['err'], 'ok')
-                # should convert then push
-                self.assertEqual(m.call_count, 1)
+                self.assertEqual(m.call_count, 2)
                 self.assertEqual(self.mail.call_count, 0)
 
     def test_delete(self):
