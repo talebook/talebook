@@ -14,5 +14,5 @@ push:
 	docker tag $(IMAGE) $(REPO1)
 	docker tag $(IMAGE) $(REPO2)
 	docker push $(REPO1)
-	docker push $(PEPO2)
+	docker push $(REPO2)
 

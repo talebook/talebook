@@ -29,6 +29,7 @@ RUN pip install \
         bs4
 
 # install envsubst
+RUN sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list
 RUN apt-get update && apt-get install -y gettext
 
 RUN mkdir -p /data/log/nginx/ && \
