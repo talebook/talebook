@@ -37,14 +37,17 @@ define("syncdb", default=False, type=bool, help=_('Create all tables'))
 
 def init_calibre():
     path = options.path_calibre
+    print(path)
     if path not in sys.path: sys.path.insert(0, path)
     sys.resources_location = options.path_resources
     sys.extensions_location = options.path_plugins
     sys.executables_location = options.path_bin
     try:
         import calibre
-    except:
-        raise ImportError( _("Can not import calibre. Please set the corrent options") )
+    except Exception as e:
+        import traceback, logging
+        logging.error(traceback.format_exc())
+        raise ImportError( _("Can not import calibre. Please set the corrent options.\n%s" % e) )
     if not options.with_library:
         sys.stderr.write( _('No saved library path. Use the --with-library option'
                 ' to specify the path to the library you want to use.') )

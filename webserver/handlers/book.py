@@ -305,7 +305,13 @@ class BookEdit(BaseHandler):
     @js
     @auth
     def post(self, bid):
-        bid = int(bid)
+        book = self.get_book(bid)
+        bid = book['id']
+        cid = book['collector']['id']
+
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
+            return {'err': 'permission', 'msg': _(u'无权操作')}
+
         data = tornado.escape.json_decode(self.request.body)
         mi = self.db.get_metadata(bid, index_is_id=True)
         KEYS = ['authors', 'title', 'comments', 'tags', 'publisher',
@@ -324,17 +330,17 @@ class BookEdit(BaseHandler):
 class BookDelete(BaseHandler):
     @js
     @auth
-    def post(self, id):
-        book = self.get_book(id)
+    def post(self, bid):
+        book = self.get_book(bid)
         bid = book['id']
         cid = book['collector']['id']
 
-        if self.is_admin() or self.is_book_owner(bid, cid):
-            self.db.delete_book( bid )
-            self.add_msg('success', _(u"删除书籍《%s》") % book['title'] )
-            return {'err': 'ok'}
-        else:
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
             return {'err': 'permission', 'msg': _(u'无权操作')}
+
+        self.db.delete_book( bid )
+        self.add_msg('success', _(u"删除书籍《%s》") % book['title'] )
+        return {'err': 'ok'}
 
 class BookDownload(BaseHandler):
     def send_error_of_not_invited(self):
@@ -349,6 +355,9 @@ class BookDownload(BaseHandler):
                 return self.send_error_of_not_invited()
             else:
                 return self.redirect('/login')
+
+        if not self.current_user.can_download():
+            raise web.HTTPError(403, reason = _(u'此账户无权限下载') )
 
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))
@@ -426,6 +435,9 @@ class BookUpload(BaseHandler):
         def convert(s):
             try: return s.group(0).encode('latin1').decode('utf8')
             except: return s.group(0)
+
+        if not self.current_user.can_upload():
+            return {'err': 'permission', 'msg': _(u'无权操作')}
 
         import re
         from calibre.ebooks.metadata import MetaInformation

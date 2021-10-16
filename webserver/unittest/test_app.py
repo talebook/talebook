@@ -7,12 +7,16 @@ from tornado import testing
 sys.path.append('..')
 import server, models
 
+
 _app = None
 _mock_user = None
 _mock_mail = None
 
 def setup_server():
     global _app
+    #server.options.path_calibre = "/data/usr/lib/calibre"
+    #server.options.path_plugins = "/data/usr/lib/calibre/calibre/plugins"
+    #server.options.path_resources = "/data/usr/share/calibre"
     server.options.with_library = "./library/"
     server.CONF['ALLOW_GUEST_PUSH'] = False
     server.CONF['installed'] = True
@@ -196,6 +200,15 @@ class TestUser(TestApp):
 
         rsp = self.fetch("/api/book/1.pdf")
         self.assertEqual(rsp.code, 404)
+
+        # disable download permission
+        self.user.set_permission('D')
+        rsp = self.fetch("/api/book/1.epub")
+        self.assertEqual(rsp.code, 403)
+
+        self.user.set_permission('d')
+        rsp = self.fetch("/api/book/1.epub")
+        self.assertEqual(rsp.code, 200)
 
     def test_push(self):
         import handlers
