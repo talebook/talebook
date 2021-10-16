@@ -20,9 +20,11 @@ def setup_server():
     server.options.with_library = "./library/"
     server.CONF['ALLOW_GUEST_PUSH'] = False
     server.CONF['ALLOW_GUEST_DOWNLOAD'] = False
+    server.CONF['html_path'] = "/tmp/"
+    server.CONF['settings_path'] = "/tmp/"
     server.CONF['progress_path'] = "/tmp/"
     server.CONF['installed'] = True
-    server.CONF['user_database'] = 'sqlite:///demo.db'
+    server.CONF['user_database'] = 'sqlite:///admin.db'
     _app = server.make_app()
     #os.path.chdir("..")
 
@@ -375,6 +377,33 @@ class TestRegister(TestApp):
         self.assertEqual(self.mail.call_count, 2)
 
         self.delete_user()
+
+
+class TestAdmin(TestApp):
+    @classmethod
+    def setUpClass(self):
+        self.user = _mock_user.start()
+        self.user.return_value = 1
+
+    @classmethod
+    def tearDownClass(self):
+        _mock_user.stop()
+
+    def test_admin_users(self):
+        d = self.json("/api/admin/users")
+        self.assertEqual(d['err'], 'ok')
+        self.assertEqual(len(d['users']), 1)
+
+    def test_admin_users(self):
+        d = self.json("/api/admin/settings")
+        self.assertEqual(d['err'], 'ok')
+        self.assertTrue(len(d['settings']) > 10)
+
+        req = {"settings_path": "/tmp/", "site_title": "abc", "not_work": "en"}
+        d = self.json("/api/admin/settings", method="POST", body=json.dumps(req))
+        self.assertEqual(d['err'], 'ok')
+        self.assertEqual(d['rsp']['site_title'], 'abc')
+        self.assertTrue('not_work' not in d['rsp'])
 
 
 def setUpModule():
