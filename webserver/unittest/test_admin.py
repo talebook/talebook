@@ -241,7 +241,7 @@ class TestUser(TestApp):
 
     def test_push(self):
         import handlers
-        with mock.patch.object(handlers.book.BookPush, 'convert_book', return_value='Yo') as m:
+        with mock.patch.object(handlers.book.BookPush, 'convert_and_mail', return_value='Yo') as m:
             d = self.json("/api/book/1/push", method='POST', body='mail_to=unittest@gmail.com')
             self.assertEqual(d['err'], 'ok')
             # should convert then push
@@ -250,7 +250,7 @@ class TestUser(TestApp):
 
     def test_push_permission(self):
         import handlers
-        with mock.patch.object(handlers.book.BookPush, 'convert_book', return_value='Yo') as m:
+        with mock.patch.object(handlers.book.BookPush, 'convert_and_mail', return_value='Yo') as m:
             with mock_permission() as user:
                 # forbid
                 user.set_permission('P')

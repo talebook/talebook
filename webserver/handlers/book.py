@@ -335,7 +335,7 @@ class BookDelete(BaseHandler):
         bid = book['id']
         cid = book['collector']['id']
 
-        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
+        if not self.current_user.can_delete() or not (self.is_admin() or self.is_book_owner(bid, cid)):
             return {'err': 'permission', 'msg': _(u'无权操作')}
 
         self.db.delete_book( bid )
@@ -356,7 +356,7 @@ class BookDownload(BaseHandler):
             else:
                 return self.redirect('/login')
 
-        if self.current_user and not self.current_user.can_download():
+        if self.current_user and not self.current_user.can_save():
             raise web.HTTPError(403, reason = _(u'此账户无权限下载') )
         else:
             logging.debug("user[%s] can download", self.current_user)
@@ -546,8 +546,11 @@ class BookRead(BaseHandler):
 class BookPush(BaseHandler):
     @js
     def post(self, id):
-        if not CONF['ALLOW_GUEST_PUSH'] and not self.current_user:
-            return {'err': 'user.need_login', 'msg': _(u'请先登录')}
+        if not CONF['ALLOW_GUEST_PUSH']:
+            if not self.current_user:
+                return {'err': 'user.need_login', 'msg': _(u'请先登录')}
+            elif not self.current_user.can_push():
+                return {'err': 'permission', 'msg': _(u'无权操作')}
 
         mail_to = self.get_argument("mail_to", None)
         if not mail_to:
@@ -569,12 +572,12 @@ class BookPush(BaseHandler):
         # we do no have formats for kindle
         if 'fmt_epub' not in book and 'fmt_azw3' not in book and 'fmt_txt' not in book:
             return {'err': 'book.no_format_for_kindle', 'msg': _(u"抱歉，该书无可用于kindle阅读的格式") }
-        self.convert_book(book, mail_to)
+        self.convert_and_mail(book, mail_to)
         self.add_msg( "success", _(u"服务器正在推送《%(title)s》到%(email)s") % {'title': book['title'], "email": mail_to} )
         return {'err': 'ok', 'msg': _(u'服务器正在转换格式并推送……')}
 
     @background
-    def convert_book(self, book, mail_to=None):
+    def convert_and_mail(self, book, mail_to=None):
         new_fmt = 'mobi'
         new_path = os.path.join(CONF['convert_path'], '%s.%s' % (ascii_filename(book['title']), new_fmt) )
         progress_file = self.get_path_progress(book['id'])
@@ -582,6 +585,7 @@ class BookPush(BaseHandler):
         old_path = None
         for f in ['txt', 'azw3', 'epub']: old_path = book.get('fmt_%s' %f, old_path)
 
+        logging.debug("convert book from [%s] to [%s]", old_path, new_path)
         ok, err = do_ebook_convert(old_path, new_path, progress_file)
         if not ok:
             self.add_msg("danger", u'文件格式转换失败，请在QQ群里联系管理员.')

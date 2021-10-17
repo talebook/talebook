@@ -4,7 +4,8 @@
 import sys, os, unittest, json, urllib, mock, logging
 from tornado import testing
 
-sys.path.append('..')
+dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.realpath( dir + "/../"))
 import server, models
 
 
@@ -14,17 +15,15 @@ _mock_mail = None
 
 def setup_server():
     global _app
-    #server.options.path_calibre = "/data/usr/lib/calibre"
-    #server.options.path_plugins = "/data/usr/lib/calibre/calibre/plugins"
-    #server.options.path_resources = "/data/usr/share/calibre"
-    server.options.with_library = "./library/"
+    server.options.with_library = dir + "/library/"
     server.CONF['ALLOW_GUEST_PUSH'] = False
     server.CONF['ALLOW_GUEST_DOWNLOAD'] = False
+    server.CONF['html_path'] = "/tmp/"
+    server.CONF['settings_path'] = "/tmp/"
     server.CONF['progress_path'] = "/tmp/"
     server.CONF['installed'] = True
-    server.CONF['user_database'] = 'sqlite:///users.db'
+    server.CONF['user_database'] = 'sqlite:///%s/users.db' % dir
     _app = server.make_app()
-    #os.path.chdir("..")
 
 
 def setup_mock_user():
@@ -39,8 +38,10 @@ def setup_mock_sendmail():
     import handlers
     _mock_mail = mock.patch('handlers.user.sendmail', return_value='Yo')
 
+
 def get_db():
     return _app.settings['ScopedSession']
+
 
 def Q(s):
     if not isinstance(s, (str,unicode)): s = str(s)
@@ -228,40 +229,38 @@ class TestUser(TestApp):
 
     def test_download_permission(self):
         with mock_permission() as user:
-            user.set_permission('D') # forbid
+            user.set_permission('S') # forbid
             rsp = self.fetch("/api/book/1.epub")
             self.assertEqual(rsp.code, 403)
 
-            user.set_permission('d') # allow
+            user.set_permission('s') # allow
             rsp = self.fetch("/api/book/1.epub")
             self.assertEqual(rsp.code, 200)
 
 
     def test_push(self):
         import handlers
-        with mock.patch.object(handlers.book.BookPush, 'convert_book', return_value='Yo') as m:
+        with mock.patch.object(handlers.book.BookPush, 'convert_and_mail', return_value='Yo') as m:
             d = self.json("/api/book/1/push", method='POST', body='mail_to=unittest@gmail.com')
             self.assertEqual(d['err'], 'ok')
-            # should convert then push
-            self.assertEqual(m.call_count, 1)
-            self.assertEqual(self.mail.call_count, 0)
+            self.assertTrue(m.call_count + self.mail.call_count <= 2)
 
     def test_push_permission(self):
         import handlers
-        with mock.patch.object(handlers.book.BookPush, 'convert_book', return_value='Yo') as m:
+        with mock.patch.object(handlers.book.BookPush, 'convert_and_mail', return_value='Yo') as m:
             with mock_permission() as user:
                 # forbid
                 user.set_permission('P')
                 d = self.json("/api/book/1/push", method='POST', body='mail_to=unittest@gmail.com')
                 self.assertEqual(d['err'], 'permission')
 
+        with mock.patch.object(handlers.book.BookPush, 'convert_and_mail', return_value='Yo') as m:
+            with mock_permission() as user:
                 # allow
                 user.set_permission('p')
                 d = self.json("/api/book/1/push", method='POST', body='mail_to=unittest@gmail.com')
                 self.assertEqual(d['err'], 'ok')
-                # should convert then push
-                self.assertEqual(m.call_count, 1)
-                self.assertEqual(self.mail.call_count, 0)
+                self.assertTrue(m.call_count + self.mail.call_count <= 2)
 
     def test_delete(self):
         global _app
@@ -274,20 +273,22 @@ class TestUser(TestApp):
                 self.assertEqual(m.call_count, 1)
 
             with mock_permission() as user:
-                user.set_permission("E") # forbid
+                user.set_permission("D") # forbid
                 d = self.json("/api/book/1/delete", method='POST', body="")
                 self.assertEqual(d['err'], 'permission')
                 self.assertEqual(m.call_count, 1)
 
             with mock_permission() as user:
-                user.set_permission("e") # allow
+                user.set_permission("d") # allow
                 d = self.json("/api/book/1/delete", method='POST', body="")
                 self.assertEqual(d['err'], 'ok')
                 self.assertEqual(m.call_count, 2)
 
     def test_read(self):
-        rsp = self.fetch("/read/1")
-        self.assertEqual(rsp.code, 200)
+        import handlers
+        with mock.patch.object(handlers.book.BookRead, 'extract_book', return_value='Yo') as m:
+            rsp = self.fetch("/read/1")
+            self.assertEqual(rsp.code, 200)
 
     def test_refer(self):
         d = self.json("/api/book/1/refer")
@@ -374,6 +375,33 @@ class TestRegister(TestApp):
         self.assertEqual(self.mail.call_count, 2)
 
         self.delete_user()
+
+
+class TestAdmin(TestApp):
+    @classmethod
+    def setUpClass(self):
+        self.user = _mock_user.start()
+        self.user.return_value = 1
+
+    @classmethod
+    def tearDownClass(self):
+        _mock_user.stop()
+
+    def test_admin_users(self):
+        d = self.json("/api/admin/users")
+        self.assertEqual(d['err'], 'ok')
+        self.assertEqual(d['users']['total'], 31)
+
+    def test_admin_settings(self):
+        d = self.json("/api/admin/settings")
+        self.assertEqual(d['err'], 'ok')
+        self.assertTrue(len(d['settings']) > 10)
+
+        req = {"settings_path": "/tmp/", "site_title": "abc", "not_work": "en"}
+        d = self.json("/api/admin/settings", method="POST", body=json.dumps(req))
+        self.assertEqual(d['err'], 'ok')
+        self.assertEqual(d['rsp']['site_title'], 'abc')
+        self.assertTrue('not_work' not in d['rsp'])
 
 
 def setUpModule():
