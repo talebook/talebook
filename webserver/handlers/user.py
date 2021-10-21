@@ -41,6 +41,8 @@ class Done(BaseHandler):
 
     def get(self):
         user = self.update_userinfo()
+        if not user.can_login():
+            raise web.HTTPError(403, log_message = _(u'无权登录'))
         self.login_user(user)
         url = self.get_secure_cookie(COOKIE_REDIRECT)
         self.clear_cookie(COOKIE_REDIRECT)
@@ -291,6 +293,9 @@ class SignIn(BaseHandler):
             return {'err': 'params.no_user', 'msg': _(u'无此用户')}
         if user.get_secure_password(password) != user.password:
             return {'err': 'params.invalid', 'msg': _(u'用户名或密码错误')}
+        if not user.can_login():
+            return {'err': 'permission', 'msg': _(u'无权登录')}
+        logging.error("PERM = %s", user.permission)
 
         self.login_user(user)
         return {'err': 'ok', 'msg': 'ok'}

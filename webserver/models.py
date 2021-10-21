@@ -136,7 +136,7 @@ class Reader(Base, SQLAlchemyMixin):
             self.username = name
 
     def set_permission(self, operations):
-        ALL = 'lvrude'
+        ALL = 'delprsuv'
         if not isinstance(operations, (str, unicode)): raise 'bug'
         v = list(self.permission)
         for p in operations:
@@ -152,12 +152,14 @@ class Reader(Base, SQLAlchemyMixin):
         if operation.upper() in self.permission: return False
         return default
 
+    def can_delete(self):   return self.has_permission('d')
+    def can_edit(self):     return self.has_permission('e')
     def can_login(self):    return self.has_permission('l')
-    def can_view(self):     return self.has_permission('v')
+    def can_push(self):     return self.has_permission('p')
     def can_read(self):     return self.has_permission('r')
+    def can_save(self):     return self.has_permission('s')
     def can_upload(self):   return self.has_permission('u')
-    def can_download(self): return self.has_permission('d')
-    def can_editor(self):   return self.has_permission('e', False)
+    def can_view(self):     return self.has_permission('v')
 
     def is_active(self):
         return self.active

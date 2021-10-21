@@ -35,8 +35,24 @@
                         <v-list-item-title> 设置为管理员 </v-list-item-title>
                     </v-list-item>
                     <v-divider></v-divider>
-                    <v-list-item @click="setuser(item.id, {'permission': 'L'})" @click2="alert('error', '暂未支持该功能，敬请期待后续版本更新')" >
-                        <v-list-item-title><v-icon>delete</v-icon> 禁用账号登陆 </v-list-item-title>
+                    <v-list-item @click="setuser(item.id, {'permission': 'L'})" >
+                        <v-list-item-title><v-icon>delete</v-icon> 禁止账号登陆 </v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="setuser(item.id, {'permission': 'E'})" >
+                        <v-list-item-title><v-icon>delete</v-icon> 禁止编辑删除 </v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="setuser(item.id, {'permission': 'P'})" >
+                        <v-list-item-title><v-icon>delete</v-icon> 禁止推送 </v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="setuser(item.id, {'permission': 'D'})" >
+                        <v-list-item-title><v-icon>delete</v-icon> 禁止下载 </v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="setuser(item.id, {'permission': 'R'})" >
+                        <v-list-item-title><v-icon>delete</v-icon> 禁止在线阅读 </v-list-item-title>
+                    </v-list-item>
+                    <v-divider></v-divider>
+                    <v-list-item >
+                        <v-list-item-title><v-icon>delete</v-icon> 暂不支持取消禁止 </v-list-item-title>
                     </v-list-item>
                 </v-list>
             </v-menu>
