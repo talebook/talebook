@@ -52,7 +52,7 @@
 
                 <template v-if="card.show_socials">
                     <p>所启用的社交网络将会在登录页面自动显示按钮。</p>
-                    <v-combobox v-model="settings.SOCIALS" :items="social.items" label="选择要启用的社交网络账号" hide-selected multiple small-chips>
+                    <v-combobox v-model="settings.SOCIALS" :items="sns_items" label="选择要启用的社交网络账号" hide-selected multiple small-chips>
                         <template v-slot:selection="{ attrs, item, parent, selected }">
                             <v-chip v-bind="attrs" color="green lighten-3" :input-value="selected" label small >
                                 <span class="pr-2"> {{ item.text }} </span>
@@ -61,14 +61,23 @@
                         </template>
                     </v-combobox>
                     <v-row v-for="s in settings.SOCIALS" :key="'social-'+s.value" >
-                        <v-col class='py-0' cols=2 sm=2>
-                            <v-subheader class="px-0 pt-4" :class="$vuetify.breakpoint.smAndUp?'float-right':''">{{s.text}}</v-subheader>
+                        <v-col class='py-0' cols=12 sm=2>
+                            <v-subheader class="px-0 pt-4" :class="$vuetify.breakpoint.smAndUp?'float-right':''">
+                                {{s.text}}  (<a @click="show_sns_config(s)">说明</a>)
+                            </v-subheader>
                         </v-col>
-                        <v-col class='py-0' cols=3 sm=3>
+                        <v-col class='py-0' cols=12 sm=3>
                             <v-text-field small hide-details single-line v-model="settings['SOCIAL_AUTH_'+s.value.toUpperCase()+'_KEY']" label="Key" type="text"></v-text-field>
                         </v-col>
-                        <v-col class='py-0' cols=7 sm=7>
+                        <v-col class='py-0' cols=12 sm=7>
                             <v-text-field small hide-details single-line v-model="settings['SOCIAL_AUTH_'+s.value.toUpperCase()+'_SECRET']" label="Secret" type="text"></v-text-field>
+                        </v-col>
+                        <v-col class='py-0' cols=12 v-show="s.help">
+                            <v-alert outlined type="info" color="purple" >
+                                <div>
+                                    请前往{{s.text}}的<a :href="s.link" target="_blank">配置页面</a>获取密钥，并设置回调地址(callback URL)为<code>{{site_url}}/auth/complete/{{s.value}}</code>
+                                </div>
+                            </v-alert>
                         </v-col>
                     </v-row>
                 </template>
@@ -88,18 +97,26 @@ export default {
         this.$store.commit("loading");
         this.backend("/admin/settings")
         .then(rsp=>{
+            var m = {}
+            rsp.sns.forEach(function(ele){
+                m[ele.value] = ele;
+            });
+            this.sns_items = rsp.sns
             this.settings = rsp.settings
-            this.social = rsp.social
+            this.site_url = rsp.site_url
             this.$store.commit("loaded");
+            this.settings.SOCIALS.forEach(function(ele){
+                ele.help = false;
+                ele.link = m[ele.value].link;
+            })
         });
     },
     data: () => ({
         combo_input: "",
-        social: {
-            select: [],
-            items: [],
-        },
+        sns: {},
+        sns_items: [],
         settings: { },
+        site_url: "",
 
         cards: [
             {
@@ -199,6 +216,11 @@ export default {
                     this.alert('success', '保存成功！可能需要5~10秒钟生效！');
                 }
             });
+        },
+        show_sns_config: function(s) {
+            var msg = `请前往${s.text}的 <a :href="${s.link}" target="_blank">配置页面</a> 获取密钥，并设置回调地址（callback URL）为
+            <code>${this.site_url}/auth/complete/${s.value}</code>`;
+            this.alert("success", msg);
         },
         test_email: function() {
             var data = new URLSearchParams();

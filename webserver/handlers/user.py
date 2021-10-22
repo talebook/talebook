@@ -530,17 +530,16 @@ class AdminSettings(SettingHandler):
     def get(self):
         if not self.admin_user:
             return {'err': 'permission', 'msg': _(u'无权访问此接口')}
-        social = {
-                'select': [],
-                'items': [
-                    {'value': 'qq',     'text': 'QQ'},
-                    {'value': 'amazon', 'text': 'Amazon'},
-                    {'value': 'github', 'text': 'Github'},
-                    {'value': 'weibo',  'text': u'微博'},
-                    {'value': 'wechat', 'text': u'微信'},
-                    ],
-                }
-        return {'err': 'ok', 'settings': CONF, 'social': social}
+
+        site_url = self.request.protocol + "://" + self.request.host
+        sns = [
+                    {'value': 'qq',     'text': 'QQ', 'link': 'https://connect.qq.com/'},
+                    {'value': 'amazon', 'text': 'Amazon', 'link': 'https://developer.amazon.com/zh/docs/login-with-amazon/web-docs.html'},
+                    {'value': 'github', 'text': 'Github', 'link': 'https://github.com/settings/applications/new'},
+                    {'value': 'weibo',  'text': u'微博', 'link': 'http://open.weibo.com/developers'},
+                    {'value': 'wechat', 'text': u'微信', 'link': 'https://developers.weixin.qq.com/doc/offiaccount/OA_Web_Apps/Wechat_webpage_authorization.html'},
+                    ]
+        return {'err': 'ok', 'settings': CONF, 'sns': sns, 'site_url': site_url}
 
     @js
     @auth
