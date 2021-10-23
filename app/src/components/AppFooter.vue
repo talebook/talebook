@@ -7,7 +7,7 @@
             <v-btn small text target="_blank" href="https://github.com/talebook/calibre-webserver">Github</v-btn>
             | <v-btn small text target="_blank" href="https://hub.docker.com/r/talebook/calibre-webserver">Docker</v-btn>
             | <v-btn small text target="_blank" href="https://github.com/talebook/talebook-library">Library</v-btn>
-            | <v-btn small text target="_blank" href="http://www.talebook.org">Author</v-btn>
+            | <v-btn small text target="_blank" href="http://talebook.org">Project</v-btn>
             </p>
         </v-col>
     </v-row>
