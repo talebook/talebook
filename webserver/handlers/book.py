@@ -357,9 +357,7 @@ class BookDownload(BaseHandler):
                 return self.redirect('/login')
 
         if self.current_user and not self.current_user.can_save():
-            raise web.HTTPError(403, reason = _(u'此账户无权限下载') )
-        else:
-            logging.debug("user[%s] can download", self.current_user)
+            raise web.HTTPError(403, reason = _(u'无权操作') )
 
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))
@@ -488,6 +486,9 @@ class BookRead(BaseHandler):
     def get(self, id):
         if not CONF['ALLOW_GUEST_READ'] and not self.current_user:
             return self.redirect('/login')
+
+        if self.current_user and not self.current_user.can_save():
+            raise web.HTTPError(403, reason = _(u'无权操作') )
 
         book = self.get_book(id)
         book_id = book['id']
