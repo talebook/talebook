@@ -102,7 +102,7 @@
 
             <v-menu offset-y right>
                 <template v-slot:activator="{on}">
-                <v-btn v-on="on" class="mr-2" icon large ><v-avatar size="32px"><img :src="user.avatar" ></v-avatar></v-btn>
+                <v-btn v-on="on" class="mr-2" icon large outlined ><v-avatar size="32px"><img :src="user.avatar" ></v-avatar></v-btn>
                 </template>
                 <v-list min-width=240>
                     <v-list-item>
