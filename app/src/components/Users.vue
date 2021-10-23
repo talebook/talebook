@@ -46,10 +46,10 @@
                     <v-list-item v-if="! item.is_active" @click="setuser(item.id, {'active': true}); item.is_active = true;" >
                         <v-list-item-title> 免邮箱认证，直接激活账户 </v-list-item-title>
                     </v-list-item>
-                    <v-list-item v-if="item.is_admin" @click="setuser(item.id, {'admin': false}); item.is_admin = true;" >
+                    <v-list-item v-if="item.is_admin" @click="setuser(item.id, {'admin': false}); item.is_admin = !item.is_admin;" >
                         <v-list-item-title> 取消管理员 </v-list-item-title>
                     </v-list-item>
-                    <v-list-item v-else @click="setuser(item.id, {'admin': true}); item.is_admin = false;" >
+                    <v-list-item v-else @click="setuser(item.id, {'admin': true}); item.is_admin = item.is_admin = !item.is_admin;" >
                         <v-list-item-title> 设置为管理员 </v-list-item-title>
                     </v-list-item>
                 </v-list>
@@ -136,9 +136,7 @@ export default {
                 method: "POST",
             })
             .then(rsp => {
-                if ( rsp.err == 'ok' ) {
-                    this.alert("success", "成功！");
-                } else {
+                if ( rsp.err != 'ok' ) {
                     this.alert("error", rsp.msg );
                 }
             });
