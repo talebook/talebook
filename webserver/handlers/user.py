@@ -93,6 +93,9 @@ class AdminUsers(BaseHandler):
                     'update_time': user.update_time.strftime("%Y-%m-%d %H:%M:%S") if user.update_time else 'N/A',
                     'access_time': user.access_time.strftime("%Y-%m-%d %H:%M:%S") if user.access_time else 'N/A',
                     }
+            for attr in dir(user):
+                if attr.startswith("can_"):
+                    d[attr] = getattr(user, attr)()
             items.append( d )
         return {"err": 'ok', "users": {"items": items, "total": total}}
 

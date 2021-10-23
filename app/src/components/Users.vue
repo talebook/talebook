@@ -24,35 +24,33 @@
                 <template v-slot:activator="{on}">
                 <v-btn color="primary" small v-on="on" >操作 <v-icon small>more_vert</v-icon></v-btn>
                 </template>
-                <v-list>
-                    <v-list-item v-if="! item.is_active" @click="setuser(item.id, {'active': true})" >
+                <v-list dense>
+                    <v-subheader >修改用户权限</v-subheader>
+                    <template v-for="perm in permissions">
+                    <v-list-item :key="'disable-'+perm.name" v-if="item[perm.name]">
+                        <v-list-item-title><v-icon color="success" >mdi-account-check</v-icon> 已允许{{perm.text}} </v-list-item-title>
+                        <v-list-item-action>
+                            <v-btn text small color="error" @click="setuser(item.id, {'permission': perm.code.toUpperCase() }); item[perm.name] = !item[perm.name] " > 关闭 </v-btn>
+                        </v-list-item-action>
+                    </v-list-item>
+                    <v-list-item :key="'enable-'+perm.name" v-else>
+                        <v-list-item-title><v-icon color="danger" >mdi-account-remove</v-icon> 已禁止{{perm.text}} </v-list-item-title>
+                        <v-list-item-action>
+                            <v-btn text small color="primary" @click="setuser(item.id, {'permission': perm.code.toLowerCase() }); item[perm.name] = !item[perm.name]; " > 开启 </v-btn>
+                        </v-list-item-action>
+                    </v-list-item>
+                    </template>
+
+                    <v-divider></v-divider>
+                    <v-subheader >账号管理</v-subheader>
+                    <v-list-item v-if="! item.is_active" @click="setuser(item.id, {'active': true}); item.is_active = true;" >
                         <v-list-item-title> 免邮箱认证，直接激活账户 </v-list-item-title>
                     </v-list-item>
-                    <v-list-item v-if="item.is_admin" @click="setuser(item.id, {'admin': false})" >
+                    <v-list-item v-if="item.is_admin" @click="setuser(item.id, {'admin': false}); item.is_admin = true;" >
                         <v-list-item-title> 取消管理员 </v-list-item-title>
                     </v-list-item>
-                    <v-list-item v-else @click="setuser(item.id, {'admin': true})" >
+                    <v-list-item v-else @click="setuser(item.id, {'admin': true}); item.is_admin = false;" >
                         <v-list-item-title> 设置为管理员 </v-list-item-title>
-                    </v-list-item>
-                    <v-divider></v-divider>
-                    <v-list-item @click="setuser(item.id, {'permission': 'L'})" >
-                        <v-list-item-title><v-icon>delete</v-icon> 禁止账号登陆 </v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="setuser(item.id, {'permission': 'E'})" >
-                        <v-list-item-title><v-icon>delete</v-icon> 禁止编辑删除 </v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="setuser(item.id, {'permission': 'P'})" >
-                        <v-list-item-title><v-icon>delete</v-icon> 禁止推送 </v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="setuser(item.id, {'permission': 'D'})" >
-                        <v-list-item-title><v-icon>delete</v-icon> 禁止下载 </v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="setuser(item.id, {'permission': 'R'})" >
-                        <v-list-item-title><v-icon>delete</v-icon> 禁止在线阅读 </v-list-item-title>
-                    </v-list-item>
-                    <v-divider></v-divider>
-                    <v-list-item >
-                        <v-list-item-title><v-icon>delete</v-icon> 暂不支持取消禁止 </v-list-item-title>
                     </v-list-item>
                 </v-list>
             </v-menu>
@@ -80,6 +78,15 @@ export default {
             { text: '登录IP',   sortable: false, value: 'login_ip'    },
             { text: '详情',     sortable: false, value: 'detail'      },
             { text: '操作',     sortable: false, value: 'actions'     },
+        ],
+        permissions: [
+            {code: "l", name: "can_login",  text: "登录" },
+            {code: "u", name: "can_upload", text: "上传" },
+            {code: "s", name: "can_save",   text: "下载" },
+            {code: "e", name: "can_edit",   text: "编辑" },
+            {code: "d", name: "can_delete", text: "删除" },
+            {code: "p", name: "can_push",   text: "推送" },
+            {code: "r", name: "can_read",   text: "在线阅读" },
         ],
     }),
     watch: {
