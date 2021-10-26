@@ -6,6 +6,7 @@ upstream tornado {
 server {
     listen 80;
     server_name _;
+    expires 365d;
 
     index index.html;
     client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
@@ -15,6 +16,7 @@ server {
     add_header  Access-Control-Allow-Origin *;
 
     location ~ ^/(api|get|read|opds|auth) {
+        expires off;
         proxy_pass       http://tornado;
         proxy_redirect   off;
         proxy_set_header Host $http_host;
