@@ -6,7 +6,7 @@ upstream tornado {
 server {
     listen 80;
     server_name _;
-    expires 365d;
+    expires max;
 
     index index.html;
     client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
@@ -15,20 +15,20 @@ server {
     error_log   /data/log/nginx/calibre-webserver-error.log;
     add_header  Access-Control-Allow-Origin *;
 
+    location = /index.html {
+        expires 60s;
+    }
+
     location ~ ^/(api|get|read|opds|auth) {
         expires off;
+        if ( $1 == "get" ) {
+            expires max;
+        }
         proxy_pass       http://tornado;
         proxy_redirect   off;
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_pass_header X-Scheme;
-    }
-
-    location ^~ /static/ {
-        if ($query_string) { expires max; }
-    }
-    location = /index.html {
-        expires 600s;
     }
 
     try_files $uri $uri/ /index.html;
