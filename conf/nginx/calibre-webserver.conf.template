@@ -20,8 +20,8 @@ server {
     }
 
     location ~ ^/(api|get|read|opds|auth) {
-        expires off;
-        if ( $1 == "get" ) {
+        expires -1s;
+        if ( $request_uri ~* ^/get/ ) {
             expires max;
         }
         proxy_pass       http://tornado;
