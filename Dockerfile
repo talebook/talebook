@@ -5,21 +5,21 @@ MAINTAINER Rex <talebook@foxmail.com>
 LABEL Maintainer="Rex <talebook@foxmail.com>"
 LABEL Thanks="oldiy <oldiy2018@gmail.com>"
 
-WORKDIR /tmp/
-COPY . /tmp/
-RUN cd /tmp/app && \
-        npm install . && \
-        npm run build && \
-        rm -rf node_modules
+WORKDIR /app
+COPY ["app/package.json", "app/package-lock.json*", "/app/"]
+RUN npm config set registry http://mirrors.tencent.com/npm/
+RUN npm install
+
+COPY app/ /app/
+RUN npm run build
 
 
 # 第二阶段，构建环境
 FROM talebook/calibre:2
 
-ARG GIT_VERSION=""
-
+# install python packages
 RUN pip install wheel
-RUN pip install \
+RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
         Baidubaike==2.0.1 \
         jinja2==2.10 \
         social-auth-core==3.3.3 \
@@ -32,6 +32,7 @@ RUN pip install \
 RUN sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list
 RUN apt-get update && apt-get install -y gettext
 
+# prepare dirs
 RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /data/books/library  && \
     mkdir -p /data/books/extract  && \
@@ -45,8 +46,9 @@ RUN mkdir -p /data/log/nginx/ && \
 COPY . /var/www/calibre-webserver/
 COPY conf/nginx/calibre-webserver.conf.template /etc/nginx/conf.d/
 COPY conf/supervisor/calibre-webserver.conf /etc/supervisor/conf.d/
-COPY --from=builder /tmp/app/dist/ /var/www/calibre-webserver/app/dist/
+COPY --from=builder /app/dist/ /var/www/calibre-webserver/app/dist/
 
+ARG GIT_VERSION=""
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     cd /var/www/calibre-webserver/ && \
     echo "VERSION = \"$GIT_VERSION\"" > webserver/version.py && \
