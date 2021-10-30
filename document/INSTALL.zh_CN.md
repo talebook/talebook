@@ -140,22 +140,22 @@ docker run -d --name calibre -p 80:80 -v /data/calibre:/data -e NGINX_CLIENT_MAX
 
 问题排查
 ===============
-* supervisord启动失败
+## supervisord启动失败
 
 如果有调整过supervisord里面的配置（例如端口、目录），一定要执行```sudo supervisorctl reload all```重新读取配置，不然是不会生效的，可能会导致启动失败。
 
 如果提示```calibre:tornado-8000: ERROR(spawn error)```，那么说明环境没配置正确。
 请打开日志文件```/data/log/calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last)```提示的错误原因。
 
-* 网站能打开，但是提示```500: internal server error```
+## 网站能打开，但是提示```500: internal server error```
 
 这种情况，一般是服务运行时出现异常，常见原因有目录权限没有配置正常、数据库没创建好、或者触发了某个代码BUG。
 
 请打开日志文件```/data/log/calibre-webserver.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last)```提示的错误原因，并提issue联系开发者排查。
 
-* 「静读天下」APP里访问书库会失败，怎么办？
+## 「静读天下」APP里访问书库会失败，怎么办？
 
-这是因为静读天下APP不支持Cookie，导致登录会失败。在最新版系统中已经调整程序逻辑，可以无需登录就正常浏览，仅在下载时检测权限。为了避免弹出登录提示，请配置：
+这是因为静读天下APP不支持Cookie，导致登录会失败。在最新版系统中(v2.0.0-87-gf6d8f06)已经调整程序逻辑，可以无需登录就正常浏览，仅在下载时检测权限。为了避免弹出登录提示，请配置：
  - 关闭「私人图书馆」模式。
  - 打开「允许任意下载」（访客无需注册或登录）
 
