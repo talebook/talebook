@@ -640,29 +640,21 @@ class OpdsIndex(OpdsHandler):
 
 class OpdsNav(OpdsHandler):
     def get(self, which):
-        if not self.current_user:
-            return self.send_error_of_not_invited()
         offset = self.get_argument("offset", 0)
         self.write( self.opds_navcatalog(which, offset=offset) )
 
 class OpdsCategory(OpdsHandler):
     def get(self, category, which):
-        if not self.current_user:
-            return self.send_error_of_not_invited()
         offset = self.get_argument("offset", 0)
         self.write( self.opds_category(category, which, offset=offset) )
 
 class OpdsCategoryGroup(OpdsHandler):
     def get(self, category, which):
-        if not self.current_user:
-            return self.send_error_of_not_invited()
         offset = self.get_argument("offset", 0)
         self.write( self.opds_category_group(category, which, offset=offset) )
 
 class OpdsSearch(OpdsHandler):
     def get(self, which):
-        if not self.current_user:
-            return self.send_error_of_not_invited()
         offset = self.get_argument("offset", 0)
         self.write( self.opds_search(which, offset=offset) )
 
