@@ -168,7 +168,7 @@ export default {
         {
             show: false,
             title: "邮件服务",
-            subtitle: '邮箱注册、推送Kindle依赖此配置',
+            subtitle: '邮箱注册、推送Kindle依赖此配置(请确保您的服务器或VPS服务商已开通SMTP服务的25端口)',
             fields: [
                 { icon: "email", key: "smtp_server", label: "SMTP服务器" },
                 { icon: "person", key: "smtp_username", label: "SMTP用户名" },
