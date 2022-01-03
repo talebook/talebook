@@ -49,10 +49,12 @@
                     <v-btn outlined text @click="dialog_refer = false">取消</v-btn>
                 </v-toolbar>
                 <v-card-text xclass="pt-3 px-3 px-sm-6">
-                    <p class="py-6 text-center" v-if="refer_books.length == 0">
-                    <v-progress-circular indeterminate color="primary" ></v-progress-circular>
+                    <p class="py-6 text-center" v-if="refer_books_loading" >
+                        <v-progress-circular indeterminate color="primary" ></v-progress-circular>
                     </p>
-
+                    <p class="py-6 text-center" v-else-if="refer_books.length == 0">
+                        无匹配的书籍信息
+                    </p>
                     <template v-else>
                         请选择最匹配的记录复制为本书的描述信息
                         <book-cards :books="refer_books">
@@ -94,7 +96,7 @@
                         </template>
                         <v-list>
                             <v-list-item :to="'/book/'+bookid+'/edit'"> <v-icon>settings_applications</v-icon> 编辑书籍信息 </v-list-item>
-                            <v-list-item @click="get_refer" > <v-icon>apps</v-icon> 从豆瓣更新信息</v-list-item>
+                            <v-list-item @click="get_refer" > <v-icon>apps</v-icon> 从互联网更新信息</v-list-item>
                             <v-divider></v-divider>
                             <v-list-item @click='delete_book' > <v-icon>delete_forever</v-icon> 删除此书</v-list-item>
                         </v-list>
@@ -230,6 +232,7 @@ export default {
         dialog_kindle: false,
         dialog_refer: false,
         dialog_msg: false,
+        refer_books_loading: false,
         refer_books: [],
     }),
     created() {
@@ -279,13 +282,15 @@ export default {
         },
         get_refer() {
             this.dialog_refer = true;
+            this.refer_books_loading = true;
             this.backend("/book/"+this.bookid+"/refer")
             .then( rsp => {
                 this.refer_books = rsp.books.map( b => {
                     b.href = "";
                     b.img = '/get/pcover?url='+encodeURIComponent(b.cover_url);
                     return b;
-                }) ;
+                });
+                this.refer_books_loading = false;
             });
         },
         set_refer(isbn) {
