@@ -25,6 +25,12 @@ export default {
             return fetch(full_url, args)
                 .then( rsp => {
                     var msg = "";
+                    if ( rsp.status == 413) {
+                        msg = "服务器响应了413异常状态码。<br/>可能是上传的文件过大，超过了服务器设置的上传大小。";
+                        self.alert("error", msg);
+                        throw msg;
+                    }
+
                     if ( rsp.status != 200 ) {
                         msg = "服务器异常，状态码: " + rsp.status + "<br/>请查阅服务器日志:<br/>calibre-webserver.log";
                         self.alert("error", msg);
