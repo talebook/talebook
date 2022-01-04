@@ -277,9 +277,13 @@ class BookRefer(BaseHandler):
     @auth
     def post(self, id):
         isbn = self.get_argument("isbn", "error")
+        only_meta = self.get_argument("only_meta", "")
+        only_cover = self.get_argument("only_cover", "")
         book_id = int(id)
         if not isbn.isdigit():
             return {'err': 'params.isbn.invalid', 'msg': _(u'ISBN参数错误') }
+        if only_meta == "yes" and only_cover == "yes":
+            return {'err': 'params.conflict', 'msg': _(u'参数冲突') }
         mi = self.db.get_metadata(book_id, index_is_id=True)
         if not mi:
             return {'err': 'params.book.invalid', 'msg': _(u'书籍不存在') }
@@ -295,9 +299,13 @@ class BookRefer(BaseHandler):
             api = douban.DoubanBookApi(CONF['douban_apikey'], copy_image=True)
             refer_mi = api.get_book(mi)
 
-        if mi.cover_data[0]:
-            refer_mi.cover_data = None
-        mi.smart_update(refer_mi, replace_metadata=True)
+        if only_cover == "yes":
+            # just set cover
+            mi.cover_data = refer_mi.cover_data
+        else:
+            if only_meta == "yes":
+                refer_mi.cover_data = None
+            mi.smart_update(refer_mi, replace_metadata=True)
         self.db.set_metadata(book_id, mi)
         return {'err': 'ok'}
 

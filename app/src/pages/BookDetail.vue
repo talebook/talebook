@@ -68,7 +68,27 @@
                                 <v-card-actions>
                                     <v-chip small dark :to="book.website" :color="book.source=='豆瓣'?'green':'blue'">{{book.source}}</v-chip>
                                     <v-spacer></v-spacer>
+                                    <!--
                                     <v-btn color='primary' small rounded @click="set_refer(book.isbn)" ><v-icon >done</v-icon>设置</v-btn>
+                                    -->
+                                    <v-menu offset-y right>
+                                        <template v-slot:activator="{on}">
+                                            <v-btn color='primary' small rounded v-on="on">
+                                                <v-icon small>done</v-icon> 设置
+                                            </v-btn>
+                                        </template>
+                                        <v-list dense>
+                                            <v-list-item @click="set_refer(book.isbn)" >
+                                                <v-list-item-title>设置书籍信息及图片</v-list-item-title>
+                                            </v-list-item>
+                                            <v-list-item @click="set_refer(book.isbn, {'only_meta': 'yes'})" >
+                                                <v-list-item-title>仅设置书籍信息</v-list-item-title>
+                                            </v-list-item>
+                                            <v-list-item @click="set_refer(book.isbn, {'only_cover': 'yes'})" >
+                                                <v-list-item-title>仅设置书籍图片</v-list-item-title>
+                                            </v-list-item>
+                                        </v-list>
+                                    </v-menu>
                                 </v-card-actions>
                             </template>
                         </book-cards>
@@ -293,8 +313,8 @@ export default {
                 this.refer_books_loading = false;
             });
         },
-        set_refer(isbn) {
-            var data = new URLSearchParams();
+        set_refer(isbn, opt) {
+            var data = new URLSearchParams(opt);
             data.append('isbn', isbn);
             this.backend("/book/"+this.bookid+"/refer", {
                 method: 'POST',
