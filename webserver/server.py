@@ -173,6 +173,7 @@ def make_app():
 
 
 def get_upload_size():
+    n = 1
     s = CONF['MAX_UPLOAD_SIZE'].lower().strip()
     if s.endswith("k") or s.endswith("kb"):
         n = 1024
