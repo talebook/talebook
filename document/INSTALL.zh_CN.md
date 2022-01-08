@@ -129,13 +129,12 @@ docker run -d --name calibre -p 80:80 -v /data/calibre:/data -v /data/logo:/var/
 ```
 
 ## 上传文件的大小
-默认情况下，系统中配置的文件上传大小为20MB，配置过大可能会消耗更多的系统资源，同时网络传输大文件时容易不稳定导致上传失败。
+如果发现上传大文件时出现了失败，那么可能会有两种原因：
 
-若需要调整该配置的大小（例如调整为30MB），可以通过调整docker启动的env变量进行设置，变量名称为 ```NGINX_CLIENT_MAX_BODY_SIZE```，例如：
-```
-docker run -d --name calibre -p 80:80 -v /data/calibre:/data -e NGINX_CLIENT_MAX_BODY_SIZE=30M talebook/calibre-webserver
-```
+1. 如果是程序抛出异常（例如issue#61），那么是由于本项目中的tornado框架默认限制为100M。请进入管理员配置中修改调大对应的配置。
 
+1. 如果明确提示`413`错误码，那么一般是由于nginx限制了上传大小。本项目中自带的nginx已配置了`client_max_body_size 0`，即不限制上传大小；
+因此建议使用者排查下是否在本项目之外配置有其他的nginx代理转发，调整其中的配置。
 
 
 问题排查

@@ -28,6 +28,9 @@ settings = {
     "max_opds_ungrouped_items" : 100,
     "url_prefix": "",
 
+    # 100MB, tornado default max_buffer_size value
+    "MAX_UPLOAD_SIZE": "100MB",
+
     "SOCIAL_AUTH_LOGIN_URL"          : '/',
     "SOCIAL_AUTH_LOGIN_REDIRECT_URL" : '/api/done/',
     "SOCIAL_AUTH_USER_MODEL"         : 'models.Reader',

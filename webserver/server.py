@@ -172,10 +172,24 @@ def make_app():
             **app_settings)
 
 
+def get_upload_size():
+    s = CONF['MAX_UPLOAD_SIZE'].lower().strip()
+    if s.endswith("k") or s.endswith("kb"):
+        n = 1024
+        s = s.split("k")[0]
+    elif s.endswith("m") or s.endswith("mb"):
+        n = 1024*1024
+        s = s.split("m")[0]
+    elif s.endswith("g") or s.endswith("gb"):
+        n = 1024*1024*1024
+        s = s.split("g")[0]
+    s = s.strip()
+    return int(s)*n
+
 def main():
     tornado.options.parse_command_line()
     app = make_app()
-    http_server = tornado.httpserver.HTTPServer(app, xheaders=True)
+    http_server = tornado.httpserver.HTTPServer(app, xheaders=True, max_buffer_size=get_upload_size())
     http_server.listen(options.port, options.host)
     tornado.ioloop.IOLoop.instance().start()
     from flask.ext.sqlalchemy import _EngineDebuggingSignalEvents
