@@ -14,8 +14,8 @@ Vue.use(Vuetify)
 import VueCookies from 'vue-cookies'
 Vue.use(VueCookies)
 
-import calibre from './calibre.js'
-Vue.use(calibre)
+import talebook from './talebook.js'
+Vue.use(talebook)
 
 import App        from './App.vue'
 import Index      from './pages/Index.vue'

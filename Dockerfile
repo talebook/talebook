@@ -40,17 +40,17 @@ RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /data/books/convert  && \
     mkdir -p /data/books/progress  && \
     mkdir -p /data/books/settings && \
-    mkdir -p /var/www/calibre-webserver/ && \
+    mkdir -p /var/www/talebook/ && \
     chmod a+w -R /data/log /data/books /var/www
 
-COPY . /var/www/calibre-webserver/
-COPY conf/nginx/calibre-webserver.conf.template /etc/nginx/conf.d/calibre-webserver.conf
-COPY conf/supervisor/calibre-webserver.conf /etc/supervisor/conf.d/
-COPY --from=builder /app/dist/ /var/www/calibre-webserver/app/dist/
+COPY . /var/www/talebook/
+COPY conf/nginx/talebook.conf /etc/nginx/conf.d/talebook.conf
+COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/
+COPY --from=builder /app/dist/ /var/www/talebook/app/dist/
 
 ARG GIT_VERSION=""
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
-    cd /var/www/calibre-webserver/ && \
+    cd /var/www/talebook/ && \
     echo "VERSION = \"$GIT_VERSION\"" > webserver/version.py && \
     cp app/dist/index.html webserver/templates/index.html && \
     touch /data/books/settings/auto.py && \
@@ -61,11 +61,11 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     rm -f webserver/*.pyc && \
     mkdir -p /prebuilt/ && \
     mv /data/* /prebuilt/ && \
-    chmod +x /var/www/calibre-webserver/docker/start.sh
+    chmod +x /var/www/talebook/docker/start.sh
 
 EXPOSE 80
 
 VOLUME ["/data"]
 
-CMD ["/var/www/calibre-webserver/docker/start.sh"]
+CMD ["/var/www/talebook/docker/start.sh"]
 

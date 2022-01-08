@@ -3,7 +3,7 @@
         <v-col xs=12 sm=8 md=4>
             <v-card class="elevation-12">
                 <v-toolbar dark color="primary">
-                    <v-toolbar-title>安装 Calibre-Webserver</v-toolbar-title>
+                    <v-toolbar-title>安装 TaleBook</v-toolbar-title>
                 </v-toolbar>
                 <v-card-text>
                     <v-form ref="form" @submit.prevent="do_intall">
@@ -42,7 +42,7 @@ export default {
         email: "",
         code: "",
         invite: false,
-        title: "Calibre Webserver",
+        title: "TaleBook",
         tips: "",
         retry: 20,
         rules: {

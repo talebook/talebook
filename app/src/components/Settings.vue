@@ -197,7 +197,7 @@ export default {
             tips: [
                 {
                     text: "若需要调整Logo，请参阅安装文档的说明。",
-                    link: "https://github.com/talebook/calibre-webserver/blob/master/document/INSTALL.zh_CN.md#%E5%85%B6%E4%BB%96%E9%85%8D%E7%BD%AE",
+                    link: "https://github.com/talebook/talebook/blob/master/document/INSTALL.zh_CN.md#%E5%85%B6%E4%BB%96%E9%85%8D%E7%BD%AE",
                 }
             ],
         },

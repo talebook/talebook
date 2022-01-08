@@ -1,4 +1,4 @@
-My Calibre WebServer
+Tale Book: My Calibre WebServer
 ====================
 A better online books library management website built on Calibre + Vue
 
@@ -30,13 +30,13 @@ https://demo.talebook.org
 
 Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)
 ===================
-部署比较简单，建议采用docker，镜像地址：[dockerhub](https://hub.docker.com/r/talebook/calibre-webserver)
+部署比较简单，建议采用docker，镜像地址：[dockerhub](https://hub.docker.com/r/talebook/talebook)
 
 执行命令
-`docker run -d --name calibre -p <本机端口>:80 -v <本机data目录>:/data talebook/talebook`
+`docker run -d --name talebook -p <本机端口>:80 -v <本机data目录>:/data talebook/talebook`
 
 例如
-`docker run -d --name calibre -p 8080:80 -v /data/calibre:/data talebook/talebook`
+`docker run -d --name talebook -p 8080:80 -v /localdata:/data talebook/talebook`
 
 ---
 
@@ -56,5 +56,5 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 - 部分网友站点：[夜读客](https://www.yeduk.com/), [文渊阁](https://wenyuange.org), [网友站点](http://book.bwh.bai-long.cn/)
 
 项目演示截图如下：
-![](https://github.com/talebook/calibre-webserver/raw/develop/document/screenshot.png)
+![](https://github.com/talebook/talebook/raw/develop/document/screenshot.png)
 

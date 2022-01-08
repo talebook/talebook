@@ -32,7 +32,7 @@ export default {
                     }
 
                     if ( rsp.status != 200 ) {
-                        msg = "服务器异常，状态码: " + rsp.status + "<br/>请查阅服务器日志:<br/>calibre-webserver.log";
+                        msg = "服务器异常，状态码: " + rsp.status + "<br/>请查阅服务器日志:<br/>talebook.log";
                         self.alert("error", msg);
                         throw msg;
                     }
@@ -40,7 +40,7 @@ export default {
                     try {
                         return rsp.json();
                     } catch ( err ) {
-                        msg = "服务器异常，响应非JSON<br/>请查阅服务器日志:<br/>calibre-webserver.log";
+                        msg = "服务器异常，响应非JSON<br/>请查阅服务器日志:<br/>talebook.log";
                         self.alert("error", msg);
                         throw msg;
                     }

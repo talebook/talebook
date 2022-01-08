@@ -123,7 +123,7 @@
                         <v-list-item-action><v-icon>history</v-icon></v-list-item-action>
                         <v-list-item-title> 阅读记录 </v-list-item-title>
                     </v-list-item>
-                    <v-list-item target="_blank" href="https://github.com/talebook/calibre-webserver/issues">
+                    <v-list-item target="_blank" href="https://github.com/talebook/talebook/issues">
                         <v-list-item-action><v-icon>sms_failed</v-icon></v-list-item-action>
                         <v-list-item-title> 反馈 </v-list-item-title>
                     </v-list-item>
@@ -209,7 +209,7 @@ export default {
             update: "2019-06-09",
             total: 10855,
             active: 198,
-            title: 'Calibre',
+            title: 'talebook',
         },
         messages: [],
     }),
