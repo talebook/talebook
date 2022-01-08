@@ -9,7 +9,7 @@ server {
     expires max;
 
     index index.html;
-    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE};
+    client_max_body_size 0;
     root /var/www//calibre-webserver/app/dist/;
     access_log  /data/log/nginx/calibre-webserver-access.log;
     error_log   /data/log/nginx/calibre-webserver-error.log;
