@@ -326,10 +326,14 @@ class BookEdit(BaseHandler):
         for key, val in data.items():
             if key in KEYS:
                 mi.set(key, val)
-        if 'pubdate' in data:
+
+        if data.get('pubdate', None):
             try: content = datetime.datetime.strptime(data['pubdate'], "%Y-%m-%d")
             except: return {'err': 'params.pudate.invalid', 'msg': _(u'出版日期参数错误，格式应为 2019-05-10') }
             mi.set('pubdate', content)
+
+        if 'tags' in data and not data['tags']:
+            self.db.set_tags(bid, [])
 
         self.db.set_metadata(bid, mi)
         return {'err': 'ok', 'msg': _(u"更新成功")}

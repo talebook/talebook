@@ -1,6 +1,6 @@
 module.exports = {
     devServer: {
-        sockHost: 'beta.talebook.org',
+        sockHost: 'dev.talebook.org',
         sockPort: 8081,
         disableHostCheck: true,
     }
