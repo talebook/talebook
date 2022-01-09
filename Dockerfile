@@ -15,7 +15,7 @@ RUN npm run build
 
 
 # 第二阶段，构建环境
-FROM talebook/calibre:2
+FROM talebook/calibre:5
 
 # install python packages
 RUN pip install wheel
@@ -29,8 +29,10 @@ RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
         bs4
 
 # install envsubst
-RUN sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list
+RUN cp /etc/apt/sources.list /tmp/ && \
+        sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list
 RUN apt-get update && apt-get install -y gettext
+RUN mv /tmp/sources.list /etc/apt/sources.list
 
 # prepare dirs
 RUN mkdir -p /data/log/nginx/ && \
@@ -57,7 +59,7 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     chmod a+w /data/books/settings/auto.py && \
     chmod a+w app/dist/index.html && \
     calibredb add --library-path=/data/books/library/ -r docker/book/ && \
-    python server.py --syncdb  && \
+    python3 server.py --syncdb  && \
     rm -f webserver/*.pyc && \
     mkdir -p /prebuilt/ && \
     mv /data/* /prebuilt/ && \

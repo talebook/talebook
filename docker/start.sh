@@ -17,4 +17,4 @@ if [ ! -d "/data/log" ]; then
 fi
 
 service nginx restart
-/usr/bin/supervisord --nodaemon
+/usr/bin/supervisord --nodaemon -c /etc/supervisor/supervisord.conf

@@ -3,7 +3,7 @@
 
 
 import re, os, logging, sys, time, tempfile, zipfile
-import models
+import models, loader, social_routes
 import tornado.ioloop
 import tornado.httpserver
 from tornado import web
@@ -13,8 +13,6 @@ from gettext import GNUTranslations
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from social_tornado.models import init_social
-from social_routes import SOCIAL_AUTH_ROUTES
-import loader
 CONF = loader.get_settings()
 
 
@@ -170,7 +168,7 @@ def make_app():
 
     logging.info("Now, Running...")
     return web.Application(
-            SOCIAL_AUTH_ROUTES + handlers.routes(),
+            social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(),
             **app_settings)
 
 

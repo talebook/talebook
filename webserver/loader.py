@@ -17,6 +17,8 @@ class SettingsLoader(dict):
             import settings
             self.update(settings.settings)
         except:
+            import traceback
+            logging.error(traceback.format_exc())
             pass
 
         self.settings_path = self.get('settings_path', None)

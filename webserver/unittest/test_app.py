@@ -5,9 +5,8 @@ import sys, os, unittest, json, urllib, mock, logging
 from tornado import testing
 
 dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.realpath( dir + "/../"))
+sys.path.append(os.path.dirname(dir))
 import server, models, settings
-settings.settings['settings_path'] = "/tmp/"
 
 
 _app = None

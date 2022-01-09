@@ -6,8 +6,9 @@ Do not modify it unless you know what you are doing.
 """
 
 import os, sys
-from webserver import server
+import webserver
+sys.path.append( os.path.dirname(webserver.__file__) )
 
-sys.path.append( os.path.dirname(server.__file__) )
-sys.exit(server.main())
+import webserver.server
+sys.exit(webserver.server.main())
 
