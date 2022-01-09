@@ -31,6 +31,12 @@ export default {
                         throw msg;
                     }
 
+                    if ( rsp.status == 502) {
+                        msg = "服务器正在启动中...";
+                        self.alert("info", msg);
+                        throw msg;
+                    }
+
                     if ( rsp.status != 200 ) {
                         msg = "服务器异常，状态码: " + rsp.status + "<br/>请查阅服务器日志:<br/>talebook.log";
                         self.alert("error", msg);
