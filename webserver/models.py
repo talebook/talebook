@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 import crypt, hashlib, logging, datetime, time
@@ -104,8 +104,8 @@ class Reader(Base, SQLAlchemyMixin):
         return p
 
     def get_secure_password(self, raw_password):
-        p1 = hashlib.sha256(raw_password).hexdigest()
-        p2 = hashlib.sha256(self.salt+p1).hexdigest()
+        p1 = hashlib.sha256(raw_password.encode("UTF-8")).hexdigest()
+        p2 = hashlib.sha256((self.salt+p1).encode("UTF-8")).hexdigest()
         return p2
 
     def set_secure_password(self, raw_password):
@@ -137,7 +137,7 @@ class Reader(Base, SQLAlchemyMixin):
 
     def set_permission(self, operations):
         ALL = 'delprsuv'
-        if not isinstance(operations, (str, unicode)): raise 'bug'
+        if not isinstance(operations, str): raise 'bug'
         v = list(self.permission)
         for p in operations:
             if p.lower() not in ALL: continue

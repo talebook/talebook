@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 import logging, math, sys
 from tornado import web
-from base import BaseHandler, ListHandler, js
+from handlers.base import BaseHandler, ListHandler, js
 from calibre.utils.filenames import ascii_filename
 
 
@@ -49,11 +49,11 @@ class MetaList(ListHandler):
         count = len(items)
         if items:
             if meta == 'rating':
-                items.sort(cmp=lambda x,y: cmp(y['name'], x['name']))
+                items.sort(key=lambda x: x['name'], reverse=True)
             else:
                 hotline = int(math.log10(count)) if count > SHOW_NUMBER else 0
                 items = [ v for v in items if v['count'] >= hotline ]
-                items.sort(cmp=lambda x,y: cmp(y['count'], x['count']))
+                items.sort(key=lambda x: x['count'], reverse=True)
         return {'meta': meta, "title": title, "items": items, 'total': count }
 
 class MetaBooks(ListHandler):

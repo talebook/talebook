@@ -1,9 +1,9 @@
 
-import book
-import user
-import meta
-import files
-import opds
+from . import book
+from . import user
+from . import meta
+from . import files
+from . import opds
 def routes():
     routes = []
     routes += opds.routes()

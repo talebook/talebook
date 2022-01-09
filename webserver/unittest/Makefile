@@ -1,3 +1,3 @@
 all:
-	python test_app.py #--failfast TestUser.test_login
+	python3 test_app.py --failfast #TestUser.test_refer
 

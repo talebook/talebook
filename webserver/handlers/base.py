@@ -1,15 +1,15 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 
-import re, os, logging, sys, time, datetime, base64
+import re, os, logging, sys, time, datetime, base64, hashlib
 from tornado import web, locale
 from tornado.options import define, options
 from jinja2 import Environment, FileSystemLoader
 from functools import wraps
 from collections import defaultdict
 from gettext import gettext as _
-from urlparse import urlparse
+from urllib.parse import urlparse
 import json
 
 import social_tornado.handlers
@@ -141,13 +141,15 @@ class BaseHandler(web.RequestHandler):
         self.should_be_invited()
 
     def set_i18n(self):
+        #TODO set correct language package
+        return
         import gettext
         accept = self.request.headers.get('Accept-Language', "")
         langs = [ v.strip().split(";")[0] for v in accept.split(",") if v.strip() ]
-        logging.debug("choose lang: %s" % langs)
-        if not langs: langs = ["zh_CN"]
-        lang = gettext.translation('messages', localedir=CONF['i18n_path'], languages=langs, fallback=True)
-        lang.install(unicode=True)
+        #logging.debug("choose lang: %s" % langs)
+        #if not langs: langs = ["zh_CN"]
+        #lang = gettext.translation('messages', localedir=CONF['i18n_path'], languages=langs, fallback=True)
+        #lang.install(unicode=True)
 
 
     def initialize(self):
@@ -430,18 +432,13 @@ class BaseHandler(web.RequestHandler):
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
         from email.mime.application import MIMEApplication
-        def get_md5(s):
-            import hashlib
-            md5 = hashlib.md5()
-            md5.update(s)
-            return md5.hexdigest()
 
         mail = MIMEMultipart()
         mail['From'] = sender
         mail['To'] = to
         mail['Subject'] = Header(subject, 'utf-8')
         mail['Date'] = formatdate(localtime=True)
-        mail['Message-ID'] = '<tencent_%s@qq.com>' % get_md5(mail.as_string())
+        mail['Message-ID'] = '<tencent_%s@qq.com>' % hashlib.md5(mail.as_string().encode("UTF-8")).hexdigest()
         mail.preamble = 'You will not see this in a MIME-aware mail reader.\n'
 
         if body is not None:
@@ -465,7 +462,7 @@ class ListHandler(BaseHandler):
         return books
 
     def do_sort(self, items, field, ascending):
-        items.sort(cmp=lambda x,y: cmp(x[field], y[field]), reverse=not ascending)
+        items.sort(key=lambda x: x[field], reverse=not ascending)
 
     def sort_books(self, items, field):
         self.do_sort(items, 'title', True)

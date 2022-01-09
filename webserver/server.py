@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 
@@ -157,13 +157,15 @@ def make_app():
         sys.exit(0)
 
     path = CONF['static_path'] + '/calibre/default_cover.jpg'
+    with open(path, 'rb') as cover_file:
+        default_cover = cover_file.read()
     app_settings = dict(CONF)
     app_settings.update({
         "legacy": book_db,
         "cache": cache,
         "ScopedSession": ScopedSession ,
         "build_time": fromtimestamp(os.stat(path).st_mtime),
-        "default_cover": open(path, 'rb').read(),
+        "default_cover": default_cover,
         })
 
     logging.info("Now, Running...")

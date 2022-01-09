@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 import sys, os, unittest, json, urllib, mock, logging
@@ -6,7 +6,8 @@ from tornado import testing
 
 dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.realpath( dir + "/../"))
-import server, models
+import server, models, settings
+settings.settings['settings_path'] = "/tmp/"
 
 
 _app = None
@@ -22,6 +23,7 @@ def setup_server():
     server.CONF['settings_path'] = "/tmp/"
     server.CONF['progress_path'] = "/tmp/"
     server.CONF['installed'] = True
+    server.CONF['INVITE_MODE'] = False
     server.CONF['user_database'] = 'sqlite:///%s/users.db' % dir
     _app = server.make_app()
 
@@ -44,8 +46,8 @@ def get_db():
 
 
 def Q(s):
-    if not isinstance(s, (str,unicode)): s = str(s)
-    return urllib.quote(s.encode("UTF-8"))
+    if not isinstance(s, str): s = str(s)
+    return urllib.parse.quote(s.encode("UTF-8"))
 
 class TestApp(testing.AsyncHTTPTestCase):
     def get_app(self):
@@ -178,7 +180,6 @@ class TestMeta(TestApp):
 
 class AutoResetPermission():
     def __init__(self, arg):
-        logging.error("Q = %s", arg)
         if not arg:
             arg = models.Reader.id == 1
         self.arg = arg
@@ -410,7 +411,8 @@ def setUpModule():
     setup_mock_sendmail()
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s')
+    logging.basicConfig(level=logging.DEBUG,
+            format='%(asctime)s %(levelname)s %(pathname)s/%(filename)s:%(lineno)d %(message)s')
     unittest.main()
 
 

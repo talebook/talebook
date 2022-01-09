@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 
@@ -16,7 +16,7 @@ from calibre.ebooks.metadata.opf2 import metadata_to_opf
 from calibre.ebooks.metadata.meta import get_metadata
 from calibre.ebooks.metadata.meta import set_metadata
 from calibre.library.save_to_disk import find_plugboard
-from base import BaseHandler
+from handlers.base import BaseHandler
 
 import loader
 CONF = loader.get_settings()
@@ -162,7 +162,7 @@ class ProgressHandler(BaseHandler):
 
         # erase all settings values from txt content
         for hidden in CONF.values():
-            if isinstance(hidden, (str, unicode)):
+            if isinstance(hidden, str):
                 txt.replace(hidden, "XXX")
         self.write(txt)
 

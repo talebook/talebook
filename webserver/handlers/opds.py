@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
 
 __license__   = 'GPL v3'
@@ -23,7 +23,7 @@ from calibre.utils.date import as_utc
 from calibre.utils.config import tweaks
 from calibre.utils.filenames import ascii_text
 
-from base import BaseHandler
+from handlers.base import BaseHandler
 import loader
 CONF = loader.get_settings()
 
@@ -250,9 +250,9 @@ def ACQUISITION_ENTRY(item, db, updated, CFM, CKEYS, prefix):
                                     joinval=CFM[key]['is_multiple']['list_to_ui']))))
             elif datatype == 'comments' or (CFM[key]['datatype'] == 'composite' and
                             CFM[key]['display'].get('contains_html', False)):
-                extra.append('%s: %s<br />'%(xml(name), comments_to_html(unicode(val))))
+                extra.append('%s: %s<br />'%(xml(name), comments_to_html(val)))
             else:
-                extra.append('%s: %s<br />'%(xml(name), xml(unicode(val))))
+                extra.append('%s: %s<br />'%(xml(name), xml(val)))
     comments = item[FM['comments']]
     if comments:
         comments = comments_to_html(comments)

@@ -1,11 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 import time, datetime, logging, re, hashlib, json, os
 import tornado.escape
 from tornado import web
 from models import Reader, Message
-from base import BaseHandler, js, auth
+from handlers.base import BaseHandler, js, auth
 from calibre.utils.smtp import sendmail, create_mail
 from version import VERSION
 
@@ -118,7 +118,7 @@ class AdminUsers(BaseHandler):
         if 'admin' in data: user.admin = data['admin']
 
         p = data.get('permission', "")
-        if not isinstance(p, (str, unicode)):
+        if not isinstance(p, str):
             return {'err': 'params.permission.invalid', 'msg': _(u'权限参数不对')}
         if p: user.set_permission(p)
         user.save()
@@ -249,7 +249,7 @@ class SignUp(BaseHandler):
         user.username = username
         user.name = nickname
         user.email = email
-        user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email).hexdigest()
+        user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
         user.create_time = datetime.datetime.now()
         user.update_time = datetime.datetime.now()
         user.access_time = datetime.datetime.now()
@@ -508,8 +508,12 @@ class SettingHandler(BaseHandler):
         html = self.render_string('index.html', **CONF)
         html.replace("Calibre Webserver", CONF['site_title'])
         page = os.path.join(CONF['html_path'], "index.html")
-        try: open(page, "w").write(html.encode("UTF-8"))
+        try:
+            with open(page, "w") as f:
+                f.write(html)
         except:
+            import traceback
+            logging.error(traceback.format_exc())
             return {'err': 'file.permission',
                     'msg': _(u'更新index.html失败！请确保文件的权限为可写入！')}
 
@@ -628,7 +632,7 @@ class AdminInstall(SettingHandler):
             user.username = username
             user.name = username
             user.email = email
-            user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email).hexdigest()
+            user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
             user.create_time = datetime.datetime.now()
             user.update_time = datetime.datetime.now()
             user.access_time = datetime.datetime.now()

@@ -1,13 +1,13 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 import logging
-import douban
-import baike
+from plugins.meta import douban
+from plugins.meta import baike
 import urllib
 import subprocess
 import tornado.escape
-from base import *
+from handlers.base import *
 
 from calibre.ebooks.metadata import authors_to_string
 from calibre.ebooks.conversion.plumber import Plumber
@@ -69,8 +69,8 @@ u"神经网络", u"程序",
 ),
 )
 
-import Queue, threading, functools
-_q = Queue.Queue()
+import queue, threading, functools
+_q = queue.Queue()
 
 def background(func):
     @functools.wraps(func)
@@ -93,22 +93,21 @@ def do_ebook_convert(old_path, new_path, log_path):
     args = ['ebook-convert', old_path, new_path]
     if new_path.lower().endswith(".epub"): args += ['--flow-size', '0']
 
-    log = open(log_path, "w", 0)
-    cmd = " ".join( "'%s'" % v for v in args)
-    logging.info("CMD: %s" % cmd )
-    p = subprocess.Popen(args, stdout=log, stderr=subprocess.PIPE)
-    err = ""
-    while p.poll() == None:
-        _, e = p.communicate()
-        err += e
-    logging.info("ebook-convert finish: %s" % new_path)
+    with open(log_path, "w", 0) as log:
+        cmd = " ".join( "'%s'" % v for v in args)
+        logging.info("CMD: %s" % cmd )
+        p = subprocess.Popen(args, stdout=log, stderr=subprocess.PIPE)
+        err = ""
+        while p.poll() == None:
+            _, e = p.communicate()
+            err += e
+        logging.info("ebook-convert finish: %s" % new_path)
 
-    if err:
-        log.write(err)
-        log.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
-        log.close()
-        return (False, err)
-    return (True, "")
+        if err:
+            log.write(err)
+            log.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
+            return (False, err)
+        return (True, "")
 
 
 class Index(BaseHandler):
@@ -383,8 +382,8 @@ class BookDownload(BaseHandler):
 
         self.set_header('Content-Disposition', att.encode('UTF-8'))
         self.set_header('Content-Type', 'application/octet-stream')
-        f = open(path, 'rb').read()
-        self.write( f )
+        with open(path, 'rb') as f:
+            self.write(f.read())
 
 class BookNav(ListHandler):
     @js
@@ -424,8 +423,8 @@ class HotBook(ListHandler):
         count = db_items.count()
         start = self.get_argument_start()
         delta = 30
-        page_max = count / delta
-        page_now = start / delta
+        page_max = int(count / delta)
+        page_now = int(start / delta)
         pages = []
         for p in range(page_now-3, page_now+3):
             if 0 <= p and p <= page_max:
@@ -466,8 +465,9 @@ class BookUpload(BaseHandler):
             f.write(data)
 
         # read ebook meta
-        stream = open(fpath, 'rb')
-        mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+        with open(fpath, 'rb') as stream:
+            mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+
         if fmt.lower() == "txt":
             mi.title = name.replace(".txt", "")
             mi.authors = [_(u'佚名')]
@@ -509,7 +509,7 @@ class BookRead(BaseHandler):
             if not fpath: continue
             # epub_dir is for javascript
             epub_dir = os.path.dirname(fpath).replace(CONF['with_library'], "/get/extract/")
-            epub_dir = urllib.quote( epub_dir )
+            epub_dir = urllib.parse.quote( epub_dir )
             self.extract_book(book, fpath, fmt)
             return self.html_page('book/read.html', vars())
 
@@ -537,18 +537,19 @@ class BookRead(BaseHandler):
                 self.add_msg("danger", u'文件格式转换失败，请在QQ群里联系管理员.')
                 return
 
-            self.db.add_format(book['id'], new_fmt, open(new_path, "rb"), index_is_id=True)
+            with open(new_path, "rb") as f:
+                self.db.add_format(book['id'], new_fmt, f, index_is_id=True)
             fpath = new_path
 
         # extract to dir
         logging.error('extract book: %s' % fpath)
         os.chdir(fdir)
-        log = open(progress_file, "a")
-        log.write(u"Dir: %s\n" % fdir)
-        subprocess.call(["unzip", fpath, "-d", fdir], stdout=log)
-        subprocess.call(["chmod", "a+rx", "-R", fdir+ "/META-INF"])
-        if new_path: subprocess.call(["rm", new_path])
-        log.close()
+        with open(progress_file, "a") as log:
+            log.write(u"Dir: %s\n" % fdir)
+            subprocess.call(["unzip", fpath, "-d", fdir], stdout=log)
+            subprocess.call(["chmod", "a+rx", "-R", fdir+ "/META-INF"])
+            if new_path:
+                subprocess.call(["rm", new_path])
         return
 
 
@@ -600,7 +601,8 @@ class BookPush(BaseHandler):
             self.add_msg("danger", u'文件格式转换失败，请在QQ群里联系管理员.')
             return
 
-        self.db.add_format(book['id'], new_fmt, open(new_path, "rb"), index_is_id=True)
+        with open(new_path, "rb") as f:
+            self.db.add_format(book['id'], new_fmt, f, index_is_id=True)
         if mail_to:
             self.do_send_mail(book, mail_to, new_fmt, new_path)
         return
@@ -611,7 +613,8 @@ class BookPush(BaseHandler):
         author = authors_to_string(book['authors'] if book['authors'] else [_(u'佚名')])
         title = book['title'] if book['title'] else _(u"无名书籍")
         fname = u'%s - %s.%s'%(title, author, fmt)
-        fdata = open(fpath).read()
+        with open(fpath) as f:
+            fdata = r.read()
 
         site_title = CONF['site_title']
         mail_from = self.settings['smtp_username']
