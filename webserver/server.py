@@ -35,7 +35,6 @@ define("syncdb", default=False, type=bool, help=_('Create all tables'))
 
 def init_calibre():
     path = options.path_calibre
-    print(path)
     if path not in sys.path: sys.path.insert(0, path)
     sys.resources_location = options.path_resources
     sys.extensions_location = options.path_plugins
