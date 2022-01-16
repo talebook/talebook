@@ -163,12 +163,12 @@ class BaseHandler(web.RequestHandler):
         self.static_host = CONF.get("static_host", "")
         self.cookies_cache = {}
         if self.static_host:
-            self.static_host = self.request.protocol + "://" + self.static_host
+            self.static_host = "//" + self.static_host
 
         host = CONF.get("static_host", "")
         if not host: host = self.request.host
-        self.cdn_url = self.request.protocol + "://" + host
-        self.base_url = self.request.protocol + "://" + self.request.host
+        self.cdn_url = "//" + host
+        self.base_url = "//" + self.request.host
 
     def on_finish(self):
         ScopedSession = self.settings['ScopedSession']
