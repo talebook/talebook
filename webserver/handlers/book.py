@@ -246,7 +246,7 @@ class BookRefer(BaseHandler):
         mi = self.db.get_metadata(book_id, index_is_id=True)
         title = re.sub(u'[(（].*', "", mi.title)
 
-        api = douban.DoubanBookApi(CONF['douban_apikey'], copy_image=False)
+        api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseUrl'], copy_image=False, maxCount=CONF['douban_maxCount'])
         # first, search title
         books = api.get_books_by_title(title)
         books = [] if books == None else books
