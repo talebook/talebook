@@ -116,6 +116,7 @@ class DoubanBookApi(object):
         mi.publisher   = book['publisher']
         mi.comments    = book['summary']
         mi.isbn        = book.get('isbn13', None)
+        mi.series     = book.get('serials', None)
         mi.tags        = [ t['name'] for t in book['tags'] ][:8]
         mi.rating      = int(float(book['rating']['average']))
         mi.pubdate     = self.str2date(book['pubdate'])

@@ -53,10 +53,12 @@ settings = {
     'SOCIAL_AUTH_GITHUB_SECRET'        : '',
 
     # See: http://service.mail.qq.com/cgi-bin/help?subtype=1&&no=1001256&&id=28
-    'smtp_server'   : "smtp.talebook.org",
-    'smtp_username' : "sender@talebook.org",
-    'smtp_password' : "password",
-    'douban_apikey' : "0df993c66c0c636e29ecbb5344252a4a",
+    'smtp_server'       : "smtp.talebook.org",
+    'smtp_username'     : "sender@talebook.org",
+    'smtp_password'     : "password",
+    'douban_apikey'     : "0df993c66c0c636e29ecbb5344252a4a",
+    'douban_baseurl'    : "https://api.douban.com",
+    'douban_max_count'  : 2,
 
     'BOOK_NAMES_FORMAT': 'en',
 
