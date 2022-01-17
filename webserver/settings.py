@@ -57,7 +57,7 @@ settings = {
     'smtp_username'     : "sender@talebook.org",
     'smtp_password'     : "password",
     'douban_apikey'     : "0df993c66c0c636e29ecbb5344252a4a",
-    'douban_baseurl'    : "http://192.168.2.108:8035",
+    'douban_baseurl'    : "https://api.douban.com",
     'douban_max_count'  : 2,
 
     'BOOK_NAMES_FORMAT': 'en',
