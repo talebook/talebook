@@ -135,8 +135,8 @@ class ProxyImageHandler(BaseHandler):
     def get(self):
         url = self.get_argument("url")
 
-        import urllib2, requests
-        p = urllib2.urlparse.urlparse(url)
+        import urllib, requests
+        p = urllib.parse.urlparse(url)
         if not self.is_whitelist(p.netloc):
             self.write("yoho")
             return

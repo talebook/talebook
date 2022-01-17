@@ -5,7 +5,7 @@ __license__   = 'GPL v3'
 __copyright__ = '2014, Rex<talebook@foxmail.com>'
 __docformat__ = 'restructuredtext en'
 
-import os, re, sys, json, logging, datetime, requests
+import os, io, re, sys, json, logging, datetime, requests
 from urllib.request import urlopen
 
 REMOVES = [
@@ -23,10 +23,12 @@ CHROME_HEADERS = {
 
 
 class DoubanBookApi(object):
-    def __init__(self, apikey, copy_image=True, manual_select=False):
+    def __init__(self, apikey, baseUrl, copy_image=True, manual_select=False, maxCount = 2):
         self.apikey = apikey
         self.copy_image = copy_image
         self.manual_select = manual_select
+        self.baseUrl = baseUrl
+        self.maxCount = maxCount
 
     def author(self, book):
         author = book['author']
@@ -35,8 +37,7 @@ class DoubanBookApi(object):
         return author
 
     def get_book_by_isbn(self, isbn):
-        API_SEARCH = "https://api.douban.com/v2/book/isbn/%s"
-        url = API_SEARCH % isbn
+        url = "%s/v2/book/isbn/%s" % (self.baseUrl, isbn)
         args = {'apikey': self.apikey}
         rsp = requests.get(url, headers=CHROME_HEADERS, params=args).json()
         if 'code' in rsp and rsp['code'] != 0:
@@ -45,9 +46,9 @@ class DoubanBookApi(object):
         return rsp
 
     def get_books_by_title(self, title, author=None):
-        url = "https://api.douban.com/v2/book/search"
+        url = "%s/v2/book/search/" % self.baseUrl
         q = title + " " + author if author else title
-        args = {'apikey': self.apikey, 'q': q.encode('UTF-8') }
+        args = {'apikey': self.apikey, 'q': q.encode('UTF-8'), 'count': self.maxCount }
         rsp = requests.get(url, headers=CHROME_HEADERS, params=args).json()
         if 'code' in rsp and rsp['code'] != 0:
             logging.error("******** douban API error: %d-%s **********" % (rsp['code'], rsp['msg']) )
@@ -109,7 +110,6 @@ class DoubanBookApi(object):
         if not authors: authors = [ u'佚名' ]
 
         from calibre.ebooks.metadata.book.base import Metadata
-        from cStringIO import StringIO
         mi = Metadata(book['title'])
         mi.authors     = authors
         mi.author_sort = mi.authors[0]
@@ -128,7 +128,7 @@ class DoubanBookApi(object):
 
         mi.cover_url = book['images']['large']
         if self.copy_image:
-            img = StringIO(urlopen(mi.cover_url).read())
+            img = io.BytesIO(urlopen(mi.cover_url).read())
             img_fmt = mi.cover_url.split(".")[-1]
             mi.cover_data = (img_fmt, img)
 
