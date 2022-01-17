@@ -312,7 +312,7 @@ class TestUser(TestApp):
 
         user = get_db().query(models.Reader).filter(models.Reader.username=='active').first()
         user.set_permission("L")
-        logging.error("user[%s] id[%s] permission[%s]", user.username, user.id, user.permission)
+        logging.debug("user[%s] id[%s] permission[%s]", user.username, user.id, user.permission)
         d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d['err'], 'permission')
 
@@ -403,6 +403,44 @@ class TestAdmin(TestApp):
         self.assertEqual(d['rsp']['site_title'], 'abc')
         self.assertTrue('not_work' not in d['rsp'])
 
+class TestOpds(TestApp):
+    @classmethod
+    def setUpClass(self):
+        self.user = _mock_user.start()
+        self.user.return_value = 1
+        self.mail = _mock_mail.start()
+        self.mail.return_value = True
+
+    @classmethod
+    def tearDownClass(self):
+        _mock_user.stop()
+        _mock_mail.stop()
+
+    def parse_xml(self, text):
+        from xml.parsers.expat import ParserCreate, ExpatError, errors
+        p = ParserCreate()
+        return p.Parse(text)
+
+    def test_opds(self):
+        rsp = self.fetch("/opds/")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_nav(self):
+        rsp = self.fetch("/opds/nav/4e617574686f7273?offset=0")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_category(self):
+        rsp = self.fetch("/opds/category/617574686f7273/4931303a617574686f7273")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_search(self):
+        rsp = self.fetch("/opds/search/cool")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
 
 def setUpModule():
     setup_server()
@@ -410,8 +448,8 @@ def setUpModule():
     setup_mock_sendmail()
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG,
-            format='%(asctime)s %(levelname)s %(pathname)s/%(filename)s:%(lineno)d %(message)s')
+    logging.basicConfig(level=logging.ERROR,
+            format='%(asctime)s %(levelname)5s %(pathname)s:%(lineno)d %(message)s')
     unittest.main()
 
 

@@ -257,18 +257,19 @@ class BaseHandler(web.RequestHandler):
         return lm.replace('month', month[updated.month])
 
     def sort(self, items, field, order):
-        from calibre.library.caches import SortKeyGenerator
+        from calibre.library.caches import SortKeyGenerator, SortKey
         class CSSortKeyGenerator(SortKeyGenerator):
             def __init__(self, fields, fm, db_prefs):
                 SortKeyGenerator.__init__(self, fields, fm, None, db_prefs)
             def __call__(self, record):
-                return self.itervals(record).next()
+                values = tuple(self.itervals(record))
+                return SortKey(self.orders, values)
 
         field = self.db.data.sanitize_sort_field_name(field)
         if field not in self.db.field_metadata.sortable_field_keys():
             raise cherrypy.HTTPError(400, '%s is not a valid sort field'%field)
-        keyg = CSSortKeyGenerator([(field, order)], self.db.field_metadata,
-                                  self.db.prefs)
+
+        keyg = CSSortKeyGenerator([(field, order)], self.db.field_metadata, self.db.prefs)
         items.sort(key=keyg, reverse=not order)
 
     def get_template_path(self):

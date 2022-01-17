@@ -98,9 +98,7 @@ def first_char(item):
 
 
 def hexlify(x):
-    if isinstance(x, unicode):
-        x = x.encode('utf-8')
-    return binascii.hexlify(x)
+    return binascii.hexlify(x.encode('utf-8')).decode("ascii")
 
 def unhexlify(x):
     return binascii.unhexlify(x).decode('utf-8')
@@ -145,7 +143,7 @@ def AUTHOR(name, uri=None):
 
 def NAVCATALOG_ENTRY(base_href, updated, title, description, query):
     href = base_href+'/nav/'+hexlify(query)
-    id_ = 'calibre-nav:'+str(hashlib.sha1(href).hexdigest())
+    id_ = 'calibre-nav:'+str(hashlib.sha1(href.encode("utf-8")).hexdigest())
     return E.entry(
         TITLE(title),
         ID(id_),
@@ -222,7 +220,7 @@ def ACQUISITION_ENTRY(item, db, updated, CFM, CKEYS, prefix):
     authors = ' & '.join([i.replace('|', ',') for i in
                                     authors.split(',')])
     extra = []
-    rating = item[FM['rating']]
+    rating = item[FM['rating']] or 0
     if rating > 0:
         rating = u''.join(repeat(u'\u2605', int(rating/2.)))
         extra.append(_('RATING: %s<br />')%rating)
@@ -316,7 +314,7 @@ class Feed(object):
         if subtitle:
             self.root.insert(1, SUBTITLE(subtitle))
 
-    def __str__(self):
+    def __bytes__(self):
         return etree.tostring(self.root, pretty_print=True, encoding='utf-8',
                 xml_declaration=True)
 
@@ -405,7 +403,7 @@ class OpdsHandler(BaseHandler):
         updated = self.db.last_modified()
         self.set_header('Last-Modified', self.last_modified(updated) )
         self.set_header('Content-Type', 'application/atom+xml; profile=opds-catalog; charset=UTF-8')
-        return str(AcquisitionFeed(updated, id_, items, offsets,
+        return bytes(AcquisitionFeed(updated, id_, items, offsets,
                                    page_url, up_url, self.db,
                                    CONF['url_prefix'], title=feed_title))
 
@@ -480,7 +478,7 @@ class OpdsHandler(BaseHandler):
         self.set_header('Last-Modified', self.last_modified(updated) )
         self.set_header('Content-Type', 'application/atom+xml; charset=UTF-8')
 
-        return str(CategoryFeed(items, category, id_, updated, offsets,
+        return bytes(CategoryFeed(items, category, id_, updated, offsets,
             page_url, up_url, self.db, title=feed_title))
 
     def opds_navcatalog(self, which=None, offset=0):
@@ -548,7 +546,7 @@ class OpdsHandler(BaseHandler):
         self.set_header('Last-Modified', self.last_modified(updated))
         self.set_header('Content-Type', 'application/atom+xml; charset=UTF-8')
 
-        return str(ans)
+        return bytes(ans)
 
     def opds_category(self, category=None, which=None, offset=0):
         try:
@@ -632,7 +630,7 @@ class OpdsHandler(BaseHandler):
 
         feed = TopLevel(updated, cats)
 
-        return str(feed)
+        return bytes(feed)
 
 class OpdsIndex(OpdsHandler):
     def get(self):
