@@ -136,6 +136,9 @@ docker run -d --name talebook -p 80:80 -v /data/calibre:/data -v /data/logo:/var
 1. 如果明确提示`413`错误码，那么一般是由于nginx限制了上传大小。本项目中自带的nginx已配置了`client_max_body_size 0`，即不限制上传大小；
 因此建议使用者排查下是否在本项目之外配置有其他的nginx代理转发，调整其中的配置。
 
+## 如果配置豆瓣插件
+需启用[cxfksword/douban-api-rs](https://github.com/cxfksword/douban-api-rs)服务，然后将对应的API地址填写到高级配置项中。
+
 
 问题排查
 ===============
