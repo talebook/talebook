@@ -345,7 +345,12 @@ class BookDelete(BaseHandler):
     def post(self, bid):
         book = self.get_book(bid)
         bid = book['id']
-        cid = book['collector']['id']
+        if isinstance(book['collector'], dict):
+            cid = book['collector']['id']
+        else:
+            cid = book['collector'].id
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
+            return {'err': 'permission', 'msg': _(u'无权操作')}
 
         if not self.current_user.can_delete() or not (self.is_admin() or self.is_book_owner(bid, cid)):
             return {'err': 'permission', 'msg': _(u'无权操作')}
