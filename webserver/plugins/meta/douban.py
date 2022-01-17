@@ -48,7 +48,7 @@ class DoubanBookApi(object):
     def get_books_by_title(self, title, author=None):
         url = "%s/v2/book/search/" % self.baseUrl
         q = title + " " + author if author else title
-        args = {'apikey': self.apikey, 'q': q.encode('UTF-8'), 'maxCount': self.maxCount }
+        args = {'apikey': self.apikey, 'q': q.encode('UTF-8'), 'count': self.maxCount }
         rsp = requests.get(url, headers=CHROME_HEADERS, params=args).json()
         if 'code' in rsp and rsp['code'] != 0:
             logging.error("******** douban API error: %d-%s **********" % (rsp['code'], rsp['msg']) )
