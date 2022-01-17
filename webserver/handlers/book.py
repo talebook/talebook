@@ -295,7 +295,7 @@ class BookRefer(BaseHandler):
             refer_mi = api.get_book(title)
         else:
             mi.isbn = isbn
-            api = douban.DoubanBookApi(CONF['douban_apikey'], copy_image=True)
+            api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseUrl'], copy_image=True, maxCount=CONF['douban_maxCount'])
             refer_mi = api.get_book(mi)
 
         if only_cover == "yes":
