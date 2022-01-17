@@ -245,7 +245,7 @@ class BookRefer(BaseHandler):
         book_id = int(id)
         mi = self.db.get_metadata(book_id, index_is_id=True)
         title = re.sub(u'[(（].*', "", mi.title)
-        api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseUrl'], copy_image=False, manual_select=False, maxCount=CONF['douban_maxCount'])
+        api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseurl'], copy_image=False, manual_select=False, maxCount=CONF['douban_max_count'])
         # first, search title
         books = api.get_books_by_title(title)
         books = [] if books == None else books
@@ -294,7 +294,7 @@ class BookRefer(BaseHandler):
             refer_mi = api.get_book(title)
         else:
             mi.isbn = isbn
-            api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseUrl'], copy_image=True, maxCount=CONF['douban_maxCount'])
+            api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseurl'], copy_image=True, maxCount=CONF['douban_max_count'])
             refer_mi = api.get_book(mi)
 
         if only_cover == "yes":
