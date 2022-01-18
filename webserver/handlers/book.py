@@ -173,11 +173,6 @@ class BookDetail(BaseHandler):
         book_id = book['id']
         book['is_owner'] = self.is_book_owner(book_id, self.user_id())
         book['is_public'] = True
-        '''
-        if ( book['publisher'] and book['publisher'] in (u'中信出版社') ) or u'吴晓波' in list(book['authors']):
-            if not book['is_owner']:
-                book['is_public'] = False
-        '''
         if self.is_admin():
             book['is_public'] = True
             book['is_owner'] = True
