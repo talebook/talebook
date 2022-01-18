@@ -417,6 +417,7 @@ class TestOpds(TestApp):
         _mock_mail.stop()
 
     def parse_xml(self, text):
+        #logging.error(text.decode("UTF-8"))
         from xml.parsers.expat import ParserCreate, ExpatError, errors
         p = ParserCreate()
         return p.Parse(text)
@@ -427,9 +428,20 @@ class TestOpds(TestApp):
         self.parse_xml(rsp.body)
 
     def test_opds_nav(self):
-        rsp = self.fetch("/opds/nav/4e617574686f7273?offset=0")
-        self.assertEqual(rsp.code, 200)
-        self.parse_xml(rsp.body)
+        urls = [
+                "/opds/nav/4e617574686f7273",
+                "/opds/nav/4e6c616e677561676573",
+                "/opds/nav/4e7075626c6973686572",
+                "/opds/nav/4e726174696e67",
+                "/opds/nav/4e736572696573",
+                "/opds/nav/4e74616773",
+                "/opds/nav/4f6e6577657374",
+                "/opds/nav/4f7469746c65",
+                ]
+        for url in urls:
+            rsp = self.fetch("%s?offset=0" % url)
+            self.assertEqual(rsp.code, 200)
+            self.parse_xml(rsp.body)
 
     def test_opds_category(self):
         rsp = self.fetch("/opds/category/617574686f7273/4931303a617574686f7273")
@@ -448,7 +460,7 @@ def setUpModule():
     setup_mock_sendmail()
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.ERROR,
+    logging.basicConfig(level=logging.DEBUG,
             format='%(asctime)s %(levelname)5s %(pathname)s:%(lineno)d %(message)s')
     unittest.main()
 

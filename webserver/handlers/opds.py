@@ -29,8 +29,8 @@ CONF = loader.get_settings()
 
 def custom_fields_to_display(db):
     ckeys = set(db.field_metadata.ignorable_field_keys())
-    yes_fields = set(tweaks['content_server_will_display'])
-    no_fields = set(tweaks['content_server_wont_display'])
+    yes_fields = set(CONF['opds_will_display'])
+    no_fields = set(CONF['opds_wont_display'])
     if '*' in yes_fields:
         yes_fields = ckeys
     if '*' in no_fields:
@@ -60,7 +60,7 @@ class Offsets(object):
             self.last_offset = 0
 
 def format_tag_string(tags, sep, ignore_max=False, no_tag_count=False, joinval=', '):
-    MAX = sys.maxint if ignore_max else tweaks['max_content_server_tags_shown']
+    MAX = sys.maxsize if ignore_max else CONF['opds_max_tags_shown']
     if tags:
         tlist = [t.strip() for t in tags.split(sep)]
     else:
@@ -71,7 +71,7 @@ def format_tag_string(tags, sep, ignore_max=False, no_tag_count=False, joinval='
     if no_tag_count:
         return joinval.join(tlist) if tlist else ''
     else:
-        return u'%s:&:%s'%(tweaks['max_content_server_tags_shown'],
+        return u'%s:&:%s'%(tweaks['opds_max_tags_shown'],
                      joinval.join(tlist)) if tlist else ''
 
 
@@ -397,7 +397,7 @@ class OpdsHandler(BaseHandler):
             raise web.HTTPError(404, reason='No books found')
         items = [x for x in self.db.data.iterall() if x[idx] in ids]
         self.sort(items, sort_by, ascending)
-        max_items = CONF['max_opds_items']
+        max_items = CONF['opds_max_items']
         offsets = Offsets(offset, max_items, len(items))
         items = items[offsets.offset:offsets.offset+max_items]
         updated = self.db.last_modified()
@@ -471,7 +471,7 @@ class OpdsHandler(BaseHandler):
         updated = self.db.last_modified()
 
         id_ = 'calibre-category-group-feed:'+category+':'+which
-        max_items = CONF['max_opds_items']
+        max_items = CONF['opds_max_items']
         offsets = Offsets(offset, max_items, len(items))
         items = list(items)[offsets.offset:offsets.offset+max_items]
 
@@ -515,10 +515,10 @@ class OpdsHandler(BaseHandler):
 
         id_ = 'calibre-category-feed:'+which
 
-        MAX_ITEMS = CONF['max_opds_ungrouped_items']
+        MAX_ITEMS = CONF['opds_max_ungrouped_items']
 
         if len(items) <= MAX_ITEMS:
-            max_items = CONF['max_opds_items']
+            max_items = CONF['opds_max_items']
             offsets = Offsets(offset, max_items, len(items))
             items = list(items)[offsets.offset:offsets.offset+max_items]
             ans = CategoryFeed(items, which, id_, updated, offsets,
@@ -537,7 +537,7 @@ class OpdsHandler(BaseHandler):
             for c in sorted(groups.keys(), key=sort_key):
                 items.append( Group(c, groups[c]) )
 
-            max_items = CONF['max_opds_items']
+            max_items = CONF['opds_max_items']
             offsets = Offsets(offset, max_items, len(items))
             items = items[offsets.offset:offsets.offset+max_items]
             ans = CategoryGroupFeed(items, which, id_, updated, offsets,
