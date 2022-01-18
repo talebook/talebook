@@ -205,6 +205,9 @@ class BookDetail(BaseHandler):
         try: pubdate = b['pubdate'].strftime("%Y-%m-%d")
         except: pubdate = None
 
+        try: ts = b['timestamp'].strftime("%Y-%m-%d")
+        except: ts = int(time.time())
+
         return {
                 'err': 'ok',
                 'kindle_sender': CONF['smtp_username'],
@@ -214,7 +217,7 @@ class BookDetail(BaseHandler):
                     'rating'          : b['rating'],
                     'count_visit'     : b['count_visit'],
                     'count_download'  : b['count_download'],
-                    'timestamp'       : b['timestamp'].strftime("%Y-%m-%d"),
+                    'timestamp'       : ts,
                     'pubdate'         : pubdate,
                     'collector'       : collector,
                     'authors'         : b['authors'],
