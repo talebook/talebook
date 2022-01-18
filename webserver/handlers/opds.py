@@ -44,7 +44,7 @@ class Offsets(object):
         if offset < 0:
             offset = 0
         if offset >= total:
-            raise cherrypy.HTTPError(404, 'Invalid offset: %r'%offset)
+            raise web.HTTPError(404, reason='Invalid offset: %r'%offset)
         last_allowed_index = total - 1
         last_current_index = offset + delta - 1
         self.slice_upper_bound = offset+delta

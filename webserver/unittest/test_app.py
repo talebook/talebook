@@ -417,7 +417,7 @@ class TestOpds(TestApp):
         _mock_mail.stop()
 
     def parse_xml(self, text):
-        #logging.error(text.decode("UTF-8"))
+        logging.error(text.decode("UTF-8"))
         from xml.parsers.expat import ParserCreate, ExpatError, errors
         p = ParserCreate()
         return p.Parse(text)
@@ -428,6 +428,12 @@ class TestOpds(TestApp):
         self.parse_xml(rsp.body)
 
     def test_opds_nav(self):
+        rsp = self.fetch("/opds/nav/4e617574686f7273?offset=1")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_nav2(self):
+        server.CONF['opds_max_ungrouped_items'] = 2
         urls = [
                 "/opds/nav/4e617574686f7273",
                 "/opds/nav/4e6c616e677561676573",
@@ -438,13 +444,30 @@ class TestOpds(TestApp):
                 "/opds/nav/4f6e6577657374",
                 "/opds/nav/4f7469746c65",
                 ]
+        groups = [
+                2,
+                server.CONF['opds_max_ungrouped_items'],
+                ]
         for url in urls:
-            rsp = self.fetch("%s?offset=0" % url)
-            self.assertEqual(rsp.code, 200)
-            self.parse_xml(rsp.body)
+            for g in groups:
+                server.CONF['opds_max_ungrouped_items'] = g
+                rsp = self.fetch(url)
+                self.assertEqual(rsp.code, 200)
+                self.parse_xml(rsp.body)
 
     def test_opds_category(self):
         rsp = self.fetch("/opds/category/617574686f7273/4931303a617574686f7273")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+        import binascii
+        c = binascii.hexlify(b"search").decode("utf-8")
+        rsp = self.fetch("/opds/category/%s/4931303a617574686f7273" % c)
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_category_group(self):
+        rsp = self.fetch("/opds/categorygroup/74616773/43")
         self.assertEqual(rsp.code, 200)
         self.parse_xml(rsp.body)
 
@@ -452,6 +475,12 @@ class TestOpds(TestApp):
         rsp = self.fetch("/opds/search/cool")
         self.assertEqual(rsp.code, 200)
         self.parse_xml(rsp.body)
+
+    def test_opds_without_login(self):
+        server.CONF['INVITE_MODE'] = True
+        rsp = self.fetch("/opds/nav/4f7469746c65")
+        self.assertEqual(rsp.code, 401)
+        server.CONF['INVITE_MODE'] = False
 
 
 def setUpModule():

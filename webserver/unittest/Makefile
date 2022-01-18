@@ -6,7 +6,6 @@ testv:
 	coverage report --include "*talebook*"
 
 testvv: testv
-	OUT=.htmlcov
-	coverage html -d "$${OUT}" --include "*talebook*"
-	cd "$${OUT}" && python3 -m http.server 7777
+	coverage html -d ".htmlcov" --include "*talebook*"
+	cd ".htmlcov" && python3 -m http.server 7777
 
