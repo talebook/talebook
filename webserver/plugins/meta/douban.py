@@ -6,7 +6,7 @@ __copyright__ = '2014, Rex<talebook@foxmail.com>'
 __docformat__ = 'restructuredtext en'
 
 import os, io, re, sys, json, logging, datetime, requests
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 
 REMOVES = [
         re.compile(u'^\([^)]*\)\s*'),
@@ -129,7 +129,7 @@ class DoubanBookApi(object):
 
         mi.cover_url = book['images']['large']
         if self.copy_image:
-            img = io.BytesIO(urlopen(mi.cover_url).read())
+            img = io.BytesIO(urlopen(Request(mi.cover_url, headers=CHROME_HEADERS)).read())
             img_fmt = mi.cover_url.split(".")[-1]
             mi.cover_data = (img_fmt, img)
 
