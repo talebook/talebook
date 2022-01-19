@@ -56,10 +56,9 @@ class BaiduBaikeApi:
         mi.provider_key = KEY
         mi.provider_value = baike.get_id()
 
-        if self.copy_image:
-            if self.copy_image and mi.cover_url:
-                logging.debug("fetching cover: %s", mi.cover_url)
-                img = io.BytesIO(urlopen(mi.cover_url).read())
+        if self.copy_image and mi.cover_url:
+            logging.debug("fetching cover: %s", mi.cover_url)
+            img = io.BytesIO(urlopen(mi.cover_url).read())
             img_fmt = mi.cover_url.split(".")[-1]
             mi.cover_data = (img_fmt, img)
 
