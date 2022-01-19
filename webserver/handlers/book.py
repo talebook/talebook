@@ -305,6 +305,8 @@ class BookRefer(BaseHandler):
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseurl'], copy_image=True, maxCount=CONF['douban_max_count'])
             refer_mi = api.get_book(mi)
+        else:
+            return {'err': 'params.provider_key.invalid', 'msg': _(u'尚不支持的provider_key: %s' % provider_key)}
 
         if only_cover == "yes":
             # just set cover
