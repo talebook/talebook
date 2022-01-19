@@ -48,7 +48,7 @@ class ImageHandler(BaseHandler):
             return self.get_cover(id, thumbnail=True, thumb_width=width, thumb_height=height)
         if fmt == 'cover': return self.get_cover(id)
         if fmt == 'opf': return self.get_metadata_as_opf(id)
-        return self.get_format(id, fmt)
+        raise web.HTTPError(404, "bad url")
 
     # Actually get content from the database {{{
     def get_cover(self, id, thumbnail=False, thumb_width=60, thumb_height=80):
@@ -79,50 +79,6 @@ class ImageHandler(BaseHandler):
         data = metadata_to_opf(mi)
         self.set_header( 'Last-Modified', self.last_modified(mi.last_modified) )
         return data
-
-    def get_format(self, id, format):
-        format = format.upper()
-        fm = self.db.format_metadata(id, format, allow_cache=False)
-        if not fm:
-            raise web.HTTPError(404, 'book: %d does not have format: %s'%(id, format))
-        mi = newmi = self.db.get_metadata(id, index_is_id=True)
-        self.set_header( 'Last-Modified', self.last_modified(max(fm['mtime'], mi.last_modified)) )
-        fmt = self.db.format(id, format, index_is_id=True, as_file=True, mode='rb')
-        if fmt is None:
-            raise web.HTTPError(404, 'book: %d does not have format: %s'%(id, format))
-        mt = guess_type('dummy.'+format.lower())[0]
-        if mt is None:
-            mt = 'application/octet-stream'
-        self.set_header( 'Content-Type', mt )
-
-        if format == 'EPUB':
-            # Get the original metadata
-            # Get any EPUB plugboards for the content server
-            plugboards = self.db.prefs.get('plugboards', {})
-            cpb = find_plugboard(plugboard_content_server_value,
-                                 'epub', plugboards)
-            if cpb:
-                # Transform the metadata via the plugboard
-                newmi = mi.deepcopy_metadata()
-                newmi.template_to_attribute(mi, cpb)
-
-        if format in ('MOBI', 'EPUB'):
-            # Write the updated file
-            set_metadata(fmt, newmi, format.lower())
-            fmt.seek(0)
-
-        fmt.seek(0, 2)
-        self.set_header( 'Content-Lenght', fmt.tell() )
-        fmt.seek(0)
-
-        au = authors_to_string(newmi.authors if newmi.authors else
-                [_('Unknown')])
-        title = newmi.title if newmi.title else _('Unknown')
-        fname = u'%s - %s_%s.%s'%(title[:30], au[:30], id, format.lower())
-        fname = ascii_filename(fname).replace('"', '_')
-        self.set_header( 'Content-Disposition',
-                b'attachment; filename="%s"'%fname )
-        return fmt
 
 class ProxyImageHandler(BaseHandler):
     def is_whitelist(self, host):

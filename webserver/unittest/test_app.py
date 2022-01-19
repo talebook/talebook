@@ -239,10 +239,6 @@ class TestUser(TestApp):
         rsp = self.fetch("/get/opf/1", follow_redirects=False)
         self.assertEqual(rsp.code, 200)
 
-    def test_get_file(self):
-        rsp = self.fetch("/get/epub/1", follow_redirects=False)
-        self.assertEqual(rsp.code, 200)
-
     def test_download_permission(self):
         with mock_permission() as user:
             user.set_permission('S') # forbid
@@ -307,10 +303,9 @@ class TestUser(TestApp):
             self.assertEqual(rsp.code, 200)
 
     def test_refer(self):
+        server.CONF['douban_baseurl'] = 'http://10.0.0.15:7001'
         d = self.json("/api/book/1/refer")
         self.assertEqual(d['err'], 'ok')
-
-        server.CONF['douban_baseurl'] = 'http://10.0.0.15:7001'
 
         for book in d['books']:
             isbn = book['isbn']
