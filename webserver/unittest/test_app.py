@@ -4,8 +4,8 @@
 import sys, os, unittest, json, urllib, mock, logging
 from tornado import testing
 
-dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.dirname(dir))
+testdir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.dirname(testdir))
 import server, models, settings
 
 
@@ -15,7 +15,7 @@ _mock_mail = None
 
 def setup_server():
     global _app
-    server.options.with_library = dir + "/library/"
+    server.options.with_library = testdir + "/library/"
     server.CONF['ALLOW_GUEST_PUSH'] = False
     server.CONF['ALLOW_GUEST_DOWNLOAD'] = False
     server.CONF['html_path'] = "/tmp/"
@@ -23,7 +23,7 @@ def setup_server():
     server.CONF['progress_path'] = "/tmp/"
     server.CONF['installed'] = True
     server.CONF['INVITE_MODE'] = False
-    server.CONF['user_database'] = 'sqlite:///%s/users.db' % dir
+    server.CONF['user_database'] = 'sqlite:///%s/users.db' % testdir
     _app = server.make_app()
 
 
@@ -169,13 +169,20 @@ class TestMeta(TestApp):
             self.assertEqual(a['total'], c['total'])
             self.assertEqual(a['total'], d['total'])
 
+    def test_tag(self):
+        self.assert_meta('tag', 4)
 
-    def test_tag(self): self.assert_meta('tag', 4)
-    def test_author(self): self.assert_meta('author', 10)
-    def test_series(self): self.assert_meta('series', 1)
-    def test_publisher(self): self.assert_meta('publisher', 5)
-    def test_rating(self): self.assert_meta('rating', 1)
+    def test_author(self):
+        self.assert_meta('author', 10)
 
+    def test_series(self):
+        self.assert_meta('series', 1)
+
+    def test_publisher(self):
+        self.assert_meta('publisher', 5)
+
+    def test_rating(self):
+        self.assert_meta('rating', 1)
 
 class AutoResetPermission():
     def __init__(self, arg):
@@ -302,16 +309,17 @@ class TestUser(TestApp):
             rsp = self.fetch("/read/1")
             self.assertEqual(rsp.code, 200)
 
-    def test_refer(self):
+    def manual_test_refer(self):
         server.CONF['douban_baseurl'] = 'http://10.0.0.15:7001'
         d = self.json("/api/book/1/refer")
         self.assertEqual(d['err'], 'ok')
 
-        for book in d['books']:
-            isbn = book['isbn']
-            body = "isbn=%s" % isbn
-            r = self.json("/api/book/1/refer", method='POST', raise_error=True, body=body)
-            self.assertEqual(r['err'], 'ok')
+        global _app
+        with mock.patch.object(_app.settings['legacy'], 'set_metadata', return_value='Yo') as m:
+            for book in d['books']:
+                body = "provider_key=%(provider_key)s&provider_value=%(provider_value)s" % book
+                r = self.json("/api/book/1/refer", method='POST', raise_error=True, body=body)
+                self.assertEqual(r['err'], 'ok')
 
     def add_user(self):
         self.mail.reset_mock()
