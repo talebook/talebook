@@ -8,6 +8,8 @@ __docformat__ = 'restructuredtext en'
 import os, io, re, sys, json, logging, datetime, requests
 from urllib.request import urlopen, Request
 
+KEY = 'douban'
+
 REMOVES = [
         re.compile(u'^\([^)]*\)\s*'),
         re.compile(u'^\[[^\]]*\]\s*'),
@@ -61,7 +63,6 @@ class DoubanBookApi(object):
         if 'code' in rsp and rsp['code'] != 0:
             logging.error("******** douban API error: %d-%s **********" % (rsp['code'], rsp['msg']) )
             return None
-
         return rsp['books']
 
     def get_book_by_title(self, title, author=None):
@@ -88,7 +89,7 @@ class DoubanBookApi(object):
             return None
 
     def str2date(self, s):
-        for fmt in ("%Y-%m-%d", "%Y-%m"):
+        for fmt in ("%Y-%m-%d", "%Y-%m", "%Y"):
             try:
                 return datetime.datetime.strptime(s, fmt)
             except:
@@ -131,11 +132,12 @@ class DoubanBookApi(object):
         mi.rating      = int(float(book['rating']['average']))
         mi.pubdate     = self.str2date(book['pubdate'])
         mi.timestamp   = datetime.datetime.now()
-        mi.douban_id   = book['id']
         mi.douban_author_intro = book['author_intro']
         mi.douban_subtitle = book.get('subtitle', None)
         mi.website     = "https://book.douban.com/isbn/%s" % mi.isbn
         mi.source      = u'豆瓣'
+        mi.provider_key = KEY
+        mi.provider_value = book['id']
 
         mi.cover_url = book['images']['large']
         if self.copy_image:

@@ -6,11 +6,12 @@ This is the standard runscript for all of calibre's tools.
 Do not modify it unless you know what you are doing.
 """
 
-import os, re, json, logging, datetime
-from urllib.request import urlopen
+import os, io, re, json, logging, datetime
+from urllib.request import urlopen, Request
 from .baidubaike.baidubaike import Page
 
 BAIKE_ISBN = '0000000000001'
+KEY = 'BaiduBaike'
 
 class BaiduBaikeApi:
 
@@ -32,7 +33,6 @@ class BaiduBaikeApi:
 
     def _metadata(self, baike):
         from calibre.ebooks.metadata.book.base import Metadata
-        from io import StringIO
 
         info = baike.get_info()
         logging.debug("\n".join( "%s:\t%s" % v for v in info.items()))
@@ -53,9 +53,11 @@ class BaiduBaikeApi:
         mi.comments  = re.sub(r'\[\d+\]$', "", baike.get_summary() )
         mi.website   = baike.http.url
         mi.source    = u'百度百科'
+        mi.provider_key = KEY
+        mi.provider_value = baike.get_id()
 
         if self.copy_image:
-            img = StringIO(urlopen(mi.cover_url).read())
+            img = io.BytesIO(urlopen(Request(mi.cover_url)).read())
             img_fmt = mi.cover_url.split(".")[-1]
             mi.cover_data = (img_fmt, img)
 
