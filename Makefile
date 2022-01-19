@@ -1,4 +1,4 @@
-.PHONY: all build push
+.PHONY: all build push test
 
 VER := $(shell git fetch --tags && git describe --tag | sed 's/-[^-]*$$//' | tr - . )
 IMAGE := talebook/talebook:$(VER)
@@ -16,3 +16,5 @@ push:
 	docker push $(REPO1)
 	docker push $(REPO2)
 
+test:
+	make -C webserver/unittest/

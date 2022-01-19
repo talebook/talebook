@@ -29,8 +29,8 @@ CONF = loader.get_settings()
 
 def custom_fields_to_display(db):
     ckeys = set(db.field_metadata.ignorable_field_keys())
-    yes_fields = set(tweaks['content_server_will_display'])
-    no_fields = set(tweaks['content_server_wont_display'])
+    yes_fields = set(CONF['opds_will_display'])
+    no_fields = set(CONF['opds_wont_display'])
     if '*' in yes_fields:
         yes_fields = ckeys
     if '*' in no_fields:
@@ -44,7 +44,7 @@ class Offsets(object):
         if offset < 0:
             offset = 0
         if offset >= total:
-            raise cherrypy.HTTPError(404, 'Invalid offset: %r'%offset)
+            raise web.HTTPError(404, reason='Invalid offset: %r'%offset)
         last_allowed_index = total - 1
         last_current_index = offset + delta - 1
         self.slice_upper_bound = offset+delta
@@ -60,7 +60,7 @@ class Offsets(object):
             self.last_offset = 0
 
 def format_tag_string(tags, sep, ignore_max=False, no_tag_count=False, joinval=', '):
-    MAX = sys.maxint if ignore_max else tweaks['max_content_server_tags_shown']
+    MAX = sys.maxsize if ignore_max else CONF['opds_max_tags_shown']
     if tags:
         tlist = [t.strip() for t in tags.split(sep)]
     else:
@@ -71,7 +71,7 @@ def format_tag_string(tags, sep, ignore_max=False, no_tag_count=False, joinval='
     if no_tag_count:
         return joinval.join(tlist) if tlist else ''
     else:
-        return u'%s:&:%s'%(tweaks['max_content_server_tags_shown'],
+        return u'%s:&:%s'%(tweaks['opds_max_tags_shown'],
                      joinval.join(tlist)) if tlist else ''
 
 
@@ -98,9 +98,7 @@ def first_char(item):
 
 
 def hexlify(x):
-    if isinstance(x, unicode):
-        x = x.encode('utf-8')
-    return binascii.hexlify(x)
+    return binascii.hexlify(x.encode('utf-8')).decode("ascii")
 
 def unhexlify(x):
     return binascii.unhexlify(x).decode('utf-8')
@@ -145,7 +143,7 @@ def AUTHOR(name, uri=None):
 
 def NAVCATALOG_ENTRY(base_href, updated, title, description, query):
     href = base_href+'/nav/'+hexlify(query)
-    id_ = 'calibre-nav:'+str(hashlib.sha1(href).hexdigest())
+    id_ = 'calibre-nav:'+str(hashlib.sha1(href.encode("utf-8")).hexdigest())
     return E.entry(
         TITLE(title),
         ID(id_),
@@ -222,7 +220,7 @@ def ACQUISITION_ENTRY(item, db, updated, CFM, CKEYS, prefix):
     authors = ' & '.join([i.replace('|', ',') for i in
                                     authors.split(',')])
     extra = []
-    rating = item[FM['rating']]
+    rating = item[FM['rating']] or 0
     if rating > 0:
         rating = u''.join(repeat(u'\u2605', int(rating/2.)))
         extra.append(_('RATING: %s<br />')%rating)
@@ -316,7 +314,7 @@ class Feed(object):
         if subtitle:
             self.root.insert(1, SUBTITLE(subtitle))
 
-    def __str__(self):
+    def __bytes__(self):
         return etree.tostring(self.root, pretty_print=True, encoding='utf-8',
                 xml_declaration=True)
 
@@ -399,13 +397,13 @@ class OpdsHandler(BaseHandler):
             raise web.HTTPError(404, reason='No books found')
         items = [x for x in self.db.data.iterall() if x[idx] in ids]
         self.sort(items, sort_by, ascending)
-        max_items = CONF['max_opds_items']
+        max_items = CONF['opds_max_items']
         offsets = Offsets(offset, max_items, len(items))
         items = items[offsets.offset:offsets.offset+max_items]
         updated = self.db.last_modified()
         self.set_header('Last-Modified', self.last_modified(updated) )
         self.set_header('Content-Type', 'application/atom+xml; profile=opds-catalog; charset=UTF-8')
-        return str(AcquisitionFeed(updated, id_, items, offsets,
+        return bytes(AcquisitionFeed(updated, id_, items, offsets,
                                    page_url, up_url, self.db,
                                    CONF['url_prefix'], title=feed_title))
 
@@ -473,14 +471,14 @@ class OpdsHandler(BaseHandler):
         updated = self.db.last_modified()
 
         id_ = 'calibre-category-group-feed:'+category+':'+which
-        max_items = CONF['max_opds_items']
+        max_items = CONF['opds_max_items']
         offsets = Offsets(offset, max_items, len(items))
         items = list(items)[offsets.offset:offsets.offset+max_items]
 
         self.set_header('Last-Modified', self.last_modified(updated) )
         self.set_header('Content-Type', 'application/atom+xml; charset=UTF-8')
 
-        return str(CategoryFeed(items, category, id_, updated, offsets,
+        return bytes(CategoryFeed(items, category, id_, updated, offsets,
             page_url, up_url, self.db, title=feed_title))
 
     def opds_navcatalog(self, which=None, offset=0):
@@ -517,10 +515,10 @@ class OpdsHandler(BaseHandler):
 
         id_ = 'calibre-category-feed:'+which
 
-        MAX_ITEMS = CONF['max_opds_ungrouped_items']
+        MAX_ITEMS = CONF['opds_max_ungrouped_items']
 
         if len(items) <= MAX_ITEMS:
-            max_items = CONF['max_opds_items']
+            max_items = CONF['opds_max_items']
             offsets = Offsets(offset, max_items, len(items))
             items = list(items)[offsets.offset:offsets.offset+max_items]
             ans = CategoryFeed(items, which, id_, updated, offsets,
@@ -539,7 +537,7 @@ class OpdsHandler(BaseHandler):
             for c in sorted(groups.keys(), key=sort_key):
                 items.append( Group(c, groups[c]) )
 
-            max_items = CONF['max_opds_items']
+            max_items = CONF['opds_max_items']
             offsets = Offsets(offset, max_items, len(items))
             items = items[offsets.offset:offsets.offset+max_items]
             ans = CategoryGroupFeed(items, which, id_, updated, offsets,
@@ -548,7 +546,7 @@ class OpdsHandler(BaseHandler):
         self.set_header('Last-Modified', self.last_modified(updated))
         self.set_header('Content-Type', 'application/atom+xml; charset=UTF-8')
 
-        return str(ans)
+        return bytes(ans)
 
     def opds_category(self, category=None, which=None, offset=0):
         try:
@@ -632,7 +630,7 @@ class OpdsHandler(BaseHandler):
 
         feed = TopLevel(updated, cats)
 
-        return str(feed)
+        return bytes(feed)
 
 class OpdsIndex(OpdsHandler):
     def get(self):

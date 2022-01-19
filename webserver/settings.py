@@ -24,8 +24,11 @@ settings = {
     "user_database" : 'sqlite:////data/books/calibre-webserver.db',
     "site_title"    : u"奇异书屋",
 
-    "max_opds_items": 50,
-    "max_opds_ungrouped_items" : 100,
+    "opds_will_display": ["*"],
+    "opds_wont_display": [],
+    "opds_max_tags_shown": 10240,
+    "opds_max_items": 50,
+    "opds_max_ungrouped_items" : 100,
     "url_prefix": "",
 
     # 100MB, tornado default max_buffer_size value

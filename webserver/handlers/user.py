@@ -298,7 +298,7 @@ class SignIn(BaseHandler):
             return {'err': 'params.invalid', 'msg': _(u'用户名或密码错误')}
         if not user.can_login():
             return {'err': 'permission', 'msg': _(u'无权登录')}
-        logging.error("PERM = %s", user.permission)
+        logging.debug("PERM = %s", user.permission)
 
         self.login_user(user)
         return {'err': 'ok', 'msg': 'ok'}
@@ -572,6 +572,8 @@ class AdminSettings(SettingHandler):
                 'autoreload',
                 'cookie_secret',
                 'douban_apikey',
+                'douban_baseurl',
+                'douban_max_count',
                 'site_title',
                 'smtp_password',
                 'smtp_server',

@@ -312,7 +312,7 @@ class TestUser(TestApp):
 
         user = get_db().query(models.Reader).filter(models.Reader.username=='active').first()
         user.set_permission("L")
-        logging.error("user[%s] id[%s] permission[%s]", user.username, user.id, user.permission)
+        logging.debug("user[%s] id[%s] permission[%s]", user.username, user.id, user.permission)
         d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d['err'], 'permission')
 
@@ -403,6 +403,85 @@ class TestAdmin(TestApp):
         self.assertEqual(d['rsp']['site_title'], 'abc')
         self.assertTrue('not_work' not in d['rsp'])
 
+class TestOpds(TestApp):
+    @classmethod
+    def setUpClass(self):
+        self.user = _mock_user.start()
+        self.user.return_value = 1
+        self.mail = _mock_mail.start()
+        self.mail.return_value = True
+
+    @classmethod
+    def tearDownClass(self):
+        _mock_user.stop()
+        _mock_mail.stop()
+
+    def parse_xml(self, text):
+        logging.error(text.decode("UTF-8"))
+        from xml.parsers.expat import ParserCreate, ExpatError, errors
+        p = ParserCreate()
+        return p.Parse(text)
+
+    def test_opds(self):
+        rsp = self.fetch("/opds/")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_nav(self):
+        rsp = self.fetch("/opds/nav/4e617574686f7273?offset=1")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_nav2(self):
+        server.CONF['opds_max_ungrouped_items'] = 2
+        urls = [
+                "/opds/nav/4e617574686f7273",
+                "/opds/nav/4e6c616e677561676573",
+                "/opds/nav/4e7075626c6973686572",
+                "/opds/nav/4e726174696e67",
+                "/opds/nav/4e736572696573",
+                "/opds/nav/4e74616773",
+                "/opds/nav/4f6e6577657374",
+                "/opds/nav/4f7469746c65",
+                ]
+        groups = [
+                2,
+                server.CONF['opds_max_ungrouped_items'],
+                ]
+        for url in urls:
+            for g in groups:
+                server.CONF['opds_max_ungrouped_items'] = g
+                rsp = self.fetch(url)
+                self.assertEqual(rsp.code, 200)
+                self.parse_xml(rsp.body)
+
+    def test_opds_category(self):
+        rsp = self.fetch("/opds/category/617574686f7273/4931303a617574686f7273")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+        import binascii
+        c = binascii.hexlify(b"search").decode("utf-8")
+        rsp = self.fetch("/opds/category/%s/4931303a617574686f7273" % c)
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_category_group(self):
+        rsp = self.fetch("/opds/categorygroup/74616773/43")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_search(self):
+        rsp = self.fetch("/opds/search/cool")
+        self.assertEqual(rsp.code, 200)
+        self.parse_xml(rsp.body)
+
+    def test_opds_without_login(self):
+        server.CONF['INVITE_MODE'] = True
+        rsp = self.fetch("/opds/nav/4f7469746c65")
+        self.assertEqual(rsp.code, 401)
+        server.CONF['INVITE_MODE'] = False
+
 
 def setUpModule():
     setup_server()
@@ -411,7 +490,7 @@ def setUpModule():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
-            format='%(asctime)s %(levelname)s %(pathname)s/%(filename)s:%(lineno)d %(message)s')
+            format='%(asctime)s %(levelname)5s %(pathname)s:%(lineno)d %(message)s')
     unittest.main()
 
 
