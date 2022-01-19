@@ -6,7 +6,7 @@ This is the standard runscript for all of calibre's tools.
 Do not modify it unless you know what you are doing.
 """
 
-import os, re, json, logging, datetime
+import os, re, json, logging, datetime, io
 from urllib.request import urlopen
 from .baidubaike.baidubaike import Page
 
@@ -32,7 +32,6 @@ class BaiduBaikeApi:
 
     def _metadata(self, baike):
         from calibre.ebooks.metadata.book.base import Metadata
-        from io import StringIO
 
         info = baike.get_info()
         logging.debug("\n".join( "%s:\t%s" % v for v in info.items()))
@@ -54,8 +53,9 @@ class BaiduBaikeApi:
         mi.website   = baike.http.url
         mi.source    = u'百度百科'
 
-        if self.copy_image:
-            img = StringIO(urlopen(mi.cover_url).read())
+        if self.copy_image and mi.cover_url:
+            logging.debug("fetching cover: %s", mi.cover_url)
+            img = io.BytesIO(urlopen(mi.cover_url).read())
             img_fmt = mi.cover_url.split(".")[-1]
             mi.cover_data = (img_fmt, img)
 
@@ -70,6 +70,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     api = BaiduBaikeApi()
     print(api.get_book(u'法神重生'))
-    print(api.get_book(u'开放的智力：知乎采铜自选集'))
+    print(api.get_book(u'东周列国志'))
 
 

@@ -227,6 +227,22 @@ class TestUser(TestApp):
         rsp = self.fetch("/api/book/1.pdf")
         self.assertEqual(rsp.code, 404)
 
+    def test_get_cover(self):
+        rsp = self.fetch("/get/cover/1.jpg", follow_redirects=False)
+        self.assertEqual(rsp.code, 200)
+
+    def test_get_thumb(self):
+        rsp = self.fetch("/get/thumb_80x80/1.jpg", follow_redirects=False)
+        self.assertEqual(rsp.code, 200)
+
+    def test_get_opf(self):
+        rsp = self.fetch("/get/opf/1", follow_redirects=False)
+        self.assertEqual(rsp.code, 200)
+
+    def test_get_file(self):
+        rsp = self.fetch("/get/epub/1", follow_redirects=False)
+        self.assertEqual(rsp.code, 200)
+
     def test_download_permission(self):
         with mock_permission() as user:
             user.set_permission('S') # forbid
@@ -293,6 +309,14 @@ class TestUser(TestApp):
     def test_refer(self):
         d = self.json("/api/book/1/refer")
         self.assertEqual(d['err'], 'ok')
+
+        server.CONF['douban_baseurl'] = 'http://10.0.0.15:7001'
+
+        for book in d['books']:
+            isbn = book['isbn']
+            body = "isbn=%s" % isbn
+            r = self.json("/api/book/1/refer", method='POST', raise_error=True, body=body)
+            self.assertEqual(r['err'], 'ok')
 
     def add_user(self):
         self.mail.reset_mock()
@@ -417,7 +441,6 @@ class TestOpds(TestApp):
         _mock_mail.stop()
 
     def parse_xml(self, text):
-        logging.error(text.decode("UTF-8"))
         from xml.parsers.expat import ParserCreate, ExpatError, errors
         p = ParserCreate()
         return p.Parse(text)
