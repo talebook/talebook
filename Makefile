@@ -17,4 +17,4 @@ push:
 	docker push $(REPO2)
 
 test:
-	make -C webserver/unittest/
+	pytest webserver

@@ -18,15 +18,9 @@ RUN npm run build
 FROM talebook/calibre:5
 
 # install python packages
-RUN pip install wheel
+COPY ["requirements.txt", "/tmp/"]
 RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
-        Baidubaike==2.0.1 \
-        jinja2==2.10 \
-        social-auth-core==3.3.3 \
-        social-auth-app-tornado==1.0.0 \
-        social-auth-storage-sqlalchemy==1.1.0 \
-        tornado==5.1.1 \
-        bs4
+        -r /tmp/requirements.txt
 
 # install envsubst
 RUN cp /etc/apt/sources.list /tmp/ && \
