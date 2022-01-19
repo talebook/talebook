@@ -44,9 +44,17 @@ class DoubanBookApi(object):
             logging.error("******** douban API error: %d-%s **********" % (rsp['code'], rsp['msg']) )
             return None
         return rsp
+    
+    def get_book_by_id(self, id):
+        url = "%s/v2/book/id/%s" % (self.baseUrl, id)
+        rsp = requests.get(url, headers=CHROME_HEADERS).json()
+        if 'code' in rsp and rsp['code'] != 0:
+            logging.error("******** douban API error: %d-%s **********" % (rsp['code'], rsp['msg']) )
+            return None
+        return rsp
 
     def get_books_by_title(self, title, author=None):
-        url = "%s/v2/book/search/" % self.baseUrl
+        url = "%s/v2/book/search" % self.baseUrl
         q = title + " " + author if author else title
         args = {'apikey': self.apikey, 'q': q.encode('UTF-8'), 'count': self.maxCount }
         rsp = requests.get(url, headers=CHROME_HEADERS, params=args).json()
@@ -92,7 +100,9 @@ class DoubanBookApi(object):
 
     def get_metadata(self, md):
         book = None
-        if md.isbn:
+        if md.douban_id:
+            book = self.get_book_by_id(md.douban_id)
+        elif md.isbn:
             book = self.get_book_by_isbn(md.isbn)
         if not book:
             book = self.get_book_by_title(md.title, md.author_sort)

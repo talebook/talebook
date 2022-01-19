@@ -78,13 +78,13 @@
                                             </v-btn>
                                         </template>
                                         <v-list dense>
-                                            <v-list-item @click="set_refer(book.isbn)" >
+                                            <v-list-item @click="set_refer(book.isbn, book.douban_id)" >
                                                 <v-list-item-title>设置书籍信息及图片</v-list-item-title>
                                             </v-list-item>
-                                            <v-list-item @click="set_refer(book.isbn, {'only_meta': 'yes'})" >
+                                            <v-list-item @click="set_refer(book.isbn, book.douban_id, {'only_meta': 'yes'})" >
                                                 <v-list-item-title>仅设置书籍信息</v-list-item-title>
                                             </v-list-item>
-                                            <v-list-item @click="set_refer(book.isbn, {'only_cover': 'yes'})" >
+                                            <v-list-item @click="set_refer(book.isbn, book.douban_id, {'only_cover': 'yes'})" >
                                                 <v-list-item-title>仅设置书籍图片</v-list-item-title>
                                             </v-list-item>
                                         </v-list>
@@ -313,9 +313,10 @@ export default {
                 this.refer_books_loading = false;
             });
         },
-        set_refer(isbn, opt) {
+        set_refer(isbn, douban_id, opt) {
             var data = new URLSearchParams(opt);
             data.append('isbn', isbn);
+            data.append('douban_id', douban_id);
             this.backend("/book/"+this.bookid+"/refer", {
                 method: 'POST',
                 body: data,

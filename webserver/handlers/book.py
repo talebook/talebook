@@ -261,7 +261,7 @@ class BookRefer(BaseHandler):
         book = api.get_book(title)
         if book: books.append( book )
 
-        keys = ['cover_url', 'source', 'website', 'title', 'author_sort' ,'publisher', 'isbn', 'comments']
+        keys = ['cover_url', 'source', 'website', 'title', 'author_sort' ,'publisher', 'isbn', 'comments', 'douban_id']
         rsp = []
         for b in books:
             d = dict( (k,b.get(k, '')) for k in keys )
@@ -275,6 +275,7 @@ class BookRefer(BaseHandler):
     @auth
     def post(self, id):
         isbn = self.get_argument("isbn", "error")
+        douban_id = self.get_argument("douban_id", "")
         only_meta = self.get_argument("only_meta", "")
         only_cover = self.get_argument("only_cover", "")
         book_id = int(id)
@@ -294,6 +295,7 @@ class BookRefer(BaseHandler):
             refer_mi = api.get_book(title)
         else:
             mi.isbn = isbn
+            mi.douban_id = douban_id
             api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseurl'], copy_image=True, maxCount=CONF['douban_max_count'])
             refer_mi = api.get_book(mi)
 
