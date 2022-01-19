@@ -6,8 +6,8 @@ This is the standard runscript for all of calibre's tools.
 Do not modify it unless you know what you are doing.
 """
 
-import os, io, re, json, logging, datetime
-from urllib.request import urlopen, Request
+import os, re, json, logging, datetime, io
+from urllib.request import urlopen
 from .baidubaike.baidubaike import Page
 
 BAIKE_ISBN = '0000000000001'
@@ -57,7 +57,9 @@ class BaiduBaikeApi:
         mi.provider_value = baike.get_id()
 
         if self.copy_image:
-            img = io.BytesIO(urlopen(Request(mi.cover_url)).read())
+            if self.copy_image and mi.cover_url:
+                logging.debug("fetching cover: %s", mi.cover_url)
+                img = io.BytesIO(urlopen(mi.cover_url).read())
             img_fmt = mi.cover_url.split(".")[-1]
             mi.cover_data = (img_fmt, img)
 
