@@ -166,9 +166,11 @@ def make_app():
         })
 
     logging.info("Now, Running...")
-    return web.Application(
+    app = web.Application(
             social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(),
             **app_settings)
+    app._engine = engine
+    return app
 
 
 def get_upload_size():
@@ -193,7 +195,7 @@ def main():
     http_server.listen(options.port, options.host)
     tornado.ioloop.IOLoop.instance().start()
     from flask.ext.sqlalchemy import _EngineDebuggingSignalEvents
-    _EngineDebuggingSignalEvents(engine, app.import_name).register()
+    _EngineDebuggingSignalEvents(app._engine, app.import_name).register()
 
 if __name__ == "__main__":
     sys.path.append( os.path.dirname(__file__) )

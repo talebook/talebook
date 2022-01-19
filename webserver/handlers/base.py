@@ -267,7 +267,7 @@ class BaseHandler(web.RequestHandler):
 
         field = self.db.data.sanitize_sort_field_name(field)
         if field not in self.db.field_metadata.sortable_field_keys():
-            raise cherrypy.HTTPError(400, '%s is not a valid sort field'%field)
+            raise web.HTTPError(400, '%s is not a valid sort field'%field)
 
         keyg = CSSortKeyGenerator([(field, order)], self.db.field_metadata, self.db.prefs)
         items.sort(key=keyg, reverse=not order)
