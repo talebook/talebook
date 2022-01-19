@@ -24,6 +24,7 @@ CLASS_CONTENT        = {
 CLASS_SUMMARY = [ 'lemma-summary' ]
 CLASS_INFO = ['basicInfo-item']
 CLASS_SUMMARY_PIC = ['summary-pic']
+CLASS_LEMMA_ID = ['lemmaWgt-promotion-rightPreciseAd']
 
 CHROME_HEADERS = {
         'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.6',
@@ -147,6 +148,15 @@ class Page(object):
             references.append(r)
 
         return references
+    
+    def get_id(self):
+        """ Get id of the page """
+        divs = self.soup.find_all(class_=CLASS_LEMMA_ID)
+        for d in divs:
+            id = d.get('data-lemmaid')
+            if id:
+                return id
+        return '0000'
 
 
 

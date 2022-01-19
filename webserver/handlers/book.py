@@ -248,7 +248,11 @@ class BookRefer(BaseHandler):
         books = api.get_books_by_title(title)
         books = [] if books == None else books
         if books and mi.isbn and mi.isbn != baike.BAIKE_ISBN:
-            if mi.isbn not in [ b.get('isbn13', "xxx") for b in books ]:
+            skip = False
+            for b in books:
+                skip = mi.isbn == b.get('isbn13', "xxx") or (mi.title == b.get('title') and mi.publisher == b.get('publisher'))
+                if skip: break
+            if skip == False:
                 book = api.get_book_by_isbn(mi.isbn)
                 # alwayse put ISBN book in TOP1
                 if book: books.insert(0, book)
@@ -259,11 +263,12 @@ class BookRefer(BaseHandler):
         book = api.get_book(title)
         if book: books.append( book )
 
-        keys = ['cover_url', 'source', 'website', 'title', 'author_sort' ,'publisher', 'isbn', 'comments']
+        keys = ['cover_url', 'source', 'website', 'title', 'author_sort' ,'publisher', 'isbn', 'comments', 'provider_key', 'provider_value']
         rsp = []
         for b in books:
             d = dict( (k,b.get(k, '')) for k in keys )
-            d['pubyear'] = b.pubdate.strftime("%Y") if b.pubdate else ""
+            pubdate = b.get('pubdate')
+            d['pubyear'] = pubdate.strftime("%Y") if pubdate else ""
             if not d['comments']: d['comments'] = u'无详细介绍'
             rsp.append( d )
 
@@ -272,12 +277,15 @@ class BookRefer(BaseHandler):
     @js
     @auth
     def post(self, id):
-        isbn = self.get_argument("isbn", "error")
+        provider_key = self.get_argument("provider_key", "error")
+        provider_value = self.get_argument("provider_value", "")
         only_meta = self.get_argument("only_meta", "")
         only_cover = self.get_argument("only_cover", "")
         book_id = int(id)
-        if not isbn.isdigit():
-            return {'err': 'params.isbn.invalid', 'msg': _(u'ISBN参数错误') }
+        if not provider_key:
+            return {'err': 'params.provider_key.invalid', 'msg': _(u'provider_key参数错误') }
+        if not provider_value:
+            return {'err': 'params.provider_key.invalid', 'msg': _(u'provider_value参数错误') }
         if only_meta == "yes" and only_cover == "yes":
             return {'err': 'params.conflict', 'msg': _(u'参数冲突') }
         mi = self.db.get_metadata(book_id, index_is_id=True)
@@ -287,13 +295,16 @@ class BookRefer(BaseHandler):
             return {'err': 'user.no_permission', 'msg': _(u'无权限') }
 
         title = re.sub(u'[(（].*', "", mi.title)
-        if isbn == baike.BAIKE_ISBN:
+        if provider_key == baike.KEY:
             api = baike.BaiduBaikeApi(copy_image=True)
             refer_mi = api.get_book(title)
-        else:
-            mi.isbn = isbn
+        elif provider_key == douban.KEY:
+            mi.isbn = provider_key
+            mi.douban_id = provider_value
             api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseurl'], copy_image=True, maxCount=CONF['douban_max_count'])
             refer_mi = api.get_book(mi)
+        else:
+            return {'err': 'params.provider_key.invalid', 'msg': _(u'尚不支持的provider_key: %s' % provider_key)}
 
         if only_cover == "yes":
             # just set cover

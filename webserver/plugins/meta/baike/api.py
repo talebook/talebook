@@ -11,6 +11,7 @@ from urllib.request import urlopen
 from .baidubaike.baidubaike import Page
 
 BAIKE_ISBN = '0000000000001'
+KEY = 'BaiduBaike'
 
 class BaiduBaikeApi:
 
@@ -52,6 +53,8 @@ class BaiduBaikeApi:
         mi.comments  = re.sub(r'\[\d+\]$', "", baike.get_summary() )
         mi.website   = baike.http.url
         mi.source    = u'百度百科'
+        mi.provider_key = KEY
+        mi.provider_value = baike.get_id()
 
         if self.copy_image and mi.cover_url:
             logging.debug("fetching cover: %s", mi.cover_url)
