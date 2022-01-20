@@ -174,7 +174,7 @@
         <v-col cols=12 sm=6 md=4>
             <v-card outlined>
                 <v-list>
-                    <v-list-item :href="'/read/'+bookid" >
+                    <v-list-item :href="'/read/'+bookid" target="_blank">
                         <v-list-item-avatar large color='primary' >
                             <v-icon dark >import_contacts</v-icon>
                         </v-list-item-avatar>

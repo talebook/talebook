@@ -532,7 +532,14 @@ class BookRead(BaseHandler):
             self.extract_book(book, fpath, fmt)
             return self.html_page('book/read.html', vars())
 
-        raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍") )
+        if 'fmt_pdf' in book:
+            path = book['fmt_pdf']
+            self.set_header('Content-Type', 'application/pdf')
+            with open(path, 'rb') as f:
+                self.write(f.read())
+            return
+
+        raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍"))
 
     @background
     def extract_book(self, book, fpath, fmt):
