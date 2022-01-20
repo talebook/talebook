@@ -135,7 +135,7 @@ class DoubanBookApi(object):
         mi.timestamp   = datetime.datetime.now()
         mi.douban_author_intro = book['author_intro']
         mi.douban_subtitle = book.get('subtitle', None)
-        mi.website     = "https://book.douban.com/isbn/%s" % mi.isbn
+        mi.website     = "https://book.douban.com/subject/%s" % book['id']
         mi.source      = u'豆瓣'
         mi.provider_key = KEY
         mi.provider_value = book['id']
