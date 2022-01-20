@@ -66,7 +66,7 @@
                                 </v-card-actions>
                                     <v-divider></v-divider>
                                 <v-card-actions>
-                                    <v-chip small dark :to="book.website" :color="book.source=='豆瓣'?'green':'blue'">{{book.source}}</v-chip>
+                                    <v-chip small dark :href="book.website" target="__blank" :color="book.source=='豆瓣'?'green':'blue'">{{book.source}}</v-chip>
                                     <v-spacer></v-spacer>
                                     <!--
                                     <v-btn color='primary' small rounded @click="set_refer(book.isbn)" ><v-icon >done</v-icon>设置</v-btn>
