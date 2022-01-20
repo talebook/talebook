@@ -637,7 +637,7 @@ class BookPush(BaseHandler):
         title = book['title'] if book['title'] else _(u"无名书籍")
         fname = u'%s - %s.%s'%(title, author, fmt)
         with open(fpath) as f:
-            fdata = r.read()
+            fdata = f.read()
 
         site_title = CONF['site_title']
         mail_from = self.settings['smtp_username']
