@@ -6,7 +6,7 @@ This is the standard runscript for all of calibre's tools.
 Do not modify it unless you know what you are doing.
 """
 
-import os, re, json, logging, datetime, io
+import os, re, json, logging, io
 from urllib.request import urlopen
 from .baidubaike.baidubaike import Page
 
@@ -33,6 +33,7 @@ class BaiduBaikeApi:
 
     def _metadata(self, baike):
         from calibre.ebooks.metadata.book.base import Metadata
+        from calibre.utils.date import utcnow, strptime
 
         info = baike.get_info()
         logging.debug("\n".join( "%s:\t%s" % v for v in info.items()))
@@ -47,8 +48,8 @@ class BaiduBaikeApi:
         mi.author_sort = mi.authors[0]
         mi.isbn      = BAIKE_ISBN
         mi.tags      = baike.get_tags()
-        mi.pubdate   = datetime.datetime.now()
-        mi.timestamp = datetime.datetime.now()
+        mi.pubdate   = utcnow()
+        mi.timestamp = utcnow()
         mi.cover_url = baike.get_image()
         mi.comments  = re.sub(r'\[\d+\]$', "", baike.get_summary() )
         mi.website   = baike.http.url
@@ -64,7 +65,7 @@ class BaiduBaikeApi:
 
         if u'完结' in info.get(u'连载状态', ""):
             day = re.findall('\d*-\d*-\d*', info[u'连载状态'])
-            try: mi.pubdate = datetime.datetime.strptime(day[0], '%Y-%m-%d')
+            try: mi.pubdate = strptime(day[0], '%Y-%m-%d')
             except: pass
         return mi
 
