@@ -1,4 +1,5 @@
-﻿# 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
+# ----------------------------------------
+# 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
 FROM node:12-alpine as builder
 MAINTAINER Rex <talebook@foxmail.com>
 
@@ -14,8 +15,9 @@ COPY app/ /app/
 RUN npm run build
 
 
+# ----------------------------------------
 # 第二阶段，构建环境
-FROM talebook/calibre:5
+FROM talebook/calibre:5 as server
 
 # install python packages
 COPY ["requirements.txt", "/tmp/"]
@@ -27,6 +29,20 @@ RUN cp /etc/apt/sources.list /tmp/ && \
         sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list
 RUN apt-get update && apt-get install -y gettext
 RUN mv /tmp/sources.list /etc/apt/sources.list
+
+
+# ----------------------------------------
+# 测试阶段
+FROM server as test
+COPY webserver/ /var/www/talebook/webserver/
+RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
+        flake8 pytest mock
+CMD ["pytest", "/var/www/talebook/webserver"]
+
+
+# ----------------------------------------
+# 生产环境
+FROM server as production
 
 # prepare dirs
 RUN mkdir -p /data/log/nginx/ && \

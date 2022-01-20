@@ -24,6 +24,7 @@ def setup_server():
     server.CONF['installed'] = True
     server.CONF['INVITE_MODE'] = False
     server.CONF['user_database'] = 'sqlite:///%s/users.db' % testdir
+    server.CONF._save_path = "/tmp/"
     _app = server.make_app()
 
 
@@ -424,7 +425,7 @@ class TestAdmin(TestApp):
         self.assertEqual(d['err'], 'ok')
         self.assertTrue(len(d['settings']) > 10)
 
-        req = {"settings_path": "/tmp/", "site_title": "abc", "not_work": "en"}
+        req = {"site_title": "abc", "not_work": "en"}
         d = self.json("/api/admin/settings", method="POST", body=json.dumps(req))
         self.assertEqual(d['err'], 'ok')
         self.assertEqual(d['rsp']['site_title'], 'abc')

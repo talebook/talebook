@@ -7,6 +7,7 @@ class SettingsLoader(dict):
     def __init__(self, *args, **kwargs):
         super(SettingsLoader, self).__init__(*args, **kwargs)
         self.loadfile()
+        self._save_path = os.path.dirname(__file__)
 
     def clear(self):
         for key in list(self.keys()):
@@ -21,8 +22,10 @@ class SettingsLoader(dict):
             logging.error(traceback.format_exc())
             pass
 
-        self.settings_path = self.get('settings_path', None)
-        if self.settings_path: sys.path.insert(0, self.settings_path)
+        p = self.get('settings_path', "").strip()
+        if os.path.isdir(p):
+            self._save_path = p
+            sys.path.insert(0, p)
 
         try:
             import auto
@@ -47,10 +50,8 @@ settings = {
 }
 '''
 
-        d = self.settings_path
-        if not d: d = os.path.dirname(__file__)
-        py = os.path.join(d, filename)
-        pyc = os.path.join(d, filename+"c")
+        py = os.path.join(self._save_path, filename)
+        pyc = os.path.join(self._save_path, filename+"c")
         logging.error("saving settings file: %s" % py)
         with open(py, "w") as f:
             f.write(code)
