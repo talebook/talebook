@@ -6,7 +6,7 @@ from tornado import testing
 
 testdir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(testdir))
-import server, models, settings
+import server, models
 
 
 _app = None
@@ -24,7 +24,6 @@ def setup_server():
     server.CONF['installed'] = True
     server.CONF['INVITE_MODE'] = False
     server.CONF['user_database'] = 'sqlite:///%s/users.db' % testdir
-    server.CONF._save_path = "/tmp/"
     _app = server.make_app()
 
 
@@ -425,11 +424,13 @@ class TestAdmin(TestApp):
         self.assertEqual(d['err'], 'ok')
         self.assertTrue(len(d['settings']) > 10)
 
-        req = {"site_title": "abc", "not_work": "en"}
-        d = self.json("/api/admin/settings", method="POST", body=json.dumps(req))
-        self.assertEqual(d['err'], 'ok')
-        self.assertEqual(d['rsp']['site_title'], 'abc')
-        self.assertTrue('not_work' not in d['rsp'])
+        import loader
+        with mock.patch.object(loader.SettingsLoader, 'set_store_path', return_value='/tmp/') as m:
+            req = {"site_title": "abc", "not_work": "en"}
+            d = self.json("/api/admin/settings", method="POST", body=json.dumps(req))
+            self.assertEqual(d['err'], 'ok')
+            self.assertEqual(d['rsp']['site_title'], 'abc')
+            self.assertTrue('not_work' not in d['rsp'])
 
 class TestOpds(TestApp):
     @classmethod
