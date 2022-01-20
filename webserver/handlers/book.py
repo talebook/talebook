@@ -2,18 +2,16 @@
 #-*- coding: UTF-8 -*-
 
 import logging
-from plugins.meta import douban
-from plugins.meta import baike
-import urllib
 import subprocess
-import tornado.escape
-from handlers.base import *
-
-from calibre.ebooks.metadata import authors_to_string
-from calibre.ebooks.conversion.plumber import Plumber
-from calibre.customize.conversion import OptionRecommendation, DummyReporter
+import urllib
 
 import loader
+import tornado.escape
+from calibre.ebooks.metadata import authors_to_string
+from handlers.base import *
+from plugins.meta import baike
+from plugins.meta import douban
+
 CONF = loader.get_settings()
 
 BOOKNAV = (
@@ -88,26 +86,25 @@ def background(func):
         t.start()
     return run
 
+
 def do_ebook_convert(old_path, new_path, log_path):
-    '''convert book, and block, and wait'''
+    """convert book, and block, and wait"""
     args = ['ebook-convert', old_path, new_path]
     if new_path.lower().endswith(".epub"): args += ['--flow-size', '0']
 
-    with open(log_path, "w", 0) as log:
-        cmd = " ".join( "'%s'" % v for v in args)
-        logging.info("CMD: %s" % cmd )
+    with open(log_path, "w") as log:
+        cmd = " ".join("'%s'" % v for v in args)
+        logging.info("CMD: %s" % cmd)
         p = subprocess.Popen(args, stdout=log, stderr=subprocess.PIPE)
-        err = ""
-        while p.poll() == None:
-            _, e = p.communicate()
-            err += e
-        logging.info("ebook-convert finish: %s" % new_path)
-
-        if err:
-            log.write(err)
+        try:
+            _, stde = p.communicate(timeout=100)
+            logging.info("ebook-convert finish: %s, err: %s" % (new_path, bytes.decode(stde)))
+        except subprocess.TimeoutExpired:
+            p.kill()
+            logging.info("ebook-convert timeout: %s" % new_path)
             log.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
-            return (False, err)
-        return (True, "")
+            return False, ""
+        return True, ""
 
 
 class Index(BaseHandler):
@@ -421,7 +418,7 @@ class RecentBook(ListHandler):
         title = _(u'新书推荐') % vars()
         category = "recents"
         ids = self.books_by_timestamp()
-        return self.render_book_list([], vars(), ids=ids);
+        return self.render_book_list([], vars(), ids=ids)
 
 class SearchBook(ListHandler):
     def get(self):
@@ -432,7 +429,7 @@ class SearchBook(ListHandler):
         title = _(u'搜索：%(name)s') % vars()
         ids = self.cache.search(name)
         search_query = name
-        return self.render_book_list([], vars(), ids);
+        return self.render_book_list([], vars(), ids)
 
 class HotBook(ListHandler):
     def get(self):
@@ -466,7 +463,6 @@ class BookUpload(BaseHandler):
             return {'err': 'permission', 'msg': _(u'无权操作')}
 
         import re
-        from calibre.ebooks.metadata import MetaInformation
         postfile = self.request.files['ebook'][0]
         name = postfile['filename']
         name = re.sub(r'[\x80-\xFF]+', convert, name)
@@ -555,7 +551,7 @@ class BookRead(BaseHandler):
         if fmt != "epub":
             new_fmt = "epub"
             new_path = os.path.join(CONF["convert_path"], 'book-%s-%s.%s'%(book['id'], int(time.time()), new_fmt) )
-            logging.error('convert book: %s => %s' % ( fpath, new_path));
+            logging.info('convert book: %s => %s, progress: %s' % (fpath, new_path, progress_file))
             os.chdir('/tmp/')
 
             ok, err = do_ebook_convert(fpath, new_path, progress_file)
@@ -565,6 +561,7 @@ class BookRead(BaseHandler):
 
             with open(new_path, "rb") as f:
                 self.db.add_format(book['id'], new_fmt, f, index_is_id=True)
+                logging.info('add new book: %s', new_path)
             fpath = new_path
 
         # extract to dir
