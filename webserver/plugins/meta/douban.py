@@ -24,7 +24,7 @@ CHROME_HEADERS = {
         }
 
 def str2date(s):
-        for fmt in ("%Y-%m-%d", "%Y-%m", "%Y年","%Y"):
+        for fmt in ("%Y-%m-%d", "%Y-%m", _("%Y年"),"%Y"):
             try:
                 return datetime.datetime.strptime(s, fmt)
             except:

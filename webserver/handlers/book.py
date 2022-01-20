@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
-from cmath import e
 import logging
 from plugins.meta import douban
 from plugins.meta import baike
@@ -247,9 +246,8 @@ class BookRefer(BaseHandler):
         # first, search title
         try:
             books = api.get_books_by_title(title)
-        except e:
-            logging.error(e)
-            return {'err': 'httprequest.douban.failed', 'msg':_(u'豆瓣接口查询失败 %s' % e)}
+        except:
+            logging.error(_(u'豆瓣接口查询 %s 失败' % title))
         books = [] if books == None else books
         if books and mi.isbn and mi.isbn != baike.BAIKE_ISBN:
             skip = False
@@ -266,9 +264,8 @@ class BookRefer(BaseHandler):
         api = baike.BaiduBaikeApi(copy_image=False)
         try:
             book = api.get_book(title)
-        except e:
-            logging.error(e)
-            return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败 %s' % e)}
+        except:
+            return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败')}
         if book: books.append( book )
 
         keys = ['cover_url', 'source', 'website', 'title', 'author_sort' ,'publisher', 'isbn', 'comments', 'provider_key', 'provider_value']
@@ -307,17 +304,15 @@ class BookRefer(BaseHandler):
             api = baike.BaiduBaikeApi(copy_image=True)
             try:
                 refer_mi = api.get_book(title)
-            except e:
-                logging.error(e)
-                return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败 %s' % e)}
+            except:
+                return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败')}
         elif provider_key == douban.KEY:
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseurl'], copy_image=True, maxCount=CONF['douban_max_count'])
             try:
                 refer_mi = api.get_book(mi)
-            except e:
-                logging.error(e)
-                return {'err': 'httprequest.douban.failed', 'msg':_(u'豆瓣接口查询失败 %s' % e)}
+            except:
+                return {'err': 'httprequest.douban.failed', 'msg':_(u'豆瓣接口查询失败')}
         else:
             return {'err': 'params.provider_key.invalid', 'msg': _(u'尚不支持的provider_key: %s' % provider_key)}
 
