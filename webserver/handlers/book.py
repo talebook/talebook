@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
+from cmath import e
 import logging
 from plugins.meta import douban
 from plugins.meta import baike
@@ -108,7 +109,6 @@ def do_ebook_convert(old_path, new_path, log_path):
             log.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
             return (False, err)
         return (True, "")
-
 
 class Index(BaseHandler):
     def fmt(self, b):
@@ -245,7 +245,11 @@ class BookRefer(BaseHandler):
         title = re.sub(u'[(（].*', "", mi.title)
         api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseurl'], copy_image=False, manual_select=False, maxCount=CONF['douban_max_count'])
         # first, search title
-        books = api.get_books_by_title(title)
+        try:
+            books = api.get_books_by_title(title)
+        except e:
+            logging.error(e)
+            return {'err': 'httprequest.douban.failed', 'msg':_(u'豆瓣接口查询失败 %s' % e)}
         books = [] if books == None else books
         if books and mi.isbn and mi.isbn != baike.BAIKE_ISBN:
             skip = False
@@ -260,7 +264,11 @@ class BookRefer(BaseHandler):
 
         # append baidu book
         api = baike.BaiduBaikeApi(copy_image=False)
-        book = api.get_book(title)
+        try:
+            book = api.get_book(title)
+        except e:
+            logging.error(e)
+            return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败 %s' % e)}
         if book: books.append( book )
 
         keys = ['cover_url', 'source', 'website', 'title', 'author_sort' ,'publisher', 'isbn', 'comments', 'provider_key', 'provider_value']
@@ -297,12 +305,19 @@ class BookRefer(BaseHandler):
         title = re.sub(u'[(（].*', "", mi.title)
         if provider_key == baike.KEY:
             api = baike.BaiduBaikeApi(copy_image=True)
-            refer_mi = api.get_book(title)
+            try:
+                refer_mi = api.get_book(title)
+            except e:
+                logging.error(e)
+                return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败 %s' % e)}
         elif provider_key == douban.KEY:
-            mi.isbn = provider_key
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(CONF['douban_apikey'], CONF['douban_baseurl'], copy_image=True, maxCount=CONF['douban_max_count'])
-            refer_mi = api.get_book(mi)
+            try:
+                refer_mi = api.get_book(mi)
+            except e:
+                logging.error(e)
+                return {'err': 'httprequest.douban.failed', 'msg':_(u'豆瓣接口查询失败 %s' % e)}
         else:
             return {'err': 'params.provider_key.invalid', 'msg': _(u'尚不支持的provider_key: %s' % provider_key)}
 
@@ -338,8 +353,9 @@ class BookEdit(BaseHandler):
                 mi.set(key, val)
 
         if data.get('pubdate', None):
-            try: content = datetime.datetime.strptime(data['pubdate'], "%Y-%m-%d")
-            except: return {'err': 'params.pudate.invalid', 'msg': _(u'出版日期参数错误，格式应为 2019-05-10') }
+            content = douban.str2date(data['pubdate'])
+            if content == None:
+                return {'err': 'params.pudate.invalid', 'msg': _(u'出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019') }
             mi.set('pubdate', content)
 
         if 'tags' in data and not data['tags']:

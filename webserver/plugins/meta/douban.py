@@ -23,6 +23,13 @@ CHROME_HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36',
         }
 
+def str2date(s):
+        for fmt in ("%Y-%m-%d", "%Y-%m", "%Y年","%Y"):
+            try:
+                return datetime.datetime.strptime(s, fmt)
+            except:
+                continue
+        return None
 
 class DoubanBookApi(object):
     def __init__(self, apikey, baseUrl, copy_image=True, manual_select=False, maxCount = 2):
@@ -88,13 +95,7 @@ class DoubanBookApi(object):
         except:
             return None
 
-    def str2date(self, s):
-        for fmt in ("%Y-%m-%d", "%Y-%m", "%Y"):
-            try:
-                return datetime.datetime.strptime(s, fmt)
-            except:
-                continue
-        return None
+    
 
     def get_book(self, md):
         return self.get_metadata(md)
@@ -130,7 +131,7 @@ class DoubanBookApi(object):
         mi.series     = book.get('serials', None)
         mi.tags        = [ t['name'] for t in book['tags'] ][:8]
         mi.rating      = int(float(book['rating']['average']))
-        mi.pubdate     = self.str2date(book['pubdate'])
+        mi.pubdate     = str2date(book['pubdate'])
         mi.timestamp   = datetime.datetime.now()
         mi.douban_author_intro = book['author_intro']
         mi.douban_subtitle = book.get('subtitle', None)
