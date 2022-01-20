@@ -510,6 +510,15 @@ class TestOpds(TestApp):
         self.assertEqual(rsp.code, 401)
         server.CONF['INVITE_MODE'] = False
 
+class TestConvert(TestApp):
+    def test_convert(self):
+        import handlers
+        fin = testdir + '/library/Han Han/Ta De Guo (5)/Ta De Guo - Han Han.epub'
+        fout = '/tmp/output.mobi'
+        flog = '/tmp/output.log'
+        ok, msg = handlers.book.do_ebook_convert(fin, fout, flog)
+        self.assertEqual(ok, True)
+
 
 def setUpModule():
     setup_server()
