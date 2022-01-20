@@ -636,7 +636,7 @@ class BookPush(BaseHandler):
         author = authors_to_string(book['authors'] if book['authors'] else [_(u'佚名')])
         title = book['title'] if book['title'] else _(u"无名书籍")
         fname = u'%s - %s.%s'%(title, author, fmt)
-        with open(fpath) as f:
+        with open(fpath, 'rb') as f:
             fdata = f.read()
 
         site_title = CONF['site_title']
