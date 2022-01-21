@@ -122,6 +122,7 @@ class DoubanBookApi(object):
         if not authors: authors = [ u'佚名' ]
 
         from calibre.ebooks.metadata.book.base import Metadata
+        from calibre.utils.date import utcnow
         mi = Metadata(book['title'])
         mi.authors     = authors
         mi.author_sort = mi.authors[0]
@@ -132,7 +133,7 @@ class DoubanBookApi(object):
         mi.tags        = [ t['name'] for t in book['tags'] ][:8]
         mi.rating      = int(float(book['rating']['average']))
         mi.pubdate     = str2date(book['pubdate'])
-        mi.timestamp   = datetime.datetime.now()
+        mi.timestamp   = utcnow()
         mi.douban_author_intro = book['author_intro']
         mi.douban_subtitle = book.get('subtitle', None)
         mi.website     = "https://book.douban.com/subject/%s/" % book['id']

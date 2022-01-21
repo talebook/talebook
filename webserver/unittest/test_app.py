@@ -6,7 +6,7 @@ from tornado import testing
 
 testdir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(testdir))
-import server, models, settings
+import server, models
 
 
 _app = None
@@ -424,11 +424,13 @@ class TestAdmin(TestApp):
         self.assertEqual(d['err'], 'ok')
         self.assertTrue(len(d['settings']) > 10)
 
-        req = {"settings_path": "/tmp/", "site_title": "abc", "not_work": "en"}
-        d = self.json("/api/admin/settings", method="POST", body=json.dumps(req))
-        self.assertEqual(d['err'], 'ok')
-        self.assertEqual(d['rsp']['site_title'], 'abc')
-        self.assertTrue('not_work' not in d['rsp'])
+        import loader
+        with mock.patch.object(loader.SettingsLoader, 'set_store_path', return_value='/tmp/') as m:
+            req = {"site_title": "abc", "not_work": "en"}
+            d = self.json("/api/admin/settings", method="POST", body=json.dumps(req))
+            self.assertEqual(d['err'], 'ok')
+            self.assertEqual(d['rsp']['site_title'], 'abc')
+            self.assertTrue('not_work' not in d['rsp'])
 
 class TestOpds(TestApp):
     @classmethod
@@ -507,6 +509,15 @@ class TestOpds(TestApp):
         rsp = self.fetch("/opds/nav/4f7469746c65")
         self.assertEqual(rsp.code, 401)
         server.CONF['INVITE_MODE'] = False
+
+class TestConvert(TestApp):
+    def test_convert(self):
+        import handlers
+        fin = testdir + '/library/Han Han/Ta De Guo (5)/Ta De Guo - Han Han.epub'
+        fout = '/tmp/output.mobi'
+        flog = '/tmp/output.log'
+        ok, msg = handlers.book.do_ebook_convert(fin, fout, flog)
+        self.assertEqual(ok, True)
 
 
 def setUpModule():

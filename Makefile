@@ -16,5 +16,9 @@ push:
 	docker push $(REPO1)
 	docker push $(REPO2)
 
+docker-test:
+	docker build -t talebook/test --target test .
+	docker run --rm --name talebook-docker-test talebook/test
+
 test:
 	pytest webserver

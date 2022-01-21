@@ -12,6 +12,14 @@ class SettingsLoader(dict):
         for key in list(self.keys()):
             self.pop(key)
 
+    def set_store_path(self):
+        p = self.get('settings_path', "").strip()
+        if not os.path.isdir(p):
+            p = os.path.dirname(__file__)
+        if sys.path[0] != p:
+            sys.path.insert(0, p)
+        return p
+
     def loadfile(self):
         try:
             import settings
@@ -21,8 +29,7 @@ class SettingsLoader(dict):
             logging.error(traceback.format_exc())
             pass
 
-        self.settings_path = self.get('settings_path', None)
-        if self.settings_path: sys.path.insert(0, self.settings_path)
+        self.set_store_path()
 
         try:
             import auto
@@ -47,8 +54,7 @@ settings = {
 }
 '''
 
-        d = self.settings_path
-        if not d: d = os.path.dirname(__file__)
+        d = self.set_store_path()
         py = os.path.join(d, filename)
         pyc = os.path.join(d, filename+"c")
         logging.error("saving settings file: %s" % py)
