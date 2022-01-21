@@ -1,97 +1,122 @@
 #!/usr/bin/env python3
-#-*- coding: UTF-8 -*-
+# -*- coding: UTF-8 -*-
 
 
-import re, os, logging, sys, time, tempfile, zipfile
+import re, os, logging, sys
 import models, loader, social_routes
 import tornado.ioloop
 import tornado.httpserver
 from tornado import web
 from tornado.options import define, options
 from gettext import gettext as _
-from gettext import GNUTranslations
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from social_tornado.models import init_social
+
 CONF = loader.get_settings()
 
 
-define("host", default="", type=str,
-        help=_('The host address on which to listen'))
-define("port", default=8080, type=int,
-        help=_('The port on which to listen.'))
-define("path-calibre", default="/usr/lib/calibre", type=str,
-        help=_('Path to calibre package.'))
-define("path-resources", default="/usr/share/calibre", type=str,
-        help=_('Path to calibre resources.'))
-define("path-plugins", default="/usr/lib/calibre/calibre/plugins", type=str,
-        help=_('Path to calibre plugins.'))
-define("path-bin", default="/usr/bin", type=str,
-        help=_('Path to calibre binary programs.'))
-define("with-library", default=CONF['with_library'], type=str,
-        help=_('Path to the library folder to serve with the content server.'))
+define("host", default="", type=str, help=_("The host address on which to listen"))
+define("port", default=8080, type=int, help=_("The port on which to listen."))
+define(
+    "path-calibre",
+    default="/usr/lib/calibre",
+    type=str,
+    help=_("Path to calibre package."),
+)
+define(
+    "path-resources",
+    default="/usr/share/calibre",
+    type=str,
+    help=_("Path to calibre resources."),
+)
+define(
+    "path-plugins",
+    default="/usr/lib/calibre/calibre/plugins",
+    type=str,
+    help=_("Path to calibre plugins."),
+)
+define(
+    "path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary programs.")
+)
+define(
+    "with-library",
+    default=CONF["with_library"],
+    type=str,
+    help=_("Path to the library folder to serve with the content server."),
+)
 
-define("syncdb", default=False, type=bool, help=_('Create all tables'))
+define("syncdb", default=False, type=bool, help=_("Create all tables"))
+
 
 def init_calibre():
     path = options.path_calibre
-    if path not in sys.path: sys.path.insert(0, path)
+    if path not in sys.path:
+        sys.path.insert(0, path)
     sys.resources_location = options.path_resources
     sys.extensions_location = options.path_plugins
     sys.executables_location = options.path_bin
     try:
-        import calibre
+        import calibre  # noqa: F401
     except Exception as e:
         import traceback, logging
+
         logging.error(traceback.format_exc())
-        raise ImportError( _("Can not import calibre. Please set the corrent options.\n%s" % e) )
+        raise ImportError(
+            _("Can not import calibre. Please set the corrent options.\n%s" % e)
+        )
     if not options.with_library:
-        sys.stderr.write( _('No saved library path. Use the --with-library option'
-                ' to specify the path to the library you want to use.') )
-        sys.stderr.write( "\n" )
+        sys.stderr.write(
+            _(
+                "No saved library path. Use the --with-library option"
+                " to specify the path to the library you want to use."
+            )
+        )
+        sys.stderr.write("\n")
         sys.exit(2)
 
+
 def bind_utf8_book_names(cache):
-    from calibre.constants import iswindows
     from calibre.db.backend import WINDOWS_RESERVED_NAMES
 
     PATH_LIMIT = cache.backend.PATH_LIMIT
+
     def safe_filename(filename):
         return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "_", filename)  # 替换为下划线
 
     # the codes is from calibre source code. just change 'ascii_filename' to 'safe_filename'
     def utf8_construct_path_name(book_id, title, author):
-        book_id = ' (%d)' % book_id
-        l = PATH_LIMIT - (len(book_id) // 2) - 2
-        author = safe_filename(author)[:l]
-        title  = safe_filename(title.lstrip())[:l].rstrip()
+        book_id = " (%d)" % book_id
+        lm = PATH_LIMIT - (len(book_id) // 2) - 2
+        author = safe_filename(author)[:lm]
+        title = safe_filename(title.lstrip())[:lm].rstrip()
         if not title:
-            title = 'Unknown'[:l]
+            title = "Unknown"[:lm]
         try:
-            while author[-1] in (' ', '.'):
+            while author[-1] in (" ", "."):
                 author = author[:-1]
         except IndexError:
-            author = ''
+            author = ""
         if not author:
-            author = safe_filename(_('Unknown'))
+            author = safe_filename(_("Unknown"))
         if author.upper() in WINDOWS_RESERVED_NAMES:
-            author += 'w'
-        return '%s/%s%s' % (author, title, book_id)
+            author += "w"
+        return "%s/%s%s" % (author, title, book_id)
 
     def utf8_construct_file_name(book_id, title, author, extlen):
         extlen = max(extlen, 14)  # 14 accounts for ORIGINAL_EPUB
-        l = (PATH_LIMIT - (extlen // 2) - 2) if iswindows else ((PATH_LIMIT - extlen - 2) // 2)
-        if l < 5:
-            raise ValueError('Extension length too long: %d' % extlen)
-        author = safe_filename(author)[:l]
-        title  = safe_filename(title.lstrip())[:l].rstrip()
+        lm = (PATH_LIMIT - extlen - 2) // 2
+        if lm < 5:
+            raise ValueError("Extension length too long: %d" % extlen)
+        author = safe_filename(author)[:lm]
+        title = safe_filename(title.lstrip())[:lm].rstrip()
         if not title:
-            title = 'Unknown'[:l]
-        name   = title + ' - ' + author
-        while name.endswith('.'):
+            title = "Unknown"[:lm]
+        name = title + " - " + author
+        while name.endswith("."):
             name = name[:-1]
         if not name:
-            name = safe_filename(_('Unknown'))
+            name = safe_filename(_("Unknown"))
         return name
 
     cache.backend.construct_path_name = utf8_construct_path_name
@@ -101,6 +126,7 @@ def bind_utf8_book_names(cache):
 
 def bind_topdir_book_names(cache):
     old_construct_path_name = cache.backend.construct_path_name
+
     def new_construct_path_name(*args, **kwargs):
         s = old_construct_path_name(*args, **kwargs)
         ns = s[0] + "/" + s
@@ -110,6 +136,7 @@ def bind_topdir_book_names(cache):
     cache.backend.construct_path_name = new_construct_path_name
     return
 
+
 def make_app():
     init_calibre()
 
@@ -117,34 +144,38 @@ def make_app():
     from calibre.db.legacy import LibraryDatabase
     from calibre.utils.date import fromtimestamp
 
-    auth_db_path = CONF['user_database']
+    auth_db_path = CONF["user_database"]
     logging.info("Init library with [%s]" % options.with_library)
-    logging.info("Init AuthDB  with [%s]" % auth_db_path )
-    logging.info("Init Static  with [%s]" % CONF['static_path'] )
-    logging.info("Init HTML    with [%s]" % CONF['html_path'] )
+    logging.info("Init AuthDB  with [%s]" % auth_db_path)
+    logging.info("Init Static  with [%s]" % CONF["static_path"])
+    logging.info("Init HTML    with [%s]" % CONF["html_path"])
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
 
-
     # hook 1: 按字母作为第一级目录，解决书库子目录太多的问题
-    if CONF['BOOK_NAMES_FORMAT'].lower() == 'utf8':
+    if CONF["BOOK_NAMES_FORMAT"].lower() == "utf8":
         bind_utf8_book_names(cache)
     else:
         bind_topdir_book_names(cache)
 
     # hook 2: don't force GUI
     from calibre import gui2
+
     old_must_use_qt = gui2.must_use_qt
+
     def new_must_use_qt(headless=True):
         try:
             old_must_use_qt(headless)
         except:
             pass
+
     gui2.must_use_qt = new_must_use_qt
 
     # build sql session factory
     engine = create_engine(auth_db_path, echo=False)
-    ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
+    ScopedSession = scoped_session(
+        sessionmaker(bind=engine, autoflush=True, autocommit=False)
+    )
     models.bind_session(ScopedSession)
     init_social(models.Base, ScopedSession, CONF)
 
@@ -153,51 +184,57 @@ def make_app():
         logging.info("Create tables into DB")
         sys.exit(0)
 
-    path = CONF['static_path'] + '/calibre/default_cover.jpg'
-    with open(path, 'rb') as cover_file:
+    path = CONF["static_path"] + "/calibre/default_cover.jpg"
+    with open(path, "rb") as cover_file:
         default_cover = cover_file.read()
     app_settings = dict(CONF)
-    app_settings.update({
-        "legacy": book_db,
-        "cache": cache,
-        "ScopedSession": ScopedSession ,
-        "build_time": fromtimestamp(os.stat(path).st_mtime),
-        "default_cover": default_cover,
-        })
+    app_settings.update(
+        {
+            "legacy": book_db,
+            "cache": cache,
+            "ScopedSession": ScopedSession,
+            "build_time": fromtimestamp(os.stat(path).st_mtime),
+            "default_cover": default_cover,
+        }
+    )
 
     logging.info("Now, Running...")
     app = web.Application(
-            social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(),
-            **app_settings)
+        social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings
+    )
     app._engine = engine
     return app
 
 
 def get_upload_size():
     n = 1
-    s = CONF['MAX_UPLOAD_SIZE'].lower().strip()
+    s = CONF["MAX_UPLOAD_SIZE"].lower().strip()
     if s.endswith("k") or s.endswith("kb"):
         n = 1024
         s = s.split("k")[0]
     elif s.endswith("m") or s.endswith("mb"):
-        n = 1024*1024
+        n = 1024 * 1024
         s = s.split("m")[0]
     elif s.endswith("g") or s.endswith("gb"):
-        n = 1024*1024*1024
+        n = 1024 * 1024 * 1024
         s = s.split("g")[0]
     s = s.strip()
-    return int(s)*n
+    return int(s) * n
+
 
 def main():
     tornado.options.parse_command_line()
     app = make_app()
-    http_server = tornado.httpserver.HTTPServer(app, xheaders=True, max_buffer_size=get_upload_size())
+    http_server = tornado.httpserver.HTTPServer(
+        app, xheaders=True, max_buffer_size=get_upload_size()
+    )
     http_server.listen(options.port, options.host)
     tornado.ioloop.IOLoop.instance().start()
     from flask.ext.sqlalchemy import _EngineDebuggingSignalEvents
+
     _EngineDebuggingSignalEvents(app._engine, app.import_name).register()
 
-if __name__ == "__main__":
-    sys.path.append( os.path.dirname(__file__) )
-    sys.exit(main())
 
+if __name__ == "__main__":
+    sys.path.append(os.path.dirname(__file__))
+    sys.exit(main())

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-#-*- coding: UTF-8 -*-
+# -*- coding: UTF-8 -*-
+# fmt: off
+# flake8: noqa
 
 import os
 
@@ -102,4 +104,3 @@ Hi, %(username)s！
 ''',
 
 }
-

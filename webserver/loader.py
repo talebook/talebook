@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-#-*- coding: UTF-8 -*-
+# -*- coding: UTF-8 -*-
 
 import os, json, sys, logging
+
 
 class SettingsLoader(dict):
     def __init__(self, *args, **kwargs):
@@ -13,7 +14,7 @@ class SettingsLoader(dict):
             self.pop(key)
 
     def set_store_path(self):
-        p = self.get('settings_path', "").strip()
+        p = self.get("settings_path", "").strip()
         if not os.path.isdir(p):
             p = os.path.dirname(__file__)
         if sys.path[0] != p:
@@ -23,9 +24,11 @@ class SettingsLoader(dict):
     def loadfile(self):
         try:
             import settings
+
             self.update(settings.settings)
         except:
             import traceback
+
             logging.error(traceback.format_exc())
             pass
 
@@ -33,44 +36,55 @@ class SettingsLoader(dict):
 
         try:
             import auto
+
             self.update(auto.settings)
         except:
             pass
 
         try:
             import manual
+
             self.update(manual.settings)
         except:
             pass
 
     def dumpfile(self, filename="auto.py"):
-        s = "\n".join( '%-30s: %s,' % ("'"+k+"'", repr(v)) for k,v in sorted(self.items()) )
-        code = u'''#!/usr/bin/env python3
+        s = "\n".join(
+            "%-30s: %s," % ("'" + k + "'", repr(v)) for k, v in sorted(self.items())
+        )
+        code = (
+            u"""#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 import os
 settings = {
-''' + s + '''
+"""
+            + s
+            + """
 }
-'''
+"""
+        )
 
         d = self.set_store_path()
         py = os.path.join(d, filename)
-        pyc = os.path.join(d, filename+"c")
+        pyc = os.path.join(d, filename + "c")
         logging.error("saving settings file: %s" % py)
         with open(py, "w") as f:
             f.write(code)
-        try: os.remove(pyc)
-        except: pass
+        try:
+            os.remove(pyc)
+        except:
+            pass
 
     def loads(self, text):
-        self.update( json.loads(text) )
+        self.update(json.loads(text))
 
     def dumps(self):
         return json.dumps(self)
 
+
 _settings = SettingsLoader()
+
+
 def get_settings():
     return _settings
-
-

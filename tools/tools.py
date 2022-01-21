@@ -1,5 +1,6 @@
 #!/usr/bin/calibre-debug
-#-*- coding: UTF-8 -*-
+# -*- coding: UTF-8 -*-
+# flake8: noqa
 
 """
 This is the standard runscript for all of calibre's tools.

@@ -1,0 +1,32 @@
+[style]
+column_limit=127
+based_on_style=google
+
+[flake8]
+ignore =
+    ;W503 line break before binary operator
+    W503,
+    ;E203 whitespace before ':'
+    E203,
+    ; whitespace after ':'
+    ;E241,
+    ;multiple imports on one line
+    E401,
+    ;bare 'except'
+    E722,
+
+; exclude file
+exclude =
+    .tox,
+    .git,
+    __pycache__,
+    build,
+    dist,
+    *.pyc,
+    *.egg-info,
+    .cache,
+    .eggs
+
+builtins = _
+max-complexity = 10
+max-line-length = 127

@@ -1,5 +1,6 @@
 #!/usr/bin/python
-#-*- coding: UTF-8 -*-
+# -*- coding: UTF-8 -*-
+# flake8: noqa
 
 import os
 import re
