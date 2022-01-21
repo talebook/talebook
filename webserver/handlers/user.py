@@ -500,9 +500,11 @@ class Welcome(BaseHandler):
         self.mark_invited()
         return {'err': 'ok', 'msg': 'ok'}
 
+
 class SettingHandler(BaseHandler):
     def save_extra_settings(self, args):
-        CONF.update( args )
+        if args != CONF:
+            CONF.update(args)
 
         # update index.html
         html = self.render_string('index.html', **CONF)
@@ -530,6 +532,7 @@ class SettingHandler(BaseHandler):
         # ok, it's safe to update current environment
         CONF['installed'] = True
         return {'err': 'ok', 'rsp': args}
+
 
 class AdminSettings(SettingHandler):
     @js
@@ -580,6 +583,7 @@ class AdminSettings(SettingHandler):
                 'smtp_username',
                 'static_host',
                 'xsrf_cookies',
+                'settings_path',
                 ]
 
         args = loader.SettingsLoader()

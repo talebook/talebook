@@ -3,6 +3,7 @@
 
 import os, json, sys, logging
 
+
 class SettingsLoader(dict):
     def __init__(self, *args, **kwargs):
         super(SettingsLoader, self).__init__(*args, **kwargs)
