@@ -405,7 +405,7 @@ class OpdsHandler(BaseHandler):
         self.set_header('Content-Type', 'application/atom+xml; profile=opds-catalog; charset=UTF-8')
         return bytes(AcquisitionFeed(updated, id_, items, offsets,
                                    page_url, up_url, self.db,
-                                   CONF['url_prefix'], title=feed_title))
+                                   CONF['opds_url_prefix'], title=feed_title))
 
     def opds_search(self, query=None, offset=0):
         try:
