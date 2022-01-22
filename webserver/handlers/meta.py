@@ -35,7 +35,7 @@ class MetaList(ListHandler):
     def get(self, meta):
         SHOW_NUMBER = 300
         if self.get_argument("show", "") == "all":
-            SHOW_NUMBER = sys.maxint
+            SHOW_NUMBER = sys.maxsize
         titles = {
                 'tag': _(u'全部标签'),
                 'author': _(u'全部作者'),
@@ -69,7 +69,7 @@ class MetaBooks(ListHandler):
         category = meta+'s' if meta in ['tag', 'author'] else meta
         if meta in ['rating']: name = int(name)
         books = self.get_item_books(category, name)
-        return self.render_book_list(books, vars());
+        return self.render_book_list(books, vars())
 
 
 def routes():

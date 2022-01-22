@@ -18,7 +18,7 @@
                 </v-form>
             </v-card-text>
 
-            <v-card-text v-if="socials.length > 1">
+            <v-card-text v-if="socials.length > 0">
                 <v-divider></v-divider>
                 <div align="center">
                     <br/>
