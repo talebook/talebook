@@ -1,51 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-
 import re, os, logging, sys
-import models, loader, social_routes
+from gettext import gettext as _
+
 import tornado.ioloop
 import tornado.httpserver
 from tornado import web
 from tornado.options import define, options
-from gettext import gettext as _
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from social_tornado.models import init_social
 
+import models, loader, social_routes
+
+
 CONF = loader.get_settings()
-
-
 define("host", default="", type=str, help=_("The host address on which to listen"))
 define("port", default=8080, type=int, help=_("The port on which to listen."))
-define(
-    "path-calibre",
-    default="/usr/lib/calibre",
-    type=str,
-    help=_("Path to calibre package."),
-)
-define(
-    "path-resources",
-    default="/usr/share/calibre",
-    type=str,
-    help=_("Path to calibre resources."),
-)
-define(
-    "path-plugins",
-    default="/usr/lib/calibre/calibre/plugins",
-    type=str,
-    help=_("Path to calibre plugins."),
-)
-define(
-    "path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary programs.")
-)
-define(
-    "with-library",
-    default=CONF["with_library"],
-    type=str,
-    help=_("Path to the library folder to serve with the content server."),
-)
-
+define("path-calibre", default="/usr/lib/calibre", type=str, help=_("Path to calibre package."))
+define("path-resources", default="/usr/share/calibre", type=str, help=_("Path to calibre resources."))
+define("path-plugins", default="/usr/lib/calibre/calibre/plugins", type=str, help=_("Path to calibre plugins."))
+define("path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary programs."))
+define("with-library", default=CONF["with_library"], type=str, help=_("Path to the library folder"))
 define("syncdb", default=False, type=bool, help=_("Create all tables"))
 
 
@@ -62,9 +39,7 @@ def init_calibre():
         import traceback, logging
 
         logging.error(traceback.format_exc())
-        raise ImportError(
-            _("Can not import calibre. Please set the corrent options.\n%s" % e)
-        )
+        raise ImportError(_("Can not import calibre. Please set the corrent options.\n%s" % e))
     if not options.with_library:
         sys.stderr.write(
             _(
@@ -173,9 +148,7 @@ def make_app():
 
     # build sql session factory
     engine = create_engine(auth_db_path, echo=False)
-    ScopedSession = scoped_session(
-        sessionmaker(bind=engine, autoflush=True, autocommit=False)
-    )
+    ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
     models.bind_session(ScopedSession)
     init_social(models.Base, ScopedSession, CONF)
 
@@ -199,9 +172,7 @@ def make_app():
     )
 
     logging.info("Now, Running...")
-    app = web.Application(
-        social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings
-    )
+    app = web.Application(social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings)
     app._engine = engine
     return app
 
@@ -225,9 +196,7 @@ def get_upload_size():
 def main():
     tornado.options.parse_command_line()
     app = make_app()
-    http_server = tornado.httpserver.HTTPServer(
-        app, xheaders=True, max_buffer_size=get_upload_size()
-    )
+    http_server = tornado.httpserver.HTTPServer(app, xheaders=True, max_buffer_size=get_upload_size())
     http_server.listen(options.port, options.host)
     tornado.ioloop.IOLoop.instance().start()
     from flask.ext.sqlalchemy import _EngineDebuggingSignalEvents

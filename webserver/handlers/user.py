@@ -2,6 +2,8 @@
 # -*- coding: UTF-8 -*-
 
 import datetime, logging, re, hashlib, os
+from gettext import gettext as _
+
 import tornado.escape
 from tornado import web
 from models import Reader, Message
@@ -94,15 +96,9 @@ class AdminUsers(BaseHandler):
                 "provider": user.social_auth[0].provider
                 if hasattr(user, "social_auth") and user.social_auth.count()
                 else "register",
-                "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S")
-                if user.create_time
-                else "N/A",
-                "update_time": user.update_time.strftime("%Y-%m-%d %H:%M:%S")
-                if user.update_time
-                else "N/A",
-                "access_time": user.access_time.strftime("%Y-%m-%d %H:%M:%S")
-                if user.access_time
-                else "N/A",
+                "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S") if user.create_time else "N/A",
+                "update_time": user.update_time.strftime("%Y-%m-%d %H:%M:%S") if user.update_time else "N/A",
+                "access_time": user.access_time.strftime("%Y-%m-%d %H:%M:%S") if user.access_time else "N/A",
             }
             for attr in dir(user):
                 if attr.startswith("can_"):
@@ -264,17 +260,9 @@ class SignUp(BaseHandler):
 
         if not re.match(RE_EMAIL, email):
             return {"err": "params.email.invalid", "msg": _(u"Email无效")}
-        if (
-            len(username) < 5
-            or len(username) > 20
-            or not re.match(RE_USERNAME, username)
-        ):
+        if len(username) < 5 or len(username) > 20 or not re.match(RE_USERNAME, username):
             return {"err": "params.username.invalid", "msg": _(u"用户名无效")}
-        if (
-            len(password) < 8
-            or len(password) > 20
-            or not re.match(RE_PASSWORD, password)
-        ):
+        if len(password) < 8 or len(password) > 20 or not re.match(RE_PASSWORD, password):
             return {"err": "params.password.invalid", "msg": _(u"密码无效")}
 
         user = self.session.query(Reader).filter(Reader.username == username).first()
@@ -284,10 +272,7 @@ class SignUp(BaseHandler):
         user.username = username
         user.name = nickname
         user.email = email
-        user.avatar = (
-            "https://www.gravatar.com/avatar/"
-            + hashlib.md5(email.encode("UTF-8")).hexdigest()
-        )
+        user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
         user.create_time = datetime.datetime.now()
         user.update_time = datetime.datetime.now()
         user.access_time = datetime.datetime.now()
@@ -351,11 +336,7 @@ class UserReset(BaseHandler):
         username = self.get_argument("username", "").strip().lower()
         if not username or not email:
             return {"err": "params.invalid", "msg": _(u"用户名或邮箱错误")}
-        user = (
-            self.session.query(Reader)
-            .filter(Reader.username == username, Reader.email == email)
-            .first()
-        )
+        user = self.session.query(Reader).filter(Reader.username == username, Reader.email == email).first()
         if not user:
             return {"err": "params.no_user", "msg": _(u"无此用户")}
         p = user.reset_password()
@@ -447,11 +428,7 @@ class UserInfo(BaseHandler):
         db = self.db
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
         count_all_users = self.session.query(func.count(Reader.id)).scalar()
-        count_hot_users = (
-            self.session.query(func.count(Reader.id))
-            .filter(Reader.access_time > last_week)
-            .scalar()
-        )
+        count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
         return {
             "books": db.count(),
             "tags": len(db.all_tags()),
@@ -515,10 +492,7 @@ class UserInfo(BaseHandler):
                         for b in v:
                             if b["id"] not in show:
                                 continue
-                            b["img"] = (
-                                self.static_host
-                                + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
-                            )
+                            b["img"] = self.static_host + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
                             b["href"] = "/book/%(id)s" % b
                             n.append(b)
                         v = n[:12]
@@ -702,17 +676,9 @@ class AdminInstall(SettingHandler):
             return {"err": "params.invalid", "msg": _(u"填写的内容有误")}
         if not re.match(RE_EMAIL, email):
             return {"err": "params.email.invalid", "msg": _(u"Email无效")}
-        if (
-            len(username) < 5
-            or len(username) > 20
-            or not re.match(RE_USERNAME, username)
-        ):
+        if len(username) < 5 or len(username) > 20 or not re.match(RE_USERNAME, username):
             return {"err": "params.username.invalid", "msg": _(u"用户名无效")}
-        if (
-            len(password) < 8
-            or len(password) > 20
-            or not re.match(RE_PASSWORD, password)
-        ):
+        if len(password) < 8 or len(password) > 20 or not re.match(RE_PASSWORD, password):
             return {"err": "params.password.invalid", "msg": _(u"密码无效")}
 
         # 避免重复创建
@@ -722,10 +688,7 @@ class AdminInstall(SettingHandler):
             user.username = username
             user.name = username
             user.email = email
-            user.avatar = (
-                "https://www.gravatar.com/avatar/"
-                + hashlib.md5(email.encode("UTF-8")).hexdigest()
-            )
+            user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
             user.create_time = datetime.datetime.now()
             user.update_time = datetime.datetime.now()
             user.access_time = datetime.datetime.now()

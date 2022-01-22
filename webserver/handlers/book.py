@@ -2,8 +2,8 @@
 # -*- coding: UTF-8 -*-
 
 import os, logging, time, datetime, subprocess, urllib, re
-import queue, threading, functools
-import random
+import queue, threading, functools, random
+from gettext import gettext as _
 
 import tornado.escape
 from tornado import web
@@ -54,9 +54,7 @@ def do_ebook_convert(old_path, new_path, log_path):
         p = subprocess.Popen(args, stdout=log, stderr=subprocess.PIPE)
         try:
             _, stde = p.communicate(timeout=100)
-            logging.info(
-                "ebook-convert finish: %s, err: %s" % (new_path, bytes.decode(stde))
-            )
+            logging.info("ebook-convert finish: %s, err: %s" % (new_path, bytes.decode(stde)))
         except subprocess.TimeoutExpired:
             p.kill()
             logging.info("ebook-convert timeout: %s" % new_path)
@@ -125,6 +123,17 @@ class Index(BaseHandler):
 
 
 class BookDetail(BaseHandler):
+    def set_book(self, book):
+        self.book = book
+
+    def val(self, k, default_value=_("Unknown")):
+        v = self.book.get(k, None)
+        if not v:
+            v = default_value
+        if isinstance(v, datetime.datetime):
+            return v.strftime("%Y-%m-%d")
+        return v
+
     @js
     def get(self, id):
         book = self.get_book(id)
@@ -154,30 +163,14 @@ class BookDetail(BaseHandler):
         else:
             self.count_increase(book_id, count_guest=1)
 
-        b = book
-
-        def get(k, default=_("Unknown")):
-            v = b.get(k, None)
-            if not v:
-                v = default
-            return v
-
-        collector = b.get("collector", None)
+        collector = book.get("collector", None)
         if isinstance(collector, dict):
             collector = collector.get("username", None)
         elif collector:
             collector = collector.username
 
-        try:
-            pubdate = b["pubdate"].strftime("%Y-%m-%d")
-        except:
-            pubdate = None
-
-        try:
-            ts = b["timestamp"].strftime("%Y-%m-%d")
-        except:
-            ts = int(time.time())
-
+        b = book
+        self.set_book(book)
         return {
             "err": "ok",
             "kindle_sender": CONF["smtp_username"],
@@ -187,18 +180,18 @@ class BookDetail(BaseHandler):
                 "rating"         : b["rating"],
                 "count_visit"    : b["count_visit"],
                 "count_download" : b["count_download"],
-                "timestamp"      : ts,
-                "pubdate"        : pubdate,
+                "timestamp"      : self.val("timestamp"),
+                "pubdate"        : self.val("pubdate"),
                 "collector"      : collector,
                 "authors"        : b["authors"],
                 "author"         : ", ".join(b["authors"]),
                 "tags"           : b["tags"],
-                "author_sort"    : get("author_sort"),
-                "publisher"      : get("publisher"),
-                "comments"       : get("comments", _(u"暂无简介")),
-                "series"         : get("series", None),
-                "language"       : get("language", None),
-                "isbn"           : get("isbn", None),
+                "author_sort"    : self.val("author_sort"),
+                "publisher"      : self.val("publisher"),
+                "comments"       : self.val("comments", _(u"暂无简介")),
+                "series"         : self.val("series", None),
+                "language"       : self.val("language", None),
+                "isbn"           : self.val("isbn", None),
                 "files"          : files,
                 "is_public"      : b["is_public"],
                 "is_owner"       : b["is_owner"],
@@ -331,9 +324,7 @@ class BookEdit(BaseHandler):
             cid = book["collector"]["id"]
         else:
             cid = book["collector"].id
-        if not self.current_user.can_edit() or not (
-            self.is_admin() or self.is_book_owner(bid, cid)
-        ):
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
             return {"err": "permission", "msg": _(u"无权操作")}
 
         data = tornado.escape.json_decode(self.request.body)
@@ -380,14 +371,10 @@ class BookDelete(BaseHandler):
             cid = book["collector"]["id"]
         else:
             cid = book["collector"].id
-        if not self.current_user.can_edit() or not (
-            self.is_admin() or self.is_book_owner(bid, cid)
-        ):
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
             return {"err": "permission", "msg": _(u"无权操作")}
 
-        if not self.current_user.can_delete() or not (
-            self.is_admin() or self.is_book_owner(bid, cid)
-        ):
+        if not self.current_user.can_delete() or not (self.is_admin() or self.is_book_owner(bid, cid)):
             return {"err": "permission", "msg": _(u"无权操作")}
 
         self.db.delete_book(bid)
@@ -464,11 +451,7 @@ class SearchBook(ListHandler):
 class HotBook(ListHandler):
     def get(self):
         title = _(u"热度榜单")
-        db_items = (
-            self.session.query(Item)
-            .filter(Item.count_visit > 1)
-            .order_by(Item.count_download.desc())
-        )
+        db_items = self.session.query(Item).filter(Item.count_visit > 1).order_by(Item.count_download.desc())
         count = db_items.count()
         start = self.get_argument_start()
         delta = 30
@@ -563,9 +546,7 @@ class BookRead(BaseHandler):
             if not fpath:
                 continue
             # epub_dir is for javascript
-            epub_dir = os.path.dirname(fpath).replace(
-                CONF["with_library"], "/get/extract/"
-            )
+            epub_dir = os.path.dirname(fpath).replace(CONF["with_library"], "/get/extract/")
             epub_dir = urllib.parse.quote(epub_dir)
             self.extract_book(book, fpath, fmt)
             return self.html_page("book/read.html", vars())
@@ -581,9 +562,7 @@ class BookRead(BaseHandler):
 
     @background
     def extract_book(self, book, fpath, fmt):
-        fdir = os.path.dirname(fpath).replace(
-            CONF["with_library"], CONF["extract_path"]
-        )
+        fdir = os.path.dirname(fpath).replace(CONF["with_library"], CONF["extract_path"])
         subprocess.call(["mkdir", "-p", fdir])
         # fdir = os.path.dirname(fpath) + "/extract"
         if os.path.isfile(fdir + "/META-INF/container.xml"):
@@ -598,10 +577,7 @@ class BookRead(BaseHandler):
                 CONF["convert_path"],
                 "book-%s-%s.%s" % (book["id"], int(time.time()), new_fmt),
             )
-            logging.info(
-                "convert book: %s => %s, progress: %s"
-                % (fpath, new_path, progress_file)
-            )
+            logging.info("convert book: %s => %s, progress: %s" % (fpath, new_path, progress_file))
             os.chdir("/tmp/")
 
             ok, err = do_ebook_convert(fpath, new_path, progress_file)
@@ -661,17 +637,14 @@ class BookPush(BaseHandler):
         self.convert_and_mail(book, mail_to)
         self.add_msg(
             "success",
-            _(u"服务器正在推送《%(title)s》到%(email)s")
-            % {"title": book["title"], "email": mail_to},
+            _(u"服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
         )
         return {"err": "ok", "msg": _(u"服务器正在转换格式并推送……")}
 
     @background
     def convert_and_mail(self, book, mail_to=None):
         new_fmt = "mobi"
-        new_path = os.path.join(
-            CONF["convert_path"], "%s.%s" % (ascii_filename(book["title"]), new_fmt)
-        )
+        new_path = os.path.join(CONF["convert_path"], "%s.%s" % (ascii_filename(book["title"]), new_fmt))
         progress_file = self.get_path_progress(book["id"])
 
         old_path = None
@@ -702,7 +675,7 @@ class BookPush(BaseHandler):
         mail_args = {
             "title": title,
             "site_url": self.base_url,
-            "site_title" : CONF["site_title"],
+            "site_title": CONF["site_title"],
         }
         mail_from = self.settings["smtp_username"]
         mail_subject = _("%(site_title)s：推送给您一本书《%(title)s》") % mail_args
@@ -710,9 +683,7 @@ class BookPush(BaseHandler):
         status = msg = ""
         try:
             logging.info("send %(title)s to %(mail_to)s" % vars())
-            mail = self.create_mail(
-                mail_from, mail_to, mail_subject, mail_body, fdata, fname
-            )
+            mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, fdata, fname)
             sendmail(
                 mail,
                 from_=mail_from,

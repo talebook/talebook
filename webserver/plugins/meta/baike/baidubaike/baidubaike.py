@@ -7,7 +7,8 @@ import requests
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 
-from .baiduexception import *
+from constants import CHROME_HEADERS
+from .baiduexception import PageError, DisambiguationError, VerifyError
 
 
 CLASS_DISAMBIGUATION = ["nslog:519"]
@@ -20,17 +21,10 @@ CLASS_CONTENT = {
     "headline-2": "\n* %(text)s *\n",
     "para": "%(text)s",
 }
-
 CLASS_SUMMARY = ["lemma-summary"]
 CLASS_INFO = ["basicInfo-item"]
 CLASS_SUMMARY_PIC = ["summary-pic"]
 CLASS_LEMMA_ID = ["lemmaWgt-promotion-rightPreciseAd"]
-
-CHROME_HEADERS = {
-    "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36",
-}
 
 
 class Page(object):
@@ -39,7 +33,7 @@ class Page(object):
         payload = None
 
         # An url or a word to be Paged
-        pattern = re.compile("^https?:\/\/baike\.baidu\.com\/.*", re.IGNORECASE)
+        pattern = re.compile(r"^https?:\/\/baike\.baidu\.com\/.*", re.IGNORECASE)
         if re.match(pattern, string):
             url = string
         else:
@@ -100,7 +94,7 @@ class Page(object):
             text = div.get_text()
             for k, fmt in CLASS_CONTENT.items():
                 if k in klass:
-                    content.append(fmt % vars())
+                    content.append(fmt % {"text": text})
 
         return "\n".join(content)
 
@@ -116,13 +110,12 @@ class Page(object):
     def get_summary(self):
         """Get summary infomation of a page"""
         divs = self.soup.find_all(class_=CLASS_SUMMARY)
-        summary = ""
         return "\n".join(div.get_text(strip=True) for div in divs)
 
     def get_inurls(self):
         """Get links inside a page"""
         inurls = OrderedDict()
-        href = self.soup.find_all(href=re.compile("\/(sub)?view(\/[0-9]*)+.htm"))
+        href = self.soup.find_all(href=re.compile(r"\/(sub)?view(\/[0-9]*)+.htm"))
 
         for url in href:
             inurls[url.get_text()] = "https://baike.baidu.com%s" % url.get("href")

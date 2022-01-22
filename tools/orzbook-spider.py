@@ -17,11 +17,11 @@ referer = 'http://orzbook.com/22360.html'
 NOT_FOUND = u'服务器人数在线过多，请稍等一下再刷新'
 
 headers = {
-'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.6',
-'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-'Referer': referer,
-'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.87 Safari/537.36',
-}
+        'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.6',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Referer': referer,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.87 Safari/537.36',
+        }
 
 
 re_list = r'''http://orzbook.com/date/\d+/\d+'''

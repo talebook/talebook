@@ -17,11 +17,11 @@ referer = 'http://mebook.cc/22360.html'
 NOT_FOUND = u'抱歉，您查看的内容无法找到。请使用搜索功能查找相关的关键词'
 
 headers = {
-'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.6',
-'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-'Referer': referer,
-'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.87 Safari/537.36',
-}
+        'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.6',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Referer': referer,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.87 Safari/537.36',
+        }
 
 formats = ['epub', 'mobi', 'azw3', 'azw']
 

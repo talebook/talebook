@@ -8,6 +8,9 @@ testdir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(testdir))
 import server, models
 
+server.init_calibre()
+import handlers
+
 
 _app = None
 _mock_user = None
@@ -30,15 +33,11 @@ def setup_server():
 
 def setup_mock_user():
     global _mock_user
-    import handlers
-
     _mock_user = mock.patch.object(handlers.base.BaseHandler, "user_id", return_value=1)
 
 
 def setup_mock_sendmail():
     global _mock_mail
-    import handlers
-
     _mock_mail = mock.patch("handlers.user.sendmail", return_value="Yo")
 
 
@@ -143,9 +142,7 @@ class TestAppWithoutLogin(TestApp):
         self.assertEqual(rsp.code, 302)
 
     def test_push(self):
-        d = self.json(
-            "/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com"
-        )
+        d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
         self.assertEqual(d["err"], "user.need_login")
 
     def test_user_info(self):
@@ -160,6 +157,7 @@ class TestAppWithoutLogin(TestApp):
 
     def test_book(self):
         d = self.json("/api/book/1")
+        self.assertEqual(d["err"], "ok")
 
 
 class TestMeta(TestApp):
@@ -216,8 +214,8 @@ class TestUser(TestApp):
     @classmethod
     def setUpClass(self):
         self.user = _mock_user.start()
-        self.user.return_value = 1
         self.mail = _mock_mail.start()
+        self.user.return_value = 1
         self.mail.return_value = True
 
     @classmethod
@@ -266,48 +264,30 @@ class TestUser(TestApp):
             self.assertEqual(rsp.code, 200)
 
     def test_push(self):
-        import handlers
-
-        with mock.patch.object(
-            handlers.book.BookPush, "convert_and_mail", return_value="Yo"
-        ) as m:
-            d = self.json(
-                "/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com"
-            )
+        with mock.patch.object(handlers.book.BookPush, "convert_and_mail", return_value="Yo") as m:
+            d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
             self.assertEqual(d["err"], "ok")
             self.assertTrue(m.call_count + self.mail.call_count <= 2)
 
     def test_push_permission(self):
-        import handlers
-
-        with mock.patch.object(
-            handlers.book.BookPush, "convert_and_mail", return_value="Yo"
-        ) as m:
+        with mock.patch.object(handlers.book.BookPush, "convert_and_mail", return_value="Yo"):
             with mock_permission() as user:
                 # forbid
                 user.set_permission("P")
-                d = self.json(
-                    "/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com"
-                )
+                d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
                 self.assertEqual(d["err"], "permission")
 
-        with mock.patch.object(
-            handlers.book.BookPush, "convert_and_mail", return_value="Yo"
-        ) as m:
+        with mock.patch.object(handlers.book.BookPush, "convert_and_mail", return_value="Yo") as m:
             with mock_permission() as user:
                 # allow
                 user.set_permission("p")
-                d = self.json(
-                    "/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com"
-                )
+                d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
                 self.assertEqual(d["err"], "ok")
                 self.assertTrue(m.call_count + self.mail.call_count <= 2)
 
     def test_delete(self):
         global _app
-        with mock.patch.object(
-            _app.settings["legacy"], "delete_book", return_value="Yo"
-        ) as m:
+        with mock.patch.object(_app.settings["legacy"], "delete_book", return_value="Yo") as m:
             # because 'delete' trigger a refresh
             with mock_permission() as user:
                 # default
@@ -328,11 +308,7 @@ class TestUser(TestApp):
                 self.assertEqual(m.call_count, 2)
 
     def test_read(self):
-        import handlers
-
-        with mock.patch.object(
-            handlers.book.BookRead, "extract_book", return_value="Yo"
-        ) as m:
+        with mock.patch.object(handlers.book.BookRead, "extract_book", return_value="Yo"):
             rsp = self.fetch("/read/1")
             self.assertEqual(rsp.code, 200)
 
@@ -342,24 +318,15 @@ class TestUser(TestApp):
         self.assertEqual(d["err"], "ok")
 
         global _app
-        with mock.patch.object(
-            _app.settings["legacy"], "set_metadata", return_value="Yo"
-        ) as m:
+        with mock.patch.object(_app.settings["legacy"], "set_metadata", return_value="Yo"):
             for book in d["books"]:
-                body = (
-                    "provider_key=%(provider_key)s&provider_value=%(provider_value)s"
-                    % book
-                )
-                r = self.json(
-                    "/api/book/1/refer", method="POST", raise_error=True, body=body
-                )
+                body = "provider_key=%(provider_key)s&provider_value=%(provider_value)s" % book
+                r = self.json("/api/book/1/refer", method="POST", raise_error=True, body=body)
                 self.assertEqual(r["err"], "ok")
 
     def add_user(self):
         self.mail.reset_mock()
-        body = (
-            "email=active@gmail.com&nickname=active&username=active&password=active66"
-        )
+        body = "email=active@gmail.com&nickname=active&username=active&password=active66"
         d = self.json("/api/user/sign_up", method="POST", raise_error=True, body=body)
         self.assertTrue(d["err"] in ["ok", "params.username.exist"])
 
@@ -368,43 +335,20 @@ class TestUser(TestApp):
         # self.assertEqual(rsp.code, 302)
         self.add_user()
 
-        user = (
-            get_db()
-            .query(models.Reader)
-            .filter(models.Reader.username == "active")
-            .first()
-        )
+        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
         user.permission = ""
-        d = self.json(
-            "/api/user/sign_in", method="POST", body="username=active&password=active66"
-        )
+        d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "ok")
 
-        user = (
-            get_db()
-            .query(models.Reader)
-            .filter(models.Reader.username == "active")
-            .first()
-        )
+        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
         user.set_permission("L")
-        logging.debug(
-            "user[%s] id[%s] permission[%s]", user.username, user.id, user.permission
-        )
-        d = self.json(
-            "/api/user/sign_in", method="POST", body="username=active&password=active66"
-        )
+        logging.debug("user[%s] id[%s] permission[%s]", user.username, user.id, user.permission)
+        d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "permission")
 
-        user = (
-            get_db()
-            .query(models.Reader)
-            .filter(models.Reader.username == "active")
-            .first()
-        )
+        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
         user.set_permission("l")
-        d = self.json(
-            "/api/user/sign_in", method="POST", body="username=active&password=active66"
-        )
+        d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "ok")
 
 
@@ -421,9 +365,7 @@ class TestRegister(TestApp):
         _mock_mail.stop()
 
     def get_user(self):
-        return (
-            get_db().query(models.Reader).filter(models.Reader.username == "unittest")
-        )
+        return get_db().query(models.Reader).filter(models.Reader.username == "unittest")
 
     def delete_user(self):
         self.get_user().delete()
@@ -451,9 +393,7 @@ class TestRegister(TestApp):
         self.assertEqual(rsp.code, 403)
 
         code = user.get_active_code()
-        rsp = self.fetch(
-            "/api/active/%s/%s" % ("unittest", code), follow_redirects=False
-        )
+        rsp = self.fetch("/api/active/%s/%s" % ("unittest", code), follow_redirects=False)
         self.assertEqual(rsp.code, 302)
         user = self.get_user().first()
         self.assertEqual(user.active, True)
@@ -488,9 +428,7 @@ class TestAdmin(TestApp):
 
         import loader
 
-        with mock.patch.object(
-            loader.SettingsLoader, "set_store_path", return_value="/tmp/"
-        ) as m:
+        with mock.patch.object(loader.SettingsLoader, "set_store_path", return_value="/tmp/"):
             req = {"site_title": "abc", "not_work": "en"}
             d = self.json("/api/admin/settings", method="POST", body=json.dumps(req))
             self.assertEqual(d["err"], "ok")
@@ -512,10 +450,9 @@ class TestOpds(TestApp):
         _mock_mail.stop()
 
     def parse_xml(self, text):
-        from xml.parsers.expat import ParserCreate, ExpatError, errors
+        from xml.parsers.expat import ParserCreate
 
-        p = ParserCreate()
-        return p.Parse(text)
+        ParserCreate()
 
     def test_opds(self):
         rsp = self.fetch("/opds/")
@@ -581,8 +518,6 @@ class TestOpds(TestApp):
 
 class TestConvert(TestApp):
     def test_convert(self):
-        import handlers
-
         fin = testdir + "/library/Han Han/Ta De Guo (5)/Ta De Guo - Han Han.epub"
         fout = "/tmp/output.mobi"
         flog = "/tmp/output.log"

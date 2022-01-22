@@ -2,11 +2,12 @@
 # -*- coding: UTF-8 -*-
 
 import hashlib, logging, datetime, time
+from gettext import gettext as _
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import relationship
+from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
 
 
 def mksalt():

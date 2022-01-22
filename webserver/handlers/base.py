@@ -32,16 +32,10 @@ def website_format(value):
     for link in value.split(";"):
         if link.startswith("douban://"):
             douban_id = link.split("//")[-1]
-            links.append(
-                u"<a target='_blank' href='https://book.douban.com/subject/%s/'>豆瓣</a> "
-                % douban_id
-            )
+            links.append(u"<a target='_blank' href='https://book.douban.com/subject/%s/'>豆瓣</a> " % douban_id)
         elif link.startswith("isbn://"):
             douban_id = link.split("//")[-1]
-            links.append(
-                u"<a target='_blank' href='https://book.douban.com/isbn/%s/'>豆瓣</a> "
-                % douban_id
-            )
+            links.append(u"<a target='_blank' href='https://book.douban.com/isbn/%s/'>豆瓣</a> " % douban_id)
         elif link.startswith("http://"):
             links.append(u"<a target='_blank' href='%s'>参考链接</a> " % link)
     return ";".join(links)
@@ -56,8 +50,7 @@ def js(func):
 
             logging.error(traceback.format_exc())
             msg = (
-                'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>'
-                % traceback.format_exc()
+                'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
             )
             rsp = {"err": "exception", "msg": msg}
             if isinstance(e, web.Finish):
@@ -216,9 +209,7 @@ class BaseHandler(web.RequestHandler):
         return self.current_user.is_admin()
 
     def login_user(self, user):
-        logging.info(
-            "LOGIN: %s - %d - %s" % (self.request.remote_ip, user.id, user.username)
-        )
+        logging.info("LOGIN: %s - %d - %s" % (self.request.remote_ip, user.id, user.username))
         self.set_secure_cookie("user_id", str(user.id))
         self.set_secure_cookie("lt", str(int(time.time())))
         user.access_time = datetime.datetime.now()
@@ -297,9 +288,7 @@ class BaseHandler(web.RequestHandler):
         if field not in self.db.field_metadata.sortable_field_keys():
             raise web.HTTPError(400, "%s is not a valid sort field" % field)
 
-        keyg = CSSortKeyGenerator(
-            [(field, order)], self.db.field_metadata, self.db.prefs
-        )
+        keyg = CSSortKeyGenerator([(field, order)], self.db.field_metadata, self.db.prefs)
         items.sort(key=keyg, reverse=not order)
 
     def get_template_path(self):
@@ -340,21 +329,20 @@ class BaseHandler(web.RequestHandler):
         if request.user:
             request.user_extra = self.current_user.extra
             if not request.user.avatar:
-                request.user.avatar = (
-                    "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
-                )
+                request.user.avatar = "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
             else:
                 request.user.avatar = request.user.avatar.replace("http://", "//")
 
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
         page_vars = {
-            "db" : self.db,
-            "messages" : self.pop_messages(),
-            "count_all_users" : self.session.query(sql_func.count(Reader.id)).scalar(),
-            "count_hot_users" : self.session.query(sql_func.count(Reader.id))
-                                    .filter(Reader.access_time > last_week).scalar(),
-            "IMG" : self.static_host,
-            "SITE_TITLE" : CONF["site_title"],
+            "db": self.db,
+            "messages": self.pop_messages(),
+            "count_all_users": self.session.query(sql_func.count(Reader.id)).scalar(),
+            "count_hot_users": self.session.query(sql_func.count(Reader.id))
+            .filter(Reader.access_time > last_week)
+            .scalar(),
+            "IMG": self.static_host,
+            "SITE_TITLE": CONF["site_title"],
         }
         vals = dict(*args, **kwargs)
         vals.update(page_vars)
@@ -384,17 +372,14 @@ class BaseHandler(web.RequestHandler):
         _ts = time.time()
         books = self.db.get_data_as_dict(*args, **kwargs)
         logging.debug(
-            "[%5d ms] select books from library  (count = %d)"
-            % (int(1000 * (time.time() - _ts)), len(books))
+            "[%5d ms] select books from library  (count = %d)" % (int(1000 * (time.time() - _ts)), len(books))
         )
 
         item = Item()
         empty_item = item.to_dict()
         empty_item["collector"] = self.session.query(Reader).order_by(Reader.id).first()
         ids = [book["id"] for book in books]
-        items = (
-            self.session.query(Item).filter(Item.book_id.in_(ids)).all() if ids else []
-        )
+        items = self.session.query(Item).filter(Item.book_id.in_(ids)).all() if ids else []
         maps = {}
         for b in items:
             d = b.to_dict()
@@ -404,8 +389,7 @@ class BaseHandler(web.RequestHandler):
         for book in books:
             book.update(maps.get(book["id"], empty_item))
         logging.debug(
-            "[%5d ms] select books from database (count = %d)"
-            % (int(1000 * (time.time() - _ts)), len(books))
+            "[%5d ms] select books from database (count = %d)" % (int(1000 * (time.time() - _ts)), len(books))
         )
         return books
 
@@ -487,10 +471,7 @@ class BaseHandler(web.RequestHandler):
         mail["To"] = to
         mail["Subject"] = Header(subject, "utf-8")
         mail["Date"] = formatdate(localtime=True)
-        mail["Message-ID"] = (
-            "<tencent_%s@qq.com>"
-            % hashlib.md5(mail.as_string().encode("UTF-8")).hexdigest()
-        )
+        mail["Message-ID"] = "<tencent_%s@qq.com>" % hashlib.md5(mail.as_string().encode("UTF-8")).hexdigest()
         mail.preamble = "You will not see this in a MIME-aware mail reader.\n"
 
         if body is not None:
@@ -499,9 +480,7 @@ class BaseHandler(web.RequestHandler):
 
         if attachment_data is not None:
             name = Header(attachment_name, "utf-8").encode()
-            msg = MIMEApplication(
-                attachment_data, "octet-stream", charset="utf-8", name=name
-            )
+            msg = MIMEApplication(attachment_data, "octet-stream", charset="utf-8", name=name)
             msg.add_header("Content-Disposition", "attachment", filename=name)
             mail.attach(msg)
         return mail.as_string()

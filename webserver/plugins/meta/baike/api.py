@@ -6,7 +6,7 @@ This is the standard runscript for all of calibre's tools.
 Do not modify it unless you know what you are doing.
 """
 
-import os, re, json, logging, io
+import re, logging, io, traceback
 from urllib.request import urlopen
 from .baidubaike.baidubaike import Page
 
@@ -27,9 +27,7 @@ class BaiduBaikeApi:
     def _baike(self, title):
         try:
             return Page(title)
-        except Exception as e:
-            import traceback
-
+        except Exception:
             logging.error(traceback.print_exc())
             return None
 
@@ -66,7 +64,7 @@ class BaiduBaikeApi:
             mi.cover_data = (img_fmt, img)
 
         if u"完结" in info.get(u"连载状态", ""):
-            day = re.findall("\d*-\d*-\d*", info[u"连载状态"])
+            day = re.findall(r"\d*-\d*-\d*", info[u"连载状态"])
             try:
                 mi.pubdate = strptime(day[0], "%Y-%m-%d")
             except:

@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 import math, sys
+from gettext import gettext as _
 from handlers.base import ListHandler, js
 
 
@@ -71,7 +72,7 @@ class MetaBooks(ListHandler):
         if meta in ["rating"]:
             name = int(name)
         books = self.get_item_books(category, name)
-        return self.render_book_list(books, vars())
+        return self.render_book_list(books, title=title)
 
 
 def routes():
