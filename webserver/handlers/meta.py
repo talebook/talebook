@@ -36,7 +36,7 @@ class MetaList(ListHandler):
     def get(self, meta):
         SHOW_NUMBER = 300
         if self.get_argument("show", "") == "all":
-            SHOW_NUMBER = sys.maxint
+            SHOW_NUMBER = sys.maxsize
         titles = {
             "tag": _(u"全部标签"),
             "author": _(u"全部作者"),

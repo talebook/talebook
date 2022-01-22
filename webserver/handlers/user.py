@@ -537,9 +537,11 @@ class Welcome(BaseHandler):
         return {"err": "ok", "msg": "ok"}
 
 
+
 class SettingHandler(BaseHandler):
     def save_extra_settings(self, args):
-        CONF.update(args)
+        if args != CONF:
+            CONF.update(args)
 
         # update index.html
         html = self.render_string("index.html", **CONF)
@@ -567,6 +569,7 @@ class SettingHandler(BaseHandler):
         # ok, it's safe to update current environment
         CONF["installed"] = True
         return {"err": "ok", "rsp": args}
+
 
 
 class AdminSettings(SettingHandler):
@@ -607,6 +610,7 @@ class AdminSettings(SettingHandler):
     def post(self):
         data = tornado.escape.json_decode(self.request.body)
         KEYS = [
+<<<<<<< HEAD
             "ALLOW_GUEST_DOWNLOAD",
             "ALLOW_GUEST_PUSH",
             "ALLOW_GUEST_READ",
@@ -635,6 +639,37 @@ class AdminSettings(SettingHandler):
             "static_host",
             "xsrf_cookies",
         ]
+=======
+                'ALLOW_GUEST_DOWNLOAD',
+                'ALLOW_GUEST_PUSH',
+                'ALLOW_GUEST_READ',
+                'ALLOW_REGISTER',
+                'BOOK_NAMES_FORMAT',
+                'FRIENDS',
+                'FOOTER',
+                'INVITE_CODE',
+                'INVITE_MESSAGE',
+                'INVITE_MODE',
+                'MAX_UPLOAD_SIZE',
+                'RESET_MAIL_CONTENT',
+                'RESET_MAIL_TITLE',
+                'SIGNUP_MAIL_CONTENT',
+                'SIGNUP_MAIL_TITLE',
+                'SOCIALS',
+                'autoreload',
+                'cookie_secret',
+                'douban_apikey',
+                'douban_baseurl',
+                'douban_max_count',
+                'site_title',
+                'smtp_password',
+                'smtp_server',
+                'smtp_username',
+                'static_host',
+                'xsrf_cookies',
+                'settings_path',
+                ]
+>>>>>>> master
 
         args = loader.SettingsLoader()
         args.clear()
