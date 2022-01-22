@@ -485,6 +485,25 @@ class BaseHandler(web.RequestHandler):
             mail.attach(msg)
         return mail.as_string()
 
+    def mail(self, sender, to, subject, body, attachment_data=None, attachment_name=None, **kwargs):
+        from calibre.utils.smtp import sendmail
+
+        relay = kwargs.get("relay", CONF["smtp_server"])
+        username = kwargs.get("username", CONF["smtp_username"])
+        password = kwargs.get("password", CONF["smtp_password"])
+        mail = self.create_mail(sender, to, subject, body, attachment_data, attachment_name)
+        sendmail(
+            mail,
+            from_=sender,
+            to=[to],
+            timeout=20,
+            port=465,
+            encryption="SSL",
+            relay=relay,
+            username=username,
+            password=password,
+        )
+
 
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):

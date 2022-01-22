@@ -1,5 +1,5 @@
 test:
-	python3 test_app.py --failfast TestOpds
+	python3 test_app.py --failfast
 
 testv:
 	coverage run -m unittest discover .

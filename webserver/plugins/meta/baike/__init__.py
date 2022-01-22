@@ -1,1 +1,1 @@
-from .api import BaiduBaikeApi  # noqa: F401
+from .api import BaiduBaikeApi, KEY  # noqa: F401

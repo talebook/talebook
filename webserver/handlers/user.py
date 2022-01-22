@@ -148,15 +148,12 @@ class AdminTestMail(BaseHandler):
         mail_subject = _(u"Calibre功能验证邮件")
         mail_body = _(u"这是一封测试邮件，验证邮件参数是否配置正确。")
 
-        mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, None, None)
         try:
-            sendmail(
-                mail,
-                from_=mail_from,
-                to=[mail_to],
-                timeout=10,
-                port=465,
-                encryption="SSL",
+            self.mail(
+                mail_from,
+                mail_to,
+                mail_subject,
+                mail_body,
                 relay=mail_server,
                 username=mail_username,
                 password=mail_password,
@@ -236,18 +233,7 @@ class SignUp(BaseHandler):
         mail_to = user.email
         mail_from = CONF["smtp_username"]
         mail_body = CONF["SIGNUP_MAIL_CONTENT"] % args
-        mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, None, None)
-        sendmail(
-            mail,
-            from_=mail_from,
-            to=[mail_to],
-            timeout=20,
-            port=465,
-            encryption="SSL",
-            relay=CONF["smtp_server"],
-            username=CONF["smtp_username"],
-            password=CONF["smtp_password"],
-        )
+        self.mail(mail_from, mail_to, mail_subject, mail_body)
 
     @js
     def post(self):
@@ -351,18 +337,7 @@ class UserReset(BaseHandler):
         mail_to = user.email
         mail_from = CONF["smtp_username"]
         mail_body = CONF["RESET_MAIL_CONTENT"] % args
-        mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, None, None)
-        sendmail(
-            mail,
-            from_=mail_from,
-            to=[mail_to],
-            timeout=20,
-            port=465,
-            encryption="SSL",
-            relay=CONF["smtp_server"],
-            username=CONF["smtp_username"],
-            password=CONF["smtp_password"],
-        )
+        self.mail(mail_from, mail_to, mail_subject, mail_body)
 
         # do save into db
         try:

@@ -9,7 +9,6 @@ import tornado.escape
 from tornado import web
 from calibre.ebooks.metadata import authors_to_string
 from calibre.ebooks.metadata.meta import get_metadata
-from calibre.utils.smtp import sendmail
 from calibre.utils.filenames import ascii_filename
 
 import loader
@@ -59,8 +58,8 @@ def do_ebook_convert(old_path, new_path, log_path):
             p.kill()
             logging.info("ebook-convert timeout: %s" % new_path)
             log.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
-            return False, ""
-        return True, ""
+            return False
+        return True
 
 
 class Index(BaseHandler):
@@ -217,14 +216,14 @@ class BookRefer(BaseHandler):
         # first, search title
         books = api.get_books_by_title(title) or []
         if books and mi.isbn and mi.isbn != baike.BAIKE_ISBN:
-            skip = False
+            got_that_book = False
             for b in books:
-                skip = mi.isbn == b.get("isbn13", "xxx") or (
+                got_that_book = (mi.isbn == b.get("isbn13", "xxx")) or (
                     mi.title == b.get("title") and mi.publisher == b.get("publisher")
                 )
-                if skip:
+                if got_that_book:
                     break
-            if skip is False:
+            if not got_that_book:
                 book = api.get_book_by_isbn(mi.isbn)
                 # alwayse put ISBN book in TOP1
                 if book:
@@ -498,6 +497,7 @@ class BookUpload(BaseHandler):
         fpath = os.path.join(CONF["upload_path"], name)
         with open(fpath, "wb") as f:
             f.write(data)
+        logging.debug("save upload file into [%s]", fpath)
 
         # read ebook meta
         with open(fpath, "rb") as stream:
@@ -580,7 +580,7 @@ class BookRead(BaseHandler):
             logging.info("convert book: %s => %s, progress: %s" % (fpath, new_path, progress_file))
             os.chdir("/tmp/")
 
-            ok, err = do_ebook_convert(fpath, new_path, progress_file)
+            ok = do_ebook_convert(fpath, new_path, progress_file)
             if not ok:
                 self.add_msg("danger", u"文件格式转换失败，请在QQ群里联系管理员.")
                 return
@@ -625,7 +625,7 @@ class BookPush(BaseHandler):
         for fmt in ["mobi", "azw", "pdf"]:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
-                self.do_send_mail(book, mail_to, fmt, fpath)
+                self.bg_send_book(book, mail_to, fmt, fpath)
                 return {"err": "ok", "msg": _(u"服务器正在推送……")}
 
         # we do no have formats for kindle
@@ -634,7 +634,8 @@ class BookPush(BaseHandler):
                 "err": "book.no_format_for_kindle",
                 "msg": _(u"抱歉，该书无可用于kindle阅读的格式"),
             }
-        self.convert_and_mail(book, mail_to)
+
+        self.bg_convert_and_send(book, mail_to)
         self.add_msg(
             "success",
             _(u"服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
@@ -642,9 +643,22 @@ class BookPush(BaseHandler):
         return {"err": "ok", "msg": _(u"服务器正在转换格式并推送……")}
 
     @background
-    def convert_and_mail(self, book, mail_to=None):
-        new_fmt = "mobi"
-        new_path = os.path.join(CONF["convert_path"], "%s.%s" % (ascii_filename(book["title"]), new_fmt))
+    def bg_send_book(self, book, mail_to, fmt, fpath):
+        self.do_send_mail(book, mail_to, fmt, fpath)
+
+    @background
+    def bg_convert_and_send(self, book, mail_to):
+        fmt = "mobi"  # best format for kindle
+        fpath = self.convert_to_mobi_format(book, fmt)
+        if fpath:
+            self.do_send_mail(book, mail_to, fmt, fpath)
+
+    def get_path_of_fmt(self, book, fmt):
+        """for mock test"""
+        return os.path.join(CONF["convert_path"], "%s.%s" % (ascii_filename(book["title"]), new_fmt))
+
+    def convert_to_mobi_format(self, book, new_fmt):
+        new_path = self.get_path_of_fmt(book, new_fmt)
         progress_file = self.get_path_progress(book["id"])
 
         old_path = None
@@ -652,18 +666,14 @@ class BookPush(BaseHandler):
             old_path = book.get("fmt_%s" % f, old_path)
 
         logging.debug("convert book from [%s] to [%s]", old_path, new_path)
-        ok, err = do_ebook_convert(old_path, new_path, progress_file)
+        ok = do_ebook_convert(old_path, new_path, progress_file)
         if not ok:
             self.add_msg("danger", u"文件格式转换失败，请在QQ群里联系管理员.")
-            return
-
+            return None
         with open(new_path, "rb") as f:
             self.db.add_format(book["id"], new_fmt, f, index_is_id=True)
-        if mail_to:
-            self.do_send_mail(book, mail_to, new_fmt, new_path)
-        return
+        return new_path
 
-    @background
     def do_send_mail(self, book, mail_to, fmt, fpath):
         # read meta info
         author = authors_to_string(book["authors"] if book["authors"] else [_(u"佚名")])
@@ -683,18 +693,7 @@ class BookPush(BaseHandler):
         status = msg = ""
         try:
             logging.info("send %(title)s to %(mail_to)s" % vars())
-            mail = self.create_mail(mail_from, mail_to, mail_subject, mail_body, fdata, fname)
-            sendmail(
-                mail,
-                from_=mail_from,
-                to=[mail_to],
-                timeout=20,
-                port=465,
-                encryption="SSL",
-                relay=CONF["smtp_server"],
-                username=CONF["smtp_username"],
-                password=CONF["smtp_password"],
-            )
+            self.mail(mail_from, mail_to, mail_subject, mail_body, fdata, fname)
             status = "success"
             msg = _("[%(title)s] 已成功发送至Kindle邮箱 [%(mail_to)s] !!") % vars()
             logging.info(msg)

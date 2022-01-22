@@ -22,6 +22,7 @@ def setup_server():
     server.options.with_library = testdir + "/library/"
     server.CONF["ALLOW_GUEST_PUSH"] = False
     server.CONF["ALLOW_GUEST_DOWNLOAD"] = False
+    server.CONF["upload_path"] = "/tmp/"
     server.CONF["html_path"] = "/tmp/"
     server.CONF["settings_path"] = "/tmp/"
     server.CONF["progress_path"] = "/tmp/"
@@ -38,7 +39,7 @@ def setup_mock_user():
 
 def setup_mock_sendmail():
     global _mock_mail
-    _mock_mail = mock.patch("handlers.user.sendmail", return_value="Yo")
+    _mock_mail = mock.patch("calibre.utils.smtp.sendmail", return_value="Yo")
 
 
 def get_db():
@@ -210,7 +211,7 @@ def mock_permission(arg=None):
     return AutoResetPermission(arg)
 
 
-class TestUser(TestApp):
+class TestWithUserLogin(TestApp):
     @classmethod
     def setUpClass(self):
         self.user = _mock_user.start()
@@ -223,6 +224,8 @@ class TestUser(TestApp):
         _mock_user.stop()
         _mock_mail.stop()
 
+
+class TestUser(TestWithUserLogin):
     def test_userinfo(self):
         d = self.json("/api/user/info")
         self.assertEqual(d["err"], "ok")
@@ -234,13 +237,35 @@ class TestUser(TestApp):
         self.assertEqual(d["sys"], {})
         self.assertTrue(len(d["user"]["extra"]["download_history"]) >= 1)
 
-    def test_download(self):
-        rsp = self.fetch("/api/book/1.epub")
-        self.assertEqual(rsp.code, 200)
+    def add_user(self):
+        self.mail.reset_mock()
+        body = "email=active@gmail.com&nickname=active&username=active&password=active66"
+        d = self.json("/api/user/sign_up", method="POST", raise_error=True, body=body)
+        self.assertTrue(d["err"] in ["ok", "params.username.exist"])
 
-        rsp = self.fetch("/api/book/1.pdf")
-        self.assertEqual(rsp.code, 404)
+    def test_login(self):
+        # rsp = self.fetch("/api/done", follow_redirects=False)
+        # self.assertEqual(rsp.code, 302)
+        self.add_user()
 
+        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
+        user.permission = ""
+        d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
+        self.assertEqual(d["err"], "ok")
+
+        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
+        user.set_permission("L")
+        logging.debug("user[%s] id[%s] permission[%s]", user.username, user.id, user.permission)
+        d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
+        self.assertEqual(d["err"], "permission")
+
+        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
+        user.set_permission("l")
+        d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
+        self.assertEqual(d["err"], "ok")
+
+
+class TestFile(TestWithUserLogin):
     def test_get_cover(self):
         rsp = self.fetch("/get/cover/1.jpg", follow_redirects=False)
         self.assertEqual(rsp.code, 200)
@@ -253,6 +278,19 @@ class TestUser(TestApp):
         rsp = self.fetch("/get/opf/1", follow_redirects=False)
         self.assertEqual(rsp.code, 200)
 
+
+class TestBook(TestWithUserLogin):
+    def test_nav(self):
+        rsp = self.fetch("/api/book/nav")
+        self.assertEqual(rsp.code, 200)
+
+    def test_download(self):
+        rsp = self.fetch("/api/book/1.epub")
+        self.assertEqual(rsp.code, 200)
+
+        rsp = self.fetch("/api/book/1.pdf")
+        self.assertEqual(rsp.code, 404)
+
     def test_download_permission(self):
         with mock_permission() as user:
             user.set_permission("S")  # forbid
@@ -263,21 +301,39 @@ class TestUser(TestApp):
             rsp = self.fetch("/api/book/1.epub")
             self.assertEqual(rsp.code, 200)
 
+    def mock_convert(self):
+        class MockConvertPath:
+            def __init__(self, path=None):
+                if not path:
+                    path = testdir + "/library/Han Han/Ta De Guo (5)/Ta De Guo - Han Han.epub"
+                self.mock1 = mock.patch.object(handlers.book.BookPush, "get_path_of_fmt", return_value=path)
+                self.mock2 = mock.patch("handlers.book.do_ebook_convert", return_value=True)
+
+            def __enter__(self):
+                self.mock1.start()
+                return self.mock2.start()
+
+            def __exit__(self, type, value, trace):
+                self.mock1.stop()
+                self.mock2.stop()
+
+        return MockConvertPath()
+
     def test_push(self):
-        with mock.patch.object(handlers.book.BookPush, "convert_and_mail", return_value="Yo") as m:
+        with self.mock_convert() as m:
             d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
             self.assertEqual(d["err"], "ok")
             self.assertTrue(m.call_count + self.mail.call_count <= 2)
 
     def test_push_permission(self):
-        with mock.patch.object(handlers.book.BookPush, "convert_and_mail", return_value="Yo"):
+        with self.mock_convert():
             with mock_permission() as user:
                 # forbid
                 user.set_permission("P")
                 d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
                 self.assertEqual(d["err"], "permission")
 
-        with mock.patch.object(handlers.book.BookPush, "convert_and_mail", return_value="Yo") as m:
+        with self.mock_convert() as m:
             with mock_permission() as user:
                 # allow
                 user.set_permission("p")
@@ -312,7 +368,66 @@ class TestUser(TestApp):
             rsp = self.fetch("/read/1")
             self.assertEqual(rsp.code, 200)
 
+    def test_edit(self):
+        body = {
+            "id": 5,
+            "title": "老人与海",
+            "rating": 8,
+            "count_visit": 4,
+            "count_download": 1,
+            "timestamp": "2022-01-20",
+            "pubdate": "1999-10-01",
+            "collector": "admin",
+            "authors": ["海明威"],
+            "author": "海明威",
+            "tags": ["海明威", "老人与海", "外国文学", "经典", "励志", "小说", "名著", "美国"],
+            "author_sort": "海明威",
+            "publisher": "上海译文出版社",
+            "comments": "本书讲述了一个渔夫的故事。古巴老渔夫圣地亚哥在连续八十四天没捕到鱼的情况下。",
+            "series": "x",
+            "language": None,
+            "isbn": "9787532723447",
+            "is_public": True,
+            "is_owner": True,
+        }
+        with mock.patch.object(_app.settings["legacy"], "set_metadata", return_value="Yo"):
+            r = self.json("/api/book/1/edit", method="POST", raise_error=True, body=json.dumps(body))
+            self.assertEqual(r["err"], "ok")
+
+
+class TestUpload(TestWithUserLogin):
+    def mtest_upload(self):
+        from email.header import Header
+        from email.mime.application import MIMEApplication
+        from email.mime.multipart import MIMEMultipart
+
+        fpath = testdir + "/library/Han Han/Ta De Guo (5)/Ta De Guo - Han Han.epub"
+        fname = u"中文书籍.epub"
+        with open(fpath, "rb") as f:
+            fdata = f.read()
+
+        with mock.patch.object(_app.settings["legacy"], "import_book", return_value="Yo") as m:
+            with mock.patch("models.Item.save", return_value="Yo"):
+                # build multipart message
+                filename = Header(fname, "utf-8").encode()
+                app = MIMEApplication(fdata, "octet-stream", charset="utf-8")
+                app.add_header("Content-Disposition", "form-data", name="ebook", filename=fname)
+                msg = MIMEMultipart("form-data")
+                msg.attach(app)
+                # split headers and body from message
+                form = msg.as_string().split("\n\n", 1)
+                headers = dict( line.split(": ", 1) for line in form[0].split("\n"))
+                body = form[1].replace("\n", "\r\n")
+                # send request
+                # FIXME: tornado save original ASCII into file ?
+                r = self.json("/api/book/upload", method="POST", headers=headers, body=body)
+                self.assertEqual(r['err'], 'ok')
+                self.assertEqual(m.call_count, 1)
+
+
+class TestRefer(TestWithUserLogin):
     def manual_test_refer(self):
+        # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
         server.CONF["douban_baseurl"] = "http://10.0.0.15:7001"
         d = self.json("/api/book/1/refer")
         self.assertEqual(d["err"], "ok")
@@ -324,35 +439,8 @@ class TestUser(TestApp):
                 r = self.json("/api/book/1/refer", method="POST", raise_error=True, body=body)
                 self.assertEqual(r["err"], "ok")
 
-    def add_user(self):
-        self.mail.reset_mock()
-        body = "email=active@gmail.com&nickname=active&username=active&password=active66"
-        d = self.json("/api/user/sign_up", method="POST", raise_error=True, body=body)
-        self.assertTrue(d["err"] in ["ok", "params.username.exist"])
 
-    def test_login(self):
-        # rsp = self.fetch("/api/done", follow_redirects=False)
-        # self.assertEqual(rsp.code, 302)
-        self.add_user()
-
-        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
-        user.permission = ""
-        d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
-        self.assertEqual(d["err"], "ok")
-
-        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
-        user.set_permission("L")
-        logging.debug("user[%s] id[%s] permission[%s]", user.username, user.id, user.permission)
-        d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
-        self.assertEqual(d["err"], "permission")
-
-        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
-        user.set_permission("l")
-        d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
-        self.assertEqual(d["err"], "ok")
-
-
-class TestRegister(TestApp):
+class TestUserSignUp(TestWithUserLogin):
     @classmethod
     def setUpClass(self):
         self.user = _mock_user.start()
@@ -436,19 +524,7 @@ class TestAdmin(TestApp):
             self.assertTrue("not_work" not in d["rsp"])
 
 
-class TestOpds(TestApp):
-    @classmethod
-    def setUpClass(self):
-        self.user = _mock_user.start()
-        self.user.return_value = 1
-        self.mail = _mock_mail.start()
-        self.mail.return_value = True
-
-    @classmethod
-    def tearDownClass(self):
-        _mock_user.stop()
-        _mock_mail.stop()
-
+class TestOpds(TestWithUserLogin):
     def parse_xml(self, text):
         from xml.parsers.expat import ParserCreate
 
@@ -521,7 +597,7 @@ class TestConvert(TestApp):
         fin = testdir + "/library/Han Han/Ta De Guo (5)/Ta De Guo - Han Han.epub"
         fout = "/tmp/output.mobi"
         flog = "/tmp/output.log"
-        ok, msg = handlers.book.do_ebook_convert(fin, fout, flog)
+        ok = handlers.book.do_ebook_convert(fin, fout, flog)
         self.assertEqual(ok, True)
 
 
@@ -534,6 +610,6 @@ def setUpModule():
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.DEBUG,
-        format="%(asctime)s %(levelname)5s %(pathname)s:%(lineno)d %(message)s",
+        format="%(levelname)5s %(pathname)s:%(lineno)d %(message)s",
     )
     unittest.main()
