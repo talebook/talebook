@@ -6,6 +6,7 @@ __copyright__ = '2014, Rex<talebook@foxmail.com>'
 __docformat__ = 'restructuredtext en'
 
 import os, io, re, sys, json, logging, datetime, requests
+from time import timezone
 from urllib.request import urlopen, Request
 
 KEY = 'douban'
@@ -26,7 +27,7 @@ CHROME_HEADERS = {
 def str2date(s):
         for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m", _("%Y年"),"%Y"):
             try:
-                return datetime.datetime.strptime(s, fmt)
+                return datetime.datetime.strptime(s, fmt).replace(tzinfo = timezone.utc)
             except:
                 continue
         return None
