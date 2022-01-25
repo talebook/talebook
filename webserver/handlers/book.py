@@ -61,7 +61,6 @@ def do_ebook_convert(old_path, new_path, log_path):
             return False
         return True
 
-
 class Index(BaseHandler):
     def fmt(self, b):
         pub = b.get("publisher", None)
@@ -214,7 +213,10 @@ class BookRefer(BaseHandler):
             maxCount=CONF["douban_max_count"],
         )
         # first, search title
-        books = api.get_books_by_title(title) or []
+        try:
+            books = api.get_books_by_title(title) or []
+        except:
+            logging.error(_(u'豆瓣接口查询 %s 失败' % title))
         if books and mi.isbn and mi.isbn != baike.BAIKE_ISBN:
             got_that_book = False
             for b in books:
@@ -232,7 +234,10 @@ class BookRefer(BaseHandler):
 
         # append baidu book
         api = baike.BaiduBaikeApi(copy_image=False)
-        book = api.get_book(title)
+        try:
+            book = api.get_book(title)
+        except:
+            return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败')}
         if book:
             books.append(book)
 
@@ -285,9 +290,11 @@ class BookRefer(BaseHandler):
         title = re.sub(u"[(（].*", "", mi.title)
         if provider_key == baike.KEY:
             api = baike.BaiduBaikeApi(copy_image=True)
-            refer_mi = api.get_book(title)
+            try:
+                refer_mi = api.get_book(title)
+            except:
+                return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败')}
         elif provider_key == douban.KEY:
-            mi.isbn = provider_key
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(
                 CONF["douban_apikey"],
@@ -295,7 +302,10 @@ class BookRefer(BaseHandler):
                 copy_image=True,
                 maxCount=CONF["douban_max_count"],
             )
-            refer_mi = api.get_book(mi)
+            try:
+                refer_mi = api.get_book(mi)
+            except:
+                return {'err': 'httprequest.douban.failed', 'msg':_(u'豆瓣接口查询失败')}
         else:
             return {
                 "err": "params.provider_key.invalid",
@@ -343,15 +353,11 @@ class BookEdit(BaseHandler):
             if key in KEYS:
                 mi.set(key, val)
 
-        if data.get("pubdate", None):
-            try:
-                content = datetime.datetime.strptime(data["pubdate"], "%Y-%m-%d")
-            except:
-                return {
-                    "err": "params.pudate.invalid",
-                    "msg": _(u"出版日期参数错误，格式应为 2019-05-10"),
-                }
-            mi.set("pubdate", content)
+        if data.get('pubdate', None):
+            content = douban.str2date(data['pubdate'])
+            if content == None:
+                return {'err': 'params.pudate.invalid', 'msg': _(u'出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019') }
+            mi.set('pubdate', content)
 
         if "tags" in data and not data["tags"]:
             self.db.set_tags(bid, [])

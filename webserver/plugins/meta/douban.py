@@ -5,10 +5,17 @@ __license__ = "GPL v3"
 __copyright__ = "2014, Rex<talebook@foxmail.com>"
 __docformat__ = "restructuredtext en"
 
-import io, re, sys, logging, datetime, requests, traceback
+import os, io, re, sys, json, logging, datetime, requests, traceback
+from datetime import timezone
+from gettext import gettext as _
 from urllib.request import urlopen, Request
 
-from constants import CHROME_HEADERS
+CHROME_HEADERS = {
+    "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    + "Chrome/66.0.3359.139 Safari/537.36",
+}
 
 
 KEY = "douban"
@@ -18,6 +25,16 @@ REMOVES = [
     re.compile(r"^【[^】]*】\s*"),
     re.compile(r"^（[^）]*）\s*"),
 ]
+
+
+def str2date(s):
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m", _("%Y年"), "%Y"):
+        try:
+            return datetime.datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
+        except:
+            logging.error(traceback.format_exc())
+            continue
+    return None
 
 
 class DoubanBookApi(object):
@@ -76,14 +93,6 @@ class DoubanBookApi(object):
                 return b
         return None
 
-    def str2date(self, s):
-        for fmt in ("%Y-%m-%d", "%Y-%m", "%Y"):
-            try:
-                return datetime.datetime.strptime(s, fmt)
-            except:
-                continue
-        return None
-
     def get_book(self, md):
         return self.get_metadata(md)
 
@@ -121,11 +130,11 @@ class DoubanBookApi(object):
         mi.series = book.get("serials", None)
         mi.tags = [t["name"] for t in book["tags"]][:8]
         mi.rating = int(float(book["rating"]["average"]))
-        mi.pubdate = self.str2date(book["pubdate"])
+        mi.pubdate = str2date(book["pubdate"])
         mi.timestamp = utcnow()
         mi.douban_author_intro = book["author_intro"]
         mi.douban_subtitle = book.get("subtitle", None)
-        mi.website = "https://book.douban.com/isbn/%s" % mi.isbn
+        mi.website = "https://book.douban.com/subject/%s/" % book["id"]
         mi.source = u"豆瓣"
         mi.provider_key = KEY
         mi.provider_value = book["id"]
@@ -159,14 +168,15 @@ def select_douban_metadata(mi):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("%s BOOK-TITLE" % sys.argv[0])
+    if len(sys.argv) != 3:
+        print("%s BOOK-TITLE BASE-URL" % sys.argv[0])
         exit(0)
 
-    from settings import settings
     from pprint import pprint
 
     logging.basicConfig(level=logging.DEBUG)
-    api = DoubanBookApi(settings["douban_apikey"])
-    books = api.get_books_by_title(sys.argv[1].decode("UTF-8"))
+    api = DoubanBookApi("fake-api-key", sys.argv[2])
+    books = api.get_books_by_title(sys.argv[1])
     pprint(books)
+    metas = [str2date(b["pubdate"]) for b in books]
+    pprint(metas)
