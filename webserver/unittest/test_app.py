@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import sys, os, unittest, json, urllib, mock, logging
-from tornado import testing
+import sys, os, unittest, json, urllib, mock, logging, base64, time
+from tornado import testing, web
 
 testdir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(testdir))
@@ -50,6 +50,29 @@ def Q(s):
     if not isinstance(s, str):
         s = str(s)
     return urllib.parse.quote(s.encode("UTF-8"))
+
+
+class FakeHandler(handlers.base.BaseHandler):
+    def __init__(h):
+        h.request = h
+        h.request.headers = {}
+        h.request.remote_ip = "1.2.3.4"
+        h.rsp_headers = {}
+        h.rsp = None
+        h.cookie = {}
+        h.session = get_db()
+
+    def write(self, rsp):
+        self.rsp = rsp
+
+    def finish(self):
+        return None
+
+    def set_header(self, k, v):
+        self.rsp_headers[k] = v
+
+    def set_secure_cookie(self, k, v):
+        self.cookie[k] = v
 
 
 class TestApp(testing.AsyncHTTPTestCase):
@@ -450,11 +473,14 @@ class TestUserSignUp(TestWithUserLogin):
 
     @classmethod
     def tearDownClass(self):
+        self.delete_user()
         _mock_mail.stop()
 
+    @classmethod
     def get_user(self):
         return get_db().query(models.Reader).filter(models.Reader.username == "unittest")
 
+    @classmethod
     def delete_user(self):
         self.get_user().delete()
         get_db().commit()
@@ -491,7 +517,28 @@ class TestUserSignUp(TestWithUserLogin):
         self.assertEqual(d["err"], "ok")
         self.assertEqual(self.mail.call_count, 2)
 
+        # build fake auth header unittest:unittest
+        f = FakeHandler()
+        f.request.headers['Authorization'] = "xxxxx"
+        self.assertEqual(False, handlers.base.BaseHandler.process_auth_header(f))
+
+        f.request.headers['Authorization'] = self.auth("username:password")
+        self.assertEqual(False, handlers.base.BaseHandler.process_auth_header(f))
+
+        f.request.headers['Authorization'] = self.auth("unittest:password")
+        self.assertEqual(False, handlers.base.BaseHandler.process_auth_header(f))
+
+        ts = int(time.time())
+        f.request.headers['Authorization'] = self.auth("unittest:unittest")
+        self.assertEqual(True, handlers.base.BaseHandler.process_auth_header(f))
+        self.assertTrue(int(f.cookie['invited']) >= ts)
+        self.assertTrue(int(f.cookie['lt']) >= ts)
+        self.assertTrue(int(f.cookie['lt']) >= ts)
+
         self.delete_user()
+
+    def auth(self, s):
+        return "Basic " + base64.encodebytes(s.encode("ascii")).decode("ascii")
 
 
 class TestAdmin(TestApp):
@@ -600,6 +647,59 @@ class TestConvert(TestApp):
         ok = handlers.book.do_ebook_convert(fin, fout, flog)
         self.assertEqual(ok, True)
 
+
+class TestJsonResponse(TestApp):
+    def raise_(self, err):
+        raise err
+
+    def assertHeaders(self, headers):
+        self.assertEqual(headers, {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Cache-Control": "max-age=0",
+            })
+
+    def test_err(self):
+        f = FakeHandler()
+        with mock.patch("traceback.format_exc", return_value=""):
+            handlers.base.js(lambda x: self.raise_(RuntimeError()))(f)
+        self.assertTrue(isinstance(f.rsp['msg'], str))
+        self.assertEqual(f.rsp['err'], 'exception')
+        self.assertHeaders(f.rsp_headers)
+
+    def test_finish(self):
+        f = FakeHandler()
+        with mock.patch("traceback.format_exc", return_value=""):
+            handlers.base.js(lambda x: self.raise_(web.Finish()))(f)
+        self.assertEqual(f.rsp, "")
+        self.assertHeaders(f.rsp_headers)
+
+
+class TestInviteMode(TestApp):
+    def setUp(self):
+        server.CONF['INVITE_MODE'] = True
+        TestApp.setUp(self)
+
+    def tearDown(self):
+        server.CONF['INVITE_MODE'] = False
+        TestApp.tearDown(self)
+
+    def test_index(self):
+        d = self.json("/api/index")
+        self.assertEqual(d['err'], 'not_invited')
+
+        d = self.json("/api/book/1")
+        self.assertEqual(d['err'], 'not_invited')
+
+        r = self.fetch("/api/book/1.epub")
+        self.assertEqual(r.code, 401)
+
+    def test_opds_index(self):
+        r = self.fetch("/opds/")
+        self.assertEqual(r.code, 401)
+
+        r = self.fetch("/opds/nav/4e617574686f7273?offset=1")
+        self.assertEqual(r.code, 401)
 
 def setUpModule():
     setup_server()

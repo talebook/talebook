@@ -107,7 +107,7 @@ class BaseHandler(web.RequestHandler):
         auth_header = self.request.headers.get("Authorization", "")
         if not auth_header.startswith("Basic "):
             return False
-        auth_decoded = base64.decodestring(auth_header[6:])
+        auth_decoded = base64.decodebytes(auth_header[6:].encode("ascii")).decode("UTF-8")
         username, password = auth_decoded.split(":", 2)
         user = self.session.query(Reader).filter(Reader.username == username).first()
         if not user:
