@@ -14,6 +14,9 @@ ignore =
     E401,
     ;bare 'except'
     E722,
+    C901,
+    E402,
+
 
 ; exclude file
 exclude =

@@ -55,45 +55,48 @@ def safe_filename(filename):
     return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "_", filename)  # 替换为下划线
 
 
+# the codes is from calibre source code. just change 'ascii_filename' to 'safe_filename'
+def utf8_construct_path_name(book_id, title, author):
+    from calibre.db.backend import DB, WINDOWS_RESERVED_NAMES
+
+    book_id = " (%d)" % book_id
+    lm = DB.PATH_LIMIT - (len(book_id) // 2) - 2
+    author = safe_filename(author)[:lm]
+    title = safe_filename(title.lstrip())[:lm].rstrip()
+    if not title:
+        title = "Unknown"[:lm]
+    try:
+        while author[-1] in (" ", "."):
+            author = author[:-1]
+    except IndexError:
+        author = ""
+    if not author:
+        author = safe_filename(_("Unknown"))
+    if author.upper() in WINDOWS_RESERVED_NAMES:
+        author += "w"
+    return "%s/%s%s" % (author, title, book_id)
+
+
+def utf8_construct_file_name(book_id, title, author, extlen):
+    from calibre.db.backend import DB
+
+    extlen = max(extlen, 14)  # 14 accounts for ORIGINAL_EPUB
+    lm = (DB.PATH_LIMIT - extlen - 2) // 2
+    if lm < 5:
+        raise ValueError("Extension length too long: %d" % extlen)
+    author = safe_filename(author)[:lm]
+    title = safe_filename(title.lstrip())[:lm].rstrip()
+    if not title:
+        title = "Unknown"[:lm]
+    name = title + " - " + author
+    while name.endswith("."):
+        name = name[:-1]
+    if not name:
+        name = safe_filename(_("Unknown"))
+    return name
+
+
 def bind_utf8_book_names(cache):
-    PATH_LIMIT = cache.backend.PATH_LIMIT
-    from calibre.db.backend import WINDOWS_RESERVED_NAMES
-
-    # the codes is from calibre source code. just change 'ascii_filename' to 'safe_filename'
-    def utf8_construct_path_name(book_id, title, author):
-        book_id = " (%d)" % book_id
-        lm = PATH_LIMIT - (len(book_id) // 2) - 2
-        author = safe_filename(author)[:lm]
-        title = safe_filename(title.lstrip())[:lm].rstrip()
-        if not title:
-            title = "Unknown"[:lm]
-        try:
-            while author[-1] in (" ", "."):
-                author = author[:-1]
-        except IndexError:
-            author = ""
-        if not author:
-            author = safe_filename(_("Unknown"))
-        if author.upper() in WINDOWS_RESERVED_NAMES:
-            author += "w"
-        return "%s/%s%s" % (author, title, book_id)
-
-    def utf8_construct_file_name(book_id, title, author, extlen):
-        extlen = max(extlen, 14)  # 14 accounts for ORIGINAL_EPUB
-        lm = (PATH_LIMIT - extlen - 2) // 2
-        if lm < 5:
-            raise ValueError("Extension length too long: %d" % extlen)
-        author = safe_filename(author)[:lm]
-        title = safe_filename(title.lstrip())[:lm].rstrip()
-        if not title:
-            title = "Unknown"[:lm]
-        name = title + " - " + author
-        while name.endswith("."):
-            name = name[:-1]
-        if not name:
-            name = safe_filename(_("Unknown"))
-        return name
-
     cache.backend.construct_path_name = utf8_construct_path_name
     cache.backend.construct_file_name = utf8_construct_file_name
     return

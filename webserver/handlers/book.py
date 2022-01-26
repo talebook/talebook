@@ -200,11 +200,18 @@ class BookDetail(BaseHandler):
 
 
 class BookRefer(BaseHandler):
-    @js
-    @auth
-    def get(self, id):
-        book_id = int(id)
-        mi = self.db.get_metadata(book_id, index_is_id=True)
+    def has_proper_book(self, books, mi):
+        if not books or not mi.isbn or mi.isbn == baike.BAIKE_ISBN:
+            return False
+
+        for b in books:
+            if mi.isbn == b.get("isbn13", "xxx"):
+                return True
+            if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
+                return True
+        return False
+
+    def plugin_search_books(self, mi):
         title = re.sub(u"[(（].*", "", mi.title)
         api = douban.DoubanBookApi(
             CONF["douban_apikey"],
@@ -218,19 +225,13 @@ class BookRefer(BaseHandler):
             books = api.get_books_by_title(title) or []
         except:
             logging.error(_(u"豆瓣接口查询 %s 失败" % title))
-        if books and mi.isbn and mi.isbn != baike.BAIKE_ISBN:
-            got_that_book = False
-            for b in books:
-                got_that_book = (mi.isbn == b.get("isbn13", "xxx")) or (
-                    mi.title == b.get("title") and mi.publisher == b.get("publisher")
-                )
-                if got_that_book:
-                    break
-            if not got_that_book:
-                book = api.get_book_by_isbn(mi.isbn)
-                # alwayse put ISBN book in TOP1
-                if book:
-                    books.insert(0, book)
+
+        if not self.has_proper_book(books, mi):
+            # 若有ISBN号，但是却没搜索出来，则精准查询一次ISBN
+            # 总是把最佳书籍放在第一位
+            book = api.get_book_by_isbn(mi.isbn)
+            if book:
+                books.insert(0, book)
         books = [api._metadata(b) for b in books]
 
         # append baidu book
@@ -241,7 +242,37 @@ class BookRefer(BaseHandler):
             return {"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")}
         if book:
             books.append(book)
+        return books
 
+    def plugin_get_book_meta(self, provider_key, provider_value, mi):
+        if provider_key == baike.KEY:
+            title = re.sub(u"[(（].*", "", mi.title)
+            api = baike.BaiduBaikeApi(copy_image=True)
+            try:
+                return api.get_book(title)
+            except:
+                return {"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")}
+
+        if provider_key == douban.KEY:
+            mi.douban_id = provider_value
+            api = douban.DoubanBookApi(
+                CONF["douban_apikey"],
+                CONF["douban_baseurl"],
+                copy_image=True,
+                maxCount=CONF["douban_max_count"],
+            )
+            try:
+                return api.get_book(mi)
+            except:
+                return {"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")}
+        return {"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")}
+
+    @js
+    @auth
+    def get(self, id):
+        book_id = int(id)
+        mi = self.db.get_metadata(book_id, index_is_id=True)
+        books = self.plugin_search_books(mi)
         keys = [
             "cover_url",
             "source",
@@ -260,9 +291,8 @@ class BookRefer(BaseHandler):
             pubdate = b.get("pubdate")
             d["pubyear"] = pubdate.strftime("%Y") if pubdate else ""
             if not d["comments"]:
-                d["comments"] = u"无详细介绍"
+                d["comments"] = _(u"无详细介绍")
             rsp.append(d)
-
         return {"err": "ok", "books": rsp}
 
     @js
@@ -276,43 +306,17 @@ class BookRefer(BaseHandler):
         if not provider_key:
             return {"err": "params.provider_key.invalid", "msg": _(u"provider_key参数错误")}
         if not provider_value:
-            return {
-                "err": "params.provider_key.invalid",
-                "msg": _(u"provider_value参数错误"),
-            }
+            return {"err": "params.provider_key.invalid", "msg": _(u"provider_value参数错误")}
         if only_meta == "yes" and only_cover == "yes":
             return {"err": "params.conflict", "msg": _(u"参数冲突")}
+
         mi = self.db.get_metadata(book_id, index_is_id=True)
         if not mi:
             return {"err": "params.book.invalid", "msg": _(u"书籍不存在")}
         if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
             return {"err": "user.no_permission", "msg": _(u"无权限")}
 
-        title = re.sub(u"[(（].*", "", mi.title)
-        if provider_key == baike.KEY:
-            api = baike.BaiduBaikeApi(copy_image=True)
-            try:
-                refer_mi = api.get_book(title)
-            except:
-                return {"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")}
-        elif provider_key == douban.KEY:
-            mi.douban_id = provider_value
-            api = douban.DoubanBookApi(
-                CONF["douban_apikey"],
-                CONF["douban_baseurl"],
-                copy_image=True,
-                maxCount=CONF["douban_max_count"],
-            )
-            try:
-                refer_mi = api.get_book(mi)
-            except:
-                return {"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")}
-        else:
-            return {
-                "err": "params.provider_key.invalid",
-                "msg": _(u"尚不支持的provider_key: %s" % provider_key),
-            }
-
+        refer_mi = self.plugin_get_book_meta(provider_key, provider_value, mi)
         if only_cover == "yes":
             # just set cover
             mi.cover_data = refer_mi.cover_data
