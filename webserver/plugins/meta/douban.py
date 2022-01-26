@@ -5,8 +5,7 @@ __license__ = "GPL v3"
 __copyright__ = "2014, Rex<talebook@foxmail.com>"
 __docformat__ = "restructuredtext en"
 
-import os, io, re, sys, json, logging, datetime, requests, traceback
-from datetime import timezone
+import io, re, sys, logging, datetime, requests, traceback
 from gettext import gettext as _
 from urllib.request import urlopen, Request
 
@@ -30,7 +29,7 @@ REMOVES = [
 def str2date(s):
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m", _("%Y年"), "%Y"):
         try:
-            return datetime.datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
+            return datetime.datetime.strptime(s, fmt).replace(tzinfo=datetime.timezone.utc)
         except:
             logging.error(traceback.format_exc())
             continue

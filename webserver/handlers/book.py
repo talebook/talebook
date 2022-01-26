@@ -61,6 +61,7 @@ def do_ebook_convert(old_path, new_path, log_path):
             return False
         return True
 
+
 class Index(BaseHandler):
     def fmt(self, b):
         pub = b.get("publisher", None)
@@ -173,27 +174,27 @@ class BookDetail(BaseHandler):
             "err": "ok",
             "kindle_sender": CONF["smtp_username"],
             "book": {
-                "id"             : b["id"],
-                "title"          : b["title"],
-                "rating"         : b["rating"],
-                "count_visit"    : b["count_visit"],
-                "count_download" : b["count_download"],
-                "timestamp"      : self.val("timestamp"),
-                "pubdate"        : self.val("pubdate"),
-                "collector"      : collector,
-                "authors"        : b["authors"],
-                "author"         : ", ".join(b["authors"]),
-                "tags"           : b["tags"],
-                "author_sort"    : self.val("author_sort"),
-                "publisher"      : self.val("publisher"),
-                "comments"       : self.val("comments", _(u"暂无简介")),
-                "series"         : self.val("series", None),
-                "language"       : self.val("language", None),
-                "isbn"           : self.val("isbn", None),
-                "files"          : files,
-                "is_public"      : b["is_public"],
-                "is_owner"       : b["is_owner"],
-                "img"            : self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
+                "id": b["id"],
+                "title": b["title"],
+                "rating": b["rating"],
+                "count_visit": b["count_visit"],
+                "count_download": b["count_download"],
+                "timestamp": self.val("timestamp"),
+                "pubdate": self.val("pubdate"),
+                "collector": collector,
+                "authors": b["authors"],
+                "author": ", ".join(b["authors"]),
+                "tags": b["tags"],
+                "author_sort": self.val("author_sort"),
+                "publisher": self.val("publisher"),
+                "comments": self.val("comments", _(u"暂无简介")),
+                "series": self.val("series", None),
+                "language": self.val("language", None),
+                "isbn": self.val("isbn", None),
+                "files": files,
+                "is_public": b["is_public"],
+                "is_owner": b["is_owner"],
+                "img": self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
             },
         }
 
@@ -216,7 +217,7 @@ class BookRefer(BaseHandler):
         try:
             books = api.get_books_by_title(title) or []
         except:
-            logging.error(_(u'豆瓣接口查询 %s 失败' % title))
+            logging.error(_(u"豆瓣接口查询 %s 失败" % title))
         if books and mi.isbn and mi.isbn != baike.BAIKE_ISBN:
             got_that_book = False
             for b in books:
@@ -237,7 +238,7 @@ class BookRefer(BaseHandler):
         try:
             book = api.get_book(title)
         except:
-            return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败')}
+            return {"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")}
         if book:
             books.append(book)
 
@@ -293,7 +294,7 @@ class BookRefer(BaseHandler):
             try:
                 refer_mi = api.get_book(title)
             except:
-                return {'err': 'httprequest.baidubaike.failed', 'msg':_(u'百度百科查询失败')}
+                return {"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")}
         elif provider_key == douban.KEY:
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(
@@ -305,7 +306,7 @@ class BookRefer(BaseHandler):
             try:
                 refer_mi = api.get_book(mi)
             except:
-                return {'err': 'httprequest.douban.failed', 'msg':_(u'豆瓣接口查询失败')}
+                return {"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")}
         else:
             return {
                 "err": "params.provider_key.invalid",
@@ -353,11 +354,11 @@ class BookEdit(BaseHandler):
             if key in KEYS:
                 mi.set(key, val)
 
-        if data.get('pubdate', None):
-            content = douban.str2date(data['pubdate'])
-            if content == None:
-                return {'err': 'params.pudate.invalid', 'msg': _(u'出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019') }
-            mi.set('pubdate', content)
+        if data.get("pubdate", None):
+            content = douban.str2date(data["pubdate"])
+            if content is None:
+                return {"err": "params.pudate.invalid", "msg": _(u"出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019")}
+            mi.set("pubdate", content)
 
         if "tags" in data and not data["tags"]:
             self.db.set_tags(bid, [])
@@ -661,7 +662,7 @@ class BookPush(BaseHandler):
 
     def get_path_of_fmt(self, book, fmt):
         """for mock test"""
-        return os.path.join(CONF["convert_path"], "%s.%s" % (ascii_filename(book["title"]), new_fmt))
+        return os.path.join(CONF["convert_path"], "%s.%s" % (ascii_filename(book["title"]), fmt))
 
     def convert_to_mobi_format(self, book, new_fmt):
         new_path = self.get_path_of_fmt(book, new_fmt)

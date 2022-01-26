@@ -6,10 +6,10 @@ from tornado import testing, web
 
 testdir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.dirname(testdir))
-import server, models
+import server, models  # nosq: E402
 
 server.init_calibre()
-import handlers
+import handlers  # nosq: E402
 
 
 _app = None
@@ -420,7 +420,6 @@ class TestBook(TestWithUserLogin):
 
 class TestUpload(TestWithUserLogin):
     def mtest_upload(self):
-        from email.header import Header
         from email.mime.application import MIMEApplication
         from email.mime.multipart import MIMEMultipart
 
@@ -432,19 +431,18 @@ class TestUpload(TestWithUserLogin):
         with mock.patch.object(_app.settings["legacy"], "import_book", return_value="Yo") as m:
             with mock.patch("models.Item.save", return_value="Yo"):
                 # build multipart message
-                filename = Header(fname, "utf-8").encode()
                 app = MIMEApplication(fdata, "octet-stream", charset="utf-8")
                 app.add_header("Content-Disposition", "form-data", name="ebook", filename=fname)
                 msg = MIMEMultipart("form-data")
                 msg.attach(app)
                 # split headers and body from message
                 form = msg.as_string().split("\n\n", 1)
-                headers = dict( line.split(": ", 1) for line in form[0].split("\n"))
+                headers = dict(line.split(": ", 1) for line in form[0].split("\n"))
                 body = form[1].replace("\n", "\r\n")
                 # send request
                 # FIXME: tornado save original ASCII into file ?
                 r = self.json("/api/book/upload", method="POST", headers=headers, body=body)
-                self.assertEqual(r['err'], 'ok')
+                self.assertEqual(r["err"], "ok")
                 self.assertEqual(m.call_count, 1)
 
 
@@ -519,21 +517,21 @@ class TestUserSignUp(TestWithUserLogin):
 
         # build fake auth header unittest:unittest
         f = FakeHandler()
-        f.request.headers['Authorization'] = "xxxxx"
+        f.request.headers["Authorization"] = "xxxxx"
         self.assertEqual(False, handlers.base.BaseHandler.process_auth_header(f))
 
-        f.request.headers['Authorization'] = self.auth("username:password")
+        f.request.headers["Authorization"] = self.auth("username:password")
         self.assertEqual(False, handlers.base.BaseHandler.process_auth_header(f))
 
-        f.request.headers['Authorization'] = self.auth("unittest:password")
+        f.request.headers["Authorization"] = self.auth("unittest:password")
         self.assertEqual(False, handlers.base.BaseHandler.process_auth_header(f))
 
         ts = int(time.time())
-        f.request.headers['Authorization'] = self.auth("unittest:unittest")
+        f.request.headers["Authorization"] = self.auth("unittest:unittest")
         self.assertEqual(True, handlers.base.BaseHandler.process_auth_header(f))
-        self.assertTrue(int(f.cookie['invited']) >= ts)
-        self.assertTrue(int(f.cookie['lt']) >= ts)
-        self.assertTrue(int(f.cookie['lt']) >= ts)
+        self.assertTrue(int(f.cookie["invited"]) >= ts)
+        self.assertTrue(int(f.cookie["lt"]) >= ts)
+        self.assertTrue(int(f.cookie["lt"]) >= ts)
 
         self.delete_user()
 
@@ -653,18 +651,21 @@ class TestJsonResponse(TestApp):
         raise err
 
     def assertHeaders(self, headers):
-        self.assertEqual(headers, {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Credentials": "true",
-            "Cache-Control": "max-age=0",
-            })
+        self.assertEqual(
+            headers,
+            {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+                "Cache-Control": "max-age=0",
+            },
+        )
 
     def test_err(self):
         f = FakeHandler()
         with mock.patch("traceback.format_exc", return_value=""):
             handlers.base.js(lambda x: self.raise_(RuntimeError()))(f)
-        self.assertTrue(isinstance(f.rsp['msg'], str))
-        self.assertEqual(f.rsp['err'], 'exception')
+        self.assertTrue(isinstance(f.rsp["msg"], str))
+        self.assertEqual(f.rsp["err"], "exception")
         self.assertHeaders(f.rsp_headers)
 
     def test_finish(self):
@@ -677,19 +678,19 @@ class TestJsonResponse(TestApp):
 
 class TestInviteMode(TestApp):
     def setUp(self):
-        server.CONF['INVITE_MODE'] = True
+        server.CONF["INVITE_MODE"] = True
         TestApp.setUp(self)
 
     def tearDown(self):
-        server.CONF['INVITE_MODE'] = False
+        server.CONF["INVITE_MODE"] = False
         TestApp.tearDown(self)
 
     def test_index(self):
         d = self.json("/api/index")
-        self.assertEqual(d['err'], 'not_invited')
+        self.assertEqual(d["err"], "not_invited")
 
         d = self.json("/api/book/1")
-        self.assertEqual(d['err'], 'not_invited')
+        self.assertEqual(d["err"], "not_invited")
 
         r = self.fetch("/api/book/1.epub")
         self.assertEqual(r.code, 401)
@@ -700,6 +701,7 @@ class TestInviteMode(TestApp):
 
         r = self.fetch("/opds/nav/4e617574686f7273?offset=1")
         self.assertEqual(r.code, 401)
+
 
 def setUpModule():
     setup_server()

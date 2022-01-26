@@ -8,7 +8,6 @@ import tornado.escape
 from tornado import web
 from models import Reader, Message
 from handlers.base import BaseHandler, js, auth
-from calibre.utils.smtp import sendmail
 from version import VERSION
 
 import loader

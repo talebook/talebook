@@ -51,13 +51,13 @@ def init_calibre():
         sys.exit(2)
 
 
+def safe_filename(filename):
+    return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "_", filename)  # 替换为下划线
+
+
 def bind_utf8_book_names(cache):
-    from calibre.db.backend import WINDOWS_RESERVED_NAMES
-
     PATH_LIMIT = cache.backend.PATH_LIMIT
-
-    def safe_filename(filename):
-        return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "_", filename)  # 替换为下划线
+    from calibre.db.backend import WINDOWS_RESERVED_NAMES
 
     # the codes is from calibre source code. just change 'ascii_filename' to 'safe_filename'
     def utf8_construct_path_name(book_id, title, author):
