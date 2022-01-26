@@ -5,9 +5,14 @@ __license__   = 'GPL v3'
 __copyright__ = '2014, Rex<talebook@foxmail.com>'
 __docformat__ = 'restructuredtext en'
 
-import os, io, re, sys, json, logging, datetime, requests
-from time import timezone
+import datetime
+import io
+import logging
+import re
+import sys
 from urllib.request import urlopen, Request
+
+import requests
 
 KEY = 'douban'
 
@@ -24,13 +29,14 @@ CHROME_HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36',
         }
 
+
 def str2date(s):
-        for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m", _("%Y年"),"%Y"):
-            try:
-                return datetime.datetime.strptime(s, fmt).replace(tzinfo = timezone.utc)
-            except:
-                continue
-        return None
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m", _("%Y年"), "%Y"):
+        try:
+            return datetime.datetime.strptime(s, fmt).replace(tzinfo=datetime.timezone.utc)
+        except:
+            continue
+    return None
 
 class DoubanBookApi(object):
     def __init__(self, apikey, baseUrl, copy_image=True, manual_select=False, maxCount = 2):

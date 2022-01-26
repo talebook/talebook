@@ -323,6 +323,7 @@ class BookRefer(BaseHandler):
         self.db.set_metadata(book_id, mi)
         return {'err': 'ok'}
 
+
 class BookEdit(BaseHandler):
     @js
     @auth
@@ -347,7 +348,8 @@ class BookEdit(BaseHandler):
         if data.get('pubdate', None):
             content = douban.str2date(data['pubdate'])
             if content == None:
-                return {'err': 'params.pudate.invalid', 'msg': _(u'出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019') }
+                return {'err': 'params.pudate.invalid',
+                        'msg': _(u'出版日期参数错误，%s，格式应为 2019-05-10或2019-05或2019年或2019' % data['pubdate'])}
             mi.set('pubdate', content)
 
         if 'tags' in data and not data['tags']:
