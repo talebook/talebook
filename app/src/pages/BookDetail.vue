@@ -110,7 +110,8 @@
                     <v-btn :small="tiny" dark color="primary" class="mx-2 d-flex d-sm-flex"
                             :href="'/read/'+bookid" target="_blank"> <v-icon left v-if="!tiny">import_contacts</v-icon> 阅读</v-btn>
 
-                    <v-menu v-if="book.is_owner" offset-y>
+                    <template v-if="book.is_owner" >
+                    <v-menu offset-y>
                         <template v-slot:activator="{on}">
                             <v-btn v-on="on" dark color="primary" class="ml-2" :small="tiny" >管理 <v-icon small >more_vert</v-icon></v-btn>
                         </template>
@@ -121,6 +122,7 @@
                             <v-list-item @click='delete_book' > <v-icon>delete_forever</v-icon> 删除此书</v-list-item>
                         </v-list>
                     </v-menu>
+                    </template>
                 </v-toolbar>
                 <v-row>
                     <v-col class="ma-auto" cols=8 sm=4>
