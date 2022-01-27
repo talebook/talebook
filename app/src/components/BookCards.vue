@@ -1,6 +1,6 @@
 <template>
     <v-row>
-    <v-col cols=12 xs=12 sm=6 md=4 v-for="(book,idx) in render_books" :key="idx+'-books-'+book.id" class="book-card">
+    <v-col cols=12 xs=12 sm=6 md=4 v-for="(book,idx) in render_books" :key="idx+'-books-'+book.id" class="book-list-card">
         <v-card :to="book.href" >
             <v-row>
                 <v-col cols=3 class='col-book-img'>
@@ -72,8 +72,8 @@ export default {
     font-size: small;
     margin-bottom: 0px;
 }
-.book-card {
-    padding: 6px;
+.book-list-card {
+    padding-top: 22px;
 }
 .page-title {
     font-weight: bold;
@@ -87,7 +87,7 @@ export default {
     padding: 0 0 0 12px;
 }
 .col-book-info {
-    padding: 0 12px 0 0;
+    padding: 0;
     margin-left: -6px;
     margin-top: -6px;
 }
