@@ -189,7 +189,9 @@ export default {
             title: "高级配置项",
             fields: [
                 { icon: "home", key: "static_host", label: "CDN域名" },
+                // 后续可以修改为choice下拉框选项
                 { icon: "info", key: "BOOK_NAMES_FORMAT", label: "目录和文件名模式（utf8为保留原始中文，en表示拼音英文）" },
+                { icon: "info", key: "avatar_service", label: "可使用www.gavatar.com或cavatar.cn头像服务" },
                 { icon: "info", key: "MAX_UPLOAD_SIZE", label: "文件上传字节数限制(例如100MB或100KB）" },
                 { icon: "info", key: "douban_baseurl", label: "豆瓣插件API地址(例如 http://10.0.0.1:8080 )" },
                 { icon: "info", key: "douban_max_count", label: "豆瓣插件API查询结果数量" },

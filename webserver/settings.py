@@ -65,6 +65,8 @@ settings = {
     'douban_baseurl'    : "https://api.douban.com",
     'douban_max_count'  : 2,
 
+    'avatar_service'    : "https://cravatar.cn",
+
     'BOOK_NAMES_FORMAT': 'en',
 
     'INVITE_MODE'   : False,

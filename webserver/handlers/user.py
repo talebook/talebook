@@ -257,7 +257,7 @@ class SignUp(BaseHandler):
         user.username = username
         user.name = nickname
         user.email = email
-        user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
+        user.avatar = CONF["avatar_service"] + "/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
         user.create_time = datetime.datetime.now()
         user.update_time = datetime.datetime.now()
         user.access_time = datetime.datetime.now()
@@ -453,7 +453,8 @@ class UserInfo(BaseHandler):
             }
         )
         if user.avatar:
-            d["avatar"] = user.avatar.replace("http://", "https://")
+            gravatar_url = "https://www.gravatar.com"
+            d["avatar"] = user.avatar.replace("http://", "https://").replace(gravatar_url, CONF["avatar_service"])
         if user.extra:
             d["kindle_email"] = user.extra.get("kindle_email", "")
             if detail:
@@ -610,6 +611,7 @@ class AdminSettings(SettingHandler):
             "static_host",
             "xsrf_cookies",
             "settings_path",
+            "avatar_service",
         ]
 
         args = loader.SettingsLoader()
@@ -664,7 +666,7 @@ class AdminInstall(SettingHandler):
             user.username = username
             user.name = username
             user.email = email
-            user.avatar = "https://www.gravatar.com/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
+            user.avatar = CONF["avatar_service"] + "/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
             user.create_time = datetime.datetime.now()
             user.update_time = datetime.datetime.now()
             user.access_time = datetime.datetime.now()
