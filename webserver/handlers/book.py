@@ -637,7 +637,7 @@ class BookPush(BaseHandler):
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
                 self.bg_send_book(book, mail_to, fmt, fpath)
-                return {"err": "ok", "msg": _(u"服务器正在推送……")}
+                return {"err": "ok", "msg": _(u"服务器后台正在推送了。您可关闭此窗口，继续浏览其他书籍。")}
 
         # we do no have formats for kindle
         if "fmt_epub" not in book and "fmt_azw3" not in book and "fmt_txt" not in book:
@@ -651,7 +651,7 @@ class BookPush(BaseHandler):
             "success",
             _(u"服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
         )
-        return {"err": "ok", "msg": _(u"服务器正在转换格式并推送……")}
+        return {"err": "ok", "msg": _(u"服务器正在转换格式，稍后将自动推送。您可关闭此窗口，继续浏览其他书籍。")}
 
     @background
     def bg_send_book(self, book, mail_to, fmt, fpath):
