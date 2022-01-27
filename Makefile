@@ -13,6 +13,7 @@ build:
 push:
 	docker tag $(IMAGE) $(REPO1)
 	docker tag $(IMAGE) $(REPO2)
+	docker push $(IMAGE)
 	docker push $(REPO1)
 	docker push $(REPO2)
 
@@ -20,5 +21,10 @@ docker-test:
 	docker build -t talebook/test --target test .
 	docker run --rm --name talebook-docker-test talebook/test
 
-test:
+lint:
+	flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
+	flake8 webserver --count --exit-zero --statistics --config .style.yapf
+
+test: lint
 	pytest webserver
+
