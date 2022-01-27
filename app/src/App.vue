@@ -15,7 +15,7 @@
                 <app-footer v-if="$store.state.nav" ></app-footer>
             </v-container>
 
-            <v-dialog v-model="$store.state.alert.show" persistent width="50%">
+            <v-dialog v-model="$store.state.alert.show" persistent :fullscreen="$vuetify.breakpoint.mobile" width="$vuetify.breakpoint.smAndDown?'80%':'50%'">
                 <v-card>
                     <v-toolbar dark color="primary">
                         <v-toolbar-title align-center></v-toolbar-title>

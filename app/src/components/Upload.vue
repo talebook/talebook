@@ -3,7 +3,7 @@
         <v-btn bottom color="pink" dark fab fixed right @click="dialog = !dialog" >
             <v-icon>mdi-plus</v-icon>
         </v-btn>
-        <v-dialog v-model="dialog" persistent width="300">
+        <v-dialog v-model="dialog" persistent :fullscreen="$vuetify.breakpoint.mobile" transition="dialog-bottom-transition" width="300">
             <v-card>
                 <v-toolbar flat dense dark color="primary">
                     上传书籍
