@@ -294,9 +294,9 @@ export default {
             }).then( rsp => {
                 this.dialog_kindle = false;
                 if ( rsp.err == 'ok' ) {
-                    this.alert('success', rsp.msg);
+                    this.alert('success', rsp.msg, "#");
                 } else {
-                    this.alert('error', rsp.msg);
+                    this.alert('error', rsp.msg, "#");
                 }
             });
         },
