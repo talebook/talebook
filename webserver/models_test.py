@@ -5,7 +5,7 @@ import json
 import logging
 import unittest
 
-import models
+from webserver import models
 
 
 class TestUser(unittest.TestCase):
