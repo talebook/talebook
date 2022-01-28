@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import hashlib, logging, datetime, time
+import datetime
+import hashlib
+import logging
+import time
+import json
 from gettext import gettext as _
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+
+from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import relationship
-from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
 
 
 def mksalt():
-    import string, random
+    import random
+    import string
 
     # for python3, just use: crypt.mksalt(crypt.METHOD_SHA512)
     saltchars = string.ascii_letters + string.digits + "./"
@@ -76,6 +82,9 @@ class Reader(Base, SQLAlchemyMixin):
     UPLOAD = 0b00010000  # 上传
     DOWNLOAD = 0b00100000  # 下载
 
+    OVERSIZE_SHRINK_RATE = 0.8
+    SQLITE_MAX_LENGTH = 32*1024.0
+
     __tablename__ = "readers"
     id = Column(Integer, primary_key=True)
     username = Column(String(200))
@@ -94,6 +103,20 @@ class Reader(Base, SQLAlchemyMixin):
 
     def __str__(self):
         return "<id=%d, username=%s, email=%s>" % (self.id, self.username, self.email)
+
+    def shrink_column_extra(self):
+        # check whether the length of `extra` column is out of limit 32KB
+        text = json.dumps(self.extra)
+        shrink = min(self.OVERSIZE_SHRINK_RATE, self.SQLITE_MAX_LENGTH/len(text))
+        if len(text) > self.SQLITE_MAX_LENGTH:
+            for k,v in self.extra.items():
+                if k.endswith("_history") and isinstance(v, list):
+                    new_length = int(len(v)*shrink)
+                    self.extra[k] = v[:new_length]
+        
+    def save(self):
+        self.shrink_column_extra()
+        return super().save()
 
     def init_default_user(self):
         class DefaultUserInfo:

@@ -2,19 +2,22 @@
 # -*- coding: UTF-8 -*-
 
 
-import os, logging, time, datetime, base64, hashlib
+import base64
+import datetime
+import hashlib
+import logging
+import os
+import time
 from collections import defaultdict
 from gettext import gettext as _
 from urllib.parse import urlparse
 
-from tornado import web
-from jinja2 import Environment, FileSystemLoader
-from sqlalchemy import func as sql_func
-
-# import social_tornado.handlers
-from models import Reader, Message, Item
 import loader
-
+from jinja2 import Environment, FileSystemLoader
+# import social_tornado.handlers
+from models import Item, Message, Reader
+from sqlalchemy import func as sql_func
+from tornado import web
 
 messages = defaultdict(list)
 CONF = loader.get_settings()
@@ -244,7 +247,10 @@ class BaseHandler(web.RequestHandler):
             "timestamp": int(time.time()),
         }
         history.insert(0, val)
-        extra[action] = history[:200]
+        # an item is about 100Byte, sqlite's max length is 32KB
+        # we have five type of history, so make a average limit of max history
+        ITEM_COUNT_LIMIT = 60 #  =32KB/100B/5
+        extra[action] = history[:ITEM_COUNT_LIMIT]
         user = self.current_user
         user.extra.update(extra)
         user.save()
@@ -274,7 +280,7 @@ class BaseHandler(web.RequestHandler):
         return lm.replace("month", month[updated.month])
 
     def sort(self, items, field, order):
-        from calibre.library.caches import SortKeyGenerator, SortKey
+        from calibre.library.caches import SortKey, SortKeyGenerator
 
         class CSSortKeyGenerator(SortKeyGenerator):
             def __init__(self, fields, fm, db_prefs):
@@ -461,10 +467,10 @@ class BaseHandler(web.RequestHandler):
 
     def create_mail(self, sender, to, subject, body, attachment_data, attachment_name):
         from email.header import Header
-        from email.utils import formatdate
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
         from email.mime.application import MIMEApplication
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.utils import formatdate
 
         mail = MIMEMultipart()
         mail["From"] = sender
