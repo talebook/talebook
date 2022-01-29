@@ -72,8 +72,8 @@ export default {
     font-size: small;
     margin-bottom: 0px;
 }
-.book-list-card {
-    padding-top: 22px;
+.book-list-card .row {
+    margin-bottom: 0px;
 }
 .page-title {
     font-weight: bold;

@@ -99,41 +99,8 @@ export default {
 </script>
 
 <style>
-.book-title {
-    display: block;
-    /*height: 1em;*/
-    overflow-y: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    text-overflow: clip;
-    text-align: left;
-    font-weight: bold;
-}
-.book-comments {
-    /*text-indent: 2em;*/
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    text-overflow: clip;
-    margin-top: 6px;
-    text-align: left;
-}
-.book-card {
-    padding: 6px;
-}
-.page-title {
-    font-weight: bold;
-    text-align: left;
-}
 .new-legend {
     margin-top: 30px;
     margin-bottom: 20px;
 }
-.footer-text {
-    font-size: .8em;
-    color: #888;
-}
-
 </style>

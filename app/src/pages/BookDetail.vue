@@ -56,7 +56,9 @@
                         无匹配的书籍信息
                     </p>
                     <template v-else>
+                        <p>
                         请选择最匹配的记录复制为本书的描述信息
+                        </p>
                         <book-cards :books="refer_books">
                             <template #actions="{book}">
                                 <v-card-actions>
@@ -64,13 +66,10 @@
                                     <v-chip class="mr-1" small v-if="book.publisher">{{book.publisher}}</v-chip>
                                     <v-chip small v-if="book.pubyear">{{book.pubyear}}</v-chip>
                                 </v-card-actions>
-                                    <v-divider></v-divider>
+                                <v-divider></v-divider>
                                 <v-card-actions>
                                     <v-chip small dark :href="book.website" target="__blank" :color="book.source=='豆瓣'?'green':'blue'">{{book.source}}</v-chip>
                                     <v-spacer></v-spacer>
-                                    <!--
-                                    <v-btn color='primary' small rounded @click="set_refer(book.isbn)" ><v-icon >done</v-icon>设置</v-btn>
-                                    -->
                                     <v-menu offset-y right>
                                         <template v-slot:activator="{on}">
                                             <v-btn color='primary' small rounded v-on="on">
