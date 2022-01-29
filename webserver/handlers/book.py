@@ -222,7 +222,7 @@ class BookRefer(BaseHandler):
         )
         # first, search title
         try:
-            books = api.get_books_by_title(title) or []
+            books = api.search_books(title) or []
         except:
             logging.error(_(u"豆瓣接口查询 %s 失败" % title))
 

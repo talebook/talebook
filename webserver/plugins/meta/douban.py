@@ -5,9 +5,16 @@ __license__ = "GPL v3"
 __copyright__ = "2014, Rex<talebook@foxmail.com>"
 __docformat__ = "restructuredtext en"
 
-import io, re, sys, logging, datetime, requests, traceback
+import datetime
+import io
+import json
+import logging
+import re
+import sys
+import traceback
 from gettext import gettext as _
-from urllib.request import urlopen, Request
+
+import requests
 
 CHROME_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
@@ -31,7 +38,6 @@ def str2date(s):
         try:
             return datetime.datetime.strptime(s, fmt).replace(tzinfo=datetime.timezone.utc)
         except:
-            logging.error(traceback.format_exc())
             continue
     return None
 
@@ -39,10 +45,10 @@ def str2date(s):
 class DoubanBookApi(object):
     def __init__(self, apikey, baseUrl, copy_image=True, manual_select=False, maxCount=2):
         self.apikey = apikey
-        self.copy_image = copy_image
-        self.manual_select = manual_select
         self.baseUrl = baseUrl
         self.maxCount = maxCount
+        self.copy_image = copy_image
+        self.manual_select = manual_select
 
     def author(self, book):
         author = book["author"]
@@ -52,35 +58,48 @@ class DoubanBookApi(object):
             return author[0]
         return author
 
+    def request(self, url, params={}):
+        if self.apikey:
+            params["apikey"] = self.apikey
+
+        try:
+            rsp = requests.get(url, headers=CHROME_HEADERS, params=params)
+        except Exception as e:
+            logging.error("douban API error, request fail, err=%s", str(e))
+            return None
+
+        if rsp.status_code != 200:
+            logging.error("douban API error: status_code[%s] != 200 OK", rsp.status_code)
+            return None
+
+        try:
+            data = rsp.json()
+        except json.JSONDecodeError:
+            logging.error("douban API error: json decode fail, content:\n%s", rsp.content)
+            return None
+
+        if "code" in data and data["code"] != 0:
+            logging.error("douban API error: code=%d, msg=%s", rsp["code"], rsp["msg"])
+            return None
+        return data
+
     def get_book_by_isbn(self, isbn):
         url = "%s/v2/book/isbn/%s" % (self.baseUrl, isbn)
-        args = {"apikey": self.apikey}
-        rsp = requests.get(url, headers=CHROME_HEADERS, params=args).json()
-        if "code" in rsp and rsp["code"] != 0:
-            logging.error("******** douban API error: %d-%s **********" % (rsp["code"], rsp["msg"]))
-            return None
-        return rsp
+        return self.request(url)
 
     def get_book_by_id(self, id):
         url = "%s/v2/book/id/%s" % (self.baseUrl, id)
-        rsp = requests.get(url, headers=CHROME_HEADERS).json()
-        if "code" in rsp and rsp["code"] != 0:
-            logging.error("******** douban API error: %d-%s **********" % (rsp["code"], rsp["msg"]))
-            return None
-        return rsp
+        return self.request(url)
 
-    def get_books_by_title(self, title, author=None):
+    def search_books(self, title, author=None):
         url = "%s/v2/book/search" % self.baseUrl
-        q = title + " " + author if author else title
-        args = {"apikey": self.apikey, "q": q.encode("UTF-8"), "count": self.maxCount}
-        rsp = requests.get(url, headers=CHROME_HEADERS, params=args).json()
-        if "code" in rsp and rsp["code"] != 0:
-            logging.error("******** douban API error: %d-%s **********" % (rsp["code"], rsp["msg"]))
-            return None
-        return rsp["books"]
+        q = (title + " " + author) if author else title
+        args = {"q": q.encode("UTF-8"), "count": self.maxCount}
+        r = self.request(url, params=args)
+        return r['books'] if r else None
 
     def get_book_by_title(self, title, author=None):
-        books = self.get_book_by_title(title, author)
+        books = self.search_books(title, author)
         if not books:
             return None
         for b in books:
@@ -122,6 +141,7 @@ class DoubanBookApi(object):
 
         mi = Metadata(book["title"])
         mi.authors = authors
+        mi.author = mi.authors[0]
         mi.author_sort = mi.authors[0]
         mi.publisher = book["publisher"]
         mi.comments = book["summary"]
@@ -140,7 +160,7 @@ class DoubanBookApi(object):
 
         mi.cover_url = book["images"]["large"]
         if self.copy_image:
-            img = io.BytesIO(urlopen(Request(mi.cover_url, headers=CHROME_HEADERS)).read())
+            img = requests.get(mi.cover_url, headers=CHROME_HEADERS).content
             img_fmt = mi.cover_url.split(".")[-1]
             mi.cover_data = (img_fmt, img)
 
