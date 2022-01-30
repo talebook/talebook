@@ -12,12 +12,12 @@ from collections import defaultdict
 from gettext import gettext as _
 from urllib.parse import urlparse
 
-import loader
 from jinja2 import Environment, FileSystemLoader
-# import social_tornado.handlers
-from models import Item, Message, Reader
 from sqlalchemy import func as sql_func
 from tornado import web
+from webserver import loader
+# import social_tornado.handlers
+from webserver.models import Item, Message, Reader
 
 messages = defaultdict(list)
 CONF = loader.get_settings()
@@ -299,7 +299,7 @@ class BaseHandler(web.RequestHandler):
 
     def get_template_path(self):
         """获取模板路径"""
-        return CONF.get("template_path", "templates")
+        return CONF.get("resource_path", "templates")
 
     def create_template_loader(self, template_path):
         """根据template_path创建相对应的Jinja2 Environment"""

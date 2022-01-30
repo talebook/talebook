@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import os, json, sys, logging
+import json
+import logging
+import os
+import sys
 
 
 class SettingsLoader(dict):
@@ -23,9 +26,9 @@ class SettingsLoader(dict):
 
     def loadfile(self):
         try:
-            import settings
+            import webserver.settings
 
-            self.update(settings.settings)
+            self.update(webserver.settings.settings)
         except:
             import traceback
 

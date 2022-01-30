@@ -2,15 +2,13 @@
 # -*- coding: UTF-8 -*-
 
 
-import re, os, logging
+import logging
+import os
+import re
+
 from tornado import web
-
-from calibre.utils.magick.draw import thumbnail as generate_thumbnail
-from calibre.ebooks.metadata.opf2 import metadata_to_opf
-from handlers.base import BaseHandler
-
-import loader
-import constants
+from webserver import constants, loader
+from webserver.handlers.base import BaseHandler
 
 CONF = loader.get_settings()
 
@@ -52,6 +50,8 @@ class ImageHandler(BaseHandler):
 
     # Actually get content from the database {{{
     def get_cover(self, id, thumbnail=False, thumb_width=60, thumb_height=80):
+        from calibre.utils.magick.draw import thumbnail as generate_thumbnail
+
         try:
             self.set_header("Content-Type", "image/jpeg")
             cover = self.db.cover(id, index_is_id=True)
@@ -76,6 +76,8 @@ class ImageHandler(BaseHandler):
             raise web.HTTPError(404, "Failed to generate cover: %r" % err)
 
     def get_metadata_as_opf(self, id_):
+        from calibre.ebooks.metadata.opf2 import metadata_to_opf
+
         self.set_header("Content-Type", "application/oebps-package+xml; charset=UTF-8")
         mi = self.db.get_metadata(id_, index_is_id=True)
         data = metadata_to_opf(mi)
@@ -94,7 +96,9 @@ class ProxyImageHandler(BaseHandler):
     def get(self):
         url = self.get_argument("url")
 
-        import urllib, requests
+        import urllib
+
+        import requests
 
         p = urllib.parse.urlparse(url)
         if not self.is_whitelist(p.netloc):

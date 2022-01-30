@@ -5,27 +5,28 @@ __license__ = "GPL v3"
 __copyright__ = "2010, Kovid Goyal <kovid@kovidgoyal.net>"
 __docformat__ = "restructuredtext en"
 
-import hashlib, binascii, sys
-from tornado import web
-from functools import partial
-from itertools import repeat
+import binascii
+import hashlib
+import sys
 from collections import defaultdict
+from functools import partial
 from gettext import gettext as _
+from itertools import repeat
 
-from lxml import etree, html
-from lxml.builder import ElementMaker
-
+from calibre import guess_type
+from calibre import prepare_string_for_xml as xml
 from calibre.constants import __appname__
 from calibre.ebooks.metadata import fmt_sidx
 from calibre.library.comments import comments_to_html
-from calibre import guess_type, prepare_string_for_xml as xml
-from calibre.utils.icu import sort_key
-from calibre.utils.date import as_utc
 from calibre.utils.config import tweaks
+from calibre.utils.date import as_utc
 from calibre.utils.filenames import ascii_text
-
-from handlers.base import BaseHandler
-import loader
+from calibre.utils.icu import sort_key
+from lxml import etree, html
+from lxml.builder import ElementMaker
+from tornado import web
+from webserver import loader
+from webserver.handlers.base import BaseHandler
 
 CONF = loader.get_settings()
 

@@ -12,8 +12,8 @@ settings = {
     "static_host"   : "",
     "html_path"     : os.path.join(os.path.dirname(__file__), "../app/dist"),
     "i18n_path"     : os.path.join(os.path.dirname(__file__), "i18n"),
-    "static_path"   : os.path.join(os.path.dirname(__file__), "static"),
-    "template_path" : os.path.join(os.path.dirname(__file__), "templates"),
+    "static_path"   : os.path.join(os.path.dirname(__file__), "resources"),
+    "resource_path" : os.path.join(os.path.dirname(__file__), "resources"),
     "settings_path" : "/data/books/settings/",
     "progress_path" : "/data/books/progress/",
     "convert_path"  : "/data/books/convert/",
@@ -38,7 +38,7 @@ settings = {
 
     "SOCIAL_AUTH_LOGIN_URL"          : '/',
     "SOCIAL_AUTH_LOGIN_REDIRECT_URL" : '/api/done/',
-    "SOCIAL_AUTH_USER_MODEL"         : 'models.Reader',
+    "SOCIAL_AUTH_USER_MODEL"         : 'webserver.models.Reader',
     "SOCIAL_AUTH_AUTHENTICATION_BACKENDS" : (
         'social_core.backends.qq.QQOAuth2',
         'social_core.backends.weibo.WeiboOAuth2',

@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import sys, os, unittest, json, urllib, mock, logging, base64, time
+import base64
+import json
+import logging
+import os
+import sys
+import time
+import unittest
+import urllib
+from unittest import mock
+
 from tornado import testing, web
 
 testdir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.dirname(testdir))
-import server, models  # nosq: E402
+projdir = os.path.realpath(testdir + "/../../")
+sys.path.append(projdir)
 
-server.init_calibre()
-import handlers  # nosq: E402
+from webserver import handlers, main, models, loader  # nosq: E402
+from webserver.handlers.base import BaseHandler
+import webserver.handlers.base
+import webserver.handlers.book
 
 
 _app = None
@@ -19,22 +30,23 @@ _mock_mail = None
 
 def setup_server():
     global _app
-    server.options.with_library = testdir + "/library/"
-    server.CONF["ALLOW_GUEST_PUSH"] = False
-    server.CONF["ALLOW_GUEST_DOWNLOAD"] = False
-    server.CONF["upload_path"] = "/tmp/"
-    server.CONF["html_path"] = "/tmp/"
-    server.CONF["settings_path"] = "/tmp/"
-    server.CONF["progress_path"] = "/tmp/"
-    server.CONF["installed"] = True
-    server.CONF["INVITE_MODE"] = False
-    server.CONF["user_database"] = "sqlite:///%s/users.db" % testdir
-    _app = server.make_app()
+    # main.init_calibre()
+    main.options.with_library = testdir + "/library/"
+    main.CONF["ALLOW_GUEST_PUSH"] = False
+    main.CONF["ALLOW_GUEST_DOWNLOAD"] = False
+    main.CONF["upload_path"] = "/tmp/"
+    main.CONF["html_path"] = "/tmp/"
+    main.CONF["settings_path"] = "/tmp/"
+    main.CONF["progress_path"] = "/tmp/"
+    main.CONF["installed"] = True
+    main.CONF["INVITE_MODE"] = False
+    main.CONF["user_database"] = "sqlite:///%s/users.db" % testdir
+    _app = main.make_app()
 
 
 def setup_mock_user():
     global _mock_user
-    _mock_user = mock.patch.object(handlers.base.BaseHandler, "user_id", return_value=1)
+    _mock_user = mock.patch.object(BaseHandler, "user_id", return_value=1)
 
 
 def setup_mock_sendmail():
@@ -52,7 +64,7 @@ def Q(s):
     return urllib.parse.quote(s.encode("UTF-8"))
 
 
-class FakeHandler(handlers.base.BaseHandler):
+class FakeHandler(BaseHandler):
     def __init__(h):
         h.request = h
         h.request.headers = {}
@@ -329,8 +341,8 @@ class TestBook(TestWithUserLogin):
             def __init__(self, path=None):
                 if not path:
                     path = testdir + "/library/Han Han/Ta De Guo (5)/Ta De Guo - Han Han.epub"
-                self.mock1 = mock.patch.object(handlers.book.BookPush, "get_path_of_fmt", return_value=path)
-                self.mock2 = mock.patch("handlers.book.do_ebook_convert", return_value=True)
+                self.mock1 = mock.patch.object(webserver.handlers.book.BookPush, "get_path_of_fmt", return_value=path)
+                self.mock2 = mock.patch("webserver.handlers.book.do_ebook_convert", return_value=True)
 
             def __enter__(self):
                 self.mock1.start()
@@ -387,7 +399,7 @@ class TestBook(TestWithUserLogin):
                 self.assertEqual(m.call_count, 2)
 
     def test_read(self):
-        with mock.patch.object(handlers.book.BookRead, "extract_book", return_value="Yo"):
+        with mock.patch.object(webserver.handlers.book.BookRead, "extract_book", return_value="Yo"):
             rsp = self.fetch("/read/1")
             self.assertEqual(rsp.code, 200)
 
@@ -449,7 +461,7 @@ class TestUpload(TestWithUserLogin):
 class TestRefer(TestWithUserLogin):
     def manual_test_refer(self):
         # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
-        server.CONF["douban_baseurl"] = "http://10.0.0.15:7001"
+        main.CONF["douban_baseurl"] = "http://10.0.0.15:7001"
         d = self.json("/api/book/1/refer")
         self.assertEqual(d["err"], "ok")
 
@@ -518,17 +530,17 @@ class TestUserSignUp(TestWithUserLogin):
         # build fake auth header unittest:unittest
         f = FakeHandler()
         f.request.headers["Authorization"] = "xxxxx"
-        self.assertEqual(False, handlers.base.BaseHandler.process_auth_header(f))
+        self.assertEqual(False, BaseHandler.process_auth_header(f))
 
         f.request.headers["Authorization"] = self.auth("username:password")
-        self.assertEqual(False, handlers.base.BaseHandler.process_auth_header(f))
+        self.assertEqual(False, BaseHandler.process_auth_header(f))
 
         f.request.headers["Authorization"] = self.auth("unittest:password")
-        self.assertEqual(False, handlers.base.BaseHandler.process_auth_header(f))
+        self.assertEqual(False, BaseHandler.process_auth_header(f))
 
         ts = int(time.time())
         f.request.headers["Authorization"] = self.auth("unittest:unittest")
-        self.assertEqual(True, handlers.base.BaseHandler.process_auth_header(f))
+        self.assertEqual(True, BaseHandler.process_auth_header(f))
         self.assertTrue(int(f.cookie["invited"]) >= ts)
         self.assertTrue(int(f.cookie["lt"]) >= ts)
         self.assertTrue(int(f.cookie["lt"]) >= ts)
@@ -559,8 +571,6 @@ class TestAdmin(TestApp):
         self.assertEqual(d["err"], "ok")
         self.assertTrue(len(d["settings"]) > 10)
 
-        import loader
-
         with mock.patch.object(loader.SettingsLoader, "set_store_path", return_value="/tmp/"):
             req = {"site_title": "abc", "not_work": "en"}
             d = self.json("/api/admin/settings", method="POST", body=json.dumps(req))
@@ -586,7 +596,7 @@ class TestOpds(TestWithUserLogin):
         self.parse_xml(rsp.body)
 
     def test_opds_nav2(self):
-        server.CONF["opds_max_ungrouped_items"] = 2
+        main.CONF["opds_max_ungrouped_items"] = 2
         urls = [
             "/opds/nav/4e617574686f7273",
             "/opds/nav/4e6c616e677561676573",
@@ -599,11 +609,11 @@ class TestOpds(TestWithUserLogin):
         ]
         groups = [
             2,
-            server.CONF["opds_max_ungrouped_items"],
+            main.CONF["opds_max_ungrouped_items"],
         ]
         for url in urls:
             for g in groups:
-                server.CONF["opds_max_ungrouped_items"] = g
+                main.CONF["opds_max_ungrouped_items"] = g
                 rsp = self.fetch(url)
                 self.assertEqual(rsp.code, 200)
                 self.parse_xml(rsp.body)
@@ -631,10 +641,10 @@ class TestOpds(TestWithUserLogin):
         self.parse_xml(rsp.body)
 
     def test_opds_without_login(self):
-        server.CONF["INVITE_MODE"] = True
+        main.CONF["INVITE_MODE"] = True
         rsp = self.fetch("/opds/nav/4f7469746c65")
         self.assertEqual(rsp.code, 401)
-        server.CONF["INVITE_MODE"] = False
+        main.CONF["INVITE_MODE"] = False
 
 
 class TestConvert(TestApp):
@@ -642,7 +652,7 @@ class TestConvert(TestApp):
         fin = testdir + "/library/Han Han/Ta De Guo (5)/Ta De Guo - Han Han.epub"
         fout = "/tmp/output.mobi"
         flog = "/tmp/output.log"
-        ok = handlers.book.do_ebook_convert(fin, fout, flog)
+        ok = webserver.handlers.book.do_ebook_convert(fin, fout, flog)
         self.assertEqual(ok, True)
 
 
@@ -663,7 +673,7 @@ class TestJsonResponse(TestApp):
     def test_err(self):
         f = FakeHandler()
         with mock.patch("traceback.format_exc", return_value=""):
-            handlers.base.js(lambda x: self.raise_(RuntimeError()))(f)
+            webserver.handlers.base.js(lambda x: self.raise_(RuntimeError()))(f)
         self.assertTrue(isinstance(f.rsp["msg"], str))
         self.assertEqual(f.rsp["err"], "exception")
         self.assertHeaders(f.rsp_headers)
@@ -671,18 +681,18 @@ class TestJsonResponse(TestApp):
     def test_finish(self):
         f = FakeHandler()
         with mock.patch("traceback.format_exc", return_value=""):
-            handlers.base.js(lambda x: self.raise_(web.Finish()))(f)
+            webserver.handlers.base.js(lambda x: self.raise_(web.Finish()))(f)
         self.assertEqual(f.rsp, "")
         self.assertHeaders(f.rsp_headers)
 
 
 class TestInviteMode(TestApp):
     def setUp(self):
-        server.CONF["INVITE_MODE"] = True
+        main.CONF["INVITE_MODE"] = True
         TestApp.setUp(self)
 
     def tearDown(self):
-        server.CONF["INVITE_MODE"] = False
+        main.CONF["INVITE_MODE"] = False
         TestApp.tearDown(self)
 
     def test_index(self):

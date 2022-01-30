@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import os, logging, time, datetime, subprocess, urllib, re
-import queue, threading, functools, random
+import datetime
+import functools
+import logging
+import os
+import queue
+import random
+import re
+import subprocess
+import threading
+import time
+import urllib
 from gettext import gettext as _
 
 import tornado.escape
 from tornado import web
-from calibre.ebooks.metadata import authors_to_string
-from calibre.ebooks.metadata.meta import get_metadata
-from calibre.utils.filenames import ascii_filename
-
-import loader
-import constants
-from handlers.base import js, auth, BaseHandler, ListHandler
-from plugins.meta import baike, douban
-from models import Item
-
+from webserver import constants, loader
+from webserver.handlers.base import BaseHandler, ListHandler, auth, js
+from webserver.models import Item
+from webserver.plugins.meta import baike, douban
 
 CONF = loader.get_settings()
 _q = queue.Queue()
@@ -29,7 +32,8 @@ def background(func):
             try:
                 func(*args, **kwargs)
             except:
-                import traceback, logging
+                import logging
+                import traceback
 
                 logging.error("Failed to run background task:")
                 logging.error(traceback.format_exc())
@@ -479,14 +483,18 @@ class HotBook(ListHandler):
 
 
 class BookUpload(BaseHandler):
+    @classmethod
+    def convert(s):
+        try:
+            return s.group(0).encode("latin1").decode("utf8")
+        except:
+            return s.group(0)
+
     @js
     @auth
     def post(self):
-        def convert(s):
-            try:
-                return s.group(0).encode("latin1").decode("utf8")
-            except:
-                return s.group(0)
+        from calibre.ebooks.metadata.meta import get_metadata
+
 
         if not self.current_user.can_upload():
             return {"err": "permission", "msg": _(u"无权操作")}
@@ -495,7 +503,7 @@ class BookUpload(BaseHandler):
 
         postfile = self.request.files["ebook"][0]
         name = postfile["filename"]
-        name = re.sub(r"[\x80-\xFF]+", convert, name)
+        name = re.sub(r"[\x80-\xFF]+", BookUpload.convert, name)
         logging.error("upload book name = " + repr(name))
         fmt = os.path.splitext(name)[1]
         fmt = fmt[1:] if fmt else None
@@ -666,6 +674,8 @@ class BookPush(BaseHandler):
 
     def get_path_of_fmt(self, book, fmt):
         """for mock test"""
+        from calibre.utils.filenames import ascii_filename
+
         return os.path.join(CONF["convert_path"], "%s.%s" % (ascii_filename(book["title"]), fmt))
 
     def convert_to_mobi_format(self, book, new_fmt):
@@ -686,6 +696,8 @@ class BookPush(BaseHandler):
         return new_path
 
     def do_send_mail(self, book, mail_to, fmt, fpath):
+        from calibre.ebooks.metadata import authors_to_string
+
         # read meta info
         author = authors_to_string(book["authors"] if book["authors"] else [_(u"佚名")])
         title = book["title"] if book["title"] else _(u"无名书籍")

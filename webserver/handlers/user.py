@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import datetime, logging, re, hashlib, os
+import datetime
+import hashlib
+import logging
+import os
+import re
 from gettext import gettext as _
 
 import tornado.escape
 from tornado import web
-from models import Reader, Message
-from handlers.base import BaseHandler, js, auth
-from version import VERSION
-
-import loader
+from webserver import loader
+from webserver.handlers.base import BaseHandler, auth, js
+from webserver.models import Message, Reader
+from webserver.version import VERSION
 
 CONF = loader.get_settings()
 

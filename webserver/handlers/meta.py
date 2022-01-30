@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import math, sys
+import math
+import sys
 from gettext import gettext as _
-from handlers.base import ListHandler, js
+
+from webserver.handlers.base import ListHandler, js
 
 
 class AuthorBooksUpdate(ListHandler):

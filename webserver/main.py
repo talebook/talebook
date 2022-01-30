@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import re, os, logging, sys
+import logging
+import os
+import re
+import sys
 from gettext import gettext as _
 
-import tornado.ioloop
 import tornado.httpserver
-from tornado import web
-from tornado.options import define, options
+import tornado.ioloop
+from social_tornado.models import init_social
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
-from social_tornado.models import init_social
+from tornado import web
+from tornado.options import define, options
 
-import models, loader, social_routes
-
+from webserver import loader, models, social_routes, handlers
 
 CONF = loader.get_settings()
 define("host", default="", type=str, help=_("The host address on which to listen"))
@@ -36,7 +38,8 @@ def init_calibre():
     try:
         import calibre  # noqa: F401
     except Exception as e:
-        import traceback, logging
+        import logging
+        import traceback
 
         logging.error(traceback.format_exc())
         raise ImportError(_("Can not import calibre. Please set the corrent options.\n%s" % e))
@@ -118,14 +121,13 @@ def bind_topdir_book_names(cache):
 def make_app():
     init_calibre()
 
-    import handlers
     from calibre.db.legacy import LibraryDatabase
     from calibre.utils.date import fromtimestamp
 
     auth_db_path = CONF["user_database"]
     logging.info("Init library with [%s]" % options.with_library)
     logging.info("Init AuthDB  with [%s]" % auth_db_path)
-    logging.info("Init Static  with [%s]" % CONF["static_path"])
+    logging.info("Init Static  with [%s]" % CONF["resource_path"])
     logging.info("Init HTML    with [%s]" % CONF["html_path"])
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
@@ -160,7 +162,7 @@ def make_app():
         logging.info("Create tables into DB")
         sys.exit(0)
 
-    path = CONF["static_path"] + "/calibre/default_cover.jpg"
+    path = CONF["resource_path"] + "/calibre/default_cover.jpg"
     with open(path, "rb") as cover_file:
         default_cover = cover_file.read()
     app_settings = dict(CONF)

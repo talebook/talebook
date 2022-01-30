@@ -7,7 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 
-from constants import CHROME_HEADERS
+from webserver.constants import CHROME_HEADERS
 from .baiduexception import PageError, DisambiguationError, VerifyError
 
 

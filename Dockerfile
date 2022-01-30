@@ -64,7 +64,7 @@ ARG GIT_VERSION=""
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     cd /var/www/talebook/ && \
     echo "VERSION = \"$GIT_VERSION\"" > webserver/version.py && \
-    cp app/dist/index.html webserver/templates/index.html && \
+    cp app/dist/index.html webserver/resources/index.html && \
     touch /data/books/settings/auto.py && \
     chmod a+w /data/books/settings/auto.py && \
     chmod a+w app/dist/index.html && \

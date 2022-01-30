@@ -7,14 +7,13 @@ import sys
 import unittest
 from unittest import mock
 
-testdir = os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + "../../../")
-print(testdir)
+testdir = os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + "/../../../")
 sys.path.append(testdir)
 
-import server
-from plugins.meta.douban import CHROME_HEADERS, DoubanBookApi
+import webserver.main
+from webserver.plugins.meta.douban import CHROME_HEADERS, DoubanBookApi
 
-server.init_calibre()
+webserver.main.init_calibre()
 
 DOUBAN_BOOK = {
     "id": "35737227",

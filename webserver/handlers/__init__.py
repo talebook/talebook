@@ -1,14 +1,14 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 
-from . import book
-from . import user
-from . import meta
-from . import files
-from . import opds
-
 
 def routes():
+    from . import book
+    from . import user
+    from . import meta
+    from . import files
+    from . import opds
+
     routes = []
     routes += opds.routes()
     routes += book.routes()
