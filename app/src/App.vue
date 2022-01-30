@@ -1,7 +1,7 @@
 <template>
     <v-app>
         <app-header v-if="$store.state.nav" ></app-header>
-        <v-content>
+        <v-main>
             <v-container fluid fill-height v-if="$store.state.loading" >
                 <v-row>
                     <v-col align=center justify=center>
@@ -31,7 +31,7 @@
                     </v-card-actions>
                 </v-card>
             </v-dialog>
-        </v-content>
+        </v-main>
         <upload v-if="$store.state.nav" ></upload>
     </v-app>
 </template>
