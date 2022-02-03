@@ -15,7 +15,6 @@ from itertools import repeat
 
 from calibre import guess_type
 from calibre import prepare_string_for_xml as xml
-from calibre.constants import __appname__
 from calibre.ebooks.metadata import fmt_sidx
 from calibre.library.comments import comments_to_html
 from calibre.utils.config import tweaks
@@ -315,7 +314,7 @@ def ACQUISITION_ENTRY(item, db, updated, CFM, CKEYS, prefix):
     return ans
 
 
-default_feed_title = __appname__ + " " + _("Library")
+default_feed_title = CONF['site_title'] + " " + _("Library")
 
 
 class Feed(object):
@@ -335,7 +334,7 @@ class Feed(object):
 
         self.root = FEED(
             TITLE(title or default_feed_title),
-            AUTHOR(__appname__, uri="http://calibre-ebook.com"),
+            AUTHOR(CONF['site_title'], uri="http://calibre-ebook.com"),
             ID(id_),
             ICON("/favicon.png"),
             UPDATED(updated),
