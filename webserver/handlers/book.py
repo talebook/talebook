@@ -495,12 +495,8 @@ class BookUpload(BaseHandler):
     def post(self):
         from calibre.ebooks.metadata.meta import get_metadata
 
-
         if not self.current_user.can_upload():
             return {"err": "permission", "msg": _(u"无权操作")}
-
-        import re
-
         postfile = self.request.files["ebook"][0]
         name = postfile["filename"]
         name = re.sub(r"[\x80-\xFF]+", BookUpload.convert, name)

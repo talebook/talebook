@@ -17,7 +17,7 @@ testdir = os.path.dirname(os.path.realpath(__file__))
 projdir = os.path.realpath(testdir + "/../../")
 sys.path.append(projdir)
 
-from webserver import handlers, main, models, loader  # nosq: E402
+from webserver import main, models, loader  # nosq: E402
 from webserver.handlers.base import BaseHandler
 import webserver.handlers.base
 import webserver.handlers.book

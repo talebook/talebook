@@ -6,7 +6,6 @@ __copyright__ = "2014, Rex<talebook@foxmail.com>"
 __docformat__ = "restructuredtext en"
 
 import datetime
-import io
 import json
 import logging
 import re

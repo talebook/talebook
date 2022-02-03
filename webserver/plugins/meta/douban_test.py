@@ -18,7 +18,7 @@ webserver.main.init_calibre()
 DOUBAN_BOOK = {
     "id": "35737227",
     "author": ["[美]马修·卡拉柯"],
-    "author_intro": "★内容简介    本书首次出版于2008年，是作者的第一本专著。在这本书中，马修·卡拉柯引用了动物行为学、进化论以及海德格尔的研究，讨论了列维纳斯关于伦理学的性质和范围的问题、阿甘本的“人类学机器”观点以及德里达所开创的一种非人类中心主义伦理学，以挑战欧陆哲学传统的人类中心主 义，从政治、 伦理以及本体论等方面论证：人与动物之间的界线可以并且应该被抹去。卡拉柯呼吁应该废除人与动物区别的固有观念，为看",
+    "author_intro": "本书首次出版于2008年，是作者的第一本专著。在这本书中，马修·卡拉柯引用了动物行为学、进化论以及海德格尔的研究，",
     "translators": ["庞红蕊"],
     "images": {
         "small": "https://img9.doubanio.com/view/subject/s/public/s34101604.jpg",
@@ -36,7 +36,7 @@ DOUBAN_BOOK = {
     "producer": "",
     "serials": "",
     "subtitle": "从海德格尔到德里达的动物问题",
-    "summary": "“要在观念和实际生活中公正地对待动物，这于人类而言是一个巨大的转变，哲学在其中所起到的作用十分微弱。尽管如此，我依然认为哲学是不可或缺的。如果在‘动物性’以及人与动物之界线等传统概念之外，我们仍能另辟蹊径来思考动物的话，或许只有哲学才能够实现这一可能性。",
+    "summary": "“要在观念和实际生活中公正地对待动物，这于人类而言是一个巨大的转变",
     "title": "动物志",
     "tags": [
         {"name": "动物"},
@@ -76,7 +76,7 @@ DOUBAN_SEARCH = {
             "producer": "",
             "serials": "",
             "subtitle": "",
-            "summary": "◎获奖记录\n☆ 2017年英国地图制图学会综合大奖\n☆ 约翰·巴塞洛缪专题地图奖\n◎编辑推荐\n☆ 用GPS跟踪器在非洲追踪被盗猎威胁的大象，用记录磁场强度的项圈揭示獾在地...",
+            "summary": "◎获奖记录\n☆ 2017年英国地图制图学会综合大奖\n☆ 约翰·巴塞洛缪专题地图奖\n◎编辑推荐",
             "title": "动物去哪里",
             "tags": [],
             "origin": "",
@@ -128,7 +128,7 @@ DOUBAN_SEARCH = {
             "producer": "",
             "serials": "",
             "subtitle": "",
-            "summary": "芳踪难觅的栗腹鹭，钟爱旅行的勺嘴鹬\n感情专一的虎尾海马，雌雄难辨的曲纹唇鱼\n从海洋到森林，由沙漠至淡水\n从草原到山脉，由湿地至苔原\n43 种来自全球各地的野生濒危动...",
+            "summary": "芳踪难觅的栗腹鹭，钟爱旅行的勺嘴鹬\n感情专一的虎尾海马，雌雄难辨的曲纹唇鱼",
             "title": "地球上最孤单的动物",
             "tags": [],
             "origin": "",
@@ -154,7 +154,7 @@ DOUBAN_SEARCH = {
             "producer": "",
             "serials": "",
             "subtitle": "",
-            "summary": "动物到底是如何看东西的，这一点仍然是个谜。猫的眼睛会看到怎样的东西？公牛真的害怕红色的吗？狗是色盲吗？昆虫如何使用他们的复眼呢？为了回答这些问题，我们在这本...",
+            "summary": "动物到底是如何看东西的，这一点仍然是个谜。猫的眼睛会看到怎样的东西？公牛真的害怕红色的吗？",
             "title": "动物眼中的世界",
             "tags": [],
             "origin": "",
@@ -180,7 +180,7 @@ DOUBAN_SEARCH = {
             "producer": "",
             "serials": "",
             "subtitle": "",
-            "summary": "《动物农场》是奥威尔最优秀的作品之一，是一则入木三分的反乌托的政治讽喻寓言。\n农场的一群动物成功地进行了一场“革命”，将压榨他们的人类东家赶出农场，建立起一个...",
+            "summary": "《动物农场》是奥威尔最优秀的作品之一，是一则入木三分的反乌托的政治讽喻寓言。",
             "title": "动物农场",
             "tags": [],
             "origin": "",
@@ -245,7 +245,7 @@ class TestDoubanApi(unittest.TestCase):
 
         title = "动物"
         d = api.search_books(title)
-        self.assertEqual(d, DOUBAN_SEARCH['books'])
+        self.assertEqual(d, DOUBAN_SEARCH["books"])
         mk.assert_called_with(
             "baseurl/v2/book/search",
             headers=CHROME_HEADERS,
@@ -258,15 +258,14 @@ class TestDoubanApi(unittest.TestCase):
         r2.status_code = 200
         r2.json.return_value = dict(DOUBAN_SEARCH)
         mk.return_value = r2
-    
+
         api = DoubanBookApi("key", "baseurl")
 
-        title = '动物园'
+        title = "动物园"
         author = None
         book = api.get_book_by_title(title, author)
-        self.assertEqual(book['title'], '动物园')
-        self.assertEqual(book['id'], '26889178')
-
+        self.assertEqual(book["title"], "动物园")
+        self.assertEqual(book["id"], "26889178")
 
     @mock.patch("requests.get")
     def test_get_book(self, mk):
@@ -277,12 +276,12 @@ class TestDoubanApi(unittest.TestCase):
         q = mock.Mock()
         q.douban_id = 123
         book = api.get_book(q)
-        self.assertEqual(book.title, DOUBAN_BOOK['title'])
+        self.assertEqual(book.title, DOUBAN_BOOK["title"])
 
         q = mock.Mock()
         q.isbn = 123
         book = api.get_book(q)
-        self.assertEqual(book.title, DOUBAN_BOOK['title'])
+        self.assertEqual(book.title, DOUBAN_BOOK["title"])
 
     @mock.patch("requests.get")
     def test_get_book2(self, mk):
@@ -294,18 +293,17 @@ class TestDoubanApi(unittest.TestCase):
         r2.json.return_value = dict(DOUBAN_SEARCH)
 
         mk.side_effect = [r1, r2]
-    
+
         api = DoubanBookApi("key", "baseurl", copy_image=False)
 
         q = mock.Mock()
         q.douban_id = 123
         q.isbn = 123
-        q.title = '动物园'
+        q.title = "动物园"
         q.author_sort = None
         book = api.get_book(q)
-        self.assertEqual(book.title, '动物园')
-        self.assertEqual(book.provider_value, '26889178')
-
+        self.assertEqual(book.title, "动物园")
+        self.assertEqual(book.provider_value, "26889178")
 
 
 if __name__ == "__main__":

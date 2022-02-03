@@ -16,6 +16,7 @@ from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import func as sql_func
 from tornado import web
 from webserver import loader
+
 # import social_tornado.handlers
 from webserver.models import Item, Message, Reader
 
@@ -249,7 +250,7 @@ class BaseHandler(web.RequestHandler):
         history.insert(0, val)
         # an item is about 100Byte, sqlite's max length is 32KB
         # we have five type of history, so make a average limit of max history
-        ITEM_COUNT_LIMIT = 60 #  =32KB/100B/5
+        ITEM_COUNT_LIMIT = 60  # = 32KB/100B/5
         extra[action] = history[:ITEM_COUNT_LIMIT]
         user = self.current_user
         user.extra.update(extra)

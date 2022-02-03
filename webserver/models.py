@@ -83,7 +83,7 @@ class Reader(Base, SQLAlchemyMixin):
     DOWNLOAD = 0b00100000  # 下载
 
     OVERSIZE_SHRINK_RATE = 0.8
-    SQLITE_MAX_LENGTH = 32*1024.0
+    SQLITE_MAX_LENGTH = 32 * 1024.0
 
     __tablename__ = "readers"
     id = Column(Integer, primary_key=True)
@@ -107,13 +107,13 @@ class Reader(Base, SQLAlchemyMixin):
     def shrink_column_extra(self):
         # check whether the length of `extra` column is out of limit 32KB
         text = json.dumps(self.extra)
-        shrink = min(self.OVERSIZE_SHRINK_RATE, self.SQLITE_MAX_LENGTH/len(text))
+        shrink = min(self.OVERSIZE_SHRINK_RATE, self.SQLITE_MAX_LENGTH / len(text))
         if len(text) > self.SQLITE_MAX_LENGTH:
-            for k,v in self.extra.items():
+            for k, v in self.extra.items():
                 if k.endswith("_history") and isinstance(v, list):
-                    new_length = int(len(v)*shrink)
+                    new_length = int(len(v) * shrink)
                     self.extra[k] = v[:new_length]
-        
+
     def save(self):
         self.shrink_column_extra()
         return super().save()
@@ -155,10 +155,7 @@ class Reader(Base, SQLAlchemyMixin):
         self.avatar = url.replace("http://q.qlogo.cn", "//q.qlogo.cn")
 
         if social_user.provider == "github":
-            self.avatar = (
-                "https://avatars.githubusercontent.com/u/%s"
-                % social_user.extra_data["id"]
-            )
+            self.avatar = "https://avatars.githubusercontent.com/u/%s" % social_user.extra_data["id"]
 
     def get_active_code(self):
         return self.get_secure_password(self.create_time.strftime("%Y-%m-%d %H:%M:%S"))
