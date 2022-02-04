@@ -8,6 +8,10 @@ if [ ! -d "/data/books/settings" ]; then
   cp -rf /prebuilt/books/settings /data/books/
 fi
 
+if [ ! -d "/data/books/library" ]; then
+  cp -rf /prebuilt/books/library /data/books/
+fi
+
 if [ ! -s "/data/books/calibre-webserver.db" ]; then
   cp /prebuilt/books/calibre-webserver.db /data/books/
 fi

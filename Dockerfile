@@ -34,9 +34,10 @@ RUN mv /tmp/sources.list /etc/apt/sources.list
 # ----------------------------------------
 # 测试阶段
 FROM server as test
-COPY webserver/ /var/www/talebook/webserver/
 RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
-        flake8 pytest mock
+        flake8 pytest
+COPY webserver/ /var/www/talebook/webserver/
+COPY tests/ /var/www/talebook/tests/
 CMD ["pytest", "/var/www/talebook/tests"]
 
 
