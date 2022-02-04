@@ -29,7 +29,7 @@ test: lint
 	pytest tests
 
 testv:
-	coverage run -m unittest discover tests
+	coverage run -m unittest
 	coverage report --include "*talebook*"
 
 testvv: testv
