@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import sys
+import shutil
 import time
 import unittest
 import urllib
@@ -30,7 +31,11 @@ _mock_mail = None
 
 def setup_server():
     global _app
-    # main.init_calibre()
+    # copy new db
+    shutil.copyfile(testdir+"/cases/users.db", testdir+"/library/users.db")
+    shutil.copyfile(testdir+"/cases/metadata.db", testdir+"/library/metadata.db")
+
+    # set env
     main.options.with_library = testdir + "/library/"
     main.CONF["ALLOW_GUEST_PUSH"] = False
     main.CONF["ALLOW_GUEST_DOWNLOAD"] = False
@@ -40,7 +45,7 @@ def setup_server():
     main.CONF["progress_path"] = "/tmp/"
     main.CONF["installed"] = True
     main.CONF["INVITE_MODE"] = False
-    main.CONF["user_database"] = "sqlite:///%s/users.db" % testdir
+    main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
     _app = main.make_app()
 
 
@@ -751,6 +756,36 @@ class TestInviteMode(TestApp):
 
         r = self.fetch("/opds/nav/4e617574686f7273?offset=1")
         self.assertEqual(r.code, 401)
+
+
+class TestUpload(TestWithUserLogin):
+    @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
+    @mock.patch("webserver.handlers.base.BaseHandler.user_history")
+    @mock.patch("webserver.handlers.base.BaseHandler.add_msg")
+    @mock.patch("webserver.models.Item.save")
+    def test_upload_old_file(self, m4, m3, m2, m1):
+        name = "abc.epub"
+        path = testdir + "/cases/old.epub"
+        with open(path, "rb") as f:
+            data = f.read()
+            m1.return_value = (name, data)
+
+            d = self.json("/api/book/upload", method="POST", body="k=1")
+            self.assertEqual(d["err"], "samebook")
+
+    @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
+    @mock.patch("webserver.handlers.base.BaseHandler.user_history")
+    @mock.patch("webserver.handlers.base.BaseHandler.add_msg")
+    @mock.patch("webserver.models.Item.save")
+    def test_upload_new_file(self, m4, m3, m2, m1):
+        name = "new.epub"
+        path = testdir + "/cases/new.epub"
+        with open(path, "rb") as f:
+            data = f.read()
+            m1.return_value = (name, data)
+
+            d = self.json("/api/book/upload", method="POST", body="k=1")
+            self.assertEqual(d["err"], "ok")
 
 
 def setUpModule():
