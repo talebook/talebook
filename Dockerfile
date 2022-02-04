@@ -37,7 +37,7 @@ FROM server as test
 COPY webserver/ /var/www/talebook/webserver/
 RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
         flake8 pytest mock
-CMD ["pytest", "/var/www/talebook/webserver"]
+CMD ["pytest", "/var/www/talebook/tests"]
 
 
 # ----------------------------------------

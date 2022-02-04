@@ -26,5 +26,13 @@ lint:
 	flake8 webserver --count --exit-zero --statistics --config .style.yapf
 
 test: lint
-	pytest webserver
+	pytest tests
+
+testv:
+	coverage run -m unittest discover tests
+	coverage report --include "*talebook*"
+
+testvv: testv
+	coverage html -d ".htmlcov" --include "*talebook*"
+	cd ".htmlcov" && python3 -m http.server 7777
 
