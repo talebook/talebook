@@ -235,6 +235,7 @@ class BookRefer(BaseHandler):
             # 总是把最佳书籍放在第一位
             book = api.get_book_by_isbn(mi.isbn)
             if book:
+                books = list(books)
                 books.insert(0, book)
         books = [api._metadata(b) for b in books]
 

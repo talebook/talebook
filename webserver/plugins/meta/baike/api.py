@@ -1,4 +1,4 @@
-#!/usr/bin/calibre-debug
+#!/usr/bin/python3
 # -*- coding: UTF-8 -*-
 
 """
@@ -6,12 +6,19 @@ This is the standard runscript for all of calibre's tools.
 Do not modify it unless you know what you are doing.
 """
 
-import re, logging, io, traceback
-from urllib.request import urlopen
+import re, logging, traceback
 from .baidubaike.baidubaike import Page
+import requests
 
 BAIKE_ISBN = "0000000000001"
 KEY = "BaiduBaike"
+
+CHROME_HEADERS = {
+    "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    + "Chrome/66.0.3359.139 Safari/537.36",
+}
 
 
 class BaiduBaikeApi:
@@ -56,12 +63,7 @@ class BaiduBaikeApi:
         mi.source = u"百度百科"
         mi.provider_key = KEY
         mi.provider_value = baike.get_id()
-
-        if self.copy_image and mi.cover_url:
-            logging.debug("fetching cover: %s", mi.cover_url)
-            img = io.BytesIO(urlopen(mi.cover_url).read())
-            img_fmt = mi.cover_url.split(".")[-1]
-            mi.cover_data = (img_fmt, img)
+        mi.cover_data = self.get_cover(mi.cover_url)
 
         if u"完结" in info.get(u"连载状态", ""):
             day = re.findall(r"\d*-\d*-\d*", info[u"连载状态"])
@@ -70,6 +72,13 @@ class BaiduBaikeApi:
             except:
                 pass
         return mi
+
+    def get_cover(self, cover_url):
+        if not self.copy_image or not cover_url:
+            return None
+        img = requests.get(cover_url, headers=CHROME_HEADERS).content
+        img_fmt = cover_url.split(".")[-1]
+        return (img_fmt, img)
 
 
 if __name__ == "__main__":

@@ -95,7 +95,7 @@ class DoubanBookApi(object):
         q = (title + " " + author) if author else title
         args = {"q": q.encode("UTF-8"), "count": self.maxCount}
         r = self.request(url, params=args)
-        return r['books'] if r else None
+        return r["books"] if r else None
 
     def get_book_by_title(self, title, author=None):
         books = self.search_books(title, author)
@@ -124,6 +124,13 @@ class DoubanBookApi(object):
         if not book:
             return None
         return self._metadata(book)
+
+    def get_cover(self, cover_url):
+        if not self.copy_image:
+            return None
+        img = requests.get(cover_url, headers=CHROME_HEADERS).content
+        img_fmt = cover_url.split(".")[-1]
+        return (img_fmt, img)
 
     def _metadata(self, book):
         authors = []
@@ -158,10 +165,7 @@ class DoubanBookApi(object):
         mi.provider_value = book["id"]
 
         mi.cover_url = book["images"]["large"]
-        if self.copy_image:
-            img = requests.get(mi.cover_url, headers=CHROME_HEADERS).content
-            img_fmt = mi.cover_url.split(".")[-1]
-            mi.cover_data = (img_fmt, img)
+        mi.cover_data = self.get_cover(mi.cover_url)
 
         logging.debug("=================\ndouban metadata:\n%s" % mi)
         return mi
