@@ -46,7 +46,8 @@ def setup_server():
     main.CONF["installed"] = True
     main.CONF["INVITE_MODE"] = False
     main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
-    _app = main.make_app()
+    if _app is None:
+        _app = main.make_app()
 
 
 def setup_mock_user():
@@ -435,34 +436,6 @@ class TestBook(TestWithUserLogin):
             self.assertEqual(r["err"], "ok")
 
 
-class TestUpload(TestWithUserLogin):
-    def mtest_upload(self):
-        from email.mime.application import MIMEApplication
-        from email.mime.multipart import MIMEMultipart
-
-        fpath = testdir + "/library/Han Han/Ta De Guo (5)/Ta De Guo - Han Han.epub"
-        fname = u"中文书籍.epub"
-        with open(fpath, "rb") as f:
-            fdata = f.read()
-
-        with mock.patch.object(_app.settings["legacy"], "import_book", return_value="Yo") as m:
-            with mock.patch("models.Item.save", return_value="Yo"):
-                # build multipart message
-                app = MIMEApplication(fdata, "octet-stream", charset="utf-8")
-                app.add_header("Content-Disposition", "form-data", name="ebook", filename=fname)
-                msg = MIMEMultipart("form-data")
-                msg.attach(app)
-                # split headers and body from message
-                form = msg.as_string().split("\n\n", 1)
-                headers = dict(line.split(": ", 1) for line in form[0].split("\n"))
-                body = form[1].replace("\n", "\r\n")
-                # send request
-                # FIXME: tornado save original ASCII into file ?
-                r = self.json("/api/book/upload", method="POST", headers=headers, body=body)
-                self.assertEqual(r["err"], "ok")
-                self.assertEqual(m.call_count, 1)
-
-
 class TestReferDouban(TestWithUserLogin):
     def setUp(self):
         self.douban_url = "http://10.0.0.15:7001"
@@ -756,36 +729,6 @@ class TestInviteMode(TestApp):
 
         r = self.fetch("/opds/nav/4e617574686f7273?offset=1")
         self.assertEqual(r.code, 401)
-
-
-class TestUpload(TestWithUserLogin):
-    @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
-    @mock.patch("webserver.handlers.base.BaseHandler.user_history")
-    @mock.patch("webserver.handlers.base.BaseHandler.add_msg")
-    @mock.patch("webserver.models.Item.save")
-    def test_upload_old_file(self, m4, m3, m2, m1):
-        name = "abc.epub"
-        path = testdir + "/cases/old.epub"
-        with open(path, "rb") as f:
-            data = f.read()
-            m1.return_value = (name, data)
-
-            d = self.json("/api/book/upload", method="POST", body="k=1")
-            self.assertEqual(d["err"], "samebook")
-
-    @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
-    @mock.patch("webserver.handlers.base.BaseHandler.user_history")
-    @mock.patch("webserver.handlers.base.BaseHandler.add_msg")
-    @mock.patch("webserver.models.Item.save")
-    def test_upload_new_file(self, m4, m3, m2, m1):
-        name = "new.epub"
-        path = testdir + "/cases/new.epub"
-        with open(path, "rb") as f:
-            data = f.read()
-            m1.return_value = (name, data)
-
-            d = self.json("/api/book/upload", method="POST", body="k=1")
-            self.assertEqual(d["err"], "ok")
 
 
 def setUpModule():
