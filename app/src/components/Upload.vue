@@ -45,7 +45,6 @@ export default {
             })
             .then( rsp => {
                 this.dialog = false;
-                this.loading = false;
                 if ( rsp.err == 'ok' ) {
                     this.alert("success", "上传成功！", "/book/"+rsp.book_id);
                 } else if ( rsp.err == 'samebook' ) {
@@ -53,6 +52,9 @@ export default {
                 } else {
                     this.alert("error", rsp.msg);
                 }
+            })
+            .finally(() => {
+                this.loading = false;
             });
         },
     },

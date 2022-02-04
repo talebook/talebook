@@ -120,12 +120,13 @@ export default {
                 if ( rsp.err != 'ok' ) {
                     this.items = [];
                     this.total = 0;
-                    this.loading = false;
                     alert( rsp.msg );
                     return false;
                 }
                 this.items = rsp.users.items;
                 this.total = rsp.users.total;
+            })
+            .finally(() => {
                 this.loading = false;
             });
         },

@@ -311,6 +311,8 @@ export default {
                     b.img = '/get/pcover?url='+encodeURIComponent(b.cover_url);
                     return b;
                 });
+            })
+            .finally(() => {
                 this.refer_books_loading = false;
             });
         },
