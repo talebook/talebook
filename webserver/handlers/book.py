@@ -491,6 +491,11 @@ class BookUpload(BaseHandler):
         except:
             return s.group(0)
 
+    def get_upload_file(self):
+        # for unittest mock
+        p = self.request.files["ebook"][0]
+        return (p["filename"], p["body"])
+
     @js
     @auth
     def post(self):
@@ -498,8 +503,7 @@ class BookUpload(BaseHandler):
 
         if not self.current_user.can_upload():
             return {"err": "permission", "msg": _(u"无权操作")}
-        postfile = self.request.files["ebook"][0]
-        name = postfile["filename"]
+        name, data = self.get_upload_file()
         name = re.sub(r"[\x80-\xFF]+", BookUpload.convert, name)
         logging.error("upload book name = " + repr(name))
         fmt = os.path.splitext(name)[1]
@@ -509,7 +513,6 @@ class BookUpload(BaseHandler):
         fmt = fmt.lower()
 
         # save file
-        data = postfile["body"]
         fpath = os.path.join(CONF["upload_path"], name)
         with open(fpath, "wb") as f:
             f.write(data)
