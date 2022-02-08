@@ -1,0 +1,18 @@
+version: "2.4"
+
+services:
+
+  # main service
+  talebook:
+    image: talebook/talebook
+    volumes:
+      - /data/demo:/data
+    ports:
+      - "8006:80"
+    depends_on:
+      - douban-rs-api
+
+  # optional, for meta plugins
+  # please set "http://douban-rs-api" in settings
+  douban-rs-api:
+    image: ghcr.io/cxfksword/douban-api-rs
