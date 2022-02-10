@@ -424,7 +424,9 @@ class BookDownload(BaseHandler):
             raise web.HTTPError(404, reason=_(u"%s格式无法下载" % fmt))
         path = book["fmt_%s" % fmt]
         book["fmt"] = fmt
-        att = u'attachment; filename="%(id)d-%(title)s.%(fmt)s"' % book
+        book["title"] = urllib.parse.quote_plus(book["title"])
+        fname = '%(id)d-%(title)s.%(fmt)s' % book
+        att = u'attachment; filename="%s"; filename*=UTF-8\'\'%s' % (fname, fname)
         if is_opds:
             att = u'attachment; filename="%(id)d.%(fmt)s"' % book
 
