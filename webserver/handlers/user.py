@@ -183,11 +183,13 @@ class UserUpdate(BaseHandler):
     def post(self):
         data = tornado.escape.json_decode(self.request.body)
         user = self.current_user
-        nickname = data.get("nickname", "").strip()
-        if len(nickname) > 0:
-            if len(nickname) < 3:
-                return {"err": "params.nickname.invald", "msg": _(u"昵称无效")}
-            user.name = nickname
+        nickname = data.get("nickname", "")
+        if nickname:
+            nickname = nickname.strip()
+            if len(nickname) > 0:
+                if len(nickname) < 3:
+                    return {"err": "params.nickname.invald", "msg": _(u"昵称无效")}
+                user.name = nickname
 
         p0 = data.get("password0", "").strip()
         p1 = data.get("password1", "").strip()
@@ -448,7 +450,7 @@ class UserInfo(BaseHandler):
                 "is_login": True,
                 "is_admin": user.is_admin(),
                 "is_active": user.is_active(),
-                "nickname": user.name,
+                "nickname": user.name or "",
                 "username": user.username,
                 "email": user.email,
                 "extra": {},
