@@ -8,11 +8,9 @@ REPO2 := talebook/calibre-webserver:latest
 all: build
 
 build:
-	docker build --no-cache=false --build-arg GIT_VERSION=$(VER) -t $(IMAGE) .
+	docker build --no-cache=false --build-arg GIT_VERSION=$(VER) -t $(IMAGE) -t $(REPO1) -t $(REPO2) .
 
 push:
-	docker tag $(IMAGE) $(REPO1)
-	docker tag $(IMAGE) $(REPO2)
 	docker push $(IMAGE)
 	docker push $(REPO1)
 	docker push $(REPO2)
