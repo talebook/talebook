@@ -72,13 +72,6 @@
                         <v-col class='py-0' cols=12 sm=7>
                             <v-text-field small hide-details single-line v-model="settings['SOCIAL_AUTH_'+s.value.toUpperCase()+'_SECRET']" label="Secret" type="text"></v-text-field>
                         </v-col>
-                        <v-col class='py-0' cols=12 v-show="s.help">
-                            <v-alert outlined type="info" color="purple" >
-                                <div>
-                                    请前往{{s.text}}的<a :href="s.link" target="_blank">配置页面</a>获取密钥，并设置回调地址(callback URL)为<code>{{site_url}}/auth/complete/{{s.value}}</code>
-                                </div>
-                            </v-alert>
-                        </v-col>
                     </v-row>
                 </template>
 
@@ -224,7 +217,7 @@ export default {
         },
         show_sns_config: function(s) {
             var msg = `请前往${s.text}的 <a :href="${s.link}" target="_blank">配置页面</a> 获取密钥，并设置回调地址（callback URL）为
-            <code>${this.site_url}/auth/complete/${s.value}</code>`;
+            <code>${this.site_url}/auth/complete/${s.value}.do</code>`;
             this.alert("success", msg);
         },
         test_email: function() {
