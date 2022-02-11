@@ -8,7 +8,8 @@ REPO2 := talebook/calibre-webserver:latest
 all: build
 
 build:
-	docker build --no-cache=false --build-arg GIT_VERSION=$(VER) -t $(IMAGE) -t $(REPO1) -t $(REPO2) .
+	docker build --no-cache=false --build-arg GIT_VERSION=$(VER) \
+		-f Dockerfile.cn -t $(IMAGE) -t $(REPO1) -t $(REPO2) .
 
 push:
 	docker push $(IMAGE)
@@ -16,7 +17,7 @@ push:
 	docker push $(REPO2)
 
 docker-test:
-	docker build -t talebook/test --target test .
+	docker build -t talebook/test --target test -f Dockerfile.cn .
 	docker run --rm --name talebook-docker-test talebook/test
 
 lint:

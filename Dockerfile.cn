@@ -7,6 +7,7 @@ LABEL Thanks="oldiy <oldiy2018@gmail.com>"
 
 WORKDIR /app
 COPY ["app/package.json", "app/package-lock.json*", "/app/"]
+RUN npm config set registry http://mirrors.tencent.com/npm/
 RUN npm install
 
 COPY app/ /app/
@@ -19,19 +20,24 @@ FROM talebook/calibre:5 as server
 
 # install python packages
 COPY ["requirements.txt", "/tmp/"]
-RUN pip install -r /tmp/requirements.txt
+RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
+        -r /tmp/requirements.txt
 
 # debian里安装的pyqt5版本v5.15.2有问题（issue #124），需要更新为5.15.3
-RUN pip install pyqt5==5.15.3
+RUN pip install pyqt5==5.15.3 -i https://mirrors.tencent.com/pypi/simple/
 
 # install envsubst
+RUN cp /etc/apt/sources.list /tmp/ && \
+        sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list
 RUN apt-get update && apt-get install -y gettext
+RUN mv /tmp/sources.list /etc/apt/sources.list
 
 
 # ----------------------------------------
 # 测试阶段
 FROM server as test
-RUN pip install flake8 pytest
+RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
+        flake8 pytest
 COPY webserver/ /var/www/talebook/webserver/
 COPY tests/ /var/www/talebook/tests/
 CMD ["pytest", "/var/www/talebook/tests"]
@@ -77,3 +83,4 @@ EXPOSE 80
 VOLUME ["/data"]
 
 CMD ["/var/www/talebook/docker/start.sh"]
+
