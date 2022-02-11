@@ -15,16 +15,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container:
+      image: talebook/calibre:5
+
     steps:
       - uses: actions/checkout@v2
-
-      - name: Set up calibre
-        uses: docker://talebook/calibre:5
-
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.9"
 
       - name: Install dependencies
         run: |
