@@ -23,9 +23,6 @@ COPY ["requirements.txt", "/tmp/"]
 RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
         -r /tmp/requirements.txt
 
-# debian里安装的pyqt5版本v5.15.2有问题（issue #124），需要更新为5.15.3
-RUN pip install pyqt5==5.15.3 -i https://mirrors.tencent.com/pypi/simple/
-
 # install envsubst
 RUN cp /etc/apt/sources.list /tmp/ && \
         sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list

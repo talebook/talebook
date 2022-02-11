@@ -21,9 +21,6 @@ FROM talebook/calibre:5 as server
 COPY ["requirements.txt", "/tmp/"]
 RUN pip install -r /tmp/requirements.txt
 
-# debian里安装的pyqt5版本v5.15.2有问题（issue #124），需要更新为5.15.3
-RUN pip install pyqt5==5.15.3
-
 # install envsubst
 RUN apt-get update && apt-get install -y gettext
 
