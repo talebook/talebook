@@ -1,4 +1,4 @@
-name: 'buildx images'
+name: 'buildx docker images'
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
         run: |
           DOCKER_IMAGE=${{ secrets.DOCKER_USERNAME }}/${GITHUB_REPOSITORY#*/}
           VERSION=nightly
-          SHORTREF=${GITHUB_SHA::8}
+          SHORTREF=nightly-${GITHUB_SHA::8}
 
           # If this is git tag, use the tag name as a docker tag
           if [[ $GITHUB_REF == refs/tags/* ]]; then
