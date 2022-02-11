@@ -5,30 +5,38 @@ name: Python application
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v2
-      with:
-        python-version: "3.9"
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install flake8 pytest mock
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics --builtins="_"
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        #flake8 webserver --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --builtins="_"
-    - name: Test with pytest
-      run: |
-        pytest webserver
+      - uses: actions/checkout@v2
+
+      - name: Set up calibre
+        uses: docker://talebook/calibre:3.8
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest  pyqt5==5.15.3
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
+
+          # exit-zero treats all errors as warnings
+          flake8 webserver --count --exit-zero --statistics --config .style.yapf
+
+      - name: Test with pytest
+        run: |
+          pytest ./tests
