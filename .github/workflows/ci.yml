@@ -5,9 +5,12 @@ name: Python application
 
 on:
   push:
-    branches: [master]
+    branches:
+      - master
+      - add-workflow-actions
   pull_request:
-    branches: [master]
+    branches: 
+      - master
 
 jobs:
   test:
