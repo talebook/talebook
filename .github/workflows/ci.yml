@@ -21,10 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v1
-        with:
-          python-version: 3.8
+      - name: Inspect
+        run: |
+            which calibre
+            python3 -V
 
       - name: Install dependencies
         run: |
