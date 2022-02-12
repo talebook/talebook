@@ -58,13 +58,10 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           context: .
           platforms: linux/amd64,linux/arm64
-          push: false #${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' }}
           tags: |
             ${{ steps.meta.outputs.tags }}
             talebook/calibre-webserver:latest
           build-args: |
             ${{ steps.prep.outputs.build_args }}
 
-      - name: Build Result
-        run: |
-          echo ${{ steps.build.outputs.metadata }}
