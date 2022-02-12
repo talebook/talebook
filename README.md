@@ -1,5 +1,11 @@
 Tale Book: My Calibre WebServer
 ====================
+[![GitHub License](https://img.shields.io/github/license/talebook/talebook?style=flat-square)](https://github.com/talebook/talebook/blob/master/LICENSE)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/w/talebook/talebook?logo=github&style=flat-square&label=commits)]()
+[![Tests](https://github.com/talebook/talebook/actions/workflows/ci.yml/badge.svg)](https://github.com/talebook/talebook/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/talebook/talebook/actions/workflows/build.yml/badge.svg)](https://github.com/talebook/talebook/actions/workflows/build.yml)
+[![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)](https://hub.docker.com/r/talebook/talebook)
+
 A better online books library management website built on Calibre + Vue
 
 See a running instance of demo:
