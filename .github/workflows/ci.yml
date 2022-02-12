@@ -16,7 +16,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     container:
-      image: talebook/calibre:5.0.1
+      image: talebook/calibre-docker
 
     steps:
       - uses: actions/checkout@v2
