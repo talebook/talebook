@@ -45,7 +45,7 @@ jobs:
           else
             VERSION=${GITHUB_SHA::8}
           fi
-          BUILD_ARGS="GIT_VERSION=${VERSION}
+          BUILD_ARGS="GIT_VERSION=${VERSION}"
           echo "Build args: ${BUILD_ARGS}"
 
           # Set output parameters.ash
