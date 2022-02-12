@@ -14,31 +14,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Prepare
-        id: prep
-        run: |
-          DOCKER_IMAGE=${{ secrets.DOCKER_USERNAME }}/${GITHUB_REPOSITORY#*/}
-          VERSION=nightly
-          SHORTREF=nightly-${GITHUB_SHA::8}
-          EXTRA_DOCKER_IMAGE=talebook/calibre-webserver:latest
-
-          # If this is git tag, use the tag name as a docker tag
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          fi
-          TAGS="${DOCKER_IMAGE}:${VERSION},${DOCKER_IMAGE}:${SHORTREF}"
-
-          # If the VERSION looks like a version number, assume that
-          # this is the most recent version of the image and also
-          # tag it 'latest'.
-          if [[ $VERSION =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            TAGS="$TAGS,${DOCKER_IMAGE}:latest,${EXTRA_DOCKER_IMAGE}"
-          fi
-
-          # Set output parameters.ash
-          echo ::set-output name=tags::${TAGS}
-          echo ::set-output name=docker_image::${DOCKER_IMAGE}
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@master
         with:
@@ -61,14 +36,35 @@ jobs:
         with:
           images: ${{ github.repository }}
 
-      - name: Build
+      - name: Prepare Build Args
+        id: prep
+        run: |
+          # If this is git tag, use the tag name as a docker tag
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=${GITHUB_SHA::8}
+          fi
+          BUILD_ARGS="GIT_VERSION=${VERSION}
+          echo "Build args: ${BUILD_ARGS}"
+
+          # Set output parameters.ash
+          echo ::set-output name=build_args::${BUILD_ARGS}
+
+      - name: Build Image
+        id: build
         uses: docker/build-push-action@v2
         with:
           builder: ${{ steps.buildx.outputs.name }}
           context: .
-          file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.prep.outputs.tags }}
+          push: false #${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            talebook/calibre-webserver:latest
           build-args: |
-            "GIT_VERSION=v${{VERSION}"
+            ${{ steps.prep.outputs.build_args }}
+
+      - name: Build Result
+        run: |
+          echo ${{ steps.build.outputs.metadata }}
