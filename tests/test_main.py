@@ -758,7 +758,8 @@ class TestInviteMode(TestApp):
 def setUpModule():
     logging.basicConfig(
         level=logging.DEBUG,
-        format="%(levelname)7s %(pathname)s:%(lineno)d %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        format="%(asctime)s %(levelname)7s %(pathname)s:%(lineno)d %(message)s",
     )
     setup_server()
     setup_mock_user()

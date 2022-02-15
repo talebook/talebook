@@ -487,7 +487,7 @@ class HotBook(ListHandler):
 
 class BookUpload(BaseHandler):
     @classmethod
-    def convert(s):
+    def convert(self, s):
         try:
             return s.group(0).encode("latin1").decode("utf8")
         except:
