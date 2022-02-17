@@ -15,7 +15,7 @@ RUN npm run build
 
 # ----------------------------------------
 # 第二阶段，构建环境
-FROM talebook/calibre-docker as server
+FROM talebook/calibre-docker:v1.1.0 as server
 
 # install python packages
 COPY ["requirements.txt", "/tmp/"]
