@@ -157,19 +157,21 @@ export default {
     },
     created() {
         this.sidebar = this.$vuetify.breakpoint.lgAndUp;
-        this.backend('/user/messages')
+        this.$backend('/user/messages')
         .then(rsp => {
             if ( rsp.err == 'ok' ) {
                 this.messages = rsp.messages;
             }
         });
-        this.backend('/user/info')
+        this.$backend('/user/info')
         .then(rsp => {
             this.$store.commit('login', rsp);
             var sys = rsp.sys;
             this.sys = rsp.sys;
             this.user = rsp.user;
-            document.title = sys.title;
+            if ( process.client ) {
+                document.title = sys.title;
+            }
             var nav_items = [
                 { icon: 'home',         href:'/',       text: '首页',         },
                 { heading: '分类浏览' },
@@ -199,7 +201,7 @@ export default {
     data: () => ({
         loaded: false,
         user: {},
-        sidebar: false,
+        sidebar: true,
         right: null,
         items: [ ],
         btn_search: false,
@@ -238,7 +240,7 @@ export default {
             }
         },
         hidemsg: function(idx, msgid) {
-            this.backend("/user/messages", {
+            this.$backend("/user/messages", {
                 method: 'POST',
                 body: JSON.stringify({id: msgid}),
             })

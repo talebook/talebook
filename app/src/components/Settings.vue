@@ -86,22 +86,22 @@
 
 <script>
 export default {
-    created() {
-        this.$store.commit("loading");
-        this.backend("/admin/settings")
-        .then(rsp=>{
+    async asyncData({ params, app }) {
+        return app.$backend("/book/nav").then(rsp => {
+            var data = {
+                sns_items: rsp.sns,
+                settings: rsp.settings,
+                site_url: rsp.site_url,
+            }
             var m = {}
             rsp.sns.forEach(function(ele){
                 m[ele.value] = ele;
             });
-            this.sns_items = rsp.sns
-            this.settings = rsp.settings
-            this.site_url = rsp.site_url
-            this.$store.commit("loaded");
-            this.settings.SOCIALS.forEach(function(ele){
+            data.settings.SOCIALS.forEach(function(ele){
                 ele.help = false;
                 ele.link = m[ele.value].link;
             })
+            return data;
         });
     },
     data: () => ({
@@ -203,36 +203,36 @@ export default {
     }),
     methods: {
         save_settings: function() {
-            this.backend("/admin/settings", {
+            this.$backend("/admin/settings", {
                 method: 'POST',
                 body: JSON.stringify(this.settings),
             })
             .then( rsp => {
                 if ( rsp.err != 'ok' ) {
-                    this.alert('error', rsp.msg);
+                    this.$alert('error', rsp.msg);
                 } else {
-                    this.alert('success', '保存成功！可能需要5~10秒钟生效！');
+                    this.$alert('success', '保存成功！可能需要5~10秒钟生效！');
                 }
             });
         },
         show_sns_config: function(s) {
             var msg = `请前往${s.text}的 <a :href="${s.link}" target="_blank">配置页面</a> 获取密钥，并设置回调地址（callback URL）为
             <code>${this.site_url}/auth/complete/${s.value}.do</code>`;
-            this.alert("success", msg);
+            this.$alert("success", msg);
         },
         test_email: function() {
             var data = new URLSearchParams();
             data.append('smtp_server', this.settings['smtp_server']);
             data.append('smtp_username', this.settings['smtp_username']);
             data.append('smtp_password', this.settings['smtp_password']);
-            this.backend("/admin/testmail", {
+            this.$backend("/admin/testmail", {
                 method: 'POST',
                 body: data,
             }).then( rsp => {
                 if ( rsp.err != 'ok' ) {
-                    this.alert('error', rsp.msg);
+                    this.$alert('error', rsp.msg);
                 } else {
-                    this.alert('success', rsp.msg);
+                    this.$alert('success', rsp.msg);
                 }
             });
         },
