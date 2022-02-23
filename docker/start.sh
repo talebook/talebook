@@ -21,4 +21,5 @@ if [ ! -d "/data/log" ]; then
 fi
 
 service nginx restart
+#cd /var/www/talebook/app/&& npm run start &
 /usr/bin/supervisord --nodaemon -c /etc/supervisor/supervisord.conf
