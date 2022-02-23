@@ -136,7 +136,7 @@ class Reader(Base, SQLAlchemyMixin):
 
     def reset_password(self):
         s = "%s%s%s" % (self.username, self.create_time.strftime("%s"), time.time())
-        p = hashlib.md5(s).hexdigest()[:16]
+        p = hashlib.md5(s.encode("UTF-8")).hexdigest()[:16]
         self.set_secure_password(p)
         return p
 
