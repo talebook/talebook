@@ -1,7 +1,3 @@
-import colors from 'vuetify/es5/util/colors'
-import logger from "connect-logger";
-
-
 export default {
   loading: '~/components/Loading.vue',
   srcDir: 'src/',
@@ -55,6 +51,7 @@ export default {
 
   // Vuetify module configuration: https://go.nuxtjs.dev/config-vuetify
   vuetify: {
+      // treeShake: true,
       defaultAssets: false,
       iconfont: 'mdi',
   },
@@ -80,12 +77,8 @@ export default {
     baseURL: process.env.BASE_URL,
   },
 
-  serverMiddleware: [
-    logger({ format: "%date %status %method %url (%time)" })
-  ],
-
   server: {
-    port: 8081, // default: 3000
+    port: 9000, // default: 3000
     host: '0.0.0.0' // default: localhost
   },
 
