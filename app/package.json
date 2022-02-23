@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "nuxt",
-    "build": "nuxt build --spa",
-    "build-ssr": "nuxt build",
+    "build": "nuxt build",
+    "build-spa": "nuxt build --spa",
     "start": "nuxt start",
     "generate": "nuxt generate"
   },

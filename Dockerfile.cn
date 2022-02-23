@@ -12,7 +12,7 @@ RUN npm install
 
 COPY app/ /app/
 RUN npm run build
-RUN npm run build-ssr
+RUN npm run build-spa
 #RUN rm -rf node_modules && NODE_ENV=production npm install
 
 # ----------------------------------------
