@@ -62,6 +62,7 @@ RUN mkdir -p /data/log/nginx/ && \
 
 COPY . /var/www/talebook/
 COPY conf/nginx/talebook.conf /etc/nginx/conf.d/talebook.conf
+COPY conf/nginx/demo.com.* /etc/nginx/ssl/
 COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/
 COPY --from=builder /app/dist/ /var/www/talebook/app/dist/
 
@@ -83,7 +84,7 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
 COPY --from=builder /app/.nuxt/ /var/www/talebook/app/.nuxt/
 COPY --from=builder /app/node_modules/ /var/www/talebook/app/node_modules/
 
-EXPOSE 80
+EXPOSE 80 443
 
 VOLUME ["/data"]
 
