@@ -1,3 +1,4 @@
 .git
 app/dist
+app/.nuxt
 app/node_modules

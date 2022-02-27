@@ -14,10 +14,13 @@ export default ({ app }, inject) =>  {
             }
             var server = "";
             if ( process.server ) {
-                server = process.env.BASE_URL;
                 if ( app.context.req != undefined ) {
+                    var headers = app.context.req.headers;
+                    server = `http://${headers.host}`;
                     args.headers = {
-                        "cookie": app.context.req.headers.cookie
+                        "cookie": headers.cookie,
+                        "X-Forwarded-For": headers["X-Forwarded-For"],
+                        "X-Scheme": headers["X-Scheme"],
                     }
                 }
             } else {
