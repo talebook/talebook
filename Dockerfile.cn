@@ -62,7 +62,7 @@ RUN mkdir -p /data/log/nginx/ && \
 
 COPY . /var/www/talebook/
 COPY conf/nginx/talebook.conf /etc/nginx/conf.d/talebook.conf
-COPY conf/nginx/demo.com.* /etc/nginx/ssl/
+COPY conf/nginx/ssl/ssl.* /etc/nginx/ssl/
 COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/
 COPY --from=builder /app/dist/ /var/www/talebook/app/dist/
 

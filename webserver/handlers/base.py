@@ -49,6 +49,7 @@ def js(func):
     def do(self, *args, **kwargs):
         try:
             rsp = func(self, *args, **kwargs)
+            rsp['msg'] = rsp.get("msg", "")
         except Exception as e:
             import traceback
 

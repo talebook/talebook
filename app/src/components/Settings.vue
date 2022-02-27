@@ -75,8 +75,12 @@
                     </v-row>
                 </template>
 
+                <template v-if="card.show_ssl">
+                    <ssl-manager />
+                </template>
             </v-card-text>
         </v-card>
+
         <br/>
         <div class="text-center">
             <v-btn color="primary" @click="save_settings">保存</v-btn>
@@ -85,7 +89,11 @@
 </template>
 
 <script>
+import SSLManager from "~/components/SSLManager.vue";
 export default {
+    components: {
+        "ssl-manager": SSLManager,
+    },
     async asyncData({ params, app }) {
         return app.$backend("/book/nav").then(rsp => {
             var data = {
@@ -197,6 +205,13 @@ export default {
                     link: "https://github.com/talebook/talebook/blob/master/document/INSTALL.zh_CN.md#%E5%85%B6%E4%BB%96%E9%85%8D%E7%BD%AE",
                 }
             ],
+        },
+
+        {
+            show: false,
+            title: "SSL证书管理",
+            fields: [],
+            show_ssl: true,
         },
 
         ],

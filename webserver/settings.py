@@ -25,6 +25,8 @@ settings = {
     "login_url"     : "/login",
     "user_database" : 'sqlite:////data/books/calibre-webserver.db',
     "site_title"    : u"奇异书屋",
+    "ssl_crt_file"  : "/etc/nginx/ssl/ssl.crt",
+    "ssl_key_file"  : "/etc/nginx/ssl/ssl.key",
 
     "opds_will_display"        : ["*"],
     "opds_wont_display"        : [],

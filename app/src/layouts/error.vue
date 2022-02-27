@@ -22,7 +22,7 @@ export default {
     },
   },
   created() {
-    this.$store.commit("puremode", true);
+    //this.$store.commit("puremode", true);
   },
 
   data() {
@@ -32,8 +32,7 @@ export default {
     };
   },
   head() {
-    const title =
-      this.error.statusCode === 404 ? this.pageNotFound : this.otherError;
+    const title = this.error.statusCode === 404 ? this.pageNotFound : this.otherError;
     return {
       title,
     };
