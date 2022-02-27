@@ -64,21 +64,22 @@ export default ({ app }, inject) =>  {
                     }
                 })
                 .then( rsp => {
+                    const { route, redirect } = app.context;
                     if ( rsp.err == 'not_installed' ) {
-                        app.$router.push("/install").catch(()=>{});
-                        throw "redirect to install page";
+                        redirect("/install");
+                        //throw "redirect to install page";
                     } else if ( rsp.err == 'not_invited' ) {
-                        var next = app.$route.fullPath;
+                        var next = route.fullPath;
                         next = next ? "?next="+next : "";
-                        if ( app.$route.path != "/welcome" ) {
-                            app.$router.push("/welcome"+next).catch(()=>{});
+                        if ( route.path != "/welcome" ) {
+                            redirect("/welcome"+next);
                             throw "redirect to welcome page";
                         }
                     } else if ( rsp.err == 'user.need_login' ) {
-                        app.$router.push("/login").catch(()=>{});
+                        redirect("/login");
                         throw "redirect to login page";
                     } else if ( rsp.err == 'exception' ) {
-                        app.$store.commit("alert", {type:"error", msg: rsp.msg, to: null});
+                        app.store.commit("alert", {type:"error", msg: rsp.msg, to: null});
                         throw "server exception";
                     }
                     return rsp;

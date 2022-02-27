@@ -31,9 +31,6 @@
 
 <script>
 export default {
-    created() {
-        this.$store.commit("navbar", false);
-    },
     data: () => ({
         e1: 1,
         username: "admin",
@@ -54,6 +51,12 @@ export default {
         },
 
     }),
+    asyncData({ store }) {
+        store.commit("navbar", false);
+    },
+    created() {
+        this.$store.commit("navbar", false);
+    },
     methods: {
         check_install: function() {
             fetch("/api/index").then( rsp => {
@@ -109,7 +112,6 @@ export default {
             });
         },
     },
-
 }
 </script>
 

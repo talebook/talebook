@@ -29,7 +29,6 @@ export const mutations = {
     loaded(state) {
         state.loading = false;
     },
-    */
     puremode(state, pure) {
         if (pure) {
             state.nav = false;
@@ -37,6 +36,7 @@ export const mutations = {
             state.nav = true;
         }
     },
+    */
     navbar(state, nav) {
         state.nav = nav;
     },

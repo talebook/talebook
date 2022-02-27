@@ -3,15 +3,14 @@
 
 import datetime
 import hashlib
-import os
 import logging
+import os
 import re
-import shutil
-import subprocess
 import ssl
+import subprocess
 import tempfile
 import traceback
-
+import uuid
 from gettext import gettext as _
 
 import tornado
@@ -311,7 +310,11 @@ class AdminInstall(SettingHandler):
         args = loader.SettingsLoader()
         args.clear()
 
-        import uuid
+
+        # set options for China user
+        # TODO: maybe it should be provided as an install options
+        args['avatar_service'] = 'https://cravatar.cn'
+        args['BOOK_NAMES_FORMAT'] = 'utf8'
 
         # set a random secret
         args["cookie_secret"] = u"%s" % uuid.uuid1()
