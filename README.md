@@ -45,8 +45,8 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 `docker run -d --name talebook -p 8080:80 -v /localdata:/data talebook/talebook`
 
 ---
-
-手动安装请参考[安装文档](document/INSTALL.zh_CN.md)
+常见问题请参阅[使用指南](document/README.zh_CN.md)
+手动安装请参考[开发者指南](document/Development.zh_CN.md)
 
 
 **感谢 oldiy 制作第一版的Docker镜像，并编写了这么多教程！**
