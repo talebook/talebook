@@ -72,7 +72,7 @@ export default {
             var data = new FormData();
             data.append("ssl_crt", this.ssl_crt);
             data.append("ssl_key", this.ssl_key);
-            this.$backend("/sys/ssl", {
+            this.$backend("/admin/ssl", {
                 method: 'POST',
                 body: data,
             })

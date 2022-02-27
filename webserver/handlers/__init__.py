@@ -8,10 +8,10 @@ def routes():
     from . import meta
     from . import files
     from . import opds
-    from . import sys
+    from . import admin
 
     routes = []
-    routes += sys.routes()
+    routes += admin.routes()
     routes += opds.routes()
     routes += book.routes()
     routes += user.routes()
