@@ -33,7 +33,7 @@ export default {
     name: "ssl-manager",
     data: () => ({
         loading: false,
-        dialog: true,
+        dialog: false,
         ssl_crt: null,
         ssl_key: null,
     }),

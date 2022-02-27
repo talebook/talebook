@@ -95,7 +95,7 @@ export default {
         "ssl-manager": SSLManager,
     },
     async asyncData({ params, app }) {
-        return app.$backend("/book/nav").then(rsp => {
+        return app.$backend("/admin/settings").then(rsp => {
             var data = {
                 sns_items: rsp.sns,
                 settings: rsp.settings,
