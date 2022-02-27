@@ -383,7 +383,7 @@ class SSLHandlerLogic:
         return {"err": "ok"}
 
 
-class AdminUploadSSL(BaseHandler):
+class AdminSSL(BaseHandler):
     def get_upload_file(self):
         # for unittest mock
         ssl_crt = self.request.files["ssl_crt"][0]
@@ -408,7 +408,7 @@ class AdminUploadSSL(BaseHandler):
 
 def routes():
     return [
-        (r"/api/admin/ssl", AdminUploadSSL),
+        (r"/api/admin/ssl", AdminSSL),
         (r"/api/admin/users", AdminUsers),
         (r"/api/admin/install", AdminInstall),
         (r"/api/admin/settings", AdminSettings),
