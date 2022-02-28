@@ -310,6 +310,9 @@ class AdminInstall(SettingHandler):
         args = loader.SettingsLoader()
         args.clear()
 
+        # inherit the basic path from system's config
+        args['settings_path'] = CONF['settings_path']
+
 
         # set options for China user
         # TODO: maybe it should be provided as an install options
