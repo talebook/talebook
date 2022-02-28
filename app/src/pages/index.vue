@@ -78,7 +78,8 @@ export default {
             { icon: 'mdi-trending-up',    href:'/hot',       text: '热度榜单', },
             ]
     },
-    async asyncData({ app }) {
+    async asyncData({ app, res }) {
+        res.setHeader('Cache-Control', 'no-cache');
         return app.$backend("/index?random=12&recent=12");
     },
     data: () => ({

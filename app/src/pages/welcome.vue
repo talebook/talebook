@@ -35,7 +35,8 @@ export default {
         loading: false,
         invite_code: "",
     }),
-    async asyncData({ app }) {
+    async asyncData({ app, res }) {
+        res.setHeader('Cache-Control', 'no-cache');
         return app.$backend("/welcome");
     },
     created() {

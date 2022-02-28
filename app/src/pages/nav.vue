@@ -21,7 +21,8 @@ export default {
     data: () => ({
         navs: [],
     }),
-    async asyncData({ params, app }) {
+    async asyncData({ params, app, res }) {
+        res.setHeader('Cache-Control', 'no-cache');
         return app.$backend("/book/nav");
     },
     created() {
