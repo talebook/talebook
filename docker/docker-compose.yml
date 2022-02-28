@@ -8,7 +8,8 @@ services:
     volumes:
       - /data/demo:/data
     ports:
-      - "8006:80"
+      - "8080:80"
+      - "8443:443"
     depends_on:
       - douban-rs-api
 
