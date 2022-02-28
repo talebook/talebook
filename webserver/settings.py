@@ -10,6 +10,7 @@ settings = {
     "autoreload"    : True,
     "xsrf_cookies"  : False,
     "static_host"   : "",
+    "nuxt_env_path" : os.path.join(os.path.dirname(__file__), "../app/.env"),
     "html_path"     : os.path.join(os.path.dirname(__file__), "../app/dist"),
     "i18n_path"     : os.path.join(os.path.dirname(__file__), "i18n"),
     "static_path"   : os.path.join(os.path.dirname(__file__), "resources"),

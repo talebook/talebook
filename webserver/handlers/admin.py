@@ -146,16 +146,13 @@ class SettingHandler(BaseHandler):
         if args != CONF:
             CONF.update(args)
 
-        # update index.html
-        html = self.render_string("index.html", **CONF)
-        html.replace("Calibre Webserver", CONF["site_title"])
-        page = os.path.join(CONF["html_path"], "index.html")
+        # update nuxtjs .env file
         try:
-            with open(page, "w") as f:
-                f.write(html)
+            with open(CONF['nuxt_env_path'], "w") as f:
+                f.write('TITLE="%s"' % CONF["site_title"])
         except:
             logging.error(traceback.format_exc())
-            return {"err": "file.permission", "msg": _(u"更新index.html失败！请确保文件的权限为可写入！")}
+            return {"err": "file.permission", "msg": _(u"更新nuxtjs配置文件失败！请确保文件的权限为可写入！")}
 
         # don't update running environment for now
         args["installed"] = True

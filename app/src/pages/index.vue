@@ -84,7 +84,7 @@ export default {
     data: () => ({
         random_books: [],
         new_books: [],
-        title: '奇异书屋',
+        title: '',
         navs: [],
     })
 }
