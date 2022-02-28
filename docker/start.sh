@@ -20,5 +20,10 @@ if [ ! -d "/data/log" ]; then
   cp -rf /prebuilt/log /data/
 fi
 
+if [ ! -d "/data/books/ssl" ]; then
+  cp -rf /prebuilt/books/ssl /data/books/
+fi
+
 service nginx restart
+#cd /var/www/talebook/app/&& npm run start &
 /usr/bin/supervisord --nodaemon -c /etc/supervisor/supervisord.conf

@@ -10,6 +10,7 @@ settings = {
     "autoreload"    : True,
     "xsrf_cookies"  : False,
     "static_host"   : "",
+    "nuxt_env_path" : os.path.join(os.path.dirname(__file__), "../app/.env"),
     "html_path"     : os.path.join(os.path.dirname(__file__), "../app/dist"),
     "i18n_path"     : os.path.join(os.path.dirname(__file__), "i18n"),
     "static_path"   : os.path.join(os.path.dirname(__file__), "resources"),
@@ -25,6 +26,8 @@ settings = {
     "login_url"     : "/login",
     "user_database" : 'sqlite:////data/books/calibre-webserver.db',
     "site_title"    : u"奇异书屋",
+    "ssl_crt_file"  : "/data/books/ssl/ssl.crt",
+    "ssl_key_file"  : "/data/books/ssl/ssl.key",
 
     "opds_will_display"        : ["*"],
     "opds_wont_display"        : [],

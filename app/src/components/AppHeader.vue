@@ -1,6 +1,6 @@
 <template>
     <div >
-        <v-navigation-drawer app v-model="sidebar" width="240px" :clipped="$vuetify.breakpoint.lgAndUp" >
+        <v-navigation-drawer v-model="sidebar" app fixed width="240" :clipped="$vuetify.breakpoint.lgAndUp" >
             <v-list dense v-if="items.length > 0" >
                 <template v-for="(item, idx) in items">
                     <v-subheader v-if="item.heading" :key="idx" >{{ item.heading }}</v-subheader>
@@ -42,7 +42,7 @@
             </v-list>
         </v-navigation-drawer>
 
-        <v-app-bar class="px-0" color="blue" dense dark fixed app :clipped-left="$vuetify.breakpoint.lgAndUp" extension-height="64" >
+        <v-app-bar class="px-0" color="blue" dense dark app fixed clipped-left extension-height="64" >
             <template v-if="btn_search && $vuetify.breakpoint.xs" #extension>
                     <v-container fluid>
                 <v-form @submit.prevent="do_serach">
@@ -73,6 +73,7 @@
 
             <v-btn v-else icon class="d-flex d-sm-none" @click="btn_search = !btn_search"> <v-icon>search</v-icon> </v-btn>
 
+            <template v-if="err == 'ok'">
             <template v-if="user.is_login">
             <v-menu offset-y right :close-on-content-click="false" v-if="messages.length > 0">
                 <template v-slot:activator="{on}">
@@ -146,73 +147,87 @@
             <v-btn v-else class="px-xs-1" to="/login" color="indigo accent-4">
                 <v-icon class="d-none d-sm-flex">account_circle</v-icon> 请登录
             </v-btn>
-
+            </template>
         </v-app-bar>
+
     </div>
 </template>
 
 <script>
 export default {
-    computed: {
-    },
-    created() {
-        this.sidebar = this.$vuetify.breakpoint.lgAndUp;
-        this.backend('/user/messages')
-        .then(rsp => {
-            if ( rsp.err == 'ok' ) {
-                this.messages = rsp.messages;
+    data: () => ({
+        err: "",
+        sidebar: null,
+        right: null,
+        btn_search: false,
+        search: "",
+        user: {},
+        sys: {
+            books: 0,
+            tags: 0,
+            authors: 0,
+            publishers: 0,
+            series: 0,
+            users: 0,
+            active: 0,
+            version: "",
+            mtime: "",
+            title: "",
+            footer: "",
+            socials: [],
+            friends: [],
+            allow: {
+                register: true,
+                download: true,
+                push: true,
+                read: true
             }
-        });
-        this.backend('/user/info')
-        .then(rsp => {
-            this.$store.commit('login', rsp);
-            var sys = rsp.sys;
-            this.sys = rsp.sys;
-            this.user = rsp.user;
-            document.title = sys.title;
-            var nav_items = [
+        },
+        messages: [],
+    }),
+    computed: {
+        items: function() {
+            return [
                 { icon: 'home',         href:'/',       text: '首页',         },
                 { heading: '分类浏览' },
-                { icon:   'widgets',             href:'/nav',       text: '所有书籍', count: sys.books      },
-                { icon:   'mdi-home-group',      href:'/publisher', text: '出版社',   count: sys.publishers },
-                { icon:   'mdi-human-greeting',  href:'/author',    text: '作者',     count: sys.authors    },
-                { icon:   'mdi-tag-heart',       href:'/tag',       text: '标签',     count: sys.tags       },
+                { icon:   'widgets',             href:'/nav',       text: '所有书籍', count: this.sys.books      },
+                { icon:   'mdi-home-group',      href:'/publisher', text: '出版社',   count: this.sys.publishers },
+                { icon:   'mdi-human-greeting',  href:'/author',    text: '作者',     count: this.sys.authors    },
+                { icon:   'mdi-tag-heart',       href:'/tag',       text: '标签',     count: this.sys.tags       },
                 { target: "", links: [
-                { icon:   'mdi-library-shelves', href:'/series',    text: '丛书',     count: sys.series     },
+                { icon:   'mdi-library-shelves', href:'/series',    text: '丛书',     count: this.sys.series     },
                 { icon:   'mdi-star-half',       href:'/rating',    text: '评分',     },
                 { icon:   'mdi-trending-up',     href:'/hot',       text: '热度榜单', },
                 { icon:   'mdi-history',         href:'/recent',    text: '最近更新', },
                 ]}
-            ].concat(  ( sys.friends.length > 0 ) ? [
+            ].concat(  ( this.sys.friends.length > 0 ) ? [
                 { heading: '友情链接' },
-                { links: sys.friends, target: "_blank" },
+                { links: this.sys.friends, target: "_blank" },
             ] : [] ).concat([
                 { heading: '系统' },
-                { icon: 'mdi-history', text: '系统版本', href: "", count: sys.version },
-                { icon: 'mdi-human', text: '用户数', href: "", count: sys.users },
+                { icon: 'mdi-history', text: '系统版本', href: "", count: this.sys.version },
+                { icon: 'mdi-human', text: '用户数', href: "", count: this.sys.users },
                 { icon: 'mdi-cellphone', text: 'OPDS接口', href: "/opds/", count: "OPDS", target: "_blank"},
             ]);
-            this.items = nav_items;
-            this.loaded = true;
+        }
+    },
+    mounted() {
+        this.sidebar = this.$vuetify.breakpoint.lgAndUp;
+        this.$backend('/user/info').then(rsp => {
+            this.err = rsp.err;
+            this.sys = rsp.sys;
+            this.user = rsp.user;
+            if ( process.client ) {
+                document.title = rsp.sys.title;
+            }
+            this.$store.commit('login', rsp);
+        });
+        this.$backend('/user/messages').then(rsp => {
+            if ( rsp.err == 'ok' ) {
+                this.messages = rsp.messages;
+            }
         });
     },
-    data: () => ({
-        loaded: false,
-        user: {},
-        sidebar: false,
-        right: null,
-        items: [ ],
-        btn_search: false,
-        search: "",
-        sys: {
-            version: "v2.1.1",
-            update: "2019-06-09",
-            total: 10855,
-            active: 198,
-            title: 'talebook',
-        },
-        messages: [],
-    }),
     methods: {
         chunk: function(arr, len) {
             var e = arr.length;
@@ -238,7 +253,7 @@ export default {
             }
         },
         hidemsg: function(idx, msgid) {
-            this.backend("/user/messages", {
+            this.$backend("/user/messages", {
                 method: 'POST',
                 body: JSON.stringify({id: msgid}),
             })
@@ -251,15 +266,3 @@ export default {
     },
 }
 </script>
-
-<style scoped>
-
-.btn-home {
-    padding: 0;
-}
-
-.link-friend {
-    text-align: center;
-}
-
-</style>

@@ -584,8 +584,7 @@ class TestUserSignUp(TestWithUserLogin):
     def auth(self, s):
         return "Basic " + base64.encodebytes(s.encode("ascii")).decode("ascii")
 
-
-class TestAdmin(TestApp):
+class TestWithAdminUser(TestApp):
     @classmethod
     def setUpClass(self):
         self.user = _mock_user.start()
@@ -595,6 +594,8 @@ class TestAdmin(TestApp):
     def tearDownClass(self):
         _mock_user.stop()
 
+
+class TestAdmin(TestWithAdminUser):
     def test_admin_users(self):
         d = self.json("/api/admin/users")
         self.assertEqual(d["err"], "ok")

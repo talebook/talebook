@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sys
+import traceback
 
 
 class SettingsLoader(dict):
@@ -30,8 +31,6 @@ class SettingsLoader(dict):
 
             self.update(webserver.settings.settings)
         except:
-            import traceback
-
             logging.error(traceback.format_exc())
             pass
 
@@ -42,6 +41,7 @@ class SettingsLoader(dict):
 
             self.update(auto.settings)
         except:
+            logging.error(traceback.format_exc())
             pass
 
         try:
@@ -52,9 +52,7 @@ class SettingsLoader(dict):
             pass
 
     def dumpfile(self, filename="auto.py"):
-        s = "\n".join(
-            "%-30s: %s," % ("'" + k + "'", repr(v)) for k, v in sorted(self.items())
-        )
+        s = "\n".join("%-30s: %s," % ("'" + k + "'", repr(v)) for k, v in sorted(self.items()))
         code = (
             u"""#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-

@@ -1,6 +1,6 @@
 .PHONY: all build push test
 
-VER := $(shell git fetch --tags && git describe --tag | sed 's/-[^-]*$$//' | tr - . )
+VER := $(shell git describe --tag | sed 's/-[^-]*$$//' | tr - . )
 IMAGE := talebook/talebook:$(VER)
 REPO1 := talebook/talebook:latest
 REPO2 := talebook/calibre-webserver:latest
@@ -8,8 +8,8 @@ REPO2 := talebook/calibre-webserver:latest
 all: build
 
 build:
-	docker build --no-cache=false --build-arg GIT_VERSION=$(VER) \
-		-f Dockerfile.cn -t $(IMAGE) -t $(REPO1) -t $(REPO2) .
+	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
+		-f Dockerfile -t $(IMAGE) -t $(REPO1) -t $(REPO2) .
 
 push:
 	docker push $(IMAGE)
@@ -17,7 +17,7 @@ push:
 	docker push $(REPO2)
 
 docker-test:
-	docker build -t talebook/test --target test -f Dockerfile.cn .
+	docker build --build-arg BUILD_COUNTRY=CN -t talebook/test --target test -f Dockerfile .
 	docker run --rm --name talebook-docker-test talebook/test
 
 lint:

@@ -115,7 +115,7 @@ export default {
             if ( sortBy       != undefined ) { data.append('sort', sortBy)       }
             if ( sortDesc     != undefined ) { data.append('desc', sortDesc)     }
             if ( itemsPerPage != undefined ) { data.append('num',  itemsPerPage) }
-            this.backend('/admin/users?'+data.toString())
+            this.$backend('/admin/users?'+data.toString())
             .then(rsp => {
                 if ( rsp.err != 'ok' ) {
                     this.items = [];
@@ -132,13 +132,13 @@ export default {
         },
         setuser(uid, action) {
             action.id = uid;
-            this.backend("/admin/users", {
+            this.$backend("/admin/users", {
                 body: JSON.stringify(action),
                 method: "POST",
             })
             .then(rsp => {
                 if ( rsp.err != 'ok' ) {
-                    this.alert("error", rsp.msg );
+                    this.$alert("error", rsp.msg );
                 }
             });
         },
