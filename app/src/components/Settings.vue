@@ -94,22 +94,20 @@ export default {
     components: {
         "ssl-manager": SSLManager,
     },
-    async asyncData({ params, app }) {
-        return app.$backend("/admin/settings").then(rsp => {
-            var data = {
-                sns_items: rsp.sns,
-                settings: rsp.settings,
-                site_url: rsp.site_url,
-            }
+    created() {
+        this.$backend("/admin/settings").then(rsp => {
+            this.sns_items = rsp.sns;
+            this.settings = rsp.settings;
+            this.site_url = rsp.site_url;
+
             var m = {}
             rsp.sns.forEach(function(ele){
                 m[ele.value] = ele;
             });
-            data.settings.SOCIALS.forEach(function(ele){
+            this.settings.SOCIALS.forEach(function(ele){
                 ele.help = false;
                 ele.link = m[ele.value].link;
             })
-            return data;
         });
     },
     data: () => ({
