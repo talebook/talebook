@@ -23,27 +23,25 @@ RUN npm run build
 # 第二阶段，构建环境
 FROM talebook/calibre-docker as server
 
+# Set mirrors in china
+RUN sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list
+RUN pip config set global.index-url https://mirrors.tencent.com/pypi/simple/
+
 # install envsubst
-RUN cp /etc/apt/sources.list /tmp/ && \
-        sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list
 RUN apt-get update && apt-get install -y gettext
 
 # intall nodejs for nuxtjs server side render
 RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
 RUN apt-get install -y nodejs
 
-RUN mv /tmp/sources.list /etc/apt/sources.list
-
 # install python packages
 COPY ["requirements.txt", "/tmp/"]
-RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
-        -r /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt
 
 # ----------------------------------------
 # 测试阶段
 FROM server as test
-RUN pip install -i https://mirrors.tencent.com/pypi/simple/ \
-        flake8 pytest
+RUN pip install flake8 pytest
 COPY webserver/ /var/www/talebook/webserver/
 COPY tests/ /var/www/talebook/tests/
 CMD ["pytest", "/var/www/talebook/tests"]
@@ -61,11 +59,12 @@ RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /data/books/convert  && \
     mkdir -p /data/books/progress  && \
     mkdir -p /data/books/settings && \
+    mkdir -p /data/books/ssl && \
     mkdir -p /var/www/talebook/ && \
     chmod a+w -R /data/log /data/books /var/www
 
 COPY . /var/www/talebook/
-COPY conf/nginx/ssl.* /etc/nginx/
+COPY conf/nginx/ssl.* /data/books/ssl/
 COPY conf/nginx/talebook.conf /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/
 COPY --from=builder /app/dist/ /var/www/talebook/app/dist/
@@ -93,4 +92,3 @@ EXPOSE 80 443
 VOLUME ["/data"]
 
 CMD ["/var/www/talebook/docker/start.sh"]
-
