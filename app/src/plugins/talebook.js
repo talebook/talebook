@@ -67,17 +67,17 @@ export default ({ app }, inject) =>  {
                 .then( rsp => {
                     const { route, redirect } = app.context;
                     if ( rsp.err == 'not_installed' ) {
-                        redirect("/install");
+                        redirect(301, "/install");
                         //throw "redirect to install page";
                     } else if ( rsp.err == 'not_invited' ) {
                         var next = route.fullPath;
                         next = next ? "?next="+next : "";
                         if ( route.path != "/welcome" ) {
-                            redirect("/welcome"+next);
+                            redirect(301, "/welcome"+next);
                             throw "redirect to welcome page";
                         }
                     } else if ( rsp.err == 'user.need_login' ) {
-                        redirect("/login");
+                        redirect(301, "/login");
                         throw "redirect to login page";
                     } else if ( rsp.err == 'exception' ) {
                         app.store.commit("alert", {type:"error", msg: rsp.msg, to: null});
