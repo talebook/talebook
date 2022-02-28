@@ -39,7 +39,6 @@ export default {
         inited: false,
     }),
     async asyncData({ route, app,req }) {
-        console.log("async data with req", req)
         return app.$backend(route.fullPath);
     },
     created() {

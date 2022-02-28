@@ -33,7 +33,7 @@ export default ({ app }, inject) =>  {
                 Object.assign(args, options);
             }
             //console.trace();
-            console.log("request", full_url)
+            //console.log("request", full_url)
             return fetch(full_url, args)
                 .then( rsp => {
                     var msg = "";

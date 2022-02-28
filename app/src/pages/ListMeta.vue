@@ -28,10 +28,8 @@ export default {
         },
         meta_items: function() {
             var prefix = this.$route.path + "/";
-            console.log("prefix = ", prefix);
             return this.items.map(d => {
                 d.href = prefix + d.name;
-                console.log("href=", d.href);
                 return d;
             });
         },

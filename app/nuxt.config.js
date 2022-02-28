@@ -1,5 +1,4 @@
 export default {
-  loading: '~/components/Loading.vue',
   srcDir: 'src/',
   // Global page headers: https://go.nuxtjs.dev/config-head
   head: {

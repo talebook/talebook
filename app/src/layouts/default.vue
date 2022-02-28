@@ -44,7 +44,7 @@ export default {
     },
     data: () => ({
     }),
-    created() {
+    mounted() {
         this.$store.commit("loaded");
     },
 }
