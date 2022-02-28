@@ -16,7 +16,8 @@ export default ({ app }, inject) =>  {
             if ( process.server ) {
                 if ( app.context.req != undefined ) {
                     var headers = app.context.req.headers;
-                    server = `http://${headers.host}`;
+                    var scheme = headers["X-Scheme"] ?? "http";
+                    server = `${scheme}://${headers.host}`;
                     args.headers = {
                         "cookie": headers.cookie,
                         "X-Forwarded-For": headers["X-Forwarded-For"],
