@@ -1,6 +1,6 @@
 export const state = () => ({
     nav: true,
-    loading: false,
+    loading: true,
     count: 0,
     user: {
         is_admin: false,
@@ -22,13 +22,13 @@ export const state = () => ({
 })
 
 export const mutations = {
-    /*
     loading(state) {
         state.loading = true;
     },
     loaded(state) {
         state.loading = false;
     },
+    /*
     puremode(state, pure) {
         if (pure) {
             state.nav = false;

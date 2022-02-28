@@ -1,5 +1,6 @@
 <template>
     <v-app>
+        <loading />
         <app-header v-if="$store.state.nav" ></app-header>
         <v-main>
             <v-container fluid>
@@ -31,19 +32,20 @@
 <script>
 import AppHeader from "~/components/AppHeader.vue"
 import AppFooter from "~/components/AppFooter.vue"
+import Loading from "~/components/Loading.vue"
 import Upload from "~/components/Upload.vue"
 export default {
     name: 'DefaultLayout',
-    //name: 'App',
     components: {
         AppHeader,
         AppFooter,
+        Loading,
         Upload,
     },
-    data () {
-        return {
-            dialog_msg: false,
-        }
-    }
+    data: () => ({
+    }),
+    created() {
+        this.$store.commit("loaded");
+    },
 }
 </script>

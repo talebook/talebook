@@ -73,6 +73,7 @@
 
             <v-btn v-else icon class="d-flex d-sm-none" @click="btn_search = !btn_search"> <v-icon>search</v-icon> </v-btn>
 
+            <template v-if="err == 'ok'">
             <template v-if="user.is_login">
             <v-menu offset-y right :close-on-content-click="false" v-if="messages.length > 0">
                 <template v-slot:activator="{on}">
@@ -146,6 +147,7 @@
             <v-btn v-else class="px-xs-1" to="/login" color="indigo accent-4">
                 <v-icon class="d-none d-sm-flex">account_circle</v-icon> 请登录
             </v-btn>
+            </template>
         </v-app-bar>
 
     </div>
@@ -154,6 +156,7 @@
 <script>
 export default {
     data: () => ({
+        err: "",
         sidebar: null,
         right: null,
         btn_search: false,
@@ -211,12 +214,13 @@ export default {
     mounted() {
         this.sidebar = this.$vuetify.breakpoint.lgAndUp;
         this.$backend('/user/info').then(rsp => {
-            this.$store.commit('login', rsp);
+            this.err = rsp.err;
             this.sys = rsp.sys;
             this.user = rsp.user;
             if ( process.client ) {
                 document.title = rsp.sys.title;
             }
+            this.$store.commit('login', rsp);
         });
         this.$backend('/user/messages').then(rsp => {
             if ( rsp.err == 'ok' ) {
