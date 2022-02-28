@@ -44,7 +44,9 @@ export default {
         page_size: 20,
     }),
     async asyncData({ app, route, res }) {
-        res.setHeader('Cache-Control', 'no-cache');
+        if ( res !== undefined ) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
         return app.$backend(route.fullPath);
     },
     created() {

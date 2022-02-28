@@ -22,7 +22,9 @@ export default {
         navs: [],
     }),
     async asyncData({ params, app, res }) {
-        res.setHeader('Cache-Control', 'no-cache');
+        if ( res !== undefined ) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
         return app.$backend("/book/nav");
     },
     created() {

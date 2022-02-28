@@ -56,7 +56,9 @@ export default {
         },
     }),
     async asyncData({ params, app, res }) {
-        res.setHeader('Cache-Control', 'no-cache');
+        if ( res !== undefined ) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
         return app.$backend("/user/info?detail=1");
     },
     created() {

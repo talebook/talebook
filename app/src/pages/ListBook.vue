@@ -39,7 +39,9 @@ export default {
         inited: false,
     }),
     async asyncData({ route, app, res }) {
-        res.setHeader('Cache-Control', 'no-cache');
+        if ( res !== undefined ) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
         return app.$backend(route.fullPath);
     },
     created() {

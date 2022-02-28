@@ -79,7 +79,9 @@ export default {
             ]
     },
     async asyncData({ app, res }) {
-        res.setHeader('Cache-Control', 'no-cache');
+        if ( res !== undefined ) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
         return app.$backend("/index?random=12&recent=12");
     },
     data: () => ({

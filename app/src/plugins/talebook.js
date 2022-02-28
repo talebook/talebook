@@ -81,7 +81,9 @@ export default ({ app }, inject) =>  {
                         redirect(301, "/login");
                         throw "redirect to login page";
                     } else if ( rsp.err == 'exception' ) {
-                        res.setHeader('Cache-Control', 'no-cache');
+                        if ( res !== undefined ) {
+                            res.setHeader('Cache-Control', 'no-cache');
+                        }
                         app.store.commit("alert", {type:"error", msg: rsp.msg, to: null});
                         throw "server exception";
                     }

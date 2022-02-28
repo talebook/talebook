@@ -258,7 +258,9 @@ export default {
         refer_books: [],
     }),
     async asyncData({ params, app, res }) {
-        res.setHeader('Cache-Control', 'no-cache');
+        if ( res !== undefined ) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
         return app.$backend(`/book/${params.bookid}`);
     },
     created() {
