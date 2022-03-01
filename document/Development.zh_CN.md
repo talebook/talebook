@@ -77,7 +77,7 @@ services:
 首先，介绍下本程序的主要架构和依赖：
 ```
 talebook
-  - app/          # 前端Web代码：依赖 vuetifyjs -> vuejs -> nodejs
+  - app/          # 前端Web代码：依赖 nuxtjs + vuetifyjs -> vuejs -> nodejs
   - webserver/    # 后台服务代码：依赖 tornado -> calibre -> PyQt5
   - tests/        # 后台单元测试代码
   - conf/         # 外围程序的配置文件（nginx和supervisor）
