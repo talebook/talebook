@@ -60,6 +60,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
           push: ${{ github.event_name != 'pull_request' }}
+          cache-from: type=registry,ref=talebook/talebook:latest
+          cache-to: type=inline
           tags: |
             ${{ steps.meta.outputs.tags }}
             talebook/calibre-webserver:latest
