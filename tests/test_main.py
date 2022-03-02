@@ -58,6 +58,7 @@ def setup_server():
     main.CONF["html_path"] = "/tmp/"
     main.CONF["settings_path"] = "/tmp/"
     main.CONF["progress_path"] = "/tmp/"
+    main.CONF["nuxt_env_path"] = "/tmp/.env.text"
     main.CONF["installed"] = True
     main.CONF["INVITE_MODE"] = False
     main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
@@ -682,6 +683,10 @@ class TestOpds(TestWithUserLogin):
         rsp = self.fetch("/opds/search/%s" % urllib.parse.quote("韩寒"))
         self.assertEqual(rsp.code, 200)
         self.parse_xml(rsp.body)
+
+    def test_opds_search_not_found(self):
+        rsp = self.fetch("/opds/search/%s" % urllib.parse.quote("豪士"))
+        self.assertEqual(rsp.code, 404)
 
     def test_opds_without_login(self):
         main.CONF["INVITE_MODE"] = True
