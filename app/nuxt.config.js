@@ -2,7 +2,7 @@ export default {
   srcDir: 'src/',
   // Global page headers: https://go.nuxtjs.dev/config-head
   head: {
-    titleTemplate: "%s",
+    titleTemplate: process.env.TITLE_TEMPLATE || "%s | talebook",
     title: process.env.TITLE || 'talebook',
     htmlAttrs: {
       lang: 'en'
@@ -61,12 +61,12 @@ export default {
 
   googleAnalytics: {
     // Used as fallback if no runtime config is provided
-    id: 'UA-45286404-2',
+    id: 'G-LLF01B5ZZ8',
   },
 
   publicRuntimeConfig: {
     googleAnalytics: {
-      id: process.env.GOOGLE_ANALYTICS_ID || 'UA-45286404-2',
+      id: process.env.GOOGLE_ANALYTICS_ID || 'G-LLF01B5ZZ8',
     }
   },
 

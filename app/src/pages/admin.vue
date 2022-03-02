@@ -42,6 +42,9 @@ export default {
         show2: false,
         show3: false,
     }),
+    head: () => ({
+        title: "管理员",
+    }),
     methods: {
     },
   }

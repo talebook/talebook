@@ -217,9 +217,6 @@ export default {
             this.err = rsp.err;
             this.sys = rsp.sys;
             this.user = rsp.user;
-            if ( process.client ) {
-                document.title = rsp.sys.title;
-            }
             this.$store.commit('login', rsp);
         });
         this.$backend('/user/messages').then(rsp => {

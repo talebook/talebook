@@ -246,7 +246,7 @@ export default {
     data: () => ({
         err: "",
         msg: "",
-        book: {'id': 0, 'files': [], 'tags': [], 'pubdate': ''},
+        book: {'id': 0, title: '', 'files': [], 'tags': [], 'pubdate': ''},
         debug: false,
         mail_to: "",
         kindle_sender: "",
@@ -262,6 +262,11 @@ export default {
             res.setHeader('Cache-Control', 'no-cache');
         }
         return app.$backend(`/book/${params.bookid}`);
+    },
+    head() {
+        return {
+            title: this.book.title,
+        }
     },
     created() {
         this.init(this.$route);

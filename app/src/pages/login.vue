@@ -76,6 +76,9 @@ export default {
     asyncData({ store }) {
         store.commit("navbar", false);
     },
+    head: () => ({
+        title: "登录"
+    }),
     created() {
         this.$store.commit("navbar", false);
         this.$backend("/user/info").then((rsp) => {

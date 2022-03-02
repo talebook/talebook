@@ -21,6 +21,9 @@ export default {
     data: () => ({
         navs: [],
     }),
+    head: () => ({
+        title: "书籍索引"
+    }),
     async asyncData({ params, app, res }) {
         if ( res !== undefined ) {
             res.setHeader('Cache-Control', 'no-cache');

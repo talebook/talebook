@@ -137,6 +137,11 @@ export default {
         }
         return app.$backend("/book/"+params.bid);
     },
+    head() {
+        return {
+            title: "编辑 " + this.book.title,
+        }
+    },
     created() {
         //this.$store.commit('navbar', true);
         //this.init(this.$route);

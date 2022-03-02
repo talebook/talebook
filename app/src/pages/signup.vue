@@ -48,6 +48,9 @@ export default {
         },
 
     }),
+    head: () => ({
+        title: "注册",
+    }),
     methods: {
         valid: function(v) {
             if ( v.length < 8 ) {

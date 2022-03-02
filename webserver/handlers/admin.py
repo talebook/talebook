@@ -147,9 +147,14 @@ class SettingHandler(BaseHandler):
             CONF.update(args)
 
         # update nuxtjs .env file
+        nuxtjs_env = '''
+TITLE="%(site_title)s"
+TITLE_TEMPLATE="%%s | %(site_title)s"
+GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
+'''
         try:
             with open(CONF['nuxt_env_path'], "w") as f:
-                f.write('TITLE="%s"' % CONF["site_title"])
+                f.write(nuxtjs_env % CONF)
         except:
             logging.error(traceback.format_exc())
             return {"err": "file.permission", "msg": _(u"更新nuxtjs配置文件失败！请确保文件的权限为可写入！")}
@@ -234,6 +239,7 @@ class AdminSettings(SettingHandler):
             "xsrf_cookies",
             "settings_path",
             "avatar_service",
+            "google_analytics_id"
         ]
 
         args = loader.SettingsLoader()

@@ -87,8 +87,10 @@ export default {
     data: () => ({
         random_books: [],
         new_books: [],
-        title: '',
         navs: [],
+    }),
+    head: () => ({
+        titleTemplate: "%s",
     })
 }
 </script>

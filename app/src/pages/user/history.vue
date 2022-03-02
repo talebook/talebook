@@ -43,6 +43,9 @@ export default {
         }
         return app.$backend("/user/info?detail=1");
     },
+    head: () => ({
+        title: "阅读记录",
+    }),
     created() {
         this.init(this.$route);
     },

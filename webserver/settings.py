@@ -29,6 +29,9 @@ settings = {
     "ssl_crt_file"  : "/data/books/ssl/ssl.crt",
     "ssl_key_file"  : "/data/books/ssl/ssl.key",
 
+    # https://analytics.google.com/
+    "google_analytics_id" : "G-LLF01B5ZZ8",
+
     "opds_will_display"        : ["*"],
     "opds_wont_display"        : [],
     "opds_max_tags_shown"      : 10240,

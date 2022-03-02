@@ -44,6 +44,42 @@ export default {
         }
         return app.$backend(route.fullPath);
     },
+    head() {
+        switch(this.$route.path) {
+            case "/hot":
+                return {title: "热门书籍"};
+
+            case "/search":
+                return {title: "搜索"};
+
+            case "/recent": 
+                return {title: "近期更新"}; 
+
+            default:
+                break
+        }
+
+        if (this.$route.params.meta !== undefined) {
+            var name = decodeURIComponent(this.$route.params.name);
+            var titles = {
+                tag: `"${name}”标签的书籍`,
+                series: `${name}丛书`,
+                rating: `${name}星书籍`,
+                author: `${name}的著作`,
+                publisher: `${name}出版的书籍`,
+            }
+            var meta = this.$route.path.split("/")[1];
+            if ( titles[meta] !== undefined ) {
+                return {
+                    title: titles[meta]
+                }
+            }
+        }
+
+        return {
+            title: this.title,
+        }
+    },
     created() {
         if ( this.$route.query.start != undefined ) {
             this.page = 1 + parseInt(this.$route.query.start / this.page_size)
@@ -60,7 +96,6 @@ export default {
     beforeRouteUpdate(to, from, next) {
         this.init(to, next);
     },
-    
     methods: {
         init(route, next) {
             this.inited = true;

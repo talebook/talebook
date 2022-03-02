@@ -29,6 +29,9 @@ export default {
     },
     data: () => ({
     }),
+    head: () => ({
+        title: '激活成功',
+    }),
 }
 </script>
 

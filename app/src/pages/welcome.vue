@@ -41,6 +41,9 @@ export default {
         }
         return app.$backend("/welcome");
     },
+    head: () => ({
+        title: "私人图书馆"
+    }),
     created() {
         this.$store.commit('navbar', false);
         if ( this.err == 'free' ) {

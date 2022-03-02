@@ -29,6 +29,9 @@ export default {
     data: () => ({
         msg: "您已退出登录。",
     }),
+    head: () => ({
+        title: "已退出登录"
+    }),
     methods: {
         logout: function() {
             this.$backend('/user/sign_out')

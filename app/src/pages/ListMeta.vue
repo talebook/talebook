@@ -20,8 +20,6 @@
 
 <script>
 export default {
-    components: {
-    },
     computed: {
         page_cnt: function() {
             return Math.max(1, Math.ceil(this.total/this.page_size));
@@ -36,7 +34,6 @@ export default {
     },
     data: () => ({
         meta: "",
-        title: "",
         page: 0,
         items: [],
         total: 0,
@@ -48,6 +45,23 @@ export default {
             res.setHeader('Cache-Control', 'no-cache');
         }
         return app.$backend(route.fullPath);
+    },
+    head() {
+        var path = this.$route.path;
+        var titles = {
+            tag: "全部标签",
+            series: "全部丛书",
+            rating: "全部评分",
+            author: "全部作者",
+            publisher: "全部出版社",
+        }
+        var meta = this.$route.path.split("/")[1];
+        if ( titles[meta] !== undefined ) {
+            return {
+                title: titles[meta],
+            }
+        }
+        return {};
     },
     created() {
         //this.init(this.$route);
@@ -64,7 +78,6 @@ export default {
             this.meta = route.params.meta;
             this.$backend("/"+this.meta + (this.show_all?"?show=all":"") )
             .then(rsp => {
-                this.title = rsp.title;
                 this.items = rsp.items;
                 this.total = rsp.total;
             })
