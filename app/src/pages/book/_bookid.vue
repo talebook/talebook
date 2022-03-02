@@ -137,23 +137,23 @@
                             <br/>
                             <div class='tag-chips'>
                                 <template v-for="author in book.authors">
-                                <v-chip rounded small dark color="indigo" :to="'/author/'+author" :key="'author-'+author">
+                                <v-chip rounded small dark color="indigo" :to="'/author/'+encodeURIComponent(author)" :key="'author-'+author">
                                     <v-icon>face</v-icon>
                                     {{author}}
                                 </v-chip>
                                 </template>
-                                <v-chip rounded small dark color="indigo" :to="'/publisher/'+book.publisher" >
+                                <v-chip rounded small dark color="indigo" :to="'/publisher/'+encodeURIComponent(book.publisher)" >
                                     <v-icon>group</v-icon>
                                     出版：{{book.publisher}}
                                 </v-chip>
-                                <v-chip rounded small dark color="indigo" v-if="book.series" :to="'/series/'+book.series" >
+                                <v-chip rounded small dark color="indigo" v-if="book.series" :to="'/series/'+encodeURIComponent(book.series)" >
                                     <v-icon>explore</v-icon>丛书: {{book.series}}
                                 </v-chip>
                                 <v-chip rounded small dark color="grey" v-if="book.isbn" >
                                     <v-icon>explore</v-icon>ISBN：{{book.isbn}}
                                 </v-chip>
                                 <template v-for="tag in book.tags" >
-                                <v-chip rounded small dark color="grey" :key="'tag-'+tag" v-if="tag" :to="'/tag/'+tag" >
+                                <v-chip rounded small dark color="grey" :key="'tag-'+tag" v-if="tag" :to="'/tag/'+encodeURIComponent(tag)" >
                                     <v-icon>loyalty</v-icon> {{tag}}
                                 </v-chip>
                                 </template>

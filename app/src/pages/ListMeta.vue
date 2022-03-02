@@ -29,7 +29,7 @@ export default {
         meta_items: function() {
             var prefix = this.$route.path + "/";
             return this.items.map(d => {
-                d.href = prefix + d.name;
+                d.href = prefix + encodeURIComponent(d.name);
                 return d;
             });
         },
