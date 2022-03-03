@@ -26,6 +26,7 @@ define("path-plugins", default="/usr/lib/calibre/calibre/plugins", type=str, hel
 define("path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary programs."))
 define("with-library", default=CONF["with_library"], type=str, help=_("Path to the library folder"))
 define("syncdb", default=False, type=bool, help=_("Create all tables"))
+define("update-config", default=False, type=bool, help=_("update config when system upgrade"))
 
 
 def init_calibre():
@@ -129,6 +130,7 @@ def make_app():
     logging.info("Init AuthDB  with [%s]" % auth_db_path)
     logging.info("Init Static  with [%s]" % CONF["resource_path"])
     logging.info("Init HTML    with [%s]" % CONF["html_path"])
+    logging.info("Init Nuxtjs  with [%s]" % CONF["nuxt_env_path"])
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
 
@@ -160,6 +162,15 @@ def make_app():
     if options.syncdb:
         models.user_syncdb(engine)
         logging.info("Create tables into DB")
+        sys.exit(0)
+
+    if options.update_config:
+        logging.info("updating configs ...")
+        # 触发一次空白配置更新
+        from webserver.handlers.admin import SettingsSaverLogic
+        logic = SettingsSaverLogic()
+        logic.update_nuxtjs_env()
+        logging.info("done")
         sys.exit(0)
 
     path = CONF["resource_path"] + "/calibre/default_cover.jpg"

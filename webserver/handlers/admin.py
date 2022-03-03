@@ -141,20 +141,24 @@ class AdminOwnerMode(BaseHandler):
         self.redirect("/", 302)
 
 
-class SettingHandler(BaseHandler):
-    def save_extra_settings(self, args):
-        if args != CONF:
-            CONF.update(args)
-
+class SettingsSaverLogic():
+    def update_nuxtjs_env(self):
         # update nuxtjs .env file
         nuxtjs_env = '''
 TITLE="%(site_title)s"
 TITLE_TEMPLATE="%%s | %(site_title)s"
 GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
+
 '''
+        with open(CONF['nuxt_env_path'], "w") as f:
+            f.write(nuxtjs_env % CONF)
+
+    def save_extra_settings(self, args):
+        if args != CONF:
+            CONF.update(args)
+
         try:
-            with open(CONF['nuxt_env_path'], "w") as f:
-                f.write(nuxtjs_env % CONF)
+            self.update_nuxtjs_env()
         except:
             logging.error(traceback.format_exc())
             return {"err": "file.permission", "msg": _(u"更新nuxtjs配置文件失败！请确保文件的权限为可写入！")}
@@ -172,7 +176,7 @@ GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
         return {"err": "ok", "rsp": args}
 
 
-class AdminSettings(SettingHandler):
+class AdminSettings(BaseHandler):
     @js
     @auth
     def get(self):
@@ -252,10 +256,11 @@ class AdminSettings(SettingHandler):
             elif key in KEYS:
                 args[key] = val
 
-        return self.save_extra_settings(args)
+        logic = SettingsSaverLogic()
+        return logic.save_extra_settings(args)
 
 
-class AdminInstall(SettingHandler):
+class AdminInstall(BaseHandler):
     def should_be_invited(self):
         pass
 
@@ -330,7 +335,9 @@ class AdminInstall(SettingHandler):
             args["INVITE_CODE"] = code
         else:
             args["INVITE_MODE"] = False
-        return self.save_extra_settings(args)
+
+        logic = SettingsSaverLogic()
+        return logic.save_extra_settings(args)
 
 
 class SSLHandlerLogic:
