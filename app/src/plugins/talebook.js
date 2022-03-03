@@ -23,6 +23,7 @@ export default ({ app }, inject) =>  {
                         "cookie": headers.cookie,
                         "X-Forwarded-Host": headers.host,
                         "X-Forwarded-For": headers["x-forwarded-for"],
+                        "X-Forwarded-Proto": headers["x-forwarded-proto"],
                         "X-Scheme": headers["x-scheme"],
                     }
                 }
