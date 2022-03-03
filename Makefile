@@ -1,6 +1,6 @@
 .PHONY: all build push test
 
-VER := $(shell git describe --tag | sed 's/-[^-]*$$//' | tr - . )
+VER := $(shell git branch --show-current)
 IMAGE := talebook/talebook:$(VER)
 REPO1 := talebook/talebook:latest
 REPO2 := talebook/calibre-webserver:latest
