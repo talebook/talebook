@@ -2,8 +2,8 @@ export default {
   srcDir: 'src/',
   // Global page headers: https://go.nuxtjs.dev/config-head
   head: {
-    titleTemplate: process.env.TITLE_TEMPLATE || "%s | talebook",
-    title: process.env.TITLE || 'talebook',
+    title: "talebook",
+    titleTemplate: "%s | talebook",
     htmlAttrs: {
       lang: 'en'
     },
@@ -14,8 +14,12 @@ export default {
       { name: 'apple-mobile-web-app-status-bar-style', content: 'black' },
       //{ name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui' },
-      { hid: 'description', name: 'description', content: '这是个安静读书的地方。在线阅读Epub/Mobi/Pdf/Azw3等格式的电子书，也支持下载或推送到Kindle设备里。' },
       { name: 'keywords', content: '在线阅读 电子书 下载 推送 kindle epub mobi' },
+      {
+        hid: 'description',
+        name: 'description',
+        content: '这是个安静读书的地方。在线阅读Epub/Mobi/Pdf/Azw3等格式的电子书，也支持下载或推送到Kindle设备里',
+      },
     ],
     link: [
       { rel: 'shortcut icon', type: 'image/x-icon', href: '/favicon.ico' }
@@ -65,8 +69,12 @@ export default {
   },
 
   publicRuntimeConfig: {
+    head: {
+        title: process.env.TITLE || "talebook",
+        titleTemplate: process.env.TITLE_TEMPLATE || " %s | talebook",
+      },
     googleAnalytics: {
-      id: process.env.GOOGLE_ANALYTICS_ID || 'G-LLF01B5ZZ8',
+      id: process.env.GOOGLE_ANALYTICS_ID,
     }
   },
 
