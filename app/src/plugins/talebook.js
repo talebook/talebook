@@ -16,12 +16,12 @@ export default ({ app }, inject) =>  {
             if ( process.server ) {
                 if ( app.context.req != undefined ) {
                     var headers = app.context.req.headers;
-                    var scheme = headers["X-Scheme"] ?? "http";
+                    var scheme = headers["x-scheme"] ?? "http";
                     server = `${scheme}://${headers.host}`;
                     args.headers = {
                         "cookie": headers.cookie,
-                        "X-Forwarded-For": headers["X-Forwarded-For"],
-                        "X-Scheme": headers["X-Scheme"],
+                        "X-Forwarded-For": headers["x-forwarded-for"],
+                        "X-Scheme": headers["x-scheme"],
                     }
                 }
             } else {
