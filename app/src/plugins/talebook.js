@@ -15,11 +15,13 @@ export default ({ app }, inject) =>  {
             var server = "";
             if ( process.server ) {
                 if ( app.context.req != undefined ) {
+                    // 某些NAS用户会在外面套一层反向代理，docker内无法访问该URL
+                    // 强制服务器地址为本机；通过 XFH 传递实际访问的域名
+                    server = app.context.$config.api_url;
                     var headers = app.context.req.headers;
-                    var scheme = headers["x-scheme"] ?? "http";
-                    server = `${scheme}://${headers.host}`;
                     args.headers = {
                         "cookie": headers.cookie,
+                        "X-Forwarded-Host": headers.host,
                         "X-Forwarded-For": headers["x-forwarded-for"],
                         "X-Scheme": headers["x-scheme"],
                     }

@@ -139,7 +139,17 @@ class BaseHandler(web.RequestHandler):
             self.set_status(200)
             raise web.Finish()
 
+    def set_hosts(self):
+        host = self.request.headers.get("X-Forwarded-Host", self.request.host)
+        cdn_host = CONF["static_host"] or host
+        # cdn_url is for images and files which can be cached
+        self.cdn_url = self.request.protocol + "://" + cdn_host
+        # base_url is for api which is dynamic
+        self.base_url = self.request.protocol + "://" + host
+
+
     def prepare(self):
+        self.set_hosts()
         self.set_i18n()
         self.process_auth_header()
         self.should_be_installed()
@@ -164,16 +174,7 @@ class BaseHandler(web.RequestHandler):
         self.build_time = self.settings["build_time"]
         self.default_cover = self.settings["default_cover"]
         self.admin_user = None
-        self.static_host = CONF.get("static_host", "")
         self.cookies_cache = {}
-        if self.static_host:
-            self.static_host = self.request.protocol + "://" + self.static_host
-
-        host = CONF.get("static_host", "")
-        if not host:
-            host = self.request.host
-        self.cdn_url = self.request.protocol + "://" + host
-        self.base_url = self.request.protocol + "://" + self.request.host
 
     def on_finish(self):
         ScopedSession = self.settings["ScopedSession"]
@@ -349,7 +350,7 @@ class BaseHandler(web.RequestHandler):
             "count_hot_users": self.session.query(sql_func.count(Reader.id))
             .filter(Reader.access_time > last_week)
             .scalar(),
-            "IMG": self.static_host,
+            "IMG": self.cdn_url,
             "SITE_TITLE": CONF["site_title"],
         }
         vals = dict(*args, **kwargs)
@@ -459,13 +460,6 @@ class BaseHandler(web.RequestHandler):
 
     def get_path_progress(self, book_id):
         return os.path.join(CONF["progress_path"], "progress-%s.log" % book_id)
-
-    def get_save_referer(self, default="/"):
-        referer = self.request.headers.get("referer", default)
-        parts = urlparse(referer)
-        if parts.netloc != self.request.host:
-            return default
-        return referer
 
     def create_mail(self, sender, to, subject, body, attachment_data, attachment_name):
         from email.header import Header

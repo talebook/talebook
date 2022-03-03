@@ -99,9 +99,8 @@ class SignUp(BaseHandler):
         return self.redirect("/active/success")
 
     def send_active_email(self, user):
-        site = self.request.protocol + "://" + self.request.host
         code = user.get_active_code()
-        link = "%s/api/active/%s/%s" % (site, user.username, code)
+        link = "%s/api/active/%s/%s" % (self.base_url, user.username, code)
         args = {
             "site_title": CONF["site_title"],
             "username": user.username,
@@ -346,7 +345,7 @@ class UserInfo(BaseHandler):
                         for b in v:
                             if b["id"] not in show:
                                 continue
-                            b["img"] = self.static_host + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
+                            b["img"] = self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
                             b["href"] = "/book/%(id)s" % b
                             n.append(b)
                         v = n[:12]
@@ -363,7 +362,7 @@ class UserInfo(BaseHandler):
         detail = self.get_argument("detail", "")
         rsp = {
             "err": "ok",
-            "cdn": self.static_host,
+            "cdn": self.cdn_url,
             "sys": self.get_sys_info() if not detail else {},
             "user": self.get_user_info(detail),
         }

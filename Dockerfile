@@ -89,6 +89,7 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     chmod a+w app/dist/index.html && \
     calibredb add --library-path=/data/books/library/ -r docker/book/ && \
     python3 server.py --syncdb  && \
+    python3 server.py --update-config  && \
     rm -f webserver/*.pyc && \
     mkdir -p /prebuilt/ && \
     mv /data/* /prebuilt/ && \
