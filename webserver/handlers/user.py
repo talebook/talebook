@@ -4,7 +4,6 @@
 import datetime
 import hashlib
 import logging
-import os
 import re
 from gettext import gettext as _
 
@@ -100,7 +99,7 @@ class SignUp(BaseHandler):
 
     def send_active_email(self, user):
         code = user.get_active_code()
-        link = "%s/api/active/%s/%s" % (self.base_url, user.username, code)
+        link = "%s/api/active/%s/%s" % (self.site_url, user.username, code)
         args = {
             "site_title": CONF["site_title"],
             "username": user.username,

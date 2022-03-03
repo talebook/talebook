@@ -80,8 +80,6 @@ class Index(BaseHandler):
         if not comments:
             comments = _(u"点击浏览详情")
 
-        cdn = self.cdn_url
-        base = self.base_url
         return {
             "id": b["id"],
             "title": b["title"],
@@ -90,11 +88,9 @@ class Index(BaseHandler):
             "authors": b["authors"],
             "publisher": pub,
             "comments": comments,
-            "img": cdn + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
-            # "cover_large_url": cdn+"/get/thumb_600_840/%(id)s.jpg?t=%(timestamp)s" % b,
-            # "cover_url":       cdn+"/get/thumb_155_220/%(id)s.jpg?t=%(timestamp)s" % b,
-            "author_url": base + "/author/" + author_sort,
-            "publisher_url": base + "/publisher/" + pub,
+            "img": self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
+            "author_url": self.api_url + "/author/" + author_sort,
+            "publisher_url": self.api_url + "/publisher/" + pub,
         }
 
     @js
@@ -157,7 +153,7 @@ class BookDetail(BaseHandler):
                 {
                     "format": fmt,
                     "size": filesize,
-                    "href": self.base_url + "/api/book/%s.%s" % (book_id, fmt),
+                    "href": self.cdn_url + "/api/book/%s.%s" % (book_id, fmt),
                 }
             )
 
@@ -709,7 +705,7 @@ class BookPush(BaseHandler):
 
         mail_args = {
             "title": title,
-            "site_url": self.base_url,
+            "site_url": self.site_url,
             "site_title": CONF["site_title"],
         }
         mail_from = self.settings["smtp_username"]

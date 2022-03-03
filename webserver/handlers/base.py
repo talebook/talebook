@@ -10,7 +10,6 @@ import os
 import time
 from collections import defaultdict
 from gettext import gettext as _
-from urllib.parse import urlparse
 
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import func as sql_func
@@ -140,13 +139,18 @@ class BaseHandler(web.RequestHandler):
             raise web.Finish()
 
     def set_hosts(self):
+        # site_url为完整路径，用于发邮件等
         host = self.request.headers.get("X-Forwarded-Host", self.request.host)
-        cdn_host = CONF["static_host"] or host
-        # cdn_url is for images and files which can be cached
-        self.cdn_url = self.request.protocol + "://" + cdn_host
-        # base_url is for api which is dynamic
-        self.base_url = self.request.protocol + "://" + host
+        self.site_url = self.request.protocol + "://" + host
 
+        # 默认情况下，访问站内资源全部采用相对路径
+        self.api_url = ""   # API动态请求地址
+        self.cdn_url = ""   # 可缓存的资源，图片，文件
+
+        # 如果设置有static_host配置，则改为绝对路径
+        if CONF["static_host"]:
+            self.api_url = self.request.protocol + "://" + host
+            self.cdn_url = self.request.protocol + "://" + CONF["static_host"]
 
     def prepare(self):
         self.set_hosts()
@@ -612,6 +616,6 @@ class ListHandler(BaseHandler):
             "language": get("language", None),
             "isbn": get("isbn", None),
             "img": self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
-            "author_url": self.base_url + "/author/" + author_sort,
-            "publisher_url": self.base_url + "/publisher/" + pub,
+            "author_url": self.api_url + "/author/" + author_sort,
+            "publisher_url": self.api_url + "/publisher/" + pub,
         }
