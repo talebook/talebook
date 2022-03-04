@@ -48,6 +48,7 @@ settings = {
     "SOCIAL_AUTH_AUTHENTICATION_BACKENDS" : (
         'social_core.backends.qq.QQOAuth2',
         'social_core.backends.weibo.WeiboOAuth2',
+        'social_core.backends.amazon.AmazonOAuth2',
         'social_core.backends.github.GithubOAuth2',
     ),
 
@@ -87,11 +88,11 @@ settings = {
 
     'FRIENDS': [
         { "text": u"芒果读书", "href": "http://diumx.com/" },
-        { "text": u"文渊阁",   "href": "https://wenyuange.org/" },
-        { "text": u"苦瓜书盘", "href": "https://www.kgbook.com" },
-        { "text": u"夜读客", "href": "http://www.yeduk.com/" },
-        { "text": u"万千合集", "href": "http://www.hejizhan.com/" },
         { "text": u"鸠摩搜索", "href": "https://www.jiumodiary.com/" },
+        { "text": u"文渊阁",   "href": "https://wenyuange.org/" },
+        { "text": u"阅读链",   "href": "https://www.yuedu.pro/" },
+        { "text": u"苦瓜书盘", "href": "https://www.kgbook.com" },
+        { "text": u"三秋书屋", "href": "https://www.sanqiu.cc/" },        
     ],
     'SOCIALS': [
     ],
