@@ -75,7 +75,7 @@ export default {
     methods: {
         init(route, next) {
             this.$store.commit('navbar', true);
-            this.meta = route.params.meta;
+            this.meta = this.$route.path.split("/")[1];
             this.$backend("/"+this.meta + (this.show_all?"?show=all":"") )
             .then(rsp => {
                 this.items = rsp.items;
