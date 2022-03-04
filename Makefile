@@ -5,7 +5,7 @@ IMAGE := talebook/talebook:$(VER)
 REPO1 := talebook/talebook:latest
 REPO2 := talebook/calibre-webserver:latest
 
-all: build
+all: build update
 
 build:
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
@@ -35,3 +35,5 @@ testvv: testv
 	coverage html -d ".htmlcov" --include "*talebook*"
 	cd ".htmlcov" && python3 -m http.server 7777
 
+update:
+	docker-compose -f docker/docker-compose.yml up -d
