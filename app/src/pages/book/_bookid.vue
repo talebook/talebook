@@ -6,7 +6,16 @@
                     <v-card-title class="">推送到Kindle</v-card-title>
                     <v-card-text>
                         <p>填写Kindle收件人邮箱地址：</p>
-                        <v-text-field v-model="mail_to" label="Email*" required></v-text-field>
+                        <v-combobox
+                            :items="email_items"
+                            :rules="[check_email]"
+                            outlined
+                            dense
+                            v-model="mail_to"
+                            label="Email*"
+                            auto-select-first
+                            required
+                        ></v-combobox>
                         <small>* 请先将本站邮箱加入到Kindle发件人中:<br />{{ kindle_sender }}</small>
                     </v-card-text>
                     <v-card-actions>
@@ -268,6 +277,15 @@ export default {
         tiny: function () {
             return this.$vuetify.breakpoint.xsOnly;
         },
+        email_items: function() {
+            var emails = [this.$store.state.user.kindle_email];
+            if (process.client) {
+                emails.push(this.$cookies.get("last_mailto"));
+            }
+            return emails.filter((value, index, self) => {
+                return value != "" && value !== undefined && value !== null && self.indexOf(value) === index;
+            });
+        },
     },
     data: () => ({
         err: "",
@@ -282,6 +300,10 @@ export default {
         dialog_msg: false,
         refer_books_loading: false,
         refer_books: [],
+        email_rules: function (email) {
+            var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+            return (email != this.kindle_sender && re.test(email)) || "Invalid email format";
+        },
     }),
     async asyncData({ params, app, res }) {
         if (res !== undefined) {
@@ -296,9 +318,9 @@ export default {
     },
     created() {
         this.init(this.$route);
-        this.mail_to = "";
+        this.mail_to = this.$store.state.user.kindle_email;
         if (process.client) {
-            this.mail_to = this.$cookies.get("kindle_mail");
+            this.mail_to = this.$cookies.get("last_mailto");
         }
     },
     beforeRouteUpdate(to, from, next) {
@@ -315,7 +337,7 @@ export default {
         },
         sendto_kindle() {
             if (process.client) {
-                this.$cookies.set("kindle_mail", this.mail_to);
+                this.$cookies.set("last_mailto", this.mail_to);
             }
             this.$backend("/book/" + this.book.id + "/push", {
                 method: "POST",
@@ -375,6 +397,13 @@ export default {
                     this.$alert("error", rsp.msg);
                 }
             });
+        },
+        check_email(email) {
+            if (email == this.kindle_sender) {
+                return "发件邮件不可作为收件人";
+            }
+            var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+            return re.test(email) || "Email格式错误";
         },
     },
 };
