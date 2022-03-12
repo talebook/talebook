@@ -288,10 +288,6 @@ export default {
             if ( next ) next();
         },
         sendto_kindle() {
-            if ( ! this.$store.state.user.is_login ) {
-                this.$router.push("/login");
-                return;
-            }
             if ( process.client ) {
                 this.$cookies.set("kindle_mail", this.mail_to);
             }
