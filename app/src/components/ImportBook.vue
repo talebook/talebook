@@ -1,28 +1,29 @@
 <template>
     <v-card>
-        <v-card-text> 简单的说明文字 </v-card-text>
+        <v-card-text> 请将需要导入的书籍放入uploads目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt</v-card-text>
         <v-card-actions>
             <v-btn color="primary" @click="scan_books"><v-icon>mdi-file-find</v-icon>扫描书籍</v-btn>
-            <v-btn outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新表格</v-btn>
-            <v-btn v-if="selected.length > 0" outlined color="primary" @click="import_books"><v-icon>mdi-tag</v-icon>导入书籍 </v-btn>
-            <v-btn v-if="selected.length > 0" outlined color="primary" @click="mark_as('ignore')"
-                ><v-icon>mdi-tag</v-icon>全部标记为「忽略」</v-btn
-            >
-            <v-btn v-if="selected.length > 0" outlined color="primary" @click="mark_as('done')"
-                ><v-icon>mdi-tag</v-icon>全部标记为「已完成」</v-btn
-            >
+            <v-btn outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
+            <template v-if="selected.length > 0">
+                <v-btn outlined color="primary" @click="import_books"><v-icon>mdi-import</v-icon>导入书籍 </v-btn>
+                <!--
+                <v-btn outlined color="primary" @click="mark_as('ignore')"><v-icon>mdi-tag</v-icon>全部标记为「忽略」</v-btn>
+                <v-btn outlined color="primary" @click="mark_as('done')"><v-icon>mdi-tag</v-icon>全部标记为「已完成」</v-btn>
+                -->
+            </template>
             <v-spacer></v-spacer>
             <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line hide-details></v-text-field>
         </v-card-actions>
-        <v-card-text>
-            <v-progress-linear color="amber" value="15"></v-progress-linear>
+        <v-card-text v-if="false"   >
+            <v-progress-linear color="amber" value="20"></v-progress-linear>
         </v-card-text>
         <v-card-text>
             <div v-if="selected.length == 0">请勾选需要处理的书籍</div>
             <div v-else>共选择了{{ selected.length }}个</div>
         </v-card-text>
         <v-data-table
-            class="elevation-1"
+            dense
+            class="elevation-1 text-body-2"
             show-select
             v-model="selected"
             item-key="hash"
@@ -34,10 +35,20 @@
             :loading="loading"
             :page.sync="page"
             :items-per-page="100"
+            :options="{ sortDesc: true }"
             :footer-props="{ 'items-per-page-options': [10, 50, 100] }"
         >
-            <template v-slot:item.login_ip="{ item }">
-                {{ item.extra.login_ip }}
+            <template v-slot:item.status="{ item }">
+                <v-chip small v-if="item.status == 'ready'" class="success">可导入</v-chip>
+                <v-chip small v-else-if="item.status == 'exist'" class="lighten-4">已存在</v-chip>
+                <v-chip small v-else-if="item.status == 'imported'" class="primary">导入成功</v-chip>
+                <v-chip small v-else-if="item.status == 'new'" class="grey">待扫描</v-chip>
+                <v-chip small v-else class="info">{{ item.status }}</v-chip>
+            </template>
+            <template v-slot:item.title="{ item }">
+                书名：<span v-if="item.book_id == 0"> {{ item.title }} </span>
+                <a v-else target="_blank" :href="`/book/${item.book_id}`">{{ item.title }}</a> <br />
+                作者：{{ item.author }}
             </template>
             <template v-slot:item.detail="{ item }">
                 <span v-if="item.extra.visit_history"> 访问{{ item.extra.visit_history.length }}本 </span>
@@ -83,23 +94,14 @@ export default {
         loading: true,
         options: {},
         headers: [
-            { text: "路径", sortable: true, value: "path" },
-            { text: "文件哈希值", sortable: true, value: "hash" },
-            { text: "书名", sortable: false, value: "title" },
-            { text: "作者", sortable: true, value: "author" },
-            { text: "出版社", sortable: false, value: "publisher" },
-            { text: "标签", sortable: true, value: "tags" },
+            { text: "ID", sortable: true, value: "id" },
             { text: "状态", sortable: true, value: "status" },
-            { text: "时间", sortable: true, value: "update_time" },
-            { text: "书库链接", sortable: false, value: "book_id" },
+            { text: "路径", sortable: true, value: "path" },
+            { text: "扫描信息", sortable: false, value: "title" },
+            { text: "时间", sortable: true, value: "create_time", width: "200px" },
             { text: "操作", sortable: false, value: "actions" },
         ],
-        scan: {
-            done: 0,
-            total: 0,
-            status: "finish",
-        },
-        import: {
+        progress: {
             done: 0,
             total: 0,
             status: "finish",
@@ -154,30 +156,6 @@ export default {
                     this.loading = false;
                 });
         },
-        check_scan_status() {
-            this.$backend("/admin/scan/status").then((rsp) => {
-                if (rsp.err != "ok") {
-                    this.$alert("error", rsp.msg);
-                    return;
-                }
-                this.scan = rsp.status;
-                if (this.scan.new > 0) {
-                    setTimeout(this.check_scan_status, 1000);
-                }
-            });
-        },
-        check_import_status() {
-            this.$backend("/admin/import/status").then((rsp) => {
-                if (rsp.err != "ok") {
-                    this.$alert("error", rsp.msg);
-                    return;
-                }
-                this.import = rsp.status;
-                if (this.scan.ready > 0) {
-                    setTimeout(this.check_import_status, 1000);
-                }
-            });
-        },
         loop_check_status(url, callback) {
             this.$backend(url).then((rsp) => {
                 if (rsp.err != "ok") {
@@ -186,45 +164,50 @@ export default {
                 }
                 if (callback(rsp)) {
                     setTimeout(() => {
-                        this.check_import_status(url, callback);
+                        this.loop_check_status(url, callback);
                     }, 1000);
+                } else {
+                    this.getDataFromApi();
+                    this.$alert("info", "处理完毕！");
                 }
             });
         },
         scan_books() {
-            alert("scan books");
-            var path = "/data/upload";
-            var path = "/data/download/mlook";
+            var path = "/data/books/upload";
             this.$backend("/admin/scan/run", {
                 method: "POST",
                 body: JSON.stringify({ path: path }),
             }).then((rsp) => {
                 if (rsp.err != "ok") {
                     this.$alert("error", rsp.msg);
-                    return
+                    return;
                 }
 
                 //this.check_scan_status();
-                this.loop_check_status("/admin/scan/status", (rsp)=>{
+                this.loop_check_status("/admin/scan/status", (rsp) => {
                     this.scan = rsp.status;
                     return this.scan.new > 0;
-                })
+                });
             });
         },
         import_books() {
-            alert("import books");
+            console.log(this.selected);
             this.$backend("/admin/import/run", {
                 method: "POST",
-                body: JSON.stringify({ hashlist: this.selected }),
+                body: JSON.stringify({
+                    hashlist: this.selected.map((v) => {
+                        return v.hash;
+                    }),
+                }),
             }).then((rsp) => {
                 if (rsp.err != "ok") {
                     this.$alert("error", rsp.msg);
                 }
                 //this.check_import_status();
-                this.loop_check_status("/admin/import/status", (rsp)=>{
+                this.loop_check_status("/admin/import/status", (rsp) => {
                     this.import = rsp.status;
                     return this.import.ready > 0;
-                })
+                });
             });
         },
         mark_as(status) {

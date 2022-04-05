@@ -15,6 +15,7 @@ import time
 import traceback
 import uuid
 from gettext import gettext as _
+import traceback
 
 import tornado
 from webserver import loader
@@ -35,11 +36,12 @@ class Scanner:
 
     def allow_backgrounds(self):
         """for unittest control"""
-        return True
+        return False
 
     def resume_last_scan(self):
         # TODO
         return False
+
 
     def save_or_rollback(self, row):
         try:
@@ -49,6 +51,7 @@ class Scanner:
             logging.error("update: status=%-5s, path=%s %s", row.status, row.path, bid if row.book_id > 0 else "")
             return True
         except Exception as err:
+            logging.error(traceback.format_exc())
             self.session.rollback()
             logging.warn("save error: %s", err)
             return False
@@ -74,7 +77,7 @@ class Scanner:
         if not self.allow_backgrounds():
             self.do_scan(tasks)
         else:
-            t = threading.Thread(name="do_scan", target=self.do_scan, args=(tasks))
+            t = threading.Thread(name="do_scan", target=self.do_scan, args=(tasks, ))
             t.setDaemon(True)
             t.start()
         return len(tasks)
@@ -152,28 +155,35 @@ class Scanner:
         # TODO
         return False
 
+    def build_query(self, hashlist):
+        query = self.session.query(ScanFile).filter(ScanFile.status == ScanFile.READY) #.filter(ScanFile.import_id == 0)
+        if isinstance(hashlist, (list, tuple)):
+            query = query.filter(ScanFile.hash.in_(hashlist))
+        elif isinstance(hashlist, str):
+            query = query.filter(ScanFile.hash == hashlist)
+        return query
+
     def run_import(self, hashlist):
         if self.resume_last_import():
             return 1
 
-        query = self.session.query(ScanFile).filter(ScanFile.status == ScanFile.READY) #.filter(ScanFile.import_id == 0)
-        if hashlist:
-            query = query.filter(ScanFile.hash.in_(hashlist))
-        total = query.count()
+        total = self.build_query(hashlist).count()
 
         if not self.allow_backgrounds():
-            self.do_import(query)
+            self.do_import(hashlist)
         else:
-            t = threading.Thread(name="do_import", target=self.do_import, args=(query))
+            t = threading.Thread(name="do_import", target=self.do_import, args=(hashlist, ))
             t.setDaemon(True)
             t.start()
         return total
 
-    def do_import(self, query):
+    def do_import(self, hashlist):
         from calibre.ebooks.metadata.meta import get_metadata
 
         # 生成任务ID
         import_id = int(time.time())
+
+        query = self.build_query(hashlist)
         query.update({ScanFile.import_id: import_id})
         self.session.commit()
 
@@ -275,6 +285,7 @@ class ScanList(BaseHandler):
                 "publisher": s.publisher,
                 "tags": s.tags,
                 "status": s.status,
+                "book_id": s.book_id,
                 "create_time": s.create_time.strftime("%Y-%m-%d %H:%M:%S") if s.create_time else "N/A",
                 "update_time": s.update_time.strftime("%Y-%m-%d %H:%M:%S") if s.update_time else "N/A",
             }

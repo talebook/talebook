@@ -22,21 +22,31 @@ class TestScan(TestWithUserLogin):
         d = self.json("/api/admin/scan/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
 
+    def test_scan_background(self):
+        req = {"path": testdir + "/cases/"}
+        d = self.json("/api/admin/scan/run", method="POST", body=json.dumps(req))
+        self.assertEqual(d["err"], "ok")
+
+
     @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
     def test_import(self, m1):
+        m1.return_value = False
+        hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
+        req = {"hashlist": [hash]}
+        d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
+        self.assertEqual(d["err"], "ok")
+
+    @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
+    def test_import_all(self, m1):
         m1.return_value = False
         req = {"hashlist": "all"}
         d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
 
-    @mock.patch("webserver.handlers.book.is_allow_background")
-    def test_scan_status(self, m1):
-        m1.return_value = True
+    def test_scan_status(self):
         d = self.json("/api/admin/scan/status")
         self.assertEqual(d["err"], "ok")
 
-    @mock.patch("webserver.handlers.book.is_allow_background")
-    def test_import_status(self, m1):
-        m1.return_value = True
+    def test_import_status(self):
         d = self.json("/api/admin/import/status")
         self.assertEqual(d["err"], "ok")
