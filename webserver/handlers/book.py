@@ -24,7 +24,6 @@ from webserver.plugins.meta import baike, douban
 CONF = loader.get_settings()
 _q = queue.Queue()
 
-
 def background(func):
     @functools.wraps(func)
     def run(*args, **kwargs):

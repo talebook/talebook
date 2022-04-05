@@ -7,7 +7,9 @@
         <v-tabs-slider></v-tabs-slider>
         <v-tab ripple>系统设置</v-tab>
         <v-tab ripple>用户管理</v-tab>
+        <v-tab ripple>导入图书</v-tab>
     </v-tabs>
+    <v-divider />
 
     <v-tabs-items v-model="tab_active">
         <v-tab-item >
@@ -17,6 +19,9 @@
         </v-tab-item>
         <v-tab-item >
             <users></users>
+        </v-tab-item>
+        <v-tab-item >
+            <import-book></import-book>
         </v-tab-item>
     </v-tabs-items>
 </v-card>
@@ -28,6 +33,7 @@
 <script>
 import Settings from "~/components/Settings.vue"
 import Users from "~/components/Users.vue"
+import ImportBook from "~/components/ImportBook.vue"
 export default {
     created()  {
         this.$store.commit('navbar', true);

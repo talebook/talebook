@@ -2,6 +2,17 @@
     <div >
         <v-navigation-drawer v-model="sidebar" app fixed width="240" :clipped="$vuetify.breakpoint.lgAndUp" >
             <v-list dense v-if="items.length > 0" >
+                <v-list-item dense to="/admin">
+                    <v-list-item-action class="mt-1 mb-1 mr-2" dense>
+                        <v-icon class="pa-0 ma-0">mdi-cog</v-icon>
+                    </v-list-item-action>
+                    <v-list-item-content>
+                        <v-list-item-title>
+                            管理员
+                        </v-list-item-title>
+                    </v-list-item-content>
+                </v-list-item>
+
                 <template v-for="(item, idx) in items">
                     <v-subheader v-if="item.heading" :key="idx" >{{ item.heading }}</v-subheader>
 

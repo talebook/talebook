@@ -6,6 +6,7 @@ import hashlib
 import logging
 import time
 import json
+import os
 from gettext import gettext as _
 
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
@@ -270,6 +271,45 @@ class Item(Base, SQLAlchemyMixin):
         self.count_visit = 0
         self.count_download = 0
         self.collector_id = 1
+
+
+class ScanFile(Base, SQLAlchemyMixin):
+    __tablename__ = "scanfiles"
+    id = Column(Integer, primary_key=True)
+    scan_id = Column(Integer, default=0)
+    import_id = Column(Integer, default=0)
+
+    name = Column(String(512))
+    path = Column(String(1024))
+    hash = Column(String(512), unique=True)
+    status = Column(String(24))
+
+    title = Column(String(100))
+    author = Column(String(100))
+    publisher = Column(String(100))
+    tags = Column(String(100))
+
+    create_time = Column(DateTime)
+    update_time = Column(DateTime)
+    book_id = Column(Integer, default=0)
+    data = Column(MutableDict.as_mutable(JSONType), default={})
+
+    # STATUS
+    NEW = "new"
+    DROP = "drop"
+    READY = "ready"
+    EXIST = "exist"
+    IMPORTED = "imported"
+
+    def __init__(self, path, hash_value, scan_id):
+        super(ScanFile, self).__init__()
+        self.name = os.path.basename(path)
+        self.path = path
+        self.hash = hash_value
+        self.scan_id = scan_id
+        self.status = self.NEW
+        self.create_time = datetime.datetime.now()
+        self.update_time = datetime.datetime.now()
 
 
 def user_syncdb(engine):

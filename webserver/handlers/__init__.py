@@ -9,9 +9,11 @@ def routes():
     from . import files
     from . import opds
     from . import admin
+    from . import scan
 
     routes = []
     routes += admin.routes()
+    routes += scan.routes()
     routes += opds.routes()
     routes += book.routes()
     routes += user.routes()

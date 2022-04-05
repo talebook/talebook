@@ -78,6 +78,16 @@ def auth(func):
 
     return do
 
+def is_admin(func):
+    def do(self, *args, **kwargs):
+        if not self.current_user:
+            return {"err": "user.need_login", "msg": _(u"请先登录")}
+        if not self.admin_user:
+            return {"err": "permission.not_admin", "msg": _(u"当前用户非管理员")}
+        return func(self, *args, **kwargs)
+
+    return do
+
 
 class BaseHandler(web.RequestHandler):
     _path_to_env = {}
