@@ -520,6 +520,33 @@ class BaseHandler(web.RequestHandler):
             password=password,
         )
 
+    def fmt(self, b):
+        " convert book object to simple dict (then for JSON) "
+        pub = b.get("publisher", None)
+        if not pub:
+            pub = _("Unknown")
+
+        author_sort = b.get("author_sort", None)
+        if not author_sort:
+            author_sort = _("Unknown")
+
+        comments = b.get("comments", None)
+        if not comments:
+            comments = _(u"点击浏览详情")
+
+        return {
+            "id": b["id"],
+            "title": b["title"],
+            "rating": b["rating"],
+            "author": ", ".join(b["authors"]),
+            "authors": b["authors"],
+            "publisher": pub,
+            "comments": comments,
+            "img": self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
+            "author_url": self.api_url + "/author/" + author_sort,
+            "publisher_url": self.api_url + "/publisher/" + pub,
+        }
+
 
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):

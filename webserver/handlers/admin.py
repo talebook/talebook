@@ -14,7 +14,7 @@ from gettext import gettext as _
 
 import tornado
 from webserver import loader
-from webserver.handlers.base import BaseHandler, auth, js
+from webserver.handlers.base import BaseHandler, auth, js, is_admin
 from webserver.models import Reader
 
 CONF = loader.get_settings()
@@ -419,6 +419,34 @@ class AdminSSL(BaseHandler):
         return logic.run(ssl_crt, ssl_key)
 
 
+
+class AdminBookList(BaseHandler):
+    @js
+    @is_admin
+    def get(self):
+        if not self.admin_user:
+            return {"err": "permission.not_admin", "msg": _(u"当前用户非管理员")}
+
+        num = max(10, int(self.get_argument("num", 20)))
+        page = max(0, int(self.get_argument("page", 1)) - 1)
+        sort = self.get_argument("sort", "id")
+        desc = self.get_argument("desc", "desc")
+        logging.debug("num=%d, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
+
+        self.db.sort(sort, desc)
+        start = page * num
+        end = start + num
+        all_ids = list(self.cache.search(""))
+        total = len(all_ids)
+
+        books = []
+        page_ids = all_ids[start:end]
+        if page_ids:
+            books = [self.fmt(b) for b in self.get_books(ids=page_ids)]
+
+        return {"err": "ok", "items": books, "total": total}
+
+
 def routes():
     return [
         (r"/api/admin/ssl", AdminSSL),
@@ -426,4 +454,5 @@ def routes():
         (r"/api/admin/install", AdminInstall),
         (r"/api/admin/settings", AdminSettings),
         (r"/api/admin/testmail", AdminTestMail),
+        (r"/api/admin/book/list", AdminBookList),
     ]

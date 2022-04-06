@@ -7,7 +7,8 @@
         <v-tabs-slider></v-tabs-slider>
         <v-tab ripple>系统设置</v-tab>
         <v-tab ripple>用户管理</v-tab>
-        <v-tab ripple>导入图书</v-tab>
+        <v-tab ripple>导入图书 <v-chip small class="primary">Beta</v-chip></v-tab>
+        <v-tab ripple>书籍管理 <v-chip small class="primary">Beta</v-chip></v-tab>
     </v-tabs>
     <v-divider />
 
@@ -23,6 +24,9 @@
         <v-tab-item >
             <import-book></import-book>
         </v-tab-item>
+        <v-tab-item >
+            <books></books>
+        </v-tab-item>
     </v-tabs-items>
 </v-card>
 
@@ -33,6 +37,7 @@
 <script>
 import Settings from "~/components/Settings.vue"
 import Users from "~/components/Users.vue"
+import Books from "~/components/Books.vue"
 import ImportBook from "~/components/ImportBook.vue"
 export default {
     created()  {
