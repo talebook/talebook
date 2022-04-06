@@ -151,6 +151,16 @@ class Scanner:
                 continue
         return True
 
+    def delete(self, hashlist):
+        query = self.session.query(ScanFile)
+        if isinstance(hashlist, (list, tuple)):
+            query = query.filter(ScanFile.hash.in_(hashlist))
+        elif isinstance(hashlist, str):
+            query = query.filter(ScanFile.hash == hashlist)
+        count = query.delete()
+        self.session.commit()
+        return count
+
     def resume_last_import(self):
         # TODO
         return False
@@ -315,20 +325,32 @@ class ScanRun(BaseHandler):
         return {"err": "ok", "msg": _(u"开始扫描了"), "total": total}
 
 
+class ScanDelete(BaseHandler):
+    @js
+    @is_admin
+    def post(self):
+        req = tornado.escape.json_decode(self.request.body)
+        hashlist = req["hashlist"]
+        if not hashlist:
+            return {"err": "params.error", "msg": _(u"参数错误")}
+        if hashlist == "all":
+            hashlist = None
+
+        m = Scanner(self.db, self.session)
+        count = m.delete(hashlist)
+        return {"err": "ok", "msg": _(u"删除成功"), "count": count}
+
+
 class ScanStatus(BaseHandler):
     @js
     @is_admin
     def get(self):
         m = Scanner(self.db, self.session)
         status = m.scan_status()[1]
-        return {"err": "ok", "msg": _(u"发送成功"), "status": status}
+        return {"err": "ok", "msg": _(u"成功"), "status": status}
 
 
 class ImportRun(BaseHandler):
-    @background
-    def run(self, hashlist):
-        logging.info("running the import in background")
-
     @js
     @is_admin
     def post(self):
@@ -343,7 +365,7 @@ class ImportRun(BaseHandler):
         total = m.run_import(hashlist)
         if total == 0:
             return {"err": "empty", "msg": _("没有等待导入书库的书籍！")}
-        return {"err": "ok", "msg": _(u"发送成功")}
+        return {"err": "ok", "msg": _(u"扫描成功")}
 
 
 class ImportStatus(BaseHandler):
@@ -352,7 +374,7 @@ class ImportStatus(BaseHandler):
     def get(self):
         m = Scanner(self.db, self.session)
         status = m.import_status()[1]
-        return {"err": "ok", "msg": _(u"发送成功"), "status": status}
+        return {"err": "ok", "msg": _(u"成功"), "status": status}
 
 
 def routes():
@@ -360,6 +382,7 @@ def routes():
         (r"/api/admin/scan/list", ScanList),
         (r"/api/admin/scan/run", ScanRun),
         (r"/api/admin/scan/status", ScanStatus),
+        (r"/api/admin/scan/delete", ScanDelete),
         (r"/api/admin/scan/mark", ScanMark),
         (r"/api/admin/import/run", ImportRun),
         (r"/api/admin/import/status", ImportStatus),

@@ -2,23 +2,21 @@
     <v-card>
         <v-card-text> 请将需要导入的书籍放入uploads目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt</v-card-text>
         <v-card-actions>
-            <v-btn color="primary" @click="scan_books"><v-icon>mdi-file-find</v-icon>扫描书籍</v-btn>
-            <v-btn outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
+            <v-btn :disabled="loading" color="primary" @click="scan_books"><v-icon>mdi-file-find</v-icon>扫描书籍</v-btn>
+            <v-btn :disabled="loading" outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
             <template v-if="selected.length > 0">
-                <v-btn outlined color="primary" @click="import_books"><v-icon>mdi-import</v-icon>导入书籍 </v-btn>
+                <v-btn :disabled="loading" outlined color="primary" @click="import_books"><v-icon>mdi-import</v-icon>导入书籍 </v-btn>
+                <v-btn :disabled="loading" outlined color="primary" @click="delete_record"><v-icon>mdi-delete</v-icon>删除 </v-btn>
                 <!--
-                <v-btn outlined color="primary" @click="mark_as('ignore')"><v-icon>mdi-tag</v-icon>全部标记为「忽略」</v-btn>
-                <v-btn outlined color="primary" @click="mark_as('done')"><v-icon>mdi-tag</v-icon>全部标记为「已完成」</v-btn>
+                <v-btn :disabled="loading" outlined color="primary" @click="mark_as('ignore')"><v-icon>mdi-tag</v-icon>全部标记为「忽略」</v-btn>
+                <v-btn :disabled="loading" outlined color="primary" @click="mark_as('done')"><v-icon>mdi-tag</v-icon>全部标记为「已完成」</v-btn>
                 -->
             </template>
             <v-spacer></v-spacer>
             <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line hide-details></v-text-field>
         </v-card-actions>
-        <v-card-text v-if="false"   >
-            <v-progress-linear color="amber" value="20"></v-progress-linear>
-        </v-card-text>
         <v-card-text>
-            <div v-if="selected.length == 0">请勾选需要处理的书籍</div>
+            <div v-if="selected.length == 0">请勾选需要处理的文件</div>
             <div v-else>共选择了{{ selected.length }}个</div>
         </v-card-text>
         <v-data-table
@@ -91,7 +89,7 @@ export default {
         page: 1,
         items: [],
         total: 0,
-        loading: true,
+        loading: false,
         options: {},
         headers: [
             { text: "ID", sortable: true, value: "id" },
@@ -157,41 +155,53 @@ export default {
                 });
         },
         loop_check_status(url, callback) {
-            this.$backend(url).then((rsp) => {
-                if (rsp.err != "ok") {
-                    this.$alert("error", rsp.msg);
-                    return;
-                }
-                if (callback(rsp)) {
-                    setTimeout(() => {
-                        this.loop_check_status(url, callback);
-                    }, 1000);
-                } else {
-                    this.getDataFromApi();
-                    this.$alert("info", "处理完毕！");
-                }
-            });
+            this.loading = true;
+            this.$backend(url)
+                .then((rsp) => {
+                    if (rsp.err != "ok") {
+                        this.$alert("error", rsp.msg);
+                        return;
+                    }
+                    if (callback(rsp)) {
+                        setTimeout(() => {
+                            this.loop_check_status(url, callback);
+                        }, 1000);
+                    } else {
+                        this.getDataFromApi();
+                        this.$alert("info", "处理完毕！");
+                    }
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
         },
         scan_books() {
             var path = "/data/books/upload";
+            this.loading = true;
             this.$backend("/admin/scan/run", {
                 method: "POST",
                 body: JSON.stringify({ path: path }),
-            }).then((rsp) => {
-                if (rsp.err != "ok") {
-                    this.$alert("error", rsp.msg);
-                    return;
-                }
+            })
+                .then((rsp) => {
+                    if (rsp.err != "ok") {
+                        this.$alert("error", rsp.msg);
+                        return;
+                    }
 
-                //this.check_scan_status();
-                this.loop_check_status("/admin/scan/status", (rsp) => {
-                    this.scan = rsp.status;
-                    return this.scan.new > 0;
-                });
-            });
+                    //this.check_scan_status();
+                    this.loop_check_status("/admin/scan/status", (rsp) => {
+                        this.scan = rsp.status;
+                        if (this.scan.new == 0) {
+                            this.loading = false;
+                            return false;
+                        }
+                        return true;
+                    });
+                })
+                .finally(() => {});
         },
         import_books() {
-            console.log(this.selected);
+            this.loading = true;
             this.$backend("/admin/import/run", {
                 method: "POST",
                 body: JSON.stringify({
@@ -199,27 +209,60 @@ export default {
                         return v.hash;
                     }),
                 }),
-            }).then((rsp) => {
-                if (rsp.err != "ok") {
-                    this.$alert("error", rsp.msg);
-                }
-                //this.check_import_status();
-                this.loop_check_status("/admin/import/status", (rsp) => {
-                    this.import = rsp.status;
-                    return this.import.ready > 0;
+            })
+                .then((rsp) => {
+                    if (rsp.err != "ok") {
+                        this.$alert("error", rsp.msg);
+                    }
+                    //this.check_import_status();
+                    this.loop_check_status("/admin/import/status", (rsp) => {
+                        this.import = rsp.status;
+                        if (this.import.ready == 0) {
+                            this.loading = false;
+                            return false;
+                        }
+                        return true;
+                    });
+                })
+                .finally(() => {
+                    this.loading = false;
                 });
-            });
+        },
+        delete_record() {
+            console.log(this.selected);
+            this.loading = true;
+            this.$backend("/admin/scan/delete", {
+                method: "POST",
+                body: JSON.stringify({
+                    hashlist: this.selected.map((v) => {
+                        return v.hash;
+                    }),
+                }),
+            })
+                .then((rsp) => {
+                    if (rsp.err != "ok") {
+                        this.$alert("error", rsp.msg);
+                    }
+                    this.getDataFromApi();
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
         },
         mark_as(status) {
-            alert("mark as" + status);
+            this.loading = true;
             this.$backend("/admin/scan/mark", {
                 method: "POST",
                 body: JSON.stringify({ hashlist: this.selected, status: status }),
-            }).then((rsp) => {
-                if (rsp.err != "ok") {
-                    this.$alert("error", rsp.msg);
-                }
-            });
+            })
+                .then((rsp) => {
+                    if (rsp.err != "ok") {
+                        this.$alert("error", rsp.msg);
+                    }
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
             this.items.map((v) => {
                 if (this.selected.indexOf(v.hash)) {
                     v.status = status;
