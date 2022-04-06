@@ -194,7 +194,7 @@ class Scanner:
         import_id = int(time.time())
 
         query = self.build_query(hashlist)
-        query.update({ScanFile.import_id: import_id})
+        query.update({ScanFile.import_id: import_id}, synchronize_session=False)
         self.session.commit()
 
         # 逐个处理
