@@ -29,7 +29,7 @@ class TestScan(TestWithUserLogin):
 
 
     @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
-    def test_import(self, m1):
+    def test_import_one(self, m1):
         m1.return_value = False
         hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
         req = {"hashlist": [hash]}

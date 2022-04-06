@@ -114,6 +114,8 @@ class TestApp(testing.AsyncHTTPTestCase):
         return _app
 
     def json(self, url, *args, **kwargs):
+        if 'request_timeout' not in kwargs:
+            kwargs['request_timeout'] = 60
         rsp = self.fetch(url, *args, **kwargs)
         self.assertEqual(rsp.code, 200)
         return json.loads(rsp.body)
