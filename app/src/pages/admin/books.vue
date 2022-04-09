@@ -1,7 +1,7 @@
 <template>
     <v-card>
         <v-card-title> 图书管理 <v-chip small class="primary">Beta</v-chip> </v-card-title>
-        <v-card-text> 此表格仅展示图书的部分字段，完整图书信息请点击链接查看</v-card-text>
+        <v-card-text> 此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面</v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
             <template v-if="selected.length > 0">
@@ -14,10 +14,6 @@
             <v-spacer></v-spacer>
             <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line hide-details></v-text-field>
         </v-card-actions>
-        <v-card-text>
-            <div v-if="selected.length == 0">请勾选需要处理的书籍</div>
-            <div v-else>共选择了{{ selected.length }}个</div>
-        </v-card-text>
         <v-data-table
             dense
             class="elevation-1 text-body-2"
@@ -40,11 +36,77 @@
                 <v-chip small v-else-if="item.status == 'new'" class="grey">待扫描</v-chip>
                 <v-chip small v-else class="info">{{ item.status }}</v-chip>
             </template>
-            <template v-slot:item.title="{ item }">
-                <a target="_blank" :href="`/book/${item.book_id}`">{{ item.title }}</a>
+            <template v-slot:item.id="{ item }">
+                <a target="_blank" :href="`/book/${item.book_id}`">{{ item.id }}</a>
             </template>
+            <template v-slot:item.title="{ item }">
+                <v-edit-dialog
+                    large
+                    persistent
+                    :return-value.sync="item.title"
+                    @save="save(item, 'title')"
+                    save-text="保存"
+                    cancel-text="取消"
+                >
+                    {{ item.title }}
+                    <template v-slot:input>
+                        <div class="mt-4 text-caption">修改字段</div>
+                        <v-text-field v-model="item.title" label="Edit" single-line counter></v-text-field>
+                    </template>
+                </v-edit-dialog>
+            </template>
+
+            <template v-slot:item.author="{ item }">
+                <v-edit-dialog
+                    large
+                    persistent
+                    :return-value.sync="item.author"
+                    @save="save(item, 'author')"
+                    save-text="保存"
+                    cancel-text="取消"
+                >
+                    {{ item.author }}
+                    <template v-slot:input>
+                        <div class="mt-4 text-caption">修改字段</div>
+                        <v-text-field v-model="item.author" label="Edit" single-line counter></v-text-field>
+                    </template>
+                </v-edit-dialog>
+            </template>
+
+            <template v-slot:item.publisher="{ item }">
+                <v-edit-dialog
+                    large
+                    persistent
+                    :return-value.sync="item.publisher"
+                    @save="save(item, 'publisher')"
+                    save-text="保存"
+                    cancel-text="取消"
+                >
+                    {{ item.publisher }}
+                    <template v-slot:input>
+                        <div class="mt-4 text-caption">修改字段</div>
+                        <v-text-field v-model="item.publisher" label="Edit" single-line counter></v-text-field>
+                    </template>
+                </v-edit-dialog>
+            </template>
+
             <template v-slot:item.comments="{ item }">
-                <span :title="item.comments" style="width: 300px; display: inline-block;" class="text-truncate">{{item.comments}}</span>
+                <v-edit-dialog
+                    large
+                    persistent
+                    :return-value.sync="item.comments"
+                    @save="save(item, 'comments')"
+                    save-text="保存"
+                    cancel-text="取消"
+                >
+                    <span :title="item.comments" style="width: 300px; display: inline-block" class="text-truncate">{{
+                        item.comments
+                    }}</span>
+                    <template v-slot:input>
+                        <div class="mt-4 text-caption">修改字段</div>
+                        <v-textarea v-model="item.comments"></v-textarea>
+                    </template>
+                </v-edit-dialog>
             </template>
             <template v-slot:item.actions="{ item }">
                 <v-menu offset-y right>
@@ -89,8 +151,7 @@ export default {
             status: "finish",
         },
     }),
-    created() {
-    },
+    created() {},
     watch: {
         options: {
             handler() {
@@ -123,7 +184,7 @@ export default {
                     if (rsp.err != "ok") {
                         this.items = [];
                         this.total = 0;
-                        this.$alert("error", rsp.msg)
+                        this.$alert("error", rsp.msg);
                         return false;
                     }
                     this.items = rsp.items;
@@ -174,6 +235,9 @@ export default {
                     v.status = status;
                 }
             });
+        },
+        save(item, field) {
+            console.log("click save", item);
         },
     },
 };
