@@ -2,8 +2,10 @@
     <v-card>
         <v-card-text> 请将需要导入的书籍放入uploads目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt</v-card-text>
         <v-card-actions>
+            <v-btn :disabled="loading" color="primary" @click="scan_books"><v-icon>mdi-file-find</v-icon>扫描书籍</v-btn>
             <v-btn :disabled="loading" outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
             <template v-if="selected.length > 0">
+                <v-btn :disabled="loading" outlined color="primary" @click="import_books"><v-icon>mdi-import</v-icon>导入书籍 </v-btn>
                 <v-btn :disabled="loading" outlined color="primary" @click="delete_record"><v-icon>mdi-delete</v-icon>删除 </v-btn>
                 <!--
                 <v-btn :disabled="loading" outlined color="primary" @click="mark_as('ignore')"><v-icon>mdi-tag</v-icon>全部标记为「忽略」</v-btn>
@@ -14,7 +16,7 @@
             <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line hide-details></v-text-field>
         </v-card-actions>
         <v-card-text>
-            <div v-if="selected.length == 0">请勾选需要处理的书籍</div>
+            <div v-if="selected.length == 0">请勾选需要处理的文件</div>
             <div v-else>共选择了{{ selected.length }}个</div>
         </v-card-text>
         <v-data-table
@@ -31,7 +33,6 @@
             :loading="loading"
             :page.sync="page"
             :items-per-page="100"
-            :options="{ sortDesc: true }"
             :footer-props="{ 'items-per-page-options': [10, 50, 100] }"
         >
             <template v-slot:item.status="{ item }">
@@ -42,10 +43,16 @@
                 <v-chip small v-else class="info">{{ item.status }}</v-chip>
             </template>
             <template v-slot:item.title="{ item }">
-                <a target="_blank" :href="`/book/${item.book_id}`">{{ item.title }}</a>
+                书名：<span v-if="item.book_id == 0"> {{ item.title }} </span>
+                <a v-else target="_blank" :href="`/book/${item.book_id}`">{{ item.title }}</a> <br />
+                作者：{{ item.author }}
             </template>
-            <template v-slot:item.comments="{ item }">
-                <span :title="item.comments" style="width: 300px; display: inline-block;" class="text-truncate">{{item.comments}}</span>
+            <template v-slot:item.detail="{ item }">
+                <span v-if="item.extra.visit_history"> 访问{{ item.extra.visit_history.length }}本 </span>
+                <span v-if="item.extra.read_history"> 阅读{{ item.extra.read_history.length }}本 </span>
+                <span v-if="item.extra.push_history"> 推送{{ item.extra.push_history.length }}本 </span>
+                <span v-if="item.extra.download_history"> 下载{{ item.extra.download_history.length }}本 </span>
+                <span v-if="item.extra.upload_history"> 上传{{ item.extra.upload_history.length }}本 </span>
             </template>
             <template v-slot:item.actions="{ item }">
                 <v-menu offset-y right>
@@ -53,10 +60,18 @@
                         <v-btn color="primary" small v-on="on">操作 <v-icon small>more_vert</v-icon></v-btn>
                     </template>
                     <v-list dense>
-                        <v-subheader>管理</v-subheader>
+                        <v-subheader>修改用户权限</v-subheader>
+
                         <v-divider></v-divider>
-                        <v-list-item>
-                            <v-list-item-title>待开发</v-list-item-title>
+                        <v-subheader>账号管理</v-subheader>
+                        <v-list-item v-if="!item.is_active">
+                            <v-list-item-title> 免邮箱认证，直接激活账户 </v-list-item-title>
+                        </v-list-item>
+                        <v-list-item v-if="item.is_admin">
+                            <v-list-item-title> 取消管理员 </v-list-item-title>
+                        </v-list-item>
+                        <v-list-item v-else>
+                            <v-list-item-title> 设置为管理员 </v-list-item-title>
                         </v-list-item>
                     </v-list>
                 </v-menu>
@@ -77,11 +92,10 @@ export default {
         options: {},
         headers: [
             { text: "ID", sortable: true, value: "id" },
-            { text: "书名", sortable: true, value: "title" },
-            { text: "作者", sortable: true, value: "author" },
-            { text: "出版社", sortable: false, value: "publisher" },
-            { text: "标签", sortable: true, value: "tags", width: "100px" },
-            { text: "简介", sortable: true, value: "comments" },
+            { text: "状态", sortable: true, value: "status" },
+            { text: "路径", sortable: true, value: "path" },
+            { text: "扫描信息", sortable: false, value: "title" },
+            { text: "时间", sortable: true, value: "create_time", width: "200px" },
             { text: "操作", sortable: false, value: "actions" },
         ],
         progress: {
@@ -96,6 +110,14 @@ export default {
                 this.getDataFromApi();
             },
             deep: true,
+        },
+    },
+    mounted() {
+        this.getDataFromApi();
+    },
+    computed: {
+        pageCount: function () {
+            return parseInt(this.total / 20);
         },
     },
     methods: {
@@ -116,12 +138,12 @@ export default {
             if (itemsPerPage != undefined) {
                 data.append("num", itemsPerPage);
             }
-            this.$backend("/admin/book/list?" + data.toString())
+            this.$backend("/admin/scan/list?" + data.toString())
                 .then((rsp) => {
                     if (rsp.err != "ok") {
                         this.items = [];
                         this.total = 0;
-                        this.$alert("error", rsp.msg)
+                        alert(rsp.msg);
                         return false;
                     }
                     this.items = rsp.items;
@@ -131,10 +153,84 @@ export default {
                     this.loading = false;
                 });
         },
-        delete_book() {
+        loop_check_status(url, callback) {
+            this.loading = true;
+            this.$backend(url)
+                .then((rsp) => {
+                    if (rsp.err != "ok") {
+                        this.$alert("error", rsp.msg);
+                        return;
+                    }
+                    if (callback(rsp)) {
+                        setTimeout(() => {
+                            this.loop_check_status(url, callback);
+                        }, 1000);
+                    } else {
+                        this.getDataFromApi();
+                        this.$alert("info", "处理完毕！");
+                    }
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
+        },
+        scan_books() {
+            var path = "/data/books/upload";
+            this.loading = true;
+            this.$backend("/admin/scan/run", {
+                method: "POST",
+                body: JSON.stringify({ path: path }),
+            })
+                .then((rsp) => {
+                    if (rsp.err != "ok") {
+                        this.$alert("error", rsp.msg);
+                        return;
+                    }
+
+                    //this.check_scan_status();
+                    this.loop_check_status("/admin/scan/status", (rsp) => {
+                        this.scan = rsp.status;
+                        if (this.scan.new == 0) {
+                            this.loading = false;
+                            return false;
+                        }
+                        return true;
+                    });
+                })
+                .finally(() => {});
+        },
+        import_books() {
+            this.loading = true;
+            this.$backend("/admin/import/run", {
+                method: "POST",
+                body: JSON.stringify({
+                    hashlist: this.selected.map((v) => {
+                        return v.hash;
+                    }),
+                }),
+            })
+                .then((rsp) => {
+                    if (rsp.err != "ok") {
+                        this.$alert("error", rsp.msg);
+                    }
+                    //this.check_import_status();
+                    this.loop_check_status("/admin/import/status", (rsp) => {
+                        this.import = rsp.status;
+                        if (this.import.ready == 0) {
+                            this.loading = false;
+                            return false;
+                        }
+                        return true;
+                    });
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
+        },
+        delete_record() {
             console.log(this.selected);
             this.loading = true;
-            this.$backend("/admin/book/delete", {
+            this.$backend("/admin/scan/delete", {
                 method: "POST",
                 body: JSON.stringify({
                     hashlist: this.selected.map((v) => {
@@ -152,8 +248,7 @@ export default {
                     this.loading = false;
                 });
         },
-        update_book(status) {
-            return;
+        mark_as(status) {
             this.loading = true;
             this.$backend("/admin/scan/mark", {
                 method: "POST",
