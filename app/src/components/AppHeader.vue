@@ -2,40 +2,26 @@
     <div>
         <v-navigation-drawer v-model="sidebar" app fixed width="240" :clipped="$vuetify.breakpoint.lgAndUp">
             <v-list dense v-if="items.length > 0">
-                <v-list-group no-action :value="visit_admin_pages" to="/admin/">
-                    <template v-slot:activator>
-                        <v-list-item-action class="mt-1 mb-1 mr-2" dense>
-                            <v-icon class="pa-0 ma-0">mdi-cog</v-icon>
-                        </v-list-item-action>
-                        <v-list-item-content>
-                            <v-list-item-title> 管理员 </v-list-item-title>
-                        </v-list-item-content>
-                    </template>
-
-                    <v-list-item to="/admin/settings">
-                        <v-list-item-content>
-                            <v-list-item-title><v-icon>mdi-cog</v-icon> 系统设置</v-list-item-title>
-                        </v-list-item-content>
-                    </v-list-item>
-                    <v-list-item to="/admin/users">
-                        <v-list-item-content>
-                            <v-list-item-title> <v-icon>mdi-users</v-icon> 用户管理</v-list-item-title>
-                        </v-list-item-content>
-                    </v-list-item>
-                    <v-list-item to="/admin/books">
-                        <v-list-item-content>
-                            <v-list-item-title> <v-icon>mdi-cog</v-icon> 图书管理</v-list-item-title>
-                        </v-list-item-content>
-                    </v-list-item>
-                    <v-list-item to="/admin/imports">
-                        <v-list-item-content>
-                            <v-list-item-title> <v-icon>mdi-import</v-icon> 导入图书</v-list-item-title>
-                        </v-list-item-content>
-                    </v-list-item>
-                </v-list-group>
-
                 <template v-for="(item, idx) in items">
                     <v-subheader v-if="item.heading" :key="idx">{{ item.heading }}</v-subheader>
+                    
+                    <!-- 二级菜单 -->
+                    <v-list-group v-else-if="item.groups" no-action :value="item.expand">
+                        <template v-slot:activator>
+                            <v-list-item-action class="mt-1 mb-1 mr-2" dense>
+                                <v-icon class="pa-0 ma-0">{{item.icon}}</v-icon>
+                            </v-list-item-action>
+                            <v-list-item-content>
+                                <v-list-item-title v-text="item.text"> 管理员 </v-list-item-title>
+                            </v-list-item-content>
+                        </template>
+
+                        <v-list-item v-for="link in item.groups" :key="link.href" :to="link.href">
+                            <v-list-item-content>
+                                <v-list-item-title><v-icon>{{link.icon}}</v-icon> {{link.text}}</v-list-item-title>
+                            </v-list-item-content>
+                        </v-list-item>
+                    </v-list-group>
 
                     <!-- 友情链接 -->
                     <template v-else-if="item.links">
@@ -240,6 +226,17 @@ export default {
         items: function () {
             return [
                 { icon: "home", href: "/", text: "首页" },
+                {
+                    icon: "mdi-cog",
+                    text: "管理",
+                    expand: (this.$route.path.indexOf("/admin/") == 0),
+                    groups: [
+                        { icon: "mdi-cog", href: "/admin/settings", text: "系统设置"},
+                        { icon: "mdi-human-greeting", href: "/admin/users", text: "用户管理"},
+                        { icon: "mdi-library-shelves", href: "/admin/books", text: "图书管理"},
+                        { icon: "mdi-import", href: "/admin/imports", text: "导入图书"},
+                    ],
+                },
                 { heading: "分类浏览" },
                 { icon: "widgets", href: "/nav", text: "所有书籍", count: this.sys.books },
                 { icon: "mdi-home-group", href: "/publisher", text: "出版社", count: this.sys.publishers },
