@@ -1,12 +1,13 @@
 <template>
     <div>
         <v-card class="my-2 elevation-4" v-for="card in cards" :key="card.title" >
-            <v-card-actions>
-                <v-btn @click="card.show = !card.show" icon>
+            <v-card-title @click="card.show = !card.show">
+                <v-btn @click.once="card.show = !card.show" icon>
                     <v-icon>{{ card.show ? 'keyboard_arrow_down' : 'keyboard_arrow_up' }}</v-icon>
                 </v-btn>
-                <p @click="card.show = !card.show" class="cursor-pointer title mb-0"> <span>{{card.title}}</span> </p>
-            </v-card-actions>
+                {{card.title}}
+            </v-card-title>
+    
             <v-card-text v-show="card.show">
                 <p v-if="card.subtitle" class="">{{card.subtitle}}</p>
 

@@ -1,5 +1,6 @@
 <template>
     <v-card>
+        <v-card-title> 导入图书  <v-chip small class="primary">Beta</v-chip> </v-card-title>
         <v-card-text> 请将需要导入的书籍放入uploads目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt</v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" color="primary" @click="scan_books"><v-icon>mdi-file-find</v-icon>扫描书籍</v-btn>

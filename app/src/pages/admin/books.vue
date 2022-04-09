@@ -1,6 +1,7 @@
 <template>
     <v-card>
-        <v-card-text> 请将需要导入的书籍放入uploads目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt</v-card-text>
+        <v-card-title> 图书管理 <v-chip small class="primary">Beta</v-chip> </v-card-title>
+        <v-card-text> 此表格仅展示图书的部分字段，完整图书信息请点击链接查看</v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
             <template v-if="selected.length > 0">
