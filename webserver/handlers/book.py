@@ -24,6 +24,7 @@ from webserver.plugins.meta import baike, douban
 CONF = loader.get_settings()
 _q = queue.Queue()
 
+
 def background(func):
     @functools.wraps(func)
     def run(*args, **kwargs):
@@ -330,8 +331,8 @@ class BookDownload(BaseHandler):
         path = book["fmt_%s" % fmt]
         book["fmt"] = fmt
         book["title"] = urllib.parse.quote_plus(book["title"])
-        fname = '%(id)d-%(title)s.%(fmt)s' % book
-        att = u'attachment; filename="%s"; filename*=UTF-8\'\'%s' % (fname, fname)
+        fname = "%(id)d-%(title)s.%(fmt)s" % book
+        att = u"attachment; filename=\"%s\"; filename*=UTF-8''%s" % (fname, fname)
         if is_opds:
             att = u'attachment; filename="%(id)d.%(fmt)s"' % book
 

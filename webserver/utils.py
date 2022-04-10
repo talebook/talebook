@@ -97,7 +97,7 @@ class BookFormatter:
             }
         )
         if with_files:
-            data['files'] = self.get_files()
+            data["files"] = self.get_files()
         if with_perms:
             data.update(self.get_permissions())
         return data
