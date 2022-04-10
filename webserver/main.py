@@ -141,6 +141,17 @@ def make_app():
         logging.info("done")
         sys.exit(0)
 
+    # build sql session factory
+    engine = create_engine(auth_db_path, **CONF["db_engine_args"])
+    ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
+    models.bind_session(ScopedSession)
+    init_social(models.Base, ScopedSession, CONF)
+
+    if options.syncdb:
+        models.user_syncdb(engine)
+        logging.info("Create tables into DB")
+        sys.exit(0)
+
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
 
@@ -162,17 +173,6 @@ def make_app():
             pass
 
     gui2.must_use_qt = new_must_use_qt
-
-    # build sql session factory
-    engine = create_engine(auth_db_path, echo=False)
-    ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
-    models.bind_session(ScopedSession)
-    init_social(models.Base, ScopedSession, CONF)
-
-    if options.syncdb:
-        models.user_syncdb(engine)
-        logging.info("Create tables into DB")
-        sys.exit(0)
 
     path = CONF["resource_path"] + "/calibre/default_cover.jpg"
     with open(path, "rb") as cover_file:

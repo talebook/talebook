@@ -39,6 +39,10 @@ settings = {
     "opds_max_ungrouped_items" : 100,
     "opds_url_prefix"          : "",
 
+    "db_engine_args": {
+        "echo": False,
+    }
+
     # 100MB, tornado default max_buffer_size value
     "MAX_UPLOAD_SIZE": "100MB",
 

@@ -4,3 +4,6 @@ social-auth-app-tornado==1.0.0
 social-auth-storage-sqlalchemy==1.1.0
 tornado==6.1
 bs4
+
+# build-in support for MYSQL
+pymysql
