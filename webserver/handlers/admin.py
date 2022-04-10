@@ -16,6 +16,7 @@ import tornado
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
 from webserver.models import Reader
+from webserver.utils import SimpleBookFormatter
 
 CONF = loader.get_settings()
 
@@ -140,16 +141,16 @@ class AdminOwnerMode(BaseHandler):
         self.redirect("/", 302)
 
 
-class SettingsSaverLogic():
+class SettingsSaverLogic:
     def update_nuxtjs_env(self):
         # update nuxtjs .env file
-        nuxtjs_env = '''
+        nuxtjs_env = """
 TITLE="%(site_title)s"
 TITLE_TEMPLATE="%%s | %(site_title)s"
 GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
 
-'''
-        with open(CONF['nuxt_env_path'], "w") as f:
+"""
+        with open(CONF["nuxt_env_path"], "w") as f:
             f.write(nuxtjs_env % CONF)
 
     def save_extra_settings(self, args):
@@ -241,7 +242,7 @@ class AdminSettings(BaseHandler):
             "xsrf_cookies",
             "settings_path",
             "avatar_service",
-            "google_analytics_id"
+            "google_analytics_id",
         ]
 
         args = loader.SettingsLoader()
@@ -317,12 +318,12 @@ class AdminInstall(BaseHandler):
         args.clear()
 
         # inherit the basic path from system's config
-        args['settings_path'] = CONF['settings_path']
+        args["settings_path"] = CONF["settings_path"]
 
         # set options for China user
         # TODO: maybe it should be provided as an install options
-        args['avatar_service'] = 'https://cravatar.cn'
-        args['BOOK_NAMES_FORMAT'] = 'utf8'
+        args["avatar_service"] = "https://cravatar.cn"
+        args["BOOK_NAMES_FORMAT"] = "utf8"
 
         # set a random secret
         args["cookie_secret"] = u"%s" % uuid.uuid1()
@@ -419,7 +420,6 @@ class AdminSSL(BaseHandler):
         return logic.run(ssl_crt, ssl_key)
 
 
-
 class AdminBookList(BaseHandler):
     @js
     @is_admin
@@ -430,19 +430,24 @@ class AdminBookList(BaseHandler):
         num = max(10, int(self.get_argument("num", 20)))
         page = max(0, int(self.get_argument("page", 1)) - 1)
         sort = self.get_argument("sort", "id")
-        desc = self.get_argument("desc", "desc")
+        desc = self.get_argument("desc", "desc") == "true"
+        search = self.get_argument("search", "")
         logging.debug("num=%d, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
 
-        self.db.sort(sort, desc)
+        self.db.sort(field=sort, ascending=(not desc))
         start = page * num
         end = start + num
-        all_ids = list(self.cache.search(""))
+        all_ids = list(self.cache.search(search))
         total = len(all_ids)
+
+        # sort by id
+        if sort == "id":
+            all_ids.sort(reverse=desc)
 
         books = []
         page_ids = all_ids[start:end]
         if page_ids:
-            books = [self.fmt(b) for b in self.get_books(ids=page_ids)]
+            books = [SimpleBookFormatter(b, self.cdn_url).format() for b in self.get_books(ids=page_ids)]
 
         return {"err": "ok", "items": books, "total": total}
 

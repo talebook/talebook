@@ -16,7 +16,7 @@ from gettext import gettext as _
 
 import tornado.escape
 from tornado import web
-from webserver import constants, loader
+from webserver import constants, loader, utils
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.models import Item
 from webserver.plugins.meta import baike, douban
@@ -66,6 +66,9 @@ def do_ebook_convert(old_path, new_path, log_path):
 
 
 class Index(BaseHandler):
+    def fmt(self, b):
+        return utils.BookFormatter(self, b).format()
+
     @js
     def get(self):
         max_random = 30
@@ -95,80 +98,13 @@ class Index(BaseHandler):
 
 
 class BookDetail(BaseHandler):
-    def set_book(self, book):
-        self.book = book
-
-    def val(self, k, default_value=_("Unknown")):
-        v = self.book.get(k, None)
-        if not v:
-            v = default_value
-        if isinstance(v, datetime.datetime):
-            return v.strftime("%Y-%m-%d")
-        return v
-
     @js
     def get(self, id):
         book = self.get_book(id)
-        book_id = book["id"]
-        book["is_owner"] = self.is_book_owner(book_id, self.user_id())
-        book["is_public"] = True
-        if self.is_admin():
-            book["is_public"] = True
-            book["is_owner"] = True
-        self.user_history("visit_history", book)
-        files = []
-        for fmt in book.get("available_formats", ""):
-            try:
-                filesize = self.db.sizeof_format(book_id, fmt, index_is_id=True)
-            except:
-                continue
-            files.append(
-                {
-                    "format": fmt,
-                    "size": filesize,
-                    "href": self.cdn_url + "/api/book/%s.%s" % (book_id, fmt),
-                }
-            )
-
-        if self.user_id():
-            self.count_increase(book_id, count_visit=1)
-        else:
-            self.count_increase(book_id, count_guest=1)
-
-        collector = book.get("collector", None)
-        if isinstance(collector, dict):
-            collector = collector.get("username", None)
-        elif collector:
-            collector = collector.username
-
-        b = book
-        self.set_book(book)
         return {
             "err": "ok",
             "kindle_sender": CONF["smtp_username"],
-            "book": {
-                "id": b["id"],
-                "title": b["title"],
-                "rating": b["rating"],
-                "count_visit": b["count_visit"],
-                "count_download": b["count_download"],
-                "timestamp": self.val("timestamp"),
-                "pubdate": self.val("pubdate"),
-                "collector": collector,
-                "authors": b["authors"],
-                "author": ", ".join(b["authors"]),
-                "tags": b["tags"],
-                "author_sort": self.val("author_sort"),
-                "publisher": self.val("publisher"),
-                "comments": self.val("comments", _(u"暂无简介")),
-                "series": self.val("series", None),
-                "language": self.val("language", None),
-                "isbn": self.val("isbn", None),
-                "files": files,
-                "is_public": b["is_public"],
-                "is_owner": b["is_owner"],
-                "img": self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
-            },
+            "book": utils.BookFormatter(self, book).format(with_files=True, with_perms=True),
         }
 
 

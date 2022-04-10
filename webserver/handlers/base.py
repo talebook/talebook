@@ -14,7 +14,7 @@ from gettext import gettext as _
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import func as sql_func
 from tornado import web
-from webserver import loader
+from webserver import loader, utils
 
 # import social_tornado.handlers
 from webserver.models import Item, Message, Reader
@@ -520,34 +520,6 @@ class BaseHandler(web.RequestHandler):
             password=password,
         )
 
-    def fmt(self, b):
-        " convert book object to simple dict (then for JSON) "
-        pub = b.get("publisher", None)
-        if not pub:
-            pub = _("Unknown")
-
-        author_sort = b.get("author_sort", None)
-        if not author_sort:
-            author_sort = _("Unknown")
-
-        comments = b.get("comments", None)
-        if not comments:
-            comments = _(u"点击浏览详情")
-
-        return {
-            "id": b["id"],
-            "title": b["title"],
-            "rating": b["rating"],
-            "author": ", ".join(b["authors"]),
-            "authors": b["authors"],
-            "publisher": pub,
-            "comments": comments,
-            "img": self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
-            "author_url": self.api_url + "/author/" + author_sort,
-            "publisher_url": self.api_url + "/publisher/" + pub,
-        }
-
-
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):
         ids = books = []
@@ -604,55 +576,4 @@ class ListHandler(BaseHandler):
         }
 
     def fmt(self, b):
-        def get(k, default=_("Unknown")):
-            v = b.get(k, None)
-            if not v:
-                v = default
-            return v
-
-        collector = b.get("collector", None)
-        if isinstance(collector, dict):
-            collector = collector.get("username", None)
-        elif collector:
-            collector = collector.username
-
-        try:
-            pubdate = b["pubdate"].strftime("%Y-%m-%d")
-        except:
-            pubdate = None
-
-        pub = b.get("publisher", None)
-        if not pub:
-            pub = _("Unknown")
-
-        author_sort = b.get("author_sort", None)
-        if not author_sort:
-            author_sort = _("Unknown")
-
-        comments = b.get("comments", None)
-        if not comments:
-            comments = _(u"点击浏览详情")
-
-        return {
-            "id": b["id"],
-            "title": b["title"],
-            "rating": b["rating"],
-            "count_visit": get("count_visit", 0),
-            "count_download": get("count_download", 0),
-            "timestamp": b["timestamp"].strftime("%Y-%m-%d"),
-            "pubdate": pubdate,
-            "collector": collector,
-            "author": ", ".join(b["authors"]),
-            "authors": b["authors"],
-            "tag": " / ".join(b["tags"]),
-            "tags": b["tags"],
-            "author_sort": get("author_sort"),
-            "publisher": get("publisher"),
-            "comments": get("comments", _(u"暂无简介")),
-            "series": get("series", None),
-            "language": get("language", None),
-            "isbn": get("isbn", None),
-            "img": self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
-            "author_url": self.api_url + "/author/" + author_sort,
-            "publisher_url": self.api_url + "/publisher/" + pub,
-        }
+        return utils.BookFormatter(self, b).format()
