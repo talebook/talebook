@@ -4,8 +4,6 @@
 import json
 from unittest import mock, skip
 from tests.test_main import TestWithUserLogin, setUpModule as init, testdir
-from webserver import main, models
-from sqlalchemy import create_engine
 
 
 def setUpModule():
@@ -26,7 +24,6 @@ class TestScan(TestWithUserLogin):
         req = {"path": testdir + "/cases/"}
         d = self.json("/api/admin/scan/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
-
 
     @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
     def test_import_one(self, m1):

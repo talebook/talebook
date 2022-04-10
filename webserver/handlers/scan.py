@@ -1,27 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import datetime
 import hashlib
-import json
 import logging
 import os
-import re
-import ssl
-import subprocess
-import tempfile
 import threading
 import time
 import traceback
-import uuid
 from gettext import gettext as _
-import traceback
 
 import tornado
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
-from webserver.handlers.book import background
-from webserver.models import Item, Reader, ScanFile
+from webserver.models import Item, ScanFile
 import sqlalchemy
 
 CONF = loader.get_settings()
@@ -42,7 +33,6 @@ class Scanner:
         # TODO
         return False
 
-
     def save_or_rollback(self, row):
         try:
             row.save()
@@ -62,7 +52,7 @@ class Scanner:
 
         # 生成任务（粗略扫描），前端可以调用API查询进展
         tasks = []
-        for dirpath, _, filenames in os.walk(path_dir):
+        for dirpath, __, filenames in os.walk(path_dir):
             for fname in filenames:
                 fpath = os.path.join(dirpath, fname)
                 if not os.path.isfile(fpath):
@@ -77,7 +67,7 @@ class Scanner:
         if not self.allow_backgrounds():
             self.do_scan(tasks)
         else:
-            t = threading.Thread(name="do_scan", target=self.do_scan, args=(tasks, ))
+            t = threading.Thread(name="do_scan", target=self.do_scan, args=(tasks,))
             t.setDaemon(True)
             t.start()
         return len(tasks)
@@ -92,7 +82,7 @@ class Scanner:
         rows = []
         inserted_hash = set()
         for fname, fpath, fmt in tasks:
-            #logging.info("Scan: %s", fpath)
+            # logging.info("Scan: %s", fpath)
             if self.session.query(ScanFile).filter(ScanFile.path == fpath).count() > 0:
                 # 如果已经有相同的文件记录，则跳过
                 continue
@@ -114,7 +104,7 @@ class Scanner:
         # 检查文件哈希值，检查DB重复情况
         for row in rows:
             fpath = row.path
-            
+
             # 读取文件，计算哈希值
             sha256 = hashlib.sha256()
             with open(fpath, "rb") as f:
@@ -166,7 +156,9 @@ class Scanner:
         return False
 
     def build_query(self, hashlist):
-        query = self.session.query(ScanFile).filter(ScanFile.status == ScanFile.READY) #.filter(ScanFile.import_id == 0)
+        query = self.session.query(ScanFile).filter(
+            ScanFile.status == ScanFile.READY
+        )  # .filter(ScanFile.import_id == 0)
         if isinstance(hashlist, (list, tuple)):
             query = query.filter(ScanFile.hash.in_(hashlist))
         elif isinstance(hashlist, str):
@@ -182,7 +174,7 @@ class Scanner:
         if not self.allow_backgrounds():
             self.do_import(hashlist)
         else:
-            t = threading.Thread(name="do_import", target=self.do_import, args=(hashlist, ))
+            t = threading.Thread(name="do_import", target=self.do_import, args=(hashlist,))
             t.setDaemon(True)
             t.start()
         return total

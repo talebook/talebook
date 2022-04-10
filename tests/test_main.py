@@ -764,6 +764,7 @@ class TestInviteMode(TestApp):
 
 
 def setUpModule():
+    os.environ["ASYNC_TEST_TIMEOUT"] = "60"
     logging.basicConfig(
         level=logging.DEBUG,
         datefmt="%Y-%m-%d %H:%M:%S",

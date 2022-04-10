@@ -48,7 +48,7 @@ def js(func):
     def do(self, *args, **kwargs):
         try:
             rsp = func(self, *args, **kwargs)
-            rsp['msg'] = rsp.get("msg", "")
+            rsp["msg"] = rsp.get("msg", "")
         except Exception as e:
             import traceback
 
@@ -77,6 +77,7 @@ def auth(func):
         return func(self, *args, **kwargs)
 
     return do
+
 
 def is_admin(func):
     def do(self, *args, **kwargs):
@@ -154,8 +155,8 @@ class BaseHandler(web.RequestHandler):
         self.site_url = self.request.protocol + "://" + host
 
         # 默认情况下，访问站内资源全部采用相对路径
-        self.api_url = ""   # API动态请求地址
-        self.cdn_url = ""   # 可缓存的资源，图片，文件
+        self.api_url = ""  # API动态请求地址
+        self.cdn_url = ""  # 可缓存的资源，图片，文件
 
         # 如果设置有static_host配置，则改为绝对路径
         if CONF["static_host"]:
@@ -519,6 +520,7 @@ class BaseHandler(web.RequestHandler):
             username=username,
             password=password,
         )
+
 
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):
