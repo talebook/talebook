@@ -94,6 +94,14 @@
                         >
                             <v-list-item-title> 设置为管理员 </v-list-item-title>
                         </v-list-item>
+                        <v-list-item
+                            @click="
+                                setuser(item.id, { delete: item.username });
+                                getDataFromApi()
+                            "
+                        >
+                            <v-list-item-title> 立即删除该用户 </v-list-item-title>
+                        </v-list-item>
                     </v-list>
                 </v-menu>
             </template>
