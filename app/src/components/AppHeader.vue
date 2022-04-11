@@ -4,12 +4,12 @@
             <v-list dense v-if="items.length > 0">
                 <template v-for="(item, idx) in items">
                     <v-subheader v-if="item.heading" :key="idx">{{ item.heading }}</v-subheader>
-                    
+
                     <!-- 二级菜单 -->
                     <v-list-group v-else-if="item.groups" no-action :value="item.expand">
                         <template v-slot:activator>
                             <v-list-item-action class="mt-1 mb-1 mr-2" dense>
-                                <v-icon class="pa-0 ma-0">{{item.icon}}</v-icon>
+                                <v-icon class="pa-0 ma-0">{{ item.icon }}</v-icon>
                             </v-list-item-action>
                             <v-list-item-content>
                                 <v-list-item-title v-text="item.text"> 管理员 </v-list-item-title>
@@ -18,7 +18,9 @@
 
                         <v-list-item v-for="link in item.groups" :key="link.href" :to="link.href">
                             <v-list-item-content>
-                                <v-list-item-title><v-icon>{{link.icon}}</v-icon> {{link.text}}</v-list-item-title>
+                                <v-list-item-title
+                                    ><v-icon>{{ link.icon }}</v-icon> {{ link.text }}</v-list-item-title
+                                >
                             </v-list-item-content>
                         </v-list-item>
                     </v-list-group>
@@ -224,19 +226,24 @@ export default {
     }),
     computed: {
         items: function () {
-            return [
+            var home_links = [
+                // home
                 { icon: "home", href: "/", text: "首页" },
+            ];
+            var admin_links = [
                 {
                     icon: "mdi-cog",
                     text: "管理",
-                    expand: (this.$route.path.indexOf("/admin/") == 0),
+                    expand: this.$route.path.indexOf("/admin/") == 0,
                     groups: [
-                        { icon: "mdi-cog", href: "/admin/settings", text: "系统设置"},
-                        { icon: "mdi-human-greeting", href: "/admin/users", text: "用户管理"},
-                        { icon: "mdi-library-shelves", href: "/admin/books", text: "图书管理"},
-                        { icon: "mdi-import", href: "/admin/imports", text: "导入图书"},
+                        { icon: "mdi-cog", href: "/admin/settings", text: "系统设置" },
+                        { icon: "mdi-human-greeting", href: "/admin/users", text: "用户管理" },
+                        { icon: "mdi-library-shelves", href: "/admin/books", text: "图书管理" },
+                        { icon: "mdi-import", href: "/admin/imports", text: "导入图书" },
                     ],
                 },
+            ];
+            var nav_links = [
                 { heading: "分类浏览" },
                 { icon: "widgets", href: "/nav", text: "所有书籍", count: this.sys.books },
                 { icon: "mdi-home-group", href: "/publisher", text: "出版社", count: this.sys.publishers },
@@ -251,18 +258,28 @@ export default {
                         { icon: "mdi-history", href: "/recent", text: "最近更新" },
                     ],
                 },
-            ]
-                .concat(this.sys.friends.length > 0 ? [{ heading: "友情链接" }, { links: this.sys.friends, target: "_blank" }] : [])
-                .concat([
-                    { heading: "系统" },
-                    { icon: "mdi-history", text: "系统版本", href: "", count: this.sys.version },
-                    { icon: "mdi-human", text: "用户数", href: "", count: this.sys.users },
-                    { icon: "mdi-cellphone", text: "OPDS接口", href: "/opds/", count: "OPDS", target: "_blank" },
-                ]);
+            ];
+            var friend_links = [
+                // links
+                { heading: "友情链接" },
+                { links: this.sys.friends, target: "_blank" },
+            ];
+            var sys_links = [
+                { heading: "系统" },
+                { icon: "mdi-history", text: "系统版本", href: "", count: this.sys.version },
+                { icon: "mdi-human", text: "用户数", href: "", count: this.sys.users },
+                { icon: "mdi-cellphone", text: "OPDS接口", href: "/opds/", count: "OPDS", target: "_blank" },
+            ];
+
+            return home_links
+                .concat(this.user.is_admin ? admin_links : [])
+                .concat(nav_links)
+                .concat(this.sys.friends.length > 0 ? friend_links : [])
+                .concat(sys_links);
         },
     },
     mounted() {
-        this.visit_admin_pages = (this.$route.path.indexOf("/admin/") == 0);
+        this.visit_admin_pages = this.$route.path.indexOf("/admin/") == 0;
         this.sidebar = this.$vuetify.breakpoint.lgAndUp;
         this.$backend("/user/info").then((rsp) => {
             this.err = rsp.err;

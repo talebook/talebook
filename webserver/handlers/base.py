@@ -206,7 +206,8 @@ class BaseHandler(web.RequestHandler):
         login_time = self.get_secure_cookie("lt")
         if not login_time or int(login_time) < int(time.time()) - 7 * 86400:
             return None
-        return int(self.get_secure_cookie("user_id"))
+        uid = self.get_secure_cookie("user_id")
+        return int(uid) if uid.isdigit() else None
 
     def get_current_user(self):
         user_id = self.user_id()
