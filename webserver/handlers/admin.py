@@ -309,22 +309,22 @@ class AdminInstall(BaseHandler):
             user = Reader()
             user.username = username
             user.name = username
-            user.email = email
-            user.avatar = CONF["avatar_service"] + "/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
             user.create_time = datetime.datetime.now()
-            user.update_time = datetime.datetime.now()
-            user.access_time = datetime.datetime.now()
-            user.active = True
-            user.admin = True
-            user.extra = {"kindle_email": ""}
-            user.set_secure_password(password)
-            try:
-                user.save()
-            except:
-                import traceback
 
-                logging.error(traceback.format_exc())
-                return {"err": "db.error", "msg": _(u"系统异常，请重试或更换注册信息")}
+        # 设置admin user的信息
+        user.email = email
+        user.avatar = CONF["avatar_service"] + "/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
+        user.update_time = datetime.datetime.now()
+        user.access_time = datetime.datetime.now()
+        user.active = True
+        user.admin = True
+        user.extra = {"kindle_email": ""}
+        user.set_secure_password(password)
+        try:
+            user.save()
+        except:
+            logging.error(traceback.format_exc())
+            return {"err": "db.error", "msg": _(u"系统异常，请重试或更换注册信息")}
 
         args = loader.SettingsLoader()
         args.clear()
