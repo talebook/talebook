@@ -169,7 +169,7 @@
                             </v-list-item>
                             <v-divider></v-divider>
                             <template v-if="user.is_admin">
-                                <v-list-item to="/admin">
+                                <v-list-item to="/admin/settings">
                                     <v-list-item-action><v-icon color="red">mdi-console</v-icon></v-list-item-action>
                                     <v-list-item-title> 管理员入口 </v-list-item-title>
                                 </v-list-item>
@@ -245,7 +245,7 @@ export default {
             ];
             var nav_links = [
                 { heading: "分类浏览" },
-                { icon: "widgets", href: "/nav", text: "所有书籍", count: this.sys.books },
+                { icon: "widgets", href: "/nav", text: "分类导览", count: this.sys.books },
                 { icon: "mdi-home-group", href: "/publisher", text: "出版社", count: this.sys.publishers },
                 { icon: "mdi-human-greeting", href: "/author", text: "作者", count: this.sys.authors },
                 { icon: "mdi-tag-heart", href: "/tag", text: "标签", count: this.sys.tags },
@@ -255,7 +255,7 @@ export default {
                         { icon: "mdi-library-shelves", href: "/series", text: "丛书", count: this.sys.series },
                         { icon: "mdi-star-half", href: "/rating", text: "评分" },
                         { icon: "mdi-trending-up", href: "/hot", text: "热度榜单" },
-                        { icon: "mdi-history", href: "/recent", text: "最近更新" },
+                        { icon: "mdi-history", href: "/recent", text: "所有书籍" },
                     ],
                 },
             ];
