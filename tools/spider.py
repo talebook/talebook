@@ -66,7 +66,7 @@ def visit_thread(tid, name):
         done_urls.add(path)
     rsp = get(path)
     attchments = re.findall(re_attchment, rsp.text)
-    if not attachments:
+    if not attchments:
         logging.error("No attachment in %s" % path)
         return
     for path, name in attchments:
