@@ -176,14 +176,12 @@ export default {
                 });
         },
         scan_books() {
-            var path = "/data/books/upload";
             this.loading = true;
             this.$backend("/admin/scan/run", {
                 method: "POST",
-                body: JSON.stringify({ path: path }),
             })
                 .then((rsp) => {
-                    if (rsp.err != "ok") {
+                    if (rsp.err !== "ok") {
                         this.$alert("error", rsp.msg);
                         return;
                     }
@@ -191,7 +189,7 @@ export default {
                     //this.check_scan_status();
                     this.loop_check_status("/admin/scan/status", (rsp) => {
                         this.scan = rsp.status;
-                        if (this.scan.new == 0) {
+                        if (this.scan.new === 0) {
                             this.loading = false;
                             return false;
                         }
@@ -211,13 +209,13 @@ export default {
                 }),
             })
                 .then((rsp) => {
-                    if (rsp.err != "ok") {
+                    if (rsp.err !== "ok") {
                         this.$alert("error", rsp.msg);
                     }
                     //this.check_import_status();
                     this.loop_check_status("/admin/import/status", (rsp) => {
                         this.import = rsp.status;
-                        if (this.import.ready == 0) {
+                        if (this.import.ready === 0) {
                             this.loading = false;
                             return false;
                         }
@@ -240,7 +238,7 @@ export default {
                 }),
             })
                 .then((rsp) => {
-                    if (rsp.err != "ok") {
+                    if (rsp.err !== "ok") {
                         this.$alert("error", rsp.msg);
                     }
                     this.getDataFromApi();
@@ -256,7 +254,7 @@ export default {
                 body: JSON.stringify({ hashlist: this.selected, status: status }),
             })
                 .then((rsp) => {
-                    if (rsp.err != "ok") {
+                    if (rsp.err !== "ok") {
                         this.$alert("error", rsp.msg);
                     }
                 })

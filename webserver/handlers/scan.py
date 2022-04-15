@@ -9,11 +9,12 @@ import time
 import traceback
 from gettext import gettext as _
 
+import sqlalchemy
 import tornado
+
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
 from webserver.models import Item, ScanFile
-import sqlalchemy
 
 CONF = loader.get_settings()
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
@@ -306,8 +307,7 @@ class ScanRun(BaseHandler):
     @js
     @is_admin
     def post(self):
-        req = tornado.escape.json_decode(self.request.body)
-        path = req.get("path", "")
+        path = self.settings["scan_upload_path"]
         if not path.startswith("/data/"):
             return {"err": "params.error", "msg": _(u"参数错误")}
         m = Scanner(self.db, self.session)
