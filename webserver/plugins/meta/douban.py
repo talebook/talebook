@@ -19,9 +19,8 @@ CHROME_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)"
-    + "Chrome/66.0.3359.139 Safari/537.36",
+                  + "Chrome/66.0.3359.139 Safari/537.36",
 }
-
 
 KEY = "douban"
 REMOVES = [
@@ -33,7 +32,7 @@ REMOVES = [
 
 
 def str2date(s):
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m", _("%Y年"), "%Y"):
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m", _("%Y年"), _("%Y年%m月"), _("%Y年%m月%d日"), "%Y"):
         try:
             return datetime.datetime.strptime(s, fmt).replace(tzinfo=datetime.timezone.utc)
         except:
@@ -83,6 +82,8 @@ class DoubanBookApi(object):
         return data
 
     def get_book_by_isbn(self, isbn):
+        if not isbn:
+            return None
         url = "%s/v2/book/isbn/%s" % (self.baseUrl, isbn)
         return self.request(url)
 
@@ -142,8 +143,9 @@ class DoubanBookApi(object):
         if not authors:
             authors = [u"佚名"]
 
+        logging.debug("=================\nsource metadata:\n%s" % book)
+
         from calibre.ebooks.metadata.book.base import Metadata
-        from calibre.utils.date import utcnow
 
         mi = Metadata(book["title"])
         mi.authors = authors
@@ -156,7 +158,7 @@ class DoubanBookApi(object):
         mi.tags = [t["name"] for t in book["tags"]][:8]
         mi.rating = int(float(book["rating"]["average"]))
         mi.pubdate = str2date(book["pubdate"])
-        mi.timestamp = utcnow()
+        # mi.timestamp = utcnow()
         mi.douban_author_intro = book["author_intro"]
         mi.douban_subtitle = book.get("subtitle", None)
         mi.website = "https://book.douban.com/subject/%s/" % book["id"]
