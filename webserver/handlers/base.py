@@ -14,8 +14,8 @@ from gettext import gettext as _
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import func as sql_func
 from tornado import web
-from webserver import loader, utils
 
+from webserver import loader, utils
 # import social_tornado.handlers
 from webserver.models import Item, Message, Reader
 
@@ -54,7 +54,7 @@ def js(func):
 
             logging.error(traceback.format_exc())
             msg = (
-                'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
+                    'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
             )
             rsp = {"err": "exception", "msg": msg}
             if isinstance(e, web.Finish):
@@ -314,7 +314,7 @@ class BaseHandler(web.RequestHandler):
             raise web.HTTPError(400, "%s is not a valid sort field" % field)
 
         keyg = CSSortKeyGenerator([(field, order)], self.db.field_metadata, self.db.prefs)
-        items.sort(key=keyg, reverse=not order)
+        items.sort(key=keyg)
 
     def get_template_path(self):
         """获取模板路径"""
@@ -364,8 +364,8 @@ class BaseHandler(web.RequestHandler):
             "messages": self.pop_messages(),
             "count_all_users": self.session.query(sql_func.count(Reader.id)).scalar(),
             "count_hot_users": self.session.query(sql_func.count(Reader.id))
-            .filter(Reader.access_time > last_week)
-            .scalar(),
+                .filter(Reader.access_time > last_week)
+                .scalar(),
             "IMG": self.cdn_url,
             "SITE_TITLE": CONF["site_title"],
         }
@@ -451,18 +451,18 @@ class BaseHandler(web.RequestHandler):
         name_column = "A.rating as name" if field in ["rating"] else "A.name"
         args = {"table": table, "field": field, "name_column": name_column}
         sql = (
-            """SELECT A.id, %(name_column)s, count(distinct book) as count
-        FROM %(table)s as A left join books_%(table)s_link as B
-        on A.id = B.%(field)s group by A.id"""
-            % args
+                """SELECT A.id, %(name_column)s, count(distinct book) as count
+            FROM %(table)s as A left join books_%(table)s_link as B
+            on A.id = B.%(field)s group by A.id"""
+                % args
         )
         logging.debug(sql)
         rows = self.cache.backend.conn.get(sql)
         items = [{"id": a, "name": b, "count": c} for a, b, c in rows]
         return items
 
-    def books_by_timestamp(self):
-        sql = "SELECT id, timestamp FROM books order by timestamp desc"
+    def books_by_id(self):
+        sql = "SELECT id FROM books order by id desc"
         ids = [v[0] for v in self.cache.backend.conn.get(sql)]
         return ids
 
@@ -525,7 +525,7 @@ class BaseHandler(web.RequestHandler):
 
 class ListHandler(BaseHandler):
     def get_item_books(self, category, name):
-        ids = books = []
+        books = []
         item_id = self.cache.get_item_id(category, name)
         if item_id:
             ids = self.db.get_books_for_category(category, item_id)
@@ -536,7 +536,6 @@ class ListHandler(BaseHandler):
         items.sort(key=lambda x: x[field], reverse=not ascending)
 
     def sort_books(self, items, field):
-        self.do_sort(items, "title", True)
         fm = self.db.field_metadata
         keys = frozenset(fm.sortable_field_keys())
         if field in keys:
@@ -547,30 +546,29 @@ class ListHandler(BaseHandler):
                 "timestamp",
             )
             self.do_sort(items, field, ascending)
+        else:
+            self.do_sort(items, "id", False)
         return None
 
     @js
-    def render_book_list(self, all_books, ids=None, title=None):
+    def render_book_list(self, all_books, ids=None, title=None, sort_by_id=False):
         start = self.get_argument_start()
-        sort = self.get_argument("sort", "timestamp")
         try:
             size = int(self.get_argument("size"))
         except:
-            size = 30
-        delta = min(max(size, 30), 100)
-
-        count = 0
-        books = []
+            size = 60
+        delta = min(max(size, 60), 100)
 
         if ids:
             ids = list(ids)
             count = len(ids)
-            books = self.get_books(ids=ids[start : start + delta])
-            self.sort_books(books, sort)
+            books = self.get_books(ids=ids[start: start + delta])
+            if sort_by_id:
+                # 归一化，按照id从大到小排列。
+                self.do_sort(books, "id", False)
         else:
             count = len(all_books)
-            self.sort_books(all_books, sort)
-            books = all_books[start : start + delta]
+            books = all_books[start: start + delta]
         return {
             "err": "ok",
             "title": title,

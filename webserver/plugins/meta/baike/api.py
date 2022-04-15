@@ -52,7 +52,7 @@ class BaiduBaikeApi:
 
         mi = Metadata(info["title"])
         plat = "网络平台"
-        mi.publisher = info.get(u"出版社", plat)
+        info.get("出版社", info.get("连载平台", plat))
         mi.authors = [info.get(u"作者", u"佚名")]
         mi.author_sort = mi.authors[0]
         mi.isbn = info.get("ISBN", BAIKE_ISBN)
@@ -61,7 +61,7 @@ class BaiduBaikeApi:
         if pd is None:
             pd = utcnow()
         mi.pubdate = pd
-        # mi.timestamp = mi.pubdate
+        mi.timestamp = mi.pubdate
         mi.cover_url = baike.get_image()
         mi.comments = re.sub(r"\[\d+\]$", "", baike.get_summary())
         mi.website = baike.http.url

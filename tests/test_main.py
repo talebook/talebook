@@ -52,6 +52,7 @@ def setup_server():
 
     # set env
     main.options.with_library = testdir + "/library/"
+    main.CONF["scan_upload_path"] = testdir + "/cases/"
     main.CONF["ALLOW_GUEST_PUSH"] = False
     main.CONF["ALLOW_GUEST_DOWNLOAD"] = False
     main.CONF["upload_path"] = "/tmp/"

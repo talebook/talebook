@@ -15,6 +15,8 @@ from gettext import gettext as _
 
 import requests
 
+from calibre.utils.date import utcnow
+
 CHROME_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -158,7 +160,7 @@ class DoubanBookApi(object):
         mi.tags = [t["name"] for t in book["tags"]][:8]
         mi.rating = int(float(book["rating"]["average"]))
         mi.pubdate = str2date(book["pubdate"])
-        # mi.timestamp = utcnow()
+        mi.timestamp = utcnow()
         mi.douban_author_intro = book["author_intro"]
         mi.douban_subtitle = book.get("subtitle", None)
         mi.website = "https://book.douban.com/subject/%s/" % book["id"]

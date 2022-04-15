@@ -169,7 +169,7 @@ def html_to_lxml(raw):
     raw = u"<div>%s</div>" % raw
     root = html.fragment_fromstring(raw)
     root.set("xmlns", "http://www.w3.org/1999/xhtml")
-    raw = etree.tostring(root, encoding='utf-8')
+    raw = etree.tostring(root, pretty_print=True, encoding="utf-8", xml_declaration=True)
     try:
         return etree.fromstring(raw)
     except:
@@ -180,7 +180,7 @@ def html_to_lxml(raw):
                     remove.append(attr)
             for a in remove:
                 del x.attrib[a]
-        raw = etree.tostring(root, encoding='utf-8')
+        raw = etree.tostring(root, pretty_print=True, encoding="utf-8", xml_declaration=True)
         try:
             return etree.fromstring(raw)
         except:
