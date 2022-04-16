@@ -15,8 +15,6 @@ from gettext import gettext as _
 
 import requests
 
-from calibre.utils.date import utcnow
-
 CHROME_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -148,6 +146,8 @@ class DoubanBookApi(object):
         logging.debug("=================\nsource metadata:\n%s" % book)
 
         from calibre.ebooks.metadata.book.base import Metadata
+        from calibre.utils.date import utcnow
+
 
         mi = Metadata(book["title"])
         mi.authors = authors
