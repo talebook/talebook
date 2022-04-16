@@ -55,7 +55,7 @@ def download(name, url):
     link = re.findall(r'https?://pan.baidu.com/s/[^ ]*', rsp.text)[0]
     t = u"%s\t%s\t%s\t%s\n" % (name, link, passwd, title)
     open(book_path, "a").write( t.encode("UTF-8") )
-    print t
+    print(t)
 
 
 def visit_list(page):

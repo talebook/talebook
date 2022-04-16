@@ -20,7 +20,7 @@ sys.resources_location = os.environ.get('CALIBRE_RESOURCES_PATH', '/usr/share/ca
 sys.extensions_location = os.environ.get('CALIBRE_EXTENSIONS_PATH', '/usr/lib/calibre/calibre/plugins')
 sys.executables_location = os.environ.get('CALIBRE_EXECUTABLES_PATH', '/usr/bin')
 
-from webserver import douban
+from webserver.plugins.meta import douban
 from calibre.db.legacy import LibraryDatabase
 
 class App:
@@ -31,19 +31,19 @@ class App:
         self.db = LibraryDatabase(os.path.expanduser(library_path))
 
     def log_error(self, msg):
-        print "\033[1;31;40m%s\033[0m" % msg
+        print("\033[1;31;40m%s\033[0m" % msg)
 
     def log_succ(self, msg):
-        print "\033[1;32;40m%s\033[0m" % msg
+        print("\033[1;32;40m%s\033[0m" % msg)
 
     def get_baike_metadata(self, title):
-        from baidubaike import Page
+        from webserver.plugins.meta.baike.baidubaike.baidubaike import Page
 
         try: baike = Page(title)
         except: return None
 
         info = baike.get_info()
-        print "\n".join( "%s:\t%s" % v for v in info.items())
+        print("\n".join( "%s:\t%s" % v for v in info.items()))
         mi = Metadata(info['title'])
         plat = info.get(u'首发网站', None)
         if not plat:
@@ -99,13 +99,13 @@ class App:
             if book['tags']: continue
             if book['isbn']: continue
             if int(book['id']) < 6722: continue
-            print self.fmt%("Todo", book['id'], self.total, book['isbn'], book['title'])
+            print(self.fmt%("Todo", book['id'], self.total, book['isbn'], book['title']))
             self.do_book_update(book['id'])
 
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print "%s library-path-dir" % sys.argv[0]
+        print("%s library-path-dir" % sys.argv[0])
         exit(0)
     app = App(sys.argv[1])
     #print app.get_baike_metadata(u'法神重生')

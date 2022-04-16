@@ -6,9 +6,14 @@ This is the standard runscript for all of calibre's tools.
 Do not modify it unless you know what you are doing.
 """
 
-import re, logging, traceback
-from .baidubaike.baidubaike import Page
+import logging
+import re
+import traceback
+
 import requests
+
+from webserver.plugins.meta.douban import str2date
+from .baidubaike.baidubaike import Page
 
 BAIKE_ISBN = "0000000000001"
 KEY = "BaiduBaike"
@@ -17,7 +22,7 @@ CHROME_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)"
-    + "Chrome/66.0.3359.139 Safari/537.36",
+                  + "Chrome/66.0.3359.139 Safari/537.36",
 }
 
 
@@ -43,20 +48,20 @@ class BaiduBaikeApi:
         from calibre.utils.date import utcnow, strptime
 
         info = baike.get_info()
-        logging.debug("\n".join("%s:\t%s" % v for v in info.items()))
+        logging.debug("\n" + "\n".join("%s:\t%s" % v for v in info.items()))
 
         mi = Metadata(info["title"])
-        plat = "网络小说平台"
-        plat = info.get(u"首发状态", plat)
-        plat = info.get(u"首发网站", plat)
-        plat = plat.replace(u"首发", "")
-        mi.publisher = info.get(u"连载平台", plat)
+        plat = "网络平台"
+        info.get("出版社", info.get("连载平台", plat))
         mi.authors = [info.get(u"作者", u"佚名")]
         mi.author_sort = mi.authors[0]
-        mi.isbn = BAIKE_ISBN
+        mi.isbn = info.get("ISBN", BAIKE_ISBN)
         mi.tags = baike.get_tags()
-        mi.pubdate = utcnow()
-        mi.timestamp = utcnow()
+        pd = str2date(info.get(u"出版时间"))
+        if pd is None:
+            pd = utcnow()
+        mi.pubdate = pd
+        mi.timestamp = mi.pubdate
         mi.cover_url = baike.get_image()
         mi.comments = re.sub(r"\[\d+\]$", "", baike.get_summary())
         mi.website = baike.http.url

@@ -2,7 +2,8 @@
 # -*- coding: UTF-8 -*-
 
 import json
-from unittest import mock, skip
+from unittest import mock
+
 from tests.test_main import TestWithUserLogin, setUpModule as init, testdir
 
 
@@ -16,12 +17,12 @@ class TestScan(TestWithUserLogin):
     @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
     def test_scan(self, m1):
         m1.return_value = False
-        req = {"path": testdir + "/cases/"}
+        req = {"path": testdir + "/cases/b"}
         d = self.json("/api/admin/scan/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
 
     def test_scan_background(self):
-        req = {"path": testdir + "/cases/"}
+        req = {"path": testdir + "/cases/a"}
         d = self.json("/api/admin/scan/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
 

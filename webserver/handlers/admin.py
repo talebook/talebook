@@ -13,6 +13,7 @@ import uuid
 from gettext import gettext as _
 
 import tornado
+
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
 from webserver.models import Reader
@@ -101,7 +102,7 @@ class AdminUsers(BaseHandler):
             if self.user_id() == user.id:
                 return {"err": "params.user.invalid", "msg": _("不允许删除自己")}
 
-            user.delete()
+            self.session.query(Reader).filter(Reader.id == user.id).delete()
             self.session.commit()
             return {"err": "ok", "msg": _("删除成功")}
 
@@ -243,6 +244,7 @@ class AdminSettings(BaseHandler):
             "SOCIALS",
             "autoreload",
             "cookie_secret",
+            "scan_upload_path",
             "douban_apikey",
             "douban_baseurl",
             "douban_max_count",

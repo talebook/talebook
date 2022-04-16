@@ -31,8 +31,8 @@ ARG BUILD_COUNTRY=""
 # Set mirrors in china
 RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
     echo "using repo mirrors for ${BUILD_COUNTRY}"; \
-    sed 's@deb.debian.org/debian@mirrors.tencentyun.com/debian@' -i /etc/apt/sources.list; \
-    pip config set global.index-url https://mirrors.tencent.com/pypi/simple/; \
+    sed 's@deb.debian.org/debian@mirrors.aliyun.com/debian@' -i /etc/apt/sources.list; \
+    pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/; \
     fi
 
 # install envsubst
@@ -65,6 +65,7 @@ RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /data/books/library  && \
     mkdir -p /data/books/extract  && \
     mkdir -p /data/books/upload  && \
+    mkdir -p /data/books/imports  && \
     mkdir -p /data/books/convert  && \
     mkdir -p /data/books/progress  && \
     mkdir -p /data/books/settings && \

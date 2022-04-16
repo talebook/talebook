@@ -15,6 +15,7 @@ from gettext import gettext as _
 
 import tornado.escape
 from tornado import web
+
 from webserver import constants, loader, utils
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.models import Item
@@ -71,23 +72,22 @@ class Index(BaseHandler):
 
     @js
     def get(self):
-        max_random = 30
-        max_recent = 30
-        cnt_random = min(int(self.get_argument("random", 8)), max_random)
-        cnt_recent = min(int(self.get_argument("recent", 10)), max_recent)
+        cnt_random = min(int(self.get_argument("random", 8)), 30)
+        cnt_recent = min(int(self.get_argument("recent", 10)), 30)
 
         # nav = "index"
         # title = _(u"全部书籍")
         ids = list(self.cache.search(""))
         if not ids:
             raise web.HTTPError(404, reason=_(u"本书库暂无藏书"))
-        random_ids = random.sample(ids, min(max_random, len(ids)))
+        random_ids = random.sample(ids, min(cnt_random, len(ids)))
         random_books = [b for b in self.get_books(ids=random_ids) if b["cover"]]
-        random_books = random_books[:cnt_random]
-        ids.sort()
-        new_ids = random.sample(ids[-300:], min(max_recent, len(ids)))
+        random_books.sort(key=lambda x: x["id"], reverse=True)
+
+        ids.sort(reverse=True)
+        new_ids = random.sample(ids[0:100], min(cnt_recent, len(ids)))
         new_books = [b for b in self.get_books(ids=new_ids) if b["cover"]]
-        new_books = new_books[:cnt_recent]
+        new_books.sort(key=lambda x: x["id"], reverse=True)
 
         return {
             "random_books_count": len(random_books),
@@ -130,6 +130,7 @@ class BookRefer(BaseHandler):
             maxCount=CONF["douban_max_count"],
         )
         # first, search title
+        books = []
         try:
             books = api.search_books(title) or []
         except:
@@ -233,7 +234,20 @@ class BookRefer(BaseHandler):
         else:
             if only_meta == "yes":
                 refer_mi.cover_data = None
+            if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
+                ts = []
+                for nn, tags in constants.BOOKNAV:
+                    for tag in tags:
+                        if tag in refer_mi.title or tag in refer_mi.comments:
+                            ts.append(tag)
+                        elif tag in refer_mi.authors:
+                            ts.append(tag)
+                if len(ts) > 0:
+                    mi.tags += ts[:8]
+                    logging.info("tags are %s" % ','.join(mi.tags))
+                    self.db.set_tags(book_id, mi.tags)
             mi.smart_update(refer_mi, replace_metadata=True)
+
         self.db.set_metadata(book_id, mi)
         return {"err": "ok"}
 
@@ -316,8 +330,12 @@ class BookDownload(BaseHandler):
             else:
                 return self.redirect("/login")
 
-        if self.current_user and not self.current_user.can_save():
-            raise web.HTTPError(403, reason=_(u"无权操作"))
+        if self.current_user:
+            if self.current_user.can_save():
+                if not self.current_user.is_active():
+                    raise web.HTTPError(403, reason=_(u"无权操作，请先登录注册邮箱激活账号。"))
+            else:
+                raise web.HTTPError(403, reason=_(u"无权操作"))
 
         fmt = fmt.lower()
         logging.debug("download %s.%s" % (id, fmt))
@@ -347,7 +365,7 @@ class BookNav(ListHandler):
         tagmap = self.all_tags_with_count()
         navs = []
         for h1, tags in constants.BOOKNAV:
-            new_tags = [{"name": v, "count": tagmap.get(v, 0)} for v in tags]
+            new_tags = [{"name": v, "count": tagmap.get(v, 0)} for v in tags if tagmap.get(v, 0) > 0]
             navs.append({"legend": h1, "tags": new_tags})
         return {"err": "ok", "navs": navs}
 
@@ -355,8 +373,8 @@ class BookNav(ListHandler):
 class RecentBook(ListHandler):
     def get(self):
         title = _(u"新书推荐")
-        ids = self.books_by_timestamp()
-        return self.render_book_list([], ids=ids, title=title)
+        ids = self.books_by_id()
+        return self.render_book_list([], ids=ids, title=title, sort_by_id=True)
 
 
 class SearchBook(ListHandler):
@@ -376,7 +394,7 @@ class HotBook(ListHandler):
         db_items = self.session.query(Item).filter(Item.count_visit > 1).order_by(Item.count_download.desc())
         count = db_items.count()
         start = self.get_argument_start()
-        delta = 30
+        delta = 60
         page_max = int(count / delta)
         page_now = int(start / delta)
         pages = []
@@ -386,13 +404,13 @@ class HotBook(ListHandler):
         items = db_items.limit(delta).offset(start).all()
         ids = [item.book_id for item in items]
         books = self.get_books(ids=ids)
-        self.do_sort(books, "count_visit", False)
+        self.do_sort(books, "count_download", False)
         return self.render_book_list(books, title=title)
 
 
 class BookUpload(BaseHandler):
     @classmethod
-    def convert(self, s):
+    def convert(cls, s):
         try:
             return s.group(0).encode("latin1").decode("utf8")
         except:
@@ -534,8 +552,11 @@ class BookPush(BaseHandler):
         if not CONF["ALLOW_GUEST_PUSH"]:
             if not self.current_user:
                 return {"err": "user.need_login", "msg": _(u"请先登录")}
-            elif not self.current_user.can_push():
-                return {"err": "permission", "msg": _(u"无权操作")}
+            else:
+                if not self.current_user.can_push():
+                    return {"err": "permission", "msg": _(u"无权操作")}
+                elif not self.current_user.is_active():
+                    return {"err": "permission", "msg": _(u"无权操作，请先激活账号。")}
 
         mail_to = self.get_argument("mail_to", None)
         if not mail_to:

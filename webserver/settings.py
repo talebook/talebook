@@ -19,6 +19,7 @@ settings = {
     "progress_path" : "/data/books/progress/",
     "convert_path"  : "/data/books/convert/",
     "upload_path"   : "/data/books/upload/",
+    "scan_upload_path"   : "/data/books/imports/",
     "extract_path"  : "/data/books/extract/",
     "with_library"  : "/data/books/library/",
     "cookie_secret" : "cookie_secret",
@@ -96,7 +97,7 @@ settings = {
         { "text": u"文渊阁",   "href": "https://wenyuange.org/" },
         { "text": u"阅读链",   "href": "https://www.yuedu.pro/" },
         { "text": u"苦瓜书盘", "href": "https://www.kgbook.com" },
-        { "text": u"三秋书屋", "href": "https://www.sanqiu.cc/" },        
+        { "text": u"三秋书屋", "href": "https://www.sanqiu.cc/" },
     ],
     'SOCIALS': [
     ],

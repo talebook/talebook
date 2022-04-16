@@ -196,6 +196,7 @@ export default {
                 { icon: "info", key: "douban_baseurl", label: "豆瓣插件API地址(例如 http://10.0.0.1:8080 )" },
                 { icon: "info", key: "douban_max_count", label: "豆瓣插件API查询结果数量" },
                 { icon: "lock", key: "cookie_secret", label: "COOKIE随机密钥" },
+                { icon: "info", key: "scan_upload_path", label: "批量导入扫描目录" },
                 { icon: "", key: "autoreload", label: "更新配置后自动重启服务器(首次开启需人工重启)", type: 'checkbox' },
             ],
             tips: [

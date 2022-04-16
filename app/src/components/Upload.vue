@@ -1,6 +1,6 @@
 <template>
     <div>
-        <v-btn bottom color="pink" dark fab fixed right @click="dialog = !dialog" >
+        <v-btn bottom color="pink" dark fab fixed right @click="dialog = !dialog">
             <v-icon>mdi-upload</v-icon>
         </v-btn>
         <v-dialog v-model="dialog" persistent transition="dialog-bottom-transition" width="300">
@@ -17,10 +17,10 @@
                         <v-file-input v-model="ebooks" label="请选择要上传的电子书"></v-file-input>
                     </v-form>
                 </v-card-text>
-                <v-card-actions >
-                    <v-spacer> </v-spacer>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
                     <v-btn :loading="loading" color="primary" @click="do_upload">上传</v-btn>
-                    <v-spacer> </v-spacer>
+                    <v-spacer></v-spacer>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -35,7 +35,7 @@ export default {
         ebooks: null,
     }),
     methods: {
-        do_upload: function() {
+        do_upload: function () {
             this.loading = true;
             var data = new FormData();
             data.append("ebook", this.ebooks);
@@ -43,19 +43,21 @@ export default {
                 method: 'POST',
                 body: data,
             })
-            .then( rsp => {
-                this.dialog = false;
-                if ( rsp.err == 'ok' ) {
-                    this.$alert("success", "上传成功！", "/book/"+rsp.book_id);
-                } else if ( rsp.err == 'samebook' ) {
-                    this.$alert("error", rsp.msg, "/book/"+rsp.book_id);
-                } else {
-                    this.$alert("error", rsp.msg);
-                }
-            })
-            .finally(() => {
-                this.loading = false;
-            });
+                .then(rsp => {
+                    this.dialog = false;
+                    if (rsp.err === 'ok') {
+                        this.$alert("success", "上传成功！", "/book/" + rsp.book_id);
+                        this.$router.push("/book/" + rsp.book_id)
+                    } else if (rsp.err === 'samebook') {
+                        this.$alert("error", rsp.msg, "/book/" + rsp.book_id);
+                        this.$router.push("/book/" + rsp.book_id)
+                    } else {
+                        this.$alert("error", rsp.msg);
+                    }
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
         },
     },
 
