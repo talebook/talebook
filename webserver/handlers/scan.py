@@ -18,7 +18,7 @@ from webserver.models import Item, ScanFile
 
 CONF = loader.get_settings()
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
-
+SCAN_DIR_PREFIX = "/data/" # 限定扫描必须在/data/目录下，以防黑客扫描到其他系统目录
 
 class Scanner:
     def __init__(self, calibre_db, session_db, user_id=None):
@@ -293,7 +293,7 @@ class ScanList(BaseHandler):
                 "update_time": s.update_time.strftime("%Y-%m-%d %H:%M:%S") if s.update_time else "N/A",
             }
             response.append(d)
-        return {"err": "ok", "items": response, "total": total}
+        return {"err": "ok", "items": response, "total": total, "scan_dir": CONF["scan_upload_path"]}
 
 
 class ScanMark(BaseHandler):
@@ -307,8 +307,8 @@ class ScanRun(BaseHandler):
     @js
     @is_admin
     def post(self):
-        path = self.settings["scan_upload_path"]
-        if not path.startswith("/data/"):
+        path = CONF["scan_upload_path"]
+        if not path.startswith(SCAN_DIR_PREFIX):
             return {"err": "params.error", "msg": _(u"参数错误")}
         m = Scanner(self.db, self.session)
         total = m.run_scan(path)
