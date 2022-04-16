@@ -120,11 +120,6 @@ def bind_topdir_book_names(cache):
 
 
 def make_app():
-    init_calibre()
-
-    from calibre.db.legacy import LibraryDatabase
-    from calibre.utils.date import fromtimestamp
-
     auth_db_path = CONF["user_database"]
     logging.info("Init library with [%s]" % options.with_library)
     logging.info("Init AuthDB  with [%s]" % auth_db_path)
@@ -151,6 +146,11 @@ def make_app():
         models.user_syncdb(engine)
         logging.info("Create tables into DB")
         sys.exit(0)
+
+    init_calibre()
+
+    from calibre.db.legacy import LibraryDatabase
+    from calibre.utils.date import fromtimestamp
 
     book_db = LibraryDatabase(os.path.expanduser(options.with_library))
     cache = book_db.new_api
