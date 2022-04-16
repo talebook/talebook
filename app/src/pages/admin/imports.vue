@@ -1,7 +1,10 @@
 <template>
     <v-card>
-        <v-card-title> 导入图书  <v-chip small class="primary">Beta</v-chip> </v-card-title>
-        <v-card-text> 请将需要导入的书籍放入uploads目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt</v-card-text>
+        <v-card-title> 导入图书 <v-chip small class="primary">Beta</v-chip> </v-card-title>
+        <v-card-text>
+        请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。<br/>
+        已导入成功的记录请不要删除，以免书籍被再次导入。
+        </v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" color="primary" @click="scan_books"><v-icon>mdi-file-find</v-icon>扫描书籍</v-btn>
             <v-btn :disabled="loading" outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
@@ -48,35 +51,6 @@
                 <a v-else target="_blank" :href="`/book/${item.book_id}`">{{ item.title }}</a> <br />
                 作者：{{ item.author }}
             </template>
-            <template v-slot:item.detail="{ item }">
-                <span v-if="item.extra.visit_history"> 访问{{ item.extra.visit_history.length }}本 </span>
-                <span v-if="item.extra.read_history"> 阅读{{ item.extra.read_history.length }}本 </span>
-                <span v-if="item.extra.push_history"> 推送{{ item.extra.push_history.length }}本 </span>
-                <span v-if="item.extra.download_history"> 下载{{ item.extra.download_history.length }}本 </span>
-                <span v-if="item.extra.upload_history"> 上传{{ item.extra.upload_history.length }}本 </span>
-            </template>
-            <template v-slot:item.actions="{ item }">
-                <v-menu offset-y right>
-                    <template v-slot:activator="{ on }">
-                        <v-btn color="primary" small v-on="on">操作 <v-icon small>more_vert</v-icon></v-btn>
-                    </template>
-                    <v-list dense>
-                        <v-subheader>修改用户权限</v-subheader>
-
-                        <v-divider></v-divider>
-                        <v-subheader>账号管理</v-subheader>
-                        <v-list-item v-if="!item.is_active">
-                            <v-list-item-title> 免邮箱认证，直接激活账户 </v-list-item-title>
-                        </v-list-item>
-                        <v-list-item v-if="item.is_admin">
-                            <v-list-item-title> 取消管理员 </v-list-item-title>
-                        </v-list-item>
-                        <v-list-item v-else>
-                            <v-list-item-title> 设置为管理员 </v-list-item-title>
-                        </v-list-item>
-                    </v-list>
-                </v-menu>
-            </template>
         </v-data-table>
     </v-card>
 </template>
@@ -85,6 +59,7 @@
 export default {
     data: () => ({
         selected: [],
+        scan_dir: "/data/books/imports/",
         search: "",
         page: 1,
         items: [],
@@ -97,7 +72,6 @@ export default {
             { text: "路径", sortable: true, value: "path" },
             { text: "扫描信息", sortable: false, value: "title" },
             { text: "时间", sortable: true, value: "create_time", width: "200px" },
-            { text: "操作", sortable: false, value: "actions" },
         ],
         progress: {
             done: 0,
@@ -149,6 +123,7 @@ export default {
                     }
                     this.items = rsp.items;
                     this.total = rsp.total;
+                    this.scan_dir = rsp.scan_dir;
                 })
                 .finally(() => {
                     this.loading = false;
