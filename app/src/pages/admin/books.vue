@@ -32,10 +32,12 @@
                 <v-chip small v-else-if="item.status == 'new'" class="grey">待扫描</v-chip>
                 <v-chip small v-else class="info">{{ item.status }}</v-chip>
             </template>
+            <template v-slot:item.img="{ item }">
+                <a target="_blank" :href="item.img"><v-img :src="item.thumb" class="my-1" max-height="80"  :aspect-ratio="3/4" /></a>
+            </template>
             <template v-slot:item.id="{ item }">
                 <a target="_blank" :href="`/book/${item.id}`">{{ item.id }}</a>
             </template>
-
             <template v-slot:item.title="{ item }">
                 <v-edit-dialog large :return-value.sync="item.title" @save="save(item, 'title')" save-text="保存" cancel-text="取消">
                     <span class="three-lines" style="max-width: 200px">{{ item.title }}</span>
@@ -196,8 +198,9 @@ export default {
         items: [],
         total: 0,
         loading: false,
-        options: { sortBy: ["id"], sortDesc: true },
+        options: { sortBy: ["id"], sortDesc: [true] },
         headers: [
+            { text: "封面", sortable: false, value: "img", width: "80px" },
             { text: "ID", sortable: true, value: "id", width: "80px" },
             { text: "书名", sortable: true, value: "title" },
             { text: "作者", sortable: true, value: "author", width: "100px" },
