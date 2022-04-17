@@ -28,6 +28,7 @@ class Scanner:
 
     def allow_backgrounds(self):
         """for unittest control"""
+        # FIXME 起线程后台运行后，会出现session对象的绑定错误。暂时没排查到原因
         return False
 
     def resume_last_scan(self):
@@ -134,6 +135,7 @@ class Scanner:
             row.tags = ", ".join(mi.tags)
             row.status = ScanFile.READY  # 设置为可处理
 
+            # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
             books = self.db.books_with_same_title(mi)
             if books:
                 row.book_id = books.pop()
