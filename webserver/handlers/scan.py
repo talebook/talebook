@@ -220,6 +220,7 @@ class Scanner:
             try:
                 item.save()
             except Exception as err:
+                self.session.rollback()
                 logging.error("save link error: %s", err)
         return True
 
