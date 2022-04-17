@@ -5,6 +5,7 @@ import sys
 from functools import cmp_to_key
 from gettext import gettext as _
 
+from webserver import utils
 from webserver.handlers.base import ListHandler, js
 
 
@@ -60,28 +61,6 @@ class MetaList(ListHandler):
         return {"meta": meta, "title": title, "items": items, "total": count}
 
 
-def compare_books(r, l):
-    if 'rating' not in r or r['rating'] is None:
-        rr = 0
-    else:
-        rr = r['rating']
-
-    if 'rating' not in l or l['rating'] is None:
-        rl = 0
-    else:
-        rl = l['rating']
-
-    if rr > rl:
-        return 1
-    elif rr == rl:
-        if r["id"] > l["id"]:
-            return 1
-        else:
-            return -1
-    else:
-        return -1
-
-
 class MetaBooks(ListHandler):
     def get(self, meta, name):
         titles = {
@@ -96,7 +75,7 @@ class MetaBooks(ListHandler):
         if meta in ["rating"]:
             name = int(name)
         books = self.get_item_books(category, name)
-        books.sort(key=cmp_to_key(compare_books), reverse=True)
+        books.sort(key=cmp_to_key(utils.compare_books_by_rating_or_id), reverse=True)
         return self.render_book_list(books, title=title)
 
 

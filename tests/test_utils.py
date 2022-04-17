@@ -4,7 +4,7 @@
 
 import unittest
 
-from webserver.handlers.meta import compare_books
+from webserver.utils import compare_books_by_rating_or_id
 
 
 class TestUtils(unittest.TestCase):
@@ -21,5 +21,5 @@ class TestUtils(unittest.TestCase):
             [1, {"rating": 0, "id": 2}, {"id": 1}],
         ]
         for val, a, b in cases:
-            self.assertEqual(val, compare_books(a, b), "compare %s > %s" % (a, b))
-            self.assertEqual(-1 * val, compare_books(b, a), "compare %s > %s" % (b, a))
+            self.assertEqual(val, compare_books_by_rating_or_id(a, b), "compare %s > %s" % (a, b))
+            self.assertEqual(-1 * val, compare_books_by_rating_or_id(b, a), "compare %s > %s" % (b, a))

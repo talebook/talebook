@@ -103,3 +103,17 @@ class BookFormatter:
         if with_perms:
             data.update(self.get_permissions())
         return data
+
+
+def compare_books_by_rating_or_id(x, y):
+    a = x.get("rating", 0) or 0
+    b = y.get("rating", 0) or 0
+
+    if a > b:
+        return 1
+    elif a < b:
+        return -1
+    elif x["id"] > y["id"]:
+        return 1
+    else:
+        return -1
