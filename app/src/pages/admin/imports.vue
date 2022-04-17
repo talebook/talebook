@@ -2,8 +2,9 @@
     <v-card>
         <v-card-title> 导入图书 <v-chip small class="primary">Beta</v-chip> </v-card-title>
         <v-card-text>
-        请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。<br/>
-        已导入成功的记录请不要删除，以免书籍被再次导入。
+        请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。
+        已导入成功的记录请不要删除，以免书籍被再次导入。<br/>
+        另外，还可以使用<a target="_blank" href="https://calibre-ebook.com/">PC版Calibre软件</a>管理书籍，但是请注意：使用完PC版后，需重启Web版方可生效。
         </v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" color="primary" @click="scan_books"><v-icon>mdi-file-find</v-icon>扫描书籍</v-btn>
@@ -11,13 +12,7 @@
             <template v-if="selected.length > 0">
                 <v-btn :disabled="loading" outlined color="primary" @click="import_books"><v-icon>mdi-import</v-icon>导入书籍 </v-btn>
                 <v-btn :disabled="loading" outlined color="primary" @click="delete_record"><v-icon>mdi-delete</v-icon>删除 </v-btn>
-                <!--
-                <v-btn :disabled="loading" outlined color="primary" @click="mark_as('ignore')"><v-icon>mdi-tag</v-icon>全部标记为「忽略」</v-btn>
-                <v-btn :disabled="loading" outlined color="primary" @click="mark_as('done')"><v-icon>mdi-tag</v-icon>全部标记为「已完成」</v-btn>
-                -->
             </template>
-            <v-spacer></v-spacer>
-            <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line hide-details></v-text-field>
         </v-card-actions>
         <v-card-text>
             <div v-if="selected.length == 0">请勾选需要处理的文件</div>
