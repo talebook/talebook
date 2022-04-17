@@ -31,12 +31,12 @@ class SimpleBookFormatter:
 
     def format(self):
         b = self.book
-        b["timestamp"] = b["timestamp"].strftime("%s")
+        b["ts"] = b["timestamp"].strftime("%s")
         return {
             "id": b["id"],
             "title": b["title"],
             "rating": b["rating"],
-            "timestamp": b["timestamp"],
+            "timestamp": self.val("timestamp"),
             "pubdate": self.val("pubdate"),
             "author": ", ".join(b["authors"]),
             "authors": b["authors"],
@@ -48,8 +48,8 @@ class SimpleBookFormatter:
             "series": self.val("series", None),
             "language": self.val("language", None),
             "isbn": self.val("isbn", None),
-            "img": self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b,
-            "thumb": self.cdn_url + "/get/thumb_60x80/%(id)s.jpg?t=%(timestamp)s" % b,
+            "img": self.cdn_url + "/get/cover/%(id)s.jpg?t=%(ts)s" % b,
+            "thumb": self.cdn_url + "/get/thumb_60x80/%(id)s.jpg?t=%(ts)s" % b,
             # 额外填充的字段
             "collector": self.get_collector(),
             "count_visit": self.val("count_visit", 0),
