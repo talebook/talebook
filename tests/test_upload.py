@@ -46,7 +46,8 @@ class TestUpload(TestWithUserLogin):
     @mock.patch("webserver.handlers.base.BaseHandler.user_history")
     @mock.patch("webserver.handlers.base.BaseHandler.add_msg")
     @mock.patch("webserver.models.Item.save")
-    def test_upload_new_file(self, m4, m3, m2, m1):
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
+    def test_upload_new_file(self, m5, m4, m3, m2, m1):
         warnings.simplefilter('ignore', ResourceWarning)
         name = "new.epub"
         path = testdir + "/cases/new.epub"
@@ -56,6 +57,7 @@ class TestUpload(TestWithUserLogin):
             m2.return_value = True
             m3.return_value = True
             m4.return_value = True
+            m5.return_value = 1008610086
 
             d = self.json("/api/book/upload", method="POST", body="k=1", request_timeout=30)
             self.assertEqual(d["err"], "ok")

@@ -63,6 +63,7 @@ def setup_server():
     main.CONF["installed"] = True
     main.CONF["INVITE_MODE"] = False
     main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
+    main.CONF["db_engine_args"] = {"echo": True}
     if _app is None:
         _app = main.make_app()
 
