@@ -26,7 +26,7 @@ NAS用户，可以参阅网友们写的指南：
 ### Logo
 favicon和导航菜单中的二维码logo，已经内置在了代码目录```/var/www/talebook/app/dist/img/```中。
  - favicon.ico: 网站图标文件
- - qq.png: 二维码图片
+ - link.png: 二维码图片
 
 如果需要定制修改这两个文件，请直接将使用新的文件覆盖即可。
 
