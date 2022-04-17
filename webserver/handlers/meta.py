@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
-
 import math
 import sys
 from functools import cmp_to_key
@@ -62,15 +61,15 @@ class MetaList(ListHandler):
 
 
 def compare_books(r, l):
-    if "rating" not in r:
+    if 'rating' not in r or r['rating'] is None:
         rr = 0
     else:
-        rr = r["rating"]
+        rr = r['rating']
 
-    if "rating" not in l:
+    if 'rating' not in l or l['rating'] is None:
         rl = 0
     else:
-        rl = r["rating"]
+        rl = l['rating']
 
     if rr > rl:
         return 1
@@ -97,7 +96,6 @@ class MetaBooks(ListHandler):
         if meta in ["rating"]:
             name = int(name)
         books = self.get_item_books(category, name)
-        self.do_sort(books, "rating", False)
         books.sort(key=cmp_to_key(compare_books), reverse=True)
         return self.render_book_list(books, title=title)
 
