@@ -16,6 +16,7 @@ from sqlalchemy import func as sql_func
 from tornado import web
 
 from webserver import loader, utils
+
 # import social_tornado.handlers
 from webserver.models import Item, Message, Reader
 
@@ -54,7 +55,7 @@ def js(func):
 
             logging.error(traceback.format_exc())
             msg = (
-                    'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
+                'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
             )
             rsp = {"err": "exception", "msg": msg}
             if isinstance(e, web.Finish):
@@ -364,8 +365,8 @@ class BaseHandler(web.RequestHandler):
             "messages": self.pop_messages(),
             "count_all_users": self.session.query(sql_func.count(Reader.id)).scalar(),
             "count_hot_users": self.session.query(sql_func.count(Reader.id))
-                .filter(Reader.access_time > last_week)
-                .scalar(),
+            .filter(Reader.access_time > last_week)
+            .scalar(),
             "IMG": self.cdn_url,
             "SITE_TITLE": CONF["site_title"],
         }
@@ -451,10 +452,10 @@ class BaseHandler(web.RequestHandler):
         name_column = "A.rating as name" if field in ["rating"] else "A.name"
         args = {"table": table, "field": field, "name_column": name_column}
         sql = (
-                """SELECT A.id, %(name_column)s, count(distinct book) as count
+            """SELECT A.id, %(name_column)s, count(distinct book) as count
             FROM %(table)s as A left join books_%(table)s_link as B
             on A.id = B.%(field)s group by A.id"""
-                % args
+            % args
         )
         logging.debug(sql)
         rows = self.cache.backend.conn.get(sql)
@@ -562,13 +563,13 @@ class ListHandler(BaseHandler):
         if ids:
             ids = list(ids)
             count = len(ids)
-            books = self.get_books(ids=ids[start: start + delta])
+            books = self.get_books(ids=ids[start : start + delta])
             if sort_by_id:
                 # 归一化，按照id从大到小排列。
                 self.do_sort(books, "id", False)
         else:
             count = len(all_books)
-            books = all_books[start: start + delta]
+            books = all_books[start : start + delta]
         return {
             "err": "ok",
             "title": title,

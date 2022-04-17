@@ -18,7 +18,8 @@ from webserver.models import Item, ScanFile
 
 CONF = loader.get_settings()
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
-SCAN_DIR_PREFIX = "/data/" # 限定扫描必须在/data/目录下，以防黑客扫描到其他系统目录
+SCAN_DIR_PREFIX = "/data/"  # 限定扫描必须在/data/目录下，以防黑客扫描到其他系统目录
+
 
 class Scanner:
     def __init__(self, calibre_db, session_db, user_id=None):
