@@ -476,8 +476,12 @@ class BookRead(BaseHandler):
         if not CONF["ALLOW_GUEST_READ"] and not self.current_user:
             return self.redirect("/login")
 
-        if self.current_user and not self.current_user.can_save():
-            raise web.HTTPError(403, reason=_(u"无权操作"))
+        if self.current_user:
+            if self.current_user.can_read():
+                if not self.current_user.is_active():
+                    raise web.HTTPError(403, reason=_(u"无权在线阅读，请先登录注册邮箱激活账号。"))
+            else:
+                raise web.HTTPError(403, reason=_(u"无权在线阅读"))
 
         book = self.get_book(id)
         book_id = book["id"]
@@ -496,6 +500,13 @@ class BookRead(BaseHandler):
             return self.html_page("book/read.html", vars())
 
         if "fmt_pdf" in book:
+            # PDF类书籍需要检查下载权限。
+            if not CONF["ALLOW_GUEST_DOWNLOAD"] and not self.current_user:
+                return self.redirect("/login")
+
+            if self.current_user and not self.current_user.can_save():
+                raise web.HTTPError(403, reason=_(u"无权在线阅读PDF类书籍"))
+
             path = book["fmt_pdf"]
             self.set_header("Content-Type", "application/pdf")
             with open(path, "rb") as f:
