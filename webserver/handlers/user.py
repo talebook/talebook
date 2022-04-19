@@ -9,9 +9,11 @@ from gettext import gettext as _
 
 import tornado.escape
 from tornado import web
+
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import Message, Reader
+from webserver.utils import check_email
 from webserver.version import VERSION
 
 CONF = loader.get_settings()
@@ -120,7 +122,7 @@ class SignUp(BaseHandler):
         if not nickname or not username or not password:
             return {"err": "params.invalid", "msg": _(u"用户名或密码无效")}
 
-        if not re.match(Reader.RE_EMAIL, email):
+        if not check_email(email):
             return {"err": "params.email.invalid", "msg": _(u"Email无效")}
         if len(username) < 5 or len(username) > 20 or not re.match(Reader.RE_USERNAME, username):
             return {"err": "params.username.invalid", "msg": _(u"用户名无效")}
@@ -179,12 +181,19 @@ class SignIn(BaseHandler):
         if not username or not password:
             return {"err": "params.invalid", "msg": _(u"用户名或密码错误")}
         user = self.session.query(Reader).filter(Reader.username == username).first()
+
+        if not user.salt:
+            return {"err": "params.invalid", "msg": _(u"用户名或密码错误")}
+
         if not user:
             return {"err": "params.no_user", "msg": _(u"无此用户")}
+
         if user.get_secure_password(password) != user.password:
             return {"err": "params.invalid", "msg": _(u"用户名或密码错误")}
+
         if not user.can_login():
             return {"err": "permission", "msg": _(u"无权登录")}
+
         logging.debug("PERM = %s", user.permission)
 
         self.login_user(user)

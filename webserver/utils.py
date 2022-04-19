@@ -3,6 +3,7 @@
 
 
 import datetime
+import re
 from gettext import gettext as _
 
 
@@ -117,3 +118,11 @@ def compare_books_by_rating_or_id(x, y):
         return 1
     else:
         return -1
+
+
+def check_email(addr):
+    if not addr:
+        return False
+    if re.match(r"[^@]+@[^@]+\.[^@]+", addr):
+        return True
+    return False

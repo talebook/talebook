@@ -3,10 +3,10 @@
 
 import datetime
 import hashlib
-import logging
-import time
 import json
+import logging
 import os
+import time
 from gettext import gettext as _
 
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
@@ -14,6 +14,7 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import relationship
+from tornado import web
 
 
 def mksalt():
@@ -86,7 +87,6 @@ class Reader(Base, SQLAlchemyMixin):
     OVERSIZE_SHRINK_RATE = 0.8
     SQLITE_MAX_LENGTH = 32 * 1024.0
 
-    RE_EMAIL = r"[^@]+@[^@]+\.[^@]+"
     RE_USERNAME = r"[a-z][a-z0-9_]*"
     RE_PASSWORD = r'[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};\':",./<>?\|]*'
 
@@ -200,25 +200,37 @@ class Reader(Base, SQLAlchemyMixin):
             return False
         return default
 
-    def can_delete(self):
-        return self.has_permission("d")
-
-    def can_edit(self):
-        return self.has_permission("e")
-
     def can_login(self):
         return self.has_permission("l")
 
-    def can_push(self):
+    def can_delete(self, check=False):
+        if check and not self.is_active():
+            raise web.HTTPError(403, reason=_(u"未激活账号无权删除书籍，请先登录注册邮箱激活账号。"))
+        return self.has_permission("d")
+
+    def can_edit(self, check=False):
+        if check and not self.is_active():
+            raise web.HTTPError(403, reason=_(u"未激活账号无权编辑书籍，请先登录注册邮箱激活账号。"))
+        return self.has_permission("e")
+
+    def can_push(self, check=False):
+        if check and not self.is_active():
+            raise web.HTTPError(403, reason=_(u"未激活账号无权推送书籍，请先登录注册邮箱激活账号。"))
         return self.has_permission("p")
 
-    def can_read(self):
+    def can_read(self, check=False):
+        if check and not self.is_active():
+            raise web.HTTPError(403, reason=_(u"未激活账号无权在线阅读书籍，请先登录注册邮箱激活账号。"))
         return self.has_permission("r")
 
-    def can_save(self):
+    def can_save(self, check=False):
+        if check and not self.is_active():
+            raise web.HTTPError(403, reason=_(u"未激活账号无权下载书籍，请先登录注册邮箱激活账号。"))
         return self.has_permission("s")
 
-    def can_upload(self):
+    def can_upload(self, check=False):
+        if check and not self.is_active():
+            raise web.HTTPError(403, reason=_(u"未激活账号无权上传书籍，请先登录注册邮箱激活账号。"))
         return self.has_permission("u")
 
     def can_view(self):
