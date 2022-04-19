@@ -197,6 +197,7 @@ class SignIn(BaseHandler):
         logging.debug("PERM = %s", user.permission)
 
         self.login_user(user)
+
         return {"err": "ok", "msg": "ok"}
 
 

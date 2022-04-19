@@ -211,7 +211,7 @@ class BookRefer(BaseHandler):
     @auth
     def post(self, id):
         if not self.current_user:
-            return self.redirect("/login")
+            return self.redirect("/login?id=%d" % int(id))
 
         provider_key = self.get_argument("provider_key", "error")
         provider_value = self.get_argument("provider_value", "")
@@ -263,7 +263,7 @@ class BookEdit(BaseHandler):
     @auth
     def post(self, bid):
         if not self.current_user:
-            return self.redirect("/login")
+            return self.redirect("/login?id=%d" % int(bid))
 
         book = self.get_book(bid)
         if not book:
@@ -311,7 +311,7 @@ class BookDelete(BaseHandler):
     @auth
     def post(self, bid):
         if not self.current_user:
-            return self.redirect("/login")
+            return self.redirect("/login?id=%d" % int(bid))
 
         book = self.get_book(bid)
         bid = book["id"]
@@ -342,7 +342,7 @@ class BookDownload(BaseHandler):
             if is_opds:
                 return self.send_error_of_not_invited()
             elif not self.current_user:
-                return self.redirect("/login")
+                return self.redirect("/login?id=%d" % int(id))
             elif not self.current_user.can_save(check=True):
                 raise web.HTTPError(403, reason=_(u"无权操作"))
 
@@ -487,7 +487,7 @@ class BookRead(BaseHandler):
     def get(self, id):
         if not CONF["ALLOW_GUEST_READ"]:
             if not self.current_user:
-                return self.redirect("/login")
+                return self.redirect("/login?id=%d" % int(id))
             elif not self.current_user.can_read(check=True):
                 return {"err": "permission", "msg": _(u"无权在线阅读")}
 
@@ -511,7 +511,7 @@ class BookRead(BaseHandler):
             # PDF类书籍需要检查下载权限。
             if not CONF["ALLOW_GUEST_DOWNLOAD"]:
                 if not self.current_user:
-                    return self.redirect("/login")
+                    return self.redirect("/login?id=%d" % int(id))
                 elif not self.current_user.can_save(check=True):
                     raise web.HTTPError(403, reason=_(u"无权在线阅读PDF类书籍(无权下载书籍)"))
 
@@ -574,7 +574,7 @@ class BookPush(BaseHandler):
 
         if not CONF["ALLOW_GUEST_PUSH"]:
             if not self.current_user:
-                return self.redirect("/login")
+                return self.redirect("/login?id=%d" % int(id))
             elif not self.current_user.can_push(check=True):
                 return {"err": "permission", "msg": _(u"无权推送书籍")}
 

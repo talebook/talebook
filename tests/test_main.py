@@ -5,8 +5,8 @@ import base64
 import json
 import logging
 import os
-import sys
 import shutil
+import sys
 import time
 import unittest
 import urllib
@@ -21,7 +21,7 @@ sys.path.append(projdir)
 
 import webserver.handlers.base
 import webserver.handlers.book
-from webserver import loader, main, models, plugins  # nosq: E402
+from webserver import loader, main, models  # nosq: E402
 from webserver.handlers.base import BaseHandler
 
 _app = None
@@ -41,14 +41,14 @@ BID_TXT = 2
 BID_MOBI = 3
 BID_AZW3 = 4
 BID_PDF = 5
-BIDS = list(range(1,6))
+BIDS = list(range(1, 6))
 
 
 def setup_server():
     global _app
     # copy new db
-    shutil.copyfile(testdir+"/cases/users.db", testdir+"/library/users.db")
-    shutil.copyfile(testdir+"/cases/metadata.db", testdir+"/library/metadata.db")
+    shutil.copyfile(testdir + "/cases/users.db", testdir + "/library/users.db")
+    shutil.copyfile(testdir + "/cases/metadata.db", testdir + "/library/metadata.db")
 
     # set env
     main.options.with_library = testdir + "/library/"
@@ -204,8 +204,8 @@ class TestAppWithoutLogin(TestApp):
         self.assertEqual(rsp.code, 302)
 
     def test_push(self):
-        d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
-        self.assertEqual(d["err"], "user.need_login")
+        rsp = self.fetch("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
+        self.assertEqual(rsp.code, 302)
 
     def test_user_info(self):
         d = self.json("/api/user/info")
@@ -414,8 +414,8 @@ class TestBook(TestWithUserLogin):
 
             with mock_permission() as user:
                 user.set_permission("D")  # forbid
-                d = self.json("/api/book/1/delete", method="POST", body="")
-                self.assertEqual(d["err"], "permission")
+                rsp = self.fetch("/api/book/1/delete", method="POST", body="")
+                self.assertEqual(rsp.code, 302)
                 self.assertEqual(m.call_count, 1)
 
             with mock_permission() as user:
@@ -589,6 +589,7 @@ class TestUserSignUp(TestWithUserLogin):
     def auth(self, s):
         return "Basic " + base64.encodebytes(s.encode("ascii")).decode("ascii")
 
+
 class TestWithAdminUser(TestApp):
     @classmethod
     def setUpClass(self):
@@ -638,14 +639,14 @@ class TestOpds(TestWithUserLogin):
     def test_opds_nav2(self):
         main.CONF["opds_max_ungrouped_items"] = 2
         navs = [
-                b'Nauthors',
-                b'Nlanguages',
-                b'Npublisher',
-                b'Nrating',
-                b'Nseries',
-                b'Ntags',
-                b'Onewest',
-                b'Otitle',
+            b'Nauthors',
+            b'Nlanguages',
+            b'Npublisher',
+            b'Nrating',
+            b'Nseries',
+            b'Ntags',
+            b'Onewest',
+            b'Otitle',
         ]
         groups = [
             2,
@@ -662,13 +663,13 @@ class TestOpds(TestWithUserLogin):
     def test_opds_category(self):
         a = b'tags'.hex()
         b = b'I71:tags'.hex()
-        rsp = self.fetch("/opds/category/%s/%s" % (a,b))
+        rsp = self.fetch("/opds/category/%s/%s" % (a, b))
         self.assertEqual(rsp.code, 200)
         self.parse_xml(rsp.body)
 
     @unittest.skip("category里的search功能暂时搞不懂，以后考虑删掉")
     def test_opds_category_search(self):
-        b = ("I"+urllib.parse.quote("韩寒")+":authors").encode("UTF-8").hex()
+        b = ("I" + urllib.parse.quote("韩寒") + ":authors").encode("UTF-8").hex()
         a = b"search".hex()
         b = b'I5:authors'.hex()
         b = "I文学:tags".encode("UTF-8").hex()
@@ -679,7 +680,7 @@ class TestOpds(TestWithUserLogin):
     def test_opds_category_group(self):
         a = b'tags'.hex()
         b = b'C'.hex()
-        rsp = self.fetch("/opds/categorygroup/%s/%s" % (a,b))
+        rsp = self.fetch("/opds/categorygroup/%s/%s" % (a, b))
         self.assertEqual(rsp.code, 200)
         self.parse_xml(rsp.body)
 

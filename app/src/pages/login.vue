@@ -10,7 +10,8 @@
                 <v-card-text>
                     <v-form @submit.prevent="do_login">
                         <v-text-field prepend-icon="person" v-model="username" label="用户名" type="text"></v-text-field>
-                        <v-text-field prepend-icon="lock" v-model="password" label="密码" type="password" id="password"></v-text-field>
+                        <v-text-field prepend-icon="lock" v-model="password" label="密码" type="password"
+                                      id="password"></v-text-field>
                         <p class="text-right">
                             <a @click="show_login = !show_login"> 忘记密码? </a>
                         </p>
@@ -23,9 +24,9 @@
                 <v-card-text v-if="socials.length > 0">
                     <v-divider></v-divider>
                     <div align="center">
-                        <br />
+                        <br/>
                         <small>使用社交网络账号登录</small>
-                        <br />
+                        <br/>
                         <template v-for="s in socials">
                             <v-btn small outlined :key="s.text" :href="'/auth/login/' + s.value">{{ s.text }}</v-btn>
                             &nbsp;
@@ -72,8 +73,9 @@ export default {
             type: "error",
             msg: "",
         },
+        book_id: -1,
     }),
-    asyncData({ store }) {
+    asyncData({store}) {
         store.commit("navbar", false);
     },
     head: () => ({
@@ -84,6 +86,7 @@ export default {
         this.$backend("/user/info").then((rsp) => {
             this.$store.commit("login", rsp);
         });
+        this.book_id = this.$route.query.id
     },
     computed: {
         socials: function () {
@@ -99,12 +102,16 @@ export default {
                 method: "POST",
                 body: data,
             }).then((rsp) => {
-                if (rsp.err != "ok") {
+                if (rsp.err !== "ok") {
                     this.alert.type = "error";
                     this.alert.msg = rsp.msg;
                 } else {
                     this.$store.commit("navbar", true);
-                    this.$router.push("/");
+                    if (this.book_id > 0) {
+                        this.$router.push(`/book/${this.book_id}`)
+                    } else {
+                        this.$router.push("/");
+                    }
                 }
             });
         },
@@ -116,7 +123,7 @@ export default {
                 method: "POST",
                 body: data,
             }).then((rsp) => {
-                if (rsp.err == "ok") {
+                if (rsp.err === "ok") {
                     this.alert.type = "success";
                     this.alert.msg = "重置成功！请查阅密码通知邮件。";
                 } else {
