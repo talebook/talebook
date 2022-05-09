@@ -4,6 +4,7 @@ services:
 
   # main service
   talebook:
+    restart: always
     image: talebook/talebook
     volumes:
       - /data/demo:/data
@@ -16,4 +17,5 @@ services:
   # optional, for meta plugins
   # please set "http://douban-rs-api" in settings
   douban-rs-api:
+    restart: always
     image: ghcr.io/cxfksword/douban-api-rs
