@@ -116,12 +116,13 @@ class Scanner:
                     sha256.update(byte_block)
 
             hash = "sha256:" + sha256.hexdigest()
-            if self.session.query(ScanFile).filter(ScanFile.hash == hash).count() > 0:
+            if self.session.query(ScanFile).filter(ScanFile.hash == hash).count() > 0 or hash in inserted_hash:
                 # 如果已经有相同的哈希值，则删掉本任务
                 row.status = ScanFile.DROP
             else:
                 # 或者，更新为真实的哈希值
                 row.hash = hash
+            inserted_hash.add(hash)
             if not self.save_or_rollback(row):
                 continue
 
