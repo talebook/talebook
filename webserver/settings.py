@@ -94,7 +94,7 @@ settings = {
     'FRIENDS': [
         { "text": u"芒果读书", "href": "http://diumx.com/" },
         { "text": u"鸠摩搜索", "href": "https://www.jiumodiary.com/" },
-        { "text": u"文渊阁",   "href": "https://wenyuange.org/" },
+        { "text": u"追更神器", "href": "https://github.com/hectorqin/reader" },
         { "text": u"阅读链",   "href": "https://www.yuedu.pro/" },
         { "text": u"苦瓜书盘", "href": "https://www.kgbook.com" },
         { "text": u"三秋书屋", "href": "https://www.sanqiu.cc/" },
