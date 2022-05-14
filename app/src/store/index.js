@@ -36,9 +36,6 @@ export const mutations = {
         state.alert.type = v.type;
         state.alert.msg = v.msg;
         state.alert.show = true;
-        if (state.alert.type === 'success') {
-            setTimeout(() => state.alert.show = false, 1300)
-        }
     }, close_alert(state) {
         state.alert.show = false;
     },

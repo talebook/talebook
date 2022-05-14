@@ -1,6 +1,11 @@
 export default ({app}, inject) => {
     inject("alert", function (alert_type, alert_msg, alert_to) {
         app.store.commit("alert", {type: alert_type, msg: alert_msg, to: alert_to});
+        if (alert_type === 'success') {
+            setTimeout(() => {
+                app.store.commit('close_alert')
+            }, 1300)
+        }
     })
     inject("backend", function (url, options) {
         if (url === undefined) {
