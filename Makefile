@@ -36,4 +36,4 @@ testvv: testv
 	cd ".htmlcov" && python3 -m http.server 7777
 
 update:
-	docker-compose -f docker/docker-compose.yml up -d
+	docker-compose up -d
