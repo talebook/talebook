@@ -1,6 +1,6 @@
-export default ({app}, inject) => {
+export default ({ app }, inject) => {
     inject("alert", function (alert_type, alert_msg, alert_to) {
-        app.store.commit("alert", {type: alert_type, msg: alert_msg, to: alert_to});
+        app.store.commit("alert", { type: alert_type, msg: alert_msg, to: alert_to });
         if (alert_type === 'success') {
             setTimeout(() => {
                 app.store.commit('close_alert')
@@ -42,7 +42,7 @@ export default ({app}, inject) => {
         //console.log("request", full_url)
         return fetch(full_url, args)
             .then(rsp => {
-                const {res} = app.context;
+                const { res } = app.context;
                 var msg = "";
                 if (rsp.status === 413) {
                     msg = "服务器响应了413异常状态码。<br/>可能是上传的文件过大，超过了服务器设置的上传大小。";
@@ -71,7 +71,7 @@ export default ({app}, inject) => {
                 }
             })
             .then(rsp => {
-                const {route, redirect, res} = app.context;
+                const { route, redirect, res } = app.context;
                 if (rsp.err === 'not_installed') {
                     redirect(301, "/install");
                 } else if (rsp.err === 'not_invited') {
@@ -86,7 +86,7 @@ export default ({app}, inject) => {
                     if (res !== undefined) {
                         res.setHeader('Cache-Control', 'no-cache');
                     }
-                    app.store.commit("alert", {type: "error", msg: rsp.msg, to: null});
+                    app.store.commit("alert", { type: "error", msg: rsp.msg, to: null });
                 }
                 return rsp;
             })
