@@ -65,6 +65,7 @@ def utf8_construct_path_name(book_id, title, author):
 
     book_id = " (%d)" % book_id
     lm = DB.PATH_LIMIT - (len(book_id) // 2) - 2
+    lm = lm // 4 # UTF8 is 1~4 char
     author = safe_filename(author)[:lm]
     title = safe_filename(title.lstrip())[:lm].rstrip()
     if not title:
@@ -86,6 +87,7 @@ def utf8_construct_file_name(book_id, title, author, extlen):
 
     extlen = max(extlen, 14)  # 14 accounts for ORIGINAL_EPUB
     lm = (DB.PATH_LIMIT - extlen - 2) // 2
+    lm = lm // 4 # UTF8 is 1~4 char
     if lm < 5:
         raise ValueError("Extension length too long: %d" % extlen)
     author = safe_filename(author)[:lm]
