@@ -8,13 +8,11 @@ Tale Book: My Calibre WebServer
 
 A better online books library management website built on Calibre + Vue
 
-See a running instance of demo:
-
-https://demo.talebook.org
-
-简单好用的图书管理系统
+简单好用的个人图书管理系统
 ===================
-这是一个基于Calibre的简单的图书管理系统，支持**在线阅读**。主要特点是：
+**友情提醒：中国境内网站，个人是不允许进行在线出版的，维护公开的书籍网站是违法违规的行为！建议仅作为个人使用！**
+
+这是一个基于Calibre的简单的个人图书管理系统，支持**在线阅读**。主要特点是：
 * 美观的界面：由于Calibre自带的网页太丑太难用，于是基于Vue，独立编写了新的界面，支持PC访问和手机浏览；
 * 支持多用户：为了网友们更方便使用，开发了多用户功能，支持~~豆瓣~~（已废弃）、QQ、微博、Github等社交网站的登录；
 * 支持在线阅读：借助[Readium.js](https://github.com/readium/readium-js-viewer) 库，支持了网页在线阅读电子书；
@@ -26,13 +24,7 @@ https://demo.talebook.org
 * 支持快捷更新书籍信息：支持从百度百科、豆瓣搜索并导入书籍基础信息；
 * 支持私人模式：需要输入访问码，才能进入网站，便于小圈子分享网站；
 
-**友情提醒：中国境内网站，个人是不允许进行在线出版的，维护公开的书籍网站是违法违规的行为！**
-
 本项目曾用名：calibre-webserver
-
-点此链接可查阅演示网站：
-
-https://demo.talebook.org
 
 
 Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)
@@ -57,12 +49,6 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 **感谢 oldiy 制作第一版的Docker镜像，并编写了这么多教程！**
 
 + [ [群晖安装教程](https://odcn.top/2019/02/26/2734/) ]
-
-- 更新支持github登录
-
-- 演示地址 [[ Demo ](https://demo.talebook.org)]
-
-- 部分网友站点：[夜读客](https://www.yeduk.com/), [文渊阁](https://wenyuange.org), [网友站点](http://book.bwh.bai-long.cn/)
 
 项目演示截图如下：
 ![](https://github.com/talebook/talebook/raw/develop/document/screenshot.png)
