@@ -6,10 +6,10 @@
                 <v-toolbar-title align-center >请输入访问密码</v-toolbar-title>
             </v-toolbar>
             <v-card-text>
-                <p class="py-6 body-3 text-center" >{{msg}}</p>
+                <p class="py-6 body-3 text-center" >{{welcome}}</p>
                 <v-form @submit.prevent="welcome_login" >
                     <v-text-field prepend-icon="lock" v-model="invite_code" required
-                        label="访问密码" type="password" :error="err" :error-messages="err_msg" :loading="loading"></v-text-field>
+                        label="访问密码" type="password" :error="is_err" :error-messages="msg" :loading="loading"></v-text-field>
                 </v-form>
             </v-card-text>
 
@@ -29,9 +29,10 @@ export default {
     data: () => ({
         valid: true,
         form: null,
-        err: false,
-        err_msg: "",
-        msg: "本站为私人图书馆，需输入密码才可进行访问",
+        is_err: false,
+        err: "ok",
+        msg: "",
+        welcome: "本站为私人图书馆，需输入密码才可进行访问",
         loading: false,
         invite_code: "",
     }),
@@ -64,10 +65,10 @@ export default {
             .then( rsp => {
                 this.loading = false;
                 if ( rsp.err != 'ok' ) {
-                    this.err = true;
-                    this.err_msg = rsp.msg;
+                    this.is_err = true;
+                    this.msg = rsp.msg;
                 } else {
-                    this.err = false;
+                    this.is_err = false;
                     location.reload();
                 }
             });
