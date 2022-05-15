@@ -1,0 +1,28 @@
+@font-face {
+	font-family: 'Open Sans';
+	src: url('Open-Sans-italic.woff') format('woff');
+	font-weight: normal;
+	font-style: italic;
+}
+
+@font-face {
+	font-family: 'Open Sans';
+	src: url('Open-Sans-700.woff') format('woff');
+	font-weight: bold;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'Open Sans';
+	src: url('Open-Sans-700italic.woff') format('woff');
+	font-weight: bold;
+	font-style: italic;
+}
+
+@font-face {
+	font-family: 'Open Sans';
+	src: url('Open-Sans-regular.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+}
+

@@ -313,7 +313,7 @@ class BookDelete(BaseHandler):
 
         self.db.delete_book(bid)
         self.add_msg("success", _(u"删除书籍《%s》") % book["title"])
-        return {"err": "ok"}
+        return {"err": "ok", "msg": _(u"删除成功")}
 
 
 class BookDownload(BaseHandler):
@@ -496,6 +496,7 @@ class BookRead(BaseHandler):
             # epub_dir is for javascript
             epub_dir = os.path.dirname(fpath).replace(CONF["with_library"], "/get/extract/")
             epub_dir = urllib.parse.quote(epub_dir)
+            epub_dir = "/get/extract/%s" % book["id"]
             self.extract_book(book, fpath, fmt)
             return self.html_page("book/read.html", vars())
 
@@ -517,9 +518,9 @@ class BookRead(BaseHandler):
 
     @background
     def extract_book(self, book, fpath, fmt):
-        fdir = os.path.dirname(fpath).replace(CONF["with_library"], CONF["extract_path"])
+        # 解压后的目录
+        fdir = os.path.join(CONF["extract_path"], str(book["id"]))
         subprocess.call(["mkdir", "-p", fdir])
-        # fdir = os.path.dirname(fpath) + "/extract"
         if os.path.isfile(fdir + "/META-INF/container.xml"):
             subprocess.call(["chmod", "a+rx", "-R", fdir + "/META-INF"])
             return
@@ -546,7 +547,7 @@ class BookRead(BaseHandler):
             fpath = new_path
 
         # extract to dir
-        logging.error("extract book: %s" % fpath)
+        logging.error("extract book: [%s] into [%s]", fpath, fdir)
         os.chdir(fdir)
         with open(progress_file, "a") as log:
             log.write(u"Dir: %s\n" % fdir)

@@ -1,28 +1,20 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <base href="{{RES}}/static/readium/" />
+    <base href="{{RES}}/static/readium-js-viewer-lite/" />
+    <title>{{book.title}}</title>
 
     <link rel="shortcut icon" href="{{IMG}}/get/thumb_144_144/{{book.id}}.png?t={{book.timestamp}}" />
     <link rel="apple-touch-icon" href="{{IMG}}/get/thumb_144_144/{{book.id}}.png?t={{book.timestamp}}" />
     <link rel="apple-touch-icon-precomposed" href="{{IMG}}/get/thumb_144_144/{{book.id}}.png?t={{book.timestamp}}" />
+    <link rel="stylesheet" type="text/css" href='{{static_url("readium-js-viewer-lite/css/readium-all.css")}}'>
 
-    <link rel="stylesheet" type="text/css" href='{{static_url("readium/css/bootstrap.css")}}'>
-    <link rel="stylesheet" type="text/css" href='{{static_url("readium/css/viewer.css")}}'>
-    <link rel="stylesheet" type="text/css" href='{{static_url("readium/css/readium_js.css")}}'>
-    <title>{{book.title}}</title>
-
-    <script>
-        var i18n_url = "{{RES}}/static/readium/";
-        var base_url = "{{RES}}/static/readium/lib/";
-        var epub_url = "{{RES}}{{epub_dir}}";
-        var progress_url = "/get/progress/{{book_id}}";
-    </script>
     <script type="text/javascript" src='{{static_url("js/jquery-1.11.1.min.js")}}'></script>
-    <script type="text/javascript" src='{{static_url("readium/lib/require.js")}}' data-main='{{static_url("readium/lib/ReadiumViewerLite.js")}}'></script>
-    <script type="text/javascript" src='{{static_url("readium/require_config.js")}}'></script>
+    <script type="text/javascript" src='{{static_url("readium-js-viewer-lite/scripts/readium-js-viewer_all_LITE.js")}}'></script>
+    <script type="text/javascript" src='{{static_url("readium-js-viewer-lite/font-faces/fonts.js")}}'> </script>
     <style>
         @media (max-width: 480px) {
             h2.book-title-header {
@@ -33,14 +25,17 @@
                 margin-top: 12px;
                 text-align: left;
             }
+
             .navbar .btn-group {
                 display: block;
             }
         }
+
         #msg {
             margin-top: 100px;
             font-size: 150%;
         }
+
         #progress {
             width: 640px;
             overflow-y: scroll;
@@ -51,77 +46,103 @@
     </style>
 
     <!-- This is all application-specific HTML -->
-    <body>
-        <nav class="navbar" role="banner"></nav>
-        <div id="app-container">
+
+<body>
+    <nav id="app-navbar" class="navbar" role="banner" aria-label="{{ '{{Strings.i18n_toolbar}}' }}"> </nav>
+    <div id="app-container">
         <p class="text-center" id="msg">正在加载书籍</p>
         <pre id="progress"></pre>
-        </div>
+    </div>
 
-        <script>
-            require.config({
-                config : {
-                    'EpubReader' : {
-                        'annotationCssUrl': '{{static_url("readium/css/annotations.css")}}',
-                        'jsLibRoot': '{{static_url("readium/lib/thirdparty/")}}',
-                        'useSimpleLoader' : false // the cloud reader cannot pre-process HTML content documents and may need to load zipped EPUBs too.
+    <script>
+        var base_url = "{{RES}}/static/readium-js-viewer-lite/";
+        var epub_url = "{{RES}}{{epub_dir}}/";
+        var progress_url = "/get/progress/{{book_id}}";
+
+        var fontsArray = [];
+        if (typeof getFontFaces != "undefined") { // defined externally
+            fontsArray = getFontFaces(base_url + "/font-faces/");
+        }
+
+        // MUST BE *SINGLE* CALL TO require.config() FOR ALMOND (SINGLE BUNDLE) TO WORK CORRECTLY!!!
+        require.config({
+            // http://requirejs.org/docs/api.html#config-waitSeconds
+            waitSeconds: 0,
+            config: {
+                'readium_js_viewer/EpubReader': {
+                    'fonts': fontsArray,
+                    'jsLibRoot': base_url + '/scripts/zip/',
+                    'mathJaxUrl': base_url + '/scripts/mathjax/MathJax.js',
+                    'annotationCSSUrl': base_url + '/css/annotations.css',
+                    'useSimpleLoader': true, // cloud reader (strictly-speaking, this config option is false by default, but we prefer to have it explicitly set here).
+                    'epubLibraryPath': undefined, // defaults to /epub_content/epub_library.json relative to the application's root index.html
+                    'imagePathPrefix': undefined,
+                    'canHandleUrl': false,
+                    'canHandleDirectory': false,
+                    'workerUrl': undefined,
+                    'epubReadingSystemUrl': undefined
+                }
+            }
+        });
+
+        function start_reader() {
+            if (location.search.indexOf("stop=1") > 0) {
+                return;
+            }
+            require(['jquery', 'readium_js_viewer/EpubReader'], function ($, EpubReader) {
+                EpubReader.loadUI({
+                    epub: epub_url
+                });
+            });
+        }
+
+        function load_progress() {
+            $.ajax({
+                url: progress_url,
+                success: function (html) {
+                    if (html == window.progress) {
+                        return;
                     }
+                    $("#progress").html(html);
+                    window.progress = html;
+                    if (html.search(/\[FINISH\]/) > 1) {
+                        window.check_count = 0;
+                    }
+                },
+                error: function () {
+                    $("#progress").hide();
                 }
             });
-            function start_reader() {
-                if ( location.search.indexOf("stop=1") > 0 ) {
-                    return;
+        }
+
+        window.check_count = 120;
+
+        function check_ready() {
+            load_progress();
+            window.check_count -= 1;
+            if (window.check_count < 1) {
+                $("#msg").html("系统异常，请联系站点管理员");
+                return;
+            }
+            $.ajax({
+                url: epub_url + "/META-INF/container.xml?" + Math.random(),
+                success: function (data) {
+                    $("#msg").html("解压完毕，正在打开阅读界面");
+                    start_reader();
+                },
+                error: function (xhr) {
+                    $("#msg").html("首次阅读，服务器正在解压书籍，请等待约2分钟<br>" + window.check_count);
+                    setTimeout(function () {
+                        check_ready()
+                    }, 1000);
                 }
-                require(['jquery', 'EpubReader'], function($, EpubReader){
-                    EpubReader.loadUI({epub: epub_url});
-                });
-            }
-
-            function load_progress(){
-                $.ajax({
-                    url: progress_url,
-                    success: function(html){
-                        if (html == window.progress ){
-                            return; 
-                        }
-                        $("#progress").html( html );
-                        window.progress = html;
-                        if ( html.search(/\[FINISH\]/) > 1 ) {
-                            window.check_count = 0;
-                        }
-                    },
-                    error: function(){
-                        $("#progress").hide();
-                    }
-                });
-            }
-
-            window.check_count = 120;
-            function check_ready() {
-                load_progress();
-                window.check_count -= 1;
-                if ( window.check_count < 1 ) {
-                    $("#msg").html("系统异常，请在QQ群里联系管理员");
-                    return;
-                }
-                $.ajax({
-                    url: epub_url + "/META-INF/container.xml?"+Math.random(),
-                    success: function(data) {
-                        $("#msg").html("解压完毕，正在打开阅读界面");
-                        start_reader();
-                    },
-                    error: function(xhr) {
-                        $("#msg").html("首次阅读，服务器正在解压书籍，请等待约2分钟<br>"+window.check_count);
-                        setTimeout(function(){ check_ready() }, 1000);
-                    }
-                });
-            }
-
-            $(document).ready(function(){
-                check_ready();
             });
+        }
 
-        </script>
-        <script type="text/javascript" src="//tajs.qq.com/stats?sId=29043744" charset="UTF-8"></script>
-    </body>
+        $(document).ready(function () {
+            check_ready();
+        });
+    </script>
+</body>
+
 </html>

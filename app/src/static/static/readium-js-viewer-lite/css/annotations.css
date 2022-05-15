@@ -1,0 +1,11 @@
+.rd-highlight.test-highlight {
+    position: absolute;
+    opacity: 0.2;
+    background-color: red;
+}
+
+.rd-highlight.hover-test-highlight {
+    position: absolute;
+    opacity: 0.4;
+    background-color: red;
+}
