@@ -227,7 +227,6 @@ export default {
     },
     methods: {
         getDataFromApi() {
-            console.log(this.options);
             this.loading = true;
             const { sortBy, sortDesc, page, itemsPerPage } = this.options;
 
@@ -288,8 +287,6 @@ export default {
         save(book, field) {
             var edit = {};
             edit[field] = book[field];
-
-            console.log("click save", field, book);
             this.saving = true;
             this.$backend("/book/" + book.id + "/edit", {
                 method: "POST",
