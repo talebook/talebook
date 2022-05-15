@@ -494,11 +494,14 @@ class BookRead(BaseHandler):
             if not fpath:
                 continue
             # epub_dir is for javascript
-            epub_dir = os.path.dirname(fpath).replace(CONF["with_library"], "/get/extract/")
-            epub_dir = urllib.parse.quote(epub_dir)
             epub_dir = "/get/extract/%s" % book["id"]
+            is_ready = self.is_ready(book)
             self.extract_book(book, fpath, fmt)
-            return self.html_page("book/read.html", vars())
+            return self.html_page("book/read.html", {
+                "book": book,
+                "epub_dir": epub_dir,
+                "is_ready": is_ready,
+            })
 
         if "fmt_pdf" in book:
             # PDF类书籍需要检查下载权限。
@@ -515,6 +518,11 @@ class BookRead(BaseHandler):
             return
 
         raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍"))
+
+    def is_ready(self, book):
+        # 解压后的目录
+        fdir = os.path.join(CONF["extract_path"], str(book["id"]))
+        return os.path.isfile(fdir + "/META-INF/container.xml")
 
     @background
     def extract_book(self, book, fpath, fmt):

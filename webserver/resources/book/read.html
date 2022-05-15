@@ -55,6 +55,7 @@
     </div>
 
     <script>
+        var is_ready = "{{ is_ready }}";
         var base_url = "{{RES}}/static/readium-js-viewer-lite/";
         var epub_url = "{{RES}}{{epub_dir}}/";
         var progress_url = "/get/progress/{{book_id}}";
@@ -140,7 +141,11 @@
         }
 
         $(document).ready(function () {
-            check_ready();
+            if (is_ready == "True") {
+                start_reader();
+            } else {
+                check_ready();
+            }
         });
     </script>
 </body>
