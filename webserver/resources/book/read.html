@@ -17,6 +17,16 @@
     <script type="text/javascript" src='{{static_url("readium-js-viewer-lite/font-faces/fonts.js")}}'> </script>
     <style>
         @media (max-width: 480px) {
+            .toc-visible #reading-area {
+                left: 0;
+                z-index: 0;
+            }
+            .toc-visible #readium-toc-body {
+                z-index: 9;
+                position: relative;
+                display: inline-block;
+                width: 70%;
+            }
             h2.book-title-header {
                 white-space: nowrap;
                 overflow: hidden;
@@ -25,10 +35,10 @@
                 margin-top: 12px;
                 text-align: left;
             }
+        }
 
-            .navbar .btn-group {
-                display: block;
-            }
+        .navbar-right {
+            float: right;
         }
 
         #msg {
