@@ -43,6 +43,7 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 
 ---
 常见问题请参阅[使用指南](document/README.zh_CN.md)
+
 手动安装请参考[开发者指南](document/Development.zh_CN.md)
 
 
@@ -51,5 +52,5 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 + [ [群晖安装教程](https://odcn.top/2019/02/26/2734/) ]
 
 项目演示截图如下：
-![](https://github.com/talebook/talebook/raw/develop/document/screenshot.png)
+![](document/screenshot.png)
 
