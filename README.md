@@ -1,12 +1,14 @@
-Tale Book: My Calibre WebServer
-====================
 [![GitHub License](https://img.shields.io/github/license/talebook/talebook?style=flat-square)](https://github.com/talebook/talebook/blob/master/LICENSE)
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/w/talebook/talebook?logo=github&style=flat-square&label=commits)]()
 [![Tests](https://github.com/talebook/talebook/actions/workflows/ci.yml/badge.svg)](https://github.com/talebook/talebook/actions/workflows/ci.yml)
 [![Docker Build](https://github.com/talebook/talebook/actions/workflows/build.yml/badge.svg)](https://github.com/talebook/talebook/actions/workflows/build.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)](https://hub.docker.com/r/talebook/talebook)
 
+
+Tale Book: My Calibre WebServer
+====================
 A better online books library management website built on Calibre + Vue
+
 
 简单好用的个人图书管理系统
 ===================
@@ -50,7 +52,7 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 
 NAS安装指南：请参考网友们的帖子：[帖子1](https://post.smzdm.com/p/a992p6e0/)，[帖子2](https://post.smzdm.com/p/a3d7ox0k/), [帖子3](https://odcn.top/2019/02/26/2734/)
 
-** 如果觉得本项目很棒，欢迎前往[爱发电](https://afdian.net/@talebook)，赞助作者，持续优化，为爱充电！ **
+**如果觉得本项目很棒，欢迎前往[爱发电](https://afdian.net/@talebook)，赞助作者，持续优化，为爱充电！**
 
 项目演示截图如下：
 ![](document/screenshot.png)
