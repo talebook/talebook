@@ -7,6 +7,8 @@
             :options.sync="options"
             :server-items-length="total"
             :loading="loading"
+            :items-per-page="10"
+            :footer-props="{ 'items-per-page-options': [10, 50, 100] }"
             class="elevation-1"
         >
             <template v-slot:item.login_ip="{ item }">
@@ -116,7 +118,7 @@ export default {
         items: [],
         total: 0,
         loading: true,
-        options: {},
+        options: { sortBy: ["access_time"], sortDesc: [true] },
         headers: [
             { text: "ID", sortable: true, value: "id" },
             { text: "用户名", sortable: true, value: "username" },
