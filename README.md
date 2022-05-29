@@ -41,15 +41,16 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 例如
 `docker run -d --name talebook -p 8080:80 -v /localdata:/data talebook/talebook`
 
----
+
+常见问题
+===================
 常见问题请参阅[使用指南](document/README.zh_CN.md)
 
 手动安装请参考[开发者指南](document/Development.zh_CN.md)
 
+NAS安装指南：请参考网友们的帖子：[帖子1](https://post.smzdm.com/p/a992p6e0/)，[帖子2](https://post.smzdm.com/p/a3d7ox0k/), [帖子3](https://odcn.top/2019/02/26/2734/)
 
-**感谢 oldiy 制作第一版的Docker镜像，并编写了这么多教程！**
-
-+ [ [群晖安装教程](https://odcn.top/2019/02/26/2734/) ]
+** 如果觉得本项目很棒，欢迎前往[爱发电](https://afdian.net/@talebook)，赞助作者，持续优化，为爱充电！ **
 
 项目演示截图如下：
 ![](document/screenshot.png)
