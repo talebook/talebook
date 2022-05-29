@@ -69,6 +69,7 @@ RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /data/books/convert  && \
     mkdir -p /data/books/progress  && \
     mkdir -p /data/books/settings && \
+    mkdir -p /data/books/logo && \
     mkdir -p /data/books/ssl && \
     mkdir -p /var/www/talebook/ && \
     chmod a+w -R /data/log /data/books /var/www
@@ -80,6 +81,7 @@ COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/
 COPY --from=builder /app/dist/ /var/www/talebook/app/dist/
 COPY --from=builder /app/.nuxt/ /var/www/talebook/app/.nuxt/
 COPY --from=builder /app/node_modules/ /var/www/talebook/app/node_modules/
+COPY --from=builder /app/dist/logo/ /data/books/logo/
 
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     cd /var/www/talebook/ && \
@@ -92,6 +94,8 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     python3 server.py --syncdb  && \
     python3 server.py --update-config  && \
     rm -f webserver/*.pyc && \
+    rm -rf app/dist/logo && \
+    ln -s /data/books/logo app/dist/logo && \
     mkdir -p /prebuilt/ && \
     mv /data/* /prebuilt/ && \
     chmod +x /var/www/talebook/docker/start.sh
