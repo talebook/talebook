@@ -37,6 +37,7 @@ export default {
         invite_code: "",
     }),
     async asyncData({ app, res }) {
+        app.store.commit('navbar', false);
         if ( res !== undefined ) {
             res.setHeader('Cache-Control', 'no-cache');
         }
