@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.24.0 (4a2a0458)
+  labels:
+    io.kompose.service: douban-rs-api
+  name: douban-rs-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: douban-rs-api
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert
+        kompose.version: 1.24.0 (4a2a0458)
+      labels:
+        io.kompose.service: douban-rs-api
+    spec:
+      containers:
+        - image: ghcr.io/cxfksword/douban-api-rs
+          name: douban-rs-api
+          ports:
+            - containerPort: 80
+      restartPolicy: Always
