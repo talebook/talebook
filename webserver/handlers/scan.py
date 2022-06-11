@@ -97,6 +97,7 @@ class Scanner:
                 logging.warn("maybe have same book, skip: %s", fpath)
                 continue
 
+            inserted_hash.add(hash)
             row = ScanFile(fpath, hash, scan_id)
             if not self.save_or_rollback(row):
                 continue
