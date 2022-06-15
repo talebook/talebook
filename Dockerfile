@@ -69,6 +69,7 @@ RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /data/books/settings && \
     mkdir -p /data/books/logo && \
     mkdir -p /data/books/ssl && \
+    mkdir -p /data/books/sbdist && \
     mkdir -p /var/www/talebook/ && \
     chmod a+w -R /data/log /data/books /var/www
 
@@ -93,6 +94,7 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     rm -rf app/src && \
     rm -rf app/dist/logo && \
     ln -s /data/books/logo app/dist/logo && \
+    ln -s /data/books/sbdist app/dist && \
     mkdir -p /prebuilt/ && \
     mv /data/* /prebuilt/ && \
     chmod +x /var/www/talebook/docker/start.sh
