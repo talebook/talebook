@@ -315,7 +315,7 @@ class ScanRun(BaseHandler):
     def post(self):
         path = CONF["scan_upload_path"]
         if not path.startswith(SCAN_DIR_PREFIX):
-            return {"err": "params.error", "msg": _(u"参数错误")}
+            return {"err": "params.error", "msg": _(u"书籍导入目录必须是%s的子目录") % SCAN_DIR_PREFIX}
         m = Scanner(self.db, self.session)
         total = m.run_scan(path)
         if total == 0:
