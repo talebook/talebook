@@ -26,7 +26,7 @@ class SimpleBookFormatter:
         if not v:
             v = default_value
         if isinstance(v, datetime.datetime):
-            return v.strftime("%Y-%m-%d")
+            return f'{v.year:04}-{v.month:02}-{v.day:02}'
         return v
 
     def format(self):
