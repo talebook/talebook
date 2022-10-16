@@ -1,0 +1,166 @@
+{
+  "chrome_extension_name": {
+    "message": "Readium"
+  },
+  "chrome_extension_description": {
+    "message": "EPUB3책 리더."
+  },
+  "i18n_readium_library" : {
+    "message" : "Readium 라이브러리"
+  },
+  "i18n_loading" : {
+    "message" : "Loading Library"
+  },
+  "i18n_readium_options" : {
+    "message" : "Readium 옵션:"
+  },
+  "i18n_save_changes" : {
+    "message" : "변경사항 저장"
+  },
+  "i18n_close" : {
+    "message" : "닫기"
+  },
+  "i18n_paginate_all" : {
+    "message" : "모든 리플로우 컨텐츠의 페이지네이션"
+  },
+  "i18n_automatically" : {
+    "message" : "*.epub url들을 radium에서 자동으로 열기"
+  },
+  "i18n_show_warning" : {
+    "message" : "EPUB파일들을 열 때 경고메시지 표시"
+  },
+  "i18n_details" : {
+    "message" : "세부항목"
+  },
+  "i18n_read" : {
+    "message" : "읽기"
+  },
+  "i18n_delete" : {
+    "message" : "삭제"
+  },
+  "i18n_author" : {
+    "message" : "저자: "
+  },
+  "i18n_publisher" : {
+    "message" : "출판사: "
+  },
+  "i18n_source" : {
+    "message" : "소스: "
+  },
+  "i18n_pub_date" : {
+    "message" : "출판일: "
+  },
+  "i18n_modified_date" : {
+    "message" : "개정일: "
+  },
+  "i18n_id" : {
+    "message" : "ID: "
+  },
+  "i18n_epub_version" : {
+    "message" : "EPUB 버전: "
+  },
+  "i18n_created_at" : {
+    "message" : "생성: "
+  },
+  "i18n_format" : {
+    "message" : "포맷: "
+  },
+  "i18n_added" : {
+    "message" : "추가일시: "
+  },
+  "i18n_unknown" : {
+    "message" : "미상"
+  },
+  "i18n_sorry" : {
+    "message" : "현재 EPUB은 이 컨텐츠를 위한 미디어 오버레이가 포함되어 있지 않습니다."
+  },
+  "i18n_add_items" : {
+    "message" : "책을 등록하기 위하여 여기를 클릭하세요!"
+  },
+  "i18n_extracting" : {
+    "message" : "정보 추출 중: "
+  },
+  "i18n_are_you_sure" : {
+    "message" : "영구히 삭제하시길 원하십니까? "
+  },
+  "i18n_add_book_to_readium_library" : {
+    "message" : "Readium 라이브러리에 책 추가:"
+  },
+  "i18n_add_book" : {
+    "message" : "책 추가"
+  },
+  "i18n_cancel" : {
+    "message" : "취소"
+  },
+  "i18n_from_the_web" : {
+    "message" : "웹에서:"
+  },
+  "i18n_from_local_file" : {
+    "message" : "로컬 파일에서:"
+  },
+  "i18n_enter_a_url" : {
+    "message" : ".epub 파일의 URL을 입력하세요"
+  },
+  "i18n_unpacked_directory" : {
+    "message" : "추출된 디렉토리:"
+  },
+  "i18n_validate" : {
+    "message" : "승인:"
+  },
+  "i18n_confirm_that_this_book" : {
+    "message" : "이 책이 ePUB표준을 따르는지 확인"
+  },
+  "i18n_single_pages" : {
+    "message" : "단일 페이지"
+  },
+  "i18n_double_pages" : {
+    "message" : "더블 페이지"
+  },
+  "i18n_save_settings" : {
+    "message" : "설정 저장"
+  },
+  "i18n_font_size" : {
+    "message" : "폰트 크기"
+  },
+  "i18n_margins" : {
+    "message" : "여백"
+  },
+  "i18n_text_and_background_color" : {
+    "message" : "글자와 배경 색"
+  },
+  "i18n_black_and_white" : {
+    "message" : "흑백"
+  },
+  "i18n_arabian_nights" : {
+    "message" : "아라비안 나이트"
+  },
+  "i18n_sands_of_dune" : {
+    "message" : "샌즈 오브 듄"
+  },
+  "i18n_ballard_blues" : {
+    "message" : "발라드 블루스"
+  },
+  "i18n_vancouver_mist" : {
+    "message" : "밴쿠버 안개"
+  },
+  "i18n_display_format" : {
+    "message" : "디스플레이 포맷"
+  },
+  "i18n_html_readium_tm_a_project" : {
+    "message" : "Readium<sup>TM</sup>는 EPUB&reg;컨텐츠의 출판을 위한 국제디지털출판포럼(IDPF, International Digital Publishing Forum)과 지원 기업들의 오픈소스 시스템 및 렌더링 엔진 프로젝트입니다. 자세한 내용은 <a href=\"http://readium.org/\">프로젝트 홈페이지</a>를 참조하세요. 지금까지, 프로젝트 개발은 <a href=\"http://evidentpoint.com/\">Evident Point</a>와 <a href=\"http://www.bluefirereader.com/\">Bluefire Productions</a>에 의해서 주도 되었습니다. 프로젝트에 기여하시기 위해서는 <a href=\"https://github.com/readium/readium-js-viewer\">github 저장소</a>를 확인하시기 바랍니다."
+  },
+  "chrome_accept_languages": {
+    "message": "$CHROME$ accepts $languages$ languages",
+    "placeholders": {
+      "chrome": {
+        "content": "Chrome",
+        "example": "Chrome"
+      },
+      "languages": {
+        "content": "$1",
+        "example": "en-US,ja,sr,de,zh_CN"
+      }
+    }
+  }
+}
+

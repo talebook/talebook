@@ -1,4 +1,0 @@
-git clone --recursive https://github.com/talebook/readium-js-viewer.git readium-js-viewer
-cd readium-js-viewer
-npm run prepare:all
-npm run dist
