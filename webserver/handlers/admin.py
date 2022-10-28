@@ -248,6 +248,8 @@ class AdminSettings(BaseHandler):
             "douban_apikey",
             "douban_baseurl",
             "douban_max_count",
+            "push_title",
+            "push_content",
             "site_title",
             "smtp_password",
             "smtp_server",

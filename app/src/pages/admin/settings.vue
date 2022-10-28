@@ -197,6 +197,8 @@ export default {
                 { icon: "info", key: "douban_max_count", label: "豆瓣插件API查询结果数量" },
                 { icon: "lock", key: "cookie_secret", label: "COOKIE随机密钥" },
                 { icon: "info", key: "scan_upload_path", label: "批量导入扫描目录" },
+                { icon: "info", key: "push_title", label: "邮件推送的标题" },
+                { icon: "info", key: "push_content", label: "邮件推送的内容" },
                 { icon: "", key: "autoreload", label: "更新配置后自动重启服务器(首次开启需人工重启)", type: 'checkbox' },
             ],
             tips: [

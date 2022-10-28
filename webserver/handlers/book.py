@@ -660,8 +660,8 @@ class BookPush(BaseHandler):
             "site_title": CONF["site_title"],
         }
         mail_from = self.settings["smtp_username"]
-        mail_subject = _("%(site_title)s：推送给您一本书《%(title)s》") % mail_args
-        mail_body = _(u"为您奉上一本《%(title)s》, 欢迎常来访问%(site_title)s！%(site_url)s") % mail_args
+        mail_subject = _(self.settings["push_title"]) % mail_args
+        mail_body = _(self.settings["push_content"]) % mail_args
         status = msg = ""
         try:
             logging.info("send %(title)s to %(mail_to)s" % vars())

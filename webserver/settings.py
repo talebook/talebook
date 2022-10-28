@@ -30,6 +30,9 @@ settings = {
     "ssl_crt_file"  : "/data/books/ssl/ssl.crt",
     "ssl_key_file"  : "/data/books/ssl/ssl.key",
 
+    "push_title": u"%(site_title)s：推送给您一本书《%(title)s》",
+    "push_content": u"为您奉上一本《%(title)s》, 欢迎常来访问%(site_title)s！%(site_url)s",
+
     # https://analytics.google.com/
     "google_analytics_id" : "G-LLF01B5ZZ8",
 
