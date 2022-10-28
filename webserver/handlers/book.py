@@ -588,7 +588,7 @@ class BookPush(BaseHandler):
         self.user_history("push_history", book)
         self.count_increase(book_id, count_download=1)
 
-        #https://www.amazon.cn/gp/help/customer/display.html?ref_=hp_left_v4_sib&nodeId=G5WYD9SAF7PGXRNA
+        # https://www.amazon.cn/gp/help/customer/display.html?ref_=hp_left_v4_sib&nodeId=G5WYD9SAF7PGXRNA
         for fmt in ["epub", "pdf"]:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
@@ -615,7 +615,7 @@ class BookPush(BaseHandler):
 
     @background
     def bg_convert_and_send(self, book, mail_to):
-        #https://www.amazon.cn/gp/help/customer/display.html?ref_=hp_left_v4_sib&nodeId=G5WYD9SAF7PGXRNA
+        # https://www.amazon.cn/gp/help/customer/display.html?ref_=hp_left_v4_sib&nodeId=G5WYD9SAF7PGXRNA
         fmt = "epub"  # best format for kindle
         fpath = self.convert_to_mobi_format(book, fmt)
         if fpath:

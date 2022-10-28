@@ -22,7 +22,7 @@ docker-test:
 
 lint:
 	flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
-	flake8 webserver --count --exit-zero --statistics --config .style.yapf
+	flake8 webserver --count --statistics --config .style.yapf
 
 test: lint
 	pytest tests
