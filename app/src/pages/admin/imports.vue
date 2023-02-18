@@ -2,8 +2,8 @@
     <v-card>
         <v-card-title> 导入图书 <v-chip small class="primary">Beta</v-chip> </v-card-title>
         <v-card-text>
-        请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。
-        已导入成功的记录请不要删除，以免书籍被再次导入。<br/>
+        请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。<br/>
+        请注意：此功能为后台异步执行，不必重复点击，可刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。<br/>
         另外，还可以使用<a target="_blank" href="https://calibre-ebook.com/">PC版Calibre软件</a>管理书籍，但是请注意：使用完PC版后，需重启Web版方可生效。
         </v-card-text>
         <v-card-actions>
@@ -125,7 +125,6 @@ export default {
                 });
         },
         loop_check_status(url, callback) {
-            this.loading = true;
             this.$backend(url)
                 .then((rsp) => {
                     if (rsp.err != "ok") {
@@ -141,9 +140,6 @@ export default {
                         this.$alert("info", "处理完毕！");
                     }
                 })
-                .finally(() => {
-                    this.loading = false;
-                });
         },
         scan_books() {
             this.loading = true;
@@ -163,6 +159,7 @@ export default {
                             this.loading = false;
                             return false;
                         }
+                        this.loading = true;
                         return true;
                     });
                 })
@@ -189,6 +186,7 @@ export default {
                             this.loading = false;
                             return false;
                         }
+                        this.loading = true;
                         return true;
                     });
                 })
