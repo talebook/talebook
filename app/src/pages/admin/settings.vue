@@ -168,10 +168,10 @@ export default {
         {
             show: false,
             title: "邮件服务",
-            subtitle: '邮箱注册、推送Kindle依赖此配置(请确保您的服务器或VPS服务商已开通SMTP服务的25端口)',
+            subtitle: '邮箱注册、推送Kindle依赖此配置(SMTP服务器地址可带端口，或者不带端口，默认为465号)',
             fields: [
-                { icon: "email", key: "smtp_server", label: "SMTP服务器" },
-                { icon: "person", key: "smtp_username", label: "SMTP用户名" },
+                { icon: "email", key: "smtp_server", label: "SMTP服务器（例如 smtp-mail.outlook.com:587）" },
+                { icon: "person", key: "smtp_username", label: "SMTP用户名（例如 user@gmail.com）" },
                 { icon: "lock", key: "smtp_password", label: "SMTP密码" },
             ],
             buttons: [
@@ -200,6 +200,7 @@ export default {
                 { icon: "info", key: "push_title", label: "邮件推送的标题" },
                 { icon: "info", key: "push_content", label: "邮件推送的内容" },
                 { icon: "info", key: "convert_timeout", label: "书籍转换格式的最大超时时间（秒）" },
+                { icon: "info", key: "smtp_port", label: "SMTP邮件服务器端口号（默认为465）" },
                 { icon: "", key: "autoreload", label: "更新配置后自动重启服务器(首次开启需人工重启)", type: 'checkbox' },
             ],
             tips: [
