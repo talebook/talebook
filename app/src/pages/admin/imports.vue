@@ -32,7 +32,7 @@
             :loading="loading"
             :page.sync="page"
             :items-per-page="100"
-            :footer-props="{ 'items-per-page-options': [10, 50, 100] }"
+            :footer-props="{ 'items-per-page-options': [10, 50, 100, 1000] }"
         >
             <template v-slot:item.status="{ item }">
                 <v-chip small v-if="item.status == 'ready'" class="success">可导入</v-chip>
