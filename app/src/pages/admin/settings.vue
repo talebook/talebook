@@ -199,6 +199,7 @@ export default {
                 { icon: "info", key: "scan_upload_path", label: "批量导入扫描目录" },
                 { icon: "info", key: "push_title", label: "邮件推送的标题" },
                 { icon: "info", key: "push_content", label: "邮件推送的内容" },
+                { icon: "info", key: "convert_timeout", label: "书籍转换格式的最大超时时间（秒）" },
                 { icon: "", key: "autoreload", label: "更新配置后自动重启服务器(首次开启需人工重启)", type: 'checkbox' },
             ],
             tips: [

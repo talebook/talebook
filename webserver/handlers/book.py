@@ -51,17 +51,24 @@ def do_ebook_convert(old_path, new_path, log_path):
     if new_path.lower().endswith(".epub"):
         args += ["--flow-size", "0"]
 
+    timeout = 300
+    try:
+        timeout = int(CONF["convert_timeout"])
+    except:
+        pass
+
     with open(log_path, "w") as log:
         cmd = " ".join("'%s'" % v for v in args)
         logging.info("CMD: %s" % cmd)
         p = subprocess.Popen(args, stdout=log, stderr=subprocess.PIPE)
         try:
-            _, stde = p.communicate(timeout=100)
+            _, stde = p.communicate(timeout=timeout)
             logging.info("ebook-convert finish: %s, err: %s" % (new_path, bytes.decode(stde)))
         except subprocess.TimeoutExpired:
             p.kill()
             logging.info("ebook-convert timeout: %s" % new_path)
-            log.write(u"\n服务器处理异常，请在QQ群里联系管理员。\n[FINISH]")
+            log.info("ebook-convert timeout: %s" % new_path)
+            log.write(u"\n服务器转换书本格式时超时了。请在配置管理页面调大超时时间。\n[FINISH]")
             return False
         return True
 
