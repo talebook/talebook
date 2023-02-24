@@ -33,8 +33,14 @@ RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
     pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/; \
     fi
 
-# install envsubst
-RUN apt-get update && apt-get install -y gettext
+# install envsubst gosu procps
+RUN apt-get update -y && apt-get install -y gettext gosu procps
+
+# Create a talebook user and change the Nginx startup user
+RUN useradd -u 911 -U -d /data -s /bin/bash talebook && \
+    usermod -G users talebook && \
+    groupmod -g 911 talebook && \
+    sed -i "s/user www-data;/user talebook;/g" /etc/nginx/nginx.conf
 
 # intall nodejs for nuxtjs server side render
 RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
