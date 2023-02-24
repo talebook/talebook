@@ -26,6 +26,9 @@ RUN npm run build
 FROM talebook/calibre-docker as server
 ARG BUILD_COUNTRY=""
 
+# set default language
+ENV LANG=C.UTF-8
+
 # Set mirrors in china
 RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
     echo "using repo mirrors for ${BUILD_COUNTRY}"; \
