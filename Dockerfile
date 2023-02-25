@@ -88,14 +88,14 @@ RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /var/www/talebook/ && \
     chmod a+w -R /data/log /data/books /var/www
 
-COPY --chmod=755 . /var/www/talebook/
-COPY --chmod=755 conf/nginx/ssl.* /data/books/ssl/
+COPY --chmod=755 --chown=talebook:talebook . /var/www/talebook/
+COPY --chmod=755 --chown=talebook:talebook conf/nginx/ssl.* /data/books/ssl/
 COPY --chmod=755 conf/nginx/talebook.conf /etc/nginx/conf.d/talebook.conf
 COPY --chmod=755 conf/supervisor/talebook.conf /etc/supervisor/conf.d/
-COPY --chmod=755 --from=builder /app/.nuxt/ /var/www/talebook/app/.nuxt/
-COPY --chmod=755 --from=builder /app/node_modules/ /var/www/talebook/app/node_modules/
-COPY --chmod=755 --from=builder /app/src/static/ /var/www/talebook/app/dist/
-COPY --chmod=755 --from=builder /app/src/static/logo/ /data/books/logo/
+COPY --chmod=755 --chown=talebook:talebook --from=builder /app/.nuxt/ /var/www/talebook/app/.nuxt/
+COPY --chmod=755 --chown=talebook:talebook --from=builder /app/node_modules/ /var/www/talebook/app/node_modules/
+COPY --chmod=755 --chown=talebook:talebook --from=builder /app/src/static/ /var/www/talebook/app/dist/
+COPY --chmod=755 --chown=talebook:talebook --from=builder /app/src/static/logo/ /data/books/logo/
 
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     cd /var/www/talebook/ && \
