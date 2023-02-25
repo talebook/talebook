@@ -91,11 +91,7 @@ export default {
     this.page_cnt = Math.max(1, Math.ceil(this.total / this.page_size))
 
   },
-  beforeRouteEnter(to, from, next) {
-    next(vm => {
-      vm.init(to)
-    });
-  },
+
   beforeRouteUpdate(to, from, next) {
     this.init(to, next);
   },
@@ -123,7 +119,6 @@ export default {
       }
       r.start = (this.page - 1) * this.page_size;
       r.size = this.page_size;
-      //this.$alert('success', r);
       this.$router.push({query: r});
     }
   },

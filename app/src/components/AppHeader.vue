@@ -65,7 +65,7 @@
         <v-app-bar class="px-0" color="blue" dense dark app fixed clipped-left extension-height="64">
             <template v-if="btn_search && $vuetify.breakpoint.xs" #extension>
                 <v-container fluid>
-                    <v-form @submit.prevent="do_serach">
+                    <v-form @submit.prevent="do_search">
                         <v-row>
                             <v-col cols="9">
                                 <v-text-field
@@ -305,14 +305,14 @@ export default {
         },
         do_mobile_search: function () {
             if (this.search.trim() != "") {
-                this.$router.push("/search?name=" + this.search).catch(() => {});
+                this.$router.push("/search?name=" + this.search.trim());
             } else {
                 this.$refs.mobile_search.focus();
             }
         },
         do_search: function () {
             if (this.search.trim() != "") {
-                this.$router.push("/search?name=" + this.search).catch(() => {});
+                this.$router.push("/search?name=" + this.search.trim());
             } else {
                 this.$refs.search.focus();
             }
