@@ -44,6 +44,11 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 `docker run -d --name talebook -p 8080:80 -v /localdata:/data talebook/talebook`
 
 
+视频简介（感谢@Pan06da的制作）
+===================
+[![](https://bb-embed.zjffun.com/embed?v=BV1AT411S7c3)](https://player.bilibili.com/player.html?aid=482258810&bvid=BV1AT411S7c3&cid=1018595245&page=1)
+
+
 常见问题
 ===================
 常见问题请参阅[使用指南](document/README.zh_CN.md)
