@@ -37,7 +37,10 @@ RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
     fi
 
 # install envsubst gosu procps
-RUN apt-get update -y && apt-get install -y gettext gosu procps
+RUN apt-get update -y && \
+    apt-get install -y gettext gosu procps && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create a talebook user and change the Nginx startup user
 RUN useradd -u 911 -U -d /data -s /bin/bash talebook && \
@@ -46,12 +49,16 @@ RUN useradd -u 911 -U -d /data -s /bin/bash talebook && \
     sed -i "s/user www-data;/user talebook;/g" /etc/nginx/nginx.conf
 
 # intall nodejs for nuxtjs server side render
-RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
-RUN apt-get install -y nodejs
+RUN apt-get update -y && \
+    curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # install python packages
 COPY ["requirements.txt", "/tmp/"]
-RUN pip install -r /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt && \
+    rm -rf /root/.cache
 
 # ----------------------------------------
 # 测试阶段
@@ -96,8 +103,8 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     echo 'settings = {}' > /data/books/settings/auto.py && \
     chmod a+w /data/books/settings/auto.py && \
     calibredb add --library-path=/data/books/library/ -r docker/book/ && \
-    python3 server.py --syncdb  && \
-    python3 server.py --update-config  && \
+#    python3 server.py --syncdb  && \
+#    python3 server.py --update-config  && \
     rm -f webserver/*.pyc && \
     rm -rf app/src && \
     rm -rf app/dist/logo && \
