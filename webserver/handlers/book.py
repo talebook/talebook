@@ -518,11 +518,9 @@ class BookRead(BaseHandler):
             if self.current_user and not self.current_user.can_save():
                 raise web.HTTPError(403, reason=_(u"无权在线阅读PDF类书籍"))
 
-            path = book["fmt_pdf"]
-            self.set_header("Content-Type", "application/pdf")
-            with open(path, "rb") as f:
-                self.write(f.read())
-            return
+            pdf_url = urllib.parse.quote_plus(self.api_url + "/api/book/%(id)d.PDF" % book)
+            pdf_reader_url = CONF["PDF_VIEWER"] % {"pdf_url": pdf_url}
+            return self.redirect(pdf_reader_url)
 
         raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍"))
 

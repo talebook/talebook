@@ -427,8 +427,8 @@ class TestBook(TestWithUserLogin):
     def test_read(self):
         with mock.patch.object(webserver.handlers.book.BookRead, "extract_book", return_value="Yo"):
             for bid in BIDS:
-                rsp = self.fetch("/read/%s" % bid)
-                self.assertEqual(rsp.code, 200)
+                rsp = self.fetch("/read/%s" % bid, follow_redirects=False)
+                self.assertEqual(rsp.code, 302 if bid == BID_PDF else 200)
 
     def test_edit(self):
         body = {
