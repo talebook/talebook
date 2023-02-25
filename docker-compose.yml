@@ -11,6 +11,10 @@ services:
     ports:
       - "8080:80"
       - "8443:443"
+    environment:
+      - TZ=Asia/Shanghai
+      - PUID=1000
+      - PGID=1000
     depends_on:
       - douban-rs-api
 

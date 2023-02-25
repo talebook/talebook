@@ -103,8 +103,8 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     echo 'settings = {}' > /data/books/settings/auto.py && \
     chmod a+w /data/books/settings/auto.py && \
     calibredb add --library-path=/data/books/library/ -r docker/book/ && \
-#    python3 server.py --syncdb  && \
-#    python3 server.py --update-config  && \
+    python3 server.py --syncdb  && \
+    python3 server.py --update-config  && \
     rm -f webserver/*.pyc && \
     rm -rf app/src && \
     rm -rf app/dist/logo && \
