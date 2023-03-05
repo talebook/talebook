@@ -33,8 +33,13 @@ chown -R talebook:talebook \
     /var/lib/nginx \
     /data \
     /root/.config/calibre \
-    /root/.npm \
-    /var/www/talebook
+    /root/.npm
+cd /var/www/talebook
+chown -R talebook:talebook `ls | grep -v app`
+chown talebook:talebook /var/www/talebook/app
+cd /var/www/talebook/app
+chown -R talebook:talebook `ls | grep -v node_modules`
+cd /
 
 gosu talebook:talebook /var/www/talebook/server.py --syncdb
 gosu talebook:talebook /var/www/talebook/server.py --update-config
