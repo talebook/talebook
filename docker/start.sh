@@ -22,8 +22,8 @@ done
 echo "Setting permissions... \nThis may take some time"
 echo "设置权限中... \n这可能需要一些时间"
 
-PUID=${PUID:-1000}
-PGID=${PGID:-1000}
+PUID=${PUID:-0}
+PGID=${PGID:-0}
 
 groupmod -o -g "${PGID}" talebook
 usermod -o -u "${PUID}" talebook
