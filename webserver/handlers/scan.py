@@ -53,6 +53,30 @@ class Scanner:
             self.session.rollback()
             logging.warn("save error: %s", err)
             return False
+        
+
+    def save_or_rollback_batch(self, rows):
+        try:
+            for row in rows:
+                # bid = "[ book-id=%s ]" % row.book_id
+                row.save()
+                # logging.error("update: status=%-5s, path=%s %s", row.status, row.path, bid if row.book_id > 0 else "")
+            self.session.commit()
+            logging.error("========== batch update transaction committed..")
+            return True
+        except Exception as err:
+            logging.error(traceback.format_exc())
+            self.session.rollback()
+            logging.warn("save error: %s", err)
+            return False
+        
+    def paginate(self, items, per_page):
+        pages = [items[i:i+per_page] for i in range(0, len(items), per_page)]
+        return {
+            'total': len(items),
+            'pages_no': len(pages),
+            'pages': pages
+        }
 
     def run_scan(self, path_dir):
         if self.resume_last_scan():
@@ -66,6 +90,25 @@ class Scanner:
             t.setDaemon(True)
             t.start()
         return 1
+    
+
+    
+    
+    def query_scanned_books_by_path(self, fpath):
+        query = self.session.query(ScanFile)
+        query = query.filter(ScanFile.path == fpath)
+        return query.first()
+    
+    def query_scanned_books_by_status(self, status):
+        query = self.session.query(ScanFile)
+        query = query.filter(ScanFile.status == status)
+        return query.all()
+    
+    def query_scanned_books_all(self):
+        query = self.session.query(ScanFile)
+        return query.all()
+    
+
 
     def do_scan(self, path_dir):
         from calibre.ebooks.metadata.meta import get_metadata
@@ -74,7 +117,9 @@ class Scanner:
             self.bind_new_session()
 
         # 生成任务（粗略扫描），前端可以调用API查询进展
-        tasks = []
+
+        # 遍历配置目录下的所有书籍
+        allFilesInImportDir = []
         for dirpath, __, filenames in os.walk(path_dir):
             for fname in filenames:
                 fpath = os.path.join(dirpath, fname)
@@ -85,76 +130,77 @@ class Scanner:
                 if fmt not in SCAN_EXT:
                     # logging.debug("bad format: [%s] %s", fmt, fpath)
                     continue
-                tasks.append((fname, fpath, fmt))
+                allFilesInImportDir.append(fpath)
 
+        # 查询数据库所有数据
+        allScannedFilesDB = self.query_scanned_books_all()
+        pathsDB=[o.path for o in allScannedFilesDB]
+        allPathInDir = [str(fpath) for fpath in allFilesInImportDir]    
+        #比较得出需要添加的数据
+        tasks = list(set(allPathInDir) - set(pathsDB))
         # 生成任务ID
         scan_id = int(time.time())
-        logging.info("========== start to check files size & name ============")
+        logging.info("========== start to insert webserver.scanfiles ============")
 
-        rows = []
-        inserted_hash = set()
-        for fname, fpath, fmt in tasks:
-            # logging.info("Scan: %s", fpath)
-            if self.session.query(ScanFile).filter(ScanFile.path == fpath).count() > 0:
-                # 如果已经有相同的文件记录，则跳过
+        # 写入新的文件信息到数据库
+        tasksPage = self.paginate(tasks, 100)
+        totalPage = tasksPage['pages_no']
+        logging.info("========== insert totalPage: " + str(totalPage))
+        curPageNum = 0
+        for taskPage in tasksPage["pages"]:
+            rows = []
+            for task in taskPage:
+                row = ScanFile(task, task, scan_id)
+                rows.append(row)
+            logging.info("========== batch insert webserver.scanfiles. for pageNum: " + str(curPageNum))
+            curPageNum = curPageNum + 1
+            if not self.save_or_rollback_batch(rows):
+                logging.error("========== batch insert webserver.scanfiles failed.")
                 continue
+            logging.info("========== batch insert webserver.scanfiles successfully.")
 
-            stat = os.stat(fpath)
-            md5 = hashlib.md5(fname.encode("UTF-8")).hexdigest()
-            hash = "fstat:%s/%s" % (stat.st_size, md5)
-            if hash in inserted_hash:
-                logging.warn("maybe have same book, skip: %s", fpath)
+        logging.info("========== start to query scanfiles by new status ============")
+        allNewScannedFiles = self.query_scanned_books_by_status("new")
+
+        logging.info("========== start to fetch metadate from file and update tables ============")
+        rows = allNewScannedFiles;
+   
+        pageRst = self.paginate(rows, 100);
+        totalPage = pageRst['pages_no']
+        logging.info("========== update totalPage: " + str(totalPage))
+        curPageNum = 0;
+        for page in pageRst['pages']:
+            for row in page:
+                fpath = row.path
+
+                # 尝试解析metadata
+                logging.info("========== fetch metadate for " + fpath)
+                fmt = fpath.split(".")[-1].lower()
+                with open(fpath, "rb") as stream:
+                    mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                logging.info("========== fetch metadate end.")
+                row.title = mi.title
+                row.author = mi.author_sort
+                row.publisher = mi.publisher
+                row.tags = ", ".join(mi.tags)
+                row.status = ScanFile.READY  # 设置为可处理
+
+                # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
+                logging.info("========== compare title to calibre for " + row.title)
+                books = self.db.books_with_same_title(mi)
+                logging.info("========== compare title to calibre end.")
+                if books:
+                    row.book_id = books.pop()
+                    row.status = ScanFile.EXIST
+            logging.info("========== batch update webserver.scanfiles. for pageNum: " + str(curPageNum))
+            curPageNum = curPageNum + 1
+            if not self.save_or_rollback_batch(page):
+                logging.error("========== batch update webserver.scanfiles failed.")
                 continue
-
-            inserted_hash.add(hash)
-            row = ScanFile(fpath, hash, scan_id)
-            if not self.save_or_rollback(row):
-                continue
-            rows.append(row)
-        # self.session.bulk_save_objects(rows)
-
-        logging.info("========== start to check files hash & meta ============")
-        # 检查文件哈希值，检查DB重复情况
-        for row in rows:
-            fpath = row.path
-
-            # 读取文件，计算哈希值
-            sha256 = hashlib.sha256()
-            with open(fpath, "rb") as f:
-                # Read and update hash string value in blocks of 4K
-                for byte_block in iter(lambda: f.read(4096), b""):
-                    sha256.update(byte_block)
-
-            hash = "sha256:" + sha256.hexdigest()
-            if self.session.query(ScanFile).filter(ScanFile.hash == hash).count() > 0 or hash in inserted_hash:
-                # 如果已经有相同的哈希值，则删掉本任务
-                row.status = ScanFile.DROP
-            else:
-                # 或者，更新为真实的哈希值
-                row.hash = hash
-            inserted_hash.add(hash)
-            if not self.save_or_rollback(row):
-                continue
-
-            # 尝试解析metadata
-            fmt = fpath.split(".")[-1].lower()
-            with open(fpath, "rb") as stream:
-                mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-
-            row.title = mi.title
-            row.author = mi.author_sort
-            row.publisher = mi.publisher
-            row.tags = ", ".join(mi.tags)
-            row.status = ScanFile.READY  # 设置为可处理
-
-            # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
-            books = self.db.books_with_same_title(mi)
-            if books:
-                row.book_id = books.pop()
-                row.status = ScanFile.EXIST
-            if not self.save_or_rollback(row):
-                continue
+            logging.info("========== batch update webserver.scanfiles successfully.")
         return True
+    
+
 
     def delete(self, hashlist):
         query = self.session.query(ScanFile)
@@ -208,6 +254,8 @@ class Scanner:
         query.update({ScanFile.import_id: import_id}, synchronize_session=False)
         self.session.commit()
 
+        rows = []
+        items = []
         # 逐个处理
         for row in query.all():
             fpath = row.path
@@ -226,17 +274,22 @@ class Scanner:
             logging.info("import [%s] from %s", mi.title, fpath)
             row.book_id = self.db.import_book(mi, [fpath])
             row.status = ScanFile.IMPORTED
-            self.save_or_rollback(row)
+            rows.append(row)
+
+            
 
             # 添加关联表
             item = Item()
             item.book_id = row.book_id
             item.collector_id = self.user_id
-            try:
-                item.save()
-            except Exception as err:
-                self.session.rollback()
-                logging.error("save link error: %s", err)
+            items.append(item)
+        self.save_or_rollback_batch(rows)
+        try:
+            self.session.bulk_save_objects(items)
+            item.save()
+        except Exception as err:
+            self.session.rollback()
+            logging.error("save link error: %s", err)
         return True
 
     def import_status(self):
@@ -292,7 +345,14 @@ class ScanList(BaseHandler):
             "update_time": ScanFile.update_time,
         }.get(sort, ScanFile.create_time)
         order = order.asc() if desc == "false" else order.desc()
-        query = self.session.query(ScanFile).order_by(order)
+        # query = self.session.query(ScanFile).order_by(order)
+        
+        query = self.session.query(ScanFile).filter(
+            sqlalchemy.and_(
+                            ScanFile.author.is_not(None),ScanFile.author.is_not(''),ScanFile.author.is_not('Unknown'), ScanFile.author.is_not('未知'),
+                            ScanFile.publisher.is_not(None), ScanFile.publisher.is_not(''), ScanFile.publisher.is_not('Unknown'), ScanFile.publisher.is_not('未知')
+                            )
+                        ).order_by(order)
         total = query.count()
         start = page * num
 
