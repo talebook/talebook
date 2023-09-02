@@ -93,7 +93,8 @@
                                     <v-spacer></v-spacer>
                                     <v-menu offset-y right>
                                         <template v-slot:activator="{ on }">
-                                            <v-btn color="primary" small rounded v-on="on">
+                                            <v-btn color="primary" small rounded v-on="on"
+                                                   :loading="refer_books_setting_btn_loading">
                                                 <v-icon small>done</v-icon>
                                                 设置
                                             </v-btn>
@@ -354,6 +355,7 @@ export default {
         dialog_refer: false,
         dialog_msg: false,
         refer_books_loading: false,
+        refer_books_setting_btn_loading:false,
         refer_books: [],
         email_rules: function (email) {
             var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -425,6 +427,10 @@ export default {
                 });
         },
         set_refer(provider_key, provider_value, opt) {
+            // 防止多次重复点击
+            if(this.refer_books_setting_btn_loading) return;
+            // 显示加载条提示
+            this.refer_books_setting_btn_loading = true;
             var data = new URLSearchParams(opt);
             data.append("provider_key", provider_key);
             data.append("provider_value", provider_value);
@@ -441,6 +447,9 @@ export default {
                     this.$alert("error", rsp.msg);
                 }
                 this.init(this.$route);
+            }).finally(()=>{
+               //关闭加载条提示
+               this.refer_books_setting_btn_loading = false;
             });
         },
         delete_book() {
