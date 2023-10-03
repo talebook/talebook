@@ -262,7 +262,7 @@
                 </v-card-text>
             </v-card>
         </v-col>
-        <v-col cols="12" sm="6" md="4">
+        <v-col cols="12" :sm="is_txt?6:5" :md="is_txt?3:4">
             <v-card outlined>
                 <v-list>
                     <v-list-item :href="'/read/' + book.id" target="_blank">
@@ -279,7 +279,24 @@
                 </v-list>
             </v-card>
         </v-col>
-        <v-col cols="12" sm="6" md="4">
+        <v-col cols="12" sm="5" md="3" v-show="is_txt">
+          <v-card outlined>
+            <v-list>
+              <v-list-item :href="'/book/' + book.id+'/readtxt'" target="_blank">
+                <v-list-item-avatar large color="primary">
+                  <v-icon dark>import_contacts</v-icon>
+                </v-list-item-avatar>
+                <v-list-item-content>
+                  <v-list-item-title>Txt在线阅读({{ txt_parse_inited ? '已解析' : '未解析' }})</v-list-item-title>
+                </v-list-item-content>
+                <v-list-item-action>
+                  <v-icon>mdi-arrow-right</v-icon>
+                </v-list-item-action>
+              </v-list-item>
+            </v-list>
+          </v-card>
+        </v-col>
+        <v-col cols="12" :sm="is_txt?6:5" :md="is_txt?3:4">
             <v-card outlined>
                 <v-list>
                     <v-list-item @click="dialog_download = !dialog_download">
@@ -296,7 +313,7 @@
                 </v-list>
             </v-card>
         </v-col>
-        <v-col cols="12" sm="6" md="4">
+        <v-col cols="12" :sm="is_txt?6:5" :md="is_txt?3:4">
             <v-card outlined>
                 <v-list>
                     <v-list-item @click="dialog_kindle = !dialog_kindle">
@@ -324,6 +341,11 @@ export default {
         BookCards,
     },
     computed: {
+        is_txt(){
+          if(!this.book)return false
+          let formats=this.book.files.map(x=>x.format.toLowerCase())
+          return formats.includes("txt")
+        },
         pub_year: function () {
             if (this.book === null || this.book.pubdate == null) {
                 return "N/A";
@@ -350,6 +372,7 @@ export default {
         debug: false,
         mail_to: "",
         kindle_sender: "",
+        txt_parse_inited: false,
         dialog_download: false,
         dialog_kindle: false,
         dialog_refer: false,
@@ -376,6 +399,7 @@ export default {
     created() {
         this.init(this.$route);
         this.mail_to = this.$store.state.user.kindle_email;
+        this.get_txt_parse_status()
         if (process.client) {
             this.mail_to = this.$cookies.get("last_mailto");
         }
@@ -410,6 +434,14 @@ export default {
                     this.$alert("error", rsp.msg, "#");
                 }
             });
+        },
+        get_txt_parse_status(){
+          this.$backend(`/book/txt/init?id=${this.book.id}&test=1`,)
+            .then(res => {
+              if (res.err === "ok" && res.msg === "已解析") {
+                this.txt_parse_inited = true;
+              }
+            })
         },
         get_refer() {
             this.dialog_refer = true;
