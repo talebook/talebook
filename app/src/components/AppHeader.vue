@@ -192,7 +192,7 @@
 </template>
 
 <script>
-import '@/assets/css/reset.css';
+import '@/assets/reset.css';
 </script>
 
 <script>
