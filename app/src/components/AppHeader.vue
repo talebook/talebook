@@ -244,7 +244,7 @@ export default {
             ];
             var nav_links = [
                 { heading: "分类浏览" },
-                { icon: "widgets", href: "/nav", text: "分类导览", count: this.sys.books },
+                { icon: "widgets", href: "/nav", text: "本站书籍总数", count: this.sys.books },
                 { icon: "mdi-home-group", href: "/publisher", text: "出版社", count: this.sys.publishers },
                 { icon: "mdi-human-greeting", href: "/author", text: "作者", count: this.sys.authors },
                 { icon: "mdi-tag-heart", href: "/tag", text: "标签", count: this.sys.tags },
