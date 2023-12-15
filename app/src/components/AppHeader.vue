@@ -190,11 +190,6 @@
         </v-app-bar>
     </div>
 </template>
-
-<script>
-import '@/assets/reset.css';
-</script>
-
 <script>
 export default {
     data: () => ({
