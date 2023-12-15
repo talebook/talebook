@@ -252,8 +252,6 @@ export default {
                 {
                     target: "",
                     links: [
-                        { icon: "mdi-library-shelves", href: "/series", text: "丛书", count: this.sys.series },
-                        { icon: "mdi-star-half", href: "/rating", text: "评分" },
                         { icon: "mdi-trending-up", href: "/hot", text: "热度榜单" },
                         { icon: "mdi-history", href: "/recent", text: "所有书籍" },
                     ],
