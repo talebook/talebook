@@ -192,6 +192,10 @@
 </template>
 
 <script>
+import '@/assets/css/reset.css';
+</script>
+
+<script>
 export default {
     data: () => ({
         err: "",
