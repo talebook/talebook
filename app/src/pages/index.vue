@@ -70,12 +70,9 @@ export default {
     created() {
         this.$store.commit('navbar', true);
         this.navs = [
-            { icon: 'widgets',            href:'/nav',       text: '分类导览',  count: this.$store.state.sys.books      },
-            { icon: 'mdi-human-greeting', href:'/author',    text: '作者',     count: this.$store.state.sys.authors    },
-            { icon: 'mdi-home-group',     href:'/publisher', text: '出版社',   count: this.$store.state.sys.publishers },
+            { icon: 'widgets',            href:'/nav',       text: '分类',  count: this.$store.state.sys.books      },
             { icon: 'mdi-tag-heart',      href:'/tag',       text: '标签',     count: this.$store.state.sys.tags       },
             { icon: 'mdi-history',        href:'/recent',    text: '所有书籍', },
-            { icon: 'mdi-trending-up',    href:'/hot',       text: '热度榜单', },
             ]
     },
     async asyncData({ app, res }) {
