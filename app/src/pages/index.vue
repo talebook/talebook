@@ -2,7 +2,7 @@
     <div>
     <v-row>
         <v-col cols=12>
-            <p class="ma-0 title">随机推荐</p>
+            <p class="ma-0 title">Random Books</p>
         </v-col>
         <v-col cols=6 xs=6 sm=4 md=2 lg=1 v-for="(book,idx) in get_random_books" :key="'rec'+idx+book.id" class="book-card">
             <v-card :to="book.href" class="ma-1">
@@ -13,7 +13,7 @@
     <v-row>
         <v-col cols=12>
             <v-divider class="new-legend"></v-divider>
-            <p class="ma-0 title">新书推荐</p>
+            <p class="ma-0 title">New Collection</p>
         </v-col>
         <v-col cols=12>
             <book-cards :books="get_recent_books"></book-cards>
@@ -22,7 +22,7 @@
     <v-row>
         <v-col cols=12>
             <v-divider class="new-legend"></v-divider>
-            <p class="ma-0 title">分类浏览</p>
+            <p class="ma-0 title">Category</p>
         </v-col>
         <v-col cols=12 sm=6 md=4 v-for="nav in navs" :key="nav.text">
             <v-card outlined>
@@ -32,7 +32,7 @@
                             <v-icon dark >{{nav.icon}}</v-icon>
                         </v-list-item-avatar>
                         <v-list-item-content>
-                            <v-list-item-title>{{nav.text}} </v-list-item-title>
+                            <v-list-item-title>{{nav.text}} <span v-if="nav.count !== undefined" class="count"> ({{ nav.count }}) </span>  </v-list-item-title>
                             <v-list-item-subtitle>{{nav.subtitle}}</v-list-item-subtitle>
                         </v-list-item-content>
                         <v-list-item-action>
@@ -70,9 +70,9 @@ export default {
     created() {
         this.$store.commit('navbar', true);
         this.navs = [
-            { icon: 'widgets',            href:'/nav',       text: '分类',  count: this.$store.state.sys.books      },
-            { icon: 'mdi-tag-heart',      href:'/tag',       text: '标签',     count: this.$store.state.sys.tags       },
-            { icon: 'mdi-history',        href:'/recent',    text: '所有书籍', },
+            { icon: 'widgets',            href:'/nav',       text: '分类',  },
+            { icon: 'mdi-tag-heart',      href:'/tag',       text: '标签',  },
+            { icon: 'mdi-history',        href:'/recent',    text: '所有书籍', count: this.$store.state.sys.books },
             ]
     },
     async asyncData({ app, res }) {

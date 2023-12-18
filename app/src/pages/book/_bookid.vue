@@ -264,15 +264,15 @@
         <v-col cols="12" sm="6" md="4">
             <v-card outlined>
                 <v-list>
-                    <v-list-item :href="'/read/' + book.id" target="_blank">
+                    <v-list-item :href="'/'">
                         <v-list-item-avatar large color="primary">
-                            <v-icon dark>import_contacts</v-icon>
+                            <v-icon dark>home</v-icon>
                         </v-list-item-avatar>
                         <v-list-item-content>
-                            <v-list-item-title>在线阅读</v-list-item-title>
+                            <v-list-item-title>回到首页</v-list-item-title>
                         </v-list-item-content>
                         <v-list-item-action>
-                            <v-icon>mdi-arrow-right</v-icon>
+                            <v-icon>mdi-arrow-left</v-icon>
                         </v-list-item-action>
                     </v-list-item>
                 </v-list>

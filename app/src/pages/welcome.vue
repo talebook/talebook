@@ -9,7 +9,7 @@
                 <p class="py-6 body-3 text-center" >{{welcome}}</p>
                 <v-form @submit.prevent="welcome_login" >
                     <v-text-field prepend-icon="lock" v-model="invite_code" required
-                        label="访问密码" type="password" :error="is_err" :error-messages="msg" :loading="loading"></v-text-field>
+                        label="通关口令" type="password" :error="is_err" :error-messages="msg" :loading="loading"></v-text-field>
                 </v-form>
             </v-card-text>
 
@@ -32,7 +32,7 @@ export default {
         is_err: false,
         err: "ok",
         msg: "",
-        welcome: "本站为私人图书馆，需输入密码才可进行访问",
+        welcome: "私人图书馆，无口令请原地掉头",
         loading: false,
         invite_code: "",
     }),

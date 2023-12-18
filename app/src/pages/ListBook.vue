@@ -48,13 +48,13 @@ export default {
   head() {
     switch (this.$route.path) {
       case "/hot":
-        return {title: "热门书籍"};
+        return {title: "Hot"};
 
       case "/search":
-        return {title: "搜索"};
+        return {title: "Search"};
 
       case "/recent":
-        return {title: "近期更新"};
+        return {title: "Recent"};
 
       default:
         break

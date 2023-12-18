@@ -244,7 +244,7 @@ export default {
             ];
             var nav_links = [
                 { heading: "分类浏览" },
-                { icon: "widgets", href: "/nav", text: "本站书籍总数", count: this.sys.books },
+                { icon: "widgets", href: "/nav", text: "分类", count: this.sys.books },
                 { icon: "mdi-home-group", href: "/publisher", text: "出版社", count: this.sys.publishers },
                 { icon: "mdi-human-greeting", href: "/author", text: "作者", count: this.sys.authors },
                 { icon: "mdi-tag-heart", href: "/tag", text: "标签", count: this.sys.tags },
@@ -263,9 +263,8 @@ export default {
             ];
             var sys_links = [
                 { heading: "系统" },
-                { icon: "mdi-history", text: "系统版本", href: "", count: this.sys.version },
-                { icon: "mdi-human", text: "用户数", href: "", count: this.sys.users },
-                { icon: "mdi-cellphone", text: "OPDS接口", href: "/opds/", count: "OPDS", target: "_blank" },
+                { icon: "mdi-human", text: "累计藏书", href: "", count: this.sys.books },
+                { icon: "mdi-cellphone", text: "接口", href: "/opds/", count: "OPDS", target: "_blank" },
             ];
 
             return home_links
