@@ -1,4 +1,4 @@
-本站基于talebook(https://github.com/shenslink/talebook)项目，基于个人审美做了一点小改动。
+本站基于 talebook(https://github.com/shenslink/talebook) 项目，基于个人审美做了一点小改动。
 主要是自用，有兴趣的朋友也可以拉取使用，配置和使用相关的文档请参考原项目。
 
 docker安装命令：
