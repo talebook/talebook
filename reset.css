@@ -1,5 +1,3 @@
-@import url('https://shenslink.top/fonts/beiweikaishu/result.css');
-
 .theme--light.v-application { 
   background: rgba(0,0,0,.88); 
   color: #ffffffEE; 
@@ -10,8 +8,31 @@
   font-size: .75rem; 
   border-radius: 6px; 
 }
+.book-comments[data-v-2a078296] {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    margin-top: -12px;
+    
+}
+.book-comments p[data-v-2a078296] {
+    font-size: .7rem!important; 
+}
+.author {
+    font-size: .65rem!important; 
+    -webkit-box-orient: vertical;
+    text-overflow: clip;
+    text-align: left;
+    font-weight: bold;
+}
+.author p{
+}
+.v-card__subtitle, .v-card__text, .v-card__title {
+    padding: 8px 20px 5px 20px;
+}
 .book-title { 
   color: #fff; 
+  text-shadow: 1px 1px 5px #000;
 }
 .v-navigation-drawer__content { 
   background: #161616; 
@@ -32,8 +53,13 @@
 .v-responsive__content { 
   display: none; 
 }
+.v-text-field .v-input__control, .v-text-field .v-input__slot, .v-text-field fieldset {
+    border-radius: 18px;
+    text-align: center;
+}
 .theme--light.v-subheader { 
-  display: none; 
+  color: #555;
+  font-size: .7rem;
 }
 .container { 
   padding: 12px 20px 12px 20px; 
@@ -107,7 +133,8 @@
 .v-application .title {
   font-size:1.1rem!important;
   text-align: left;
-  padding: 0 0 0 5px;
+  padding: 0;
+  text-shadow: 1px 1px 6px #000;
 }
 .v-text-field.v-text-field--solo .v-input__control {
   min-height: 36px;
@@ -130,7 +157,7 @@ p:not([class]) {
 }
 .theme--light.v-card {
   margin-top: 10px;
-  background-image: url('https://shenslink.top/corner.png');
+  background-image: url('/logo/corner.png');
   background-position: right top;
   background-repeat: no-repeat;
   background-size: 6%;
@@ -139,10 +166,16 @@ p:not([class]) {
   color: #ffffffaa;
 }
 .v-chip__content {
-  color: #aaa;
+  color: #bbb;
+}
+.v-btn:not(.v-btn--round).v-size--small {
+  background-color: #444!important;
 }
 .theme--light.v-icon {
-  color: #ffffff55;
+  color: #555;
+}
+.theme--light.v-input, .theme--light.v-input input, .theme--light.v-input textarea {
+  color: #ffffffcc!important;
 }
 .v-sheet.theme--light.v-toolbar.v-toolbar--dense.v-toolbar--flat.white {
   border-radius: 6px; 
@@ -160,11 +193,15 @@ p:not([class]) {
 }
 .v-list-item__title {
   color: #ffffffaa;
-  padding-left: 15px;
+  padding-left: 0px;
 }
 .col-sm-6.col-md-4.col-12 {
   margin: 0;
   padding: 10px 10px;
+}
+.v-chip.v-chip--outlined.v-chip.v-chip {
+  background-color: #444!important;
+  border: none!important;
 }
 .v-card.v-sheet.v-sheet--outlined.theme--light {
   margin: 0!important;
@@ -188,9 +225,9 @@ p:not([class]) {
   color: #ffffffaa;
 }
 .v-form {
-  background-color: #ffffff22;
+  background-color: #ffffff00;
   border-radius: 6px; 
-  margin-top: 20px;
+  margin-top: 0px;
 }
 .new-legend {
   display: none;
