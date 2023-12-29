@@ -623,9 +623,10 @@ class BookTxtInit(BaseHandler):
         is_ready = os.path.isfile(content_path)
         if is_ready:
             with open(content_path, 'r', encoding='utf8') as f:
-                content = json.loads(f.read())
+                meta = json.loads(f.read())
             return {"err": "ok", "msg": "已解析", "data": {
-                "content": content,
+                "content": meta['toc'],
+                "encoding": meta['encoding'],
                 "name": book["title"]
             }}
         if test_ready != "0":

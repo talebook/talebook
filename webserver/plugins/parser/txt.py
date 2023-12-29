@@ -81,7 +81,8 @@ class TxtParser:
         encoding = get_file_encoding(filepath)
         logging.info("encoding is [%s] from file [%s]", encoding, filepath)
         with open(filepath, 'r', encoding=encoding, errors='ignore', newline='\n') as fileobj:
-            return self.parse_txt_book_toc(fileobj)
+            toc = self.parse_txt_book_toc(fileobj)
+            return {"encoding": encoding, "toc": toc}
 
     def parse_txt_book_toc(self, fileobj):
         # table of content
