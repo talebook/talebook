@@ -9,8 +9,9 @@ import re
 def get_file_encoding(file):
     import chardet
     with open(file, 'rb') as f:
-        tmp = chardet.detect(f.read(100))
-        return tmp['encoding']
+        c = chardet.detect(f.read(100))
+        e = c['encoding']
+        return 'GB18030' if e == 'GB2312' else e
 
 
 def get_content_encoding(byte):

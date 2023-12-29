@@ -502,6 +502,12 @@ class BookRead(BaseHandler):
             fpath = book.get("fmt_%s" % fmt, None)
             if not fpath:
                 continue
+
+            # TXT有专门的阅读器
+            if fmt == "txt":
+                txt_reader_url = f'/book/{book_id}/readtxt'
+                return self.redirect(txt_reader_url)
+
             # epub_dir is for javascript
             epub_dir = "/get/extract/%s" % book["id"]
             is_ready = self.is_ready(book)

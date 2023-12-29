@@ -45,7 +45,7 @@ class TestTxtParse(TestWithUserLogin):
                 }
             ]
 
-    def xtest_get_file_encoding(self):
+    def test_get_file_encoding(self):
         encoding = get_file_encoding(self.BOOK_PATH)
         self.assertEqual(encoding, self.BOOK_ENCODING)
 
@@ -55,7 +55,7 @@ class TestTxtParse(TestWithUserLogin):
             self.assertEqual(len(toc), len(self.BOOK_TOC))
             self.assertEqual(toc, self.BOOK_TOC)
 
-    def xtest_parse(self):
+    def test_parse(self):
         toc = TxtParser().parse(self.BOOK_PATH)
         self.assertEqual(len(toc), len(self.BOOK_TOC))
         self.assertEqual(toc, self.BOOK_TOC)
