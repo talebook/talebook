@@ -100,7 +100,7 @@ class Scanner:
                 # 如果已经有相同的文件记录，则跳过
                 row = samefiles.first()
                 if row.status == ScanFile.NEW:
-                    rows.append( row )
+                    rows.append(row)
                 else:
                     continue
 
