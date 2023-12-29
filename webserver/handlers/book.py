@@ -591,7 +591,7 @@ class TxtRead(BaseHandler):
             else:
                 # 读取从起始位置到结束位置的内容
                 content = file.read(end - start)
-        encode = get_encoding(content)
+        encode = get_content_encoding(content)
         content = content.decode(encoding=encode, errors='ignore').replace("\n", "<br>")
         return {"err": "ok", "content": content}
 
@@ -604,11 +604,11 @@ class BookTxtInit(BaseHandler):
         {
             "name": "目录(去空白)",
             "example": "第一章 假装第一章前面有空白但我不要",
-            "rule": r"(?<=[　\s])(?:序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|第\s{0,4}[\d〇零一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+?\s{0,4}(?:章|节(?!课)|卷|集(?![合和]))).{0,30}$"},
+            "rule": r"(?<=[　\s])(?:序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|第\s{0,4}[\d〇零一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+?\s{0,4}(?:章|节(?!课)|卷|集(?![合和]))).{0,30}$"}, # noqa
         {
             "name": "目录",
             "example": "第一章 标准的粤语就是这样",
-            "rule": r"^[ 　\t]{0,4}(?:序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|第\s{0,4}[\d〇零一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+?\s{0,4}(?:章|节(?!课)|卷|集(?![合和])|部(?![分赛游])|篇(?!张))).{0,30}$"},
+            "rule": r"^[ 　\t]{0,4}(?:序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|第\s{0,4}[\d〇零一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+?\s{0,4}(?:章|节(?!课)|卷|集(?![合和])|部(?![分赛游])|篇(?!张))).{0,30}$"}, # noqa
         {
             "name": "数字 分隔符 标题名称",
             "example": "1、这个就是标题",
@@ -624,7 +624,7 @@ class BookTxtInit(BaseHandler):
         {
             "name": "Chapter/Section/Part/Episode 序号 标题",
             "example": "Chapter 1 MyGrandmaIsNB",
-            "rule": r"^[ 　\t]{0,4}(?:[Cc]hapter|[Ss]ection|[Pp]art|ＰＡＲＴ|[Nn][oO][.、]|[Ee]pisode|(?:内容|文章)?简介|文案|前言|序章|楔子|正文(?!完|结)|终章|后记|尾声|番外)\s{0,4}\d{1,4}.{0,30}$"},
+            "rule": r"^[ 　\t]{0,4}(?:[Cc]hapter|[Ss]ection|[Pp]art|ＰＡＲＴ|[Nn][oO][.、]|[Ee]pisode|(?:内容|文章)?简介|文案|前言|序章|楔子|正文(?!完|结)|终章|后记|尾声|番外)\s{0,4}\d{1,4}.{0,30}$"}, # noqa
         {
             "name": "特殊符号 序号 标题",
             "example": "【第一章 后面的符号可以没有",
@@ -632,7 +632,7 @@ class BookTxtInit(BaseHandler):
         {
             "name": "特殊符号 标题(成对)",
             "example": "『加个直角引号更专业』\n(11)我奶常山赵子聋",
-            "rule": r"(?<=[\s　]{0,4})(?:[\[〈「『〖〔《（【\(].{1,30}[\)】）》〕〗』」〉\]]?|(?:内容|文章)?简介|文案|前言|序章|楔子|正文(?!完|结)|终章|后记|尾声|番外)[ 　]{0,4}$"},
+            "rule": r"(?<=[\s　]{0,4})(?:[\[〈「『〖〔《（【\(].{1,30}[\)】）》〕〗』」〉\]]?|(?:内容|文章)?简介|文案|前言|序章|楔子|正文(?!完|结)|终章|后记|尾声|番外)[ 　]{0,4}$"}, # noqa
         {
             "name": "特殊符号 标题(单个)",
             "example": "☆、晋江作者最喜欢的格式",
@@ -640,7 +640,7 @@ class BookTxtInit(BaseHandler):
         {
             "name": "章/卷 序号 标题",
             "example": "卷五 开源盛世",
-            "rule": r"^[ \t　]{0,4}(?:(?:内容|文章)?简介|文案|前言|序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|[卷章][\d零一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]{1,8})[ 　]{0,4}.{0,30}$"},
+            "rule": r"^[ \t　]{0,4}(?:(?:内容|文章)?简介|文案|前言|序章|楔子|正文(?!完|结)|终章|后记|尾声|番外|[卷章][\d零一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]{1,8})[ 　]{0,4}.{0,30}$"}, # noqa
         {
             "name": "书名 括号 序号",
             "example": "标题后面数字有括号(12)",
@@ -655,6 +655,7 @@ class BookTxtInit(BaseHandler):
             "rule": r"(?<=[ 　\t]{0,4})(?:.{0,15}分[页节章段]阅读[-_ ]|第\s{0,4}[\d零一二两三四五六七八九十百千万]{1,6}\s{0,4}[页节]).{0,30}$"
         }
     ]
+
     @js
     def get(self):
         bid = self.get_argument("id", "")
@@ -740,7 +741,7 @@ class BookTxtInit(BaseHandler):
                 # 移除临时文件
                 os.remove(tPath)
                 return
-            encode = get_encoding(fpath)
+            encode = get_file_encoding(fpath)
             logging.info("encoding " + encode)
             res = []
             i = 1
@@ -752,7 +753,7 @@ class BookTxtInit(BaseHandler):
                 while line:
                     # 获取当前文件指针的位置（seek位置）
                     seek_position = file.tell()
-                    for rule in TXT_CONTENT_RULES:
+                    for rule in self.TXT_CONTENT_RULES:
                         try:
                             matches = re.findall(rule['rule'], line)
                             if len(matches) == 0:
@@ -770,8 +771,8 @@ class BookTxtInit(BaseHandler):
                             i += 1
                             time.sleep(0.05)
                             break
-                        except Exception as e:
-                            ...
+                        except Exception:
+                            continue
                     pre_seek = seek_position
                     line = file.readline()
             if len(res) == 0:
@@ -795,7 +796,7 @@ class BookTxtInit(BaseHandler):
                 # 空队列，结束
                 return
             # 执行下一个任务
-            logging.info(f"执行下一个任务")
+            logging.info("执行下一个任务")
             BookTxtInit.__current_book_id = -1
             self.parse_txt_content()
 
@@ -914,14 +915,14 @@ class BookPush(BaseHandler):
         return
 
 
-def get_encoding(file):
+def get_file_encoding(file):
     import chardet
     with open(file, 'rb') as f:
         tmp = chardet.detect(f.read(100))
         return tmp['encoding']
 
 
-def get_encoding(byte):
+def get_content_encoding(byte):
     import chardet
     return chardet.detect(byte)['encoding']
 
