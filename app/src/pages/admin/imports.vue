@@ -15,7 +15,7 @@
             </template>
         </v-card-actions>
         <v-card-text>
-            <div v-if="selected.length == 0">请勾选需要处理的文件</div>
+            <div v-if="selected.length == 0">请勾选需要处理的文件（默认情况下全选即可。已存在的书籍，即使勾选了也不会重复导入）</div>
             <div v-else>共选择了{{ selected.length }}个</div>
         </v-card-text>
         <v-data-table
@@ -32,7 +32,7 @@
             :loading="loading"
             :page.sync="page"
             :items-per-page="100"
-            :footer-props="{ 'items-per-page-options': [10, 50, 100, 1000] }"
+            :footer-props="{ 'items-per-page-options': [10, 50, 100, 1000, 5000, 10000] }"
         >
             <template v-slot:item.status="{ item }">
                 <v-chip small v-if="item.status == 'ready'" class="success">可导入</v-chip>
