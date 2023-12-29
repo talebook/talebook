@@ -1,5 +1,11 @@
 #!/bin/sh
 
+PUID=${PUID:-0}
+PGID=${PGID:-0}
+
+groupmod -o -g "${PGID}" talebook
+usermod -o -u "${PUID}" talebook
+
 if [ ! -d "/data/books" ]; then
   cp -rf /prebuilt/books /data/
 fi
@@ -18,8 +24,21 @@ for f in *; do
     cp -rf "/prebuilt/books/$f" /data/books/
   fi
 done
+mkdir -p /root/.npm
+chown -R talebook:talebook \
+  /var/lib/nginx \
+  /data \
+  /root/.config/calibre \
+  /root/.npm \
+  /var/www/talebook/app/.env \
+  /var/www/talebook/app/dist \
+  /var/www/talebook/webserver \
+  /var/www/talebook/tools \
+  /var/www/talebook/server.py \
+  /usr/lib/calibre \
+  /usr/share/calibre
 
-/var/www/talebook/server.py --syncdb
-/var/www/talebook/server.py --update-config
+gosu talebook:talebook /var/www/talebook/server.py --syncdb
+gosu talebook:talebook /var/www/talebook/server.py --update-config
 service nginx restart
 /usr/bin/supervisord --nodaemon -c /etc/supervisor/supervisord.conf
