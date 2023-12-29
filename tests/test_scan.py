@@ -34,6 +34,34 @@ class TestScan(TestWithUserLogin):
         self.assertEqual(d["err"], "ok")
 
 
+class TestScanContinue(TestWithUserLogin):
+    NEW_ROW_ID = 69
+
+    def setUp(self):
+        # 将这行记录设置为可导入的状态
+        self.session = self.get_app().settings["ScopedSession"]
+        self.session.rollback()
+
+        row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
+        row.path = testdir + "/cases/new.epub"
+        row.status = ScanFile.NEW
+        row.book_id = 0
+        row.import_id = 0
+        row.save()
+        self.session.commit()
+        return super().setUp()
+
+    @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
+    def test_scan(self, m1):
+        m1.return_value = False
+        d = self.json("/api/admin/scan/run", method="POST", body="")
+        self.assertEqual(d["err"], "ok")
+
+        row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
+        self.assertEqual(row.status, ScanFile.READY)
+
+
+
 class TestImport(TestWithUserLogin):
     READY_ROW_ID = 69
 

@@ -95,9 +95,14 @@ class Scanner:
         inserted_hash = set()
         for fname, fpath, fmt in tasks:
             # logging.info("Scan: %s", fpath)
-            if self.session.query(ScanFile).filter(ScanFile.path == fpath).count() > 0:
+            samefiles = self.session.query(ScanFile).filter(ScanFile.path == fpath)
+            if samefiles.count() > 0:
                 # 如果已经有相同的文件记录，则跳过
-                continue
+                row = samefiles.first()
+                if row.status == ScanFile.NEW:
+                    rows.append( row )
+                else:
+                    continue
 
             stat = os.stat(fpath)
             md5 = hashlib.md5(fname.encode("UTF-8")).hexdigest()
