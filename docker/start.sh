@@ -26,15 +26,17 @@ for f in *; do
 done
 mkdir -p /root/.npm
 chown -R talebook:talebook \
-    /var/lib/nginx \
-    /data \
-    /root/.config/calibre \
-    /root/.npm
-chown -R talebook:talebook \
+  /var/lib/nginx \
+  /data \
+  /root/.config/calibre \
+  /root/.npm \
   /var/www/talebook/app/.env \
+  /var/www/talebook/app/dist \
   /var/www/talebook/webserver \
   /var/www/talebook/tools \
-  /var/www/talebook/server.py
+  /var/www/talebook/server.py \
+  /usr/lib/calibre \
+  /usr/share/calibre
 
 gosu talebook:talebook /var/www/talebook/server.py --syncdb
 gosu talebook:talebook /var/www/talebook/server.py --update-config
