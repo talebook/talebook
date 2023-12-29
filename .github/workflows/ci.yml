@@ -13,7 +13,7 @@ on:
       - master
 
 jobs:
-  test:
+  test-server:
     runs-on: ubuntu-latest
     container:
       image: talebook/calibre-docker
@@ -43,3 +43,20 @@ jobs:
       - name: Test with pytest
         run: |
           pytest ./tests
+
+  test-ui:
+    runs-on: ubuntu-latest
+    container:
+      image: node:16-alpine
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          cd app
+          npm install
+
+      - name: nuxt build
+        run: |
+          npm run build
