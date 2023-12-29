@@ -599,7 +599,7 @@ class TxtRead(BaseHandler):
                 # 读取从起始位置到结束位置的内容
                 content = file.read(end - start)
         encode = get_content_encoding(content)
-        content = content.decode(encoding=encode, errors='ignore').replace("\n", "<br>")
+        content = content.decode(encoding=encode, errors='ignore').replace("\r", "").replace("\n", "<br>")
         return {"err": "ok", "content": content}
 
 

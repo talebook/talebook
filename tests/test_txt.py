@@ -50,7 +50,7 @@ class TestTxtParse(TestWithUserLogin):
         self.assertEqual(encoding, self.BOOK_ENCODING)
 
     def test_parse_text_book_table_of_content(self):
-        with open(self.BOOK_PATH, encoding=self.BOOK_ENCODING) as fileobj:
+        with open(self.BOOK_PATH, encoding=self.BOOK_ENCODING, newline='\n') as fileobj:
             toc = TxtParser().parse_txt_book_toc(fileobj)
             self.assertEqual(len(toc), len(self.BOOK_TOC))
             self.assertEqual(toc, self.BOOK_TOC)

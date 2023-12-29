@@ -80,7 +80,7 @@ class TxtParser:
     def parse(self, filepath):
         encoding = get_file_encoding(filepath)
         logging.info("encoding is [%s] from file [%s]", encoding, filepath)
-        with open(filepath, 'r', encoding=encoding, errors='ignore') as fileobj:
+        with open(filepath, 'r', encoding=encoding, errors='ignore', newline='\n') as fileobj:
             return self.parse_txt_book_toc(fileobj)
 
     def parse_txt_book_toc(self, fileobj):
@@ -105,10 +105,12 @@ class TxtParser:
                     continue
 
                 if pre_chapter is not None:
+                    # 此时引用的对象还是上一个章节的，设置结尾位置
                     pre_chapter["end"] = pre_seek
+
                 pre_chapter = {
                     "id": idx,
-                    "title": matches[0],
+                    "title": matches[0].strip(),
                     "start": seek_position,
                     "end": -1
                 }
