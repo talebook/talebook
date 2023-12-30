@@ -456,6 +456,7 @@ class BookUpload(BaseHandler):
         with open(fpath, "rb") as stream:
             mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
             mi.title = utils.super_strip(mi.title)
+            mi.authors = [ utils.super_strip(mi.author_sort) ]
 
         if fmt.lower() == "txt":
             mi.title = name.replace(".txt", "")

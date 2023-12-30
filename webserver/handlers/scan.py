@@ -153,6 +153,7 @@ class Scanner:
             with open(fpath, "rb") as stream:
                 mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
                 mi.title = utils.super_strip(mi.title)
+                mi.authors = [ utils.super_strip(s) for s in mi.authors ]
 
             row.title = mi.title
             row.author = mi.author_sort
@@ -229,6 +230,7 @@ class Scanner:
             with open(fpath, "rb") as stream:
                 mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
                 mi.title = utils.super_strip(mi.title)
+                mi.authors = [ utils.super_strip(s) for s in mi.authors ]
 
             # 再次检查是否有重复书籍
             books = self.db.books_with_same_title(mi)
@@ -238,7 +240,7 @@ class Scanner:
                 self.save_or_rollback(row)
                 continue
 
-            logging.info("import [%s] from %s", mi.title, fpath)
+            logging.info("import [%s] from %s", repr(mi.title), fpath)
             row.book_id = self.db.import_book(mi, [fpath])
             row.status = ScanFile.IMPORTED
             self.save_or_rollback(row)
