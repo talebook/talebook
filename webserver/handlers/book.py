@@ -455,6 +455,7 @@ class BookUpload(BaseHandler):
         # read ebook meta
         with open(fpath, "rb") as stream:
             mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+            mi.title = utils.super_strip(mi.title)
 
         if fmt.lower() == "txt":
             mi.title = name.replace(".txt", "")

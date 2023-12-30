@@ -12,7 +12,7 @@ from gettext import gettext as _
 import sqlalchemy
 import tornado
 
-from webserver import loader
+from webserver import loader, utils
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
 from webserver.models import Item, ScanFile
 
@@ -152,6 +152,7 @@ class Scanner:
             fmt = fpath.split(".")[-1].lower()
             with open(fpath, "rb") as stream:
                 mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                mi.title = utils.super_strip(mi.title)
 
             row.title = mi.title
             row.author = mi.author_sort
@@ -227,6 +228,7 @@ class Scanner:
             fmt = fpath.split(".")[-1].lower()
             with open(fpath, "rb") as stream:
                 mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                mi.title = utils.super_strip(mi.title)
 
             # 再次检查是否有重复书籍
             books = self.db.books_with_same_title(mi)

@@ -13,11 +13,11 @@ from webserver.models import ScanFile
 
 def setUpModule():
     init()
-    handlers.scan.SCAN_DIR_PREFIX = "/"
-
+    handlers.scan.SCAN_DIR_PREFIX = "/var/www/talebook/tests/cases/"
 
 class TestScan(TestWithUserLogin):
     NEW_ROW_ID = 69
+    RECORDS_COUNT = 2
 
     def setUp(self):
         # 将这行记录设置为可导入的状态
@@ -33,13 +33,34 @@ class TestScan(TestWithUserLogin):
         self.session.commit()
         return super().setUp()
 
+    def test_scan(self):
+        d = self.json("/api/admin/scan/list?num=10000")
+        self.assertEqual(d['total'], self.RECORDS_COUNT)
+
     @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
     def test_scan(self, m1):
         m1.return_value = False
+
         d = self.json("/api/admin/scan/run", method="POST", body="")
         self.assertEqual(d["err"], "ok")
         row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
         self.assertEqual(row.status, ScanFile.READY)
+
+        d = self.json("/api/admin/scan/list?num=10000")
+        print(json.dumps(d))
+        self.assertEqual(d['total'], self.RECORDS_COUNT + 5)
+
+        titles = {
+                68:'天行者',
+                69:'凡人修仙之仙界篇',
+                70:'我的一生',
+                71:'book',
+                72:'天行者',
+                73:'凡人修仙之仙界篇',
+                74:'语言哲学',
+                }
+        for book in d['items']:
+            self.assertEqual(book['title'], titles[book['id']])
 
     def test_scan_background(self):
         n = threading.active_count() + 1
@@ -123,3 +144,4 @@ class TestImport(TestWithUserLogin):
         req = {"hashlist": "all"}
         d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
+
