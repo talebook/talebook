@@ -214,12 +214,12 @@ class BaseHandler(web.RequestHandler):
         user_id = self.user_id()
         if user_id:
             user_id = int(user_id)
-        user = self.session.query(Reader).get(user_id) if user_id else None
+        user = self.session.get(Reader, user_id) if user_id else None
         logging.debug("Query User(%s) = %s" % (user_id, user))
 
         admin_id = self.get_secure_cookie("admin_id")
         if admin_id:
-            self.admin_user = self.session.query(Reader).get(int(admin_id))
+            self.admin_user = self.session.get(Reader, int(admin_id))
         elif user and user.is_admin():
             self.admin_user = user
         return user

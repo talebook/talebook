@@ -11,9 +11,8 @@ from gettext import gettext as _
 
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.mutable import Mutable
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, declarative_base
 
 
 def mksalt():

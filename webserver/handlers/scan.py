@@ -59,7 +59,7 @@ class Scanner:
         except Exception as err:
             logging.error(traceback.format_exc())
             self.session.rollback()
-            logging.warn("save error: %s", err)
+            logging.error("save error: %s", err)
             return False
 
     def run_scan(self, path_dir):
@@ -115,7 +115,7 @@ class Scanner:
             md5 = hashlib.md5(fname.encode("UTF-8")).hexdigest()
             hash = "fstat:%s/%s" % (stat.st_size, md5)
             if hash in inserted_hash:
-                logging.warn("maybe have same book, skip: %s", fpath)
+                logging.error("maybe have same book, skip: %s", fpath)
                 continue
 
             inserted_hash.add(hash)
