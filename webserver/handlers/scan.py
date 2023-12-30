@@ -30,8 +30,16 @@ class Scanner:
         self.bind_new_session()
 
     def bind_new_session(self):
-        # NOTE 起线程后台运行后，如果不开新的session，会出现session对象的绑定错误
+        # ScopedSession是线程Local单例，可以多次调用
+        # NOTE 起线程后台运行后，主线程的session会在请求结束时被释放掉
+        # 如果不开新的session，会出现session对象的绑定错误
         self.session = self.func_new_session()
+
+    def remove_new_session(self):
+        # FIXME ScopedSession的session是线程Local的单例，需要单独释放掉
+        # 当前的写法容易出BUG，后面改成队列传递任务会更清晰一些
+        if threading.get_ident() != self.curret_thread:
+            self.func_new_session.remove()
 
     def allow_backgrounds(self):
         """for unittest control"""
@@ -70,8 +78,7 @@ class Scanner:
     def do_scan(self, path_dir):
         from calibre.ebooks.metadata.meta import get_metadata
 
-        if threading.get_ident() != self.curret_thread:
-            self.bind_new_session()
+        self.bind_new_session()
 
         # 生成任务（粗略扫描），前端可以调用API查询进展
         tasks = []
@@ -159,6 +166,8 @@ class Scanner:
                 row.status = ScanFile.EXIST
             if not self.save_or_rollback(row):
                 continue
+
+        self.remove_new_session()
         return True
 
     def delete(self, hashlist):
@@ -203,8 +212,7 @@ class Scanner:
     def do_import(self, hashlist):
         from calibre.ebooks.metadata.meta import get_metadata
 
-        if threading.get_ident() != self.curret_thread:
-            self.bind_new_session()
+        self.bind_new_session()
 
         # 生成任务ID
         import_id = int(time.time())
@@ -242,6 +250,8 @@ class Scanner:
             except Exception as err:
                 self.session.rollback()
                 logging.error("save link error: %s", err)
+
+        self.remove_new_session()
         return True
 
     def import_status(self):
