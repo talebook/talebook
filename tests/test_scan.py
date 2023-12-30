@@ -13,7 +13,7 @@ from webserver.models import ScanFile
 
 def setUpModule():
     init()
-    handlers.scan.SCAN_DIR_PREFIX = "/var/www/talebook/tests/cases/"
+    handlers.scan.SCAN_DIR_PREFIX = "/"
 
 class TestScan(TestWithUserLogin):
     NEW_ROW_ID = 69
