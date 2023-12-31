@@ -63,7 +63,7 @@ def setup_server():
     main.CONF["installed"] = True
     main.CONF["INVITE_MODE"] = False
     main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
-    main.CONF["db_engine_args"] = {"echo": True}
+    # main.CONF["db_engine_args"] = {"echo": True}
     if _app is None:
         _app = main.make_app()
 
@@ -767,15 +767,16 @@ class TestInviteMode(TestApp):
 
 def setUpModule():
     os.environ["ASYNC_TEST_TIMEOUT"] = "60"
-    logging.basicConfig(
-        level=logging.DEBUG,
-        datefmt="%Y-%m-%d %H:%M:%S",
-        format="%(asctime)s %(levelname)7s %(pathname)s:%(lineno)d %(message)s",
-    )
     setup_server()
     setup_mock_user()
     setup_mock_sendmail()
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.DEBUG,
+        datefmt="%Y-%m-%d %H:%M:%S",
+        filename="/data/log/unittest.log",
+        format="%(asctime)s %(levelname)7s %(pathname)s:%(lineno)d %(message)s",
+    )
     unittest.main()

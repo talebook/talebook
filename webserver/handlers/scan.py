@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import hashlib
 import logging
-import os
-import threading
-import time
 import traceback
 from gettext import gettext as _
 
 import sqlalchemy
 import tornado
 
-from webserver import loader, utils
+from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
-from webserver.models import Item, ScanFile
+from webserver.models import ScanFile
+from webserver.async_services import ScanService
 
 CONF = loader.get_settings()
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
@@ -25,29 +22,7 @@ class Scanner:
     def __init__(self, calibre_db, ScopedSession, user_id=None):
         self.db = calibre_db
         self.user_id = user_id
-        self.func_new_session = ScopedSession
-        self.curret_thread = threading.get_ident()
-        self.bind_new_session()
-
-    def bind_new_session(self):
-        # ScopedSession是线程Local单例，可以多次调用
-        # NOTE 起线程后台运行后，主线程的session会在请求结束时被释放掉
-        # 如果不开新的session，会出现session对象的绑定错误
-        self.session = self.func_new_session()
-
-    def remove_new_session(self):
-        # FIXME ScopedSession的session是线程Local的单例，需要单独释放掉
-        # 当前的写法容易出BUG，后面改成队列传递任务会更清晰一些
-        if threading.get_ident() != self.curret_thread:
-            self.func_new_session.remove()
-
-    def allow_backgrounds(self):
-        """for unittest control"""
-        return True
-
-    def resume_last_scan(self):
-        # TODO
-        return False
+        self.session = ScopedSession()
 
     def save_or_rollback(self, row):
         try:
@@ -63,114 +38,7 @@ class Scanner:
             return False
 
     def run_scan(self, path_dir):
-        if self.resume_last_scan():
-            return 1
-
-        if not self.allow_backgrounds():
-            self.do_scan(path_dir)
-        else:
-            logging.error("run into background thread")
-            t = threading.Thread(name="do_scan", target=self.do_scan, args=(path_dir,))
-            t.setDaemon(True)
-            t.start()
-        return 1
-
-    def do_scan(self, path_dir):
-        from calibre.ebooks.metadata.meta import get_metadata
-
-        self.bind_new_session()
-
-        # 生成任务（粗略扫描），前端可以调用API查询进展
-        tasks = []
-        for dirpath, __, filenames in os.walk(path_dir):
-            for fname in filenames:
-                fpath = os.path.join(dirpath, fname)
-                if not os.path.isfile(fpath):
-                    continue
-
-                fmt = fpath.split(".")[-1].lower()
-                if fmt not in SCAN_EXT:
-                    # logging.debug("bad format: [%s] %s", fmt, fpath)
-                    continue
-                tasks.append((fname, fpath, fmt))
-
-        # 生成任务ID
-        scan_id = int(time.time())
-        logging.info("========== start to check files size & name ============")
-
-        rows = []
-        inserted_hash = set()
-        for fname, fpath, fmt in tasks:
-            # logging.info("Scan: %s", fpath)
-            samefiles = self.session.query(ScanFile).filter(ScanFile.path == fpath)
-            if samefiles.count() > 0:
-                # 如果已经有相同的文件记录，则跳过
-                row = samefiles.first()
-                if row.status == ScanFile.NEW:
-                    rows.append(row)
-                else:
-                    continue
-
-            stat = os.stat(fpath)
-            md5 = hashlib.md5(fname.encode("UTF-8")).hexdigest()
-            hash = "fstat:%s/%s" % (stat.st_size, md5)
-            if hash in inserted_hash:
-                logging.error("maybe have same book, skip: %s", fpath)
-                continue
-
-            inserted_hash.add(hash)
-            row = ScanFile(fpath, hash, scan_id)
-            if not self.save_or_rollback(row):
-                continue
-            rows.append(row)
-        # self.session.bulk_save_objects(rows)
-
-        logging.info("========== start to check files hash & meta ============")
-        # 检查文件哈希值，检查DB重复情况
-        for row in rows:
-            fpath = row.path
-
-            # 读取文件，计算哈希值
-            sha256 = hashlib.sha256()
-            with open(fpath, "rb") as f:
-                # Read and update hash string value in blocks of 4K
-                for byte_block in iter(lambda: f.read(4096), b""):
-                    sha256.update(byte_block)
-
-            hash = "sha256:" + sha256.hexdigest()
-            if self.session.query(ScanFile).filter(ScanFile.hash == hash).count() > 0 or hash in inserted_hash:
-                # 如果已经有相同的哈希值，则删掉本任务
-                row.status = ScanFile.DROP
-            else:
-                # 或者，更新为真实的哈希值
-                row.hash = hash
-            inserted_hash.add(hash)
-            if not self.save_or_rollback(row):
-                continue
-
-            # 尝试解析metadata
-            fmt = fpath.split(".")[-1].lower()
-            with open(fpath, "rb") as stream:
-                mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-                mi.title = utils.super_strip(mi.title)
-                mi.authors = [ utils.super_strip(s) for s in mi.authors ]
-
-            row.title = mi.title
-            row.author = mi.author_sort
-            row.publisher = mi.publisher
-            row.tags = ", ".join(mi.tags)
-            row.status = ScanFile.READY  # 设置为可处理
-
-            # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
-            books = self.db.books_with_same_title(mi)
-            if books:
-                row.book_id = books.pop()
-                row.status = ScanFile.EXIST
-            if not self.save_or_rollback(row):
-                continue
-
-        self.remove_new_session()
-        return True
+        ScanService().do_scan(path_dir)
 
     def delete(self, hashlist):
         query = self.session.query(ScanFile)
@@ -201,62 +69,8 @@ class Scanner:
             return 1
 
         total = self.build_query(hashlist).count()
-
-        if not self.allow_backgrounds():
-            self.do_import(hashlist)
-        else:
-            logging.info("run into background thread")
-            t = threading.Thread(name="do_import", target=self.do_import, args=(hashlist,))
-            t.setDaemon(True)
-            t.start()
+        ScanService().do_import(hashlist, self.user_id)
         return total
-
-    def do_import(self, hashlist):
-        from calibre.ebooks.metadata.meta import get_metadata
-
-        self.bind_new_session()
-
-        # 生成任务ID
-        import_id = int(time.time())
-
-        query = self.build_query(hashlist)
-        query.update({ScanFile.import_id: import_id}, synchronize_session=False)
-        self.session.commit()
-
-        # 逐个处理
-        for row in query.all():
-            fpath = row.path
-            fmt = fpath.split(".")[-1].lower()
-            with open(fpath, "rb") as stream:
-                mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-                mi.title = utils.super_strip(mi.title)
-                mi.authors = [ utils.super_strip(s) for s in mi.authors ]
-
-            # 再次检查是否有重复书籍
-            books = self.db.books_with_same_title(mi)
-            if books:
-                row.status = ScanFile.EXIST
-                row.book_id = books.pop()
-                self.save_or_rollback(row)
-                continue
-
-            logging.info("import [%s] from %s", repr(mi.title), fpath)
-            row.book_id = self.db.import_book(mi, [fpath])
-            row.status = ScanFile.IMPORTED
-            self.save_or_rollback(row)
-
-            # 添加关联表
-            item = Item()
-            item.book_id = row.book_id
-            item.collector_id = self.user_id
-            try:
-                item.save()
-            except Exception as err:
-                self.session.rollback()
-                logging.error("save link error: %s", err)
-
-        self.remove_new_session()
-        return True
 
     def import_status(self):
         import_id = self.session.query(sqlalchemy.func.max(ScanFile.import_id)).scalar()
