@@ -11,7 +11,7 @@ import unittest
 from tests.test_main import TestWithUserLogin, setUpModule as init, testdir
 from webserver import handlers
 from webserver.models import ScanFile
-from webserver.async_services import AsyncService, ScanService
+from webserver.services import AsyncService, ScanService
 
 
 def setUpModule():
@@ -40,7 +40,7 @@ class TestScan(TestWithUserLogin):
         d = self.json("/api/admin/scan/list?num=10000")
         self.assertEqual(d['total'], self.RECORDS_COUNT)
 
-    @mock.patch("webserver.async_services.AsyncService.async_mode")
+    @mock.patch("webserver.services.AsyncService.async_mode")
     def test_scan(self, m1):
         m1.return_value = False
 
@@ -99,7 +99,7 @@ class TestScanContinue(TestWithUserLogin):
         self.session.commit()
         return super().setUp()
 
-    @mock.patch("webserver.async_services.AsyncService.async_mode")
+    @mock.patch("webserver.services.AsyncService.async_mode")
     def test_scan(self, m1):
         m1.return_value = False
 
@@ -128,7 +128,7 @@ class TestImport(TestWithUserLogin):
         return super().setUp()
 
     @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
-    @mock.patch("webserver.async_services.AsyncService.async_mode")
+    @mock.patch("webserver.services.AsyncService.async_mode")
     def test_import_one(self, m2, m1):
         m1.return_value = 1008610086
         m2.return_value = False
@@ -138,7 +138,7 @@ class TestImport(TestWithUserLogin):
         self.assertEqual(d["err"], "ok")
 
     @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
-    @mock.patch("webserver.async_services.AsyncService.async_mode")
+    @mock.patch("webserver.services.AsyncService.async_mode")
     def test_import_all(self, m2, m1):
         m1.return_value = 1008610086
         m2.return_value = False

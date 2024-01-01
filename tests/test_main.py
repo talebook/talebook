@@ -367,8 +367,8 @@ class TestBook(TestWithUserLogin):
             def __init__(self, path=None):
                 if not path:
                     path = testdir + "/cases/old.epub"
-                self.mock1 = mock.patch.object(webserver.handlers.book.BookPush, "get_path_of_fmt", return_value=path)
-                self.mock2 = mock.patch("webserver.handlers.book.do_ebook_convert", return_value=True)
+                self.mock1 = mock.patch.object(webserver.services.convert.ConvertService, "get_path_of_fmt", return_value=path)
+                self.mock2 = mock.patch("webserver.services.convert.ConvertService.do_ebook_convert", return_value=True)
 
             def __enter__(self):
                 self.mock1.start()
@@ -425,7 +425,7 @@ class TestBook(TestWithUserLogin):
                 self.assertEqual(m.call_count, 2)
 
     def test_read(self):
-        with mock.patch.object(webserver.handlers.book.BookRead, "extract_book", return_value="Yo"):
+        with mock.patch.object(webserver.services.extract.ExtraceService, "extract_book", return_value="Yo"):
             for bid in BIDS:
                 rsp = self.fetch("/read/%s" % bid, follow_redirects=False)
                 self.assertEqual(rsp.code, 302 if bid == BID_PDF or bid == BID_TXT else 200)
@@ -704,7 +704,7 @@ class TestConvert(TestApp):
         fin = testdir + "/cases/old.epub"
         fout = "/tmp/output.mobi"
         flog = "/tmp/output.log"
-        ok = webserver.handlers.book.do_ebook_convert(fin, fout, flog)
+        ok = ConvertService().do_ebook_convert(fin, fout, flog)
         self.assertEqual(ok, True)
 
 

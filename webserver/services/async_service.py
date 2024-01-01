@@ -6,6 +6,8 @@ import threading
 from queue import Queue
 import traceback
 
+from webserver.models import Message
+
 
 class SingletonType(type):
 
@@ -21,10 +23,9 @@ class AsyncService(metaclass=SingletonType):
     db = None
     session = None
     scoped_session = None
-    running = {}
+    running = {}  # name -> (thread, queue)
 
     def __init__(self):
-        self.running = {}  # name -> queue
         self.scoped_session = lambda : 'no-session'
         self.lock = threading.Lock()
 
@@ -34,11 +35,16 @@ class AsyncService(metaclass=SingletonType):
         self.session = scoped_session()
         # logging.info("<%s> setup: db=%s, session=%s", self, self.db, self.session)
 
+    def get_queue(self, service_name) -> Queue:
+        if service_name not in self.running:
+            return None
+        return self.running[service_name][1]
+
     def start_service(self, service_func) -> Queue:
         self.lock.acquire()
         name = service_func.__name__
         if name in self.running:
-            return self.running[name]
+            return self.running[name][1]
 
         logging.info("** Start Thread Service <%s> ** from %s", name, self)
         q = Queue()
@@ -46,7 +52,7 @@ class AsyncService(metaclass=SingletonType):
         t.name = self.__class__.__name__ + "." + service_func.__name__
         t.setDaemon(True)
         t.start()
-        self.running[t] = q
+        self.running[name] = (t, q)
         self.lock.release()
         return q
 
@@ -65,6 +71,13 @@ class AsyncService(metaclass=SingletonType):
         # actually, it will never stop
         # self.scoped_session.remove()
 
+    # 一些常用的工具库
+    def add_msg(self, user_id, status, msg):
+        m = Message(user_id, status, msg)
+        if m.reader_id:
+            m.save()
+
+    # 注册服务
     def async_mode(self):
         ''' for unittest '''
         return True

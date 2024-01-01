@@ -4,9 +4,7 @@
 
 import base64
 import datetime
-import hashlib
 import logging
-import os
 import time
 from collections import defaultdict
 from gettext import gettext as _
@@ -474,57 +472,6 @@ class BaseHandler(web.RequestHandler):
         except:
             start = 0
         return max(0, start)
-
-    def get_path_progress(self, book_id):
-        return os.path.join(CONF["progress_path"], "progress-%s.log" % book_id)
-
-    def create_mail(self, sender, to, subject, body, attachment_data, attachment_name):
-        from email.header import Header
-        from email.mime.application import MIMEApplication
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
-        from email.utils import formatdate
-
-        mail = MIMEMultipart()
-        mail["From"] = sender
-        mail["To"] = to
-        mail["Subject"] = Header(subject, "utf-8")
-        mail["Date"] = formatdate(localtime=True)
-        mail["Message-ID"] = "<tencent_%s@qq.com>" % hashlib.md5(mail.as_string().encode("UTF-8")).hexdigest()
-        mail.preamble = "You will not see this in a MIME-aware mail reader.\n"
-
-        if body is not None:
-            msg = MIMEText(body, "plain", "utf-8")
-            mail.attach(msg)
-
-        if attachment_data is not None:
-            name = Header(attachment_name, "utf-8").encode()
-            msg = MIMEApplication(attachment_data, "octet-stream", charset="utf-8", name=name)
-            msg.add_header("Content-Disposition", "attachment", filename=name)
-            mail.attach(msg)
-        return mail.as_string()
-
-    def mail(self, sender, to, subject, body, attachment_data=None, attachment_name=None, **kwargs):
-        from calibre.utils.smtp import sendmail
-
-        smtp_port = 465
-        relay = kwargs.get("relay", CONF["smtp_server"])
-        if ':' in relay:
-            relay, smtp_port = relay.split(":")
-        username = kwargs.get("username", CONF["smtp_username"])
-        password = kwargs.get("password", CONF["smtp_password"])
-        mail = self.create_mail(sender, to, subject, body, attachment_data, attachment_name)
-        sendmail(
-            mail,
-            from_=sender,
-            to=[to],
-            timeout=20,
-            port=int(smtp_port),
-            encryption="SSL",
-            relay=relay,
-            username=username,
-            password=password,
-        )
 
 
 class ListHandler(BaseHandler):

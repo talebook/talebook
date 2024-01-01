@@ -16,7 +16,7 @@ from tornado import web
 from tornado.options import define, options
 
 from webserver import loader, models, social_routes, handlers
-from webserver.async_services import AsyncService
+from webserver.services import AsyncService
 
 CONF = loader.get_settings()
 define("host", default="", type=str, help=_("The host address on which to listen"))

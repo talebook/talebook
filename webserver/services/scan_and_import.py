@@ -9,7 +9,7 @@ import traceback
 
 from webserver import utils
 from webserver.models import Item, ScanFile
-from webserver.async_services import AsyncService
+from webserver.services import AsyncService
 
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
 

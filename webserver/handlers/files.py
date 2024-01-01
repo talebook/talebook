@@ -8,6 +8,7 @@ import re
 
 from tornado import web
 from webserver import constants, loader
+from webserver.services.convert import ConvertService
 from webserver.handlers.base import BaseHandler
 
 CONF = loader.get_settings()
@@ -117,7 +118,7 @@ class ProxyImageHandler(BaseHandler):
 class ProgressHandler(BaseHandler):
     def get(self, id):
         book_id = int(id)
-        path = self.get_path_progress(book_id)
+        path = ConvertService().get_path_progress(book_id)
         if not os.path.exists(path):
             raise web.HTTPError(404, log_message="nothing")
         txt = open(path).read()

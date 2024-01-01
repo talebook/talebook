@@ -10,6 +10,7 @@ from gettext import gettext as _
 import tornado.escape
 from tornado import web
 from webserver import loader
+from webserver.services.mail import MailService
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import Message, Reader
 from webserver.version import VERSION
@@ -109,7 +110,7 @@ class SignUp(BaseHandler):
         mail_to = user.email
         mail_from = CONF["smtp_username"]
         mail_body = CONF["SIGNUP_MAIL_CONTENT"] % args
-        self.mail(mail_from, mail_to, mail_subject, mail_body)
+        MailService().mail(mail_from, mail_to, mail_subject, mail_body)
 
     @js
     def post(self):
@@ -213,7 +214,7 @@ class UserReset(BaseHandler):
         mail_to = user.email
         mail_from = CONF["smtp_username"]
         mail_body = CONF["RESET_MAIL_CONTENT"] % args
-        self.mail(mail_from, mail_to, mail_subject, mail_body)
+        MailService().mail(mail_from, mail_to, mail_subject, mail_body)
 
         # do save into db
         try:
