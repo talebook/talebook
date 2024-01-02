@@ -11,7 +11,7 @@ import tornado
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
 from webserver.models import ScanFile
-from webserver.services import ScanService
+from webserver.services.scan import ScanService
 
 CONF = loader.get_settings()
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
