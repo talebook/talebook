@@ -578,7 +578,7 @@ class BookPush(BaseHandler):
         for fmt in ["epub", "pdf"]:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
-                MailService().do_send_mail(self.user_id(), book, mail_to, fmt, fpath)
+                MailService().send_book(self.user_id(), self.site_url, book, mail_to, fmt, fpath)
                 return {"err": "ok", "msg": _(u"服务器后台正在推送了。您可关闭此窗口，继续浏览其他书籍。")}
 
         # we do no have formats for kindle
@@ -588,7 +588,7 @@ class BookPush(BaseHandler):
                 "msg": _(u"抱歉，该书无可用于kindle阅读的格式"),
             }
 
-        ConvertService().convert_and_send(self.user_id(), book, mail_to)
+        ConvertService().convert_and_send(self.user_id(), self.site_url, book, mail_to)
         self.add_msg(
             "success",
             _(u"服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},

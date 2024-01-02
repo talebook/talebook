@@ -110,7 +110,7 @@ class SignUp(BaseHandler):
         mail_to = user.email
         mail_from = CONF["smtp_username"]
         mail_body = CONF["SIGNUP_MAIL_CONTENT"] % args
-        MailService().mail(mail_from, mail_to, mail_subject, mail_body)
+        MailService().send_mail(mail_from, mail_to, mail_subject, mail_body)
 
     @js
     def post(self):
@@ -214,7 +214,7 @@ class UserReset(BaseHandler):
         mail_to = user.email
         mail_from = CONF["smtp_username"]
         mail_body = CONF["RESET_MAIL_CONTENT"] % args
-        MailService().mail(mail_from, mail_to, mail_subject, mail_body)
+        MailService().send_mail(mail_from, mail_to, mail_subject, mail_body)
 
         # do save into db
         try:

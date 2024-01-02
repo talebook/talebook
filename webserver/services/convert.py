@@ -24,7 +24,7 @@ class ConvertService(AsyncService):
     def get_path_progress(self, book_id):
         return os.path.join(CONF["progress_path"], "progress-%s.log" % book_id)
 
-    def do_ebook_convert(old_path, new_path, log_path):
+    def do_ebook_convert(self, old_path, new_path, log_path):
         """convert book, and block, and wait"""
         args = ["ebook-convert", old_path, new_path]
         if new_path.lower().endswith(".epub"):
@@ -68,11 +68,11 @@ class ConvertService(AsyncService):
         return new_path
 
     @AsyncService.register_service
-    def convert_and_send(self, user_id, book, mail_to):
+    def convert_and_send(self, user_id: int, site_url: str, book: dict, mail_to: str):
         # https://www.amazon.cn/gp/help/customer/display.html?ref_=hp_left_v4_sib&nodeId=G5WYD9SAF7PGXRNA
         fmt = "epub"  # best format for kindle
         fpath = self.convert_to_mobi_format(book, fmt)
         if fpath:
-            MailService().send_book(user_id, book, mail_to, fmt, fpath)
+            MailService().send_book(user_id, site_url, book, mail_to, fmt, fpath)
         else:
             self.add_msg(user_id, "danger", _(u"文件格式转换失败，请在QQ群里联系管理员."))

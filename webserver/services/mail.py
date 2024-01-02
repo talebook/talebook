@@ -63,11 +63,11 @@ class MailService(AsyncService):
         )
 
     @AsyncService.register_service
-    def mail(self, sender, to, subject, body, attachment_data=None, attachment_name=None, **kwargs):
+    def send_mail(self, sender, to, subject, body, attachment_data=None, attachment_name=None, **kwargs):
         return self.do_send_mail(sender, to, subject, body, attachment_data, attachment_name, **kwargs)
 
     @AsyncService.register_service
-    def send_book(self, user_id, book, mail_to, fmt, fpath):
+    def send_book(self, user_id: int, site_url: str, book: dict, mail_to: str, fmt: str, fpath: str):
         from calibre.ebooks.metadata import authors_to_string
 
         # read meta info
@@ -79,7 +79,7 @@ class MailService(AsyncService):
 
         mail_args = {
             "title": title,
-            "site_url": self.site_url,
+            "site_url": site_url,
             "site_title": CONF["site_title"],
         }
         mail_from = CONF["smtp_username"]
@@ -88,7 +88,7 @@ class MailService(AsyncService):
         status = msg = ""
         try:
             logging.info("send %(title)s to %(mail_to)s" % vars())
-            self.mail(mail_from, mail_to, mail_subject, mail_body, fdata, fname)
+            self.do_send_mail(mail_from, mail_to, mail_subject, mail_body, fdata, fname)
             status = "success"
             msg = _("[%(title)s] 已成功发送至Kindle邮箱 [%(mail_to)s] !!") % vars()
             logging.info(msg)

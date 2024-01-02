@@ -15,6 +15,8 @@ from unittest import mock
 import requests
 from tornado import testing, web
 
+from webserver.services.convert import ConvertService
+
 testdir = os.path.dirname(os.path.realpath(__file__))
 projdir = os.path.realpath(testdir + "/../../")
 sys.path.append(projdir)
@@ -27,6 +29,7 @@ from webserver.handlers.base import BaseHandler
 _app = None
 _mock_user = None
 _mock_mail = None
+_mock_service_async_mode = None
 
 '''
 1	EPUB	440912	Bai Nian Gu Du - Jia Xi Ya  Ma Er Ke Si
@@ -77,6 +80,10 @@ def setup_mock_sendmail():
     global _mock_mail
     _mock_mail = mock.patch("calibre.utils.smtp.sendmail", return_value="Yo")
 
+
+def setup_mock_service():
+    global _mock_service_async_mode
+    _mock_service_async_mode = mock.patch("webserver.services.AsyncService.async_mode")
 
 def get_db():
     return _app.settings["ScopedSession"]
@@ -277,13 +284,16 @@ class TestWithUserLogin(TestApp):
     def setUpClass(self):
         self.user = _mock_user.start()
         self.mail = _mock_mail.start()
+        self.async_service = _mock_service_async_mode.start()
         self.user.return_value = 1
         self.mail.return_value = True
+        self.async_service.return_value = False
 
     @classmethod
     def tearDownClass(self):
         _mock_user.stop()
         _mock_mail.stop()
+        _mock_service_async_mode.start()
 
 
 class TestUser(TestWithUserLogin):
@@ -425,7 +435,7 @@ class TestBook(TestWithUserLogin):
                 self.assertEqual(m.call_count, 2)
 
     def test_read(self):
-        with mock.patch.object(webserver.services.extract.ExtraceService, "extract_book", return_value="Yo"):
+        with mock.patch.object(webserver.services.extract.ExtractService, "extract_book", return_value="Yo"):
             for bid in BIDS:
                 rsp = self.fetch("/read/%s" % bid, follow_redirects=False)
                 self.assertEqual(rsp.code, 302 if bid == BID_PDF or bid == BID_TXT else 200)
@@ -519,6 +529,8 @@ class TestUserSignUp(TestWithUserLogin):
         self.user.return_value = 1
         self.mail = _mock_mail.start()
         self.mail.return_value = True
+        self.async_service = _mock_service_async_mode.start()
+        self.async_service.return_value = False
 
     @classmethod
     def tearDownClass(self):
@@ -770,6 +782,7 @@ def setUpModule():
     setup_server()
     setup_mock_user()
     setup_mock_sendmail()
+    setup_mock_service()
 
 
 if __name__ == "__main__":

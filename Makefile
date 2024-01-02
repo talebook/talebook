@@ -17,9 +17,10 @@ push:
 	docker push $(REPO2)
 
 test: lint
-	docker build --build-arg BUILD_COUNTRY=CN -t talebook/test --target test -f Dockerfile .
+	# docker build --build-arg BUILD_COUNTRY=CN -t talebook/test --target test -f Dockerfile .
+	#docker run --rm -v .:/data/log/ --name talebook-docker-test talebook/test
 	rm -f unittest.log
-	docker run --rm -v .:/data/log/ --name talebook-docker-test talebook/test
+	docker run --rm --name=talebook-docker-test -v $$PWD:$$PWD talebook/test pytest -vv --log-file=$$PWD/log/unittest.log --log-level=INFO $$PWD/tests/
 
 lint:
 	flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
