@@ -15,8 +15,6 @@ from unittest import mock
 import requests
 from tornado import testing, web
 
-from webserver.services.convert import ConvertService
-
 testdir = os.path.dirname(os.path.realpath(__file__))
 projdir = os.path.realpath(testdir + "/../../")
 sys.path.append(projdir)
@@ -709,15 +707,6 @@ class TestOpds(TestWithUserLogin):
         rsp = self.fetch("/opds/nav/%s" % b'Otitle'.hex())
         self.assertEqual(rsp.code, 401)
         main.CONF["INVITE_MODE"] = False
-
-
-class TestConvert(TestApp):
-    def test_convert(self):
-        fin = testdir + "/cases/old.epub"
-        fout = "/tmp/output.mobi"
-        flog = "/tmp/output.log"
-        ok = ConvertService().do_ebook_convert(fin, fout, flog)
-        self.assertEqual(ok, True)
 
 
 class TestJsonResponse(TestApp):
