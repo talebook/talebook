@@ -375,7 +375,7 @@ class TestBook(TestWithUserLogin):
             def __init__(self, path=None):
                 if not path:
                     path = testdir + "/cases/old.epub"
-                self.mock1 = mock.patch.object(webserver.services.convert.ConvertService, "get_path_of_fmt", return_value=path)
+                self.mock1 = mock.patch("webserver.services.convert.ConvertService.get_path_of_fmt", return_value=path)
                 self.mock2 = mock.patch("webserver.services.convert.ConvertService.do_ebook_convert", return_value=True)
 
             def __enter__(self):
@@ -775,10 +775,11 @@ def setUpModule():
 
 
 if __name__ == "__main__":
+    '''
     logging.basicConfig(
         level=logging.DEBUG,
         datefmt="%Y-%m-%d %H:%M:%S",
         filename="/data/log/unittest.log",
         format="%(asctime)s %(levelname)7s %(pathname)s:%(lineno)d %(message)s",
-    )
+    )'''
     unittest.main()

@@ -66,7 +66,7 @@ FROM server as test
 RUN pip install flake8 pytest
 COPY webserver/ /var/www/talebook/webserver/
 COPY tests/ /var/www/talebook/tests/
-CMD ["pytest", "/var/www/talebook/tests/"]
+CMD ["pytest", "/var/www/talebook/tests"]
 
 
 # ----------------------------------------
