@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import functools
 import json
 import logging
 import os
-import queue
 import random
 import re
-import subprocess
-import threading
-import time
 import urllib
 from gettext import gettext as _
 
@@ -18,61 +13,15 @@ import tornado.escape
 from tornado import web
 
 from webserver import constants, loader, utils
+from webserver.services.convert import ConvertService
+from webserver.services.extract import ExtractService
+from webserver.services.mail import MailService
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.models import Item
 from webserver.plugins.meta import baike, douban
-from webserver.plugins.parser.txt import TxtParser, get_content_encoding
+from webserver.plugins.parser.txt import get_content_encoding
 
 CONF = loader.get_settings()
-_q = queue.Queue()
-
-
-def background(func):
-    @functools.wraps(func)
-    def run(*args, **kwargs):
-        def worker():
-            try:
-                func(*args, **kwargs)
-            except:
-                import logging
-                import traceback
-
-                logging.error("Failed to run background task:")
-                logging.error(traceback.format_exc())
-
-        t = threading.Thread(name="worker", target=worker)
-        t.setDaemon(True)
-        t.start()
-
-    return run
-
-
-def do_ebook_convert(old_path, new_path, log_path):
-    """convert book, and block, and wait"""
-    args = ["ebook-convert", old_path, new_path]
-    if new_path.lower().endswith(".epub"):
-        args += ["--flow-size", "0"]
-
-    timeout = 300
-    try:
-        timeout = int(CONF["convert_timeout"])
-    except:
-        pass
-
-    with open(log_path, "w") as log:
-        cmd = " ".join("'%s'" % v for v in args)
-        logging.info("CMD: %s" % cmd)
-        p = subprocess.Popen(args, stdout=log, stderr=subprocess.PIPE)
-        try:
-            _, stde = p.communicate(timeout=timeout)
-            logging.info("ebook-convert finish: %s, err: %s" % (new_path, bytes.decode(stde)))
-        except subprocess.TimeoutExpired:
-            p.kill()
-            logging.info("ebook-convert timeout: %s" % new_path)
-            log.info("ebook-convert timeout: %s" % new_path)
-            log.write(u"\n服务器转换书本格式时超时了。请在配置管理页面调大超时时间。\n[FINISH]")
-            return False
-        return True
 
 
 class Index(BaseHandler):
@@ -456,7 +405,7 @@ class BookUpload(BaseHandler):
         with open(fpath, "rb") as stream:
             mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
             mi.title = utils.super_strip(mi.title)
-            mi.authors = [ utils.super_strip(mi.author_sort) ]
+            mi.authors = [utils.super_strip(mi.author_sort)]
 
         if fmt.lower() == "txt":
             mi.title = name.replace(".txt", "")
@@ -513,7 +462,7 @@ class BookRead(BaseHandler):
             # epub_dir is for javascript
             epub_dir = "/get/extract/%s" % book["id"]
             is_ready = self.is_ready(book)
-            self.extract_book(book, fpath, fmt)
+            ExtractService().extract_book(self.user_id(), book, fpath, fmt)
             return self.html_page("book/read.html", {
                 "book": book,
                 "epub_dir": epub_dir,
@@ -538,46 +487,6 @@ class BookRead(BaseHandler):
         # 解压后的目录
         fdir = os.path.join(CONF["extract_path"], str(book["id"]))
         return os.path.isfile(fdir + "/META-INF/container.xml") or os.path.isfile(fdir + "/content.json")
-
-    @background
-    def extract_book(self, book, fpath, fmt):
-        # 解压后的目录
-        fdir = os.path.join(CONF["extract_path"], str(book["id"]))
-        subprocess.call(["mkdir", "-p", fdir])
-        if os.path.isfile(fdir + "/META-INF/container.xml"):
-            subprocess.call(["chmod", "a+rx", "-R", fdir + "/META-INF"])
-            return
-        progress_file = self.get_path_progress(book["id"])
-        new_path = ""
-        if fmt != "epub":
-            new_fmt = "epub"
-            new_path = os.path.join(
-                CONF["convert_path"],
-                "book-%s-%s.%s" % (book["id"], int(time.time()), new_fmt),
-            )
-            logging.info("convert book: %s => %s, progress: %s" % (fpath, new_path, progress_file))
-            os.chdir("/tmp/")
-
-            ok = do_ebook_convert(fpath, new_path, progress_file)
-            if not ok:
-                self.add_msg("danger", u"文件格式转换失败，请在QQ群里联系管理员.")
-                return
-
-            with open(new_path, "rb") as f:
-                self.db.add_format(book["id"], new_fmt, f, index_is_id=True)
-                logging.info("add new book: %s", new_path)
-            fpath = new_path
-
-        # extract to dir
-        logging.error("extract book: [%s] into [%s]", fpath, fdir)
-        os.chdir(fdir)
-        with open(progress_file, "a") as log:
-            log.write(u"Dir: %s\n" % fdir)
-            subprocess.call(["unzip", fpath, "-d", fdir], stdout=log)
-            subprocess.call(["chmod", "a+rx", "-R", fdir + "/META-INF"])
-            if new_path:
-                subprocess.call(["rm", new_path])
-        return
 
 
 class TxtRead(BaseHandler):
@@ -606,9 +515,6 @@ class TxtRead(BaseHandler):
 
 
 class BookTxtInit(BaseHandler):
-    __que = []
-    __current_book_id = -1
-
     @js
     def get(self):
         bid = self.get_argument("id", "")
@@ -633,94 +539,17 @@ class BookTxtInit(BaseHandler):
             }}
         if test_ready != "0":
             return {"err": "ok", "msg": "未解析完成"}
-        # 若未解析则计算预计等待时间（分钟）
-        wait = os.path.getsize(fpath) / (1024 * 1024) * 15
-        wait = 120 if wait < 120 else wait
-        que_len = len(BookTxtInit.__que)
-        bid = book['id']
-        if bid != BookTxtInit.__current_book_id and bid not in BookTxtInit.__que:
-            logging.info(f"列入队列：book id = {bid}")
-            BookTxtInit.__que.append(bid)
-        self.parse_txt_content()
+
+        # 若未解析则计算预计等待时间，至少2分钟
+        wait = min(120, os.path.getsize(fpath) / (1024 * 1024) * 15)
+        ExtractService().parse_txt_content()
+        que_len = ExtractService().get_queue('parse_txt_content').qsize()
         return {"err": "ok", "msg": "已加入队列", "data": {
             "wait": wait,
             "name": book["title"],
             "path": content_path,
             "que": que_len
         }}
-
-    def remove_all_not_in_que(self, extract_path):
-        # 使用列表推导式获取所有直接文件夹
-        directories = [d for d in os.listdir(extract_path) if os.path.isdir(os.path.join(extract_path, d))]
-        # 删除不在队列中的临时文件
-        for d in directories:
-            f = os.path.join(extract_path, d) + "/parse"
-            if d not in BookTxtInit.__que and os.path.isfile(f):
-                os.remove(f)
-
-    @background
-    def parse_txt_content(self):
-        if BookTxtInit.__current_book_id != -1:
-            logging.info("队列中")
-            return
-
-        # 删除不在队列中的临时文件
-        self.remove_all_not_in_que(CONF["extract_path"])
-
-        # 开始执行，获取队首 id
-        bid = BookTxtInit.__current_book_id = BookTxtInit.__que[0]
-        # 出队
-        BookTxtInit.__que.pop(0)
-        book = self.get_book(bid)
-        # 解压后的目录
-        outDir = os.path.join(CONF["extract_path"], str(bid))
-        fpath = book.get("fmt_txt", None)
-        if not os.path.exists(outDir):
-            os.mkdir(outDir)
-
-        logging.info(f"当前任务：book id = {bid}")
-        tPath = outDir + "/parse"
-        try:
-            logging.info("TXT convert START ")
-            # 判断是否存在临时文件
-            if os.path.isfile(tPath):
-                logging.info("该书籍正在转换中")
-                return
-            with open(tPath, mode='w') as f:
-                f.close()
-
-            oPath = outDir + "/content.json"
-            if os.path.isfile(oPath):
-                logging.info("该书籍已转换")
-                # 移除临时文件
-                os.remove(tPath)
-                return
-
-            res = TxtParser().parse(fpath)
-            if len(res) == 0:
-                res = [{
-                    "id": 1,
-                    "title": "全部",
-                    "start": 0,
-                    "end": -1
-                }]
-            content = json.dumps(res, ensure_ascii=False)
-            with open(oPath, 'w', encoding="utf8") as f:
-                f.write(content)
-            # 移除临时文件
-            os.remove(tPath)
-            logging.info("TXT convert END ")
-        except Exception as e:
-            os.remove(tPath)
-            logging.info(f"TXT convert erro {repr(e)} ")
-        finally:
-            if len(BookTxtInit.__que) == 0:
-                # 空队列，结束
-                return
-            # 执行下一个任务
-            logging.info("执行下一个任务")
-            BookTxtInit.__current_book_id = -1
-            self.parse_txt_content()
 
 
 class BookPush(BaseHandler):
@@ -749,7 +578,7 @@ class BookPush(BaseHandler):
         for fmt in ["epub", "pdf"]:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
-                self.bg_send_book(book, mail_to, fmt, fpath)
+                MailService().send_book(self.user_id(), self.site_url, book, mail_to, fmt, fpath)
                 return {"err": "ok", "msg": _(u"服务器后台正在推送了。您可关闭此窗口，继续浏览其他书籍。")}
 
         # we do no have formats for kindle
@@ -759,82 +588,12 @@ class BookPush(BaseHandler):
                 "msg": _(u"抱歉，该书无可用于kindle阅读的格式"),
             }
 
-        self.bg_convert_and_send(book, mail_to)
+        ConvertService().convert_and_send(self.user_id(), self.site_url, book, mail_to)
         self.add_msg(
             "success",
             _(u"服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
         )
         return {"err": "ok", "msg": _(u"服务器正在转换格式，稍后将自动推送。您可关闭此窗口，继续浏览其他书籍。")}
-
-    @background
-    def bg_send_book(self, book, mail_to, fmt, fpath):
-        self.do_send_mail(book, mail_to, fmt, fpath)
-
-    @background
-    def bg_convert_and_send(self, book, mail_to):
-        # https://www.amazon.cn/gp/help/customer/display.html?ref_=hp_left_v4_sib&nodeId=G5WYD9SAF7PGXRNA
-        fmt = "epub"  # best format for kindle
-        fpath = self.convert_to_mobi_format(book, fmt)
-        if fpath:
-            self.do_send_mail(book, mail_to, fmt, fpath)
-
-    def get_path_of_fmt(self, book, fmt):
-        """for mock test"""
-        from calibre.utils.filenames import ascii_filename
-
-        return os.path.join(CONF["convert_path"], "%s.%s" % (ascii_filename(book["title"]), fmt))
-
-    def convert_to_mobi_format(self, book, new_fmt):
-        new_path = self.get_path_of_fmt(book, new_fmt)
-        progress_file = self.get_path_progress(book["id"])
-
-        old_path = None
-        for f in ["txt", "azw3"]:
-            old_path = book.get("fmt_%s" % f, old_path)
-
-        logging.debug("convert book from [%s] to [%s]", old_path, new_path)
-        ok = do_ebook_convert(old_path, new_path, progress_file)
-        if not ok:
-            self.add_msg("danger", u"文件格式转换失败，请在QQ群里联系管理员.")
-            return None
-        with open(new_path, "rb") as f:
-            self.db.add_format(book["id"], new_fmt, f, index_is_id=True)
-        return new_path
-
-    def do_send_mail(self, book, mail_to, fmt, fpath):
-        from calibre.ebooks.metadata import authors_to_string
-
-        # read meta info
-        author = authors_to_string(book["authors"] if book["authors"] else [_(u"佚名")])
-        title = book["title"] if book["title"] else _(u"无名书籍")
-        fname = u"%s - %s.%s" % (title, author, fmt)
-        with open(fpath, "rb") as f:
-            fdata = f.read()
-
-        mail_args = {
-            "title": title,
-            "site_url": self.site_url,
-            "site_title": CONF["site_title"],
-        }
-        mail_from = self.settings["smtp_username"]
-        mail_subject = _(self.settings["push_title"]) % mail_args
-        mail_body = _(self.settings["push_content"]) % mail_args
-        status = msg = ""
-        try:
-            logging.info("send %(title)s to %(mail_to)s" % vars())
-            self.mail(mail_from, mail_to, mail_subject, mail_body, fdata, fname)
-            status = "success"
-            msg = _("[%(title)s] 已成功发送至Kindle邮箱 [%(mail_to)s] !!") % vars()
-            logging.info(msg)
-        except:
-            import traceback
-
-            logging.error("Failed to send to kindle: %s" % mail_to)
-            logging.error(traceback.format_exc())
-            status = "danger"
-            msg = traceback.format_exc()
-        self.add_msg(status, msg)
-        return
 
 
 def routes():

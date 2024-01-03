@@ -7,7 +7,7 @@ services:
     restart: always
     image: talebook/talebook
     volumes:
-      - /data/demo:/data
+      - /tmp/demo:/data
     ports:
       - "8080:80"
       - "8443:443"

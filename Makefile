@@ -7,7 +7,7 @@ REPO2 := talebook/calibre-webserver:latest
 
 all: build up
 
-build:
+build: test
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
 		-f Dockerfile -t $(IMAGE) -t $(REPO1) -t $(REPO2) .
 
@@ -16,15 +16,16 @@ push:
 	docker push $(REPO1)
 	docker push $(REPO2)
 
-docker-test:
+test: lint
+	rm -f unittest.log
 	docker build --build-arg BUILD_COUNTRY=CN -t talebook/test --target test -f Dockerfile .
-	docker run --rm --name talebook-docker-test talebook/test
+	docker run --rm --name=talebook-docker-test -v "$$PWD":"$$PWD" -w "$$PWD" talebook/test pytest -vv --log-file=unittest.log --log-level=INFO tests
 
 lint:
 	flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
 	flake8 webserver --count --statistics --config .style.yapf
 
-test: lint
+pytest: lint
 	pytest tests
 
 testv:

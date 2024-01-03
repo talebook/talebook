@@ -118,6 +118,7 @@ def compare_books_by_rating_or_id(x, y):
     else:
         return -1
 
+
 def super_strip(s):
     # 删除掉所有不可见的字符
     # issue: https://github.com/talebook/talebook/issues/304

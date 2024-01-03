@@ -3,12 +3,16 @@
 
 import json
 import threading
+import logging
 import time
 from unittest import mock
+import unittest
 
 from tests.test_main import TestWithUserLogin, setUpModule as init, testdir
 from webserver import handlers
 from webserver.models import ScanFile
+from webserver.services import AsyncService
+from webserver.services.scan import ScanService
 
 
 def setUpModule():
@@ -33,16 +37,14 @@ class TestScan(TestWithUserLogin):
         self.session.commit()
         return super().setUp()
 
-    def test_scan(self):
+    def test_list(self):
         d = self.json("/api/admin/scan/list?num=10000")
         self.assertEqual(d['total'], self.RECORDS_COUNT)
 
-    @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
-    def test_scan(self, m1):
-        m1.return_value = False
-
+    def test_scan(self):
         d = self.json("/api/admin/scan/run", method="POST", body="")
         self.assertEqual(d["err"], "ok")
+
         row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
         self.assertEqual(row.status, ScanFile.READY)
 
@@ -53,15 +55,24 @@ class TestScan(TestWithUserLogin):
         scan_titles = set([ book['title'] for book in d['items'] ])
 
     def test_scan_background(self):
+        self.async_service.return_value = True
+
         n = threading.active_count() + 1
         d = self.json("/api/admin/scan/run", method="POST", body="")
         self.assertEqual(d["err"], "ok")
         self.assertEqual(n+1, threading.active_count())
-        while threading.active_count() > n:
-            time.sleep(1)
+
+        # wait job done
+        time.sleep(1)
+        q = ScanService().get_queue('do_scan')
+        n = q.qsize()
+        while n:
+            n = q.qsize()
+            time.sleep(0.1)
 
         row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
         self.assertEqual(row.status, ScanFile.READY)
+        #self.assertEqual(row.status, ScanFile.DROP)
 
     def test_scan_status(self):
         d = self.json("/api/admin/scan/status")
@@ -89,9 +100,7 @@ class TestScanContinue(TestWithUserLogin):
         self.session.commit()
         return super().setUp()
 
-    @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
-    def test_scan(self, m1):
-        m1.return_value = False
+    def test_scan(self):
         d = self.json("/api/admin/scan/run", method="POST", body="")
         self.assertEqual(d["err"], "ok")
 
@@ -117,20 +126,16 @@ class TestImport(TestWithUserLogin):
         return super().setUp()
 
     @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
-    @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
-    def test_import_one(self, m2, m1):
+    def test_import_one(self, m1):
         m1.return_value = 1008610086
-        m2.return_value = False
         hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
         req = {"hashlist": [hash]}
         d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
 
     @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
-    @mock.patch("webserver.handlers.scan.Scanner.allow_backgrounds")
-    def test_import_all(self, m2, m1):
+    def test_import_all(self, m1):
         m1.return_value = 1008610086
-        m2.return_value = False
         req = {"hashlist": "all"}
         d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")

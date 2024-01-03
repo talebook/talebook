@@ -120,6 +120,13 @@ class TxtParser:
                 break
             pre_seek = seek_position
             line = fileobj.readline()
+        if len(toc) == 0:
+            toc = [{
+                "id": 1,
+                "title": "全部",
+                "start": 0,
+                "end": -1
+            }]
         return toc
 
 
