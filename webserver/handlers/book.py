@@ -448,27 +448,6 @@ class BookRead(BaseHandler):
         self.user_history("read_history", book)
         self.count_increase(book_id, count_download=1)
 
-        # check format
-        for fmt in ["epub", "mobi", "azw", "azw3", "txt"]:
-            fpath = book.get("fmt_%s" % fmt, None)
-            if not fpath:
-                continue
-
-            # TXT有专门的阅读器
-            if fmt == "txt":
-                txt_reader_url = f'/book/{book_id}/readtxt'
-                return self.redirect(txt_reader_url)
-
-            # epub_dir is for javascript
-            epub_dir = "/get/extract/%s" % book["id"]
-            is_ready = self.is_ready(book)
-            ExtractService().extract_book(self.user_id(), book, fpath, fmt)
-            return self.html_page("book/read.html", {
-                "book": book,
-                "epub_dir": epub_dir,
-                "is_ready": is_ready,
-            })
-
         if "fmt_pdf" in book:
             # PDF类书籍需要检查下载权限。
             if not CONF["ALLOW_GUEST_DOWNLOAD"] and not self.current_user:
@@ -481,12 +460,28 @@ class BookRead(BaseHandler):
             pdf_reader_url = CONF["PDF_VIEWER"] % {"pdf_url": pdf_url}
             return self.redirect(pdf_reader_url)
 
-        raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍"))
+        if 'fmt_txt' in book:
+            # TXT有专门的阅读器
+            txt_reader_url = f'/book/{book_id}/readtxt'
+            return self.redirect(txt_reader_url)
 
-    def is_ready(self, book):
-        # 解压后的目录
-        fdir = os.path.join(CONF["extract_path"], str(book["id"]))
-        return os.path.isfile(fdir + "/META-INF/container.xml") or os.path.isfile(fdir + "/content.json")
+        # 其他格式，转换为EPUB进行在线阅读
+        for fmt in ["epub", "mobi", "azw", "azw3", "txt"]:
+            fpath = book.get("fmt_%s" % fmt, None)
+            if not fpath:
+                continue
+
+            if fmt != 'epub':
+                ConvertService().convert_and_save(self.user_id(), book, fpath, "epub")
+
+            # epub_dir is for javascript
+            epub_dir = "/get/extract/%s" % book["id"]
+            return self.html_page("book/read.html", {
+                "book": book,
+                "epub_dir": epub_dir,
+                "is_ready": (fmt == 'epub'),
+            })
+        raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍"))
 
 
 class TxtRead(BaseHandler):
@@ -542,7 +537,7 @@ class BookTxtInit(BaseHandler):
 
         # 若未解析则计算预计等待时间，至少2分钟
         wait = min(120, os.path.getsize(fpath) / (1024 * 1024) * 15)
-        ExtractService().parse_txt_content()
+        ExtractService().parse_txt_content(bid, fpath)
         que_len = ExtractService().get_queue('parse_txt_content').qsize()
         return {"err": "ok", "msg": "已加入队列", "data": {
             "wait": wait,

@@ -6,6 +6,7 @@ import logging
 
 from gettext import gettext as _
 import subprocess
+import time
 
 from webserver import loader
 from webserver.services import AsyncService
@@ -76,3 +77,26 @@ class ConvertService(AsyncService):
             MailService().send_book(user_id, site_url, book, mail_to, fmt, fpath)
         else:
             self.add_msg(user_id, "danger", _(u"文件格式转换失败，请在QQ群里联系管理员."))
+
+    @AsyncService.register_service
+    def convert_and_save(self, user_id, book, fpath, new_fmt):
+
+        new_fmt = "epub"
+        new_path = os.path.join(
+            CONF["convert_path"],
+            "book-%s-%s.%s" % (book["id"], int(time.time()), new_fmt),
+        )
+        progress_file = ConvertService().get_path_progress(book["id"])
+        logging.info("convert book: %s => %s, progress: %s" % (fpath, new_path, progress_file))
+
+        ok = ConvertService().do_ebook_convert(fpath, new_path, progress_file)
+        if not ok:
+            self.add_msg(user_id, "danger", u"文件格式转换失败！请重试，或到Github上提交问题报告")
+            return
+
+        with open(new_path, "rb") as f:
+            self.db.add_format(book["id"], new_fmt, f, index_is_id=True)
+            logging.info("add new book: %s", new_path)
+
+        # 清理临时文件
+        os.remove(new_path)

@@ -60,6 +60,7 @@ def setup_server():
     main.CONF["html_path"] = "/tmp/"
     main.CONF["settings_path"] = "/tmp/"
     main.CONF["progress_path"] = "/tmp/"
+    main.CONF["extract_path"] = "/tmp/"
     main.CONF["nuxt_env_path"] = "/tmp/.env.text"
     main.CONF["installed"] = True
     main.CONF["INVITE_MODE"] = False
@@ -433,7 +434,7 @@ class TestBook(TestWithUserLogin):
                 self.assertEqual(m.call_count, 2)
 
     def test_read(self):
-        with mock.patch.object(webserver.services.extract.ExtractService, "extract_book", return_value="Yo"):
+        with mock.patch("webserver.services.convert.ConvertService.convert_and_save", return_value="Yo"):
             for bid in BIDS:
                 rsp = self.fetch("/read/%s" % bid, follow_redirects=False)
                 self.assertEqual(rsp.code, 302 if bid == BID_PDF or bid == BID_TXT else 200)

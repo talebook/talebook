@@ -98,6 +98,13 @@
 
             window.check_count = 120;
             function check_ready() {
+                if ( "{{is_ready}}" == "true") {
+                    $("#progress").hide();
+                    $("#msg").html("正在打开阅读界面");
+                    start_reader();
+                    return;
+                }
+
                 load_progress();
                 window.check_count -= 1;
                 if ( window.check_count < 1 ) {

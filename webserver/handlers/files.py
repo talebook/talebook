@@ -5,6 +5,8 @@
 import logging
 import os
 import re
+import zipfile
+from gettext import gettext as _
 
 from tornado import web
 from webserver import constants, loader
@@ -130,12 +132,36 @@ class ProgressHandler(BaseHandler):
         self.write(txt)
 
 
+class EpubReader(BaseHandler):
+    def get(self, bid, path):
+        if not CONF["ALLOW_GUEST_READ"] and not self.current_user:
+            return self.redirect("/login")
+
+        if self.current_user:
+            if self.current_user.can_read():
+                if not self.current_user.is_active():
+                    raise web.HTTPError(403, reason=_(u"无权在线阅读，请先登录注册邮箱激活账号。"))
+            else:
+                raise web.HTTPError(403, reason=_(u"无权在线阅读"))
+
+        book = self.get_book(bid)
+        fpath = book.get("fmt_epub", None)
+        if not fpath:
+            raise web.HTTPError(404)
+
+        with zipfile.ZipFile(fpath, 'r') as zf:
+            if path not in zf.namelist():
+                raise web.HTTPError(404)
+            with zf.open(path) as f:
+                self.write(f.read())
+
+
 def routes():
     static_config = {"path": CONF["html_path"], "default_filename": "index.html"}
     return [
         (r"/get/pcover", ProxyImageHandler),
         (r"/get/progress/([0-9]+)", ProgressHandler),
-        (r"/get/extract/(.*)", web.StaticFileHandler, {"path": CONF["extract_path"]}),
+        (r"/get/extract/([0-9]+)/(.*)", EpubReader),
         (r"/get/(.*)/(.*)", ImageHandler),
         (r"/(.*)", web.StaticFileHandler, static_config),
     ]
