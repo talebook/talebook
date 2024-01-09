@@ -232,6 +232,7 @@ class AdminSettings(BaseHandler):
             "ALLOW_GUEST_READ",
             "ALLOW_REGISTER",
             "BOOK_NAMES_FORMAT",
+            "BOOK_NAV",
             "FRIENDS",
             "FOOTER",
             "INVITE_CODE",
@@ -345,7 +346,7 @@ class AdminInstall(BaseHandler):
         # set a random secret
         args["cookie_secret"] = u"%s" % uuid.uuid1()
         args["site_title"] = title
-        if invite == "true":
+        if invite == "true" and code:
             args["INVITE_MODE"] = True
             args["INVITE_CODE"] = code
         else:

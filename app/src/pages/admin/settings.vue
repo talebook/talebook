@@ -183,6 +183,14 @@ export default {
         },
         {
             show: false,
+            title: "书籍标签分类",
+            subtitle: '配置「分类导航」页面里预设的分类。添加书籍时，若书名或者作者名称出现以下分类，则自动添加对应的标签。',
+            fields: [
+                { icon: "person", key: "BOOK_NAV", type: 'textarea', label: "分类" },
+            ],
+        },
+        {
+            show: false,
             title: '友情链接',
             fields: [ ],
             show_friends: true,

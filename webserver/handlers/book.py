@@ -12,7 +12,7 @@ from gettext import gettext as _
 import tornado.escape
 from tornado import web
 
-from webserver import constants, loader, utils
+from webserver import loader, utils
 from webserver.services.convert import ConvertService
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
@@ -39,12 +39,12 @@ class Index(BaseHandler):
         if not ids:
             raise web.HTTPError(404, reason=_(u"本书库暂无藏书"))
         random_ids = random.sample(ids, min(cnt_random, len(ids)))
-        random_books = [b for b in self.get_books(ids=random_ids) if b["cover"]]
+        random_books = [b for b in self.get_books(ids=random_ids)]
         random_books.sort(key=lambda x: x["id"], reverse=True)
 
         ids.sort(reverse=True)
         new_ids = random.sample(ids[0:100], min(cnt_recent, len(ids)))
-        new_books = [b for b in self.get_books(ids=new_ids) if b["cover"]]
+        new_books = [b for b in self.get_books(ids=new_ids)]
         new_books.sort(key=lambda x: x["id"], reverse=True)
 
         return {
@@ -194,12 +194,11 @@ class BookRefer(BaseHandler):
                 refer_mi.cover_data = None
             if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
                 ts = []
-                for nn, tags in constants.BOOKNAV:
-                    for tag in tags:
-                        if tag in refer_mi.title or tag in refer_mi.comments:
-                            ts.append(tag)
-                        elif tag in refer_mi.authors:
-                            ts.append(tag)
+                for tag in CONF['BOOK_NAV'].replace("=", "/").replace("\n", "/").split("/"):
+                    if tag in refer_mi.title or tag in refer_mi.comments:
+                        ts.append(tag)
+                    elif tag in refer_mi.authors:
+                        ts.append(tag)
                 if len(ts) > 0:
                     mi.tags += ts[:8]
                     logging.info("tags are %s" % ','.join(mi.tags))
@@ -322,9 +321,22 @@ class BookNav(ListHandler):
     def get(self):
         tagmap = self.all_tags_with_count()
         navs = []
-        for h1, tags in constants.BOOKNAV:
-            new_tags = [{"name": v, "count": tagmap.get(v, 0)} for v in tags if tagmap.get(v, 0) > 0]
-            navs.append({"legend": h1, "tags": new_tags})
+        done = set()
+        for line in CONF['BOOK_NAV'].split("\n"):
+            line = utils.super_strip(line)
+            p = line.split("=")
+            if len(p) != 2:
+                continue
+            h1, tags = p
+            tags = [v.strip() for v in tags.split("/")]
+            done.update(tags)
+            tag_items = [{"name": v, "count": tagmap.get(v, 0)} for v in tags if tagmap.get(v, 0) > 0]
+            if tag_items:
+                navs.append({"legend": h1, "tags": tag_items})
+
+        tag_items = [{"name": tag, "count": cnt} for tag, cnt in tagmap.items() if tag not in done]
+        navs.append({"legend": _("其他"), "tags": tag_items})
+
         return {"err": "ok", "navs": navs}
 
 
