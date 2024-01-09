@@ -238,13 +238,13 @@ export default {
                     groups: [
                         { icon: "mdi-cog", href: "/admin/settings", text: "系统设置" },
                         { icon: "mdi-human-greeting", href: "/admin/users", text: "用户管理" },
+                        { icon: "mdi-library-shelves", href: "/admin/books", text: "图书管理" },
                         { icon: "mdi-import", href: "/admin/imports", text: "导入图书" },
                     ],
                 },
             ];
             var nav_links = [
                 { heading: "分类浏览" },
-                { icon: "mdi-library-shelves", href: "/admin/books", text: "图书管理" },
                 { icon: "widgets", href: "/nav", text: "分类导览", count: this.sys.books },
                 { icon: "mdi-home-group", href: "/publisher", text: "出版社", count: this.sys.publishers },
                 { icon: "mdi-human-greeting", href: "/author", text: "作者", count: this.sys.authors },
