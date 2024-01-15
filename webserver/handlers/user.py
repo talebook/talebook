@@ -379,7 +379,7 @@ class Welcome(BaseHandler):
             return {"err": "free", "msg": _(u"无需访问码")}
         if self.invited_code_is_ok():
             return {"err": "free", "msg": _(u"已输入访问码")}
-        return {"err": "ok", "msg": CONF["INVITE_MESSAGE"]}
+        return {"err": "ok", "msg": "", "welcome": CONF["INVITE_MESSAGE"]}
 
     @js
     def post(self):
@@ -387,7 +387,7 @@ class Welcome(BaseHandler):
         if not code or code != CONF["INVITE_CODE"]:
             return {"err": "params.invalid", "msg": _(u"访问码无效")}
         self.mark_invited()
-        return {"err": "ok", "msg": "ok"}
+        return {"err": "ok", "msg": ""}
 
 
 def routes():
