@@ -34,14 +34,21 @@ Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webs
 部署比较简单，建议采用docker，镜像地址：[dockerhub](https://hub.docker.com/r/talebook/talebook)
 
 推荐使用`docker-compose`，下载仓库中的配置文件[docker-compose.yml](docker-compose.yml)，然后执行命令启动即可。
-`docker-compose -f docker-compose.yml  up -d`
 若希望修改挂载的目录或端口，请修改docker-compose.yml文件。
 
+```
+wget https://raw.githubusercontent.com/talebook/talebook/master/docker-compose.yml
+docker-compose -f docker-compose.yml  up -d
+```
+
+
 如果使用原生docker，那么执行命令：
+
 `docker run -d --name talebook -p <本机端口>:80 -v <本机data目录>:/data talebook/talebook`
 
 例如
-`docker run -d --name talebook -p 8080:80 -v /localdata:/data talebook/talebook`
+
+`docker run -d --name talebook -p 8080:80 -v /tmp/demo:/data talebook/talebook`
 
 
 视频简介（感谢@Pan06da的制作）

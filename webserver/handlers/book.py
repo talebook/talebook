@@ -526,7 +526,6 @@ class BookTxtInit(BaseHandler):
     def get(self):
         bid = self.get_argument("id", "")
         test_ready = self.get_argument("test", "")
-        logging.info("test_ready " + test_ready)
         book = self.get_book(bid)
         fpath = book.get("fmt_txt", None)
         if not fpath:
