@@ -30,10 +30,11 @@ done
 mkdir -p /root/.npm
 
 # 设置PUID/GUID权限
-permission_file=/root/.permission
+permission_file=/data/.permission
 touch $permission_file
 permission=`cat $permission_file`
 if [ "x$permission" != "x$PUID:$PGID" ]; then
+    echo "updating permission to $PUID:$PGID"
     chown -R talebook:talebook \
       /var/lib/nginx \
       /data \
