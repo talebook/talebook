@@ -5,7 +5,7 @@
             <v-col cols=9>
                 <v-img class="float-left" height=80 contain :src="user.avatar"></v-img>
                 <v-subheader class="" >
-                    <a href="https://cn.gravatar.com" target="_blank">点击修改</a>
+                    <a href="https://cravatar.cn/avatar" target="_blank">点击修改</a>
                 </v-subheader>
             </v-col>
 
