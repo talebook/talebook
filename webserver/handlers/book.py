@@ -10,7 +10,7 @@ import urllib
 from gettext import gettext as _
 
 import tornado.escape
-from tornado import web, httputil
+from tornado import web
 
 from webserver import loader, utils
 from webserver.services.convert import ConvertService
@@ -273,65 +273,22 @@ class BookDelete(BaseHandler):
         return {"err": "ok", "msg": _(u"删除成功")}
 
 
-class BookDownload(BaseHandler):
+class BookDownload(BaseHandler, web.StaticFileHandler):
     def send_error_of_not_invited(self):
         self.set_header("WWW-Authenticate", "Basic")
         self.set_status(401)
         raise web.Finish()
 
-    def response_content_with_range_support(self, path):
-        '''
-        These code is from web.StaticFileHandler.get()
-        https://github.com/tornadoweb/tornado/blob/master/tornado/web.py#L2683
-        '''
-        self.set_header("Accept-Ranges", "bytes")
-        request_range = None
-        range_header = self.request.headers.get("Range")
-        if range_header:
-            request_range = httputil._parse_request_range(range_header)
+    def initialize(self):
+        self.root = "/"
+        self.default_filename = None
+        self.is_opds = self.get_argument("from", "") == "opds"
+        BaseHandler.initialize(self)
 
-        file_stat = os.stat(path)
-        size = file_stat.st_size
-
-        if request_range:
-            start, end = request_range
-            if start is not None and start < 0:
-                start += size
-                if start < 0:
-                    start = 0
-            if (start is not None and (start >= size or (end is not None and start >= end))) or end == 0:
-                self.set_status(416)  # Range Not Satisfiable
-                self.set_header("Content-Type", "text/plain")
-                self.set_header("Content-Range", "bytes */%s" % (size,))
-                return
-            if end is not None and end > size:
-                end = size
-            if size != (end or size) - (start or 0):
-                self.set_status(206)  # Partial Content
-                self.set_header("Content-Range", httputil._get_content_range(start, end, size))
-        else:
-            start = end = None
-
-        if start is not None and end is not None:
-            content_length = end - start
-        elif end is not None:
-            content_length = end
-        elif start is not None:
-            content_length = size - start
-        else:
-            content_length = size
-        self.set_header("Content-Length", content_length)
-
-        content = web.StaticFileHandler.get_content(path, start, end)
-        if isinstance(content, bytes):
-            content = [content]
-        for chunk in content:
-            self.write(chunk)
-
-    def get(self, id, fmt):
-        is_opds = self.get_argument("from", "") == "opds"
+    def prepare(self):
+        BaseHandler.prepare(self)
         if not CONF["ALLOW_GUEST_DOWNLOAD"] and not self.current_user:
-            if is_opds:
+            if self.is_opds:
                 return self.send_error_of_not_invited()
             else:
                 return self.redirect("/login")
@@ -343,25 +300,33 @@ class BookDownload(BaseHandler):
             else:
                 raise web.HTTPError(403, reason=_(u"无权操作"))
 
+    def parse_url_path(self, url_path: str) -> str:
+        filename = url_path.split("/")[-1]
+        bid, fmt = filename.split(".")
         fmt = fmt.lower()
-        logging.debug("download %s.%s" % (id, fmt))
-        book = self.get_book(id)
+        logging.error("download %s bid=%s, fmt=%s" % (filename, bid, fmt))
+        book = self.get_book(bid)
         book_id = book["id"]
         self.user_history("download_history", book)
         self.count_increase(book_id, count_download=1)
         if "fmt_%s" % fmt not in book:
             raise web.HTTPError(404, reason=_(u"%s格式无法下载" % fmt))
+
         path = book["fmt_%s" % fmt]
         book["fmt"] = fmt
         book["title"] = urllib.parse.quote_plus(book["title"])
         fname = "%(id)d-%(title)s.%(fmt)s" % book
         att = u"attachment; filename=\"%s\"; filename*=UTF-8''%s" % (fname, fname)
-        if is_opds:
+        if self.is_opds:
             att = u'attachment; filename="%(id)d.%(fmt)s"' % book
 
         self.set_header("Content-Disposition", att.encode("UTF-8"))
         self.set_header("Content-Type", "application/octet-stream")
-        self.response_content_with_range_support(path)
+        return path
+
+    @classmethod
+    def get_absolute_path(cls, root: str, path: str) -> str:
+        return path
 
 
 class BookNav(ListHandler):
@@ -661,7 +626,7 @@ def routes():
         (r"/api/book/([0-9]+)", BookDetail),
         (r"/api/book/([0-9]+)/delete", BookDelete),
         (r"/api/book/([0-9]+)/edit", BookEdit),
-        (r"/api/book/([0-9]+)\.(.+)", BookDownload),
+        (r"/api/book/([0-9]+\..+)", BookDownload),
         (r"/api/book/([0-9]+)/push", BookPush),
         (r"/api/book/([0-9]+)/refer", BookRefer),
         (r"/read/([0-9]+)", BookRead),

@@ -357,9 +357,19 @@ class TestBook(TestWithUserLogin):
     def test_download(self):
         rsp = self.fetch("/api/book/1.epub")
         self.assertEqual(rsp.code, 200)
+        book_body = rsp.body
 
         rsp = self.fetch("/api/book/1.pdf")
         self.assertEqual(rsp.code, 404)
+
+        rsp = self.fetch("/api/book/1.epub", headers={"Range": "bytes=0-0"})
+        self.assertEqual(rsp.code, 206)
+        self.assertEqual(len(rsp.body), 1)
+
+        rsp = self.fetch("/api/book/1.EPUB", headers={"Range": "bytes=1-"})
+        self.assertEqual(rsp.code, 206)
+        self.assertEqual(rsp.body, book_body[1:])
+
 
     def test_download_permission(self):
         with mock_permission() as user:
