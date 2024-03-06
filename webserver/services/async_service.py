@@ -27,7 +27,6 @@ class AsyncService(metaclass=SingletonType):
 
     def __init__(self):
         self.scoped_session = lambda : 'no-session'
-        self.lock = threading.Lock()
 
     def setup(self, calibre_db=None, scoped_session=None):
         self.db = calibre_db
@@ -41,7 +40,6 @@ class AsyncService(metaclass=SingletonType):
         return self.running[service_name][1]
 
     def start_service(self, service_func) -> Queue:
-        self.lock.acquire()
         name = service_func.__name__
         if name in self.running:
             return self.running[name][1]
@@ -53,7 +51,6 @@ class AsyncService(metaclass=SingletonType):
         t.setDaemon(True)
         t.start()
         self.running[name] = (t, q)
-        self.lock.release()
         return q
 
     def loop(self, service_func, q):
