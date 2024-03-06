@@ -10,7 +10,7 @@ import urllib
 from gettext import gettext as _
 
 import tornado.escape
-from tornado import web
+from tornado import web, httputil
 
 from webserver import loader, utils
 from webserver.services.convert import ConvertService
@@ -279,6 +279,55 @@ class BookDownload(BaseHandler):
         self.set_status(401)
         raise web.Finish()
 
+    def response_content_with_range_support(self, path):
+        '''
+        These code is from web.StaticFileHandler.get()
+        https://github.com/tornadoweb/tornado/blob/master/tornado/web.py#L2683
+        '''
+        self.set_header("Accept-Ranges", "bytes")
+        request_range = None
+        range_header = self.request.headers.get("Range")
+        if range_header:
+            request_range = httputil._parse_request_range(range_header)
+
+        file_stat = os.stat(path)
+        size = file_stat.st_size
+
+        if request_range:
+            start, end = request_range
+            if start is not None and start < 0:
+                start += size
+                if start < 0:
+                    start = 0
+            if (start is not None and (start >= size or (end is not None and start >= end))) or end == 0:
+                self.set_status(416)  # Range Not Satisfiable
+                self.set_header("Content-Type", "text/plain")
+                self.set_header("Content-Range", "bytes */%s" % (size,))
+                return
+            if end is not None and end > size:
+                end = size
+            if size != (end or size) - (start or 0):
+                self.set_status(206)  # Partial Content
+                self.set_header("Content-Range", httputil._get_content_range(start, end, size))
+        else:
+            start = end = None
+
+        if start is not None and end is not None:
+            content_length = end - start
+        elif end is not None:
+            content_length = end
+        elif start is not None:
+            content_length = size - start
+        else:
+            content_length = size
+        self.set_header("Content-Length", content_length)
+
+        content = web.StaticFileHandler.get_content(path, start, end)
+        if isinstance(content, bytes):
+            content = [content]
+        for chunk in content:
+            self.write(chunk)
+
     def get(self, id, fmt):
         is_opds = self.get_argument("from", "") == "opds"
         if not CONF["ALLOW_GUEST_DOWNLOAD"] and not self.current_user:
@@ -312,8 +361,7 @@ class BookDownload(BaseHandler):
 
         self.set_header("Content-Disposition", att.encode("UTF-8"))
         self.set_header("Content-Type", "application/octet-stream")
-        with open(path, "rb") as f:
-            self.write(f.read())
+        self.response_content_with_range_support(path)
 
 
 class BookNav(ListHandler):
