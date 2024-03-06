@@ -46,6 +46,7 @@ docker-compose -f docker-compose.yml  up -d
 
 `docker run -d --name talebook -p <本机端口>:80 -v <本机data目录>:/data talebook/talebook`
 
+
 例如
 
 `docker run -d --name talebook -p 8080:80 -v /tmp/demo:/data talebook/talebook`
