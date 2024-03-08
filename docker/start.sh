@@ -34,21 +34,23 @@ permission_file=/data/.permission
 touch $permission_file
 permission=`cat $permission_file`
 if [ "x$permission" != "x$PUID:$PGID" ]; then
-    echo "updating permission to $PUID:$PGID"
-    chown -R talebook:talebook \
-      /var/lib/nginx \
-      /data \
-      /root/.config/calibre \
-      /root/.npm \
-      /var/www/talebook/app/.env \
-      /var/www/talebook/app/dist \
-      /var/www/talebook/webserver \
-      /var/www/talebook/tools \
-      /var/www/talebook/server.py \
-      /usr/lib/calibre \
-      /usr/share/calibre
+    echo "updating '/data/' permission to $PUID:$PGID"
+    chown -R talebook:talebook /data
     echo "$PUID:$PGID" > $permission_file
 fi
+
+# 设置系统文件的权限（数量较少）
+chown -R talebook:talebook \
+  /var/lib/nginx \
+  /root/.config/calibre \
+  /root/.npm \
+  /var/www/talebook/app/.env \
+  /var/www/talebook/app/dist \
+  /var/www/talebook/webserver \
+  /var/www/talebook/tools \
+  /var/www/talebook/server.py \
+  /usr/lib/calibre \
+  /usr/share/calibre
 
 # 判断是否启用SSR模式
 if [ "x$SSR" = "xON" ]; then

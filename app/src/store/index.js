@@ -6,6 +6,8 @@ export const state = () => ({
     }, sys: {
         socials: [], allow: {},
     },
+    site_title: "首页",
+    site_title_template: "%s | talebook"
 })
 
 export const mutations = {
@@ -38,5 +40,7 @@ export const mutations = {
         state.alert.show = true;
     }, close_alert(state) {
         state.alert.show = false;
-    },
+    }, set_title(state, v) {
+        state.site_title_template = ' %s | ' + v;
+    }
 }

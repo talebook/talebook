@@ -49,8 +49,8 @@ export default {
     data: () => ({}),
     head() {
         return {
-            title: this.$config.head.title,
-            titleTemplate: this.$config.head.titleTemplate,
+            title: this.$store.state.site_title,
+            titleTemplate: this.$store.state.site_title_template,
         }
     },
     mounted() {

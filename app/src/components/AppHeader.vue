@@ -286,6 +286,7 @@ export default {
             this.sys = rsp.sys;
             this.user = rsp.user;
             this.$store.commit("login", rsp);
+            this.$store.commit("set_title", rsp.sys.title);
         });
         this.$backend("/user/messages").then((rsp) => {
             if (rsp.err == "ok") {
