@@ -87,7 +87,7 @@ class Scanner:
         return (scan_id, self.count(query))
 
     def count(self, query):
-        rows = query.all()
+        rows = query.all() if query else []
         count = {
             "total": len(rows),
             ScanFile.NEW: 0,
@@ -112,8 +112,8 @@ class ScanList(BaseHandler):
 
         num = max(10, int(self.get_argument("num", 20)))
         page = max(0, int(self.get_argument("page", 1)) - 1)
-        sort = self.get_argument("sort", "access_time")
-        desc = self.get_argument("desc", "desc")
+        sort = self.get_argument("sort", "create_time")
+        desc = self.get_argument("desc", "true")
         logging.debug("num=%d, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
 
         # get order by query args
@@ -129,6 +129,13 @@ class ScanList(BaseHandler):
         total = query.count()
         start = page * num
 
+        status = {
+            ScanFile.NEW: 0,
+            ScanFile.DROP: 0,
+            ScanFile.EXIST: 0,
+            ScanFile.READY: 0,
+            ScanFile.IMPORTED: 0,
+        }
         response = []
         for s in query.limit(num).offset(start).all():
             d = {
@@ -144,8 +151,9 @@ class ScanList(BaseHandler):
                 "create_time": s.create_time.strftime("%Y-%m-%d %H:%M:%S") if s.create_time else "N/A",
                 "update_time": s.update_time.strftime("%Y-%m-%d %H:%M:%S") if s.update_time else "N/A",
             }
+            status[s.status] += 1
             response.append(d)
-        return {"err": "ok", "items": response, "total": total, "scan_dir": CONF["scan_upload_path"]}
+        return {"err": "ok", "items": response, "total": total, "scan_dir": CONF["scan_upload_path"], "status": status}
 
 
 class ScanMark(BaseHandler):

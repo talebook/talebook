@@ -18,6 +18,10 @@
             <div v-if="selected.length == 0">请勾选需要处理的文件（默认情况下全选即可。已存在的书籍，即使勾选了也不会重复导入）</div>
             <div v-else>共选择了{{ selected.length }}个</div>
         </v-card-text>
+        <v-tabs v-model="filter_type">
+            <v-tab href="#todo">待处理 ({{ count_todo }})</v-tab>
+            <v-tab href="#done">已导入 ({{ count_done  }})</v-tab>
+        </v-tabs>
         <v-data-table
             dense
             class="elevation-1 text-body-2"
@@ -26,7 +30,7 @@
             item-key="hash"
             :search="search"
             :headers="headers"
-            :items="items"
+            :items="filter_items"
             :options.sync="options"
             :server-items-length="total"
             :loading="loading"
@@ -53,6 +57,7 @@
 <script>
 export default {
     data: () => ({
+        filter_type: "todo",
         selected: [],
         scan_dir: "/data/books/imports/",
         search: "",
@@ -60,7 +65,12 @@ export default {
         items: [],
         total: 0,
         loading: false,
-        options: {},
+        options: {
+            sortBy: "create_time",
+            sortDesc: true,
+        },
+        count_todo: 0,
+        count_done: 0,
         headers: [
             { text: "ID", sortable: true, value: "id" },
             { text: "状态", sortable: true, value: "status" },
@@ -86,6 +96,14 @@ export default {
         this.getDataFromApi();
     },
     computed: {
+        filter_items: function () {
+            console.log(this.filter_type)
+            if (this.filter_type == "done" ) {
+                return this.items.filter(x => x.status == 'exist' || x.status == 'imported');
+            } else {
+                return this.items.filter(x => x.status != 'exist' && x.status != 'imported');
+            }
+        },
         pageCount: function () {
             return parseInt(this.total / 20);
         },
@@ -119,6 +137,8 @@ export default {
                     this.items = rsp.items;
                     this.total = rsp.total;
                     this.scan_dir = rsp.scan_dir;
+                    this.count_done = rsp.status.exist + rsp.status.imported;
+                    this.count_todo = this.total - this.count_done;
                 })
                 .finally(() => {
                     this.loading = false;
