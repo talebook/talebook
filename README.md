@@ -67,6 +67,8 @@ NAS安装指南：请参考网友们的帖子：[帖子1](https://post.smzdm.com
 
 **如果觉得本项目很棒，欢迎前往[爱发电](https://afdian.net/@talebook)，赞助作者，持续优化，为爱充电！**
 
+QQ讨论群：点击链接加入群聊【talebook开源项目】：https://qm.qq.com/q/5lSfpJGsBq
+
 项目演示截图如下：
 ![](document/screenshot.png)
 
