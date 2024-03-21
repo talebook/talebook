@@ -2,16 +2,15 @@
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/w/talebook/talebook?logo=github&style=flat-square&label=commits)]()
 [![Tests](https://github.com/talebook/talebook/actions/workflows/ci.yml/badge.svg)](https://github.com/talebook/talebook/actions/workflows/ci.yml)
 [![Docker Build](https://github.com/talebook/talebook/actions/workflows/build.yml/badge.svg)](https://github.com/talebook/talebook/actions/workflows/build.yml)
-[![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)](https://hub.docker.com/r/talebook/talebook)
+[![Docker Pulls](https://img.shields.io/docker/pulls/talebook/talebook.svg)](https://hub.docker.com/r/talebook/talebook)
 
 
-Tale Book: My Calibre WebServer
-====================
+# Tale Book: My Calibre WebServer
+
 A better online books library management website built on Calibre + Vue
 
+## 简单好用的个人图书管理系统
 
-简单好用的个人图书管理系统
-===================
 **友情提醒：中国境内网站，个人是不允许进行在线出版的，维护公开的书籍网站是违法违规的行为！建议仅作为个人使用！**
 
 这是一个基于Calibre的简单的个人图书管理系统，支持**在线阅读**。主要特点是：
@@ -29,8 +28,8 @@ A better online books library management website built on Calibre + Vue
 本项目曾用名：calibre-webserver
 
 
-Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/calibre-webserver.svg)
-===================
+## Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/talebook.svg)
+
 部署比较简单，建议采用docker，镜像地址：[dockerhub](https://hub.docker.com/r/talebook/talebook)
 
 推荐使用`docker-compose`，下载仓库中的配置文件[docker-compose.yml](docker-compose.yml)，然后执行命令启动即可。
@@ -52,14 +51,10 @@ docker-compose -f docker-compose.yml  up -d
 `docker run -d --name talebook -p 8080:80 -v /tmp/demo:/data talebook/talebook`
 
 
-视频简介（感谢@Pan06da的制作）
-===================
-[![](https://bb-embed.zjffun.com/embed?v=BV1AT411S7c3)](https://player.bilibili.com/player.html?aid=482258810&bvid=BV1AT411S7c3&cid=1018595245&page=1)
 
+## 常见问题 
 
-常见问题
-===================
-常见问题请参阅[使用指南](document/README.zh_CN.md)
+常见问题请参阅[使用指南](document/README.zh_CN.md)，无法解决的话，提个ISSUEE，[进Q群交流](https://qm.qq.com/q/5lSfpJGsBq)
 
 手动安装请参考[开发者指南](document/Development.zh_CN.md)
 
@@ -67,8 +62,17 @@ NAS安装指南：请参考网友们的帖子：[帖子1](https://post.smzdm.com
 
 **如果觉得本项目很棒，欢迎前往[爱发电](https://afdian.net/@talebook)，赞助作者，持续优化，为爱充电！**
 
-QQ讨论群：点击链接加入群聊【talebook开源项目】：https://qm.qq.com/q/5lSfpJGsBq
+
+## 贡献者
+[![](https://contrib.rocks/image?repo=talebook/talebook)](https://github.com/talebook/talebook/graphs/contributors)
+
+
+## 演示
+
+[Demo站点（密码 admin/demodemo ）](http://demo.talebook.org)
+
+[视频简介（感谢@Pan06da的制作）](https://player.bilibili.com/player.html?aid=482258810&bvid=BV1AT411S7c3&cid=1018595245&page=1)
+
 
 项目演示截图如下：
 ![](document/screenshot.png)
-
