@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "core-js": "^3.19.3",
-    "nuxt": "^2.15.8",
+    "nuxt": "^2.17.3",
     "vue": "^2.6.14",
     "vue-cookies": "^1.7.4",
     "vue-server-renderer": "^2.6.14",
