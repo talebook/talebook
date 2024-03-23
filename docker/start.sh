@@ -62,8 +62,9 @@ else
 fi
 
 # 启动
+export PYTHONDONTWRITEBYTECODE=1
 gosu talebook:talebook /var/www/talebook/server.py --syncdb
 gosu talebook:talebook /var/www/talebook/server.py --update-config
 service nginx restart
-exec /usr/bin/supervisord --nodaemon -c /etc/supervisor/supervisord.conf
+exec /usr/bin/supervisord --nodaemon -u root -c /etc/supervisor/supervisord.conf
 
