@@ -33,6 +33,8 @@
             :items="filter_items"
             :options.sync="options"
             :server-items-length="total"
+            sort-by="create_time"
+            sort-desc="true"
             :loading="loading"
             :page.sync="page"
             :items-per-page="100"
@@ -65,10 +67,6 @@ export default {
         items: [],
         total: 0,
         loading: false,
-        options: {
-            sortBy: "create_time",
-            sortDesc: true,
-        },
         count_todo: 0,
         count_done: 0,
         headers: [
