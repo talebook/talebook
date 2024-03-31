@@ -9,6 +9,7 @@ Do not modify it unless you know what you are doing.
 import logging
 import re
 import requests
+from gettext import gettext as _
 
 from webserver.plugins.meta.douban import str2date
 from .baidubaike.baidubaike import Page

@@ -19,7 +19,7 @@ class AutoFillService(AsyncService):
     @AsyncService.register_service
     def auto_fill_all(self, idlist: list, qpm=60):
         # 根据qpm，计算更新的间隔，避免刷爆豆瓣等服务
-        sleep_seconds = 60.0/qpm
+        sleep_seconds = 60.0 / qpm
 
         for book_id in idlist:
             mi = self.db.get_metadata(book_id, index_is_id=True)
@@ -31,7 +31,8 @@ class AutoFillService(AsyncService):
 
     @AsyncService.register_function
     def auto_fill(self, book_id):
-        if not CONF['auto_fill_meta']: return
+        if not CONF['auto_fill_meta']:
+            return
         mi = self.db.get_metadata(book_id, index_is_id=True)
         return self.do_fill_metadata(book_id, mi)
 
@@ -42,7 +43,7 @@ class AutoFillService(AsyncService):
             refer_mi = self.plugin_search_best_book_info(mi)
         except:
             return
-        
+
         if not refer_mi:
             logging.info(_("忽略更新书籍 id=%d : 无法获取信息"), book_id)
             return
@@ -60,8 +61,8 @@ class AutoFillService(AsyncService):
         logging.info(_("自动更新书籍 id=[%d] 的信息，title=%s"), book_id, mi.title)
 
     def should_update(self, mi):
-        if not mi.comments: return True
-        if not mi.has_cover: return True
+        if not mi.comments or not mi.has_cover:
+            return True
         return False
 
     def guess_tags(self, refer_mi, max_count=8):

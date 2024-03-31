@@ -145,6 +145,7 @@ class AdminTestMail(BaseHandler):
             logging.error(traceback.format_exc())
             return {"err": "email.server_error", "msg": str(e)}
 
+
 class AdminOwnerMode(BaseHandler):
     @auth
     def get(self):

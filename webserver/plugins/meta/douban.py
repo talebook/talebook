@@ -114,7 +114,7 @@ class DoubanBookApi(object):
         return self.get_metadata(md)
 
     def get_book_detail(self, md):
-         # 字典结构体，转化格式
+        # 字典结构体，转化格式
         douban_id = md['id'] if isinstance(md, dict) else md.douban_id
         info = self.get_book_by_id(douban_id)
         return self._metadata(info)
