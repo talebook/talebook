@@ -4,9 +4,7 @@
         <v-card-text> 此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面</v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
-            <template v-if="books_selected.length > 0">
-                <v-btn :disabled="loading" outlined color="info" @click="auto_fetch"><v-icon>mdi-delete</v-icon>自动填充空缺字段 </v-btn>
-            </template>
+            <v-btn :disabled="loading" outlined color="info" @click="meta_dialog = !meta_dialog"><v-icon>mdi-info</v-icon>自动填充空缺字段... </v-btn>
             <v-spacer></v-spacer>
             <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line hide-details></v-text-field>
         </v-card-actions>
@@ -174,14 +172,34 @@
         </v-data-table>
 
         <!-- 小浮窗提醒 -->
-        <v-snackbar v-model="snack" :timeout="1000" :color="snackColor">
+        <v-snackbar v-model="snack" :timeout="3000" :color="snackColor">
             {{ snackText }}
 
             <template v-slot:action="{ attrs }">
                 <v-btn v-bind="attrs" text @click="snack = false"> 关闭 </v-btn>
             </template>
         </v-snackbar>
-    </v-card>
+
+        <!-- 提醒拉取图书的规则说明 -->
+        <v-dialog v-model="meta_dialog" persistent transition="dialog-bottom-transition" width="500">
+            <v-card>
+                <v-card-title> 提醒 </v-card-title>
+                <v-card-text>
+                    <p> 即将从互联网拉取所有图书的书籍信息，请了解以下功能限制：</p>
+                    <p> 1. 只更新「没有封面」或「没有简介」的图书；</p>
+                    <p> 2. 受限于豆瓣等服务的限制，每秒钟仅更新1本书; </p>
+                    <br></br>
+                    <p>预计需要运行 {{auto_fill_mins}} 分钟，在此期间请不要停止程序</p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-btn @click="meta_dialog = !meta_dialog">取消</v-btn>
+                    <v-spacer></v-spacer>
+                    <v-btn color="primary" @click="auto_fill">开始执行！</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+</v-card>
 </template>
 
 <script>
@@ -190,6 +208,7 @@ export default {
         snack: false,
         snackColor: "",
         snackText: "",
+        meta_dialog: false,
 
         books_selected: [],
         tag_input: null,
@@ -224,6 +243,11 @@ export default {
             },
             deep: true,
         },
+    },
+    computed: {
+        auto_fill_mins: function() {
+            return Math.floor(this.total/60) + 1;
+        }
     },
     methods: {
         getDataFromApi() {
@@ -261,8 +285,20 @@ export default {
                     this.loading = false;
                 });
         },
-        auto_fetch() {
-            this.$alert("error", "功能正在开发中");
+        auto_fill() {
+            this.$backend("/admin/book/fill", {
+                method: "POST",
+                body: JSON.stringify({"idlist": "all"}),
+            })
+            .then((rsp) => {
+                this.meta_dialog = false;
+                if (rsp.err != "ok") {
+                    this.$alert("error", rsp.msg);
+                }
+                this.snack = true;
+                this.snackColor = "success";
+                this.snackText = rsp.msg;
+            })
         },
         delete_book(book) {
             this.loading = true;

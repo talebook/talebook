@@ -489,7 +489,7 @@ class AdminBookFill(BaseHandler):
         else:
             return {"err": "params.error.idlist", "msg": _(u"idlist参数错误")}
 
-        AutoFillService.auto_fill_metadata(idlist)
+        AutoFillService().auto_fill_all(idlist)
         return {"err": "ok", "msg": _(u"任务启动成功！请耐心等待，稍后再来刷新页面")}
 
 

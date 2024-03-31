@@ -17,37 +17,51 @@ class AutoFillService(AsyncService):
     """自动从网上拉取书籍信息，填充到DB中"""
 
     @AsyncService.register_service
-    def auto_fill_metadata(self, idlist: list, qpm=60):
+    def auto_fill_all(self, idlist: list, qpm=60):
         # 根据qpm，计算更新的间隔，避免刷爆豆瓣等服务
         sleep_seconds = 60.0/qpm
 
         for book_id in idlist:
-            time.sleep(sleep_seconds)
             mi = self.db.get_metadata(book_id, index_is_id=True)
-            if not self.should_update(mi): continue
-            try:
-                refer_mi = self.plugin_search_best_book_info(mi)
-            except:
-                logging.exception("plugin_search_best_book_info fail")
+            if not self.should_update(mi):
+                logging.info(_("忽略更新书籍 id=%d : 无需更新"), book_id)
                 continue
+            time.sleep(sleep_seconds)
+            self.do_fill_metadata(mi)
 
-            if mi.cover_data is None:
-                logging.info(_("忽略更新书籍 id=%d : 无法获取封面"))
-                continue
+    def auto_fill(self, book_id):
+        if not CONF['auto_fill_metadata']: return
+        mi = self.db.get_metadata(book_id, index_is_id=True)
+        return self.do_fill_metadata(book_id, mi)
 
-            # 自动填充tag
-            if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
-                mi.tags = self.guess_tags(refer_mi)
-                # self.db.set_tags(book_id, mi.tags)
-            mi.smart_update(refer_mi, replace_metadata=True)
-            self.db.set_metadata(book_id, mi)
-            logging.info(_("自动更新书籍 id=[%d] 的信息，title=%s", mi.title))
+    def do_fill_metadata(self, book_id, mi):
+        refer_mi = None
+
+        try:
+            refer_mi = self.plugin_search_best_book_info(mi)
+        except:
+            return
+        
+        if not refer_mi:
+            logging.info(_("忽略更新书籍 id=%d : 无法获取信息"), book_id)
+            return
+
+        if refer_mi.cover_data is None:
+            logging.info(_("忽略更新书籍 id=%d : 无法获取封面"), book_id)
+            return
+
+        # 自动填充tag
+        if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
+            mi.tags = self.guess_tags(refer_mi)
+            # self.db.set_tags(book_id, mi.tags)
+        mi.smart_update(refer_mi, replace_metadata=True)
+        self.db.set_metadata(book_id, mi)
+        logging.info(_("自动更新书籍 id=[%d] 的信息，title=%s", book_id, mi.title))
 
     def should_update(self, mi):
         if not mi.comments: return True
-        # TODO: check cover is default
+        if not mi.has_cover: return True
         return False
-
 
     def guess_tags(self, refer_mi, max_count=8):
         ts = []
@@ -59,10 +73,6 @@ class AutoFillService(AsyncService):
             if len(ts) > max_count:
                 break
         return ts
-        if len(ts) > 0:
-            mi.tags += ts[:8]
-            logging.info("tags are %s" % ",".join(mi.tags))
-            self.db.set_tags(book_id, mi.tags)
 
     def plugin_search_best_book_info(self, mi):
         title = re.sub("[(（].*", "", mi.title)
@@ -80,7 +90,8 @@ class AutoFillService(AsyncService):
         try:
             book = api.get_book_by_isbn(mi.isbn)
         except:
-            logging.exception(_("douban 接口查询 %s 失败" % title))
+            logging.error(_("douban 接口查询 %s 失败" % title))
+
         if book:
             return api._metadata(book)
 
@@ -88,7 +99,7 @@ class AutoFillService(AsyncService):
         try:
             books = api.search_books(title)
         except:
-            logging.exception(_("douban 接口查询 %s 失败" % title))
+            logging.error(_("douban 接口查询 %s 失败" % title))
 
         if books:
             # 优先选择匹配度更高的书
@@ -104,6 +115,6 @@ class AutoFillService(AsyncService):
             if book:
                 return book
         except:
-            logging.exception(_("baidu 接口查询 %s 失败" % title))
+            logging.error(_("baidu 接口查询 %s 失败" % title))
 
         return None

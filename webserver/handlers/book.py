@@ -13,6 +13,7 @@ import tornado.escape
 from tornado import web
 
 from webserver import loader, utils
+from webserver.services.autofill import AutoFillService
 from webserver.services.convert import ConvertService
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
@@ -453,6 +454,8 @@ class BookUpload(BaseHandler):
         item.book_id = book_id
         item.collector_id = self.user_id()
         item.save()
+
+        AutoFillService().auto_fill(book_id)
         return {"err": "ok", "book_id": book_id}
 
 
