@@ -83,6 +83,7 @@ settings = {
     'douban_apikey'     : "0df993c66c0c636e29ecbb5344252a4a",
     'douban_baseurl'    : "https://api.douban.com",
     'douban_max_count'  : 2,
+    'auto_fill_meta'    : False,
 
     'avatar_service'    : "https://cravatar.cn",
 

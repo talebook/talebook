@@ -196,6 +196,23 @@ export default {
             fields: [ ],
             show_friends: true,
         },
+
+        {
+            show: false,
+            title: "互联网书籍信息源",
+            fields: [
+                { icon: "", key: "auto_fill_meta", label: "自动从互联网拉取新书的书籍信息", type: 'checkbox' },
+                { icon: "info", key: "douban_baseurl", label: "豆瓣插件API地址(例如 http://10.0.0.1:8080 )" },
+                { icon: "info", key: "douban_max_count", label: "豆瓣插件API查询结果数量" },
+            ],
+            tips: [
+                {
+                    text: "若需要启用豆瓣插件，请参阅安装文档的说明。",
+                    link: "https://github.com/talebook/talebook/blob/master/document/INSTALL.zh_CN.md#%E5%85%B6%E4%BB%96%E9%85%8D%E7%BD%AE",
+                }
+            ],
+        },
+
         {
             show: false,
             title: "高级配置项",
@@ -207,8 +224,6 @@ export default {
                 },
                 { icon: "info", key: "avatar_service", label: "可使用www.gravatar.com或cravatar.cn头像服务" },
                 { icon: "info", key: "MAX_UPLOAD_SIZE", label: "文件上传字节数限制(例如100MB或100KB）" },
-                { icon: "info", key: "douban_baseurl", label: "豆瓣插件API地址(例如 http://10.0.0.1:8080 )" },
-                { icon: "info", key: "douban_max_count", label: "豆瓣插件API查询结果数量" },
                 { icon: "lock", key: "cookie_secret", label: "COOKIE随机密钥" },
                 { icon: "info", key: "scan_upload_path", label: "批量导入扫描目录" },
                 { icon: "info", key: "push_title", label: "邮件推送的标题" },
@@ -218,7 +233,7 @@ export default {
             ],
             tips: [
                 {
-                    text: "若需要调整Logo，或启用豆瓣插件，请参阅安装文档的说明。",
+                    text: "若需要调整Logo，请参阅安装文档的说明。",
                     link: "https://github.com/talebook/talebook/blob/master/document/INSTALL.zh_CN.md#%E5%85%B6%E4%BB%96%E9%85%8D%E7%BD%AE",
                 }
             ],

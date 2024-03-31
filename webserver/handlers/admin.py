@@ -15,6 +15,7 @@ from gettext import gettext as _
 import tornado
 
 from webserver import loader
+from webserver.services.autofill import AutoFillService
 from webserver.services.mail import MailService
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
 from webserver.models import Reader
@@ -250,6 +251,7 @@ class AdminSettings(BaseHandler):
             "douban_apikey",
             "douban_baseurl",
             "douban_max_count",
+            "auto_fill_meta",
             "push_title",
             "push_content",
             "site_title",
@@ -470,6 +472,28 @@ class AdminBookList(BaseHandler):
         return {"err": "ok", "items": books, "total": total}
 
 
+class AdminBookFill(BaseHandler):
+    @js
+    @is_admin
+    def post(self):
+        req = tornado.escape.json_decode(self.request.body)
+        idlist = req["idlist"]
+        if not idlist:
+            return {"err": "params.error", "msg": _(u"参数错误")}
+
+        if idlist == "all":
+            idlist = list(self.cache.search(""))
+        elif isinstance(idlist, list):
+            for bid in idlist:
+                if not isinstance(bid, int):
+                    return {"err": "params.error.idlist", "msg": _(u"idlist参数错误")}
+        else:
+            return {"err": "params.error.idlist", "msg": _(u"idlist参数错误")}
+
+        AutoFillService().auto_fill_all(idlist)
+        return {"err": "ok", "msg": _(u"任务启动成功！请耐心等待，稍后再来刷新页面")}
+
+
 def routes():
     return [
         (r"/api/admin/ssl", AdminSSL),
@@ -478,4 +502,5 @@ def routes():
         (r"/api/admin/settings", AdminSettings),
         (r"/api/admin/testmail", AdminTestMail),
         (r"/api/admin/book/list", AdminBookList),
+        (r"/api/admin/book/fill", AdminBookFill),
     ]

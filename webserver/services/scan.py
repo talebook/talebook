@@ -10,6 +10,7 @@ import traceback
 from webserver import utils
 from webserver.models import Item, ScanFile
 from webserver.services import AsyncService
+from webserver.services.autofill import AutoFillService
 
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
 
@@ -176,3 +177,6 @@ class ScanService(AsyncService):
             except Exception as err:
                 self.session.rollback()
                 logging.error("save link error: %s", err)
+
+            # 拉取书籍信息
+            AutoFillService().auto_fill(row.book_id)

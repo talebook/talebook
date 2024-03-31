@@ -8,9 +8,8 @@ Do not modify it unless you know what you are doing.
 
 import logging
 import re
-import traceback
-
 import requests
+from gettext import gettext as _
 
 from webserver.plugins.meta.douban import str2date
 from .baidubaike.baidubaike import Page
@@ -39,8 +38,8 @@ class BaiduBaikeApi:
     def _baike(self, title):
         try:
             return Page(title)
-        except Exception:
-            logging.error(traceback.print_exc())
+        except Exception as err:
+            logging.error(_(f"百科接口异常: {err}"))
             return None
 
     def _metadata(self, baike):

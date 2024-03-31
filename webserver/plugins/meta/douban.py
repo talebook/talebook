@@ -10,7 +10,6 @@ import json
 import logging
 import re
 import sys
-import traceback
 from gettext import gettext as _
 
 import requests
@@ -63,21 +62,21 @@ class DoubanBookApi(object):
         try:
             rsp = requests.get(url, headers=CHROME_HEADERS, params=params)
         except Exception as e:
-            logging.error("douban API error, request fail, err=%s", str(e))
+            logging.error("豆瓣接口异常: request fail, err=%s", str(e))
             return None
 
         if rsp.status_code != 200:
-            logging.error("douban API error: status_code[%s] != 200 OK", rsp.status_code)
+            logging.error("豆瓣接口异常: status_code[%s] != 200 OK", rsp.status_code)
             return None
 
         try:
             data = rsp.json()
         except json.JSONDecodeError:
-            logging.error("douban API error: json decode fail, content:\n%s", rsp.content)
+            logging.error("豆瓣接口异常: json decode fail, content:\n%s", rsp.content)
             return None
 
         if "code" in data and data["code"] != 0:
-            logging.error("douban API error: code=%d, msg=%s", rsp["code"], rsp["msg"])
+            logging.error("豆瓣接口异常: code=%d, msg=%s", rsp["code"], rsp["msg"])
             return None
         return data
 
@@ -113,6 +112,12 @@ class DoubanBookApi(object):
 
     def get_book(self, md):
         return self.get_metadata(md)
+
+    def get_book_detail(self, md):
+        # 字典结构体，转化格式
+        douban_id = md['id'] if isinstance(md, dict) else md.douban_id
+        info = self.get_book_by_id(douban_id)
+        return self._metadata(info)
 
     def get_metadata(self, md):
         book = None
@@ -178,8 +183,8 @@ def get_douban_metadata(mi):
     api = DoubanBookApi()
     try:
         return api.get_metadata(mi, False)
-    except Exception:
-        logging.error(traceback.format_exc())
+    except Exception as err:
+        logging.error(f"豆瓣接口异常: {err}")
         return None
 
 
@@ -187,8 +192,8 @@ def select_douban_metadata(mi):
     api = DoubanBookApi()
     try:
         return api.get_metadata(mi, True)
-    except Exception:
-        logging.error(traceback.format_exc())
+    except Exception as err:
+        logging.error(f"豆瓣接口异常: {err}")
         return None
 
 
