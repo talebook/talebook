@@ -176,7 +176,7 @@
                     </template>
                 </v-toolbar>
                 <v-row>
-                    <v-col class="ma-auto" cols="8" sm="4">
+                    <v-col class="mx-auto" cols="8" sm="4">
                         <v-img class="book-img" :src="book.img" :aspect-ratio="11 / 15" max-height="500px"
                                contain></v-img>
                     </v-col>

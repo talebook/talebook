@@ -145,7 +145,6 @@ class AdminTestMail(BaseHandler):
             logging.error(traceback.format_exc())
             return {"err": "email.server_error", "msg": str(e)}
 
-
 class AdminOwnerMode(BaseHandler):
     @auth
     def get(self):
@@ -251,6 +250,7 @@ class AdminSettings(BaseHandler):
             "douban_apikey",
             "douban_baseurl",
             "douban_max_count",
+            "auto_fill_meta",
             "push_title",
             "push_content",
             "site_title",

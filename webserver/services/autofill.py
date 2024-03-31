@@ -27,10 +27,11 @@ class AutoFillService(AsyncService):
                 logging.info(_("忽略更新书籍 id=%d : 无需更新"), book_id)
                 continue
             time.sleep(sleep_seconds)
-            self.do_fill_metadata(mi)
+            self.do_fill_metadata(book_id, mi)
 
+    @AsyncService.register_function
     def auto_fill(self, book_id):
-        if not CONF['auto_fill_metadata']: return
+        if not CONF['auto_fill_meta']: return
         mi = self.db.get_metadata(book_id, index_is_id=True)
         return self.do_fill_metadata(book_id, mi)
 
@@ -56,7 +57,7 @@ class AutoFillService(AsyncService):
             # self.db.set_tags(book_id, mi.tags)
         mi.smart_update(refer_mi, replace_metadata=True)
         self.db.set_metadata(book_id, mi)
-        logging.info(_("自动更新书籍 id=[%d] 的信息，title=%s", book_id, mi.title))
+        logging.info(_("自动更新书籍 id=[%d] 的信息，title=%s"), book_id, mi.title)
 
     def should_update(self, mi):
         if not mi.comments: return True
@@ -90,23 +91,23 @@ class AutoFillService(AsyncService):
         try:
             book = api.get_book_by_isbn(mi.isbn)
         except:
-            logging.error(_("douban 接口查询 %s 失败" % title))
+            logging.error(_("douban 接口查询 %s 失败"), title)
 
         if book:
-            return api._metadata(book)
+            return api.get_book_detail(book)
 
         # 2. 查 title
         try:
             books = api.search_books(title)
         except:
-            logging.error(_("douban 接口查询 %s 失败" % title))
+            logging.error(_("douban 接口查询 %s 失败"), title)
 
         if books:
             # 优先选择匹配度更高的书
             for b in books:
                 if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
-                    return api._metadata(b)
-            return api._metadata(books[0])
+                    return api.get_book_detail(b)
+            return api.get_book_detail(books[0])
 
         # 3. 查 baidu
         api = baike.BaiduBaikeApi(copy_image=True)
@@ -115,6 +116,6 @@ class AutoFillService(AsyncService):
             if book:
                 return book
         except:
-            logging.error(_("baidu 接口查询 %s 失败" % title))
+            logging.error(_("baidu 接口查询 %s 失败"), title)
 
         return None

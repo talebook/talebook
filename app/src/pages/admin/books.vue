@@ -4,7 +4,7 @@
         <v-card-text> 此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面</v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
-            <v-btn :disabled="loading" outlined color="info" @click="meta_dialog = !meta_dialog"><v-icon>mdi-info</v-icon>自动填充空缺字段... </v-btn>
+            <v-btn :disabled="loading" outlined color="info" @click="meta_dialog = !meta_dialog"><v-icon>mdi-info</v-icon>自动更新图书信息... </v-btn>
             <v-spacer></v-spacer>
             <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line hide-details></v-text-field>
         </v-card-actions>
@@ -172,7 +172,7 @@
         </v-data-table>
 
         <!-- 小浮窗提醒 -->
-        <v-snackbar v-model="snack" :timeout="3000" :color="snackColor">
+        <v-snackbar v-model="snack" top :timeout="3000" :color="snackColor">
             {{ snackText }}
 
             <template v-slot:action="{ attrs }">
@@ -183,13 +183,15 @@
         <!-- 提醒拉取图书的规则说明 -->
         <v-dialog v-model="meta_dialog" persistent transition="dialog-bottom-transition" width="500">
             <v-card>
-                <v-card-title> 提醒 </v-card-title>
+                <v-toolbar flat dense dark color="primary"> 提醒 </v-toolbar>
+                <v-card-title></v-card-title>
                 <v-card-text>
                     <p> 即将从互联网拉取所有图书的书籍信息，请了解以下功能限制：</p>
-                    <p> 1. 只更新「没有封面」或「没有简介」的图书；</p>
-                    <p> 2. 受限于豆瓣等服务的限制，每秒钟仅更新1本书; </p>
+                    <p> 1. 请在「系统设置」中配置好「互联网书籍信息源」，启用豆瓣插件；</p>
+                    <p> 2. 本操作只更新「没有封面」或「没有简介」的图书；</p>
+                    <p> 3. 受限于豆瓣等服务的限制，每秒钟仅更新1本书; </p>
                     <br></br>
-                    <p>预计需要运行 {{auto_fill_mins}} 分钟，在此期间请不要停止程序</p>
+                    <p> 预计需要运行 {{auto_fill_mins}} 分钟，在此期间请不要停止程序</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-btn @click="meta_dialog = !meta_dialog">取消</v-btn>

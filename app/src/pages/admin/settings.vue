@@ -199,14 +199,11 @@ export default {
 
         {
             show: false,
-            title: "自动填充书籍信息",
+            title: "互联网书籍信息源",
             fields: [
-                { icon: "info", key: "auto_fill_metadata", label: "自动从互联网拉取新书的书籍信息", type: 'checkbox' },
+                { icon: "", key: "auto_fill_meta", label: "自动从互联网拉取新书的书籍信息", type: 'checkbox' },
                 { icon: "info", key: "douban_baseurl", label: "豆瓣插件API地址(例如 http://10.0.0.1:8080 )" },
                 { icon: "info", key: "douban_max_count", label: "豆瓣插件API查询结果数量" },
-            ],
-            buttons: [
-                { icon: "cloud-arrow-down-outline", label: "测试拉取功能是否正常", action: "test_auto_fill" },
             ],
             tips: [
                 {
