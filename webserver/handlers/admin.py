@@ -475,6 +475,18 @@ class AdminBookList(BaseHandler):
 class AdminBookFill(BaseHandler):
     @js
     @is_admin
+    def get(self):
+        s = AutoFillService()
+        status = {
+            "total": s.count_total,
+            "skip": s.count_skip,
+            "done": s.count_done,
+            "fail": s.count_fail,
+        }
+        return {"err": "ok", "msg": "ok", "status": status}
+
+    @js
+    @is_admin
     def post(self):
         req = tornado.escape.json_decode(self.request.body)
         idlist = req["idlist"]

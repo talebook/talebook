@@ -4,7 +4,7 @@
         <v-card-text> 此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面</v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
-            <v-btn :disabled="loading" outlined color="info" @click="meta_dialog = !meta_dialog"><v-icon>mdi-info</v-icon>自动更新图书信息... </v-btn>
+            <v-btn :disabled="loading" outlined color="info" @click="show_dialog_auto_file"><v-icon>mdi-info</v-icon>自动更新图书信息... </v-btn>
             <v-spacer></v-spacer>
             <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line hide-details></v-text-field>
         </v-card-actions>
@@ -192,7 +192,15 @@
                     <p> 2. 本操作只更新「没有封面」或「没有简介」的图书；</p>
                     <p> 3. 受限于豆瓣等服务的限制，每秒钟仅更新1本书; </p>
                     <br></br>
-                    <p> 预计需要运行 {{auto_fill_mins}} 分钟，在此期间请不要停止程序</p>
+                    <template v-if="progress.total > 0">
+                        <p>当前进展：<v-btn small text link @click="refresh_progress">刷新</v-btn></p>
+                        <p>总共 {{ progress.total }} 本书籍，已更新 {{  progress.done }} 本，更新失败 {{ progress.fail }} 本，无需处理 {{  progress.skip }} 本。</p>
+                    </template>
+                    <p v-else> 预计需要运行 {{auto_fill_mins}} 分钟，在此期间请不要停止程序</p>
+
+                    <template v-else>
+
+                    </template>
                 </v-card-text>
                 <v-card-actions>
                     <v-btn @click="meta_dialog = !meta_dialog">取消</v-btn>
@@ -233,6 +241,8 @@ export default {
             { text: "操作", sortable: false, value: "actions" },
         ],
         progress: {
+            skip: 0,
+            fail: 0,
             done: 0,
             total: 0,
             status: "finish",
@@ -287,6 +297,18 @@ export default {
                 .finally(() => {
                     this.loading = false;
                 });
+        },
+        refresh_progress() {
+            this.$backend("/admin/book/fill", {
+                method: "GET",
+            })
+            .then((rsp) => {
+                this.progress = rsp.status;
+            })
+        },
+        show_dialog_auto_file() {
+            this.meta_dialog = true;
+            this.refresh_progress();
         },
         auto_fill() {
             this.$backend("/admin/book/fill", {

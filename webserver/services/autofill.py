@@ -15,21 +15,37 @@ CONF = loader.get_settings()
 
 class AutoFillService(AsyncService):
     """自动从网上拉取书籍信息，填充到DB中"""
+    def __init__(self):
+        self.count_total = 0
+        self.count_skip = 0
+        self.count_done = 0
+        self.count_fail = 0
 
     @AsyncService.register_service
     def auto_fill_all(self, idlist: list, qpm=60):
         # 根据qpm，计算更新的间隔，避免刷爆豆瓣等服务
         sleep_seconds = 60.0 / qpm
 
+        self.count_total = len(idlist)
+        self.count_skip = 0
+        self.count_done = 0
+        self.count_fail = 0
+
         for book_id in idlist:
             mi = self.db.get_metadata(book_id, index_is_id=True)
             if not self.should_update(mi):
                 logging.info(_("忽略更新书籍 id=%d : 无需更新"), book_id)
+                self.count_skip += 1
                 continue
+
             time.sleep(sleep_seconds)
             try:
-                self.do_fill_metadata(book_id, mi)
+                if self.do_fill_metadata(book_id, mi):
+                    self.count_done += 1
+                else:
+                    self.count_fail += 1
             except Exception as err:
+                self.count_fail += 1
                 logging.error(_("执行异常: %s"), err)
 
     @AsyncService.register_function
@@ -45,15 +61,15 @@ class AutoFillService(AsyncService):
         try:
             refer_mi = self.plugin_search_best_book_info(mi)
         except:
-            return
+            return False
 
         if not refer_mi:
             logging.info(_("忽略更新书籍 id=%d : 无法获取信息"), book_id)
-            return
+            return False
 
         if refer_mi.cover_data is None:
             logging.info(_("忽略更新书籍 id=%d : 无法获取封面"), book_id)
-            return
+            return False
 
         # 自动填充tag
         if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
@@ -64,6 +80,7 @@ class AutoFillService(AsyncService):
         mi.smart_update(refer_mi, replace_metadata=True)
         self.db.set_metadata(book_id, mi)
         logging.info(_("自动更新书籍 id=[%d] 的信息，title=%s"), book_id, mi.title)
+        return True
 
     def should_update(self, mi):
         if not mi.comments or not mi.has_cover:
