@@ -55,7 +55,9 @@ class AutoFillService(AsyncService):
         # 自动填充tag
         if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
             mi.tags = self.guess_tags(refer_mi)
-            # self.db.set_tags(book_id, mi.tags)
+        # 保留书名不修改（万一出BUG，还能抢救一下）
+        refer_mi.title = mi.title
+
         mi.smart_update(refer_mi, replace_metadata=True)
         self.db.set_metadata(book_id, mi)
         logging.info(_("自动更新书籍 id=[%d] 的信息，title=%s"), book_id, mi.title)
