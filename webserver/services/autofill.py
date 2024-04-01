@@ -27,7 +27,10 @@ class AutoFillService(AsyncService):
                 logging.info(_("忽略更新书籍 id=%d : 无需更新"), book_id)
                 continue
             time.sleep(sleep_seconds)
-            self.do_fill_metadata(book_id, mi)
+            try:
+                self.do_fill_metadata(book_id, mi)
+            except Exception as err:
+                logging.error(_("执行异常: %s"), err)
 
     @AsyncService.register_function
     def auto_fill(self, book_id):

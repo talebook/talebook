@@ -38,7 +38,7 @@
             </template>
             <template v-slot:item.title="{ item }">
                 <v-edit-dialog large :return-value.sync="item.title" @save="save(item, 'title')" save-text="保存" cancel-text="取消">
-                    <span class="three-lines" style="max-width: 200px">{{ item.title }}</span>
+                    <span class="three-lines" style="max-width: 200px; min-width: 120px; ">{{ item.title }}</span>
 
                     <template v-slot:input>
                         <div class="mt-4 text-h6">修改字段</div>
@@ -150,13 +150,14 @@
 
             <template v-slot:item.comments="{ item }">
                 <v-edit-dialog large :return-value.sync="item.comments" @save="save(item, 'comments')" save-text="保存" cancel-text="取消">
-                    <span :title="item.comments" style="width: 300px" class="three-lines">{{ item.comments }}</span>
+                    <span :title="item.comments" style="width: 300px" class="three-lines">{{ item.comments.substr(0, 80) }}</span>
                     <template v-slot:input>
                         <div class="mt-4 text-h6">修改字段</div>
                         <v-textarea v-model="item.comments" label="简介"></v-textarea>
                     </template>
                 </v-edit-dialog>
             </template>
+
             <template v-slot:item.actions="{ item }">
                 <v-menu offset-y right>
                     <template v-slot:activator="{ on }">
