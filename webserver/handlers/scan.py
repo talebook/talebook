@@ -29,13 +29,26 @@ class Scanner:
             row.save()
             self.session.commit()
             bid = "[ book-id=%s ]" % row.book_id
-            logging.error("update: status=%-5s, path=%s %s", row.status, row.path, bid if row.book_id > 0 else "")
+            logging.error(
+                "update: status=%-5s, path=%s %s",
+                row.status,
+                row.path,
+                bid if row.book_id > 0 else "",
+            )
             return True
         except Exception as err:
             logging.error(traceback.format_exc())
             self.session.rollback()
             logging.error("save error: %s", err)
             return False
+
+    def summary(self):
+        done_status = [ScanFile.EXIST, ScanFile.IMPORTED]
+        query = self.session.query(ScanFile)
+        total = query.count()
+        done = query.filter(ScanFile.status.in_(done_status)).count()
+        todo = total - done
+        return {"total": total, "done": done, "todo": todo}
 
     def run_scan(self, path_dir):
         ScanService().do_scan(path_dir)
@@ -76,7 +89,9 @@ class Scanner:
         import_id = self.session.query(sqlalchemy.func.max(ScanFile.import_id)).scalar()
         if import_id is None:
             return (0, {})
-        query = self.session.query(ScanFile.status).filter(ScanFile.import_id == import_id)
+        query = self.session.query(ScanFile.status).filter(
+            ScanFile.import_id == import_id
+        )
         return (import_id, self.count(query))
 
     def scan_status(self):
@@ -108,12 +123,13 @@ class ScanList(BaseHandler):
     @auth
     def get(self):
         if not self.admin_user:
-            return {"err": "permission.not_admin", "msg": _(u"当前用户非管理员")}
+            return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
 
         num = max(10, int(self.get_argument("num", 20)))
         page = max(0, int(self.get_argument("page", 1)) - 1)
         sort = self.get_argument("sort", "create_time")
         desc = self.get_argument("desc", "true")
+        filter = self.get_argument("filter", "all")
         logging.debug("num=%d, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
 
         # get order by query args
@@ -126,16 +142,15 @@ class ScanList(BaseHandler):
         }.get(sort, ScanFile.create_time)
         order = order.asc() if desc == "false" else order.desc()
         query = self.session.query(ScanFile).order_by(order)
-        total = query.count()
-        start = page * num
 
-        status = {
-            ScanFile.NEW: 0,
-            ScanFile.DROP: 0,
-            ScanFile.EXIST: 0,
-            ScanFile.READY: 0,
-            ScanFile.IMPORTED: 0,
-        }
+        done_status = [ScanFile.EXIST, ScanFile.IMPORTED]
+        if filter == "todo":
+            query = query.filter(ScanFile.status.not_in(done_status))
+        elif filter == "done":
+            query = query.filter(ScanFile.status.in_(done_status))
+        total = query.count()
+
+        start = page * num
         response = []
         for s in query.limit(num).offset(start).all():
             d = {
@@ -148,19 +163,34 @@ class ScanList(BaseHandler):
                 "tags": s.tags,
                 "status": s.status,
                 "book_id": s.book_id,
-                "create_time": s.create_time.strftime("%Y-%m-%d %H:%M:%S") if s.create_time else "N/A",
-                "update_time": s.update_time.strftime("%Y-%m-%d %H:%M:%S") if s.update_time else "N/A",
+                "create_time": (
+                    s.create_time.strftime("%Y-%m-%d %H:%M:%S")
+                    if s.create_time
+                    else "N/A"
+                ),
+                "update_time": (
+                    s.update_time.strftime("%Y-%m-%d %H:%M:%S")
+                    if s.update_time
+                    else "N/A"
+                ),
             }
-            status[s.status] += 1
             response.append(d)
-        return {"err": "ok", "items": response, "total": total, "scan_dir": CONF["scan_upload_path"], "status": status}
+
+        m = Scanner(self.db, self.settings["ScopedSession"])
+        return {
+            "err": "ok",
+            "items": response,
+            "total": total,
+            "summary": m.summary(),
+            "scan_dir": CONF["scan_upload_path"],
+        }
 
 
 class ScanMark(BaseHandler):
     @js
     @is_admin
     def post(self):
-        return {"err": "ok", "msg": _(u"发送成功")}
+        return {"err": "ok", "msg": _("发送成功")}
 
 
 class ScanRun(BaseHandler):
@@ -169,12 +199,15 @@ class ScanRun(BaseHandler):
     def post(self):
         path = CONF["scan_upload_path"]
         if not path.startswith(SCAN_DIR_PREFIX):
-            return {"err": "params.error", "msg": _(u"书籍导入目录必须是%s的子目录") % SCAN_DIR_PREFIX}
+            return {
+                "err": "params.error",
+                "msg": _("书籍导入目录必须是%s的子目录") % SCAN_DIR_PREFIX,
+            }
         m = Scanner(self.db, self.settings["ScopedSession"])
         total = m.run_scan(path)
         if total == 0:
             return {"err": "empty", "msg": _("目录中没有找到符合要求的书籍文件！")}
-        return {"err": "ok", "msg": _(u"开始扫描了"), "total": total}
+        return {"err": "ok", "msg": _("开始扫描了"), "total": total}
 
 
 class ScanDelete(BaseHandler):
@@ -184,13 +217,13 @@ class ScanDelete(BaseHandler):
         req = tornado.escape.json_decode(self.request.body)
         hashlist = req["hashlist"]
         if not hashlist:
-            return {"err": "params.error", "msg": _(u"参数错误")}
+            return {"err": "params.error", "msg": _("参数错误")}
         if hashlist == "all":
             hashlist = None
 
         m = Scanner(self.db, self.settings["ScopedSession"])
         count = m.delete(hashlist)
-        return {"err": "ok", "msg": _(u"删除成功"), "count": count}
+        return {"err": "ok", "msg": _("删除成功"), "count": count}
 
 
 class ScanStatus(BaseHandler):
@@ -199,7 +232,7 @@ class ScanStatus(BaseHandler):
     def get(self):
         m = Scanner(self.db, self.settings["ScopedSession"])
         status = m.scan_status()[1]
-        return {"err": "ok", "msg": _(u"成功"), "status": status}
+        return {"err": "ok", "msg": _("成功"), "status": status, "summary": m.summary()}
 
 
 class ImportRun(BaseHandler):
@@ -209,7 +242,7 @@ class ImportRun(BaseHandler):
         req = tornado.escape.json_decode(self.request.body)
         hashlist = req["hashlist"]
         if not hashlist:
-            return {"err": "params.error", "msg": _(u"参数错误")}
+            return {"err": "params.error", "msg": _("参数错误")}
         if hashlist == "all":
             hashlist = None
 
@@ -217,7 +250,7 @@ class ImportRun(BaseHandler):
         total = m.run_import(hashlist)
         if total == 0:
             return {"err": "empty", "msg": _("没有等待导入书库的书籍！")}
-        return {"err": "ok", "msg": _(u"扫描成功")}
+        return {"err": "ok", "msg": _("扫描成功")}
 
 
 class ImportStatus(BaseHandler):
@@ -226,7 +259,7 @@ class ImportStatus(BaseHandler):
     def get(self):
         m = Scanner(self.db, self.settings["ScopedSession"])
         status = m.import_status()[1]
-        return {"err": "ok", "msg": _(u"成功"), "status": status}
+        return {"err": "ok", "msg": _("成功"), "status": status, "summary": m.summary()}
 
 
 def routes():

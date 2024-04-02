@@ -5,7 +5,6 @@ import hashlib
 import os
 import logging
 import time
-import traceback
 
 from webserver import utils
 from webserver.models import Item, ScanFile
@@ -21,12 +20,11 @@ class ScanService(AsyncService):
             row.save()
             self.session.commit()
             bid = "[ book-id=%s ]" % row.book_id
-            logging.error("update: status=%-5s, path=%s %s", row.status, row.path, bid if row.book_id > 0 else "")
+            logging.info("update: status=%-5s, path=%s %s", row.status, row.path, bid if row.book_id > 0 else "")
             return True
         except Exception as err:
-            logging.error(traceback.format_exc())
+            logging.exception("save error: %s", err)
             self.session.rollback()
-            logging.error("save error: %s", err)
             return False
 
     def build_query(self, hashlist):
@@ -146,6 +144,8 @@ class ScanService(AsyncService):
         query.update({ScanFile.import_id: import_id}, synchronize_session=False)
         self.session.commit()
 
+        imported = []
+
         # 逐个处理
         for row in query.all():
             fpath = row.path
@@ -174,9 +174,10 @@ class ScanService(AsyncService):
             item.collector_id = user_id
             try:
                 item.save()
+                imported.append(row.book_id)
             except Exception as err:
                 self.session.rollback()
                 logging.error("save link error: %s", err)
 
-            # 拉取书籍信息
-            AutoFillService().auto_fill(row.book_id)
+        # 全部导入完毕后，开始拉取书籍信息
+        AutoFillService().auto_fill_all(imported)
