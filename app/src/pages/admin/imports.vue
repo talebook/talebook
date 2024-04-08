@@ -3,7 +3,7 @@
         <v-card-title> 导入图书 <v-chip small class="primary">Beta</v-chip> </v-card-title>
         <v-card-text>
         请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。<br/>
-        请注意：此功能为后台异步执行，不必重复点击，可刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。<br/>
+        请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。<br/>
         另外，还可以使用<a target="_blank" href="https://calibre-ebook.com/">PC版Calibre软件</a>管理书籍，但是请注意：使用完PC版后，需重启Web版方可生效。
         </v-card-text>
         <v-card-actions>
@@ -18,7 +18,7 @@
             </template>
         </v-card-actions>
         <v-card-text>
-            <div v-if="selected.length == 0">请勾选需要处理的文件（默认情况下全选即可。已存在的书籍，即使勾选了也不会重复导入）</div>
+            <div v-if="selected.length == 0">请勾选需要处理的文件（默认情况下导入全部书籍即可。已存在的书籍，即使勾选了也不会重复导入）</div>
             <div v-else>共选择了{{ selected.length }}个</div>
         </v-card-text>
         <v-tabs v-model="filter_type" @change="getDataFromApi">
