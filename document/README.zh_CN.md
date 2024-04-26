@@ -53,7 +53,7 @@ docker run -d --name talebook -p 80:80 -v /data/calibre:/data -v /data/logo:/var
 ### 如果配置豆瓣插件
 需启用[cxfksword/douban-api-rs](https://github.com/cxfksword/douban-api-rs)服务，然后将对应的URL地址（例如 `http://10.0.0.1:8080` ）填写到高级配置项中。
 
-对于使用docker-composer启动的（例如使用 `docker/docker-compose.yml` 配置），那么URL地址为： `http://douban-api-rs:80/` ，因为依据docker-composer的说明，服务名称可解析出对应的IP地址。
+对于使用docker-composer启动的（例如使用 `docker/docker-compose.yml` 配置），那么URL地址为： `http://douban-rs-api:80/` ，因为依据docker-composer的说明，服务名称可解析出对应的IP地址。
 
 常见问题排查
 ===============

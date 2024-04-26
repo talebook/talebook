@@ -208,7 +208,7 @@ export default {
             tips: [
                 {
                     text: "若需要启用豆瓣插件，请参阅安装文档的说明。",
-                    link: "https://github.com/talebook/talebook/blob/master/document/INSTALL.zh_CN.md#%E5%85%B6%E4%BB%96%E9%85%8D%E7%BD%AE",
+                    link: "https://github.com/talebook/talebook/blob/master/document/README.zh_CN.md#%E5%A6%82%E6%9E%9C%E9%85%8D%E7%BD%AE%E8%B1%86%E7%93%A3%E6%8F%92%E4%BB%B6",
                 }
             ],
         },
@@ -234,7 +234,7 @@ export default {
             tips: [
                 {
                     text: "若需要调整Logo，请参阅安装文档的说明。",
-                    link: "https://github.com/talebook/talebook/blob/master/document/INSTALL.zh_CN.md#%E5%85%B6%E4%BB%96%E9%85%8D%E7%BD%AE",
+                    link: "https://github.com/talebook/talebook/blob/master/document/README.zh_CN.md#logo",
                 }
             ],
         },
