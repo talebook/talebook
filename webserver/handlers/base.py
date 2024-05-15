@@ -192,6 +192,7 @@ class BaseHandler(web.RequestHandler):
 
     def on_finish(self):
         ScopedSession = self.settings["ScopedSession"]
+        self.session.close()
         ScopedSession.remove()
 
     def static_url(self, path, **kwargs):
