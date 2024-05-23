@@ -177,6 +177,9 @@ export default {
                 { icon: "email", key: "smtp_server", label: "SMTP服务器（例如 smtp-mail.outlook.com:587）" },
                 { icon: "person", key: "smtp_username", label: "SMTP用户名（例如 user@gmail.com）" },
                 { icon: "lock", key: "smtp_password", label: "SMTP密码" },
+                { icon: "info", key: "smtp_encryption", label: "SMTP安全性", type: 'select',
+                    items: [{text: "SSL", value: "SSL"}, {text: "TLS(多数邮箱为此选项)", value: "TLS"} ]
+                },
             ],
             buttons: [
                 { icon: "email", label: "测试邮件", action: "test_email" },
@@ -272,6 +275,7 @@ export default {
             data.append('smtp_server', this.settings['smtp_server']);
             data.append('smtp_username', this.settings['smtp_username']);
             data.append('smtp_password', this.settings['smtp_password']);
+            data.append('smtp_encryption', this.settings['smtp_encryption']);
             this.$backend("/admin/testmail", {
                 method: 'POST',
                 body: data,

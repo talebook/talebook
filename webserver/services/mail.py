@@ -49,6 +49,7 @@ class MailService(AsyncService):
             relay, smtp_port = relay.split(":")
         username = kwargs.get("username", CONF["smtp_username"])
         password = kwargs.get("password", CONF["smtp_password"])
+        enc = kwargs.get("encryption", CONF["smtp_encryption"])
         mail = self.create_mail(sender, to, subject, body, attachment_data, attachment_name)
         sendmail(
             mail,
@@ -56,7 +57,7 @@ class MailService(AsyncService):
             to=[to],
             timeout=20,
             port=int(smtp_port),
-            encryption="SSL",
+            encryption=enc,
             relay=relay,
             username=username,
             password=password,

@@ -121,6 +121,7 @@ class AdminTestMail(BaseHandler):
     @js
     @auth
     def post(self):
+        mail_enc = self.get_argument("smtp_encryption")
         mail_server = self.get_argument("smtp_server")
         mail_username = self.get_argument("smtp_username")
         mail_password = self.get_argument("smtp_password")
@@ -139,6 +140,8 @@ class AdminTestMail(BaseHandler):
                 relay=mail_server,
                 username=mail_username,
                 password=mail_password,
+                encryption=mail_enc,
+
             )
             return {"err": "ok", "msg": _(u"发送成功")}
         except Exception as e:
@@ -258,6 +261,7 @@ class AdminSettings(BaseHandler):
             "smtp_password",
             "smtp_server",
             "smtp_username",
+            "smtp_encryption",
             "static_host",
             "xsrf_cookies",
             "settings_path",
