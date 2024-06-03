@@ -128,9 +128,9 @@ class ScanService(AsyncService):
             # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
             ids = self.db.books_with_same_title(mi)
             if ids:
-                for b in self.db.get_data_as_dict(ids=[ids]):
+                for b in self.db.get_data_as_dict(ids=list(ids)):
                     if fmt.upper() in b.get("available_formats", ""):
-                        row.book_id = ids.pop()
+                        row.book_id = b['id']
                         row.status = ScanFile.EXIST
                         break
             if row.status == ScanFile.EXIST:
@@ -163,7 +163,7 @@ class ScanService(AsyncService):
             # 再次检查是否有重复书籍
             ids = self.db.books_with_same_title(mi)
             if ids:
-                row.book_id = ids[0]
+                row.book_id = ids.pop()
                 for b in self.db.get_data_as_dict(ids=ids):
                     if fmt.upper() in b.get("available_formats", ""):
                         row.status = ScanFile.EXIST
