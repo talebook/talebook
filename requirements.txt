@@ -8,3 +8,5 @@ chardet
 
 # build-in support for MYSQL
 pymysql
+pytest==7.4.4
+flake8
