@@ -11,13 +11,13 @@
   },
   "dependencies": {
     "core-js": "^3.19.3",
-    "nuxt": "^2.15.8",
+    "nuxt": "^3.13.0",
     "vue": "^2.6.14",
     "vue-cookies": "^1.7.4",
     "vue-server-renderer": "^2.6.14",
     "vue-template-compiler": "^2.6.14",
     "vuetify": "^2.6.10",
-    "webpack": "^4.46.0"
+    "webpack": "^5.94.0"
   },
   "devDependencies": {
     "@mdi/font": "^6.5.95",
