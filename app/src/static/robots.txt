@@ -1,11 +1,8 @@
 User-agent: *
 Disallow: /login
-
-User-agent: *
 Disallow: /read
-
-User-agent: *
 Disallow: /opds/
+Disallow: /*/readtxt
 
 User-agent: SemrushBot
 Disallow: /
