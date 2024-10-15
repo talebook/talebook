@@ -108,13 +108,13 @@
                 load_progress();
                 window.check_count -= 1;
                 if ( window.check_count < 1 ) {
-                    $("#msg").html("系统异常，请在QQ群里联系管理员");
+                    $("#msg").html("系统异常");
                     return;
                 }
                 $.ajax({
                     url: epub_url + "/META-INF/container.xml?"+Math.random(),
                     success: function(data) {
-                        $("#msg").html("解压完毕，正在打开阅读界面");
+                        $("#msg").html("解压完毕，正在打开阅读界面<br>若打开失败，请关闭广告屏蔽插件，例如 uBlock Origin。");
                         start_reader();
                     },
                     error: function(xhr) {
@@ -129,6 +129,5 @@
             });
 
         </script>
-        <script type="text/javascript" src="//tajs.qq.com/stats?sId=29043744" charset="UTF-8"></script>
     </body>
 </html>
