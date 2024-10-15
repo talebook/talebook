@@ -23,13 +23,12 @@ NAS用户，可以参阅网友们写的指南：
  - [QQ互联登录网址](https://connect.qq.com/)
  - [Github]() 待补充
 
-### Logo
-*** 适用于v3.5.9及后续版本 ***
+### Logo (适用于v3.5.9及后续版本)
 
 favicon和导航菜单中的二维码logo，放置在数据目录 ```/data/books/logo/```中，可直接使用新图片覆盖掉。
 
 
-*** 适用于v3.5.8及更早版本 ***
+### Logo (适用于v3.5.8及更旧版本)
 
 favicon和导航菜单中的二维码logo，已经内置在了代码目录```/var/www/talebook/app/dist/img/```中。
  - favicon.ico: 网站图标文件
@@ -50,10 +49,10 @@ docker run -d --name talebook -p 80:80 -v /data/calibre:/data -v /data/logo:/var
 1. 如果明确提示`413`错误码，那么一般是由于nginx限制了上传大小。本项目中自带的nginx已配置了`client_max_body_size 0`，即不限制上传大小；
 因此建议使用者排查下是否在本项目之外配置有其他的nginx代理转发，调整其中的配置。
 
-### 如果配置豆瓣插件
+### 如何配置豆瓣插件?
 需启用[cxfksword/douban-api-rs](https://github.com/cxfksword/douban-api-rs)服务，然后将对应的URL地址（例如 `http://10.0.0.1:8080` ）填写到高级配置项中。
 
-对于使用docker-composer启动的（例如使用 `docker/docker-compose.yml` 配置），那么URL地址为： `http://douban-rs-api:80/` ，因为依据docker-composer的说明，服务名称可解析出对应的IP地址。
+对于使用docker-composer启动的（例如使用本项目自带的 `docker-compose.yml` 配置），那么URL地址为： `http://douban-rs-api:80/` ，因为依据docker-composer的说明，服务名称可解析出对应的IP地址。
 
 常见问题排查
 ===============
@@ -68,6 +67,8 @@ docker run -d --name talebook -p 80:80 -v /data/calibre:/data -v /data/logo:/var
 
 这种情况，一般是服务运行时出现异常，常见原因有目录权限没有配置正常、数据库没创建好、或者触发了某个代码BUG。
 
+** 一般都是因为data目录权限设置不正确，导致启动异常 **，可以多排查下用户名、UID、目录权限等。
+
 请打开日志文件```/data/log/talebook.log```查看原因，重点查看最后一次出现Traceback报错，关注其中```Traceback (most recent call last)```提示的错误原因，并提issue联系开发者排查。
 
 ### 「静读天下」APP里访问书库会失败，怎么办？
@@ -75,3 +76,8 @@ docker run -d --name talebook -p 80:80 -v /data/calibre:/data -v /data/logo:/var
 这是因为静读天下APP不支持Cookie，导致登录会失败。在最新版系统中(v2.0.0-87-gf6d8f06)已经调整程序逻辑，可以无需登录就正常浏览，仅在下载时检测权限。为了避免弹出登录提示，请配置：
  - 关闭「私人图书馆」模式。
  - 打开「允许任意下载」（访客无需注册或登录）
+
+### 阅读器的页面卡住了，不加载书籍，怎么办？
+
+ 这是因为浏览器的广告拦截插件屏蔽了一些JS，导致页面加载异常。请关闭相关插件后再重试，例如 uBlock Origin
+
