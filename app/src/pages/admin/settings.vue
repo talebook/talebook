@@ -210,7 +210,7 @@ export default {
             ],
             tips: [
                 {
-                    text: "若需要启用豆瓣插件，请参阅安装文档的说明。",
+                    text: "若需要启用豆瓣插件，请参阅安装文档的说明。若出现失败，可尝试更换镜像，例如 talebook/douban-api-rs ",
                     link: "https://github.com/talebook/talebook/blob/master/document/README.zh_CN.md#%E5%A6%82%E6%9E%9C%E9%85%8D%E7%BD%AE%E8%B1%86%E7%93%A3%E6%8F%92%E4%BB%B6",
                 }
             ],
