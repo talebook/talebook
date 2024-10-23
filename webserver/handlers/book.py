@@ -433,9 +433,11 @@ class BookUpload(BaseHandler):
             mi.title = utils.super_strip(mi.title)
             mi.authors = [utils.super_strip(mi.author_sort)]
 
-        if fmt.lower() == "txt":
-            mi.title = name.replace(".txt", "")
+        # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
+        if fmt in ["txt", "pdf"]:
+            mi.title = name.replace("." + fmt, "")
             mi.authors = [_(u"佚名")]
+
         logging.info("upload mi.title = " + repr(mi.title))
         books = self.db.books_with_same_title(mi)
         if books:
