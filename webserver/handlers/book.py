@@ -534,6 +534,8 @@ class TxtRead(BaseHandler):
             else:
                 # 读取从起始位置到结束位置的内容
                 content = file.read(end - start)
+        if not content:
+            return {"err": "format error", "msg": "空文件"}
         encode = get_content_encoding(content)
         content = content.decode(encoding=encode, errors='ignore').replace("\r", "").replace("\n", "<br>")
         return {"err": "ok", "content": content}
