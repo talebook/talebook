@@ -52,6 +52,17 @@ chown -R talebook:talebook \
   /usr/lib/calibre \
   /usr/share/calibre
 
+# 检测权限
+TEST_WRITE_FILE=/data/books/library/test_writeable.txt
+date > $TEST_WRITE_FILE
+if [ $? -ne 0 ]; then
+    echo "目录权限异常，无法写入";
+    exit 1
+else
+    rm $TEST_WRITE_FILE
+fi
+
+
 # 判断是否启用SSR模式
 if [ "x$SSR" = "xON" ]; then
     ln -sf /etc/nginx/server-side-render.conf /etc/nginx/conf.d/talebook.conf
