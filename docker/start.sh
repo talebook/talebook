@@ -74,8 +74,14 @@ fi
 
 # 启动
 export PYTHONDONTWRITEBYTECODE=1
+echo "====== Sync DB Scheme ===="
 gosu talebook:talebook /var/www/talebook/server.py --syncdb
+
+echo
+echo "====== Update Server Config ===="
 gosu talebook:talebook /var/www/talebook/server.py --update-config
-service nginx restart
+
+echo
+echo "====== Start Server ===="
 exec /usr/bin/supervisord --nodaemon -u root -c /etc/supervisor/supervisord.conf
 

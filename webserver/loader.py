@@ -41,7 +41,6 @@ class SettingsLoader(dict):
 
             self.update(auto.settings)
         except:
-            logging.error(traceback.format_exc())
             pass
 
         try:

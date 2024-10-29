@@ -9,6 +9,7 @@ from gettext import gettext as _
 
 import tornado.httpserver
 import tornado.ioloop
+import tornado.log
 from social_tornado.models import init_social
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -28,6 +29,7 @@ define("path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary 
 define("with-library", default=CONF["with_library"], type=str, help=_("Path to the library folder"))
 define("syncdb", default=False, type=bool, help=_("Create all tables"))
 define("update-config", default=False, type=bool, help=_("update config when system upgrade"))
+define("logfile", default=os.environ.get('LOG_FILENAME', None), type=str, help=_("Path to logging"))
 
 
 def init_calibre():
@@ -214,8 +216,20 @@ def get_upload_size():
     return int(s) * n
 
 
+def setup_logging(log_filename=None):
+    logger = logging.getLogger()
+    logging.info("Init logging with [verbose = %s, filename=%s]" % (logger.level, log_filename))
+
+    if log_filename:
+        h = logging.handlers.RotatingFileHandler(log_filename, mode='a', maxBytes=100 * 1024 * 1024, backupCount=10)
+        h.setLevel(logger.level)
+        h.setFormatter(tornado.log.LogFormatter())
+        logger.addHandler(h)
+
+
 def main():
     tornado.options.parse_command_line()
+    setup_logging(options.logfile)
     app = make_app()
     http_server = tornado.httpserver.HTTPServer(app, xheaders=True, max_buffer_size=get_upload_size())
     http_server.listen(options.port, options.host)
