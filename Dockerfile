@@ -1,7 +1,7 @@
 
 # ----------------------------------------
 # 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
-FROM node:16-alpine as builder
+FROM node:16-alpine AS builder
 ARG BUILD_COUNTRY=""
 
 LABEL Author="Rex <talebook@foxmail.com>"
@@ -25,7 +25,7 @@ RUN npm run build
 
 # ----------------------------------------
 # 第二阶段，构建环境
-FROM talebook/calibre-docker as server
+FROM talebook/calibre-docker AS server
 ARG BUILD_COUNTRY=""
 
 # Set mirrors in china
@@ -68,7 +68,7 @@ RUN pip install -r /tmp/requirements.txt && \
 
 # ----------------------------------------
 # 测试阶段
-FROM server as test
+FROM server AS test
 RUN pip install flake8 pytest
 COPY webserver/ /var/www/talebook/webserver/
 COPY tests/ /var/www/talebook/tests/
@@ -77,7 +77,7 @@ CMD ["pytest", "/var/www/talebook/tests"]
 
 # ----------------------------------------
 # 生产环境
-FROM server as production
+FROM server AS production
 ARG GIT_VERSION=""
 
 # prepare dirs
