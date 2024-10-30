@@ -218,11 +218,11 @@ def get_upload_size():
 
 def setup_logging(log_filename=None):
     logger = logging.getLogger()
-    logging.info("Init logging with [verbose = %s, filename=%s]" % (logger.level, log_filename))
+    logging.info("Init logging with [%s]" % log_filename)
 
     if log_filename:
         h = logging.handlers.RotatingFileHandler(log_filename, mode='a', maxBytes=100 * 1024 * 1024, backupCount=10)
-        h.setLevel(logger.level)
+        h.setLevel(logging.DEBUG)
         h.setFormatter(tornado.log.LogFormatter())
         logger.addHandler(h)
 

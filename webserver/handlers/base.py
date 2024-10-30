@@ -99,7 +99,7 @@ class BaseHandler(web.RequestHandler):
             userid = self.current_user.id
             username = self.current_user.username
 
-        return "%s %s (%s) %d %s" % (
+        return '%s %s (%s) "%d %s"' % (
             self.request.method,
             self.request.uri,
             self.request.remote_ip,
