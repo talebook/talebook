@@ -20,12 +20,22 @@ if [ ! -d "/data/log" ]; then
   cp -rf /prebuilt/log /data/
 fi
 
+# 检查目录，拷贝并创建目录
 cd /prebuilt/books/;
 for f in *; do
   if [ -d "$f" -a ! -d "/data/books/$f" ]; then
-    cp -rf "/prebuilt/books/$f" /data/books/
+    cp -rvf "/prebuilt/books/$f" /data/books/
   fi
 done
+
+# 检查文件，并拷贝过去
+find . \( -path ./library -o -name '*.pyc' \) -prune -o -type f -print | while read f; do
+    target="/data/books/$f"
+    if [ ! -e "$target" ]; then
+        cp "$f" "$target"
+    fi
+done
+
 
 mkdir -p /root/.npm
 
@@ -74,6 +84,11 @@ fi
 
 # 启动
 export PYTHONDONTWRITEBYTECODE=1
+echo
+echo "====== Check config ===="
+nginx -t || exit 1
+
+echo
 echo "====== Sync DB Scheme ===="
 gosu talebook:talebook /var/www/talebook/server.py --syncdb
 
