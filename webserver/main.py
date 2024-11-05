@@ -29,7 +29,6 @@ define("path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary 
 define("with-library", default=CONF["with_library"], type=str, help=_("Path to the library folder"))
 define("syncdb", default=False, type=bool, help=_("Create all tables"))
 define("update-config", default=False, type=bool, help=_("update config when system upgrade"))
-define("logfile", default=os.environ.get('LOG_FILENAME', None), type=str, help=_("Path to logging"))
 
 
 def init_calibre():
@@ -126,11 +125,11 @@ def bind_topdir_book_names(cache):
 
 def make_app():
     auth_db_path = CONF["user_database"]
-    logging.info("Init library with [%s]" % options.with_library)
-    logging.info("Init AuthDB  with [%s]" % auth_db_path)
-    logging.info("Init Static  with [%s]" % CONF["resource_path"])
-    logging.info("Init HTML    with [%s]" % CONF["html_path"])
-    logging.info("Init Nuxtjs  with [%s]" % CONF["nuxt_env_path"])
+    logging.debug("Init library with [%s]" % options.with_library)
+    logging.debug("Init AuthDB  with [%s]" % auth_db_path)
+    logging.debug("Init Static  with [%s]" % CONF["resource_path"])
+    logging.debug("Init HTML    with [%s]" % CONF["html_path"])
+    logging.debug("Init Nuxtjs  with [%s]" % CONF["nuxt_env_path"])
 
     if options.update_config:
         logging.info("updating configs ...")
@@ -216,20 +215,19 @@ def get_upload_size():
     return int(s) * n
 
 
-def setup_logging(log_filename=None):
+def setup_logging():
+    # tornado 的 默认log 已在supervisor中配置为file了，这里再增加一个console的
+    # 创建控制台处理程序并设置格式
     logger = logging.getLogger()
-    logging.info("Init logging with [%s]" % log_filename)
-
-    if log_filename:
-        h = logging.handlers.RotatingFileHandler(log_filename, mode='a', maxBytes=100 * 1024 * 1024, backupCount=10)
-        h.setLevel(logging.DEBUG)
-        h.setFormatter(tornado.log.LogFormatter())
-        logger.addHandler(h)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(tornado.log.LogFormatter())
+    logger.addHandler(console_handler)
 
 
 def main():
     tornado.options.parse_command_line()
-    setup_logging(options.logfile)
+    setup_logging()
     app = make_app()
     http_server = tornado.httpserver.HTTPServer(app, xheaders=True, max_buffer_size=get_upload_size())
     http_server.listen(options.port, options.host)

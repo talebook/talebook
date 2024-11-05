@@ -120,9 +120,6 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     mv /data/* /prebuilt/ && \
     chmod +x /var/www/talebook/docker/start.sh
 
-# log level = info
-ENV LOG_FILENAME=/data/log/talebook.log
-
 EXPOSE 80 443
 
 VOLUME ["/data"]

@@ -438,6 +438,9 @@ class BookUpload(BaseHandler):
             mi.title = name.replace("." + fmt, "")
             mi.authors = [_(u"佚名")]
 
+        for k in dir(mi):
+            logging.debug('mi.%s = %s' % (k, getattr(mi, k)))
+
         logging.info("upload mi.title = " + repr(mi.title))
         books = self.db.books_with_same_title(mi)
         if books:
