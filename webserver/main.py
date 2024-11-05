@@ -219,10 +219,11 @@ def setup_logging():
     # tornado 的 默认log 已在supervisor中配置为file了，这里再增加一个console的
     # 创建控制台处理程序并设置格式
     logger = logging.getLogger()
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(tornado.log.LogFormatter())
-    logger.addHandler(console_handler)
+    if options.log_file_prefix:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(tornado.log.LogFormatter())
+        logger.addHandler(console_handler)
 
 
 def main():
