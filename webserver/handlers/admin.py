@@ -239,6 +239,7 @@ class AdminSettings(BaseHandler):
             "BOOK_NAV",
             "FRIENDS",
             "FOOTER",
+            "HEADER",
             "INVITE_CODE",
             "INVITE_MESSAGE",
             "INVITE_MODE",

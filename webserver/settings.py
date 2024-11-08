@@ -105,6 +105,7 @@ settings = {
     'ALLOW_GUEST_PUSH' : True,
     'ALLOW_GUEST_DOWNLOAD' : True,
     'ALLOW_REGISTER' : False,
+    'HEADER': '公告信息！',
     'FOOTER': '本站基于Calibre构建，感谢开源界的力量。所有资源搜集于互联网，如有侵权请邮件联系。',
 
     'FRIENDS': [
