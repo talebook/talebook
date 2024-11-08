@@ -4,6 +4,7 @@
         <app-header v-if="$store.state.nav"></app-header>
         <v-main>
             <v-container fluid>
+                <app-press v-if="$store.state.nav"></app-press>
                 <Nuxt/>
                 <app-footer v-if="$store.state.nav"></app-footer>
             </v-container>
@@ -35,6 +36,7 @@
 <script>
 import AppHeader from "~/components/AppHeader.vue"
 import AppFooter from "~/components/AppFooter.vue"
+import AppPress from "~/components/AppPress.vue"
 import Loading from "~/components/Loading.vue"
 import Upload from "~/components/Upload.vue"
 
@@ -43,6 +45,7 @@ export default {
     components: {
         AppHeader,
         AppFooter,
+        AppPress,
         Loading,
         Upload,
     },
