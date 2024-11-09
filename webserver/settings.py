@@ -13,7 +13,7 @@ settings = {
     "nuxt_env_path" : os.path.join(os.path.dirname(__file__), "../app/.env"),
     "html_path"     : os.path.join(os.path.dirname(__file__), "../app/dist"),
     "i18n_path"     : os.path.join(os.path.dirname(__file__), "i18n"),
-    "static_path"   : os.path.join(os.path.dirname(__file__), "../app/dist/static/"),
+    "static_path"   : os.path.join(os.path.dirname(__file__), "../app/dist"),
     "resource_path" : os.path.join(os.path.dirname(__file__), "resources"),
     "settings_path" : "/data/books/settings/",
     "progress_path" : "/data/books/progress/",
