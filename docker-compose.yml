@@ -15,8 +15,6 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Asia/Shanghai
-      # 调整为『SSR=ON』可开启「服务器端渲染」模式，对于搜索引擎更友好，同时更消耗服务器性能
-      - SSR=OFF
     depends_on:
       - douban-rs-api
 

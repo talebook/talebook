@@ -2,7 +2,6 @@
 
 PUID=${PUID:-0}
 PGID=${PGID:-0}
-SSR=${SSR:-OFF}
 
 groupmod -o -g "${PGID}" talebook
 usermod -o -u "${PUID}" talebook
@@ -57,7 +56,6 @@ chown -R talebook:talebook \
   /var/www/talebook/app/.env \
   /var/www/talebook/app/dist \
   /var/www/talebook/webserver \
-  /var/www/talebook/tools \
   /var/www/talebook/server.py \
   /usr/lib/calibre \
   /usr/share/calibre
@@ -70,16 +68,6 @@ if [ $? -ne 0 ]; then
     exit 1
 else
     rm $TEST_WRITE_FILE
-fi
-
-
-# 判断是否启用SSR模式
-if [ "x$SSR" = "xON" ]; then
-    ln -sf /etc/nginx/server-side-render.conf /etc/nginx/conf.d/talebook.conf
-    ln -sf /etc/supervisor/server-side-render.conf /etc/supervisor/conf.d/talebook.conf
-else
-    ln -sf /etc/nginx/talebook.conf /etc/nginx/conf.d/talebook.conf
-    ln -sf /etc/supervisor/talebook.conf /etc/supervisor/conf.d/talebook.conf
 fi
 
 # 启动
