@@ -513,7 +513,7 @@ class BookRead(BaseHandler):
 
             # epub_dir is for javascript
             epub_dir = "/get/extract/%s" % book["id"]
-            return self.html_page("book/read.html", {
+            return self.html_page("book/" + CONF["EPUB_VIEWER"], {
                 "book": book,
                 "epub_dir": epub_dir,
                 "is_ready": (fmt == 'epub'),
