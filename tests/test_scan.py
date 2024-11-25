@@ -63,7 +63,7 @@ class TestScan(TestWithUserLogin):
         self.assertEqual(n+1, threading.active_count())
 
         # wait job done
-        time.sleep(1)
+        time.sleep(2)
         q = ScanService().get_queue('do_scan')
         n = q.qsize()
         while n:

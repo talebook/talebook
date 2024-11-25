@@ -60,7 +60,7 @@ class DoubanBookApi(object):
             params["apikey"] = self.apikey
 
         try:
-            rsp = requests.get(url, headers=CHROME_HEADERS, params=params)
+            rsp = requests.get(url, timeout=10, headers=CHROME_HEADERS, params=params)
         except Exception as e:
             logging.error("豆瓣接口异常: request fail, err=%s", str(e))
             return None

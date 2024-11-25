@@ -121,7 +121,7 @@ class BookRefer(BaseHandler):
             try:
                 return api.get_book(title)
             except:
-                return {"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")}
+                raise RuntimeError({"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")})
 
         if provider_key == douban.KEY:
             mi.douban_id = provider_value
@@ -134,8 +134,8 @@ class BookRefer(BaseHandler):
             try:
                 return api.get_book(mi)
             except:
-                return {"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")}
-        return {"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")}
+                raise RuntimeError({"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")})
+        raise RuntimeError({"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")})
 
     @js
     @auth
@@ -186,7 +186,14 @@ class BookRefer(BaseHandler):
         if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
             return {"err": "user.no_permission", "msg": _(u"无权限")}
 
-        refer_mi = self.plugin_get_book_meta(provider_key, provider_value, mi)
+        try:
+            refer_mi = self.plugin_get_book_meta(provider_key, provider_value, mi)
+        except RuntimeError as e:
+            return e.args[0]
+
+        if not refer_mi:
+            return {"err": "plugin.fail", "msg": _(u"插件拉取信息异常，请重试")}
+
         if only_cover == "yes":
             # just set cover
             mi.cover_data = refer_mi.cover_data
@@ -506,7 +513,7 @@ class BookRead(BaseHandler):
 
             # epub_dir is for javascript
             epub_dir = "/get/extract/%s" % book["id"]
-            return self.html_page("book/read.html", {
+            return self.html_page("book/" + CONF["EPUB_VIEWER"], {
                 "book": book,
                 "epub_dir": epub_dir,
                 "is_ready": (fmt == 'epub'),

@@ -4,12 +4,16 @@ VER := $(shell git branch --show-current)
 IMAGE := talebook/talebook:$(VER)
 REPO1 := talebook/talebook:latest
 REPO2 := talebook/calibre-webserver:latest
+TAG1 := talebook/talebook:server-side-render
+TAG2 := talebook/talebook:server-side-render-$(VER)
 
 all: build up
 
 build: test
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
-		-f Dockerfile -t $(IMAGE) -t $(REPO1) -t $(REPO2) .
+		-f Dockerfile -t $(IMAGE) -t $(REPO1) --target production -t $(REPO2) .
+	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
+		-f Dockerfile -t $(TAG1) -t $(TAG2) --target production-ssr .
 
 push:
 	docker push $(IMAGE)
@@ -37,7 +41,7 @@ testvv: testv
 	cd ".htmlcov" && python3 -m http.server 7777
 
 up:
-	docker-compose up
+	docker compose up
 
 down:
-	docker-compose stop
+	docker compose stop

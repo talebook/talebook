@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title></title>
+    <base href="{{RES}}/static/epubreader/" />
+
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+	<meta http-equiv="Permissions-Policy" content="interest-cohort=()">
+	<meta name="description" content="">
+	<meta name="viewport" content="width=device-width, user-scalable=no">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+
+	<link rel="icon" type="image/png" href="{{IMG}}/get/thumb_144_144/{{book.id}}.png?t={{book.timestamp}}">
+	<link rel="stylesheet" href="css/main.css">
+
+	<!-- Libs -->
+	<script src="js/libs/jszip.min.js"></script>
+	<script src="js/libs/md5.min.js"></script>
+	<script src="js/libs/epub.min.js"></script>
+
+	<!-- Reader -->
+	<script type="module">
+		import { Reader } from "./js/epubreader.min.js"
+        const path = "{{RES}}{{epub_dir}}/";
+        window.onload = (e) => new Reader(path, { openbook: false, annotations: false });
+	</script>
+</head>
+
+<body>
+</body>
+
+</html>

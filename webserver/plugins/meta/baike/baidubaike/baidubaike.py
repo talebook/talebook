@@ -39,7 +39,7 @@ class Page(object):
         else:
             payload = {"pic": 1, "enc": encoding, "word": string}
 
-        self.http = requests.get(url, headers=CHROME_HEADERS, params=payload)
+        self.http = requests.get(url, timeout=10, headers=CHROME_HEADERS, params=payload)
         self.html = self.http.text
         self.soup = BeautifulSoup(self.html, "lxml")
 
@@ -165,7 +165,7 @@ class Search(object):
             "word": word,
         }
 
-        self.http = requests.get(url, headers=CHROME_HEADERS, params=payload)
+        self.http = requests.get(url, timeout=10, headers=CHROME_HEADERS, params=payload)
         self.html = self.http.content
         self.soup = BeautifulSoup(self.html)
 
