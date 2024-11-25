@@ -10,7 +10,6 @@ import urllib
 from gettext import gettext as _
 
 import tornado.escape
-import tornado.gen
 from tornado import web
 
 from webserver import loader, utils
@@ -80,7 +79,6 @@ class BookRefer(BaseHandler):
                 return True
         return False
 
-    @tornado.gen.coroutine
     def plugin_search_books(self, mi):
         title = re.sub(u"[(（].*", "", mi.title)
         api = douban.DoubanBookApi(
@@ -116,7 +114,6 @@ class BookRefer(BaseHandler):
             books.append(book)
         return books
 
-    @tornado.gen.coroutine
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
         if provider_key == baike.KEY:
             title = re.sub(u"[(（].*", "", mi.title)
