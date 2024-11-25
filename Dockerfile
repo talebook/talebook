@@ -37,7 +37,7 @@ RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
 
 # install envsubst gosu procps
 RUN apt-get update -y && \
-    apt-get install -y gettext gosu procps && \
+    apt-get install -y gettext gosu procps vim && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
