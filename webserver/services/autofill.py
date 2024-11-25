@@ -6,6 +6,8 @@ import re
 import time
 from gettext import gettext as _
 
+import tornado.gen
+
 from webserver import loader
 from webserver.plugins.meta import baike, douban
 from webserver.services import AsyncService
@@ -98,6 +100,7 @@ class AutoFillService(AsyncService):
                 break
         return ts
 
+    @tornado.gen.coroutine
     def plugin_search_best_book_info(self, mi):
         title = re.sub("[(（].*", "", mi.title)
         api = douban.DoubanBookApi(
