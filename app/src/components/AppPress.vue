@@ -4,7 +4,7 @@
         <v-col cols=12>
             <v-alert outlined colored-border dismissible @input="close"
                border="left" color="deep-purple accent-4" type="info">
-                {{press_message}}
+                <div v-html="press_message"></div>
             </v-alert>
         </v-col>
     </v-row>
