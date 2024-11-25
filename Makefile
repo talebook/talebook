@@ -41,7 +41,7 @@ testvv: testv
 	cd ".htmlcov" && python3 -m http.server 7777
 
 up:
-	docker-compose up
+	docker compose up
 
 down:
-	docker-compose stop
+	docker compose stop
