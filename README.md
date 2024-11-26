@@ -16,7 +16,7 @@ A better online books library management website built on Calibre + Vue
 这是一个基于Calibre的简单的个人图书管理系统，支持**在线阅读**。主要特点是：
 * 美观的界面：由于Calibre自带的网页太丑太难用，于是基于Vue，独立编写了新的界面，支持PC访问和手机浏览；
 * 支持多用户：为了网友们更方便使用，开发了多用户功能，支持~~豆瓣~~（已废弃）、QQ、微博、Github等社交网站的登录；
-* 支持在线阅读：借助[Readium.js](https://github.com/readium/readium-js-viewer) 库，支持了网页在线阅读电子书；
+* 支持在线阅读：借助[epub.js](https://github.com/intity/epubreader-js) 库，支持了网页在线阅读电子书（章评功能开发中）；
 * 支持批量扫描导入书籍；
 * 支持邮件推送：可方便推送到Kindle；
 * 支持OPDS：可使用[KyBooks](http://kybook-reader.com/)等APP方便地读书；
