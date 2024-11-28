@@ -24,7 +24,7 @@
 	<script type="module">
 		import { Reader } from "./js/epubreader.min.js"
         const path = "{{RES}}{{epub_dir}}/";
-        window.onload = (e) => new Reader(path, { openbook: false, annotations: false });
+        window.onload = (e) => new Reader(path, { openbook: false, annotations: false, arrows: "content" });
 	</script>
 </head>
 
