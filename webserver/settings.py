@@ -113,7 +113,7 @@ settings = {
         { "text": u"鸠摩搜索", "href": "https://www.jiumodiary.com/" },
         { "text": u"追更神器", "href": "https://github.com/hectorqin/reader" },
         { "text": u"苦瓜书盘", "href": "https://www.kgbook.com" },
-        { "text": u"爱悦读", "href": "https://www.iyd.wang/" }
+        { "text": u"爱悦读", "href": "https://www.iyd.wang/" },
         { "text": u"moe漫画", "href": "https://mox.moe/" },
         { "text": u"雅书",   "href": "https://yabook.blog/" },
     ],
