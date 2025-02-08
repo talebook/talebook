@@ -62,7 +62,7 @@ class UserUpdate(BaseHandler):
             nickname = nickname.strip()
             if len(nickname) > 0:
                 if len(nickname) < 3:
-                    return {"err": "params.nickname.invald", "msg": _(u"昵称无效")}
+                    return {"err": "params.nickname.invalid", "msg": _(u"昵称无效")}
                 user.name = nickname
 
         p0 = data.get("password0", "").strip()
