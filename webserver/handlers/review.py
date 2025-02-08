@@ -37,7 +37,7 @@ class ReviewSummary(BaseHandler):
         q = q.filter(ReviewChapter.book_id == book_id)
         q = q.filter(or_(ReviewChapter.title == name, ReviewChapter.alias == chapter_name))
         chapter = q.first()
-        if chapter == None:
+        if chapter is None:
             return {"err": "ok", "data": {"list": []}}
 
         # 查询评论数量
@@ -134,7 +134,7 @@ class ReviewAdd(BaseHandler):
         chapter = q.first()
 
         if chapter is None:
-            chapter = ReviewChapter(book_id = book_id, title = name, alias = chapter_name)
+            chapter = ReviewChapter(book_id=book_id, title=name, alias=chapter_name)
             chapter.save()
 
         n = (
@@ -146,7 +146,6 @@ class ReviewAdd(BaseHandler):
             )
             .count()
         )
-
 
         review = Review(**data)
         review.level = n + 1

@@ -11,7 +11,7 @@ import re
 from gettext import gettext as _
 
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, BigInteger
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import relationship, declarative_base
 
@@ -342,10 +342,11 @@ class ReviewChapter(Base, SQLAlchemyMixin):
 
     @staticmethod
     def clean_title(title):
-        s = title.replace("\u3000", " ") # 替换全角空格
-        s = re.sub("\s\s*", " ", s) # 多个空格合并为一个
-        s = re.sub("[（（【].*[】））]", "", s) # 删掉括号里的内容
+        s = title.replace("\u3000", " ")  # 替换全角空格
+        s = re.sub(r"\s\s*", " ", s)  # 多个空格合并为一个
+        s = re.sub("[（（【].*[】））]", "", s)  # 删掉括号里的内容
         return s
+
 
 class Review(Base, SQLAlchemyMixin):
     __tablename__ = "reviews"
