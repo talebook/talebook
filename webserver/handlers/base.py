@@ -58,6 +58,7 @@ def js(func):
             rsp = {"err": "exception", "msg": msg}
             if isinstance(e, web.Finish):
                 rsp = ""
+        self.prepare_headers()
         self.set_header("Cache-Control", "max-age=0")
         self.write(rsp)
         self.finish()
@@ -177,12 +178,15 @@ class BaseHandler(web.RequestHandler):
             self.api_url = self.request.protocol + "://" + host
             self.cdn_url = self.request.protocol + "://" + CONF["static_host"]
 
-    def prepare(self):
+    def prepare_headers(self):
         origin = self.request.headers.get("origin", "*")
         self.set_header("Access-Control-Allow-Origin", origin)
         self.set_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE')
         self.set_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         self.set_header("Access-Control-Allow-Credentials", "true")
+
+    def prepare(self):
+        self.prepare_headers()
         self.set_hosts()
         self.set_i18n()
         self.process_auth_header()
