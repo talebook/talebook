@@ -3,6 +3,13 @@
     <v-card-title>
       <h3 class="text-center">用户设置</h3>
     </v-card-title>
+    <v-divider></v-divider>
+
+    <v-list density="compact" class="mr-4">
+      <v-list-item :title="user.email" subtitle="邮箱">
+      </v-list-item>
+    </v-list>
+
 
     <v-divider></v-divider>
     <v-list v-if="messages.length == 0" density="compact" class="mr-4">
@@ -41,6 +48,9 @@ export default {
   },
   props: ['messages'],
   data: () => ({
+    user: {
+      email: 'admin@qq.com'
+    }
   })
 }
 

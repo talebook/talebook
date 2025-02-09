@@ -44,8 +44,8 @@
       <book-toc :meta="book_meta" :toc_items="toc_items" @click:select="on_click_toc"></book-toc>
     </v-bottom-sheet>
 
-    <v-bottom-sheet class="fixed mb-14" max-height="90%" v-model="menu.panels.more" contained persistent z-index="234">
-      <guest v-if="!is_login"></guest>
+    <v-bottom-sheet inset class="fixed mb-14" max-height="90%" v-model="menu.panels.more" contained persistent z-index="234">
+      <guest v-if="!is_login" :server="this.server"></guest>
       <user v-else :messages="comments"></user>
     </v-bottom-sheet>
 
@@ -625,7 +625,11 @@ export default {
   mounted: function () {
     const url = this.server + `/api/review/me?count=true`;
     fetch(url, { mode: "cors", credentials: "include" }).then(rsp => rsp.json()).then(rsp => {
-      this.unread_count = rsp.data.count;
+      if (rsp.err == "user.need_login") {
+        this.is_login = false;
+      } else if (rsp.err == "ok") {
+        this.unread_count = rsp.data.count;
+      }
     })
 
     this.book = ePub(this.book_url);
