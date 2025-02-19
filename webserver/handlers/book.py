@@ -448,22 +448,28 @@ class BookUpload(BaseHandler):
         logging.info("upload mi.title = " + repr(mi.title))
         books = self.db.books_with_same_title(mi)
         if books:
-            book_id = books.pop()
-            return {
-                "err": "samebook",
-                "msg": _(u"已存在同名书籍《%s》") % mi.title,
-                "book_id": book_id,
-            }
-
-        fpaths = [fpath]
-        book_id = self.db.import_book(mi, fpaths)
-        self.user_history("upload_history", {"id": book_id, "title": mi.title})
+            book_id = None
+            for b in self.db.get_data_as_dict(ids=books):
+                if book_id is None:
+                    book_id = b.get("id")
+                if fmt.upper() in b.get("available_formats", ""):
+                    return {
+                        "err": "samebook",
+                        "msg": _(u"同名书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
+                        "book_id": b.get("id")
+                    }
+            logging.info(
+                "import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
+            self.db.add_format(book_id, fmt.upper(), fpath, True)
+        else:
+            fpaths = [fpath]
+            book_id = self.db.import_book(mi, fpaths)
+            self.user_history("upload_history", {"id": book_id, "title": mi.title})
+            item = Item()
+            item.book_id = book_id
+            item.collector_id = self.user_id()
+            item.save()
         self.add_msg("success", _(u"导入书籍成功！"))
-        item = Item()
-        item.book_id = book_id
-        item.collector_id = self.user_id()
-        item.save()
-
         AutoFillService().auto_fill(book_id)
         return {"err": "ok", "book_id": book_id}
 
