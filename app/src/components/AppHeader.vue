@@ -12,7 +12,7 @@
                                 <v-icon class="pa-0 ma-0">{{ item.icon }}</v-icon>
                             </v-list-item-action>
                             <v-list-item-content>
-                                <v-list-item-title v-text="item.text"> 管理员 </v-list-item-title>
+                                <v-list-item-title v-text="item.text"></v-list-item-title>
                             </v-list-item-content>
                         </template>
 
@@ -268,7 +268,7 @@ export default {
                 { heading: "系统" },
                 { icon: "mdi-history", text: "系统版本", href: "", count: this.sys.version },
                 { icon: "mdi-human", text: "用户数", href: "", count: this.sys.users },
-                { icon: "mdi-cellphone", text: "OPDS接口", href: "/opds/", count: "OPDS", target: "_blank" },
+                { icon: "mdi-cellphone", text: "OPDS介绍", href: "/opds-readme", count: "OPDS", target: "_blank" },
             ];
 
             return home_links
