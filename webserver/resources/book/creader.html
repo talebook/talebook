@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>秉烛夜读</title>
+
+  <base href="{{RES}}/static/candle-reader/" />
+
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="anonymous">
+  <link rel="preload" as="style" onload="this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap">
+  <link rel="stylesheet" crossorigin href="style.css">
+
+  <script src="js/epub-v0.3.88.js"></script>
+  <script  type="module">
+    import { Reader } from "./candle-reader.es.js"
+    new Reader('#app', {
+      debug: false,
+      server: 'http://localhost:5002',
+      themes_css: "{{RES}}/static/candle-reader/css/themes.css",
+      book_url: "{{RES}}{{epub_dir}}/",
+      display: "",
+    })
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+</body>
+</html>
