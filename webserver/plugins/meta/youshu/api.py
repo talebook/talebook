@@ -151,11 +151,18 @@ class YoushuApi:
         self.searcher = YoushuSearch()
 
     def get_book(self, title):
-        page = self.searcher.search(title)
+        page = self._youshu(title)
         if not page:
             return None
 
         return self._metadata(page)
+
+    def _youshu(self, title):
+        try:
+            return self.searcher.search(title)
+        except Exception as err:
+            logging.error(_(f"优书网接口异常: {err}"))
+            return None
 
     def _metadata(self, page):
         from calibre.ebooks.metadata.book.base import Metadata
