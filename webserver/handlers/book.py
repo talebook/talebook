@@ -19,7 +19,7 @@ from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.models import Item
-from webserver.plugins.meta import baike, douban
+from webserver.plugins.meta import baike, douban, youshu
 from webserver.plugins.parser.txt import get_content_encoding
 
 CONF = loader.get_settings()
@@ -112,6 +112,15 @@ class BookRefer(BaseHandler):
             return {"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")}
         if book:
             books.append(book)
+
+        api = youshu.YoushuApi(copy_image=True)
+        try:
+            book = api.get_book(title)
+        except:
+            return {"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")}
+        if book:
+            books.append(book)
+
         return books
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
@@ -135,6 +144,14 @@ class BookRefer(BaseHandler):
                 return api.get_book(mi)
             except:
                 raise RuntimeError({"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")})
+            
+        if provider_key == youshu.KEY:
+            title = re.sub(u"[(（].*", "", mi.title)
+            api = youshu.YoushuApi(copy_image=True)
+            try:
+                return api.get_book(title)
+            except:
+                raise RuntimeError({"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")})
         raise RuntimeError({"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")})
 
     @js
