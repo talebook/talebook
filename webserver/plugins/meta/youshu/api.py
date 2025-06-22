@@ -30,27 +30,27 @@ class YoushuPage:
         self.url = url
         self.http = self._request(url)
         self.soup = BeautifulSoup(self.http.text, 'html.parser')
-        
+
     def _request(self, url):
         try:
             return requests.get(url, timeout=10, headers=CHROME_HEADERS)
         except Exception as err:
             logging.error(_(f"优书网请求异常: {err}"))
             raise
-    
+
     def get_info(self):
         """
         extract book title and author from page
         """
         info = {"title": "", "author": ""}
-        
+
         # 提取书名和作者
         title = self.soup.find('span', style="font-size:20px;font-weight:bold;color:#f27622;").text
         author = self.soup.select_one('a:not([class])[href*="authorarticle.php"]').text
         info["title"] = title
         info["author"] = author
         return info
-    
+
     def get_summary(self):
         """
         extract book summary
@@ -59,7 +59,7 @@ class YoushuPage:
         if summary_div:
             return summary_div.text.strip()
         return ""
-    
+
     def get_image(self):
         """
         extract book cover image
@@ -70,7 +70,7 @@ class YoushuPage:
             url = re.sub(r'/300$', '/600', href)
             return url
         return None
-    
+
     def get_id(self):
         """
         extract book id
@@ -89,7 +89,7 @@ class YoushuPage:
             tags.append(tag.get_text(strip=True))
 
         return tags
-    
+
     def get_plat(self):
         """
         extract book source site
@@ -111,24 +111,25 @@ class YoushuPage:
 
         return 0
 
+
 class YoushuSearch:
     """
     search books on youshu.me
     """
     def __init__(self):
         self.search_url = "https://www.youshu.me/modules/article/search.php"
-    
+
     def search(self, keyword):
         payload = {
             "searchtype": "all",
             "searchkey": keyword,
             "t_btnsearch": ""
         }
-        
+
         try:
             response = requests.post(self.search_url, data=payload, headers=CHROME_HEADERS, timeout=10)
             soup = BeautifulSoup(response.text, 'html.parser')
-            
+
             # check if multiple results
             if "搜索关键词" in response.text:
                 # multiple results, redirect to first result
@@ -199,7 +200,7 @@ class YoushuApi:
         except Exception as err:
             logging.error(_(f"获取封面图片异常: {err}"))
             return None
-        
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

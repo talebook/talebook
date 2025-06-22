@@ -144,7 +144,7 @@ class BookRefer(BaseHandler):
                 return api.get_book(mi)
             except:
                 raise RuntimeError({"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")})
-            
+
         if provider_key == youshu.KEY:
             title = re.sub(u"[(（].*", "", mi.title)
             api = youshu.YoushuApi(copy_image=True)
