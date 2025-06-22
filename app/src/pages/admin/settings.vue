@@ -226,6 +226,9 @@ export default {
                 { icon: "info", key: "BOOK_NAMES_FORMAT", label: "目录和文件名模式", type: 'select',
                     items: [{text: "使用拼音字母目录名 (兼容性高)", value: "en"}, {text: "使用中文目录名 (UTF8编码，更美观)", value: "utf8"} ]
                 },
+                { icon: "info", key: "EPUB_VIEWER", label: "EPUB阅读器", type: 'select',
+                    items: [{text: "Epub Reader（旧版）", value: "epubjs.html"}, {text: "Candle Reader（Beta版，支持章评功能）", value: "creader.html"} ]
+                },
                 { icon: "info", key: "avatar_service", label: "可使用www.gravatar.com或cravatar.cn头像服务" },
                 { icon: "info", key: "MAX_UPLOAD_SIZE", label: "文件上传字节数限制(例如100MB或100KB）" },
                 { icon: "lock", key: "cookie_secret", label: "COOKIE随机密钥" },
