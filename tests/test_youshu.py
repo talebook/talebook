@@ -36,7 +36,9 @@ def get_mock_page():
     p.get_info.return_value = YOUSHU_DATA['info']
     p.get_image.return_value = YOUSHU_DATA['image']
     p.get_summary.return_value = YOUSHU_DATA['summary']
+    p.get_plat.return_value = '优书网'
     p.http.url = YOUSHU_DATA['info']['url']
+    p.url = YOUSHU_DATA['info']['url']
     return p
 
 YOUSHU_PAGE = get_mock_page()
