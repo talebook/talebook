@@ -52,6 +52,7 @@ settings = {
     # 100MB, tornado default max_buffer_size value
     "MAX_UPLOAD_SIZE": "100MB",
 
+    "CANDLE_READER_SERVER": "https://brs.talebook.org",
     "EPUB_VIEWER": "creader.html",
     "PDF_VIEWER": "/static/pdfjs/web/viewer.html?file=%(pdf_url)s",
 

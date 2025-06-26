@@ -540,6 +540,7 @@ class BookRead(BaseHandler):
                 "book": book,
                 "epub_dir": epub_dir,
                 "is_ready": (fmt == 'epub'),
+                "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
             })
         raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍"))
 
