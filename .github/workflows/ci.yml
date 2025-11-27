@@ -41,11 +41,7 @@ jobs:
 
       - name: Run tests with pytest
         run: |
-          pytest ./tests -v
-
-      - name: Run tests with coverage
-        run: |
-          pytest ./tests --cov=webserver --cov-report=term-missing
+          pytest ./tests -v --cov=webserver --cov-report=term-missing
 
   test-ui:
     runs-on: ubuntu-latest
@@ -55,13 +51,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '16'
-          cache: 'npm'
-          cache-dependency-path: app/package-lock.json
 
       - name: Install dependencies
         run: |
