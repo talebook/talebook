@@ -47,6 +47,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=master,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
 
       - name: Prepare build args
         id: prep
@@ -71,4 +77,5 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.tags }}
             ${{ env.REGISTRY }}/talebook/calibre-webserver:latest
+            ${{ env.REGISTRY }}/talebook/calibre-webserver:master
           build-args: ${{ steps.prep.outputs.build_args }}
