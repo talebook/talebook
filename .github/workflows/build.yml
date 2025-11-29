@@ -54,7 +54,7 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=sha,prefix=sha-
 
       - name: Prepare build args
         id: prep
@@ -78,3 +78,4 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY }}/talebook/talebook:latest
           cache-to: type=inline,mode=max
           provenance: false
+          outputs: type=image,push=${{ github.event_name != 'pull_request' }}
