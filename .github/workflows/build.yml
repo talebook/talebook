@@ -46,15 +46,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-            ${{ env.REGISTRY }}/talebook/calibre-webserver
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=sha-
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Prepare build args
         id: prep
@@ -73,9 +65,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          build-args: ${{ steps.prep.outputs.build_args }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/talebook/talebook:latest
           cache-to: type=inline,mode=max
           provenance: false
-          outputs: type=image,push=${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ env.REGISTRY }}/talebook/calibre-webserver:latest
+          build-args: ${{ steps.prep.outputs.build_args }}
