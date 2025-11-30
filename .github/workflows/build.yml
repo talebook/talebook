@@ -76,6 +76,6 @@ jobs:
           provenance: false
           tags: |
             ${{ steps.meta.outputs.tags }}
-            ${{ env.REGISTRY }}/talebook/calibre-webserver:latest
-            ${{ env.REGISTRY }}/talebook/calibre-webserver:master
+            ${{ github.repository == 'talebook/talebook' && format('{0}/talebook/calibre-webserver:latest', env.REGISTRY) || '' }}
+            ${{ github.repository == 'talebook/talebook' && format('{0}/talebook/calibre-webserver:master', env.REGISTRY) || '' }}
           build-args: ${{ steps.prep.outputs.build_args }}
