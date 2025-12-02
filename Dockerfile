@@ -1,8 +1,8 @@
-
 # ----------------------------------------
 # 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
 FROM node:16-alpine AS builder
 ARG BUILD_COUNTRY=""
+ARG TARGETARCH
 
 WORKDIR /build
 RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
@@ -25,14 +25,26 @@ RUN cp -r dist nuxt.config.js package* /app-static/
 
 # ----------------------------------------
 # 第二阶段，构建环境
-FROM talebook/calibre-docker AS server
+FROM hehetoshang/calibre-docker AS server
 ARG BUILD_COUNTRY=""
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+# 根据目标架构选择合适的基础镜像（备选方案）
+# FROM --platform=$BUILDPLATFORM talebook/calibre-docker AS server
 
 # Set mirrors in china
 RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
     echo "using repo mirrors for ${BUILD_COUNTRY}"; \
     sed 's@deb.debian.org/debian@mirrors.aliyun.com/debian@' -i /etc/apt/sources.list; \
     pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/; \
+    fi
+
+# 针对 ARM32 架构的特殊处理
+RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+    echo "Building for ARM32 (ARMv7) architecture"; \
+    # 确保使用兼容的包架构
+    dpkg --add-architecture armhf || true; \
     fi
 
 # install envsubst gosu procps
@@ -66,6 +78,8 @@ CMD ["pytest", "/var/www/talebook/tests"]
 # 生产环境
 FROM server AS production
 ARG GIT_VERSION=""
+ARG TARGETARCH
+ARG TARGETVARIANT
 
 LABEL Author="Rex <talebook@foxmail.com>"
 LABEL Thanks="oldiy <oldiy2018@gmail.com>"
@@ -75,6 +89,9 @@ ENV TZ=Asia/Shanghai
 ENV LANG=C.UTF-8
 ENV PUID=1000
 ENV PGID=1000
+
+# 架构信息（用于调试）
+RUN echo "Target architecture: $TARGETARCH$TARGETVARIANT" > /arch-info.txt
 
 # prepare dirs
 RUN mkdir -p /data/log/nginx/ && \
@@ -102,6 +119,7 @@ COPY --from=builder /app-static/dist/logo/ /data/books/logo/
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     cd /var/www/talebook/ && \
     echo "VERSION = \"$GIT_VERSION\"" > webserver/version.py && \
+    echo "ARCH = \"$TARGETARCH$TARGETVARIANT\"" >> webserver/version.py && \
     echo 'settings = {}' > /data/books/settings/auto.py && \
     chmod a+w /data/books/settings/auto.py && \
     calibredb add --library-path=/data/books/library/ -r docker/book/ && \
@@ -128,8 +146,19 @@ FROM production AS production-ssr
 
 # intall nodejs for nuxtjs server side render
 RUN apt-get update -y && \
-    curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs && \
+    # 根据架构选择合适的 NodeSource 脚本
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
+    elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+        # ARM32 使用 Node.js 的官方二进制分发
+        ARCH=armv7l; \
+        curl -fsSL https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-${ARCH}.tar.xz | tar -xJ -C /usr/local --strip-components=1; \
+    fi && \
+    if [ "$TARGETARCH" != "arm" ] || [ "$TARGETVARIANT" != "v7" ]; then \
+        apt-get install -y nodejs; \
+    fi && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -137,4 +166,3 @@ RUN apt-get update -y && \
 COPY conf/nginx/server-side-render.conf /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/server-side-render.conf /etc/supervisor/conf.d/talebook.conf
 COPY --from=builder /app-ssr/ /var/www/talebook/app/
-
