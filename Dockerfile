@@ -53,10 +53,12 @@ RUN apt-get update -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Create a talebook user and change the Nginx startup user
-RUN useradd -u 911 -U -d /var/www/talebook -s /bin/false talebook && \
+# Create a talebook user and change the Nginx startup user if it doesn't exist
+RUN if ! id -u talebook > /dev/null 2>&1; then \
+    useradd -u 911 -U -d /var/www/talebook -s /bin/false talebook && \
     usermod -G users talebook && \
-    groupmod -g 911 talebook && \
+    groupmod -g 911 talebook; \
+fi && \
     sed -i "s/user www-data;/user talebook;/g" /etc/nginx/nginx.conf
 
 # install python packages
