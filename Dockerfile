@@ -30,14 +30,13 @@ ARG BUILD_COUNTRY=""
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-# 根据目标架构选择合适的基础镜像（备选方案）
-# FROM --platform=$BUILDPLATFORM talebook/calibre-docker AS server
-
-# Set mirrors in china
-RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
-    echo "using repo mirrors for ${BUILD_COUNTRY}"; \
-    sed 's@deb.debian.org/debian@mirrors.aliyun.com/debian@' -i /etc/apt/sources.list; \
-    pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/; \
+# 修复 apt 目录权限并设置镜像
+RUN mkdir -p /var/lib/apt/lists/partial && \
+    chmod -R 0755 /var/lib/apt/lists/ && \
+    if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
+        echo "using repo mirrors for ${BUILD_COUNTRY}"; \
+        sed 's@deb.debian.org/debian@mirrors.aliyun.com/debian@' -i /etc/apt/sources.list; \
+        pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/; \
     fi
 
 # 针对 ARM32 架构的特殊处理
@@ -144,21 +143,24 @@ CMD ["/var/www/talebook/docker/start.sh"]
 # 生产环境（server side render版)
 FROM production AS production-ssr
 
-# intall nodejs for nuxtjs server side render
-RUN apt-get update -y && \
+# 修复 apt 目录权限并安装 nodejs
+RUN mkdir -p /var/lib/apt/lists/partial && \
+    chmod -R 0755 /var/lib/apt/lists/ && \
+    apt-get update -y && \
     # 根据架构选择合适的 NodeSource 脚本
     if [ "$TARGETARCH" = "amd64" ]; then \
         curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
     elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
         # ARM32 使用 Node.js 的官方二进制分发
-        ARCH=armv7l; \
-        curl -fsSL https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-${ARCH}.tar.xz | tar -xJ -C /usr/local --strip-components=1; \
+        #ARCH=armv7l; \
+        #curl -fsSL https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-${ARCH}.tar.xz | tar -xJ -C /usr/local --strip-components=1; \
     fi && \
-    if [ "$TARGETARCH" != "arm" ] || [ "$TARGETVARIANT" != "v7" ]; then \
-        apt-get install -y nodejs; \
-    fi && \
+    #if [ "$TARGETARCH" != "arm" ] || [ "$TARGETVARIANT" != "v7" ]; then \
+    apt-get install -y nodejs && \
+    #fi && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
