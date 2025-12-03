@@ -31,6 +31,7 @@ ARG TARGETARCH
 ARG TARGETVARIANT
 
 # 修复 apt 目录权限并设置镜像
+USER root
 RUN mkdir -p /var/lib/apt/lists/partial && \
     chmod -R 0755 /var/lib/apt/lists/ && \
     if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
@@ -144,6 +145,7 @@ CMD ["/var/www/talebook/docker/start.sh"]
 FROM production AS production-ssr
 
 # 修复 apt 目录权限并安装 nodejs
+USER root
 RUN mkdir -p /var/lib/apt/lists/partial && \
     chmod -R 0755 /var/lib/apt/lists/ && \
     apt-get update -y && \
