@@ -30,7 +30,6 @@ ARG BUILD_COUNTRY=""
 ARG TARGETARCH
 ARG TARGETVARIANT
 
-# 修复 apt 目录权限并设置镜像
 USER root
 RUN mkdir -p /var/lib/apt/lists/partial && \
     chmod -R 0755 /var/lib/apt/lists/ && \
@@ -146,25 +145,18 @@ CMD ["/var/www/talebook/docker/start.sh"]
 # 生产环境（server side render版)
 FROM production AS production-ssr
 
-# 修复 apt 目录权限并安装 nodejs
 USER root
 RUN mkdir -p /var/lib/apt/lists/partial && \
     chmod -R 0755 /var/lib/apt/lists/ && \
     apt-get update -y && \
-    # 根据架构选择合适的 NodeSource 脚本
     if [ "$TARGETARCH" = "amd64" ]; then \
         curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
     elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
         curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
-        # ARM32 使用 Node.js 的官方二进制分发
-        #ARCH=armv7l; \
-        #curl -fsSL https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-${ARCH}.tar.xz | tar -xJ -C /usr/local --strip-components=1; \
     fi && \
-    #if [ "$TARGETARCH" != "arm" ] || [ "$TARGETVARIANT" != "v7" ]; then \
     apt-get install -y nodejs && \
-    #fi && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
