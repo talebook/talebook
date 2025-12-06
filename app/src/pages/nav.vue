@@ -1,15 +1,28 @@
 <template>
-    <v-row>
-        <template v-for="nav in navs">
-        <v-col cols=12 :key="nav.legend">
-            <h2>{{nav.legend}}</h2>
-            <v-btn rounded small class="ma-1" v-for="item in nav.tags" :to="'/tag/'+encodeURIComponent(item.name)" :key="item.name" outlined :color="item.count != 0 ? 'primary': 'grey'" >
-                {{item.name}}
-                <span v-if="item.count">&nbsp;({{item.count}})</span>
-            </v-btn>
-        </v-col>
-        </template>
-    </v-row>
+    <div>
+        <v-row>
+            <template v-for="nav in navs">
+            <v-col cols=12 :key="nav.legend">
+                <h2>{{nav.legend}}</h2>
+                <v-btn rounded small class="ma-1" v-for="item in nav.tags" :to="'/tag/'+encodeURIComponent(item.name)" :key="item.name" outlined :color="item.count != 0 ? 'primary': 'grey'" >
+                    {{item.name}}
+                    <span v-if="item.count">&nbsp;({{item.count}})</span>
+                </v-btn>
+            </v-col>
+            </template>
+        </v-row>
+        
+        <!-- 空状态提示 -->
+        <v-row v-if="!hasAnyBooks" class="empty-state">
+            <v-col cols=12>
+                <v-card class="ma-1 pa-6 text-center">
+                    <v-icon large color="grey lighten-2">mdi-book-open-variant</v-icon>
+                    <h3 class="text-h6 grey--text">本书库暂无藏书</h3>
+                    <p class="text-caption grey--text">请先添加书籍到书库</p>
+                </v-card>
+            </v-col>
+        </v-row>
+    </div>
 </template>
 
 <script>
@@ -17,6 +30,17 @@ export default {
     components: {
     },
     computed: {
+        hasAnyBooks: function() {
+            // 检查是否有任何标签的count大于0
+            for (let nav of this.navs) {
+                for (let tag of nav.tags) {
+                    if (tag.count > 0) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        },
     },
     data: () => ({
         navs: [],
