@@ -68,7 +68,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           labels: ${{ steps.meta.outputs.labels }}
           push: ${{ github.event_name != 'pull_request' }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/talebook/talebook:latest
@@ -76,6 +76,6 @@ jobs:
           provenance: false
           tags: |
             ${{ steps.meta.outputs.tags }}
-            ${{ env.REGISTRY }}/talebook/calibre-webserver:latest
-            ${{ env.REGISTRY }}/talebook/calibre-webserver:master
+            ${{ github.repository == 'talebook/talebook' && format('{0}/talebook/calibre-webserver:latest', env.REGISTRY) || '' }}
+            ${{ github.repository == 'talebook/talebook' && format('{0}/talebook/calibre-webserver:master', env.REGISTRY) || '' }}
           build-args: ${{ steps.prep.outputs.build_args }}

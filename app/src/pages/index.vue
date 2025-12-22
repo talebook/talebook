@@ -9,6 +9,14 @@
                 <v-img :src="book.img" :aspect-ratio="11/15" > </v-img>
             </v-card>
         </v-col>
+        <!-- 空状态提示 -->
+        <v-col cols=12 v-if="get_random_books.length === 0">
+            <v-card class="ma-1 pa-6 text-center">
+                <v-icon large color="grey lighten-2">mdi-book-open-variant</v-icon>
+                <h3 class="text-h6 grey--text">本书库暂无藏书</h3>
+                <p class="text-caption grey--text">请先添加书籍到书库</p>
+            </v-card>
+        </v-col>
     </v-row>
     <v-row>
         <v-col cols=12>

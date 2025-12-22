@@ -88,7 +88,7 @@ export default {
     if (!this.inited) {
 
     }
-    this.page_cnt = Math.max(1, Math.ceil(this.total / this.page_size))
+    this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0
 
   },
 
@@ -108,7 +108,7 @@ export default {
           this.title = rsp.title;
           this.books = rsp.books;
           this.total = rsp.total
-          this.page_cnt = Math.max(1, Math.ceil(this.total / this.page_size));
+          this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
         })
       if (next) next();
     },

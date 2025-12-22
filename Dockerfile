@@ -1,8 +1,8 @@
-
 # ----------------------------------------
 # 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
 FROM node:16-alpine AS builder
 ARG BUILD_COUNTRY=""
+ARG TARGETARCH
 
 WORKDIR /build
 RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
@@ -25,14 +25,25 @@ RUN cp -r dist nuxt.config.js package* /app-static/
 
 # ----------------------------------------
 # 第二阶段，构建环境
-FROM talebook/calibre-docker AS server
+FROM hehetoshang/calibre-docker AS server
 ARG BUILD_COUNTRY=""
+ARG TARGETARCH
+ARG TARGETVARIANT
 
-# Set mirrors in china
-RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
-    echo "using repo mirrors for ${BUILD_COUNTRY}"; \
-    sed 's@deb.debian.org/debian@mirrors.aliyun.com/debian@' -i /etc/apt/sources.list; \
-    pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/; \
+USER root
+RUN mkdir -p /var/lib/apt/lists/partial && \
+    chmod -R 0755 /var/lib/apt/lists/ && \
+    if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
+        echo "using repo mirrors for ${BUILD_COUNTRY}"; \
+        sed 's@deb.debian.org/debian@mirrors.aliyun.com/debian@' -i /etc/apt/sources.list; \
+        pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/; \
+    fi
+
+# 针对 ARM32 架构的特殊处理
+RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+    echo "Building for ARM32 (ARMv7) architecture"; \
+    # 确保使用兼容的包架构
+    dpkg --add-architecture armhf || true; \
     fi
 
 # install envsubst gosu procps
@@ -41,10 +52,12 @@ RUN apt-get update -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Create a talebook user and change the Nginx startup user
-RUN useradd -u 911 -U -d /var/www/talebook -s /bin/false talebook && \
+# Create a talebook user and change the Nginx startup user if it doesn't exist
+RUN if ! id -u talebook > /dev/null 2>&1; then \
+    useradd -u 911 -U -d /var/www/talebook -s /bin/false talebook && \
     usermod -G users talebook && \
-    groupmod -g 911 talebook && \
+    groupmod -g 911 talebook; \
+fi && \
     sed -i "s/user www-data;/user talebook;/g" /etc/nginx/nginx.conf
 
 # install python packages
@@ -66,6 +79,8 @@ CMD ["pytest", "/var/www/talebook/tests"]
 # 生产环境
 FROM server AS production
 ARG GIT_VERSION=""
+ARG TARGETARCH
+ARG TARGETVARIANT
 
 LABEL Author="Rex <talebook@foxmail.com>"
 LABEL Thanks="oldiy <oldiy2018@gmail.com>"
@@ -75,6 +90,9 @@ ENV TZ=Asia/Shanghai
 ENV LANG=C.UTF-8
 ENV PUID=1000
 ENV PGID=1000
+
+# 架构信息（用于调试）
+RUN echo "Target architecture: $TARGETARCH$TARGETVARIANT" > /arch-info.txt
 
 # prepare dirs
 RUN mkdir -p /data/log/nginx/ && \
@@ -102,6 +120,7 @@ COPY --from=builder /app-static/dist/logo/ /data/books/logo/
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     cd /var/www/talebook/ && \
     echo "VERSION = \"$GIT_VERSION\"" > webserver/version.py && \
+    echo "ARCH = \"$TARGETARCH$TARGETVARIANT\"" >> webserver/version.py && \
     echo 'settings = {}' > /data/books/settings/auto.py && \
     chmod a+w /data/books/settings/auto.py && \
     calibredb add --library-path=/data/books/library/ -r docker/book/ && \
@@ -126,9 +145,17 @@ CMD ["/var/www/talebook/docker/start.sh"]
 # 生产环境（server side render版)
 FROM production AS production-ssr
 
-# intall nodejs for nuxtjs server side render
-RUN apt-get update -y && \
-    curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+USER root
+RUN mkdir -p /var/lib/apt/lists/partial && \
+    chmod -R 0755 /var/lib/apt/lists/ && \
+    apt-get update -y && \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
+    elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
+    fi && \
     apt-get install -y nodejs && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -137,4 +164,3 @@ RUN apt-get update -y && \
 COPY conf/nginx/server-side-render.conf /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/server-side-render.conf /etc/supervisor/conf.d/talebook.conf
 COPY --from=builder /app-ssr/ /var/www/talebook/app/
-
