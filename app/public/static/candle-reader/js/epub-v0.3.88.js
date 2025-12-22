@@ -1866,8 +1866,8 @@ class EpubCFI {
     return xpath.join("/");
   }
   /*
-	To get the last step if needed:
-	// Get the terminal step
+  	To get the last step if needed:
+  	// Get the terminal step
   lastStep = steps[steps.length-1];
   // Get the query string
   query = this.stepsToQuery(steps);
@@ -1875,7 +1875,7 @@ class EpubCFI {
   startContainerParent = doc.querySelector(query);
   // Find the text node within that element
   if(startContainerParent && lastStep.type == "text") {
-	container = startContainerParent.childNodes[lastStep.index];
+  	container = startContainerParent.childNodes[lastStep.index];
   }
   */
 
@@ -5495,12 +5495,12 @@ class default_DefaultViewManager {
     this.stage.destroy();
     this.rendered = false;
     /*
-		clearTimeout(this.trimTimeout);
-	if(this.settings.hidden) {
-		this.element.removeChild(this.wrapper);
-	} else {
-		this.element.removeChild(this.container);
-	}
+    		clearTimeout(this.trimTimeout);
+    	if(this.settings.hidden) {
+    		this.element.removeChild(this.wrapper);
+    	} else {
+    		this.element.removeChild(this.container);
+    	}
     */
   }
 
@@ -7052,18 +7052,18 @@ class Contents {
     this.listeners();
   }
   /**
-	* Get DOM events that are listened for and passed along
-	*/
+  	* Get DOM events that are listened for and passed along
+  	*/
 
 
   static get listenedEvents() {
     return _utils_constants__WEBPACK_IMPORTED_MODULE_5__[/* DOM_EVENTS */ "a"];
   }
   /**
-	* Get or Set width
-	* @param {number} [w]
-	* @returns {number} width
-	*/
+  	* Get or Set width
+  	* @param {number} [w]
+  	* @returns {number} width
+  	*/
 
 
   width(w) {
@@ -7081,10 +7081,10 @@ class Contents {
     return parseInt(this.window.getComputedStyle(frame)["width"]);
   }
   /**
-	* Get or Set height
-	* @param {number} [h]
-	* @returns {number} height
-	*/
+  	* Get or Set height
+  	* @param {number} [h]
+  	* @returns {number} height
+  	*/
 
 
   height(h) {
@@ -7102,10 +7102,10 @@ class Contents {
     return parseInt(this.window.getComputedStyle(frame)["height"]);
   }
   /**
-	* Get or Set width of the contents
-	* @param {number} [w]
-	* @returns {number} width
-	*/
+  	* Get or Set width of the contents
+  	* @param {number} [w]
+  	* @returns {number} width
+  	*/
 
 
   contentWidth(w) {
@@ -7122,10 +7122,10 @@ class Contents {
     return parseInt(this.window.getComputedStyle(content)["width"]);
   }
   /**
-	* Get or Set height of the contents
-	* @param {number} [h]
-	* @returns {number} height
-	*/
+  	* Get or Set height of the contents
+  	* @param {number} [h]
+  	* @returns {number} height
+  	*/
 
 
   contentHeight(h) {
@@ -7142,9 +7142,9 @@ class Contents {
     return parseInt(this.window.getComputedStyle(content)["height"]);
   }
   /**
-	* Get the width of the text using Range
-	* @returns {number} width
-	*/
+  	* Get the width of the text using Range
+  	* @returns {number} width
+  	*/
 
 
   textWidth() {
@@ -7166,9 +7166,9 @@ class Contents {
     return Math.round(width);
   }
   /**
-	* Get the height of the text using Range
-	* @returns {number} height
-	*/
+  	* Get the height of the text using Range
+  	* @returns {number} height
+  	*/
 
 
   textHeight() {
@@ -7182,9 +7182,9 @@ class Contents {
     return Math.round(height);
   }
   /**
-	* Get documentElement scrollWidth
-	* @returns {number} width
-	*/
+  	* Get documentElement scrollWidth
+  	* @returns {number} width
+  	*/
 
 
   scrollWidth() {
@@ -7192,9 +7192,9 @@ class Contents {
     return width;
   }
   /**
-	* Get documentElement scrollHeight
-	* @returns {number} height
-	*/
+  	* Get documentElement scrollHeight
+  	* @returns {number} height
+  	*/
 
 
   scrollHeight() {
@@ -7202,9 +7202,9 @@ class Contents {
     return height;
   }
   /**
-	* Set overflow css style of the contents
-	* @param {string} [overflow]
-	*/
+  	* Set overflow css style of the contents
+  	* @param {string} [overflow]
+  	*/
 
 
   overflow(overflow) {
@@ -7215,9 +7215,9 @@ class Contents {
     return this.window.getComputedStyle(this.documentElement)["overflow"];
   }
   /**
-	* Set overflowX css style of the documentElement
-	* @param {string} [overflow]
-	*/
+  	* Set overflowX css style of the documentElement
+  	* @param {string} [overflow]
+  	*/
 
 
   overflowX(overflow) {
@@ -7228,9 +7228,9 @@ class Contents {
     return this.window.getComputedStyle(this.documentElement)["overflowX"];
   }
   /**
-	* Set overflowY css style of the documentElement
-	* @param {string} [overflow]
-	*/
+  	* Set overflowY css style of the documentElement
+  	* @param {string} [overflow]
+  	*/
 
 
   overflowY(overflow) {
@@ -7241,11 +7241,11 @@ class Contents {
     return this.window.getComputedStyle(this.documentElement)["overflowY"];
   }
   /**
-	* Set Css styles on the contents element (typically Body)
-	* @param {string} property
-	* @param {string} value
-	* @param {boolean} [priority] set as "important"
-	*/
+  	* Set Css styles on the contents element (typically Body)
+  	* @param {string} property
+  	* @param {string} value
+  	* @param {boolean} [priority] set as "important"
+  	*/
 
 
   css(property, value, priority) {
@@ -7260,15 +7260,15 @@ class Contents {
     return this.window.getComputedStyle(content)[property];
   }
   /**
-	* Get or Set the viewport element
-	* @param {object} [options]
-	* @param {string} [options.width]
-	* @param {string} [options.height]
-	* @param {string} [options.scale]
-	* @param {string} [options.minimum]
-	* @param {string} [options.maximum]
-	* @param {string} [options.scalable]
-	*/
+  	* Get or Set the viewport element
+  	* @param {object} [options]
+  	* @param {string} [options.width]
+  	* @param {string} [options.height]
+  	* @param {string} [options.scale]
+  	* @param {string} [options.minimum]
+  	* @param {string} [options.maximum]
+  	* @param {string} [options.scalable]
+  	*/
 
 
   viewport(options) {
@@ -9175,8 +9175,8 @@ class themes_Themes {
   }
   /**
    * Register a theme by passing its css as string
-   * @param {string} name
-   * @param {string} css
+   * @param {string} name 
+   * @param {string} css 
    */
 
 
@@ -10049,42 +10049,42 @@ class rendition_Rendition {
   }
   /*
   render(view, show) {
-		// view.onLayout = this.layout.format.bind(this.layout);
-	view.create();
-		// Fit to size of the container, apply padding
-	this.manager.resizeView(view);
-		// Render Chain
-	return view.section.render(this.book.request)
-		.then(function(contents){
-			return view.load(contents);
-		}.bind(this))
-		.then(function(doc){
-			return this.hooks.content.trigger(view, this);
-		}.bind(this))
-		.then(function(){
-			this.layout.format(view.contents);
-			return this.hooks.layout.trigger(view, this);
-		}.bind(this))
-		.then(function(){
-			return view.display();
-		}.bind(this))
-		.then(function(){
-			return this.hooks.render.trigger(view, this);
-		}.bind(this))
-		.then(function(){
-			if(show !== false) {
-				this.q.enqueue(function(view){
-					view.show();
-				}, view);
-			}
-			// this.map = new Map(view, this.layout);
-			this.hooks.show.trigger(view, this);
-			this.trigger("rendered", view.section);
-			}.bind(this))
-		.catch(function(e){
-			this.trigger("loaderror", e);
-		}.bind(this));
-	}
+  		// view.onLayout = this.layout.format.bind(this.layout);
+  	view.create();
+  		// Fit to size of the container, apply padding
+  	this.manager.resizeView(view);
+  		// Render Chain
+  	return view.section.render(this.book.request)
+  		.then(function(contents){
+  			return view.load(contents);
+  		}.bind(this))
+  		.then(function(doc){
+  			return this.hooks.content.trigger(view, this);
+  		}.bind(this))
+  		.then(function(){
+  			this.layout.format(view.contents);
+  			return this.hooks.layout.trigger(view, this);
+  		}.bind(this))
+  		.then(function(){
+  			return view.display();
+  		}.bind(this))
+  		.then(function(){
+  			return this.hooks.render.trigger(view, this);
+  		}.bind(this))
+  		.then(function(){
+  			if(show !== false) {
+  				this.q.enqueue(function(view){
+  					view.show();
+  				}, view);
+  			}
+  			// this.map = new Map(view, this.layout);
+  			this.hooks.show.trigger(view, this);
+  			this.trigger("rendered", view.section);
+  			}.bind(this))
+  		.catch(function(e){
+  			this.trigger("loaderror", e);
+  		}.bind(this));
+  	}
   */
 
   /**
@@ -11859,7 +11859,7 @@ class IframeView {
           item.element.removeEventListener("touchstart", l);
         }
 
-        ;
+        
       });
       delete this.highlights[cfiRange];
     }
@@ -11877,7 +11877,7 @@ class IframeView {
           item.element.removeEventListener("touchstart", l);
         }
 
-        ;
+        
       });
       delete this.underlines[cfiRange];
     }
@@ -11895,7 +11895,7 @@ class IframeView {
           item.element.removeEventListener("touchstart", l);
         }
 
-        ;
+        
       });
       delete this.marks[cfiRange];
     }
@@ -18080,7 +18080,7 @@ function lookup(filename) {
   return filename && mime_mimeTypes[filename.split(".").pop().toLowerCase()] || defaultValue;
 }
 
-;
+
 /* harmony default export */ var mime = ({
   lookup
 });
