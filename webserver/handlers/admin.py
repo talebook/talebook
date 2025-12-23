@@ -83,8 +83,49 @@ class AdminUsers(BaseHandler):
             return {"err": "permission.not_admin", "msg": _(u"当前用户非管理员")}
         data = tornado.escape.json_decode(self.request.body)
         uid = data.get("id", None)
+        
+        # 创建新用户逻辑
         if not uid:
-            return {"err": "params.invalid", "msg": _(u"参数错误")}
+            # 验证必填字段
+            if not all([data.get("username"), data.get("password"), data.get("name"), data.get("email")]):
+                return {"err": "params.fields.required", "msg": _(u"用户名、密码、昵称和邮箱为必填项")}
+            
+            username = data["username"]
+            password = data["password"]
+            name = data["name"]
+            email = data["email"]
+            
+            # 检查用户名是否已存在
+            existing_user = self.session.query(Reader).filter(Reader.username == username).first()
+            if existing_user:
+                return {"err": "params.user.exist", "msg": _(u"用户名已存在")}
+            
+            # 创建新用户
+            user = Reader()
+            user.username = username
+            user.name = name
+            user.email = email
+            user.admin = data.get("admin", False)
+            user.active = data.get("active", True)
+            user.create_time = datetime.datetime.now()
+            user.update_time = datetime.datetime.now()
+            user.access_time = datetime.datetime.now()
+            user.extra = {"kindle_email": ""}
+            user.set_secure_password(password)
+            
+            # 设置权限
+            p = data.get("permission", "")
+            if isinstance(p, str) and p:
+                user.set_permission(p)
+            
+            try:
+                user.save()
+                return {"err": "ok", "msg": _("用户创建成功")}
+            except Exception as e:
+                logging.error(traceback.format_exc())
+                return {"err": "db.error", "msg": _(u"用户创建失败：{}".format(str(e)))}
+        
+        # 现有用户编辑逻辑
         del data["id"]
         if not data:
             return {"err": "params.fields.invalid", "msg": _(u"用户配置项参数错误")}

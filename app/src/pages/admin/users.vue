@@ -1,6 +1,154 @@
 <template>
     <v-card>
-        <v-card-title> 用户管理 </v-card-title>
+        <v-card-title>
+            <div class="d-flex justify-space-between align-center">
+                <span> 用户管理 </span>
+                <v-btn color="primary" @click="showAddDialog = true">
+                    <v-icon>mdi-plus</v-icon>
+                    添加用户
+                </v-btn>
+            </div>
+        </v-card-title>
+        
+        <!-- 添加用户对话框 -->
+        <v-dialog
+            v-model="showAddDialog"
+            max-width="500px"
+        >
+            <v-card>
+                <v-card-title> 添加新用户 </v-card-title>
+                <v-card-text>
+                    <v-form ref="addUserForm" v-model="valid">
+                        <!-- 基本信息 -->
+                        <v-text-field
+                            v-model="newUser.username"
+                            label="用户名"
+                            :rules="[requiredRule, usernameRule]"
+                            required
+                            prepend-icon="mdi-account"
+                            placeholder="请输入用户名，小写字母开头"
+                        ></v-text-field>
+                        
+                        <v-text-field
+                            v-model="newUser.password"
+                            label="密码"
+                            :rules="[requiredRule, passwordRule]"
+                            required
+                            prepend-icon="mdi-lock"
+                            type="password"
+                            placeholder="请输入8-20个字符的密码"
+                        ></v-text-field>
+                        
+                        <v-text-field
+                            v-model="newUser.name"
+                            label="昵称"
+                            :rules="[requiredRule]"
+                            required
+                            prepend-icon="mdi-account-circle"
+                            placeholder="请输入用户昵称"
+                        ></v-text-field>
+                        
+                        <v-text-field
+                            v-model="newUser.email"
+                            label="邮箱"
+                            :rules="[requiredRule, emailRule]"
+                            required
+                            prepend-icon="mdi-email"
+                            placeholder="请输入邮箱地址"
+                        ></v-text-field>
+                        
+                        <!-- 账号设置 -->
+                        <v-divider class="my-4"></v-divider>
+                        <h3 class="mb-2">账号设置</h3>
+                        
+                        <v-checkbox
+                            v-model="newUser.active"
+                            label="激活状态"
+                            color="primary"
+                            hide-details
+                        ></v-checkbox>
+                        
+                        <v-checkbox
+                            v-model="newUser.admin"
+                            label="管理员权限"
+                            color="primary"
+                            hide-details
+                        ></v-checkbox>
+                        
+                        <!-- 权限设置 -->
+                        <v-divider class="my-4"></v-divider>
+                        <h3 class="mb-2">权限设置</h3>
+                        
+                        <v-container fluid>
+                            <v-row>
+                                <v-col cols="12" sm="6" md="4">
+                                    <v-checkbox
+                                        v-model="newUser.permissions.can_login"
+                                        label="登录"
+                                        color="primary"
+                                        hide-details
+                                    ></v-checkbox>
+                                </v-col>
+                                <v-col cols="12" sm="6" md="4">
+                                    <v-checkbox
+                                        v-model="newUser.permissions.can_upload"
+                                        label="上传"
+                                        color="primary"
+                                        hide-details
+                                    ></v-checkbox>
+                                </v-col>
+                                <v-col cols="12" sm="6" md="4">
+                                    <v-checkbox
+                                        v-model="newUser.permissions.can_save"
+                                        label="下载"
+                                        color="primary"
+                                        hide-details
+                                    ></v-checkbox>
+                                </v-col>
+                                <v-col cols="12" sm="6" md="4">
+                                    <v-checkbox
+                                        v-model="newUser.permissions.can_edit"
+                                        label="编辑"
+                                        color="primary"
+                                        hide-details
+                                    ></v-checkbox>
+                                </v-col>
+                                <v-col cols="12" sm="6" md="4">
+                                    <v-checkbox
+                                        v-model="newUser.permissions.can_delete"
+                                        label="删除"
+                                        color="primary"
+                                        hide-details
+                                    ></v-checkbox>
+                                </v-col>
+                                <v-col cols="12" sm="6" md="4">
+                                    <v-checkbox
+                                        v-model="newUser.permissions.can_push"
+                                        label="推送"
+                                        color="primary"
+                                        hide-details
+                                    ></v-checkbox>
+                                </v-col>
+                                <v-col cols="12" sm="6" md="4">
+                                    <v-checkbox
+                                        v-model="newUser.permissions.can_read"
+                                        label="在线阅读"
+                                        color="primary"
+                                        hide-details
+                                    ></v-checkbox>
+                                </v-col>
+                            </v-row>
+                        </v-container>
+                    </v-form>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="showAddDialog = false">取消</v-btn>
+                    <v-btn color="primary" @click="addUser">确定</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+        
         <v-data-table
             :headers="headers"
             :items="items"
@@ -119,6 +267,32 @@ export default {
         total: 0,
         loading: true,
         options: { sortBy: ["access_time"], sortDesc: [true] },
+        // 添加用户对话框控制
+        showAddDialog: false,
+        valid: true,
+        // 表单验证规则
+        requiredRule: v => !!v || '此项为必填项',
+        emailRule: v => /^[^@]+@[^@]+\.[^@]+$/.test(v) || '邮箱格式不正确',
+        usernameRule: v => /^[a-z][a-z0-9_]*$/.test(v) || '用户名必须以小写字母开头，只能包含字母、数字和下划线',
+        passwordRule: v => (v && v.length >= 8 && v.length <= 20) || '密码长度必须在8-20个字符之间',
+        // 新用户数据
+        newUser: {
+            username: '',
+            password: '',
+            name: '',
+            email: '',
+            admin: false,
+            active: true,
+            permissions: {
+                can_login: true,
+                can_upload: false,
+                can_save: true,
+                can_edit: false,
+                can_delete: false,
+                can_push: false,
+                can_read: true
+            }
+        },
         headers: [
             { text: "ID", sortable: true, value: "id" },
             { text: "用户名", sortable: true, value: "username" },
@@ -201,6 +375,75 @@ export default {
                 }
             });
         },
+        // 重置表单
+        resetForm() {
+            this.$refs.addUserForm.reset();
+            this.newUser = {
+                username: '',
+                password: '',
+                name: '',
+                email: '',
+                admin: false,
+                active: true,
+                permissions: {
+                    can_login: true,
+                    can_upload: false,
+                    can_save: true,
+                    can_edit: false,
+                    can_delete: false,
+                    can_push: false,
+                    can_read: true
+                }
+            };
+        },
+        // 添加用户
+        addUser() {
+            if (!this.$refs.addUserForm.validate()) {
+                return;
+            }
+            
+            this.loading = true;
+            
+            // 构建权限字符串
+            let permissionStr = '';
+            for (let perm of this.permissions) {
+                if (this.newUser.permissions[perm.name]) {
+                    permissionStr += perm.code.toLowerCase();
+                } else {
+                    permissionStr += perm.code.toUpperCase();
+                }
+            }
+            
+            // 准备请求数据
+            const userData = {
+                username: this.newUser.username,
+                password: this.newUser.password,
+                name: this.newUser.name,
+                email: this.newUser.email,
+                admin: this.newUser.admin,
+                active: this.newUser.active,
+                permission: permissionStr
+            };
+            
+            // 发送请求
+            this.$backend("/admin/users", {
+                body: JSON.stringify(userData),
+                method: "POST",
+            }).then((rsp) => {
+                if (rsp.err != "ok") {
+                    alert(rsp.msg);
+                } else {
+                    // 重置表单
+                    this.resetForm();
+                    // 关闭对话框
+                    this.showAddDialog = false;
+                    // 刷新用户列表
+                    this.getDataFromApi();
+                }
+            }).finally(() => {
+                this.loading = false;
+            });
+        }
     },
 };
 </script>
