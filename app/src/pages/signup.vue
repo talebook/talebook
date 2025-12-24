@@ -34,7 +34,7 @@ export default {
         password: "",
         password2: "",
         nickname: "",
-        email: "",·
+        email: "",
         failmsg: "",
         validmsg: "",
         rules: {
