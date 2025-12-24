@@ -42,10 +42,10 @@
                         <v-text-field
                             v-model="newUser.name"
                             label="昵称"
-                            :rules="[requiredRule]"
+                            :rules="[requiredRule, nicknameRule]"
                             required
                             prepend-icon="mdi-account-circle"
-                            placeholder="请输入用户昵称"
+                            placeholder="请输入用户昵称，至少2个字符"
                         ></v-text-field>
                         
                         <v-text-field
@@ -272,9 +272,13 @@ export default {
         valid: true,
         // 表单验证规则
         requiredRule: v => !!v || '此项为必填项',
-        emailRule: v => /^[^@]+@[^@]+\.[^@]+$/.test(v) || '邮箱格式不正确',
-        usernameRule: v => /^[a-z][a-z0-9_]*$/.test(v) || '用户名必须以小写字母开头，只能包含字母、数字和下划线',
-        passwordRule: v => (v && v.length >= 8 && v.length <= 20) || '密码长度必须在8-20个字符之间',
+        emailRule: function (email) {
+            var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+            return re.test(email) || "邮箱格式不正确";
+        },
+        usernameRule: v => ((20 >= v.length && v.length >= 5) && /^[a-z][a-z0-9_]*$/.test(v)) || '用户名必须以小写字母开头，只能包含字母、数字和下划线，长度在5-20个字符之间',
+        passwordRule: v => (20 >= v.length && v.length >= 8) || '密码长度必须在8-20个字符之间',
+        nicknameRule: v => v.length >= 2 || '昵称长度至少为2个字符',
         // 新用户数据
         newUser: {
             username: '',
@@ -431,7 +435,7 @@ export default {
                 method: "POST",
             }).then((rsp) => {
                 if (rsp.err != "ok") {
-                    alert(rsp.msg);
+                    this.$alert("error", rsp.msg);
                 } else {
                     // 重置表单
                     this.resetForm();
