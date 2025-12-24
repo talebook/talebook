@@ -1,13 +1,11 @@
 <template>
     <v-card>
-        <v-card-title>
-            <div class="d-flex justify-space-between align-center">
-                <span> 用户管理 </span>
-                <v-btn color="primary" @click="showAddDialog = true">
-                    <v-icon>mdi-plus</v-icon>
-                    添加用户
-                </v-btn>
-            </div>
+        <v-card-title class="d-flex justify-space-between align-center">
+            <span> 用户管理 </span>
+            <v-btn color="primary" @click="showAddDialog = true">
+                <v-icon>mdi-plus</v-icon>
+                添加用户
+            </v-btn>
         </v-card-title>
         
         <!-- 添加用户对话框 -->
