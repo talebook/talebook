@@ -79,7 +79,10 @@ class UserUpdate(BaseHandler):
         if len(ke) > 0:
             if not re.match(Reader.RE_EMAIL, ke):
                 return {"err": "params.email.invalid", "msg": _(u"Kindle地址无效")}
-            user.extra["kindle_email"] = ke
+            if user.extra is None:
+                user.extra = {"kindle_email": ke}
+            else:
+                user.extra["kindle_email"] = ke
 
         try:
             user.save()
@@ -344,10 +347,10 @@ class UserInfo(BaseHandler):
                 "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S"),
             }
         )
-        if user.avatar:
+        if user and user.avatar:
             gravatar_url = "https://www.gravatar.com"
             d["avatar"] = user.avatar.replace("http://", "https://").replace(gravatar_url, CONF["avatar_service"])
-        if user.extra:
+        if user and user.extra:
             d["kindle_email"] = user.extra.get("kindle_email", "")
             if detail:
                 for k, v in user.extra.items():
