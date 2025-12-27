@@ -202,27 +202,37 @@ class UserReset(BaseHandler):
         user = self.session.query(Reader).filter(Reader.username == username, Reader.email == email).first()
         if not user:
             return {"err": "params.no_user", "msg": _(u"无此用户")}
-        p = user.reset_password()
 
-        # send notice email
+        new_password = user.reset_password()
+
+        # 先保存到数据库，确保密码不会丢失
+        try:
+            user.save()
+        except Exception as e:
+            import traceback
+            logging.error(traceback.format_exc())
+            return {"err": "db.error", "msg": _(u"系统繁忙")}
+
+        # 再发送通知邮件
         args = {
             "site_title": CONF["site_title"],
             "username": user.username,
-            "password": p,
+            "password": new_password,
         }
         mail_subject = CONF["RESET_MAIL_TITLE"] % args
         mail_to = user.email
         mail_from = CONF["smtp_username"]
         mail_body = CONF["RESET_MAIL_CONTENT"] % args
-        MailService().send_mail(mail_from, mail_to, mail_subject, mail_body)
 
-        # do save into db
         try:
-            user.save()
-            self.add_msg("success", _("你刚刚重置了密码"))
-            return {"err": "ok"}
-        except:
-            return {"err": "db.error", "msg": _(u"系统繁忙")}
+            MailService().send_mail(mail_from, mail_to, mail_subject, mail_body)
+        except Exception as e:
+            import traceback
+            logging.error(traceback.format_exc())
+            return {"err": "ok", "msg": _(u"密码已重置，但邮件发送失败，请联系管理员或重新请求重置")}
+
+        self.add_msg("success", _("你刚刚重置了密码"))
+        return {"err": "ok"}
 
 
 class SignOut(BaseHandler):
