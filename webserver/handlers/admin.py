@@ -411,12 +411,31 @@ class AdminInstall(BaseHandler):
 class SSLHandlerLogic:
     def check_ssl_chain(self, crt_body, key_body):
         """return None if ok, else Err"""
-        with tempfile.NamedTemporaryFile() as crt_file, tempfile.NamedTemporaryFile() as key_file:
-            crt_file.write(crt_body)
-            key_file.write(key_body)
-            crt_file.flush()
-            key_file.flush()
-            return self.check_ssl_chain_files(crt_file.name, key_file.name)
+        import os
+
+        crt_fd = None
+        key_fd = None
+        crt_path = None
+        key_path = None
+        try:
+            crt_fd, crt_path = tempfile.mkstemp(suffix=".crt")
+            key_fd, key_path = tempfile.mkstemp(suffix=".key")
+            with os.fdopen(crt_fd, "wb") as crt_file:
+                crt_file.write(crt_body)
+            with os.fdopen(key_fd, "wb") as key_file:
+                key_file.write(key_body)
+            return self.check_ssl_chain_files(crt_path, key_path)
+        finally:
+            if crt_path and os.path.exists(crt_path):
+                try:
+                    os.unlink(crt_path)
+                except OSError:
+                    pass
+            if key_path and os.path.exists(key_path):
+                try:
+                    os.unlink(key_path)
+                except OSError:
+                    pass
 
     def check_ssl_chain_files(self, crt_file, key_file):
         ctx = ssl.SSLContext()
