@@ -242,8 +242,9 @@ class SignOut(BaseHandler):
     @js
     @auth
     def get(self):
-        self.set_secure_cookie("user_id", "")
-        self.set_secure_cookie("admin_id", "")
+        self.clear_cookie("user_id")
+        self.clear_cookie("admin_id")
+        self.clear_cookie("lt")
         return {"err": "ok", "msg": _(u"你已成功退出登录。")}
 
 
