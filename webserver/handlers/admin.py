@@ -136,10 +136,10 @@ class AdminUsers(BaseHandler):
             user.active = data["active"]
 
         if "admin" in data:
+            was_admin = user.admin
             user.admin = data["admin"]
-
-        if user.admin is False and self.user_id() == user.id:
-            return {"err": "params.user.invalid", "msg": _("不允许取消自己的管理员权限")}
+            if was_admin is True and data["admin"] is False and self.user_id() == user.id:
+                return {"err": "params.user.invalid", "msg": _("不允许取消自己的管理员权限")}
 
         if data.get("delete", "") == user.username:
             if self.user_id() == user.id:
