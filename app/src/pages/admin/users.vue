@@ -79,58 +79,10 @@
                         
                         <v-container fluid>
                             <v-row>
-                                <v-col cols="12" sm="6" md="4">
+                                <v-col cols="12" sm="6" md="4" v-for="perm in permissions" :key="perm.name">
                                     <v-checkbox
-                                        v-model="newUser.permissions.can_login"
-                                        label="登录"
-                                        color="primary"
-                                        hide-details
-                                    ></v-checkbox>
-                                </v-col>
-                                <v-col cols="12" sm="6" md="4">
-                                    <v-checkbox
-                                        v-model="newUser.permissions.can_upload"
-                                        label="上传"
-                                        color="primary"
-                                        hide-details
-                                    ></v-checkbox>
-                                </v-col>
-                                <v-col cols="12" sm="6" md="4">
-                                    <v-checkbox
-                                        v-model="newUser.permissions.can_save"
-                                        label="下载"
-                                        color="primary"
-                                        hide-details
-                                    ></v-checkbox>
-                                </v-col>
-                                <v-col cols="12" sm="6" md="4">
-                                    <v-checkbox
-                                        v-model="newUser.permissions.can_edit"
-                                        label="编辑"
-                                        color="primary"
-                                        hide-details
-                                    ></v-checkbox>
-                                </v-col>
-                                <v-col cols="12" sm="6" md="4">
-                                    <v-checkbox
-                                        v-model="newUser.permissions.can_delete"
-                                        label="删除"
-                                        color="primary"
-                                        hide-details
-                                    ></v-checkbox>
-                                </v-col>
-                                <v-col cols="12" sm="6" md="4">
-                                    <v-checkbox
-                                        v-model="newUser.permissions.can_push"
-                                        label="推送"
-                                        color="primary"
-                                        hide-details
-                                    ></v-checkbox>
-                                </v-col>
-                                <v-col cols="12" sm="6" md="4">
-                                    <v-checkbox
-                                        v-model="newUser.permissions.can_read"
-                                        label="在线阅读"
+                                        v-model="newUser.permissions[perm.name]"
+                                        :label="perm.text"
                                         color="primary"
                                         hide-details
                                     ></v-checkbox>
