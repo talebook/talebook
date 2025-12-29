@@ -56,8 +56,8 @@
                         </v-list-item-action>
                     </v-list-item>
                 </template>
-                <v-list-item v-if="sys.sidebar_inject">
-                    <div class="ma-auto" v-html="sys.sidebar_inject"></div>
+                <v-list-item v-if="sys.sidebar_extra_html">
+                    <div class="ma-auto" v-html="sys.sidebar_extra_html"></div>
                 </v-list-item>
             </v-list>
         </v-navigation-drawer>
@@ -213,8 +213,8 @@ export default {
             mtime: "",
             title: "",
             footer: "",
-            footer_inject: "",
-            sidebar_inject: "",
+            footer_extra_html: "",
+            sidebar_extra_html: "",
             socials: [],
             friends: [],
             allow: {

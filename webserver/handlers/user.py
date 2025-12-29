@@ -309,8 +309,8 @@ class UserInfo(BaseHandler):
             "socials": CONF["SOCIALS"],
             "friends": CONF["FRIENDS"],
             "footer": CONF["FOOTER"],
-            "footer_inject": CONF["FOOTER_INJECT"],
-            "sidebar_inject": CONF["SIDEBAR_INJECT"],
+            "footer_extra_html": CONF["FOOTER_EXTRA_HTML"],
+            "sidebar_extra_html": CONF["SIDEBAR_EXTRA_HTML"],
             "header": CONF["HEADER"],
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
             "allow": {
