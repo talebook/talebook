@@ -83,8 +83,49 @@ class AdminUsers(BaseHandler):
             return {"err": "permission.not_admin", "msg": _(u"当前用户非管理员")}
         data = tornado.escape.json_decode(self.request.body)
         uid = data.get("id", None)
+        
+        # 创建新用户逻辑
         if not uid:
-            return {"err": "params.invalid", "msg": _(u"参数错误")}
+            # 验证必填字段
+            if not all([data.get("username"), data.get("password"), data.get("name"), data.get("email")]):
+                return {"err": "params.fields.required", "msg": _(u"用户名、密码、昵称和邮箱为必填项")}
+            
+            username = data["username"]
+            password = data["password"]
+            name = data["name"]
+            email = data["email"]
+            
+            # 检查用户名是否已存在
+            existing_user = self.session.query(Reader).filter(Reader.username == username).first()
+            if existing_user:
+                return {"err": "params.user.exist", "msg": _(u"用户名已存在")}
+            
+            # 创建新用户
+            user = Reader()
+            user.username = username
+            user.name = name
+            user.email = email
+            user.admin = data.get("admin", False)
+            user.active = data.get("active", True)
+            user.create_time = datetime.datetime.now()
+            user.update_time = datetime.datetime.now()
+            user.access_time = datetime.datetime.now()
+            user.extra = {"kindle_email": ""}
+            user.set_secure_password(password)
+            
+            # 设置权限
+            p = data.get("permission", "")
+            if isinstance(p, str) and p:
+                user.set_permission(p)
+            
+            try:
+                user.save()
+                return {"err": "ok", "msg": _("用户创建成功")}
+            except Exception as e:
+                logging.error(traceback.format_exc())
+                return {"err": "db.error", "msg": _(u"用户创建失败：{}".format(str(e)))}
+        
+        # 现有用户编辑逻辑
         del data["id"]
         if not data:
             return {"err": "params.fields.invalid", "msg": _(u"用户配置项参数错误")}
@@ -95,10 +136,10 @@ class AdminUsers(BaseHandler):
             user.active = data["active"]
 
         if "admin" in data:
+            was_admin = user.admin
             user.admin = data["admin"]
-
-        if user.admin is False and self.user_id() == user.id:
-            return {"err": "params.user.invalid", "msg": _("不允许取消自己的管理员权限")}
+            if was_admin is True and data["admin"] is False and self.user_id() == user.id:
+                return {"err": "params.user.invalid", "msg": _("不允许取消自己的管理员权限")}
 
         if data.get("delete", "") == user.username:
             if self.user_id() == user.id:
@@ -240,6 +281,8 @@ class AdminSettings(BaseHandler):
             "EPUB_VIEWER",
             "FRIENDS",
             "FOOTER",
+            "FOOTER_EXTRA_HTML",
+            "SIDEBAR_EXTRA_HTML",
             "HEADER",
             "INVITE_CODE",
             "INVITE_MESSAGE",
@@ -250,6 +293,7 @@ class AdminSettings(BaseHandler):
             "SIGNUP_MAIL_CONTENT",
             "SIGNUP_MAIL_TITLE",
             "SOCIALS",
+            "SHOW_SIDEBAR_SYS",
             "autoreload",
             "cookie_secret",
             "scan_upload_path",
@@ -367,12 +411,31 @@ class AdminInstall(BaseHandler):
 class SSLHandlerLogic:
     def check_ssl_chain(self, crt_body, key_body):
         """return None if ok, else Err"""
-        with tempfile.NamedTemporaryFile() as crt_file, tempfile.NamedTemporaryFile() as key_file:
-            crt_file.write(crt_body)
-            key_file.write(key_body)
-            crt_file.flush()
-            key_file.flush()
-            return self.check_ssl_chain_files(crt_file.name, key_file.name)
+        import os
+
+        crt_fd = None
+        key_fd = None
+        crt_path = None
+        key_path = None
+        try:
+            crt_fd, crt_path = tempfile.mkstemp(suffix=".crt")
+            key_fd, key_path = tempfile.mkstemp(suffix=".key")
+            with os.fdopen(crt_fd, "wb") as crt_file:
+                crt_file.write(crt_body)
+            with os.fdopen(key_fd, "wb") as key_file:
+                key_file.write(key_body)
+            return self.check_ssl_chain_files(crt_path, key_path)
+        finally:
+            if crt_path and os.path.exists(crt_path):
+                try:
+                    os.unlink(crt_path)
+                except OSError:
+                    pass
+            if key_path and os.path.exists(key_path):
+                try:
+                    os.unlink(key_path)
+                except OSError:
+                    pass
 
     def check_ssl_chain_files(self, crt_file, key_file):
         ctx = ssl.SSLContext()

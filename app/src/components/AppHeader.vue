@@ -56,8 +56,8 @@
                         </v-list-item-action>
                     </v-list-item>
                 </template>
-                <v-list-item>
-                    <v-img class="ma-auto" max-width="128" src="/logo/link.png"></v-img>
+                <v-list-item v-if="sys.sidebar_extra_html">
+                    <div class="ma-auto" v-html="sys.sidebar_extra_html"></div>
                 </v-list-item>
             </v-list>
         </v-navigation-drawer>
@@ -213,6 +213,8 @@ export default {
             mtime: "",
             title: "",
             footer: "",
+            footer_extra_html: "",
+            sidebar_extra_html: "",
             socials: [],
             friends: [],
             allow: {
@@ -275,7 +277,7 @@ export default {
                 .concat(this.user.is_admin ? admin_links : [])
                 .concat(nav_links)
                 .concat(this.sys.friends.length > 0 ? friend_links : [])
-                .concat(sys_links);
+                .concat(this.sys.show_sidebar_sys !== false ? sys_links : []);
         },
     },
     mounted() {

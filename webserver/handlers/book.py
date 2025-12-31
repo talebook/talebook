@@ -37,16 +37,20 @@ class Index(BaseHandler):
         # nav = "index"
         # title = _(u"全部书籍")
         ids = list(self.cache.search(""))
-        if not ids:
-            raise web.HTTPError(404, reason=_(u"本书库暂无藏书"))
-        random_ids = random.sample(ids, min(cnt_random, len(ids)))
-        random_books = [b for b in self.get_books(ids=random_ids)]
-        random_books.sort(key=lambda x: x["id"], reverse=True)
+        random_books = []
+        new_books = []
+        
+        if ids:
+            random_ids = random.sample(ids, min(cnt_random, len(ids)))
+            random_books = [b for b in self.get_books(ids=random_ids)]
+            random_books.sort(key=lambda x: x["id"], reverse=True)
 
-        ids.sort(reverse=True)
-        new_ids = random.sample(ids[0:100], min(cnt_recent, len(ids)))
-        new_books = [b for b in self.get_books(ids=new_ids)]
-        new_books.sort(key=lambda x: x["id"], reverse=True)
+            ids.sort(reverse=True)
+            # 确保不会尝试从空列表中取样
+            sample_ids = ids[0:100] if len(ids) > 100 else ids
+            new_ids = random.sample(sample_ids, min(cnt_recent, len(sample_ids)))
+            new_books = [b for b in self.get_books(ids=new_ids)]
+            new_books.sort(key=lambda x: x["id"], reverse=True)
 
         return {
             "random_books_count": len(random_books),

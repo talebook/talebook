@@ -1,32 +1,48 @@
 <template>
-    <v-row>
-    <v-col cols=12 xs=12 sm=6 md=4 v-for="(book,idx) in render_books" :key="idx+'-books-'+book.id" class="book-list-card">
-        <v-card :to="book.href" >
-            <v-row>
-                <v-col cols=3 class='col-book-img'>
-                    <v-img :src="book.img" :aspect-ratio="11/15" ></v-img>
-                </v-col>
-                <v-col cols=9 class='col-book-info'>
-                    <v-card-text class="pb-0" align-left>
-                        <div class="book-title">{{book.title}}</div>
-                        <slot name="introduce" :book="book"></slot>
-                        <div class="book-comments">
-                            <p v-if="book.comments" v-html="book.comments"></p>
-                            <p  v-else>点击浏览详情</p>
-                        </div>
-                    </v-card-text>
-                </v-col>
-            </v-row>
-            <slot name="actions" :book="book"></slot>
-        </v-card>
-    </v-col>
-    </v-row>
+    <div>
+        <v-row>
+            <v-col cols=12 xs=12 sm=6 md=4 v-for="(book,idx) in render_books" :key="idx+'-books-'+book.id" class="book-list-card">
+                <v-card :to="book.href" >
+                    <v-row>
+                        <v-col cols=3 class='col-book-img'>
+                            <v-img :src="book.img" :aspect-ratio="11/15" ></v-img>
+                        </v-col>
+                        <v-col cols=9 class='col-book-info'>
+                            <v-card-text class="pb-0" align-left>
+                                <div class="book-title">{{book.title}}</div>
+                                <slot name="introduce" :book="book"></slot>
+                                <div class="book-comments">
+                                    <p v-if="book.comments" v-html="book.comments"></p>
+                                    <p  v-else>点击浏览详情</p>
+                                </div>
+                            </v-card-text>
+                        </v-col>
+                    </v-row>
+                    <slot name="actions" :book="book"></slot>
+                </v-card>
+            </v-col>
+        </v-row>
+        
+        <!-- 空状态提示 -->
+        <v-row v-if="render_books.length === 0" class="empty-state">
+            <v-col cols=12>
+                <v-card class="ma-1 pa-6 text-center">
+                    <v-icon large color="grey lighten-2">mdi-book-open-variant</v-icon>
+                    <h3 class="text-h6 grey--text">本书库暂无藏书</h3>
+                    <p class="text-caption grey--text">请先添加书籍到书库</p>
+                </v-card>
+            </v-col>
+        </v-row>
+    </div>
 </template>
 
 <script>
 export default {
     props: {
-        books: Array,
+        books: {
+            type: Array,
+            default: () => [],
+        },
     },
     components: {
     },

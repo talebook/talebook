@@ -130,6 +130,9 @@ export default {
                 { icon: "home", key: "site_title", label: "网站标题", },
                 { icon: "mdi-copyright", key: "HEADER", label: "网站公告", type: 'textarea' },
                 { icon: "mdi-copyright", key: "FOOTER", label: "网站脚注", type: 'textarea' },
+                { icon: "mdi-copyright", key: "FOOTER_EXTRA_HTML", label: "页脚额外HTML内容", type: 'textarea' },
+                { icon: "mdi-copyright", key: "SIDEBAR_EXTRA_HTML", label: "侧边栏额外HTML内容", type: 'textarea' },
+                { key: "SHOW_SIDEBAR_SYS", label: "在侧边栏中显示系统信息", type: 'checkbox' },
             ],
             groups: [
             {

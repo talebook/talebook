@@ -54,7 +54,7 @@ docker-compose -f docker-compose.yml  up -d
 
 ## 常见问题 
 
-常见问题请参阅[使用指南](document/README.zh_CN.md)，无法解决的话，提个ISSUEE，[进Q群交流](https://qm.qq.com/q/5lSfpJGsBq)
+常见问题请参阅[使用指南](document/README.zh_CN.md)，无法解决的话，提个ISSUES，[进Q群交流](https://qm.qq.com/q/5lSfpJGsBq)
 
 手动安装请参考[开发者指南](document/Development.zh_CN.md)
 
