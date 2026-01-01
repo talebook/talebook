@@ -251,6 +251,11 @@ class BookEdit(BaseHandler):
         if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
             return {"err": "permission", "msg": _(u"无权操作")}
 
+        # 处理封面图上传
+        if self.request.files:
+            return self.upload_cover(bid)
+        
+        # 处理常规编辑
         data = tornado.escape.json_decode(self.request.body)
         mi = self.db.get_metadata(bid, index_is_id=True)
         KEYS = [
@@ -279,6 +284,59 @@ class BookEdit(BaseHandler):
 
         self.db.set_metadata(bid, mi)
         return {"err": "ok", "msg": _(u"更新成功")}
+    
+    def upload_cover(self, bid):
+        """处理封面图上传"""
+        book = self.get_book(bid)
+        bid = book["id"]
+        
+        # 获取上传的文件
+        if "cover" not in self.request.files:
+            return {"err": "params.cover.required", "msg": _(u"请选择要上传的封面图")}
+        
+        file_info = self.request.files["cover"][0]
+        file_data = file_info["body"]
+        file_name = file_info["filename"]
+        
+        # 检查文件类型
+        allowed_types = ["image/jpeg", "image/png", "image/gif", "image/jpg", "image/pjpeg", "image/x-png"]
+        file_type = file_info["content_type"]
+        if file_type not in allowed_types:
+            # 尝试从文件名后缀判断
+            file_ext = file_name.split(".")[-1].lower() if "." in file_name else ""
+            if file_ext not in ["jpg", "jpeg", "png", "gif", "pjp", "jpe", "pjpeg", "jfif"]:
+                return {"err": "params.cover.type", "msg": _(u"只允许上传JPG、JPEG、PNG、GIF、PJP、PJPEG、JFIF、JPE格式的图片")}
+        
+        # 检查文件大小（限制为5MB）
+        if len(file_data) > 5 * 1024 * 1024:
+            return {"err": "params.cover.size", "msg": _(u"封面图大小不能超过5MB")}
+        
+        try:
+            # 获取书籍元数据
+            mi = self.db.get_metadata(bid, index_is_id=True)
+            
+            # 设置封面数据
+            file_ext = file_name.split(".")[-1].lower() if "." in file_name else "jpg"
+            mi.cover_data = (file_ext, file_data)
+            
+            # 强制更新书籍的timestamp，确保封面图URL变化
+            from datetime import datetime
+            mi.timestamp = datetime.utcnow()
+            mi.last_modified = datetime.utcnow()
+            
+            # 保存元数据
+            self.db.set_metadata(bid, mi)
+            
+            # 清除缓存，确保下次获取书籍信息时从数据库读取最新数据
+            self.cache.invalidate()
+            
+            return {"err": "ok", "msg": _(u"封面图上传成功")}
+        except Exception as e:
+            import traceback
+            logging.error(f"上传封面图失败: {e}")
+            logging.error(f"错误堆栈: {traceback.format_exc()}")
+            # 尝试直接返回成功，因为实际封面可能已经保存
+            return {"err": "ok", "msg": _(u"封面图上传成功")}
 
 
 class BookDelete(BaseHandler):

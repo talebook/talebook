@@ -18,8 +18,9 @@ CONF = loader.get_settings()
 
 class ImageHandler(BaseHandler):
     def send_error_of_not_invited(self):
-        self.set_header("WWW-Authenticate", "Basic")
-        self.set_status(401)
+        # 对于封面图请求，如果需要邀请码，返回默认封面而不是401错误
+        self.set_header("Content-Type", "image/jpeg")
+        self.write(self.default_cover)
         raise web.Finish()
 
     def get(self, fmt, id, **kwargs):
