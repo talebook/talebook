@@ -517,13 +517,17 @@ class BookUpload(BaseHandler):
         with open(fpath, "rb") as stream:
             mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
             mi.title = utils.super_strip(mi.title)
-            # 保留所有作者信息，用于比较
-            mi.authors = [utils.super_strip(author) for author in mi.authors]
+            # 保留所有作者信息，与批量导入逻辑保持一致
+            mi.authors = [utils.super_strip(s) for s in mi.authors]
 
         # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
         if fmt in ["txt", "pdf"]:
-            mi.title = name.replace("." + fmt, "")
+            # 使用文件名提取标题，与批量导入逻辑保持一致
+            fname = os.path.basename(fpath)
+            mi.title = fname.replace("." + fmt, "")
             mi.authors = [_(u"佚名")]
+            # 确保author_sort也被设置，与批量导入逻辑保持一致
+            mi.author_sort = mi.authors[0] if mi.authors else ""
 
         logging.info("upload mi.title = " + repr(mi.title))
         books = self.db.books_with_same_title(mi)
