@@ -129,11 +129,21 @@ class ScanService(AsyncService):
             # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
             ids = self.db.books_with_same_title(mi)
             if ids:
+                # 区分同名同作者和同名不同作者的书籍
+                same_author_exists = False
                 for b in self.db.get_data_as_dict(ids=list(ids)):
-                    if fmt.upper() in b.get("available_formats", ""):
-                        row.book_id = b['id']
-                        row.status = ScanFile.EXIST
-                        break
+                    book_authors = b.get("authors", [])
+                    mi_authors = mi.authors
+                    
+                    # 检查作者是否相同
+                    if set(book_authors) == set(mi_authors):
+                        if fmt.upper() in b.get("available_formats", ""):
+                            row.book_id = b['id']
+                            row.status = ScanFile.EXIST
+                            same_author_exists = True
+                            break
+                
+                # 如果是同名不同作者，不标记为已存在，允许导入
             if row.status == ScanFile.EXIST:
                 continue
             if not self.save_or_rollback(row):
@@ -170,17 +180,45 @@ class ScanService(AsyncService):
             # 再次检查是否有重复书籍
             ids = self.db.books_with_same_title(mi)
             if ids:
-                row.book_id = ids.pop()
-                for b in self.db.get_data_as_dict(ids=ids):
-                    if fmt.upper() in b.get("available_formats", ""):
-                        row.status = ScanFile.EXIST
-                        break
-                if row.status != ScanFile.EXIST:
+                # 区分同名同作者和同名不同作者的书籍
+                same_author_book_id = None
+                
+                for b in self.db.get_data_as_dict(ids=list(ids)):
+                    book_authors = b.get("authors", [])
+                    mi_authors = mi.authors
+                    
+                    # 检查作者是否相同
+                    if set(book_authors) == set(mi_authors):
+                        same_author_book_id = b['id']
+                        if fmt.upper() in b.get("available_formats", ""):
+                            row.status = ScanFile.EXIST
+                            break
+                
+                if same_author_book_id and row.status != ScanFile.EXIST:
+                    # 同名同作者，添加格式到现有书籍
+                    row.book_id = same_author_book_id
                     logging.info(
                         "import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
                     self.db.add_format(row.book_id, fmt.upper(), fpath, True)
                     row.status = ScanFile.IMPORTED
-                self.save_or_rollback(row)
+                    self.save_or_rollback(row)
+                elif row.status != ScanFile.EXIST:
+                    # 同名不同作者，导入为新书
+                    logging.info("import [%s] from %s as new book (different author)", repr(mi.title), fpath)
+                    row.book_id = self.db.import_book(mi, [fpath])
+                    row.status = ScanFile.IMPORTED
+                    self.save_or_rollback(row)
+                    
+                    # 添加关联表
+                    item = Item()
+                    item.book_id = row.book_id
+                    item.collector_id = user_id
+                    try:
+                        item.save()
+                        imported.append(row.book_id)
+                    except Exception as err:
+                        self.session.rollback()
+                        logging.error("save link error: %s", err)
             else:
                 logging.info("import [%s] from %s", repr(mi.title), fpath)
                 row.book_id = self.db.import_book(mi, [fpath])

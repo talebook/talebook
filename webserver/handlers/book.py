@@ -517,7 +517,8 @@ class BookUpload(BaseHandler):
         with open(fpath, "rb") as stream:
             mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
             mi.title = utils.super_strip(mi.title)
-            mi.authors = [utils.super_strip(mi.author_sort)]
+            # 保留所有作者信息，用于比较
+            mi.authors = [utils.super_strip(author) for author in mi.authors]
 
         # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
         if fmt in ["txt", "pdf"]:
@@ -526,20 +527,34 @@ class BookUpload(BaseHandler):
 
         logging.info("upload mi.title = " + repr(mi.title))
         books = self.db.books_with_same_title(mi)
+        same_author_book_id = None
+        different_author_books = []
+        
         if books:
-            book_id = None
+            # 区分同名同作者和同名不同作者的书籍
             for b in self.db.get_data_as_dict(ids=books):
-                if book_id is None:
-                    book_id = b.get("id")
-                if fmt.upper() in b.get("available_formats", ""):
-                    return {
-                        "err": "samebook",
-                        "msg": _(u"同名书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
-                        "book_id": b.get("id")
-                    }
+                book_authors = b.get("authors", [])
+                mi_authors = mi.authors
+                
+                # 检查作者是否相同
+                if set(book_authors) == set(mi_authors):
+                    same_author_book_id = b.get("id")
+                    # 检查是否已存在相同格式
+                    if fmt.upper() in b.get("available_formats", ""):
+                        return {
+                            "err": "samebook",
+                            "msg": _(u"同名同作者书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
+                            "book_id": same_author_book_id
+                        }
+                else:
+                    different_author_books.append(b)
+        
+        # 如果存在同名同作者书籍，添加格式到该书籍
+        if same_author_book_id:
             logging.info(
                 "import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
-            self.db.add_format(book_id, fmt.upper(), fpath, True)
+            self.db.add_format(same_author_book_id, fmt.upper(), fpath, True)
+            book_id = same_author_book_id
         else:
             fpaths = [fpath]
             book_id = self.db.import_book(mi, fpaths)
