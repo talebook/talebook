@@ -59,6 +59,11 @@ class ScanService(AsyncService):
                     continue
                 tasks.append((fname, fpath, fmt))
 
+        # 检查是否有符合条件的书籍文件
+        if not tasks:
+            logging.info("在目录 %s 中没有找到符合条件的书籍文件", path_dir)
+            return
+
         # 生成任务ID
         scan_id = int(time.time())
         logging.info("========== start to check files size & name ============")
@@ -157,6 +162,12 @@ class ScanService(AsyncService):
         import_id = int(time.time())
 
         query = self.build_query(hashlist)
+        
+        # 检查是否有可导入的书籍
+        if query.count() == 0:
+            logging.info("没有找到可导入的书籍文件")
+            return
+            
         query.update({ScanFile.import_id: import_id}, synchronize_session=False)
         self.session.commit()
 
