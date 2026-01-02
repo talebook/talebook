@@ -292,11 +292,13 @@ export default {
             ALLOW_GUEST_READ: true,
             ALLOW_GUEST_DOWNLOAD: true,
             ALLOW_GUEST_PUSH: true,
+            ALLOW_GUEST_UPLOAD: false,
         },
         guestPermissionList: [
             { key: "ALLOW_GUEST_READ", label: "允许访客在线阅读（无需注册和登录）" },
             { key: "ALLOW_GUEST_DOWNLOAD", label: "允许任意下载（访客无需注册和登录）" },
             { key: "ALLOW_GUEST_PUSH", label: "允许任意推送Kindle（访客无需注册和登录）" },
+            { key: "ALLOW_GUEST_UPLOAD", label: "允许访客上传书籍（无需注册和登录）" },
         ],
         headers: [
             { text: "ID", sortable: true, value: "id" },
