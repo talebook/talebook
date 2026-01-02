@@ -575,6 +575,34 @@ class AdminBookFill(BaseHandler):
         return {"err": "ok", "msg": _(u"任务启动成功！请耐心等待，稍后再来刷新页面")}
 
 
+class AdminBookDelete(BaseHandler):
+    @js
+    @is_admin
+    def post(self):
+        req = tornado.escape.json_decode(self.request.body)
+        idlist = req["idlist"]
+        if not idlist or not isinstance(idlist, list):
+            return {"err": "params.error", "msg": _(u"参数错误，idlist必须是数组")}
+
+        for bid in idlist:
+            if not isinstance(bid, int):
+                return {"err": "params.error.idlist", "msg": _(u"idlist参数错误，必须是整数数组")}
+
+        # 执行批量删除
+        deleted_count = 0
+        for bid in idlist:
+            try:
+                # 删除图书
+                self.db.delete_book(bid)
+                deleted_count += 1
+            except Exception as e:
+                logging.error(f"Failed to delete book {bid}: {e}")
+                continue
+
+        # Cache对象会自动更新，不需要手动clean
+        return {"err": "ok", "msg": _(u"成功删除 {0} 本书籍".format(deleted_count))}
+
+
 def routes():
     return [
         (r"/api/admin/ssl", AdminSSL),
@@ -584,4 +612,5 @@ def routes():
         (r"/api/admin/testmail", AdminTestMail),
         (r"/api/admin/book/list", AdminBookList),
         (r"/api/admin/book/fill", AdminBookFill),
+        (r"/api/admin/book/delete", AdminBookDelete),
     ]

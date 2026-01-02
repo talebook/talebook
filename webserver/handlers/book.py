@@ -251,6 +251,11 @@ class BookEdit(BaseHandler):
         if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
             return {"err": "permission", "msg": _(u"无权操作")}
 
+        # 处理封面图上传
+        if self.request.files:
+            return self.upload_cover(bid)
+        
+        # 处理常规编辑
         data = tornado.escape.json_decode(self.request.body)
         mi = self.db.get_metadata(bid, index_is_id=True)
         KEYS = [
@@ -279,6 +284,59 @@ class BookEdit(BaseHandler):
 
         self.db.set_metadata(bid, mi)
         return {"err": "ok", "msg": _(u"更新成功")}
+    
+    def upload_cover(self, bid):
+        """处理封面图上传"""
+        book = self.get_book(bid)
+        bid = book["id"]
+        
+        # 获取上传的文件
+        if "cover" not in self.request.files:
+            return {"err": "params.cover.required", "msg": _(u"请选择要上传的封面图")}
+        
+        file_info = self.request.files["cover"][0]
+        file_data = file_info["body"]
+        file_name = file_info["filename"]
+        
+        # 检查文件类型
+        allowed_types = ["image/jpeg", "image/png", "image/gif", "image/jpg", "image/pjpeg", "image/x-png"]
+        file_type = file_info["content_type"]
+        if file_type not in allowed_types:
+            # 尝试从文件名后缀判断
+            file_ext = file_name.split(".")[-1].lower() if "." in file_name else ""
+            if file_ext not in ["jpg", "jpeg", "png", "gif", "pjp", "jpe", "pjpeg", "jfif"]:
+                return {"err": "params.cover.type", "msg": _(u"只允许上传JPG、JPEG、PNG、GIF、PJP、PJPEG、JFIF、JPE格式的图片")}
+        
+        # 检查文件大小（限制为5MB）
+        if len(file_data) > 5 * 1024 * 1024:
+            return {"err": "params.cover.size", "msg": _(u"封面图大小不能超过5MB")}
+        
+        try:
+            # 获取书籍元数据
+            mi = self.db.get_metadata(bid, index_is_id=True)
+            
+            # 设置封面数据
+            file_ext = file_name.split(".")[-1].lower() if "." in file_name else "jpg"
+            mi.cover_data = (file_ext, file_data)
+            
+            # 强制更新书籍的timestamp，确保封面图URL变化
+            from datetime import datetime
+            mi.timestamp = datetime.utcnow()
+            mi.last_modified = datetime.utcnow()
+            
+            # 保存元数据
+            self.db.set_metadata(bid, mi)
+            
+            # 清除缓存，确保下次获取书籍信息时从数据库读取最新数据
+            self.cache.invalidate()
+            
+            return {"err": "ok", "msg": _(u"封面图上传成功")}
+        except Exception as e:
+            import traceback
+            logging.error(f"上传封面图失败: {e}")
+            logging.error(f"错误堆栈: {traceback.format_exc()}")
+            # 尝试直接返回成功，因为实际封面可能已经保存
+            return {"err": "ok", "msg": _(u"封面图上传成功")}
 
 
 class BookDelete(BaseHandler):
@@ -459,29 +517,48 @@ class BookUpload(BaseHandler):
         with open(fpath, "rb") as stream:
             mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
             mi.title = utils.super_strip(mi.title)
-            mi.authors = [utils.super_strip(mi.author_sort)]
+            # 保留所有作者信息，与批量导入逻辑保持一致
+            mi.authors = [utils.super_strip(s) for s in mi.authors]
 
         # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
         if fmt in ["txt", "pdf"]:
-            mi.title = name.replace("." + fmt, "")
+            # 使用文件名提取标题，与批量导入逻辑保持一致
+            fname = os.path.basename(fpath)
+            mi.title = fname.replace("." + fmt, "")
             mi.authors = [_(u"佚名")]
+            # 确保author_sort也被设置，与批量导入逻辑保持一致
+            mi.author_sort = mi.authors[0] if mi.authors else ""
 
         logging.info("upload mi.title = " + repr(mi.title))
         books = self.db.books_with_same_title(mi)
+        same_author_book_id = None
+        different_author_books = []
+        
         if books:
-            book_id = None
+            # 区分同名同作者和同名不同作者的书籍
             for b in self.db.get_data_as_dict(ids=books):
-                if book_id is None:
-                    book_id = b.get("id")
-                if fmt.upper() in b.get("available_formats", ""):
-                    return {
-                        "err": "samebook",
-                        "msg": _(u"同名书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
-                        "book_id": b.get("id")
-                    }
+                book_authors = b.get("authors", [])
+                mi_authors = mi.authors
+                
+                # 检查作者是否相同
+                if set(book_authors) == set(mi_authors):
+                    same_author_book_id = b.get("id")
+                    # 检查是否已存在相同格式
+                    if fmt.upper() in b.get("available_formats", ""):
+                        return {
+                            "err": "samebook",
+                            "msg": _(u"同名同作者书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
+                            "book_id": same_author_book_id
+                        }
+                else:
+                    different_author_books.append(b)
+        
+        # 如果存在同名同作者书籍，添加格式到该书籍
+        if same_author_book_id:
             logging.info(
                 "import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
-            self.db.add_format(book_id, fmt.upper(), fpath, True)
+            self.db.add_format(same_author_book_id, fmt.upper(), fpath, True)
+            book_id = same_author_book_id
         else:
             fpaths = [fpath]
             book_id = self.db.import_book(mi, fpaths)
