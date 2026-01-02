@@ -330,6 +330,7 @@ export default {
                     ALLOW_GUEST_READ: rsp.settings.ALLOW_GUEST_READ,
                     ALLOW_GUEST_DOWNLOAD: rsp.settings.ALLOW_GUEST_DOWNLOAD,
                     ALLOW_GUEST_PUSH: rsp.settings.ALLOW_GUEST_PUSH,
+                    ALLOW_GUEST_UPLOAD: rsp.settings.ALLOW_GUEST_UPLOAD,
                 };
             }
         });
