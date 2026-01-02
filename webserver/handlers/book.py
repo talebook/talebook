@@ -271,7 +271,8 @@ class BookEdit(BaseHandler):
         ]
         for key, val in data.items():
             if key in KEYS:
-                mi.set(key, val)
+                # 直接设置属性，确保空字符串值也能被正确保存
+                setattr(mi, key, val)
 
         if data.get("pubdate", None):
             content = douban.str2date(data["pubdate"])

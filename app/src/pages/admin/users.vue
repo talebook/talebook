@@ -2,10 +2,16 @@
     <v-card>
         <v-card-title class="d-flex justify-space-between align-center">
             <span> 用户管理 </span>
-            <v-btn color="primary" @click="showAddDialog = true">
-                <v-icon>mdi-plus</v-icon>
-                添加用户
-            </v-btn>
+            <div>
+                <v-btn color="primary" @click="showGuestPermissionDialog = true" class="mr-2">
+                    <v-icon>mdi-account-group</v-icon>
+                    访客权限
+                </v-btn>
+                <v-btn color="primary" @click="showAddDialog = true">
+                    <v-icon>mdi-plus</v-icon>
+                    添加用户
+                </v-btn>
+            </div>
         </v-card-title>
         
         <!-- 添加用户对话框 -->
@@ -95,6 +101,37 @@
                     <v-spacer></v-spacer>
                     <v-btn text @click="showAddDialog = false">取消</v-btn>
                     <v-btn color="primary" @click="addUser">确定</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+        
+        <!-- 访客权限设置对话框 -->
+        <v-dialog
+            v-model="showGuestPermissionDialog"
+            max-width="500px"
+        >
+            <v-card>
+                <v-card-title> 访客权限设置 </v-card-title>
+                <v-card-text>
+                    <v-form ref="guestPermissionForm" v-model="guestValid">
+                        <v-container fluid>
+                            <v-row>
+                                <v-col cols="12" v-for="perm in guestPermissionList" :key="perm.key">
+                                    <v-checkbox
+                                        v-model="guestPermissions[perm.key]"
+                                        :label="perm.label"
+                                        color="primary"
+                                        hide-details
+                                    ></v-checkbox>
+                                </v-col>
+                            </v-row>
+                        </v-container>
+                    </v-form>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="showGuestPermissionDialog = false">取消</v-btn>
+                    <v-btn color="primary" @click="saveGuestPermissions">保存</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -220,10 +257,13 @@ export default {
         // 添加用户对话框控制
         showAddDialog: false,
         valid: true,
+        // 访客权限对话框控制
+        showGuestPermissionDialog: false,
+        guestValid: true,
         // 表单验证规则
         requiredRule: v => !!v || '此项为必填项',
         emailRule: function (email) {
-            var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+            var re = /^(([^<>()[]\\.,;:\s@"]+(\.[^<>()[]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
             return re.test(email) || "邮箱格式不正确";
         },
         usernameRule: v => ((20 >= v.length && v.length >= 5) && /^[a-z][a-z0-9_]*$/.test(v)) || '用户名必须以小写字母开头，只能包含字母、数字和下划线，长度在5-20个字符之间',
@@ -247,6 +287,17 @@ export default {
                 can_read: true
             }
         },
+        // 访客权限设置
+        guestPermissions: {
+            ALLOW_GUEST_READ: true,
+            ALLOW_GUEST_DOWNLOAD: true,
+            ALLOW_GUEST_PUSH: true,
+        },
+        guestPermissionList: [
+            { key: "ALLOW_GUEST_READ", label: "允许访客在线阅读（无需注册和登录）" },
+            { key: "ALLOW_GUEST_DOWNLOAD", label: "允许任意下载（访客无需注册和登录）" },
+            { key: "ALLOW_GUEST_PUSH", label: "允许任意推送Kindle（访客无需注册和登录）" },
+        ],
         headers: [
             { text: "ID", sortable: true, value: "id" },
             { text: "用户名", sortable: true, value: "username" },
@@ -269,6 +320,18 @@ export default {
             { code: "r", name: "can_read", text: "在线阅读" },
         ],
     }),
+    created() {
+        // 获取访客权限设置
+        this.$backend("/admin/settings").then(rsp => {
+            if (rsp.err === "ok") {
+                this.guestPermissions = {
+                    ALLOW_GUEST_READ: rsp.settings.ALLOW_GUEST_READ,
+                    ALLOW_GUEST_DOWNLOAD: rsp.settings.ALLOW_GUEST_DOWNLOAD,
+                    ALLOW_GUEST_PUSH: rsp.settings.ALLOW_GUEST_PUSH,
+                };
+            }
+        });
+    },
     watch: {
         options: {
             handler() {
@@ -396,6 +459,20 @@ export default {
                 }
             }).finally(() => {
                 this.loading = false;
+            });
+        },
+        // 保存访客权限设置
+        saveGuestPermissions() {
+            this.$backend("/admin/settings", {
+                method: "POST",
+                body: JSON.stringify(this.guestPermissions)
+            }).then((rsp) => {
+                if (rsp.err != "ok") {
+                    this.$alert("error", rsp.msg);
+                } else {
+                    this.$alert("success", "访客权限设置保存成功！");
+                    this.showGuestPermissionDialog = false;
+                }
             });
         }
     },
