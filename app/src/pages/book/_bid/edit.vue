@@ -256,16 +256,7 @@ export default {
             // 处理书籍信息，确保空值被正确设置
             const bookData = {...this.book};
             
-            // 处理标签和作者，如果为空则加入一个空格元素
-            if (!bookData.tags || bookData.tags.length === 0) {
-                bookData.tags = [" "];
-            }
-            if (!bookData.authors || bookData.authors.length === 0) {
-                bookData.authors = [" "];
-            }
-            
-            // 处理其他字段，如果为空则设置为空格
-            const fieldsToCheck = ["series", "publisher", "isbn", "language", "pubdate"];
+            const fieldsToCheck = ["title", "series", "publisher", "isbn", "language", "comments", "pubdate"];
             for (const field of fieldsToCheck) {
                 if (!bookData[field]) {
                     bookData[field] = " ";
