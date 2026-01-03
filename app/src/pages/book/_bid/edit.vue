@@ -253,10 +253,20 @@ export default {
                 }
             }
             
+            // 处理书籍信息，确保空值被正确设置
+            const bookData = {...this.book};
+            
+            const fieldsToCheck = ["title", "series", "publisher", "isbn", "language", "comments", "pubdate"];
+            for (const field of fieldsToCheck) {
+                if (!bookData[field]) {
+                    bookData[field] = " ";
+                }
+            }
+            
             // 保存其他书籍信息
             const rsp = await this.$backend("/book/" + this.book.id + "/edit", {
                 method: "POST",
-                body: JSON.stringify(this.book),
+                body: JSON.stringify(bookData),
             });
             
             if (rsp.err === 'ok') {

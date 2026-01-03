@@ -273,6 +273,7 @@ class BookEdit(BaseHandler):
             if key in KEYS:
                 mi.set(key, val)
 
+
         if data.get("pubdate", None):
             content = douban.str2date(data["pubdate"])
             if content is None:
@@ -492,11 +493,14 @@ class BookUpload(BaseHandler):
         return (p["filename"], p["body"])
 
     @js
-    @auth
     def post(self):
         from calibre.ebooks.metadata.meta import get_metadata
 
-        if not self.current_user.can_upload():
+        # 检查访客上传权限
+        if not self.current_user:
+            if not CONF.get("ALLOW_GUEST_UPLOAD", False):
+                return {"err": "user.need_login", "msg": _(u"请先登录")}
+        elif not self.current_user.can_upload():
             return {"err": "permission", "msg": _(u"无权操作")}
         name, data = self.get_upload_file()
         name = re.sub(r"[\x80-\xFF]+", BookUpload.convert, name)

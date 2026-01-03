@@ -40,11 +40,11 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
     fi
 
 # 针对 ARM32 架构的特殊处理
-# RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
-#    echo "Building for ARM32 (ARMv7) architecture"; \
-#    # 确保使用兼容的包架构
-#    dpkg --add-architecture armhf || true; \
-#    fi
+RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+    echo "Building for ARM32 (ARMv7) architecture"; \
+    # 确保使用兼容的包架构
+    dpkg --add-architecture armhf || true; \
+    fi
 
 # install envsubst gosu procps
 RUN apt-get update -y && \

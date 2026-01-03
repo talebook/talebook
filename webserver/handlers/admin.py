@@ -275,6 +275,7 @@ class AdminSettings(BaseHandler):
             "ALLOW_GUEST_DOWNLOAD",
             "ALLOW_GUEST_PUSH",
             "ALLOW_GUEST_READ",
+            "ALLOW_GUEST_UPLOAD",
             "ALLOW_REGISTER",
             "BOOK_NAMES_FORMAT",
             "BOOK_NAV",
