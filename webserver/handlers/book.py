@@ -499,7 +499,7 @@ class BookUpload(BaseHandler):
         # 检查访客上传权限
         if not self.current_user:
             if not CONF.get("ALLOW_GUEST_UPLOAD", False):
-                return {"err": "permission", "msg": _(u"无权操作")}
+                return {"err": "user.need_login", "msg": _(u"请先登录")}
         elif not self.current_user.can_upload():
             return {"err": "permission", "msg": _(u"无权操作")}
         name, data = self.get_upload_file()
