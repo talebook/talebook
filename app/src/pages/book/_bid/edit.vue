@@ -256,10 +256,19 @@ export default {
             // 处理书籍信息，确保空值被正确设置
             const bookData = {...this.book};
             
+            // 处理列表类型字段
+            if (!bookData.tags || bookData.tags.length === 0) {
+                bookData.tags = [" DELETE "];
+            }
+            if (!bookData.authors || bookData.authors.length === 0) {
+                bookData.authors = [" DELETE "];
+            }
+            
+            // 处理其他字段
             const fieldsToCheck = ["title", "series", "publisher", "isbn", "language", "comments", "pubdate"];
             for (const field of fieldsToCheck) {
                 if (!bookData[field]) {
-                    bookData[field] = " ";
+                    bookData[field] = " DELETE ";
                 }
             }
             
