@@ -295,12 +295,17 @@ class UserInfo(BaseHandler):
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
         count_all_users = self.session.query(func.count(Reader.id)).scalar()
         count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
+        # 获取格式数量
+        sql = "SELECT COUNT(DISTINCT format) FROM data"
+        formats_count = self.cache.backend.conn.get(sql)[0][0]
+
         return {
             "books": db.count(),
             "tags": len(db.all_tags()),
             "authors": len(db.all_authors()),
             "publishers": len(db.all_publishers()),
             "series": len(db.all_series()),
+            "formats": formats_count,
             "mtime": db.last_modified().strftime("%Y-%m-%d"),
             "users": count_all_users,
             "active": count_hot_users,
