@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 import math
 import sys
+import logging
 from functools import cmp_to_key
 from gettext import gettext as _
 
