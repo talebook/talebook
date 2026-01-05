@@ -6,12 +6,13 @@ on:
       - master
     tags:
       - "v*"
+    # 只在hehetoshang/talebook仓库触发
+    if: github.repository == 'hehetoshang/talebook'
   pull_request:
     branches:
       - master
-  
-  # 只在hehetoshang/talebook仓库触发
-  if: github.repository == 'hehetoshang/talebook'
+    # 只在hehetoshang/talebook仓库触发
+    if: github.repository == 'hehetoshang/talebook'
 
 env:
   REGISTRY: docker.io
