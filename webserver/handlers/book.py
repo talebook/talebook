@@ -271,13 +271,37 @@ class BookEdit(BaseHandler):
         ]
         for key, val in data.items():
             if key in KEYS:
-                mi.set(key, val)
+                # 处理DELETE魔术字符串
+                is_delete = False
+                # 检查字符串类型
+                if val == " DELETE ":
+                    is_delete = True
+                # 检查列表类型，如[" DELETE "]
+                elif isinstance(val, list) and len(val) == 1 and val[0] == " DELETE ":
+                    is_delete = True
+                
+                if is_delete:
+                    # 设置为空值，不同字段类型使用不同的空值
+                    if key in ["authors", "tags"]:
+                        # 列表类型使用空列表
+                    #    mi.set(key, [" "])
+                        pass
+                    else:
+                        # 其他类型使用空字符串
+                        mi.set(key, " ")
+                else:
+                    mi.set(key, val)
+
 
         if data.get("pubdate", None):
-            content = douban.str2date(data["pubdate"])
-            if content is None:
-                return {"err": "params.pudate.invalid", "msg": _(u"出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019")}
-            mi.set("pubdate", content)
+            # 处理DELETE魔术字符串
+            if data["pubdate"] == " DELETE ":
+                mi.set("pubdate", None)
+            else:
+                content = douban.str2date(data["pubdate"])
+                if content is None:
+                    return {"err": "params.pudate.invalid", "msg": _(u"出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019")}
+                mi.set("pubdate", content)
 
         if "tags" in data and not data["tags"]:
             self.db.set_tags(bid, [])
@@ -492,11 +516,14 @@ class BookUpload(BaseHandler):
         return (p["filename"], p["body"])
 
     @js
-    @auth
     def post(self):
         from calibre.ebooks.metadata.meta import get_metadata
 
-        if not self.current_user.can_upload():
+        # 检查访客上传权限
+        if not self.current_user:
+            if not CONF.get("ALLOW_GUEST_UPLOAD", False):
+                return {"err": "user.need_login", "msg": _(u"请先登录")}
+        elif not self.current_user.can_upload():
             return {"err": "permission", "msg": _(u"无权操作")}
         name, data = self.get_upload_file()
         name = re.sub(r"[\x80-\xFF]+", BookUpload.convert, name)
