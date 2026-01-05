@@ -82,7 +82,7 @@ class MetaBooks(ListHandler):
             "format": _(u'格式为"%(name)s"的书籍'),
         }
         title = titles.get(meta, _(u"未知")) % vars()  # noqa: F841
-        
+
         if meta == "format":
             # 特殊处理格式分类，从data表格获取对应书籍
             sql = """SELECT distinct A.book as id
@@ -97,8 +97,11 @@ class MetaBooks(ListHandler):
             if meta in ["rating"]:
                 name = int(name)
             books = self.get_item_books(category, name)
-        
-        books.sort(key=cmp_to_key(utils.compare_books_by_rating_or_id), reverse=True)
+
+        books.sort(
+            key=cmp_to_key(utils.compare_books_by_rating_or_id),
+            reverse=True
+        )
         return self.render_book_list(books, title=title)
 
 
