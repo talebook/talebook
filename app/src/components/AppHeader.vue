@@ -251,6 +251,7 @@ export default {
                 { icon: "mdi-home-group", href: "/publisher", text: "出版社", count: this.sys.publishers },
                 { icon: "mdi-human-greeting", href: "/author", text: "作者", count: this.sys.authors },
                 { icon: "mdi-tag-heart", href: "/tag", text: "标签", count: this.sys.tags },
+                { icon: "mdi-format-size", href: "/format", text: "格式", count: this.sys.formats },
                 {
                     target: "",
                     links: [
