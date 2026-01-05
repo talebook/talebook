@@ -207,6 +207,7 @@ export default {
             authors: 0,
             publishers: 0,
             series: 0,
+            formats: 0,
             users: 0,
             active: 0,
             version: "",
