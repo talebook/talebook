@@ -6,13 +6,9 @@ on:
       - master
     tags:
       - "v*"
-    # 只在hehetoshang/talebook仓库触发
-    if: github.repository == 'hehetoshang/talebook'
   pull_request:
     branches:
       - master
-    # 只在hehetoshang/talebook仓库触发
-    if: github.repository == 'hehetoshang/talebook'
 
 env:
   REGISTRY: docker.io
@@ -20,6 +16,8 @@ env:
 
 jobs:
   docker:
+    # 将 if 条件移动到这里，控制整个任务的执行
+    if: github.repository == 'hehetoshang/talebook'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -75,7 +73,7 @@ jobs:
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
           push: ${{ github.event_name != 'pull_request' }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/hehetoshang/talebook_amd64:latest
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           cache-to: type=inline,mode=max
           provenance: false
           tags: ${{ steps.meta.outputs.tags }}
