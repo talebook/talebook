@@ -57,7 +57,7 @@ class MetaList(ListHandler):
             GROUP BY A.format"""
             logging.debug(sql)
             rows = self.cache.backend.conn.get(sql)
-            items = [{"id": a, "name": b, "count": c} for a, b, c in rows]
+            items = [{"id": b, "name": b, "count": c} for b, c in rows]
         else:
             items = self.get_category_with_count(meta)
         count = len(items)
