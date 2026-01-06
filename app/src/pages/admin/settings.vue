@@ -142,8 +142,6 @@ export default {
                     { icon: "mdi-link", key: "FEEDBACK_URL", label: "反馈按钮跳转地址" },
                 ],
             },
-            ],
-            groups: [
             {
                 key: "INVITE_MODE",
                 label: "开启私人图书馆模式",
