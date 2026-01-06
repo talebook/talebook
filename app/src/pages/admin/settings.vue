@@ -133,8 +133,15 @@ export default {
                 { icon: "mdi-copyright", key: "FOOTER_EXTRA_HTML", label: "页脚额外HTML内容", type: 'textarea' },
                 { icon: "mdi-copyright", key: "SIDEBAR_EXTRA_HTML", label: "侧边栏额外HTML内容", type: 'textarea' },
                 { key: "SHOW_SIDEBAR_SYS", label: "在侧边栏中显示系统信息", type: 'checkbox' },
-                { key: "ALLOW_FEEDBACK", label: "显示反馈按钮", type: 'checkbox' },
-                { icon: "mdi-link", key: "FEEDBACK_URL", label: "反馈按钮跳转地址" },
+            ],
+            groups: [
+            {
+                key: "ALLOW_FEEDBACK",
+                label: "显示反馈按钮",
+                fields: [
+                    { icon: "mdi-link", key: "FEEDBACK_URL", label: "反馈按钮跳转地址" },
+                ],
+            },
             ],
             groups: [
             {
