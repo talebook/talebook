@@ -5,6 +5,7 @@ import hashlib
 import os
 import logging
 import time
+import datetime
 from gettext import gettext as _
 
 from webserver import utils
@@ -18,13 +19,19 @@ SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
 class ScanService(AsyncService):
     def save_or_rollback(self, row):
         try:
-            row.save()
-            self.session.commit()
+            # 直接使用session.add和flush，避免多次commit导致的事务冲突
+            self.session.add(row)
+            # 更新时间
+            row.update_time = datetime.datetime.now()
+            self.session.flush()
             bid = "[ book-id=%s ]" % row.book_id
             logging.info("update: status=%-5s, path=%s %s", row.status, row.path, bid if row.book_id > 0 else "")
+            # 提交事务
+            self.session.commit()
             return True
         except Exception as err:
             logging.exception("save error: %s", err)
+            # 回滚事务
             self.session.rollback()
             return False
 
