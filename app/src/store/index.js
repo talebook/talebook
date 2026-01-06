@@ -4,7 +4,7 @@ export const state = () => ({
     }, alert: {
         to: "", msg: "", type: "", show: false,
     }, sys: {
-        socials: [], allow: {},
+        socials: [], allow: {}, footer: '', footer_extra_html: '',
     },
     site_title: "首页",
     site_title_template: "%s | talebook"

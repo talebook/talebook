@@ -130,6 +130,9 @@ export default {
                 { icon: "home", key: "site_title", label: "网站标题", },
                 { icon: "mdi-copyright", key: "HEADER", label: "网站公告", type: 'textarea' },
                 { icon: "mdi-copyright", key: "FOOTER", label: "网站脚注", type: 'textarea' },
+                { icon: "mdi-copyright", key: "FOOTER_EXTRA_HTML", label: "页脚额外HTML内容", type: 'textarea' },
+                { icon: "mdi-copyright", key: "SIDEBAR_EXTRA_HTML", label: "侧边栏额外HTML内容", type: 'textarea' },
+                { key: "SHOW_SIDEBAR_SYS", label: "在侧边栏中显示系统信息", type: 'checkbox' },
             ],
             groups: [
             {
@@ -145,11 +148,6 @@ export default {
         {
             show: false,
             title: "用户设置",
-            fields: [
-                { icon: "", key: "ALLOW_GUEST_READ", label: "允许访客在线阅读（无需注册和登录）", type: 'checkbox' },
-                { icon: "", key: "ALLOW_GUEST_DOWNLOAD", label: "允许任意下载（访客无需注册和登录）", type: 'checkbox' },
-                { icon: "", key: "ALLOW_GUEST_PUSH", label: "允许任意推送Kindle（访客无需注册和登录）", type: 'checkbox' },
-            ],
             groups: [
             {
                 key: "ALLOW_REGISTER",
@@ -225,6 +223,9 @@ export default {
                 // 后续可以修改为choice下拉框选项
                 { icon: "info", key: "BOOK_NAMES_FORMAT", label: "目录和文件名模式", type: 'select',
                     items: [{text: "使用拼音字母目录名 (兼容性高)", value: "en"}, {text: "使用中文目录名 (UTF8编码，更美观)", value: "utf8"} ]
+                },
+                { icon: "info", key: "EPUB_VIEWER", label: "EPUB阅读器", type: 'select',
+                    items: [{text: "Epub Reader（旧版）", value: "epubjs.html"}, {text: "Candle Reader（Beta版，支持章评功能）", value: "creader.html"} ]
                 },
                 { icon: "info", key: "avatar_service", label: "可使用www.gravatar.com或cravatar.cn头像服务" },
                 { icon: "info", key: "MAX_UPLOAD_SIZE", label: "文件上传字节数限制(例如100MB或100KB）" },

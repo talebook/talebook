@@ -38,13 +38,13 @@ export default {
         failmsg: "",
         validmsg: "",
         rules: {
-            user: v => ( 20 >= v.length && v.length >= 5) || '6 ~ 20 characters',
-            pass: v => ( 20 >= v.length && v.length >= 8) || '8 ~ 20 characters',
-            nick: v => v.length >= 2 || 'Min 2 characters',
+            user: v => ( 20 >= v.length && v.length >= 5) || '用户名长度必须在5-20个字符之间',
+            pass: v => ( 20 >= v.length && v.length >= 8) || '密码长度必须在8-20个字符之间',
+            nick: v => v.length >= 2 || '昵称长度至少为2个字符',
             email: function (email) {
-                var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-                return re.test(email) || "Invalid email format";
-            },
+            var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+            return re.test(email) || "邮箱格式不正确";
+        },
         },
 
     }),
@@ -54,9 +54,9 @@ export default {
     methods: {
         valid: function(v) {
             if ( v.length < 8 ) {
-                return 'Min 8 characters';
+                return '密码长度必须在8-20个字符之间';
             }
-            return v == this.password || "Password are not same."
+            return v == this.password || "两次输入的密码不一致"
         },
         signup: function() {
             if ( ! this.$refs.form.validate() ) {

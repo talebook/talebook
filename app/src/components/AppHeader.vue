@@ -12,7 +12,7 @@
                                 <v-icon class="pa-0 ma-0">{{ item.icon }}</v-icon>
                             </v-list-item-action>
                             <v-list-item-content>
-                                <v-list-item-title v-text="item.text"> 管理员 </v-list-item-title>
+                                <v-list-item-title v-text="item.text"></v-list-item-title>
                             </v-list-item-content>
                         </template>
 
@@ -56,8 +56,8 @@
                         </v-list-item-action>
                     </v-list-item>
                 </template>
-                <v-list-item>
-                    <v-img class="ma-auto" max-width="128" src="/logo/link.png"></v-img>
+                <v-list-item v-if="sys.sidebar_extra_html">
+                    <div class="ma-auto" v-html="sys.sidebar_extra_html"></div>
                 </v-list-item>
             </v-list>
         </v-navigation-drawer>
@@ -207,12 +207,15 @@ export default {
             authors: 0,
             publishers: 0,
             series: 0,
+            formats: 0,
             users: 0,
             active: 0,
             version: "",
             mtime: "",
             title: "",
             footer: "",
+            footer_extra_html: "",
+            sidebar_extra_html: "",
             socials: [],
             friends: [],
             allow: {
@@ -249,6 +252,7 @@ export default {
                 { icon: "mdi-home-group", href: "/publisher", text: "出版社", count: this.sys.publishers },
                 { icon: "mdi-human-greeting", href: "/author", text: "作者", count: this.sys.authors },
                 { icon: "mdi-tag-heart", href: "/tag", text: "标签", count: this.sys.tags },
+                { icon: "mdi-file", href: "/format", text: "文件格式", count: this.sys.formats },
                 {
                     target: "",
                     links: [
@@ -268,14 +272,14 @@ export default {
                 { heading: "系统" },
                 { icon: "mdi-history", text: "系统版本", href: "", count: this.sys.version },
                 { icon: "mdi-human", text: "用户数", href: "", count: this.sys.users },
-                { icon: "mdi-cellphone", text: "OPDS接口", href: "/opds/", count: "OPDS", target: "_blank" },
+                { icon: "mdi-cellphone", text: "OPDS介绍", href: "/opds-readme", count: "OPDS", target: "_blank" },
             ];
 
             return home_links
                 .concat(this.user.is_admin ? admin_links : [])
                 .concat(nav_links)
                 .concat(this.sys.friends.length > 0 ? friend_links : [])
-                .concat(sys_links);
+                .concat(this.sys.show_sidebar_sys !== false ? sys_links : []);
         },
     },
     mounted() {

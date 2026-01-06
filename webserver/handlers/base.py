@@ -107,6 +107,12 @@ class BaseHandler(web.RequestHandler):
             username,
         )
 
+    def get_argument(self, name, default=None, strip=True):
+        value = super().get_argument(name, default, strip)
+        if value == 'null':
+            return default
+        return value
+
     def get_secure_cookie(self, key):
         if not self.cookies_cache.get(key, ""):
             self.cookies_cache[key] = super(BaseHandler, self).get_secure_cookie(key)

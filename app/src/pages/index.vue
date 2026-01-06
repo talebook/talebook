@@ -9,6 +9,14 @@
                 <v-img :src="book.img" :aspect-ratio="11/15" > </v-img>
             </v-card>
         </v-col>
+        <!-- 空状态提示 -->
+        <v-col cols=12 v-if="get_random_books.length === 0">
+            <v-card class="ma-1 pa-6 text-center">
+                <v-icon large color="grey lighten-2">mdi-book-open-variant</v-icon>
+                <h3 class="text-h6 grey--text">本书库暂无藏书</h3>
+                <p class="text-caption grey--text">请先添加书籍到书库</p>
+            </v-card>
+        </v-col>
     </v-row>
     <v-row>
         <v-col cols=12>
@@ -74,6 +82,7 @@ export default {
             { icon: 'mdi-human-greeting', href:'/author',    text: '作者',     count: this.$store.state.sys.authors    },
             { icon: 'mdi-home-group',     href:'/publisher', text: '出版社',   count: this.$store.state.sys.publishers },
             { icon: 'mdi-tag-heart',      href:'/tag',       text: '标签',     count: this.$store.state.sys.tags       },
+            { icon: 'mdi-file',    href:'/format',    text: '文件格式',     count: this.$store.state.sys.formats    },
             { icon: 'mdi-history',        href:'/recent',    text: '所有书籍', },
             { icon: 'mdi-trending-up',    href:'/hot',       text: '热度榜单', },
             ]

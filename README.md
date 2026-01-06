@@ -16,7 +16,7 @@ A better online books library management website built on Calibre + Vue
 这是一个基于Calibre的简单的个人图书管理系统，支持**在线阅读**。主要特点是：
 * 美观的界面：由于Calibre自带的网页太丑太难用，于是基于Vue，独立编写了新的界面，支持PC访问和手机浏览；
 * 支持多用户：为了网友们更方便使用，开发了多用户功能，支持~~豆瓣~~（已废弃）、QQ、微博、Github等社交网站的登录；
-* 支持在线阅读：借助[Readium.js](https://github.com/readium/readium-js-viewer) 库，支持了网页在线阅读电子书；
+* 支持在线阅读：借助[epub.js](https://github.com/intity/epubreader-js) 库，支持了网页在线阅读电子书（章评功能开发中）；
 * 支持批量扫描导入书籍；
 * 支持邮件推送：可方便推送到Kindle；
 * 支持OPDS：可使用[KyBooks](http://kybook-reader.com/)等APP方便地读书；
@@ -54,13 +54,13 @@ docker-compose -f docker-compose.yml  up -d
 
 ## 常见问题 
 
-常见问题请参阅[使用指南](document/README.zh_CN.md)，无法解决的话，提个ISSUEE，[进Q群交流](https://qm.qq.com/q/5lSfpJGsBq)
+常见问题请参阅[使用指南](document/README.zh_CN.md)，无法解决的话，提个ISSUES，[进Q群交流](https://qm.qq.com/q/5lSfpJGsBq)
 
 手动安装请参考[开发者指南](document/Development.zh_CN.md)
 
 NAS安装指南：请参考网友们的帖子：[帖子1](https://post.smzdm.com/p/a992p6e0/)，[帖子2](https://post.smzdm.com/p/a3d7ox0k/), [帖子3](https://odcn.top/2019/02/26/2734/)
 
-**如果觉得本项目很棒，欢迎前往[爱发电](https://afdian.net/@talebook)，赞助作者，持续优化，为爱充电！**
+**如果觉得本项目很棒，欢迎前往[爱发电](https://afdian.com/@talebook)，赞助作者，持续优化，为爱充电！**
 
 **再次声明！本项目没有维护任何公开的书库站点，例如 joyeuse, wenyuange 等网站均属于网友搭建的，相关问题请不要咨询我，爱莫能助！**
 
