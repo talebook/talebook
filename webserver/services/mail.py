@@ -44,24 +44,9 @@ class MailService(AsyncService):
         from calibre.utils.smtp import sendmail
 
         smtp_port = 465
-        relay = kwargs.get("relay", CONF.get("smtp_server", ""))
-        if relay and ':' in relay:
-            # 处理IPv6地址和端口，如 [::1]:25
-            if relay.startswith('['):
-                # IPv6地址格式：[IPv6]:port
-                addr_part, port_part = relay.rsplit(':', 1)
-                relay = addr_part  # 保留[IPv6]格式
-            else:
-                # 普通格式：host:port
-                parts = relay.split(':')
-                relay = ':'.join(parts[:-1])  # 处理多个冒号的情况
-                port_part = parts[-1]
-            # 验证端口是否为数字
-            try:
-                smtp_port = int(port_part)
-            except ValueError:
-                logging.warning(f"无效的SMTP端口: {port_part}, 使用默认端口465")
-                smtp_port = 465
+        relay = kwargs.get("relay", CONF["smtp_server"])
+        if ':' in relay:
+            relay, smtp_port = relay.split(":")
         username = kwargs.get("username", CONF["smtp_username"])
         password = kwargs.get("password", CONF["smtp_password"])
         enc = kwargs.get("encryption", CONF["smtp_encryption"])

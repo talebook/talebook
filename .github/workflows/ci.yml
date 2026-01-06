@@ -1,4 +1,7 @@
-name: Code Quality Check and Build
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: check code style, run pytest and nuxt build
 
 on:
   push:
@@ -13,35 +16,33 @@ jobs:
   test-server:
     runs-on: ubuntu-latest
     container:
-      image: talebook/calibre-docker:latest
+      image: talebook/calibre-docker
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v2
 
-      - name: Inspect environment
+      - name: Inspect
         run: |
-          which calibre
-          calibre --version
-          python3 --version
-          pip3 --version
+            which calibre
+            python3 -V
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install flake8 pytest==7.4.4 pytest-cov
+          pip3 install flake8 pytest==7.4.4
           if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
 
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
           flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
+
           # exit-zero treats all errors as warnings
           flake8 webserver --count --exit-zero --statistics --config .style.yapf
 
-      - name: Run tests with pytest
+      - name: Test with pytest
         run: |
-          pytest ./tests -v --cov=webserver --cov-report=term-missing
+          pytest ./tests
 
   test-ui:
     runs-on: ubuntu-latest
@@ -49,42 +50,14 @@ jobs:
       image: node:16-alpine
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v2
 
       - name: Install dependencies
         run: |
           cd app
-          npm ci
+          npm install
 
-      - name: Run linting
-        run: |
-          cd app
-          npm run lint || echo "Linting issues found"
-
-      - name: Nuxt build
+      - name: nuxt build
         run: |
           cd app
           npm run build
-
-      - name: Generate build artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nuxt-build
-          path: app/.nuxt
-          retention-days: 1
-
-  integration-test:
-    runs-on: ubuntu-latest
-    needs: [test-server, test-ui]
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: All tests passed
-        run: |
-          echo "✅ All tests completed successfully"
-          echo "Server tests: ✓"
-          echo "UI tests: ✓"

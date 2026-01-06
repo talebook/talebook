@@ -180,8 +180,7 @@ class Reader(Base, SQLAlchemyMixin):
         ALL = "delprsuv"
         if not isinstance(operations, str):
             raise "bug"
-        # 确保permission不是None，初始化为空字符串
-        v = list(self.permission or "")
+        v = list(self.permission)
         for p in operations:
             if p.lower() not in ALL:
                 continue

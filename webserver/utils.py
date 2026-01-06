@@ -83,11 +83,10 @@ class BookFormatter:
 
     def get_permissions(self):
         h = self.handler
-        user_id = h.user_id()
         return {
             # 图书权限数据
             "is_public": True,
-            "is_owner": user_id and (h.is_admin() or h.is_book_owner(self.book["id"], user_id)),
+            "is_owner": h.is_admin() or h.is_book_owner(self.book["id"], h.user_id()),
         }
 
     def format(self, with_files=False, with_perms=False):

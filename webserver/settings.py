@@ -52,8 +52,7 @@ settings = {
     # 100MB, tornado default max_buffer_size value
     "MAX_UPLOAD_SIZE": "100MB",
 
-    "CANDLE_READER_SERVER": "https://brs.talebook.org",
-    "EPUB_VIEWER": "creader.html",
+    "EPUB_VIEWER": "epubjs.html",
     "PDF_VIEWER": "/static/pdfjs/web/viewer.html?file=%(pdf_url)s",
 
     "SOCIAL_AUTH_LOGIN_URL"          : '/',
@@ -106,21 +105,17 @@ settings = {
     'ALLOW_GUEST_READ' : True,
     'ALLOW_GUEST_PUSH' : True,
     'ALLOW_GUEST_DOWNLOAD' : True,
-    'ALLOW_GUEST_UPLOAD' : False,
     'ALLOW_REGISTER' : False,
     'HEADER': '欢迎访问！如果你喜欢此项目，请前往 Github <a target="_blank" href="https://github.com/talebook/talebook"> 给 talebook 点击一个Star！</a>',
     'FOOTER': '本站基于Calibre构建，感谢开源界的力量。所有资源搜集于互联网，如有侵权请邮件联系。',
-    'FOOTER_EXTRA_HTML': '',
-    'SIDEBAR_EXTRA_HTML': '<img class="ma-auto footer-logo" style="max-width: 130px; height: auto;" src="/logo/link.png">',
-    'SHOW_SIDEBAR_SYS': True,
 
     'FRIENDS': [
+        { "text": u"芒果读书", "href": "http://diumx.com/" },
         { "text": u"鸠摩搜索", "href": "https://www.jiumodiary.com/" },
         { "text": u"追更神器", "href": "https://github.com/hectorqin/reader" },
+        { "text": u"阅读链",   "href": "https://www.yuedu.pro/" },
         { "text": u"苦瓜书盘", "href": "https://www.kgbook.com" },
-        { "text": u"爱悦读", "href": "https://www.iyd.wang/" },
-        { "text": u"moe漫画", "href": "https://mox.moe/" },
-        { "text": u"雅书",   "href": "https://yabook.blog/" },
+        { "text": u"三秋书屋", "href": "https://www.sanqiu.cc/" },
     ],
     'SOCIALS': [
     ],

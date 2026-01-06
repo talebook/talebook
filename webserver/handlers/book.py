@@ -19,7 +19,7 @@ from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.models import Item
-from webserver.plugins.meta import baike, douban, youshu
+from webserver.plugins.meta import baike, douban
 from webserver.plugins.parser.txt import get_content_encoding
 
 CONF = loader.get_settings()
@@ -37,20 +37,16 @@ class Index(BaseHandler):
         # nav = "index"
         # title = _(u"全部书籍")
         ids = list(self.cache.search(""))
-        random_books = []
-        new_books = []
-        
-        if ids:
-            random_ids = random.sample(ids, min(cnt_random, len(ids)))
-            random_books = [b for b in self.get_books(ids=random_ids)]
-            random_books.sort(key=lambda x: x["id"], reverse=True)
+        if not ids:
+            raise web.HTTPError(404, reason=_(u"本书库暂无藏书"))
+        random_ids = random.sample(ids, min(cnt_random, len(ids)))
+        random_books = [b for b in self.get_books(ids=random_ids)]
+        random_books.sort(key=lambda x: x["id"], reverse=True)
 
-            ids.sort(reverse=True)
-            # 确保不会尝试从空列表中取样
-            sample_ids = ids[0:100] if len(ids) > 100 else ids
-            new_ids = random.sample(sample_ids, min(cnt_recent, len(sample_ids)))
-            new_books = [b for b in self.get_books(ids=new_ids)]
-            new_books.sort(key=lambda x: x["id"], reverse=True)
+        ids.sort(reverse=True)
+        new_ids = random.sample(ids[0:100], min(cnt_recent, len(ids)))
+        new_books = [b for b in self.get_books(ids=new_ids)]
+        new_books.sort(key=lambda x: x["id"], reverse=True)
 
         return {
             "random_books_count": len(random_books),
@@ -116,15 +112,6 @@ class BookRefer(BaseHandler):
             return {"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")}
         if book:
             books.append(book)
-
-        api = youshu.YoushuApi(copy_image=True)
-        try:
-            book = api.get_book(title)
-        except:
-            return {"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")}
-        if book:
-            books.append(book)
-
         return books
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
@@ -148,14 +135,6 @@ class BookRefer(BaseHandler):
                 return api.get_book(mi)
             except:
                 raise RuntimeError({"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")})
-
-        if provider_key == youshu.KEY:
-            title = re.sub(u"[(（].*", "", mi.title)
-            api = youshu.YoushuApi(copy_image=True)
-            try:
-                return api.get_book(title)
-            except:
-                raise RuntimeError({"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")})
         raise RuntimeError({"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")})
 
     @js
@@ -251,11 +230,6 @@ class BookEdit(BaseHandler):
         if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
             return {"err": "permission", "msg": _(u"无权操作")}
 
-        # 处理封面图上传
-        if self.request.files:
-            return self.upload_cover(bid)
-        
-        # 处理常规编辑
         data = tornado.escape.json_decode(self.request.body)
         mi = self.db.get_metadata(bid, index_is_id=True)
         KEYS = [
@@ -271,96 +245,19 @@ class BookEdit(BaseHandler):
         ]
         for key, val in data.items():
             if key in KEYS:
-                # 处理DELETE魔术字符串
-                is_delete = False
-                # 检查字符串类型
-                if val == " DELETE ":
-                    is_delete = True
-                # 检查列表类型，如[" DELETE "]
-                elif isinstance(val, list) and len(val) == 1 and val[0] == " DELETE ":
-                    is_delete = True
-                
-                if is_delete:
-                    # 设置为空值，不同字段类型使用不同的空值
-                    if key in ["authors", "tags"]:
-                        # 列表类型使用空列表
-                    #    mi.set(key, [" "])
-                        pass
-                    else:
-                        # 其他类型使用空字符串
-                        mi.set(key, " ")
-                else:
-                    mi.set(key, val)
-
+                mi.set(key, val)
 
         if data.get("pubdate", None):
-            # 处理DELETE魔术字符串
-            if data["pubdate"] == " DELETE ":
-                mi.set("pubdate", None)
-            else:
-                content = douban.str2date(data["pubdate"])
-                if content is None:
-                    return {"err": "params.pudate.invalid", "msg": _(u"出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019")}
-                mi.set("pubdate", content)
+            content = douban.str2date(data["pubdate"])
+            if content is None:
+                return {"err": "params.pudate.invalid", "msg": _(u"出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019")}
+            mi.set("pubdate", content)
 
         if "tags" in data and not data["tags"]:
             self.db.set_tags(bid, [])
 
         self.db.set_metadata(bid, mi)
         return {"err": "ok", "msg": _(u"更新成功")}
-    
-    def upload_cover(self, bid):
-        """处理封面图上传"""
-        book = self.get_book(bid)
-        bid = book["id"]
-        
-        # 获取上传的文件
-        if "cover" not in self.request.files:
-            return {"err": "params.cover.required", "msg": _(u"请选择要上传的封面图")}
-        
-        file_info = self.request.files["cover"][0]
-        file_data = file_info["body"]
-        file_name = file_info["filename"]
-        
-        # 检查文件类型
-        allowed_types = ["image/jpeg", "image/png", "image/gif", "image/jpg", "image/pjpeg", "image/x-png"]
-        file_type = file_info["content_type"]
-        if file_type not in allowed_types:
-            # 尝试从文件名后缀判断
-            file_ext = file_name.split(".")[-1].lower() if "." in file_name else ""
-            if file_ext not in ["jpg", "jpeg", "png", "gif", "pjp", "jpe", "pjpeg", "jfif"]:
-                return {"err": "params.cover.type", "msg": _(u"只允许上传JPG、JPEG、PNG、GIF、PJP、PJPEG、JFIF、JPE格式的图片")}
-        
-        # 检查文件大小（限制为5MB）
-        if len(file_data) > 5 * 1024 * 1024:
-            return {"err": "params.cover.size", "msg": _(u"封面图大小不能超过5MB")}
-        
-        try:
-            # 获取书籍元数据
-            mi = self.db.get_metadata(bid, index_is_id=True)
-            
-            # 设置封面数据
-            file_ext = file_name.split(".")[-1].lower() if "." in file_name else "jpg"
-            mi.cover_data = (file_ext, file_data)
-            
-            # 强制更新书籍的timestamp，确保封面图URL变化
-            from datetime import datetime
-            mi.timestamp = datetime.utcnow()
-            mi.last_modified = datetime.utcnow()
-            
-            # 保存元数据
-            self.db.set_metadata(bid, mi)
-            
-            # 清除缓存，确保下次获取书籍信息时从数据库读取最新数据
-            self.cache.invalidate()
-            
-            return {"err": "ok", "msg": _(u"封面图上传成功")}
-        except Exception as e:
-            import traceback
-            logging.error(f"上传封面图失败: {e}")
-            logging.error(f"错误堆栈: {traceback.format_exc()}")
-            # 尝试直接返回成功，因为实际封面可能已经保存
-            return {"err": "ok", "msg": _(u"封面图上传成功")}
 
 
 class BookDelete(BaseHandler):
@@ -516,14 +413,11 @@ class BookUpload(BaseHandler):
         return (p["filename"], p["body"])
 
     @js
+    @auth
     def post(self):
         from calibre.ebooks.metadata.meta import get_metadata
 
-        # 检查访客上传权限
-        if not self.current_user:
-            if not CONF.get("ALLOW_GUEST_UPLOAD", False):
-                return {"err": "user.need_login", "msg": _(u"请先登录")}
-        elif not self.current_user.can_upload():
+        if not self.current_user.can_upload():
             return {"err": "permission", "msg": _(u"无权操作")}
         name, data = self.get_upload_file()
         name = re.sub(r"[\x80-\xFF]+", BookUpload.convert, name)
@@ -544,57 +438,32 @@ class BookUpload(BaseHandler):
         with open(fpath, "rb") as stream:
             mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
             mi.title = utils.super_strip(mi.title)
-            # 保留所有作者信息，与批量导入逻辑保持一致
-            mi.authors = [utils.super_strip(s) for s in mi.authors]
+            mi.authors = [utils.super_strip(mi.author_sort)]
 
         # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
         if fmt in ["txt", "pdf"]:
-            # 使用文件名提取标题，与批量导入逻辑保持一致
-            fname = os.path.basename(fpath)
-            mi.title = fname.replace("." + fmt, "")
+            mi.title = name.replace("." + fmt, "")
             mi.authors = [_(u"佚名")]
-            # 确保author_sort也被设置，与批量导入逻辑保持一致
-            mi.author_sort = mi.authors[0] if mi.authors else ""
 
         logging.info("upload mi.title = " + repr(mi.title))
         books = self.db.books_with_same_title(mi)
-        same_author_book_id = None
-        different_author_books = []
-        
         if books:
-            # 区分同名同作者和同名不同作者的书籍
-            for b in self.db.get_data_as_dict(ids=books):
-                book_authors = b.get("authors", [])
-                mi_authors = mi.authors
-                
-                # 检查作者是否相同
-                if set(book_authors) == set(mi_authors):
-                    same_author_book_id = b.get("id")
-                    # 检查是否已存在相同格式
-                    if fmt.upper() in b.get("available_formats", ""):
-                        return {
-                            "err": "samebook",
-                            "msg": _(u"同名同作者书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
-                            "book_id": same_author_book_id
-                        }
-                else:
-                    different_author_books.append(b)
-        
-        # 如果存在同名同作者书籍，添加格式到该书籍
-        if same_author_book_id:
-            logging.info(
-                "import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
-            self.db.add_format(same_author_book_id, fmt.upper(), fpath, True)
-            book_id = same_author_book_id
-        else:
-            fpaths = [fpath]
-            book_id = self.db.import_book(mi, fpaths)
-            self.user_history("upload_history", {"id": book_id, "title": mi.title})
-            item = Item()
-            item.book_id = book_id
-            item.collector_id = self.user_id()
-            item.save()
+            book_id = books.pop()
+            return {
+                "err": "samebook",
+                "msg": _(u"已存在同名书籍《%s》") % mi.title,
+                "book_id": book_id,
+            }
+
+        fpaths = [fpath]
+        book_id = self.db.import_book(mi, fpaths)
+        self.user_history("upload_history", {"id": book_id, "title": mi.title})
         self.add_msg("success", _(u"导入书籍成功！"))
+        item = Item()
+        item.book_id = book_id
+        item.collector_id = self.user_id()
+        item.save()
+
         AutoFillService().auto_fill(book_id)
         return {"err": "ok", "book_id": book_id}
 
@@ -648,7 +517,6 @@ class BookRead(BaseHandler):
                 "book": book,
                 "epub_dir": epub_dir,
                 "is_ready": (fmt == 'epub'),
-                "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
             })
         raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍"))
 

@@ -3,20 +3,26 @@
         <v-card-title> 图书管理 <v-chip small class="primary">Beta</v-chip> </v-card-title>
         <v-card-text> 此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面</v-card-text>
         <v-card-actions>
-            <v-btn :disabled="loading" outlined color="primary"
-                @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
-            <v-btn :disabled="loading" outlined color="info"
-                @click="show_dialog_auto_file"><v-icon>mdi-info</v-icon>自动更新图书信息... </v-btn>
-            <v-btn v-if="books_selected.length > 0" :disabled="loading" outlined color="error"
-                @click="delete_selected_books"><v-icon>mdi-delete-multiple</v-icon>批量删除 ({{ books_selected.length
-                }})</v-btn>
+            <v-btn :disabled="loading" outlined color="primary" @click="getDataFromApi"><v-icon>mdi-reload</v-icon>刷新</v-btn>
+            <v-btn :disabled="loading" outlined color="info" @click="show_dialog_auto_file"><v-icon>mdi-info</v-icon>自动更新图书信息... </v-btn>
             <v-spacer></v-spacer>
-            <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line
-                hide-details></v-text-field>
+            <v-text-field cols="2" dense v-model="search" append-icon="mdi-magnify" label="搜索" single-line hide-details></v-text-field>
         </v-card-actions>
-        <v-data-table dense class="elevation-1 text-body-2" show-select v-model="books_selected" item-key="id"
-            :search="search" :headers="headers" :items="items" :options.sync="options" :server-items-length="total"
-            :loading="loading" :items-per-page="100" :footer-props="{ 'items-per-page-options': [10, 50, 100] }">
+        <v-data-table
+            dense
+            class="elevation-1 text-body-2"
+            show-select
+            v-model="books_selected"
+            item-key="id"
+            :search="search"
+            :headers="headers"
+            :items="items"
+            :options.sync="options"
+            :server-items-length="total"
+            :loading="loading"
+            :items-per-page="100"
+            :footer-props="{ 'items-per-page-options': [10, 50, 100] }"
+        >
             <template v-slot:item.status="{ item }">
                 <v-chip small v-if="item.status == 'ready'" class="success">可导入</v-chip>
                 <v-chip small v-else-if="item.status == 'exist'" class="lighten-4">已存在</v-chip>
@@ -25,45 +31,13 @@
                 <v-chip small v-else class="info">{{ item.status }}</v-chip>
             </template>
             <template v-slot:item.img="{ item }">
-                <v-edit-dialog large @save="saveCover(item)">
-                    <v-btn 
-                        class="cover-btn" 
-                        :style="{
-                            'background-image': `url(${item.img})`,
-                            'aspect-ratio': '3/4',
-                            'width': 'auto',
-                            'height': 'auto',
-                            'min-height': '80px',
-                            'max-height': '80px',
-                            'background-size': 'cover',
-                            'background-position': 'center'
-                    }"
-                    ></v-btn>
-
-                    <template v-slot:input>
-                        <div class="mt-4 text-h6">修改封面图</div>
-                        <v-container fluid>
-                            <v-row>
-                                <v-col cols="12" sm="6">
-                                    <v-img :src="item.img" max-height="200" class="mb-4" contain></v-img>
-                                </v-col>
-                                <v-col cols="12" sm="6">
-                                    <v-file-input v-model="coverFile" accept="image/jpeg, image/png, image/gif"
-                                        label="选择封面图" prepend-icon="mdi-image"
-                                        @change="onCoverFileChange"></v-file-input>
-                                    <small class="text-caption">支持JPG、PNG、GIF格式，大小不超过5MB</small>
-                                </v-col>
-                            </v-row>
-                        </v-container>
-                    </template>
-                </v-edit-dialog>
+                <a target="_blank" :href="item.img"><v-img :src="item.thumb" class="my-1" max-height="80"  :aspect-ratio="3/4" /></a>
             </template>
             <template v-slot:item.id="{ item }">
                 <a target="_blank" :href="`/book/${item.id}`">{{ item.id }}</a>
             </template>
             <template v-slot:item.title="{ item }">
-                <v-edit-dialog large :return-value.sync="item.title" @save="save(item, 'title')" save-text="保存"
-                    cancel-text="取消">
+                <v-edit-dialog large :return-value.sync="item.title" @save="save(item, 'title')" save-text="保存" cancel-text="取消">
                     <span class="three-lines" style="max-width: 200px; min-width: 120px; ">{{ item.title }}</span>
 
                     <template v-slot:input>
@@ -74,16 +48,21 @@
             </template>
 
             <template v-slot:item.author="{ item }">
-                <v-edit-dialog large :return-value.sync="item.author" @save="save(item, 'authors')" save-text="保存"
-                    cancel-text="取消">
-                    <span class="three-lines" style="max-width: 200px" v-if="item.authors">{{ item.authors.join("/")
-                    }}</span>
+                <v-edit-dialog large :return-value.sync="item.author" @save="save(item, 'authors')" save-text="保存" cancel-text="取消">
+                    <span class="three-lines" style="max-width: 200px" v-if="item.authors">{{ item.authors.join("/") }}</span>
                     <span v-else> - </span>
                     <template v-slot:input>
                         <!-- AUTHORS -->
                         <div class="mt-4 text-h6">修改字段</div>
-                        <v-combobox v-model="item.authors" :items="item.authors" label="作者"
-                            :search-input.sync="tag_input" hide-selected multiple small-chips>
+                        <v-combobox
+                            v-model="item.authors"
+                            :items="item.authors"
+                            label="作者"
+                            :search-input.sync="tag_input"
+                            hide-selected
+                            multiple
+                            small-chips
+                        >
                             <template v-slot:no-data>
                                 <v-list-item>
                                     <span v-if="!tag_input">请输入新的名称</span>
@@ -106,8 +85,7 @@
             </template>
 
             <template v-slot:item.rating="{ item }">
-                <v-edit-dialog large :return-value.sync="item.rating" @save="save(item, 'rating')" save-text="保存"
-                    cancel-text="取消">
+                <v-edit-dialog large :return-value.sync="item.rating" @save="save(item, 'rating')" save-text="保存" cancel-text="取消">
                     <span v-if="item.rating != null">{{ item.rating }} 星</span>
                     <span v-else> - </span>
                     <template v-slot:input>
@@ -118,8 +96,13 @@
             </template>
 
             <template v-slot:item.publisher="{ item }">
-                <v-edit-dialog large :return-value.sync="item.publisher" @save="save(item, 'publisher')" save-text="保存"
-                    cancel-text="取消">
+                <v-edit-dialog
+                    large
+                    :return-value.sync="item.publisher"
+                    @save="save(item, 'publisher')"
+                    save-text="保存"
+                    cancel-text="取消"
+                >
                     {{ item.publisher }}
                     <template v-slot:input>
                         <div class="mt-4 text-h6">修改字段</div>
@@ -129,15 +112,21 @@
             </template>
 
             <template v-slot:item.tags="{ item }">
-                <v-edit-dialog large :return-value.sync="item.tags" @save="save(item, 'tags')" save-text="保存"
-                    cancel-text="取消">
+                <v-edit-dialog large :return-value.sync="item.tags" @save="save(item, 'tags')" save-text="保存" cancel-text="取消">
                     <span style="width: 200px" class="three-lines" v-if="item.tags">{{ item.tags.join("/") }}</span>
                     <span v-else> - </span>
                     <template v-slot:input>
                         <!-- TAGS -->
                         <div class="mt-4 text-h6">修改字段</div>
-                        <v-combobox v-model="item.tags" :items="item.tags" label="标签列表" :search-input.sync="tag_input"
-                            hide-selected multiple small-chips>
+                        <v-combobox
+                            v-model="item.tags"
+                            :items="item.tags"
+                            label="标签列表"
+                            :search-input.sync="tag_input"
+                            hide-selected
+                            multiple
+                            small-chips
+                        >
                             <template v-slot:no-data>
                                 <v-list-item>
                                     <span v-if="!tag_input">请输入新的标签名称</span>
@@ -160,10 +149,8 @@
             </template>
 
             <template v-slot:item.comments="{ item }">
-                <v-edit-dialog large :return-value.sync="item.comments" @save="save(item, 'comments')" save-text="保存"
-                    cancel-text="取消">
-                    <span :title="item.comments" style="width: 300px" class="three-lines">{{ item.comments.substr(0, 80)
-                    }}</span>
+                <v-edit-dialog large :return-value.sync="item.comments" @save="save(item, 'comments')" save-text="保存" cancel-text="取消">
+                    <span :title="item.comments" style="width: 300px" class="three-lines">{{ item.comments.substr(0, 80) }}</span>
                     <template v-slot:input>
                         <div class="mt-4 text-h6">修改字段</div>
                         <v-textarea v-model="item.comments" label="简介"></v-textarea>
@@ -207,10 +194,9 @@
                     <br></br>
                     <template v-if="progress.total > 0">
                         <p>当前进展：<v-btn small text link @click="refresh_progress">刷新</v-btn></p>
-                        <p>总共 {{ progress.total }} 本书籍，已更新 {{ progress.done }} 本，更新失败 {{ progress.fail }} 本，无需处理 {{
-                            progress.skip }} 本。</p>
+                        <p>总共 {{ progress.total }} 本书籍，已更新 {{  progress.done }} 本，更新失败 {{ progress.fail }} 本，无需处理 {{  progress.skip }} 本。</p>
                     </template>
-                    <p v-else> 预计需要运行 {{ auto_fill_mins }} 分钟，在此期间请不要停止程序</p>
+                    <p v-else> 预计需要运行 {{auto_fill_mins}} 分钟，在此期间请不要停止程序</p>
 
                     <template v-else>
 
@@ -224,23 +210,7 @@
             </v-card>
         </v-dialog>
 
-        <!-- 批量删除确认对话框 -->
-        <v-dialog v-model="delete_dialog" persistent width="500">
-            <v-card>
-                <v-toolbar flat dense dark color="error"> 确认删除 </v-toolbar>
-                <v-card-text>
-                    <p> 您确定要删除选中的 {{ books_selected.length }} 本书籍吗？</p>
-                    <p class="text--secondary"> 此操作不可逆，请谨慎操作！</p>
-                </v-card-text>
-                <v-card-actions>
-                    <v-btn @click="delete_dialog = !delete_dialog">取消</v-btn>
-                    <v-spacer></v-spacer>
-                    <v-btn color="error" @click="confirm_delete_books">确定删除</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-    </v-card>
+</v-card>
 </template>
 
 <script>
@@ -250,8 +220,6 @@ export default {
         snackColor: "",
         snackText: "",
         meta_dialog: false,
-        delete_dialog: false,
-        coverFile: null,
 
         books_selected: [],
         tag_input: null,
@@ -280,7 +248,7 @@ export default {
             status: "finish",
         },
     }),
-    created() { },
+    created() {},
     watch: {
         options: {
             handler() {
@@ -290,8 +258,8 @@ export default {
         },
     },
     computed: {
-        auto_fill_mins: function () {
-            return Math.floor(this.total / 60) + 1;
+        auto_fill_mins: function() {
+            return Math.floor(this.total/60) + 1;
         }
     },
     methods: {
@@ -334,9 +302,9 @@ export default {
             this.$backend("/admin/book/fill", {
                 method: "GET",
             })
-                .then((rsp) => {
-                    this.progress = rsp.status;
-                })
+            .then((rsp) => {
+                this.progress = rsp.status;
+            })
         },
         show_dialog_auto_file() {
             this.meta_dialog = true;
@@ -345,17 +313,17 @@ export default {
         auto_fill() {
             this.$backend("/admin/book/fill", {
                 method: "POST",
-                body: JSON.stringify({ "idlist": "all" }),
+                body: JSON.stringify({"idlist": "all"}),
             })
-                .then((rsp) => {
-                    this.meta_dialog = false;
-                    if (rsp.err != "ok") {
-                        this.$alert("error", rsp.msg);
-                    }
-                    this.snack = true;
-                    this.snackColor = "success";
-                    this.snackText = rsp.msg;
-                })
+            .then((rsp) => {
+                this.meta_dialog = false;
+                if (rsp.err != "ok") {
+                    this.$alert("error", rsp.msg);
+                }
+                this.snack = true;
+                this.snackColor = "success";
+                this.snackText = rsp.msg;
+            })
         },
         delete_book(book) {
             this.loading = true;
@@ -372,54 +340,6 @@ export default {
                     this.snackText = rsp.msg;
 
                     this.getDataFromApi();
-                })
-                .finally(() => {
-                    this.loading = false;
-                });
-        },
-        // 显示批量删除确认对话框
-        delete_selected_books() {
-            if (this.books_selected.length === 0) {
-                // 如果没有选中的书籍，显示提示信息
-                this.snack = true;
-                this.snackColor = "warning";
-                this.snackText = "请先勾选要删除的书籍";
-                return;
-            }
-            // 显示确认对话框
-            this.delete_dialog = true;
-        },
-        // 确认批量删除
-        confirm_delete_books() {
-            // 再次检查是否有选中的书籍
-            if (this.books_selected.length === 0) {
-                this.delete_dialog = false;
-                return;
-            }
-
-            this.loading = true;
-            this.delete_dialog = false;
-
-            // 获取选中的图书ID列表
-            const selectedIds = this.books_selected.map(book => book.id);
-
-            // 发送批量删除请求
-            this.$backend("/admin/book/delete", {
-                method: "POST",
-                body: JSON.stringify({ idlist: selectedIds }),
-            })
-                .then((rsp) => {
-                    if (rsp.err != "ok") {
-                        this.$alert("error", rsp.msg);
-                    } else {
-                        this.snack = true;
-                        this.snackColor = "success";
-                        this.snackText = rsp.msg;
-                        // 清空选中的图书
-                        this.books_selected = [];
-                        // 刷新图书列表
-                        this.getDataFromApi();
-                    }
                 })
                 .finally(() => {
                     this.loading = false;
@@ -442,49 +362,6 @@ export default {
                 }
             });
         },
-        onCoverFileChange(file) {
-            // 文件选择变化时的处理
-            if (file) {
-                // 可以在这里添加文件大小验证
-                if (file.size > 5 * 1024 * 1024) {
-                    this.$alert("error", "封面图大小不能超过5MB");
-                    this.coverFile = null;
-                }
-            }
-        },
-        saveCover(book) {
-            if (!this.coverFile) {
-                this.$alert("info", "请选择要上传的封面图");
-                return;
-            }
-
-            this.loading = true;
-
-            // 创建FormData对象
-            const formData = new FormData();
-            formData.append("cover", this.coverFile);
-
-            // 发送请求
-            this.$backend("/book/" + book.id + "/edit", {
-                method: "POST",
-                body: formData
-                // 不要手动设置Content-Type，浏览器会自动设置并添加boundary
-            }).then((rsp) => {
-                if (rsp.err == "ok") {
-                    this.snack = true;
-                    this.snackColor = "success";
-                    this.snackText = rsp.msg;
-                    // 刷新数据，更新封面图
-                    this.getDataFromApi();
-                } else {
-                    this.$alert("error", rsp.msg);
-                }
-            }).finally(() => {
-                this.loading = false;
-                // 重置封面文件
-                this.coverFile = null;
-            });
-        },
     },
 };
 </script>
@@ -497,17 +374,5 @@ export default {
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
     white-space: normal;
-}
-
-.cover-btn {
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    border: none;
-    cursor: pointer;
-    margin: 1px;
-    padding: 0;
-    width: auto;
-    height: auto;
 }
 </style>
