@@ -318,11 +318,13 @@ class UserInfo(BaseHandler):
             "sidebar_extra_html": CONF["SIDEBAR_EXTRA_HTML"],
             "header": CONF["HEADER"],
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
+            "FEEDBACK_URL": CONF["FEEDBACK_URL"],
             "allow": {
                 "register": CONF["ALLOW_REGISTER"],
                 "download": CONF["ALLOW_GUEST_DOWNLOAD"],
                 "push": CONF["ALLOW_GUEST_PUSH"],
                 "read": CONF["ALLOW_GUEST_READ"],
+                "FEEDBACK": CONF["ALLOW_FEEDBACK"],
             },
         }
 
