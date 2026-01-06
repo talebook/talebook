@@ -89,8 +89,12 @@ def is_admin(func):
     return do
 
 
+import threading
+
 class BaseHandler(web.RequestHandler):
     _path_to_env = {}
+    # 添加一个锁来保护数据库连接的访问
+    _db_lock = threading.Lock()
 
     def _request_summary(self) -> str:
         userid = 0
@@ -463,7 +467,8 @@ class BaseHandler(web.RequestHandler):
         sql = """SELECT tags.name, count(distinct book) as count
         FROM tags left join books_tags_link on tags.id = books_tags_link.tag
         group by tags.id"""
-        tags = dict((i[0], i[1]) for i in self.cache.backend.conn.get(sql))
+        with self._db_lock:
+            tags = dict((i[0], i[1]) for i in self.cache.backend.conn.get(sql))
         return tags
 
     def get_category_with_count(self, field):
@@ -477,13 +482,15 @@ class BaseHandler(web.RequestHandler):
             % args
         )
         logging.debug(sql)
-        rows = self.cache.backend.conn.get(sql)
+        with self._db_lock:
+            rows = self.cache.backend.conn.get(sql)
         items = [{"id": a, "name": b, "count": c} for a, b, c in rows]
         return items
 
     def books_by_id(self):
         sql = "SELECT id FROM books order by id desc"
-        ids = [v[0] for v in self.cache.backend.conn.get(sql)]
+        with self._db_lock:
+            ids = [v[0] for v in self.cache.backend.conn.get(sql)]
         return ids
 
     def get_argument_start(self):
