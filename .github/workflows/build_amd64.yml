@@ -79,7 +79,8 @@ jobs:
       - name: Prepare build args
         id: prep
         run: |
-          echo "build_args=GIT_VERSION=${{ github.sha::8 }}" >> $GITHUB_OUTPUT
+          SHORT_SHA=${GITHUB_SHA:0:8}
+          echo "build_args=GIT_VERSION=$SHORT_SHA" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v5
