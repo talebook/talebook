@@ -277,8 +277,6 @@ class AdminSettings(BaseHandler):
             "ALLOW_GUEST_READ",
             "ALLOW_GUEST_UPLOAD",
             "ALLOW_REGISTER",
-            "ALLOW_FEEDBACK",
-            "FEEDBACK_URL",
             "BOOK_NAMES_FORMAT",
             "BOOK_NAV",
             "EPUB_VIEWER",

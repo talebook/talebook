@@ -136,13 +136,6 @@ export default {
             ],
             groups: [
             {
-                key: "ALLOW_FEEDBACK",
-                label: "显示反馈按钮",
-                fields: [
-                    { icon: "mdi-link", key: "FEEDBACK_URL", label: "反馈按钮跳转地址" },
-                ],
-            },
-            {
                 key: "INVITE_MODE",
                 label: "开启私人图书馆模式",
                 fields: [
