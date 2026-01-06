@@ -134,7 +134,8 @@ class ScanService(AsyncService):
                     mi.authors = [utils.super_strip(s) for s in mi.authors]
 
                 row.title = mi.title
-                row.author = mi.author_sort
+                # 使用mi.authors列表而不是mi.author_sort，避免作者信息丢失
+                row.author = mi.authors[0] if mi.authors else ""
                 row.publisher = mi.publisher
                 row.tags = ", ".join(mi.tags)
                 row.status = ScanFile.READY  # 设置为可处理
