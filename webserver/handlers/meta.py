@@ -56,7 +56,8 @@ class MetaList(ListHandler):
             FROM data as A
             GROUP BY A.format"""
             logging.debug(sql)
-            rows = self.cache.backend.conn.get(sql)
+            with self._db_lock:
+                rows = self.cache.backend.conn.get(sql)
             items = [{"id": b, "name": b, "count": c} for b, c in rows]
         else:
             items = self.get_category_with_count(meta)
@@ -89,7 +90,8 @@ class MetaBooks(ListHandler):
             FROM data as A
             WHERE A.format = ?"""
             logging.debug(sql)
-            rows = self.cache.backend.conn.get(sql, (name,))
+            with self._db_lock:
+                rows = self.cache.backend.conn.get(sql, (name,))
             ids = [r[0] for r in rows]
             books = self.db.get_data_as_dict(ids=ids)
         else:
@@ -98,10 +100,8 @@ class MetaBooks(ListHandler):
                 name = int(name)
             books = self.get_item_books(category, name)
 
-        books.sort(
-            key=cmp_to_key(utils.compare_books_by_rating_or_id),
-            reverse=True
-        )
+        books.sort(key=cmp_to_key(utils.compare_books_by_rating_or_id), 
+            reverse=True)
         return self.render_book_list(books, title=title)
 
 

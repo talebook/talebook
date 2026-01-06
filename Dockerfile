@@ -25,7 +25,7 @@ RUN cp -r dist nuxt.config.js package* /app-static/
 
 # ----------------------------------------
 # 第二阶段，构建环境
-FROM talebook/calibre-docker AS server
+FROM hehetoshang/calibre-docker AS server
 ARG BUILD_COUNTRY=""
 ARG TARGETARCH
 ARG TARGETVARIANT

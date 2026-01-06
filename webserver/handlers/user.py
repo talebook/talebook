@@ -297,7 +297,9 @@ class UserInfo(BaseHandler):
         count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
         # 获取格式数量
         sql = "SELECT COUNT(DISTINCT format) FROM data"
-        formats_count = self.cache.backend.conn.get(sql)[0][0]
+        # 使用BaseHandler的锁来保护数据库连接的访问
+        with self._db_lock:
+            formats_count = self.cache.backend.conn.get(sql)[0][0]
 
         return {
             "books": db.count(),

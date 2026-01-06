@@ -23,6 +23,11 @@ class AutoFillService(AsyncService):
 
     @AsyncService.register_service
     def auto_fill_all(self, idlist: list, qpm=60):
+        # 检查是否启用了自动填充书籍信息
+        if not CONF['auto_fill_meta']:
+            logging.info("自动填充书籍信息已关闭，跳过处理")
+            return
+            
         # 根据qpm，计算更新的间隔，避免刷爆豆瓣等服务
         sleep_seconds = 60.0 / qpm
 
