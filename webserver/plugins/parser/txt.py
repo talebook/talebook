@@ -76,25 +76,6 @@ class TxtParser:
             "rule": r"(?=[ 　\t]{0,4})(?:.{0,15}分[页节章段]阅读[-_ ]|第\s{0,4}[\d零一二两三四五六七八九十百千万]{1,6}\s{0,4}[页节]).{0,30}$"
         }
     ]
-    
-    def __init__(self):
-        """初始化，预编译所有正则表达式"""
-        self.compiled_rules = []
-        for rule_info in self.TXT_CONTENT_RULES:
-            try:
-                compiled_rule = re.compile(rule_info['rule'])
-                self.compiled_rules.append({
-                    'name': rule_info['name'],
-                    'example': rule_info['example'],
-                    'rule': compiled_rule
-                })
-            except re.error as e:
-                logging.error(f"正则表达式编译失败: {rule_info['name']} - {rule_info['rule']}, 错误: {e}")
-                # 跳过编译失败的正则表达式，继续编译其他正则表达式
-                continue
-        
-        # 记录成功编译的正则表达式数量
-        logging.info(f"成功编译 {len(self.compiled_rules)} 个正则表达式，共 {len(self.TXT_CONTENT_RULES)} 个")
 
     def parse(self, filepath):
         encoding = get_file_encoding(filepath)
@@ -114,11 +95,11 @@ class TxtParser:
         while line:
             # 获取当前文件指针的位置（seek位置）
             seek_position = fileobj.tell()
-            for rule_info in self.compiled_rules:
+            for rule in self.TXT_CONTENT_RULES:
                 try:
-                    matches = rule_info['rule'].findall(line)
+                    matches = re.findall(rule['rule'], line)
                 except Exception as e:
-                    logging.error(f"正则表达式匹配失败: {rule_info['name']}, 错误: {e}")
+                    logging.error("re.findall fail: err=%s, rule=%s", e, rule['rule'])
                     continue
 
                 if len(matches) == 0:

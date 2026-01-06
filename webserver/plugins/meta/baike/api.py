@@ -80,13 +80,9 @@ class BaiduBaikeApi:
     def get_cover(self, cover_url):
         if not self.copy_image or not cover_url:
             return None
-        try:
-            img = requests.get(cover_url, timeout=10, headers=CHROME_HEADERS).content
-            img_fmt = cover_url.split(".")[-1]
-            return (img_fmt, img)
-        except Exception as e:
-            logging.warning(_(f"获取封面失败: {e}"))
-            return None
+        img = requests.get(cover_url, timeout=10, headers=CHROME_HEADERS).content
+        img_fmt = cover_url.split(".")[-1]
+        return (img_fmt, img)
 
 
 if __name__ == "__main__":

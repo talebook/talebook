@@ -1,34 +1,21 @@
 <template>
-    <div>
-        <v-row>
-            <template v-if="meta == 'rating'">
-                <v-col cols=4 sm=2 v-for="item in meta_items" :key="item.name" >
-                    <v-chip :to="item.href" outlined color="primary" >
-                        {{item.name}}星
-                        <span v-if="item.count">&nbsp;({{item.count}})</span>
-                    </v-chip>
-                </v-col>
-            </template >
-            <v-col v-else>
-                <v-chip small class="ma-1" v-for="item in meta_items" :to="item.href" :key="item.name" outlined color="primary" >
-                    {{item.name}}
+    <v-row>
+        <template v-if="meta == 'rating'">
+            <v-col cols=4 sm=2 v-for="item in meta_items" :key="item.name" >
+                <v-chip :to="item.href" outlined color="primary" >
+                    {{item.name}}星
                     <span v-if="item.count">&nbsp;({{item.count}})</span>
                 </v-chip>
-                <v-btn v-if="total > items.length" @click="expand()" color="primary" rounded small>显示全部...</v-btn>
             </v-col>
-        </v-row>
-        
-        <!-- 空状态提示 -->
-        <v-row v-if="meta_items.length === 0" class="empty-state">
-            <v-col cols=12>
-                <v-card class="ma-1 pa-6 text-center">
-                    <v-icon large color="grey lighten-2">mdi-book-open-variant</v-icon>
-                    <h3 class="text-h6 grey--text">本书库暂无藏书</h3>
-                    <p class="text-caption grey--text">请先添加书籍到书库</p>
-                </v-card>
-            </v-col>
-        </v-row>
-    </div>
+        </template >
+        <v-col v-else>
+            <v-chip small class="ma-1" v-for="item in meta_items" :to="item.href" :key="item.name" outlined color="primary" >
+                {{item.name}}
+                <span v-if="item.count">&nbsp;({{item.count}})</span>
+            </v-chip>
+            <v-btn v-if="total > items.length" @click="expand()" color="primary" rounded small>显示全部...</v-btn>
+        </v-col>
+    </v-row>
 </template>
 
 <script>
@@ -67,7 +54,6 @@ export default {
             rating: "全部评分",
             author: "全部作者",
             publisher: "全部出版社",
-            format: "全部格式",
         }
         var meta = this.$route.path.split("/")[1];
         if ( titles[meta] !== undefined ) {

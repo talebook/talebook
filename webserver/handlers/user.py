@@ -79,10 +79,7 @@ class UserUpdate(BaseHandler):
         if len(ke) > 0:
             if not re.match(Reader.RE_EMAIL, ke):
                 return {"err": "params.email.invalid", "msg": _(u"Kindle地址无效")}
-            if user.extra is None:
-                user.extra = {"kindle_email": ke}
-            else:
-                user.extra["kindle_email"] = ke
+            user.extra["kindle_email"] = ke
 
         try:
             user.save()
@@ -205,46 +202,35 @@ class UserReset(BaseHandler):
         user = self.session.query(Reader).filter(Reader.username == username, Reader.email == email).first()
         if not user:
             return {"err": "params.no_user", "msg": _(u"无此用户")}
+        p = user.reset_password()
 
-        new_password = user.reset_password()
-
-        # 先保存到数据库，确保密码不会丢失
-        try:
-            user.save()
-        except Exception as e:
-            import traceback
-            logging.error(traceback.format_exc())
-            return {"err": "db.error", "msg": _(u"系统繁忙")}
-
-        # 再发送通知邮件
+        # send notice email
         args = {
             "site_title": CONF["site_title"],
             "username": user.username,
-            "password": new_password,
+            "password": p,
         }
         mail_subject = CONF["RESET_MAIL_TITLE"] % args
         mail_to = user.email
         mail_from = CONF["smtp_username"]
         mail_body = CONF["RESET_MAIL_CONTENT"] % args
+        MailService().send_mail(mail_from, mail_to, mail_subject, mail_body)
 
+        # do save into db
         try:
-            MailService().send_mail(mail_from, mail_to, mail_subject, mail_body)
-        except Exception as e:
-            import traceback
-            logging.error(traceback.format_exc())
-            return {"err": "ok", "msg": _(u"密码已重置，但邮件发送失败，请联系管理员或重新请求重置")}
-
-        self.add_msg("success", _("你刚刚重置了密码"))
-        return {"err": "ok"}
+            user.save()
+            self.add_msg("success", _("你刚刚重置了密码"))
+            return {"err": "ok"}
+        except:
+            return {"err": "db.error", "msg": _(u"系统繁忙")}
 
 
 class SignOut(BaseHandler):
     @js
     @auth
     def get(self):
-        self.clear_cookie("user_id")
-        self.clear_cookie("admin_id")
-        self.clear_cookie("lt")
+        self.set_secure_cookie("user_id", "")
+        self.set_secure_cookie("admin_id", "")
         return {"err": "ok", "msg": _(u"你已成功退出登录。")}
 
 
@@ -295,17 +281,12 @@ class UserInfo(BaseHandler):
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
         count_all_users = self.session.query(func.count(Reader.id)).scalar()
         count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
-        # 获取格式数量
-        sql = "SELECT COUNT(DISTINCT format) FROM data"
-        formats_count = self.cache.backend.conn.get(sql)[0][0]
-
         return {
             "books": db.count(),
             "tags": len(db.all_tags()),
             "authors": len(db.all_authors()),
             "publishers": len(db.all_publishers()),
             "series": len(db.all_series()),
-            "formats": formats_count,
             "mtime": db.last_modified().strftime("%Y-%m-%d"),
             "users": count_all_users,
             "active": count_hot_users,
@@ -314,10 +295,7 @@ class UserInfo(BaseHandler):
             "socials": CONF["SOCIALS"],
             "friends": CONF["FRIENDS"],
             "footer": CONF["FOOTER"],
-            "footer_extra_html": CONF["FOOTER_EXTRA_HTML"],
-            "sidebar_extra_html": CONF["SIDEBAR_EXTRA_HTML"],
             "header": CONF["HEADER"],
-            "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
             "allow": {
                 "register": CONF["ALLOW_REGISTER"],
                 "download": CONF["ALLOW_GUEST_DOWNLOAD"],
@@ -353,10 +331,10 @@ class UserInfo(BaseHandler):
                 "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S"),
             }
         )
-        if user and user.avatar:
+        if user.avatar:
             gravatar_url = "https://www.gravatar.com"
             d["avatar"] = user.avatar.replace("http://", "https://").replace(gravatar_url, CONF["avatar_service"])
-        if user and user.extra:
+        if user.extra:
             d["kindle_email"] = user.extra.get("kindle_email", "")
             if detail:
                 for k, v in user.extra.items():

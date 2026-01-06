@@ -9,7 +9,6 @@ ListBook.head = function() {
         rating: `${name}星书籍`,
         author: `${name}的著作`,
         publisher: `${name}出版的书籍`,
-        format: `${name}格式的书籍`,
     }
     var meta = this.$route.path.split("/")[1];
     if ( titles[meta] !== undefined ) {
