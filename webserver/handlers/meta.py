@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 import math
 import sys
+import logging
 from functools import cmp_to_key
 from gettext import gettext as _
 
@@ -46,10 +47,19 @@ class MetaList(ListHandler):
             "series": _(u"丛书列表"),
             "rating": _(u"全部评分"),
             "publisher": _(u"全部出版社"),
+            "format": _(u"全部格式"),
         }
         title = titles.get(meta, _(u"未知")) % vars()
-        # category = meta if meta in ["series", "publisher"] else meta + "s"
-        items = self.get_category_with_count(meta)
+        if meta == "format":
+            # 特殊处理格式分类，从data表格获取
+            sql = """SELECT A.format as name, count(distinct A.book) as count
+            FROM data as A
+            GROUP BY A.format"""
+            logging.debug(sql)
+            rows = self.cache.backend.conn.get(sql)
+            items = [{"id": b, "name": b, "count": c} for b, c in rows]
+        else:
+            items = self.get_category_with_count(meta)
         count = len(items)
         if items:
             if meta == "rating":
@@ -69,20 +79,36 @@ class MetaBooks(ListHandler):
             "series": _('"%(name)s"丛书包含的书籍'),
             "rating": _("评分为%(name)s星的书籍"),
             "publisher": _(u'"%(name)s"出版的书籍'),
+            "format": _(u'格式为"%(name)s"的书籍'),
         }
         title = titles.get(meta, _(u"未知")) % vars()  # noqa: F841
-        category = meta + "s" if meta in ["tag", "author"] else meta
-        if meta in ["rating"]:
-            name = int(name)
-        books = self.get_item_books(category, name)
-        books.sort(key=cmp_to_key(utils.compare_books_by_rating_or_id), reverse=True)
+
+        if meta == "format":
+            # 特殊处理格式分类，从data表格获取对应书籍
+            sql = """SELECT distinct A.book as id
+            FROM data as A
+            WHERE A.format = ?"""
+            logging.debug(sql)
+            rows = self.cache.backend.conn.get(sql, (name,))
+            ids = [r[0] for r in rows]
+            books = self.db.get_data_as_dict(ids=ids)
+        else:
+            category = meta + "s" if meta in ["tag", "author"] else meta
+            if meta in ["rating"]:
+                name = int(name)
+            books = self.get_item_books(category, name)
+
+        books.sort(
+            key=cmp_to_key(utils.compare_books_by_rating_or_id),
+            reverse=True
+        )
         return self.render_book_list(books, title=title)
 
 
 def routes():
     return [
-        (r"/api/(author|publisher|tag|rating|series)", MetaList),
-        (r"/api/(author|publisher|tag|rating|series)/(.*)", MetaBooks),
+        (r"/api/(author|publisher|tag|rating|series|format)", MetaList),
+        (r"/api/(author|publisher|tag|rating|series|format)/(.*)", MetaBooks),
         (r"/api/author/(.*)/update", AuthorBooksUpdate),
         (r"/api/publisher/(.*)/update", PubBooksUpdate),
     ]
