@@ -5,11 +5,6 @@ on:
     branches:
       - master
       - dev
-    tags:
-      - "v*"
-  pull_request:
-    branches:
-      - master
 
 env:
   REGISTRY: docker.io
@@ -17,7 +12,6 @@ env:
 
 jobs:
   docker:
-    # 将 if 条件移动到这里，控制整个任务的执行
     if: github.repository == 'hehetoshang/talebook'
     runs-on: ubuntu-latest
     permissions:
@@ -45,27 +39,48 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata
+      - name: Determine tags
+        id: tags
+        run: |
+          # 获取当前分支名
+          if [[ $GITHUB_REF == refs/heads/* ]]; then
+            BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          else
+            BRANCH_NAME=""
+          fi
+          
+          # 根据分支生成标签
+          TAGS=""
+          
+          if [[ "$BRANCH_NAME" == "master" ]]; then
+            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:master"
+          elif [[ "$BRANCH_NAME" == "dev" ]]; then
+            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev"
+          fi
+          
+          if [[ -n "$TAGS" ]]; then
+            echo "tags=$TAGS" >> $GITHUB_OUTPUT
+            echo "Branch: $BRANCH_NAME, Tags: $TAGS"
+          else
+            echo "No tags to push for branch: $BRANCH_NAME"
+            # 设置一个空标签，但会触发错误 - 这是有意为之
+            echo "tags=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract metadata (for labels only)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=master,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=raw,value=temp,enable=true
 
       - name: Prepare build args
         id: prep
         run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION=${GITHUB_SHA::8}
-          fi
-          echo "build_args=GIT_VERSION=$VERSION" >> $GITHUB_OUTPUT
+          SHORT_SHA=${GITHUB_SHA:0:8}
+          echo "build_args=GIT_VERSION=$SHORT_SHA" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -77,5 +92,5 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           cache-to: type=inline,mode=max
           provenance: false
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.tags.outputs.tags }}
           build-args: ${{ steps.prep.outputs.build_args }}

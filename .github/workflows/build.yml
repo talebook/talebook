@@ -68,7 +68,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64 #,linux/arm/v7
+          platforms: linux/amd64 #,linux/arm64,linux/arm/v7
           labels: ${{ steps.meta.outputs.labels }}
           push: ${{ github.event_name != 'pull_request' }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/talebook/talebook:latest
