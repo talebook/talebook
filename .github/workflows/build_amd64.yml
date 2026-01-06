@@ -17,7 +17,6 @@ env:
 
 jobs:
   docker:
-    # 将 if 条件移动到这里，控制整个任务的执行
     if: github.repository == 'hehetoshang/talebook'
     runs-on: ubuntu-latest
     permissions:
@@ -50,9 +49,16 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # 修改这里：为 master 和 dev 分支都生成特定标签
           tags: |
+            # master 分支的标签
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=master,enable={{is_default_branch}}
+            type=raw,value=master,enable={{branch=='master'}}
+            # dev 分支的标签
+            type=raw,value=dev,enable={{branch=='dev'}}
+            # 总是生成基于 commit SHA 的标签作为后备
+            type=raw,value=sha-${{ github.sha }},enable=true
+            # 版本标签（当推送 tag 时）
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
