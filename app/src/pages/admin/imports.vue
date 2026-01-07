@@ -233,6 +233,8 @@ export default {
                         this.$alert("error", rsp.msg);
                     }
                     this.getDataFromApi();
+                    // 清空选中数组
+                    this.selected = [];
                 })
                 .finally(() => {
                     this.loading = false;
