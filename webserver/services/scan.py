@@ -79,27 +79,37 @@ class ScanService(AsyncService):
         inserted_hash = set()
         for fname, fpath, fmt in tasks:
             # logging.info("Scan: %s", fpath)
+            # 检查是否已存在相同路径的记录
             samefiles = self.session.query(ScanFile).filter(ScanFile.path == fpath)
             if samefiles.count() > 0:
-                # 如果已经有相同的文件记录，则跳过
+                # 如果已经有相同的文件记录，则处理现有记录
                 row = samefiles.first()
+                # 更新扫描ID为当前扫描ID
+                row.scan_id = scan_id
+                # 更新时间
+                row.update_time = datetime.datetime.now()
+                # 只处理NEW状态的记录，其他状态跳过
                 if row.status == ScanFile.NEW:
                     rows.append(row)
                 else:
-                    continue
-
-            stat = os.stat(fpath)
-            md5 = hashlib.md5(fname.encode("UTF-8")).hexdigest()
-            hash = "fstat:%s/%s" % (stat.st_size, md5)
-            if hash in inserted_hash:
-                logging.error("maybe have same book, skip: %s", fpath)
+                    # 检查现有记录的哈希是否为真实哈希（非临时哈希），如果是则跳过
+                    if not row.hash.startswith("fstat:"):
+                        continue
+                    # 如果是临时哈希，尝试重新处理
+                    rows.append(row)
                 continue
 
-            inserted_hash.add(hash)
-            row = ScanFile(fpath, hash, scan_id)
+            # 检查是否已存在相同真实哈希的记录
+            stat = os.stat(fpath)
+            md5 = hashlib.md5(fname.encode("UTF-8")).hexdigest()
+            temp_hash = "fstat:%s/%s" % (stat.st_size, md5)
+            
+            # 创建文件对象
+            row = ScanFile(fpath, temp_hash, scan_id)
             if not self.save_or_rollback(row):
                 continue
             rows.append(row)
+            inserted_hash.add(temp_hash)
         # self.session.bulk_save_objects(rows)
 
         logging.info("========== start to check files hash & meta ============")
@@ -114,14 +124,19 @@ class ScanService(AsyncService):
                 for byte_block in iter(lambda: f.read(4096), b""):
                     sha256.update(byte_block)
 
-            hash = "sha256:" + sha256.hexdigest()
-            if self.session.query(ScanFile).filter(ScanFile.hash == hash).count() > 0 or hash in inserted_hash:
-                # 如果已经有相同的哈希值，则删掉本任务
+            real_hash = "sha256:" + sha256.hexdigest()
+            
+            # 检查真实哈希值是否已经存在
+            existing = self.session.query(ScanFile).filter(ScanFile.hash == real_hash).first()
+            if existing and existing.id != row.id:
+                # 如果已经有相同的真实哈希值记录，且不是当前记录
                 row.status = ScanFile.DROP
-            else:
-                # 或者，更新为真实的哈希值
-                row.hash = hash
-            inserted_hash.add(hash)
+                if not self.save_or_rollback(row):
+                    continue
+                continue
+            
+            # 更新为真实的哈希值
+            row.hash = real_hash
             if not self.save_or_rollback(row):
                 continue
 
