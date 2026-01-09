@@ -88,4 +88,4 @@ ENV/
 # Rope project settings
 .ropeproject
 /.idea/
-data/
+/talebook-compose/
