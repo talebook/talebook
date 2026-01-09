@@ -134,9 +134,20 @@ class DoubanBookApi(object):
     def get_cover(self, cover_url):
         if not self.copy_image:
             return None
-        img = requests.get(cover_url, headers=CHROME_HEADERS).content
-        img_fmt = cover_url.split(".")[-1]
-        return (img_fmt, img)
+        try:
+            rsp = requests.get(cover_url, timeout=10, headers=CHROME_HEADERS)
+            if rsp.status_code != 200:
+                logging.error("获取封面失败: status_code[%s] != 200 OK", rsp.status_code)
+                return None
+            img = rsp.content
+            if not img or len(img) == 0:
+                logging.error("获取封面失败: 封面数据为空")
+                return None
+            img_fmt = cover_url.split(".")[-1]
+            return (img_fmt, img)
+        except Exception as e:
+            logging.error("获取封面失败: %s", str(e))
+            return None
 
     def _metadata(self, book):
         authors = []
@@ -173,7 +184,11 @@ class DoubanBookApi(object):
         mi.provider_value = book["id"]
 
         mi.cover_url = book["images"]["large"]
-        mi.cover_data = self.get_cover(mi.cover_url)
+        cover_data = self.get_cover(mi.cover_url)
+        if cover_data:
+            mi.cover_data = cover_data
+        else:
+            mi.cover_data = None
 
         logging.debug("=================\ndouban metadata:\n%s" % mi)
         return mi

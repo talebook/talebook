@@ -216,11 +216,18 @@ class BookRefer(BaseHandler):
             return {"err": "plugin.fail", "msg": _(u"插件拉取信息异常，请重试")}
 
         if only_cover == "yes":
-            # just set cover
-            mi.cover_data = refer_mi.cover_data
+            # 仅设置封面，检查封面数据是否有效
+            if refer_mi.cover_data and len(refer_mi.cover_data) > 0:
+                mi.cover_data = refer_mi.cover_data
+            else:
+                return {"err": "cover.empty", "msg": _(u"获取到的封面数据为空")}
         else:
             if only_meta == "yes":
                 refer_mi.cover_data = None
+            else:
+                # 更新前检查封面数据是否有效
+                if refer_mi.cover_data and len(refer_mi.cover_data) == 0:
+                    refer_mi.cover_data = None
             if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
                 ts = []
                 for tag in CONF['BOOK_NAV'].replace("=", "/").replace("\n", "/").split("/"):
