@@ -52,7 +52,8 @@ class ScanService(AsyncService):
         logging.info("<%s> we are: db=%s, session=%s", self, self.db, self.session)
         logging.info("start to scan %s", path_dir)
 
-        # 生成任务（粗略扫描），前端可以调用API查询进展
+        # 先检查目录中是否有待扫描的书籍
+        has_books = False
         tasks = []
         for dirpath, __, filenames in os.walk(path_dir):
             for fname in filenames:
@@ -61,13 +62,12 @@ class ScanService(AsyncService):
                     continue
 
                 fmt = fpath.split(".")[-1].lower()
-                if fmt not in SCAN_EXT:
-                    # logging.debug("bad format: [%s] %s", fmt, fpath)
-                    continue
-                tasks.append((fname, fpath, fmt))
+                if fmt in SCAN_EXT:
+                    has_books = True
+                    tasks.append((fname, fpath, fmt))
 
         # 检查是否有符合条件的书籍文件
-        if not tasks:
+        if not has_books:
             logging.info("在目录 %s 中没有找到符合条件的书籍文件", path_dir)
             return
 
