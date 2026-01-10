@@ -51,14 +51,15 @@ class MetaList(ListHandler):
         }
         title = titles.get(meta, _(u"未知")) % vars()
         if meta == "format":
-            # 特殊处理格式分类，从data表格获取
-            sql = """SELECT A.format as name, count(distinct A.book) as count
-            FROM data as A
-            GROUP BY A.format"""
-            logging.debug(sql)
-            with self._db_lock:
-                rows = self.cache.backend.conn.get(sql)
-            items = [{"id": b, "name": b, "count": c} for b, c in rows]
+            # 使用Calibre API获取所有格式及其对应的书籍数量
+            from collections import defaultdict
+            format_count = defaultdict(int)
+            all_book_ids = self.db.new_api.all_book_ids()
+            for book_id in all_book_ids:
+                book_formats = self.db.new_api.formats(book_id)
+                for fmt in book_formats:
+                    format_count[fmt] += 1
+            items = [{"id": fmt, "name": fmt, "count": count} for fmt, count in format_count.items()]
         else:
             items = self.get_category_with_count(meta)
         count = len(items)
@@ -85,15 +86,14 @@ class MetaBooks(ListHandler):
         title = titles.get(meta, _(u"未知")) % vars()  # noqa: F841
 
         if meta == "format":
-            # 特殊处理格式分类，从data表格获取对应书籍
-            sql = """SELECT distinct A.book as id
-            FROM data as A
-            WHERE A.format = ?"""
-            logging.debug(sql)
-            with self._db_lock:
-                rows = self.cache.backend.conn.get(sql, (name,))
-            ids = [r[0] for r in rows]
-            books = self.db.get_data_as_dict(ids=ids)
+            # 使用Calibre API获取指定格式的书籍
+            all_book_ids = self.db.new_api.all_book_ids()
+            matching_ids = []
+            for book_id in all_book_ids:
+                book_formats = self.db.new_api.formats(book_id)
+                if name in book_formats:
+                    matching_ids.append(book_id)
+            books = self.db.get_data_as_dict(ids=matching_ids)
         else:
             category = meta + "s" if meta in ["tag", "author"] else meta
             if meta in ["rating"]:

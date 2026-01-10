@@ -51,28 +51,10 @@ class Scanner:
         return {"total": total, "done": done, "todo": todo}
 
     def run_scan(self, path_dir):
-        # 先检查目录中是否有待扫描的书籍
-        import os
-        has_books = False
-        for dirpath, __, filenames in os.walk(path_dir):
-            for fname in filenames:
-                fpath = os.path.join(dirpath, fname)
-                if not os.path.isfile(fpath):
-                    continue
-                fmt = fpath.split(".")[-1].lower()
-                if fmt in SCAN_EXT:
-                    has_books = True
-                    break
-            if has_books:
-                break
-        
-        # 如果有书籍，就调用异步服务
-        if has_books:
-            ScanService().do_scan(path_dir)
-            return 1
-        else:
-            # 如果没有书籍，就返回0
-            return 0
+        # 直接调用异步服务进行扫描
+        ScanService().do_scan(path_dir)
+        # 由于do_scan是异步的，我们无法立即知道结果，所以总是返回1表示任务已启动
+        return 1
 
     def delete(self, hashlist):
         query = self.session.query(ScanFile)
@@ -225,10 +207,9 @@ class ScanRun(BaseHandler):
                 "msg": _("书籍导入目录必须是%s的子目录") % SCAN_DIR_PREFIX,
             }
         m = Scanner(self.db, self.settings["ScopedSession"])
-        total = m.run_scan(path)
-        if total == 0:
-            return {"err": "empty", "msg": _("目录中没有找到符合要求的书籍文件！")}
-        return {"err": "ok", "msg": _("开始扫描了"), "total": total}
+        # 直接启动扫描任务，不检查目录是否有书籍（由do_scan内部处理）
+        m.run_scan(path)
+        return {"err": "ok", "msg": _("开始扫描了"), "total": 1}
 
 
 class ScanDelete(BaseHandler):
