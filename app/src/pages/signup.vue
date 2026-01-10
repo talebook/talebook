@@ -28,6 +28,14 @@
 export default {
     created() {
         this.$store.commit("navbar", false);
+        // 检查注册功能是否开启
+        this.$backend('/user/info')
+        .then( rsp => {
+            if (rsp.err === 'ok' && !rsp.sys.allow.register) {
+                // 注册功能已关闭，重定向到登录页面
+                this.$router.push("/login");
+            }
+        });
     },
     data: () => ({
         username: "",

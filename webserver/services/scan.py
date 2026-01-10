@@ -219,21 +219,20 @@ class ScanService(AsyncService):
                 except Exception as err:
                     logging.error("Failed to parse metadata for %s during import: %s", fpath, err)
                     logging.exception("Error details:")
-                    
-            if not mi:
-                # 创建一个简单的metadata对象，避免导入失败
-                from calibre.ebooks.metadata.book.base import Metadata
-                mi = Metadata()
-                mi.title = fname.replace("." + fmt, "")
-                mi.authors = [_(u"佚名")]
-            else:
-                mi.title = utils.super_strip(mi.title)
-                mi.authors = [utils.super_strip(s) for s in mi.authors]
-
-                # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
-                if fmt in ["txt", "pdf"]:
+                    # 创建一个简单的metadata对象，避免导入失败
+                    from calibre.ebooks.metadata.book.base import Metadata
+                    mi = Metadata()
                     mi.title = fname.replace("." + fmt, "")
                     mi.authors = [_(u"佚名")]
+                else:
+                    # 处理metadata
+                    mi.title = utils.super_strip(mi.title)
+                    mi.authors = [utils.super_strip(s) for s in mi.authors]
+                    
+                    # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
+                    if fmt in ["txt", "pdf"]:
+                        mi.title = fname.replace("." + fmt, "")
+                        mi.authors = [_(u"佚名")]
 
             # 再次检查是否有重复书籍
             ids = self.db.books_with_same_title(mi)
