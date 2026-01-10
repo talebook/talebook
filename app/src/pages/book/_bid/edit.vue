@@ -258,17 +258,17 @@ export default {
             
             // 处理列表类型字段
             if (!bookData.tags || bookData.tags.length === 0) {
-                bookData.tags = [" DELETE "];
+                bookData.tags = ["__DELETE__"];
             }
             if (!bookData.authors || bookData.authors.length === 0) {
-                bookData.authors = [" DELETE "];
+                bookData.authors = ["__DELETE__"];
             }
             
             // 处理其他字段
             const fieldsToCheck = ["title", "series", "publisher", "isbn", "language", "comments", "pubdate"];
             for (const field of fieldsToCheck) {
                 if (!bookData[field]) {
-                    bookData[field] = " DELETE ";
+                    bookData[field] = "__DELETE__";
                 }
             }
             

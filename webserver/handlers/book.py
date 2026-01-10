@@ -281,10 +281,10 @@ class BookEdit(BaseHandler):
                 # 处理DELETE魔术字符串
                 is_delete = False
                 # 检查字符串类型
-                if val == " DELETE ":
+                if val == "__DELETE__":
                     is_delete = True
-                # 检查列表类型，如[" DELETE "]
-                elif isinstance(val, list) and len(val) == 1 and val[0] == " DELETE ":
+                # 检查列表类型
+                elif isinstance(val, list) and len(val) == 1 and val[0] == "__DELETE__":
                     is_delete = True
                 
                 if is_delete:
@@ -302,7 +302,7 @@ class BookEdit(BaseHandler):
 
         if data.get("pubdate", None):
             # 处理DELETE魔术字符串
-            if data["pubdate"] == " DELETE ":
+            if data["pubdate"] == "__DELETE__":
                 mi.set("pubdate", None)
             else:
                 content = douban.str2date(data["pubdate"])
