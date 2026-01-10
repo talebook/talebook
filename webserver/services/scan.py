@@ -142,24 +142,28 @@ class ScanService(AsyncService):
 
             # 尝试解析metadata
             fmt = fpath.split(".")[-1].lower()
-            try:
-                with open(fpath, "rb") as stream:
+            mi = None
+            with open(fpath, "rb") as stream:
+                try:
                     mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-                    mi.title = utils.super_strip(mi.title)
-                    mi.authors = [utils.super_strip(s) for s in mi.authors]
+                except Exception as err:
+                    logging.error("Failed to parse metadata for %s: %s", fpath, err)
+                    logging.exception("Error details:")
+                    row.title = fname
+                    row.author = "Unknown"
+                    row.status = ScanFile.READY  # 设置为可处理，尽管解析失败
+                    continue
+                
+                # 处理metadata
+                mi.title = utils.super_strip(mi.title)
+                mi.authors = [utils.super_strip(s) for s in mi.authors]
 
-                row.title = mi.title
-                # 使用mi.authors列表而不是mi.author_sort，避免作者信息丢失
-                row.author = mi.authors[0] if mi.authors else ""
-                row.publisher = mi.publisher
-                row.tags = ", ".join(mi.tags)
-                row.status = ScanFile.READY  # 设置为可处理
-            except Exception as err:
-                logging.error("Failed to parse metadata for %s: %s", fpath, err)
-                logging.exception("Error details:")
-                row.title = fname
-                row.author = "Unknown"
-                row.status = ScanFile.READY  # 设置为可处理，尽管解析失败
+            row.title = mi.title
+            # 使用mi.authors列表而不是mi.author_sort，避免作者信息丢失
+            row.author = mi.authors[0] if mi.authors else ""
+            row.publisher = mi.publisher
+            row.tags = ", ".join(mi.tags)
+            row.status = ScanFile.READY  # 设置为可处理
 
             # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
             ids = self.db.books_with_same_title(mi)
@@ -208,24 +212,27 @@ class ScanService(AsyncService):
             fpath = row.path
             fname = os.path.basename(row.path)
             fmt = fpath.split(".")[-1].lower()
-            try:
-                with open(fpath, "rb") as stream:
+            mi = None
+            with open(fpath, "rb") as stream:
+                try:
                     mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-                    mi.title = utils.super_strip(mi.title)
-                    mi.authors = [utils.super_strip(s) for s in mi.authors]
-
-                # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
-                if fmt in ["txt", "pdf"]:
+                except Exception as err:
+                    logging.error("Failed to parse metadata for %s during import: %s", fpath, err)
+                    logging.exception("Error details:")
+                    # 创建一个简单的metadata对象，避免导入失败
+                    from calibre.ebooks.metadata.book.base import Metadata
+                    mi = Metadata()
                     mi.title = fname.replace("." + fmt, "")
                     mi.authors = [_(u"佚名")]
-            except Exception as err:
-                logging.error("Failed to parse metadata for %s during import: %s", fpath, err)
-                logging.exception("Error details:")
-                # 创建一个简单的metadata对象，避免导入失败
-                from calibre.ebooks.metadata.book.base import Metadata
-                mi = Metadata()
-                mi.title = fname.replace("." + fmt, "")
-                mi.authors = [_(u"佚名")]
+                else:
+                    # 处理metadata
+                    mi.title = utils.super_strip(mi.title)
+                    mi.authors = [utils.super_strip(s) for s in mi.authors]
+                    
+                    # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
+                    if fmt in ["txt", "pdf"]:
+                        mi.title = fname.replace("." + fmt, "")
+                        mi.authors = [_(u"佚名")]
 
             # 再次检查是否有重复书籍
             ids = self.db.books_with_same_title(mi)
