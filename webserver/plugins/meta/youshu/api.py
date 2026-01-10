@@ -195,17 +195,12 @@ class YoushuApi:
             return None
         try:
             rsp = requests.get(cover_url, timeout=10, headers=CHROME_HEADERS)
-            # 检查是否为真实的Response对象，处理测试环境情况
+            # 处理测试环境中的模拟对象，只在有status_code属性时检查
             if hasattr(rsp, 'status_code') and rsp.status_code != 200:
                 logging.error(_(f"获取封面失败: status_code[{rsp.status_code}] != 200 OK"))
                 return None
-            # 获取响应内容，处理不同对象类型
-            if hasattr(rsp, 'content'):
-                img = rsp.content
-            elif hasattr(rsp, 'text'):
-                img = rsp.text.encode('utf-8')
-            else:
-                img = rsp
+            # 直接获取content，测试环境中模拟对象会有content属性
+            img = rsp.content
             if not img or len(img) == 0:
                 logging.error(_("获取封面失败: 封面数据为空"))
                 return None
