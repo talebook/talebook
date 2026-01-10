@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: talebook/calibre-docker:latest
+      options: --user root
 
     steps:
       - name: Checkout code
