@@ -207,9 +207,10 @@ class ScanRun(BaseHandler):
                 "msg": _("书籍导入目录必须是%s的子目录") % SCAN_DIR_PREFIX,
             }
         m = Scanner(self.db, self.settings["ScopedSession"])
-        # 直接启动扫描任务，不检查目录是否有书籍（由do_scan内部处理）
-        m.run_scan(path)
-        return {"err": "ok", "msg": _("开始扫描了"), "total": 1}
+        total = m.run_scan(path)
+        if total == 0:
+            return {"err": "empty", "msg": _("目录中没有找到符合要求的书籍文件！")}
+        return {"err": "ok", "msg": _("开始扫描了"), "total": total}
 
 
 class ScanDelete(BaseHandler):
