@@ -149,21 +149,22 @@ class ScanService(AsyncService):
                 except Exception as err:
                     logging.error("Failed to parse metadata for %s: %s", fpath, err)
                     logging.exception("Error details:")
-                    row.title = fname
-                    row.author = "Unknown"
-                    row.status = ScanFile.READY  # 设置为可处理，尽管解析失败
-                    continue
-                
+                    
+            if mi:
                 # 处理metadata
                 mi.title = utils.super_strip(mi.title)
                 mi.authors = [utils.super_strip(s) for s in mi.authors]
 
-            row.title = mi.title
-            # 使用mi.authors列表而不是mi.author_sort，避免作者信息丢失
-            row.author = mi.authors[0] if mi.authors else ""
-            row.publisher = mi.publisher
-            row.tags = ", ".join(mi.tags)
-            row.status = ScanFile.READY  # 设置为可处理
+                row.title = mi.title
+                # 使用mi.authors列表而不是mi.author_sort，避免作者信息丢失
+                row.author = mi.authors[0] if mi.authors else ""
+                row.publisher = mi.publisher
+                row.tags = ", ".join(mi.tags)
+                row.status = ScanFile.READY  # 设置为可处理
+            else:
+                row.title = fname
+                row.author = "Unknown"
+                row.status = ScanFile.READY  # 设置为可处理，尽管解析失败
 
             # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
             ids = self.db.books_with_same_title(mi)
