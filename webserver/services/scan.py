@@ -149,9 +149,8 @@ class ScanService(AsyncService):
                 except Exception as err:
                     logging.error("Failed to parse metadata for %s: %s", fpath, err)
                     logging.exception("Error details:")
-                    
+                
             if mi:
-                # 处理metadata
                 mi.title = utils.super_strip(mi.title)
                 mi.authors = [utils.super_strip(s) for s in mi.authors]
 
