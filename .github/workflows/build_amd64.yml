@@ -3,7 +3,6 @@ name: Build and Push AMD64 Docker Image
 on:
   push:
     branches:
-      - master
       - dev
   pull_request:
     branches:
@@ -15,7 +14,6 @@ env:
 
 jobs:
   docker:
-    if: github.repository == 'hehetoshang/talebook' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
