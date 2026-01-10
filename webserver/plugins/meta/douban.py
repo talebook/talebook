@@ -188,6 +188,11 @@ class DoubanBookApi(object):
         mi.cover_url = book["images"]["large"]
         cover_data = self.get_cover(mi.cover_url)
 
+        if cover_data:
+            mi.cover_data = cover_data
+        else:
+            mi.cover_data = None
+
         logging.debug("=================\ndouban metadata:\n%s" % mi)
         return mi
 
