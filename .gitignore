@@ -89,3 +89,8 @@ ENV/
 .ropeproject
 /.idea/
 data/
+.npm
+.config
+dev.yml
+ssr.yml
+.DS_Store
