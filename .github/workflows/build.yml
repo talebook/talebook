@@ -6,9 +6,6 @@ on:
       - master
     tags:
       - "v*"
-  pull_request:
-    branches:
-      - master
 
 env:
   REGISTRY: docker.io

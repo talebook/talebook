@@ -5,6 +5,9 @@ on:
     branches:
       - master
       - dev
+  pull_request:
+    branches:
+      - master
 
 env:
   REGISTRY: docker.io
@@ -12,7 +15,7 @@ env:
 
 jobs:
   docker:
-    if: github.repository == 'hehetoshang/talebook'
+    if: github.repository == 'hehetoshang/talebook' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
