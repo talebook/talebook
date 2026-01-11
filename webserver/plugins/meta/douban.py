@@ -136,11 +136,9 @@ class DoubanBookApi(object):
             return None
         try:
             rsp = requests.get(cover_url, timeout=10, headers=CHROME_HEADERS)
-            # 处理测试环境中的模拟对象，只在有status_code属性时检查
-            if hasattr(rsp, 'status_code') and rsp.status_code != 200:
+            if rsp.status_code != 200:
                 logging.error("获取封面失败: status_code[%s] != 200 OK", rsp.status_code)
                 return None
-            # 直接获取content，测试环境中模拟对象会有content属性
             img = rsp.content
             if not img or len(img) == 0:
                 logging.error("获取封面失败: 封面数据为空")
