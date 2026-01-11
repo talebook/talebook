@@ -194,7 +194,9 @@ class TestDoubanApi(unittest.TestCase):
     def test_metadata(self, mk):
         api = DoubanBookApi("apikey", "baseurl")
         book = dict(DOUBAN_BOOK)
-        image = unittest.TestResult()
+        # 创建一个具有status_code和content属性的mock对象
+        image = mock.Mock()
+        image.status_code = 200
         image.content = b"image-body"
         mk.return_value = image
 
