@@ -108,6 +108,8 @@ settings = {
     'ALLOW_GUEST_DOWNLOAD' : True,
     'ALLOW_GUEST_UPLOAD' : False,
     'ALLOW_REGISTER' : False,
+    'ALLOW_FEEDBACK' : True,
+    'FEEDBACK_URL' : 'https://github.com/talebook/talebook/issues',
     'HEADER': '欢迎访问！如果你喜欢此项目，请前往 Github <a target="_blank" href="https://github.com/talebook/talebook"> 给 talebook 点击一个Star！</a>',
     'FOOTER': '本站基于Calibre构建，感谢开源界的力量。所有资源搜集于互联网，如有侵权请邮件联系。',
     'FOOTER_EXTRA_HTML': '',

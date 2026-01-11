@@ -163,7 +163,7 @@
                                 <v-list-item-action><v-icon>history</v-icon></v-list-item-action>
                                 <v-list-item-title> 阅读记录 </v-list-item-title>
                             </v-list-item>
-                            <v-list-item target="_blank" href="https://github.com/talebook/talebook/issues">
+                            <v-list-item v-if="sys.allow.FEEDBACK" target="_blank" :href="sys.FEEDBACK_URL">
                                 <v-list-item-action><v-icon>sms_failed</v-icon></v-list-item-action>
                                 <v-list-item-title> 反馈 </v-list-item-title>
                             </v-list-item>
@@ -207,6 +207,7 @@ export default {
             authors: 0,
             publishers: 0,
             series: 0,
+            formats: 0,
             users: 0,
             active: 0,
             version: "",
@@ -251,6 +252,7 @@ export default {
                 { icon: "mdi-home-group", href: "/publisher", text: "出版社", count: this.sys.publishers },
                 { icon: "mdi-human-greeting", href: "/author", text: "作者", count: this.sys.authors },
                 { icon: "mdi-tag-heart", href: "/tag", text: "标签", count: this.sys.tags },
+                { icon: "mdi-file", href: "/format", text: "文件格式", count: this.sys.formats },
                 {
                     target: "",
                     links: [
