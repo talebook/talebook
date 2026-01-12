@@ -70,6 +70,7 @@ jobs:
             echo "recorded=$RECORDED" >> $GITHUB_OUTPUT
           else
             echo "recorded=" >> $GITHUB_OUTPUT
+          fi
 
       - name: Compare versions (decide whether to update)
         id: compare
