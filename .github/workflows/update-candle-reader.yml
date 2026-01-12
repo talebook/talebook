@@ -56,15 +56,19 @@ jobs:
           curl -L -o dist.zip "https://github.com/talebook/candle-reader/releases/download/${VERSION}/dist.zip"
           
           # 清理旧文件并创建目录
-          rm -rf app/public/candle-reader
-          mkdir -p app/public/candle-reader
+          rm -rf app/public/static/candle-reader
+          mkdir -p app/public/static/candle-reader
           
-          # 解压到目标目录
-          echo "Extracting to app/public/candle-reader/..."
-          unzip -q dist.zip -d app/public/candle-reader/
+          # 解压到临时目录
+          echo "Extracting dist.zip..."
+          unzip -q dist.zip
           
-          # 清理下载的 zip 文件
-          rm dist.zip
+          # 移动 dist/* 到目标目录
+          echo "Moving files to app/public/static/candle-reader/..."
+          mv dist/* app/public/static/candle-reader/
+          
+          # 清理临时文件
+          rm -rf dist dist.zip
           
           echo "Candle-reader files updated successfully"
       
@@ -73,6 +77,13 @@ jobs:
         run: |
           echo "${{ steps.get-latest.outputs.latest_version }}" > candle-reader-version.txt
           echo "Version file updated to ${{ steps.get-latest.outputs.latest_version }}"
+      
+      - name: Force add files to git
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          git add -f app/public/static/candle-reader/
+          git add candle-reader-version.txt
+          echo "Files added to git (forced)"
       
       - name: Create Pull Request
         if: steps.compare.outputs.needs_update == 'true'
@@ -91,7 +102,7 @@ jobs:
             - **发布链接**: https://github.com/talebook/candle-reader/releases/tag/${{ steps.get-latest.outputs.latest_version }}
             
             ### 更新内容
-            - 下载并解压了最新的 dist.zip 到 `app/public/candle-reader/`
+            - 下载并解压了最新的 dist.zip 到 `app/public/static/candle-reader/`
             - 更新了版本记录文件
             
             请审查更改日志并测试后再合并。
