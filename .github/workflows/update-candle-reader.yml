@@ -116,27 +116,6 @@ jobs:
         run: |
           set -euo pipefail
           LATEST="${{ steps.compare.outputs.latest }}"
-          BRANCH="update/candle-reader-dist-${{ github.run_id }}-${LATEST}"
-
-          # Ensure origin refs and tags are present
-          git fetch origin --prune --tags
-
-          # Determine remote default branch (origin/HEAD)
-          DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true)
-          if [ -n "$DEFAULT_BRANCH" ]; then
-            DEFAULT_BRANCH=${DEFAULT_BRANCH#refs/remotes/origin/}
-          else
-            # Fallback: try to get from remote show, else default to main
-            DEFAULT_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p' || true)
-            DEFAULT_BRANCH=${DEFAULT_BRANCH:-master}
-          fi
-
-          echo "Default branch on origin is ${DEFAULT_BRANCH}"
-
-          # Create new branch from remote default branch
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH" "origin/${DEFAULT_BRANCH}"
 
           # Replace target directory with new dist contents
           rm -rf "${{ env.TARGET_DIR }}"
@@ -146,36 +125,13 @@ jobs:
           # Update version file
           echo "${LATEST}" > "${{ env.VERSION_FILE }}"
 
-          # Stage changes
-          git add -A "${{ env.TARGET_DIR }}" "${{ env.VERSION_FILE }}"
-
-          # If no changes staged, exit without creating PR
-          if git diff --cached --quiet; then
-            echo "No changes detected after unpacking. Nothing to commit."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
-            echo "base=${DEFAULT_BRANCH}" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "Changes detected; will commit and create PR."
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
-          echo "base=${DEFAULT_BRANCH}" >> "$GITHUB_OUTPUT"
-
-      - name: Commit changes
-        if: steps.prepare.outputs.changed == 'true'
-        run: |
-          git commit -m "chore(candle-reader): update compiled dist to ${{ steps.compare.outputs.latest }}"
-
       - name: Create Pull Request with updated dist
-        if: steps.prepare.outputs.changed == 'true'
+        if: steps.compare.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore(candle-reader): update compiled dist to ${{ steps.compare.outputs.latest }}"
-          branch: ${{ steps.prepare.outputs.branch }}
-          base: ${{ steps.prepare.outputs.base }}
+          branch: "update/candle-reader-dist-${{ github.run_id }}-${{ steps.compare.outputs.latest }}"
           title: "Update candle-reader dist to ${{ steps.compare.outputs.latest }}"
           body: |
             Automated update of app/public/candle-reader from talebook/candle-reader.
