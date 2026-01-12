@@ -16,7 +16,10 @@ def get_file_encoding(file):
 
 def get_content_encoding(byte):
     import chardet
-    return chardet.detect(byte)['encoding']
+    # 文件正常有内容, 但是在某些情况下 detect 会返回 None.
+    # 为了保证正常读取文件内容, 这里默认返回 UTF-16.
+    # 其实这里完全可以从 extract 下面的 json 文件取文件编码, 之前已经做过一次编码检测了
+    return chardet.detect(byte)['encoding'] or 'UTF-16'
 
 
 class TxtParser:
