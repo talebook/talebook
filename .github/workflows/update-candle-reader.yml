@@ -5,7 +5,7 @@ on:
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
-name: Scheduled update of candle-reader dist (versioned)
+name: Check and update candle-reader
 
 permissions:
   contents: write
