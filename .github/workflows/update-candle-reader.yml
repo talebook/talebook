@@ -1,7 +1,6 @@
 # talebook/talebook: scheduled/manual check for candle-reader release, update app/public/candle-reader only when version changed
 on:
   schedule:
-    # 每 6 小时检查一次，可根据需要调整 cron 表达式
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
@@ -37,6 +36,7 @@ jobs:
           OWNER: ${{ env.CHILD_OWNER }}
           REPO: ${{ env.CHILD_REPO }}
           TOKEN: ${{ secrets.CHILD_REPO_TOKEN }}
+          ASSET_NAME: ${{ env.ASSET_NAME }}
         run: |
           API="https://api.github.com/repos/${OWNER}/${REPO}/releases/latest"
           if [ -n "${TOKEN}" ]; then
@@ -46,30 +46,25 @@ jobs:
           fi
           echo "Querying latest release for ${OWNER}/${REPO} ..."
           RELEASE_JSON=$(curl -s -H "Accept: application/vnd.github.v3+json" ${AUTH_HEADER:+-H "$AUTH_HEADER"} "$API")
-          # Extract tag_name (fallback to name), and the dist.zip asset download URL
           LATEST_TAG=$(echo "$RELEASE_JSON" | jq -r '.tag_name // .name // empty')
           DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name=="'"${ASSET_NAME}"'") .browser_download_url // empty')
           if [ -z "$LATEST_TAG" ]; then
             echo "Latest release tag/name not found in release JSON. Dumping JSON for debug:"
             echo "$RELEASE_JSON"
-            echo "tag="
-            echo "download_url="
-            echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-            echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
             exit 1
           fi
           echo "Found latest tag: $LATEST_TAG"
-          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "download_url=$DOWNLOAD_URL" >> "$GITHUB_OUTPUT"
+          echo "tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Read recorded version from repository
         id: read_version
         run: |
           if [ -f "${{ env.VERSION_FILE }}" ]; then
-            RECORDED=$(cat "${{ env.VERSION_FILE }}" | tr -d '\r\n')
-            echo "recorded=$RECORDED" >> $GITHUB_OUTPUT
+            RECORDED=$(tr -d '\r\n' < "${{ env.VERSION_FILE }}" || true)
+            echo "recorded=${RECORDED}" >> "$GITHUB_OUTPUT"
           else
-            echo "recorded=" >> $GITHUB_OUTPUT
+            echo "recorded=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Compare versions (decide whether to update)
@@ -81,14 +76,14 @@ jobs:
           echo "Recorded : '$RECORDED'"
           if [ -z "$LATEST_TAG" ]; then
             echo "No latest tag found, will not proceed."
-            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           elif [ "$LATEST_TAG" = "$RECORDED" ]; then
             echo "Version unchanged. Nothing to do."
-            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Version changed: $RECORDED -> $LATEST_TAG"
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "latest=$LATEST_TAG" >> $GITHUB_OUTPUT
+            echo "Version changed: ${RECORDED} -> ${LATEST_TAG}"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "latest=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Abort early if no change
@@ -101,6 +96,7 @@ jobs:
         env:
           DOWNLOAD_URL: ${{ steps.get_release.outputs.download_url }}
           TOKEN: ${{ secrets.CHILD_REPO_TOKEN }}
+          ASSET_NAME: ${{ env.ASSET_NAME }}
         run: |
           if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
             echo "No download URL for ${ASSET_NAME} found in release. Aborting."
@@ -118,38 +114,68 @@ jobs:
         id: prepare
         if: steps.compare.outputs.changed == 'true'
         run: |
-          set -e
+          set -euo pipefail
           LATEST="${{ steps.compare.outputs.latest }}"
           BRANCH="update/candle-reader-dist-${{ github.run_id }}-${LATEST}"
-          echo "BRANCH=${BRANCH}" >> $GITHUB_OUTPUT
+
+          # Ensure origin refs and tags are present
+          git fetch origin --prune --tags
+
+          # Determine remote default branch (origin/HEAD)
+          DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true)
+          if [ -n "$DEFAULT_BRANCH" ]; then
+            DEFAULT_BRANCH=${DEFAULT_BRANCH#refs/remotes/origin/}
+          else
+            # Fallback: try to get from remote show, else default to main
+            DEFAULT_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p' || true)
+            DEFAULT_BRANCH=${DEFAULT_BRANCH:-master}
+          fi
+
+          echo "Default branch on origin is ${DEFAULT_BRANCH}"
+
+          # Create new branch from remote default branch
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
+          git checkout -b "$BRANCH" "origin/${DEFAULT_BRANCH}"
+
           # Replace target directory with new dist contents
           rm -rf "${{ env.TARGET_DIR }}"
           mkdir -p "${{ env.TARGET_DIR }}"
           unzip -q ${ASSET_NAME} -d "${{ env.TARGET_DIR }}"
+
           # Update version file
           echo "${LATEST}" > "${{ env.VERSION_FILE }}"
+
+          # Stage changes
           git add -A "${{ env.TARGET_DIR }}" "${{ env.VERSION_FILE }}"
-          # If no actual file changes (rare), still proceed to commit so version is in repo
+
+          # If no changes staged, exit without creating PR
           if git diff --cached --quiet; then
-            echo "No changes staged (unexpected). Exiting."
+            echo "No changes detected after unpacking. Nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+            echo "base=${DEFAULT_BRANCH}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
+          echo "Changes detected; will commit and create PR."
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "base=${DEFAULT_BRANCH}" >> "$GITHUB_OUTPUT"
+
       - name: Commit changes
-        if: steps.compare.outputs.changed == 'true'
+        if: steps.prepare.outputs.changed == 'true'
         run: |
           git commit -m "chore(candle-reader): update compiled dist to ${{ steps.compare.outputs.latest }}"
 
       - name: Create Pull Request with updated dist
-        if: steps.compare.outputs.changed == 'true'
+        if: steps.prepare.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore(candle-reader): update compiled dist to ${{ steps.compare.outputs.latest }}"
-          branch: ${{ steps.prepare.outputs.BRANCH }}
+          branch: ${{ steps.prepare.outputs.branch }}
+          base: ${{ steps.prepare.outputs.base }}
           title: "Update candle-reader dist to ${{ steps.compare.outputs.latest }}"
           body: |
             Automated update of app/public/candle-reader from talebook/candle-reader.
