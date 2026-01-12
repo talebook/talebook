@@ -117,6 +117,10 @@ class SignUp(BaseHandler):
 
     @js
     def post(self):
+        # 检查是否允许注册
+        if not CONF["ALLOW_REGISTER"]:
+            return {"err": "register.disabled", "msg": _(u"注册功能已关闭")}
+            
         email = self.get_argument("email", "").strip()
         nickname = self.get_argument("nickname", "").strip()
         username = self.get_argument("username", "").strip().lower()
@@ -295,12 +299,19 @@ class UserInfo(BaseHandler):
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
         count_all_users = self.session.query(func.count(Reader.id)).scalar()
         count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
+        # 获取格式数量
+        sql = "SELECT COUNT(DISTINCT format) FROM data"
+        # 使用BaseHandler的锁来保护数据库连接的访问
+        with self._db_lock:
+            formats_count = self.cache.backend.conn.get(sql)[0][0]
+
         return {
             "books": db.count(),
             "tags": len(db.all_tags()),
             "authors": len(db.all_authors()),
             "publishers": len(db.all_publishers()),
             "series": len(db.all_series()),
+            "formats": formats_count,
             "mtime": db.last_modified().strftime("%Y-%m-%d"),
             "users": count_all_users,
             "active": count_hot_users,
@@ -313,11 +324,13 @@ class UserInfo(BaseHandler):
             "sidebar_extra_html": CONF["SIDEBAR_EXTRA_HTML"],
             "header": CONF["HEADER"],
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
+            "FEEDBACK_URL": CONF["FEEDBACK_URL"],
             "allow": {
                 "register": CONF["ALLOW_REGISTER"],
                 "download": CONF["ALLOW_GUEST_DOWNLOAD"],
                 "push": CONF["ALLOW_GUEST_PUSH"],
                 "read": CONF["ALLOW_GUEST_READ"],
+                "FEEDBACK": CONF["ALLOW_FEEDBACK"],
             },
         }
 

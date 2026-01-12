@@ -51,7 +51,10 @@ class Scanner:
         return {"total": total, "done": done, "todo": todo}
 
     def run_scan(self, path_dir):
+        # 直接调用异步服务进行扫描
         ScanService().do_scan(path_dir)
+        # 由于do_scan是异步的，我们无法立即知道结果，所以总是返回1表示任务已启动
+        return 1
 
     def delete(self, hashlist):
         query = self.session.query(ScanFile)

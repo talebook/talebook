@@ -148,9 +148,11 @@ export default {
                             return;
                         }
                         if (callback(rsp)) {
+                            // 在扫描过程中，每次检查状态后都刷新书籍列表，实现自动更新
+                            this.getDataFromApi();
                             setTimeout(() => {
                                 this.loop_check_status(url, callback);
-                            }, 1000);
+                            }, 2000);
                         } else {
                             this.getDataFromApi();
                             this.$alert("info", "处理完毕！");
@@ -231,6 +233,8 @@ export default {
                         this.$alert("error", rsp.msg);
                     }
                     this.getDataFromApi();
+                    // 清空选中数组
+                    this.selected = [];
                 })
                 .finally(() => {
                     this.loading = false;

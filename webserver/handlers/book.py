@@ -216,11 +216,18 @@ class BookRefer(BaseHandler):
             return {"err": "plugin.fail", "msg": _(u"插件拉取信息异常，请重试")}
 
         if only_cover == "yes":
-            # just set cover
-            mi.cover_data = refer_mi.cover_data
+            # 仅设置封面，检查封面数据是否有效
+            if refer_mi.cover_data and len(refer_mi.cover_data) > 0:
+                mi.cover_data = refer_mi.cover_data
+            else:
+                return {"err": "cover.empty", "msg": _(u"获取到的封面数据为空")}
         else:
             if only_meta == "yes":
                 refer_mi.cover_data = None
+            else:
+                # 更新前检查封面数据是否有效
+                if refer_mi.cover_data and len(refer_mi.cover_data) == 0:
+                    refer_mi.cover_data = None
             if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
                 ts = []
                 for tag in CONF['BOOK_NAV'].replace("=", "/").replace("\n", "/").split("/"):
@@ -274,10 +281,10 @@ class BookEdit(BaseHandler):
                 # 处理DELETE魔术字符串
                 is_delete = False
                 # 检查字符串类型
-                if val == " DELETE ":
+                if val == "__DELETE__":
                     is_delete = True
-                # 检查列表类型，如[" DELETE "]
-                elif isinstance(val, list) and len(val) == 1 and val[0] == " DELETE ":
+                # 检查列表类型
+                elif isinstance(val, list) and len(val) == 1 and val[0] == "__DELETE__":
                     is_delete = True
                 
                 if is_delete:
@@ -295,7 +302,7 @@ class BookEdit(BaseHandler):
 
         if data.get("pubdate", None):
             # 处理DELETE魔术字符串
-            if data["pubdate"] == " DELETE ":
+            if data["pubdate"] == "__DELETE__":
                 mi.set("pubdate", None)
             else:
                 content = douban.str2date(data["pubdate"])
