@@ -1,0 +1,157 @@
+# talebook/talebook: scheduled/manual check for candle-reader release, update app/public/candle-reader only when version changed
+on:
+  schedule:
+    # 每 6 小时检查一次，可根据需要调整 cron 表达式
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+name: Scheduled update of candle-reader dist (versioned)
+
+permissions:
+  contents: write
+
+env:
+  CHILD_OWNER: talebook
+  CHILD_REPO: candle-reader
+  VERSION_FILE: .candle-reader-version
+  TARGET_DIR: app/public/candle-reader
+  ASSET_NAME: dist.zip
+
+jobs:
+  update-candle-reader:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install utilities
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq unzip
+
+      - name: Get latest release info from child repo
+        id: get_release
+        env:
+          OWNER: ${{ env.CHILD_OWNER }}
+          REPO: ${{ env.CHILD_REPO }}
+          TOKEN: ${{ secrets.CHILD_REPO_TOKEN }}
+        run: |
+          API="https://api.github.com/repos/${OWNER}/${REPO}/releases/latest"
+          if [ -n "${TOKEN}" ]; then
+            AUTH_HEADER="Authorization: token ${TOKEN}"
+          else
+            AUTH_HEADER=""
+          fi
+          echo "Querying latest release for ${OWNER}/${REPO} ..."
+          RELEASE_JSON=$(curl -s -H "Accept: application/vnd.github.v3+json" ${AUTH_HEADER:+-H "$AUTH_HEADER"} "$API")
+          # Extract tag_name (fallback to name), and the dist.zip asset download URL
+          LATEST_TAG=$(echo "$RELEASE_JSON" | jq -r '.tag_name // .name // empty')
+          DOWNLOAD_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name=="'"${ASSET_NAME}"'") .browser_download_url // empty')
+          if [ -z "$LATEST_TAG" ]; then
+            echo "Latest release tag/name not found in release JSON. Dumping JSON for debug:"
+            echo "$RELEASE_JSON"
+            echo "tag="
+            echo "download_url="
+            echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+            echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          echo "Found latest tag: $LATEST_TAG"
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+      - name: Read recorded version from repository
+        id: read_version
+        run: |
+          if [ -f "${{ env.VERSION_FILE }}" ]; then
+            RECORDED=$(cat "${{ env.VERSION_FILE }}" | tr -d '\r\n')
+            echo "recorded=$RECORDED" >> $GITHUB_OUTPUT
+          else
+            echo "recorded=" >> $GITHUB_OUTPUT
+
+      - name: Compare versions (decide whether to update)
+        id: compare
+        run: |
+          LATEST_TAG="${{ steps.get_release.outputs.tag }}"
+          RECORDED="${{ steps.read_version.outputs.recorded }}"
+          echo "Latest tag: '$LATEST_TAG'"
+          echo "Recorded : '$RECORDED'"
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No latest tag found, will not proceed."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          elif [ "$LATEST_TAG" = "$RECORDED" ]; then
+            echo "Version unchanged. Nothing to do."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version changed: $RECORDED -> $LATEST_TAG"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "latest=$LATEST_TAG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Abort early if no change
+        if: steps.compare.outputs.changed == 'false'
+        run: |
+          echo "No update required. Exiting."
+
+      - name: Download dist.zip from release
+        if: steps.compare.outputs.changed == 'true'
+        env:
+          DOWNLOAD_URL: ${{ steps.get_release.outputs.download_url }}
+          TOKEN: ${{ secrets.CHILD_REPO_TOKEN }}
+        run: |
+          if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
+            echo "No download URL for ${ASSET_NAME} found in release. Aborting."
+            exit 1
+          fi
+          echo "Downloading ${ASSET_NAME} from $DOWNLOAD_URL"
+          if [ -n "${TOKEN}" ]; then
+            curl -L -H "Authorization: token ${TOKEN}" -o ${ASSET_NAME} "$DOWNLOAD_URL"
+          else
+            curl -L -o ${ASSET_NAME} "$DOWNLOAD_URL"
+          fi
+          ls -lh ${ASSET_NAME}
+
+      - name: Prepare branch and unpack dist to working tree
+        id: prepare
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          set -e
+          LATEST="${{ steps.compare.outputs.latest }}"
+          BRANCH="update/candle-reader-dist-${{ github.run_id }}-${LATEST}"
+          echo "BRANCH=${BRANCH}" >> $GITHUB_OUTPUT
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          # Replace target directory with new dist contents
+          rm -rf "${{ env.TARGET_DIR }}"
+          mkdir -p "${{ env.TARGET_DIR }}"
+          unzip -q ${ASSET_NAME} -d "${{ env.TARGET_DIR }}"
+          # Update version file
+          echo "${LATEST}" > "${{ env.VERSION_FILE }}"
+          git add -A "${{ env.TARGET_DIR }}" "${{ env.VERSION_FILE }}"
+          # If no actual file changes (rare), still proceed to commit so version is in repo
+          if git diff --cached --quiet; then
+            echo "No changes staged (unexpected). Exiting."
+            exit 0
+          fi
+
+      - name: Commit changes
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          git commit -m "chore(candle-reader): update compiled dist to ${{ steps.compare.outputs.latest }}"
+
+      - name: Create Pull Request with updated dist
+        if: steps.compare.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(candle-reader): update compiled dist to ${{ steps.compare.outputs.latest }}"
+          branch: ${{ steps.prepare.outputs.BRANCH }}
+          title: "Update candle-reader dist to ${{ steps.compare.outputs.latest }}"
+          body: |
+            Automated update of app/public/candle-reader from talebook/candle-reader.
+            Latest release: ${{ steps.compare.outputs.latest }}
+            Release JSON download URL: ${{ steps.get_release.outputs.download_url }}
+            Recorded version file: ${{ env.VERSION_FILE }}
