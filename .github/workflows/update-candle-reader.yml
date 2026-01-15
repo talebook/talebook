@@ -4,31 +4,38 @@ on:
   schedule:
     # 每天 UTC 时间 00:00 运行
     - cron: '0 0 * * *'
+  repository_dispatch:
+    types: [update-candle-reader]
   workflow_dispatch: # 允许手动触发
+
+env:
+  OWNER: talebook
+  REPO: candle-reader
+  VERSION_FILE: candle-reader-version.txt
+  TARGET_DIR: app/public/static/candle-reader
 
 jobs:
   update-candle-reader:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Get latest candle-reader release
         id: get-latest
         run: |
-          LATEST_VERSION=$(curl -s https://api.github.com/repos/talebook/candle-reader/releases/latest | jq -r .tag_name)
+          LATEST_VERSION=$(curl -s "https://api.github.com/repos/${{ env.OWNER }}/${{ env.REPO }}/releases/latest" | jq -r .tag_name)
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "Latest candle-reader version: $LATEST_VERSION"
+          echo "Latest ${{ env.REPO }} version: $LATEST_VERSION"
       
       - name: Read current version
         id: current-version
         run: |
-          # 假设版本号存储在 version.txt 文件中，请根据实际情况修改
-          if [ -f "candle-reader-version.txt" ]; then
-            CURRENT_VERSION=$(cat candle-reader-version.txt)
+          if [ -f "${{ env.VERSION_FILE }}" ]; then
+            CURRENT_VERSION=$(cat ${{ env.VERSION_FILE }})
           else
             CURRENT_VERSION="none"
           fi
@@ -52,37 +59,37 @@ jobs:
           VERSION="${{ steps.get-latest.outputs.latest_version }}"
           
           # 下载 dist.zip
-          echo "Downloading candle-reader dist.zip..."
-          curl -L -o dist.zip "https://github.com/talebook/candle-reader/releases/download/${VERSION}/dist.zip"
+          echo "Downloading ${{ env.REPO }} dist.zip..."
+          curl -L -o dist.zip "https://github.com/${{ env.OWNER }}/${{ env.REPO }}/releases/download/${VERSION}/dist.zip"
           
           # 清理旧文件并创建目录
-          rm -rf app/public/static/candle-reader
-          mkdir -p app/public/static/candle-reader
+          rm -rf ${{ env.TARGET_DIR }}
+          mkdir -p ${{ env.TARGET_DIR }}
           
           # 解压到临时目录
           echo "Extracting dist.zip..."
           unzip -q dist.zip
           
           # 移动 dist/* 到目标目录
-          echo "Moving files to app/public/static/candle-reader/..."
-          mv dist/* app/public/static/candle-reader/
+          echo "Moving files to ${{ env.TARGET_DIR }}/..."
+          mv dist/* ${{ env.TARGET_DIR }}/
           
           # 清理临时文件
           rm -rf dist dist.zip
           
-          echo "Candle-reader files updated successfully"
+          echo "${{ env.REPO }} files updated successfully"
       
       - name: Update version file
         if: steps.compare.outputs.needs_update == 'true'
         run: |
-          echo "${{ steps.get-latest.outputs.latest_version }}" > candle-reader-version.txt
+          echo "${{ steps.get-latest.outputs.latest_version }}" > ${{ env.VERSION_FILE }}
           echo "Version file updated to ${{ steps.get-latest.outputs.latest_version }}"
       
       - name: Force add files to git
         if: steps.compare.outputs.needs_update == 'true'
         run: |
-          git add -f app/public/static/candle-reader/
-          git add candle-reader-version.txt
+          git add -f ${{ env.TARGET_DIR }}/
+          git add ${{ env.VERSION_FILE }}
           echo "Files added to git (forced)"
       
       - name: Create Pull Request
@@ -90,23 +97,23 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update candle-reader to ${{ steps.get-latest.outputs.latest_version }}"
-          title: "Update candle-reader to ${{ steps.get-latest.outputs.latest_version }}"
+          commit-message: "chore: update ${{ env.REPO }} to ${{ steps.get-latest.outputs.latest_version }}"
+          title: "Update ${{ env.REPO }} to ${{ steps.get-latest.outputs.latest_version }}"
           body: |
-            ## 自动更新 candle-reader 版本
+            ## 自动更新 ${{ env.REPO }} 版本
             
             此 PR 由 GitHub Actions 自动创建。
             
             - **当前版本**: `${{ steps.current-version.outputs.current_version }}`
             - **最新版本**: `${{ steps.get-latest.outputs.latest_version }}`
-            - **发布链接**: https://github.com/talebook/candle-reader/releases/tag/${{ steps.get-latest.outputs.latest_version }}
+            - **发布链接**: https://github.com/${{ env.OWNER }}/${{ env.REPO }}/releases/tag/${{ steps.get-latest.outputs.latest_version }}
             
             ### 更新内容
-            - 下载并解压了最新的 dist.zip 到 `app/public/static/candle-reader/`
+            - 下载并解压了最新的 dist.zip 到 `${{ env.TARGET_DIR }}/`
             - 更新了版本记录文件
             
             请审查更改日志并测试后再合并。
-          branch: update-candle-reader-${{ steps.get-latest.outputs.latest_version }}
+          branch: update-${{ env.REPO }}-${{ steps.get-latest.outputs.latest_version }}
           delete-branch: true
           labels: |
             dependencies
