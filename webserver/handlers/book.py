@@ -128,12 +128,14 @@ class BookRefer(BaseHandler):
         return books
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
+        refer_mi = None
         if provider_key == baike.KEY:
             title = re.sub(u"[(（].*", "", mi.title)
             api = baike.BaiduBaikeApi(copy_image=True)
             try:
-                return api.get_book(title)
-            except:
+                refer_mi = api.get_book(title)
+            except Exception as e:
+                logging.error("获取百度百科书籍信息失败: %s", e)
                 raise RuntimeError({"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")})
         elif provider_key == douban.KEY:
             mi.douban_id = provider_value
@@ -147,7 +149,7 @@ class BookRefer(BaseHandler):
             try:
                 refer_mi = api.get_book(mi)
                 # 检查豆瓣封面是否获取成功
-                if not refer_mi.cover_data:
+                if refer_mi and not refer_mi.cover_data:
                     # 封面获取失败，保留本地原有的封面数据
                     refer_mi.cover_data = mi.cover_data
                     # 记录日志
@@ -160,10 +162,17 @@ class BookRefer(BaseHandler):
             api = youshu.YoushuApi(copy_image=True)
             try:
                 refer_mi = api.get_book(title)
-            except:
+            except Exception as e:
+                logging.error("获取优书网书籍信息失败: %s", e)
                 raise RuntimeError({"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")})
         else:
             raise RuntimeError({"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")})
+        
+        # 确保返回值有效
+        if not refer_mi:
+            raise RuntimeError({"err": "plugin.fail", "msg": _(u"插件拉取信息异常，请重试")})
+        
+        return refer_mi
 
     @js
     @auth
@@ -219,9 +228,6 @@ class BookRefer(BaseHandler):
             refer_mi = self.plugin_get_book_meta(provider_key, provider_value, mi)
         except RuntimeError as e:
             return e.args[0]
-
-        if not refer_mi:
-            return {"err": "plugin.fail", "msg": _(u"插件拉取信息异常，请重试")}
 
         cover_fallback = False
         if only_cover == "yes":
