@@ -142,18 +142,25 @@ class BookRefer(BaseHandler):
                 CONF["douban_apikey"],
                 CONF["douban_baseurl"],
                 copy_image=True,
-                maxCount=CONF["douban_max_count"],
+                manual_select=False,
+                maxCount=1,
             )
             try:
-                return api.get_book(mi)
-            except:
+                refer_mi = api.get_book(mi)
+                # 检查豆瓣封面是否获取成功
+                if not refer_mi.cover_data:
+                    # 封面获取失败，保留本地原有的封面数据
+                    refer_mi.cover_data = mi.cover_data
+                    # 记录日志
+                    logging.info("豆瓣封面获取失败，保留本地原有封面")
+            except Exception as e:
+                logging.error("获取豆瓣书籍信息失败: %s", e)
                 raise RuntimeError({"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")})
-
-        if provider_key == youshu.KEY:
+        elif provider_key == youshu.KEY:
             title = re.sub(u"[(（].*", "", mi.title)
             api = youshu.YoushuApi(copy_image=True)
             try:
-                return api.get_book(title)
+                refer_mi = api.get_book(title)
             except:
                 raise RuntimeError({"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")})
         raise RuntimeError({"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")})
@@ -207,6 +214,7 @@ class BookRefer(BaseHandler):
         if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
             return {"err": "user.no_permission", "msg": _(u"无权限")}
 
+        original_cover_data = mi.cover_data
         try:
             refer_mi = self.plugin_get_book_meta(provider_key, provider_value, mi)
         except RuntimeError as e:
@@ -215,6 +223,7 @@ class BookRefer(BaseHandler):
         if not refer_mi:
             return {"err": "plugin.fail", "msg": _(u"插件拉取信息异常，请重试")}
 
+        cover_fallback = False
         if only_cover == "yes":
             # 仅设置封面，检查封面数据是否有效
             if refer_mi.cover_data and len(refer_mi.cover_data) > 0:
@@ -226,7 +235,11 @@ class BookRefer(BaseHandler):
                 refer_mi.cover_data = None
             else:
                 # 更新前检查封面数据是否有效
-                if refer_mi.cover_data and len(refer_mi.cover_data) == 0:
+                if not refer_mi.cover_data and original_cover_data:
+                    # 豆瓣封面获取失败，使用了本地原有封面
+                    refer_mi.cover_data = original_cover_data
+                    cover_fallback = True
+                elif refer_mi.cover_data and len(refer_mi.cover_data) == 0:
                     refer_mi.cover_data = None
             if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
                 ts = []
@@ -242,6 +255,8 @@ class BookRefer(BaseHandler):
             mi.smart_update(refer_mi, replace_metadata=True)
 
         self.db.set_metadata(book_id, mi)
+        if cover_fallback:
+            return {"err": "ok", "msg": _(u"书籍信息更新成功，但豆瓣封面获取失败，已使用本地原有封面")}
         return {"err": "ok"}
 
 
