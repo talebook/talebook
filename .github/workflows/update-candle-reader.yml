@@ -1,9 +1,6 @@
 name: Check Candle Reader Version
 
 on:
-  schedule:
-    # 每天 UTC 时间 00:00 运行
-    - cron: '0 0 * * *'
   repository_dispatch:
     types: [update-candle-reader]
   workflow_dispatch: # 允许手动触发
