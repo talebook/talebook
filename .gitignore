@@ -89,3 +89,9 @@ ENV/
 .ropeproject
 /.idea/
 /talebook-compose/
+data/
+.npm
+.config
+dev.yml
+ssr.yml
+.DS_Store
