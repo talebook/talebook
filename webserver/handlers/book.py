@@ -135,8 +135,7 @@ class BookRefer(BaseHandler):
                 return api.get_book(title)
             except:
                 raise RuntimeError({"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")})
-
-        if provider_key == douban.KEY:
+        elif provider_key == douban.KEY:
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(
                 CONF["douban_apikey"],
@@ -163,7 +162,8 @@ class BookRefer(BaseHandler):
                 refer_mi = api.get_book(title)
             except:
                 raise RuntimeError({"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")})
-        raise RuntimeError({"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")})
+        else:
+            raise RuntimeError({"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")})
 
     @js
     @auth
