@@ -187,7 +187,7 @@ class ScanService(AsyncService):
                 continue
 
     @AsyncService.register_service
-    def do_import(self, hashlist, user_id):
+    def do_import(self, hashlist, user_id, delete_after=False):
         from calibre.ebooks.metadata.meta import get_metadata
 
         # 生成任务ID
@@ -257,6 +257,14 @@ class ScanService(AsyncService):
                     self.db.add_format(row.book_id, fmt.upper(), fpath, True)
                     row.status = ScanFile.IMPORTED
                     self.save_or_rollback(row)
+                    
+                    # 如果需要导入后删除源文件
+                    if delete_after:
+                        try:
+                            os.remove(fpath)
+                            logging.info("删除源文件: %s", fpath)
+                        except Exception as err:
+                            logging.error("删除源文件失败: %s, %s", fpath, err)
                 elif row.status != ScanFile.EXIST:
                     # 同名不同作者，导入为新书
                     logging.info("import [%s] from %s as new book (different author)", repr(mi.title), fpath)
@@ -271,6 +279,14 @@ class ScanService(AsyncService):
                     try:
                         item.save()
                         imported.append(row.book_id)
+                        
+                        # 如果需要导入后删除源文件
+                        if delete_after:
+                            try:
+                                os.remove(fpath)
+                                logging.info("删除源文件: %s", fpath)
+                            except Exception as err:
+                                logging.error("删除源文件失败: %s, %s", fpath, err)
                     except Exception as err:
                         self.session.rollback()
                         logging.error("save link error: %s", err)
@@ -287,6 +303,14 @@ class ScanService(AsyncService):
                 try:
                     item.save()
                     imported.append(row.book_id)
+                    
+                    # 如果需要导入后删除源文件
+                    if delete_after:
+                        try:
+                            os.remove(fpath)
+                            logging.info("删除源文件: %s", fpath)
+                        except Exception as err:
+                            logging.error("删除源文件失败: %s, %s", fpath, err)
                 except Exception as err:
                     self.session.rollback()
                     logging.error("save link error: %s", err)
