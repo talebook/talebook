@@ -257,7 +257,7 @@ class ScanService(AsyncService):
                     self.db.add_format(row.book_id, fmt.upper(), fpath, True)
                     row.status = ScanFile.IMPORTED
                     self.save_or_rollback(row)
-                    
+
                     # 如果需要导入后删除源文件
                     if delete_after:
                         try:
@@ -279,7 +279,7 @@ class ScanService(AsyncService):
                     try:
                         item.save()
                         imported.append(row.book_id)
-                        
+
                         # 如果需要导入后删除源文件
                         if delete_after:
                             try:
@@ -303,7 +303,7 @@ class ScanService(AsyncService):
                 try:
                     item.save()
                     imported.append(row.book_id)
-                    
+
                     # 如果需要导入后删除源文件
                     if delete_after:
                         try:
