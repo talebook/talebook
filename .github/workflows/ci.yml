@@ -29,21 +29,13 @@ jobs:
           pip3 --version
 
       - name: Install Python dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip3 install flake8 pytest==7.4.4 pytest-cov
-          if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
+        run: make init
 
       - name: Lint with flake8
-        run: |
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings
-          flake8 webserver --count --exit-zero --statistics --config .style.yapf
+        run: make lint
 
       - name: Run tests with pytest
-        run: |
-          pytest ./tests -v --cov=webserver --cov-report=term-missing
+        run: make pytest
 
   test-ui:
     runs-on: ubuntu-latest

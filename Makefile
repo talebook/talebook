@@ -9,6 +9,10 @@ TAG2 := talebook/talebook:server-side-render-$(VER)
 
 all: build up
 
+init:
+	python3 -m pip install --upgrade pip uv
+	uv sync
+
 build: test
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
 		-f Dockerfile -t $(IMAGE) -t $(REPO1) --target production -t $(REPO2) .
@@ -26,18 +30,18 @@ test: lint
 	docker run --rm --name=talebook-docker-test -v "$$PWD":"$$PWD" -w "$$PWD" talebook/test pytest --log-file=unittest.log --log-level=INFO tests
 
 lint:
-	flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
-	flake8 webserver --count --statistics --config .style.yapf
+	uv run flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
+	uv run flake8 webserver --count --statistics --config .style.yapf
 
 pytest: lint
-	pytest tests
+	uv run pytest tests -v --cov=webserver --cov-report=term-missing
 
 testv:
-	coverage run -m unittest
-	coverage report --include "*talebook*"
+	uv run coverage run -m unittest
+	uv run coverage report --include "*talebook*"
 
 testvv: testv
-	coverage html -d ".htmlcov" --include "*talebook*"
+	uv run coverage html -d ".htmlcov" --include "*talebook*"
 	cd ".htmlcov" && python3 -m http.server 7777
 
 up:
