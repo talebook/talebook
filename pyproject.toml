@@ -13,6 +13,7 @@ dependencies = [
     "msgpack>=1.1.2",
     "pytest==7.4.4",
     "pytest-cov>=4.1.0",
+    "python-dateutil>=2.9.0",
     "social-auth-app-tornado==1.0.0",
     "social-auth-core==4.5.1",
     "social-auth-storage-sqlalchemy==1.1.0",
