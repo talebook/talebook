@@ -2,7 +2,6 @@
 # -*- coding: UTF-8 -*-
 import math
 import sys
-import logging
 from functools import cmp_to_key
 from gettext import gettext as _
 
@@ -100,8 +99,7 @@ class MetaBooks(ListHandler):
                 name = int(name)
             books = self.get_item_books(category, name)
 
-        books.sort(key=cmp_to_key(utils.compare_books_by_rating_or_id), 
-            reverse=True)
+        books.sort(key=cmp_to_key(utils.compare_books_by_rating_or_id), reverse=True)
         return self.render_book_list(books, title=title)
 
 

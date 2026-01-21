@@ -120,7 +120,7 @@ class SignUp(BaseHandler):
         # 检查是否允许注册
         if not CONF["ALLOW_REGISTER"]:
             return {"err": "register.disabled", "msg": _(u"注册功能已关闭")}
-            
+
         email = self.get_argument("email", "").strip()
         nickname = self.get_argument("nickname", "").strip()
         username = self.get_argument("username", "").strip().lower()
@@ -215,7 +215,7 @@ class UserReset(BaseHandler):
         # 先保存到数据库，确保密码不会丢失
         try:
             user.save()
-        except Exception as e:
+        except Exception:
             import traceback
             logging.error(traceback.format_exc())
             return {"err": "db.error", "msg": _(u"系统繁忙")}
@@ -233,7 +233,7 @@ class UserReset(BaseHandler):
 
         try:
             MailService().send_mail(mail_from, mail_to, mail_subject, mail_body)
-        except Exception as e:
+        except Exception:
             import traceback
             logging.error(traceback.format_exc())
             return {"err": "ok", "msg": _(u"密码已重置，但邮件发送失败，请联系管理员或重新请求重置")}

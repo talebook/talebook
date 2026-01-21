@@ -103,7 +103,7 @@ class ScanService(AsyncService):
             stat = os.stat(fpath)
             md5 = hashlib.md5(fname.encode("UTF-8")).hexdigest()
             temp_hash = "fstat:%s/%s" % (stat.st_size, md5)
-            
+
             # 创建文件对象
             row = ScanFile(fpath, temp_hash, scan_id)
             if not self.save_or_rollback(row):
@@ -125,7 +125,7 @@ class ScanService(AsyncService):
                     sha256.update(byte_block)
 
             real_hash = "sha256:" + sha256.hexdigest()
-            
+
             # 检查真实哈希值是否已经存在
             existing = self.session.query(ScanFile).filter(ScanFile.hash == real_hash).first()
             if existing and existing.id != row.id:
@@ -134,7 +134,7 @@ class ScanService(AsyncService):
                 if not self.save_or_rollback(row):
                     continue
                 continue
-            
+
             # 更新为真实的哈希值
             row.hash = real_hash
             if not self.save_or_rollback(row):
@@ -149,7 +149,7 @@ class ScanService(AsyncService):
                 except Exception as err:
                     logging.error("Failed to parse metadata for %s: %s", fpath, err)
                     logging.exception("Error details:")
-                
+
             if mi:
                 mi.title = utils.super_strip(mi.title)
                 mi.authors = [utils.super_strip(s) for s in mi.authors]
@@ -169,19 +169,17 @@ class ScanService(AsyncService):
             ids = self.db.books_with_same_title(mi)
             if ids:
                 # 区分同名同作者和同名不同作者的书籍
-                same_author_exists = False
                 for b in self.db.get_data_as_dict(ids=list(ids)):
                     book_authors = b.get("authors", [])
                     mi_authors = mi.authors
-                    
+
                     # 检查作者是否相同
                     if set(book_authors) == set(mi_authors):
                         if fmt.upper() in b.get("available_formats", ""):
                             row.book_id = b['id']
                             row.status = ScanFile.EXIST
-                            same_author_exists = True
                             break
-                
+
                 # 如果是同名不同作者，不标记为已存在，允许导入
             if row.status == ScanFile.EXIST:
                 continue
@@ -196,12 +194,12 @@ class ScanService(AsyncService):
         import_id = int(time.time())
 
         query = self.build_query(hashlist)
-        
+
         # 检查是否有可导入的书籍
         if query.count() == 0:
             logging.info("没有找到可导入的书籍文件")
             return
-            
+
         query.update({ScanFile.import_id: import_id}, synchronize_session=False)
         self.session.commit()
 
@@ -228,7 +226,7 @@ class ScanService(AsyncService):
                     # 处理metadata
                     mi.title = utils.super_strip(mi.title)
                     mi.authors = [utils.super_strip(s) for s in mi.authors]
-                    
+
                     # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
                     if fmt in ["txt", "pdf"]:
                         mi.title = fname.replace("." + fmt, "")
@@ -239,18 +237,18 @@ class ScanService(AsyncService):
             if ids:
                 # 区分同名同作者和同名不同作者的书籍
                 same_author_book_id = None
-                
+
                 for b in self.db.get_data_as_dict(ids=list(ids)):
                     book_authors = b.get("authors", [])
                     mi_authors = mi.authors
-                    
+
                     # 检查作者是否相同
                     if set(book_authors) == set(mi_authors):
                         same_author_book_id = b['id']
                         if fmt.upper() in b.get("available_formats", ""):
                             row.status = ScanFile.EXIST
                             break
-                
+
                 if same_author_book_id and row.status != ScanFile.EXIST:
                     # 同名同作者，添加格式到现有书籍
                     row.book_id = same_author_book_id
@@ -265,7 +263,7 @@ class ScanService(AsyncService):
                     row.book_id = self.db.import_book(mi, [fpath])
                     row.status = ScanFile.IMPORTED
                     self.save_or_rollback(row)
-                    
+
                     # 添加关联表
                     item = Item()
                     item.book_id = row.book_id

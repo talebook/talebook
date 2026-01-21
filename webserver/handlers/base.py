@@ -6,6 +6,7 @@ import base64
 import datetime
 import logging
 import time
+import threading
 from collections import defaultdict
 from gettext import gettext as _
 
@@ -88,8 +89,6 @@ def is_admin(func):
 
     return do
 
-
-import threading
 
 class BaseHandler(web.RequestHandler):
     _path_to_env = {}

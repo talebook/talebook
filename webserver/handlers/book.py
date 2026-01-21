@@ -39,7 +39,7 @@ class Index(BaseHandler):
         ids = list(self.cache.search(""))
         random_books = []
         new_books = []
-        
+
         if ids:
             random_ids = random.sample(ids, min(cnt_random, len(ids)))
             random_books = [b for b in self.get_books(ids=random_ids)]
@@ -167,11 +167,11 @@ class BookRefer(BaseHandler):
                 raise RuntimeError({"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")})
         else:
             raise RuntimeError({"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")})
-        
+
         # 确保返回值有效
         if not refer_mi:
             raise RuntimeError({"err": "plugin.fail", "msg": _(u"插件拉取信息异常，请重试")})
-        
+
         return refer_mi
 
     @js
@@ -282,7 +282,7 @@ class BookEdit(BaseHandler):
         # 处理封面图上传
         if self.request.files:
             return self.upload_cover(bid)
-        
+
         # 处理常规编辑
         data = tornado.escape.json_decode(self.request.body)
         mi = self.db.get_metadata(bid, index_is_id=True)
@@ -307,19 +307,18 @@ class BookEdit(BaseHandler):
                 # 检查列表类型
                 elif isinstance(val, list) and len(val) == 1 and val[0] == "__DELETE__":
                     is_delete = True
-                
+
                 if is_delete:
                     # 设置为空值，不同字段类型使用不同的空值
                     if key in ["authors", "tags"]:
                         # 列表类型使用空列表
-                    #    mi.set(key, [" "])
+                        # mi.set(key, [" "])
                         pass
                     else:
                         # 其他类型使用空字符串
                         mi.set(key, " ")
                 else:
                     mi.set(key, val)
-
 
         if data.get("pubdate", None):
             # 处理DELETE魔术字符串
@@ -336,20 +335,20 @@ class BookEdit(BaseHandler):
 
         self.db.set_metadata(bid, mi)
         return {"err": "ok", "msg": _(u"更新成功")}
-    
+
     def upload_cover(self, bid):
         """处理封面图上传"""
         book = self.get_book(bid)
         bid = book["id"]
-        
+
         # 获取上传的文件
         if "cover" not in self.request.files:
             return {"err": "params.cover.required", "msg": _(u"请选择要上传的封面图")}
-        
+
         file_info = self.request.files["cover"][0]
         file_data = file_info["body"]
         file_name = file_info["filename"]
-        
+
         # 检查文件类型
         allowed_types = ["image/jpeg", "image/png", "image/gif", "image/jpg", "image/pjpeg", "image/x-png"]
         file_type = file_info["content_type"]
@@ -358,30 +357,30 @@ class BookEdit(BaseHandler):
             file_ext = file_name.split(".")[-1].lower() if "." in file_name else ""
             if file_ext not in ["jpg", "jpeg", "png", "gif", "pjp", "jpe", "pjpeg", "jfif"]:
                 return {"err": "params.cover.type", "msg": _(u"只允许上传JPG、JPEG、PNG、GIF、PJP、PJPEG、JFIF、JPE格式的图片")}
-        
+
         # 检查文件大小（限制为5MB）
         if len(file_data) > 5 * 1024 * 1024:
             return {"err": "params.cover.size", "msg": _(u"封面图大小不能超过5MB")}
-        
+
         try:
             # 获取书籍元数据
             mi = self.db.get_metadata(bid, index_is_id=True)
-            
+
             # 设置封面数据
             file_ext = file_name.split(".")[-1].lower() if "." in file_name else "jpg"
             mi.cover_data = (file_ext, file_data)
-            
+
             # 强制更新书籍的timestamp，确保封面图URL变化
             from datetime import datetime
             mi.timestamp = datetime.utcnow()
             mi.last_modified = datetime.utcnow()
-            
+
             # 保存元数据
             self.db.set_metadata(bid, mi)
-            
+
             # 清除缓存，确保下次获取书籍信息时从数据库读取最新数据
             self.cache.invalidate()
-            
+
             return {"err": "ok", "msg": _(u"封面图上传成功")}
         except Exception as e:
             import traceback
@@ -588,13 +587,13 @@ class BookUpload(BaseHandler):
         books = self.db.books_with_same_title(mi)
         same_author_book_id = None
         different_author_books = []
-        
+
         if books:
             # 区分同名同作者和同名不同作者的书籍
             for b in self.db.get_data_as_dict(ids=books):
                 book_authors = b.get("authors", [])
                 mi_authors = mi.authors
-                
+
                 # 检查作者是否相同
                 if set(book_authors) == set(mi_authors):
                     same_author_book_id = b.get("id")
@@ -607,7 +606,7 @@ class BookUpload(BaseHandler):
                         }
                 else:
                     different_author_books.append(b)
-        
+
         # 如果存在同名同作者书籍，添加格式到该书籍
         if same_author_book_id:
             logging.info(
