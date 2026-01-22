@@ -233,6 +233,10 @@ export default {
                 // home
                 { icon: "home", href: "/", text: "首页" },
             ];
+            var library_links = [
+                // home
+                { icon: "book", href: "/library", text: "书库" },
+            ];
             var admin_links = [
                 {
                     icon: "mdi-cog",
