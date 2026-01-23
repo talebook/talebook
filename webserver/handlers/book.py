@@ -498,6 +498,7 @@ class RecentBook(ListHandler):
         ids = self.books_by_id()
         return self.render_book_list([], ids=ids, title=title, sort_by_id=True)
 
+
 class LibraryBook(ListHandler):
     @js
     def get(self):
