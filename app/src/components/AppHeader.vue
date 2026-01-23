@@ -280,6 +280,7 @@ export default {
             ];
 
             return home_links
+                .concat(library_links)
                 .concat(this.user.is_admin ? admin_links : [])
                 .concat(nav_links)
                 .concat(this.sys.friends.length > 0 ? friend_links : [])
