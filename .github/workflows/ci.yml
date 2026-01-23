@@ -49,9 +49,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure Git safe directory
-        run: git config --global --add safe.directory /__w/talebook/talebook
-
       - name: Install dependencies
         run: |
           cd app
