@@ -492,8 +492,16 @@ class BookNav(ListHandler):
 
 
 class RecentBook(ListHandler):
+    @js
     def get(self):
         title = _(u"新书推荐")
+        ids = self.books_by_id()
+        return self.render_book_list([], ids=ids, title=title, sort_by_id=True)
+
+class LibraryBook(ListHandler):
+    @js
+    def get(self):
+        title = _(u"书库")
         ids = self.books_by_id()
         return self.render_book_list([], ids=ids, title=title, sort_by_id=True)
 
@@ -793,6 +801,7 @@ def routes():
         (r"/api/index", Index),
         (r"/api/search", SearchBook),
         (r"/api/recent", RecentBook),
+        (r"/api/library", LibraryBook),
         (r"/api/hot", HotBook),
         (r"/api/book/nav", BookNav),
         (r"/api/book/upload", BookUpload),
