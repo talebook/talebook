@@ -50,9 +50,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_tag}}
             type=raw,value=master,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=raw,value={{ref_name}},enable={{is_tag}}
 
       - name: Prepare build args
         id: prep
