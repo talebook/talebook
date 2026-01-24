@@ -47,6 +47,13 @@ settings = {
 
     "db_engine_args": {
         "echo": False,
+        "connect_args": {
+            "check_same_thread": False,
+            "timeout": 30,
+        },
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_recycle": 3600,
     },
 
     # 100MB, tornado default max_buffer_size value
