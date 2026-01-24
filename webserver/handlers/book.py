@@ -517,17 +517,26 @@ class LibraryBook(ListHandler):
         if publisher and publisher != "全部":
             publisher_id = self.cache.get_item_id("publisher", publisher)
             if publisher_id:
-                ids = [id for id in ids if id in self.db.get_books_for_category("publisher", publisher_id)]
+                # 获取出版社对应的书籍ID列表
+                publisher_books = self.db.get_books_ids_for_category("publisher", publisher_id)
+                # 取交集
+                ids = list(set(ids) & set(publisher_books))
         
         if author and author != "全部":
             author_id = self.cache.get_item_id("author", author)
             if author_id:
-                ids = [id for id in ids if id in self.db.get_books_for_category("author", author_id)]
+                # 作者需要使用复数形式authors
+                author_books = self.db.get_books_ids_for_category("authors", author_id)
+                # 取交集
+                ids = list(set(ids) & set(author_books))
         
         if tag and tag != "全部":
             tag_id = self.cache.get_item_id("tag", tag)
             if tag_id:
-                ids = [id for id in ids if id in self.db.get_books_for_category("tag", tag_id)]
+                # 标签需要使用复数形式tags
+                tag_books = self.db.get_books_ids_for_category("tags", tag_id)
+                # 取交集
+                ids = list(set(ids) & set(tag_books))
         
         if book_format and book_format != "全部":
             # 按文件格式筛选
