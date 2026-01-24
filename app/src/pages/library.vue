@@ -12,14 +12,22 @@
           <div class="d-flex align-center">
             <span class="mr-3">出版社：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('publisher', '全部')" :color="filters.publisher === '全部' ? 'primary' : 'white'" :text-color="filters.publisher === '全部' ? 'white' : 'primary'" :outlined="filters.publisher !== '全部'" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.publisher.slice(0, 10)" :key="item.id" @click="updateFilter('publisher', item.name)" :color="filters.publisher === item.name ? 'primary' : 'white'" :text-color="filters.publisher === item.name ? 'white' : 'primary'" :outlined="filters.publisher !== item.name" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('publisher', '全部')" :color="filters.publisher === '全部' ? 'primary' : 'grey lighten-2'" :text-color="filters.publisher === '全部' ? 'white' : 'black'" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.publisher.slice(0, 10)" :key="item.id" @click="updateFilter('publisher', item.name)" :color="filters.publisher === item.name ? 'primary' : 'grey lighten-2'" :text-color="filters.publisher === item.name ? 'white' : 'black'" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.publisher.length > 10">
-                <v-chip v-if="expanded.publisher" v-for="item in filterOptions.publisher.slice(10)" :key="item.id" @click="updateFilter('publisher', item.name)" :color="filters.publisher === item.name ? 'primary' : 'white'" :text-color="filters.publisher === item.name ? 'white' : 'primary'" :outlined="filters.publisher !== item.name" label small>{{ item.name }}</v-chip>
                 <v-chip @click="expanded.publisher = !expanded.publisher" color="white" text-color="primary" outlined label small>{{ expanded.publisher ? '收起' : `更多(${filterOptions.publisher.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
+          <!-- 展开的标签从下一行开始显示 -->
+          <template v-if="filterOptions.publisher.length > 10 && expanded.publisher">
+            <div class="d-flex align-center mt-1">
+              <span class="mr-3"></span>
+              <v-chip-group column="false" class="flex-grow-1">
+                <v-chip v-for="item in filterOptions.publisher.slice(10)" :key="item.id" @click="updateFilter('publisher', item.name)" :color="filters.publisher === item.name ? 'primary' : 'grey lighten-2'" :text-color="filters.publisher === item.name ? 'white' : 'black'" label small>{{ item.name }}</v-chip>
+              </v-chip-group>
+            </div>
+          </template>
         </div>
 
         <!-- 作者筛选 -->
@@ -27,14 +35,22 @@
           <div class="d-flex align-center">
             <span class="mr-3">作者：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('author', '全部')" :color="filters.author === '全部' ? 'primary' : 'white'" :text-color="filters.author === '全部' ? 'white' : 'primary'" :outlined="filters.author !== '全部'" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.author.slice(0, 10)" :key="item.id" @click="updateFilter('author', item.name)" :color="filters.author === item.name ? 'primary' : 'white'" :text-color="filters.author === item.name ? 'white' : 'primary'" :outlined="filters.author !== item.name" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('author', '全部')" :color="filters.author === '全部' ? 'primary' : 'grey lighten-2'" :text-color="filters.author === '全部' ? 'white' : 'black'" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.author.slice(0, 10)" :key="item.id" @click="updateFilter('author', item.name)" :color="filters.author === item.name ? 'primary' : 'grey lighten-2'" :text-color="filters.author === item.name ? 'white' : 'black'" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.author.length > 10">
-                <v-chip v-if="expanded.author" v-for="item in filterOptions.author.slice(10)" :key="item.id" @click="updateFilter('author', item.name)" :color="filters.author === item.name ? 'primary' : 'white'" :text-color="filters.author === item.name ? 'white' : 'primary'" :outlined="filters.author !== item.name" label small>{{ item.name }}</v-chip>
                 <v-chip @click="expanded.author = !expanded.author" color="white" text-color="primary" outlined label small>{{ expanded.author ? '收起' : `更多(${filterOptions.author.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
+          <!-- 展开的标签从下一行开始显示 -->
+          <template v-if="filterOptions.author.length > 10 && expanded.author">
+            <div class="d-flex align-center mt-1">
+              <span class="mr-3"></span>
+              <v-chip-group column="false" class="flex-grow-1">
+                <v-chip v-for="item in filterOptions.author.slice(10)" :key="item.id" @click="updateFilter('author', item.name)" :color="filters.author === item.name ? 'primary' : 'grey lighten-2'" :text-color="filters.author === item.name ? 'white' : 'black'" label small>{{ item.name }}</v-chip>
+              </v-chip-group>
+            </div>
+          </template>
         </div>
 
         <!-- 标签筛选 -->
@@ -42,14 +58,22 @@
           <div class="d-flex align-center">
             <span class="mr-3">标签：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('tag', '全部')" :color="filters.tag === '全部' ? 'primary' : 'white'" :text-color="filters.tag === '全部' ? 'white' : 'primary'" :outlined="filters.tag !== '全部'" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.tag.slice(0, 10)" :key="item.id" @click="updateFilter('tag', item.name)" :color="filters.tag === item.name ? 'primary' : 'white'" :text-color="filters.tag === item.name ? 'white' : 'primary'" :outlined="filters.tag !== item.name" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('tag', '全部')" :color="filters.tag === '全部' ? 'primary' : 'grey lighten-2'" :text-color="filters.tag === '全部' ? 'white' : 'black'" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.tag.slice(0, 10)" :key="item.id" @click="updateFilter('tag', item.name)" :color="filters.tag === item.name ? 'primary' : 'grey lighten-2'" :text-color="filters.tag === item.name ? 'white' : 'black'" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.tag.length > 10">
-                <v-chip v-if="expanded.tag" v-for="item in filterOptions.tag.slice(10)" :key="item.id" @click="updateFilter('tag', item.name)" :color="filters.tag === item.name ? 'primary' : 'white'" :text-color="filters.tag === item.name ? 'white' : 'primary'" :outlined="filters.tag !== item.name" label small>{{ item.name }}</v-chip>
                 <v-chip @click="expanded.tag = !expanded.tag" color="white" text-color="primary" outlined label small>{{ expanded.tag ? '收起' : `更多(${filterOptions.tag.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
+          <!-- 展开的标签从下一行开始显示 -->
+          <template v-if="filterOptions.tag.length > 10 && expanded.tag">
+            <div class="d-flex align-center mt-1">
+              <span class="mr-3"></span>
+              <v-chip-group column="false" class="flex-grow-1">
+                <v-chip v-for="item in filterOptions.tag.slice(10)" :key="item.id" @click="updateFilter('tag', item.name)" :color="filters.tag === item.name ? 'primary' : 'grey lighten-2'" :text-color="filters.tag === item.name ? 'white' : 'black'" label small>{{ item.name }}</v-chip>
+              </v-chip-group>
+            </div>
+          </template>
         </div>
 
         <!-- 文件格式筛选 -->
@@ -57,14 +81,22 @@
           <div class="d-flex align-center">
             <span class="mr-3">文件格式：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('format', '全部')" :color="filters.format === '全部' ? 'primary' : 'white'" :text-color="filters.format === '全部' ? 'white' : 'primary'" :outlined="filters.format !== '全部'" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.format.slice(0, 10)" :key="item.id" @click="updateFilter('format', item.name)" :color="filters.format === item.name ? 'primary' : 'white'" :text-color="filters.format === item.name ? 'white' : 'primary'" :outlined="filters.format !== item.name" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('format', '全部')" :color="filters.format === '全部' ? 'primary' : 'grey lighten-2'" :text-color="filters.format === '全部' ? 'white' : 'black'" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.format.slice(0, 10)" :key="item.id" @click="updateFilter('format', item.name)" :color="filters.format === item.name ? 'primary' : 'grey lighten-2'" :text-color="filters.format === item.name ? 'white' : 'black'" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.format.length > 10">
-                <v-chip v-if="expanded.format" v-for="item in filterOptions.format.slice(10)" :key="item.id" @click="updateFilter('format', item.name)" :color="filters.format === item.name ? 'primary' : 'white'" :text-color="filters.format === item.name ? 'white' : 'primary'" :outlined="filters.format !== item.name" label small>{{ item.name }}</v-chip>
                 <v-chip @click="expanded.format = !expanded.format" color="white" text-color="primary" outlined label small>{{ expanded.format ? '收起' : `更多(${filterOptions.format.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
+          <!-- 展开的标签从下一行开始显示 -->
+          <template v-if="filterOptions.format.length > 10 && expanded.format">
+            <div class="d-flex align-center mt-1">
+              <span class="mr-3"></span>
+              <v-chip-group column="false" class="flex-grow-1">
+                <v-chip v-for="item in filterOptions.format.slice(10)" :key="item.id" @click="updateFilter('format', item.name)" :color="filters.format === item.name ? 'primary' : 'grey lighten-2'" :text-color="filters.format === item.name ? 'white' : 'black'" label small>{{ item.name }}</v-chip>
+              </v-chip-group>
+            </div>
+          </template>
         </div>
       </v-col>
 
@@ -131,13 +163,10 @@ export default {
     };
   },
   created() {
-    if (this.$route.query.start != undefined) {
-      this.page = 1 + parseInt(this.$route.query.start / this.page_size);
-    }
-    this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
+    // 页码和总数由fetchBooks方法处理
   },
   mounted() {
-    this.loadFilterOptions();
+    // loadFilterOptions已在init方法中调用
   },
   beforeRouteUpdate(to, from, next) {
     this.init(to, next);
@@ -146,33 +175,69 @@ export default {
     init(route, next) {
       this.inited = true;
       this.$store.commit('navbar', true);
-      this.$backend(route.fullPath)
-        .then(rsp => {
-          if (rsp.err === 'exception' || rsp.err === 'network_error') {
-            this.alert("error", rsp.msg);
-            return;
-          }
-          this.title = rsp.title;
-          this.books = rsp.books || [];
-          this.total = rsp.total || 0;
-          this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
-        });
+      
+      // 从URL查询参数中解析筛选条件
+      const query = route.query;
+      Object.keys(this.filters).forEach(key => {
+        if (query[key] && query[key] !== '全部') {
+          this.filters[key] = query[key];
+        }
+      });
+      
+      // 解析页码
+      let page = 1;
+      if (query.start) {
+        page = 1 + parseInt(query.start / this.page_size);
+      }
+      
+      this.fetchBooks(page);
       this.loadFilterOptions();
+      
       if (next) next();
     },
     change_page() {
-      var r = Object.assign({}, this.$route.query);
-      if (this.page < 1) {
-        this.page = 1;
-      }
-      r.start = (this.page - 1) * this.page_size;
-      r.size = this.page_size;
-      this.$router.push({query: r});
+      // 直接调用fetchBooks获取对应页码的数据
+      this.fetchBooks(this.page);
     },
     updateFilter(type, value) {
       this.filters[type] = value;
-      // 这里可以添加筛选逻辑，例如调用 API 获取筛选后的书籍数据
-      // 目前暂时只更新 UI 状态
+      // 更新筛选条件后重新获取书籍数据，重置到第一页
+      this.fetchBooks(1);
+    },
+    async fetchBooks(page = 1) {
+      // 构建查询参数
+      const query = {
+        start: (page - 1) * this.page_size,
+        size: this.page_size
+      };
+      
+      // 添加筛选条件
+      Object.keys(this.filters).forEach(key => {
+        if (this.filters[key] !== '全部') {
+          query[key] = this.filters[key];
+        }
+      });
+      
+      // 构建查询字符串
+      const queryString = Object.keys(query)
+        .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(query[key])}`)
+        .join('&');
+      
+      try {
+        const rsp = await this.$backend(`/library?${queryString}`);
+        if (rsp.err === 'exception' || rsp.err === 'network_error') {
+          this.alert("error", rsp.msg);
+          return;
+        }
+        
+        this.books = rsp.books || [];
+        this.total = rsp.total || 0;
+        this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
+        this.page = page;
+      } catch (error) {
+        console.error('Failed to fetch books:', error);
+        this.alert("error", "获取书籍数据失败");
+      }
     },
     async loadFilterOptions() {
       // 获取所有筛选条件的选项
