@@ -130,7 +130,7 @@ export default {
     books: [],
     total: 0,
     page_size: 60,
-    page_cnt: 0,
+    page_cnt: 1, // 初始化为1，确保翻页按钮显示
     inited: false,
     filters: {
       publisher: "全部",
@@ -151,11 +151,22 @@ export default {
       format: false
     }
   }),
+  watch: {
+    // 监听total变化，动态更新page_cnt
+    total(newTotal) {
+      this.page_cnt = newTotal > 0 ? Math.max(1, Math.ceil(newTotal / this.page_size)) : 0;
+    }
+  },
   async asyncData({route, app, res}) {
     if (res !== undefined) {
       res.setHeader('Cache-Control', 'no-cache');
     }
-    return app.$backend(route.fullPath);
+    const data = await app.$backend(route.fullPath);
+    return {
+      books: data.books || [],
+      total: data.total || 0,
+      title: data.title || "书库"
+    };
   },
   head() {
     return {
@@ -163,7 +174,8 @@ export default {
     };
   },
   created() {
-    // 页码和总数由fetchBooks方法处理
+    // 初始化页码计数
+    this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
   },
   mounted() {
     // 初始加载时获取筛选选项
@@ -233,10 +245,14 @@ export default {
           return;
         }
         
-        this.books = rsp.books || [];
-        this.total = rsp.total || 0;
-        this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
-        this.page = page;
+        // 确保数据更新到组件实例
+        this.$nextTick(() => {
+          this.books = rsp.books || [];
+          this.total = rsp.total || 0;
+          this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
+          this.page = page;
+          console.log('Books updated:', this.books.length);
+        });
       } catch (error) {
         console.error('Failed to fetch books:', error);
         this.alert("error", "获取书籍数据失败");
