@@ -6,11 +6,11 @@
         <v-divider class="mt-3 mb-0"></v-divider>
       </v-col>
 
-      <v-col cols=12 class="mt-4">
+      <v-col cols=12>
         <!-- 读者筛选 -->
-        <div class="d-flex align-center mb-3">
+        <div class="d-flex align-center mb-2">
           <span class="mr-3">读者：</span>
-          <v-chip-group v-model="filters.reader" active-class="primary--text" column="false">
+          <v-chip-group column="false">
             <v-chip @click="updateFilter('reader', '全部')" :color="filters.reader === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
             <v-chip @click="updateFilter('reader', '男生')" :color="filters.reader === '男生' ? 'primary' : 'grey lighten-2'" label small>{{ '男生' }}</v-chip>
             <v-chip @click="updateFilter('reader', '女生')" :color="filters.reader === '女生' ? 'primary' : 'grey lighten-2'" label small>{{ '女生' }}</v-chip>
@@ -18,9 +18,9 @@
         </div>
 
         <!-- 分类筛选 -->
-        <div class="d-flex align-center mb-3">
+        <div class="d-flex align-center mb-2">
           <span class="mr-3">分类：</span>
-          <v-chip-group v-model="filters.category" active-class="primary--text" column="false">
+          <v-chip-group column="false">
             <v-chip @click="updateFilter('category', '全部')" :color="filters.category === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
             <v-chip @click="updateFilter('category', '主题')" :color="filters.category === '主题' ? 'primary' : 'grey lighten-2'" label small>{{ '主题' }}</v-chip>
             <v-chip @click="updateFilter('category', '角色')" :color="filters.category === '角色' ? 'primary' : 'grey lighten-2'" label small>{{ '角色' }}</v-chip>
@@ -29,9 +29,9 @@
         </div>
 
         <!-- 状态筛选 -->
-        <div class="d-flex align-center mb-3">
+        <div class="d-flex align-center mb-2">
           <span class="mr-3">状态：</span>
-          <v-chip-group v-model="filters.status" active-class="primary--text" column="false">
+          <v-chip-group column="false">
             <v-chip @click="updateFilter('status', '全部')" :color="filters.status === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
             <v-chip @click="updateFilter('status', '已完结')" :color="filters.status === '已完结' ? 'primary' : 'grey lighten-2'" label small>{{ '已完结' }}</v-chip>
             <v-chip @click="updateFilter('status', '连载中')" :color="filters.status === '连载中' ? 'primary' : 'grey lighten-2'" label small>{{ '连载中' }}</v-chip>
@@ -41,7 +41,7 @@
         <!-- 字数筛选 -->
         <div class="d-flex align-center mb-3">
           <span class="mr-3">字数：</span>
-          <v-chip-group v-model="filters.wordCount" active-class="primary--text" column="false">
+          <v-chip-group column="false">
             <v-chip @click="updateFilter('wordCount', '全部')" :color="filters.wordCount === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
             <v-chip @click="updateFilter('wordCount', '30万以下')" :color="filters.wordCount === '30万以下' ? 'primary' : 'grey lighten-2'" label small>{{ '30万以下' }}</v-chip>
             <v-chip @click="updateFilter('wordCount', '30-50万')" :color="filters.wordCount === '30-50万' ? 'primary' : 'grey lighten-2'" label small>{{ '30-50万' }}</v-chip>
