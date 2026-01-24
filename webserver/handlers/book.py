@@ -508,10 +508,11 @@ class LibraryBook(ListHandler):
 
 
 class SearchBook(ListHandler):
+    @js
     def get(self):
         name = self.get_argument("name", "")
         if not name.strip():
-            return self.write({"err": "params.invalid", "msg": _(u"请输入搜索关键字")})
+            return {"err": "params.invalid", "msg": _(u"请输入搜索关键字")}
 
         title = _(u"搜索：%(name)s") % {"name": name}
         ids = self.cache.search(name)
