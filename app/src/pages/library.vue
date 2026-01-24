@@ -7,47 +7,39 @@
       </v-col>
 
       <v-col cols=12>
-        <!-- 读者筛选 -->
+        <!-- 出版社筛选 -->
         <div class="d-flex align-center mb-2">
-          <span class="mr-3">读者：</span>
+          <span class="mr-3">出版社：</span>
           <v-chip-group column="false">
-            <v-chip @click="updateFilter('reader', '全部')" :color="filters.reader === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
-            <v-chip @click="updateFilter('reader', '男生')" :color="filters.reader === '男生' ? 'primary' : 'grey lighten-2'" label small>{{ '男生' }}</v-chip>
-            <v-chip @click="updateFilter('reader', '女生')" :color="filters.reader === '女生' ? 'primary' : 'grey lighten-2'" label small>{{ '女生' }}</v-chip>
+            <v-chip @click="updateFilter('publisher', '全部')" :color="filters.publisher === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
+            <v-chip v-for="item in filterOptions.publisher" :key="item.id" @click="updateFilter('publisher', item.name)" :color="filters.publisher === item.name ? 'primary' : 'grey lighten-2'" label small>{{ item.name }}</v-chip>
           </v-chip-group>
         </div>
 
-        <!-- 分类筛选 -->
+        <!-- 作者筛选 -->
         <div class="d-flex align-center mb-2">
-          <span class="mr-3">分类：</span>
+          <span class="mr-3">作者：</span>
           <v-chip-group column="false">
-            <v-chip @click="updateFilter('category', '全部')" :color="filters.category === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
-            <v-chip @click="updateFilter('category', '主题')" :color="filters.category === '主题' ? 'primary' : 'grey lighten-2'" label small>{{ '主题' }}</v-chip>
-            <v-chip @click="updateFilter('category', '角色')" :color="filters.category === '角色' ? 'primary' : 'grey lighten-2'" label small>{{ '角色' }}</v-chip>
-            <v-chip @click="updateFilter('category', '情节')" :color="filters.category === '情节' ? 'primary' : 'grey lighten-2'" label small>{{ '情节' }}</v-chip>
+            <v-chip @click="updateFilter('author', '全部')" :color="filters.author === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
+            <v-chip v-for="item in filterOptions.author" :key="item.id" @click="updateFilter('author', item.name)" :color="filters.author === item.name ? 'primary' : 'grey lighten-2'" label small>{{ item.name }}</v-chip>
           </v-chip-group>
         </div>
 
-        <!-- 状态筛选 -->
+        <!-- 标签筛选 -->
         <div class="d-flex align-center mb-2">
-          <span class="mr-3">状态：</span>
+          <span class="mr-3">标签：</span>
           <v-chip-group column="false">
-            <v-chip @click="updateFilter('status', '全部')" :color="filters.status === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
-            <v-chip @click="updateFilter('status', '已完结')" :color="filters.status === '已完结' ? 'primary' : 'grey lighten-2'" label small>{{ '已完结' }}</v-chip>
-            <v-chip @click="updateFilter('status', '连载中')" :color="filters.status === '连载中' ? 'primary' : 'grey lighten-2'" label small>{{ '连载中' }}</v-chip>
+            <v-chip @click="updateFilter('tag', '全部')" :color="filters.tag === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
+            <v-chip v-for="item in filterOptions.tag" :key="item.id" @click="updateFilter('tag', item.name)" :color="filters.tag === item.name ? 'primary' : 'grey lighten-2'" label small>{{ item.name }}</v-chip>
           </v-chip-group>
         </div>
 
-        <!-- 字数筛选 -->
+        <!-- 文件格式筛选 -->
         <div class="d-flex align-center mb-3">
-          <span class="mr-3">字数：</span>
+          <span class="mr-3">文件格式：</span>
           <v-chip-group column="false">
-            <v-chip @click="updateFilter('wordCount', '全部')" :color="filters.wordCount === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
-            <v-chip @click="updateFilter('wordCount', '30万以下')" :color="filters.wordCount === '30万以下' ? 'primary' : 'grey lighten-2'" label small>{{ '30万以下' }}</v-chip>
-            <v-chip @click="updateFilter('wordCount', '30-50万')" :color="filters.wordCount === '30-50万' ? 'primary' : 'grey lighten-2'" label small>{{ '30-50万' }}</v-chip>
-            <v-chip @click="updateFilter('wordCount', '50-100万')" :color="filters.wordCount === '50-100万' ? 'primary' : 'grey lighten-2'" label small>{{ '50-100万' }}</v-chip>
-            <v-chip @click="updateFilter('wordCount', '100-200万')" :color="filters.wordCount === '100-200万' ? 'primary' : 'grey lighten-2'" label small>{{ '100-200万' }}</v-chip>
-            <v-chip @click="updateFilter('wordCount', '200万以上')" :color="filters.wordCount === '200万以上' ? 'primary' : 'grey lighten-2'" label small>{{ '200万以上' }}</v-chip>
+            <v-chip @click="updateFilter('format', '全部')" :color="filters.format === '全部' ? 'primary' : 'grey lighten-2'" label small>{{ '全部' }}</v-chip>
+            <v-chip v-for="item in filterOptions.format" :key="item.id" @click="updateFilter('format', item.name)" :color="filters.format === item.name ? 'primary' : 'grey lighten-2'" label small>{{ item.name }}</v-chip>
           </v-chip-group>
         </div>
       </v-col>
@@ -85,10 +77,16 @@ export default {
     page_cnt: 0,
     inited: false,
     filters: {
-      reader: "全部",
-      category: "全部",
-      status: "全部",
-      wordCount: "全部"
+      publisher: "全部",
+      author: "全部",
+      tag: "全部",
+      format: "全部"
+    },
+    filterOptions: {
+      publisher: [],
+      author: [],
+      tag: [],
+      format: []
     }
   }),
   async asyncData({route, app, res}) {
@@ -107,6 +105,7 @@ export default {
       this.page = 1 + parseInt(this.$route.query.start / this.page_size);
     }
     this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
+    this.loadFilterOptions();
   },
 
   beforeRouteUpdate(to, from, next) {
@@ -142,6 +141,20 @@ export default {
       this.filters[type] = value;
       // 这里可以添加筛选逻辑，例如调用 API 获取筛选后的书籍数据
       // 目前暂时只更新 UI 状态
+    },
+    async loadFilterOptions() {
+      // 获取所有筛选条件的选项
+      const filterTypes = ['publisher', 'author', 'tag', 'format'];
+      for (const type of filterTypes) {
+        try {
+          const rsp = await this.$backend(`/api/${type}?show=all`);
+          if (rsp.err === 'ok') {
+            this.filterOptions[type] = rsp.items;
+          }
+        } catch (error) {
+          console.error(`Failed to load ${type} options:`, error);
+        }
+      }
     }
   },
 }

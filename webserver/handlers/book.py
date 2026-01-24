@@ -519,6 +519,7 @@ class SearchBook(ListHandler):
 
 
 class HotBook(ListHandler):
+    @js
     def get(self):
         title = _(u"热度榜单")
         db_items = self.session.query(Item).filter(Item.count_visit > 1).order_by(Item.count_download.desc())
