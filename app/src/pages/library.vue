@@ -166,7 +166,10 @@ export default {
     // 页码和总数由fetchBooks方法处理
   },
   mounted() {
-    // loadFilterOptions已在init方法中调用
+    // 初始加载时获取筛选选项
+    if (!this.inited) {
+      this.loadFilterOptions();
+    }
   },
   beforeRouteUpdate(to, from, next) {
     this.init(to, next);
