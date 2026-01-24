@@ -135,9 +135,10 @@ export default {
       this.page = 1 + parseInt(this.$route.query.start / this.page_size);
     }
     this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
+  },
+  mounted() {
     this.loadFilterOptions();
   },
-
   beforeRouteUpdate(to, from, next) {
     this.init(to, next);
   },
@@ -156,6 +157,7 @@ export default {
           this.total = rsp.total;
           this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
         });
+      this.loadFilterOptions();
       if (next) next();
     },
     change_page() {
