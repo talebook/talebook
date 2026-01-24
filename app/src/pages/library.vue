@@ -177,7 +177,7 @@ export default {
       const filterTypes = ['publisher', 'author', 'tag', 'format'];
       for (const type of filterTypes) {
         try {
-          const rsp = await this.$backend(`/api/${type}?show=all`);
+          const rsp = await this.$backend(`/${type}?show=all`);
           if (rsp.err === 'ok') {
             this.filterOptions[type] = rsp.items;
           }
