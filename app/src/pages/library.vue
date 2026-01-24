@@ -148,13 +148,13 @@ export default {
       this.$store.commit('navbar', true);
       this.$backend(route.fullPath)
         .then(rsp => {
-          if (rsp.err != 'ok') {
+          if (rsp.err === 'exception' || rsp.err === 'network_error') {
             this.alert("error", rsp.msg);
             return;
           }
           this.title = rsp.title;
-          this.books = rsp.books;
-          this.total = rsp.total;
+          this.books = rsp.books || [];
+          this.total = rsp.total || 0;
           this.page_cnt = this.total > 0 ? Math.max(1, Math.ceil(this.total / this.page_size)) : 0;
         });
       this.loadFilterOptions();
@@ -180,7 +180,7 @@ export default {
       for (const type of filterTypes) {
         try {
           const rsp = await this.$backend(`/${type}?show=all`);
-          if (rsp.err === 'ok') {
+          if (rsp.items) {
             this.filterOptions[type] = rsp.items;
           }
         } catch (error) {
