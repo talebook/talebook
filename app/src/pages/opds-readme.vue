@@ -35,8 +35,23 @@
 export default {
   data() {
     return {
-      opdsUrl: window.location.origin + '/opds/'
+      opdsUrl: ''
     }
+  },
+  mounted() {
+    // 在客户端渲染时，使用 window.location.origin
+    this.opdsUrl = window.location.origin + '/opds/'
+  },
+  asyncData({ req }) {
+    // 在服务器端渲染时，使用 req 对象获取 URL
+    if (req) {
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol
+      const host = req.headers['x-forwarded-host'] || req.headers.host
+      return {
+        opdsUrl: `${protocol}://${host}/opds/`
+      }
+    }
+    return {}
   }
 }
 </script>

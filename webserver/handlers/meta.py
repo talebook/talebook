@@ -73,6 +73,7 @@ class MetaList(ListHandler):
 
 
 class MetaBooks(ListHandler):
+    @js
     def get(self, meta, name):
         titles = {
             "tag": _(u'含有"%(name)s"标签的书籍'),

@@ -233,6 +233,10 @@ export default {
                 // home
                 { icon: "home", href: "/", text: "首页" },
             ];
+            var library_links = [
+                // home
+                { icon: "book", href: "/library", text: "书库" },
+            ];
             var admin_links = [
                 {
                     icon: "mdi-cog",
@@ -276,6 +280,7 @@ export default {
             ];
 
             return home_links
+                .concat(library_links)
                 .concat(this.user.is_admin ? admin_links : [])
                 .concat(nav_links)
                 .concat(this.sys.friends.length > 0 ? friend_links : [])

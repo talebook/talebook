@@ -528,7 +528,6 @@ class ListHandler(BaseHandler):
             self.do_sort(items, "id", False)
         return None
 
-    @js
     def render_book_list(self, all_books, ids=None, title=None, sort_by_id=False):
         start = self.get_argument_start()
         try:
