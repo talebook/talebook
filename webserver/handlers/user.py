@@ -304,15 +304,21 @@ class UserInfo(BaseHandler):
         # 使用BaseHandler的锁来保护数据库连接的访问
         with self._db_lock:
             formats_count = self.cache.backend.conn.get(sql)[0][0]
+            books_count = db.count()
+            tags_count = len(db.all_tags())
+            authors_count = len(db.all_authors())
+            publishers_count = len(db.all_publishers())
+            series_count = len(db.all_series())
+            last_modified = db.last_modified().strftime("%Y-%m-%d")
 
         return {
-            "books": db.count(),
-            "tags": len(db.all_tags()),
-            "authors": len(db.all_authors()),
-            "publishers": len(db.all_publishers()),
-            "series": len(db.all_series()),
+            "books": books_count,
+            "tags": tags_count,
+            "authors": authors_count,
+            "publishers": publishers_count,
+            "series": series_count,
             "formats": formats_count,
-            "mtime": db.last_modified().strftime("%Y-%m-%d"),
+            "mtime": last_modified,
             "users": count_all_users,
             "active": count_hot_users,
             "version": VERSION,
