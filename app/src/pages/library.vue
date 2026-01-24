@@ -12,11 +12,11 @@
           <div class="d-flex align-center">
             <span class="mr-3">出版社：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('publisher', '全部')" :color="filters.publisher === '全部' ? 'primary' : 'white'" :text-color="filters.publisher === '全部' ? 'white' : 'primary'" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.publisher.slice(0, 10)" :key="item.id" @click="updateFilter('publisher', item.name)" :color="filters.publisher === item.name ? 'primary' : 'white'" :text-color="filters.publisher === item.name ? 'white' : 'primary'" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('publisher', '全部')" :color="filters.publisher === '全部' ? 'primary' : 'white'" :text-color="filters.publisher === '全部' ? 'white' : 'primary'" :outlined="filters.publisher !== '全部'" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.publisher.slice(0, 10)" :key="item.id" @click="updateFilter('publisher', item.name)" :color="filters.publisher === item.name ? 'primary' : 'white'" :text-color="filters.publisher === item.name ? 'white' : 'primary'" :outlined="filters.publisher !== item.name" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.publisher.length > 10">
-                <v-chip v-if="expanded.publisher" v-for="item in filterOptions.publisher.slice(10)" :key="item.id" @click="updateFilter('publisher', item.name)" :color="filters.publisher === item.name ? 'primary' : 'white'" :text-color="filters.publisher === item.name ? 'white' : 'primary'" label small>{{ item.name }}</v-chip>
-                <v-chip @click="expanded.publisher = !expanded.publisher" color="white" text-color="primary" label small>{{ expanded.publisher ? '收起' : `更多(${filterOptions.publisher.length - 10})` }}</v-chip>
+                <v-chip v-if="expanded.publisher" v-for="item in filterOptions.publisher.slice(10)" :key="item.id" @click="updateFilter('publisher', item.name)" :color="filters.publisher === item.name ? 'primary' : 'white'" :text-color="filters.publisher === item.name ? 'white' : 'primary'" :outlined="filters.publisher !== item.name" label small>{{ item.name }}</v-chip>
+                <v-chip @click="expanded.publisher = !expanded.publisher" color="white" text-color="primary" outlined label small>{{ expanded.publisher ? '收起' : `更多(${filterOptions.publisher.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
@@ -27,11 +27,11 @@
           <div class="d-flex align-center">
             <span class="mr-3">作者：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('author', '全部')" :color="filters.author === '全部' ? 'primary' : 'white'" :text-color="filters.author === '全部' ? 'white' : 'primary'" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.author.slice(0, 10)" :key="item.id" @click="updateFilter('author', item.name)" :color="filters.author === item.name ? 'primary' : 'white'" :text-color="filters.author === item.name ? 'white' : 'primary'" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('author', '全部')" :color="filters.author === '全部' ? 'primary' : 'white'" :text-color="filters.author === '全部' ? 'white' : 'primary'" :outlined="filters.author !== '全部'" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.author.slice(0, 10)" :key="item.id" @click="updateFilter('author', item.name)" :color="filters.author === item.name ? 'primary' : 'white'" :text-color="filters.author === item.name ? 'white' : 'primary'" :outlined="filters.author !== item.name" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.author.length > 10">
-                <v-chip v-if="expanded.author" v-for="item in filterOptions.author.slice(10)" :key="item.id" @click="updateFilter('author', item.name)" :color="filters.author === item.name ? 'primary' : 'white'" :text-color="filters.author === item.name ? 'white' : 'primary'" label small>{{ item.name }}</v-chip>
-                <v-chip @click="expanded.author = !expanded.author" color="white" text-color="primary" label small>{{ expanded.author ? '收起' : `更多(${filterOptions.author.length - 10})` }}</v-chip>
+                <v-chip v-if="expanded.author" v-for="item in filterOptions.author.slice(10)" :key="item.id" @click="updateFilter('author', item.name)" :color="filters.author === item.name ? 'primary' : 'white'" :text-color="filters.author === item.name ? 'white' : 'primary'" :outlined="filters.author !== item.name" label small>{{ item.name }}</v-chip>
+                <v-chip @click="expanded.author = !expanded.author" color="white" text-color="primary" outlined label small>{{ expanded.author ? '收起' : `更多(${filterOptions.author.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
@@ -42,11 +42,11 @@
           <div class="d-flex align-center">
             <span class="mr-3">标签：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('tag', '全部')" :color="filters.tag === '全部' ? 'primary' : 'white'" :text-color="filters.tag === '全部' ? 'white' : 'primary'" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.tag.slice(0, 10)" :key="item.id" @click="updateFilter('tag', item.name)" :color="filters.tag === item.name ? 'primary' : 'white'" :text-color="filters.tag === item.name ? 'white' : 'primary'" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('tag', '全部')" :color="filters.tag === '全部' ? 'primary' : 'white'" :text-color="filters.tag === '全部' ? 'white' : 'primary'" :outlined="filters.tag !== '全部'" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.tag.slice(0, 10)" :key="item.id" @click="updateFilter('tag', item.name)" :color="filters.tag === item.name ? 'primary' : 'white'" :text-color="filters.tag === item.name ? 'white' : 'primary'" :outlined="filters.tag !== item.name" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.tag.length > 10">
-                <v-chip v-if="expanded.tag" v-for="item in filterOptions.tag.slice(10)" :key="item.id" @click="updateFilter('tag', item.name)" :color="filters.tag === item.name ? 'primary' : 'white'" :text-color="filters.tag === item.name ? 'white' : 'primary'" label small>{{ item.name }}</v-chip>
-                <v-chip @click="expanded.tag = !expanded.tag" color="white" text-color="primary" label small>{{ expanded.tag ? '收起' : `更多(${filterOptions.tag.length - 10})` }}</v-chip>
+                <v-chip v-if="expanded.tag" v-for="item in filterOptions.tag.slice(10)" :key="item.id" @click="updateFilter('tag', item.name)" :color="filters.tag === item.name ? 'primary' : 'white'" :text-color="filters.tag === item.name ? 'white' : 'primary'" :outlined="filters.tag !== item.name" label small>{{ item.name }}</v-chip>
+                <v-chip @click="expanded.tag = !expanded.tag" color="white" text-color="primary" outlined label small>{{ expanded.tag ? '收起' : `更多(${filterOptions.tag.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
@@ -57,11 +57,11 @@
           <div class="d-flex align-center">
             <span class="mr-3">文件格式：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('format', '全部')" :color="filters.format === '全部' ? 'primary' : 'white'" :text-color="filters.format === '全部' ? 'white' : 'primary'" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.format.slice(0, 10)" :key="item.id" @click="updateFilter('format', item.name)" :color="filters.format === item.name ? 'primary' : 'white'" :text-color="filters.format === item.name ? 'white' : 'primary'" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('format', '全部')" :color="filters.format === '全部' ? 'primary' : 'white'" :text-color="filters.format === '全部' ? 'white' : 'primary'" :outlined="filters.format !== '全部'" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.format.slice(0, 10)" :key="item.id" @click="updateFilter('format', item.name)" :color="filters.format === item.name ? 'primary' : 'white'" :text-color="filters.format === item.name ? 'white' : 'primary'" :outlined="filters.format !== item.name" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.format.length > 10">
-                <v-chip v-if="expanded.format" v-for="item in filterOptions.format.slice(10)" :key="item.id" @click="updateFilter('format', item.name)" :color="filters.format === item.name ? 'primary' : 'white'" :text-color="filters.format === item.name ? 'white' : 'primary'" label small>{{ item.name }}</v-chip>
-                <v-chip @click="expanded.format = !expanded.format" color="white" text-color="primary" label small>{{ expanded.format ? '收起' : `更多(${filterOptions.format.length - 10})` }}</v-chip>
+                <v-chip v-if="expanded.format" v-for="item in filterOptions.format.slice(10)" :key="item.id" @click="updateFilter('format', item.name)" :color="filters.format === item.name ? 'primary' : 'white'" :text-color="filters.format === item.name ? 'white' : 'primary'" :outlined="filters.format !== item.name" label small>{{ item.name }}</v-chip>
+                <v-chip @click="expanded.format = !expanded.format" color="white" text-color="primary" outlined label small>{{ expanded.format ? '收起' : `更多(${filterOptions.format.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
