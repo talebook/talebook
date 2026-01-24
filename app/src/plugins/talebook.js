@@ -42,7 +42,6 @@ export default ({ app }, inject) => {
         //console.log("request", full_url)
         return fetch(full_url, args)
             .then(rsp => {
-                const { res } = app.context;
                 var msg = "";
                 if (rsp.status === 413) {
                     msg = "服务器响应了413异常状态码。<br/>可能是上传的文件过大，超过了服务器设置的上传大小。";

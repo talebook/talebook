@@ -80,12 +80,12 @@ class Scanner:
             query = query.filter(ScanFile.hash == hashlist)
         return query
 
-    def run_import(self, hashlist):
+    def run_import(self, hashlist, delete_after=False):
         if self.resume_last_import():
             return 1
 
         total = self.build_query(hashlist).count()
-        ScanService().do_import(hashlist, self.user_id)
+        ScanService().do_import(hashlist, self.user_id, delete_after)
         return total
 
     def import_status(self):
@@ -244,13 +244,14 @@ class ImportRun(BaseHandler):
     def post(self):
         req = tornado.escape.json_decode(self.request.body)
         hashlist = req["hashlist"]
+        delete_after = req.get("delete_after", False)
         if not hashlist:
             return {"err": "params.error", "msg": _("参数错误")}
         if hashlist == "all":
             hashlist = None
 
         m = Scanner(self.db, self.settings["ScopedSession"], self.user_id())
-        total = m.run_import(hashlist)
+        total = m.run_import(hashlist, delete_after)
         if total == 0:
             return {"err": "empty", "msg": _("没有等待导入书库的书籍！")}
         return {"err": "ok", "msg": _("扫描成功")}

@@ -48,11 +48,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=master,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=raw,value=master,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
       - name: Prepare build args
         id: prep
@@ -76,6 +74,6 @@ jobs:
           provenance: false
           tags: |
             ${{ steps.meta.outputs.tags }}
-            ${{ github.repository == 'talebook/talebook' && format('{0}/talebook/calibre-webserver:latest', env.REGISTRY) || '' }}
-            ${{ github.repository == 'talebook/talebook' && format('{0}/talebook/calibre-webserver:master', env.REGISTRY) || '' }}
+            ${{ github.repository == 'talebook/talebook' && startsWith(github.ref, 'refs/tags/') && format('{0}/talebook/calibre-webserver:latest', env.REGISTRY) || '' }}
+            ${{ github.repository == 'talebook/talebook' && github.ref == 'refs/heads/master' && format('{0}/talebook/calibre-webserver:master', env.REGISTRY) || '' }}
           build-args: ${{ steps.prep.outputs.build_args }}

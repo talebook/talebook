@@ -16,6 +16,13 @@
             <template v-else>
                 <v-btn :disabled="loading" color="warning" @click="import_books"><v-icon>mdi-import</v-icon>导入全部书籍 </v-btn>
             </template>
+            <v-spacer></v-spacer>
+            <v-checkbox
+                v-model="delete_after_import"
+                label="导入后删除源文件"
+                color="primary"
+                hide-details
+            ></v-checkbox>
         </v-card-actions>
         <v-card-text>
             <div v-if="selected.length == 0">请勾选需要处理的文件（默认情况下导入全部书籍即可。已存在的书籍，即使勾选了也不会重复导入）</div>
@@ -73,6 +80,7 @@ export default {
         options: {},
         count_todo: 0,
         count_done: 0,
+        delete_after_import: false,
         headers: [
             { text: "ID", sortable: true, value: "id" },
             { text: "状态", sortable: true, value: "status" },
@@ -196,6 +204,7 @@ export default {
                 method: "POST",
                 body: JSON.stringify({
                     hashlist: hashlist,
+                    delete_after: this.delete_after_import
                 }),
             })
                 .then((rsp) => {

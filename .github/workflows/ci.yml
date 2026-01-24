@@ -54,7 +54,7 @@ jobs:
       - name: Run linting
         run: |
           cd app
-          npm run lint || echo "Linting issues found"
+          npm run lint
 
       - name: Nuxt build
         run: |
@@ -72,7 +72,7 @@ jobs:
   integration-test:
     runs-on: ubuntu-latest
     needs: [test-server, test-ui]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
