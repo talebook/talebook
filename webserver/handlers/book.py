@@ -503,37 +503,37 @@ class LibraryBook(ListHandler):
     @js
     def get(self):
         title = _(u"书库")
-        
+
         # 获取筛选参数
         publisher = self.get_argument("publisher", None)
         author = self.get_argument("author", None)
         tag = self.get_argument("tag", None)
         book_format = self.get_argument("format", None)
-        
+
         # 初始获取所有书籍ID
         ids = self.books_by_id()
-        
+
         # 应用筛选条件
         if publisher and publisher != "全部":
             # 按出版社筛选
             publisher_books = self.db.search_getting_ids(f"publisher:'{publisher}'", "")
             ids = list(set(ids) & set(publisher_books))
-        
+
         if author and author != "全部":
             # 按作者筛选
             author_books = self.db.search_getting_ids(f"author:'{author}'", "")
             ids = list(set(ids) & set(author_books))
-        
+
         if tag and tag != "全部":
             # 按标签筛选
             tag_books = self.db.search_getting_ids(f"tag:'{tag}'", "")
             ids = list(set(ids) & set(tag_books))
-        
+
         if book_format and book_format != "全部":
             # 按文件格式筛选
             books = self.get_books(ids=ids)
             ids = [book["id"] for book in books if f"fmt_{book_format.lower()}" in book]
-        
+
         return self.render_book_list([], ids=ids, title=title, sort_by_id=True)
 
 
