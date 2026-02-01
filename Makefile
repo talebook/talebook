@@ -25,7 +25,7 @@ push:
 	docker push $(REPO1)
 	docker push $(REPO2)
 
-test: lint
+test:
 	rm -f unittest.log
 	docker build --build-arg BUILD_COUNTRY=CN -t talebook/test --target test -f Dockerfile .
 	docker run --rm --name=talebook-docker-test -v "$$PWD":"$$PWD" -w "$$PWD" talebook/test pytest --log-file=unittest.log --log-level=INFO tests
@@ -50,3 +50,7 @@ up:
 
 down:
 	docker compose stop
+
+dev: build
+	docker-compose -f dev.yml up
+

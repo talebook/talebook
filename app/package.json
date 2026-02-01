@@ -1,35 +1,36 @@
 {
-  "name": "talebook",
-  "version": "1.0.0",
+  "name": "app",
+  "type": "module",
   "private": true,
   "scripts": {
-    "dev": "nuxt",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
     "build": "nuxt build",
-    "build-spa": "nuxt build --spa",
-    "start": "nuxt start",
-    "generate": "nuxt generate"
+    "test": "npx pagewright test",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "build-spa": "nuxt generate",
+    "start": "PORT=9000 node .output/server/index.mjs",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "core-js": "^3.19.3",
-    "nuxt": "^2.15.8",
-    "vue": "^2.6.14",
-    "vue-cookies": "^1.7.4",
-    "vue-server-renderer": "^2.6.14",
-    "vue-template-compiler": "^2.6.14",
-    "vuetify": "^2.6.10",
-    "webpack": "^4.46.0"
+    "@mdi/font": "^7.4.47",
+    "@pinia/nuxt": "^0.11.3",
+    "nuxt": "^4.3.0",
+    "pinia": "^3.0.4",
+    "sass": "^1.97.3",
+    "vue": "^3.5.27",
+    "vue-router": "^4.6.4",
+    "vuetify-nuxt-module": "^0.19.3"
   },
   "devDependencies": {
-    "@mdi/font": "^6.5.95",
-    "@nuxtjs/google-analytics": "^2.4.0",
-    "@nuxtjs/google-fonts": "^1.3.0",
-    "@nuxtjs/vuetify": "^1.12.3",
-    "connect-logger": "^0.0.1",
-    "eslint": "^8.57.0",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-vue": "^9.20.0",
-    "material-design-icons-iconfont": "^6.4.1"
+    "@nuxt/test-utils": "^3.23.0",
+    "@pinia/testing": "^1.0.3",
+    "@playwright/test": "^1.58.0",
+    "@vue/test-utils": "^2.4.6",
+    "h3": "^2.0.1-rc.11",
+    "happy-dom": "^20.3.9",
+    "listhen": "^1.9.0",
+    "resize-observer-polyfill": "^1.5.1",
+    "vitest": "^3.2.4"
   }
 }

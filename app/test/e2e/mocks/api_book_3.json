@@ -1,0 +1,49 @@
+{
+  "err": "ok",
+  "kindle_sender": "",
+  "book": {
+    "id": 3,
+    "title": "安徒生童话",
+    "rating": 9,
+    "timestamp": "2022-02-04 12:03:59.902895+00:00",
+    "pubdate": "2006-08-01 00:00:00+00:00",
+    "author": "安徒生",
+    "authors": [
+      "安徒生"
+    ],
+    "author_sort": "安徒生",
+    "tag": "外国文学 / 经典 / 文学 / 童话 / 安徒生 / 丹麦 / 儿童文学 / 安徒生童话",
+    "tags": [
+      "外国文学",
+      "经典",
+      "文学",
+      "童话",
+      "安徒生",
+      "丹麦",
+      "儿童文学",
+      "安徒生童话"
+    ],
+    "publisher": "上海译文出版社",
+    "comments": "安徒生(1805—1875)，世界上最著名的童话作家之一。    《安徒生童话》是他的毕生之作。《皇帝的新装》、《卖火柴的小女孩》、《丑小鸭》等，早已成为童话宝库中的璀璨明珠。他的作品真正可以让人从小读到老。要是你还没有品味过的话，那就先从这个选本读起吧，它收进了大家最爱读也最应该读的作品。",
+    "series": "译文名著文库",
+    "language": "",
+    "isbn": "",
+    "img": "/get/cover/3.jpg",
+    "thumb": "/get/thumb_60x80/3.jpg",
+    "collector": "admin",
+    "count_visit": 0,
+    "count_download": 0,
+    "available_formats": [
+      "mobi"
+    ],
+    "files": [
+      {
+        "format": "mobi",
+        "size": 2662851,
+        "href": "/api/book/3.mobi"
+      }
+    ],
+    "is_public": true,
+    "is_owner": true
+  }
+}

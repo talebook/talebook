@@ -1,0 +1,49 @@
+{
+  "err": "ok",
+  "kindle_sender": "",
+  "book": {
+    "id": 9,
+    "title": "鲁滨孙历险记",
+    "rating": 8,
+    "timestamp": "2022-02-04 12:06:06.161670+00:00",
+    "pubdate": "2006-08-01 00:00:00+00:00",
+    "author": "笛福",
+    "authors": [
+      "笛福"
+    ],
+    "author_sort": "笛福",
+    "tag": "外国文学 / 经典 / 小说 / 文学 / 名著 / 笛福 / 英国 / 英国文学",
+    "tags": [
+      "外国文学",
+      "经典",
+      "小说",
+      "文学",
+      "名著",
+      "笛福",
+      "英国",
+      "英国文学"
+    ],
+    "publisher": "上海译文出版社",
+    "comments": "《鲁滨孙历险记》中鲁滨孙出身于中产阶级，他父亲常用知足常乐的哲学教育他，要他满足现状。但他还是抵挡不住海外新世界的诱惑，几次三番地出海闯荡，终于有一次被困在了一个荒岛上。二十八年的孤岛生活仍然未能阻止他的冒险精神，他凭着坚韧的毅力，在荒岛上造房子、修田地、种粮食、养牲畜，硬是把荒岛建成了一个世外桃源，最后终于脱险，返回了欧洲。",
+    "series": "译文名著文库",
+    "language": "zho",
+    "isbn": "",
+    "img": "/get/cover/9.jpg",
+    "thumb": "/get/thumb_60x80/9.jpg",
+    "collector": "admin",
+    "count_visit": 0,
+    "count_download": 0,
+    "available_formats": [
+      "epub"
+    ],
+    "files": [
+      {
+        "format": "epub",
+        "size": 464050,
+        "href": "/api/book/9.epub"
+      }
+    ],
+    "is_public": true,
+    "is_owner": true
+  }
+}
