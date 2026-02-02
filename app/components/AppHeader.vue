@@ -25,7 +25,7 @@
             </template>
 
             <v-app-bar-nav-icon @click.stop="sidebar = !sidebar"></v-app-bar-nav-icon>
-            <v-toolbar-title class="ml-n5 mr-12 align-center" @click="router.push('/')" style="cursor: pointer">
+            <v-toolbar-title class="ml-2 mr-4 align-center" @click="router.push('/')" style="cursor: pointer">
                 {{ store.sys.title }}
             </v-toolbar-title>
 
@@ -328,5 +328,23 @@ function hidemsg(idx, msgid) {
 }
 .search-field :deep(.v-field--variant-solo-inverted) {
     background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 侧边栏字体大小 */
+:deep(.v-navigation-drawer) .v-list-item-title {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+:deep(.v-navigation-drawer) .v-list-subheader__text {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+:deep(.v-navigation-drawer) .v-list-item--density-compact .v-list-item-title {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+:deep(.v-navigation-drawer) .v-btn__content {
+    font-size: 14px !important;
+    font-weight: 500 !important;
 }
 </style>
