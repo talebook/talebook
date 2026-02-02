@@ -13,6 +13,7 @@
                                     variant="solo-inverted"
                                     v-model="search"
                                     ref="mobile_search"
+                                    theme="light"
                                 ></v-text-field>
                             </v-col>
                             <v-col cols="3">
@@ -24,26 +25,28 @@
             </template>
 
             <v-app-bar-nav-icon @click.stop="sidebar = !sidebar"></v-app-bar-nav-icon>
-            <v-toolbar-title class="ml-n5 mr-12 align-center" @click="router.push('/')" style="cursor: pointer">
+            <v-toolbar-title class="ml-2 mr-4 align-center" @click="router.push('/')" style="cursor: pointer">
                 {{ store.sys.title }}
             </v-toolbar-title>
 
-            <v-spacer></v-spacer>
             <template v-if="display.smAndUp.value">
-                <v-text-field
-                    flat
-                    variant="solo-inverted"
-                    hide-details
-                    prepend-inner-icon="mdi-magnify"
-                    @keyup.enter="do_search"
-                    ref="search_input"
-                    v-model="search"
-                    name="name"
-                    label="Search"
-                    class="d-none d-sm-flex ml-8"
-                >
-                </v-text-field>
-                <v-spacer></v-spacer>
+                <div class="search-wrapper">
+                    <v-text-field
+                        flat
+                        variant="solo-inverted"
+                        hide-details
+                        prepend-inner-icon="mdi-magnify"
+                        @keyup.enter="do_search"
+                        ref="search_input"
+                        v-model="search"
+                        name="name"
+                        label="Search"
+                        class="d-none d-sm-flex search-field"
+                        theme="light"
+                        bg-color="rgba(255, 255, 255, 0.15)"
+                    >
+                    </v-text-field>
+                </div>
             </template>
 
             <v-btn v-else icon class="d-flex d-sm-none" @click="btn_search = !btn_search"> <v-icon>mdi-magnify</v-icon> </v-btn>
@@ -290,3 +293,58 @@ function hidemsg(idx, msgid) {
     });
 }
 </script>
+
+<style scoped>
+.search-wrapper {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40vw;
+    max-width: 600px;
+    min-width: 250px;
+}
+.search-field {
+    width: 100% !important;
+}
+.search-field :deep(.v-input__control) {
+    width: 100% !important;
+}
+.search-field :deep(.v-field) {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    border-radius: 10px !important;
+}
+.search-field :deep(.v-field__overlay) {
+    background-color: transparent !important;
+}
+.search-field :deep(.v-field__input) {
+    color: white !important;
+}
+.search-field :deep(.v-label) {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+.search-field :deep(.v-icon) {
+    color: rgba(255, 255, 255, 1) !important;
+    opacity: 1 !important;
+}
+.search-field :deep(.v-field--variant-solo-inverted) {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 侧边栏字体大小 */
+:deep(.v-navigation-drawer) .v-list-item-title {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+:deep(.v-navigation-drawer) .v-list-subheader__text {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+:deep(.v-navigation-drawer) .v-list-item--density-compact .v-list-item-title {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+:deep(.v-navigation-drawer) .v-btn__content {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+</style>
