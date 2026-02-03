@@ -2,8 +2,8 @@
 <template>
     <v-row v-if="show_press" >
         <v-col cols=12>
-            <v-alert outlined colored-border closable @click:close="close"
-               border="left" color="deep-purple accent-4" type="info">
+            <v-alert outlined closable @click:close="close"
+               border="start" type="info" color="white" class="press-alert">
                 <div v-html="press_message"></div>
             </v-alert>
         </v-col>
@@ -55,5 +55,12 @@ function close() {
 }
 </script>
 
-<style>
+<style scoped>
+.press-alert :deep(.v-alert__border) {
+    border-color: #6200ea !important;
+    opacity: 1 !important;
+}
+.press-alert {
+    border: 1px solid #000000 !important;
+}
 </style>
