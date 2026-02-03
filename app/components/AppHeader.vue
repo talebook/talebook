@@ -110,8 +110,8 @@
                     </v-menu>
                 </template>
 
-                <v-btn v-else class="px-xs-1" to="/login" color="indigo accent-4">
-                    <v-icon class="d-none d-sm-flex" start>mdi-account-circle</v-icon> 请登录
+                <v-btn v-else class="px-xs-1 login-btn" to="/login" color="#304ffe" variant="elevated">
+                    <v-icon class="d-none d-sm-flex me-0" size="24">mdi-account-circle</v-icon> 请登录
                 </v-btn>
             </template>
         </v-app-bar>
@@ -154,8 +154,8 @@
                         </template>
                     </v-list-item>
                 </template>
-                <v-list-item v-if="store.sys.sidebar_extra_html">
-                    <div class="ma-auto" v-html="store.sys.sidebar_extra_html"></div>
+                <v-list-item v-if="store.sys.sidebar_extra_html" class="sidebar-extra-item">
+                    <div class="sidebar-extra-content" v-html="store.sys.sidebar_extra_html"></div>
                 </v-list-item>
             </v-list>
         </v-navigation-drawer>
@@ -346,5 +346,27 @@ function hidemsg(idx, msgid) {
 :deep(.v-navigation-drawer) .v-btn__content {
     font-size: 14px !important;
     font-weight: 500 !important;
+}
+
+/* 侧边栏额外内容居中 */
+:deep(.v-navigation-drawer) .sidebar-extra-item .v-list-item__content {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+:deep(.v-navigation-drawer) .sidebar-extra-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+:deep(.v-navigation-drawer) .sidebar-extra-content img {
+    margin: 0 auto;
+    display: block;
+}
+
+/* 侧边栏图标和文字间距 */
+:deep(.v-navigation-drawer) .v-list-item__spacer {
+    width: 12px !important;
 }
 </style>

@@ -103,4 +103,8 @@ const get_recent_books = computed(() => {
     margin-top: 30px;
     margin-bottom: 20px;
 }
+.title {
+    font-size: 1.25rem;
+    font-weight: 500;
+}
 </style>
