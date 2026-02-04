@@ -160,8 +160,9 @@ watch(total, (newTotal) => {
   page_cnt.value = newTotal > 0 ? Math.max(1, Math.ceil(newTotal / page_size)) : 0
 })
 
-// 构建查询参数
-const buildQuery = (p = 1) => {
+// 获取书籍数据
+const fetchBooks = async (p = 1) => {
+  // 构建查询参数
   const query = {
     start: (p - 1) * page_size,
     size: page_size
@@ -174,13 +175,13 @@ const buildQuery = (p = 1) => {
     }
   })
   
-  return query
-}
-
-// 获取书籍数据
-const fetchBooks = async (p = 1) => {
+  // 构建查询字符串
+  const queryString = Object.keys(query)
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(query[key])}`)
+    .join('&')
+  
   try {
-    const rsp = await $backend(`/library`, { query: buildQuery(p) })
+    const rsp = await $backend(`/library?${queryString}`)
     if (rsp.err === 'exception' || rsp.err === 'network_error') {
       if ($alert) $alert('error', rsp.msg)
       return
@@ -242,7 +243,11 @@ const change_page = (newPage) => {
 
 // 更新筛选
 const updateFilter = (type, value) => {
-  filters.value[type] = value
+  // 创建新的对象以确保响应式更新
+  filters.value = {
+    ...filters.value,
+    [type]: value
+  }
   // 更新筛选条件后重新获取书籍数据，重置到第一页
   fetchBooks(1)
 }

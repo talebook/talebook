@@ -126,7 +126,7 @@ const site_url = ref("")
 
 const cards = ref([
     {
-    show: true,
+    show: false,
     title: "基础信息",
     fields: [
         { icon: "mdi-home", key: "site_title", label: "网站标题", },
