@@ -10,7 +10,8 @@
                 <p class="py-6 body-3 text-center" >{{welcome}}</p>
                 <v-form @submit.prevent="welcome_login" >
                     <v-text-field prepend-icon="mdi-lock" v-model="invite_code" required
-                        label="访问密码" type="password" :error="is_err" :error-messages="msg" :loading="loading"></v-text-field>
+                        label="访问密码" type="password" :error="is_err" :error-messages="is_err ? msg : ''" :loading="loading"></v-text-field>
+                    <p v-if="!is_err && msg" class="text-success text-center mt-2">{{ msg }}</p>
                 </v-form>
             </v-card-text>
 
@@ -70,12 +71,13 @@ const welcome_login = async () => {
         })
         
         if (rsp.err != 'ok') {
-            is_err.value = true
-            msg.value = rsp.msg
-        } else {
-            is_err.value = false
-            window.location.reload()
-        }
+                    is_err.value = true
+                    msg.value = rsp.msg
+                } else {
+                    is_err.value = false
+                    msg.value = "访问码正确，正在跳转..."
+                    window.location.reload()
+                }
     } finally {
         loading.value = false
     }
