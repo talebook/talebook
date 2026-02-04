@@ -12,10 +12,10 @@
           <div class="d-flex align-center">
             <span class="mr-3">出版社：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('publisher', '全部')" :class="filters.publisher === '全部' ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.publisher.slice(0, 10)" :key="item.id" @click="updateFilter('publisher', item.name)" :class="filters.publisher === item.name ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('publisher', '全部')" :class="filters.publisher === '全部' ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.publisher.slice(0, 10)" :key="item.id" @click="updateFilter('publisher', item.name)" :class="filters.publisher === item.name ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.publisher.length > 10">
-                <v-chip @click="expanded.publisher = !expanded.publisher" class="border text-primary" density="compact" label small>{{ expanded.publisher ? '收起' : `更多(${filterOptions.publisher.length - 10})` }}</v-chip>
+                <v-chip @click="expanded.publisher = !expanded.publisher" class="filter-chip-more" density="compact" label small>{{ expanded.publisher ? '收起' : `更多(${filterOptions.publisher.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
@@ -24,7 +24,7 @@
             <div class="d-flex align-center mt-1">
               <span class="mr-3"></span>
               <v-chip-group column="false" class="flex-grow-1">
-                <v-chip v-for="item in filterOptions.publisher.slice(10)" :key="item.id" @click="updateFilter('publisher', item.name)" :class="filters.publisher === item.name ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ item.name }}</v-chip>
+                <v-chip v-for="item in filterOptions.publisher.slice(10)" :key="item.id" @click="updateFilter('publisher', item.name)" :class="filters.publisher === item.name ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ item.name }}</v-chip>
               </v-chip-group>
             </div>
           </template>
@@ -35,10 +35,10 @@
           <div class="d-flex align-center">
             <span class="mr-3">作者：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('author', '全部')" :class="filters.author === '全部' ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.author.slice(0, 10)" :key="item.id" @click="updateFilter('author', item.name)" :class="filters.author === item.name ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('author', '全部')" :class="filters.author === '全部' ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.author.slice(0, 10)" :key="item.id" @click="updateFilter('author', item.name)" :class="filters.author === item.name ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.author.length > 10">
-                <v-chip @click="expanded.author = !expanded.author" class="border text-primary" density="compact" label small>{{ expanded.author ? '收起' : `更多(${filterOptions.author.length - 10})` }}</v-chip>
+                <v-chip @click="expanded.author = !expanded.author" class="filter-chip-more" density="compact" label small>{{ expanded.author ? '收起' : `更多(${filterOptions.author.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
@@ -47,7 +47,7 @@
             <div class="d-flex align-center mt-1">
               <span class="mr-3"></span>
               <v-chip-group column="false" class="flex-grow-1">
-                <v-chip v-for="item in filterOptions.author.slice(10)" :key="item.id" @click="updateFilter('author', item.name)" :class="filters.author === item.name ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ item.name }}</v-chip>
+                <v-chip v-for="item in filterOptions.author.slice(10)" :key="item.id" @click="updateFilter('author', item.name)" :class="filters.author === item.name ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ item.name }}</v-chip>
               </v-chip-group>
             </div>
           </template>
@@ -58,10 +58,10 @@
           <div class="d-flex align-center">
             <span class="mr-3">标签：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('tag', '全部')" :class="filters.tag === '全部' ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.tag.slice(0, 10)" :key="item.id" @click="updateFilter('tag', item.name)" :class="filters.tag === item.name ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('tag', '全部')" :class="filters.tag === '全部' ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.tag.slice(0, 10)" :key="item.id" @click="updateFilter('tag', item.name)" :class="filters.tag === item.name ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.tag.length > 10">
-                <v-chip @click="expanded.tag = !expanded.tag" class="border text-primary" density="compact" label small>{{ expanded.tag ? '收起' : `更多(${filterOptions.tag.length - 10})` }}</v-chip>
+                <v-chip @click="expanded.tag = !expanded.tag" class="filter-chip-more" density="compact" label small>{{ expanded.tag ? '收起' : `更多(${filterOptions.tag.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
@@ -70,7 +70,7 @@
             <div class="d-flex align-center mt-1">
               <span class="mr-3"></span>
               <v-chip-group column="false" class="flex-grow-1">
-                <v-chip v-for="item in filterOptions.tag.slice(10)" :key="item.id" @click="updateFilter('tag', item.name)" :class="filters.tag === item.name ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ item.name }}</v-chip>
+                <v-chip v-for="item in filterOptions.tag.slice(10)" :key="item.id" @click="updateFilter('tag', item.name)" :class="filters.tag === item.name ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ item.name }}</v-chip>
               </v-chip-group>
             </div>
           </template>
@@ -81,10 +81,10 @@
           <div class="d-flex align-center">
             <span class="mr-3">文件格式：</span>
             <v-chip-group column="false" class="flex-grow-1">
-              <v-chip @click="updateFilter('format', '全部')" :class="filters.format === '全部' ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ '全部' }}</v-chip>
-              <v-chip v-for="item in filterOptions.format.slice(0, 10)" :key="item.id" @click="updateFilter('format', item.name)" :class="filters.format === item.name ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ item.name }}</v-chip>
+              <v-chip @click="updateFilter('format', '全部')" :class="filters.format === '全部' ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ '全部' }}</v-chip>
+              <v-chip v-for="item in filterOptions.format.slice(0, 10)" :key="item.id" @click="updateFilter('format', item.name)" :class="filters.format === item.name ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ item.name }}</v-chip>
               <template v-if="filterOptions.format.length > 10">
-                <v-chip @click="expanded.format = !expanded.format" class="border text-primary" density="compact" label small>{{ expanded.format ? '收起' : `更多(${filterOptions.format.length - 10})` }}</v-chip>
+                <v-chip @click="expanded.format = !expanded.format" class="filter-chip-more" density="compact" label small>{{ expanded.format ? '收起' : `更多(${filterOptions.format.length - 10})` }}</v-chip>
               </template>
             </v-chip-group>
           </div>
@@ -93,7 +93,7 @@
             <div class="d-flex align-center mt-1">
               <span class="mr-3"></span>
               <v-chip-group column="false" class="flex-grow-1">
-                <v-chip v-for="item in filterOptions.format.slice(10)" :key="item.id" @click="updateFilter('format', item.name)" :class="filters.format === item.name ? 'bg-primary text-white' : 'border'" density="compact" label small>{{ item.name }}</v-chip>
+                <v-chip v-for="item in filterOptions.format.slice(10)" :key="item.id" @click="updateFilter('format', item.name)" :class="filters.format === item.name ? 'filter-chip-active' : 'filter-chip-inactive'" density="compact" label small>{{ item.name }}</v-chip>
               </v-chip-group>
             </div>
           </template>
@@ -272,5 +272,22 @@ useHead({
 
 .book-pager {
   margin-top: 30px;
+}
+
+/* 筛选按钮样式 */
+.filter-chip-active {
+  background-color: rgb(var(--v-theme-primary)) !important;
+  color: white !important;
+}
+
+.filter-chip-inactive {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background-color: transparent !important;
+}
+
+.filter-chip-more {
+  border: 1px solid rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-primary)) !important;
+  background-color: transparent !important;
 }
 </style>
