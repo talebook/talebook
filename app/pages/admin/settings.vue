@@ -2,8 +2,8 @@
 <template>
     <div>
         <v-card class="my-2 elevation-4" v-for="card in cards" :key="card.title" >
-            <v-card-title @click="card.show = !card.show" class="cursor-pointer">
-                <v-btn icon variant="text" size="small" class="mr-2">
+            <v-card-title @click="card.show = !card.show" class="cursor-pointer py-4 pl-2">
+                <v-btn icon variant="text" size="small" class="mr-1">
                     <v-icon>{{ card.show ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
                 </v-btn>
                 {{card.title}}
@@ -21,7 +21,7 @@
                 <template v-for="f in card.fields" :key="f.key" >
                   <v-checkbox density="compact" hide-details v-if="f.type === 'checkbox' " :prepend-icon="f.icon" v-model="settings[f.key]" :label="f.label" color="primary"></v-checkbox>
                   <v-textarea variant="outlined" v-else-if="f.type === 'textarea' " :prepend-icon="f.icon" v-model="settings[f.key]" :label="f.label" rows="3"></v-textarea>
-                  <v-select density="compact" hide-details v-else-if="f.type === 'select' " :prepend-icon="f.icon" v-model="settings[f.key]" :items="f.items" :label="f.label" item-title="text" item-value="value"> </v-select>
+                  <v-select hide-details class="mb-4" v-else-if="f.type === 'select' " :prepend-icon="f.icon" v-model="settings[f.key]" :items="f.items" :label="f.label" item-title="text" item-value="value"> </v-select>
                   <v-text-field v-else :prepend-icon="f.icon" v-model="settings[f.key]" :label="f.label" type="text"></v-text-field>
                 </template>
                 

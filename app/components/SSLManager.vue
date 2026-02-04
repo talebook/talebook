@@ -1,7 +1,7 @@
 
 <template>
     <div>
-        <v-btn density="compact" @click="dialog = !dialog" >
+        <v-btn @click="dialog = !dialog" >
             <v-icon start>mdi-upload</v-icon> 更新SSL证书
         </v-btn>
         <v-dialog v-model="dialog" persistent transition="dialog-bottom-transition" width="400">
