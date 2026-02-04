@@ -243,11 +243,7 @@ const change_page = (newPage) => {
 
 // 更新筛选
 const updateFilter = (type, value) => {
-  // 创建新的对象以确保响应式更新
-  filters.value = {
-    ...filters.value,
-    [type]: value
-  }
+  filters.value[type] = value
   // 更新筛选条件后重新获取书籍数据，重置到第一页
   fetchBooks(1)
 }
