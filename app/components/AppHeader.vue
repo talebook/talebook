@@ -1,6 +1,6 @@
 <template>
     <div>
-        <v-app-bar class="px-0" color="blue" density="compact" theme="dark" :order="0" extension-height="64">
+        <v-app-bar class="px-0" color="blue" density="compact" theme="light" :order="0" extension-height="64">
             <template v-if="btn_search && display.xs.value" #extension>
                 <v-container fluid>
                     <v-form @submit.prevent="do_search">
@@ -17,7 +17,7 @@
                                 ></v-text-field>
                             </v-col>
                             <v-col cols="3">
-                                <v-btn theme="dark" rounded @click="do_mobile_search" color="primary">搜索</v-btn>
+                                <v-btn theme="light" rounded @click="do_mobile_search" color="primary">搜索</v-btn>
                             </v-col>
                         </v-row>
                     </v-form>
@@ -78,21 +78,19 @@
 
                     <v-menu offset-y right>
                         <template v-slot:activator="{ props }">
-                            <v-btn v-bind="props" class="mr-2" icon size="large" variant="outlined">
-                                <v-avatar size="32px"><img :src="store.user.avatar" /></v-avatar>
+                            <v-btn v-bind="props" class="mr-2" icon size="45" variant="outlined">
+                                <v-avatar size="32" :image="store.user.avatar"></v-avatar>
                             </v-btn>
                         </template>
                         <v-list min-width="240">
                             <v-list-item>
                                 <template v-slot:prepend>
-                                    <v-avatar>
-                                        <img :src="store.user.avatar" />
-                                    </v-avatar>
+                                    <v-avatar size="40" :image="store.user.avatar"></v-avatar>
                                 </template>
                                 <v-list-item-title> {{ store.user.nickname }} </v-list-item-title>
                                 <v-list-item-subtitle> {{ store.user.email }} </v-list-item-subtitle>
                             </v-list-item>
-                            <v-divider></v-divider>
+                            <v-divider class="my-2"></v-divider>
                             <v-list-item to="/user/detail" title="用户中心" prepend-icon="mdi-account-box"></v-list-item>
                             <v-list-item to="/user/history" title="阅读记录" prepend-icon="mdi-history"></v-list-item>
                             <v-list-item v-if="store.sys.allow.FEEDBACK" target="_blank" :href="store.sys.FEEDBACK_URL" title="反馈" prepend-icon="mdi-message-alert"></v-list-item>
@@ -332,15 +330,15 @@ function hidemsg(idx, msgid) {
 
 /* 侧边栏字体大小 */
 :deep(.v-navigation-drawer) .v-list-item-title {
-    font-size: 14px !important;
-    font-weight: 500 !important;
-}
-:deep(.v-navigation-drawer) .v-list-subheader__text {
     font-size: 13px !important;
     font-weight: 500 !important;
 }
+:deep(.v-navigation-drawer) .v-list-subheader__text {
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
 :deep(.v-navigation-drawer) .v-list-item--density-compact .v-list-item-title {
-    font-size: 14px !important;
+    font-size: 13px !important;
     font-weight: 500 !important;
 }
 :deep(.v-navigation-drawer) .v-btn__content {
@@ -367,6 +365,6 @@ function hidemsg(idx, msgid) {
 
 /* 侧边栏图标和文字间距 */
 :deep(.v-navigation-drawer) .v-list-item__spacer {
-    width: 12px !important;
+    width: 8px !important;
 }
 </style>

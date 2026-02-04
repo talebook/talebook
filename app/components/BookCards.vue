@@ -78,6 +78,7 @@ const render_books = computed(() => {
 .book-comments p {
     font-size: small;
     margin-bottom: 0px;
+    line-height: 1.6;
 }
 .book-list-card .v-row {
     margin-bottom: 0px;
@@ -91,11 +92,10 @@ const render_books = computed(() => {
     margin-bottom: 20px;
 }
 .col-book-img {
-    padding: 0 0 0 12px;
+    padding: 12px 0 0 12px;
 }
 .col-book-info {
-    padding: 0;
-    margin-left: -6px;
-    margin-top: -6px;
+    margin-left: -4px;
+    padding: 8px 0;
 }
 </style>
