@@ -66,7 +66,7 @@
                                     </v-avatar>
                                 </template>
 
-                                <v-list-item-title>{{ msg.data.message }}</v-list-item-title>
+                                <v-list-item-title style="white-space: normal; word-break: break-word;">{{ msg.data.message }}</v-list-item-title>
                                 <v-list-item-subtitle>{{ msg.create_time }}</v-list-item-subtitle>
 
                                 <template v-slot:append>
@@ -78,7 +78,7 @@
 
                     <v-menu offset-y right>
                         <template v-slot:activator="{ props }">
-                            <v-btn v-bind="props" class="mr-2" icon size="45" variant="outlined">
+                            <v-btn v-bind="props" class="mr-4" icon size="45" variant="outlined">
                                 <v-avatar size="32" :image="store.user.avatar"></v-avatar>
                             </v-btn>
                         </template>
@@ -108,7 +108,7 @@
                     </v-menu>
                 </template>
 
-                <v-btn v-else class="px-xs-1 login-btn" to="/login" color="#304ffe" variant="elevated">
+                <v-btn v-else class="px-xs-1 login-btn mr-4" to="/login" color="#304ffe" variant="elevated">
                     <v-icon class="d-none d-sm-flex me-0" size="24">mdi-account-circle</v-icon> 请登录
                 </v-btn>
             </template>

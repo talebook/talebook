@@ -1,7 +1,7 @@
 
 <template>
     <v-card>
-        <v-card-title> 导入图书 <v-chip size="small" class="primary ml-2">Beta</v-chip> </v-card-title>
+        <v-card-title> 导入图书 <v-chip size="small" variant="elevated" color="primary ml-2">Beta</v-chip> </v-card-title>
         <v-card-text>
         请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。<br/>
         请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。<br/>
@@ -9,13 +9,13 @@
         </v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" variant="outlined" color="primary" @click="getDataFromApi"><v-icon start>mdi-reload</v-icon>刷新</v-btn>
-            <v-btn :disabled="loading" color="primary" @click="scan_books"><v-icon start>mdi-file-find</v-icon>扫描书籍</v-btn>
+            <v-btn :disabled="loading" variant="elevated" color="primary" @click="scan_books"><v-icon start>mdi-file-find</v-icon>扫描书籍</v-btn>
             <template v-if="selected.length > 0">
-                <v-btn :disabled="loading" color="secondary" @click="import_books"><v-icon start>mdi-import</v-icon>导入选中书籍 </v-btn>
+                <v-btn :disabled="loading" variant="elevated" color="#424242" @click="import_books"><v-icon start>mdi-import</v-icon>导入选中书籍 </v-btn>
                 <v-btn :disabled="loading" variant="outlined" color="primary" @click="delete_record"><v-icon start>mdi-delete</v-icon>删除 </v-btn>
             </template>
             <template v-else>
-                <v-btn :disabled="loading" color="warning" @click="import_books"><v-icon start>mdi-import</v-icon>导入全部书籍 </v-btn>
+                <v-btn :disabled="loading" variant="elevated" color="warning" @click="import_books"><v-icon start>mdi-import</v-icon>导入全部书籍 </v-btn>
             </template>
             <v-spacer></v-spacer>
             <v-checkbox
