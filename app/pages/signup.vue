@@ -5,6 +5,8 @@
         <v-card class="elevation-12">
             <v-toolbar dark color="primary">
                 <v-toolbar-title>填写注册信息</v-toolbar-title>
+                <v-spacer></v-spacer>
+                <v-btn rounded color="success" variant="elevated" to="/login" class="text-white mr-4">登录</v-btn>
             </v-toolbar>
             <v-card-text>
                 <v-form ref="form" @submit.prevent="signup">

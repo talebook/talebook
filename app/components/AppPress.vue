@@ -4,7 +4,7 @@
         <v-col cols="12">
             <v-alert outlined closable @click:close="close"
                border="start" type="info" color="white" class="press-alert">
-                <div v-html="press_message"></div>
+                <div class="press-content" v-html="press_message"></div>
             </v-alert>
         </v-col>
     </v-row>
@@ -62,12 +62,5 @@ function close() {
 }
 .press-alert {
     border: 1px solid #000000 !important;
-}
-.press-alert :deep(a) {
-    color: #1976d2 !important;
-    text-decoration: underline;
-}
-.press-alert :deep(a:hover) {
-    color: #0d47a1 !important;
 }
 </style>

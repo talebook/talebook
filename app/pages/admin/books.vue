@@ -43,7 +43,7 @@
             </template>
             
             <template v-slot:item.id="{ item }">
-                <a target="_blank" :href="`/book/${item.id}`">{{ item.id }}</a>
+                <a class="press-content" target="_blank" :href="`/book/${item.id}`">{{ item.id }}</a>
             </template>
             
             <template v-slot:item.title="{ item }">
