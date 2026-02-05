@@ -131,13 +131,13 @@
 
                     <!-- 友情链接 -->
                     <template v-else-if="item.links">
-                        <v-list-item density="compact" v-for="(links, cidx) in chunk(item.links, 2)" :key="idx + 'chunk' + cidx">
-                            <v-row>
-                                <v-col class="pa-0" cols="6" v-for="link in links" :key="link.href">
-                                    <v-btn v-if="item.target != ''" variant="text" target="_blank" :href="link.href">
+                        <v-list-item v-for="(links, cidx) in chunk(item.links, 2)" :key="idx + 'chunk' + cidx" class="nav-links-item">
+                            <v-row no-gutters>
+                                <v-col cols="6" v-for="link in links" :key="link.href" class="nav-link-col">
+                                    <v-btn v-if="item.target != ''" variant="text" target="_blank" :href="link.href" class="nav-link-btn">
                                         <v-icon v-if="link.icon" start>{{ link.icon }}</v-icon> {{ link.text }}
                                     </v-btn>
-                                    <v-btn v-else variant="text" :to="link.href">
+                                    <v-btn v-else variant="text" :to="link.href" class="nav-link-btn">
                                         <v-icon v-if="link.icon" start>{{ link.icon }}</v-icon> {{ link.text }}
                                     </v-btn>
                                 </v-col>
@@ -366,5 +366,27 @@ function hidemsg(idx, msgid) {
 /* 侧边栏图标和文字间距 */
 :deep(.v-navigation-drawer) .v-list-item__spacer {
     width: 8px !important;
+}
+
+/* 导航链接样式 */
+:deep(.v-navigation-drawer) .nav-links-item {
+    padding-left: 8px;
+    padding-right: 8px;
+}
+:deep(.v-navigation-drawer) .nav-links-item .v-list-item__content {
+    display: block;
+    width: 100%;
+}
+:deep(.v-navigation-drawer) .nav-link-col {
+    padding: 0 4px;
+    display: flex;
+    justify-content: flex-start;
+}
+:deep(.v-navigation-drawer) .nav-link-btn {
+    justify-content: flex-start;
+    padding-left: 8px;
+    padding-right: 8px;
+    width: auto;
+    min-width: unset;
 }
 </style>
