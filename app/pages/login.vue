@@ -6,14 +6,14 @@
                 <v-toolbar dark color="primary">
                     <v-toolbar-title>欢迎访问</v-toolbar-title>
                     <v-spacer></v-spacer>
-                    <v-btn v-if="allowRegister" rounded color="green" to="/signup">注册</v-btn>
+                    <v-btn v-if="allowRegister" rounded color="success" variant="elevated" to="/signup" class="text-white mr-4">注册</v-btn>
                 </v-toolbar>
                 <v-card-text>
                     <v-form @submit.prevent="do_login">
                         <v-text-field prepend-icon="mdi-account" v-model="username" label="用户名" type="text"></v-text-field>
                         <v-text-field prepend-icon="mdi-lock" v-model="password" label="密码" type="password" id="password"></v-text-field>
                         <p class="text-right">
-                            <a href="javascript:void(0)" @click="show_login = !show_login"> 忘记密码? </a>
+                            <a class="press-content" href="javascript:void(0)" @click="show_login = !show_login"> 忘记密码? </a>
                         </p>
                         <div align="center">
                             <v-btn type="submit" large rounded color="primary" :loading="loading">登录</v-btn>

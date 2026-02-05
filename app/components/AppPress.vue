@@ -1,10 +1,10 @@
 <!-- 网站公告 -->
 <template>
-    <v-row v-if="show_press" >
-        <v-col cols=12>
+    <v-row v-if="show_press" class="mb-3">
+        <v-col cols="12">
             <v-alert outlined closable @click:close="close"
                border="start" type="info" color="white" class="press-alert">
-                <div v-html="press_message"></div>
+                <div class="press-content" v-html="press_message"></div>
             </v-alert>
         </v-col>
     </v-row>

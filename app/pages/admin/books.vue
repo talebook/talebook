@@ -1,7 +1,7 @@
 
 <template>
     <v-card>
-        <v-card-title> 图书管理 <v-chip size="small" class="primary ml-2">Beta</v-chip> </v-card-title>
+        <v-card-title> 图书管理 <v-chip size="small" variant="elevated" color="primary" class="ml-2">Beta</v-chip> </v-card-title>
         <v-card-text> 此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面</v-card-text>
         <v-card-actions>
             <v-btn :disabled="loading" variant="outlined" color="primary"
@@ -43,17 +43,17 @@
             </template>
             
             <template v-slot:item.id="{ item }">
-                <a target="_blank" :href="`/book/${item.id}`">{{ item.id }}</a>
+                <a class="press-content" target="_blank" :href="`/book/${item.id}`">{{ item.id }}</a>
             </template>
             
             <template v-slot:item.title="{ item }">
-                <div class="cursor-pointer" @click="editField(item, 'title', '书名')">
+                <div class="cursor-pointer" style="min-width: 120px; white-space: normal; word-break: break-word;" @click="editField(item, 'title', '书名')">
                     {{ item.title }}
                 </div>
             </template>
 
             <template v-slot:item.authors="{ item }">
-                <div class="cursor-pointer" @click="editField(item, 'authors', '作者')">
+                <div class="cursor-pointer" style="min-width: 60px; white-space: normal; word-break: break-word;" @click="editField(item, 'authors', '作者')">
                     <span v-if="item.authors">{{ item.authors.join("/") }}</span>
                     <span v-else> - </span>
                 </div>
@@ -73,15 +73,15 @@
             </template>
 
             <template v-slot:item.tags="{ item }">
-                <div class="cursor-pointer" @click="editField(item, 'tags', '标签')">
-                    <span v-if="item.tags">{{ item.tags.join("/") }}</span>
+                <div class="cursor-pointer" style="min-width: 200px; white-space: normal; word-break: break-word;" @click="editField(item, 'tags', '标签')">
+                    <span v-if="item.tags">{{ (tagsStr = item.tags.join("/"), tagsStr.slice(0, 77) + (tagsStr.length > 70 ? '...' : '')) }}</span>
                     <span v-else> - </span>
                 </div>
             </template>
 
             <template v-slot:item.comments="{ item }">
-                <div class="cursor-pointer text-truncate" style="max-width: 200px;" @click="editField(item, 'comments', '简介')">
-                    {{ item.comments || '-' }}
+                <div class="cursor-pointer" style="min-width: 300px; white-space: normal; word-break: break-word;" @click="editField(item, 'comments', '简介')">
+                    {{ item.comments ? item.comments.slice(0, 65) + (item.comments.length > 65 ? '...' : '') : '-' }}
                 </div>
             </template>
 
@@ -221,7 +221,7 @@ const options = ref({ page: 1, itemsPerPage: 10, sortBy: [{ key: 'id', order: 'd
 const headers = [
     { title: "封面", key: "img", sortable: false, width: "80px" },
     { title: "ID", key: "id", sortable: true, width: "80px" },
-    { title: "书名", key: "title", sortable: true },
+    { title: "书名", key: "title", sortable: true, width: "200px" },
     { title: "作者", key: "authors", sortable: true, width: "100px" },
     { title: "评分", key: "rating", sortable: false, width: "60px" },
     { title: "出版社", key: "publisher", sortable: false },
