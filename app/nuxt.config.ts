@@ -34,7 +34,7 @@ export default defineNuxtConfig({
   },
   routeRules: {
     '/api/**': { proxy: (process.env.API_URL || "http://127.0.0.1:8000") + '/api/**' },
-    '/get/**': { proxy: (process.env.API_URL || "http://127.0.0.1:8000") + '/get/**' }
+    '/get/**': { proxy: (process.env.API_URL || "http://127.0.0.1:8000") + '/get/**' },
   },
   app: {
     head: {
