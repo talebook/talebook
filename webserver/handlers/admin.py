@@ -17,6 +17,7 @@ import tornado
 from webserver import loader
 from webserver.services.autofill import AutoFillService
 from webserver.services.mail import MailService
+from webserver.services.opds_import import OPDSImportService
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
 from webserver.models import Reader
 from webserver.utils import SimpleBookFormatter
@@ -607,6 +608,33 @@ class AdminBookDelete(BaseHandler):
         return {"err": "ok", "msg": _(u"成功删除 {0} 本书籍".format(deleted_count))}
 
 
+class AdminOPDSImport(BaseHandler):
+    @js
+    @is_admin
+    def post(self):
+        req = tornado.escape.json_decode(self.request.body)
+        opds_url = req.get("opds_url", "")
+        books = req.get("books", [])
+        
+        if not opds_url:
+            return {"err": "params.error", "msg": _(u"参数错误，OPDS URL不能为空")}
+
+        # 启动 OPDS 导入服务
+        if books:
+            # 导入指定的书籍
+            OPDSImportService().do_import(opds_url, self.user_id(), books=books)
+        else:
+            # 导入整个 OPDS 源
+            OPDSImportService().do_import(opds_url, self.user_id())
+        return {"err": "ok", "msg": _(u"开始从 OPDS 导入")}
+
+    @js
+    @is_admin
+    def get(self):
+        # 这里可以返回 OPDS 导入的状态
+        return {"err": "ok", "msg": "ok"}
+
+
 def routes():
     return [
         (r"/api/admin/ssl", AdminSSL),
@@ -617,4 +645,5 @@ def routes():
         (r"/api/admin/book/list", AdminBookList),
         (r"/api/admin/book/fill", AdminBookFill),
         (r"/api/admin/book/delete", AdminBookDelete),
+        (r"/api/admin/opds/import", AdminOPDSImport),
     ]
