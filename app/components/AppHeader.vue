@@ -136,6 +136,26 @@
                         </v-list>
                     </v-menu>
 
+                    <!-- 多语言切换入口 -->
+                    <v-menu
+                        offset-y
+                        right
+                    >
+                        <template #activator="{ props }">
+                            <v-btn
+                                v-bind="props"
+                                icon
+                            >
+                                <v-icon>mdi-web</v-icon>
+                            </v-btn>
+                        </template>
+                        <v-list min-width="240">
+                            <v-list-item>
+                                <v-list-item-title class="text-center">本功能尚未加入</v-list-item-title>
+                            </v-list-item>
+                        </v-list>
+                    </v-menu>
+
                     <v-menu
                         offset-y
                         right
@@ -206,20 +226,41 @@
                     </v-menu>
                 </template>
 
-                <v-btn
-                    v-else
-                    class="px-xs-1 login-btn mr-4"
-                    to="/login"
-                    color="#304ffe"
-                    variant="elevated"
-                >
-                    <v-icon
-                        class="d-none d-sm-flex me-0"
-                        size="24"
+                <template v-else>
+                    <!-- 多语言切换入口（未登录状态） -->
+                    <v-menu
+                        offset-y
+                        right
                     >
-                        mdi-account-circle
-                    </v-icon> 请登录
-                </v-btn>
+                        <template #activator="{ props }">
+                            <v-btn
+                                v-bind="props"
+                                icon
+                            >
+                                <v-icon>mdi-web</v-icon>
+                            </v-btn>
+                        </template>
+                        <v-list min-width="240">
+                            <v-list-item>
+                                <v-list-item-title class="text-center">本功能尚未加入</v-list-item-title>
+                            </v-list-item>
+                        </v-list>
+                    </v-menu>
+
+                    <v-btn
+                        class="px-xs-1 login-btn mr-4"
+                        to="/login"
+                        color="#304ffe"
+                        variant="elevated"
+                    >
+                        <v-icon
+                            class="d-none d-sm-flex me-0"
+                            size="24"
+                        >
+                            mdi-account-circle
+                        </v-icon> 请登录
+                    </v-btn>
+                </template>
             </template>
         </v-app-bar>
 
@@ -413,11 +454,8 @@ const items = computed(() => {
         { heading: '系统' },
         { icon: 'mdi-history', text: '系统版本', href: '', count: store.sys.version },
         { icon: 'mdi-human', text: '用户数', href: '', count: store.sys.users },
+        { icon: 'mdi-cellphone', text: 'OPDS介绍', href: '/opds-readme', count: 'OPDS', target: '_blank' },
     ];
-    
-    if (store.sys.allow.OPDS_ENABLED !== false) {
-        sys_links.push({ icon: 'mdi-cellphone', text: 'OPDS介绍', href: '/opds-readme', count: 'OPDS', target: '_blank' });
-    }
 
     return home_links
         .concat(library_links)
