@@ -1,6 +1,6 @@
 <script>
- // don't create a template for the section
-import ListBook from '~/pages/ListBook.vue'
+// don't create a template for the section
+import ListBook from '~/pages/ListBook.vue';
 ListBook.head = function() {
     var name = decodeURIComponent(this.$route.params.name);
     var titles = {
@@ -10,14 +10,14 @@ ListBook.head = function() {
         author: `${name}的著作`,
         publisher: `${name}出版的书籍`,
         format: `${name}格式的书籍`,
-    }
-    var meta = this.$route.path.split("/")[1];
+    };
+    var meta = this.$route.path.split('/')[1];
     if ( titles[meta] !== undefined ) {
         return {
             title: titles[meta]
-        }
+        };
     }
-    return {}
-}
-export default ListBook
+    return {};
+};
+export default ListBook;
 </script>

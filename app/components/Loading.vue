@@ -1,12 +1,19 @@
 <template>
-    <div v-show="store.loading" class="loading-page">
-        <v-progress-circular indeterminate size=128 color="deep-orange lighten-2"></v-progress-circular>
+    <div
+        v-show="store.loading"
+        class="loading-page"
+    >
+        <v-progress-circular
+            indeterminate
+            size="128"
+            color="deep-orange lighten-2"
+        />
     </div>
 </template>
 
 <script setup>
-import { useMainStore } from '@/stores/main'
-const store = useMainStore()
+import { useMainStore } from '@/stores/main';
+const store = useMainStore();
 </script>
 
 <style scoped>

@@ -12,23 +12,23 @@ const apiRecent = JSON.parse(fs.readFileSync(path.join(mockDir, 'api_recent.json
 const apiHot = JSON.parse(fs.readFileSync(path.join(mockDir, 'api_hot.json'), 'utf-8'));
 
 test.describe('Library Pages', () => {
-  test('Recent page displays books', async ({ page }) => {
-    await page.goto('/recent');
+    test('Recent page displays books', async ({ page }) => {
+        await page.goto('/recent');
     
-    await expect(page.getByText(apiRecent.title)).toBeVisible();
+        await expect(page.getByText(apiRecent.title)).toBeVisible();
     
-    if (apiRecent.books.length > 0) {
-        await expect(page.getByText(apiRecent.books[0].title).first()).toBeVisible();
-    }
-  });
+        if (apiRecent.books.length > 0) {
+            await expect(page.getByText(apiRecent.books[0].title).first()).toBeVisible();
+        }
+    });
 
-  test('Hot page displays books', async ({ page }) => {
-    await page.goto('/hot');
+    test('Hot page displays books', async ({ page }) => {
+        await page.goto('/hot');
     
-    await expect(page.getByRole('heading', { name: apiHot.title })).toBeVisible();
+        await expect(page.getByRole('heading', { name: apiHot.title })).toBeVisible();
     
-    if (apiHot.books.length > 0) {
-        await expect(page.getByText(apiHot.books[0].title).first()).toBeVisible();
-    }
-  });
+        if (apiHot.books.length > 0) {
+            await expect(page.getByText(apiHot.books[0].title).first()).toBeVisible();
+        }
+    });
 });
