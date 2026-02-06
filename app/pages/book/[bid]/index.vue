@@ -127,14 +127,14 @@
 
                         <v-spacer></v-spacer>
 
-                        <v-btn color="primary" variant="elevated" class="mx-2" :href="'/read/' + book.id" target="_blank">
-                            <v-icon start>mdi-book-open-page-variant</v-icon>
-                            阅读
-                        </v-btn>
-
                         <v-btn color="primary" variant="elevated" class="mx-2" @click="dialog_kindle = !dialog_kindle">
                             <v-icon start>mdi-email</v-icon>
                             推送
+                        </v-btn>
+
+                        <v-btn color="primary" variant="elevated" class="mx-2" :href="'/read/' + book.id" target="_blank">
+                            <v-icon start>mdi-book-open-page-variant</v-icon>
+                            阅读
                         </v-btn>
 
                         <template v-if="book.is_owner">
