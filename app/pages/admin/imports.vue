@@ -14,6 +14,7 @@
             请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。<br>
             请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。<br>
             另外，还可以使用<a
+                class="press-content"
                 target="_blank"
                 href="https://calibre-ebook.com/"
             >PC版Calibre软件</a>管理书籍，但是请注意：使用完PC版后，需重启Web版方可生效。
@@ -38,6 +39,16 @@
                 <v-icon start>
                     mdi-file-find
                 </v-icon>扫描书籍
+            </v-btn>
+            <v-btn
+                :disabled="loading"
+                variant="elevated"
+                color="primary"
+                @click="openOpdsImportDialog"
+            >
+                <v-icon start>
+                    mdi-database-import
+                </v-icon>从其他 OPDS 导入
             </v-btn>
             <template v-if="selected.length > 0">
                 <v-btn
@@ -162,6 +173,31 @@
             </template>
         </v-data-table-server>
     </v-card>
+
+    <!-- OPDS Import Dialog -->
+    <v-dialog
+        v-model="opdsImportDialogVisible"
+        width="500"
+    >
+        <v-card>
+            <v-card-title>
+                从其他 OPDS 导入
+            </v-card-title>
+            <v-card-text>
+                本功能尚未加入
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer />
+                <v-btn
+                    color="primary"
+                    text
+                    @click="opdsImportDialogVisible = false"
+                >
+                    关闭
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 </template>
 
 <script setup>
@@ -186,6 +222,7 @@ const options = ref({ page: 1, itemsPerPage: 100, sortBy: [{ key: 'create_time',
 const count_todo = ref(0);
 const count_done = ref(0);
 const delete_after_import = ref(false);
+const opdsImportDialogVisible = ref(false);
 
 const headers = [
     { title: 'ID', key: 'id', sortable: true },
@@ -347,6 +384,10 @@ const delete_record = () => {
         .finally(() => {
             loading.value = false;
         });
+};
+
+const openOpdsImportDialog = () => {
+    opdsImportDialogVisible.value = true;
 };
 
 onMounted(() => {
