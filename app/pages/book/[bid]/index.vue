@@ -318,7 +318,7 @@ const store = useMainStore()
 const { $backend, $alert } = useNuxtApp()
 const cookie = useCookie('last_mailto')
 
-const bookid = route.params.bookid
+const bookid = route.params.bid
 const book = ref({
     id: 0,
     title: '',
