@@ -363,11 +363,9 @@
                             />
                             <br>
                             <div class="tag-chips">
-                                <template
-                                    v-for="author in book.authors"
-                                    :key="'author-' + author"
-                                >
+                                <template v-for="author in book.authors">
                                     <v-chip
+                                        :key="'author-' + author"
                                         rounded
                                         small
                                         dark

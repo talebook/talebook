@@ -87,9 +87,8 @@
                             v-if="tips"
                             class="mt-4"
                             type="info"
-                        >
-                            {{ tips }}
-                        </v-alert>
+                            v-html="tips"
+                        />
                     </v-card-text>
                 </v-card>
             </v-col>

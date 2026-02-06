@@ -1,11 +1,9 @@
 <template>
     <div>
         <v-row>
-            <template
-                v-for="nav in navs"
-                :key="nav.legend"
-            >
+            <template v-for="nav in navs">
                 <v-col
+                    :key="nav.legend"
                     cols="12"
                 >
                     <h2>{{ nav.legend }}</h2>

@@ -38,7 +38,7 @@
             density="compact"
             theme="dark"
         >
-            <v-app-bar-title class="ml-n5 mr-12 align-center d-flex">
+            <v-app-bar-title class="mr-12 align-center d-flex">
                 <v-app-bar-nav-icon @click.stop="sidebar = !sidebar">
                     <v-icon>mdi-menu</v-icon>
                 </v-app-bar-nav-icon>

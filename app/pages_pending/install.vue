@@ -72,9 +72,8 @@
                     <v-alert
                         v-if="tips"
                         type="info"
-                    >
-                        {{ tips }}
-                    </v-alert>
+                        v-html="tips"
+                    />
                 </v-card-text>
 
                 <v-card-actions>

@@ -461,7 +461,7 @@
                     <p> 1. 请在「系统设置」中配置好「互联网书籍信息源」，启用豆瓣插件；</p>
                     <p> 2. 本操作只更新「没有封面」或「没有简介」的图书；</p>
                     <p> 3. 受限于豆瓣等服务的限制，每秒钟仅更新1本书; </p>
-                    <br>
+                    <br></br>
                     <template v-if="progress.total > 0">
                         <p>
                             当前进展：<v-btn
@@ -481,6 +481,8 @@
                     <p v-else>
                         预计需要运行 {{ auto_fill_mins }} 分钟，在此期间请不要停止程序
                     </p>
+
+                    <template v-else />
                 </v-card-text>
                 <v-card-actions>
                     <v-btn @click="meta_dialog = !meta_dialog">

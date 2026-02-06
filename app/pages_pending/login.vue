@@ -64,17 +64,16 @@
                         <br>
                         <small>使用社交网络账号登录</small>
                         <br>
-                        <template
-                            v-for="s in socials"
-                            :key="s.text"
-                        >
+                        <template v-for="s in socials">
                             <v-btn
+                                :key="s.text"
                                 small
                                 outlined
                                 :href="'/auth/login/' + s.value"
                             >
                                 {{ s.text }}
                             </v-btn>
+                            &nbsp;
                         </template>
                     </div>
                 </v-card-text>

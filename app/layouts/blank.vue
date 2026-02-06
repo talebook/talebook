@@ -23,9 +23,8 @@
                             outlined
                             :model-value="store.alert.show"
                             :type="store.alert.type"
-                        >
-                            {{ store.alert.msg }}
-                        </v-alert>
+                            v-html="store.alert.msg"
+                        />
                     </v-card-text>
                     <v-card-actions v-if="store.alert.type!=='success' || store.alert.to">
                         <v-spacer />
