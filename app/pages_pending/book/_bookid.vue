@@ -134,17 +134,17 @@
                     </v-btn>
 
                     <v-spacer></v-spacer>
+                    <v-btn :small="tiny" dark color="primary" class="mx-2 d-flex d-sm-flex" :href="'/read/' + book.id"
+                           target="_blank">
+                        <v-icon left v-if="!tiny">import_contacts</v-icon>
+                        阅读
+                    </v-btn
+                    >
                     <v-btn :small="tiny" dark color="primary" class="mx-2 d-flex d-sm-flex"
                            @click="dialog_kindle = !dialog_kindle"
                     >
                         <v-icon left v-if="!tiny">email</v-icon>
                         推送
-                    </v-btn
-                    >
-                    <v-btn :small="tiny" dark color="primary" class="mx-2 d-flex d-sm-flex" :href="'/read/' + book.id"
-                           target="_blank">
-                        <v-icon left v-if="!tiny">import_contacts</v-icon>
-                        阅读
                     </v-btn
                     >
 
