@@ -100,6 +100,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();

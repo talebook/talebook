@@ -51,6 +51,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();

@@ -562,8 +562,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useAsyncData, useCookie, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 import BookCards from '~/components/BookCards.vue';
 
@@ -609,6 +610,10 @@ const refer_books = ref([]);
 // TXT
 const txt_parse_inited = ref(false);
 
+// 数据获取状态
+const pending = ref(true);
+const error = ref(null);
+
 store.setNavbar(true);
 
 // Methods
@@ -623,34 +628,41 @@ const get_txt_parse_status = async () => {
     }
 };
 
-// 修复1: 移除 await，正确使用 useAsyncData
-const { data, refresh } = useAsyncData(`book-${bookid}`, async () => {
-    try {
-        const response = await $backend(`/book/${bookid}`);
+// 数据获取逻辑
+const { data: fetchData, error: fetchError, pending: fetchPending } = useAsyncData(`book-${bookid}`, async () => {
+    const response = await $backend(`/book/${bookid}`);
+    
+    if (response.err === 'ok') {
+        return response;
+    } else {
+        throw new Error(response.msg || '获取书籍信息失败');
+    }
+});
+
+// 监听数据变化
+watch(() => fetchData.value, (newData) => {
+    if (newData && newData.book) {
+        book.value = newData.book;
+        mail_to.value = newData.user?.kindle_email || '';
+        kindle_sender.value = newData.kindle_sender || '';
         
-        if (response.err === 'ok') {
-            book.value = response.book;
-            mail_to.value = response.user?.kindle_email || '';
-            kindle_sender.value = response.kindle_sender || '';
-            
-            if (cookie.value) {
-                mail_to.value = cookie.value;
-            }
-            
-            // 获取 TXT 解析状态
-            await get_txt_parse_status();
-        } else {
-            if ($alert) {
-                $alert('error', response.msg, '/');
-            }
-            return { error: response.msg };
+        if (cookie.value) {
+            mail_to.value = cookie.value;
         }
         
-        return response;
-    } catch (e) {
-        console.error(e);
-        return { error: '获取书籍信息失败' };
+        // 获取 TXT 解析状态
+        get_txt_parse_status();
     }
+}, { immediate: true });
+
+// 监听错误状态
+watch(() => fetchError.value, (newError) => {
+    error.value = newError;
+});
+
+// 监听加载状态
+watch(() => fetchPending.value, (newPending) => {
+    pending.value = newPending;
 });
 
 // Computed properties
