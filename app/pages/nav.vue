@@ -35,6 +35,7 @@
 </template>
 
 <script setup>
+import { ref, computed, watch } from 'vue'
 import { useMainStore } from '@/stores/main'
 
 const store = useMainStore()
@@ -42,13 +43,23 @@ const { $backend } = useNuxtApp()
 
 const navs = ref([])
 
-const { data: navData } = await useAsyncData('nav', async () => {
-    return $backend('/book/nav')
+// 修复1: 移除 await，正确使用 useAsyncData
+const { data: navData } = useAsyncData('nav', async () => {
+    try {
+        const response = await $backend('/book/nav')
+        return response
+    } catch (error) {
+        console.error('获取导航数据失败:', error)
+        return { navs: [] }
+    }
 })
 
-if (navData.value) {
-    navs.value = navData.value.navs || []
-}
+// 修复2: 使用 watch 监听数据变化
+watch(navData, (newData) => {
+    if (newData) {
+        navs.value = newData.navs || []
+    }
+}, { immediate: true })
 
 const hasAnyBooks = computed(() => {
     for (const nav of navs.value) {

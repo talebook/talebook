@@ -64,9 +64,11 @@
                         <br>
                         <small>使用社交网络账号登录</small>
                         <br>
-                        <template v-for="s in socials">
+                        <template
+                            v-for="s in socials"
+                            :key="s.text"
+                        >
                             <v-btn
-                                :key="s.text"
                                 small
                                 outlined
                                 :href="'/auth/login/' + s.value"

@@ -72,8 +72,9 @@
                     <v-alert
                         v-if="tips"
                         type="info"
-                        v-html="tips"
-                    />
+                    >
+                        <div v-html="tips" />
+                    </v-alert>
                 </v-card-text>
 
                 <v-card-actions>

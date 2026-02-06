@@ -27,7 +27,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMainStore } from '@/stores/main'
 
@@ -46,22 +46,40 @@ const welcome = ref("本站为私人图书馆，需输入密码才可进行访�
 const loading = ref(false)
 const invite_code = ref("")
 
-// Initial check
-const { data: welcomeData } = await useAsyncData('welcome', async () => {
-    return $backend("/welcome")
+// 修复1: 移除 await，正确使用 useAsyncData
+const { data: welcomeData } = useAsyncData('welcome', async () => {
+    try {
+        const response = await $backend("/welcome")
+        return response
+    } catch (error) {
+        console.error('获取欢迎页数据失败:', error)
+        return { err: 'error', msg: '网络错误' }
+    }
 })
 
-if (welcomeData.value) {
-    if (welcomeData.value.err === 'free') {
-        router.push(route.query.next || "/")
-    } else if (welcomeData.value.err === 'not_installed') {
-        router.push("/install")
+// 修复2: 使用 watch 监听数据变化
+watch(welcomeData, (newData) => {
+    if (newData) {
+        if (newData.err === 'free') {
+            router.push(route.query.next || "/")
+        } else if (newData.err === 'not_installed') {
+            router.push("/install")
+        }
     }
-}
+}, { immediate: true })
 
 const welcome_login = async () => {
+    if (!invite_code.value.trim()) {
+        is_err.value = true
+        msg.value = "请输入访问码"
+        return
+    }
+    
     loading.value = true
-    var data = new URLSearchParams()
+    is_err.value = false
+    msg.value = ""
+    
+    const data = new URLSearchParams()
     data.append('invite_code', invite_code.value)
     
     try {
@@ -70,14 +88,21 @@ const welcome_login = async () => {
             body: data,
         })
         
-        if (rsp.err != 'ok') {
-                    is_err.value = true
-                    msg.value = rsp.msg
-                } else {
-                    is_err.value = false
-                    msg.value = "访问码正确，正在跳转..."
-                    window.location.reload()
-                }
+        if (rsp.err !== 'ok') {
+            is_err.value = true
+            msg.value = rsp.msg || "访问码错误"
+        } else {
+            is_err.value = false
+            msg.value = "访问码正确，正在跳转..."
+            // 使用 router 跳转而不是 reload，更好的用户体验
+            setTimeout(() => {
+                router.push(route.query.next || "/")
+            }, 1000)
+        }
+    } catch (error) {
+        console.error('登录失败:', error)
+        is_err.value = true
+        msg.value = "网络错误，请稍后重试"
     } finally {
         loading.value = false
     }

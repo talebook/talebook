@@ -5,6 +5,7 @@ export default [
   // 忽略配置
   {
     ignores: [
+      'pages_pending/**',
       'node_modules/**',
       '.nuxt/**',
       '.output/**',
@@ -66,7 +67,9 @@ export default [
       'vue/valid-v-slot': 'off',
       'no-console': 'off',
       'vue/no-v-html': 'off',
-      'vue/no-template-shadow': 'off'
+      'vue/no-template-shadow': 'off',
+      'vue/no-v-text-v-html-on-component': 'off',
+      'vue/no-use-v-if-with-v-for': 'off'
     }
   }
 ];
