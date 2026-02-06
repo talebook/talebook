@@ -741,14 +741,16 @@ class OpdsHandler(BaseHandler):
 class OpdsIndex(OpdsHandler):
     def get(self):
         if not CONF["OPDS_ENABLED"]:
-            raise web.HTTPError(404, reason="OPDS is disabled")
+            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
+            return
         self.write(self.opds())
 
 
 class OpdsNav(OpdsHandler):
     def get(self, which):
         if not CONF["OPDS_ENABLED"]:
-            raise web.HTTPError(404, reason="OPDS is disabled")
+            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
+            return
         offset = self.get_argument("offset", 0)
         self.write(self.opds_navcatalog(which, offset=offset))
 
@@ -756,7 +758,8 @@ class OpdsNav(OpdsHandler):
 class OpdsCategory(OpdsHandler):
     def get(self, category, which):
         if not CONF["OPDS_ENABLED"]:
-            raise web.HTTPError(404, reason="OPDS is disabled")
+            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
+            return
         offset = self.get_argument("offset", 0)
         self.write(self.opds_category(category, which, offset=offset))
 
@@ -764,7 +767,8 @@ class OpdsCategory(OpdsHandler):
 class OpdsCategoryGroup(OpdsHandler):
     def get(self, category, which):
         if not CONF["OPDS_ENABLED"]:
-            raise web.HTTPError(404, reason="OPDS is disabled")
+            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
+            return
         offset = self.get_argument("offset", 0)
         self.write(self.opds_category_group(category, which, offset=offset))
 
@@ -772,7 +776,8 @@ class OpdsCategoryGroup(OpdsHandler):
 class OpdsSearch(OpdsHandler):
     def get(self, which):
         if not CONF["OPDS_ENABLED"]:
-            raise web.HTTPError(404, reason="OPDS is disabled")
+            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
+            return
         offset = self.get_argument("offset", 0)
         self.write(self.opds_search(which, offset=offset))
 

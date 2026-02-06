@@ -99,12 +99,22 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { useAsyncData, useNuxtApp } from 'nuxt/app';
+import { computed, onMounted } from 'vue';
+import { useAsyncData, useNuxtApp, useRoute } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
-const { $backend } = useNuxtApp();
+const { $backend, $alert } = useNuxtApp();
+const route = useRoute();
+
+onMounted(() => {
+    // 处理URL参数中的错误信息
+    if (route.query.err === 'opds_disabled' && route.query.msg) {
+        if ($alert) {
+            $alert('error', route.query.msg);
+        }
+    }
+});
 
 // 修复: 直接使用 useAsyncData 不添加 await
 const { data: indexData } = useAsyncData('index', () => 
