@@ -19,7 +19,7 @@ export default defineNuxtPlugin((nuxtApp) => {
         var args = {
             mode: "cors", redirect: "follow", credentials: 'include',
         }
-        
+
         const config = useRuntimeConfig()
         let server = "";
         
