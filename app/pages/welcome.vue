@@ -1,91 +1,147 @@
 
 <template>
-<v-row justify="center" class='fill-center'>
-    <v-col cols="12" sm="8" md="4">
-        <v-card class="elevation-12">
-            <v-toolbar dark color="primary">
-                <v-toolbar-title align-center >请输入访问密码</v-toolbar-title>
-            </v-toolbar>
-            <v-card-text>
-                <p class="py-6 body-3 text-center" >{{welcome}}</p>
-                <v-form @submit.prevent="welcome_login" >
-                    <v-text-field prepend-icon="mdi-lock" v-model="invite_code" required
-                        label="访问密码" type="password" :error="is_err" :error-messages="is_err ? msg : ''" :loading="loading"></v-text-field>
-                    <p v-if="!is_err && msg" class="text-success text-center mt-2">{{ msg }}</p>
-                </v-form>
-            </v-card-text>
+    <v-row
+        justify="center"
+        class="fill-center"
+    >
+        <v-col
+            cols="12"
+            sm="8"
+            md="4"
+        >
+            <v-card class="elevation-12">
+                <v-toolbar
+                    dark
+                    color="primary"
+                >
+                    <v-toolbar-title align-center>
+                        请输入访问密码
+                    </v-toolbar-title>
+                </v-toolbar>
+                <v-card-text>
+                    <p class="py-6 body-3 text-center">
+                        {{ welcome }}
+                    </p>
+                    <v-form @submit.prevent="welcome_login">
+                        <v-text-field
+                            v-model="invite_code"
+                            prepend-icon="mdi-lock"
+                            required
+                            label="访问密码"
+                            type="password"
+                            :error="is_err"
+                            :error-messages="is_err ? msg : ''"
+                            :loading="loading"
+                        />
+                        <p
+                            v-if="!is_err && msg"
+                            class="text-success text-center mt-2"
+                        >
+                            {{ msg }}
+                        </p>
+                    </v-form>
+                </v-card-text>
 
-            <v-card-actions>
-                <v-spacer></v-spacer>
-                <v-btn @click="welcome_login" color="primary">Login</v-btn>
-                <v-spacer></v-spacer>
-            </v-card-actions>
-
-        </v-card>
-    </v-col>
-</v-row>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn
+                        color="primary"
+                        @click="welcome_login"
+                    >
+                        Login
+                    </v-btn>
+                    <v-spacer />
+                </v-card-actions>
+            </v-card>
+        </v-col>
+    </v-row>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { useMainStore } from '@/stores/main'
+import { ref, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useMainStore } from '@/stores/main';
 
-const router = useRouter()
-const route = useRoute()
-const store = useMainStore()
-const { $backend } = useNuxtApp()
+const router = useRouter();
+const route = useRoute();
+const store = useMainStore();
+const { $backend } = useNuxtApp();
 
 definePageMeta({
-  layout: 'blank'
-})
+    layout: 'blank'
+});
 
-const is_err = ref(false)
-const msg = ref("")
-const welcome = ref("本站为私人图书馆，需输入密码才可进行访问")
-const loading = ref(false)
-const invite_code = ref("")
+const is_err = ref(false);
+const msg = ref('');
+const welcome = ref('本站为私人图书馆，需输入密码才可进行访问');
+const loading = ref(false);
+const invite_code = ref('');
 
-// Initial check
-const { data: welcomeData } = await useAsyncData('welcome', async () => {
-    return $backend("/welcome")
-})
-
-if (welcomeData.value) {
-    if (welcomeData.value.err === 'free') {
-        router.push(route.query.next || "/")
-    } else if (welcomeData.value.err === 'not_installed') {
-        router.push("/install")
+// 修复1: 移除 await，正确使用 useAsyncData
+const { data: welcomeData } = useAsyncData('welcome', async () => {
+    try {
+        const response = await $backend('/welcome');
+        return response;
+    } catch (error) {
+        console.error('获取欢迎页数据失败:', error);
+        return { err: 'error', msg: '网络错误' };
     }
-}
+});
+
+// 修复2: 使用 watch 监听数据变化
+watch(welcomeData, (newData) => {
+    if (newData) {
+        if (newData.err === 'free') {
+            router.push(route.query.next || '/');
+        } else if (newData.err === 'not_installed') {
+            router.push('/install');
+        }
+    }
+}, { immediate: true });
 
 const welcome_login = async () => {
-    loading.value = true
-    var data = new URLSearchParams()
-    data.append('invite_code', invite_code.value)
+    if (!invite_code.value.trim()) {
+        is_err.value = true;
+        msg.value = '请输入访问码';
+        return;
+    }
+    
+    loading.value = true;
+    is_err.value = false;
+    msg.value = '';
+    
+    const data = new URLSearchParams();
+    data.append('invite_code', invite_code.value);
     
     try {
-        const rsp = await $backend("/welcome", {
+        const rsp = await $backend('/welcome', {
             method: 'POST',
             body: data,
-        })
+        });
         
-        if (rsp.err != 'ok') {
-                    is_err.value = true
-                    msg.value = rsp.msg
-                } else {
-                    is_err.value = false
-                    msg.value = "访问码正确，正在跳转..."
-                    window.location.reload()
-                }
+        if (rsp.err !== 'ok') {
+            is_err.value = true;
+            msg.value = rsp.msg || '访问码错误';
+        } else {
+            is_err.value = false;
+            msg.value = '访问码正确，正在跳转...';
+            // 使用 router 跳转而不是 reload，更好的用户体验
+            setTimeout(() => {
+                router.push(route.query.next || '/');
+            }, 1000);
+        }
+    } catch (error) {
+        console.error('登录失败:', error);
+        is_err.value = true;
+        msg.value = '网络错误，请稍后重试';
     } finally {
-        loading.value = false
+        loading.value = false;
     }
-}
+};
 
 useHead({
-    title: "私人图书馆"
-})
+    title: '私人图书馆'
+});
 </script>
 
 <style scoped>

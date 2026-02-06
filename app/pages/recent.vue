@@ -4,5 +4,5 @@
 </template>
 
 <script setup>
-import BookList from '~/components/BookList.vue'
+import BookList from '~/components/BookList.vue';
 </script>

@@ -1,28 +1,41 @@
 <!-- 网站公告 -->
 <template>
-    <v-row v-if="show_press" class="mb-3">
+    <v-row
+        v-if="show_press"
+        class="mb-3"
+    >
         <v-col cols="12">
-            <v-alert outlined closable @click:close="close"
-               border="start" type="info" color="white" class="press-alert">
-                <div class="press-content" v-html="press_message"></div>
+            <v-alert
+                outlined
+                closable
+                border="start"
+                type="info"
+                color="white"
+                class="press-alert"
+                @click:close="close"
+            >
+                <div
+                    class="press-content"
+                    v-html="press_message"
+                />
             </v-alert>
         </v-col>
     </v-row>
 </template>
 
 <script setup>
-import { useMainStore } from '@/stores/main'
+import { useMainStore } from '@/stores/main';
 
-const store = useMainStore()
-const cookie = useCookie('close_press', { default: () => 'none' })
+const store = useMainStore();
+const cookie = useCookie('close_press', { default: () => 'none' });
 
-const has_press = computed(() => store.sys.header != undefined)
+const has_press = computed(() => store.sys.header != undefined);
 const press_message = computed(() => {
     if ( store.sys.header != undefined ) {
         return store.sys.header;
     }
-    return "";
-})
+    return '';
+});
 
 function hashCode(s) {
     var hash = 0, i, chr;
@@ -42,12 +55,12 @@ const show_press = computed(() => {
     var msg = press_message.value;
     var hash = hashCode(press_message.value);
     
-    if ( msg == "" || hash == cookie.value ) {
+    if ( msg == '' || hash == cookie.value ) {
         return false;
     }
 
     return true;
-})
+});
 
 function close() {
     var hash = hashCode(press_message.value);

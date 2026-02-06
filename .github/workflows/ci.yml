@@ -35,7 +35,7 @@ jobs:
         run: make init
 
       - name: Lint with flake8
-        run: make lint
+        run: make lint-py
 
       - name: Run tests with pytest
         run: make pytest
@@ -56,8 +56,7 @@ jobs:
 
       - name: Run linting
         run: |
-          cd app
-          npm run lint
+          make lint-ui
 
       - name: Nuxt build
         run: |

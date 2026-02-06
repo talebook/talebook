@@ -10,7 +10,9 @@
     "build-spa": "nuxt generate",
     "start": "PORT=9000 node .output/server/index.mjs",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "lint": "eslint --ext .js,.vue,.ts,.tsx .",
+    "lint:fix": "eslint --ext .js,.vue,.ts,.tsx . --fix"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
@@ -26,7 +28,14 @@
     "@nuxt/test-utils": "^3.23.0",
     "@pinia/testing": "^1.0.3",
     "@playwright/test": "^1.58.0",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "@vue/eslint-config-typescript": "^14.6.0",
     "@vue/test-utils": "^2.4.6",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.7.0",
+    "globals": "^17.3.0",
     "h3": "^2.0.1-rc.11",
     "happy-dom": "^20.3.9",
     "listhen": "^1.9.0",
