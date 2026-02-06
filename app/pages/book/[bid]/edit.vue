@@ -281,6 +281,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useAsyncData, useNuxtApp } from 'nuxt/app';
 
 const route = useRoute();
 const router = useRouter();
