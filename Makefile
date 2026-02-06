@@ -31,6 +31,7 @@ test:
 	docker run --rm --name=talebook-docker-test -v "$$PWD":"$$PWD" -w "$$PWD" talebook/test pytest --log-file=unittest.log --log-level=INFO tests
 
 lint-ui:
+	npm ci
 	cd app && npm run lint
 
 lint-py:

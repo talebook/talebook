@@ -56,8 +56,7 @@ jobs:
 
       - name: Run linting
         run: |
-          cd app
-          npm run lint
+          make lint-ui
 
       - name: Nuxt build
         run: |
