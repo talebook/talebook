@@ -432,6 +432,14 @@ class OpdsHandler(BaseHandler):
         self.set_header("WWW-Authenticate", "Basic")
         self.set_status(401)
         raise web.Finish()
+    
+    def prepare(self):
+        self.set_hosts()
+        self.set_i18n()
+        self.process_auth_header()
+        self.should_be_installed()
+        # 跳过私人图书馆模式检查，让OPDS服务不受限制
+        # self.should_be_invited()
 
     def get_opds_acquisition_feed(
         self,
@@ -732,29 +740,39 @@ class OpdsHandler(BaseHandler):
 
 class OpdsIndex(OpdsHandler):
     def get(self):
+        if not CONF["OPDS_ENABLED"]:
+            raise web.HTTPError(404, reason="OPDS is disabled")
         self.write(self.opds())
 
 
 class OpdsNav(OpdsHandler):
     def get(self, which):
+        if not CONF["OPDS_ENABLED"]:
+            raise web.HTTPError(404, reason="OPDS is disabled")
         offset = self.get_argument("offset", 0)
         self.write(self.opds_navcatalog(which, offset=offset))
 
 
 class OpdsCategory(OpdsHandler):
     def get(self, category, which):
+        if not CONF["OPDS_ENABLED"]:
+            raise web.HTTPError(404, reason="OPDS is disabled")
         offset = self.get_argument("offset", 0)
         self.write(self.opds_category(category, which, offset=offset))
 
 
 class OpdsCategoryGroup(OpdsHandler):
     def get(self, category, which):
+        if not CONF["OPDS_ENABLED"]:
+            raise web.HTTPError(404, reason="OPDS is disabled")
         offset = self.get_argument("offset", 0)
         self.write(self.opds_category_group(category, which, offset=offset))
 
 
 class OpdsSearch(OpdsHandler):
     def get(self, which):
+        if not CONF["OPDS_ENABLED"]:
+            raise web.HTTPError(404, reason="OPDS is disabled")
         offset = self.get_argument("offset", 0)
         self.write(self.opds_search(which, offset=offset))
 

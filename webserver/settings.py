@@ -44,6 +44,7 @@ settings = {
     "opds_max_items"           : 50,
     "opds_max_ungrouped_items" : 100,
     "opds_url_prefix"          : "",
+    "OPDS_ENABLED"             : True,
 
     "db_engine_args": {
         "echo": False,

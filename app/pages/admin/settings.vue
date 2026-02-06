@@ -425,6 +425,18 @@ const cards = ref([
         fields: [],
         show_ssl: true,
     },
+    {
+        show: false,
+        title: 'OPDS 设置',
+        fields: [
+            { icon: 'mdi-book-open-variant', key: 'OPDS_ENABLED', label: '启用 OPDS 服务', type: 'checkbox' },
+        ],
+        tips: [
+            {
+                text: 'OPDS（Open Publication Distribution System）是一种用于电子书分发的开放标准，关闭后将无法通过OPDS客户端访问书库。',
+            }
+        ],
+    },
 ]);
 
 onMounted(() => {

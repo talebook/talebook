@@ -413,8 +413,11 @@ const items = computed(() => {
         { heading: '系统' },
         { icon: 'mdi-history', text: '系统版本', href: '', count: store.sys.version },
         { icon: 'mdi-human', text: '用户数', href: '', count: store.sys.users },
-        { icon: 'mdi-cellphone', text: 'OPDS介绍', href: '/opds-readme', count: 'OPDS', target: '_blank' },
     ];
+    
+    if (store.sys.allow.OPDS_ENABLED !== false) {
+        sys_links.push({ icon: 'mdi-cellphone', text: 'OPDS介绍', href: '/opds-readme', count: 'OPDS', target: '_blank' });
+    }
 
     return home_links
         .concat(library_links)
