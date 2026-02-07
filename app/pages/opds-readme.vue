@@ -46,15 +46,7 @@
             <h1>OPDS 服务已关闭</h1>
             <section>
                 <div class="error-message">
-                    <p>当前 OPDS 服务已关闭，您需要在管理员设置中开启 OPDS 服务后才能使用。</p>
-                    <v-btn
-                        color="primary"
-                        to="/admin/settings"
-                        class="mt-4"
-                    >
-                        <v-icon start>mdi-cog</v-icon>
-                        前往管理员设置
-                    </v-btn>
+                    <p>当前 OPDS 服务已关闭，您需要联系管理员开启 OPDS 服务后才能使用。</p>
                 </div>
             </section>
         </template>

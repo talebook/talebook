@@ -1,4 +1,3 @@
-
 <template>
     <v-card>
         <v-card-title>
@@ -182,39 +181,59 @@
     >
         <v-card>
             <v-card-title>
-                <div class="flex items-center justify-between w-full">
-                    <span>从其他 OPDS 导入</span>
-                    <v-btn
-                        color="primary"
-                        text
-                        @click="opdsImportDialogVisible = false"
-                    >
-                        关闭
-                    </v-btn>
-                </div>
+                从其他 OPDS 导入
             </v-card-title>
             <v-card-text>
                 <!-- 连接信息填写界面 -->
                 <div v-if="opdsImportState === 'connecting'">
+                    <v-row>
+                        <v-col cols="8">
+                            <v-text-field
+                                v-model="opdsHost"
+                                label="主机地址"
+                                placeholder="例如: http://example.com"
+                                variant="outlined"
+                                full-width
+                                @keyup.enter="connectToOpds"
+                            ></v-text-field>
+                        </v-col>
+                        <v-col cols="4">
+                            <v-text-field
+                                v-model="opdsPort"
+                                label="端口"
+                                placeholder="例如: 80"
+                                variant="outlined"
+                                full-width
+                                type="number"
+                                @keyup.enter="connectToOpds"
+                            ></v-text-field>
+                        </v-col>
+                    </v-row>
                     <v-text-field
-                        v-model="opdsUrl"
-                        label="OPDS 目录 URL"
-                        placeholder="例如: http://example.com/opds"
+                        v-model="opdsPath"
+                        label="路径"
+                        placeholder="例如: /opds 或 /opds/root.xml"
                         variant="outlined"
                         full-width
-                    ></v-text-field>
-                    <v-btn
-                        :disabled="loading"
-                        color="primary"
-                        @click="connectToOpds"
                         class="mt-4"
-                    >
-                        连接
-                    </v-btn>
+                        @keyup.enter="connectToOpds"
+                    ></v-text-field>
+                    <div class="text-body-2 text-gray-600 mt-2">
+                        提示：通常OPDS服务地址类似 http://example.com:8080/opds 或 http://example.com/opds/root.xml
+                    </div>
                 </div>
                 
                 <!-- 目录浏览界面 -->
                 <div v-else-if="opdsImportState === 'browsing'">
+                    <div class="mb-4">
+                        <v-chip size="small" color="info" class="mr-2">
+                            当前路径: {{ currentOpdsPath || '根目录' }}
+                        </v-chip>
+                        <v-chip size="small" color="primary">
+                            选中书籍: {{ selectedOpdsBooks.length }} 本
+                        </v-chip>
+                    </div>
+                    
                     <v-list
                         density="compact"
                         class="border rounded-lg overflow-hidden"
@@ -223,27 +242,31 @@
                         <!-- 返回上级目录选项 -->
                         <v-list-item
                             v-if="currentOpdsPath !== ''"
-                            @click="navigateToOpdsPath('')"
-                            class="bg-gray-50"
+                            @click="goBackInOpdsPath"
+                            class="bg-gray-50 cursor-pointer"
                         >
                             <v-list-item-icon>
                                 <v-icon>mdi-folder-up</v-icon>
                             </v-list-item-icon>
-                            <v-list-item-title>..</v-list-item-title>
+                            <v-list-item-title>返回上级目录</v-list-item-title>
                         </v-list-item>
                         
                         <!-- 文件夹和书籍列表 -->
-                        <template v-for="item in opdsItems" :key="item.id || item.href">
+                        <template v-for="(item, index) in opdsItems" :key="item.id || index">
                             <!-- 文件夹项 -->
                             <v-list-item
                                 v-if="item.type === 'folder'"
-                                @click="navigateToOpdsPath(item.path)"
-                                class="hover:bg-gray-50"
+                                @click="navigateToOpdsFolder(item)"
+                                class="hover:bg-gray-50 cursor-pointer"
                             >
                                 <v-list-item-icon>
-                                    <v-icon>mdi-folder</v-icon>
+                                    <v-icon color="amber">mdi-folder</v-icon>
                                 </v-list-item-icon>
                                 <v-list-item-title>{{ item.title }}</v-list-item-title>
+                                <v-list-item-subtitle v-if="item.summary">{{ item.summary }}</v-list-item-subtitle>
+                                <template #append>
+                                    <v-icon>mdi-chevron-right</v-icon>
+                                </template>
                             </v-list-item>
                             
                             <!-- 书籍项 -->
@@ -256,15 +279,43 @@
                                         v-model="selectedOpdsBooks"
                                         :value="item"
                                         color="primary"
+                                        hide-details
                                     ></v-checkbox>
                                 </v-list-item-action>
                                 <v-list-item-icon>
-                                    <v-icon>mdi-book</v-icon>
+                                    <v-icon color="blue">mdi-book</v-icon>
                                 </v-list-item-icon>
-                                <v-list-item-title>{{ item.title }}</v-list-item-title>
-                                <v-list-item-subtitle>{{ item.author }}</v-list-item-subtitle>
+                                <v-list-item-content>
+                                    <v-list-item-title class="font-weight-medium">{{ item.title }}</v-list-item-title>
+                                    <v-list-item-subtitle v-if="item.author">作者: {{ item.author }}</v-list-item-subtitle>
+                                    <v-list-item-subtitle v-if="item.summary" class="text-caption text-truncate">
+                                        {{ item.summary }}
+                                    </v-list-item-subtitle>
+                                </v-list-item-content>
+                                <template #append v-if="item.cover_link">
+                                    <v-avatar size="40">
+                                        <v-img :src="item.cover_link" alt="封面"></v-img>
+                                    </v-avatar>
+                                </template>
+                            </v-list-item>
+                            
+                            <!-- 未知类型项 -->
+                            <v-list-item
+                                v-else
+                                class="hover:bg-gray-50"
+                            >
+                                <v-list-item-icon>
+                                    <v-icon>mdi-help-circle</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>{{ item.title || '未知项目' }}</v-list-item-title>
                             </v-list-item>
                         </template>
+                        
+                        <!-- 空状态 -->
+                        <div v-if="opdsItems.length === 0" class="text-center py-8">
+                            <v-icon size="48" color="grey">mdi-folder-open-outline</v-icon>
+                            <div class="mt-2 text-gray-600">目录为空</div>
+                        </div>
                     </v-list>
                 </div>
                 
@@ -276,26 +327,94 @@
                             color="primary"
                             size="64"
                         ></v-progress-circular>
-                        <div class="mt-4">正在导入，请稍候...</div>
+                        <div class="mt-4 text-h6">正在导入书籍...</div>
+                        <div class="mt-2 text-body-1">
+                            已导入 {{ opdsImportProgress.done }} / {{ opdsImportProgress.total }} 本
+                        </div>
+                        <v-progress-linear
+                            v-model="opdsImportProgress.percent"
+                            color="primary"
+                            height="20"
+                            class="mt-4"
+                        >
+                            <template #default="{ value }">
+                                <strong>{{ Math.ceil(value) }}%</strong>
+                            </template>
+                        </v-progress-linear>
+                        <div class="mt-4 text-body-2 text-gray-600">
+                            导入完成后会自动关闭此窗口
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 错误状态 -->
+                <div v-else-if="opdsImportState === 'error'">
+                    <div class="text-center py-8">
+                        <v-icon size="64" color="error">mdi-alert-circle</v-icon>
+                        <div class="mt-4 text-h6 text-error">{{ opdsError }}</div>
+                        <div class="mt-4">
+                            <v-btn color="primary" @click="resetOpdsImportState">
+                                返回连接界面
+                            </v-btn>
+                        </div>
                     </div>
                 </div>
             </v-card-text>
-            <v-card-actions v-if="opdsImportState === 'browsing'">
-                <v-spacer />
-                <v-btn
-                    :disabled="loading || selectedOpdsBooks.length === 0"
-                    color="primary"
-                    @click="importSelectedOpdsBooks"
-                >
-                    导入选中书籍
-                </v-btn>
+            <v-card-actions class="flex w-full items-center justify-end gap-2">
+                <!-- 连接状态的按钮 -->
+                <template v-if="opdsImportState === 'connecting'">
+                    <v-btn
+                        :loading="opdsLoading"
+                        color="primary"
+                        @click="connectToOpds"
+                    >
+                        连接
+                    </v-btn>
+                    <v-btn
+                        color="primary"
+                        text
+                        @click="opdsImportDialogVisible = false"
+                    >
+                        关闭
+                    </v-btn>
+                </template>
+                
+                <!-- 浏览状态的按钮 -->
+                <template v-else-if="opdsImportState === 'browsing'">
+                    <v-btn
+                        :disabled="selectedOpdsBooks.length === 0"
+                        color="primary"
+                        @click="importSelectedOpdsBooks"
+                    >
+                        导入选中书籍 ({{ selectedOpdsBooks.length }})
+                    </v-btn>
+                    <v-btn
+                        color="primary"
+                        text
+                        @click="opdsImportDialogVisible = false"
+                    >
+                        关闭
+                    </v-btn>
+                </template>
+                
+                <!-- 导入状态的按钮 -->
+                <template v-else-if="opdsImportState === 'importing'">
+                    <v-btn
+                        color="primary"
+                        text
+                        :loading="opdsImportProgress.done < opdsImportProgress.total"
+                        @click="opdsImportDialogVisible = false"
+                    >
+                        关闭
+                    </v-btn>
+                </template>
             </v-card-actions>
         </v-card>
     </v-dialog>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
@@ -317,12 +436,21 @@ const count_todo = ref(0);
 const count_done = ref(0);
 const delete_after_import = ref(false);
 const opdsImportDialogVisible = ref(false);
-const opdsUrl = ref('');
-const opdsImportState = ref('connecting'); // connecting, browsing, importing
+const opdsHost = ref('');
+const opdsPort = ref('');
+const opdsPath = ref('');
+const opdsImportState = ref('connecting'); // connecting, browsing, importing, error
 const currentOpdsPath = ref('');
 const opdsItems = ref([]);
 const selectedOpdsBooks = ref([]);
 const opdsConnection = ref(null);
+const opdsLoading = ref(false);
+const opdsError = ref('');
+const opdsImportProgress = ref({
+    done: 0,
+    total: 0,
+    percent: 0
+});
 
 const headers = [
     { title: 'ID', key: 'id', sortable: true },
@@ -488,142 +616,230 @@ const delete_record = () => {
 
 const openOpdsImportDialog = () => {
     opdsImportDialogVisible.value = true;
+    resetOpdsImportState();
 };
 
-const connectToOpds = () => {
-    if (!opdsUrl.value) {
-        if ($alert) $alert('error', '请输入 OPDS URL');
+const connectToOpds = async () => {
+    if (!opdsHost.value) {
+        $alert('error', '请输入主机地址');
         return;
     }
 
-    loading.value = true;
-    // 这里应该调用后端接口获取 OPDS 根目录
-    // 暂时模拟数据
-    setTimeout(() => {
-        opdsConnection.value = opdsUrl.value;
-        currentOpdsPath.value = '';
-        // 模拟根目录数据
-        opdsItems.value = [
-            {
-                type: 'folder',
-                title: '科幻小说',
-                path: 'sci-fi'
-            },
-            {
-                type: 'folder',
-                title: '文学经典',
-                path: 'classics'
-            },
-            {
-                type: 'book',
-                id: 1,
-                title: '三体',
-                author: '刘慈欣',
-                href: 'http://example.com/opds/books/1'
-            },
-            {
-                type: 'book',
-                id: 2,
-                title: '流浪地球',
-                author: '刘慈欣',
-                href: 'http://example.com/opds/books/2'
-            }
-        ];
-        opdsImportState.value = 'browsing';
-        loading.value = false;
-    }, 1000);
-};
+    // 验证URL格式
+    if (!opdsHost.value.startsWith('http://') && !opdsHost.value.startsWith('https://')) {
+        $alert('error', '主机地址需要以 http:// 或 https:// 开头');
+        return;
+    }
 
-const navigateToOpdsPath = (path) => {
-    if (path === '') {
-        // 返回根目录
-        currentOpdsPath.value = '';
-        // 模拟根目录数据
-        opdsItems.value = [
-            {
-                type: 'folder',
-                title: '科幻小说',
-                path: 'sci-fi'
-            },
-            {
-                type: 'folder',
-                title: '文学经典',
-                path: 'classics'
-            },
-            {
-                type: 'book',
-                id: 1,
-                title: '三体',
-                author: '刘慈欣',
-                href: 'http://example.com/opds/books/1'
-            },
-            {
-                type: 'book',
-                id: 2,
-                title: '流浪地球',
-                author: '刘慈欣',
-                href: 'http://example.com/opds/books/2'
-            }
-        ];
-    } else {
-        // 导航到子目录
-        currentOpdsPath.value = path;
-        // 模拟子目录数据
-        opdsItems.value = [
-            {
-                type: 'book',
-                id: 3,
-                title: '银河帝国',
-                author: '艾萨克·阿西莫夫',
-                href: 'http://example.com/opds/books/3'
-            },
-            {
-                type: 'book',
-                id: 4,
-                title: '基地',
-                author: '艾萨克·阿西莫夫',
-                href: 'http://example.com/opds/books/4'
-            }
-        ];
+    opdsLoading.value = true;
+    opdsError.value = '';
+    
+    try {
+        // 调用后端API浏览OPDS目录
+        const response = await $backend('/api/admin/opds/browse', {
+            method: 'POST',
+            body: JSON.stringify({
+                host: opdsHost.value,
+                port: opdsPort.value,
+                path: opdsPath.value
+            }),
+        });
+        
+        if (response.err === 'ok') {
+            // 保存连接信息
+            opdsConnection.value = response.current_path;
+            currentOpdsPath.value = opdsPath.value || '';
+            
+            // 处理返回的项目列表
+            opdsItems.value = response.items.map(item => {
+                // 确保每个项目都有id
+                if (!item.id && item.href) {
+                    // 使用href生成一个简单的hash id
+                    item.id = Math.abs(hashCode(item.href));
+                }
+                return item;
+            });
+            
+            // 更新状态
+            opdsImportState.value = 'browsing';
+            $alert('success', '连接成功！');
+        } else {
+            opdsError.value = response.msg || '连接失败，请检查地址是否正确';
+            opdsImportState.value = 'error';
+            $alert('error', opdsError.value);
+        }
+    } catch (error) {
+        opdsError.value = '连接失败：' + (error.message || '请检查地址是否正确');
+        opdsImportState.value = 'error';
+        $alert('error', opdsError.value);
+    } finally {
+        opdsLoading.value = false;
     }
 };
 
-const importSelectedOpdsBooks = () => {
+// 简单的hash函数
+const hashCode = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // 转换为32位整数
+    }
+    return hash;
+};
+
+const navigateToOpdsFolder = async (folder) => {
+    if (!folder.href) {
+        $alert('error', '无法导航：缺少链接地址');
+        return;
+    }
+    
+    opdsLoading.value = true;
+    
+    try {
+        // 解析href获取路径
+        const url = new URL(folder.href);
+        const path = url.pathname;
+        
+        // 调用后端API浏览该路径
+        const response = await $backend('/api/admin/opds/browse', {
+            method: 'POST',
+            body: JSON.stringify({
+                host: opdsHost.value,
+                port: opdsPort.value,
+                path: path
+            }),
+        });
+        
+        if (response.err === 'ok') {
+            currentOpdsPath.value = path;
+            opdsItems.value = response.items.map(item => {
+                if (!item.id && item.href) {
+                    item.id = Math.abs(hashCode(item.href));
+                }
+                return item;
+            });
+        } else {
+            $alert('error', response.msg || '导航失败');
+        }
+    } catch (error) {
+        $alert('error', '导航失败：' + error.message);
+    } finally {
+        opdsLoading.value = false;
+    }
+};
+
+const goBackInOpdsPath = async () => {
+    if (!currentOpdsPath.value) return;
+    
+    // 计算上级目录
+    const pathSegments = currentOpdsPath.value.split('/').filter(segment => segment);
+    pathSegments.pop(); // 移除最后一段
+    const parentPath = '/' + pathSegments.join('/');
+    
+    opdsLoading.value = true;
+    
+    try {
+        const response = await $backend('/api/admin/opds/browse', {
+            method: 'POST',
+            body: JSON.stringify({
+                host: opdsHost.value,
+                port: opdsPort.value,
+                path: parentPath
+            }),
+        });
+        
+        if (response.err === 'ok') {
+            currentOpdsPath.value = parentPath;
+            opdsItems.value = response.items.map(item => {
+                if (!item.id && item.href) {
+                    item.id = Math.abs(hashCode(item.href));
+                }
+                return item;
+            });
+        } else {
+            $alert('error', response.msg || '返回上级目录失败');
+        }
+    } catch (error) {
+        $alert('error', '返回上级目录失败：' + error.message);
+    } finally {
+        opdsLoading.value = false;
+    }
+};
+
+const importSelectedOpdsBooks = async () => {
     if (selectedOpdsBooks.value.length === 0) {
-        if ($alert) $alert('error', '请至少选择一本书籍');
+        $alert('error', '请至少选择一本书籍');
         return;
     }
 
-    loading.value = true;
+    // 确认导入
+    if (!confirm(`确定要导入选中的 ${selectedOpdsBooks.value.length} 本书籍吗？`)) {
+        return;
+    }
+
+    opdsLoading.value = true;
     opdsImportState.value = 'importing';
     
-    // 调用后端接口导入选中的书籍
-    $backend('/api/admin/opds/import', {
-        method: 'POST',
-        body: JSON.stringify({
-            opds_url: opdsConnection.value,
-            books: selectedOpdsBooks.value.map(book => ({
-                id: book.id,
-                title: book.title,
-                author: book.author,
-                href: book.href
-            }))
-        }),
-    })
-        .then((rsp) => {
-            if (rsp.err != 'ok') {
-                if ($alert) $alert('error', rsp.msg);
-            } else {
-                if ($alert) $alert('info', rsp.msg);
-                // 导入成功后关闭弹窗
-                opdsImportDialogVisible.value = false;
-                // 重置状态
-                resetOpdsImportState();
-            }
-        })
-        .finally(() => {
-            loading.value = false;
+    // 初始化导入进度
+    opdsImportProgress.value = {
+        done: 0,
+        total: selectedOpdsBooks.value.length,
+        percent: 0
+    };
+    
+    try {
+        // 调用后端API导入选中的书籍
+        const response = await $backend('/api/admin/opds/import', {
+            method: 'POST',
+            body: JSON.stringify({
+                opds_url: opdsConnection.value,
+                books: selectedOpdsBooks.value.map(book => ({
+                    id: book.id,
+                    title: book.title,
+                    author: book.author,
+                    href: book.href
+                }))
+            }),
         });
+        
+        if (response.err === 'ok') {
+            $alert('success', `开始导入 ${selectedOpdsBooks.value.length} 本书籍，请稍后在导入记录中查看进度`);
+            
+            // 启动进度检查
+            checkOpdsImportProgress();
+        } else {
+            $alert('error', response.msg || '导入失败');
+            opdsImportState.value = 'browsing';
+        }
+    } catch (error) {
+        $alert('error', '导入失败：' + error.message);
+        opdsImportState.value = 'browsing';
+    } finally {
+        opdsLoading.value = false;
+    }
+};
+
+const checkOpdsImportProgress = () => {
+    // 这里可以调用后端API检查导入进度
+    // 由于后端可能没有实时进度API，我们使用模拟进度
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += 10;
+        opdsImportProgress.value.done = Math.floor(progress / 100 * opdsImportProgress.value.total);
+        opdsImportProgress.value.percent = progress;
+        
+        if (progress >= 100) {
+            clearInterval(interval);
+            setTimeout(() => {
+                $alert('success', '书籍导入完成！');
+                // 导入完成后关闭窗口
+                opdsImportDialogVisible.value = false;
+                // 刷新主列表
+                getDataFromApi();
+            }, 1000);
+        }
+    }, 500);
 };
 
 const resetOpdsImportState = () => {
@@ -632,6 +848,16 @@ const resetOpdsImportState = () => {
     opdsItems.value = [];
     selectedOpdsBooks.value = [];
     opdsConnection.value = null;
+    opdsHost.value = '';
+    opdsPort.value = '';
+    opdsPath.value = '';
+    opdsError.value = '';
+    opdsLoading.value = false;
+    opdsImportProgress.value = {
+        done: 0,
+        total: 0,
+        percent: 0
+    };
 };
 
 onMounted(() => {
@@ -642,3 +868,12 @@ useHead({
     title: '导入图书'
 });
 </script>
+
+<style scoped>
+.cursor-pointer {
+    cursor: pointer;
+}
+.hover\:bg-gray-50:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+</style>

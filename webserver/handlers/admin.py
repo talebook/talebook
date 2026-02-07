@@ -608,25 +608,102 @@ class AdminBookDelete(BaseHandler):
         return {"err": "ok", "msg": _(u"成功删除 {0} 本书籍".format(deleted_count))}
 
 
-class AdminOPDSImport(BaseHandler):
+class AdminOPDSBrowse(BaseHandler):
+    """OPDS目录浏览接口"""
+    
     @js
     @is_admin
     def post(self):
-        req = tornado.escape.json_decode(self.request.body)
-        opds_url = req.get("opds_url", "")
-        books = req.get("books", [])
-        
-        if not opds_url:
-            return {"err": "params.error", "msg": _(u"参数错误，OPDS URL不能为空")}
+        try:
+            req = tornado.escape.json_decode(self.request.body)
+            host = req.get("host", "")
+            port = req.get("port", "")
+            path = req.get("path", "")
+            
+            if not host:
+                return {"err": "params.error", "msg": _(u"参数错误，主机地址不能为空")}
+            
+            logging.info(f"OPDS浏览请求: host={host}, port={port}, path={path}")
+            
+            # 创建OPDS导入服务实例
+            opds_service = OPDSImportService()
+            
+            # 浏览目录
+            result = opds_service.browse_opds_catalog(host, port, path)
+            
+            if result.get('success'):
+                return {
+                    "err": "ok", 
+                    "items": result['items'],
+                    "current_path": result['current_path']
+                }
+            else:
+                return {
+                    "err": "error",
+                    "msg": result.get('error', _(u"浏览目录失败"))
+                }
+                
+        except Exception as e:
+            logging.error(f"OPDS目录浏览失败: {e}")
+            logging.error(traceback.format_exc())
+            return {"err": "error", "msg": _(u"浏览目录失败: {}").format(str(e))}
 
-        # 启动 OPDS 导入服务
-        if books:
-            # 导入指定的书籍
-            OPDSImportService().do_import(opds_url, self.user_id(), books=books)
-        else:
-            # 导入整个 OPDS 源
-            OPDSImportService().do_import(opds_url, self.user_id())
-        return {"err": "ok", "msg": _(u"开始从 OPDS 导入")}
+
+class AdminOPDSImportStatus(BaseHandler):
+    """OPDS导入状态查询接口"""
+    
+    @js
+    @is_admin
+    def get(self):
+        # 这里可以返回 OPDS 导入的状态
+        opds_service = OPDSImportService()
+        status = {
+            "total": opds_service.count_total,
+            "done": opds_service.count_done,
+            "skip": opds_service.count_skip,
+            "fail": opds_service.count_fail,
+        }
+        return {"err": "ok", "msg": "ok", "status": status}
+
+
+class AdminOPDSImport(BaseHandler):
+    """OPDS导入接口"""
+    
+    @js
+    @is_admin
+    def post(self):
+        try:
+            req = tornado.escape.json_decode(self.request.body)
+            opds_url = req.get("opds_url", "")
+            books = req.get("books", [])
+            delete_after = req.get("delete_after", False)
+            
+            if not opds_url:
+                return {"err": "params.error", "msg": _(u"参数错误，OPDS URL不能为空")}
+
+            logging.info(f"OPDS导入请求: url={opds_url}, books={len(books)}本, delete_after={delete_after}")
+            
+            # 启动 OPDS 导入服务
+            if books:
+                # 导入指定的书籍
+                OPDSImportService().do_import(
+                    opds_url,
+                    self.user_id(),
+                    delete_after=delete_after,
+                    books=books
+                )
+                msg = _(u"开始从 OPDS 导入选中的 {} 本书籍").format(len(books))
+            else:
+                # 导入整个 OPDS 源
+                OPDSImportService().do_import(opds_url, self.user_id(), delete_after=delete_after)
+                msg = _(u"开始从 OPDS 导入所有书籍")
+                
+            return {"err": "ok", "msg": msg}
+            
+        except Exception as e:
+            logging.error(f"OPDS导入失败: {e}")
+            logging.error(traceback.format_exc())
+            return {"err": "error", "msg": _(u"OPDS导入失败: {}").format(str(e))}
 
     @js
     @is_admin
@@ -645,5 +722,7 @@ def routes():
         (r"/api/admin/book/list", AdminBookList),
         (r"/api/admin/book/fill", AdminBookFill),
         (r"/api/admin/book/delete", AdminBookDelete),
+        (r"/api/admin/opds/browse", AdminOPDSBrowse),
         (r"/api/admin/opds/import", AdminOPDSImport),
+        (r"/api/admin/opds/import/status", AdminOPDSImportStatus),
     ]
