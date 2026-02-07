@@ -25,7 +25,7 @@ CONF = loader.get_settings()
 
 class OPDSImportService(AsyncService):
     def __init__(self):
-        super().__init__(name="opds_import")
+        super().__init__()
         self.count_total = 0
         self.count_done = 0
         self.count_skip = 0
