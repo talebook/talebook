@@ -327,7 +327,7 @@
                             color="primary"
                             size="64"
                         ></v-progress-circular>
-                        <div class="mt-4 text-h6">正在导入书籍...</div>
+                        <div class="mt-4 text-h6">正在导入书籍到待处理列表...</div>
                         <div class="mt-2 text-body-1">
                             已导入 {{ opdsImportProgress.done }} / {{ opdsImportProgress.total }} 本
                         </div>
@@ -341,8 +341,47 @@
                                 <strong>{{ Math.ceil(value) }}%</strong>
                             </template>
                         </v-progress-linear>
-                        <div class="mt-4 text-body-2 text-gray-600">
-                            导入完成后会自动关闭此窗口
+                        <div class="mt-4">
+                            <v-alert type="info" variant="tonal" class="text-left">
+                                <div class="text-body-2">
+                                    <v-icon color="info" size="small">mdi-information</v-icon>
+                                    导入的书籍会自动添加到"待处理"列表
+                                </div>
+                                <div class="text-body-2 mt-1">
+                                    导入完成后，您需要在主界面上点击"扫描书籍"按钮来识别这些书籍
+                                </div>
+                            </v-alert>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 导入完成界面 -->
+                <div v-else-if="opdsImportState === 'completed'">
+                    <div class="text-center py-8">
+                        <v-icon size="64" color="success">mdi-check-circle</v-icon>
+                        <div class="mt-4 text-h6 text-success">导入完成！</div>
+                        <div class="mt-2 text-body-1">
+                            成功导入 {{ opdsImportResult.done }} 本书籍到待处理列表
+                        </div>
+                        <div v-if="opdsImportResult.fail > 0" class="mt-2 text-body-1 text-warning">
+                            失败 {{ opdsImportResult.fail }} 本
+                        </div>
+                        <div class="mt-4">
+                            <v-alert type="success" variant="tonal" class="text-left">
+                                <div class="text-body-2">
+                                    <v-icon color="success" size="small">mdi-check</v-icon>
+                                    书籍已成功添加到扫描目录
+                                </div>
+                                <div class="text-body-2 mt-1">
+                                    接下来请：
+                                    <ol class="mt-2 pl-4">
+                                        <li>关闭此窗口</li>
+                                        <li>在主界面上点击"扫描书籍"按钮</li>
+                                        <li>在"待处理"列表中查看导入的书籍</li>
+                                        <li>选择要导入的书籍并点击"导入"</li>
+                                    </ol>
+                                </div>
+                            </v-alert>
                         </div>
                     </div>
                 </div>
@@ -402,10 +441,29 @@
                     <v-btn
                         color="primary"
                         text
-                        :loading="opdsImportProgress.done < opdsImportProgress.total"
-                        @click="opdsImportDialogVisible = false"
+                        disabled
                     >
-                        关闭
+                        正在导入...
+                    </v-btn>
+                </template>
+                
+                <!-- 完成状态的按钮 -->
+                <template v-else-if="opdsImportState === 'completed'">
+                    <v-btn
+                        color="primary"
+                        @click="handleOpdsImportComplete"
+                    >
+                        完成
+                    </v-btn>
+                </template>
+                
+                <!-- 错误状态的按钮 -->
+                <template v-else-if="opdsImportState === 'error'">
+                    <v-btn
+                        color="primary"
+                        @click="resetOpdsImportState"
+                    >
+                        返回连接界面
                     </v-btn>
                 </template>
             </v-card-actions>
@@ -439,7 +497,7 @@ const opdsImportDialogVisible = ref(false);
 const opdsHost = ref('');
 const opdsPort = ref('');
 const opdsPath = ref('');
-const opdsImportState = ref('connecting'); // connecting, browsing, importing, error
+const opdsImportState = ref('connecting'); // connecting, browsing, importing, completed, error
 const currentOpdsPath = ref('');
 const opdsItems = ref([]);
 const selectedOpdsBooks = ref([]);
@@ -450,6 +508,10 @@ const opdsImportProgress = ref({
     done: 0,
     total: 0,
     percent: 0
+});
+const opdsImportResult = ref({
+    done: 0,
+    fail: 0
 });
 
 const headers = [
@@ -552,6 +614,10 @@ const scan_books = () => {
             count_todo.value = rsp.summary.todo;
             if (scan_status.value.new === 0) {
                 loading.value = false;
+                // 扫描完成后提示用户
+                if (scan_status.value.new === 0 && scan_status.value.total > 0) {
+                    $alert('success', '扫描完成！请查看"待处理"列表中的书籍。');
+                }
                 return false;
             }
             loading.value = true;
@@ -774,7 +840,7 @@ const importSelectedOpdsBooks = async () => {
     }
 
     // 确认导入
-    if (!confirm(`确定要导入选中的 ${selectedOpdsBooks.value.length} 本书籍吗？`)) {
+    if (!confirm(`确定要导入选中的 ${selectedOpdsBooks.value.length} 本书籍吗？\n\n导入的书籍将添加到"待处理"列表中，您需要手动进行扫描和导入操作。`)) {
         return;
     }
 
@@ -804,17 +870,27 @@ const importSelectedOpdsBooks = async () => {
         });
         
         if (response.err === 'ok') {
-            $alert('success', `开始导入 ${selectedOpdsBooks.value.length} 本书籍，请稍后在导入记录中查看进度`);
+            // 更新导入结果
+            opdsImportResult.value = {
+                done: response.total || selectedOpdsBooks.value.length,
+                fail: 0
+            };
             
-            // 启动进度检查
-            checkOpdsImportProgress();
+            // 显示完成界面
+            opdsImportState.value = 'completed';
+            opdsImportProgress.value.percent = 100;
+            opdsImportProgress.value.done = opdsImportResult.value.done;
+            
+            // 自动刷新主列表
+            getDataFromApi();
         } else {
             $alert('error', response.msg || '导入失败');
             opdsImportState.value = 'browsing';
         }
     } catch (error) {
         $alert('error', '导入失败：' + error.message);
-        opdsImportState.value = 'browsing';
+        opdsImportState.value = 'error';
+        opdsError.value = '导入失败：' + error.message;
     } finally {
         opdsLoading.value = false;
     }
@@ -842,6 +918,20 @@ const checkOpdsImportProgress = () => {
     }, 500);
 };
 
+const handleOpdsImportComplete = () => {
+    // 关闭窗口并重置状态
+    opdsImportDialogVisible.value = false;
+    
+    // 提示用户进行扫描
+    $alert('info', 'OPDS书籍已添加到扫描目录，请点击"扫描书籍"按钮进行识别。');
+    
+    // 重置状态
+    resetOpdsImportState();
+    
+    // 刷新主列表
+    getDataFromApi();
+};
+
 const resetOpdsImportState = () => {
     opdsImportState.value = 'connecting';
     currentOpdsPath.value = '';
@@ -857,6 +947,10 @@ const resetOpdsImportState = () => {
         done: 0,
         total: 0,
         percent: 0
+    };
+    opdsImportResult.value = {
+        done: 0,
+        fail: 0
     };
 };
 

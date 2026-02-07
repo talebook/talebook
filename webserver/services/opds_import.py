@@ -1,3 +1,5 @@
+# webserver/services/opds_import.py
+
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
@@ -6,6 +8,8 @@ import os
 import tempfile
 import traceback
 import urllib.parse
+import hashlib
+import shutil
 from datetime import datetime
 from gettext import gettext as _
 
@@ -26,6 +30,7 @@ class OPDSImportService(AsyncService):
         self.count_done = 0
         self.count_skip = 0
         self.count_fail = 0
+        self.scan_dir = CONF.get("scan_upload_path", "/data/books/imports/")
 
     def browse_opds_catalog(self, host, port=None, path=''):
         """浏览OPDS目录结构"""
@@ -64,13 +69,14 @@ class OPDSImportService(AsyncService):
         try:
             if books:
                 # 导入指定的书籍
-                self.import_selected_books(opds_url, user_id, delete_after, books)
+                return self.import_selected_books(opds_url, user_id, delete_after, books)
             else:
                 # 导入整个OPDS源
-                self.import_from_opds(opds_url, user_id, delete_after)
+                return self.import_from_opds(opds_url, user_id, delete_after)
         except Exception as e:
             logging.error(traceback.format_exc())
             logging.error(f"OPDS导入失败: {e}")
+            return {"err": "error", "msg": str(e)}
 
     def reset_counters(self):
         """重置计数器"""
@@ -88,7 +94,7 @@ class OPDSImportService(AsyncService):
             catalog_data = self.fetch_opds_catalog(opds_url)
             if not catalog_data:
                 logging.error("无法获取OPDS目录")
-                return
+                return {"err": "error", "msg": "无法获取OPDS目录"}
 
             # 解析OPDS目录
             books = self.parse_opds_catalog(catalog_data)
@@ -96,18 +102,29 @@ class OPDSImportService(AsyncService):
             logging.info(f"找到 {self.count_total} 本书籍")
 
             # 导入每本书
+            imported_files = []
             for book in books:
                 try:
-                    self.import_book(book, user_id, delete_after)
-                    self.count_done += 1
+                    result = self.import_book_to_scan(book, user_id)
+                    if result:
+                        imported_files.append(result)
+                        self.count_done += 1
+                    else:
+                        self.count_skip += 1
                 except Exception as e:
                     logging.error(f"导入书籍失败: {book.get('title', '未知')}, 错误: {e}")
                     self.count_fail += 1
 
-            logging.info(f"OPDS导入完成: 总计 {self.count_total}, 成功 {self.count_done}, 失败 {self.count_fail}")
+            logging.info(f"OPDS导入完成: 总计 {self.count_total}, 成功 {self.count_done}, 跳过 {self.count_skip}, 失败 {self.count_fail}")
+            return {
+                "err": "ok", 
+                "msg": f"成功添加 {self.count_done} 本书籍到待处理列表",
+                "imported_files": imported_files
+            }
         except Exception as e:
             logging.error(traceback.format_exc())
             logging.error(f"OPDS导入过程中出错: {e}")
+            return {"err": "error", "msg": str(e)}
 
     def fetch_opds_catalog(self, url):
         """获取OPDS目录内容"""
@@ -321,36 +338,68 @@ class OPDSImportService(AsyncService):
 
         return books
 
-    def import_book(self, book, user_id=None, delete_after=False):
-        """导入单本书籍"""
-        logging.info(f"导入书籍: {book.get('title')} - {book.get('author')}")
-        
-        # 下载书籍文件
-        file_path = self.download_book(book)
-        if not file_path:
-            logging.error(f"无法下载书籍: {book.get('title')}")
-            return
-
-        # 这里可以调用现有的导入逻辑
-        # 例如，将文件移动到扫描目录，然后触发扫描
-        # 或者直接调用导入服务
-        
-        # 暂时只是记录日志
-        logging.info(f"书籍下载完成: {file_path}")
+    def import_book_to_scan(self, book, user_id=None):
+        """导入单本书籍到扫描目录"""
+        try:
+            title = book.get('title', '未知书籍')
+            author = book.get('author', '未知作者')
+            logging.info(f"导入书籍到扫描目录: {title} - {author}")
+            
+            # 下载书籍文件
+            file_path = self.download_book(book)
+            if not file_path:
+                logging.error(f"无法下载书籍: {title}")
+                return None
+            
+            # 生成目标文件名
+            safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
+            format_ = book.get('format', 'epub')
+            target_filename = f"opds_{safe_title}.{format_}"
+            target_path = os.path.join(self.scan_dir, target_filename)
+            
+            # 确保文件名唯一
+            counter = 1
+            while os.path.exists(target_path):
+                target_filename = f"opds_{safe_title}_{counter}.{format_}"
+                target_path = os.path.join(self.scan_dir, target_filename)
+                counter += 1
+            
+            # 移动文件到扫描目录
+            shutil.move(file_path, target_path)
+            logging.info(f"书籍已移动到扫描目录: {target_path}")
+            
+            # 创建扫描记录（如果需要）
+            # 这里假设系统会自动扫描扫描目录中的新文件
+            
+            return {
+                'title': title,
+                'author': author,
+                'filename': target_filename,
+                'path': target_path
+            }
+            
+        except Exception as e:
+            logging.error(f"导入书籍到扫描目录失败: {e}")
+            return None
 
     def import_selected_books(self, opds_url, user_id=None, delete_after=False, books=None):
         """导入用户选中的书籍"""
         logging.info(f"开始导入选中的书籍: {len(books)}本")
         
         self.count_total = len(books)
+        imported_files = []
         
         for book_info in books:
             try:
                 # 获取书籍的详细信息和下载链接
                 book_data = self.get_book_details(book_info['href'])
                 if book_data:
-                    self.import_book(book_data, user_id, delete_after)
-                    self.count_done += 1
+                    result = self.import_book_to_scan(book_data, user_id)
+                    if result:
+                        imported_files.append(result)
+                        self.count_done += 1
+                    else:
+                        self.count_skip += 1
                 else:
                     logging.error(f"无法获取书籍详情: {book_info.get('title', '未知')}")
                     self.count_fail += 1
@@ -358,7 +407,13 @@ class OPDSImportService(AsyncService):
                 logging.error(f"导入书籍失败: {book_info.get('title', '未知')}, 错误: {e}")
                 self.count_fail += 1
 
-        logging.info(f"OPDS导入完成: 总计 {self.count_total}, 成功 {self.count_done}, 失败 {self.count_fail}")
+        logging.info(f"OPDS导入完成: 总计 {self.count_total}, 成功 {self.count_done}, 跳过 {self.count_skip}, 失败 {self.count_fail}")
+        
+        return {
+            "err": "ok", 
+            "msg": f"成功添加 {self.count_done} 本书籍到待处理列表",
+            "imported_files": imported_files
+        }
 
     def get_book_details(self, book_url):
         """获取书籍的详细信息"""
@@ -419,8 +474,15 @@ class OPDSImportService(AsyncService):
             format_ = book.get('format', 'epub')
             safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
             temp_dir = tempfile.gettempdir()
-            file_name = f"{safe_title}.{format_}"
+            file_name = f"opds_{safe_title}.{format_}"
             file_path = os.path.join(temp_dir, file_name)
+
+            # 确保文件名唯一
+            counter = 1
+            while os.path.exists(file_path):
+                file_name = f"opds_{safe_title}_{counter}.{format_}"
+                file_path = os.path.join(temp_dir, file_name)
+                counter += 1
 
             # 下载文件
             logging.info(f"下载书籍文件: {url} 到 {file_path}")
