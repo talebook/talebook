@@ -70,9 +70,9 @@
                     <v-card-text v-if="socials && socials.length > 0">
                         <v-divider />
                         <div align="center">
-                            <br />
+                            <br>
                             <small>使用社交网络账号登录</small>
-                            <br />
+                            <br>
                             <template
                                 v-for="s in socials"
                                 :key="s.text"

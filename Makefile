@@ -58,3 +58,5 @@ down:
 dev: build
 	docker-compose -f dev.yml up
 
+dev-ui:
+	cd app && npm run dev

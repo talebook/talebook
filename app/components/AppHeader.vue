@@ -151,7 +151,9 @@
                         </template>
                         <v-list min-width="240">
                             <v-list-item>
-                                <v-list-item-title class="text-center">本功能尚未加入</v-list-item-title>
+                                <v-list-item-title class="text-center">
+                                    本功能尚未加入
+                                </v-list-item-title>
                             </v-list-item>
                         </v-list>
                     </v-menu>
@@ -242,7 +244,9 @@
                         </template>
                         <v-list min-width="240">
                             <v-list-item>
-                                <v-list-item-title class="text-center">本功能尚未加入</v-list-item-title>
+                                <v-list-item-title class="text-center">
+                                    本功能尚未加入
+                                </v-list-item-title>
                             </v-list-item>
                         </v-list>
                     </v-menu>
