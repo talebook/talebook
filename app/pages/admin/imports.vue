@@ -702,7 +702,7 @@ const connectToOpds = async () => {
     
     try {
         // 调用后端API浏览OPDS目录
-        const response = await $backend('/api/admin/opds/browse', {
+        const response = await $backend('/admin/opds/browse', {
             method: 'POST',
             body: JSON.stringify({
                 host: opdsHost.value,
@@ -768,7 +768,7 @@ const navigateToOpdsFolder = async (folder) => {
         const path = url.pathname;
         
         // 调用后端API浏览该路径
-        const response = await $backend('/api/admin/opds/browse', {
+        const response = await $backend('/admin/opds/browse', {
             method: 'POST',
             body: JSON.stringify({
                 host: opdsHost.value,
@@ -806,7 +806,7 @@ const goBackInOpdsPath = async () => {
     opdsLoading.value = true;
     
     try {
-        const response = await $backend('/api/admin/opds/browse', {
+        const response = await $backend('/admin/opds/browse', {
             method: 'POST',
             body: JSON.stringify({
                 host: opdsHost.value,
@@ -856,7 +856,7 @@ const importSelectedOpdsBooks = async () => {
     
     try {
         // 调用后端API导入选中的书籍
-        const response = await $backend('/api/admin/opds/import', {
+        const response = await $backend('/admin/opds/import', {
             method: 'POST',
             body: JSON.stringify({
                 opds_url: opdsConnection.value,
