@@ -143,7 +143,9 @@ class OPDSImportService(AsyncService):
     def parse_opds_navigation(self, catalog_data, base_url):
         """解析OPDS导航目录，返回文件夹和书籍列表"""
         try:
-            root = etree.fromstring(catalog_data)
+            # 使用更宽松的XML解析器，忽略一些语法错误
+            parser = etree.XMLParser(recover=True)
+            root = etree.fromstring(catalog_data, parser)
             ns = {
                 'atom': 'http://www.w3.org/2005/Atom',
                 'dc': 'http://purl.org/dc/terms/',
@@ -162,6 +164,16 @@ class OPDSImportService(AsyncService):
                 nav_links = entry.xpath('atom:link[@rel="subsection" or @rel="http://opds-spec.org/crawlable" or @rel="collection"]', namespaces=ns)
                 if nav_links:
                     item_type = 'folder'
+                else:
+                    # 检查没有rel属性但type属性包含opds或atom的链接（用于识别Talebook的导航条目）
+                    type_links = entry.xpath('atom:link[not(@rel) and (contains(@type, "opds") or contains(@type, "atom"))]', namespaces=ns)
+                    if type_links:
+                        item_type = 'folder'
+                
+                # 检查是否是书籍（有acquisition链接）
+                acquisition_links = entry.xpath('atom:link[@rel="http://opds-spec.org/acquisition"]', namespaces=ns)
+                if acquisition_links:
+                    item_type = 'book'
                 
                 # 获取标题
                 title_elem = entry.find('atom:title', namespaces=ns)
@@ -192,7 +204,7 @@ class OPDSImportService(AsyncService):
                         
                         if item_type == 'folder':
                             # 对于文件夹，使用导航链接
-                            if rel in ['subsection', 'http://opds-spec.org/crawlable', 'collection']:
+                            if rel in ['subsection', 'http://opds-spec.org/crawlable', 'collection'] or not rel:
                                 href = link_href
                                 break
                         else:
@@ -218,9 +230,20 @@ class OPDSImportService(AsyncService):
                 
                 # 提取摘要
                 summary = ""
+                # 先尝试从summary标签中提取
                 summary_elem = entry.find('atom:summary', namespaces=ns)
                 if summary_elem is not None and summary_elem.text:
                     summary = summary_elem.text
+                else:
+                    # 如果没有summary标签，尝试从content标签中提取
+                    content_elem = entry.find('atom:content', namespaces=ns)
+                    if content_elem is not None and content_elem.text:
+                        summary = content_elem.text
+                    elif content_elem is not None and content_elem.get('type') == 'xhtml':
+                        # 处理xhtml格式的content
+                        div_elem = content_elem.find('.//div', namespaces=ns)
+                        if div_elem is not None and div_elem.text:
+                            summary = div_elem.text
                 
                 # 构建项目信息
                 item_info = {
@@ -293,7 +316,9 @@ class OPDSImportService(AsyncService):
         """解析OPDS目录，提取书籍信息（用于批量导入）"""
         books = []
         try:
-            root = etree.fromstring(catalog_data)
+            # 使用更宽松的XML解析器，忽略一些语法错误
+            parser = etree.XMLParser(recover=True)
+            root = etree.fromstring(catalog_data, parser)
             ns = {
                 'atom': 'http://www.w3.org/2005/Atom',
                 'dc': 'http://purl.org/dc/terms/',
@@ -422,7 +447,9 @@ class OPDSImportService(AsyncService):
             if not catalog_data:
                 return None
             
-            root = etree.fromstring(catalog_data)
+            # 使用更宽松的XML解析器，忽略一些语法错误
+            parser = etree.XMLParser(recover=True)
+            root = etree.fromstring(catalog_data, parser)
             ns = {
                 'atom': 'http://www.w3.org/2005/Atom',
                 'dc': 'http://purl.org/dc/terms/',
