@@ -1305,8 +1305,44 @@ const importSelectedOpdsBooks = async () => {
         percent: 0
     };
     
+    // 轮询间隔（毫秒）
+    const pollInterval = 2000;
+    let pollTimer = null;
+    
+    const pollImportStatus = async () => {
+        try {
+            const statusResp = await $backend('/admin/opds/import/status');
+            if (statusResp.err === 'ok' && statusResp.status) {
+                const { total, done, skip, fail } = statusResp.status;
+                // 更新进度
+                opdsImportProgress.value.total = total || selectedOpdsBooks.value.length;
+                opdsImportProgress.value.done = done || 0;
+                opdsImportProgress.value.percent = total > 0 ? Math.round((done / total) * 100) : 0;
+                
+                // 如果导入完成（done >= total 或 total > 0 且 done + skip + fail >= total）
+                const completed = (total > 0 && (done + skip + fail >= total)) || 
+                                  (total === 0 && done > 0);
+                if (completed) {
+                    clearInterval(pollTimer);
+                    opdsImportResult.value = {
+                        done: done,
+                        fail: fail
+                    };
+                    opdsImportState.value = 'completed';
+                    opdsImportProgress.value.percent = 100;
+                    opdsImportProgress.value.done = done;
+                    // 自动刷新主列表
+                    getDataFromApi();
+                    opdsLoading.value = false;
+                }
+            }
+        } catch (error) {
+            console.warn('轮询导入状态失败:', error);
+        }
+    };
+    
     try {
-        // 调用后端API导入选中的书籍
+        // 调用后端API导入选中的书籍（异步）
         const response = await $backend('/admin/opds/import', {
             method: 'POST',
             body: JSON.stringify({
@@ -1321,29 +1357,21 @@ const importSelectedOpdsBooks = async () => {
         });
         
         if (response.err === 'ok') {
-            // 更新导入结果
-            opdsImportResult.value = {
-                done: response.done || selectedOpdsBooks.value.length,
-                fail: response.fail || 0
-            };
-            
-            // 显示完成界面
-            opdsImportState.value = 'completed';
-            opdsImportProgress.value.percent = 100;
-            opdsImportProgress.value.done = opdsImportResult.value.done;
-            
-            // 自动刷新主列表
-            getDataFromApi();
+            // 启动轮询
+            pollTimer = setInterval(pollImportStatus, pollInterval);
+            // 立即轮询一次
+            setTimeout(pollImportStatus, 500);
         } else {
             $alert('error', response.msg || '导入失败');
             opdsImportState.value = 'browsing';
+            opdsLoading.value = false;
         }
     } catch (error) {
         $alert('error', '导入失败：' + error.message);
         opdsImportState.value = 'error';
         opdsError.value = '导入失败：' + error.message;
-    } finally {
         opdsLoading.value = false;
+        if (pollTimer) clearInterval(pollTimer);
     }
 };
 

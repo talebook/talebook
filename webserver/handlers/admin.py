@@ -655,8 +655,9 @@ class AdminOPDSImportStatus(BaseHandler):
     @js
     @is_admin
     def get(self):
-        # 这里可以返回 OPDS 导入的状态
-        opds_service = OPDSImportService()
+        # 返回全局导入状态（单例模式）
+        from webserver.services.opds_import import OPDSImportService
+        opds_service = OPDSImportService.get_instance()
         status = {
             "total": opds_service.count_total,
             "done": opds_service.count_done,
@@ -683,22 +684,27 @@ class AdminOPDSImport(BaseHandler):
 
             logging.info(f"OPDS导入请求: url={opds_url}, books={len(books)}本, delete_after={delete_after}")
             
-            # 启动 OPDS 导入服务
+            # 启动异步导入任务
+            import threading
+            def import_task():
+                from webserver.services.opds_import import OPDSImportService
+                opds_service = OPDSImportService.get_instance()
+                opds_service.reset_counters()
+                if books:
+                    opds_service.import_selected_books(opds_url, self.user_id(), delete_after, books)
+                else:
+                    opds_service.import_from_opds(opds_url, self.user_id(), delete_after)
+            
+            thread = threading.Thread(target=import_task, daemon=True)
+            thread.start()
+            
+            # 立即返回，避免阻塞HTTP请求
             if books:
-                # 导入指定的书籍
-                OPDSImportService().do_import(
-                    opds_url,
-                    self.user_id(),
-                    delete_after=delete_after,
-                    books=books
-                )
-                msg = _(u"开始从 OPDS 导入选中的 {} 本书籍").format(len(books))
+                msg = _(u"已开始异步导入选中的 {} 本书籍，请稍后查看进度").format(len(books))
             else:
-                # 导入整个 OPDS 源
-                OPDSImportService().do_import(opds_url, self.user_id(), delete_after=delete_after)
-                msg = _(u"开始从 OPDS 导入所有书籍")
+                msg = _(u"已开始异步导入所有书籍，请稍后查看进度")
                 
-            return {"err": "ok", "msg": msg}
+            return {"err": "ok", "msg": msg, "async": True}
             
         except Exception as e:
             logging.error(f"OPDS导入失败: {e}")

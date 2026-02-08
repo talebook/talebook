@@ -25,6 +25,17 @@ CONF = loader.get_settings()
 
 
 class OPDSImportService(AsyncService):
+    _instance = None
+    _instance_lock = threading.Lock()
+    
+    @classmethod
+    def get_instance(cls):
+        """获取单例实例"""
+        with cls._instance_lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+    
     def __init__(self):
         super().__init__()
         self.count_total = 0
