@@ -123,6 +123,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
 import AppFooter from '~/components/AppFooter.vue';
@@ -145,9 +146,10 @@ const name = ref(null);
 const novelContent = ref('');
 const selected = ref(-1);
 const loading = ref(true);
+const { t } = useI18n();
 const tip = reactive({
-    title: '正在解析',
-    content: '正在解析目录，请稍后...'
+    title: t('messages.parsing'),
+    content: t('messages.parsingContent')
 });
 
 let intvl = null;

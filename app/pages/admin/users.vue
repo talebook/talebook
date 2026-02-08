@@ -2,7 +2,7 @@
 <template>
     <v-card>
         <v-card-title class="d-flex justify-space-between align-center">
-            <span> 用户管理 </span>
+            <span> {{ $t('messages.userManagement') }} </span>
             <div>
                 <v-btn
                     color="primary"
@@ -12,16 +12,16 @@
                     <v-icon start>
                         mdi-account-group
                     </v-icon>
-                    访客权限
-                </v-btn>
-                <v-btn
-                    color="primary"
-                    @click="showAddDialog = true"
-                >
-                    <v-icon start>
-                        mdi-plus
-                    </v-icon>
-                    添加用户
+                    {{ $t('messages.guestPermission') }}
+                        <v-btn
+                            color="primary"
+                            size="small"
+                            v-bind="props"
+                        >
+                            {{ t('actions.more') }} <v-icon size="small">
+                                mdi-dots-vertical
+                            </v-icon>
+                        </v-btn>
                 </v-btn>
             </div>
         </v-card-title>
@@ -32,7 +32,7 @@
             max-width="500px"
         >
             <v-card>
-                <v-card-title> 添加新用户 </v-card-title>
+                <v-card-title> {{ $t('messages.addNewUser') }} </v-card-title>
                 <v-card-text>
                     <v-form
                         ref="addUserForm"
@@ -41,57 +41,57 @@
                         <!-- 基本信息 -->
                         <v-text-field
                             v-model="newUser.username"
-                            label="用户名"
+                            :label="$t('messages.username')"
                             :rules="[requiredRule, usernameRule]"
                             required
                             prepend-icon="mdi-account"
-                            placeholder="请输入用户名，小写字母开头"
+                            :placeholder="$t('messages.usernamePlaceholder')"
                         />
                         
                         <v-text-field
                             v-model="newUser.password"
-                            label="密码"
+                            :label="$t('messages.password')"
                             :rules="[requiredRule, passwordRule]"
                             required
                             prepend-icon="mdi-lock"
                             type="password"
-                            placeholder="请输入8-20个字符的密码"
+                            :placeholder="$t('messages.passwordPlaceholder')"
                         />
                         
                         <v-text-field
                             v-model="newUser.name"
-                            label="昵称"
+                            :label="$t('messages.nickname')"
                             :rules="[requiredRule, nicknameRule]"
                             required
                             prepend-icon="mdi-account-circle"
-                            placeholder="请输入用户昵称，至少2个字符"
+                            :placeholder="$t('messages.nicknamePlaceholder')"
                         />
                         
                         <v-text-field
                             v-model="newUser.email"
-                            label="邮箱"
+                            :label="$t('messages.email')"
                             :rules="[requiredRule, emailRule]"
                             required
                             prepend-icon="mdi-email"
-                            placeholder="请输入邮箱地址"
+                            :placeholder="$t('messages.emailPlaceholder')"
                         />
                         
                         <!-- 账号设置 -->
                         <v-divider class="my-4" />
                         <h3 class="mb-2">
-                            账号设置
+                            {{ $t('messages.accountSettings') }}
                         </h3>
                         
                         <v-checkbox
                             v-model="newUser.active"
-                            label="激活状态"
+                            :label="$t('messages.activeStatus')"
                             color="primary"
                             hide-details
                         />
                         
                         <v-checkbox
                             v-model="newUser.admin"
-                            label="管理员权限"
+                            :label="$t('messages.adminPermission')"
                             color="primary"
                             hide-details
                         />
@@ -99,7 +99,7 @@
                         <!-- 权限设置 -->
                         <v-divider class="my-4" />
                         <h3 class="mb-2">
-                            权限设置
+                            {{ $t('messages.permissionSettings') }}
                         </h3>
                         
                         <v-container fluid>
@@ -128,13 +128,13 @@
                         text
                         @click="showAddDialog = false"
                     >
-                        取消
+                        {{ t('actions.cancel') }}
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="addUser"
                     >
-                        确定
+                        {{ t('actions.confirm') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -146,7 +146,7 @@
             max-width="500px"
         >
             <v-card>
-                <v-card-title> 访客权限设置 </v-card-title>
+                <v-card-title> {{ t('admin.guest.title') }} </v-card-title>
                 <v-card-text>
                     <v-form ref="guestPermissionForm">
                         <v-container fluid>
@@ -173,13 +173,13 @@
                         text
                         @click="showGuestPermissionDialog = false"
                     >
-                        取消
+                        {{ t('actions.cancel') }}
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="saveGuestPermissions"
                     >
-                        保存
+                        {{ t('actions.save') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -199,11 +199,11 @@
                 {{ item.extra.login_ip }}
             </template>
             <template #item.detail="{ item }">
-                <span v-if="item.extra.visit_history"> 访问{{ item.extra.visit_history.length }}本 </span>
-                <span v-if="item.extra.read_history"> 阅读{{ item.extra.read_history.length }}本 </span>
-                <span v-if="item.extra.push_history"> 推送{{ item.extra.push_history.length }}本 </span>
-                <span v-if="item.extra.download_history"> 下载{{ item.extra.download_history.length }}本 </span>
-                <span v-if="item.extra.upload_history"> 上传{{ item.extra.upload_history.length }}本 </span>
+                <span v-if="item.extra.visit_history"> {{ $t('admin.users.history.visit', {count: item.extra.visit_history.length}) }} </span>
+                <span v-if="item.extra.read_history"> {{ $t('admin.users.history.read', {count: item.extra.read_history.length}) }} </span>
+                <span v-if="item.extra.push_history"> {{ $t('admin.users.history.push', {count: item.extra.push_history.length}) }} </span>
+                <span v-if="item.extra.download_history"> {{ $t('admin.users.history.download', {count: item.extra.download_history.length}) }} </span>
+                <span v-if="item.extra.upload_history"> {{ $t('admin.users.history.upload', {count: item.extra.upload_history.length}) }} </span>
             </template>
             <template #item.actions="{ item }">
                 <v-menu>
@@ -213,13 +213,13 @@
                             size="small"
                             v-bind="props"
                         >
-                            操作 <v-icon size="small">
+                            {{ $t('admin.users.actions.manage') }} <v-icon size="small">
                                 mdi-dots-vertical
                             </v-icon>
                         </v-btn>
                     </template>
                     <v-list density="compact">
-                        <v-list-subheader>修改用户权限</v-list-subheader>
+                        <v-list-subheader>{{ $t('admin.users.permissions.edit') }}</v-list-subheader>
                         <template
                             v-for="perm in permissions"
                             :key="perm.name"
@@ -317,9 +317,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
+const { t } = useI18n();
 const { $backend, $alert } = useNuxtApp();
 
 store.setNavbar(true);
@@ -338,14 +340,14 @@ const addUserForm = ref(null);
 const showGuestPermissionDialog = ref(false);
 
 // Form rules
-const requiredRule = v => !!v || '此项为必填项';
+const requiredRule = v => !!v || t('validation.required');
 const emailRule = (email) => {
     var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-    return re.test(email) || '邮箱格式不正确';
+    return re.test(email) || t('validation.emailInvalid');
 };
-const usernameRule = v => ((20 >= v.length && v.length >= 5) && /^[a-z][a-z0-9_]*$/.test(v)) || '用户名必须以小写字母开头，只能包含字母、数字和下划线，长度在5-20个字符之间';
-const passwordRule = v => (20 >= v.length && v.length >= 8) || '密码长度必须在8-20个字符之间';
-const nicknameRule = v => v.length >= 2 || '昵称长度至少为2个字符';
+const usernameRule = v => ((20 >= v.length && v.length >= 5) && /^[a-z][a-z0-9_]*$/.test(v)) || t('validation.usernameFormat');
+const passwordRule = v => (20 >= v.length && v.length >= 8) || t('validation.passwordLength');
+const nicknameRule = v => v.length >= 2 || t('validation.nickLength');
 
 // New user data
 const newUser = ref({
@@ -375,33 +377,33 @@ const guestPermissions = ref({
 });
 
 const guestPermissionList = [
-    { key: 'ALLOW_GUEST_READ', label: '允许访客在线阅读（无需注册和登录）' },
-    { key: 'ALLOW_GUEST_DOWNLOAD', label: '允许任意下载（访客无需注册和登录）' },
-    { key: 'ALLOW_GUEST_PUSH', label: '允许任意推送Kindle（访客无需注册和登录）' },
-    { key: 'ALLOW_GUEST_UPLOAD', label: '允许访客上传书籍（无需注册和登录）' },
+    { key: 'ALLOW_GUEST_READ', label: t('admin.guest.allow_read') },
+    { key: 'ALLOW_GUEST_DOWNLOAD', label: t('admin.guest.allow_download') },
+    { key: 'ALLOW_GUEST_PUSH', label: t('admin.guest.allow_push') },
+    { key: 'ALLOW_GUEST_UPLOAD', label: t('admin.guest.allow_upload') },
 ];
 
 const headers = [
-    { title: 'ID', key: 'id', sortable: true },
-    { title: '用户名', key: 'username', sortable: true },
-    { title: '昵称', key: 'name', sortable: false },
-    { title: 'Email', key: 'email', sortable: true },
-    { title: '注册平台', key: 'provider', sortable: false },
-    { title: '注册时间', key: 'create_time', sortable: true },
-    { title: '登录时间', key: 'access_time', sortable: true },
-    { title: '登录IP', key: 'login_ip', sortable: false },
-    { title: '详情', key: 'detail', sortable: false },
-    { title: '操作', key: 'actions', sortable: false },
+    { title: t('admin.table.id'), key: 'id', sortable: true },
+    { title: t('admin.table.username'), key: 'username', sortable: true },
+    { title: t('admin.table.name'), key: 'name', sortable: false },
+    { title: t('admin.table.email'), key: 'email', sortable: true },
+    { title: t('admin.table.provider'), key: 'provider', sortable: false },
+    { title: t('admin.table.create_time'), key: 'create_time', sortable: true },
+    { title: t('admin.table.access_time'), key: 'access_time', sortable: true },
+    { title: t('admin.table.login_ip'), key: 'login_ip', sortable: false },
+    { title: t('admin.table.detail'), key: 'detail', sortable: false },
+    { title: t('admin.table.actions'), key: 'actions', sortable: false },
 ];
 
 const permissions = [
-    { code: 'l', name: 'can_login', text: '登录' },
-    { code: 'u', name: 'can_upload', text: '上传' },
-    { code: 's', name: 'can_save', text: '下载' },
-    { code: 'e', name: 'can_edit', text: '编辑' },
-    { code: 'd', name: 'can_delete', text: '删除' },
-    { code: 'p', name: 'can_push', text: '推送' },
-    { code: 'r', name: 'can_read', text: '在线阅读' },
+    { code: 'l', name: 'can_login', text: t('admin.perms.login') },
+    { code: 'u', name: 'can_upload', text: t('admin.perms.upload') },
+    { code: 's', name: 'can_save', text: t('admin.perms.download') },
+    { code: 'e', name: 'can_edit', text: t('admin.perms.edit') },
+    { code: 'd', name: 'can_delete', text: t('admin.perms.delete') },
+    { code: 'p', name: 'can_push', text: t('admin.perms.push') },
+    { code: 'r', name: 'can_read', text: t('admin.perms.read') },
 ];
 
 const updateOptions = (newOptions) => {
@@ -521,7 +523,7 @@ const saveGuestPermissions = () => {
         if (rsp.err != 'ok') {
             if ($alert) $alert('error', rsp.msg);
         } else {
-            if ($alert) $alert('success', '访客权限设置保存成功！');
+            if ($alert) $alert('success', t('admin.guest.saveSuccess'));
             showGuestPermissionDialog.value = false;
         }
     });
@@ -544,6 +546,6 @@ onMounted(() => {
 });
 
 useHead({
-    title: '用户管理'
+    title: () => t('admin.usersTitle')
 });
 </script>

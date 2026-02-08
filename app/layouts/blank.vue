@@ -33,14 +33,14 @@
                             color="primary"
                             @click="router.push(store.alert.to); store.closeAlert()"
                         >
-                            好的
+                            {{ $t('messages.ok') }}
                         </v-btn>
                         <v-btn
                             v-else
                             color="primary"
                             @click="store.closeAlert()"
                         >
-                            关闭
+                            {{ $t('messages.dialogClose') }}
                         </v-btn>
                         <v-spacer />
                     </v-card-actions>

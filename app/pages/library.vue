@@ -10,7 +10,7 @@
                 <!-- 出版社筛选 -->
                 <div class="mb-2">
                     <div class="d-flex align-center">
-                        <span class="mr-3">出版社：</span>
+                        <span class="mr-3">{{ $t('messages.publisher') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
                             column="false"
                             class="flex-grow-1"
@@ -20,9 +20,9 @@
                                 density="compact"
                                 label
                                 small
-                                @click="updateFilter('publisher', '全部')"
+                                @click="updateFilter('publisher', $t('messages.all'))"
                             >
-                                {{ '全部' }}
+                                {{ $t('messages.all') }}
                             </v-chip>
                             <v-chip
                                 v-for="item in filterOptions.publisher.slice(0, 10)"
@@ -43,7 +43,7 @@
                                     small
                                     @click="expanded.publisher = !expanded.publisher"
                                 >
-                                    {{ expanded.publisher ? '收起' : `更多(${filterOptions.publisher.length - 10})` }}
+                                    {{ expanded.publisher ? $t('messages.collapse') : `${$t('messages.more')}(${filterOptions.publisher.length - 10})` }}
                                 </v-chip>
                             </template>
                         </v-chip-group>
@@ -75,7 +75,7 @@
                 <!-- 作者筛选 -->
                 <div class="mb-2">
                     <div class="d-flex align-center">
-                        <span class="mr-3">作者：</span>
+                        <span class="mr-3">{{ $t('messages.author') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
                             column="false"
                             class="flex-grow-1"
@@ -85,9 +85,9 @@
                                 density="compact"
                                 label
                                 small
-                                @click="updateFilter('author', '全部')"
+                                @click="updateFilter('author', $t('messages.all'))"
                             >
-                                {{ '全部' }}
+                                {{ $t('messages.all') }}
                             </v-chip>
                             <v-chip
                                 v-for="item in filterOptions.author.slice(0, 10)"
@@ -108,7 +108,7 @@
                                     small
                                     @click="expanded.author = !expanded.author"
                                 >
-                                    {{ expanded.author ? '收起' : `更多(${filterOptions.author.length - 10})` }}
+                                    {{ expanded.author ? $t('messages.collapse') : `${$t('messages.more')}(${filterOptions.author.length - 10})` }}
                                 </v-chip>
                             </template>
                         </v-chip-group>
@@ -140,19 +140,19 @@
                 <!-- 标签筛选 -->
                 <div class="mb-2">
                     <div class="d-flex align-center">
-                        <span class="mr-3">标签：</span>
+                        <span class="mr-3">{{ $t('messages.tags') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
                             column="false"
                             class="flex-grow-1"
                         >
                             <v-chip
-                                :class="filters.tag === '全部' ? 'filter-chip-active' : 'filter-chip-inactive'"
+                                :class="filters.tag === t('messages.all') ? 'filter-chip-active' : 'filter-chip-inactive'"
                                 density="compact"
                                 label
                                 small
-                                @click="updateFilter('tag', '全部')"
+                                @click="updateFilter('tag', t('messages.all'))"
                             >
-                                {{ '全部' }}
+                                {{ t('messages.all') }}
                             </v-chip>
                             <v-chip
                                 v-for="item in filterOptions.tag.slice(0, 10)"
@@ -173,7 +173,7 @@
                                     small
                                     @click="expanded.tag = !expanded.tag"
                                 >
-                                    {{ expanded.tag ? '收起' : `更多(${filterOptions.tag.length - 10})` }}
+                                    {{ expanded.tag ? $t('messages.collapse') : `${$t('messages.more')}(${filterOptions.tag.length - 10})` }}
                                 </v-chip>
                             </template>
                         </v-chip-group>
@@ -205,19 +205,19 @@
                 <!-- 文件格式筛选 -->
                 <div class="mb-3">
                     <div class="d-flex align-center">
-                        <span class="mr-3">文件格式：</span>
+                        <span class="mr-3">{{ $t('book.format') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
                             column="false"
                             class="flex-grow-1"
                         >
                             <v-chip
-                                :class="filters.format === '全部' ? 'filter-chip-active' : 'filter-chip-inactive'"
+                                :class="filters.format === t('messages.all') ? 'filter-chip-active' : 'filter-chip-inactive'"
                                 density="compact"
                                 label
                                 small
-                                @click="updateFilter('format', '全部')"
+                                @click="updateFilter('format', t('messages.all'))"
                             >
-                                {{ '全部' }}
+                                {{ t('messages.all') }}
                             </v-chip>
                             <v-chip
                                 v-for="item in filterOptions.format.slice(0, 10)"
@@ -238,7 +238,7 @@
                                     small
                                     @click="expanded.format = !expanded.format"
                                 >
-                                    {{ expanded.format ? '收起' : `更多(${filterOptions.format.length - 10})` }}
+                                    {{ expanded.format ? $t('messages.collapse') : `${$t('messages.more')}(${filterOptions.format.length - 10})` }}
                                 </v-chip>
                             </template>
                         </v-chip-group>
@@ -291,14 +291,16 @@
 <script setup>
 import BookCards from '~/components/BookCards.vue';
 import { useMainStore } from '@/stores/main';
+import { useI18n } from 'vue-i18n';
 
 const store = useMainStore();
+const { t } = useI18n();
 const { $backend, $alert } = useNuxtApp();
 const route = useRoute();
 
 store.setNavbar(true);
 
-const title = ref('书库');
+const title = ref(t('library.title'));
 const page = ref(1);
 const books = ref([]);
 const total = ref(0);
@@ -307,10 +309,10 @@ const page_cnt = ref(1);
 const inited = ref(false);
 
 const filters = ref({
-    publisher: '全部',
-    author: '全部',
-    tag: '全部',
-    format: '全部'
+    publisher: t('messages.all'),
+    author: t('messages.all'),
+    tag: t('messages.all'),
+    format: t('messages.all')
 });
 
 const filterOptions = ref({
@@ -342,7 +344,7 @@ const fetchBooks = async (p = 1) => {
   
     // 添加筛选条件
     Object.keys(filters.value).forEach(key => {
-        if (filters.value[key] !== '全部') {
+        if (filters.value[key] !== t('messages.all')) {
             query[key] = filters.value[key];
         }
     });
@@ -355,7 +357,7 @@ const fetchBooks = async (p = 1) => {
     try {
         const rsp = await $backend(`/library?${queryString}`);
         if (rsp.err === 'exception' || rsp.err === 'network_error') {
-            if ($alert) $alert('error', rsp.msg);
+            if ($alert) $alert('error', rsp.msg || t('errors.networkError'));
             return;
         }
     
@@ -363,7 +365,7 @@ const fetchBooks = async (p = 1) => {
         total.value = rsp.total || 0;
         page_cnt.value = total.value > 0 ? Math.max(1, Math.ceil(total.value / page_size)) : 0;
         page.value = p;
-        title.value = rsp.title || '书库';
+        title.value = rsp.title || t('library.title');
     } catch (error) {
         console.error('Failed to fetch books:', error);
         if ($alert) $alert('error', '获取书籍数据失败');
@@ -392,7 +394,7 @@ const init = async () => {
     // 从URL查询参数中解析筛选条件
     const query = route.query;
     Object.keys(filters.value).forEach(key => {
-        if (query[key] && query[key] !== '全部') {
+        if (query[key] && query[key] !== t('messages.all')) {
             filters.value[key] = query[key];
         }
     });
@@ -432,9 +434,9 @@ onMounted(() => {
     init();
 });
 
-useHead({
-    title: '书库'
-});
+useHead(() => ({
+    title: t('library.title')
+}));
 </script>
 
 <style scoped>

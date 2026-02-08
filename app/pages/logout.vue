@@ -28,7 +28,7 @@
                         variant="elevated"
                         href="/"
                     >
-                        返回首页
+                        {{ $t('common.home') }}
                     </v-btn>
                     <v-spacer />
                 </v-card-actions>
@@ -39,11 +39,14 @@
 
 <script setup>
 import { useMainStore } from '@/stores/main';
+import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const store = useMainStore();
 const { $backend } = useNuxtApp();
+const { t } = useI18n();
 
-const msg = ref('您已退出登录。');
+const msg = ref(t('auth.loggedOut'));
 
 const logout = async () => {
     try {
@@ -60,7 +63,7 @@ onMounted(() => {
     logout();
 });
 
-useHead({
-    title: '已退出登录'
-});
+useHead(() => ({
+    title: t('auth.loggedOutTitle')
+}));
 </script>

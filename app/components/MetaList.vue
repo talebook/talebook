@@ -39,7 +39,7 @@
                     size="small"
                     @click="expand()"
                 >
-                    显示全部...
+                    {{ $t('messages.showAll') }}
                 </v-btn>
             </v-col>
         </v-row>
@@ -58,10 +58,10 @@
                         mdi-book-open-variant
                     </v-icon>
                     <h3 class="text-h6 grey--text">
-                        本书库暂无藏书
+                        {{ $t('messages.noBooks') }}
                     </h3>
                     <p class="text-caption grey--text">
-                        请先添加书籍到书库
+                        {{ $t('messages.addBooksFirst') }}
                     </p>
                 </v-card>
             </v-col>
@@ -144,16 +144,10 @@ const page_cnt = computed(() => {
     return Math.max(1, Math.ceil(total.value/page_size.value));
 });
 
-const titles = {
-    tag: '全部标签',
-    series: '全部丛书',
-    rating: '全部评分',
-    author: '全部作者',
-    publisher: '全部出版社',
-    format: '全部格式',
-};
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 
 useHead({
-    title: titles[meta.value] || ''
+    title: () => t(`messages.titles.${meta.value}`) || ''
 });
 </script>

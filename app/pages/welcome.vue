@@ -15,8 +15,8 @@
                     color="primary"
                 >
                     <v-toolbar-title align-center>
-                        请输入访问密码
-                    </v-toolbar-title>
+                                            {{ $t('welcomePage.inputTitle') }}
+                                        </v-toolbar-title>
                 </v-toolbar>
                 <v-card-text>
                     <p class="py-6 body-3 text-center">
@@ -27,7 +27,7 @@
                             v-model="invite_code"
                             prepend-icon="mdi-lock"
                             required
-                            label="访问密码"
+                            :label="$t('welcomePage.inputLabel')"
                             type="password"
                             :error="is_err"
                             :error-messages="is_err ? msg : ''"
@@ -48,7 +48,7 @@
                         color="primary"
                         @click="welcome_login"
                     >
-                        Login
+                        {{ $t('common.login') }}
                     </v-btn>
                     <v-spacer />
                 </v-card-actions>
@@ -62,10 +62,12 @@ import { ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
 const route = useRoute();
 const store = useMainStore();
+const { t } = useI18n();
 const { $backend } = useNuxtApp();
 
 definePageMeta({
@@ -74,7 +76,7 @@ definePageMeta({
 
 const is_err = ref(false);
 const msg = ref('');
-const welcome = ref('本站为私人图书馆，需输入密码才可进行访问');
+const welcome = ref(t('welcomePage.welcomeText'));
 const loading = ref(false);
 const invite_code = ref('');
 
@@ -103,7 +105,7 @@ watch(welcomeData, (newData) => {
 const welcome_login = async () => {
     if (!invite_code.value.trim()) {
         is_err.value = true;
-        msg.value = '请输入访问码';
+        msg.value = t('welcomePage.inputPrompt');
         return;
     }
     
@@ -122,10 +124,10 @@ const welcome_login = async () => {
         
         if (rsp.err !== 'ok') {
             is_err.value = true;
-            msg.value = rsp.msg || '访问码错误';
+            msg.value = rsp.msg || t('welcomePage.invalidCode');
         } else {
             is_err.value = false;
-            msg.value = '访问码正确，正在跳转...';
+            msg.value = t('welcomePage.successRedirect');
             // 使用 router 跳转而不是 reload，更好的用户体验
             setTimeout(() => {
                 router.push(route.query.next || '/');
@@ -134,15 +136,15 @@ const welcome_login = async () => {
     } catch (error) {
         console.error('登录失败:', error);
         is_err.value = true;
-        msg.value = '网络错误，请稍后重试';
+        msg.value = t('welcomePage.networkError');
     } finally {
         loading.value = false;
     }
 };
 
-useHead({
-    title: '私人图书馆'
-});
+useHead(() => ({
+    title: t('welcomePage.pageTitle')
+}));
 </script>
 
 <style scoped>
