@@ -154,6 +154,13 @@
                     待扫描
                 </v-chip>
                 <v-chip
+                    v-else-if="item.status == 'downloading'"
+                    size="small"
+                    color="info"
+                >
+                    下载中
+                </v-chip>
+                <v-chip
                     v-else
                     size="small"
                     color="info"
@@ -1361,6 +1368,8 @@ const importSelectedOpdsBooks = async () => {
             pollTimer = setInterval(pollImportStatus, pollInterval);
             // 立即轮询一次
             setTimeout(pollImportStatus, 500);
+            // 立即刷新待处理列表以显示刚刚插入的下载项
+            getDataFromApi();
         } else {
             $alert('error', response.msg || '导入失败');
             opdsImportState.value = 'browsing';

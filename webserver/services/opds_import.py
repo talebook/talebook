@@ -425,6 +425,23 @@ class OPDSImportService(AsyncService):
             # 移动文件到扫描目录（shutil.move 在同文件系统上为原子操作）
             shutil.move(file_path, target_path)
             logging.info(f"书籍已移动到扫描目录: {target_path}")
+            # 如果此前在待处理列表中创建了对应的 ScanFile（status=downloading），更新其路径和状态
+            try:
+                from webserver.services.async_service import AsyncService
+                sess = AsyncService().scoped_session()
+                # 尝试通过 acquisition_link 存储的 hash 查找对应记录
+                href = book.get('acquisition_link') or book.get('href')
+                if href:
+                    h = hashlib.sha256(href.encode('utf-8')).hexdigest()[:64]
+                    sf = sess.query(ScanFile).filter(ScanFile.hash == h).first()
+                    if sf:
+                        sf.path = target_path
+                        sf.status = ScanFile.NEW
+                        sf.update_time = datetime.now()
+                        sf.save()
+                        sess.commit()
+            except Exception:
+                logging.debug('无法更新 ScanFile 状态或不存在对应记录')
             
             # 创建扫描记录（如果需要）
             # 这里假设系统会自动扫描扫描目录中的新文件

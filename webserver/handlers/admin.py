@@ -19,7 +19,7 @@ from webserver.services.autofill import AutoFillService
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
-from webserver.models import Reader
+from webserver.models import Reader, ScanFile
 from webserver.utils import SimpleBookFormatter
 
 CONF = loader.get_settings()
@@ -684,6 +684,33 @@ class AdminOPDSImport(BaseHandler):
 
             logging.info(f"OPDS导入请求: url={opds_url}, books={len(books)}本, delete_after={delete_after}")
             
+            # 在开始异步下载前，将选中书籍插入到待处理列表并标记为downloading
+            try:
+                if books:
+                    for b in books:
+                        href = b.get('href') or b.get('acquisition_link') or ''
+                        title = b.get('title', '')
+                        author = b.get('author', '')
+                        # 使用href生成唯一hash值
+                        if href:
+                            h = hashlib.sha256(href.encode('utf-8')).hexdigest()
+                        else:
+                            h = hashlib.sha256((title + author + str(uuid.uuid4())).encode('utf-8')).hexdigest()
+                        # 创建ScanFile记录，path暂存为href，status为downloading
+                        # ScanFile __init__ 接受 (path, hash_value, scan_id)
+                        sf = ScanFile(href, h[:64], 0)
+                        sf.title = title
+                        sf.author = author
+                        sf.status = 'downloading'
+                        sf.create_time = datetime.datetime.now()
+                        sf.update_time = datetime.datetime.now()
+                        # 将原始链接存入data，便于后台任务使用
+                        sf.data = {'acquisition_link': href}
+                        self.session.add(sf)
+                    self.session.commit()
+            except Exception:
+                logging.error(traceback.format_exc())
+
             # 启动异步导入任务
             import threading
             def import_task():
@@ -694,7 +721,7 @@ class AdminOPDSImport(BaseHandler):
                     opds_service.import_selected_books(opds_url, self.user_id(), delete_after, books)
                 else:
                     opds_service.import_from_opds(opds_url, self.user_id(), delete_after)
-            
+
             thread = threading.Thread(target=import_task, daemon=True)
             thread.start()
             

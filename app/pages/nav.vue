@@ -32,15 +32,15 @@
             <v-col cols="12">
                 <v-card class="ma-1 pa-6 text-center">
                     <v-icon
-                        size="large"
-                        color="grey-lighten-2"
+                        large
+                        color="grey lighten-2"
                     >
                         mdi-book-open-variant
                     </v-icon>
-                    <h3 class="text-h6 text-grey">
+                    <h3 class="text-h6 grey--text">
                         本书库暂无藏书
                     </h3>
-                    <p class="text-caption text-grey">
+                    <p class="text-caption grey--text">
                         请先添加书籍到书库
                     </p>
                 </v-card>
