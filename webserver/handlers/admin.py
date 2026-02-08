@@ -705,12 +705,6 @@ class AdminOPDSImport(BaseHandler):
             logging.error(traceback.format_exc())
             return {"err": "error", "msg": _(u"OPDS导入失败: {}").format(str(e))}
 
-    @js
-    @is_admin
-    def get(self):
-        # 这里可以返回 OPDS 导入的状态
-        return {"err": "ok", "msg": "ok"}
-
 
 def routes():
     return [
