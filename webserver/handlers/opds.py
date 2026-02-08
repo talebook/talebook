@@ -432,7 +432,16 @@ class OpdsHandler(BaseHandler):
         self.set_header("WWW-Authenticate", "Basic")
         self.set_status(401)
         raise web.Finish()
-    
+
+    def send_opds_disabled(self):
+        # 使用浏览器重定向以保持原有行为
+        self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
+        raise web.Finish()
+
+    def should_be_opds_enabled(self):
+        if not CONF.get("OPDS_ENABLED", False):
+            return self.send_opds_disabled()
+
     def prepare(self):
         self.set_hosts()
         self.set_i18n()
@@ -440,6 +449,8 @@ class OpdsHandler(BaseHandler):
         self.should_be_installed()
         # 跳过私人图书馆模式检查，让OPDS服务不受限制
         # self.should_be_invited()
+        # 检查 OPDS 是否启用，统一放到基类中
+        self.should_be_opds_enabled()
 
     def get_opds_acquisition_feed(
         self,
@@ -740,44 +751,29 @@ class OpdsHandler(BaseHandler):
 
 class OpdsIndex(OpdsHandler):
     def get(self):
-        if not CONF["OPDS_ENABLED"]:
-            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
-            return
         self.write(self.opds())
 
 
 class OpdsNav(OpdsHandler):
     def get(self, which):
-        if not CONF["OPDS_ENABLED"]:
-            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
-            return
         offset = self.get_argument("offset", 0)
         self.write(self.opds_navcatalog(which, offset=offset))
 
 
 class OpdsCategory(OpdsHandler):
     def get(self, category, which):
-        if not CONF["OPDS_ENABLED"]:
-            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
-            return
         offset = self.get_argument("offset", 0)
         self.write(self.opds_category(category, which, offset=offset))
 
 
 class OpdsCategoryGroup(OpdsHandler):
     def get(self, category, which):
-        if not CONF["OPDS_ENABLED"]:
-            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
-            return
         offset = self.get_argument("offset", 0)
         self.write(self.opds_category_group(category, which, offset=offset))
 
 
 class OpdsSearch(OpdsHandler):
     def get(self, which):
-        if not CONF["OPDS_ENABLED"]:
-            self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
-            return
         offset = self.get_argument("offset", 0)
         self.write(self.opds_search(which, offset=offset))
 

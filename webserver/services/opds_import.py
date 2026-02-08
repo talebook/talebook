@@ -7,6 +7,8 @@ import tempfile
 import traceback
 import urllib.parse
 import hashlib
+import threading
+import uuid
 import shutil
 import re
 from datetime import datetime
@@ -30,6 +32,8 @@ class OPDSImportService(AsyncService):
         self.count_skip = 0
         self.count_fail = 0
         self.scan_dir = CONF.get("scan_upload_path", "/data/books/imports/")
+        # 保护内部计数器的线程锁（同一进程内并发访问安全）
+        self._lock = threading.Lock()
 
     def browse_opds_catalog(self, host, port=None, path=''):
         """浏览OPDS目录结构"""
@@ -79,10 +83,11 @@ class OPDSImportService(AsyncService):
 
     def reset_counters(self):
         """重置计数器"""
-        self.count_total = 0
-        self.count_done = 0
-        self.count_skip = 0
-        self.count_fail = 0
+        with self._lock:
+            self.count_total = 0
+            self.count_done = 0
+            self.count_skip = 0
+            self.count_fail = 0
 
     def import_from_opds(self, opds_url, user_id=None, delete_after=False):
         """从OPDS源导入书籍"""
@@ -97,7 +102,8 @@ class OPDSImportService(AsyncService):
 
             # 解析OPDS目录
             books = self.parse_opds_catalog(catalog_data)
-            self.count_total = len(books)
+            with self._lock:
+                self.count_total = len(books)
             logging.info(f"找到 {self.count_total} 本书籍")
 
             # 导入每本书
@@ -107,12 +113,15 @@ class OPDSImportService(AsyncService):
                     result = self.import_book_to_scan(book, user_id)
                     if result:
                         imported_files.append(result)
-                        self.count_done += 1
+                        with self._lock:
+                            self.count_done += 1
                     else:
-                        self.count_skip += 1
+                        with self._lock:
+                            self.count_skip += 1
                 except Exception as e:
                     logging.error(f"导入书籍失败: {book.get('title', '未知')}, 错误: {e}")
-                    self.count_fail += 1
+                    with self._lock:
+                        self.count_fail += 1
 
             logging.info(f"OPDS导入完成: 总计 {self.count_total}, 成功 {self.count_done}, 跳过 {self.count_skip}, 失败 {self.count_fail}")
             return {
@@ -220,9 +229,14 @@ class OPDSImportService(AsyncService):
                             elif not href:  # 如果没有下载链接，使用第一个链接
                                 href = link_href
                 
-                # 生成ID
+                # 生成确定性的短ID（使用SHA-256并截断为前12个hex字符），
+                # 避免使用 Python 内置的 hash() 因为它在不同进程/重启间不稳定。
                 if href:
-                    item_id = hash(href) % 1000000
+                    try:
+                        item_id = hashlib.sha256(href.encode('utf-8')).hexdigest()[:12]
+                    except Exception:
+                        # 回退：在极少数情况下保持原有方式但不抛出异常
+                        item_id = str(abs(hash(href)) % 1000000)
                 
                 # 提取封面链接
                 cover_link = None
@@ -291,9 +305,15 @@ class OPDSImportService(AsyncService):
                         if link_type and ('opds' in link_type or 'atom' in link_type):
                             item_type = 'folder'
                         
+                        # 使用与上面相同的确定性短ID算法
+                        try:
+                            short_id = hashlib.sha256(link_href.encode('utf-8')).hexdigest()[:12]
+                        except Exception:
+                            short_id = str(abs(hash(link_href)) % 1000000)
+
                         item_info = {
                             'type': item_type,
-                            'id': hash(link_href) % 1000000,
+                            'id': short_id,
                             'title': title,
                             'author': '',
                             'href': link_href,
@@ -381,20 +401,17 @@ class OPDSImportService(AsyncService):
                 logging.error(f"无法下载书籍: {title}")
                 return None
             
-            # 生成目标文件名
+            # 生成目标文件名，若冲突则使用短 UUID 后缀保证跨进程唯一性
             safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip()
             format_ = book.get('format', 'epub')
             target_filename = f"opds_{safe_title}.{format_}"
             target_path = os.path.join(self.scan_dir, target_filename)
-            
-            # 确保文件名唯一
-            counter = 1
-            while os.path.exists(target_path):
-                target_filename = f"opds_{safe_title}_{counter}.{format_}"
+
+            if os.path.exists(target_path):
+                target_filename = f"opds_{safe_title}_{uuid.uuid4().hex[:8]}.{format_}"
                 target_path = os.path.join(self.scan_dir, target_filename)
-                counter += 1
             
-            # 移动文件到扫描目录
+            # 移动文件到扫描目录（shutil.move 在同文件系统上为原子操作）
             shutil.move(file_path, target_path)
             logging.info(f"书籍已移动到扫描目录: {target_path}")
             
@@ -416,7 +433,8 @@ class OPDSImportService(AsyncService):
         """导入用户选中的书籍"""
         logging.info(f"开始导入选中的书籍: {len(books)}本")
         
-        self.count_total = len(books)
+        with self._lock:
+            self.count_total = len(books)
         imported_files = []
         
         for book_info in books:
@@ -432,7 +450,8 @@ class OPDSImportService(AsyncService):
                 
                 if not book_data['acquisition_link']:
                     logging.error(f"书籍缺少下载链接: {book_data['title']}")
-                    self.count_fail += 1
+                    with self._lock:
+                        self.count_fail += 1
                     continue
                 
                 # 确保href是完整的URL
@@ -460,16 +479,19 @@ class OPDSImportService(AsyncService):
                 result = self.import_book_to_scan(book_data, user_id)
                 if result:
                     imported_files.append(result)
-                    self.count_done += 1
+                    with self._lock:
+                        self.count_done += 1
                     logging.info(f"成功导入: {book_data['title']}")
                 else:
-                    self.count_skip += 1
+                    with self._lock:
+                        self.count_skip += 1
                     logging.warning(f"跳过导入: {book_data['title']}")
                     
             except Exception as e:
                 logging.error(f"导入书籍失败: {book_info.get('title', '未知')}, 错误: {e}")
                 logging.error(traceback.format_exc())
-                self.count_fail += 1
+                with self._lock:
+                    self.count_fail += 1
 
         logging.info(f"OPDS导入完成: 总计 {self.count_total}, 成功 {self.count_done}, 跳过 {self.count_skip}, 失败 {self.count_fail}")
         
@@ -668,16 +690,9 @@ class OPDSImportService(AsyncService):
             if not safe_title:
                 safe_title = "unknown_book"
                 
-            temp_dir = tempfile.gettempdir()
-            file_name = f"opds_{safe_title}.{format_}"
-            file_path = os.path.join(temp_dir, file_name)
-
-            # 确保文件名唯一
-            counter = 1
-            while os.path.exists(file_path):
-                file_name = f"opds_{safe_title}_{counter}.{format_}"
-                file_path = os.path.join(temp_dir, file_name)
-                counter += 1
+            # 使用 mkstemp 创建唯一临时文件，避免并发下载时重名
+            fd, file_path = tempfile.mkstemp(prefix=f"opds_{safe_title}_", suffix=f".{format_}")
+            os.close(fd)
 
             # 下载文件
             logging.info(f"下载书籍文件: {url} 到 {file_path}")
