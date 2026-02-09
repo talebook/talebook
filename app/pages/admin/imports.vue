@@ -1,7 +1,7 @@
 <template>
     <v-card>
         <v-card-title>
-            导入图书 <v-chip
+            {{ $t('admin.title.imports') }} <v-chip
                 size="small"
                 variant="elevated"
                 color="primary ml-2"
@@ -10,13 +10,9 @@
             </v-chip>
         </v-card-title>
         <v-card-text>
-            请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。<br>
-            请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。<br>
-            另外，还可以使用<a
-                class="press-content"
-                target="_blank"
-                href="https://calibre-ebook.com/"
-            >PC版Calibre软件</a>管理书籍，但是请注意：使用完PC版后，需重启Web版方可生效。
+            {{ $t('admin.message.importDirInfo') }}<br>
+            {{ $t('admin.message.importAsyncInfo') }}<br>
+            {{ $t('admin.message.calibreInfo') }}
         </v-card-text>
         <v-card-actions>
             <v-btn
@@ -27,7 +23,7 @@
             >
                 <v-icon start>
                     mdi-reload
-                </v-icon>刷新
+                </v-icon>{{ $t('admin.button.refresh') }}
             </v-btn>
             <v-btn
                 :disabled="loading"
@@ -37,7 +33,7 @@
             >
                 <v-icon start>
                     mdi-file-find
-                </v-icon>扫描书籍
+                </v-icon>{{ $t('admin.button.scanBooks') }}
             </v-btn>
             <v-btn
                 :disabled="loading"
@@ -47,7 +43,7 @@
             >
                 <v-icon start>
                     mdi-database-import
-                </v-icon>从其他 OPDS 导入
+                </v-icon>{{ $t('admin.button.importFromOpds') }}
             </v-btn>
             <template v-if="selected.length > 0">
                 <v-btn
@@ -58,7 +54,7 @@
                 >
                     <v-icon start>
                         mdi-import
-                    </v-icon>导入选中书籍
+                    </v-icon>{{ $t('admin.button.importSelectedBooks') }}
                 </v-btn>
                 <v-btn
                     :disabled="loading"
@@ -68,7 +64,7 @@
                 >
                     <v-icon start>
                         mdi-delete
-                    </v-icon>删除
+                    </v-icon>{{ $t('common.delete') }}
                 </v-btn>
             </template>
             <template v-else>
@@ -80,23 +76,23 @@
                 >
                     <v-icon start>
                         mdi-import
-                    </v-icon>导入全部书籍
+                    </v-icon>{{ $t('admin.button.importAllBooks') }}
                 </v-btn>
             </template>
             <v-spacer />
             <v-checkbox
                 v-model="delete_after_import"
-                label="导入后删除源文件"
+                :label="$t('admin.label.deleteAfterImport')"
                 color="primary"
                 hide-details
             />
         </v-card-actions>
         <v-card-text>
             <div v-if="selected.length == 0">
-                请勾选需要处理的文件（默认情况下导入全部书籍即可。已存在的书籍，即使勾选了也不会重复导入）
+                {{ $t('admin.message.selectFilesInfo') }}
             </div>
             <div v-else>
-                共选择了{{ selected.length }}个
+                {{ $t('admin.message.selectedCount') }}
             </div>
         </v-card-text>
         <v-tabs
@@ -104,10 +100,10 @@
             @update:model-value="onFilterChange"
         >
             <v-tab value="todo">
-                待处理 ({{ count_todo }})
+                {{ $t('admin.tab.todo') }} ({{ count_todo }})
             </v-tab>
             <v-tab value="done">
-                已导入 ({{ count_done }})
+                {{ $t('admin.tab.done') }} ({{ count_done }})
             </v-tab>
         </v-tabs>
         <v-data-table-server
@@ -130,35 +126,35 @@
                     size="small"
                     color="success"
                 >
-                    可导入
+                    {{ $t('admin.status.ready') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'exist'"
                     size="small"
                     color="grey-lighten-2"
                 >
-                    已存在
+                    {{ $t('admin.status.exist') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'imported'"
                     size="small"
                     color="primary"
                 >
-                    导入成功
+                    {{ $t('admin.status.imported') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'new'"
                     size="small"
                     color="grey"
                 >
-                    待扫描
+                    {{ $t('admin.status.new') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'downloading'"
                     size="small"
                     color="info"
                 >
-                    下载中
+                    {{ $t('admin.status.downloading') }}
                 </v-chip>
                 <v-chip
                     v-else
@@ -188,14 +184,14 @@
     >
         <v-card>
             <v-card-title>
-                从其他 OPDS 导入
+                {{ $t('admin.button.importFromOpds') }}
                 <v-spacer />
                 <v-chip
                     v-if="opdsImportState === 'browsing' && selectedOpdsBooks.length > 0"
                     color="primary"
                     size="small"
                 >
-                    已选: {{ selectedOpdsBooks.length }} 本
+                    {{ $t('admin.message.selectedCount') }}
                 </v-chip>
             </v-card-title>
             <v-card-text style="padding: 16px;">
@@ -205,8 +201,8 @@
                         <v-col cols="8">
                             <v-text-field
                                 v-model="opdsHost"
-                                label="主机地址"
-                                placeholder="例如: http://example.com"
+                                :label="$t('admin.label.host')"
+                                :placeholder="$t('admin.placeholder.host')"
                                 variant="outlined"
                                 full-width
                                 @keyup.enter="connectToOpds"
@@ -216,8 +212,8 @@
                         <v-col cols="4">
                             <v-text-field
                                 v-model="opdsPort"
-                                label="端口"
-                                placeholder="例如: 80"
+                                :label="$t('admin.label.port')"
+                                :placeholder="$t('admin.placeholder.port')"
                                 variant="outlined"
                                 full-width
                                 type="number"
@@ -227,16 +223,16 @@
                     </v-row>
                     <v-text-field
                         v-model="opdsPath"
-                        label="路径"
-                        placeholder="例如: /opds 或 /opds/root.xml"
+                        :label="$t('admin.label.path')"
+                        :placeholder="$t('admin.placeholder.path')"
                         variant="outlined"
                         full-width
                         class="mt-4"
                         @keyup.enter="connectToOpds"
                     />
                     <div class="text-body-2 text-gray-600 mt-2">
-                        提示：通常OPDS服务地址类似 http://example.com:8080/opds 或 http://example.com/opds/root.xml
-                        <br>注意：如果端口为空，系统会根据协议自动填充默认端口（HTTP: 80, HTTPS: 443）
+                        {{ $t('admin.message.opdsTip') }}
+                        <br>{{ $t('admin.message.opdsPortTip') }}
                     </div>
                 </div>
                 
@@ -288,7 +284,7 @@
                                     color="primary"
                                     size="32"
                                 ></v-progress-circular>
-                                <div class="mt-4 text-body-1 text-gray-600">正在加载目录...</div>
+                                <div class="mt-4 text-body-1 text-gray-600">{{ $t('admin.message.loadingDirectory') }}</div>
                             </div>
                             
                             <!-- 返回上级目录 -->
@@ -298,7 +294,7 @@
                                 class="flex items-center pa-3 hover:bg-gray-50 rounded cursor-pointer mb-1"
                             >
                                 <v-icon class="mr-2" color="primary">mdi-arrow-left</v-icon>
-                                <span class="text-body-1">返回上级目录</span>
+                                <span class="text-body-1">{{ $t('admin.message.backToParent') }}</span>
                             </div>
                             
                             <!-- 项目列表 -->
@@ -365,7 +361,7 @@
                             <!-- 空状态 -->
                             <div v-if="opdsItems.length === 0 && !opdsLoading" class="text-center py-8">
                                 <v-icon size="48" color="grey">mdi-folder-open-outline</v-icon>
-                                <div class="mt-2 text-gray-600">目录为空</div>
+                                <div class="mt-2 text-gray-600">{{ $t('admin.message.emptyDirectory') }}</div>
                             </div>
                         </div>
                     </div>
@@ -380,10 +376,10 @@
                             size="64"
                         />
                         <div class="mt-4 text-h6">
-                            正在导入书籍到待处理列表...
+                            {{ $t('admin.message.importingBooks') }}
                         </div>
                         <div class="mt-2 text-body-1">
-                            已导入 {{ opdsImportProgress.done }} / {{ opdsImportProgress.total }} 本
+                            {{ $t('admin.message.importProgress') }}
                         </div>
                         <v-progress-linear
                             v-model="opdsImportProgress.percent"
@@ -408,10 +404,10 @@
                                     >
                                         mdi-information
                                     </v-icon>
-                                    导入的书籍会自动添加到"待处理"列表
+                                    {{ $t('admin.message.importToTodo') }}
                                 </div>
                                 <div class="text-body-2 mt-1">
-                                    导入完成后，您需要在主界面上点击"扫描书籍"按钮来识别这些书籍
+                                    {{ $t('admin.message.importAfterScan') }}
                                 </div>
                             </v-alert>
                         </div>
@@ -428,16 +424,16 @@
                             mdi-check-circle
                         </v-icon>
                         <div class="mt-4 text-h6 text-success">
-                            导入完成！
+                            {{ $t('admin.message.importCompleted') }}
                         </div>
                         <div class="mt-2 text-body-1">
-                            成功导入 {{ opdsImportResult.done }} 本书籍到待处理列表
+                            {{ $t('admin.message.importSuccess') }}
                         </div>
                         <div
                             v-if="opdsImportResult.fail > 0"
                             class="mt-2 text-body-1 text-warning"
                         >
-                            失败 {{ opdsImportResult.fail }} 本
+                            {{ $t('admin.message.importFailed') }}
                         </div>
                         <div class="mt-4">
                             <v-alert
@@ -452,15 +448,15 @@
                                     >
                                         mdi-check
                                     </v-icon>
-                                    书籍已成功添加到扫描目录
+                                    {{ $t('admin.message.booksAddedToScanDir') }}
                                 </div>
                                 <div class="text-body-2 mt-1">
-                                    接下来请：
+                                    {{ $t('admin.message.importNextSteps') }}
                                     <ol class="mt-2 pl-4">
-                                        <li>关闭此窗口</li>
-                                        <li>在主界面上点击"扫描书籍"按钮</li>
-                                        <li>在"待处理"列表中查看导入的书籍</li>
-                                        <li>选择要导入的书籍并点击"导入"</li>
+                                        <li>{{ $t('admin.message.importStep1') }}</li>
+                                        <li>{{ $t('admin.message.importStep2') }}</li>
+                                        <li>{{ $t('admin.message.importStep3') }}</li>
+                                        <li>{{ $t('admin.message.importStep4') }}</li>
                                     </ol>
                                 </div>
                             </v-alert>
@@ -485,7 +481,7 @@
                                 color="primary"
                                 @click="resetOpdsImportState"
                             >
-                                返回连接界面
+                                {{ $t('admin.message.backToConnect') }}
                             </v-btn>
                         </div>
                     </div>
@@ -522,7 +518,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
-const { $backend, $alert } = useNuxtApp();
+const { $backend, $alert, $t } = useNuxtApp();
 
 store.setNavbar(true);
 
@@ -570,14 +566,14 @@ const leftButtonText = computed(() => {
     switch (opdsImportState.value) {
         case 'connecting':
         case 'browsing':
-            return '关闭';
+            return $t('common.close');
         case 'importing':
-            return '正在导入...';
+            return $t('admin.message.importingBooks');
         case 'completed':
         case 'error':
-            return '返回连接界面';
+            return $t('admin.message.backToConnect');
         default:
-            return '关闭';
+            return $t('common.close');
     }
 });
 
@@ -585,17 +581,17 @@ const leftButtonText = computed(() => {
 const rightButtonText = computed(() => {
     switch (opdsImportState.value) {
         case 'connecting':
-            return '连接';
+            return $t('admin.message.connect');
         case 'browsing':
-            return '导入选中书籍';
+            return $t('admin.button.importSelectedBooks');
         case 'importing':
-            return '正在导入...';
+            return $t('admin.message.importingBooks');
         case 'completed':
-            return '完成';
+            return $t('common.done');
         case 'error':
-            return '重试';
+            return $t('common.retry');
         default:
-            return '操作';
+            return $t('common.action');
     }
 });
 
@@ -670,7 +666,7 @@ const breadcrumbs = computed(() => {
     
     // 添加根目录
     crumbs.push({
-        title: '根目录',
+        title: $t('admin.message.rootDirectory'),
         disabled: navigationHistory.value.length === 0,
         path: originalOpdsPath.value
     });
@@ -702,10 +698,10 @@ const handleBreadcrumbClick = (crumb, index) => {
 
 const headers = [
     { title: 'ID', key: 'id', sortable: true },
-    { title: '状态', key: 'status', sortable: true },
-    { title: '路径', key: 'path', sortable: true },
-    { title: '扫描信息', key: 'title', sortable: false },
-    { title: '时间', key: 'create_time', sortable: true, width: '200px' },
+    { title: $t('admin.label.status'), key: 'status', sortable: true },
+    { title: $t('admin.label.path'), key: 'path', sortable: true },
+    { title: $t('admin.label.scanInfo'), key: 'title', sortable: false },
+    { title: $t('admin.label.time'), key: 'create_time', sortable: true, width: '200px' },
 ];
 
 const progress = ref({
@@ -1426,7 +1422,7 @@ onMounted(() => {
 });
 
 useHead({
-    title: '导入图书'
+    title: $t('admin.title.imports')
 });
 </script>
 

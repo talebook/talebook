@@ -157,7 +157,7 @@
                                         density="compact"
                                         hide-details
                                         variant="underlined"
-                                        label="名称"
+                                        :label="$t('admin.label.name')"
                                         type="text"
                                     />
                                 </v-col>
@@ -170,7 +170,7 @@
                                         density="compact"
                                         hide-details
                                         variant="underlined"
-                                        label="链接"
+                                        :label="$t('admin.label.link')"
                                         type="text"
                                     >
                                         <template #append>
@@ -192,7 +192,7 @@
                                     >
                                         <v-icon start>
                                             mdi-plus
-                                        </v-icon>添加
+                                        </v-icon>{{ $t('common.add') }}
                                     </v-btn>
                                 </v-col>
                             </v-row>
@@ -200,12 +200,12 @@
 
                         <template v-if="card.show_socials">
                             <p class="mb-4">
-                                所启用的社交网络将会在登录页面自动显示按钮。
+                                {{ $t('admin.message.socialLoginInfo') }}
                             </p>
                             <v-combobox 
                                 v-model="settings.SOCIALS" 
                                 :items="sns_items" 
-                                label="选择要启用的社交网络账号" 
+                                :label="$t('admin.label.selectSocialAccounts')" 
                                 hide-selected 
                                 multiple 
                                 chips 
@@ -214,7 +214,7 @@
                                 item-value="value"
                                 return-object
                             />
-                  
+                      
                             <div
                                 v-for="s in settings.SOCIALS"
                                 :key="'social-'+s.value"
@@ -225,7 +225,7 @@
                                     <a
                                         class="text-caption text-decoration-underline cursor-pointer"
                                         @click="show_sns_config(s)"
-                                    >配置说明</a>
+                                    >{{ $t('admin.label.configurationGuide') }}</a>
                                 </div>
                                 <v-row dense>
                                     <v-col
@@ -236,7 +236,7 @@
                                             v-model="settings['SOCIAL_AUTH_'+s.value.toUpperCase()+'_KEY']"
                                             density="compact"
                                             hide-details
-                                            label="Key/AppID"
+                                            :label="$t('admin.label.keyAppid')"
                                             type="text"
                                         />
                                     </v-col>
@@ -248,7 +248,7 @@
                                             v-model="settings['SOCIAL_AUTH_'+s.value.toUpperCase()+'_SECRET']"
                                             density="compact"
                                             hide-details
-                                            label="Secret/Key"
+                                            :label="$t('admin.label.secretKey')"
                                             type="text"
                                         />
                                     </v-col>
@@ -267,12 +267,12 @@
         <br>
         <div class="text-center mb-8">
             <v-btn
-                color="primary"
-                size="large"
-                @click="save_settings"
-            >
-                保存配置
-            </v-btn>
+                    color="primary"
+                    size="large"
+                    @click="save_settings"
+                >
+                    {{ $t('admin.button.saveSettings') }}
+                </v-btn>
         </div>
     </div>
 </template>
@@ -283,7 +283,7 @@ import SSLManager from '~/components/SSLManager.vue';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
-const { $backend, $alert } = useNuxtApp();
+const { $backend, $alert, $t } = useNuxtApp();
 
 store.setNavbar(true);
 
@@ -294,45 +294,45 @@ const site_url = ref('');
 const cards = ref([
     {
         show: false,
-        title: '基础信息',
+        title: $t('admin.section.basicInfo'),
         fields: [
-            { icon: 'mdi-home', key: 'site_title', label: '网站标题', },
-            { icon: 'mdi-copyright', key: 'HEADER', label: '网站公告', type: 'textarea' },
-            { icon: 'mdi-copyright', key: 'FOOTER', label: '网站脚注', type: 'textarea' },
-            { icon: 'mdi-code-tags', key: 'FOOTER_EXTRA_HTML', label: '页脚额外HTML内容', type: 'textarea' },
-            { icon: 'mdi-code-tags', key: 'SIDEBAR_EXTRA_HTML', label: '侧边栏额外HTML内容', type: 'textarea' },
-            { key: 'SHOW_SIDEBAR_SYS', label: '在侧边栏中显示系统信息', type: 'checkbox' },
+            { icon: 'mdi-home', key: 'site_title', label: $t('admin.label.siteTitle'), },
+            { icon: 'mdi-copyright', key: 'HEADER', label: $t('admin.label.siteAnnouncement'), type: 'textarea' },
+            { icon: 'mdi-copyright', key: 'FOOTER', label: $t('admin.label.siteFooter'), type: 'textarea' },
+            { icon: 'mdi-code-tags', key: 'FOOTER_EXTRA_HTML', label: $t('admin.label.footerExtraHtml'), type: 'textarea' },
+            { icon: 'mdi-code-tags', key: 'SIDEBAR_EXTRA_HTML', label: $t('admin.label.sidebarExtraHtml'), type: 'textarea' },
+            { key: 'SHOW_SIDEBAR_SYS', label: $t('admin.label.showSidebarSys'), type: 'checkbox' },
         ],
         groups: [
             {
                 key: 'ALLOW_FEEDBACK',
-                label: '显示反馈按钮',
+                label: $t('admin.label.showFeedback'),
                 fields: [
-                    { icon: 'mdi-link', key: 'FEEDBACK_URL', label: '反馈按钮跳转地址' },
+                    { icon: 'mdi-link', key: 'FEEDBACK_URL', label: $t('admin.label.feedbackUrl') },
                 ],
             },
             {
                 key: 'INVITE_MODE',
-                label: '开启私人图书馆模式',
+                label: $t('admin.label.inviteMode'),
                 fields: [
-                    { icon: 'mdi-lock', key: 'INVITE_CODE', label: '访问码' },
-                    { icon: 'mdi-account', key: 'INVITE_MESSAGE', type: 'textarea', label: '提示语' },
+                    { icon: 'mdi-lock', key: 'INVITE_CODE', label: $t('admin.label.inviteCode') },
+                    { icon: 'mdi-account', key: 'INVITE_MESSAGE', type: 'textarea', label: $t('admin.label.inviteMessage') },
                 ],
             },
         ],
     },
     {
         show: false,
-        title: '用户设置',
+        title: $t('admin.section.userSettings'),
         groups: [
             {
                 key: 'ALLOW_REGISTER',
-                label: '允许访客以邮箱注册账号',
+                label: $t('admin.label.allowRegister'),
                 fields: [
-                    { icon: 'mdi-information', key: 'SIGNUP_MAIL_TITLE', label: '激活邮件标题' },
-                    { icon: 'mdi-information', key: 'SIGNUP_MAIL_CONTENT', label: '激活邮件正文', type: 'textarea' },
-                    { icon: 'mdi-information', key: 'RESET_MAIL_TITLE', label: '重置密码邮件标题' },
-                    { icon: 'mdi-information', key: 'RESET_MAIL_CONTENT', label: '重置密码邮件正文', type: 'textarea' },
+                    { icon: 'mdi-information', key: 'SIGNUP_MAIL_TITLE', label: $t('admin.label.activationEmailTitle') },
+                    { icon: 'mdi-information', key: 'SIGNUP_MAIL_CONTENT', label: $t('admin.label.activationEmailContent'), type: 'textarea' },
+                    { icon: 'mdi-information', key: 'RESET_MAIL_TITLE', label: $t('admin.label.resetPasswordEmailTitle') },
+                    { icon: 'mdi-information', key: 'RESET_MAIL_CONTENT', label: $t('admin.label.resetPasswordEmailContent'), type: 'textarea' },
                 ],
             },
         ],
@@ -340,52 +340,52 @@ const cards = ref([
 
     {
         show: false,
-        title: '社交网络登录',
+        title: $t('admin.section.socialLogin'),
         fields: [ ],
         show_socials: true,
     },
     {
         show: false,
-        title: '邮件服务',
-        subtitle: '邮箱注册、推送Kindle依赖此配置(SMTP服务器地址可带端口，或者不带端口，默认为465号)',
+        title: $t('admin.section.emailService'),
+        subtitle: $t('admin.message.emailServiceInfo'),
         fields: [
-            { icon: 'mdi-email', key: 'smtp_server', label: 'SMTP服务器（例如 smtp-mail.outlook.com:587）' },
-            { icon: 'mdi-account', key: 'smtp_username', label: 'SMTP用户名（例如 user@gmail.com）' },
-            { icon: 'mdi-lock', key: 'smtp_password', label: 'SMTP密码' },
-            { icon: 'mdi-information', key: 'smtp_encryption', label: 'SMTP安全性', type: 'select',
-                items: [{text: 'SSL', value: 'SSL'}, {text: 'TLS(多数邮箱为此选项)', value: 'TLS'} ]
+            { icon: 'mdi-email', key: 'smtp_server', label: $t('admin.label.smtpServer') },
+            { icon: 'mdi-account', key: 'smtp_username', label: $t('admin.label.smtpUsername') },
+            { icon: 'mdi-lock', key: 'smtp_password', label: $t('admin.label.smtpPassword') },
+            { icon: 'mdi-information', key: 'smtp_encryption', label: $t('admin.label.smtpEncryption'), type: 'select',
+                items: [{text: $t('admin.option.ssl'), value: 'SSL'}, {text: $t('admin.option.tls'), value: 'TLS'} ]
             },
         ],
         buttons: [
-            { icon: 'mdi-email-check', label: '测试邮件', action: 'test_email' },
+            { icon: 'mdi-email-check', label: $t('admin.button.testEmail'), action: 'test_email' },
         ],
     },
     {
         show: false,
-        title: '书籍标签分类',
-        subtitle: '配置「分类导航」页面里预设的分类。添加书籍时，若书名或者作者名称出现以下分类，则自动添加对应的标签。',
+        title: $t('admin.section.bookCategories'),
+        subtitle: $t('admin.message.bookCategoriesInfo'),
         fields: [
-            { icon: 'mdi-tag-multiple', key: 'BOOK_NAV', type: 'textarea', label: '分类' },
+            { icon: 'mdi-tag-multiple', key: 'BOOK_NAV', type: 'textarea', label: $t('admin.label.categories') },
         ],
     },
     {
         show: false,
-        title: '友情链接',
+        title: $t('admin.section.friendshipLinks'),
         fields: [ ],
         show_friends: true,
     },
 
     {
         show: false,
-        title: '互联网书籍信息源',
+        title: $t('admin.section.bookInfoSources'),
         fields: [
-            { icon: '', key: 'auto_fill_meta', label: '自动从互联网拉取新书的书籍信息', type: 'checkbox' },
-            { icon: 'mdi-information', key: 'douban_baseurl', label: '豆瓣插件API地址(例如 http://10.0.0.1:8080 )' },
-            { icon: 'mdi-information', key: 'douban_max_count', label: '豆瓣插件API查询结果数量' },
+            { icon: '', key: 'auto_fill_meta', label: $t('admin.label.autoFillMeta'), type: 'checkbox' },
+            { icon: 'mdi-information', key: 'douban_baseurl', label: $t('admin.label.doubanBaseurl') },
+            { icon: 'mdi-information', key: 'douban_max_count', label: $t('admin.label.doubanMaxCount') },
         ],
         tips: [
             {
-                text: '若需要启用豆瓣插件，请参阅安装文档的说明。若出现失败，可尝试更换镜像，例如 talebook/douban-api-rs ',
+                text: $t('admin.message.doubanPluginInfo'),
                 link: 'https://github.com/talebook/talebook/blob/master/document/README.zh_CN.md#%E5%A6%82%E6%9E%9C%E9%85%8D%E7%BD%AE%E8%B1%86%E7%93%A3%E6%8F%92%E4%BB%B6',
             }
         ],
@@ -393,27 +393,27 @@ const cards = ref([
 
     {
         show: false,
-        title: '高级配置项',
+        title: $t('admin.section.advancedSettings'),
         fields: [
-            { icon: 'mdi-home', key: 'static_host', label: 'CDN域名' },
-            { icon: 'mdi-information', key: 'BOOK_NAMES_FORMAT', label: '目录和文件名模式', type: 'select',
-                items: [{text: '使用拼音字母目录名 (兼容性高)', value: 'en'}, {text: '使用中文目录名 (UTF8编码，更美观)', value: 'utf8'} ]
+            { icon: 'mdi-home', key: 'static_host', label: $t('admin.label.staticHost') },
+            { icon: 'mdi-information', key: 'BOOK_NAMES_FORMAT', label: $t('admin.label.bookNamesFormat'), type: 'select',
+                items: [{text: $t('admin.option.pinyinDir'), value: 'en'}, {text: $t('admin.option.chineseDir'), value: 'utf8'} ]
             },
-            { icon: 'mdi-information', key: 'EPUB_VIEWER', label: 'EPUB阅读器', type: 'select',
-                items: [{text: 'Epub Reader（旧版）', value: 'epubjs.html'}, {text: 'Candle Reader（Beta版，支持章评功能）', value: 'creader.html'} ]
+            { icon: 'mdi-information', key: 'EPUB_VIEWER', label: $t('admin.label.epubViewer'), type: 'select',
+                items: [{text: $t('admin.option.oldEpubReader'), value: 'epubjs.html'}, {text: $t('admin.option.candleReader'), value: 'creader.html'} ]
             },
-            { icon: 'mdi-information', key: 'avatar_service', label: '可使用www.gravatar.com或cravatar.cn头像服务' },
-            { icon: 'mdi-information', key: 'MAX_UPLOAD_SIZE', label: '文件上传字节数限制(例如100MB或100KB）' },
-            { icon: 'mdi-lock', key: 'cookie_secret', label: 'COOKIE随机密钥' },
-            { icon: 'mdi-folder', key: 'scan_upload_path', label: '批量导入扫描目录' },
-            { icon: 'mdi-information', key: 'push_title', label: '邮件推送的标题' },
-            { icon: 'mdi-information', key: 'push_content', label: '邮件推送的内容' },
-            { icon: 'mdi-clock', key: 'convert_timeout', label: '书籍转换格式的最大超时时间（秒）' },
-            { icon: '', key: 'autoreload', label: '更新配置后自动重启服务器(首次开启需人工重启)', type: 'checkbox' },
+            { icon: 'mdi-information', key: 'avatar_service', label: $t('admin.label.avatarService') },
+            { icon: 'mdi-information', key: 'MAX_UPLOAD_SIZE', label: $t('admin.label.maxUploadSize') },
+            { icon: 'mdi-lock', key: 'cookie_secret', label: $t('admin.label.cookieSecret') },
+            { icon: 'mdi-folder', key: 'scan_upload_path', label: $t('admin.label.scanUploadPath') },
+            { icon: 'mdi-information', key: 'push_title', label: $t('admin.label.pushTitle') },
+            { icon: 'mdi-information', key: 'push_content', label: $t('admin.label.pushContent') },
+            { icon: 'mdi-clock', key: 'convert_timeout', label: $t('admin.label.convertTimeout') },
+            { icon: '', key: 'autoreload', label: $t('admin.label.autoreload'), type: 'checkbox' },
         ],
         tips: [
             {
-                text: '若需要调整Logo，请参阅安装文档的说明。',
+                text: $t('admin.message.logoInfo'),
                 link: 'https://github.com/talebook/talebook/blob/master/document/README.zh_CN.md#logo',
             }
         ],
@@ -421,19 +421,19 @@ const cards = ref([
 
     {
         show: false,
-        title: 'SSL证书管理',
+        title: $t('admin.section.sslManagement'),
         fields: [],
         show_ssl: true,
     },
     {
         show: false,
-        title: 'OPDS 设置',
+        title: $t('admin.section.opdsSettings'),
         fields: [
-            { icon: 'mdi-book-open-variant', key: 'OPDS_ENABLED', label: '启用 OPDS 服务', type: 'checkbox' },
+            { icon: 'mdi-book-open-variant', key: 'OPDS_ENABLED', label: $t('admin.label.opdsEnabled'), type: 'checkbox' },
         ],
         tips: [
             {
-                text: 'OPDS（Open Publication Distribution System）是一种用于电子书分发的开放标准，关闭后将无法通过OPDS客户端访问书库。',
+                text: $t('admin.message.opdsInfo'),
             }
         ],
     },
@@ -513,7 +513,7 @@ const run = (func) => {
 };
 
 useHead({
-    title: '系统设置'
+    title: $t('admin.title.settings')
 });
 </script>
 

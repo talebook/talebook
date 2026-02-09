@@ -2,7 +2,7 @@
 <template>
     <v-card>
         <v-card-title class="d-flex justify-space-between align-center">
-            <span> 用户管理 </span>
+            <span> {{ $t('admin.title.users') }} </span>
             <div>
                 <v-btn
                     color="primary"
@@ -12,7 +12,7 @@
                     <v-icon start>
                         mdi-account-group
                     </v-icon>
-                    访客权限
+                    {{ $t('admin.button.guestPermission') }}
                 </v-btn>
                 <v-btn
                     color="primary"
@@ -21,7 +21,7 @@
                     <v-icon start>
                         mdi-plus
                     </v-icon>
-                    添加用户
+                    {{ $t('admin.button.addUser') }}
                 </v-btn>
             </div>
         </v-card-title>
@@ -32,7 +32,7 @@
             max-width="500px"
         >
             <v-card>
-                <v-card-title> 添加新用户 </v-card-title>
+                <v-card-title> {{ $t('admin.button.addUser') }} </v-card-title>
                 <v-card-text>
                     <v-form
                         ref="addUserForm"
@@ -41,57 +41,54 @@
                         <!-- 基本信息 -->
                         <v-text-field
                             v-model="newUser.username"
-                            label="用户名"
+                            :label="$t('admin.label.username')"
                             :rules="[requiredRule, usernameRule]"
                             required
                             prepend-icon="mdi-account"
-                            placeholder="请输入用户名，小写字母开头"
+                            :placeholder="$t('admin.placeholder.username')"
                         />
-                        
                         <v-text-field
                             v-model="newUser.password"
-                            label="密码"
+                            :label="$t('admin.label.password')"
                             :rules="[requiredRule, passwordRule]"
                             required
                             prepend-icon="mdi-lock"
                             type="password"
-                            placeholder="请输入8-20个字符的密码"
+                            :placeholder="$t('admin.placeholder.password')"
                         />
-                        
                         <v-text-field
                             v-model="newUser.name"
-                            label="昵称"
+                            :label="$t('admin.label.nickname')"
                             :rules="[requiredRule, nicknameRule]"
                             required
                             prepend-icon="mdi-account-circle"
-                            placeholder="请输入用户昵称，至少2个字符"
+                            :placeholder="$t('admin.placeholder.nickname')"
                         />
-                        
                         <v-text-field
                             v-model="newUser.email"
-                            label="邮箱"
+                            :label="$t('admin.label.email')"
                             :rules="[requiredRule, emailRule]"
                             required
                             prepend-icon="mdi-email"
-                            placeholder="请输入邮箱地址"
+                            :placeholder="$t('admin.placeholder.email')"
                         />
                         
                         <!-- 账号设置 -->
                         <v-divider class="my-4" />
                         <h3 class="mb-2">
-                            账号设置
+                            {{ $t('admin.section.accountSettings') }}
                         </h3>
                         
                         <v-checkbox
                             v-model="newUser.active"
-                            label="激活状态"
+                            :label="$t('admin.label.activeStatus')"
                             color="primary"
                             hide-details
                         />
                         
                         <v-checkbox
                             v-model="newUser.admin"
-                            label="管理员权限"
+                            :label="$t('admin.label.adminPermission')"
                             color="primary"
                             hide-details
                         />
@@ -99,7 +96,7 @@
                         <!-- 权限设置 -->
                         <v-divider class="my-4" />
                         <h3 class="mb-2">
-                            权限设置
+                            {{ $t('admin.section.permissionSettings') }}
                         </h3>
                         
                         <v-container fluid>
@@ -128,13 +125,13 @@
                         text
                         @click="showAddDialog = false"
                     >
-                        取消
+                        {{ $t('common.cancel') }}
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="addUser"
                     >
-                        确定
+                        {{ $t('common.confirm') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -146,7 +143,7 @@
             max-width="500px"
         >
             <v-card>
-                <v-card-title> 访客权限设置 </v-card-title>
+                <v-card-title> {{ $t('admin.button.guestPermission') }} </v-card-title>
                 <v-card-text>
                     <v-form ref="guestPermissionForm">
                         <v-container fluid>
@@ -173,13 +170,13 @@
                         text
                         @click="showGuestPermissionDialog = false"
                     >
-                        取消
+                        {{ $t('common.cancel') }}
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="saveGuestPermissions"
                     >
-                        保存
+                        {{ $t('common.save') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -209,17 +206,17 @@
                 <v-menu>
                     <template #activator="{ props }">
                         <v-btn
-                            color="primary"
-                            size="small"
-                            v-bind="props"
-                        >
-                            操作 <v-icon size="small">
-                                mdi-dots-vertical
-                            </v-icon>
-                        </v-btn>
+                                color="primary"
+                                size="small"
+                                v-bind="props"
+                            >
+                                {{ $t('admin.user.action') }} <v-icon size="small">
+                                    mdi-dots-vertical
+                                </v-icon>
+                            </v-btn>
                     </template>
                     <v-list density="compact">
-                        <v-list-subheader>修改用户权限</v-list-subheader>
+                        <v-list-subheader>{{ $t('admin.user.modifyPermission') }}</v-list-subheader>
                         <template
                             v-for="perm in permissions"
                             :key="perm.name"
@@ -230,7 +227,7 @@
                                         mdi-account-check
                                     </v-icon>
                                 </template>
-                                <v-list-item-title>已允许{{ perm.text }}</v-list-item-title>
+                                <v-list-item-title>{{ $t('admin.user.enabled') }}{{ perm.text }}</v-list-item-title>
                                 <template #append>
                                     <v-btn
                                         variant="text"
@@ -241,7 +238,7 @@
                                             item[perm.name] = !item[perm.name];
                                         "
                                     >
-                                        关闭
+                                        {{ $t('admin.user.disable') }}
                                     </v-btn>
                                 </template>
                             </v-list-item>
@@ -254,7 +251,7 @@
                                         mdi-account-remove
                                     </v-icon>
                                 </template>
-                                <v-list-item-title>已禁止{{ perm.text }}</v-list-item-title>
+                                <v-list-item-title>{{ $t('admin.user.disabled') }}{{ perm.text }}</v-list-item-title>
                                 <template #append>
                                     <v-btn
                                         variant="text"
@@ -265,14 +262,14 @@
                                             item[perm.name] = !item[perm.name];
                                         "
                                     >
-                                        开启
+                                        {{ $t('admin.user.enable') }}
                                     </v-btn>
                                 </template>
                             </v-list-item>
                         </template>
 
                         <v-divider />
-                        <v-list-subheader>账号管理</v-list-subheader>
+                        <v-list-subheader>{{ $t('admin.user.accountManagement') }}</v-list-subheader>
                         <v-list-item
                             v-if="!item.is_active"
                             @click="
@@ -280,7 +277,7 @@
                                 item.is_active = true;
                             "
                         >
-                            <v-list-item-title> 免邮箱认证，直接激活账户 </v-list-item-title>
+                            <v-list-item-title> {{ $t('admin.user.activateAccount') }} </v-list-item-title>
                         </v-list-item>
                         <v-list-item
                             v-if="item.is_admin"
@@ -289,7 +286,7 @@
                                 item.is_admin = !item.is_admin;
                             "
                         >
-                            <v-list-item-title> 取消管理员 </v-list-item-title>
+                            <v-list-item-title> {{ $t('admin.user.removeAdmin') }} </v-list-item-title>
                         </v-list-item>
                         <v-list-item
                             v-else
@@ -298,7 +295,7 @@
                                 item.is_admin = !item.is_admin;
                             "
                         >
-                            <v-list-item-title> 设置为管理员 </v-list-item-title>
+                            <v-list-item-title> {{ $t('admin.user.setAdmin') }} </v-list-item-title>
                         </v-list-item>
                         <v-list-item
                             @click="
@@ -306,7 +303,7 @@
                                 getDataFromApi()
                             "
                         >
-                            <v-list-item-title> 立即删除该用户 </v-list-item-title>
+                            <v-list-item-title> {{ $t('admin.user.deleteUser') }} </v-list-item-title>
                         </v-list-item>
                     </v-list>
                 </v-menu>
@@ -320,7 +317,7 @@ import { ref, onMounted } from 'vue';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
-const { $backend, $alert } = useNuxtApp();
+const { $backend, $alert, $t } = useNuxtApp();
 
 store.setNavbar(true);
 
@@ -375,23 +372,23 @@ const guestPermissions = ref({
 });
 
 const guestPermissionList = [
-    { key: 'ALLOW_GUEST_READ', label: '允许访客在线阅读（无需注册和登录）' },
-    { key: 'ALLOW_GUEST_DOWNLOAD', label: '允许任意下载（访客无需注册和登录）' },
-    { key: 'ALLOW_GUEST_PUSH', label: '允许任意推送Kindle（访客无需注册和登录）' },
-    { key: 'ALLOW_GUEST_UPLOAD', label: '允许访客上传书籍（无需注册和登录）' },
+    { key: 'ALLOW_GUEST_READ', label: $t('admin.label.allowGuestRead') },
+    { key: 'ALLOW_GUEST_DOWNLOAD', label: $t('admin.label.allowGuestDownload') },
+    { key: 'ALLOW_GUEST_PUSH', label: $t('admin.label.allowGuestPush') },
+    { key: 'ALLOW_GUEST_UPLOAD', label: $t('admin.label.allowGuestUpload') },
 ];
 
 const headers = [
     { title: 'ID', key: 'id', sortable: true },
-    { title: '用户名', key: 'username', sortable: true },
-    { title: '昵称', key: 'name', sortable: false },
+    { title: $t('admin.label.username'), key: 'username', sortable: true },
+    { title: $t('admin.label.nickname'), key: 'name', sortable: false },
     { title: 'Email', key: 'email', sortable: true },
-    { title: '注册平台', key: 'provider', sortable: false },
-    { title: '注册时间', key: 'create_time', sortable: true },
-    { title: '登录时间', key: 'access_time', sortable: true },
-    { title: '登录IP', key: 'login_ip', sortable: false },
-    { title: '详情', key: 'detail', sortable: false },
-    { title: '操作', key: 'actions', sortable: false },
+    { title: $t('admin.label.registrationPlatform'), key: 'provider', sortable: false },
+    { title: $t('admin.label.registrationTime'), key: 'create_time', sortable: true },
+    { title: $t('admin.label.loginTime'), key: 'access_time', sortable: true },
+    { title: $t('admin.label.loginIp'), key: 'login_ip', sortable: false },
+    { title: $t('admin.label.detail'), key: 'detail', sortable: false },
+    { title: $t('admin.label.action'), key: 'actions', sortable: false },
 ];
 
 const permissions = [
@@ -544,6 +541,6 @@ onMounted(() => {
 });
 
 useHead({
-    title: '用户管理'
+    title: $t('admin.title.users')
 });
 </script>
