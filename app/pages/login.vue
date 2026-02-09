@@ -18,7 +18,7 @@
                         dark
                         color="primary"
                     >
-                        <v-toolbar-title>欢迎访问</v-toolbar-title>
+                        <v-toolbar-title>{{ $t('common.welcome') }}</v-toolbar-title>
                         <v-spacer />
                         <v-btn
                             v-if="allowRegister"
@@ -28,7 +28,7 @@
                             to="/signup"
                             class="text-white mr-4"
                         >
-                            注册
+                            {{ $t('auth.signUp') }}
                         </v-btn>
                     </v-toolbar>
                     <v-card-text>
@@ -36,14 +36,14 @@
                             <v-text-field
                                 v-model="username"
                                 prepend-icon="mdi-account"
-                                label="用户名"
+                                :label="$t('auth.username')"
                                 type="text"
                             />
                             <v-text-field
                                 id="password"
                                 v-model="password"
                                 prepend-icon="mdi-lock"
-                                label="密码"
+                                :label="$t('auth.password')"
                                 type="password"
                             />
                             <p class="text-right">
@@ -51,7 +51,7 @@
                                     class="press-content"
                                     href="javascript:void(0)"
                                     @click="show_login = !show_login"
-                                > 忘记密码? </a>
+                                > {{ $t('auth.forgotPassword') }} </a>
                             </p>
                             <div align="center">
                                 <v-btn
@@ -61,7 +61,7 @@
                                     color="primary"
                                     :loading="loading"
                                 >
-                                    登录
+                                    {{ $t('auth.signIn') }}
                                 </v-btn>
                             </div>
                         </v-form>
@@ -71,7 +71,7 @@
                         <v-divider />
                         <div align="center">
                             <br>
-                            <small>使用社交网络账号登录</small>
+                            <small>{{ $t('auth.socialLogin') }}</small>
                             <br>
                             <template
                                 v-for="s in socials"
@@ -105,20 +105,20 @@
                         dark
                         color="red"
                     >
-                        <v-toolbar-title>重置密码</v-toolbar-title>
+                        <v-toolbar-title>{{ $t('auth.resetPassword') }}</v-toolbar-title>
                     </v-toolbar>
                     <v-card-text>
                         <v-form @submit.prevent="do_reset">
                             <v-text-field
                                 v-model="username"
                                 prepend-icon="mdi-account"
-                                label="用户名"
+                                :label="$t('auth.username')"
                                 type="text"
                             />
                             <v-text-field
                                 v-model="email"
                                 prepend-icon="mdi-email"
-                                label="注册邮箱"
+                                :label="$t('auth.email')"
                                 type="text"
                                 autocomplete="old-email"
                             />
@@ -132,7 +132,7 @@
                                     class="mr-5"
                                     @click="show_login = !show_login"
                                 >
-                                    返回
+                                    {{ $t('common.back') }}
                                 </v-btn>
                                 <v-btn
                                     rounded
@@ -141,7 +141,7 @@
                                     type="submit"
                                     :loading="loading"
                                 >
-                                    重置密码
+                                    {{ $t('auth.resetPassword') }}
                                 </v-btn>
                             </div>
                         </v-form>
@@ -163,9 +163,11 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
 const store = useMainStore();
+const { t } = useI18n();
 const { $backend } = useNuxtApp();
 
 const username = ref('');
@@ -225,7 +227,7 @@ const do_login = async () => {
         }
     } catch (e) {
         alert.value.type = 'error';
-        alert.value.msg = '网络错误';
+        alert.value.msg = t('errors.networkError');
     } finally {
         loading.value = false;
     }
@@ -247,22 +249,22 @@ const do_reset = async () => {
         
         if (rsp.err == 'ok') {
             alert.value.type = 'success';
-            alert.value.msg = '重置成功！请查阅密码通知邮件。';
+            alert.value.msg = t('auth.resetSuccess');
         } else {
             alert.value.type = 'error';
             alert.value.msg = rsp.msg;
         }
     } catch (e) {
         alert.value.type = 'error';
-        alert.value.msg = '网络错误';
+        alert.value.msg = t('errors.networkError');
     } finally {
         loading.value = false;
     }
 };
 
-useHead({
-    title: '登录'
-});
+useHead(() => ({
+    title: t('auth.signIn')
+}));
 </script>
 
 <style scoped>

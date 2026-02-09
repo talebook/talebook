@@ -563,6 +563,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useAsyncData, useCookie, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
@@ -572,6 +573,7 @@ const route = useRoute();
 const router = useRouter();
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
+const { t } = useI18n();
 const cookie = useCookie('last_mailto');
 
 const bookid = route.params.bid;
@@ -688,7 +690,7 @@ const email_items = computed(() => {
 });
 
 useHead({
-    title: () => book.value.title || '书籍详情'
+    title: () => book.value.title || t('book.detailsTitle')
 });
 
 // Other methods

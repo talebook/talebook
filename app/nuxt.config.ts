@@ -4,7 +4,8 @@ export default defineNuxtConfig({
     devtools: { enabled: true },
     modules: [
         'vuetify-nuxt-module',
-        '@pinia/nuxt'
+        '@pinia/nuxt',
+        '@nuxtjs/i18n'
     ],
     css: [
         '@mdi/font/css/materialdesignicons.css'
@@ -65,5 +66,39 @@ export default defineNuxtConfig({
             crawlLinks: false,
             failOnError: false,
         }
+    },
+    
+    i18n: {
+        // 策略配置
+        strategy: 'no_prefix', // 使用 cookie 管理语言，不添加路径前缀
+        defaultLocale: 'zh', // 默认语言
+        locales: [
+            {
+                code: 'zh',
+                name: '简体中文',
+                iso: 'zh-CN',
+                file: 'zh-CN.json'
+            },
+            {
+                code: 'en-US',
+                name: 'English (US)',
+                iso: 'en-US',
+                file: 'en-US.json'
+            }
+        ],
+        
+        // 语言文件目录 - 相对于项目根目录
+        langDir: 'locales/',
+        
+        // 检测浏览器语言并重定向
+        detectBrowserLanguage: {
+            useCookie: true,
+            cookieKey: 'i18n_redirected',
+            redirectOn: 'root', // 在根路径检测并重定向
+            alwaysRedirect: false
+        },
+        
+        // Vue I18n 配置
+        vueI18n: './i18n.config.ts'
     }
 });

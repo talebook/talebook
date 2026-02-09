@@ -1,7 +1,7 @@
 <template>
     <v-card>
         <v-card-title>
-            导入图书 <v-chip
+            {{ $t('admin.imports.title') }} <v-chip
                 size="small"
                 variant="elevated"
                 color="primary ml-2"
@@ -10,13 +10,9 @@
             </v-chip>
         </v-card-title>
         <v-card-text>
-            请将需要导入的书籍放入{{ scan_dir }}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。<br>
-            请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。<br>
-            另外，还可以使用<a
-                class="press-content"
-                target="_blank"
-                href="https://calibre-ebook.com/"
-            >PC版Calibre软件</a>管理书籍，但是请注意：使用完PC版后，需重启Web版方可生效。
+            {{ $t('admin.imports.description', {dir: scan_dir}) }}<br>
+            {{ $t('admin.imports.note') }}<br>
+            {{ $t('admin.imports.calibreNote') }}
         </v-card-text>
         <v-card-actions>
             <v-btn
@@ -27,7 +23,7 @@
             >
                 <v-icon start>
                     mdi-reload
-                </v-icon>刷新
+                </v-icon>{{ $t('admin.imports.actions.refresh') }}
             </v-btn>
             <v-btn
                 :disabled="loading"
@@ -37,7 +33,7 @@
             >
                 <v-icon start>
                     mdi-file-find
-                </v-icon>扫描书籍
+                </v-icon>{{ $t('admin.imports.actions.scanBooks') }}
             </v-btn>
             <v-btn
                 :disabled="loading"
@@ -47,7 +43,7 @@
             >
                 <v-icon start>
                     mdi-database-import
-                </v-icon>从其他 OPDS 导入
+                </v-icon>{{ $t('admin.imports.actions.importFromOpds') }}
             </v-btn>
             <template v-if="selected.length > 0">
                 <v-btn
@@ -58,7 +54,7 @@
                 >
                     <v-icon start>
                         mdi-import
-                    </v-icon>导入选中书籍
+                    </v-icon>{{ $t('admin.imports.actions.importSelected') }}
                 </v-btn>
                 <v-btn
                     :disabled="loading"
@@ -68,7 +64,7 @@
                 >
                     <v-icon start>
                         mdi-delete
-                    </v-icon>删除
+                    </v-icon>{{ $t('admin.imports.actions.delete') }}
                 </v-btn>
             </template>
             <template v-else>
@@ -80,23 +76,23 @@
                 >
                     <v-icon start>
                         mdi-import
-                    </v-icon>导入全部书籍
+                    </v-icon>{{ $t('admin.imports.actions.importAll') }}
                 </v-btn>
             </template>
             <v-spacer />
             <v-checkbox
                 v-model="delete_after_import"
-                label="导入后删除源文件"
+                :label="$t('admin.imports.options.deleteAfterImport')"
                 color="primary"
                 hide-details
             />
         </v-card-actions>
         <v-card-text>
             <div v-if="selected.length == 0">
-                请勾选需要处理的文件（默认情况下导入全部书籍即可。已存在的书籍，即使勾选了也不会重复导入）
+                {{ $t('admin.imports.selectionHint') }}
             </div>
             <div v-else>
-                共选择了{{ selected.length }}个
+                {{ $t('admin.imports.selectedCount', {count: selected.length}) }}
             </div>
         </v-card-text>
         <v-tabs
@@ -104,10 +100,10 @@
             @update:model-value="onFilterChange"
         >
             <v-tab value="todo">
-                待处理 ({{ count_todo }})
+                {{ $t('admin.imports.tabs.todo') }} ({{ count_todo }})
             </v-tab>
             <v-tab value="done">
-                已导入 ({{ count_done }})
+                {{ $t('admin.imports.tabs.done') }} ({{ count_done }})
             </v-tab>
         </v-tabs>
         <v-data-table-server
@@ -130,35 +126,35 @@
                     size="small"
                     color="success"
                 >
-                    可导入
+                    {{ $t('admin.imports.status.ready') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'exist'"
                     size="small"
                     color="grey-lighten-2"
                 >
-                    已存在
+                    {{ $t('admin.imports.status.exist') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'imported'"
                     size="small"
                     color="primary"
                 >
-                    导入成功
+                    {{ $t('admin.imports.status.imported') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'new'"
                     size="small"
                     color="grey"
                 >
-                    待扫描
+                    {{ $t('admin.imports.status.pending') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'downloading'"
                     size="small"
                     color="info"
                 >
-                    下载中
+                    {{ $t('admin.imports.status.downloading') }}
                 </v-chip>
                 <v-chip
                     v-else
@@ -169,13 +165,13 @@
                 </v-chip>
             </template>
             <template #item.title="{ item }">
-                书名：<span v-if="item.book_id == 0"> {{ item.title }} </span>
+                {{ $t('admin.imports.bookInfo.title') }}<span v-if="item.book_id == 0"> {{ item.title }} </span>
                 <a
                     v-else
                     target="_blank"
                     :href="`/book/${item.book_id}`"
                 >{{ item.title }}</a> <br>
-                作者：{{ item.author }}
+                {{ $t('admin.imports.bookInfo.author') }}{{ item.author }}
             </template>
         </v-data-table-server>
     </v-card>
@@ -190,11 +186,13 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 import OpdsImportDialog from '@/components/OpdsImportDialog.vue';
 
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
+const { t } = useI18n();
 
 store.setNavbar(true);
 
@@ -214,11 +212,11 @@ const delete_after_import = ref(false);
 const opdsImportDialogVisible = ref(false);
 
 const headers = [
-    { title: 'ID', key: 'id', sortable: true },
-    { title: '状态', key: 'status', sortable: true },
-    { title: '路径', key: 'path', sortable: true },
-    { title: '扫描信息', key: 'title', sortable: false },
-    { title: '时间', key: 'create_time', sortable: true, width: '200px' },
+    { title: t('admin.imports.headers.id'), key: 'id', sortable: true },
+    { title: t('admin.imports.headers.status'), key: 'status', sortable: true },
+    { title: t('admin.imports.headers.path'), key: 'path', sortable: true },
+    { title: t('admin.imports.headers.title'), key: 'title', sortable: false },
+    { title: t('admin.imports.headers.time'), key: 'create_time', sortable: true, width: '200px' },
 ];
 
 const progress = ref({
@@ -388,7 +386,7 @@ onMounted(() => {
 });
 
 useHead({
-    title: '导入图书'
+    title: () => t('admin.importsTitle')
 });
 </script>
 

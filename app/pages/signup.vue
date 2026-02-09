@@ -15,7 +15,7 @@
                         dark
                         color="primary"
                     >
-                        <v-toolbar-title>填写注册信息</v-toolbar-title>
+                        <v-toolbar-title>{{ $t('auth.signupFormTitle') }}</v-toolbar-title>
                         <v-spacer />
                         <v-btn
                             rounded
@@ -24,7 +24,7 @@
                             to="/login"
                             class="text-white mr-4"
                         >
-                            登录
+                            {{ $t('auth.signIn') }}
                         </v-btn>
                     </v-toolbar>
                     <v-card-text>
@@ -36,7 +36,7 @@
                                 v-model="username"
                                 required
                                 prepend-icon="mdi-account"
-                                label="用户名"
+                                :label="$t('auth.username')"
                                 type="text"
                                 autocomplete="new-username"
                                 :rules="[rules.user]"
@@ -45,7 +45,7 @@
                                 v-model="password"
                                 required
                                 prepend-icon="mdi-lock"
-                                label="密码"
+                                :label="$t('auth.password')"
                                 type="password"
                                 autocomplete="new-password"
                                 :rules="[rules.pass]"
@@ -54,7 +54,7 @@
                                 v-model="password2"
                                 required
                                 prepend-icon="mdi-lock"
-                                label="确认密码"
+                                :label="$t('messages.confirmPassword')"
                                 type="password"
                                 autocomplete="new-password2"
                                 :rules="[validPwd]"
@@ -63,7 +63,7 @@
                                 v-model="nickname"
                                 required
                                 prepend-icon="mdi-face-man"
-                                label="昵称"
+                                :label="$t('messages.nickname')"
                                 type="text"
                                 autocomplete="new-nickname"
                                 :rules="[rules.nick]"
@@ -72,7 +72,7 @@
                                 v-model="email"
                                 required
                                 prepend-icon="mdi-email"
-                                label="Email"
+                                :label="$t('auth.email')"
                                 type="text"
                                 autocomplete="new-email"
                                 :rules="[rules.email]"
@@ -89,7 +89,7 @@
                                     type="submit"
                                     :loading="loading"
                                 >
-                                    注册
+                                    {{ $t('auth.signUp') }}
                                 </v-btn>
                             </div>
                         </v-form>
@@ -112,9 +112,11 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
 const store = useMainStore();
+const { t } = useI18n();
 const { $backend } = useNuxtApp();
 
 const form = ref(null);
@@ -131,20 +133,20 @@ const showNavbar = true; // 后期可通过配置或环境变量控制
 store.setNavbar(showNavbar);
 
 const rules = {
-    user: v => ( v && 20 >= v.length && v.length >= 5) || '用户名长度必须在5-20个字符之间',
-    pass: v => ( v && 20 >= v.length && v.length >= 8) || '密码长度必须在8-20个字符之间',
-    nick: v => (v && v.length >= 2) || '昵称长度至少为2个字符',
+    user: v => ( v && 20 >= v.length && v.length >= 5) || t('validation.usernameLength'),
+    pass: v => ( v && 20 >= v.length && v.length >= 8) || t('validation.passwordLength'),
+    nick: v => (v && v.length >= 2) || t('validation.nickLength'),
     email: function (email) {
         var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-        return re.test(email) || '邮箱格式不正确';
+        return re.test(email) || t('validation.emailInvalid');
     },
 };
 
 const validPwd = (v) => {
     if ( v.length < 8 ) {
-        return '密码长度必须在8-20个字符之间';
+        return t('validation.passwordLength');
     }
-    return v == password.value || '两次输入的密码不一致';
+    return v == password.value || t('validation.passwordMismatch');
 };
 
 onMounted(async () => {
@@ -185,15 +187,15 @@ const signup = async () => {
             router.push('/');
         }
     } catch (e) {
-        failmsg.value = '网络错误';
+        failmsg.value = t('errors.networkError');
     } finally {
         loading.value = false;
     }
 };
 
-useHead({
-    title: '注册'
-});
+useHead(() => ({
+    title: t('auth.signUp')
+}));
 </script>
 
 <style scoped>

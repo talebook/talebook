@@ -3,8 +3,8 @@
     <div>
         <v-btn @click="dialog = !dialog">
             <v-icon start>
-                mdi-upload
-            </v-icon> 更新SSL证书
+                    mdi-upload
+                </v-icon> {{ $t('messages.updateSsl') }}
         </v-btn>
         <v-dialog
             v-model="dialog"
@@ -20,19 +20,19 @@
                     color="primary"
                 >
                     <v-toolbar-title class="ml-4">
-                        上传SSL证书
+                        {{ $t('messages.updateSsl') }}
                     </v-toolbar-title>
                     <v-spacer />
                     <v-btn
                         variant="text"
                         @click="dialog = false"
                     >
-                        关闭
+                        {{ $t('messages.dialogClose') }}
                     </v-btn>
                 </v-toolbar>
                 <v-card-text class="pt-4">
                     <p class="mb-4 text-caption">
-                        请上传PEM格式的证书文件
+                        {{ $t('messages.selectCertFile') }}
                     </p>
                     <v-form
                         ref="form"
@@ -40,13 +40,13 @@
                     >
                         <v-file-input
                             v-model="ssl_crt"
-                            accept=".crt"
-                            label="请选择要上传的证书文件（.crt）"
+                                accept=".crt"
+                                :label="$t('messages.selectCertFile')"
                         />
                         <v-file-input
                             v-model="ssl_key"
-                            accept=".key"
-                            label="请选择要上传的证书私钥（.key）"
+                                accept=".key"
+                                :label="$t('messages.selectKeyFile')"
                         />
                     </v-form>
                 </v-card-text>
@@ -57,7 +57,7 @@
                         color="primary"
                         @click="upload_ssl"
                     >
-                        上传SSL证书
+                        {{ $t('messages.updateSsl') }}
                     </v-btn>
                     <v-spacer />
                 </v-card-actions>
@@ -69,6 +69,9 @@
 <script setup>
 import { ref } from 'vue';
 const { $backend, $alert } = useNuxtApp();
+
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 
 const loading = ref(false);
 const dialog = ref(false);
@@ -88,23 +91,23 @@ const check_certs = async () => {
     const keyFile = Array.isArray(ssl_key.value) ? ssl_key.value[0] : ssl_key.value;
 
     if (!crtFile) {
-        if ($alert) $alert('error', '请选择证书文件');
+        if ($alert) $alert('error', t('messages.selectCertFile'));
         return false;
     }
     if (!keyFile) {
-        if ($alert) $alert('error', '请选择私钥文件');
+        if ($alert) $alert('error', t('messages.selectKeyFile'));
         return false;
     }
 
     var content = await crtFile.text();
     if ( ! re.crt.test(content) ) {
-        if ($alert) $alert('error', '证书文件(.crt)异常，文件内容不是PEM格式');
+        if ($alert) $alert('error', t('messages.certFileError'));
         return false;
     }
 
     content = await keyFile.text();
     if ( ! re.key.test(content) ) {
-        if ($alert) $alert('error', '私钥文件(.key)异常，文件内容不是PEM格式');
+        if ($alert) $alert('error', t('messages.keyFileError'));
         return false;
     }
     return true;
@@ -134,7 +137,7 @@ const upload_ssl = async () => {
         .then( rsp => {
             dialog.value = false;
             if ( rsp.err == 'ok' ) {
-                if ($alert) $alert('success', '上传成功！');
+                if ($alert) $alert('success', t('messages.uploadSuccess'));
             } else {
                 if ($alert) $alert('error', rsp.msg);
             }
