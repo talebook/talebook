@@ -280,12 +280,14 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useAsyncData, useNuxtApp } from 'nuxt/app';
 
 const route = useRoute();
 const router = useRouter();
 const { $backend, $alert } = useNuxtApp();
+const { t } = useI18n();
 
 const bookid = route.params.bid;
 const book = ref({'id': 0, 'files': [], 'tags': [], 'pubdate': ''});
@@ -323,13 +325,13 @@ watch(data, (newData) => {
 
 // 修复3: useHead 使用函数形式
 useHead({
-    title: () => `编辑 ${book.value?.title || '书籍'}`
+    title: () => `${t('actions.edit')} ${book.value?.title || t('common.book')}`
 });
 
 const onCoverFileChange = (file) => {
     if (file) {
         if (file.size > 5 * 1024 * 1024) {
-            $alert('error', '封面图大小不能超过5MB');
+            $alert('error', t('errors.coverTooLarge'));
             coverFile.value = null;
         }
     }
@@ -337,7 +339,7 @@ const onCoverFileChange = (file) => {
 
 const uploadCover = async () => {
     if (!coverFile.value) {
-        $alert('info', '请选择要上传的封面图');
+        $alert('info', t('errors.chooseCover'));
         return;
     }
     
@@ -352,17 +354,17 @@ const uploadCover = async () => {
             body: formData
         });
         
-        if (coverRsp.err === 'ok') {
-            $alert('success', '封面图上传成功！');
+            if (coverRsp.err === 'ok') {
+            $alert('success', t('messages.uploadCoverSuccess'));
             // 刷新书籍信息
             await refresh();
             coverFile.value = null;
         } else {
-            $alert('error', '封面图上传失败：' + coverRsp.msg);
+            $alert('error', t('errors.uploadCoverFailed') + (coverRsp.msg ? (': ' + coverRsp.msg) : ''));
         }
     } catch (error) {
         console.error('上传封面失败:', error);
-        $alert('error', '封面图上传失败');
+        $alert('error', t('errors.uploadCoverFailed'));
     } finally {
         saving.value = false;
     }
@@ -370,7 +372,7 @@ const uploadCover = async () => {
 
 const save_book = async () => {
     if (!book.value.id) {
-        $alert('error', '书籍信息不完整');
+        $alert('error', t('errors.bookInfoIncomplete'));
         return;
     }
     
@@ -423,14 +425,14 @@ const save_book = async () => {
         });
         
         if (rsp.err === 'ok') {
-            $alert('success', '保存成功！');
+            $alert('success', t('messages.savedSuccessfully'));
             router.push('/book/' + book.value.id);
         } else {
             $alert('error', rsp.msg);
         }
     } catch (error) {
         console.error('保存书籍失败:', error);
-        $alert('error', '保存失败');
+        $alert('error', t('errors.saveFailed'));
     } finally {
         saving.value = false;
     }

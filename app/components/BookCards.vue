@@ -43,7 +43,7 @@
                                         v-html="book.comments"
                                     />
                                     <p v-else>
-                                        点击浏览详情
+                                        {{ $t('messages.clickToView') }}
                                     </p>
                                 </div>
                             </v-card-text>
@@ -71,10 +71,10 @@
                         mdi-book-open-variant
                     </v-icon>
                     <h3 class="text-h6 grey--text">
-                        本书库暂无藏书
+                        {{ $t('messages.noBooks') }}
                     </h3>
                     <p class="text-caption grey--text">
-                        请先添加书籍到书库
+                        {{ $t('messages.addBooksFirst') }}
                     </p>
                 </v-card>
             </v-col>
