@@ -87,7 +87,7 @@ export default defineNuxtConfig({
             }
         ],
         
-        // 语言文件目录 - 相对于项目根目录
+        // 语言文件目录 - 相对于i18n/locales/目录
         langDir: 'locales/',
         
         // 检测浏览器语言并重定向

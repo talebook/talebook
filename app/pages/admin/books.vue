@@ -2,7 +2,7 @@
 <template>
     <v-card>
         <v-card-title>
-            {{ $t('admin.booksTitle') }} <v-chip
+            图书管理 <v-chip
                 size="small"
                 variant="elevated"
                 color="primary"
@@ -11,7 +11,7 @@
                 Beta
             </v-chip>
         </v-card-title>
-        <v-card-text> {{ $t('admin.booksNotice') }}</v-card-text>
+        <v-card-text> 此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面</v-card-text>
         <v-card-actions>
             <v-btn
                 :disabled="loading"
@@ -21,7 +21,7 @@
             >
                 <v-icon start>
                     mdi-reload
-                </v-icon>{{ $t('actions.refresh') }}
+                </v-icon>刷新
             </v-btn>
             <v-btn
                 :disabled="loading"
@@ -31,7 +31,7 @@
             >
                 <v-icon start>
                     mdi-information
-                </v-icon>{{ $t('admin.autoUpdateBooks') }}
+                </v-icon>自动更新图书信息...
             </v-btn>
             <v-btn
                 v-if="books_selected.length > 0"
@@ -42,7 +42,7 @@
             >
                 <v-icon start>
                     mdi-delete-alert
-                            </v-icon>{{ $t('actions.bulkDelete') }} ({{ books_selected.length
+                </v-icon>批量删除 ({{ books_selected.length
                 }})
             </v-btn>
             <v-spacer />
@@ -50,7 +50,7 @@
                 v-model="search"
                 density="compact"
                 append-inner-icon="mdi-magnify"
-                :label="$t('common.search')"
+                label="搜索"
                 single-line
                 hide-details
             />
@@ -71,40 +71,40 @@
             @update:options="updateOptions"
         >
             <template #item.status="{ item }">
-                    <v-chip
+                <v-chip
                     v-if="item.status == 'ready'"
                     size="small"
                     color="success"
                 >
-                    {{ $t('admin.importStatus.ready') }}
+                    可导入
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'exist'"
                     size="small"
                     color="grey-lighten-2"
                 >
-                    {{ $t('admin.importStatus.exist') }}
+                    已存在
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'imported'"
                     size="small"
                     color="primary"
                 >
-                    {{ $t('admin.importStatus.imported') }}
+                    导入成功
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'new'"
                     size="small"
                     color="grey"
                 >
-                    {{ $t('admin.importStatus.pending') }}
+                    待扫描
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'downloading'"
                     size="small"
                     color="info"
                 >
-                    {{ $t('admin.importStatus.downloading') }}
+                    下载中
                 </v-chip>
                 <v-chip
                     v-else
@@ -135,10 +135,10 @@
             </template>
             
             <template #item.title="{ item }">
-                    <div
+                <div
                     class="cursor-pointer"
                     style="min-width: 120px; white-space: normal; word-break: break-word;"
-                    @click="editField(item, 'title', $t('book.field.title'))"
+                    @click="editField(item, 'title', '书名')"
                 >
                     {{ item.title }}
                 </div>
@@ -148,7 +148,7 @@
                 <div
                     class="cursor-pointer"
                     style="min-width: 60px; white-space: normal; word-break: break-word;"
-                    @click="editField(item, 'authors', $t('book.field.authors'))"
+                    @click="editField(item, 'authors', '作者')"
                 >
                     <span v-if="item.authors">{{ item.authors.join("/") }}</span>
                     <span v-else> - </span>
@@ -158,9 +158,9 @@
             <template #item.rating="{ item }">
                 <div
                     class="cursor-pointer"
-                    @click="editField(item, 'rating', $t('book.field.rating'))"
+                    @click="editField(item, 'rating', '评分')"
                 >
-                    <span v-if="item.rating != null">{{ item.rating }} {{ $t('book.ratingStar') }}</span>
+                    <span v-if="item.rating != null">{{ item.rating }} 星</span>
                     <span v-else> - </span>
                 </div>
             </template>
@@ -168,7 +168,7 @@
             <template #item.publisher="{ item }">
                 <div
                     class="cursor-pointer"
-                    @click="editField(item, 'publisher', $t('book.field.publisher'))"
+                    @click="editField(item, 'publisher', '出版社')"
                 >
                     {{ item.publisher || '-' }}
                 </div>
@@ -178,7 +178,7 @@
                 <div
                     class="cursor-pointer"
                     style="min-width: 200px; white-space: normal; word-break: break-word;"
-                    @click="editField(item, 'tags', $t('book.field.tags'))"
+                    @click="editField(item, 'tags', '标签')"
                 >
                     <span v-if="item.tags">{{ (tagsStr = item.tags.join("/"), tagsStr.slice(0, 77) + (tagsStr.length > 70 ? '...' : '')) }}</span>
                     <span v-else> - </span>
@@ -189,7 +189,7 @@
                 <div
                     class="cursor-pointer"
                     style="min-width: 300px; white-space: normal; word-break: break-word;"
-                    @click="editField(item, 'comments', $t('book.field.comments'))"
+                    @click="editField(item, 'comments', '简介')"
                 >
                     {{ item.comments ? item.comments.slice(0, 65) + (item.comments.length > 65 ? '...' : '') : '-' }}
                 </div>
@@ -203,14 +203,14 @@
                             size="small"
                             v-bind="props"
                         >
-                            {{ $t('actions.more') }} <v-icon size="small">
+                            操作 <v-icon size="small">
                                 mdi-dots-vertical
                             </v-icon>
                         </v-btn>
                     </template>
                     <v-list density="compact">
                         <v-list-item @click="delete_book(item)">
-                            <v-list-item-title>{{ $t('actions.deleteBook') }}</v-list-item-title>
+                            <v-list-item-title>删除此书</v-list-item-title>
                         </v-list-item>
                     </v-list>
                 </v-menu>
@@ -223,7 +223,7 @@
             width="500"
         >
             <v-card>
-                <v-card-title>{{ t('actions.edit') }} {{ editFieldLabel }}</v-card-title>
+                <v-card-title>修改{{ editFieldLabel }}</v-card-title>
                 <v-card-text>
                     <v-text-field
                         v-if="['title', 'publisher'].includes(editingField)"
@@ -255,13 +255,13 @@
                         text
                         @click="editDialog = false"
                     >
-                        {{ t('actions.cancel') }}
+                        取消
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="saveField"
                     >
-                        {{ t('actions.save') }}
+                        保存
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -273,7 +273,7 @@
             width="500"
         >
             <v-card>
-                <v-card-title>{{ t('book.editCoverTitle') }}</v-card-title>
+                <v-card-title>修改封面图</v-card-title>
                 <v-card-text>
                     <v-row>
                         <v-col
@@ -294,11 +294,11 @@
                             <v-file-input
                                 v-model="coverFile"
                                 accept="image/jpeg, image/png, image/gif"
-                                :label="t('book.selectCover')"
+                                label="选择封面图"
                                 prepend-icon="mdi-image"
                                 @change="onCoverFileChange"
                             />
-                            <small class="text-caption">{{ t('book.coverSupported') }}</small>
+                            <small class="text-caption">支持JPG、PNG、GIF格式，大小不超过5MB</small>
                         </v-col>
                     </v-row>
                 </v-card-text>
@@ -308,13 +308,13 @@
                         text
                         @click="coverDialog = false"
                     >
-                        {{ $t('admin.books.coverDialog.cancel') }}
+                        取消
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="saveCover"
                     >
-                        {{ $t('admin.books.coverDialog.save') }}
+                        保存
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -329,12 +329,12 @@
         >
             {{ snackText }}
             <template #actions>
-                    <v-btn
-                        variant="text"
-                        @click="snack = false"
-                    >
-                        {{ t('actions.close') }}
-                    </v-btn>
+                <v-btn
+                    variant="text"
+                    @click="snack = false"
+                >
+                    关闭
+                </v-btn>
             </template>
         </v-snackbar>
 
@@ -352,42 +352,43 @@
                     dark
                     color="primary"
                 >
-                    {{ t('admin.books.reminder') }}
+                    提醒
                 </v-toolbar>
                 <v-card-text class="pt-4">
-                    <p> {{ $t('admin.books.metaDialog.description') }}</p>
-                    <p> 1. {{ $t('admin.books.metaDialog.rule1') }}</p>
-                    <p> 2. {{ $t('admin.books.metaDialog.rule2') }}</p>
-                    <p> 3. {{ $t('admin.books.metaDialog.rule3') }} </p>
+                    <p> 即将从互联网拉取所有图书的书籍信息，请了解以下功能限制：</p>
+                    <p> 1. 请在「系统设置」中配置好「互联网书籍信息源」，启用豆瓣插件；</p>
+                    <p> 2. 本操作只更新「没有封面」或「没有简介」的图书；</p>
+                    <p> 3. 受限于豆瓣等服务的限制，每秒钟仅更新1本书; </p>
                     <br>
                     <template v-if="progress.total > 0">
                         <p>
-                            {{ t('admin.books.current_progress') }}：<v-btn
+                            当前进展：<v-btn
                                 size="small"
                                 variant="text"
                                 @click="refresh_progress"
                             >
-                                {{ t('actions.refresh') }}
+                                刷新
                             </v-btn>
                         </p>
                         <p>
-                            {{ $t('admin.books.metaDialog.progressDetails', {total: progress.total, done: progress.done, fail: progress.fail, skip: progress.skip}) }}
+                            总共 {{ progress.total }} 本书籍，已更新 {{ progress.done }} 本，更新失败 {{ progress.fail }} 本，无需处理 {{
+                                progress.skip }} 本。
                         </p>
                     </template>
                     <p v-else>
-                        {{ $t('admin.books.metaDialog.estimatedTime', {minutes: auto_fill_mins}) }}
+                        预计需要运行 {{ auto_fill_mins }} 分钟，在此期间请不要停止程序
                     </p>
                 </v-card-text>
                 <v-card-actions>
                     <v-btn @click="meta_dialog = !meta_dialog">
-                        {{ t('actions.cancel') }}
+                        取消
                     </v-btn>
                     <v-spacer />
                     <v-btn
                         color="primary"
                         @click="auto_fill"
                     >
-                        {{ t('actions.start') }}
+                        开始执行！
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -406,24 +407,24 @@
                     dark
                     color="error"
                 >
-                    {{ t('actions.confirmDelete') }}
+                    确认删除
                 </v-toolbar>
                 <v-card-text class="pt-4">
-                    <p> {{ t('admin.books.confirm_delete_count', {count: books_selected.length}) }}</p>
+                    <p> 您确定要删除选中的 {{ books_selected.length }} 本书籍吗？</p>
                     <p class="text-medium-emphasis">
-                        {{ t('admin.books.delete_warning') }}
+                        此操作不可逆，请谨慎操作！
                     </p>
                 </v-card-text>
                 <v-card-actions>
                     <v-btn @click="delete_dialog = !delete_dialog">
-                        {{ t('actions.cancel') }}
+                        取消
                     </v-btn>
                     <v-spacer />
                     <v-btn
                         color="error"
                         @click="confirm_delete_books"
                     >
-                        {{ t('actions.confirm') }}
+                        确定删除
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -433,12 +434,10 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
-const { t } = useI18n();
 
 store.setNavbar(true);
 
@@ -458,15 +457,15 @@ const itemsPerPage = ref(10);
 const options = ref({ page: 1, itemsPerPage: 10, sortBy: [{ key: 'id', order: 'desc' }] });
 
 const headers = [
-    { title: t('admin.books.headers.cover'), key: 'img', sortable: false, width: '80px' },
-    { title: t('admin.table.id'), key: 'id', sortable: true, width: '80px' },
-    { title: t('admin.table.title'), key: 'title', sortable: true, width: '200px' },
-    { title: t('admin.table.authors'), key: 'authors', sortable: true, width: '100px' },
-    { title: t('admin.table.rating'), key: 'rating', sortable: false, width: '60px' },
-    { title: t('admin.table.publisher'), key: 'publisher', sortable: false },
-    { title: t('admin.table.tags'), key: 'tags', sortable: true, width: '100px' },
-    { title: t('admin.table.comments'), key: 'comments', sortable: true },
-    { title: t('admin.table.actions'), key: 'actions', sortable: false },
+    { title: '封面', key: 'img', sortable: false, width: '80px' },
+    { title: 'ID', key: 'id', sortable: true, width: '80px' },
+    { title: '书名', key: 'title', sortable: true, width: '200px' },
+    { title: '作者', key: 'authors', sortable: true, width: '100px' },
+    { title: '评分', key: 'rating', sortable: false, width: '60px' },
+    { title: '出版社', key: 'publisher', sortable: false },
+    { title: '标签', key: 'tags', sortable: true, width: '100px' },
+    { title: '简介', key: 'comments', sortable: true },
+    { title: '操作', key: 'actions', sortable: false },
 ];
 
 const progress = ref({
@@ -577,7 +576,7 @@ const delete_selected_books = () => {
     if (books_selected.value.length === 0) {
         snack.value = true;
         snackColor.value = 'warning';
-        snackText.value = t('admin.books.selectBooksToDelete');
+        snackText.value = '请先勾选要删除的书籍';
         return;
     }
     delete_dialog.value = true;
@@ -664,7 +663,7 @@ const onCoverFileChange = (e) => {
     const file = Array.isArray(coverFile.value) ? coverFile.value[0] : coverFile.value;
     if (file) {
         if (file.size > 5 * 1024 * 1024) {
-            if ($alert) $alert('error', t('book.coverSizeLimit'));
+            if ($alert) $alert('error', '封面图大小不能超过5MB');
             coverFile.value = null;
         }
     }
@@ -674,7 +673,7 @@ const saveCover = () => {
     const file = Array.isArray(coverFile.value) ? coverFile.value[0] : coverFile.value;
     
     if (!file) {
-        if ($alert) $alert('info', t('book.selectCover'));
+        if ($alert) $alert('info', '请选择要上传的封面图');
         return;
     }
 
@@ -707,7 +706,7 @@ watch(search, () => {
 });
 
 useHead({
-    title: () => t('admin.booksTitle')
+    title: '图书管理'
 });
 </script>
 

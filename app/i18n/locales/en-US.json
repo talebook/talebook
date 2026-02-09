@@ -84,14 +84,6 @@
     "coverSizeLimit": "Cover must be smaller than 5MB",
     "ratingStar": "star"
   },
-  "$vuetify": {
-    "noDataText": "No data available",
-    "loading": "Loading...",
-    "dataFooter": {
-      "itemsPerPageText": "Items per page",
-      "pageText": "Page {0} of {1}"
-    }
-  },
   "library": {
     "title": "Library",
     "myBooks": "My Books",
@@ -342,118 +334,12 @@
     "emailInvalid": "Invalid email format",
     "passwordMismatch": "Passwords do not match"
   },
-  "admin": {
-    "usersTitle": "User Management",
-    "settingsTitle": "System Settings",
-    "importsTitle": "Import Books",
-    "booksTitle": "Book Management",
-    "booksNotice": "This table only shows partial book fields; click to edit quickly. Click the link to view full book details.",
-    "autoUpdateBooks": "Auto updating book metadata...",
-    "importStatus": {
-      "ready": "Ready to import",
-      "exist": "Already exists",
-      "imported": "Imported",
-      "pending": "Pending scan",
-      "downloading": "Downloading"
-    },
-    "imports": {
-      "importSelected": "Import selected books",
-      "headers": {
-        "id": "ID",
-        "status": "Status",
-        "path": "Path",
-        "title": "Scan Info",
-        "time": "Time"
-      }
-    },
-    "books": {
-      "headers": {
-        "cover": "Cover"
-      },
-      "reminder": "Reminder",
-      "current_progress": "Current progress",
-      "confirm_delete_count": "Are you sure you want to delete the selected {count} books?",
-      "delete_warning": "This operation is irreversible. Please proceed with caution.",
-      "selectBooksToDelete": "Please select books to delete"
-    },
-    "table": {
-      "id": "ID",
-      "username": "Username",
-      "name": "Nickname",
-      "email": "Email",
-      "provider": "Provider",
-      "create_time": "Registered At",
-      "access_time": "Last Access",
-      "login_ip": "Login IP",
-      "detail": "Detail",
-      "actions": "Actions"
-    },
-    "perms": {
-      "login": "Login",
-      "upload": "Upload",
-      "download": "Download",
-      "edit": "Edit",
-      "delete": "Delete",
-      "push": "Push",
-      "read": "Read Online"
-    },
-    "guest": {
-      "allow_read": "Allow guest online reading (no login required)",
-      "allow_download": "Allow arbitrary downloads (guests can download without login)",
-      "allow_push": "Allow arbitrary Kindle push (guests can push without login)",
-      "allow_upload": "Allow guests to upload books (no login required)"
-    },
-    "title": "Guest Permission"
-  },
-  "settings": {
-    "card": {
-      "basic": "Basic Information",
-      "users": "User Settings",
-      "socials": "Social Logins",
-      "mail": "Mail Service",
-      "book_nav": "Book Tag Categories"
-    },
-    "subtitle": {
-      "mail": "Email registration and Kindle push rely on this configuration (SMTP server may include port, default 465)",
-      "book_nav": "Configure preset categories for the Category Navigation page. When adding books, tags matching these categories will be auto-applied."
-    },
-    "fields": {
-      "site_title": "Site Title",
-      "header": "Site Announcement",
-      "footer": "Site Footer",
-      "footer_extra_html": "Footer Extra HTML",
-      "sidebar_extra_html": "Sidebar Extra HTML",
-      "show_sidebar_sys": "Show system info in sidebar",
-      "smtp_server": "SMTP server (e.g. smtp-mail.outlook.com:587)",
-      "smtp_username": "SMTP username (e.g. user{'@'}gmail.com)",
-      "smtp_password": "SMTP password",
-      "smtp_encryption": "SMTP encryption"
-    },
-    "groups": {
-      "show_feedback": "Show feedback button",
-      "invite_mode": "Private library mode",
-      "allow_register": "Allow guest registration"
-    },
-    "fields_extra": {
-      "feedback_url": "Feedback button target URL",
-      "invite_code": "Access code",
-      "invite_message": "Invite message",
-      "signup_mail_title": "Activation email title",
-      "signup_mail_content": "Activation email body",
-      "reset_mail_title": "Password reset email title",
-      "reset_mail_content": "Password reset email body",
-      "friend_name": "Name",
-      "friend_link": "Link",
-      "select_socials": "Select social accounts to enable",
-      "key_appid": "Key/AppID",
-      "secret_key": "Secret/Key",
-      "book_nav": "Categories"
-    },
-    "socials": {
-      "enabled_hint": "Enabled social networks will show buttons on the login page."
-    },
-    "buttons": {
-      "test_email": "Test Email"
+  "$vuetify": {
+    "noDataText": "No data",
+    "loading": "Loading...",
+    "dataFooter": {
+      "itemsPerPageText": "Items per page",
+      "pageText": "Page {0} of {1}"
     }
   }
 }
