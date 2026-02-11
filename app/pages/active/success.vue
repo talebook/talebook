@@ -14,12 +14,12 @@
                     theme="dark"
                 >
                     <v-toolbar-title class="text-center">
-                        激活成功
+                        {{ $t('messages.activateSuccess') }}
                     </v-toolbar-title>
                 </v-toolbar>
                 <v-card-text>
                     <p class="mt-12 mb-8 text-center">
-                        你已成功激活账号，请前往首页浏览吧！
+                        {{ $t('messages.activationMessage') }}
                     </p>
                 </v-card-text>
 
@@ -45,8 +45,11 @@ import { useMainStore } from '@/stores/main';
 
 const mainStore = useMainStore();
 
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
+
 useHead({
-    title: '激活成功'
+    title: () => t('messages.activateSuccess')
 });
 
 onMounted(() => {

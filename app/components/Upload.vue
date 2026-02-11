@@ -20,24 +20,24 @@
                     density="compact"
                     color="primary"
                 >
-                    <v-toolbar-title>上传书籍</v-toolbar-title>
+                    <v-toolbar-title>{{ $t('messages.uploadBooks') }}</v-toolbar-title>
                     <v-spacer />
                     <v-btn
                         variant="text"
                         @click="dialog = false"
                     >
-                        关闭
+                        {{ $t('messages.dialogClose') }}
                     </v-btn>
                 </v-toolbar>
                 <v-card-text>
-                    <p>受限于服务器能力，请勿上传100M的大文件书籍。</p>
+                    <p>{{ $t('messages.uploadNotice') }}</p>
                     <v-form
                         ref="form"
                         @submit.prevent="do_upload"
                     >
                         <v-file-input
                             v-model="ebooks"
-                            label="请选择要上传的电子书"
+                            :label="$t('messages.selectEbook')"
                         />
                     </v-form>
                 </v-card-text>
@@ -48,7 +48,7 @@
                         color="primary"
                         @click="do_upload"
                     >
-                        上传
+                        {{ $t('actions.upload') }}
                     </v-btn>
                     <v-spacer />
                 </v-card-actions>
@@ -59,8 +59,10 @@
 
 <script setup>
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const { $backend, $alert } = useNuxtApp();
+const { t } = useI18n();
 const router = useRouter();
 
 const loading = ref(false);
@@ -86,7 +88,7 @@ function do_upload() {
         .then(rsp => {
             dialog.value = false;
             if (rsp.err === 'ok') {
-                $alert('success', '上传成功！', '/book/' + rsp.book_id);
+                $alert('success', t('messages.uploadSuccess'), '/book/' + rsp.book_id);
                 router.push('/book/' + rsp.book_id);
             } else if (rsp.err === 'samebook') {
                 $alert('error', rsp.msg, '/book/' + rsp.book_id);

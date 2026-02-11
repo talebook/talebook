@@ -133,6 +133,13 @@
                     待扫描
                 </v-chip>
                 <v-chip
+                    v-else-if="item.status == 'downloading'"
+                    small
+                    class="info"
+                >
+                    下载中
+                </v-chip>
+                <v-chip
                     v-else
                     small
                     class="info"

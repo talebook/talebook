@@ -32,16 +32,16 @@
             <v-col cols="12">
                 <v-card class="ma-1 pa-6 text-center">
                     <v-icon
-                        size="large"
-                        color="grey-lighten-2"
+                        large
+                        color="grey lighten-2"
                     >
                         mdi-book-open-variant
                     </v-icon>
-                    <h3 class="text-h6 text-grey">
-                        本书库暂无藏书
+                    <h3 class="text-h6 grey--text">
+                        {{ $t('messages.noBooks') }}
                     </h3>
-                    <p class="text-caption text-grey">
-                        请先添加书籍到书库
+                    <p class="text-caption grey--text">
+                        {{ $t('messages.addBooksFirst') }}
                     </p>
                 </v-card>
             </v-col>
@@ -51,11 +51,13 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
 const { $backend } = useNuxtApp();
+const { t } = useI18n();
 
 const navs = ref([]);
 
@@ -90,7 +92,7 @@ const hasAnyBooks = computed(() => {
 
 store.setNavbar(true);
 
-useHead({
-    title: '书籍索引'
-});
+useHead(() => ({
+    title: t('messages.bookIndex')
+}));
 </script>

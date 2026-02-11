@@ -3,7 +3,7 @@
         <v-row>
             <v-col cols="12">
                 <p class="ma-0 title">
-                    随便推荐
+                    {{ $t('navigation.recommended') }}
                 </p>
             </v-col>
             <v-col
@@ -40,10 +40,10 @@
                         mdi-book-open-variant
                     </v-icon>
                     <h3 class="text-h6 grey--text">
-                        本书库暂无藏书
+                        {{ $t('library.noBooks') }}
                     </h3>
                     <p class="text-caption grey--text">
-                        请先添加书籍到书库
+                        {{ $t('library.addBooksFirst') }}
                     </p>
                 </v-card>
             </v-col>
@@ -52,7 +52,7 @@
             <v-col cols="12">
                 <v-divider class="new-legend" />
                 <p class="ma-0 title">
-                    新书推荐
+                    {{ $t('index.newReleases') }}
                 </p>
             </v-col>
             <v-col cols="12">
@@ -63,7 +63,7 @@
             <v-col cols="12">
                 <v-divider class="new-legend" />
                 <p class="ma-0 title">
-                    分类浏览
+                    {{ $t('index.browseByCategory') }}
                 </p>
             </v-col>
             <v-col
@@ -99,12 +99,24 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { useAsyncData, useNuxtApp } from 'nuxt/app';
+import { computed, onMounted } from 'vue';
+import { useAsyncData, useNuxtApp, useRoute } from 'nuxt/app';
+import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
-const { $backend } = useNuxtApp();
+const { $backend, $alert } = useNuxtApp();
+const route = useRoute();
+const { t } = useI18n();
+
+onMounted(() => {
+    // 处理URL参数中的错误信息
+    if (route.query.err === 'opds_disabled' && route.query.msg) {
+        if ($alert) {
+            $alert('error', route.query.msg);
+        }
+    }
+});
 
 // 修复: 直接使用 useAsyncData 不添加 await
 const { data: indexData } = useAsyncData('index', () => 
@@ -115,13 +127,13 @@ store.setNavbar(true);
 
 // 使用计算属性直接处理数据
 const navs = computed(() => [
-    { icon: 'mdi-widgets',        href:'/nav',       text: '分类导览',  subtitle: store.sys.books + ' 本书籍'      },
-    { icon: 'mdi-human-greeting', href:'/author',    text: '作者',     subtitle: store.sys.authors + ' 位作者'    },
-    { icon: 'mdi-home-group',     href:'/publisher', text: '出版社',   subtitle: store.sys.publishers + ' 家出版社' },
-    { icon: 'mdi-tag-heart',      href:'/tag',       text: '标签',     subtitle: store.sys.tags + ' 个标签'       },
-    { icon: 'mdi-file',           href:'/format',    text: '文件格式', subtitle: store.sys.formats + ' 种格式'    },
-    { icon: 'mdi-history',        href:'/recent',    text: '所有书籍', subtitle: '查看最近更新' },
-    { icon: 'mdi-trending-up',    href:'/hot',       text: '热度榜单', subtitle: '查看热门书籍' },
+    { icon: 'mdi-widgets',        href:'/nav',       text: t('navigation.browse'),  subtitle: t('counts.books', { count: store.sys.books || 0 }) },
+    { icon: 'mdi-human-greeting', href:'/author',    text: t('navigation.authors'), subtitle: t('counts.authors', { count: store.sys.authors || 0 }) },
+    { icon: 'mdi-home-group',     href:'/publisher', text: t('navigation.publishers'), subtitle: t('counts.publishers', { count: store.sys.publishers || 0 }) },
+    { icon: 'mdi-tag-heart',      href:'/tag',       text: t('navigation.tags'), subtitle: t('counts.tags', { count: store.sys.tags || 0 }) },
+    { icon: 'mdi-file',           href:'/format',    text: t('navigation.formats'), subtitle: t('counts.formats', { count: store.sys.formats || 0 }) },
+    { icon: 'mdi-history',        href:'/recent',    text: t('navigation.recent'), subtitle: '' },
+    { icon: 'mdi-trending-up',    href:'/hot',       text: t('navigation.hot'), subtitle: '' },
 ]);
 
 // 直接计算书籍数据 - 这是正确的做法

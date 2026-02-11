@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
+    "@nuxtjs/i18n": "^10.2.3",
     "@pinia/nuxt": "^0.11.3",
     "nuxt": "^4.3.0",
     "pinia": "^3.0.4",

@@ -433,6 +433,25 @@ class OpdsHandler(BaseHandler):
         self.set_status(401)
         raise web.Finish()
 
+    def send_opds_disabled(self):
+        # 使用浏览器重定向以保持原有行为
+        self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
+        raise web.Finish()
+
+    def should_be_opds_enabled(self):
+        if not CONF.get("OPDS_ENABLED", False):
+            return self.send_opds_disabled()
+
+    def prepare(self):
+        self.set_hosts()
+        self.set_i18n()
+        self.process_auth_header()
+        self.should_be_installed()
+        # 跳过私人图书馆模式检查，让OPDS服务不受限制
+        # self.should_be_invited()
+        # 检查 OPDS 是否启用，统一放到基类中
+        self.should_be_opds_enabled()
+
     def get_opds_acquisition_feed(
         self,
         ids,

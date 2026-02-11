@@ -17,8 +17,9 @@ import tornado
 from webserver import loader
 from webserver.services.autofill import AutoFillService
 from webserver.services.mail import MailService
+from webserver.services.opds_import import OPDSImportService
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
-from webserver.models import Reader
+from webserver.models import Reader, ScanFile
 from webserver.utils import SimpleBookFormatter
 
 CONF = loader.get_settings()
@@ -297,6 +298,7 @@ class AdminSettings(BaseHandler):
             "SIGNUP_MAIL_TITLE",
             "SOCIALS",
             "SHOW_SIDEBAR_SYS",
+            "OPDS_ENABLED",
             "autoreload",
             "cookie_secret",
             "scan_upload_path",
@@ -606,6 +608,137 @@ class AdminBookDelete(BaseHandler):
         return {"err": "ok", "msg": _(u"成功删除 {0} 本书籍".format(deleted_count))}
 
 
+class AdminOPDSBrowse(BaseHandler):
+    """OPDS目录浏览接口"""
+    
+    @js
+    @is_admin
+    def post(self):
+        try:
+            req = tornado.escape.json_decode(self.request.body)
+            host = req.get("host", "")
+            port = req.get("port", "")
+            path = req.get("path", "")
+            
+            if not host:
+                return {"err": "params.error", "msg": _(u"参数错误，主机地址不能为空")}
+            
+            logging.info(f"OPDS浏览请求: host={host}, port={port}, path={path}")
+            
+            # 创建OPDS导入服务实例
+            opds_service = OPDSImportService()
+            
+            # 浏览目录
+            result = opds_service.browse_opds_catalog(host, port, path)
+            
+            if result.get('success'):
+                return {
+                    "err": "ok", 
+                    "items": result['items'],
+                    "current_path": result['current_path']
+                }
+            else:
+                return {
+                    "err": "error",
+                    "msg": result.get('error', _(u"浏览目录失败"))
+                }
+                
+        except Exception as e:
+            logging.error(f"OPDS目录浏览失败: {e}")
+            logging.error(traceback.format_exc())
+            return {"err": "error", "msg": _(u"浏览目录失败: {}").format(str(e))}
+
+
+class AdminOPDSImportStatus(BaseHandler):
+    """OPDS导入状态查询接口"""
+    
+    @js
+    @is_admin
+    def get(self):
+        # 返回全局导入状态（单例模式）
+        from webserver.services.opds_import import OPDSImportService
+        opds_service = OPDSImportService.get_instance()
+        status = {
+            "total": opds_service.count_total,
+            "done": opds_service.count_done,
+            "skip": opds_service.count_skip,
+            "fail": opds_service.count_fail,
+        }
+        return {"err": "ok", "msg": "ok", "status": status}
+
+
+class AdminOPDSImport(BaseHandler):
+    """OPDS导入接口"""
+    
+    @js
+    @is_admin
+    def post(self):
+        try:
+            req = tornado.escape.json_decode(self.request.body)
+            opds_url = req.get("opds_url", "")
+            books = req.get("books", [])
+            delete_after = req.get("delete_after", False)
+            
+            if not opds_url:
+                return {"err": "params.error", "msg": _(u"参数错误，OPDS URL不能为空")}
+
+            logging.info(f"OPDS导入请求: url={opds_url}, books={len(books)}本, delete_after={delete_after}")
+            
+            # 在开始异步下载前，将选中书籍插入到待处理列表并标记为downloading
+            try:
+                if books:
+                    for b in books:
+                        href = b.get('href') or b.get('acquisition_link') or ''
+                        title = b.get('title', '')
+                        author = b.get('author', '')
+                        # 使用href生成唯一hash值
+                        if href:
+                            h = hashlib.sha256(href.encode('utf-8')).hexdigest()
+                        else:
+                            h = hashlib.sha256((title + author + str(uuid.uuid4())).encode('utf-8')).hexdigest()
+                        # 创建ScanFile记录，path暂存为href，status为downloading
+                        # ScanFile __init__ 接受 (path, hash_value, scan_id)
+                        sf = ScanFile(href, h[:64], 0)
+                        sf.title = title
+                        sf.author = author
+                        sf.status = 'downloading'
+                        sf.create_time = datetime.datetime.now()
+                        sf.update_time = datetime.datetime.now()
+                        # 将原始链接存入data，便于后台任务使用
+                        sf.data = {'acquisition_link': href}
+                        self.session.add(sf)
+                    self.session.commit()
+            except Exception:
+                logging.error(traceback.format_exc())
+
+            # 启动异步导入任务
+            import threading
+            def import_task():
+                from webserver.services.opds_import import OPDSImportService
+                opds_service = OPDSImportService.get_instance()
+                opds_service.reset_counters()
+                if books:
+                    opds_service.import_selected_books(opds_url, self.user_id(), delete_after, books)
+                else:
+                    opds_service.import_from_opds(opds_url, self.user_id(), delete_after)
+
+            thread = threading.Thread(target=import_task, daemon=True)
+            thread.start()
+            
+            # 立即返回，避免阻塞HTTP请求
+            if books:
+                msg = _(u"已开始异步导入选中的 {} 本书籍，请稍后查看进度").format(len(books))
+            else:
+                msg = _(u"已开始异步导入所有书籍，请稍后查看进度")
+                
+            return {"err": "ok", "msg": msg, "async": True}
+            
+        except Exception as e:
+            logging.error(f"OPDS导入失败: {e}")
+            logging.error(traceback.format_exc())
+            return {"err": "error", "msg": _(u"OPDS导入失败: {}").format(str(e))}
+
+
 def routes():
     return [
         (r"/api/admin/ssl", AdminSSL),
@@ -616,4 +749,7 @@ def routes():
         (r"/api/admin/book/list", AdminBookList),
         (r"/api/admin/book/fill", AdminBookFill),
         (r"/api/admin/book/delete", AdminBookDelete),
+        (r"/api/admin/opds/browse", AdminOPDSBrowse),
+        (r"/api/admin/opds/import", AdminOPDSImport),
+        (r"/api/admin/opds/import/status", AdminOPDSImportStatus),
     ]

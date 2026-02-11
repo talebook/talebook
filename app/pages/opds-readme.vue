@@ -1,56 +1,81 @@
 
 <template>
     <div class="opds-page">
-        <h1>OPDS 介绍</h1>
-        <section>
-            <h2>OPDS 链接</h2>
-            <p>您的 OPDS 链接为：<code>{{ opdsUrl }}</code></p>
-        </section>
-        <section>
-            <h2>常见 OPDS 阅读软件</h2>
-            <ul>
-                <li>
-                    <strong>KyBook</strong>：支持 iOS 和 macOS 的电子书阅读器 <a
-                        href="https://apps.apple.com/app/kybook/id1049898139"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >[下载]</a>
-                </li>
-                <li>
-                    <strong>静读天下</strong>：Android 平台上功能强大的电子书阅读器 <a
-                        href="https://play.google.com/store/apps/details?id=com.flyersoft.moonreader"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >[下载]</a>
-                </li>
-            </ul>
-        </section>
-        <section>
-            <h2>配置指南</h2>
-            <ol>
-                <li>在阅读器中添加新的 OPDS 书库</li>
-                <li>输入您的 OPDS 链接</li>
-                <li>根据提示完成认证（如果需要）</li>
-                <li>开始浏览和阅读您的电子书</li>
-            </ol>
+        <template v-if="opdsEnabled">
+                <h1>{{ $t('opdsPage.title') }}</h1>
+            <section>
+                <h2>{{ $t('opdsPage.links') }}</h2>
+                <p>{{ $t('opdsPage.yourLink') }} <code>{{ opdsUrl }}</code></p>
+            </section>
+            <section>
+                <h2>{{ $t('opdsPage.commonReaders') }}</h2>
+                <ul>
+                    <li>
+                        <strong>KyBook</strong>：支持 iOS 和 macOS 的电子书阅读器 <a
+                            href="https://apps.apple.com/app/kybook/id1049898139"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >{{ $t('opdsPage.download') }}</a>
+                    </li>
+                    <li>
+                        <strong>静读天下</strong>：Android 平台上功能强大的电子书阅读器 <a
+                            href="https://play.google.com/store/apps/details?id=com.flyersoft.moonreader"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >{{ $t('opdsPage.download') }}</a>
+                    </li>
+                </ul>
+            </section>
+            <section>
+                <h2>{{ $t('opdsPage.configGuide') }}</h2>
+                <ol>
+                    <li>{{ $t('opdsPage.steps.addLibrary') }}</li>
+                    <li>{{ $t('opdsPage.steps.enterLink') }}</li>
+                    <li>{{ $t('opdsPage.steps.authenticate') }}</li>
+                    <li>{{ $t('opdsPage.steps.browse') }}</li>
+                </ol>
 
-            <h2>请注意</h2>
-            <p>因为静读天下APP不支持cookie登录，因此需要做如下配置：</p>
-            <ol>
-                <li>关闭「私人图书馆」模式。</li>
-                <li>打开「允许任意下载」（访客无需注册或登录）</li>
-            </ol>
-        </section>
+                <h2>{{ $t('opdsPage.noteTitle') }}</h2>
+                <p>{{ $t('opdsPage.readerNote') }}</p>
+                <ol>
+                    <li>{{ $t('opdsPage.noteAllowDownload') }}</li>
+                </ol>
+            </section>
+        </template>
+        <template v-else>
+            <h1>{{ $t('opdsPage.closedTitle') }}</h1>
+            <section>
+                <div class="error-message">
+                    <p>{{ $t('opdsPage.closedMessage') }}</p>
+                </div>
+            </section>
+        </template>
     </div>
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue';
+import { useRequestURL, useNuxtApp } from 'nuxt/app';
+import { useI18n } from 'vue-i18n';
+
 const url = useRequestURL();
 const opdsUrl = `${url.protocol}//${url.host}/opds/`;
+const { $backend } = useNuxtApp();
+const { t } = useI18n();
+const opdsEnabled = ref(true);
 
-useHead({
-    title: 'OPDS 介绍'
+onMounted(() => {
+    // 获取OPDS服务状态
+    $backend('/admin/settings').then(rsp => {
+        if (rsp.err === 'ok') {
+            opdsEnabled.value = rsp.settings.OPDS_ENABLED !== false;
+        }
+    });
 });
+
+useHead(() => ({
+    title: t('opds.title')
+}));
 </script>
 
 <style scoped>
