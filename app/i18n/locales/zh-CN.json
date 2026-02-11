@@ -565,7 +565,11 @@
         "doubanPluginInfo": "若需要启用豆瓣插件，请参阅安装文档的说明。若出现失败，可尝试更换镜像，例如 talebook/douban-api-rs ",
         "logoInfo": "若需要调整Logo，请参阅安装文档的说明。",
         "opdsInfo": "OPDS（Open Publication Distribution System）是一种用于电子书分发的开放标准，关闭后将无法通过OPDS客户端访问书库。",
-        "socialLoginInfo": "所启用的社交网络将会在登录页面自动显示按钮。"
+        "socialLoginInfo": "所启用的社交网络将会在登录页面自动显示按钮。",
+        "saveSuccess": "保存成功",
+        "goTo": "请前往",
+        "configurationPage": "的开发者配置页面",
+        "getKeysAndSetCallback": "，获取密钥后设置回调地址为："
       }
     },
     "users": {

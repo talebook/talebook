@@ -566,7 +566,11 @@
         "doubanPluginInfo": "To enable Douban plugin, please refer to the installation documentation. If it fails, you can try changing the mirror, such as talebook/douban-api-rs",
         "logoInfo": "To adjust the logo, please refer to the installation documentation.",
         "opdsInfo": "OPDS (Open Publication Distribution System) is an open standard for ebook distribution. When disabled, OPDS clients will not be able to access the library.",
-        "socialLoginInfo": "Enabled social networks will automatically display buttons on the login page."
+        "socialLoginInfo": "Enabled social networks will automatically display buttons on the login page.",
+        "saveSuccess": "Saved successfully",
+        "goTo": "Please go to",
+        "configurationPage": "developer configuration page",
+        "getKeysAndSetCallback": ", get the keys and set the callback address to:"  
       }
     },
     "users": {
