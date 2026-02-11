@@ -149,7 +149,7 @@
                                 >
                                     <v-text-field
                                         v-model="book.series"
-                                        :label="t('book.field.series')"
+                                        :label="t('book.series')"
                                     >
                                         {{ book.series }}
                                     </v-text-field>
@@ -181,7 +181,7 @@
                                 >
                                     <v-text-field
                                         v-model="book.isbn"
-                                        :label="t('book.field.isbn')"
+                                        :label="t('book.isbn')"
                                     />
                                 </v-col>
                                 <v-col
@@ -191,7 +191,7 @@
                                 >
                                     <v-text-field
                                         v-model="book.language"
-                                        :label="t('book.field.language')"
+                                        :label="t('book.language')"
                                     />
                                 </v-col>
 
