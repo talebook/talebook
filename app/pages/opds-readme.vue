@@ -74,7 +74,7 @@ onMounted(() => {
 });
 
 useHead(() => ({
-    title: t('opds.title')
+    title: t('opdsPage.title')
 }));
 </script>
 

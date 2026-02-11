@@ -77,14 +77,22 @@
       "authors": "作者",
       "rating": "评分",
       "publisher": "出版社",
+      "pubdate": "出版日期",
       "tags": "标签",
       "comments": "简介"
     },
     "detailsTitle": "书籍详情",
     "editCoverTitle": "修改封面图",
+    "editBookInfo": "编辑书籍信息",
+    "coverImage": "封面图片",
     "selectCover": "选择封面图",
+    "uploadCover": "上传封面",
     "coverSupported": "支持JPG、PNG、GIF格式，大小不超过5MB",
     "coverSizeLimit": "封面图大小不能超过5MB",
+    "uploadCoverFailed": "封面上传失败",
+    "enterNewName": "输入新名称",
+    "enterNewTagName": "输入新标签名称",
+    "addTag": "添加标签",
     "ratingStar": "星",
     "kindle": {
       "push": "推送到Kindle",
@@ -113,7 +121,8 @@
     "queueMessage": "前方等待{count}个转换待完成，已步入后台队列",
     "parsingMessage": "首次阅读，正在解析目录，请稍后... {seconds}",
     "timeoutMessage": "超时未完成，可继续等待稍后刷新尝试",
-    "parseTimeout": "解析超时"
+    "parseTimeout": "解析超时",
+    "viewDetails": "浏览详情"
   },
   "library": {
     "title": "图书馆",
@@ -131,7 +140,10 @@
     "readingTime": "阅读时间",
     "completionRate": "完成率",
     "noBooks": "本书库暂无藏书",
-    "addBooksFirst": "请先添加书籍到书库"
+    "addBooksFirst": "请先添加书籍到书库",
+    "message": {
+      "fetchBooksFailed": "获取书籍列表失败"
+    }
   },
   "opds": {
     "import": "从 OPDS 导入",
@@ -303,6 +315,7 @@
     "activationMessage": "你已成功激活账号，请前往首页浏览吧！",
     "parsing": "正在解析",
     "parsingContent": "正在解析目录，请稍后...",
+    "error": "错误",
     "dialogClose": "关闭",
     "clickToView": "点击浏览详情",
     "uploadCoverSuccess": "封面图上传成功！",

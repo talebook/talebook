@@ -77,14 +77,22 @@
       "authors": "Authors",
       "rating": "Rating",
       "publisher": "Publisher",
+      "pubdate": "Publication Date",
       "tags": "Tags",
       "comments": "Description"
     },
     "detailsTitle": "Book Details",
     "editCoverTitle": "Edit Cover",
+    "editBookInfo": "Edit Book Information",
+    "coverImage": "Cover Image",
     "selectCover": "Select cover image",
+    "uploadCover": "Upload Cover",
     "coverSupported": "Supports JPG, PNG, GIF; max size 5MB",
     "coverSizeLimit": "Cover must be smaller than 5MB",
+    "uploadCoverFailed": "Cover upload failed",
+    "enterNewName": "Enter new name",
+    "enterNewTagName": "Enter new tag name",
+    "addTag": "Add Tag",
     "ratingStar": "star",
     "kindle": {
       "push": "Push to Kindle",
@@ -113,7 +121,8 @@
     "queueMessage": "Waiting for {count} conversions to complete, added to background queue",
     "parsingMessage": "First time reading, parsing table of contents, please wait... {seconds}",
     "timeoutMessage": "Timeout, please wait and refresh to try again",
-    "parseTimeout": "Parsing Timeout"
+    "parseTimeout": "Parsing Timeout",
+    "viewDetails": "View Details"
   },
   "library": {
     "title": "Library",
@@ -131,9 +140,13 @@
     "readingTime": "Reading Time",
     "completionRate": "Completion Rate",
     "noBooks": "No books in library",
-    "addBooksFirst": "Please add books to library first"
+    "addBooksFirst": "Please add books to library first",
+    "message": {
+      "fetchBooksFailed": "Failed to fetch books list"
+    }
   },
   "opds": {
+    "title": "OPDS Service",
     "import": "Import from OPDS",
     "host": "Host Address",
     "port": "Port",
@@ -303,6 +316,7 @@
     "activationMessage": "Your account has been activated. Please visit the homepage.",
     "parsing": "Parsing",
     "parsingContent": "Parsing table of contents, please wait...",
+    "error": "Error",
     "dialogClose": "Close",
     "clickToView": "Click to view details",
     "uploadCoverSuccess": "Cover uploaded successfully!",
