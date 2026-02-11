@@ -393,7 +393,19 @@
         "comments": "Description"
       },
       "message": {
-        "bookTableInfo": "This table shows only some fields. Click to edit. See book details page for complete info."
+        "bookTableInfo": "This table shows only some fields. Click to edit. See book details page for complete info.",
+        "aboutToFetch": "About to fetch book information from the internet...",
+        "configInternetSource": "Please ensure you have configured internet book information sources in system settings",
+        "onlyUpdateBooksWithout": "Only update books without descriptions",
+        "limitedByServices": "Limited by external service access frequency, may take a long time",
+        "currentProgress": "Current progress:",
+        "progressDetails": "Total: {0}, Processed: {1}, Failed: {2}, Skipped: {3}",
+        "estimatedTime": "Estimated time remaining: {0} minutes",
+        "confirmDeleteSelected": "Confirm deletion of selected {0} books?",
+        "operationIrreversible": "This operation is irreversible, cannot be recovered after deletion",
+        "selectBooksFirst": "Please select books to operate on first",
+        "coverSizeLimit": "Cover image size cannot exceed 5MB",
+        "selectCoverFirst": "Please select a cover image to upload first"
       },
       "status": {
         "ready": "Ready",

@@ -393,7 +393,19 @@
         "comments": "简介"
       },
       "message": {
-        "bookTableInfo": "此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面"
+        "bookTableInfo": "此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面",
+        "aboutToFetch": "即将开始从互联网获取书籍信息...",
+        "configInternetSource": "请确保已在系统设置中配置了互联网书籍信息源",
+        "onlyUpdateBooksWithout": "仅更新没有描述的书籍",
+        "limitedByServices": "受限于外部服务的访问频率，可能需要较长时间",
+        "currentProgress": "当前进度:",
+        "progressDetails": "共 {0} 本，已处理 {1} 本，失败 {2} 本，跳过 {3} 本",
+        "estimatedTime": "预计剩余时间: {0} 分钟",
+        "confirmDeleteSelected": "确认删除选中的 {0} 本书籍？",
+        "operationIrreversible": "此操作不可逆，删除后无法恢复",
+        "selectBooksFirst": "请先选择要操作的书籍",
+        "coverSizeLimit": "封面图大小不能超过5MB",
+        "selectCoverFirst": "请选择要上传的封面图"
       },
       "status": {
         "ready": "可导入",
