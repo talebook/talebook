@@ -383,7 +383,8 @@
         "bulkDelete": "Delete Selected"
       },
       "label": {
-        "search": "Search"
+        "search": "Search",
+        "comments": "Description"
       },
       "message": {
         "bookTableInfo": "This table shows only some fields. Click to edit. See book details page for complete info."
