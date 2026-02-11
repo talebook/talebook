@@ -1,7 +1,7 @@
 <template>
     <v-card>
         <v-card-title>
-            {{ $t('admin.title.imports') }} <v-chip
+            {{ t('admin.imports.title') }} <v-chip
                 size="small"
                 variant="elevated"
                 color="primary ml-2"
@@ -10,9 +10,9 @@
             </v-chip>
         </v-card-title>
         <v-card-text>
-            {{ $t('admin.message.importDirInfo') }}<br>
-            {{ $t('admin.message.importAsyncInfo') }}<br>
-            {{ $t('admin.message.calibreInfo') }}
+            {{ t('admin.imports.message.importDirInfo', [scan_dir]) }}<br>
+            {{ t('admin.imports.message.importAsyncInfo') }}<br>
+            {{ t('admin.imports.message.calibreInfo') }}
         </v-card-text>
         <v-card-actions>
             <v-btn
@@ -23,7 +23,7 @@
             >
                 <v-icon start>
                     mdi-reload
-                </v-icon>{{ $t('admin.button.refresh') }}
+                </v-icon>{{ t('admin.imports.button.refresh') }}
             </v-btn>
             <v-btn
                 :disabled="loading"
@@ -33,7 +33,7 @@
             >
                 <v-icon start>
                     mdi-file-find
-                </v-icon>{{ $t('admin.button.scanBooks') }}
+                </v-icon>{{ t('admin.imports.button.scanBooks') }}
             </v-btn>
             <v-btn
                 :disabled="loading"
@@ -43,7 +43,7 @@
             >
                 <v-icon start>
                     mdi-database-import
-                </v-icon>{{ $t('admin.button.importFromOpds') }}
+                </v-icon>{{ t('admin.imports.button.importFromOpds') }}
             </v-btn>
             <template v-if="selected.length > 0">
                 <v-btn
@@ -54,7 +54,7 @@
                 >
                     <v-icon start>
                         mdi-import
-                    </v-icon>{{ $t('admin.button.importSelectedBooks') }}
+                    </v-icon>{{ t('admin.imports.button.importSelectedBooks') }}
                 </v-btn>
                 <v-btn
                     :disabled="loading"
@@ -64,7 +64,7 @@
                 >
                     <v-icon start>
                         mdi-delete
-                    </v-icon>{{ $t('common.delete') }}
+                    </v-icon>{{ t('common.delete') }}
                 </v-btn>
             </template>
             <template v-else>
@@ -76,23 +76,23 @@
                 >
                     <v-icon start>
                         mdi-import
-                    </v-icon>{{ $t('admin.button.importAllBooks') }}
+                    </v-icon>{{ t('admin.imports.button.importAllBooks') }}
                 </v-btn>
             </template>
             <v-spacer />
             <v-checkbox
                 v-model="delete_after_import"
-                :label="$t('admin.label.deleteAfterImport')"
+                :label="t('admin.imports.label.deleteAfterImport')"
                 color="primary"
                 hide-details
             />
         </v-card-actions>
         <v-card-text>
             <div v-if="selected.length == 0">
-                {{ $t('admin.message.selectFilesInfo') }}
+                {{ t('admin.imports.message.selectFilesInfo') }}
             </div>
             <div v-else>
-                {{ $t('admin.message.selectedCount') }}
+                {{ t('admin.imports.message.selectedCount', [selected.length]) }}
             </div>
         </v-card-text>
         <v-tabs
@@ -100,10 +100,10 @@
             @update:model-value="onFilterChange"
         >
             <v-tab value="todo">
-                {{ $t('admin.tab.todo') }} ({{ count_todo }})
+                {{ t('admin.imports.tab.todo') }} ({{ count_todo }})
             </v-tab>
             <v-tab value="done">
-                {{ $t('admin.tab.done') }} ({{ count_done }})
+                {{ t('admin.imports.tab.done') }} ({{ count_done }})
             </v-tab>
         </v-tabs>
         <v-data-table-server
@@ -126,35 +126,35 @@
                     size="small"
                     color="success"
                 >
-                    {{ $t('admin.status.ready') }}
+                    {{ t('admin.imports.status.ready') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'exist'"
                     size="small"
                     color="grey-lighten-2"
                 >
-                    {{ $t('admin.status.exist') }}
+                    {{ t('admin.imports.status.exist') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'imported'"
                     size="small"
                     color="primary"
                 >
-                    {{ $t('admin.status.imported') }}
+                    {{ t('admin.imports.status.imported') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'new'"
                     size="small"
                     color="grey"
                 >
-                    {{ $t('admin.status.new') }}
+                    {{ t('admin.imports.status.new') }}
                 </v-chip>
                 <v-chip
                     v-else-if="item.status == 'downloading'"
                     size="small"
                     color="info"
                 >
-                    {{ $t('admin.status.downloading') }}
+                    {{ t('admin.imports.status.downloading') }}
                 </v-chip>
                 <v-chip
                     v-else
@@ -165,13 +165,13 @@
                 </v-chip>
             </template>
             <template #item.title="{ item }">
-                书名：<span v-if="item.book_id == 0"> {{ item.title }} </span>
+                {{ t('admin.imports.label.bookTitle') }}：<span v-if="item.book_id == 0"> {{ item.title }} </span>
                 <a
                     v-else
                     target="_blank"
                     :href="`/book/${item.book_id}`"
                 >{{ item.title }}</a> <br>
-                作者：{{ item.author }}
+                {{ t('admin.imports.label.author') }}：{{ item.author }}
             </template>
         </v-data-table-server>
     </v-card>
@@ -184,14 +184,14 @@
     >
         <v-card>
             <v-card-title>
-                {{ $t('admin.button.importFromOpds') }}
+                {{ t('admin.button.importFromOpds') }}
                 <v-spacer />
                 <v-chip
                     v-if="opdsImportState === 'browsing' && selectedOpdsBooks.length > 0"
                     color="primary"
                     size="small"
                 >
-                    {{ $t('admin.message.selectedCount') }}
+                    {{ t('admin.message.selectedCount') }}
                 </v-chip>
             </v-card-title>
             <v-card-text style="padding: 16px;">
@@ -201,8 +201,8 @@
                         <v-col cols="8">
                             <v-text-field
                                 v-model="opdsHost"
-                                :label="$t('admin.label.host')"
-                                :placeholder="$t('admin.placeholder.host')"
+                                :label="t('admin.label.host')"
+                                :placeholder="t('admin.placeholder.host')"
                                 variant="outlined"
                                 full-width
                                 @keyup.enter="connectToOpds"
@@ -212,8 +212,8 @@
                         <v-col cols="4">
                             <v-text-field
                                 v-model="opdsPort"
-                                :label="$t('admin.label.port')"
-                                :placeholder="$t('admin.placeholder.port')"
+                                :label="t('admin.label.port')"
+                                :placeholder="t('admin.placeholder.port')"
                                 variant="outlined"
                                 full-width
                                 type="number"
@@ -223,16 +223,16 @@
                     </v-row>
                     <v-text-field
                         v-model="opdsPath"
-                        :label="$t('admin.label.path')"
-                        :placeholder="$t('admin.placeholder.path')"
+                        :label="t('admin.label.path')"
+                        :placeholder="t('admin.placeholder.path')"
                         variant="outlined"
                         full-width
                         class="mt-4"
                         @keyup.enter="connectToOpds"
                     />
                     <div class="text-body-2 text-gray-600 mt-2">
-                        {{ $t('admin.message.opdsTip') }}
-                        <br>{{ $t('admin.message.opdsPortTip') }}
+                        {{ t('admin.message.opdsTip') }}
+                        <br>{{ t('admin.message.opdsPortTip') }}
                     </div>
                 </div>
                 
@@ -284,7 +284,7 @@
                                     color="primary"
                                     size="32"
                                 ></v-progress-circular>
-                                <div class="mt-4 text-body-1 text-gray-600">{{ $t('admin.message.loadingDirectory') }}</div>
+                                <div class="mt-4 text-body-1 text-gray-600">{{ t('admin.message.loadingDirectory') }}</div>
                             </div>
                             
                             <!-- 返回上级目录 -->
@@ -294,7 +294,7 @@
                                 class="flex items-center pa-3 hover:bg-gray-50 rounded cursor-pointer mb-1"
                             >
                                 <v-icon class="mr-2" color="primary">mdi-arrow-left</v-icon>
-                                <span class="text-body-1">{{ $t('admin.message.backToParent') }}</span>
+                                <span class="text-body-1">{{ t('admin.message.backToParent') }}</span>
                             </div>
                             
                             <!-- 项目列表 -->
@@ -340,7 +340,7 @@
                                         <!-- 书籍信息 -->
                                         <div class="flex-grow min-w-0">
                                             <div class="font-weight-medium text-body-1 truncate">{{ item.title }}</div>
-                                            <div v-if="item.author" class="text-caption text-gray-600">作者: {{ item.author }}</div>
+                                            <div v-if="item.author" class="text-caption text-gray-600">{{ t('admin.imports.label.author') }}: {{ item.author }}</div>
                                             <div v-if="item.summary" class="text-caption text-gray-500 truncate">{{ item.summary }}</div>
                                         </div>
                                         
@@ -349,7 +349,7 @@
                                             <v-avatar size="40" rounded="sm">
                                                 <v-img 
                                                     :src="item.cover_link" 
-                                                    alt="封面"
+                                                    :alt="t('admin.imports.label.cover')"
                                                     cover
                                                 ></v-img>
                                             </v-avatar>
@@ -361,7 +361,7 @@
                             <!-- 空状态 -->
                             <div v-if="opdsItems.length === 0 && !opdsLoading" class="text-center py-8">
                                 <v-icon size="48" color="grey">mdi-folder-open-outline</v-icon>
-                                <div class="mt-2 text-gray-600">{{ $t('admin.message.emptyDirectory') }}</div>
+                                <div class="mt-2 text-gray-600">{{ t('admin.message.emptyDirectory') }}</div>
                             </div>
                         </div>
                     </div>
@@ -376,10 +376,10 @@
                             size="64"
                         />
                         <div class="mt-4 text-h6">
-                            {{ $t('admin.message.importingBooks') }}
+                            {{ t('admin.message.importingBooks') }}
                         </div>
                         <div class="mt-2 text-body-1">
-                            {{ $t('admin.message.importProgress') }}
+                            {{ t('admin.message.importProgress') }}
                         </div>
                         <v-progress-linear
                             v-model="opdsImportProgress.percent"
@@ -404,10 +404,10 @@
                                     >
                                         mdi-information
                                     </v-icon>
-                                    {{ $t('admin.message.importToTodo') }}
+                                    {{ t('admin.message.importToTodo') }}
                                 </div>
                                 <div class="text-body-2 mt-1">
-                                    {{ $t('admin.message.importAfterScan') }}
+                                    {{ t('admin.message.importAfterScan') }}
                                 </div>
                             </v-alert>
                         </div>
@@ -424,16 +424,16 @@
                             mdi-check-circle
                         </v-icon>
                         <div class="mt-4 text-h6 text-success">
-                            {{ $t('admin.message.importCompleted') }}
+                            {{ t('admin.message.importCompleted') }}
                         </div>
                         <div class="mt-2 text-body-1">
-                            {{ $t('admin.message.importSuccess') }}
+                            {{ t('admin.message.importSuccess') }}
                         </div>
                         <div
                             v-if="opdsImportResult.fail > 0"
                             class="mt-2 text-body-1 text-warning"
                         >
-                            {{ $t('admin.message.importFailed') }}
+                            {{ t('admin.message.importFailed') }}
                         </div>
                         <div class="mt-4">
                             <v-alert
@@ -448,15 +448,15 @@
                                     >
                                         mdi-check
                                     </v-icon>
-                                    {{ $t('admin.message.booksAddedToScanDir') }}
+                                    {{ t('admin.message.booksAddedToScanDir') }}
                                 </div>
                                 <div class="text-body-2 mt-1">
-                                    {{ $t('admin.message.importNextSteps') }}
+                                    {{ t('admin.message.importNextSteps') }}
                                     <ol class="mt-2 pl-4">
-                                        <li>{{ $t('admin.message.importStep1') }}</li>
-                                        <li>{{ $t('admin.message.importStep2') }}</li>
-                                        <li>{{ $t('admin.message.importStep3') }}</li>
-                                        <li>{{ $t('admin.message.importStep4') }}</li>
+                                        <li>{{ t('admin.message.importStep1') }}</li>
+                                        <li>{{ t('admin.message.importStep2') }}</li>
+                                        <li>{{ t('admin.message.importStep3') }}</li>
+                                        <li>{{ t('admin.message.importStep4') }}</li>
                                     </ol>
                                 </div>
                             </v-alert>
@@ -481,7 +481,7 @@
                                 color="primary"
                                 @click="resetOpdsImportState"
                             >
-                                {{ $t('admin.message.backToConnect') }}
+                                {{ t('admin.message.backToConnect') }}
                             </v-btn>
                         </div>
                     </div>
@@ -515,10 +515,12 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
-const { $backend, $alert, $t } = useNuxtApp();
+const { $backend, $alert } = useNuxtApp();
+const { t } = useI18n();
 
 store.setNavbar(true);
 
@@ -566,14 +568,14 @@ const leftButtonText = computed(() => {
     switch (opdsImportState.value) {
         case 'connecting':
         case 'browsing':
-            return $t('common.close');
+            return t('common.close');
         case 'importing':
-            return $t('admin.message.importingBooks');
+            return t('admin.imports.message.importingBooks');
         case 'completed':
         case 'error':
-            return $t('admin.message.backToConnect');
+            return t('admin.imports.message.backToConnect');
         default:
-            return $t('common.close');
+            return t('common.close');
     }
 });
 
@@ -581,17 +583,17 @@ const leftButtonText = computed(() => {
 const rightButtonText = computed(() => {
     switch (opdsImportState.value) {
         case 'connecting':
-            return $t('admin.message.connect');
+            return t('admin.imports.message.connect');
         case 'browsing':
-            return $t('admin.button.importSelectedBooks');
+            return t('admin.imports.button.importSelectedBooks');
         case 'importing':
-            return $t('admin.message.importingBooks');
+            return t('admin.imports.message.importingBooks');
         case 'completed':
-            return $t('common.done');
+            return t('common.done');
         case 'error':
-            return $t('common.retry');
+            return t('common.retry');
         default:
-            return $t('common.action');
+            return t('common.action');
     }
 });
 
@@ -666,7 +668,7 @@ const breadcrumbs = computed(() => {
     
     // 添加根目录
     crumbs.push({
-        title: $t('admin.message.rootDirectory'),
+        title: t('admin.imports.message.rootDirectory'),
         disabled: navigationHistory.value.length === 0,
         path: originalOpdsPath.value
     });
@@ -696,13 +698,13 @@ const handleBreadcrumbClick = (crumb, index) => {
     }
 };
 
-const headers = [
+const headers = computed(() => [
     { title: 'ID', key: 'id', sortable: true },
-    { title: $t('admin.label.status'), key: 'status', sortable: true },
-    { title: $t('admin.label.path'), key: 'path', sortable: true },
-    { title: $t('admin.label.scanInfo'), key: 'title', sortable: false },
-    { title: $t('admin.label.time'), key: 'create_time', sortable: true, width: '200px' },
-];
+    { title: t('admin.imports.label.status'), key: 'status', sortable: true },
+    { title: t('admin.imports.label.path'), key: 'path', sortable: true },
+    { title: t('admin.imports.label.scanInfo'), key: 'title', sortable: false },
+    { title: t('admin.imports.label.time'), key: 'create_time', sortable: true, width: '200px' },
+]);
 
 const progress = ref({
     done: 0,
@@ -912,13 +914,13 @@ const autoFillPortFromHost = () => {
 
 const connectToOpds = async () => {
     if (!opdsHost.value) {
-        $alert('error', '请输入主机地址');
+        $alert('error', t('admin.imports.message.enterHost'));
         return;
     }
 
     // 验证URL格式
     if (!opdsHost.value.startsWith('http://') && !opdsHost.value.startsWith('https://')) {
-        $alert('error', '主机地址需要以 http:// 或 https:// 开头');
+        $alert('error', t('admin.imports.message.hostProtocol'));
         return;
     }
 
@@ -931,7 +933,7 @@ const connectToOpds = async () => {
     if (opdsPort.value) {
         const portNum = parseInt(opdsPort.value);
         if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
-            $alert('error', '端口号必须在 1-65535 范围内');
+            $alert('error', t('admin.imports.message.portRange'));
             return;
         }
     }
@@ -982,14 +984,14 @@ const connectToOpds = async () => {
             
             // 更新状态
             opdsImportState.value = 'browsing';
-            $alert('success', '连接成功！');
+            $alert('success', t('admin.imports.message.connectSuccess'));
         } else {
-            opdsError.value = response.msg || '连接失败，请检查地址是否正确';
+            opdsError.value = response.msg || t('admin.imports.message.connectFailedCheckAddress');
             opdsImportState.value = 'error';
             $alert('error', opdsError.value);
         }
     } catch (error) {
-        opdsError.value = '连接失败：' + (error.message || '请检查地址是否正确');
+        opdsError.value = t('admin.imports.message.connectFailed') + (error.message || t('admin.imports.message.checkAddress'));
         opdsImportState.value = 'error';
         $alert('error', opdsError.value);
     } finally {
@@ -1010,7 +1012,7 @@ const hashCode = (str) => {
 
 const navigateToOpdsFolder = async (folder) => {
     if (!folder.href) {
-        $alert('error', '无法导航：缺少链接地址');
+        $alert('error', t('admin.imports.message.cannotNavigateMissingLink'));
         return;
     }
     
@@ -1056,10 +1058,10 @@ const navigateToOpdsFolder = async (folder) => {
                 return item;
             });
         } else {
-            $alert('error', response.msg || '导航失败');
+            $alert('error', response.msg || t('admin.imports.message.navigateFailed'));
         }
     } catch (error) {
-        $alert('error', '导航失败：' + error.message);
+        $alert('error', t('admin.imports.message.navigateFailed') + error.message);
     } finally {
         opdsLoading.value = false;
     }
@@ -1422,7 +1424,7 @@ onMounted(() => {
 });
 
 useHead({
-    title: $t('admin.title.imports')
+    title: t('admin.imports.title')
 });
 </script>
 

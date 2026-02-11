@@ -38,10 +38,10 @@
                         mdi-book-open-variant
                     </v-icon>
                     <h3 class="text-h6 grey--text">
-                        {{ $t('messages.noBooks') }}
+                        {{ t('messages.noBooks') }}
                     </h3>
                     <p class="text-caption grey--text">
-                        {{ $t('messages.addBooksFirst') }}
+                        {{ t('messages.addBooksFirst') }}
                     </p>
                 </v-card>
             </v-col>

@@ -10,10 +10,10 @@
                     width="300"
                 >
                     <v-card>
-                        <v-card-title>推送到Kindle</v-card-title>
+                        <v-card-title>{{ t('book.kindle.push') }}</v-card-title>
                         <v-card-text>
                             <p class="mb-4">
-                                填写Kindle收件人邮箱地址：
+                                {{ t('book.kindle.emailPlaceholder') }}
                             </p>
                             <v-combobox
                                 v-model="mail_to"
@@ -32,7 +32,7 @@
                                 variant="text"
                                 @click="dialog_kindle = false"
                             >
-                                取消
+                                {{ t('common.cancel') }}
                             </v-btn>
                             <v-spacer />
                             <v-btn
@@ -40,7 +40,7 @@
                                 variant="text"
                                 @click="sendto_kindle"
                             >
-                                发送
+                                {{ t('common.send') }}
                             </v-btn>
                         </v-card-actions>
                     </v-card>
@@ -53,7 +53,7 @@
                     width="300"
                 >
                     <v-card>
-                        <v-card-title>下载书籍</v-card-title>
+                        <v-card-title>{{ t('book.download') }}</v-card-title>
                         <v-card-text>
                             <v-list v-if="book.files && book.files.length > 0">
                                 <v-list-item
@@ -79,7 +79,7 @@
                                 </v-list-item>
                             </v-list>
                             <p v-else>
-                                <br>本书暂无可供下载的文件格式
+                                <br>{{ t('book.noDownloadFormats') }}
                             </p>
                         </v-card-text>
                         <v-card-actions>
@@ -88,7 +88,7 @@
                                 variant="text"
                                 @click="dialog_download = false"
                             >
-                                关闭
+                                {{ t('common.close') }}
                             </v-btn>
                             <v-spacer />
                         </v-card-actions>
@@ -107,13 +107,13 @@
                             density="compact"
                             color="primary"
                         >
-                            <v-toolbar-title>从互联网同步书籍信息</v-toolbar-title>
+                            <v-toolbar-title>{{ t('book.internetSync') }}</v-toolbar-title>
                             <v-spacer />
                             <v-btn
                                 variant="outlined"
                                 @click="dialog_refer = false"
                             >
-                                取消
+                                {{ t('common.cancel') }}
                             </v-btn>
                         </v-toolbar>
                         <v-card-text class="pt-4">
@@ -130,11 +130,11 @@
                                 v-else-if="refer_books.length === 0"
                                 class="py-6 text-center"
                             >
-                                无匹配的书籍信息
+                                {{ t('book.noMatchingBooks') }}
                             </p>
                             <template v-else>
                                 <p class="mb-4">
-                                    请选择最匹配的记录复制为本书的描述信息：
+                                    {{ t('book.selectMatchingBook') }}
                                 </p>
                                 <BookCards :books="refer_books">
                                     <template #actions="{ book: referBook }">
@@ -186,22 +186,22 @@
                                                         <v-icon size="small">
                                                             mdi-check
                                                         </v-icon>
-                                                        设置
+                                                        {{ t('common.set') }}
                                                     </v-btn>
                                                 </template>
                                                 <v-list density="compact">
                                                     <v-list-item @click="set_refer(referBook.provider_key, referBook.provider_value)">
-                                                        <v-list-item-title>设置书籍信息及图片</v-list-item-title>
+                                                        <v-list-item-title>{{ t('book.setInfoAndImage') }}</v-list-item-title>
                                                     </v-list-item>
                                                     <v-list-item
                                                         @click="set_refer(referBook.provider_key, referBook.provider_value, { only_meta: 'yes' })"
                                                     >
-                                                        <v-list-item-title>仅设置书籍信息</v-list-item-title>
+                                                        <v-list-item-title>{{ t('book.setOnlyInfo') }}</v-list-item-title>
                                                     </v-list-item>
                                                     <v-list-item
                                                         @click="set_refer(referBook.provider_key, referBook.provider_value, { only_cover: 'yes' })"
                                                     >
-                                                        <v-list-item-title>仅设置书籍图片</v-list-item-title>
+                                                        <v-list-item-title>{{ t('book.setOnlyImage') }}</v-list-item-title>
                                                     </v-list-item>
                                                 </v-list>
                                             </v-menu>
@@ -231,29 +231,29 @@
                         <v-spacer />
 
                         <v-btn
-                            color="primary"
-                            variant="elevated"
-                            class="mx-2"
-                            @click="dialog_kindle = !dialog_kindle"
-                        >
-                            <v-icon start>
-                                mdi-email
-                            </v-icon>
-                            推送
-                        </v-btn>
+                                color="primary"
+                                variant="elevated"
+                                class="mx-2"
+                                @click="dialog_kindle = !dialog_kindle"
+                            >
+                                <v-icon start>
+                                    mdi-email
+                                </v-icon>
+                                {{ t('common.push') }}
+                            </v-btn>
 
-                        <v-btn
-                            color="primary"
-                            variant="elevated"
-                            class="mx-2"
-                            :href="'/read/' + book.id"
-                            target="_blank"
-                        >
-                            <v-icon start>
-                                mdi-book-open-page-variant
-                            </v-icon>
-                            阅读
-                        </v-btn>
+                            <v-btn
+                                color="primary"
+                                variant="elevated"
+                                class="mx-2"
+                                :href="'/read/' + book.id"
+                                target="_blank"
+                            >
+                                <v-icon start>
+                                    mdi-book-open-page-variant
+                                </v-icon>
+                                {{ t('common.read') }}
+                            </v-btn>
 
                         <template v-if="book.is_owner">
                             <v-menu offset-y>
@@ -264,7 +264,7 @@
                                         variant="elevated"
                                         class="ml-2 mr-4"
                                     >
-                                        管理
+                                        {{ t('common.manage') }}
                                         <v-icon size="small">
                                             mdi-dots-vertical
                                         </v-icon>
@@ -275,13 +275,13 @@
                                         <template #prepend>
                                             <v-icon>mdi-cog</v-icon>
                                         </template>
-                                        <v-list-item-title>编辑书籍信息</v-list-item-title>
+                                        <v-list-item-title>{{ t('book.editInfo') }}</v-list-item-title>
                                     </v-list-item>
                                     <v-list-item @click="get_refer">
                                         <template #prepend>
                                             <v-icon>mdi-apps</v-icon>
                                         </template>
-                                        <v-list-item-title>从互联网更新信息</v-list-item-title>
+                                        <v-list-item-title>{{ t('book.updateFromInternet') }}</v-list-item-title>
                                     </v-list-item>
                                     <v-divider />
                                     <v-list-item @click="delete_book">
@@ -290,7 +290,7 @@
                                                 mdi-delete-forever
                                             </v-icon>
                                         </template>
-                                        <v-list-item-title>删除此书</v-list-item-title>
+                                        <v-list-item-title>{{ t('book.deleteBook') }}</v-list-item-title>
                                     </v-list-item>
                                 </v-list>
                             </v-menu>
@@ -363,7 +363,7 @@
                                         <v-icon start>
                                             mdi-domain
                                         </v-icon>
-                                        出版：{{ book.publisher }}
+                                        {{ t('book.publisher') }}：{{ book.publisher }}
                                     </v-chip>
                                     <v-chip
                                         v-if="book.series"
@@ -376,7 +376,7 @@
                                         <v-icon start>
                                             mdi-bookshelf
                                         </v-icon>
-                                        丛书: {{ book.series }}
+                                        {{ t('book.series') }}: {{ book.series }}
                                     </v-chip>
                                     <v-chip
                                         v-if="book.isbn"
@@ -413,7 +413,7 @@
                                     v-html="book.comments"
                                 />
                                 <p v-else>
-                                    点击浏览详情
+                                    {{ t('book.viewDetails') }}
                                 </p>
                             </v-card-text>
                         </v-col>
@@ -452,7 +452,7 @@
                                             </v-icon>
                                         </v-avatar>
                                     </template>
-                                    <v-list-item-title>在线阅读</v-list-item-title>
+                                    <v-list-item-title>{{ t('book.onlineRead') }}</v-list-item-title>
                                     <template #append>
                                         <v-icon>mdi-chevron-right</v-icon>
                                     </template>
@@ -485,7 +485,7 @@
                                             </v-icon>
                                         </v-avatar>
                                     </template>
-                                    <v-list-item-title>Txt在线阅读({{ txt_parse_inited ? '已解析' : '未解析' }})</v-list-item-title>
+                                    <v-list-item-title>{{ t('book.txtOnlineRead') }}({{ txt_parse_inited ? t('book.parsed') : t('book.unparsed') }})</v-list-item-title>
                                     <template #append>
                                         <v-icon>mdi-chevron-right</v-icon>
                                     </template>
@@ -516,7 +516,7 @@
                                             </v-icon>
                                         </v-avatar>
                                     </template>
-                                    <v-list-item-title>下载</v-list-item-title>
+                                    <v-list-item-title>{{ t('common.download') }}</v-list-item-title>
                                     <template #append>
                                         <v-icon>mdi-chevron-right</v-icon>
                                     </template>
@@ -547,7 +547,7 @@
                                             </v-icon>
                                         </v-avatar>
                                     </template>
-                                    <v-list-item-title>推送至Kindle</v-list-item-title>
+                                    <v-list-item-title>{{ t('book.pushToKindle') }}</v-list-item-title>
                                     <template #append>
                                         <v-icon>mdi-chevron-right</v-icon>
                                     </template>

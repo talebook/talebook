@@ -16,7 +16,7 @@
                             class="flex-grow-1"
                         >
                             <v-chip
-                                :class="filters.publisher === '全部' ? 'filter-chip-active' : 'filter-chip-inactive'"
+                                :class="filters.publisher === t('messages.all') ? 'filter-chip-active' : 'filter-chip-inactive'"
                                 density="compact"
                                 label
                                 small
@@ -81,7 +81,7 @@
                             class="flex-grow-1"
                         >
                             <v-chip
-                                :class="filters.author === '全部' ? 'filter-chip-active' : 'filter-chip-inactive'"
+                                :class="filters.author === t('messages.all') ? 'filter-chip-active' : 'filter-chip-inactive'"
                                 density="compact"
                                 label
                                 small
@@ -368,7 +368,7 @@ const fetchBooks = async (p = 1) => {
         title.value = rsp.title || t('library.title');
     } catch (error) {
         console.error('Failed to fetch books:', error);
-        if ($alert) $alert('error', '获取书籍数据失败');
+        if ($alert) $alert('error', t('library.message.fetchBooksFailed'));
     }
 };
 

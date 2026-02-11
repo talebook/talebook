@@ -71,10 +71,10 @@ export default defineNuxtConfig({
     i18n: {
         // 策略配置
         strategy: 'no_prefix', // 使用 cookie 管理语言，不添加路径前缀
-        defaultLocale: 'zh', // 默认语言
+        defaultLocale: 'zh-CN', // 默认语言
         locales: [
             {
-                code: 'zh',
+                code: 'zh-CN',
                 name: '简体中文',
                 iso: 'zh-CN',
                 file: 'zh-CN.json'
