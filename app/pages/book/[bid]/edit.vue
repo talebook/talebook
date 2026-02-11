@@ -7,7 +7,7 @@
                     color="primary"
                 >
                     <v-toolbar-title align-center>
-                        编辑书籍信息
+                        {{ t('book.editBookInfo') }}
                     </v-toolbar-title>
                     <v-spacer />
                     <v-btn
@@ -16,7 +16,7 @@
                         variant="elevated"
                         :to="'/book/'+book.id"
                     >
-                        取消
+                        {{ t('common.cancel') }}
                     </v-btn>
                     <v-btn
                         class="mr-4"
@@ -24,7 +24,7 @@
                         variant="elevated"
                         @click="save_book"
                     >
-                        保存
+                        {{ t('common.save') }}
                     </v-btn>
                 </v-toolbar>
                 <v-card-text class="pa-0 pa-md-2">
@@ -32,7 +32,7 @@
                         <v-container>
                             <v-row>
                                 <v-col cols="12">
-                                    <h3>封面图</h3>
+                                    <h3>{{ t('book.coverImage') }}</h3>
                                     <v-row>
                                         <v-col
                                             cols="12"
@@ -52,11 +52,11 @@
                                             <v-file-input
                                                 v-model="coverFile"
                                                 accept="image/jpeg, image/png, image/gif"
-                                                label="选择封面图"
+                                                :label="t('book.selectCover')"
                                                 prepend-icon="mdi-image"
                                                 @change="onCoverFileChange"
                                             />
-                                            <small class="text-caption">支持JPG、PNG、GIF格式，大小不超过5MB</small>
+                                            <small class="text-caption">{{ t('book.coverSupported') }}</small>
                                             <div class="mt-2">
                                                 <v-btn
                                                     color="primary"
@@ -64,7 +64,7 @@
                                                     :disabled="!coverFile"
                                                     @click="uploadCover"
                                                 >
-                                                    上传封面
+                                                    {{ t('book.uploadCover') }}
                                                 </v-btn>
                                             </div>
                                         </v-col>
@@ -77,7 +77,7 @@
                                 >
                                     <v-text-field
                                         v-model="book.title"
-                                        label="书名"
+                                        :label="t('book.field.title')"
                                     />
                                 </v-col>
                                 <v-col
@@ -103,23 +103,23 @@
                                         v-model="book.authors"
                                         v-model:search-input="author_input"
                                         :items="book.authors"
-                                        label="作者"
+                                        :label="t('book.field.authors')"
                                         hide-selected
                                         multiple
                                         small-chips
                                     >
                                         <template #no-data>
                                             <v-list-item>
-                                                <span v-if="! author_input">请输入新的名称</span>
+                                                <span v-if="! author_input">{{ t('book.enterNewName') }}</span>
                                                 <div v-else>
-                                                    <span class="subheading">添加</span>
+                                                    <span class="subheading">{{ t('common.add') }}</span>
                                                     <v-chip
                                                         color="green lighten-3"
                                                         label
                                                         small
                                                         rounded
                                                     >
-                                                        {{
+                                                        {{ 
                                                             author_input
                                                         }}
                                                     </v-chip>
@@ -149,7 +149,7 @@
                                 >
                                     <v-text-field
                                         v-model="book.series"
-                                        label="丛书名称"
+                                        :label="t('book.series')"
                                     >
                                         {{ book.series }}
                                     </v-text-field>
@@ -161,7 +161,7 @@
                                 >
                                     <v-text-field
                                         v-model="book.publisher"
-                                        label="出版社"
+                                        :label="t('book.field.publisher')"
                                     />
                                 </v-col>
                                 <v-col
@@ -171,7 +171,7 @@
                                 >
                                     <v-text-field
                                         v-model="book.pubdate"
-                                        label="出版日期"
+                                        :label="t('book.field.pubdate')"
                                     />
                                 </v-col>
                                 <v-col
@@ -181,7 +181,7 @@
                                 >
                                     <v-text-field
                                         v-model="book.isbn"
-                                        label="ISBN编号"
+                                        :label="t('book.isbn')"
                                     />
                                 </v-col>
                                 <v-col
@@ -191,7 +191,7 @@
                                 >
                                     <v-text-field
                                         v-model="book.language"
-                                        label="语言"
+                                        :label="t('book.language')"
                                     />
                                 </v-col>
 
@@ -205,23 +205,23 @@
                                         v-model="book.tags"
                                         v-model:search-input="tag_input"
                                         :items="book.tags"
-                                        label="标签列表"
+                                        :label="t('book.field.tags')"
                                         hide-selected
                                         multiple
                                         small-chips
                                     >
                                         <template #no-data>
                                             <v-list-item>
-                                                <span v-if="! tag_input">请输入新的标签名称</span>
+                                                <span v-if="! tag_input">{{ t('book.enterNewTagName') }}</span>
                                                 <div v-else>
-                                                    <span class="subheading">添加标签</span>
+                                                    <span class="subheading">{{ t('book.addTag') }}</span>
                                                     <v-chip
                                                         color="green lighten-3"
                                                         label
                                                         small
                                                         rounded
                                                     >
-                                                        {{
+                                                        {{ 
                                                             tag_input
                                                         }}
                                                     </v-chip>
@@ -253,7 +253,7 @@
                                         small
                                         outlined
                                         rows="15"
-                                        label="内容简介"
+                                        :label="t('book.field.comments')"
                                     />
                                 </v-col>
                                 <v-divider />
@@ -266,7 +266,7 @@
                                         color="green"
                                         @click="save_book"
                                     >
-                                        保存
+                                        {{ t('common.save') }}
                                     </v-btn>
                                 </v-col>
                             </v-row>
@@ -390,7 +390,7 @@ const save_book = async () => {
             });
             
             if (coverRsp.err !== 'ok') {
-                $alert('error', '封面图上传失败：' + coverRsp.msg);
+                $alert('error', t('book.uploadCoverFailed') + (coverRsp.msg ? (': ' + coverRsp.msg) : ''));
                 saving.value = false;
                 return;
             }

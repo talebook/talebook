@@ -2,7 +2,7 @@
 <template>
     <v-card>
         <v-card-title class="d-flex justify-space-between align-center">
-            <span> {{ $t('messages.userManagement') }} </span>
+            <span> {{ t('admin.users.title') }} </span>
             <div>
                 <v-btn
                     color="primary"
@@ -12,16 +12,16 @@
                     <v-icon start>
                         mdi-account-group
                     </v-icon>
-                    {{ $t('messages.guestPermission') }}
-                        <v-btn
-                            color="primary"
-                            size="small"
-                            v-bind="props"
-                        >
-                            {{ t('actions.more') }} <v-icon size="small">
-                                mdi-dots-vertical
-                            </v-icon>
-                        </v-btn>
+                    {{ t('admin.users.button.guestPermission') }}
+                </v-btn>
+                <v-btn
+                    color="primary"
+                    @click="showAddDialog = true"
+                >
+                    <v-icon start>
+                        mdi-plus
+                    </v-icon>
+                    {{ t('admin.users.button.addUser') }}
                 </v-btn>
             </div>
         </v-card-title>
@@ -32,7 +32,7 @@
             max-width="500px"
         >
             <v-card>
-                <v-card-title> {{ $t('messages.addNewUser') }} </v-card-title>
+                <v-card-title> {{ t('admin.users.button.addUser') }} </v-card-title>
                 <v-card-text>
                     <v-form
                         ref="addUserForm"
@@ -41,57 +41,54 @@
                         <!-- 基本信息 -->
                         <v-text-field
                             v-model="newUser.username"
-                            :label="$t('messages.username')"
+                            :label="t('admin.users.label.username')"
                             :rules="[requiredRule, usernameRule]"
                             required
                             prepend-icon="mdi-account"
-                            :placeholder="$t('messages.usernamePlaceholder')"
+                            :placeholder="t('admin.users.placeholder.username')"
                         />
-                        
                         <v-text-field
                             v-model="newUser.password"
-                            :label="$t('messages.password')"
+                            :label="t('admin.users.label.password')"
                             :rules="[requiredRule, passwordRule]"
                             required
                             prepend-icon="mdi-lock"
                             type="password"
-                            :placeholder="$t('messages.passwordPlaceholder')"
+                            :placeholder="t('admin.users.placeholder.password')"
                         />
-                        
                         <v-text-field
                             v-model="newUser.name"
-                            :label="$t('messages.nickname')"
+                            :label="t('admin.users.label.nickname')"
                             :rules="[requiredRule, nicknameRule]"
                             required
                             prepend-icon="mdi-account-circle"
-                            :placeholder="$t('messages.nicknamePlaceholder')"
+                            :placeholder="t('admin.users.placeholder.nickname')"
                         />
-                        
                         <v-text-field
                             v-model="newUser.email"
-                            :label="$t('messages.email')"
+                            :label="t('admin.users.label.email')"
                             :rules="[requiredRule, emailRule]"
                             required
                             prepend-icon="mdi-email"
-                            :placeholder="$t('messages.emailPlaceholder')"
+                            :placeholder="t('admin.users.placeholder.email')"
                         />
                         
                         <!-- 账号设置 -->
                         <v-divider class="my-4" />
                         <h3 class="mb-2">
-                            {{ $t('messages.accountSettings') }}
+                            {{ t('admin.users.label.accountSettings') }}
                         </h3>
                         
                         <v-checkbox
                             v-model="newUser.active"
-                            :label="$t('messages.activeStatus')"
+                            :label="t('admin.users.label.activeStatus')"
                             color="primary"
                             hide-details
                         />
                         
                         <v-checkbox
                             v-model="newUser.admin"
-                            :label="$t('messages.adminPermission')"
+                            :label="t('admin.users.label.adminPermission')"
                             color="primary"
                             hide-details
                         />
@@ -99,7 +96,7 @@
                         <!-- 权限设置 -->
                         <v-divider class="my-4" />
                         <h3 class="mb-2">
-                            {{ $t('messages.permissionSettings') }}
+                            {{ t('admin.users.label.permissionSettings') }}
                         </h3>
                         
                         <v-container fluid>
@@ -128,13 +125,13 @@
                         text
                         @click="showAddDialog = false"
                     >
-                        {{ t('actions.cancel') }}
+                        {{ $t('common.cancel') }}
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="addUser"
                     >
-                        {{ t('actions.confirm') }}
+                        {{ $t('common.confirm') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -146,7 +143,7 @@
             max-width="500px"
         >
             <v-card>
-                <v-card-title> {{ t('admin.guest.title') }} </v-card-title>
+                <v-card-title> {{ t('admin.users.button.guestPermission') }} </v-card-title>
                 <v-card-text>
                     <v-form ref="guestPermissionForm">
                         <v-container fluid>
@@ -173,13 +170,13 @@
                         text
                         @click="showGuestPermissionDialog = false"
                     >
-                        {{ t('actions.cancel') }}
+                        {{ t('common.cancel') }}
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="saveGuestPermissions"
                     >
-                        {{ t('actions.save') }}
+                        {{ t('common.save') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -199,27 +196,27 @@
                 {{ item.extra.login_ip }}
             </template>
             <template #item.detail="{ item }">
-                <span v-if="item.extra.visit_history"> {{ $t('admin.users.history.visit', {count: item.extra.visit_history.length}) }} </span>
-                <span v-if="item.extra.read_history"> {{ $t('admin.users.history.read', {count: item.extra.read_history.length}) }} </span>
-                <span v-if="item.extra.push_history"> {{ $t('admin.users.history.push', {count: item.extra.push_history.length}) }} </span>
-                <span v-if="item.extra.download_history"> {{ $t('admin.users.history.download', {count: item.extra.download_history.length}) }} </span>
-                <span v-if="item.extra.upload_history"> {{ $t('admin.users.history.upload', {count: item.extra.upload_history.length}) }} </span>
+                <span v-if="item.extra.visit_history"> {{ t('admin.users.label.visited') }}{{ item.extra.visit_history.length }}{{ t('admin.users.label.books') }} </span>
+                <span v-if="item.extra.read_history"> {{ t('admin.users.label.read') }}{{ item.extra.read_history.length }}{{ t('admin.users.label.books') }} </span>
+                <span v-if="item.extra.push_history"> {{ t('admin.users.label.pushed') }}{{ item.extra.push_history.length }}{{ t('admin.users.label.books') }} </span>
+                <span v-if="item.extra.download_history"> {{ t('admin.users.label.downloaded') }}{{ item.extra.download_history.length }}{{ t('admin.users.label.books') }} </span>
+                <span v-if="item.extra.upload_history"> {{ t('admin.users.label.uploaded') }}{{ item.extra.upload_history.length }}{{ t('admin.users.label.books') }} </span>
             </template>
             <template #item.actions="{ item }">
                 <v-menu>
                     <template #activator="{ props }">
                         <v-btn
-                            color="primary"
-                            size="small"
-                            v-bind="props"
-                        >
-                            {{ $t('admin.users.actions.manage') }} <v-icon size="small">
-                                mdi-dots-vertical
-                            </v-icon>
-                        </v-btn>
+                                color="primary"
+                                size="small"
+                                v-bind="props"
+                            >
+                                {{ t('admin.users.user.action') }} <v-icon size="small">
+                                    mdi-dots-vertical
+                                </v-icon>
+                            </v-btn>
                     </template>
                     <v-list density="compact">
-                        <v-list-subheader>{{ $t('admin.users.permissions.edit') }}</v-list-subheader>
+                        <v-list-subheader>{{ t('admin.users.user.modifyPermission') }}</v-list-subheader>
                         <template
                             v-for="perm in permissions"
                             :key="perm.name"
@@ -230,7 +227,7 @@
                                         mdi-account-check
                                     </v-icon>
                                 </template>
-                                <v-list-item-title>已允许{{ perm.text }}</v-list-item-title>
+                                <v-list-item-title>{{ t('admin.users.user.enabled') }}{{ perm.text }}</v-list-item-title>
                                 <template #append>
                                     <v-btn
                                         variant="text"
@@ -241,20 +238,20 @@
                                             item[perm.name] = !item[perm.name];
                                         "
                                     >
-                                        关闭
+                                        {{ t('admin.users.user.disable') }}
                                     </v-btn>
                                 </template>
                             </v-list-item>
                             <v-list-item
                                 v-else
-                                :key="'enable-' + perm.name"
+                                :key="'enable-'+perm.name"
                             >
                                 <template #prepend>
                                     <v-icon color="error">
                                         mdi-account-remove
                                     </v-icon>
                                 </template>
-                                <v-list-item-title>已禁止{{ perm.text }}</v-list-item-title>
+                                <v-list-item-title>{{ t('admin.users.user.disabled') }}{{ perm.text }}</v-list-item-title>
                                 <template #append>
                                     <v-btn
                                         variant="text"
@@ -265,14 +262,14 @@
                                             item[perm.name] = !item[perm.name];
                                         "
                                     >
-                                        开启
+                                        {{ t('admin.users.user.enable') }}
                                     </v-btn>
                                 </template>
                             </v-list-item>
                         </template>
 
                         <v-divider />
-                        <v-list-subheader>账号管理</v-list-subheader>
+                        <v-list-subheader>{{ t('admin.users.user.accountManagement') }}</v-list-subheader>
                         <v-list-item
                             v-if="!item.is_active"
                             @click="
@@ -280,7 +277,7 @@
                                 item.is_active = true;
                             "
                         >
-                            <v-list-item-title> 免邮箱认证，直接激活账户 </v-list-item-title>
+                            <v-list-item-title> {{ t('admin.users.user.activateAccount') }} </v-list-item-title>
                         </v-list-item>
                         <v-list-item
                             v-if="item.is_admin"
@@ -289,7 +286,7 @@
                                 item.is_admin = !item.is_admin;
                             "
                         >
-                            <v-list-item-title> 取消管理员 </v-list-item-title>
+                            <v-list-item-title> {{ t('admin.users.user.removeAdmin') }} </v-list-item-title>
                         </v-list-item>
                         <v-list-item
                             v-else
@@ -298,7 +295,7 @@
                                 item.is_admin = !item.is_admin;
                             "
                         >
-                            <v-list-item-title> 设置为管理员 </v-list-item-title>
+                            <v-list-item-title> {{ t('admin.users.user.setAdmin') }} </v-list-item-title>
                         </v-list-item>
                         <v-list-item
                             @click="
@@ -306,7 +303,7 @@
                                 getDataFromApi()
                             "
                         >
-                            <v-list-item-title> 立即删除该用户 </v-list-item-title>
+                            <v-list-item-title> {{ t('admin.users.user.deleteUser') }} </v-list-item-title>
                         </v-list-item>
                     </v-list>
                 </v-menu>
@@ -316,13 +313,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
-const { t } = useI18n();
 const { $backend, $alert } = useNuxtApp();
+const { t } = useI18n();
 
 store.setNavbar(true);
 
@@ -340,14 +337,14 @@ const addUserForm = ref(null);
 const showGuestPermissionDialog = ref(false);
 
 // Form rules
-const requiredRule = v => !!v || t('validation.required');
+const requiredRule = v => !!v || t('admin.users.message.required');
 const emailRule = (email) => {
-    var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-    return re.test(email) || t('validation.emailInvalid');
+    var re = /^(([^<>()[\.,;:\s@"]+([^<>()[\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    return re.test(email) || t('admin.users.message.invalidEmail');
 };
-const usernameRule = v => ((20 >= v.length && v.length >= 5) && /^[a-z][a-z0-9_]*$/.test(v)) || t('validation.usernameFormat');
-const passwordRule = v => (20 >= v.length && v.length >= 8) || t('validation.passwordLength');
-const nicknameRule = v => v.length >= 2 || t('validation.nickLength');
+const usernameRule = v => ((20 >= v.length && v.length >= 5) && /^[a-z][a-z0-9_]*$/.test(v)) || t('admin.users.message.invalidUsername');
+const passwordRule = v => (20 >= v.length && v.length >= 8) || t('admin.users.message.invalidPassword');
+const nicknameRule = v => v.length >= 2 || t('admin.users.message.invalidNickname');
 
 // New user data
 const newUser = ref({
@@ -376,34 +373,34 @@ const guestPermissions = ref({
     ALLOW_GUEST_UPLOAD: false,
 });
 
-const guestPermissionList = [
-    { key: 'ALLOW_GUEST_READ', label: t('admin.guest.allow_read') },
-    { key: 'ALLOW_GUEST_DOWNLOAD', label: t('admin.guest.allow_download') },
-    { key: 'ALLOW_GUEST_PUSH', label: t('admin.guest.allow_push') },
-    { key: 'ALLOW_GUEST_UPLOAD', label: t('admin.guest.allow_upload') },
-];
+const guestPermissionList = computed(() => [
+    { key: 'ALLOW_GUEST_READ', label: t('admin.users.label.allowGuestRead') },
+    { key: 'ALLOW_GUEST_DOWNLOAD', label: t('admin.users.label.allowGuestDownload') },
+    { key: 'ALLOW_GUEST_PUSH', label: t('admin.users.label.allowGuestPush') },
+    { key: 'ALLOW_GUEST_UPLOAD', label: t('admin.users.label.allowGuestUpload') },
+]);
 
-const headers = [
-    { title: t('admin.table.id'), key: 'id', sortable: true },
-    { title: t('admin.table.username'), key: 'username', sortable: true },
-    { title: t('admin.table.name'), key: 'name', sortable: false },
-    { title: t('admin.table.email'), key: 'email', sortable: true },
-    { title: t('admin.table.provider'), key: 'provider', sortable: false },
-    { title: t('admin.table.create_time'), key: 'create_time', sortable: true },
-    { title: t('admin.table.access_time'), key: 'access_time', sortable: true },
-    { title: t('admin.table.login_ip'), key: 'login_ip', sortable: false },
-    { title: t('admin.table.detail'), key: 'detail', sortable: false },
-    { title: t('admin.table.actions'), key: 'actions', sortable: false },
-];
+const headers = computed(() => [
+    { title: 'ID', key: 'id', sortable: true },
+    { title: t('admin.users.label.username'), key: 'username', sortable: true },
+    { title: t('admin.users.label.nickname'), key: 'name', sortable: false },
+    { title: 'Email', key: 'email', sortable: true },
+    { title: t('admin.users.label.registrationPlatform'), key: 'provider', sortable: false },
+    { title: t('admin.users.label.registrationTime'), key: 'create_time', sortable: true },
+    { title: t('admin.users.label.loginTime'), key: 'access_time', sortable: true },
+    { title: t('admin.users.label.loginIp'), key: 'login_ip', sortable: false },
+    { title: t('admin.users.label.detail'), key: 'detail', sortable: false },
+    { title: t('admin.users.label.action'), key: 'actions', sortable: false },
+]);
 
 const permissions = [
-    { code: 'l', name: 'can_login', text: t('admin.perms.login') },
-    { code: 'u', name: 'can_upload', text: t('admin.perms.upload') },
-    { code: 's', name: 'can_save', text: t('admin.perms.download') },
-    { code: 'e', name: 'can_edit', text: t('admin.perms.edit') },
-    { code: 'd', name: 'can_delete', text: t('admin.perms.delete') },
-    { code: 'p', name: 'can_push', text: t('admin.perms.push') },
-    { code: 'r', name: 'can_read', text: t('admin.perms.read') },
+    { code: 'l', name: 'can_login', text: t('admin.users.label.permissionLogin') },
+    { code: 'u', name: 'can_upload', text: t('admin.users.label.permissionUpload') },
+    { code: 's', name: 'can_save', text: t('admin.users.label.permissionDownload') },
+    { code: 'e', name: 'can_edit', text: t('admin.users.label.permissionEdit') },
+    { code: 'd', name: 'can_delete', text: t('admin.users.label.permissionDelete') },
+    { code: 'p', name: 'can_push', text: t('admin.users.label.permissionPush') },
+    { code: 'r', name: 'can_read', text: t('admin.users.label.permissionRead') },
 ];
 
 const updateOptions = (newOptions) => {
@@ -523,7 +520,7 @@ const saveGuestPermissions = () => {
         if (rsp.err != 'ok') {
             if ($alert) $alert('error', rsp.msg);
         } else {
-            if ($alert) $alert('success', t('admin.guest.saveSuccess'));
+            if ($alert) $alert('success', t('admin.users.message.guestPermissionSaved'));
             showGuestPermissionDialog.value = false;
         }
     });
@@ -546,6 +543,6 @@ onMounted(() => {
 });
 
 useHead({
-    title: () => t('admin.usersTitle')
+    title: t('admin.users.title')
 });
 </script>
