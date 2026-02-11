@@ -94,6 +94,9 @@ const { data: welcomeData } = useAsyncData('welcome', async () => {
 // 修复2: 使用 watch 监听数据变化
 watch(welcomeData, (newData) => {
     if (newData) {
+        if (newData.welcome) {
+            welcome.value = newData.welcome;
+        }
         if (newData.err === 'free') {
             router.push(route.query.next || '/');
         } else if (newData.err === 'not_installed') {

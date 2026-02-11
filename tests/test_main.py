@@ -724,6 +724,7 @@ class TestOpds(TestWithUserLogin):
 
     def test_opds_without_login(self):
         main.CONF["INVITE_MODE"] = True
+        main.CONF["OPDS_ENABLED"] = False
         rsp = self.fetch("/opds/nav/%s" % b'Otitle'.hex())
         self.assertEqual(rsp.code, 401)
         main.CONF["INVITE_MODE"] = False
@@ -762,9 +763,11 @@ class TestJsonResponse(TestApp):
 class TestInviteMode(TestApp):
     def setUp(self):
         main.CONF["INVITE_MODE"] = True
+        main.CONF["OPDS_ENABLED"] = True
         TestApp.setUp(self)
 
     def tearDown(self):
+        main.CONF["OPDS_ENABLED"] = False
         main.CONF["INVITE_MODE"] = False
         TestApp.tearDown(self)
 

@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - dev
-      - add-workflow-actions
+      - dev-*
   pull_request:
     branches:
       - master

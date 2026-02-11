@@ -438,7 +438,7 @@ class OpdsHandler(BaseHandler):
         self.redirect("/?err=opds_disabled&msg=OPDS服务已关闭")
         raise web.Finish()
 
-    def should_be_opds_enabled(self):
+    def should_enable_opds(self):
         if not CONF.get("OPDS_ENABLED", False):
             return self.send_opds_disabled()
 
@@ -448,9 +448,9 @@ class OpdsHandler(BaseHandler):
         self.process_auth_header()
         self.should_be_installed()
         # 跳过私人图书馆模式检查，让OPDS服务不受限制
-        # self.should_be_invited()
+        self.should_be_invited()
         # 检查 OPDS 是否启用，统一放到基类中
-        self.should_be_opds_enabled()
+        # self.should_enable_opds()
 
     def get_opds_acquisition_feed(
         self,
