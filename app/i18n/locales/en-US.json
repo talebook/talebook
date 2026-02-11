@@ -384,6 +384,12 @@
       },
       "label": {
         "search": "Search",
+        "title": "Title",
+        "authors": "Authors",
+        "rating": "Rating",
+        "star": "star",
+        "publisher": "Publisher",
+        "tags": "Tags",
         "comments": "Description"
       },
       "message": {

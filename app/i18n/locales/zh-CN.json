@@ -384,6 +384,12 @@
       },
       "label": {
         "search": "搜索",
+        "title": "书名",
+        "authors": "作者",
+        "rating": "评分",
+        "star": "星",
+        "publisher": "出版社",
+        "tags": "标签",
         "comments": "简介"
       },
       "message": {
