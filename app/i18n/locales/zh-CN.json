@@ -546,6 +546,8 @@
         "smtpUsername": "SMTP用户名（例如 user{'@'}gmail.com）",
         "smtpPassword": "SMTP密码",
         "smtpEncryption": "SMTP安全性",
+        "keyAppid": "Key/AppID",
+        "secretKey": "Secret/Key",
         "selectSocialAccounts": "选择要启用的社交网络账号",
         "configurationGuide": "配置说明"
       },
