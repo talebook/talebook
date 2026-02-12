@@ -125,13 +125,13 @@
                         text
                         @click="showAddDialog = false"
                     >
-                        {{ $t('common.cancel') }}
+                        {{ t('common.cancel') }}
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="addUser"
                     >
-                        {{ $t('common.confirm') }}
+                        {{ t('common.confirm') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
