@@ -31,14 +31,14 @@
                         </p>
                         <template v-if="card.tips">
                             <p
-                                v-for="t in card.tips"
-                                :key="t.text"
+                                v-for="tip in card.tips"
+                                :key="tip.text"
                                 class="text-caption mb-2"
                             >
-                                {{ t.text }} <a
-                                    v-if="t.link"
+                                {{ tip.text }} <a
+                                    v-if="tip.link"
                                     target="_blank"
-                                    :href="t.link"
+                                    :href="tip.link"
                                 >{{ t('common.link') }}</a>
                             </p>
                         </template>
@@ -267,12 +267,12 @@
         <br>
         <div class="text-center mb-8">
             <v-btn
-                    color="primary"
-                    size="large"
-                    @click="save_settings"
-                >
-                    {{ t('admin.settings.button.saveSettings') }}
-                </v-btn>
+                color="primary"
+                size="large"
+                @click="save_settings"
+            >
+                {{ t('admin.settings.button.saveSettings') }}
+            </v-btn>
         </div>
     </div>
 </template>
@@ -477,10 +477,10 @@ const save_settings = () => {
     })
         .then( rsp => {
             if ( rsp.err != 'ok' ) {
-            if ($alert) $alert('error', rsp.msg);
-        } else {
-            if ($alert) $alert('success', t('admin.settings.message.saveSuccess'));
-        }
+                if ($alert) $alert('error', rsp.msg);
+            } else {
+                if ($alert) $alert('success', t('admin.settings.message.saveSuccess'));
+            }
         });
 };
 

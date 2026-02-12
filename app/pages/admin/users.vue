@@ -125,13 +125,13 @@
                         text
                         @click="showAddDialog = false"
                     >
-                        {{ $t('common.cancel') }}
+                        {{ t('common.cancel') }}
                     </v-btn>
                     <v-btn
                         color="primary"
                         @click="addUser"
                     >
-                        {{ $t('common.confirm') }}
+                        {{ t('common.confirm') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -197,23 +197,27 @@
             </template>
             <template #item.detail="{ item }">
                 <span v-if="item.extra.visit_history"> {{ t('admin.users.label.visited') }}{{ item.extra.visit_history.length }}{{ t('admin.users.label.books') }} </span>
+                <br v-if="item.extra.visit_history">
                 <span v-if="item.extra.read_history"> {{ t('admin.users.label.read') }}{{ item.extra.read_history.length }}{{ t('admin.users.label.books') }} </span>
+                <br v-if="item.extra.read_history">
                 <span v-if="item.extra.push_history"> {{ t('admin.users.label.pushed') }}{{ item.extra.push_history.length }}{{ t('admin.users.label.books') }} </span>
+                <br v-if="item.extra.push_history">
                 <span v-if="item.extra.download_history"> {{ t('admin.users.label.downloaded') }}{{ item.extra.download_history.length }}{{ t('admin.users.label.books') }} </span>
+                <br v-if="item.extra.download_history">
                 <span v-if="item.extra.upload_history"> {{ t('admin.users.label.uploaded') }}{{ item.extra.upload_history.length }}{{ t('admin.users.label.books') }} </span>
             </template>
             <template #item.actions="{ item }">
                 <v-menu>
                     <template #activator="{ props }">
                         <v-btn
-                                color="primary"
-                                size="small"
-                                v-bind="props"
-                            >
-                                {{ t('admin.users.user.action') }} <v-icon size="small">
-                                    mdi-dots-vertical
-                                </v-icon>
-                            </v-btn>
+                            color="primary"
+                            size="small"
+                            v-bind="props"
+                        >
+                            {{ t('admin.users.user.action') }} <v-icon size="small">
+                                mdi-dots-vertical
+                            </v-icon>
+                        </v-btn>
                     </template>
                     <v-list density="compact">
                         <v-list-subheader>{{ t('admin.users.user.modifyPermission') }}</v-list-subheader>

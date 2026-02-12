@@ -154,12 +154,16 @@
                             <v-list-item
                                 v-for="localeItem in allLocales"
                                 :key="localeItem.code"
-                                @click="setLocale(localeItem.code)"
                                 :active="localeItem.code === locale"
+                                @click="setLocale(localeItem.code)"
                             >
                                 <template #prepend>
-                                    <v-icon v-if="localeItem.code === locale">mdi-check</v-icon>
-                                    <v-icon v-else>mdi-translate</v-icon>
+                                    <v-icon v-if="localeItem.code === locale">
+                                        mdi-check
+                                    </v-icon>
+                                    <v-icon v-else>
+                                        mdi-translate
+                                    </v-icon>
                                 </template>
                                 <v-list-item-title>{{ localeItem.name }}</v-list-item-title>
                             </v-list-item>
@@ -254,12 +258,16 @@
                             <v-list-item
                                 v-for="localeItem in allLocales"
                                 :key="localeItem.code"
-                                @click="setLocale(localeItem.code)"
                                 :active="localeItem.code === locale"
+                                @click="setLocale(localeItem.code)"
                             >
                                 <template #prepend>
-                                    <v-icon v-if="localeItem.code === locale">mdi-check</v-icon>
-                                    <v-icon v-else>mdi-translate</v-icon>
+                                    <v-icon v-if="localeItem.code === locale">
+                                        mdi-check
+                                    </v-icon>
+                                    <v-icon v-else>
+                                        mdi-translate
+                                    </v-icon>
                                 </template>
                                 <v-list-item-title>{{ localeItem.name }}</v-list-item-title>
                             </v-list-item>

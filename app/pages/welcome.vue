@@ -15,8 +15,8 @@
                     color="primary"
                 >
                     <v-toolbar-title align-center>
-                                            {{ t('welcomePage.inputTitle') }}
-                                        </v-toolbar-title>
+                        {{ t('welcomePage.inputTitle') }}
+                    </v-toolbar-title>
                 </v-toolbar>
                 <v-card-text>
                     <p class="py-6 body-3 text-center">
@@ -45,11 +45,11 @@
                 <v-card-actions>
                     <v-spacer />
                     <v-btn
-                            color="primary"
-                            @click="welcome_login"
-                        >
-                            {{ t('common.login') }}
-                        </v-btn>
+                        color="primary"
+                        @click="welcome_login"
+                    >
+                        {{ t('common.login') }}
+                    </v-btn>
                     <v-spacer />
                 </v-card-actions>
             </v-card>

@@ -610,7 +610,7 @@ class AdminBookDelete(BaseHandler):
 
 class AdminOPDSBrowse(BaseHandler):
     """OPDS目录浏览接口"""
-    
+
     @js
     @is_admin
     def post(self):
@@ -619,18 +619,18 @@ class AdminOPDSBrowse(BaseHandler):
             host = req.get("host", "")
             port = req.get("port", "")
             path = req.get("path", "")
-            
+
             if not host:
                 return {"err": "params.error", "msg": _(u"参数错误，主机地址不能为空")}
-            
+
             logging.info(f"OPDS浏览请求: host={host}, port={port}, path={path}")
-            
+
             # 创建OPDS导入服务实例
             opds_service = OPDSImportService()
-            
+
             # 浏览目录
             result = opds_service.browse_opds_catalog(host, port, path)
-            
+
             if result.get('success'):
                 return {
                     "err": "ok", 
@@ -642,7 +642,7 @@ class AdminOPDSBrowse(BaseHandler):
                     "err": "error",
                     "msg": result.get('error', _(u"浏览目录失败"))
                 }
-                
+
         except Exception as e:
             logging.error(f"OPDS目录浏览失败: {e}")
             logging.error(traceback.format_exc())
@@ -651,7 +651,7 @@ class AdminOPDSBrowse(BaseHandler):
 
 class AdminOPDSImportStatus(BaseHandler):
     """OPDS导入状态查询接口"""
-    
+
     @js
     @is_admin
     def get(self):
@@ -669,7 +669,7 @@ class AdminOPDSImportStatus(BaseHandler):
 
 class AdminOPDSImport(BaseHandler):
     """OPDS导入接口"""
-    
+
     @js
     @is_admin
     def post(self):
@@ -678,12 +678,12 @@ class AdminOPDSImport(BaseHandler):
             opds_url = req.get("opds_url", "")
             books = req.get("books", [])
             delete_after = req.get("delete_after", False)
-            
+
             if not opds_url:
                 return {"err": "params.error", "msg": _(u"参数错误，OPDS URL不能为空")}
 
             logging.info(f"OPDS导入请求: url={opds_url}, books={len(books)}本, delete_after={delete_after}")
-            
+
             # 在开始异步下载前，将选中书籍插入到待处理列表并标记为downloading
             try:
                 if books:
@@ -724,15 +724,15 @@ class AdminOPDSImport(BaseHandler):
 
             thread = threading.Thread(target=import_task, daemon=True)
             thread.start()
-            
+
             # 立即返回，避免阻塞HTTP请求
             if books:
                 msg = _(u"已开始异步导入选中的 {} 本书籍，请稍后查看进度").format(len(books))
             else:
                 msg = _(u"已开始异步导入所有书籍，请稍后查看进度")
-                
+
             return {"err": "ok", "msg": msg, "async": True}
-            
+
         except Exception as e:
             logging.error(f"OPDS导入失败: {e}")
             logging.error(traceback.format_exc())

@@ -354,7 +354,7 @@ const uploadCover = async () => {
             body: formData
         });
         
-            if (coverRsp.err === 'ok') {
+        if (coverRsp.err === 'ok') {
             $alert('success', t('messages.uploadCoverSuccess'));
             // 刷新书籍信息
             await refresh();

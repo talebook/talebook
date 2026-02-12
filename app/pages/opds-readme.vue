@@ -2,7 +2,7 @@
 <template>
     <div class="opds-page">
         <template v-if="opdsEnabled">
-                <h1>{{ t('opdsPage.title') }}</h1>
+            <h1>{{ t('opdsPage.title') }}</h1>
             <section>
                 <h2>{{ t('opdsPage.links') }}</h2>
                 <p>{{ t('opdsPage.yourLink') }} <code>{{ opdsUrl }}</code></p>

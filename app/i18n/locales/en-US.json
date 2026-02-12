@@ -41,7 +41,8 @@
     "language": "Language",
     "send": "Send",
     "push": "Push",
-    "set": "Set"
+    "set": "Set",
+    "link": "Link"
   },
   "book": {
     "title": "Book",
@@ -204,6 +205,40 @@
     "books": "Book Management",
     "import": "Import Books"
   },
+  "user": {
+    "history": {
+      "pageTitle": "Reading History",
+      "noHistory": "No reading history yet. Please",
+      "exploreBooks": "explore the ocean of books",
+      "exploreBooksEnd": "~",
+      "noRecords": "No records",
+      "onlineReading": "Online Reading",
+      "pushedBooks": "Pushed Books",
+      "browseHistory": "Browse History"
+    },
+    "detail": {
+      "pageTitle": "User Center",
+      "avatar": "Avatar",
+      "changeAvatar": "Change Avatar",
+      "username": "Username",
+      "email": "Email",
+      "resendActivationEmail": "Resend Activation Email",
+      "password": "Password",
+      "changePassword": "Change Password",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm Password",
+      "nickname": "Nickname",
+      "kindleAddress": "Kindle Address",
+      "kindle": "Kindle",
+      "save": "Save",
+      "passwordMinLength": "Password must be at least 8 characters",
+      "nicknameMinLength": "Nickname must be at least 2 characters",
+      "invalidEmailFormat": "Invalid email format",
+      "passwordsNotSame": "Passwords do not match",
+      "activationEmailSent": "Activation email has been sent!"
+    }
+  },
   "auth": {
     "signIn": "Sign In",
     "signUp": "Sign Up",
@@ -284,6 +319,7 @@
     "more": "More",
     "publisher": "Publisher",
     "author": "Author",
+    "tags": "Tags",
     "colon": ": ",
     "userManagement": "User Management",
     "guestPermission": "Guest Permission",
@@ -448,7 +484,9 @@
         "scanInfo": "Scan Info",
         "time": "Time",
         "host": "Host Address",
-        "port": "Port"
+        "port": "Port",
+        "bookTitle": "Book Title",
+        "author": "Author"
       },
       "placeholder": {
         "host": "e.g.: http://example.com",
@@ -482,6 +520,13 @@
         "importStep4": "4. Select and import",
         "backToConnect": "Back to connect",
         "connect": "Connect"
+      },
+      "status": {
+        "new": "New",
+        "ready": "Ready",
+        "exist": "Existing",
+        "imported": "Imported",
+        "downloading": "Downloading"
       },
       "tab": {
         "todo": "Pending",
@@ -584,8 +629,16 @@
         "password": "Password",
         "nickname": "Nickname",
         "email": "Email",
+        "accountSettings": "Account Settings",
         "activeStatus": "Active",
         "adminPermission": "Admin",
+        "permissionSettings": "Permission Settings",
+        "visited": "Visited ",
+        "read": "Read ",
+        "pushed": "Pushed ",
+        "downloaded": "Downloaded ",
+        "uploaded": "Uploaded ",
+        "books": " books",
         "allowGuestRead": "Allow guest reading",
         "allowGuestDownload": "Allow guest download",
         "allowGuestPush": "Allow guest push",
@@ -595,7 +648,14 @@
         "loginTime": "Login Time",
         "loginIp": "Login IP",
         "detail": "Details",
-        "action": "Action"
+        "action": "Action",
+        "permissionLogin": "Login",
+        "permissionUpload": "Upload",
+        "permissionDownload": "Download",
+        "permissionEdit": "Edit",
+        "permissionDelete": "Delete",
+        "permissionPush": "Push",
+        "permissionRead": "Read"
       },
       "placeholder": {
         "username": "Please enter username, starting with lowercase letters",
@@ -623,14 +683,63 @@
       }
     }
   },
+  "install": {
+    "installTaleBook": "Install TaleBook",
+    "websiteTitle": "Website Title",
+    "adminUsername": "Admin Username",
+    "adminPassword": "Admin Password",
+    "adminEmail": "Admin Email",
+    "enablePrivateLibrary": "Enable Private Library Mode",
+    "accessCode": "Access Code",
+    "completeSetup": "Complete Setup",
+    "userRule": "6 ~ 20 characters",
+    "passRule": "8 ~ 20 characters",
+    "emailRule": "Invalid email format",
+    "apiServiceNormal": "API service is normal",
+    "installSuccessRedirect": "Installation successful, redirecting to homepage",
+    "timeoutRefresh": "Timeout, please refresh and try again",
+    "writingConfig": "Writing configuration file...",
+    "configWriteSuccess": "Configuration written successfully!",
+    "checkingServer": "Checking server...",
+    "networkError": "Network error"
+  },
   "$vuetify": {
     "noDataText": "No data",
     "dataFooter": {
       "itemsPerPageText": "Items per page",
-      "pageText": "Page {0} of {1}"
+      "pageText": "Page {0} of {1}",
+      "itemsPerPageAll": "All",
+      "firstPage": "First page",
+      "prevPage": "Previous page",
+      "nextPage": "Next page",
+      "lastPage": "Last page"
+    },
+    "dataTable": {
+      "itemsPerPageText": "Rows per page",
+      "ariaLabel": {
+        "sortDescending": "Sort descending",
+        "sortAscending": "Sort ascending",
+        "sortNone": "No sort",
+        "activateNone": "Disable sorting",
+        "activateDescending": "Enable descending sort",
+        "activateAscending": "Enable ascending sort"
+      }
     },
     "dataIterator": {
       "loadingText": "Loading..."
+    },
+    "close": "Close",
+    "pagination": {
+      "ariaLabel": {
+        "root": "Pagination",
+        "next": "Next page",
+        "prev": "Previous page",
+        "previous": "Previous page",
+        "page": "Page",
+        "currentPage": "Current page",
+        "rowsPerPage": "Rows per page",
+        "of": "of"
+      }
     }
   }
 }
