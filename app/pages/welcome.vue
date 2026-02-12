@@ -15,7 +15,7 @@
                     color="primary"
                 >
                     <v-toolbar-title align-center>
-                                            {{ $t('welcomePage.inputTitle') }}
+                                            {{ t('welcomePage.inputTitle') }}
                                         </v-toolbar-title>
                 </v-toolbar>
                 <v-card-text>
@@ -27,7 +27,7 @@
                             v-model="invite_code"
                             prepend-icon="mdi-lock"
                             required
-                            :label="$t('welcomePage.inputLabel')"
+                            :label="t('welcomePage.inputLabel')"
                             type="password"
                             :error="is_err"
                             :error-messages="is_err ? msg : ''"
@@ -45,11 +45,11 @@
                 <v-card-actions>
                     <v-spacer />
                     <v-btn
-                        color="primary"
-                        @click="welcome_login"
-                    >
-                        {{ $t('common.login') }}
-                    </v-btn>
+                            color="primary"
+                            @click="welcome_login"
+                        >
+                            {{ t('common.login') }}
+                        </v-btn>
                     <v-spacer />
                 </v-card-actions>
             </v-card>

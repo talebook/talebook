@@ -15,7 +15,7 @@
                         dark
                         color="primary"
                     >
-                        <v-toolbar-title>{{ $t('auth.signupFormTitle') }}</v-toolbar-title>
+                        <v-toolbar-title>{{ t('auth.signupFormTitle') }}</v-toolbar-title>
                         <v-spacer />
                         <v-btn
                             rounded
@@ -24,7 +24,7 @@
                             to="/login"
                             class="text-white mr-4"
                         >
-                            {{ $t('auth.signIn') }}
+                            {{ t('auth.signIn') }}
                         </v-btn>
                     </v-toolbar>
                     <v-card-text>
@@ -36,7 +36,7 @@
                                 v-model="username"
                                 required
                                 prepend-icon="mdi-account"
-                                :label="$t('auth.username')"
+                                :label="t('auth.username')"
                                 type="text"
                                 autocomplete="new-username"
                                 :rules="[rules.user]"
@@ -45,7 +45,7 @@
                                 v-model="password"
                                 required
                                 prepend-icon="mdi-lock"
-                                :label="$t('auth.password')"
+                                :label="t('auth.password')"
                                 type="password"
                                 autocomplete="new-password"
                                 :rules="[rules.pass]"
@@ -54,7 +54,7 @@
                                 v-model="password2"
                                 required
                                 prepend-icon="mdi-lock"
-                                :label="$t('messages.confirmPassword')"
+                                :label="t('messages.confirmPassword')"
                                 type="password"
                                 autocomplete="new-password2"
                                 :rules="[validPwd]"
@@ -63,7 +63,7 @@
                                 v-model="nickname"
                                 required
                                 prepend-icon="mdi-face-man"
-                                :label="$t('messages.nickname')"
+                                :label="t('messages.nickname')"
                                 type="text"
                                 autocomplete="new-nickname"
                                 :rules="[rules.nick]"
@@ -72,7 +72,7 @@
                                 v-model="email"
                                 required
                                 prepend-icon="mdi-email"
-                                :label="$t('auth.email')"
+                                :label="t('auth.email')"
                                 type="text"
                                 autocomplete="new-email"
                                 :rules="[rules.email]"
@@ -89,7 +89,7 @@
                                     type="submit"
                                     :loading="loading"
                                 >
-                                    {{ $t('auth.signUp') }}
+                                    {{ t('auth.signUp') }}
                                 </v-btn>
                             </div>
                         </v-form>

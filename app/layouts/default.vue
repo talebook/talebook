@@ -55,8 +55,11 @@
 </template>
 
 <script setup>
+import { computed, onMounted } from 'vue';
+import { useRouter, useHead } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 import { useDisplay } from 'vuetify';
+import Loading from '@/components/Loading.vue';
 
 const store = useMainStore();
 const display = useDisplay();
@@ -68,6 +71,9 @@ useHead({
 });
 
 onMounted(() => {
-    store.setLoading(false);
+    // 延迟隐藏加载动画，让用户有时间看到加载效果
+    setTimeout(() => {
+        store.setLoading(false);
+    }, 1000);
 });
 </script>

@@ -78,7 +78,7 @@
                             size="28"
                             style="margin-right: 10px"
                         />
-                        加载中...
+                        {{ t('book.loading') }}
                     </div>
                     <div
                         v-show="!loading"
@@ -95,7 +95,7 @@
                             :disabled="selected===0"
                             @click="getNovelContent(selected-1)"
                         >
-                            上一章
+                            {{ t('book.previousChapter') }}
                         </v-btn>
                         <v-btn
                             v-show="!sidebar"
@@ -103,7 +103,7 @@
                             elevation="0"
                             @click="sidebar=true"
                         >
-                            目录
+                            {{ t('book.tableOfContents') }}
                         </v-btn>
                         <v-btn
                             color="primary"
@@ -111,7 +111,7 @@
                             :disabled="selected===content.length-1"
                             @click="getNovelContent(selected+1)"
                         >
-                            下一章
+                            {{ t('book.nextChapter') }}
                         </v-btn>
                     </div>
                 </div>
@@ -168,7 +168,7 @@ const init = () => {
     $backend(`/book/txt/init?id=${bookid}&test=0`)
         .then(rsp => {
             if (rsp.err !== 'ok') {
-                tip.title = '错误';
+                tip.title = t('messages.error');
                 tip.content = rsp.msg;
                 return;
             }
@@ -182,17 +182,17 @@ const init = () => {
                 let queLen = parseInt(rsp.data.que);
                 name.value = rsp.data.name;
                 if (queLen > 0) {
-                    tip.title = '队列中';
-                    tip.content = '前方等待' + queLen + '个转换待完成，已步入后台队列';
+                    tip.title = t('book.inQueue');
+                    tip.content = t('book.queueMessage', { count: queLen });
                     return;
                 }
                 intvl = setInterval(() => {
                     wait.value--;
-                    tip.content = '首次阅读，正在解析目录，请稍后... ' + wait.value;
+                    tip.content = t('book.parsingMessage', { seconds: wait.value });
                     if (wait.value <= 0) {
                         clearInterval(intvl);
-                        tip.content = '超时未完成，可继续等待稍后刷新尝试';
-                        tip.title = '解析超时';
+                        tip.content = t('book.timeoutMessage');
+                        tip.title = t('book.parseTimeout');
                         return;
                     }
                     if (wait.value % 5 !== 0) return;
@@ -222,7 +222,7 @@ const getNovelContent = (i) => {
     $backend(`/read/txt?id=${bookid}&start=${start}&end=${end}`)
         .then(res => {
             if (res.err !== 'ok') {
-                novelContent.value = '获取正文失败！' + res.msg;
+                novelContent.value = t('book.contentError') + res.msg;
                 return;
             }
             novelContent.value = `<h3>${title}</h3><br>${res.content}`;

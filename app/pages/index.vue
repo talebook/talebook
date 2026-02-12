@@ -3,7 +3,7 @@
         <v-row>
             <v-col cols="12">
                 <p class="ma-0 title">
-                    {{ $t('navigation.recommended') }}
+                    {{ t('navigation.recommended') }}
                 </p>
             </v-col>
             <v-col
@@ -40,10 +40,10 @@
                         mdi-book-open-variant
                     </v-icon>
                     <h3 class="text-h6 grey--text">
-                        {{ $t('library.noBooks') }}
+                        {{ t('library.noBooks') }}
                     </h3>
                     <p class="text-caption grey--text">
-                        {{ $t('library.addBooksFirst') }}
+                        {{ t('library.addBooksFirst') }}
                     </p>
                 </v-card>
             </v-col>
@@ -52,7 +52,7 @@
             <v-col cols="12">
                 <v-divider class="new-legend" />
                 <p class="ma-0 title">
-                    {{ $t('index.newReleases') }}
+                    {{ t('index.newReleases') }}
                 </p>
             </v-col>
             <v-col cols="12">
@@ -63,7 +63,7 @@
             <v-col cols="12">
                 <v-divider class="new-legend" />
                 <p class="ma-0 title">
-                    {{ $t('index.browseByCategory') }}
+                    {{ t('index.browseByCategory') }}
                 </p>
             </v-col>
             <v-col

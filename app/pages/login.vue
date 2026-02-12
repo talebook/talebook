@@ -18,7 +18,7 @@
                         dark
                         color="primary"
                     >
-                        <v-toolbar-title>{{ $t('common.welcome') }}</v-toolbar-title>
+                        <v-toolbar-title>{{ t('common.welcome') }}</v-toolbar-title>
                         <v-spacer />
                         <v-btn
                             v-if="allowRegister"
@@ -28,7 +28,7 @@
                             to="/signup"
                             class="text-white mr-4"
                         >
-                            {{ $t('auth.signUp') }}
+                            {{ t('auth.signUp') }}
                         </v-btn>
                     </v-toolbar>
                     <v-card-text>
@@ -36,14 +36,14 @@
                             <v-text-field
                                 v-model="username"
                                 prepend-icon="mdi-account"
-                                :label="$t('auth.username')"
+                                :label="t('auth.username')"
                                 type="text"
                             />
                             <v-text-field
                                 id="password"
                                 v-model="password"
                                 prepend-icon="mdi-lock"
-                                :label="$t('auth.password')"
+                                :label="t('auth.password')"
                                 type="password"
                             />
                             <p class="text-right">
@@ -51,7 +51,7 @@
                                     class="press-content"
                                     href="javascript:void(0)"
                                     @click="show_login = !show_login"
-                                > {{ $t('auth.forgotPassword') }} </a>
+                                > {{ t('auth.forgotPassword') }} </a>
                             </p>
                             <div align="center">
                                 <v-btn
@@ -61,7 +61,7 @@
                                     color="primary"
                                     :loading="loading"
                                 >
-                                    {{ $t('auth.signIn') }}
+                                    {{ t('auth.signIn') }}
                                 </v-btn>
                             </div>
                         </v-form>
@@ -71,7 +71,7 @@
                         <v-divider />
                         <div align="center">
                             <br>
-                            <small>{{ $t('auth.socialLogin') }}</small>
+                            <small>{{ t('auth.socialLogin') }}</small>
                             <br>
                             <template
                                 v-for="s in socials"
@@ -105,20 +105,20 @@
                         dark
                         color="red"
                     >
-                        <v-toolbar-title>{{ $t('auth.resetPassword') }}</v-toolbar-title>
+                        <v-toolbar-title>{{ t('auth.resetPassword') }}</v-toolbar-title>
                     </v-toolbar>
                     <v-card-text>
                         <v-form @submit.prevent="do_reset">
                             <v-text-field
                                 v-model="username"
                                 prepend-icon="mdi-account"
-                                :label="$t('auth.username')"
+                                :label="t('auth.username')"
                                 type="text"
                             />
                             <v-text-field
                                 v-model="email"
                                 prepend-icon="mdi-email"
-                                :label="$t('auth.email')"
+                                :label="t('auth.email')"
                                 type="text"
                                 autocomplete="old-email"
                             />
@@ -132,7 +132,7 @@
                                     class="mr-5"
                                     @click="show_login = !show_login"
                                 >
-                                    {{ $t('common.back') }}
+                                    {{ t('common.back') }}
                                 </v-btn>
                                 <v-btn
                                     rounded
@@ -141,7 +141,7 @@
                                     type="submit"
                                     :loading="loading"
                                 >
-                                    {{ $t('auth.resetPassword') }}
+                                    {{ t('auth.resetPassword') }}
                                 </v-btn>
                             </div>
                         </v-form>

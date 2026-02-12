@@ -28,7 +28,7 @@
                         variant="elevated"
                         href="/"
                     >
-                        {{ $t('common.home') }}
+                        {{ t('common.home') }}
                     </v-btn>
                     <v-spacer />
                 </v-card-actions>
@@ -51,7 +51,7 @@ const msg = ref(t('auth.loggedOut'));
 const logout = async () => {
     try {
         const rsp = await $backend('/user/sign_out');
-        msg.value = rsp.msg || '您已退出登录。';
+        msg.value = rsp.msg || t('auth.loggedOut');
     } catch (error) {
         console.error('Logout error:', error);
     }
