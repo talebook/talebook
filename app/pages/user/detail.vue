@@ -10,18 +10,22 @@
                 </div>
             </v-col>
             <v-col cols="9">
-                <v-img
-                    class="float-left"
-                    height="80"
-                    contain
-                    :src="user.avatar"
-                />
-                <div class="text-subtitle-2 text-medium-emphasis">
-                    <a
-                        href="https://cn.cravatar.com/"
-                        target="_blank"
-                        class="press-content"
-                    >{{ t('user.detail.changeAvatar') }}</a>
+                <div class="d-flex flex-column align-start">
+                    <div class="text-subtitle-2 text-medium-emphasis mb-1">
+                        <a
+                            href="https://cravatar.com/"
+                            target="_blank"
+                            class="press-content"
+                        >{{ t('user.detail.changeAvatar') }}</a>
+                    </div>
+                    <v-img
+                        class="mr-3"
+                        height="80"
+                        width="60"
+                        contain
+                        :src="user.avatar"
+                        :alt="t('user.detail.avatar')"
+                    />
                 </div>
             </v-col>
 
