@@ -15,7 +15,42 @@
                         dark
                         color="primary"
                     >
-                        <v-toolbar-title>安装 TaleBook</v-toolbar-title>
+                        <v-toolbar-title>{{ $t('install.installTaleBook') }}</v-toolbar-title>
+                        <v-spacer></v-spacer>
+                        <!-- 多语言切换入口 -->
+                        <v-menu
+                            offset-y
+                            right
+                        >
+                            <template #activator="{ props }">
+                                <v-btn
+                                    v-bind="props"
+                                    icon
+                                    variant="text"
+                                    color="white"
+                                >
+                                    <v-icon>mdi-translate</v-icon>
+                                </v-btn>
+                            </template>
+                            <v-list min-width="240">
+                                <v-list-item
+                                    v-for="localeItem in allLocales"
+                                    :key="localeItem.code"
+                                    :active="localeItem.code === locale"
+                                    @click="setLocale(localeItem.code)"
+                                >
+                                    <template #prepend>
+                                        <v-icon v-if="localeItem.code === locale">
+                                            mdi-check
+                                        </v-icon>
+                                        <v-icon v-else>
+                                            mdi-translate
+                                        </v-icon>
+                                    </template>
+                                    <v-list-item-title>{{ localeItem.name }}</v-list-item-title>
+                                </v-list-item>
+                            </v-list>
+                        </v-menu>
                     </v-toolbar>
                     <v-card-text>
                         <v-form
@@ -26,14 +61,14 @@
                                 v-model="title"
                                 required
                                 prepend-icon="mdi-home"
-                                label="网站标题"
+                                :label="$t('install.websiteTitle')"
                                 type="text"
                             />
                             <v-text-field
                                 v-model="username"
                                 required
                                 prepend-icon="mdi-account"
-                                label="管理员用户名"
+                                :label="$t('install.adminUsername')"
                                 type="text"
                                 autocomplete="new-username"
                                 :rules="[rules.user]"
@@ -42,7 +77,7 @@
                                 v-model="password"
                                 required
                                 prepend-icon="mdi-lock"
-                                label="管理员登录密码"
+                                :label="$t('install.adminPassword')"
                                 type="password"
                                 autocomplete="new-password"
                                 :rules="[rules.pass]"
@@ -51,21 +86,21 @@
                                 v-model="email"
                                 required
                                 prepend-icon="mdi-email"
-                                label="管理员Email"
+                                :label="$t('install.adminEmail')"
                                 type="text"
                                 autocomplete="new-email"
                                 :rules="[rules.email]"
                             />
                             <v-checkbox
                                 v-model="invite"
-                                label="开启私人图书馆模式"
+                                :label="$t('install.enablePrivateLibrary')"
                             />
                             <template v-if="invite">
                                 <v-text-field
                                     v-model="code"
                                     required
                                     prepend-icon="mdi-lock"
-                                    label="访问码"
+                                    :label="$t('install.accessCode')"
                                     type="text"
                                     autocomplete="new-code"
                                 />
@@ -79,7 +114,7 @@
                                     color="primary"
                                     :loading="loading"
                                 >
-                                    完成设置
+                                    {{ $t('install.completeSetup') }}
                                 </v-btn>
                             </div>
                         </v-form>
@@ -97,13 +132,20 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
+import { useI18n } from '#i18n';
 
 const router = useRouter();
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
+const { locale, locales, setLocale } = useI18n();
+
+// 多语言相关
+const allLocales = computed(() => {
+    return locales.value || [];
+});
 
 definePageMeta({
     layout: 'blank'
@@ -121,18 +163,18 @@ const loading = ref(false);
 let retry = 20;
 
 const rules = {
-    user: v => ( v && 20 >= v.length && v.length >= 5) || '6 ~ 20 characters',
-    pass: v => ( v && 20 >= v.length && v.length >= 8) || '8 ~ 20 characters',
+    user: v => ( v && 20 >= v.length && v.length >= 5) || $t('install.userRule'),
+    pass: v => ( v && 20 >= v.length && v.length >= 8) || $t('install.passRule'),
     email: function (email) {
         var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-        return re.test(email) || 'Invalid email format';
+        return re.test(email) || $t('install.emailRule');
     },
 };
 
 const check_install = () => {
     fetch('/api/index').then( rsp => {
         if ( rsp.status == 200 ) {
-            tips.value += '<br/>API服务正常<br/>安装成功，跳转到主页';
+            tips.value += `<br/>${$t('install.apiServiceNormal')}<br/>${$t('install.installSuccessRedirect')}`;
             
             // force refresh index.html logic equivalent
             // Fetching random param to bypass cache not strictly needed if we just nav
@@ -149,7 +191,7 @@ const check_install = () => {
                     check_install();
                 }, 1000);
             } else {
-                tips.value += '<br/>超时，请刷新重试';
+                tips.value += `<br/>${$t('install.timeoutRefresh')}`;
                 loading.value = false;
             }
         }
@@ -169,7 +211,7 @@ const do_install = async () => {
     data.append('invite', invite.value);
     data.append('title', title.value);
     
-    tips.value = '正在写入配置文件...';
+    tips.value = $t('install.writingConfig');
     
     try {
         const rsp = await $backend('/admin/install', {
@@ -181,7 +223,7 @@ const do_install = async () => {
             if ($alert) $alert('error', rsp.msg);
             loading.value = false;
         } else {
-            tips.value += '<br/>配置写入成功！<br/>正在检测服务器...';
+            tips.value += `<br/>${$t('install.configWriteSuccess')}<br/>${$t('install.checkingServer')}`;
             setTimeout( () => {
                 check_install();
             }, 5000);
@@ -189,11 +231,11 @@ const do_install = async () => {
     } catch (e) {
         console.error(e);
         loading.value = false;
-        if ($alert) $alert('error', '网络错误');
+        if ($alert) $alert('error', $t('install.networkError'));
     }
 };
 
 useHead({
-    title: '安装 TaleBook'
+    title: $t('install.installTaleBook')
 });
 </script>

@@ -682,6 +682,26 @@
       }
     }
   },
+  "install": {
+    "installTaleBook": "安装 TaleBook",
+    "websiteTitle": "网站标题",
+    "adminUsername": "管理员用户名",
+    "adminPassword": "管理员登录密码",
+    "adminEmail": "管理员Email",
+    "enablePrivateLibrary": "开启私人图书馆模式",
+    "accessCode": "访问码",
+    "completeSetup": "完成设置",
+    "userRule": "6 ~ 20 characters",
+    "passRule": "8 ~ 20 characters",
+    "emailRule": "邮箱格式不正确",
+    "apiServiceNormal": "API服务正常",
+    "installSuccessRedirect": "安装成功，跳转到主页",
+    "timeoutRefresh": "超时，请刷新重试",
+    "writingConfig": "正在写入配置文件...",
+    "configWriteSuccess": "配置写入成功！",
+    "checkingServer": "正在检测服务器...",
+    "networkError": "网络错误"
+  },
   "$vuetify": {
     "noDataText": "无数据",
     "dataFooter": {

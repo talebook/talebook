@@ -683,6 +683,26 @@
       }
     }
   },
+  "install": {
+    "installTaleBook": "Install TaleBook",
+    "websiteTitle": "Website Title",
+    "adminUsername": "Admin Username",
+    "adminPassword": "Admin Password",
+    "adminEmail": "Admin Email",
+    "enablePrivateLibrary": "Enable Private Library Mode",
+    "accessCode": "Access Code",
+    "completeSetup": "Complete Setup",
+    "userRule": "6 ~ 20 characters",
+    "passRule": "8 ~ 20 characters",
+    "emailRule": "Invalid email format",
+    "apiServiceNormal": "API service is normal",
+    "installSuccessRedirect": "Installation successful, redirecting to homepage",
+    "timeoutRefresh": "Timeout, please refresh and try again",
+    "writingConfig": "Writing configuration file...",
+    "configWriteSuccess": "Configuration written successfully!",
+    "checkingServer": "Checking server...",
+    "networkError": "Network error"
+  },
   "$vuetify": {
     "noDataText": "No data",
     "dataFooter": {
