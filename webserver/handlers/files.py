@@ -140,16 +140,18 @@ class EpubReader(BaseHandler):
         if self.current_user:
             if self.current_user.can_read():
                 if not self.current_user.is_active():
-                    raise web.HTTPError(403, reason=_(u"无权在线阅读，请先登录注册邮箱激活账号。"))
+                    raise web.HTTPError(
+                        403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。")
+                    )
             else:
-                raise web.HTTPError(403, reason=_(u"无权在线阅读"))
+                raise web.HTTPError(403, reason=_("无权在线阅读"))
 
         book = self.get_book(bid)
         fpath = book.get("fmt_epub", None)
         if not fpath:
             raise web.HTTPError(404)
 
-        with zipfile.ZipFile(fpath, 'r') as zf:
+        with zipfile.ZipFile(fpath, "r") as zf:
             if path not in zf.namelist():
                 raise web.HTTPError(404)
             with zf.open(path) as f:
