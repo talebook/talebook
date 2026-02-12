@@ -329,8 +329,8 @@ class OPDSImportService(AsyncService):
             # 如果没有找到条目，可能是导航页面，检查导航链接
             if not items:
                 nav_links = root.xpath(
-                    '//atom:link[@rel="subsection" or ' \
-                    '@rel="http://opds-spec.org/crawlable" or ' \
+                    '//atom:link[@rel="subsection" or '
+                    '@rel="http://opds-spec.org/crawlable" or '
                     '@rel="collection" or @rel="start"]',
                     namespaces=ns,
                 )
