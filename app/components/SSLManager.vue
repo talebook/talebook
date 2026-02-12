@@ -3,8 +3,8 @@
     <div>
         <v-btn @click="dialog = !dialog">
             <v-icon start>
-                    mdi-upload
-                </v-icon> {{ $t('messages.updateSsl') }}
+                mdi-upload
+            </v-icon> {{ $t('messages.updateSsl') }}
         </v-btn>
         <v-dialog
             v-model="dialog"
@@ -40,13 +40,13 @@
                     >
                         <v-file-input
                             v-model="ssl_crt"
-                                accept=".crt"
-                                :label="$t('messages.selectCertFile')"
+                            accept=".crt"
+                            :label="$t('messages.selectCertFile')"
                         />
                         <v-file-input
                             v-model="ssl_key"
-                                accept=".key"
-                                :label="$t('messages.selectKeyFile')"
+                            accept=".key"
+                            :label="$t('messages.selectKeyFile')"
                         />
                     </v-form>
                 </v-card-text>

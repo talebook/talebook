@@ -231,29 +231,29 @@
                         <v-spacer />
 
                         <v-btn
-                                color="primary"
-                                variant="elevated"
-                                class="mx-2"
-                                @click="dialog_kindle = !dialog_kindle"
-                            >
-                                <v-icon start>
-                                    mdi-email
-                                </v-icon>
-                                {{ t('common.push') }}
-                            </v-btn>
+                            color="primary"
+                            variant="elevated"
+                            class="mx-2"
+                            @click="dialog_kindle = !dialog_kindle"
+                        >
+                            <v-icon start>
+                                mdi-email
+                            </v-icon>
+                            {{ t('common.push') }}
+                        </v-btn>
 
-                            <v-btn
-                                color="primary"
-                                variant="elevated"
-                                class="mx-2"
-                                :href="'/read/' + book.id"
-                                target="_blank"
-                            >
-                                <v-icon start>
-                                    mdi-book-open-page-variant
-                                </v-icon>
-                                {{ t('common.read') }}
-                            </v-btn>
+                        <v-btn
+                            color="primary"
+                            variant="elevated"
+                            class="mx-2"
+                            :href="'/read/' + book.id"
+                            target="_blank"
+                        >
+                            <v-icon start>
+                                mdi-book-open-page-variant
+                            </v-icon>
+                            {{ t('common.read') }}
+                        </v-btn>
 
                         <template v-if="book.is_owner">
                             <v-menu offset-y>

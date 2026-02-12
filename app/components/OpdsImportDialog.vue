@@ -2,9 +2,9 @@
     <!-- OPDS Import Dialog -->
     <v-dialog
         :model-value="dialogVisible"
-        @update:model-value="(value) => emit('update:dialogVisible', value)"
         width="800"
         max-height="90vh"
+        @update:model-value="(value) => emit('update:dialogVisible', value)"
     >
         <v-card>
             <v-card-title>
@@ -62,42 +62,53 @@
                 
                 <!-- 目录浏览界面 -->
                 <div v-else-if="opdsImportState === 'browsing'">
-                        <!-- 自定义面包屑导航 -->
-                        <div class="mb-4">
-                            <div class="d-flex align-center flex-wrap pa-0">
-                                <v-icon size="small" class="mr-1">mdi-folder</v-icon>
-                                <template v-for="(crumb, index) in breadcrumbs" :key="index">
-                                    <div 
-                                        class="d-flex align-center"
+                    <!-- 自定义面包屑导航 -->
+                    <div class="mb-4">
+                        <div class="d-flex align-center flex-wrap pa-0">
+                            <v-icon
+                                size="small"
+                                class="mr-1"
+                            >
+                                mdi-folder
+                            </v-icon>
+                            <template
+                                v-for="(crumb, index) in breadcrumbs"
+                                :key="index"
+                            >
+                                <div 
+                                    class="d-flex align-center"
+                                >
+                                    <span 
+                                        class="text-body-2"
+                                        :class="{
+                                            'text-black cursor-pointer hover:underline hover:text-primary': !crumb.disabled,
+                                            'text-gray-500': crumb.disabled
+                                        }"
+                                        @click.stop="handleBreadcrumbClick(crumb, index)"
                                     >
-                                        <span 
-                                            class="text-body-2"
-                                            :class="{
-                                                'text-black cursor-pointer hover:underline hover:text-primary': !crumb.disabled,
-                                                'text-gray-500': crumb.disabled
-                                            }"
-                                            @click.stop="handleBreadcrumbClick(crumb, index)"
-                                        >
-                                            {{ crumb.title }}
-                                        </span>
-                                        <v-icon 
-                                            v-if="index < breadcrumbs.length - 1" 
-                                            size="small" 
-                                            class="mx-1"
-                                        >
-                                            mdi-chevron-right
-                                        </v-icon>
-                                    </div>
-                                </template>
-                            </div>
+                                        {{ crumb.title }}
+                                    </span>
+                                    <v-icon 
+                                        v-if="index < breadcrumbs.length - 1" 
+                                        size="small" 
+                                        class="mx-1"
+                                    >
+                                        mdi-chevron-right
+                                    </v-icon>
+                                </div>
+                            </template>
                         </div>
+                    </div>
                     
                     <!-- 目录内容区域 -->
                     <div 
                         class="border rounded-lg"
                         style="max-height: 400px; min-height: 200px; overflow-y: auto; position: relative;"
                     >
-                        <div class="pa-2" :style="{ minHeight: opdsItems.length === 0 ? '200px' : 'auto' }">
+                        <div
+                            class="pa-2"
+                            :style="{ minHeight: opdsItems.length === 0 ? '200px' : 'auto' }"
+                        >
                             <!-- 加载动画 -->
                             <div 
                                 v-if="opdsLoading && opdsItems.length === 0"
@@ -107,17 +118,24 @@
                                     indeterminate
                                     color="primary"
                                     size="32"
-                                ></v-progress-circular>
-                                <div class="mt-4 text-body-1 text-gray-600">正在加载目录...</div>
+                                />
+                                <div class="mt-4 text-body-1 text-gray-600">
+                                    正在加载目录...
+                                </div>
                             </div>
                             
                             <!-- 返回上级目录 -->
                             <div 
                                 v-if="currentOpdsPath !== '' && currentOpdsPath !== originalOpdsPath && !opdsLoading"
-                                @click="goBackInOpdsPath"
                                 class="flex items-center pa-3 hover:bg-gray-50 rounded cursor-pointer mb-1"
+                                @click="goBackInOpdsPath"
                             >
-                                <v-icon class="mr-2" color="primary">mdi-arrow-left</v-icon>
+                                <v-icon
+                                    class="mr-2"
+                                    color="primary"
+                                >
+                                    mdi-arrow-left
+                                </v-icon>
                                 <span class="text-body-1">返回上级目录</span>
                             </div>
                             
@@ -131,15 +149,29 @@
                                     <!-- 文件夹 -->
                                     <div
                                         v-if="item.type === 'folder' || (!item.type && item.href)"
-                                        @click="navigateToOpdsFolder(item)"
                                         class="flex items-center pa-3 hover:bg-gray-50 rounded cursor-pointer"
+                                        @click="navigateToOpdsFolder(item)"
                                     >
-                                        <v-icon class="mr-3" color="amber">mdi-folder</v-icon>
+                                        <v-icon
+                                            class="mr-3"
+                                            color="amber"
+                                        >
+                                            mdi-folder
+                                        </v-icon>
                                         <div class="flex-grow">
-                                            <div class="font-weight-medium text-body-1">{{ item.title }}</div>
-                                            <div v-if="item.summary" class="text-caption text-gray-600">{{ item.summary }}</div>
+                                            <div class="font-weight-medium text-body-1">
+                                                {{ item.title }}
+                                            </div>
+                                            <div
+                                                v-if="item.summary"
+                                                class="text-caption text-gray-600"
+                                            >
+                                                {{ item.summary }}
+                                            </div>
                                         </div>
-                                        <v-icon size="small">mdi-chevron-right</v-icon>
+                                        <v-icon size="small">
+                                            mdi-chevron-right
+                                        </v-icon>
                                     </div>
                                     
                                     <!-- 书籍 -->
@@ -155,27 +187,51 @@
                                                 color="primary"
                                                 hide-details
                                                 class="ma-0 pa-0"
-                                            ></v-checkbox>
+                                            />
                                         </div>
                                         
                                         <!-- 书籍图标 -->
-                                        <v-icon class="mr-3" color="blue" size="small">mdi-book</v-icon>
+                                        <v-icon
+                                            class="mr-3"
+                                            color="blue"
+                                            size="small"
+                                        >
+                                            mdi-book
+                                        </v-icon>
                                         
                                         <!-- 书籍信息 -->
                                         <div class="flex-grow min-w-0">
-                                            <div class="font-weight-medium text-body-1 truncate">{{ item.title }}</div>
-                                            <div v-if="item.author" class="text-caption text-gray-600">作者: {{ item.author }}</div>
-                                            <div v-if="item.summary" class="text-caption text-gray-500 truncate">{{ item.summary }}</div>
+                                            <div class="font-weight-medium text-body-1 truncate">
+                                                {{ item.title }}
+                                            </div>
+                                            <div
+                                                v-if="item.author"
+                                                class="text-caption text-gray-600"
+                                            >
+                                                作者: {{ item.author }}
+                                            </div>
+                                            <div
+                                                v-if="item.summary"
+                                                class="text-caption text-gray-500 truncate"
+                                            >
+                                                {{ item.summary }}
+                                            </div>
                                         </div>
                                         
                                         <!-- 封面图片 -->
-                                        <div v-if="item.cover_link" class="ml-3 flex-shrink-0">
-                                            <v-avatar size="40" rounded="sm">
+                                        <div
+                                            v-if="item.cover_link"
+                                            class="ml-3 flex-shrink-0"
+                                        >
+                                            <v-avatar
+                                                size="40"
+                                                rounded="sm"
+                                            >
                                                 <v-img 
                                                     :src="item.cover_link" 
                                                     alt="封面"
                                                     cover
-                                                ></v-img>
+                                                />
                                             </v-avatar>
                                         </div>
                                     </div>
@@ -183,9 +239,19 @@
                             </template>
                             
                             <!-- 空状态 -->
-                            <div v-if="opdsItems.length === 0 && !opdsLoading" class="text-center py-8">
-                                <v-icon size="48" color="grey">mdi-folder-open-outline</v-icon>
-                                <div class="mt-2 text-gray-600">目录为空</div>
+                            <div
+                                v-if="opdsItems.length === 0 && !opdsLoading"
+                                class="text-center py-8"
+                            >
+                                <v-icon
+                                    size="48"
+                                    color="grey"
+                                >
+                                    mdi-folder-open-outline
+                                </v-icon>
+                                <div class="mt-2 text-gray-600">
+                                    目录为空
+                                </div>
                             </div>
                         </div>
                     </div>

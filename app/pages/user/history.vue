@@ -1,63 +1,93 @@
 <template>
-  <div>
-    <v-row align="start" v-if="history.length == 0">
-      <v-col cols="12">
-        <p class="title"> 暂无阅读历史。请尽情<NuxtLink to="/">畅游书籍的海洋</NuxtLink>吧~ </p>
-      </v-col>
-    </v-row>
-    <v-row v-else v-for="item in history" :key="item.name">
-      <v-col cols="12">
-        <legend>{{ item.name }}</legend>
-        <v-divider></v-divider>
-      </v-col>
-      <v-col cols="12" v-if="item.books.length == 0">
-        <p class="pb-6">无记录</p>
-      </v-col>
-      <v-col cols="4" sm="2" v-else v-for="book in item.books" :key="item.name + book.id">
-        <v-card :to="book.href" class="ma-1">
-          <v-img :src="book.img" :aspect-ratio="11 / 15"> </v-img>
-        </v-card>
-      </v-col>
-    </v-row>
-  </div>
+    <div>
+        <v-row
+            v-if="history.length == 0"
+            align="start"
+        >
+            <v-col cols="12">
+                <p class="title">
+                    {{ t('user.history.noHistory') }} <NuxtLink to="/">
+                        {{ t('user.history.exploreBooks') }}
+                    </NuxtLink>{{ t('user.history.exploreBooksEnd') }}
+                </p>
+            </v-col>
+        </v-row>
+        <v-row
+            v-for="item in history"
+            v-else
+            :key="item.name"
+        >
+            <v-col cols="12">
+                <legend>{{ item.name }}</legend>
+                <v-divider />
+            </v-col>
+            <v-col
+                v-if="item.books.length == 0"
+                cols="12"
+            >
+                <p class="pb-6">
+                    {{ t('user.history.noRecords') }}
+                </p>
+            </v-col>
+            <v-col
+                v-for="book in item.books"
+                v-else
+                :key="item.name + book.id"
+                cols="4"
+                sm="2"
+            >
+                <v-card
+                    :to="book.href"
+                    class="ma-1"
+                >
+                    <v-img
+                        :src="book.img"
+                        :aspect-ratio="11 / 15"
+                    />
+                </v-card>
+            </v-col>
+        </v-row>
+    </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useMainStore } from '@/stores/main'
+import { ref, computed, onMounted } from 'vue';
+import { useMainStore } from '@/stores/main';
+import { useI18n } from 'vue-i18n';
 
-const { $backend } = useNuxtApp()
-const mainStore = useMainStore()
-const user = ref({})
+const { $backend } = useNuxtApp();
+const mainStore = useMainStore();
+const { t } = useI18n();
+const user = ref({});
 
 useHead({
-  title: "阅读记录",
-})
+    title: t('user.history.pageTitle'),
+});
 
 const get_history = (his) => {
-  if (!his) { return []; }
-  return his.map(b => {
-    b.href = '/book/' + b.id;
-    return b;
-  });
-}
+    if (!his) { return []; }
+    return his.map(b => {
+        b.href = '/book/' + b.id;
+        return b;
+    });
+};
 
 const history = computed(() => {
-  if (user.value.extra === undefined) { return [] }
-  return [
-    { name: '在线阅读', books: get_history(user.value.extra.read_history) },
-    { name: '推送过的书', books: get_history(user.value.extra.push_history) },
-    { name: '浏览记录', books: get_history(user.value.extra.visit_history) },
-  ]
-})
+    if (user.value.extra === undefined) { return []; }
+    return [
+        { name: t('user.history.onlineReading'), books: get_history(user.value.extra.read_history) },
+        { name: t('user.history.pushedBooks'), books: get_history(user.value.extra.push_history) },
+        { name: t('user.history.browseHistory'), books: get_history(user.value.extra.visit_history) },
+    ];
+});
 
 onMounted(() => {
-  mainStore.setNavbar(true)
-  $backend("/user/info?detail=1")
-    .then(rsp => {
-      user.value = rsp.user;
-    });
-})
+    mainStore.setNavbar(true);
+    $backend('/user/info?detail=1')
+        .then(rsp => {
+            user.value = rsp.user;
+        });
+});
 </script>
 
 <style></style>

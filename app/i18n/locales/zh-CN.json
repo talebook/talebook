@@ -41,7 +41,8 @@
     "language": "语言",
     "send": "发送",
     "push": "推送",
-    "set": "设置"
+    "set": "设置",
+    "link": "链接"
   },
   "book": {
     "title": "书籍",
@@ -203,6 +204,40 @@
     "books": "图书管理",
     "import": "导入图书"
   },
+  "user": {
+    "history": {
+      "pageTitle": "阅读记录",
+      "noHistory": "暂无阅读历史。请尽情",
+      "exploreBooks": "畅游书籍的海洋",
+      "exploreBooksEnd": "吧~",
+      "noRecords": "无记录",
+      "onlineReading": "在线阅读",
+      "pushedBooks": "推送过的书",
+      "browseHistory": "浏览记录"
+    },
+    "detail": {
+      "pageTitle": "用户中心",
+      "avatar": "头像",
+      "changeAvatar": "点击修改",
+      "username": "用户名",
+      "email": "邮箱",
+      "resendActivationEmail": "重新发送激活邮件",
+      "password": "密码",
+      "changePassword": "点击修改",
+      "currentPassword": "当前密码",
+      "newPassword": "新密码",
+      "confirmPassword": "确认密码",
+      "nickname": "昵称",
+      "kindleAddress": "Kindle地址",
+      "kindle": "Kindle",
+      "save": "保存",
+      "passwordMinLength": "密码长度至少为8个字符",
+      "nicknameMinLength": "昵称长度至少为2个字符",
+      "invalidEmailFormat": "邮箱格式不正确",
+      "passwordsNotSame": "两次输入的密码不一致",
+      "activationEmailSent": "激活邮件已发出！"
+    }
+  },
   "auth": {
     "signIn": "登录",
     "signUp": "注册",
@@ -283,6 +318,7 @@
     "more": "更多",
     "publisher": "出版社",
     "author": "作者",
+    "tags": "标签",
     "colon": "：",
     "userManagement": "用户管理",
     "guestPermission": "访客权限",
@@ -447,7 +483,9 @@
         "scanInfo": "扫描信息",
         "time": "时间",
         "host": "主机地址",
-        "port": "端口"
+        "port": "端口",
+        "bookTitle": "书名",
+        "author": "作者"
       },
       "placeholder": {
         "host": "例如: http://example.com",
@@ -481,6 +519,13 @@
         "importStep4": "4. 选择要导入的书籍并点击\"导入\"",
         "backToConnect": "返回连接界面",
         "connect": "连接"
+      },
+      "status": {
+        "new": "待扫描",
+        "ready": "可导入",
+        "exist": "已存在",
+        "imported": "导入成功",
+        "downloading": "下载中"
       },
       "tab": {
         "todo": "待处理",
@@ -641,10 +686,39 @@
     "noDataText": "无数据",
     "dataFooter": {
       "itemsPerPageText": "每页条目",
-      "pageText": "第 {0} 页，共 {1} 页"
+      "pageText": "第 {0} 页，共 {1} 页",
+      "itemsPerPageAll": "全部",
+      "firstPage": "首页",
+      "prevPage": "上一页",
+      "nextPage": "下一页",
+      "lastPage": "末页"
+    },
+    "dataTable": {
+      "itemsPerPageText": "每页行数",
+      "ariaLabel": {
+        "sortDescending": "降序排序",
+        "sortAscending": "升序排序",
+        "sortNone": "未排序",
+        "activateNone": "禁用排序",
+        "activateDescending": "启用降序排序",
+        "activateAscending": "启用升序排序"
+      }
     },
     "dataIterator": {
       "loadingText": "加载中..."
+    },
+    "close": "关闭",
+    "pagination": {
+      "ariaLabel": {
+        "root": "分页",
+        "next": "下一页",
+        "prev": "上一页",
+        "previous": "上一页",
+        "page": "页码",
+        "currentPage": "当前页码",
+        "rowsPerPage": "每页行数",
+        "of": "共"
+      }
     }
   }
 }

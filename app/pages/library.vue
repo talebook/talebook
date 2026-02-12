@@ -12,7 +12,7 @@
                     <div class="d-flex align-center">
                         <span class="mr-3">{{ $t('messages.publisher') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
-                            column="false"
+                            :column="false"
                             class="flex-grow-1"
                         >
                             <v-chip
@@ -53,7 +53,7 @@
                         <div class="d-flex align-center mt-1">
                             <span class="mr-3" />
                             <v-chip-group
-                                column="false"
+                                :column="false"
                                 class="flex-grow-1"
                             >
                                 <v-chip
@@ -77,7 +77,7 @@
                     <div class="d-flex align-center">
                         <span class="mr-3">{{ $t('messages.author') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
-                            column="false"
+                            :column="false"
                             class="flex-grow-1"
                         >
                             <v-chip
@@ -118,7 +118,7 @@
                         <div class="d-flex align-center mt-1">
                             <span class="mr-3" />
                             <v-chip-group
-                                column="false"
+                                :column="false"
                                 class="flex-grow-1"
                             >
                                 <v-chip
@@ -142,7 +142,7 @@
                     <div class="d-flex align-center">
                         <span class="mr-3">{{ $t('messages.tags') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
-                            column="false"
+                            :column="false"
                             class="flex-grow-1"
                         >
                             <v-chip
@@ -183,7 +183,7 @@
                         <div class="d-flex align-center mt-1">
                             <span class="mr-3" />
                             <v-chip-group
-                                column="false"
+                                :column="false"
                                 class="flex-grow-1"
                             >
                                 <v-chip
@@ -207,7 +207,7 @@
                     <div class="d-flex align-center">
                         <span class="mr-3">{{ $t('book.format') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
-                            column="false"
+                            :column="false"
                             class="flex-grow-1"
                         >
                             <v-chip
@@ -248,7 +248,7 @@
                         <div class="d-flex align-center mt-1">
                             <span class="mr-3" />
                             <v-chip-group
-                                column="false"
+                                :column="false"
                                 class="flex-grow-1"
                             >
                                 <v-chip
