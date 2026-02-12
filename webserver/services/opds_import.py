@@ -12,7 +12,6 @@ import uuid
 import shutil
 import re
 from datetime import datetime
-from gettext import gettext as _
 
 import requests
 from lxml import etree
@@ -330,7 +329,9 @@ class OPDSImportService(AsyncService):
             # 如果没有找到条目，可能是导航页面，检查导航链接
             if not items:
                 nav_links = root.xpath(
-                    '//atom:link[@rel="subsection" or @rel="http://opds-spec.org/crawlable" or @rel="collection" or @rel="start"]',
+                    '//atom:link[@rel="subsection" or ' \
+                    '@rel="http://opds-spec.org/crawlable" or ' \
+                    '@rel="collection" or @rel="start"]',
                     namespaces=ns,
                 )
                 for link in nav_links:
