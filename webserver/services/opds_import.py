@@ -51,7 +51,7 @@ class OPDSImportService(AsyncService):
             # 验证host格式
             if not host.startswith(("http://", "https://")):
                 raise ValueError("Host必须包含协议前缀(http://或https://)")
-            
+
             # 验证并构建完整的URL
             base_url = host
             if port:
@@ -62,7 +62,7 @@ class OPDSImportService(AsyncService):
                         raise ValueError("端口号必须在1-65535之间")
                 except ValueError:
                     raise ValueError("端口号必须是有效的数字")
-                
+
                 # 确保URL格式正确
                 if base_url.endswith("/"):
                     base_url = base_url[:-1]
@@ -155,7 +155,7 @@ class OPDSImportService(AsyncService):
                 done = self.count_done
                 skip = self.count_skip
                 fail = self.count_fail
-            
+
             logging.info(
                 f"OPDS导入完成: 总计 {total}, 成功 {done}, 跳过 {skip}, 失败 {fail}"
             )
@@ -468,7 +468,7 @@ class OPDSImportService(AsyncService):
 
             # 生成目标文件名，若冲突则使用短 UUID 后缀保证跨进程唯一性
             # 更严格的字符限制，只允许字母、数字、空格、连字符和下划线
-            safe_title = re.sub(r'[^a-zA-Z0-9\s\-_]', '_', title).strip()
+            safe_title = re.sub(r"[^a-zA-Z0-9\s\-_]", "_", title).strip()
             # 限制文件名长度，避免过长
             safe_title = safe_title[:50]
             format_ = book.get("format", "epub")
@@ -481,7 +481,7 @@ class OPDSImportService(AsyncService):
 
             # 确保扫描目录存在
             os.makedirs(self.scan_dir, exist_ok=True)
-            
+
             # 移动文件到扫描目录（shutil.move 在同文件系统上为原子操作）
             shutil.move(file_path, target_path)
             logging.info(f"书籍已移动到扫描目录: {target_path}")
@@ -600,7 +600,7 @@ class OPDSImportService(AsyncService):
             done = self.count_done
             skip = self.count_skip
             fail = self.count_fail
-        
+
         logging.info(
             f"OPDS导入完成: 总计 {total}, 成功 {done}, 跳过 {skip}, 失败 {fail}"
         )
@@ -804,7 +804,7 @@ class OPDSImportService(AsyncService):
             title = book.get("title", "unknown")
             format_ = book.get("format", "epub")
             # 更严格的字符限制，只允许字母、数字、空格、连字符和下划线
-            safe_title = re.sub(r'[^a-zA-Z0-9\s\-_]', '_', title).strip()
+            safe_title = re.sub(r"[^a-zA-Z0-9\s\-_]", "_", title).strip()
             # 限制文件名长度，避免过长
             safe_title = safe_title[:50]
             if not safe_title:
