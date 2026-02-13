@@ -12,7 +12,7 @@ services:
       - "8080:80"
       - "8443:443"
     environment:
-      # 如果需要上传ssl证书，请将PUID与PGID设置为0
+      # 如果需要上传ssl证书，请将PUID与PGID设置为0（root用户）
       - PUID=1000
       - PGID=1000
       - TZ=Asia/Shanghai
