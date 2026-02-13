@@ -22,7 +22,7 @@ settings = {
     "scan_upload_path"   : "/data/books/imports/",
     "extract_path"  : "/data/books/extract/",
     "with_library"  : "/data/books/library/",
-    "cookie_secret" : os.environ.get("COOKIE_SECRET", "cookie_secret"),
+    "cookie_secret" : "cookie_secret",
     "cookie_expire" : 7*86400,
     "login_url"     : "/login",
     "user_database" : 'sqlite:////data/books/calibre-webserver.db',
