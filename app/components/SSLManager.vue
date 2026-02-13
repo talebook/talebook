@@ -68,6 +68,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { validateCertFile, validateKeyFile, validateCertKeyFiles } from '~/utils/sslValidator';
 const { $backend, $alert } = useNuxtApp();
 
 import { useI18n } from 'vue-i18n';
@@ -79,14 +80,7 @@ const ssl_crt = ref(null);
 const ssl_key = ref(null);
 
 const check_certs = async () => {
-    var re = {
-        crt: /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gm,
-        key: /-----BEGIN [A-Z]* PRIVATE KEY-----[\s\S]*?-----END [A-Z]* PRIVATE KEY-----/gm,
-    };
-
     // Vuetify 3 file input v-model is array of files or single file depending on 'multiple' prop
-    // Default is array in recent versions or single object?
-    // It seems to be array in Vuetify 3
     const crtFile = Array.isArray(ssl_crt.value) ? ssl_crt.value[0] : ssl_crt.value;
     const keyFile = Array.isArray(ssl_key.value) ? ssl_key.value[0] : ssl_key.value;
 
@@ -99,17 +93,32 @@ const check_certs = async () => {
         return false;
     }
 
-    var content = await crtFile.text();
-    if ( ! re.crt.test(content) ) {
-        if ($alert) $alert('error', t('messages.certFileError'));
+    // 使用 sslValidator 模块验证证书
+    const certResult = await validateCertFile(crtFile);
+    if (!certResult.valid) {
+        if ($alert) $alert('error', certResult.error || t('messages.certFileError'));
         return false;
     }
 
-    content = await keyFile.text();
-    if ( ! re.key.test(content) ) {
-        if ($alert) $alert('error', t('messages.keyFileError'));
+    // 使用 sslValidator 模块验证私钥
+    const keyResult = await validateKeyFile(keyFile);
+    if (!keyResult.valid) {
+        if ($alert) $alert('error', keyResult.error || t('messages.keyFileError'));
         return false;
     }
+
+    // 验证证书和私钥是否匹配
+    const matchResult = await validateCertKeyFiles(crtFile, keyFile);
+    if (!matchResult.valid) {
+        if ($alert) $alert('error', matchResult.error);
+        return false;
+    }
+
+    // 如果有警告（如加密私钥），显示警告但不阻止上传
+    if (matchResult.warning) {
+        console.warn('SSL Warning:', matchResult.warning);
+    }
+
     return true;
 };
 

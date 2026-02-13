@@ -16,7 +16,7 @@
                         color="primary"
                     >
                         <v-toolbar-title>{{ $t('install.installTaleBook') }}</v-toolbar-title>
-                        <v-spacer></v-spacer>
+                        <v-spacer />
                         <!-- 多语言切换入口 -->
                         <v-menu
                             offset-y
