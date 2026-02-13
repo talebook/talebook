@@ -1501,9 +1501,9 @@ onMounted(() => {
     getDataFromApi();
 });
 
-useHead({
+useHead(() => ({
     title: t('admin.imports.title')
-});
+}));
 </script>
 
 <style scoped>

@@ -706,9 +706,9 @@ watch(search, () => {
     getDataFromApi();
 });
 
-useHead({
+useHead(() => ({
     title: t('admin.books.title')
-});
+}));
 </script>
 
 <style scoped>
