@@ -15,6 +15,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Asia/Shanghai
+      - COOKIE_SECRET="your_secure_secret_key_here"
     depends_on:
       - douban-rs-api
 

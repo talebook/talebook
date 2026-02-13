@@ -48,9 +48,21 @@ class OPDSImportService(AsyncService):
     def browse_opds_catalog(self, host, port=None, path=""):
         """浏览OPDS目录结构"""
         try:
-            # 构建完整的URL
+            # 验证host格式
+            if not host.startswith(("http://", "https://")):
+                raise ValueError("Host必须包含协议前缀(http://或https://)")
+
+            # 验证并构建完整的URL
             base_url = host
             if port:
+                # 验证端口号
+                try:
+                    port_num = int(port)
+                    if port_num < 1 or port_num > 65535:
+                        raise ValueError("端口号必须在1-65535之间")
+                except ValueError:
+                    raise ValueError("端口号必须是有效的数字")
+
                 # 确保URL格式正确
                 if base_url.endswith("/"):
                     base_url = base_url[:-1]
@@ -137,12 +149,19 @@ class OPDSImportService(AsyncService):
                     with self._lock:
                         self.count_fail += 1
 
+            # 读取最终状态时也需要锁保护
+            with self._lock:
+                total = self.count_total
+                done = self.count_done
+                skip = self.count_skip
+                fail = self.count_fail
+
             logging.info(
-                f"OPDS导入完成: 总计 {self.count_total}, 成功 {self.count_done}, 跳过 {self.count_skip}, 失败 {self.count_fail}"
+                f"OPDS导入完成: 总计 {total}, 成功 {done}, 跳过 {skip}, 失败 {fail}"
             )
             return {
                 "err": "ok",
-                "msg": f"成功添加 {self.count_done} 本书籍到待处理列表",
+                "msg": f"成功添加 {done} 本书籍到待处理列表",
                 "imported_files": imported_files,
             }
         except Exception as e:
@@ -448,9 +467,10 @@ class OPDSImportService(AsyncService):
                 return None
 
             # 生成目标文件名，若冲突则使用短 UUID 后缀保证跨进程唯一性
-            safe_title = "".join(
-                c for c in title if c.isalnum() or c in (" ", "-", "_")
-            ).strip()
+            # 更严格的字符限制，只允许字母、数字、空格、连字符和下划线
+            safe_title = re.sub(r"[^a-zA-Z0-9\s\-_]", "_", title).strip()
+            # 限制文件名长度，避免过长
+            safe_title = safe_title[:50]
             format_ = book.get("format", "epub")
             target_filename = f"opds_{safe_title}.{format_}"
             target_path = os.path.join(self.scan_dir, target_filename)
@@ -458,6 +478,9 @@ class OPDSImportService(AsyncService):
             if os.path.exists(target_path):
                 target_filename = f"opds_{safe_title}_{uuid.uuid4().hex[:8]}.{format_}"
                 target_path = os.path.join(self.scan_dir, target_filename)
+
+            # 确保扫描目录存在
+            os.makedirs(self.scan_dir, exist_ok=True)
 
             # 移动文件到扫描目录（shutil.move 在同文件系统上为原子操作）
             shutil.move(file_path, target_path)
@@ -473,13 +496,17 @@ class OPDSImportService(AsyncService):
                     h = hashlib.sha256(href.encode("utf-8")).hexdigest()[:64]
                     sf = sess.query(ScanFile).filter(ScanFile.hash == h).first()
                     if sf:
-                        sf.path = target_path
-                        sf.status = ScanFile.NEW
-                        sf.update_time = datetime.now()
-                        sf.save()
-                        sess.commit()
-            except Exception:
-                logging.debug("无法更新 ScanFile 状态或不存在对应记录")
+                        try:
+                            sf.path = target_path
+                            sf.status = ScanFile.NEW
+                            sf.update_time = datetime.now()
+                            sf.save()
+                            sess.commit()
+                        except Exception as e:
+                            sess.rollback()
+                            logging.error(f"更新 ScanFile 状态时出错，已回滚事务: {e}")
+            except Exception as e:
+                logging.debug(f"无法更新 ScanFile 状态或不存在对应记录: {e}")
 
             # 创建扫描记录（如果需要）
             # 这里假设系统会自动扫描扫描目录中的新文件
@@ -567,16 +594,23 @@ class OPDSImportService(AsyncService):
                 with self._lock:
                     self.count_fail += 1
 
+        # 读取最终状态时也需要锁保护
+        with self._lock:
+            total = self.count_total
+            done = self.count_done
+            skip = self.count_skip
+            fail = self.count_fail
+
         logging.info(
-            f"OPDS导入完成: 总计 {self.count_total}, 成功 {self.count_done}, 跳过 {self.count_skip}, 失败 {self.count_fail}"
+            f"OPDS导入完成: 总计 {total}, 成功 {done}, 跳过 {skip}, 失败 {fail}"
         )
 
         return {
             "err": "ok",
-            "msg": f"成功添加 {self.count_done} 本书籍到待处理列表",
-            "total": self.count_total,
-            "done": self.count_done,
-            "fail": self.count_fail,
+            "msg": f"成功添加 {done} 本书籍到待处理列表",
+            "total": total,
+            "done": done,
+            "fail": fail,
             "imported_files": imported_files,
         }
 
@@ -769,9 +803,10 @@ class OPDSImportService(AsyncService):
             # 生成临时文件路径
             title = book.get("title", "unknown")
             format_ = book.get("format", "epub")
-            safe_title = "".join(
-                c for c in title if c.isalnum() or c in (" ", "-", "_")
-            ).strip()
+            # 更严格的字符限制，只允许字母、数字、空格、连字符和下划线
+            safe_title = re.sub(r"[^a-zA-Z0-9\s\-_]", "_", title).strip()
+            # 限制文件名长度，避免过长
+            safe_title = safe_title[:50]
             if not safe_title:
                 safe_title = "unknown_book"
 

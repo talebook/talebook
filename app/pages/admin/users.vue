@@ -546,7 +546,7 @@ onMounted(() => {
     getDataFromApi();
 });
 
-useHead({
+useHead(() => ({
     title: t('admin.users.title')
-});
+}));
 </script>

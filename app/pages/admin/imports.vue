@@ -687,6 +687,18 @@ const isRightButtonLoading = computed(() => {
     return opdsLoading.value || opdsImportState.value === 'importing';
 });
 
+// 新增：使用computed替代多个ref来同步状态
+const isImporting = computed(() => opdsImportState.value === 'importing');
+const isConnecting = computed(() => opdsImportState.value === 'connecting');
+const isBrowsing = computed(() => opdsImportState.value === 'browsing');
+const isCompleted = computed(() => opdsImportState.value === 'completed');
+const isError = computed(() => opdsImportState.value === 'error');
+
+// 计算导入是否正在进行中
+const isOpdsOperationInProgress = computed(() => {
+    return opdsLoading.value || opdsImportState.value === 'importing';
+});
+
 // 左侧按钮点击处理
 const handleLeftButtonClick = () => {
     switch (opdsImportState.value) {
@@ -1489,9 +1501,9 @@ onMounted(() => {
     getDataFromApi();
 });
 
-useHead({
+useHead(() => ({
     title: t('admin.imports.title')
-});
+}));
 </script>
 
 <style scoped>

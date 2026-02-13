@@ -80,8 +80,8 @@ const ssl_key = ref(null);
 
 const check_certs = async () => {
     var re = {
-        crt: /-----BEGIN CERTIFICATE-----[^ ]*-----END CERTIFICATE-----/gm,
-        key: /-----BEGIN [A-Z]* PRIVATE KEY-----[^ ]*-----END [A-Z]* PRIVATE KEY-----/gm,
+        crt: /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gm,
+        key: /-----BEGIN [A-Z]* PRIVATE KEY-----[\s\S]*?-----END [A-Z]* PRIVATE KEY-----/gm,
     };
 
     // Vuetify 3 file input v-model is array of files or single file depending on 'multiple' prop
