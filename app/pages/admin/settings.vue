@@ -3,12 +3,12 @@
     <div>
         <v-card
             v-for="card in cards"
-            :key="card.title"
+            :key="card.key"
             class="my-2 elevation-4"
         >
             <v-card-title
                 class="cursor-pointer py-4 pl-2"
-                @click="card.show = !card.show"
+                @click="cardShows[card.key] = !cardShows[card.key]"
             >
                 <v-btn
                     icon
@@ -16,12 +16,12 @@
                     size="small"
                     class="mr-1"
                 >
-                    <v-icon>{{ card.show ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
+                    <v-icon>{{ cardShows[card.key] ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
                 </v-btn>
                 {{ card.title }}
             </v-card-title>
             <v-expand-transition>
-                <div v-show="card.show">
+                <div v-show="cardShows[card.key]">
                     <v-card-text style="padding: 0 16px 16px">
                         <p
                             v-if="card.subtitle"
@@ -278,7 +278,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import SSLManager from '~/components/SSLManager.vue';
 import { useMainStore } from '@/stores/main';
@@ -293,9 +293,23 @@ const sns_items = ref([]);
 const settings = ref({ FRIENDS: [], SOCIALS: [] }); // Init with defaults to avoid v-if errors
 const site_url = ref('');
 
-const cards = ref([
+// Store card expand/collapse states separately from computed cards
+const cardShows = ref({
+    basicInfo: false,
+    userSettings: false,
+    socialLogin: false,
+    emailService: false,
+    bookCategories: false,
+    friendshipLinks: false,
+    bookInfoSources: false,
+    advancedSettings: false,
+    sslManagement: false,
+    opdsSettings: false,
+});
+
+const cards = computed(() => [
     {
-        show: false,
+        key: 'basicInfo',
         title: t('admin.settings.section.basicInfo'),
         fields: [
             { icon: 'mdi-home', key: 'site_title', label: t('admin.settings.label.siteTitle'), },
@@ -324,7 +338,7 @@ const cards = ref([
         ],
     },
     {
-        show: false,
+        key: 'userSettings',
         title: t('admin.settings.section.userSettings'),
         groups: [
             {
@@ -341,13 +355,13 @@ const cards = ref([
     },
 
     {
-        show: false,
+        key: 'socialLogin',
         title: t('admin.settings.section.socialLogin'),
         fields: [ ],
         show_socials: true,
     },
     {
-        show: false,
+        key: 'emailService',
         title: t('admin.settings.section.emailService'),
         subtitle: t('admin.settings.message.emailServiceInfo'),
         fields: [
@@ -363,7 +377,7 @@ const cards = ref([
         ],
     },
     {
-        show: false,
+        key: 'bookCategories',
         title: t('admin.settings.section.bookCategories'),
         subtitle: t('admin.settings.message.bookCategoriesInfo'),
         fields: [
@@ -371,14 +385,14 @@ const cards = ref([
         ],
     },
     {
-        show: false,
+        key: 'friendshipLinks',
         title: t('admin.settings.section.friendshipLinks'),
         fields: [ ],
         show_friends: true,
     },
 
     {
-        show: false,
+        key: 'bookInfoSources',
         title: t('admin.settings.section.bookInfoSources'),
         fields: [
             { icon: '', key: 'auto_fill_meta', label: t('admin.settings.label.autoFillMeta'), type: 'checkbox' },
@@ -394,7 +408,7 @@ const cards = ref([
     },
 
     {
-        show: false,
+        key: 'advancedSettings',
         title: t('admin.settings.section.advancedSettings'),
         fields: [
             { icon: 'mdi-home', key: 'static_host', label: t('admin.settings.label.staticHost') },
@@ -422,13 +436,13 @@ const cards = ref([
     },
 
     {
-        show: false,
+        key: 'sslManagement',
         title: t('admin.settings.section.sslManagement'),
         fields: [],
         show_ssl: true,
     },
     {
-        show: false,
+        key: 'opdsSettings',
         title: t('admin.settings.section.opdsSettings'),
         fields: [
             { icon: 'mdi-book-open-variant', key: 'OPDS_ENABLED', label: t('admin.settings.label.opdsEnabled'), type: 'checkbox' },
@@ -514,9 +528,9 @@ const run = (func) => {
     if (func === 'test_email') test_email();
 };
 
-useHead({
+useHead(() => ({
     title: t('admin.settings.title')
-});
+}));
 </script>
 
 <style scoped>
