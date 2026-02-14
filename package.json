@@ -1,0 +1,18 @@
+{
+  "name": "talebook",
+  "private": true,
+  "workspaces": [
+    "app"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=app",
+    "dev": "npm run dev --workspace=app",
+    "generate": "npm run generate --workspace=app",
+    "preview": "npm run preview --workspace=app",
+    "lint": "npm run lint --workspace=app",
+    "lint:fix": "npm run lint:fix --workspace=app",
+    "test": "npm run test --workspace=app",
+    "start": "npm run start --workspace=app",
+    "postinstall": "npm run postinstall --workspace=app"
+  }
+}
