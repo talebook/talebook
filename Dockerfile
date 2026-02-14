@@ -155,8 +155,8 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
         curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
         curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
-    ＃elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
-        ＃curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
+    #elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+        #curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
     fi && \
     apt-get install -y nodejs && \
     apt-get clean && \
