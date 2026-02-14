@@ -397,7 +397,7 @@ const headers = computed(() => [
     { title: t('admin.users.label.action'), key: 'actions', sortable: false },
 ]);
 
-const permissions = [
+const permissions = computed(() => [
     { code: 'l', name: 'can_login', text: t('admin.users.label.permissionLogin') },
     { code: 'u', name: 'can_upload', text: t('admin.users.label.permissionUpload') },
     { code: 's', name: 'can_save', text: t('admin.users.label.permissionDownload') },
@@ -405,7 +405,7 @@ const permissions = [
     { code: 'd', name: 'can_delete', text: t('admin.users.label.permissionDelete') },
     { code: 'p', name: 'can_push', text: t('admin.users.label.permissionPush') },
     { code: 'r', name: 'can_read', text: t('admin.users.label.permissionRead') },
-];
+]);
 
 const updateOptions = (newOptions) => {
     options.value = newOptions;

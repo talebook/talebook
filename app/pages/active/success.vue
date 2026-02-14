@@ -10,10 +10,10 @@
         >
             <v-card class="elevation-12">
                 <v-toolbar
+                    dark
                     color="primary"
-                    theme="dark"
                 >
-                    <v-toolbar-title class="text-center">
+                    <v-toolbar-title align-center>
                         {{ $t('messages.activateSuccess') }}
                     </v-toolbar-title>
                 </v-toolbar>

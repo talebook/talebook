@@ -71,9 +71,6 @@ useHead({
 });
 
 onMounted(() => {
-    // 延迟隐藏加载动画，让用户有时间看到加载效果
-    setTimeout(() => {
-        store.setLoading(false);
-    }, 1000);
+    store.setLoading(false);
 });
 </script>

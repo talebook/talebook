@@ -521,8 +521,8 @@
       "user": {
         "action": "Action",
         "modifyPermission": "Modify permissions",
-        "enabled": "Enabled",
-        "disable": "Disable",
+        "enabled": "Enabled ",
+        "disable": "Disable ",
         "accountManagement": "Account management",
         "activateAccount": "Activate account without email",
         "removeAdmin": "Remove admin",
