@@ -660,6 +660,9 @@ watch(() => fetchData.value, (newData) => {
 // 监听错误状态
 watch(() => fetchError.value, (newError) => {
     error.value = newError;
+    if (newError && $alert) {
+        $alert('error', newError.message || '获取书籍信息失败');
+    }
 });
 
 // 监听加载状态
