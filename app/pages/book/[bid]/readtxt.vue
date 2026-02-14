@@ -36,7 +36,7 @@
             class="px-0"
             color="blue"
             density="compact"
-            theme="dark"
+            theme="light"
         >
             <v-app-bar-title class="mr-12 align-center d-flex">
                 <v-app-bar-nav-icon @click.stop="sidebar = !sidebar">
@@ -62,7 +62,7 @@
                     <v-card-title ref="tipTitle">
                         {{ tip.title }}
                     </v-card-title>
-                    <v-card-text ref="tip">
+                    <v-card-text>
                         {{ tip.content }}
                     </v-card-text>
                 </v-card>
