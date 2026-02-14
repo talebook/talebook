@@ -343,7 +343,7 @@ const showGuestPermissionDialog = ref(false);
 // Form rules
 const requiredRule = v => !!v || t('admin.users.message.required');
 const emailRule = (email) => {
-    var re = /^(([^<>()[\.,;:\s@"]+([^<>()[\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    var re = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
     return re.test(email) || t('admin.users.message.invalidEmail');
 };
 const usernameRule = v => ((20 >= v.length && v.length >= 5) && /^[a-z][a-z0-9_]*$/.test(v)) || t('admin.users.message.invalidUsername');
