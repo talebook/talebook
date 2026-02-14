@@ -2,11 +2,8 @@
     <div id="txt-main">
         <v-navigation-drawer
             v-model="sidebar"
-            location="start"
-            temporary
+            :order="1"
             width="240"
-            class="d-flex flex-column"
-            style="height: 100%"
         >
             <v-list-subheader style="height: 48px">
                 {{ name }}
@@ -38,17 +35,14 @@
             density="compact"
             theme="light"
         >
-            <v-app-bar-title class="mr-12 align-center d-flex">
-                <v-app-bar-nav-icon @click.stop="sidebar = !sidebar">
-                    <v-icon>mdi-menu</v-icon>
-                </v-app-bar-nav-icon>
-                <span
-                    class="cursor-pointer ml-2"
-                    @click="router.push('/')"
-                >
-                    {{ name }}
-                </span>
-            </v-app-bar-title>
+            <v-app-bar-nav-icon @click.stop="sidebar = !sidebar" />
+            <v-toolbar-title
+                class="ml-2 mr-4 align-center"
+                style="cursor: pointer"
+                @click="router.push('/')"
+            >
+                {{ name }}
+            </v-toolbar-title>
         </v-app-bar>
 
         <div style="margin-top: 64px;">
