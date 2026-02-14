@@ -2,77 +2,39 @@
   "common": {
     "welcome": "Welcome",
     "home": "Home",
-    "about": "About",
-    "contact": "Contact",
     "login": "Login",
-    "logout": "Logout",
     "save": "Save",
     "cancel": "Cancel",
-    "loading": "Loading...",
     "search": "Search",
-    "settings": "Settings",
-    "profile": "Profile",
-    "admin": "Admin",
     "back": "Back",
-    "next": "Next",
-    "previous": "Previous",
     "confirm": "Confirm",
     "delete": "Delete",
     "edit": "Edit",
     "add": "Add",
     "refresh": "Refresh",
     "download": "Download",
-    "upload": "Upload",
-    "import": "Import",
-    "export": "Export",
-    "filter": "Filter",
-    "sort": "Sort",
-    "view": "View",
     "close": "Close",
-    "open": "Open",
-    "yes": "Yes",
-    "no": "No",
-    "ok": "OK",
-    "error": "Error",
-    "success": "Success",
-    "warning": "Warning",
     "info": "Info",
-    "help": "Help",
-    "language": "Language",
     "send": "Send",
     "push": "Push",
     "set": "Set",
-    "link": "Link"
+    "link": "Link",
+    "action": "Action",
+    "book": "Book",
+    "done": "Done",
+    "manage": "Manage",
+    "read": "Read",
+    "retry": "Retry"
   },
   "book": {
-    "title": "Book",
-    "author": "Author",
     "publisher": "Publisher",
-    "import": "Import Books",
-    "scan": "Scan Books",
-    "delete": "Delete",
-    "read": "Read",
     "download": "Download",
-    "share": "Share",
-    "favorite": "Favorite",
-    "rating": "Rating",
-    "review": "Review",
-    "metadata": "Metadata",
     "format": "Format",
-    "size": "Size",
-    "pages": "Pages",
-    "published": "Published Date",
     "isbn": "ISBN",
     "language": "Language",
-    "category": "Category",
-    "tags": "Tags",
     "series": "Series",
-    "volume": "Volume",
-    "description": "Description",
     "cover": "Cover",
     "tableOfContents": "Table of Contents",
-    "relatedBooks": "Related Books",
-    "recommendations": "Recommendations",
     "field": {
       "title": "Title",
       "authors": "Authors",
@@ -89,15 +51,13 @@
     "selectCover": "Select cover image",
     "uploadCover": "Upload Cover",
     "coverSupported": "Supports JPG, PNG, GIF; max size 5MB",
-    "coverSizeLimit": "Cover must be smaller than 5MB",
     "uploadCoverFailed": "Cover upload failed",
     "enterNewName": "Enter new name",
     "enterNewTagName": "Enter new tag name",
     "addTag": "Add Tag",
-    "ratingStar": "star",
     "kindle": {
       "push": "Push to Kindle",
-      "emailPlaceholder": "Enter Kindle recipient email address:" 
+      "emailPlaceholder": "Enter Kindle recipient email address:"
     },
     "noDownloadFormats": "No downloadable formats available for this book",
     "internetSync": "Sync book information from internet",
@@ -127,54 +87,14 @@
   },
   "library": {
     "title": "Library",
-    "myBooks": "My Books",
-    "recent": "Recently Read",
-    "favorites": "Favorites",
-    "readingList": "Reading List",
-    "finished": "Finished",
-    "reading": "Reading",
-    "toRead": "To Read",
-    "collections": "Collections",
-    "stats": "Statistics",
-    "totalBooks": "Total Books",
-    "totalPages": "Total Pages",
-    "readingTime": "Reading Time",
-    "completionRate": "Completion Rate",
     "noBooks": "No books in library",
     "addBooksFirst": "Please add books to library first",
     "message": {
       "fetchBooksFailed": "Failed to fetch books list"
     }
   },
-  "opds": {
-    "title": "OPDS Service",
-    "import": "Import from OPDS",
-    "host": "Host Address",
-    "port": "Port",
-    "path": "Path",
-    "connect": "Connect",
-    "browse": "Browse Directory",
-    "select": "Select Books",
-    "importing": "Importing...",
-    "catalog": "Catalog",
-    "feeds": "Feeds",
-    "entries": "Entries",
-    "acquisition": "Acquisition Links",
-    "navigation": "Navigation",
-    "authentication": "Authentication"
-  },
   "errors": {
-    "required": "This field is required",
-    "invalidUrl": "Invalid URL address",
-    "connectionFailed": "Connection failed",
-    "notFound": "Not Found",
-    "unauthorized": "Unauthorized",
-    "forbidden": "Forbidden",
-    "serverError": "Server Error",
     "networkError": "Network Error",
-    "timeout": "Request Timeout",
-    "validationError": "Validation Error",
-    "unknownError": "Unknown Error",
     "coverTooLarge": "Cover must be smaller than 5MB",
     "chooseCover": "Please choose a cover image to upload",
     "uploadCoverFailed": "Cover upload failed",
@@ -184,8 +104,6 @@
   "navigation": {
     "home": "Home",
     "library": "Library",
-    "search": "Search",
-    "discover": "Discover",
     "recent": "Recent",
     "hot": "Hot",
     "recommended": "Recommended",
@@ -198,8 +116,6 @@
     "ratings": "Ratings",
     "admin": "Admin",
     "settings": "System Settings",
-    "help": "Help",
-    "about": "About",
     "browse": "Browse Categories",
     "users": "User Management",
     "books": "Book Management",
@@ -242,17 +158,11 @@
   "auth": {
     "signIn": "Sign In",
     "signUp": "Sign Up",
-    "signOut": "Sign Out",
     "username": "Username",
     "password": "Password",
     "email": "Email",
-    "rememberMe": "Remember Me",
     "forgotPassword": "Forgot Password",
     "resetPassword": "Reset Password",
-    "changePassword": "Change Password",
-    "profile": "Profile",
-    "avatar": "Avatar",
-    "preferences": "Preferences",
     "socialLogin": "Sign in with social network",
     "resetSuccess": "Reset successful! Please check the notification email for your password.",
     "signupFormTitle": "Fill in registration information",
@@ -260,43 +170,11 @@
     "loggedOutTitle": "Logged out"
   },
   "actions": {
-    "create": "Create",
-    "update": "Update",
-    "delete": "Delete",
     "edit": "Edit",
-    "view": "View",
-    "download": "Download",
     "upload": "Upload",
-    "import": "Import",
-    "export": "Export",
-    "share": "Share",
-    "print": "Print",
-    "copy": "Copy",
-    "paste": "Paste",
-    "cut": "Cut",
-    "save": "Save",
-    "cancel": "Cancel",
-    "submit": "Submit",
-    "reset": "Reset",
-    "search": "Search",
-    "filter": "Filter",
-    "sort": "Sort",
-    "refresh": "Refresh",
-    "back": "Back",
-    "next": "Next",
-    "previous": "Previous",
-    "bulkDelete": "Delete Selected",
-    "more": "More",
     "deleteBook": "Delete Book",
-    "backToConnect": "Back to connect",
-    "connect": "Connect",
-    "done": "Done",
-    "retry": "Retry",
-    "action": "Action",
-    "saveSettings": "Save Settings",
     "confirmDelete": "Confirm Delete",
-    "start": "Start",
-    "add": "Add"
+    "start": "Start"
   },
   "messages": {
     "noBooks": "No books in this library",
@@ -321,23 +199,7 @@
     "author": "Author",
     "tags": "Tags",
     "colon": ": ",
-    "userManagement": "User Management",
-    "guestPermission": "Guest Permission",
-    "addUser": "Add User",
-    "addNewUser": "Add New User",
-    "basicInfo": "Basic Information",
-    "username": "Username",
-    "usernamePlaceholder": "Please enter username, starting with lowercase letters",
-    "password": "Password",
-    "passwordPlaceholder": "Please enter 8-20 characters password",
     "nickname": "Nickname",
-    "nicknamePlaceholder": "Please enter user nickname, at least 2 characters",
-    "email": "Email",
-    "emailPlaceholder": "Please enter email address",
-    "accountSettings": "Account Settings",
-    "activeStatus": "Active Status",
-    "adminPermission": "Admin Permission",
-    "permissionSettings": "Permission Settings",
     "showAll": "Show all...",
     "updateSsl": "Update SSL Certificate",
     "selectCertFile": "Please select certificate file",
@@ -365,8 +227,6 @@
       "publisher": "All Publishers",
       "format": "All Formats"
     },
-    "importing": "Processing...",
-    "root": "Root",
     "confirmPassword": "Confirm Password"
   },
   "index": {
@@ -419,12 +279,6 @@
     "passwordMismatch": "Passwords do not match"
   },
   "admin": {
-    "title": {
-      "books": "Book Management",
-      "imports": "Import Books",
-      "settings": "System Settings",
-      "users": "User Management"
-    },
     "books": {
       "title": "Book Management",
       "button": {
@@ -483,15 +337,9 @@
         "path": "Path",
         "scanInfo": "Scan Info",
         "time": "Time",
-        "host": "Host Address",
-        "port": "Port",
         "bookTitle": "Book Title",
-        "author": "Author"
-      },
-      "placeholder": {
-        "host": "e.g.: http://example.com",
-        "port": "e.g.: 80",
-        "path": "e.g.: /opds or /opds/root.xml"
+        "author": "Author",
+        "cover": "Cover"
       },
       "message": {
         "importDirInfo": "Please put books in {0} directory. Supported formats: azw/azw3/epub/mobi/pdf/txt.",
@@ -519,7 +367,16 @@
         "importStep3": "3. Check 'Pending' list",
         "importStep4": "4. Select and import",
         "backToConnect": "Back to connect",
-        "connect": "Connect"
+        "connect": "Connect",
+        "cannotNavigateMissingLink": "Cannot navigate: Missing link",
+        "checkAddress": "Please check if the address is correct",
+        "connectFailed": "Connection failed: ",
+        "connectFailedCheckAddress": "Connection failed, please check the address",
+        "connectSuccess": "Connection successful",
+        "enterHost": "Please enter host address",
+        "hostProtocol": "Host address must start with http:// or https://",
+        "navigateFailed": "Navigation failed: ",
+        "portRange": "Port must be between 1-65535"
       },
       "status": {
         "new": "New",
@@ -545,9 +402,7 @@
         "bookInfoSources": "Book Info Sources",
         "advancedSettings": "Advanced Settings",
         "sslManagement": "SSL Management",
-        "opdsSettings": "OPDS Settings",
-        "accountSettings": "Account Settings",
-        "permissionSettings": "Permission Settings"
+        "opdsSettings": "OPDS Settings"
       },
       "button": {
         "saveSettings": "Save Settings",
@@ -615,7 +470,7 @@
         "saveSuccess": "Saved successfully",
         "goTo": "Please go to",
         "configurationPage": "developer configuration page",
-        "getKeysAndSetCallback": ", get the keys and set the callback address to:"  
+        "getKeysAndSetCallback": ", get the keys and set the callback address to:"
       }
     },
     "users": {
@@ -663,13 +518,6 @@
         "nickname": "Please enter user nickname, at least 2 characters",
         "email": "Please enter email address"
       },
-      "form": {
-        "required": "Required field",
-        "usernameRule": "Username must start with lowercase, 5-20 chars",
-        "passwordRule": "Password must be 8-20 chars",
-        "nicknameRule": "Nickname must be at least 2 chars",
-        "emailRule": "Invalid email format"
-      },
       "user": {
         "action": "Action",
         "modifyPermission": "Modify permissions",
@@ -679,8 +527,31 @@
         "activateAccount": "Activate account without email",
         "removeAdmin": "Remove admin",
         "setAdmin": "Set as admin",
-        "deleteUser": "Delete user immediately"
+        "deleteUser": "Delete user immediately",
+        "disabled": "Disabled",
+        "enable": "Enable"
+      },
+      "message": {
+        "guestPermissionSaved": "Guest permissions saved successfully!",
+        "invalidEmail": "Invalid email format",
+        "invalidNickname": "Nickname must be at least 2 characters",
+        "invalidPassword": "Password must be between 8-20 characters",
+        "invalidUsername": "Username must start with a lowercase letter, contain only letters, numbers, and underscores, and be between 5-20 characters",
+        "required": "This field is required"
       }
+    },
+    "button": {
+      "importFromOpds": "Import from OPDS"
+    },
+    "label": {
+      "host": "Host Address",
+      "path": "Path",
+      "port": "Port"
+    },
+    "placeholder": {
+      "host": "Enter host address",
+      "path": "Enter path",
+      "port": "Enter port"
     }
   },
   "install": {
@@ -741,5 +612,9 @@
         "of": "of"
       }
     }
+  },
+  "error": {
+    "otherError": "Other Error",
+    "pageNotFound": "Page Not Found"
   }
 }

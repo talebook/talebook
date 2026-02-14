@@ -191,7 +191,7 @@
                     color="primary"
                     size="small"
                 >
-                    {{ t('admin.message.selectedCount') }}
+                    {{ t('admin.imports.message.selectedCount') }}
                 </v-chip>
             </v-card-title>
             <v-card-text style="padding: 16px;">
@@ -231,8 +231,8 @@
                         @keyup.enter="connectToOpds"
                     />
                     <div class="text-body-2 text-gray-600 mt-2">
-                        {{ t('admin.message.opdsTip') }}
-                        <br>{{ t('admin.message.opdsPortTip') }}
+                        {{ t('admin.imports.message.opdsTip') }}
+                        <br>{{ t('admin.imports.message.opdsPortTip') }}
                     </div>
                 </div>
                 
@@ -296,7 +296,7 @@
                                     size="32"
                                 />
                                 <div class="mt-4 text-body-1 text-gray-600">
-                                    {{ t('admin.message.loadingDirectory') }}
+                                    {{ t('admin.imports.message.loadingDirectory') }}
                                 </div>
                             </div>
                             
@@ -312,7 +312,7 @@
                                 >
                                     mdi-arrow-left
                                 </v-icon>
-                                <span class="text-body-1">{{ t('admin.message.backToParent') }}</span>
+                                <span class="text-body-1">{{ t('admin.imports.message.backToParent') }}</span>
                             </div>
                             
                             <!-- 项目列表 -->
@@ -426,7 +426,7 @@
                                     mdi-folder-open-outline
                                 </v-icon>
                                 <div class="mt-2 text-gray-600">
-                                    {{ t('admin.message.emptyDirectory') }}
+                                    {{ t('admin.imports.message.emptyDirectory') }}
                                 </div>
                             </div>
                         </div>
@@ -442,10 +442,10 @@
                             size="64"
                         />
                         <div class="mt-4 text-h6">
-                            {{ t('admin.message.importingBooks') }}
+                            {{ t('admin.imports.message.importingBooks') }}
                         </div>
                         <div class="mt-2 text-body-1">
-                            {{ t('admin.message.importProgress') }}
+                            {{ t('admin.imports.message.importProgress') }}
                         </div>
                         <v-progress-linear
                             v-model="opdsImportProgress.percent"
@@ -470,10 +470,10 @@
                                     >
                                         mdi-information
                                     </v-icon>
-                                    {{ t('admin.message.importToTodo') }}
+                                    {{ t('admin.imports.message.importToTodo') }}
                                 </div>
                                 <div class="text-body-2 mt-1">
-                                    {{ t('admin.message.importAfterScan') }}
+                                    {{ t('admin.imports.message.importAfterScan') }}
                                 </div>
                             </v-alert>
                         </div>
@@ -490,16 +490,16 @@
                             mdi-check-circle
                         </v-icon>
                         <div class="mt-4 text-h6 text-success">
-                            {{ t('admin.message.importCompleted') }}
+                            {{ t('admin.imports.message.importCompleted') }}
                         </div>
                         <div class="mt-2 text-body-1">
-                            {{ t('admin.message.importSuccess') }}
+                            {{ t('admin.imports.message.importSuccess') }}
                         </div>
                         <div
                             v-if="opdsImportResult.fail > 0"
                             class="mt-2 text-body-1 text-warning"
                         >
-                            {{ t('admin.message.importFailed') }}
+                            {{ t('admin.imports.message.importFailed') }}
                         </div>
                         <div class="mt-4">
                             <v-alert
@@ -514,15 +514,15 @@
                                     >
                                         mdi-check
                                     </v-icon>
-                                    {{ t('admin.message.booksAddedToScanDir') }}
+                                    {{ t('admin.imports.message.booksAddedToScanDir') }}
                                 </div>
                                 <div class="text-body-2 mt-1">
-                                    {{ t('admin.message.importNextSteps') }}
+                                    {{ t('admin.imports.message.importNextSteps') }}
                                     <ol class="mt-2 pl-4">
-                                        <li>{{ t('admin.message.importStep1') }}</li>
-                                        <li>{{ t('admin.message.importStep2') }}</li>
-                                        <li>{{ t('admin.message.importStep3') }}</li>
-                                        <li>{{ t('admin.message.importStep4') }}</li>
+                                        <li>{{ t('admin.imports.message.importStep1') }}</li>
+                                        <li>{{ t('admin.imports.message.importStep2') }}</li>
+                                        <li>{{ t('admin.imports.message.importStep3') }}</li>
+                                        <li>{{ t('admin.imports.message.importStep4') }}</li>
                                     </ol>
                                 </div>
                             </v-alert>
@@ -547,7 +547,7 @@
                                 color="primary"
                                 @click="resetOpdsImportState"
                             >
-                                {{ t('admin.message.backToConnect') }}
+                                {{ t('admin.imports.message.backToConnect') }}
                             </v-btn>
                         </div>
                     </div>
