@@ -1,0 +1,49 @@
+{
+  "err": "ok",
+  "kindle_sender": "",
+  "book": {
+    "id": 12,
+    "title": "他的国",
+    "rating": 7,
+    "timestamp": "2022-02-04 12:10:33.180034+00:00",
+    "pubdate": "2009-01-01 00:00:00+00:00",
+    "author": "韩寒",
+    "authors": [
+      "韩寒"
+    ],
+    "author_sort": "韩寒",
+    "tag": "小说 / 中国 / 中国文学 / 韩寒 / 他的国 / 讽刺 / 青春 / 超现实",
+    "tags": [
+      "小说",
+      "中国",
+      "中国文学",
+      "韩寒",
+      "他的国",
+      "讽刺",
+      "青春",
+      "超现实"
+    ],
+    "publisher": "万卷出版公司",
+    "comments": "在你年少时是否曾梦想成为国王？    长大后的你是否还会继续这个英雄梦？    有些人的心里没有很多东西，哪怕是穿过内心的深处挖到肝里也没有。    有没有比兄弟和女人更加重要的情谊？    有没有比飙车时凛冽的风更刺激的逃亡？    纵身跳下，恍惚里终于看见一双双惊讶和肯定的眼神。    画面在人们面前晃过，你的青春是否也只是果园里一块不和谐的石头？    这是一个关于他的国的故事。    野草冲出土壤，它们一百三十五度仰望的天空在哪里……",
+    "series": "",
+    "language": "",
+    "isbn": "",
+    "img": "/get/cover/12.jpg",
+    "thumb": "/get/thumb_60x80/12.jpg",
+    "collector": "admin",
+    "count_visit": 0,
+    "count_download": 0,
+    "available_formats": [
+      "epub"
+    ],
+    "files": [
+      {
+        "format": "epub",
+        "size": 251729,
+        "href": "/api/book/12.epub"
+      }
+    ],
+    "is_public": true,
+    "is_owner": true
+  }
+}

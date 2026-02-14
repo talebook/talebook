@@ -43,7 +43,7 @@ class Done(BaseHandler):
     def get(self):
         user = self.update_userinfo()
         if not user.can_login():
-            raise web.HTTPError(403, log_message=_(u"无权登录"))
+            raise web.HTTPError(403, log_message=_("无权登录"))
         self.login_user(user)
         url = self.get_secure_cookie(COOKIE_REDIRECT)
         self.clear_cookie(COOKIE_REDIRECT)
@@ -62,7 +62,7 @@ class UserUpdate(BaseHandler):
             nickname = nickname.strip()
             if len(nickname) > 0:
                 if len(nickname) < 3:
-                    return {"err": "params.nickname.invald", "msg": _(u"昵称无效")}
+                    return {"err": "params.nickname.invald", "msg": _("昵称无效")}
                 user.name = nickname
 
         p0 = data.get("password0", "").strip()
@@ -70,15 +70,20 @@ class UserUpdate(BaseHandler):
         p2 = data.get("password2", "").strip()
         if len(p0) > 0:
             if user.get_secure_password(p0) != user.password:
-                return {"err": "params.password.error", "msg": _(u"密码错误")}
-            if p1 != p2 or len(p1) < 8 or len(p1) > 20 or not re.match(Reader.RE_PASSWORD, p1):
-                return {"err": "params.password.invalid", "msg": _(u"密码无效")}
+                return {"err": "params.password.error", "msg": _("密码错误")}
+            if (
+                p1 != p2
+                or len(p1) < 8
+                or len(p1) > 20
+                or not re.match(Reader.RE_PASSWORD, p1)
+            ):
+                return {"err": "params.password.invalid", "msg": _("密码无效")}
             user.set_secure_password(p1)
 
         ke = data.get("kindle_email", "").strip()
         if len(ke) > 0:
             if not re.match(Reader.RE_EMAIL, ke):
-                return {"err": "params.email.invalid", "msg": _(u"Kindle地址无效")}
+                return {"err": "params.email.invalid", "msg": _("Kindle地址无效")}
             if user.extra is None:
                 user.extra = {"kindle_email": ke}
             else:
@@ -89,14 +94,14 @@ class UserUpdate(BaseHandler):
             self.add_msg("success", _("Settings saved."))
             return {"err": "ok"}
         except:
-            return {"err": "db.error", "msg": _(u"数据库操作异常，请重试")}
+            return {"err": "db.error", "msg": _("数据库操作异常，请重试")}
 
 
 class SignUp(BaseHandler):
     def check_active_code(self, username, code):
         user = self.session.query(Reader).filter(Reader.username == username).first()
         if not user or code != user.get_active_code():
-            raise web.HTTPError(403, log_message=_(u"激活码无效"))
+            raise web.HTTPError(403, log_message=_("激活码无效"))
         user.active = True
         user.save()
         return self.redirect("/active/success")
@@ -119,30 +124,42 @@ class SignUp(BaseHandler):
     def post(self):
         # 检查是否允许注册
         if not CONF["ALLOW_REGISTER"]:
-            return {"err": "register.disabled", "msg": _(u"注册功能已关闭")}
+            return {"err": "register.disabled", "msg": _("注册功能已关闭")}
 
         email = self.get_argument("email", "").strip()
         nickname = self.get_argument("nickname", "").strip()
         username = self.get_argument("username", "").strip().lower()
         password = self.get_argument("password", "").strip()
         if not nickname or not username or not password:
-            return {"err": "params.invalid", "msg": _(u"用户名或密码无效")}
+            return {"err": "params.invalid", "msg": _("用户名或密码无效")}
 
         if not re.match(Reader.RE_EMAIL, email):
-            return {"err": "params.email.invalid", "msg": _(u"Email无效")}
-        if len(username) < 5 or len(username) > 20 or not re.match(Reader.RE_USERNAME, username):
-            return {"err": "params.username.invalid", "msg": _(u"用户名无效")}
-        if len(password) < 8 or len(password) > 20 or not re.match(Reader.RE_PASSWORD, password):
-            return {"err": "params.password.invalid", "msg": _(u"密码无效")}
+            return {"err": "params.email.invalid", "msg": _("Email无效")}
+        if (
+            len(username) < 5
+            or len(username) > 20
+            or not re.match(Reader.RE_USERNAME, username)
+        ):
+            return {"err": "params.username.invalid", "msg": _("用户名无效")}
+        if (
+            len(password) < 8
+            or len(password) > 20
+            or not re.match(Reader.RE_PASSWORD, password)
+        ):
+            return {"err": "params.password.invalid", "msg": _("密码无效")}
 
         user = self.session.query(Reader).filter(Reader.username == username).first()
         if user:
-            return {"err": "params.username.exist", "msg": _(u"用户名已被使用")}
+            return {"err": "params.username.exist", "msg": _("用户名已被使用")}
         user = Reader()
         user.username = username
         user.name = nickname
         user.email = email
-        user.avatar = CONF["avatar_service"] + "/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
+        user.avatar = (
+            CONF["avatar_service"]
+            + "/avatar/"
+            + hashlib.md5(email.encode("UTF-8")).hexdigest()
+        )
         user.create_time = datetime.datetime.now()
         user.update_time = datetime.datetime.now()
         user.access_time = datetime.datetime.now()
@@ -155,7 +172,7 @@ class SignUp(BaseHandler):
             import traceback
 
             logging.error(traceback.format_exc())
-            return {"err": "db.error", "msg": _(u"系统异常，请重试或更换注册信息")}
+            return {"err": "db.error", "msg": _("系统异常，请重试或更换注册信息")}
         self.send_active_email(user)
         return {"err": "ok"}
 
@@ -185,14 +202,14 @@ class SignIn(BaseHandler):
         username = self.get_argument("username", "").strip().lower()
         password = self.get_argument("password", "").strip()
         if not username or not password:
-            return {"err": "params.invalid", "msg": _(u"用户名或密码错误")}
+            return {"err": "params.invalid", "msg": _("用户名或密码错误")}
         user = self.session.query(Reader).filter(Reader.username == username).first()
         if not user:
-            return {"err": "params.no_user", "msg": _(u"无此用户")}
+            return {"err": "params.no_user", "msg": _("无此用户")}
         if user.get_secure_password(password) != user.password:
-            return {"err": "params.invalid", "msg": _(u"用户名或密码错误")}
+            return {"err": "params.invalid", "msg": _("用户名或密码错误")}
         if not user.can_login():
-            return {"err": "permission", "msg": _(u"无权登录")}
+            return {"err": "permission", "msg": _("无权登录")}
         logging.debug("PERM = %s", user.permission)
 
         self.login_user(user)
@@ -205,10 +222,14 @@ class UserReset(BaseHandler):
         email = self.get_argument("email", "").strip().lower()
         username = self.get_argument("username", "").strip().lower()
         if not username or not email:
-            return {"err": "params.invalid", "msg": _(u"用户名或邮箱错误")}
-        user = self.session.query(Reader).filter(Reader.username == username, Reader.email == email).first()
+            return {"err": "params.invalid", "msg": _("用户名或邮箱错误")}
+        user = (
+            self.session.query(Reader)
+            .filter(Reader.username == username, Reader.email == email)
+            .first()
+        )
         if not user:
-            return {"err": "params.no_user", "msg": _(u"无此用户")}
+            return {"err": "params.no_user", "msg": _("无此用户")}
 
         new_password = user.reset_password()
 
@@ -217,8 +238,9 @@ class UserReset(BaseHandler):
             user.save()
         except Exception:
             import traceback
+
             logging.error(traceback.format_exc())
-            return {"err": "db.error", "msg": _(u"系统繁忙")}
+            return {"err": "db.error", "msg": _("系统繁忙")}
 
         # 再发送通知邮件
         args = {
@@ -235,8 +257,12 @@ class UserReset(BaseHandler):
             MailService().send_mail(mail_from, mail_to, mail_subject, mail_body)
         except Exception:
             import traceback
+
             logging.error(traceback.format_exc())
-            return {"err": "ok", "msg": _(u"密码已重置，但邮件发送失败，请联系管理员或重新请求重置")}
+            return {
+                "err": "ok",
+                "msg": _("密码已重置，但邮件发送失败，请联系管理员或重新请求重置"),
+            }
 
         self.add_msg("success", _("你刚刚重置了密码"))
         return {"err": "ok"}
@@ -249,7 +275,7 @@ class SignOut(BaseHandler):
         self.clear_cookie("user_id")
         self.clear_cookie("admin_id")
         self.clear_cookie("lt")
-        return {"err": "ok", "msg": _(u"你已成功退出登录。")}
+        return {"err": "ok", "msg": _("你已成功退出登录。")}
 
 
 class UserMessages(BaseHandler):
@@ -280,10 +306,10 @@ class UserMessages(BaseHandler):
     def post(self):
         data = tornado.escape.json_decode(self.request.body)
         if "id" not in data:
-            return {"err": "params.invalid", "msg": _(u"ID错误")}
+            return {"err": "params.invalid", "msg": _("ID错误")}
         msg = self.session.query(Message).filter(Message.id == data["id"]).first()
         if not msg:
-            return {"err": "params.not_found", "msg": _(u"查无此ID")}
+            return {"err": "params.not_found", "msg": _("查无此ID")}
 
         msg.unread = False
         msg.update_time = datetime.datetime.now()
@@ -298,7 +324,11 @@ class UserInfo(BaseHandler):
         db = self.db
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
         count_all_users = self.session.query(func.count(Reader.id)).scalar()
-        count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
+        count_hot_users = (
+            self.session.query(func.count(Reader.id))
+            .filter(Reader.access_time > last_week)
+            .scalar()
+        )
         # 获取格式数量
         sql = "SELECT COUNT(DISTINCT format) FROM data"
         # 使用BaseHandler的锁来保护数据库连接的访问
@@ -369,7 +399,9 @@ class UserInfo(BaseHandler):
         )
         if user and user.avatar:
             gravatar_url = "https://www.gravatar.com"
-            d["avatar"] = user.avatar.replace("http://", "https://").replace(gravatar_url, CONF["avatar_service"])
+            d["avatar"] = user.avatar.replace("http://", "https://").replace(
+                gravatar_url, CONF["avatar_service"]
+            )
         if user and user.extra:
             d["kindle_email"] = user.extra.get("kindle_email", "")
             if detail:
@@ -382,7 +414,10 @@ class UserInfo(BaseHandler):
                         for b in v:
                             if b["id"] not in show:
                                 continue
-                            b["img"] = self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
+                            b["img"] = (
+                                self.cdn_url
+                                + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
+                            )
                             b["href"] = "/book/%(id)s" % b
                             n.append(b)
                         v = n[:12]
@@ -413,16 +448,16 @@ class Welcome(BaseHandler):
     @js
     def get(self):
         if not self.need_invited():
-            return {"err": "free", "msg": _(u"无需访问码")}
+            return {"err": "free", "msg": _("无需访问码")}
         if self.invited_code_is_ok():
-            return {"err": "free", "msg": _(u"已输入访问码")}
+            return {"err": "free", "msg": _("已输入访问码")}
         return {"err": "ok", "msg": "", "welcome": CONF["INVITE_MESSAGE"]}
 
     @js
     def post(self):
         code = self.get_argument("invite_code", None)
         if not code or code != CONF["INVITE_CODE"]:
-            return {"err": "params.invalid", "msg": _(u"访问码无效")}
+            return {"err": "params.invalid", "msg": _("访问码无效")}
         self.mark_invited()
         return {"err": "ok", "msg": ""}
 

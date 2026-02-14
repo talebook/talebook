@@ -1,0 +1,50 @@
+{
+  "err": "ok",
+  "kindle_sender": "",
+  "book": {
+    "id": 6,
+    "title": "唐诗三百首",
+    "rating": 9,
+    "timestamp": "2022-02-04 12:05:11.787850+00:00",
+    "pubdate": "1998-01-01 00:00:00+00:00",
+    "author": "蘅塘退士, 陈婉俊补注",
+    "authors": [
+      "蘅塘退士",
+      "陈婉俊补注"
+    ],
+    "author_sort": "蘅塘退士",
+    "tag": "经典 / 唐诗三百首 / 诗歌 / 古典文学 / 诗词 / 唐诗 / 中国 / 古典",
+    "tags": [
+      "经典",
+      "唐诗三百首",
+      "诗歌",
+      "古典文学",
+      "诗词",
+      "唐诗",
+      "中国",
+      "古典"
+    ],
+    "publisher": "中华书局",
+    "comments": "《唐诗三百首》的旧注本亦有许多种，其中以陈婉俊的补注本简明精当，流行最广。她的注解除简介作者生平外，比较注重语词名物的诠释，博引旁征，字梳句栉，对今天的读者仍有一定的参考价值。",
+    "series": "",
+    "language": "zho",
+    "isbn": "",
+    "img": "/get/cover/6.jpg",
+    "thumb": "/get/thumb_60x80/6.jpg",
+    "collector": "admin",
+    "count_visit": 0,
+    "count_download": 0,
+    "available_formats": [
+      "epub"
+    ],
+    "files": [
+      {
+        "format": "epub",
+        "size": 324726,
+        "href": "/api/book/6.epub"
+      }
+    ],
+    "is_public": true,
+    "is_owner": true
+  }
+}

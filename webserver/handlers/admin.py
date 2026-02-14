@@ -17,8 +17,9 @@ import tornado
 from webserver import loader
 from webserver.services.autofill import AutoFillService
 from webserver.services.mail import MailService
+from webserver.services.opds_import import OPDSImportService
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
-from webserver.models import Reader
+from webserver.models import Reader, ScanFile
 from webserver.utils import SimpleBookFormatter
 
 CONF = loader.get_settings()
@@ -29,7 +30,7 @@ class AdminUsers(BaseHandler):
     @auth
     def get(self):
         if not self.admin_user:
-            return {"err": "permission.not_admin", "msg": _(u"当前用户非管理员")}
+            return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
 
         num = max(10, int(self.get_argument("num", 20)))
         page = max(0, int(self.get_argument("page", 1)) - 1)
@@ -66,9 +67,15 @@ class AdminUsers(BaseHandler):
                 "provider": user.social_auth[0].provider
                 if hasattr(user, "social_auth") and user.social_auth.count()
                 else "register",
-                "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S") if user.create_time else "N/A",
-                "update_time": user.update_time.strftime("%Y-%m-%d %H:%M:%S") if user.update_time else "N/A",
-                "access_time": user.access_time.strftime("%Y-%m-%d %H:%M:%S") if user.access_time else "N/A",
+                "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S")
+                if user.create_time
+                else "N/A",
+                "update_time": user.update_time.strftime("%Y-%m-%d %H:%M:%S")
+                if user.update_time
+                else "N/A",
+                "access_time": user.access_time.strftime("%Y-%m-%d %H:%M:%S")
+                if user.access_time
+                else "N/A",
             }
             for attr in dir(user):
                 if attr.startswith("can_"):
@@ -80,15 +87,25 @@ class AdminUsers(BaseHandler):
     @auth
     def post(self):
         if not self.admin_user:
-            return {"err": "permission.not_admin", "msg": _(u"当前用户非管理员")}
+            return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
         data = tornado.escape.json_decode(self.request.body)
         uid = data.get("id", None)
 
         # 创建新用户逻辑
         if not uid:
             # 验证必填字段
-            if not all([data.get("username"), data.get("password"), data.get("name"), data.get("email")]):
-                return {"err": "params.fields.required", "msg": _(u"用户名、密码、昵称和邮箱为必填项")}
+            if not all(
+                [
+                    data.get("username"),
+                    data.get("password"),
+                    data.get("name"),
+                    data.get("email"),
+                ]
+            ):
+                return {
+                    "err": "params.fields.required",
+                    "msg": _("用户名、密码、昵称和邮箱为必填项"),
+                }
 
             username = data["username"]
             password = data["password"]
@@ -96,9 +113,11 @@ class AdminUsers(BaseHandler):
             email = data["email"]
 
             # 检查用户名是否已存在
-            existing_user = self.session.query(Reader).filter(Reader.username == username).first()
+            existing_user = (
+                self.session.query(Reader).filter(Reader.username == username).first()
+            )
             if existing_user:
-                return {"err": "params.user.exist", "msg": _(u"用户名已存在")}
+                return {"err": "params.user.exist", "msg": _("用户名已存在")}
 
             # 创建新用户
             user = Reader()
@@ -123,23 +142,30 @@ class AdminUsers(BaseHandler):
                 return {"err": "ok", "msg": _("用户创建成功")}
             except Exception as e:
                 logging.error(traceback.format_exc())
-                return {"err": "db.error", "msg": _(u"用户创建失败：{}".format(str(e)))}
+                return {"err": "db.error", "msg": _("用户创建失败：{}".format(str(e)))}
 
         # 现有用户编辑逻辑
         del data["id"]
         if not data:
-            return {"err": "params.fields.invalid", "msg": _(u"用户配置项参数错误")}
+            return {"err": "params.fields.invalid", "msg": _("用户配置项参数错误")}
         user = self.session.query(Reader).filter(Reader.id == uid).first()
         if not user:
-            return {"err": "params.user.not_exist", "msg": _(u"用户ID错误")}
+            return {"err": "params.user.not_exist", "msg": _("用户ID错误")}
         if "active" in data:
             user.active = data["active"]
 
         if "admin" in data:
             was_admin = user.admin
             user.admin = data["admin"]
-            if was_admin is True and data["admin"] is False and self.user_id() == user.id:
-                return {"err": "params.user.invalid", "msg": _("不允许取消自己的管理员权限")}
+            if (
+                was_admin is True
+                and data["admin"] is False
+                and self.user_id() == user.id
+            ):
+                return {
+                    "err": "params.user.invalid",
+                    "msg": _("不允许取消自己的管理员权限"),
+                }
 
         if data.get("delete", "") == user.username:
             if self.user_id() == user.id:
@@ -151,7 +177,7 @@ class AdminUsers(BaseHandler):
 
         p = data.get("permission", "")
         if not isinstance(p, str):
-            return {"err": "params.permission.invalid", "msg": _(u"权限参数不对")}
+            return {"err": "params.permission.invalid", "msg": _("权限参数不对")}
         if p:
             user.set_permission(p)
         user.save()
@@ -169,8 +195,8 @@ class AdminTestMail(BaseHandler):
 
         mail_from = mail_username
         mail_to = mail_username
-        mail_subject = _(u"Calibre功能验证邮件")
-        mail_body = _(u"这是一封测试邮件，验证邮件参数是否配置正确。")
+        mail_subject = _("Calibre功能验证邮件")
+        mail_body = _("这是一封测试邮件，验证邮件参数是否配置正确。")
 
         try:
             MailService().do_send_mail(
@@ -182,9 +208,8 @@ class AdminTestMail(BaseHandler):
                 username=mail_username,
                 password=mail_password,
                 encryption=mail_enc,
-
             )
-            return {"err": "ok", "msg": _(u"发送成功")}
+            return {"err": "ok", "msg": _("发送成功")}
         except Exception as e:
             logging.error(traceback.format_exc())
             return {"err": "email.server_error", "msg": str(e)}
@@ -220,7 +245,10 @@ GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
             self.update_nuxtjs_env()
         except:
             logging.error(traceback.format_exc())
-            return {"err": "file.permission", "msg": _(u"更新nuxtjs配置文件失败！请确保文件的权限为可写入！")}
+            return {
+                "err": "file.permission",
+                "msg": _("更新nuxtjs配置文件失败！请确保文件的权限为可写入！"),
+            }
 
         # don't update running environment for now
         args["installed"] = True
@@ -228,7 +256,10 @@ GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
             args.dumpfile()
         except:
             logging.error(traceback.format_exc())
-            return {"err": "file.permission", "msg": _(u"更新磁盘配置文件失败！请确保配置文件的权限为可写入！")}
+            return {
+                "err": "file.permission",
+                "msg": _("更新磁盘配置文件失败！请确保配置文件的权限为可写入！"),
+            }
 
         # ok, it's safe to update current environment
         CONF["installed"] = True
@@ -240,7 +271,7 @@ class AdminSettings(BaseHandler):
     @auth
     def get(self):
         if not self.admin_user:
-            return {"err": "permission", "msg": _(u"无权访问此接口")}
+            return {"err": "permission", "msg": _("无权访问此接口")}
 
         sns = [
             {"value": "qq", "text": "QQ", "link": "https://connect.qq.com/"},
@@ -256,12 +287,12 @@ class AdminSettings(BaseHandler):
             },
             {
                 "value": "weibo",
-                "text": u"微博",
+                "text": "微博",
                 "link": "http://open.weibo.com/developers",
             },
             {
                 "value": "wechat",
-                "text": u"微信",
+                "text": "微信",
                 "link": "https://developers.weixin.qq.com/doc/offiaccount/OA_Web_Apps/Wechat_webpage_authorization.html",
             },
         ]
@@ -297,6 +328,7 @@ class AdminSettings(BaseHandler):
             "SIGNUP_MAIL_TITLE",
             "SOCIALS",
             "SHOW_SIDEBAR_SYS",
+            "OPDS_ENABLED",
             "autoreload",
             "cookie_secret",
             "scan_upload_path",
@@ -347,7 +379,7 @@ class AdminInstall(BaseHandler):
     @js
     def post(self):
         if CONF.get("installed", True):
-            return {"err": "installed", "msg": _(u"不可重复执行安装操作")}
+            return {"err": "installed", "msg": _("不可重复执行安装操作")}
 
         code = self.get_argument("code", "").strip()
         email = self.get_argument("email", "").strip().lower()
@@ -356,13 +388,21 @@ class AdminInstall(BaseHandler):
         username = self.get_argument("username", "").strip().lower()
         password = self.get_argument("password", "").strip()
         if not username or not password or not email or not title:
-            return {"err": "params.invalid", "msg": _(u"填写的内容有误")}
+            return {"err": "params.invalid", "msg": _("填写的内容有误")}
         if not re.match(Reader.RE_EMAIL, email):
-            return {"err": "params.email.invalid", "msg": _(u"Email无效")}
-        if len(username) < 5 or len(username) > 20 or not re.match(Reader.RE_USERNAME, username):
-            return {"err": "params.username.invalid", "msg": _(u"用户名无效")}
-        if len(password) < 8 or len(password) > 20 or not re.match(Reader.RE_PASSWORD, password):
-            return {"err": "params.password.invalid", "msg": _(u"密码无效")}
+            return {"err": "params.email.invalid", "msg": _("Email无效")}
+        if (
+            len(username) < 5
+            or len(username) > 20
+            or not re.match(Reader.RE_USERNAME, username)
+        ):
+            return {"err": "params.username.invalid", "msg": _("用户名无效")}
+        if (
+            len(password) < 8
+            or len(password) > 20
+            or not re.match(Reader.RE_PASSWORD, password)
+        ):
+            return {"err": "params.password.invalid", "msg": _("密码无效")}
 
         # 避免重复创建
         user = self.session.query(Reader).filter(Reader.username == username).first()
@@ -374,7 +414,11 @@ class AdminInstall(BaseHandler):
 
         # 设置admin user的信息
         user.email = email
-        user.avatar = CONF["avatar_service"] + "/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
+        user.avatar = (
+            CONF["avatar_service"]
+            + "/avatar/"
+            + hashlib.md5(email.encode("UTF-8")).hexdigest()
+        )
         user.update_time = datetime.datetime.now()
         user.access_time = datetime.datetime.now()
         user.active = True
@@ -385,7 +429,7 @@ class AdminInstall(BaseHandler):
             user.save()
         except:
             logging.error(traceback.format_exc())
-            return {"err": "db.error", "msg": _(u"系统异常，请重试或更换注册信息")}
+            return {"err": "db.error", "msg": _("系统异常，请重试或更换注册信息")}
 
         args = loader.SettingsLoader()
         args.clear()
@@ -399,7 +443,7 @@ class AdminInstall(BaseHandler):
         args["BOOK_NAMES_FORMAT"] = "utf8"
 
         # set a random secret
-        args["cookie_secret"] = u"%s" % uuid.uuid1()
+        args["cookie_secret"] = "%s" % uuid.uuid1()
         args["site_title"] = title
         if invite == "true" and code:
             args["INVITE_MODE"] = True
@@ -464,7 +508,7 @@ class SSLHandlerLogic:
     def run(self, ssl_crt, ssl_key):
         err = self.check_ssl_chain(ssl_crt, ssl_key)
         if err is not None:
-            return {"err": "params.ssl_error", "msg": _(u"证书或密钥校验失败: %s" % err)}
+            return {"err": "params.ssl_error", "msg": _("证书或密钥校验失败: %s" % err)}
 
         try:
             self.save_files(ssl_crt, ssl_key)
@@ -472,19 +516,28 @@ class SSLHandlerLogic:
             import traceback
 
             logging.error(traceback.format_exc())
-            return {"err": "internal.ssl_save_error", "msg": _(u"证书存储失败: %s" % err)}
+            return {
+                "err": "internal.ssl_save_error",
+                "msg": _("证书存储失败: %s" % err),
+            }
 
         # testing nginx config
         try:
             self.nginx_check()
         except subprocess.CalledProcessError as err:
-            return {"err": "internal.nginx_test_error", "msg": _(u"NGINX配置异常: %s") % err}
+            return {
+                "err": "internal.nginx_test_error",
+                "msg": _("NGINX配置异常: %s") % err,
+            }
 
         # reload nginx config
         try:
             self.nginx_reload()
         except subprocess.CalledProcessError as err:
-            return {"err": "internal.nginx_reload_error", "msg": _(u"NGINX重新加载配置异常: %s") % err}
+            return {
+                "err": "internal.nginx_reload_error",
+                "msg": _("NGINX重新加载配置异常: %s") % err,
+            }
 
         return {"err": "ok"}
 
@@ -506,7 +559,7 @@ class AdminSSL(BaseHandler):
 
         logging.error("got request")
         if not self.is_admin():
-            return {"err": "permission", "msg": _(u"无权操作")}
+            return {"err": "permission", "msg": _("无权操作")}
 
         ssl_crt, ssl_key = self.get_upload_file()
         return logic.run(ssl_crt, ssl_key)
@@ -517,7 +570,7 @@ class AdminBookList(BaseHandler):
     @is_admin
     def get(self):
         if not self.admin_user:
-            return {"err": "permission.not_admin", "msg": _(u"当前用户非管理员")}
+            return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
 
         num = max(10, int(self.get_argument("num", 20)))
         page = max(0, int(self.get_argument("page", 1)) - 1)
@@ -539,7 +592,10 @@ class AdminBookList(BaseHandler):
         books = []
         page_ids = all_ids[start:end]
         if page_ids:
-            books = [SimpleBookFormatter(b, self.cdn_url).format() for b in self.get_books(ids=page_ids)]
+            books = [
+                SimpleBookFormatter(b, self.cdn_url).format()
+                for b in self.get_books(ids=page_ids)
+            ]
 
         return {"err": "ok", "items": books, "total": total}
 
@@ -563,19 +619,19 @@ class AdminBookFill(BaseHandler):
         req = tornado.escape.json_decode(self.request.body)
         idlist = req["idlist"]
         if not idlist:
-            return {"err": "params.error", "msg": _(u"参数错误")}
+            return {"err": "params.error", "msg": _("参数错误")}
 
         if idlist == "all":
             idlist = list(self.cache.search(""))
         elif isinstance(idlist, list):
             for bid in idlist:
                 if not isinstance(bid, int):
-                    return {"err": "params.error.idlist", "msg": _(u"idlist参数错误")}
+                    return {"err": "params.error.idlist", "msg": _("idlist参数错误")}
         else:
-            return {"err": "params.error.idlist", "msg": _(u"idlist参数错误")}
+            return {"err": "params.error.idlist", "msg": _("idlist参数错误")}
 
         AutoFillService().auto_fill_all(idlist)
-        return {"err": "ok", "msg": _(u"任务启动成功！请耐心等待，稍后再来刷新页面")}
+        return {"err": "ok", "msg": _("任务启动成功！请耐心等待，稍后再来刷新页面")}
 
 
 class AdminBookDelete(BaseHandler):
@@ -585,11 +641,14 @@ class AdminBookDelete(BaseHandler):
         req = tornado.escape.json_decode(self.request.body)
         idlist = req["idlist"]
         if not idlist or not isinstance(idlist, list):
-            return {"err": "params.error", "msg": _(u"参数错误，idlist必须是数组")}
+            return {"err": "params.error", "msg": _("参数错误，idlist必须是数组")}
 
         for bid in idlist:
             if not isinstance(bid, int):
-                return {"err": "params.error.idlist", "msg": _(u"idlist参数错误，必须是整数数组")}
+                return {
+                    "err": "params.error.idlist",
+                    "msg": _("idlist参数错误，必须是整数数组"),
+                }
 
         # 执行批量删除
         deleted_count = 0
@@ -603,7 +662,148 @@ class AdminBookDelete(BaseHandler):
                 continue
 
         # Cache对象会自动更新，不需要手动clean
-        return {"err": "ok", "msg": _(u"成功删除 {0} 本书籍".format(deleted_count))}
+        return {"err": "ok", "msg": _("成功删除 {0} 本书籍".format(deleted_count))}
+
+
+class AdminOPDSBrowse(BaseHandler):
+    """OPDS目录浏览接口"""
+
+    @js
+    @is_admin
+    def post(self):
+        try:
+            req = tornado.escape.json_decode(self.request.body)
+            host = req.get("host", "")
+            port = req.get("port", "")
+            path = req.get("path", "")
+
+            if not host:
+                return {"err": "params.error", "msg": _("参数错误，主机地址不能为空")}
+
+            logging.info(f"OPDS浏览请求: host={host}, port={port}, path={path}")
+
+            # 创建OPDS导入服务实例
+            opds_service = OPDSImportService()
+
+            # 浏览目录
+            result = opds_service.browse_opds_catalog(host, port, path)
+
+            if result.get("success"):
+                return {
+                    "err": "ok",
+                    "items": result["items"],
+                    "current_path": result["current_path"],
+                }
+            else:
+                return {"err": "error", "msg": result.get("error", _("浏览目录失败"))}
+
+        except Exception as e:
+            logging.error(f"OPDS目录浏览失败: {e}")
+            logging.error(traceback.format_exc())
+            return {"err": "error", "msg": _("浏览目录失败: {}").format(str(e))}
+
+
+class AdminOPDSImportStatus(BaseHandler):
+    """OPDS导入状态查询接口"""
+
+    @js
+    @is_admin
+    def get(self):
+        # 返回全局导入状态（单例模式）
+        from webserver.services.opds_import import OPDSImportService
+
+        opds_service = OPDSImportService.get_instance()
+        status = {
+            "total": opds_service.count_total,
+            "done": opds_service.count_done,
+            "skip": opds_service.count_skip,
+            "fail": opds_service.count_fail,
+        }
+        return {"err": "ok", "msg": "ok", "status": status}
+
+
+class AdminOPDSImport(BaseHandler):
+    """OPDS导入接口"""
+
+    @js
+    @is_admin
+    def post(self):
+        try:
+            req = tornado.escape.json_decode(self.request.body)
+            opds_url = req.get("opds_url", "")
+            books = req.get("books", [])
+            delete_after = req.get("delete_after", False)
+
+            if not opds_url:
+                return {"err": "params.error", "msg": _("参数错误，OPDS URL不能为空")}
+
+            logging.info(
+                f"OPDS导入请求: url={opds_url}, books={len(books)}本, delete_after={delete_after}"
+            )
+
+            # 在开始异步下载前，将选中书籍插入到待处理列表并标记为downloading
+            try:
+                if books:
+                    for b in books:
+                        href = b.get("href") or b.get("acquisition_link") or ""
+                        title = b.get("title", "")
+                        author = b.get("author", "")
+                        # 使用href生成唯一hash值
+                        if href:
+                            h = hashlib.sha256(href.encode("utf-8")).hexdigest()
+                        else:
+                            h = hashlib.sha256(
+                                (title + author + str(uuid.uuid4())).encode("utf-8")
+                            ).hexdigest()
+                        # 创建ScanFile记录，path暂存为href，status为downloading
+                        # ScanFile __init__ 接受 (path, hash_value, scan_id)
+                        sf = ScanFile(href, h[:64], 0)
+                        sf.title = title
+                        sf.author = author
+                        sf.status = "downloading"
+                        sf.create_time = datetime.datetime.now()
+                        sf.update_time = datetime.datetime.now()
+                        # 将原始链接存入data，便于后台任务使用
+                        sf.data = {"acquisition_link": href}
+                        self.session.add(sf)
+                    self.session.commit()
+            except Exception:
+                logging.error(traceback.format_exc())
+
+            # 启动异步导入任务
+            import threading
+
+            def import_task():
+                from webserver.services.opds_import import OPDSImportService
+
+                opds_service = OPDSImportService.get_instance()
+                opds_service.reset_counters()
+                if books:
+                    opds_service.import_selected_books(
+                        opds_url, self.user_id(), delete_after, books
+                    )
+                else:
+                    opds_service.import_from_opds(
+                        opds_url, self.user_id(), delete_after
+                    )
+
+            thread = threading.Thread(target=import_task, daemon=True)
+            thread.start()
+
+            # 立即返回，避免阻塞HTTP请求
+            if books:
+                msg = _("已开始异步导入选中的 {} 本书籍，请稍后查看进度").format(
+                    len(books)
+                )
+            else:
+                msg = _("已开始异步导入所有书籍，请稍后查看进度")
+
+            return {"err": "ok", "msg": msg, "async": True}
+
+        except Exception as e:
+            logging.error(f"OPDS导入失败: {e}")
+            logging.error(traceback.format_exc())
+            return {"err": "error", "msg": _("OPDS导入失败: {}").format(str(e))}
 
 
 def routes():
@@ -616,4 +816,7 @@ def routes():
         (r"/api/admin/book/list", AdminBookList),
         (r"/api/admin/book/fill", AdminBookFill),
         (r"/api/admin/book/delete", AdminBookDelete),
+        (r"/api/admin/opds/browse", AdminOPDSBrowse),
+        (r"/api/admin/opds/import", AdminOPDSImport),
+        (r"/api/admin/opds/import/status", AdminOPDSImportStatus),
     ]

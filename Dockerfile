@@ -1,6 +1,6 @@
 # ----------------------------------------
 # 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
-FROM node:16-alpine AS builder
+FROM node:20-alpine AS builder
 ARG BUILD_COUNTRY=""
 ARG TARGETARCH
 
@@ -18,9 +18,11 @@ COPY app/ /build/
 RUN mkdir -p /app-ssr/ /app-static/
 RUN npm run build
 RUN ls -al
-RUN cp -r .nuxt node_modules package* /app-ssr/
+RUN cp -r .output package* /app-ssr/
 RUN npm run build-spa
-RUN cp -r dist nuxt.config.js package* /app-static/
+RUN rm -rf dist && cp -r .output/public dist
+RUN if [ ! -f dist/index.html ]; then cp dist/200.html dist/index.html; fi
+RUN cp -r dist package* /app-static/
 
 
 # ----------------------------------------
@@ -150,11 +152,11 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
     chmod -R 0755 /var/lib/apt/lists/ && \
     apt-get update -y && \
     if [ "$TARGETARCH" = "amd64" ]; then \
-        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
     elif [ "$TARGETARCH" = "arm64" ]; then \
-        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
-    elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
-        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -; \
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
+    #elif [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+        #curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
     fi && \
     apt-get install -y nodejs && \
     apt-get clean && \
