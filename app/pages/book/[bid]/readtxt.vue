@@ -5,23 +5,25 @@
             :order="1"
             width="240"
         >
-            <v-list-subheader style="height: 48px">
+            <v-list-subheader
+                class="d-flex align-center px-4"
+                style="height: 48px; font-size: 14px; font-weight: 500;"
+            >
                 {{ name }}
             </v-list-subheader>
             <v-virtual-scroll
                 style="height: calc(100% - 48px)"
                 :items="content"
-                :item-height="40"
+                :item-height="48"
             >
                 <template #default="{ item, index }">
                     <v-list-item
                         :key="item.title"
-                        dense
                         :active="selected === index"
                         color="primary"
                         @click="getNovelContent(index)"
                     >
-                        <v-list-item-title>
+                        <v-list-item-title style="font-size: 13px; font-weight: 500;">
                             {{ item.title }}
                         </v-list-item-title>
                     </v-list-item>
@@ -45,7 +47,7 @@
             </v-toolbar-title>
         </v-app-bar>
 
-        <div style="margin-top: 64px;">
+        <div>
             <v-container>
                 <v-card
                     v-if="!inited"
