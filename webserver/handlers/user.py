@@ -43,7 +43,7 @@ class Done(BaseHandler):
     def get(self):
         user = self.update_userinfo()
         if not user.can_login():
-            raise web.HTTPError(403, log_message=_("无权登录"))
+            raise web.HTTPError(403, reason=_("无权登录"))
         self.login_user(user)
         url = self.get_secure_cookie(COOKIE_REDIRECT)
         self.clear_cookie(COOKIE_REDIRECT)
@@ -101,7 +101,7 @@ class SignUp(BaseHandler):
     def check_active_code(self, username, code):
         user = self.session.query(Reader).filter(Reader.username == username).first()
         if not user or code != user.get_active_code():
-            raise web.HTTPError(403, log_message=_("激活码无效"))
+            raise web.HTTPError(403, reason=_("激活码无效"))
         user.active = True
         user.save()
         return self.redirect("/active/success")

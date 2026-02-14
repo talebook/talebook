@@ -254,7 +254,7 @@ class BookRefer(BaseHandler):
         try:
             refer_mi = self.plugin_get_book_meta(provider_key, provider_value, mi)
         except RuntimeError as e:
-            return e.args[0]
+            return e.args[0] if e.args else {"err": "unknown.error", "msg": str(e)}
 
         cover_fallback = False
         if only_cover == "yes":
