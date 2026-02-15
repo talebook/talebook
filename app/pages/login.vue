@@ -217,6 +217,11 @@ const alert = ref({
 // 人机验证相关
 const captchaRef = ref(null);
 const captchaEnabled = ref(false);
+const captchaScenes = ref({
+    register: false,
+    login: false,
+    welcome: false
+});
 const captchaVerified = ref(false);
 const captchaData = ref(null);
 const showCaptchaDialog = ref(false);
@@ -247,6 +252,9 @@ const checkCaptchaEnabled = async () => {
     try {
         const rsp = await $backend('/captcha/config');
         captchaEnabled.value = rsp.config && rsp.config.enabled;
+        if (rsp.config && rsp.config.scenes) {
+            captchaScenes.value = rsp.config.scenes;
+        }
     } catch (e) {
         captchaEnabled.value = false;
     }
@@ -259,8 +267,8 @@ const onLoginClick = () => {
         alert.value.msg = t('errors.networkError');
         return;
     }
-    
-    if (captchaEnabled.value) {
+
+    if (captchaEnabled.value && captchaScenes.value.login) {
         // 显示验证码弹窗
         captchaVerified.value = false;
         captchaData.value = null;

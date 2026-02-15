@@ -165,6 +165,11 @@ const loading = ref(false);
 // 人机验证相关
 const captchaRef = ref(null);
 const captchaEnabled = ref(false);
+const captchaScenes = ref({
+    register: false,
+    login: false,
+    welcome: false
+});
 const captchaVerified = ref(false);
 const captchaData = ref(null);
 const showCaptchaDialog = ref(false);
@@ -173,13 +178,26 @@ const showCaptchaDialog = ref(false);
 const showNavbar = true; // 后期可通过配置或环境变量控制
 store.setNavbar(showNavbar);
 
+// 与后端保持一致的验证规则
+const RE_USERNAME = /^[a-z][a-z0-9_]*$/;
+const RE_PASSWORD = /^[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};':",./<>?|]*$/;
+const RE_EMAIL = /^[^@]+@[^@]+\.[^@]+$/;
+
 const rules = {
-    user: v => ( v && 20 >= v.length && v.length >= 5) || t('validation.usernameLength'),
-    pass: v => ( v && 20 >= v.length && v.length >= 8) || t('validation.passwordLength'),
+    user: v => {
+        if (!v || v.length < 5 || v.length > 20) return t('validation.usernameLength');
+        if (!RE_USERNAME.test(v)) return t('validation.usernameFormat');
+        return true;
+    },
+    pass: v => {
+        if (!v || v.length < 8 || v.length > 20) return t('validation.passwordLength');
+        if (!RE_PASSWORD.test(v)) return t('validation.passwordFormat');
+        return true;
+    },
     nick: v => (v && v.length >= 2) || t('validation.nickLength'),
-    email: function (email) {
-        var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-        return re.test(email) || t('validation.emailInvalid');
+    email: v => {
+        if (!v) return t('validation.emailInvalid');
+        return RE_EMAIL.test(v) || t('validation.emailInvalid');
     },
 };
 
@@ -209,6 +227,9 @@ const checkCaptchaEnabled = async () => {
     try {
         const rsp = await $backend('/captcha/config');
         captchaEnabled.value = rsp.config && rsp.config.enabled;
+        if (rsp.config && rsp.config.scenes) {
+            captchaScenes.value = rsp.config.scenes;
+        }
     } catch (e) {
         captchaEnabled.value = false;
     }
@@ -218,8 +239,8 @@ const checkCaptchaEnabled = async () => {
 const onSignupClick = async () => {
     const { valid } = await form.value.validate();
     if (!valid) return;
-    
-    if (captchaEnabled.value) {
+
+    if (captchaEnabled.value && captchaScenes.value.register) {
         // 显示验证码弹窗
         captchaVerified.value = false;
         captchaData.value = null;

@@ -111,4 +111,10 @@ def get_captcha_config(settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     config = provider.get_frontend_config()
     config["enabled"] = True
+    # 添加各场景的启用状态
+    config["scenes"] = {
+        "register": is_captcha_enabled(settings, "register"),
+        "login": is_captcha_enabled(settings, "login"),
+        "welcome": is_captcha_enabled(settings, "welcome"),
+    }
     return config

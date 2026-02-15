@@ -273,7 +273,9 @@
   },
   "validation": {
     "usernameLength": "Username must be between 5 and 20 characters",
+    "usernameFormat": "Username must start with a lowercase letter and can only contain lowercase letters, numbers, and underscores",
     "passwordLength": "Password must be between 8 and 20 characters",
+    "passwordFormat": "Password contains invalid characters",
     "nickLength": "Nickname must be at least 2 characters",
     "emailInvalid": "Invalid email format",
     "passwordMismatch": "Passwords do not match"

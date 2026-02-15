@@ -157,6 +157,11 @@ const invite_code = ref('');
 // 人机验证相关
 const captchaRef = ref(null);
 const captchaEnabled = ref(false);
+const captchaScenes = ref({
+    register: false,
+    login: false,
+    welcome: false
+});
 const captchaVerified = ref(false);
 const captchaData = ref(null);
 const showCaptchaDialog = ref(false);
@@ -171,6 +176,19 @@ const { data: welcomeData } = useAsyncData('welcome', async () => {
         return { err: 'error', msg: '网络错误' };
     }
 });
+
+// 检查是否启用了验证码
+const checkCaptchaEnabled = async () => {
+    try {
+        const rsp = await $backend('/captcha/config');
+        captchaEnabled.value = rsp.config && rsp.config.enabled;
+        if (rsp.config && rsp.config.scenes) {
+            captchaScenes.value = rsp.config.scenes;
+        }
+    } catch (e) {
+        captchaEnabled.value = false;
+    }
+};
 
 // 修复2: 使用 watch 监听数据变化
 watch(welcomeData, (newData) => {
@@ -188,16 +206,6 @@ watch(welcomeData, (newData) => {
     }
 }, { immediate: true });
 
-// 检查是否启用了验证码
-const checkCaptchaEnabled = async () => {
-    try {
-        const rsp = await $backend('/captcha/config');
-        captchaEnabled.value = rsp.config && rsp.config.enabled;
-    } catch (e) {
-        captchaEnabled.value = false;
-    }
-};
-
 // 点击欢迎页登录按钮
 const onWelcomeClick = () => {
     if (!invite_code.value.trim()) {
@@ -205,8 +213,8 @@ const onWelcomeClick = () => {
         msg.value = t('welcomePage.inputPrompt');
         return;
     }
-    
-    if (captchaEnabled.value) {
+
+    if (captchaEnabled.value && captchaScenes.value.welcome) {
         // 显示验证码弹窗
         captchaVerified.value = false;
         captchaData.value = null;

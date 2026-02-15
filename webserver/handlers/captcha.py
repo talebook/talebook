@@ -24,7 +24,15 @@ else:
     logging.info("CAPTCHA disabled")
 
 
-class CaptchaConfigHandler(BaseHandler):
+class CaptchaBaseHandler(BaseHandler):
+    """验证码基类 - 不需要邀请验证"""
+
+    def should_be_invited(self):
+        # 验证码接口不需要邀请验证
+        pass
+
+
+class CaptchaConfigHandler(CaptchaBaseHandler):
     """获取验证码配置（前端初始化用）"""
 
     @js
@@ -34,7 +42,7 @@ class CaptchaConfigHandler(BaseHandler):
         return {"err": "ok", "config": config}
 
 
-class CaptchaVerifyHandler(BaseHandler):
+class CaptchaVerifyHandler(CaptchaBaseHandler):
     """验证码二次验证接口（供前端测试用）"""
 
     @js

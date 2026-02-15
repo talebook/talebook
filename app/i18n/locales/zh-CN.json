@@ -278,7 +278,9 @@
   },
   "validation": {
     "usernameLength": "用户名长度必须在5-20个字符之间",
+    "usernameFormat": "用户名必须以小写字母开头，只能包含小写字母、数字和下划线",
     "passwordLength": "密码长度必须在8-20个字符之间",
+    "passwordFormat": "密码包含非法字符",
     "nickLength": "昵称长度至少为2个字符",
     "emailInvalid": "邮箱格式不正确",
     "passwordMismatch": "两次输入的密码不一致"
