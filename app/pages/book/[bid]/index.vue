@@ -246,7 +246,7 @@
                             color="primary"
                             variant="elevated"
                             class="mx-2"
-                            :href="'/read/' + book.id"
+                            :href="is_txt ? '/book/' + book.id + '/readtxt' : '/read/' + book.id"
                             target="_blank"
                         >
                             <v-icon start>
@@ -430,6 +430,7 @@
             <v-col cols="12">
                 <v-row justify="space-around">
                     <v-col
+                        v-if="!is_txt"
                         cols="12"
                         sm="6"
                         md="auto"
