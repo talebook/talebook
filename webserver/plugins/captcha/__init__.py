@@ -6,7 +6,7 @@
 """
 
 import logging
-from typing import Dict, Any, Optional, Type
+from typing import Dict, Any, Optional
 
 from .base import BaseCaptchaProvider
 from .geetest import GeetestProvider

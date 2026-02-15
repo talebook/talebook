@@ -4,7 +4,6 @@
 人机验证相关接口
 """
 
-import logging
 from gettext import gettext as _
 
 from webserver import loader

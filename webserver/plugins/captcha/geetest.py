@@ -7,7 +7,7 @@
 import hmac
 import json
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 import requests
 
