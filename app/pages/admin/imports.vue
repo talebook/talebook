@@ -118,6 +118,7 @@
             :items-length="total"
             :loading="loading"
             :items-per-page="itemsPerPage"
+            :items-per-page-options="[{value: 10, title: '10'}, {value: 25, title: '25'}, {value: 50, title: '50'}, {value: 100, title: '100'}, {value: -1, title: t('common.all')}]"
             @update:options="updateOptions"
         >
             <template #item.status="{ item }">
@@ -796,6 +797,10 @@ const import_status = ref({});
 
 const updateOptions = (newOptions) => {
     options.value = newOptions;
+    // 同步更新 itemsPerPage，确保用户选择"全部"时能正确显示
+    if (newOptions.itemsPerPage !== undefined) {
+        itemsPerPage.value = newOptions.itemsPerPage;
+    }
     getDataFromApi();
 };
 

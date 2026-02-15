@@ -24,7 +24,8 @@
     "done": "Done",
     "manage": "Manage",
     "read": "Read",
-    "retry": "Retry"
+    "retry": "Retry",
+    "all": "All"
   },
   "book": {
     "publisher": "Publisher",

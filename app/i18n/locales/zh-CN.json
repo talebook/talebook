@@ -24,7 +24,8 @@
     "book": "书籍",
     "done": "完成",
     "manage": "管理",
-    "retry": "重试"
+    "retry": "重试",
+    "all": "全部"
   },
   "error": {
     "otherError": "其他错误",
