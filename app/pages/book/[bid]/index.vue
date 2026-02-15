@@ -321,13 +321,9 @@
                                     </p>
                                     <span class="text-grey">{{ book.author }}著，{{ pub_year }}年版</span>
                                     <span
-                                        v-if="book.files && book.files.length > 0 && book.files[0].format === 'PDF' && book.files[0].size >= 1048576"
+                                        v-if="book.files && book.files.length > 0"
                                         class="text-grey font-weight-bold"
-                                    >&nbsp;&nbsp;&nbsp;[文件格式: PDF - {{ parseInt(book.files[0].size / 1048576) }}MB]</span>
-                                    <span
-                                        v-else-if="book.files && book.files.length > 0 && book.files[0].format === 'PDF' && book.files[0].size < 1048576"
-                                        class="text-grey font-weight-bold"
-                                    >&nbsp;&nbsp;&nbsp;[文件格式: PDF - {{ parseInt(book.files[0].size / 1024) }}KB]</span>
+                                    >&nbsp;&nbsp;&nbsp;[{{ book.files.map(f => f.format).join(', ') }}<span v-if="book.files[0].size >= 1048576"> - {{ parseInt(book.files[0].size / 1048576) }}MB</span><span v-else-if="book.files[0].size > 0"> - {{ parseInt(book.files[0].size / 1024) }}KB</span>]</span>
                                 </div>
                                 <v-rating
                                     v-model="book.rating"
