@@ -402,7 +402,8 @@
         "bookInfoSources": "Book Info Sources",
         "advancedSettings": "Advanced Settings",
         "sslManagement": "SSL Management",
-        "opdsSettings": "OPDS Settings"
+        "opdsSettings": "OPDS Settings",
+        "captchaSettings": "CAPTCHA Settings"
       },
       "button": {
         "saveSettings": "Save Settings",
@@ -450,7 +451,13 @@
         "keyAppid": "Key/AppID",
         "secretKey": "Secret/Key",
         "selectSocialAccounts": "Select social network accounts to enable",
-        "configurationGuide": "Configuration Guide"
+        "configurationGuide": "Configuration Guide",
+        "captchaProvider": "CAPTCHA Provider",
+        "captchaEnableForRegister": "Enable for Registration",
+        "captchaEnableForLogin": "Enable for Login",
+        "captchaEnableForWelcome": "Enable for Private Library",
+        "geetestCaptchaId": "GeeTest Captcha ID",
+        "geetestCaptchaKey": "GeeTest Captcha Key"
       },
       "option": {
         "ssl": "SSL",
@@ -458,7 +465,9 @@
         "pinyinDir": "Use Pinyin directory names (better compatibility)",
         "chineseDir": "Use Chinese directory names (UTF8, more beautiful)",
         "oldEpubReader": "Epub Reader (Old Version)",
-        "candleReader": "Candle Reader (Beta, supports chapter comments)"
+        "candleReader": "Candle Reader (Beta, supports chapter comments)",
+        "none": "Disabled",
+        "geetest": "GeeTest"
       },
       "message": {
         "emailServiceInfo": "Email registration and Kindle push rely on this configuration (SMTP server address can include port or not, default is 465)",
@@ -470,7 +479,8 @@
         "saveSuccess": "Saved successfully",
         "goTo": "Please go to",
         "configurationPage": "developer configuration page",
-        "getKeysAndSetCallback": ", get the keys and set the callback address to:"
+        "getKeysAndSetCallback": ", get the keys and set the callback address to:",
+        "captchaInfo": "When enabled, users need to complete CAPTCHA verification on corresponding pages. Currently supports GeeTest."
       }
     },
     "users": {
@@ -573,6 +583,13 @@
     "configWriteSuccess": "Configuration written successfully!",
     "checkingServer": "Checking server...",
     "networkError": "Network error"
+  },
+  "captcha": {
+    "title": "CAPTCHA",
+    "loading": "Loading...",
+    "verifyFailed": "Verification failed, please try again",
+    "pleaseComplete": "Please complete the CAPTCHA",
+    "loadFailed": "Failed to load CAPTCHA"
   },
   "$vuetify": {
     "noDataText": "No data",

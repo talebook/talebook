@@ -77,6 +77,14 @@
                                 autocomplete="new-email"
                                 :rules="[rules.email]"
                             />
+                            <!-- 人机验证组件 -->
+                            <CaptchaWidget
+                                v-if="captchaEnabled"
+                                ref="captchaRef"
+                                scene="register"
+                                @verify="onCaptchaVerify"
+                                @error="onCaptchaError"
+                            />
                             <div
                                 align="center"
                                 class="mt-4"
@@ -88,6 +96,7 @@
                                     color="red"
                                     type="submit"
                                     :loading="loading"
+                                    :disabled="captchaEnabled && !captchaVerified"
                                 >
                                     {{ t('auth.signUp') }}
                                 </v-btn>
@@ -113,6 +122,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
 import { useI18n } from 'vue-i18n';
+import CaptchaWidget from '~/components/CaptchaWidget.vue';
 
 const router = useRouter();
 const store = useMainStore();
@@ -127,6 +137,12 @@ const nickname = ref('');
 const email = ref('');
 const failmsg = ref('');
 const loading = ref(false);
+
+// 人机验证相关
+const captchaRef = ref(null);
+const captchaEnabled = ref(false);
+const captchaVerified = ref(false);
+const captchaData = ref(null);
 
 // 控制是否显示导航栏（可作为开关使用）
 const showNavbar = true; // 后期可通过配置或环境变量控制
@@ -159,7 +175,31 @@ onMounted(async () => {
     } catch (e) {
         console.error(e);
     }
+    // 检查是否启用了验证码
+    checkCaptchaEnabled();
 });
+
+// 检查是否启用了验证码
+const checkCaptchaEnabled = async () => {
+    try {
+        const rsp = await $backend('/captcha/config');
+        captchaEnabled.value = rsp.config && rsp.config.enabled;
+    } catch (e) {
+        captchaEnabled.value = false;
+    }
+};
+
+// 验证码验证成功回调
+const onCaptchaVerify = (data) => {
+    captchaData.value = data;
+    captchaVerified.value = true;
+};
+
+// 验证码错误回调
+const onCaptchaError = (msg) => {
+    captchaVerified.value = false;
+    failmsg.value = msg;
+};
 
 const signup = async () => {
     const { valid } = await form.value.validate();
@@ -174,6 +214,14 @@ const signup = async () => {
     data.append('nickname', nickname.value);
     data.append('email', email.value);
     
+    // 添加验证码参数
+    if (captchaEnabled.value && captchaData.value) {
+        data.append('lot_number', captchaData.value.lot_number);
+        data.append('captcha_output', captchaData.value.captcha_output);
+        data.append('pass_token', captchaData.value.pass_token);
+        data.append('gen_time', captchaData.value.gen_time);
+    }
+    
     try {
         const rsp = await $backend('/user/sign_up', {
             method: 'POST',
@@ -182,6 +230,12 @@ const signup = async () => {
         
         if ( rsp.err != 'ok' ) {
             failmsg.value = rsp.msg;
+            // 重置验证码
+            if (captchaEnabled.value && captchaRef.value) {
+                captchaRef.value.reset();
+                captchaVerified.value = false;
+                captchaData.value = null;
+            }
         } else {
             store.setNavbar(true);
             router.push('/');

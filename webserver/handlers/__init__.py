@@ -10,6 +10,7 @@ def routes():
     from . import opds
     from . import admin
     from . import scan
+    from . import captcha
 
     routes = []
     routes += admin.routes()
@@ -19,4 +20,5 @@ def routes():
     routes += user.routes()
     routes += meta.routes()
     routes += files.routes()
+    routes += captcha.routes()
     return routes

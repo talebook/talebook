@@ -14,9 +14,42 @@ from webserver.services.mail import MailService
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import Message, Reader
 from webserver.version import VERSION
+from webserver.plugins import captcha as captcha_module
 
 CONF = loader.get_settings()
 COOKIE_REDIRECT = "login_redirect"
+
+
+def check_captcha(handler, scene):
+    """
+    检查验证码
+    :param handler: RequestHandler 实例
+    :param scene: 场景名称 (register, login, welcome)
+    :return: (bool, str) - (是否通过, 错误信息)
+    """
+    if not captcha_module.is_captcha_enabled(CONF, scene):
+        return True, None
+    
+    lot_number = handler.get_argument("lot_number", "")
+    captcha_output = handler.get_argument("captcha_output", "")
+    pass_token = handler.get_argument("pass_token", "")
+    gen_time = handler.get_argument("gen_time", "")
+    
+    if not all([lot_number, captcha_output, pass_token, gen_time]):
+        return False, _("请完成人机验证")
+    
+    result = captcha_module.verify_captcha(
+        CONF,
+        lot_number=lot_number,
+        captcha_output=captcha_output,
+        pass_token=pass_token,
+        gen_time=gen_time,
+    )
+    
+    if result:
+        return True, None
+    else:
+        return False, _("人机验证失败，请重试")
 
 
 class Done(BaseHandler):
@@ -126,6 +159,11 @@ class SignUp(BaseHandler):
         if not CONF["ALLOW_REGISTER"]:
             return {"err": "register.disabled", "msg": _("注册功能已关闭")}
 
+        # 检查人机验证
+        passed, msg = check_captcha(self, 'register')
+        if not passed:
+            return {"err": "captcha.invalid", "msg": msg}
+
         email = self.get_argument("email", "").strip()
         nickname = self.get_argument("nickname", "").strip()
         username = self.get_argument("username", "").strip().lower()
@@ -199,6 +237,11 @@ class UserActive(SignUp):
 class SignIn(BaseHandler):
     @js
     def post(self):
+        # 检查人机验证
+        passed, msg = check_captcha(self, 'login')
+        if not passed:
+            return {"err": "captcha.invalid", "msg": msg}
+
         username = self.get_argument("username", "").strip().lower()
         password = self.get_argument("password", "").strip()
         if not username or not password:
@@ -455,6 +498,11 @@ class Welcome(BaseHandler):
 
     @js
     def post(self):
+        # 检查人机验证
+        passed, msg = check_captcha(self, 'welcome')
+        if not passed:
+            return {"err": "captcha.invalid", "msg": msg}
+
         code = self.get_argument("invite_code", None)
         if not code or code != CONF["INVITE_CODE"]:
             return {"err": "params.invalid", "msg": _("访问码无效")}

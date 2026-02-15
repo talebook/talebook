@@ -124,6 +124,14 @@ settings = {
     'SIDEBAR_EXTRA_HTML': '<img class="ma-auto footer-logo" style="max-width: 130px; height: auto;" src="/logo/link.png">',
     'SHOW_SIDEBAR_SYS': True,
 
+    # 人机验证配置
+    'CAPTCHA_PROVIDER': '',  # 验证提供商，可选值: 'geetest' 或空字符串表示不启用
+    'CAPTCHA_ENABLE_FOR_REGISTER': False,  # 注册界面启用认证
+    'CAPTCHA_ENABLE_FOR_LOGIN': False,     # 登录页面启用认证
+    'CAPTCHA_ENABLE_FOR_WELCOME': False,   # 私人图书馆界面启用认证
+    'GEETEST_CAPTCHA_ID': '',              # 极验 Captcha ID (公钥)
+    'GEETEST_CAPTCHA_KEY': '',             # 极验 Captcha Key (私钥)
+
     'FRIENDS': [
         { "text": u"鸠摩搜索", "href": "https://www.jiumodiary.com/" },
         { "text": u"追更神器", "href": "https://github.com/hectorqin/reader" },

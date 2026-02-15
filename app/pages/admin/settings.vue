@@ -109,6 +109,7 @@
                             :key="g.label"
                         >
                             <v-checkbox
+                                v-if="!g.show_when || g.show_when()"
                                 v-model="settings[g.key]"
                                 density="compact"
                                 hide-details
@@ -116,7 +117,7 @@
                                 color="primary"
                             />
                             <div
-                                v-if="settings[g.key]"
+                                v-if="settings[g.key] && g.fields"
                                 class="ml-4 pl-4 border-left"
                             >
                                 <template
@@ -137,6 +138,26 @@
                                         :prepend-icon="f.icon"
                                         :label="f.label"
                                         type="text"
+                                    />
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- 人机验证配置字段 -->
+                        <template v-if="card.captcha_fields && settings.CAPTCHA_PROVIDER">
+                            <div class="mt-4 pa-2 border rounded">
+                                <template
+                                    v-for="f in card.captcha_fields"
+                                    :key="f.key"
+                                >
+                                    <v-text-field
+                                        v-model="settings[f.key]"
+                                        density="compact"
+                                        hide-details
+                                        class="mb-2"
+                                        :prepend-icon="f.icon"
+                                        :label="f.label"
+                                        :type="f.type || 'text'"
                                     />
                                 </template>
                             </div>
@@ -305,7 +326,14 @@ const cardShows = ref({
     advancedSettings: false,
     sslManagement: false,
     opdsSettings: false,
+    captchaSettings: false,
 });
+
+// 人机验证提供商选项
+const captchaProviders = [
+    { text: t('admin.settings.option.none'), value: '' },
+    { text: t('admin.settings.option.geetest'), value: 'geetest' },
+];
 
 const cards = computed(() => [
     {
@@ -451,6 +479,41 @@ const cards = computed(() => [
             {
                 text: t('admin.settings.message.opdsInfo'),
             }
+        ],
+    },
+    {
+        key: 'captchaSettings',
+        title: t('admin.settings.section.captchaSettings'),
+        subtitle: t('admin.settings.message.captchaInfo'),
+        fields: [
+            { 
+                icon: 'mdi-shield-check', 
+                key: 'CAPTCHA_PROVIDER', 
+                label: t('admin.settings.label.captchaProvider'), 
+                type: 'select',
+                items: captchaProviders
+            },
+        ],
+        groups: [
+            {
+                key: 'CAPTCHA_ENABLE_FOR_REGISTER',
+                label: t('admin.settings.label.captchaEnableForRegister'),
+                show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest',
+            },
+            {
+                key: 'CAPTCHA_ENABLE_FOR_LOGIN',
+                label: t('admin.settings.label.captchaEnableForLogin'),
+                show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest',
+            },
+            {
+                key: 'CAPTCHA_ENABLE_FOR_WELCOME',
+                label: t('admin.settings.label.captchaEnableForWelcome'),
+                show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest',
+            },
+        ],
+        captcha_fields: [
+            { icon: 'mdi-key', key: 'GEETEST_CAPTCHA_ID', label: t('admin.settings.label.geetestCaptchaId') },
+            { icon: 'mdi-lock', key: 'GEETEST_CAPTCHA_KEY', label: t('admin.settings.label.geetestCaptchaKey'), type: 'password' },
         ],
     },
 ]);

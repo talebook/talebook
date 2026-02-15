@@ -17,6 +17,41 @@
                     <v-toolbar-title align-center>
                         {{ t('welcomePage.inputTitle') }}
                     </v-toolbar-title>
+                    <v-spacer />
+                    <!-- 多语言切换入口 -->
+                    <v-menu
+                        offset-y
+                        right
+                    >
+                        <template #activator="{ props }">
+                            <v-btn
+                                v-bind="props"
+                                icon
+                                variant="text"
+                                color="white"
+                            >
+                                <v-icon>mdi-translate</v-icon>
+                            </v-btn>
+                        </template>
+                        <v-list min-width="240">
+                            <v-list-item
+                                v-for="localeItem in allLocales"
+                                :key="localeItem.code"
+                                :active="localeItem.code === locale"
+                                @click="setLocale(localeItem.code)"
+                            >
+                                <template #prepend>
+                                    <v-icon v-if="localeItem.code === locale">
+                                        mdi-check
+                                    </v-icon>
+                                    <v-icon v-else>
+                                        mdi-translate
+                                    </v-icon>
+                                </template>
+                                <v-list-item-title>{{ localeItem.name }}</v-list-item-title>
+                            </v-list-item>
+                        </v-list>
+                    </v-menu>
                 </v-toolbar>
                 <v-card-text>
                     <p class="py-6 body-3 text-center">
@@ -32,6 +67,14 @@
                             :error="is_err"
                             :error-messages="is_err ? msg : ''"
                             :loading="loading"
+                        />
+                        <!-- 人机验证组件 -->
+                        <CaptchaWidget
+                            v-if="captchaEnabled"
+                            ref="captchaRef"
+                            scene="welcome"
+                            @verify="onCaptchaVerify"
+                            @error="onCaptchaError"
                         />
                         <p
                             v-if="!is_err && msg"
@@ -58,17 +101,23 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 import { useI18n } from 'vue-i18n';
+import CaptchaWidget from '~/components/CaptchaWidget.vue';
 
 const router = useRouter();
 const route = useRoute();
 const store = useMainStore();
-const { t } = useI18n();
+const { t, locale, locales, setLocale } = useI18n();
 const { $backend } = useNuxtApp();
+
+// 多语言相关
+const allLocales = computed(() => {
+    return locales.value || [];
+});
 
 definePageMeta({
     layout: 'blank'
@@ -79,6 +128,12 @@ const msg = ref('');
 const welcome = ref(t('welcomePage.welcomeText'));
 const loading = ref(false);
 const invite_code = ref('');
+
+// 人机验证相关
+const captchaRef = ref(null);
+const captchaEnabled = ref(false);
+const captchaVerified = ref(false);
+const captchaData = ref(null);
 
 // 修复1: 移除 await，正确使用 useAsyncData
 const { data: welcomeData } = useAsyncData('welcome', async () => {
@@ -102,13 +157,45 @@ watch(welcomeData, (newData) => {
         } else if (newData.err === 'not_installed') {
             router.push('/install');
         }
+        // 检查是否启用了验证码
+        checkCaptchaEnabled();
     }
 }, { immediate: true });
+
+// 检查是否启用了验证码
+const checkCaptchaEnabled = async () => {
+    try {
+        const rsp = await $backend('/captcha/config');
+        captchaEnabled.value = rsp.config && rsp.config.enabled;
+    } catch (e) {
+        captchaEnabled.value = false;
+    }
+};
+
+// 验证码验证成功回调
+const onCaptchaVerify = (data) => {
+    captchaData.value = data;
+    captchaVerified.value = true;
+};
+
+// 验证码错误回调
+const onCaptchaError = (errorMsg) => {
+    captchaVerified.value = false;
+    is_err.value = true;
+    msg.value = errorMsg;
+};
 
 const welcome_login = async () => {
     if (!invite_code.value.trim()) {
         is_err.value = true;
         msg.value = t('welcomePage.inputPrompt');
+        return;
+    }
+    
+    // 检查验证码
+    if (captchaEnabled.value && !captchaVerified.value) {
+        is_err.value = true;
+        msg.value = t('captcha.pleaseComplete');
         return;
     }
     
@@ -119,6 +206,14 @@ const welcome_login = async () => {
     const data = new URLSearchParams();
     data.append('invite_code', invite_code.value);
     
+    // 添加验证码参数
+    if (captchaEnabled.value && captchaData.value) {
+        data.append('lot_number', captchaData.value.lot_number);
+        data.append('captcha_output', captchaData.value.captcha_output);
+        data.append('pass_token', captchaData.value.pass_token);
+        data.append('gen_time', captchaData.value.gen_time);
+    }
+    
     try {
         const rsp = await $backend('/welcome', {
             method: 'POST',
@@ -128,6 +223,12 @@ const welcome_login = async () => {
         if (rsp.err !== 'ok') {
             is_err.value = true;
             msg.value = rsp.msg || t('welcomePage.invalidCode');
+            // 重置验证码
+            if (captchaEnabled.value && captchaRef.value) {
+                captchaRef.value.reset();
+                captchaVerified.value = false;
+                captchaData.value = null;
+            }
         } else {
             is_err.value = false;
             msg.value = t('welcomePage.successRedirect');
