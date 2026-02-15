@@ -13,7 +13,7 @@ from .geetest import GeetestProvider
 
 # 注册所有可用的验证提供商
 _CAPTCHA_PROVIDERS = {
-    'geetest': GeetestProvider,
+    "geetest": GeetestProvider,
 }
 
 # 全局缓存
@@ -27,7 +27,7 @@ def get_available_providers() -> Dict[str, str]:
     :return: 提供商名称和显示名称的映射
     """
     return {
-        'geetest': 'GeeTest (极验)',
+        "geetest": "GeeTest (极验)",
     }
 
 
@@ -38,25 +38,25 @@ def get_captcha_provider(settings: Dict[str, Any]) -> Optional[BaseCaptchaProvid
     :return: 验证提供商实例，如果未配置则返回 None
     """
     global _current_provider, _current_provider_name
-    
-    provider_name = settings.get('CAPTCHA_PROVIDER', '')
-    
+
+    provider_name = settings.get("CAPTCHA_PROVIDER", "")
+
     # 如果未启用验证，返回 None
     if not provider_name:
         _current_provider = None
         _current_provider_name = None
         return None
-    
+
     # 如果提供商未改变，返回缓存的实例
     if _current_provider_name == provider_name and _current_provider is not None:
         return _current_provider
-    
+
     # 获取提供商类
     provider_class = _CAPTCHA_PROVIDERS.get(provider_name)
     if not provider_class:
         logging.error(f"Unknown captcha provider: {provider_name}")
         return None
-    
+
     # 创建新实例
     try:
         _current_provider = provider_class(settings)
@@ -91,7 +91,7 @@ def verify_captcha(settings: Dict[str, Any], **kwargs) -> bool:
     if not provider:
         # 未配置验证提供商，默认通过
         return True
-    
+
     return provider.verify(**kwargs)
 
 
@@ -104,11 +104,11 @@ def get_captcha_config(settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     provider = get_captcha_provider(settings)
     if not provider:
         return None
-    
+
     if not provider.is_configured():
         logging.warning(f"Captcha provider {provider.name} is not configured properly")
         return None
-    
+
     config = provider.get_frontend_config()
-    config['enabled'] = True
+    config["enabled"] = True
     return config

@@ -29,15 +29,15 @@ def check_captcha(handler, scene):
     """
     if not captcha_module.is_captcha_enabled(CONF, scene):
         return True, None
-    
+
     lot_number = handler.get_argument("lot_number", "")
     captcha_output = handler.get_argument("captcha_output", "")
     pass_token = handler.get_argument("pass_token", "")
     gen_time = handler.get_argument("gen_time", "")
-    
+
     if not all([lot_number, captcha_output, pass_token, gen_time]):
         return False, _("请完成人机验证")
-    
+
     result = captcha_module.verify_captcha(
         CONF,
         lot_number=lot_number,
@@ -45,7 +45,7 @@ def check_captcha(handler, scene):
         pass_token=pass_token,
         gen_time=gen_time,
     )
-    
+
     if result:
         return True, None
     else:
@@ -160,7 +160,7 @@ class SignUp(BaseHandler):
             return {"err": "register.disabled", "msg": _("注册功能已关闭")}
 
         # 检查人机验证
-        passed, msg = check_captcha(self, 'register')
+        passed, msg = check_captcha(self, "register")
         if not passed:
             return {"err": "captcha.invalid", "msg": msg}
 
@@ -238,7 +238,7 @@ class SignIn(BaseHandler):
     @js
     def post(self):
         # 检查人机验证
-        passed, msg = check_captcha(self, 'login')
+        passed, msg = check_captcha(self, "login")
         if not passed:
             return {"err": "captcha.invalid", "msg": msg}
 
@@ -499,7 +499,7 @@ class Welcome(BaseHandler):
     @js
     def post(self):
         # 检查人机验证
-        passed, msg = check_captcha(self, 'welcome')
+        passed, msg = check_captcha(self, "welcome")
         if not passed:
             return {"err": "captcha.invalid", "msg": msg}
 

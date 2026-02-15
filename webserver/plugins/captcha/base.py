@@ -11,20 +11,20 @@ from typing import Dict, Any, Optional
 
 class BaseCaptchaProvider(ABC):
     """人机验证提供商抽象基类"""
-    
+
     # 提供商名称标识
     name = ""
-    
+
     # 前端SDK URL
     sdk_url = ""
-    
+
     def __init__(self, settings: Dict[str, Any]):
         """
         初始化验证提供商
         :param settings: 系统配置字典
         """
         self.settings = settings
-    
+
     @abstractmethod
     def is_configured(self) -> bool:
         """
@@ -32,7 +32,7 @@ class BaseCaptchaProvider(ABC):
         :return: True 如果已配置，False 否则
         """
         pass
-    
+
     @abstractmethod
     def get_frontend_config(self) -> Dict[str, Any]:
         """
@@ -40,7 +40,7 @@ class BaseCaptchaProvider(ABC):
         :return: 前端初始化需要的配置字典
         """
         pass
-    
+
     @abstractmethod
     def verify(self, **kwargs) -> bool:
         """
@@ -49,7 +49,7 @@ class BaseCaptchaProvider(ABC):
         :return: True 验证通过，False 验证失败
         """
         pass
-    
+
     def is_enabled_for(self, scene: str) -> bool:
         """
         检查某场景是否启用了验证
