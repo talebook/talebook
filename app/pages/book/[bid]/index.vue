@@ -218,7 +218,7 @@
                     <v-toolbar
                         flat
                         density="compact"
-                        color="white"
+                        :color="store.theme === 'light' ? 'white' : 'grey-darken-4'"
                     >
                         <v-btn
                             icon

@@ -1,9 +1,10 @@
 <template>
-    <div id="txt-main">
+    <div id="txt-main" :class="mainStore.theme === 'dark' ? 'v-theme--dark' : 'v-theme--light'">
         <v-navigation-drawer
             v-model="sidebar"
             :order="1"
             width="240"
+            :theme="mainStore.theme"
         >
             <v-list-subheader
                 class="d-flex align-center px-4"
@@ -35,7 +36,7 @@
             class="px-0"
             color="blue"
             density="compact"
-            theme="light"
+            :theme="mainStore.theme"
         >
             <v-app-bar-nav-icon @click.stop="sidebar = !sidebar" />
             <v-toolbar-title
@@ -45,6 +46,133 @@
             >
                 {{ name }}
             </v-toolbar-title>
+            <v-spacer />
+            <!-- 主题切换按钮 -->
+            <v-btn
+                icon
+                @click="toggleTheme"
+            >
+                <v-icon>{{ mainStore.theme === 'light' ? 'mdi-weather-night' : 'mdi-weather-sunny' }}</v-icon>
+            </v-btn>
+            <!-- 多语言切换入口 -->
+            <v-menu
+                offset-y
+                right
+            >
+                <template #activator="{ props }">
+                    <v-btn
+                        v-bind="props"
+                        icon
+                    >
+                        <v-icon>mdi-translate</v-icon>
+                    </v-btn>
+                </template>
+                <v-list min-width="240">
+                    <v-list-item
+                        v-for="localeItem in allLocales"
+                        :key="localeItem.code"
+                        :active="localeItem.code === locale"
+                        @click="setLocale(localeItem.code)"
+                    >
+                        <template #prepend>
+                            <v-icon v-if="localeItem.code === locale">
+                                mdi-check
+                            </v-icon>
+                            <v-icon v-else>
+                                mdi-translate
+                            </v-icon>
+                        </template>
+                        <v-list-item-title>{{ localeItem.name }}</v-list-item-title>
+                    </v-list-item>
+                </v-list>
+            </v-menu>
+
+            <!-- 用户头像菜单（登录状态） -->
+            <template v-if="mainStore.user.is_login">
+                <v-menu
+                    offset-y
+                    right
+                >
+                    <template #activator="{ props }">
+                        <v-btn
+                            v-bind="props"
+                            class="mr-4"
+                            icon
+                            size="45"
+                            variant="outlined"
+                        >
+                            <v-avatar
+                                size="32"
+                                :image="mainStore.user.avatar"
+                            />
+                        </v-btn>
+                    </template>
+                    <v-list min-width="240">
+                        <v-list-item>
+                            <template #prepend>
+                                <v-avatar
+                                    size="40"
+                                    :image="mainStore.user.avatar"
+                                />
+                            </template>
+                            <v-list-item-title> {{ mainStore.user.nickname }} </v-list-item-title>
+                            <v-list-item-subtitle> {{ mainStore.user.email }} </v-list-item-subtitle>
+                        </v-list-item>
+                        <v-divider class="my-2" />
+                        <v-list-item
+                            to="/user/detail"
+                            :title="t('messages.userCenter')"
+                            prepend-icon="mdi-account-box"
+                        />
+                        <v-list-item
+                            to="/user/history"
+                            :title="t('messages.readingHistory')"
+                            prepend-icon="mdi-history"
+                        />
+                        <v-list-item
+                            v-if="mainStore.sys.allow.FEEDBACK"
+                            target="_blank"
+                            :href="mainStore.sys.FEEDBACK_URL"
+                            :title="t('messages.feedback')"
+                            prepend-icon="mdi-message-alert"
+                        />
+                        <v-divider />
+                        <template v-if="mainStore.user.is_admin">
+                            <v-list-item
+                                to="/admin/settings"
+                                :title="t('messages.adminEntry')"
+                            >
+                                <template #prepend>
+                                    <v-icon color="red">
+                                        mdi-console
+                                    </v-icon>
+                                </template>
+                            </v-list-item>
+                        </template>
+                        <v-list-item
+                            to="/logout"
+                            :title="t('messages.logout')"
+                            prepend-icon="mdi-exit-to-app"
+                        />
+                    </v-list>
+                </v-menu>
+            </template>
+            <!-- 登录按钮（未登录状态） -->
+            <template v-else>
+                <v-btn
+                    class="px-xs-1 login-btn mr-4"
+                    to="/login"
+                    color="#304ffe"
+                    variant="elevated"
+                >
+                    <v-icon
+                        class="d-none d-sm-flex me-0"
+                        size="24"
+                    >
+                        mdi-account-circle
+                    </v-icon> {{ t('messages.pleaseLogin') }}
+                </v-btn>
+            </template>
         </v-app-bar>
 
         <div>
@@ -118,11 +246,21 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
 import AppFooter from '~/components/AppFooter.vue';
+
+const { locale, locales, setLocale } = useI18n();
+
+const allLocales = computed(() => {
+    return locales.value || [];
+});
+
+function toggleTheme() {
+    mainStore.toggleTheme();
+}
 
 definePageMeta({
     layout: 'blank'
@@ -152,6 +290,12 @@ let intvl = null;
 
 onMounted(() => {
     mainStore.setNavbar(false);
+    // 获取用户信息
+    $backend('/user/info').then((rsp) => {
+        if (rsp.err === 'ok') {
+            mainStore.login(rsp);
+        }
+    });
     init();
 });
 
@@ -235,5 +379,9 @@ const getNovelContent = (i) => {
 #txt-main {
     background-color: #f5f5f5;
     min-height: 100vh;
+}
+
+:deep(.v-theme--dark) #txt-main {
+    background-color: #121212;
 }
 </style>

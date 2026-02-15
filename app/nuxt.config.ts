@@ -22,6 +22,11 @@ export default defineNuxtConfig({
                         colors: {
                             primary: '#1976D2',
                         }
+                    },
+                    dark: {
+                        colors: {
+                            primary: '#1976D2',
+                        }
                     }
                 }
             }

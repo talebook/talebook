@@ -4,7 +4,7 @@
             class="px-0"
             color="blue"
             density="compact"
-            theme="light"
+            :theme="store.theme"
             :order="0"
             extension-height="64"
         >
@@ -23,12 +23,12 @@
                                     hide-details
                                     single-line
                                     variant="solo-inverted"
-                                    theme="light"
+                                    :theme="store.theme"
                                 />
                             </v-col>
                             <v-col cols="3">
                                 <v-btn
-                                    theme="light"
+                                    :theme="store.theme"
                                     rounded
                                     color="primary"
                                     @click="do_mobile_search"
@@ -62,8 +62,8 @@
                         name="name"
                         :label="$t('common.search')"
                         class="d-none d-sm-flex search-field"
-                        theme="light"
-                        bg-color="rgba(255, 255, 255, 0.15)"
+                        :theme="store.theme"
+                        :bg-color="store.theme === 'light' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.3)'"
                         @keyup.enter="do_search"
                     />
                 </div>
@@ -135,6 +135,14 @@
                             </v-list-item>
                         </v-list>
                     </v-menu>
+
+                    <!-- 主题切换按钮 -->
+                    <v-btn
+                        icon
+                        @click="toggleTheme"
+                    >
+                        <v-icon>{{ store.theme === 'light' ? 'mdi-weather-night' : 'mdi-weather-sunny' }}</v-icon>
+                    </v-btn>
 
                     <!-- 多语言切换入口 -->
                     <v-menu
@@ -241,6 +249,14 @@
                 </template>
 
                 <template v-else>
+                    <!-- 主题切换按钮（未登录状态） -->
+                    <v-btn
+                        icon
+                        @click="toggleTheme"
+                    >
+                        <v-icon>{{ store.theme === 'light' ? 'mdi-weather-night' : 'mdi-weather-sunny' }}</v-icon>
+                    </v-btn>
+
                     <!-- 多语言切换入口（未登录状态） -->
                     <v-menu
                         offset-y
@@ -554,6 +570,10 @@ function hidemsg(idx, msgid) {
         }
     });
 }
+
+function toggleTheme() {
+    store.toggleTheme();
+}
 </script>
 
 <style scoped>
@@ -572,24 +592,10 @@ function hidemsg(idx, msgid) {
     width: 100% !important;
 }
 .search-field :deep(.v-field) {
-    background-color: rgba(255, 255, 255, 0.2) !important;
     border-radius: 10px !important;
 }
 .search-field :deep(.v-field__overlay) {
     background-color: transparent !important;
-}
-.search-field :deep(.v-field__input) {
-    color: white !important;
-}
-.search-field :deep(.v-label) {
-    color: rgba(255, 255, 255, 0.85) !important;
-}
-.search-field :deep(.v-icon) {
-    color: rgba(255, 255, 255, 1) !important;
-    opacity: 1 !important;
-}
-.search-field :deep(.v-field--variant-solo-inverted) {
-    background-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 /* 侧边栏字体大小 */
