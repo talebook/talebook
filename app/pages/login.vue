@@ -32,7 +32,7 @@
                         </v-btn>
                     </v-toolbar>
                     <v-card-text>
-                        <v-form @submit.prevent="do_login">
+                        <v-form @submit.prevent="onLoginClick">
                             <v-text-field
                                 v-model="username"
                                 prepend-icon="mdi-account"
@@ -45,14 +45,6 @@
                                 prepend-icon="mdi-lock"
                                 :label="t('auth.password')"
                                 type="password"
-                            />
-                            <!-- 人机验证组件 -->
-                            <CaptchaWidget
-                                v-if="captchaEnabled"
-                                ref="captchaRef"
-                                scene="login"
-                                @verify="onCaptchaVerify"
-                                @error="onCaptchaError"
                             />
                             <p class="text-right">
                                 <a
@@ -68,7 +60,6 @@
                                     rounded
                                     color="primary"
                                     :loading="loading"
-                                    :disabled="captchaEnabled && !captchaVerified"
                                 >
                                     {{ t('auth.signIn') }}
                                 </v-btn>
@@ -165,6 +156,39 @@
                 </v-card>
             </v-col>
         </v-row>
+        
+        <!-- 验证码弹窗 -->
+        <v-dialog
+            v-model="showCaptchaDialog"
+            max-width="500"
+            persistent
+        >
+            <v-card>
+                <v-toolbar
+                    dark
+                    color="primary"
+                >
+                    <v-toolbar-title>{{ t('captcha.title') }}</v-toolbar-title>
+                </v-toolbar>
+                <v-card-text>
+                    <CaptchaWidget
+                        ref="captchaRef"
+                        scene="login"
+                        @verify="onCaptchaVerify"
+                        @error="onCaptchaError"
+                    />
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn
+                        color="secondary"
+                        @click="closeCaptchaDialog"
+                    >
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -195,6 +219,7 @@ const captchaRef = ref(null);
 const captchaEnabled = ref(false);
 const captchaVerified = ref(false);
 const captchaData = ref(null);
+const showCaptchaDialog = ref(false);
 
 // 控制是否显示导航栏（可作为开关使用）
 const showNavbar = true; // 后期可通过配置或环境变量控制
@@ -227,10 +252,40 @@ const checkCaptchaEnabled = async () => {
     }
 };
 
+// 点击登录按钮
+const onLoginClick = () => {
+    if (!username.value || !password.value) {
+        alert.value.type = 'error';
+        alert.value.msg = t('errors.networkError');
+        return;
+    }
+    
+    if (captchaEnabled.value) {
+        // 显示验证码弹窗
+        captchaVerified.value = false;
+        captchaData.value = null;
+        showCaptchaDialog.value = true;
+    } else {
+        // 直接登录
+        do_login();
+    }
+};
+
+// 关闭验证码弹窗
+const closeCaptchaDialog = () => {
+    showCaptchaDialog.value = false;
+    if (captchaRef.value) {
+        captchaRef.value.reset();
+    }
+};
+
 // 验证码验证成功回调
 const onCaptchaVerify = (data) => {
     captchaData.value = data;
     captchaVerified.value = true;
+    showCaptchaDialog.value = false;
+    // 执行登录
+    do_login();
 };
 
 // 验证码错误回调
@@ -328,3 +383,4 @@ useHead(() => ({
     min-height: calc(100vh - 120px);
 }
 </style>
+

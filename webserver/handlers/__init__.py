@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
+import logging
 
 
 def routes():
@@ -19,6 +20,8 @@ def routes():
     routes += book.routes()
     routes += user.routes()
     routes += meta.routes()
+    captcha_routes = captcha.routes()
+    routes += captcha_routes
+    logging.info("CAPTCHA routes registered: %s", [r[0] for r in captcha_routes])
     routes += files.routes()
-    routes += captcha.routes()
     return routes

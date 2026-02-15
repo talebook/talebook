@@ -4,6 +4,7 @@
 人机验证相关接口
 """
 
+import logging
 from gettext import gettext as _
 
 from webserver import loader
@@ -11,6 +12,16 @@ from webserver.handlers.base import BaseHandler, js
 from webserver.plugins import captcha as captcha_module
 
 CONF = loader.get_settings()
+
+# 启动时记录验证码配置状态
+if CONF.get("CAPTCHA_PROVIDER"):
+    logging.info("CAPTCHA enabled with provider: %s", CONF["CAPTCHA_PROVIDER"])
+    for scene in ["REGISTER", "LOGIN", "WELCOME"]:
+        key = f"CAPTCHA_ENABLE_FOR_{scene}"
+        if CONF.get(key):
+            logging.info("CAPTCHA enabled for %s", scene.lower())
+else:
+    logging.info("CAPTCHA disabled")
 
 
 class CaptchaConfigHandler(BaseHandler):

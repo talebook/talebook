@@ -57,7 +57,7 @@
                     <p class="py-6 body-3 text-center">
                         {{ welcome }}
                     </p>
-                    <v-form @submit.prevent="welcome_login">
+                    <v-form @submit.prevent="onWelcomeClick">
                         <v-text-field
                             v-model="invite_code"
                             prepend-icon="mdi-lock"
@@ -67,14 +67,6 @@
                             :error="is_err"
                             :error-messages="is_err ? msg : ''"
                             :loading="loading"
-                        />
-                        <!-- 人机验证组件 -->
-                        <CaptchaWidget
-                            v-if="captchaEnabled"
-                            ref="captchaRef"
-                            scene="welcome"
-                            @verify="onCaptchaVerify"
-                            @error="onCaptchaError"
                         />
                         <p
                             v-if="!is_err && msg"
@@ -89,7 +81,7 @@
                     <v-spacer />
                     <v-btn
                         color="primary"
-                        @click="welcome_login"
+                        @click="onWelcomeClick"
                     >
                         {{ t('common.login') }}
                     </v-btn>
@@ -98,6 +90,39 @@
             </v-card>
         </v-col>
     </v-row>
+    
+    <!-- 验证码弹窗 -->
+    <v-dialog
+        v-model="showCaptchaDialog"
+        max-width="500"
+        persistent
+    >
+        <v-card>
+            <v-toolbar
+                dark
+                color="primary"
+            >
+                <v-toolbar-title>{{ t('captcha.title') }}</v-toolbar-title>
+            </v-toolbar>
+            <v-card-text>
+                <CaptchaWidget
+                    ref="captchaRef"
+                    scene="welcome"
+                    @verify="onCaptchaVerify"
+                    @error="onCaptchaError"
+                />
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer />
+                <v-btn
+                    color="secondary"
+                    @click="closeCaptchaDialog"
+                >
+                    {{ t('common.cancel') }}
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 </template>
 
 <script setup>
@@ -134,6 +159,7 @@ const captchaRef = ref(null);
 const captchaEnabled = ref(false);
 const captchaVerified = ref(false);
 const captchaData = ref(null);
+const showCaptchaDialog = ref(false);
 
 // 修复1: 移除 await，正确使用 useAsyncData
 const { data: welcomeData } = useAsyncData('welcome', async () => {
@@ -172,10 +198,40 @@ const checkCaptchaEnabled = async () => {
     }
 };
 
+// 点击欢迎页登录按钮
+const onWelcomeClick = () => {
+    if (!invite_code.value.trim()) {
+        is_err.value = true;
+        msg.value = t('welcomePage.inputPrompt');
+        return;
+    }
+    
+    if (captchaEnabled.value) {
+        // 显示验证码弹窗
+        captchaVerified.value = false;
+        captchaData.value = null;
+        showCaptchaDialog.value = true;
+    } else {
+        // 直接登录
+        welcome_login();
+    }
+};
+
+// 关闭验证码弹窗
+const closeCaptchaDialog = () => {
+    showCaptchaDialog.value = false;
+    if (captchaRef.value) {
+        captchaRef.value.reset();
+    }
+};
+
 // 验证码验证成功回调
 const onCaptchaVerify = (data) => {
     captchaData.value = data;
     captchaVerified.value = true;
+    showCaptchaDialog.value = false;
+    // 执行登录
+    welcome_login();
 };
 
 // 验证码错误回调
@@ -189,13 +245,6 @@ const welcome_login = async () => {
     if (!invite_code.value.trim()) {
         is_err.value = true;
         msg.value = t('welcomePage.inputPrompt');
-        return;
-    }
-    
-    // 检查验证码
-    if (captchaEnabled.value && !captchaVerified.value) {
-        is_err.value = true;
-        msg.value = t('captcha.pleaseComplete');
         return;
     }
     
@@ -256,3 +305,4 @@ useHead(() => ({
     margin-top: 100px;
 }
 </style>
+

@@ -85,7 +85,7 @@ const initGeetest = async () => {
 
         window.initGeetest4({
             captchaId: config.value.captchaId,
-            product: 'float',
+            product: 'popup',
             language: 'zho'
         }, (gt) => {
             geetestInstance = gt;
@@ -185,5 +185,16 @@ onUnmounted(() => {
 
 :deep(.geetest_captcha) {
     margin: 0 auto;
+}
+</style>
+
+<style>
+/* 确保极验弹窗不受父容器限制 */
+.geetest_widget {
+    z-index: 9999 !important;
+}
+
+.geetest_fullpage_click {
+    z-index: 9999 !important;
 }
 </style>
