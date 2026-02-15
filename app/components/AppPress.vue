@@ -10,8 +10,8 @@
                 closable
                 border="start"
                 type="info"
-                color="white"
-                class="press-alert"
+                :color="store.theme === 'light' ? 'white' : 'grey-darken-4'"
+                :class="store.theme === 'light' ? 'press-alert' : 'press-alert-dark'"
                 @click:close="close"
             >
                 <div
@@ -69,11 +69,29 @@ function close() {
 </script>
 
 <style scoped>
+/* 白天模式样式 */
 .press-alert :deep(.v-alert__border) {
     border-color: #6200ea !important;
     opacity: 1 !important;
 }
 .press-alert {
     border: 1px solid #000000 !important;
+}
+
+/* 夜间模式样式 */
+.press-alert-dark :deep(.v-alert__border) {
+    border-color: #6200ea !important;
+    opacity: 1 !important;
+}
+.press-alert-dark {
+    border: 1px solid #ffffff !important;
+    background-color: #1e1e1e !important;
+}
+.press-alert-dark :deep(.v-alert__content) {
+    color: #ffffff !important;
+}
+.press-alert-dark :deep(.press-content a),
+.press-alert-dark :deep(a.press-content) {
+    color: #1976d2 !important;
 }
 </style>

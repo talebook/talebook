@@ -1,5 +1,5 @@
 <template>
-    <v-app>
+    <v-app :theme="store.theme">
         <Loading />
         <AppHeader v-if="store.nav" />
         <v-main>
