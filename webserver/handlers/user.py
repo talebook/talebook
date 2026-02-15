@@ -37,7 +37,7 @@ def check_captcha(handler, scene):
         captcha_verified = handler.get_secure_cookie("captcha_verified")
         if not captcha_verified:
             return False, _("请先完成验证码验证")
-        
+
         # 验证通过后清除标记，防止重复使用
         handler.clear_cookie("captcha_verified")
         return True, None

@@ -61,7 +61,7 @@ class CaptchaImageHandler(CaptchaBaseHandler):
         # 同时存储生成时间，用于精确判断（使用 UTC 时间戳）
         self.set_secure_cookie("captcha_generate_time", str(datetime.datetime.utcnow().timestamp()), expires=expires)
 
-        logging.info(f"=== 验证码生成调试 ===")
+        logging.info("=== 验证码生成调试 ===")
         logging.info(f"验证码答案: {result['code']}")
         logging.info(f"过期时间: {expires}")
         logging.info(f"所有Cookies: {dict(self.request.cookies)}")
@@ -88,7 +88,7 @@ class CaptchaVerifyHandler(CaptchaBaseHandler):
             generate_time = self.get_secure_cookie("captcha_generate_time")
 
             # 添加调试日志
-            logging.info(f"=== 验证码验证调试 ===")
+            logging.info("=== 验证码验证调试 ===")
             logging.info(f"用户输入: {captcha_code}")
             logging.info(f"Cookie中的答案: {captcha_answer}")
             logging.info(f"Cookie中的生成时间: {generate_time}")
@@ -107,7 +107,7 @@ class CaptchaVerifyHandler(CaptchaBaseHandler):
                 remaining = 60 - elapsed
                 logging.info(f"验证码过期检查 - 生成时间: {gen_time}, 当前时间: {now}, 已过去: {elapsed:.1f}秒, 剩余: {remaining:.1f}秒")
                 if elapsed > 60:  # 超过60秒
-                    logging.info(f"验证码已过期 - 超过60秒")
+                    logging.info("验证码已过期 - 超过60秒")
                     self.clear_cookie("captcha_answer")
                     self.clear_cookie("captcha_generate_time")
                     return {"err": "captcha.expired", "msg": _("验证码已过期，请刷新")}
