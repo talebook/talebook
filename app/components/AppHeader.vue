@@ -598,6 +598,20 @@ function toggleTheme() {
     background-color: transparent !important;
 }
 
+.search-field :deep(.v-field__input) {
+    color: white !important;
+}
+.search-field :deep(.v-label) {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+.search-field :deep(.v-icon) {
+    color: rgba(255, 255, 255, 1) !important;
+    opacity: 1 !important;
+}
+.search-field :deep(.v-field--variant-solo-inverted) {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
 /* 侧边栏字体大小 */
 :deep(.v-navigation-drawer) .v-list-item-title {
     font-size: 13px !important;
