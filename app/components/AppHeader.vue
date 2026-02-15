@@ -404,7 +404,7 @@
                     class="sidebar-extra-item"
                 >
                     <div
-                        class="sidebar-extra-content"
+                        class="sidebar-extra-content press-content"
                         v-html="store.sys.sidebar_extra_html"
                     />
                 </v-list-item>

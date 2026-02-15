@@ -32,11 +32,14 @@ class AdminUsers(BaseHandler):
         if not self.admin_user:
             return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
 
-        num = max(10, int(self.get_argument("num", 20)))
+        num = int(self.get_argument("num", 20))
+        # 当 num <= 0 时，表示显示全部
+        if num <= 0:
+            num = None
         page = max(0, int(self.get_argument("page", 1)) - 1)
         sort = self.get_argument("sort", "access_time")
         desc = self.get_argument("desc", "desc")
-        logging.debug("num=%d, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
+        logging.debug("num=%s, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
 
         f = {
             "id": Reader.id,
@@ -52,9 +55,14 @@ class AdminUsers(BaseHandler):
 
         query = self.session.query(Reader).order_by(f)
         total = query.count()
-        start = page * num
+        # 当 num 为 None 时，显示全部数据，不分页
+        if num is None:
+            query_results = query.all()
+        else:
+            start = page * num
+            query_results = query.limit(num).offset(start).all()
         items = []
-        for user in query.limit(num).offset(start).all():
+        for user in query_results:
             d = {
                 "id": user.id,
                 "username": user.username,
@@ -572,16 +580,17 @@ class AdminBookList(BaseHandler):
         if not self.admin_user:
             return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
 
-        num = max(10, int(self.get_argument("num", 20)))
+        num = int(self.get_argument("num", 20))
+        # 当 num <= 0 时，表示显示全部
+        if num <= 0:
+            num = None
         page = max(0, int(self.get_argument("page", 1)) - 1)
         sort = self.get_argument("sort", "id")
         desc = self.get_argument("desc", "desc") == "true"
         search = self.get_argument("search", "")
-        logging.debug("num=%d, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
+        logging.debug("num=%s, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
 
         self.db.sort(field=sort, ascending=(not desc))
-        start = page * num
-        end = start + num
         all_ids = list(self.cache.search(search))
         total = len(all_ids)
 
@@ -590,7 +599,13 @@ class AdminBookList(BaseHandler):
             all_ids.sort(reverse=desc)
 
         books = []
-        page_ids = all_ids[start:end]
+        # 当 num 为 None 时，显示全部数据，不分页
+        if num is None:
+            page_ids = all_ids
+        else:
+            start = page * num
+            end = start + num
+            page_ids = all_ids[start:end]
         if page_ids:
             books = [
                 SimpleBookFormatter(b, self.cdn_url).format()

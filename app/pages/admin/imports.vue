@@ -118,7 +118,6 @@
             :items-length="total"
             :loading="loading"
             :items-per-page="itemsPerPage"
-            :items-per-page-options="[{value: 10, title: '10'}, {value: 25, title: '25'}, {value: 50, title: '50'}, {value: 100, title: '100'}, {value: -1, title: t('common.all')}]"
             @update:options="updateOptions"
         >
             <template #item.status="{ item }">
@@ -1581,5 +1580,14 @@ useHead(() => ({
 .v-checkbox {
     margin: 0;
     padding: 0;
+}
+
+/* 加宽分页选择器 */
+:deep(.v-data-table-footer__items-per-page) {
+    min-width: 120px;
+}
+
+:deep(.v-data-table-footer__items-per-page .v-field) {
+    min-width: 100px;
 }
 </style>
