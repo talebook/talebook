@@ -5,6 +5,7 @@ export const useMainStore = defineStore('main', {
     nav: true,
     loading: true,
     count: 0,
+    theme: 'light',
     user: {
       is_admin: false,
       is_login: false,
@@ -55,6 +56,12 @@ export const useMainStore = defineStore('main', {
     },
     setTitle(v: string) {
         this.site_title_template = ' %s | ' + v;
+    },
+    setTheme(v: string) {
+        this.theme = v;
+    },
+    toggleTheme() {
+        this.theme = this.theme === 'light' ? 'dark' : 'light';
     }
   }
 })

@@ -2,9 +2,8 @@
     <v-app>
         <Loading />
         <v-main>
-            <v-container fluid>
-                <slot />
-            </v-container>
+            
+            <slot />
 
             <v-dialog
                 v-model="store.alert.show"
