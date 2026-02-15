@@ -38,6 +38,10 @@ lint-py:
 	flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
 	flake8 webserver --count --statistics --config .style.yapf
 
+check-i18n:
+	uv run check_i18n_translation_missing.py
+	uv run check_i18n_translation_useless.py
+
 pytest:
 	pytest tests -v --cov=webserver --cov-report=term-missing
 

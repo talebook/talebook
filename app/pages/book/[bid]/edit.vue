@@ -150,9 +150,7 @@
                                     <v-text-field
                                         v-model="book.series"
                                         :label="t('book.series')"
-                                    >
-                                        {{ book.series }}
-                                    </v-text-field>
+                                    />
                                 </v-col>
                                 <v-col
                                     class="py-0"

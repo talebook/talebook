@@ -116,7 +116,7 @@
     "ratings": "Ratings",
     "admin": "Admin",
     "settings": "System Settings",
-    "browse": "Browse Categories",
+    "browse": "Categories",
     "users": "User Management",
     "books": "Book Management",
     "import": "Import Books"
@@ -610,6 +610,11 @@
         "currentPage": "Current page",
         "rowsPerPage": "Rows per page",
         "of": "of"
+      }
+    },
+    "rating": {
+      "ariaLabel": {
+        "item": "Rating {0} of {1}"
       }
     }
   },

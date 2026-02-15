@@ -622,6 +622,11 @@
         "rowsPerPage": "每页行数",
         "of": "共"
       }
+    },
+    "rating": {
+      "ariaLabel": {
+        "item": "评分 {0} / {1}"
+      }
     }
   }
 }
