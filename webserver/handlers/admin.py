@@ -356,6 +356,13 @@ class AdminSettings(BaseHandler):
             "settings_path",
             "avatar_service",
             "google_analytics_id",
+            # 人机验证配置
+            "CAPTCHA_PROVIDER",
+            "CAPTCHA_ENABLE_FOR_REGISTER",
+            "CAPTCHA_ENABLE_FOR_LOGIN",
+            "CAPTCHA_ENABLE_FOR_WELCOME",
+            "GEETEST_CAPTCHA_ID",
+            "GEETEST_CAPTCHA_KEY",
         ]
 
         args = loader.SettingsLoader()

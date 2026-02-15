@@ -2,6 +2,7 @@
     <div
         v-show="store.loading"
         class="loading-page"
+        :class="{ 'dark-theme': store.theme === 'dark' }"
     >
         <v-progress-circular
             indeterminate
@@ -29,5 +30,9 @@ const store = useMainStore();
     padding-top: 200px;
     font-size: 30px;
     font-family: sans-serif;
+}
+
+.loading-page.dark-theme {
+    background: #121212;
 }
 </style>

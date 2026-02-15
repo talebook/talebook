@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Title</title>
+    <script src="http://static.geetest.com/v4/gt4.js"></script>
+    <script src="https://apps.bdimg.com/libs/jquery/1.9.1/jquery.js"></script>
+    <style>body {
+        margin: 50px 0;
+        font-family: "PingFangSC-Regular", "Open Sans", Arial, "Hiragino Sans GB", "Microsoft YaHei", "STHeiti", "WenQuanYi Micro Hei", SimSun, sans-serif;
+        text-align: center;
+    }
+
+    .inp {
+        width: 278px;
+        height: 40px;
+        padding: 0 10px;
+        border: 1px solid #ccc;
+        border-radius: 2px;
+        font-size: 18px;
+    }
+
+    .btn {
+        display: inline-block;
+        width: 100px;
+        height: 40px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        background: white linear-gradient(180deg, #fff 0%, #f3f3f3 100%);
+        border-radius: 2px;
+        color: #666;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 40px;
+    }
+
+    .btn:hover {
+        background: white linear-gradient(0deg, #fff 0%, #f3f3f3 100%);
+    }
+
+    #captcha {
+        display: inline-block;
+        width: 300px;
+        height: 50px;
+    }
+
+    label {
+        display: inline-block;
+        width: 80px;
+        text-align: right;
+        vertical-align: top;
+    }
+
+    #wait {
+        margin: 0;
+        color: #666;
+        text-align: left;
+    }</style>
+</head>
+<body><h1>demo</h1>
+
+<form id="form">
+    <div><label for="username">用户名：</label> <input class="inp" id="username" value="用户名"></div>
+    <br>
+    <div><label for="password">密码：</label> <input class="inp" id="password" type="password" value="123456"></div>
+    <br>
+    <div><label for="btn">插件：</label>
+        <div id="captcha">
+            <div id="btn" class="btn">提交</div>
+        </div>
+        <br></div>
+    <br>
+    <div id="reset">
+        <button id="reset_btn" class="btn">重置</button>
+    </div>
+    <br>
+</form>
+
+<script>
+    var captchaId = "647f5ed2ed8acb4be36784e01556bb71"
+    var product = "float"
+        if (product !== 'bind') {
+        $('#btn').remove();
+    }
+
+    initGeetest4({
+        captchaId: captchaId,
+        product: product,
+    }, function (gt) {
+        window.gt = gt
+        gt
+            .appendTo("#captcha")
+            .onSuccess(function (e) {
+                var result = gt.getValidate();
+                $.ajax({
+                    url: '/login',
+                    data: result,
+                    dataType: 'json',
+                    success: function (res) {
+                        console.log(res.result);
+                    }
+                })
+            })
+
+        $('#btn').click(function () {
+            gt.showBox();
+        })
+        $('#reset_btn').click(function () {
+            gt.reset();
+        })
+    });
+
+</script>
+<script></script>
+</body>
+</html>

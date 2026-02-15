@@ -32,7 +32,7 @@
                         </v-btn>
                     </v-toolbar>
                     <v-card-text>
-                        <v-form @submit.prevent="do_login">
+                        <v-form @submit.prevent="onLoginClick">
                             <v-text-field
                                 v-model="username"
                                 prepend-icon="mdi-account"
@@ -156,6 +156,39 @@
                 </v-card>
             </v-col>
         </v-row>
+        
+        <!-- 验证码弹窗 -->
+        <v-dialog
+            v-model="showCaptchaDialog"
+            max-width="500"
+            persistent
+        >
+            <v-card>
+                <v-toolbar
+                    dark
+                    color="primary"
+                >
+                    <v-toolbar-title>{{ t('captcha.title') }}</v-toolbar-title>
+                </v-toolbar>
+                <v-card-text>
+                    <CaptchaWidget
+                        ref="captchaRef"
+                        scene="login"
+                        @verify="onCaptchaVerify"
+                        @error="onCaptchaError"
+                    />
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn
+                        color="secondary"
+                        @click="closeCaptchaDialog"
+                    >
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -164,6 +197,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
 import { useI18n } from 'vue-i18n';
+import CaptchaWidget from '~/components/CaptchaWidget.vue';
 
 const router = useRouter();
 const store = useMainStore();
@@ -180,6 +214,18 @@ const alert = ref({
     msg: '',
 });
 
+// 人机验证相关
+const captchaRef = ref(null);
+const captchaEnabled = ref(false);
+const captchaScenes = ref({
+    register: false,
+    login: false,
+    welcome: false
+});
+const captchaVerified = ref(false);
+const captchaData = ref(null);
+const showCaptchaDialog = ref(false);
+
 // 控制是否显示导航栏（可作为开关使用）
 const showNavbar = true; // 后期可通过配置或环境变量控制
 store.setNavbar(showNavbar);
@@ -193,10 +239,69 @@ onMounted(async () => {
         if (rsp.user && rsp.user.is_login) {
             router.push('/');
         }
+        // 检查是否启用了验证码
+        checkCaptchaEnabled();
     } catch (e) {
         // ignore error
+        checkCaptchaEnabled();
     }
 });
+
+// 检查是否启用了验证码
+const checkCaptchaEnabled = async () => {
+    try {
+        const rsp = await $backend('/captcha/config');
+        captchaEnabled.value = rsp.config && rsp.config.enabled;
+        if (rsp.config && rsp.config.scenes) {
+            captchaScenes.value = rsp.config.scenes;
+        }
+    } catch (e) {
+        captchaEnabled.value = false;
+    }
+};
+
+// 点击登录按钮
+const onLoginClick = () => {
+    if (!username.value || !password.value) {
+        alert.value.type = 'error';
+        alert.value.msg = t('errors.networkError');
+        return;
+    }
+
+    if (captchaEnabled.value && captchaScenes.value.login) {
+        // 显示验证码弹窗
+        captchaVerified.value = false;
+        captchaData.value = null;
+        showCaptchaDialog.value = true;
+    } else {
+        // 直接登录
+        do_login();
+    }
+};
+
+// 关闭验证码弹窗
+const closeCaptchaDialog = () => {
+    showCaptchaDialog.value = false;
+    if (captchaRef.value) {
+        captchaRef.value.reset();
+    }
+};
+
+// 验证码验证成功回调
+const onCaptchaVerify = (data) => {
+    captchaData.value = data;
+    captchaVerified.value = true;
+    showCaptchaDialog.value = false;
+    // 执行登录
+    do_login();
+};
+
+// 验证码错误回调
+const onCaptchaError = (msg) => {
+    captchaVerified.value = false;
+    alert.value.type = 'error';
+    alert.value.msg = msg;
+};
 
 const socials = computed(() => store.sys.socials || []);
 const allowRegister = computed(() => store.sys.allow ? store.sys.allow.register : false);
@@ -204,10 +309,24 @@ const allowRegister = computed(() => store.sys.allow ? store.sys.allow.register 
 const do_login = async () => {
     loading.value = true;
     alert.value.msg = '';
-    
+
     var data = new URLSearchParams();
     data.append('username', username.value);
     data.append('password', password.value);
+
+    // 添加验证码参数
+    if (captchaEnabled.value && captchaData.value) {
+        if (captchaData.value.provider === 'image') {
+            // 图形验证码
+            data.append('captcha_code', captchaData.value.captcha_code);
+        } else {
+            // 极验验证码
+            data.append('lot_number', captchaData.value.lot_number);
+            data.append('captcha_output', captchaData.value.captcha_output);
+            data.append('pass_token', captchaData.value.pass_token);
+            data.append('gen_time', captchaData.value.gen_time);
+        }
+    }
     
     try {
         const rsp = await $backend('/user/sign_in', {
@@ -218,6 +337,12 @@ const do_login = async () => {
         if (rsp.err != 'ok') {
             alert.value.type = 'error';
             alert.value.msg = rsp.msg;
+            // 重置验证码
+            if (captchaEnabled.value && captchaRef.value) {
+                captchaRef.value.reset();
+                captchaVerified.value = false;
+                captchaData.value = null;
+            }
         } else {
             store.setNavbar(true);
             // Refresh user info
@@ -272,3 +397,4 @@ useHead(() => ({
     min-height: calc(100vh - 120px);
 }
 </style>
+

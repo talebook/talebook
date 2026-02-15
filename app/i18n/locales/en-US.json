@@ -273,7 +273,9 @@
   },
   "validation": {
     "usernameLength": "Username must be between 5 and 20 characters",
+    "usernameFormat": "Username must start with a lowercase letter and can only contain lowercase letters, numbers, and underscores",
     "passwordLength": "Password must be between 8 and 20 characters",
+    "passwordFormat": "Password contains invalid characters",
     "nickLength": "Nickname must be at least 2 characters",
     "emailInvalid": "Invalid email format",
     "passwordMismatch": "Passwords do not match"
@@ -402,7 +404,8 @@
         "bookInfoSources": "Book Info Sources",
         "advancedSettings": "Advanced Settings",
         "sslManagement": "SSL Management",
-        "opdsSettings": "OPDS Settings"
+        "opdsSettings": "OPDS Settings",
+        "captchaSettings": "CAPTCHA Settings"
       },
       "button": {
         "saveSettings": "Save Settings",
@@ -450,7 +453,13 @@
         "keyAppid": "Key/AppID",
         "secretKey": "Secret/Key",
         "selectSocialAccounts": "Select social network accounts to enable",
-        "configurationGuide": "Configuration Guide"
+        "configurationGuide": "Configuration Guide",
+        "captchaProvider": "CAPTCHA Provider",
+        "captchaEnableForRegister": "Enable for Registration",
+        "captchaEnableForLogin": "Enable for Login",
+        "captchaEnableForWelcome": "Enable for Private Library",
+        "geetestCaptchaId": "GeeTest Captcha ID",
+        "geetestCaptchaKey": "GeeTest Captcha Key"
       },
       "option": {
         "ssl": "SSL",
@@ -458,7 +467,10 @@
         "pinyinDir": "Use Pinyin directory names (better compatibility)",
         "chineseDir": "Use Chinese directory names (UTF8, more beautiful)",
         "oldEpubReader": "Epub Reader (Old Version)",
-        "candleReader": "Candle Reader (Beta, supports chapter comments)"
+        "candleReader": "Candle Reader (Beta, supports chapter comments)",
+        "none": "Disabled",
+        "image": "Image CAPTCHA (no configuration needed)",
+        "geetest": "GeeTest"
       },
       "message": {
         "emailServiceInfo": "Email registration and Kindle push rely on this configuration (SMTP server address can include port or not, default is 465)",
@@ -470,7 +482,8 @@
         "saveSuccess": "Saved successfully",
         "goTo": "Please go to",
         "configurationPage": "developer configuration page",
-        "getKeysAndSetCallback": ", get the keys and set the callback address to:"
+        "getKeysAndSetCallback": ", get the keys and set the callback address to:",
+        "captchaInfo": "When enabled, users need to complete CAPTCHA verification on corresponding pages. Currently supports GeeTest."
       }
     },
     "users": {
@@ -574,8 +587,19 @@
     "checkingServer": "Checking server...",
     "networkError": "Network error"
   },
+  "captcha": {
+    "title": "CAPTCHA",
+    "loading": "Loading...",
+    "verifyFailed": "Verification failed, please try again",
+    "pleaseComplete": "Please complete the CAPTCHA",
+    "loadFailed": "Failed to load CAPTCHA",
+    "inputCode": "Enter Code",
+    "inputPlaceholder": "Enter the code from the image",
+    "refresh": "Refresh"
+  },
   "$vuetify": {
     "noDataText": "No data",
+    "loading": "Loading...",
     "dataFooter": {
       "itemsPerPageText": "Items per page",
       "pageText": "Page {0} of {1}",

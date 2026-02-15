@@ -278,7 +278,9 @@
   },
   "validation": {
     "usernameLength": "用户名长度必须在5-20个字符之间",
+    "usernameFormat": "用户名必须以小写字母开头，只能包含小写字母、数字和下划线",
     "passwordLength": "密码长度必须在8-20个字符之间",
+    "passwordFormat": "密码包含非法字符",
     "nickLength": "昵称长度至少为2个字符",
     "emailInvalid": "邮箱格式不正确",
     "passwordMismatch": "两次输入的密码不一致"
@@ -423,7 +425,8 @@
         "bookInfoSources": "互联网书籍信息源",
         "advancedSettings": "高级配置项",
         "sslManagement": "SSL证书管理",
-        "opdsSettings": "OPDS 设置"
+        "opdsSettings": "OPDS 设置",
+        "captchaSettings": "人机验证设置"
       },
       "button": {
         "saveSettings": "保存配置",
@@ -471,7 +474,13 @@
         "keyAppid": "Key/AppID",
         "secretKey": "Secret/Key",
         "selectSocialAccounts": "选择要启用的社交网络账号",
-        "configurationGuide": "配置说明"
+        "configurationGuide": "配置说明",
+        "captchaProvider": "验证提供商",
+        "captchaEnableForRegister": "注册界面启用认证",
+        "captchaEnableForLogin": "登录页面启用认证",
+        "captchaEnableForWelcome": "私人图书馆界面启用认证",
+        "geetestCaptchaId": "极验 Captcha ID",
+        "geetestCaptchaKey": "极验 Captcha Key"
       },
       "option": {
         "ssl": "SSL",
@@ -479,7 +488,10 @@
         "pinyinDir": "使用拼音字母目录名 (兼容性高)",
         "chineseDir": "使用中文目录名 (UTF8编码，更美观)",
         "oldEpubReader": "Epub Reader（旧版）",
-        "candleReader": "Candle Reader（Beta版，支持章评功能）"
+        "candleReader": "Candle Reader（Beta版，支持章评功能）",
+        "none": "不启用",
+        "image": "图形验证码 (无需配置)",
+        "geetest": "GeeTest (极验)"
       },
       "message": {
         "emailServiceInfo": "邮箱注册、推送Kindle依赖此配置(SMTP服务器地址可带端口，或者不带端口，默认为465号)",
@@ -491,7 +503,8 @@
         "saveSuccess": "保存成功",
         "goTo": "请前往",
         "configurationPage": "的开发者配置页面",
-        "getKeysAndSetCallback": "，获取密钥后设置回调地址为："
+        "getKeysAndSetCallback": "，获取密钥后设置回调地址为：",
+        "captchaInfo": "启用后，在对应页面需要完成人机验证才能继续操作。目前支持极验GeeTest。"
       }
     },
     "users": {
@@ -585,8 +598,19 @@
     "checkingServer": "正在检测服务器...",
     "networkError": "网络错误"
   },
+  "captcha": {
+    "title": "人机验证",
+    "loading": "加载中...",
+    "verifyFailed": "验证失败，请重试",
+    "pleaseComplete": "请完成人机验证",
+    "loadFailed": "验证码加载失败",
+    "inputCode": "输入验证码",
+    "inputPlaceholder": "请输入图片中的验证码",
+    "refresh": "刷新"
+  },
   "$vuetify": {
     "noDataText": "无数据",
+    "loading": "加载中...",
     "dataFooter": {
       "itemsPerPageText": "每页条目",
       "pageText": "第 {0} 页，共 {1} 页",
