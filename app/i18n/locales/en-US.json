@@ -600,6 +600,7 @@
   "$vuetify": {
     "noDataText": "No data",
     "loading": "Loading...",
+    "loadingText": "Loading...",
     "dataFooter": {
       "itemsPerPageText": "Items per page",
       "pageText": "Page {0} of {1}",
