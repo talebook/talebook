@@ -490,6 +490,7 @@
         "oldEpubReader": "Epub Reader（旧版）",
         "candleReader": "Candle Reader（Beta版，支持章评功能）",
         "none": "不启用",
+        "image": "图形验证码 (无需配置)",
         "geetest": "GeeTest (极验)"
       },
       "message": {
@@ -602,10 +603,14 @@
     "loading": "加载中...",
     "verifyFailed": "验证失败，请重试",
     "pleaseComplete": "请完成人机验证",
-    "loadFailed": "验证码加载失败"
+    "loadFailed": "验证码加载失败",
+    "inputCode": "输入验证码",
+    "inputPlaceholder": "请输入图片中的验证码",
+    "refresh": "刷新"
   },
   "$vuetify": {
     "noDataText": "无数据",
+    "loading": "加载中...",
     "dataFooter": {
       "itemsPerPageText": "每页条目",
       "pageText": "第 {0} 页，共 {1} 页",

@@ -10,9 +10,11 @@ from typing import Dict, Any, Optional
 
 from .base import BaseCaptchaProvider
 from .geetest import GeetestProvider
+from .image_captcha import ImageCaptchaProvider
 
 # 注册所有可用的验证提供商
 _CAPTCHA_PROVIDERS = {
+    "image": ImageCaptchaProvider,
     "geetest": GeetestProvider,
 }
 
@@ -27,6 +29,7 @@ def get_available_providers() -> Dict[str, str]:
     :return: 提供商名称和显示名称的映射
     """
     return {
+        "image": "图形验证码 (无需配置)",
         "geetest": "GeeTest (极验)",
     }
 

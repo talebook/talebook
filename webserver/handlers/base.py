@@ -128,9 +128,16 @@ class BaseHandler(web.RequestHandler):
             self.cookies_cache[key] = super(BaseHandler, self).get_secure_cookie(key)
         return self.cookies_cache[key]
 
-    def set_secure_cookie(self, key, val):
+    def set_secure_cookie(self, key, val, expires=None):
         self.cookies_cache[key] = val
-        super(BaseHandler, self).set_secure_cookie(key, val)
+        if expires:
+            # Tornado 使用 expires_days 参数，需要转换为天数
+            import datetime
+            now = datetime.datetime.now()
+            expires_days = (expires - now).total_seconds() / 86400
+            super(BaseHandler, self).set_secure_cookie(key, val, expires_days=expires_days)
+        else:
+            super(BaseHandler, self).set_secure_cookie(key, val)
         return None
 
     def head(self, *args, **kwargs):

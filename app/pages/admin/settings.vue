@@ -145,12 +145,16 @@
 
                         <!-- 人机验证配置字段 -->
                         <template v-if="card.captcha_fields && settings.CAPTCHA_PROVIDER">
-                            <div class="mt-4 pa-2 border rounded">
+                            <div
+                                v-if="card.captcha_fields.some(f => !f.show_when || f.show_when())"
+                                class="mt-4 pa-2 border rounded"
+                            >
                                 <template
                                     v-for="f in card.captcha_fields"
                                     :key="f.key"
                                 >
                                     <v-text-field
+                                        v-if="!f.show_when || f.show_when()"
                                         v-model="settings[f.key]"
                                         density="compact"
                                         hide-details
@@ -332,6 +336,7 @@ const cardShows = ref({
 // 人机验证提供商选项
 const captchaProviders = [
     { text: t('admin.settings.option.none'), value: '' },
+    { text: t('admin.settings.option.image'), value: 'image' },
     { text: t('admin.settings.option.geetest'), value: 'geetest' },
 ];
 
@@ -498,22 +503,22 @@ const cards = computed(() => [
             {
                 key: 'CAPTCHA_ENABLE_FOR_REGISTER',
                 label: t('admin.settings.label.captchaEnableForRegister'),
-                show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest',
+                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
             },
             {
                 key: 'CAPTCHA_ENABLE_FOR_LOGIN',
                 label: t('admin.settings.label.captchaEnableForLogin'),
-                show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest',
+                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
             },
             {
                 key: 'CAPTCHA_ENABLE_FOR_WELCOME',
                 label: t('admin.settings.label.captchaEnableForWelcome'),
-                show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest',
+                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
             },
         ],
         captcha_fields: [
-            { icon: 'mdi-key', key: 'GEETEST_CAPTCHA_ID', label: t('admin.settings.label.geetestCaptchaId') },
-            { icon: 'mdi-lock', key: 'GEETEST_CAPTCHA_KEY', label: t('admin.settings.label.geetestCaptchaKey'), type: 'password' },
+            { icon: 'mdi-key', key: 'GEETEST_CAPTCHA_ID', label: t('admin.settings.label.geetestCaptchaId'), show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
+            { icon: 'mdi-lock', key: 'GEETEST_CAPTCHA_KEY', label: t('admin.settings.label.geetestCaptchaKey'), type: 'password', show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
         ],
     },
 ]);

@@ -255,20 +255,26 @@ const welcome_login = async () => {
         msg.value = t('welcomePage.inputPrompt');
         return;
     }
-    
+
     loading.value = true;
     is_err.value = false;
     msg.value = '';
-    
+
     const data = new URLSearchParams();
     data.append('invite_code', invite_code.value);
-    
+
     // 添加验证码参数
     if (captchaEnabled.value && captchaData.value) {
-        data.append('lot_number', captchaData.value.lot_number);
-        data.append('captcha_output', captchaData.value.captcha_output);
-        data.append('pass_token', captchaData.value.pass_token);
-        data.append('gen_time', captchaData.value.gen_time);
+        if (captchaData.value.provider === 'image') {
+            // 图形验证码
+            data.append('captcha_code', captchaData.value.captcha_code);
+        } else {
+            // 极验验证码
+            data.append('lot_number', captchaData.value.lot_number);
+            data.append('captcha_output', captchaData.value.captcha_output);
+            data.append('pass_token', captchaData.value.pass_token);
+            data.append('gen_time', captchaData.value.gen_time);
+        }
     }
     
     try {

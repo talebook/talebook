@@ -309,17 +309,23 @@ const allowRegister = computed(() => store.sys.allow ? store.sys.allow.register 
 const do_login = async () => {
     loading.value = true;
     alert.value.msg = '';
-    
+
     var data = new URLSearchParams();
     data.append('username', username.value);
     data.append('password', password.value);
-    
+
     // 添加验证码参数
     if (captchaEnabled.value && captchaData.value) {
-        data.append('lot_number', captchaData.value.lot_number);
-        data.append('captcha_output', captchaData.value.captcha_output);
-        data.append('pass_token', captchaData.value.pass_token);
-        data.append('gen_time', captchaData.value.gen_time);
+        if (captchaData.value.provider === 'image') {
+            // 图形验证码
+            data.append('captcha_code', captchaData.value.captcha_code);
+        } else {
+            // 极验验证码
+            data.append('lot_number', captchaData.value.lot_number);
+            data.append('captcha_output', captchaData.value.captcha_output);
+            data.append('pass_token', captchaData.value.pass_token);
+            data.append('gen_time', captchaData.value.gen_time);
+        }
     }
     
     try {

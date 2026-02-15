@@ -469,6 +469,7 @@
         "oldEpubReader": "Epub Reader (Old Version)",
         "candleReader": "Candle Reader (Beta, supports chapter comments)",
         "none": "Disabled",
+        "image": "Image CAPTCHA (no configuration needed)",
         "geetest": "GeeTest"
       },
       "message": {
@@ -591,10 +592,14 @@
     "loading": "Loading...",
     "verifyFailed": "Verification failed, please try again",
     "pleaseComplete": "Please complete the CAPTCHA",
-    "loadFailed": "Failed to load CAPTCHA"
+    "loadFailed": "Failed to load CAPTCHA",
+    "inputCode": "Enter Code",
+    "inputPlaceholder": "Enter the code from the image",
+    "refresh": "Refresh"
   },
   "$vuetify": {
     "noDataText": "No data",
+    "loading": "Loading...",
     "dataFooter": {
       "itemsPerPageText": "Items per page",
       "pageText": "Page {0} of {1}",

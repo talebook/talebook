@@ -30,6 +30,19 @@ def check_captcha(handler, scene):
     if not captcha_module.is_captcha_enabled(CONF, scene):
         return True, None
 
+    # 检查是否是图形验证码
+    captcha_code = handler.get_argument("captcha_code", "")
+    if captcha_code:
+        # 检查是否已经通过验证码验证（由 /api/captcha/verify 设置标记）
+        captcha_verified = handler.get_secure_cookie("captcha_verified")
+        if not captcha_verified:
+            return False, _("请先完成验证码验证")
+        
+        # 验证通过后清除标记，防止重复使用
+        handler.clear_cookie("captcha_verified")
+        return True, None
+
+    # 极验验证码
     lot_number = handler.get_argument("lot_number", "")
     captcha_output = handler.get_argument("captcha_output", "")
     pass_token = handler.get_argument("pass_token", "")

@@ -22,8 +22,16 @@
                 {{ error }}
             </v-alert>
         </div>
+        <!-- 图形验证码 -->
+        <ImageCaptchaWidget
+            v-else-if="config && config.provider === 'image'"
+            ref="imageCaptchaRef"
+            @verify="onImageVerify"
+            @error="onImageError"
+        />
+        <!-- 极验验证码 -->
         <div
-            v-else-if="config"
+            v-else-if="config && config.provider === 'geetest'"
             :id="containerId"
             class="captcha-box"
         />
@@ -33,6 +41,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import ImageCaptchaWidget from './ImageCaptchaWidget.vue';
 
 const { t } = useI18n();
 const { $backend } = useNuxtApp();
@@ -52,6 +61,7 @@ const loading = ref(true);
 const error = ref('');
 const config = ref(null);
 const containerId = `captcha-${Math.random().toString(36).substr(2, 9)}`;
+const imageCaptchaRef = ref(null);
 
 // 极验实例
 let geetestInstance = null;
@@ -114,6 +124,16 @@ const initGeetest = async () => {
     }
 };
 
+// 图形验证码验证成功
+const onImageVerify = (data) => {
+    emit('verify', data);
+};
+
+// 图形验证码错误
+const onImageError = (msg) => {
+    emit('error', msg);
+};
+
 // 获取验证码配置
 const fetchConfig = async () => {
     try {
@@ -131,7 +151,9 @@ const fetchConfig = async () => {
 
 // 重置验证码
 const reset = () => {
-    if (geetestInstance) {
+    if (config.value && config.value.provider === 'image' && imageCaptchaRef.value) {
+        imageCaptchaRef.value.reset();
+    } else if (geetestInstance) {
         geetestInstance.reset();
     }
 };
@@ -146,7 +168,7 @@ onMounted(async () => {
     error.value = '';
 
     const enabled = await fetchConfig();
-    if (enabled) {
+    if (enabled && config.value.provider === 'geetest') {
         await initGeetest();
     }
 
