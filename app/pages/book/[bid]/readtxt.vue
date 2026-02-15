@@ -34,7 +34,7 @@
 
         <v-app-bar
             class="px-0"
-            color="blue"
+            :color="mainStore.theme === 'light' ? 'blue' : undefined"
             density="compact"
             :theme="mainStore.theme"
         >
@@ -175,7 +175,7 @@
             </template>
         </v-app-bar>
 
-        <div>
+        <div class="content-area">
             <v-container>
                 <v-card
                     v-if="!inited"
@@ -206,7 +206,7 @@
                     </div>
                     <div
                         v-show="!loading"
-                        style="word-wrap: break-word"
+                        class="novel-content"
                         v-html="novelContent"
                     />
                     <div
@@ -381,7 +381,28 @@ const getNovelContent = (i) => {
     min-height: 100vh;
 }
 
-:deep(.v-theme--dark) #txt-main {
+#txt-main.v-theme--dark {
     background-color: #121212;
+}
+
+.content-area {
+    color: #333;
+}
+
+#txt-main.v-theme--dark .content-area {
+    color: #e0e0e0;
+}
+
+.novel-content {
+    word-wrap: break-word;
+    line-height: 1.8;
+}
+
+#txt-main.v-theme--dark .novel-content :deep(h3) {
+    color: #e0e0e0;
+}
+
+#txt-main.v-theme--dark .novel-content :deep(p) {
+    color: #e0e0e0;
 }
 </style>

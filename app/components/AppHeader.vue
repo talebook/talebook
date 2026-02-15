@@ -2,7 +2,7 @@
     <div>
         <v-app-bar
             class="px-0"
-            color="blue"
+            :color="store.theme === 'light' ? 'blue' : undefined"
             density="compact"
             :theme="store.theme"
             :order="0"
