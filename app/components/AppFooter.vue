@@ -7,11 +7,11 @@
             <v-divider class="mt-10 mb-3" />
             <p
                 v-if="footer_extra_html"
-                class="mb-0 text-center footer-text"
+                class="mb-0 text-center footer-text press-content"
                 v-html="footer_extra_html"
             />
             <p
-                class="mb-0 text-center footer-text"
+                class="mb-0 text-center footer-text press-content"
                 v-html="footer_text"
             />
             <p>

@@ -796,6 +796,10 @@ const import_status = ref({});
 
 const updateOptions = (newOptions) => {
     options.value = newOptions;
+    // 同步更新 itemsPerPage，确保用户选择"全部"时能正确显示
+    if (newOptions.itemsPerPage !== undefined) {
+        itemsPerPage.value = newOptions.itemsPerPage;
+    }
     getDataFromApi();
 };
 
@@ -1576,5 +1580,14 @@ useHead(() => ({
 .v-checkbox {
     margin: 0;
     padding: 0;
+}
+
+/* 加宽分页选择器 */
+:deep(.v-data-table-footer__items-per-page) {
+    min-width: 120px;
+}
+
+:deep(.v-data-table-footer__items-per-page .v-field) {
+    min-width: 100px;
 }
 </style>

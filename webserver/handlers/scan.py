@@ -128,12 +128,15 @@ class ScanList(BaseHandler):
         if not self.admin_user:
             return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
 
-        num = max(10, int(self.get_argument("num", 20)))
+        num = int(self.get_argument("num", 20))
+        # 当 num <= 0 时，表示显示全部
+        if num <= 0:
+            num = None
         page = max(0, int(self.get_argument("page", 1)) - 1)
         sort = self.get_argument("sort", "create_time")
         desc = self.get_argument("desc", "true")
         filter = self.get_argument("filter", "all")
-        logging.debug("num=%d, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
+        logging.debug("num=%s, page=%d, sort=%s, desc=%s" % (num, page, sort, desc))
 
         # get order by query args
         order = {
@@ -153,9 +156,14 @@ class ScanList(BaseHandler):
             query = query.filter(ScanFile.status.in_(done_status))
         total = query.count()
 
-        start = page * num
+        # 当 num 为 None 时，显示全部数据，不分页
+        if num is None:
+            query_results = query.all()
+        else:
+            start = page * num
+            query_results = query.limit(num).offset(start).all()
         response = []
-        for s in query.limit(num).offset(start).all():
+        for s in query_results:
             d = {
                 "id": s.id,
                 "path": s.path,
