@@ -386,21 +386,22 @@
                                         </v-icon>
                                         ISBN：{{ book.isbn }}
                                     </v-chip>
-                                    <v-chip
-                                        v-for="tag in book.tags"
-                                        v-if="tag"
-                                        :key="'tag-' + tag"
-                                        class="ma-1"
-                                        size="small"
-                                        color="grey"
-                                        :to="'/tag/' + encodeURIComponent(tag)"
-                                        variant="flat"
-                                    >
-                                        <v-icon start>
-                                            mdi-tag
-                                        </v-icon>
-                                        {{ tag }}
-                                    </v-chip>
+                                    <template v-for="tag in book.tags">
+                                        <v-chip
+                                            v-if="tag"
+                                            :key="'tag-' + tag"
+                                            class="ma-1"
+                                            size="small"
+                                            color="grey"
+                                            :to="'/tag/' + encodeURIComponent(tag)"
+                                            variant="flat"
+                                        >
+                                            <v-icon start>
+                                                mdi-tag
+                                            </v-icon>
+                                            {{ tag }}
+                                        </v-chip>
+                                    </template>
                                 </div>
                             </v-card-text>
                             <v-card-text>
