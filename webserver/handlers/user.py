@@ -24,7 +24,7 @@ def check_captcha(handler, scene):
     """
     检查验证码
     :param handler: RequestHandler 实例
-    :param scene: 场景名称 (register, login, welcome)
+    :param scene: 场景名称 (register, login, welcome, reset)
     :return: (bool, str) - (是否通过, 错误信息)
     """
     if not captcha_module.is_captcha_enabled(CONF, scene):
@@ -275,6 +275,11 @@ class SignIn(BaseHandler):
 class UserReset(BaseHandler):
     @js
     def post(self):
+        # 检查人机验证
+        passed, msg = check_captcha(self, "reset")
+        if not passed:
+            return {"err": "captcha.invalid", "msg": msg}
+
         email = self.get_argument("email", "").strip().lower()
         username = self.get_argument("username", "").strip().lower()
         if not username or not email:

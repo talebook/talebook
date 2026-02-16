@@ -108,7 +108,7 @@
                         <v-toolbar-title>{{ t('auth.resetPassword') }}</v-toolbar-title>
                     </v-toolbar>
                     <v-card-text>
-                        <v-form @submit.prevent="do_reset">
+                        <v-form @submit.prevent="onResetClick">
                             <v-text-field
                                 v-model="username"
                                 prepend-icon="mdi-account"
@@ -173,7 +173,7 @@
                 <v-card-text>
                     <CaptchaWidget
                         ref="captchaRef"
-                        scene="login"
+                        :scene="captchaScene"
                         @verify="onCaptchaVerify"
                         @error="onCaptchaError"
                     />
@@ -220,11 +220,13 @@ const captchaEnabled = ref(false);
 const captchaScenes = ref({
     register: false,
     login: false,
-    welcome: false
+    welcome: false,
+    reset: false
 });
 const captchaVerified = ref(false);
 const captchaData = ref(null);
 const showCaptchaDialog = ref(false);
+const captchaScene = ref('login'); // 当前验证码场景
 
 // 控制是否显示导航栏（可作为开关使用）
 const showNavbar = true; // 后期可通过配置或环境变量控制
@@ -270,6 +272,7 @@ const onLoginClick = () => {
 
     if (captchaEnabled.value && captchaScenes.value.login) {
         // 显示验证码弹窗
+        captchaScene.value = 'login';
         captchaVerified.value = false;
         captchaData.value = null;
         showCaptchaDialog.value = true;
@@ -282,9 +285,7 @@ const onLoginClick = () => {
 // 关闭验证码弹窗
 const closeCaptchaDialog = () => {
     showCaptchaDialog.value = false;
-    if (captchaRef.value) {
-        captchaRef.value.reset();
-    }
+    // 取消时不重置验证码，避免不必要的刷新
 };
 
 // 验证码验证成功回调
@@ -292,13 +293,18 @@ const onCaptchaVerify = (data) => {
     captchaData.value = data;
     captchaVerified.value = true;
     showCaptchaDialog.value = false;
-    // 执行登录
-    do_login();
+    // 根据场景执行相应操作
+    if (captchaScene.value === 'login') {
+        do_login();
+    } else if (captchaScene.value === 'reset') {
+        do_reset();
+    }
 };
 
 // 验证码错误回调
 const onCaptchaError = (msg) => {
     captchaVerified.value = false;
+    // 错误信息已经在 CaptchaWidget 内部显示，这里只更新外部状态
     alert.value.type = 'error';
     alert.value.msg = msg;
 };
@@ -337,8 +343,13 @@ const do_login = async () => {
         if (rsp.err != 'ok') {
             alert.value.type = 'error';
             alert.value.msg = rsp.msg;
-            // 重置验证码
-            if (captchaEnabled.value && captchaRef.value) {
+            // 如果是验证码错误，在验证码组件内显示错误
+            if (captchaEnabled.value && captchaRef.value && rsp.err === 'captcha.invalid') {
+                captchaRef.value.showError(rsp.msg);
+                captchaVerified.value = false;
+                captchaData.value = null;
+            } else if (captchaEnabled.value && captchaRef.value) {
+                // 其他错误（如密码错误）只重置验证码
                 captchaRef.value.reset();
                 captchaVerified.value = false;
                 captchaData.value = null;
@@ -358,6 +369,26 @@ const do_login = async () => {
     }
 };
 
+// 点击重置密码按钮
+const onResetClick = () => {
+    if (!username.value || !email.value) {
+        alert.value.type = 'error';
+        alert.value.msg = t('errors.networkError');
+        return;
+    }
+
+    if (captchaEnabled.value && captchaScenes.value.reset) {
+        // 显示验证码弹窗
+        captchaScene.value = 'reset';
+        captchaVerified.value = false;
+        captchaData.value = null;
+        showCaptchaDialog.value = true;
+    } else {
+        // 直接重置
+        do_reset();
+    }
+};
+
 const do_reset = async () => {
     loading.value = true;
     alert.value.msg = '';
@@ -365,6 +396,20 @@ const do_reset = async () => {
     var data = new URLSearchParams();
     data.append('username', username.value);
     data.append('email', email.value);
+
+    // 添加验证码参数
+    if (captchaEnabled.value && captchaData.value) {
+        if (captchaData.value.provider === 'image') {
+            // 图形验证码
+            data.append('captcha_code', captchaData.value.captcha_code);
+        } else {
+            // 极验验证码
+            data.append('lot_number', captchaData.value.lot_number);
+            data.append('captcha_output', captchaData.value.captcha_output);
+            data.append('pass_token', captchaData.value.pass_token);
+            data.append('gen_time', captchaData.value.gen_time);
+        }
+    }
     
     try {
         const rsp = await $backend('/user/reset', {
@@ -378,6 +423,17 @@ const do_reset = async () => {
         } else {
             alert.value.type = 'error';
             alert.value.msg = rsp.msg;
+            // 如果是验证码错误，在验证码组件内显示错误
+            if (captchaEnabled.value && captchaRef.value && rsp.err === 'captcha.invalid') {
+                captchaRef.value.showError(rsp.msg);
+                captchaVerified.value = false;
+                captchaData.value = null;
+            } else if (captchaEnabled.value && captchaRef.value) {
+                // 其他错误（如用户不存在）只重置验证码
+                captchaRef.value.reset();
+                captchaVerified.value = false;
+                captchaData.value = null;
+            }
         }
     } catch (e) {
         alert.value.type = 'error';

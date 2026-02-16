@@ -119,5 +119,6 @@ def get_captcha_config(settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "register": is_captcha_enabled(settings, "register"),
         "login": is_captcha_enabled(settings, "login"),
         "welcome": is_captcha_enabled(settings, "welcome"),
+        "reset": is_captcha_enabled(settings, "reset"),
     }
     return config

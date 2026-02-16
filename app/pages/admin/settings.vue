@@ -515,6 +515,11 @@ const cards = computed(() => [
                 label: t('admin.settings.label.captchaEnableForWelcome'),
                 show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
             },
+            {
+                key: 'CAPTCHA_ENABLE_FOR_RESET',
+                label: t('admin.settings.label.captchaEnableForReset'),
+                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
+            },
         ],
         captcha_fields: [
             { icon: 'mdi-key', key: 'GEETEST_CAPTCHA_ID', label: t('admin.settings.label.geetestCaptchaId'), show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },

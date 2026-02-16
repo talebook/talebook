@@ -18,7 +18,7 @@ CONF = loader.get_settings()
 # 启动时记录验证码配置状态
 if CONF.get("CAPTCHA_PROVIDER"):
     logging.info("CAPTCHA enabled with provider: %s", CONF["CAPTCHA_PROVIDER"])
-    for scene in ["REGISTER", "LOGIN", "WELCOME"]:
+    for scene in ["REGISTER", "LOGIN", "WELCOME", "RESET"]:
         key = f"CAPTCHA_ENABLE_FOR_{scene}"
         if CONF.get(key):
             logging.info("CAPTCHA enabled for %s", scene.lower())
@@ -59,7 +59,11 @@ class CaptchaImageHandler(CaptchaBaseHandler):
         self.set_secure_cookie("captcha_answer", result["code"], expires=expires)
 
         # 同时存储生成时间，用于精确判断（使用 UTC 时间戳）
-        self.set_secure_cookie("captcha_generate_time", str(datetime.datetime.utcnow().timestamp()), expires=expires)
+        self.set_secure_cookie(
+            "captcha_generate_time",
+            str(datetime.datetime.utcnow().timestamp()),
+            expires=expires,
+        )
 
         logging.info("=== 验证码生成调试 ===")
         logging.info(f"验证码答案: {result['code']}")
@@ -69,7 +73,7 @@ class CaptchaImageHandler(CaptchaBaseHandler):
         return {
             "err": "ok",
             "captcha_id": result["captcha_id"],
-            "image": result["image"]
+            "image": result["image"],
         }
 
 
@@ -101,11 +105,15 @@ class CaptchaVerifyHandler(CaptchaBaseHandler):
 
             # 检查是否过期（双重验证）
             try:
-                gen_time = datetime.datetime.fromtimestamp(float(generate_time.decode('utf-8')))
+                gen_time = datetime.datetime.fromtimestamp(
+                    float(generate_time.decode("utf-8"))
+                )
                 now = datetime.datetime.utcnow()
                 elapsed = (now - gen_time).total_seconds()
                 remaining = 60 - elapsed
-                logging.info(f"验证码过期检查 - 生成时间: {gen_time}, 当前时间: {now}, 已过去: {elapsed:.1f}秒, 剩余: {remaining:.1f}秒")
+                logging.info(
+                    f"验证码过期检查 - 生成时间: {gen_time}, 当前时间: {now}, 已过去: {elapsed:.1f}秒, 剩余: {remaining:.1f}秒"
+                )
                 if elapsed > 60:  # 超过60秒
                     logging.info("验证码已过期 - 超过60秒")
                     self.clear_cookie("captcha_answer")
@@ -118,7 +126,7 @@ class CaptchaVerifyHandler(CaptchaBaseHandler):
             result = captcha_module.verify_captcha(
                 CONF,
                 captcha_code=captcha_code,
-                captcha_answer=captcha_answer.decode('utf-8')
+                captcha_answer=captcha_answer.decode("utf-8"),
             )
 
             # 验证成功后设置验证通过标记，失败不清除（允许重试）
