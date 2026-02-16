@@ -767,6 +767,113 @@ class AdminOPDSImportStatus(BaseHandler):
         return {"err": "ok", "msg": "ok", "status": status}
 
 
+class AdminOPDSImportFailedList(BaseHandler):
+    """获取OPDS导入失败的记录列表"""
+
+    @js
+    @is_admin
+    def get(self):
+        try:
+            # 查询所有失败的记录
+            failed_items = (
+                self.session.query(ScanFile)
+                .filter(ScanFile.status == ScanFile.FAILED)
+                .order_by(ScanFile.update_time.desc())
+                .all()
+            )
+
+            items = []
+            for sf in failed_items:
+                items.append({
+                    "id": sf.id,
+                    "title": sf.title,
+                    "author": sf.author,
+                    "path": sf.path,  # 原始下载链接
+                    "hash": sf.hash,
+                    "status": sf.status,
+                    "error": sf.data.get("error") if sf.data else None,
+                    "update_time": sf.update_time.isoformat() if sf.update_time else None,
+                })
+
+            return {"err": "ok", "items": items, "count": len(items)}
+
+        except Exception as e:
+            logging.error(f"获取失败记录列表失败: {e}")
+            logging.error(traceback.format_exc())
+            return {"err": "error", "msg": _("获取失败记录列表失败: {}").format(str(e))}
+
+
+class AdminOPDSImportRetry(BaseHandler):
+    """重试失败的OPDS导入"""
+
+    @js
+    @is_admin
+    def post(self):
+        try:
+            req = tornado.escape.json_decode(self.request.body)
+            item_id = req.get("id")
+            item_hash = req.get("hash")
+
+            if not item_id and not item_hash:
+                return {"err": "params.error", "msg": _("参数错误，需要提供记录ID或hash")}
+
+            # 查询失败的记录
+            query = self.session.query(ScanFile).filter(ScanFile.status == ScanFile.FAILED)
+            if item_id:
+                query = query.filter(ScanFile.id == item_id)
+            else:
+                query = query.filter(ScanFile.hash == item_hash)
+
+            sf = query.first()
+            if not sf:
+                return {"err": "not.found", "msg": _("未找到失败的导入记录")}
+
+            # 获取原始下载链接
+            href = sf.path
+            if sf.data and sf.data.get("acquisition_link"):
+                href = sf.data.get("acquisition_link")
+
+            if not href:
+                return {"err": "no.link", "msg": _("未找到下载链接")}
+
+            # 重置状态为 downloading
+            sf.status = ScanFile.DOWNLOADING
+            sf.update_time = datetime.datetime.now()
+            sf.data = sf.data or {}
+            sf.data["retry_count"] = sf.data.get("retry_count", 0) + 1
+            sf.data.pop("error", None)  # 清除错误信息
+            self.session.commit()
+
+            # 启动异步重试任务
+            import threading
+
+            def retry_task():
+                from webserver.services.opds_import import OPDSImportService
+
+                opds_service = OPDSImportService.get_instance()
+                book_data = {
+                    "title": sf.title,
+                    "author": sf.author,
+                    "href": href,
+                    "acquisition_link": href,
+                }
+                opds_service.import_book_to_scan(book_data, self.user_id())
+
+            thread = threading.Thread(target=retry_task, daemon=True)
+            thread.start()
+
+            return {
+                "err": "ok",
+                "msg": _("已开始重试导入: {}").format(sf.title),
+                "async": True,
+            }
+
+        except Exception as e:
+            logging.error(f"重试导入失败: {e}")
+            logging.error(traceback.format_exc())
+            return {"err": "error", "msg": _("重试导入失败: {}").format(str(e))}
+
+
 class AdminOPDSImport(BaseHandler):
     """OPDS导入接口"""
 
@@ -805,7 +912,7 @@ class AdminOPDSImport(BaseHandler):
                         sf = ScanFile(href, h[:64], 0)
                         sf.title = title
                         sf.author = author
-                        sf.status = "downloading"
+                        sf.status = ScanFile.DOWNLOADING
                         sf.create_time = datetime.datetime.now()
                         sf.update_time = datetime.datetime.now()
                         # 将原始链接存入data，便于后台任务使用
@@ -864,4 +971,6 @@ def routes():
         (r"/api/admin/opds/browse", AdminOPDSBrowse),
         (r"/api/admin/opds/import", AdminOPDSImport),
         (r"/api/admin/opds/import/status", AdminOPDSImportStatus),
+        (r"/api/admin/opds/import/failed", AdminOPDSImportFailedList),
+        (r"/api/admin/opds/import/retry", AdminOPDSImportRetry),
     ]

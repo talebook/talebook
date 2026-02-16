@@ -12,6 +12,7 @@ import uuid
 import shutil
 import re
 from datetime import datetime
+from contextlib import contextmanager
 
 import requests
 from lxml import etree
@@ -44,6 +45,30 @@ class OPDSImportService(AsyncService):
         self.scan_dir = CONF.get("scan_upload_path", "/data/books/imports/")
         # 保护内部计数器的线程锁（同一进程内并发访问安全）
         self._lock = threading.Lock()
+        # 线程本地存储，用于管理数据库会话
+        self._local = threading.local()
+
+    @contextmanager
+    def get_session(self):
+        """上下文管理器确保会话正确创建和关闭"""
+        # 获取 AsyncService 单例的 scoped_session
+        async_service = AsyncService()
+        session = getattr(self._local, 'session', None)
+        if session is None:
+            session = async_service.scoped_session()
+            self._local.session = session
+
+        try:
+            yield session
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            raise
+        finally:
+            # 关闭会话并清理线程本地存储
+            session.close()
+            async_service.scoped_session.remove()
+            self._local.session = None
 
     def browse_opds_catalog(self, host, port=None, path=""):
         """浏览OPDS目录结构"""
@@ -455,15 +480,21 @@ class OPDSImportService(AsyncService):
 
     def import_book_to_scan(self, book, user_id=None):
         """导入单本书籍到扫描目录"""
-        try:
-            title = book.get("title", "未知书籍")
-            author = book.get("author", "未知作者")
-            logging.info(f"导入书籍到扫描目录: {title} - {author}")
+        title = book.get("title", "未知书籍")
+        author = book.get("author", "未知作者")
+        logging.info(f"导入书籍到扫描目录: {title} - {author}")
 
+        # 获取书籍链接，用于后续更新状态
+        href = book.get("acquisition_link") or book.get("href")
+        book_hash = hashlib.sha256(href.encode("utf-8")).hexdigest()[:64] if href else None
+
+        try:
             # 下载书籍文件
             file_path = self.download_book(book)
             if not file_path:
                 logging.error(f"无法下载书籍: {title}")
+                # 下载失败，更新状态为 FAILED
+                self._update_scanfile_status(book_hash, None, ScanFile.FAILED, "下载失败")
                 return None
 
             # 生成目标文件名，若冲突则使用短 UUID 后缀保证跨进程唯一性
@@ -485,32 +516,9 @@ class OPDSImportService(AsyncService):
             # 移动文件到扫描目录（shutil.move 在同文件系统上为原子操作）
             shutil.move(file_path, target_path)
             logging.info(f"书籍已移动到扫描目录: {target_path}")
-            # 如果此前在待处理列表中创建了对应的 ScanFile（status=downloading），更新其路径和状态
-            sess = None
-            try:
-                from webserver.services.async_service import AsyncService
 
-                sess = AsyncService().scoped_session()
-                # 尝试通过 acquisition_link 存储的 hash 查找对应记录
-                href = book.get("acquisition_link") or book.get("href")
-                if href:
-                    h = hashlib.sha256(href.encode("utf-8")).hexdigest()[:64]
-                    sf = sess.query(ScanFile).filter(ScanFile.hash == h).first()
-                    if sf:
-                        try:
-                            sf.path = target_path
-                            sf.status = ScanFile.NEW
-                            sf.update_time = datetime.now()
-                            sf.save()
-                            sess.commit()
-                        except Exception as e:
-                            sess.rollback()
-                            logging.error(f"更新 ScanFile 状态时出错，已回滚事务: {e}")
-            except Exception as e:
-                logging.debug(f"无法更新 ScanFile 状态或不存在对应记录: {e}")
-            finally:
-                if sess:
-                    sess.close()
+            # 更新 ScanFile 状态为 NEW（下载成功）
+            self._update_scanfile_status(book_hash, target_path, ScanFile.NEW)
 
             # 创建扫描记录（如果需要）
             # 这里假设系统会自动扫描扫描目录中的新文件
@@ -524,7 +532,37 @@ class OPDSImportService(AsyncService):
 
         except Exception as e:
             logging.error(f"导入书籍到扫描目录失败: {e}")
+            # 导入失败，更新状态为 FAILED
+            self._update_scanfile_status(book_hash, None, ScanFile.FAILED, str(e))
             return None
+
+    def _update_scanfile_status(self, book_hash, target_path, status, error_msg=None):
+        """更新 ScanFile 状态
+        
+        Args:
+            book_hash: 书籍链接的 hash 值
+            target_path: 下载后的文件路径（失败时为 None）
+            status: 新状态（ScanFile.NEW 或 ScanFile.FAILED）
+            error_msg: 错误信息（失败时记录）
+        """
+        if not book_hash:
+            return
+
+        try:
+            with self.get_session() as sess:
+                sf = sess.query(ScanFile).filter(ScanFile.hash == book_hash).first()
+                if sf:
+                    if target_path:
+                        sf.path = target_path
+                    sf.status = status
+                    sf.update_time = datetime.now()
+                    if error_msg:
+                        sf.data = sf.data or {}
+                        sf.data["error"] = error_msg
+                    sf.save()
+                    logging.info(f"已更新 ScanFile 记录 {sf.id}: status={status}")
+        except Exception as e:
+            logging.error(f"更新 ScanFile 状态时出错: {e}")
 
     def import_selected_books(
         self, opds_url, user_id=None, delete_after=False, books=None
