@@ -302,6 +302,8 @@ class ScanFile(Base, SQLAlchemyMixin):
     READY = "ready"
     EXIST = "exist"
     IMPORTED = "imported"
+    DOWNLOADING = "downloading"
+    FAILED = "failed"
 
     def __init__(self, path, hash_value, scan_id):
         super(ScanFile, self).__init__()
