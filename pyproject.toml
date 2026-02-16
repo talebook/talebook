@@ -8,19 +8,25 @@ dependencies = [
     "bs4>=0.0.2",
     "chardet>=5.2.0",
     "apsw>=3.51.2.0",
-    "flake8>=7.3.0",
     "jinja2==3.1.6",
     "pymysql>=1.1.2",
     "msgpack>=1.1.2",
     "pytest==7.4.4",
     "pytest-cov>=4.1.0",
     "python-dateutil>=2.9.0",
+    "ruff>=0.4.5",
     "social-auth-app-tornado==1.0.0",
     "social-auth-core==4.5.1",
     "social-auth-storage-sqlalchemy==1.1.0",
     "tornado==6.5",
 ]
 
-[tool.black]
+[tool.ruff]
 line-length = 120
+exclude = [".venv", ".env"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP"]
+
+[tool.ruff.format]
 
