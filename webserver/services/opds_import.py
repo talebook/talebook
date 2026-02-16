@@ -61,7 +61,7 @@ class OPDSImportService(AsyncService):
         try:
             yield session
             session.commit()
-        except Exception as e:
+        except Exception:
             session.rollback()
             raise
         finally:
@@ -538,7 +538,7 @@ class OPDSImportService(AsyncService):
 
     def _update_scanfile_status(self, book_hash, target_path, status, error_msg=None):
         """更新 ScanFile 状态
-        
+
         Args:
             book_hash: 书籍链接的 hash 值
             target_path: 下载后的文件路径（失败时为 None）
