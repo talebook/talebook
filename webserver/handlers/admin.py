@@ -482,13 +482,35 @@ class SSLHandlerLogic:
         key_path = None
         try:
             crt_fd, crt_path = tempfile.mkstemp(suffix=".crt")
-            key_fd, key_path = tempfile.mkstemp(suffix=".key")
-            with os.fdopen(crt_fd, "wb") as crt_file:
-                crt_file.write(crt_body)
-            with os.fdopen(key_fd, "wb") as key_file:
-                key_file.write(key_body)
-            return self.check_ssl_chain_files(crt_path, key_path)
+            try:
+                key_fd, key_path = tempfile.mkstemp(suffix=".key")
+                with os.fdopen(crt_fd, "wb") as crt_file:
+                    crt_file.write(crt_body)
+                crt_fd = None  # fdopen 关闭后设为 None
+                with os.fdopen(key_fd, "wb") as key_file:
+                    key_file.write(key_body)
+                key_fd = None  # fdopen 关闭后设为 None
+                return self.check_ssl_chain_files(crt_path, key_path)
+            except:
+                # 如果 key_fd 创建失败，确保关闭 crt_fd
+                if crt_fd is not None:
+                    try:
+                        os.close(crt_fd)
+                    except OSError:
+                        pass
+                raise
         finally:
+            # 确保关闭未关闭的文件描述符
+            if crt_fd is not None:
+                try:
+                    os.close(crt_fd)
+                except OSError:
+                    pass
+            if key_fd is not None:
+                try:
+                    os.close(key_fd)
+                except OSError:
+                    pass
             if crt_path and os.path.exists(crt_path):
                 try:
                     os.unlink(crt_path)

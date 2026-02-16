@@ -26,7 +26,7 @@ CONF = loader.get_settings()
 def day_format(value, format="%Y-%m-%d"):
     try:
         return value.strftime(format)
-    except:
+    except (AttributeError, TypeError, ValueError):
         return "1990-01-01"
 
 
@@ -247,7 +247,10 @@ class BaseHandler(web.RequestHandler):
         if not login_time or int(login_time) < int(time.time()) - 7 * 86400:
             return None
         uid = self.get_secure_cookie("user_id")
-        return int(uid) if uid and uid.isdigit() else None
+        if uid:
+            uid = uid.decode('utf-8') if isinstance(uid, bytes) else uid
+            return int(uid) if uid.isdigit() else None
+        return None
 
     def get_current_user(self):
         user_id = self.user_id()

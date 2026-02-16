@@ -180,7 +180,7 @@ store.setNavbar(showNavbar);
 
 // 与后端保持一致的验证规则
 const RE_USERNAME = /^[a-z][a-z0-9_]*$/;
-const RE_PASSWORD = /^[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};':",./<>?|]*$/;
+const RE_PASSWORD = /^[-a-zA-Z0-9!@#$%^&*()_+=[\]{};':",./<>?|]*$/;
 const RE_EMAIL = /^[^@]+@[^@]+\.[^@]+$/;
 
 const rules = {

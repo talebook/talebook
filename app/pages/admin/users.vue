@@ -347,7 +347,8 @@ const emailRule = (email) => {
     return re.test(email) || t('admin.users.message.invalidEmail');
 };
 const usernameRule = v => ((20 >= v.length && v.length >= 5) && /^[a-z][a-z0-9_]*$/.test(v)) || t('admin.users.message.invalidUsername');
-const passwordRule = v => (20 >= v.length && v.length >= 8) || t('admin.users.message.invalidPassword');
+const RE_PASSWORD = /^[-a-zA-Z0-9!@#$%^&*()_+=[\]{};':",./<>?|]*$/;
+const passwordRule = v => ((20 >= v.length && v.length >= 8) && RE_PASSWORD.test(v)) || t('admin.users.message.invalidPassword');
 const nicknameRule = v => v.length >= 2 || t('admin.users.message.invalidNickname');
 
 // New user data
