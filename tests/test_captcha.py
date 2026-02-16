@@ -235,7 +235,8 @@ class TestGeetestProvider(unittest.TestCase):
     def test_verify_network_error(self, mock_post):
         """测试网络错误时默认通过"""
         # 模拟网络错误
-        mock_post.side_effect = Exception("Network error")
+        import requests
+        mock_post.side_effect = requests.RequestException("Network error")
         
         provider = GeetestProvider(self.valid_settings)
         result = provider.verify(
