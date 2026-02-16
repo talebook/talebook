@@ -35,8 +35,7 @@ lint-ui:
 	cd app && npm run lint
 
 lint-py:
-	-ruff check webserver --select=E9,F63,F7,F82 --output-format=full --statistics
-	-ruff check webserver --statistics
+	ruff format --check --diff webserver
 
 check-i18n:
 	uv run check_i18n_translation_missing.py
