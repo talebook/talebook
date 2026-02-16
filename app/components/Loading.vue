@@ -1,0 +1,38 @@
+<template>
+    <div
+        v-show="store.loading"
+        class="loading-page"
+        :class="{ 'dark-theme': store.theme === 'dark' }"
+    >
+        <v-progress-circular
+            indeterminate
+            size="128"
+            color="deep-orange lighten-2"
+        />
+    </div>
+</template>
+
+<script setup>
+import { useMainStore } from '@/stores/main';
+const store = useMainStore();
+</script>
+
+<style scoped>
+.loading-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    background: white;
+    text-align: center;
+    padding-top: 200px;
+    font-size: 30px;
+    font-family: sans-serif;
+}
+
+.loading-page.dark-theme {
+    background: #121212;
+}
+</style>

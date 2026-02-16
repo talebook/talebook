@@ -41,24 +41,28 @@ class MetaList(ListHandler):
         if self.get_argument("show", "") == "all":
             SHOW_NUMBER = sys.maxsize
         titles = {
-            "tag": _(u"全部标签"),
-            "author": _(u"全部作者"),
-            "series": _(u"丛书列表"),
-            "rating": _(u"全部评分"),
-            "publisher": _(u"全部出版社"),
-            "format": _(u"全部格式"),
+            "tag": _("全部标签"),
+            "author": _("全部作者"),
+            "series": _("丛书列表"),
+            "rating": _("全部评分"),
+            "publisher": _("全部出版社"),
+            "format": _("全部格式"),
         }
-        title = titles.get(meta, _(u"未知")) % vars()
+        title = titles.get(meta, _("未知")) % vars()
         if meta == "format":
             # 使用Calibre API获取所有格式及其对应的书籍数量
             from collections import defaultdict
+
             format_count = defaultdict(int)
             all_book_ids = self.db.new_api.all_book_ids()
             for book_id in all_book_ids:
                 book_formats = self.db.new_api.formats(book_id)
                 for fmt in book_formats:
                     format_count[fmt] += 1
-            items = [{"id": fmt, "name": fmt, "count": count} for fmt, count in format_count.items()]
+            items = [
+                {"id": fmt, "name": fmt, "count": count}
+                for fmt, count in format_count.items()
+            ]
         else:
             items = self.get_category_with_count(meta)
         count = len(items)
@@ -76,14 +80,14 @@ class MetaBooks(ListHandler):
     @js
     def get(self, meta, name):
         titles = {
-            "tag": _(u'含有"%(name)s"标签的书籍'),
-            "author": _(u'"%(name)s"编著的书籍'),
+            "tag": _('含有"%(name)s"标签的书籍'),
+            "author": _('"%(name)s"编著的书籍'),
             "series": _('"%(name)s"丛书包含的书籍'),
             "rating": _("评分为%(name)s星的书籍"),
-            "publisher": _(u'"%(name)s"出版的书籍'),
-            "format": _(u'格式为"%(name)s"的书籍'),
+            "publisher": _('"%(name)s"出版的书籍'),
+            "format": _('格式为"%(name)s"的书籍'),
         }
-        title = titles.get(meta, _(u"未知")) % vars()  # noqa: F841
+        title = titles.get(meta, _("未知")) % vars()  # noqa: F841
 
         if meta == "format":
             # 使用Calibre API获取指定格式的书籍
