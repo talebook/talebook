@@ -176,7 +176,7 @@ class ScanService(AsyncService):
                     # 检查作者是否相同
                     if set(book_authors) == set(mi_authors):
                         if fmt.upper() in b.get("available_formats", ""):
-                            row.book_id = b['id']
+                            row.book_id = b["id"]
                             row.status = ScanFile.EXIST
                             break
 
@@ -219,9 +219,10 @@ class ScanService(AsyncService):
                     logging.exception("Error details:")
                     # 创建一个简单的metadata对象，避免导入失败
                     from calibre.ebooks.metadata.book.base import Metadata
+
                     mi = Metadata()
                     mi.title = fname.replace("." + fmt, "")
-                    mi.authors = [_(u"佚名")]
+                    mi.authors = [_("佚名")]
                 else:
                     # 处理metadata
                     mi.title = utils.super_strip(mi.title)
@@ -230,7 +231,7 @@ class ScanService(AsyncService):
                     # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
                     if fmt in ["txt", "pdf"]:
                         mi.title = fname.replace("." + fmt, "")
-                        mi.authors = [_(u"佚名")]
+                        mi.authors = [_("佚名")]
 
             # 再次检查是否有重复书籍
             ids = self.db.books_with_same_title(mi)
@@ -244,7 +245,7 @@ class ScanService(AsyncService):
 
                     # 检查作者是否相同
                     if set(book_authors) == set(mi_authors):
-                        same_author_book_id = b['id']
+                        same_author_book_id = b["id"]
                         if fmt.upper() in b.get("available_formats", ""):
                             row.status = ScanFile.EXIST
                             break
@@ -252,8 +253,7 @@ class ScanService(AsyncService):
                 if same_author_book_id and row.status != ScanFile.EXIST:
                     # 同名同作者，添加格式到现有书籍
                     row.book_id = same_author_book_id
-                    logging.info(
-                        "import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
+                    logging.info("import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
                     self.db.add_format(row.book_id, fmt.upper(), fpath, True)
                     row.status = ScanFile.IMPORTED
                     self.save_or_rollback(row)

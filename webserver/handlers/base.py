@@ -35,16 +35,10 @@ def website_format(value):
     for link in value.split(";"):
         if link.startswith("douban://"):
             douban_id = link.split("//")[-1]
-            links.append(
-                "<a target='_blank' href='https://book.douban.com/subject/%s/'>豆瓣</a> "
-                % douban_id
-            )
+            links.append("<a target='_blank' href='https://book.douban.com/subject/%s/'>豆瓣</a> " % douban_id)
         elif link.startswith("isbn://"):
             douban_id = link.split("//")[-1]
-            links.append(
-                "<a target='_blank' href='https://book.douban.com/isbn/%s/'>豆瓣</a> "
-                % douban_id
-            )
+            links.append("<a target='_blank' href='https://book.douban.com/isbn/%s/'>豆瓣</a> " % douban_id)
         elif link.startswith("http://"):
             links.append("<a target='_blank' href='%s'>参考链接</a> " % link)
     return ";".join(links)
@@ -60,8 +54,7 @@ def js(func):
 
             logging.error(traceback.format_exc())
             msg = (
-                'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>'
-                % traceback.format_exc()
+                'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
             )
             rsp = {"err": "exception", "msg": msg}
             if isinstance(e, web.Finish):
@@ -133,6 +126,7 @@ class BaseHandler(web.RequestHandler):
         if expires:
             # Tornado 使用 expires_days 参数，需要转换为天数
             import datetime
+
             now = datetime.datetime.now()
             expires_days = (expires - now).total_seconds() / 86400
             super(BaseHandler, self).set_secure_cookie(key, val, expires_days=expires_days)
@@ -159,9 +153,7 @@ class BaseHandler(web.RequestHandler):
         auth_header = self.request.headers.get("Authorization", "")
         if not auth_header.startswith("Basic "):
             return False
-        auth_decoded = base64.decodebytes(auth_header[6:].encode("ascii")).decode(
-            "UTF-8"
-        )
+        auth_decoded = base64.decodebytes(auth_header[6:].encode("ascii")).decode("UTF-8")
         username, password = auth_decoded.split(":", 2)
         user = self.session.query(Reader).filter(Reader.username == username).first()
         if not user:
@@ -248,7 +240,7 @@ class BaseHandler(web.RequestHandler):
             return None
         uid = self.get_secure_cookie("user_id")
         if uid:
-            uid = uid.decode('utf-8') if isinstance(uid, bytes) else uid
+            uid = uid.decode("utf-8") if isinstance(uid, bytes) else uid
             return int(uid) if uid.isdigit() else None
         return None
 
@@ -273,9 +265,7 @@ class BaseHandler(web.RequestHandler):
         return self.current_user.is_admin()
 
     def login_user(self, user):
-        logging.info(
-            "LOGIN: %s - %d - %s" % (self.request.remote_ip, user.id, user.username)
-        )
+        logging.info("LOGIN: %s - %d - %s" % (self.request.remote_ip, user.id, user.username))
         self.set_secure_cookie("user_id", str(user.id))
         self.set_secure_cookie("lt", str(int(time.time())))
         user.access_time = datetime.datetime.now()
@@ -357,9 +347,7 @@ class BaseHandler(web.RequestHandler):
         if field not in self.db.field_metadata.sortable_field_keys():
             raise web.HTTPError(400, "%s is not a valid sort field" % field)
 
-        keyg = CSSortKeyGenerator(
-            [(field, order)], self.db.field_metadata, self.db.prefs
-        )
+        keyg = CSSortKeyGenerator([(field, order)], self.db.field_metadata, self.db.prefs)
         items.sort(key=keyg)
 
     def get_template_path(self):
@@ -400,9 +388,7 @@ class BaseHandler(web.RequestHandler):
         if request.user:
             request.user_extra = self.current_user.extra
             if not request.user.avatar:
-                request.user.avatar = (
-                    "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
-                )
+                request.user.avatar = "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
             else:
                 request.user.avatar = request.user.avatar.replace("http://", "//")
 
@@ -445,17 +431,14 @@ class BaseHandler(web.RequestHandler):
         _ts = time.time()
         books = self.db.get_data_as_dict(*args, **kwargs)
         logging.debug(
-            "[%5d ms] select books from library  (count = %d)"
-            % (int(1000 * (time.time() - _ts)), len(books))
+            "[%5d ms] select books from library  (count = %d)" % (int(1000 * (time.time() - _ts)), len(books))
         )
 
         item = Item()
         empty_item = item.to_dict()
         empty_item["collector"] = self.session.query(Reader).order_by(Reader.id).first()
         ids = [book["id"] for book in books]
-        items = (
-            self.session.query(Item).filter(Item.book_id.in_(ids)).all() if ids else []
-        )
+        items = self.session.query(Item).filter(Item.book_id.in_(ids)).all() if ids else []
         maps = {}
         for b in items:
             d = b.to_dict()
@@ -465,8 +448,7 @@ class BaseHandler(web.RequestHandler):
         for book in books:
             book.update(maps.get(book["id"], empty_item))
         logging.debug(
-            "[%5d ms] select books from database (count = %d)"
-            % (int(1000 * (time.time() - _ts)), len(books))
+            "[%5d ms] select books from database (count = %d)" % (int(1000 * (time.time() - _ts)), len(books))
         )
         return books
 

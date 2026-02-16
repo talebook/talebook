@@ -92,9 +92,7 @@ class Scanner:
         import_id = self.session.query(sqlalchemy.func.max(ScanFile.import_id)).scalar()
         if import_id is None:
             return (0, {})
-        query = self.session.query(ScanFile.status).filter(
-            ScanFile.import_id == import_id
-        )
+        query = self.session.query(ScanFile.status).filter(ScanFile.import_id == import_id)
         return (import_id, self.count(query))
 
     def scan_status(self):
@@ -174,16 +172,8 @@ class ScanList(BaseHandler):
                 "tags": s.tags,
                 "status": s.status,
                 "book_id": s.book_id,
-                "create_time": (
-                    s.create_time.strftime("%Y-%m-%d %H:%M:%S")
-                    if s.create_time
-                    else "N/A"
-                ),
-                "update_time": (
-                    s.update_time.strftime("%Y-%m-%d %H:%M:%S")
-                    if s.update_time
-                    else "N/A"
-                ),
+                "create_time": (s.create_time.strftime("%Y-%m-%d %H:%M:%S") if s.create_time else "N/A"),
+                "update_time": (s.update_time.strftime("%Y-%m-%d %H:%M:%S") if s.update_time else "N/A"),
             }
             response.append(d)
 

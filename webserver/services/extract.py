@@ -16,7 +16,7 @@ CONF = loader.get_settings()
 class ExtractService(AsyncService):
     @AsyncService.register_service
     def parse_txt_content(self, bid, fpath):
-        '''从TXT文件中提取目录并存储为json'''
+        """从TXT文件中提取目录并存储为json"""
         outDir = os.path.join(CONF["extract_path"], str(bid))  # 解压后的目录
         content_path = os.path.join(outDir, "content.json")
         if os.path.isfile(content_path):
@@ -29,7 +29,7 @@ class ExtractService(AsyncService):
         try:
             ret = TxtParser().parse(fpath)
             content = json.dumps(ret, ensure_ascii=False)
-            with open(content_path, 'w', encoding="utf8") as f:
+            with open(content_path, "w", encoding="utf8") as f:
                 f.write(content)
                 return True
         except Exception as e:

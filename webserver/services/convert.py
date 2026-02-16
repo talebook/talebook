@@ -48,7 +48,7 @@ class ConvertService(AsyncService):
                 p.kill()
                 logging.info("ebook-convert timeout: %s" % new_path)
                 log.info("ebook-convert timeout: %s" % new_path)
-                log.write(u"\n服务器转换书本格式时超时了。请在配置管理页面调大超时时间。\n[FINISH]")
+                log.write("\n服务器转换书本格式时超时了。请在配置管理页面调大超时时间。\n[FINISH]")
                 return False
             return True
 
@@ -76,7 +76,7 @@ class ConvertService(AsyncService):
         if fpath:
             MailService().send_book(user_id, site_url, book, mail_to, fmt, fpath)
         else:
-            self.add_msg(user_id, "danger", _(u"文件格式转换失败，请在QQ群里联系管理员."))
+            self.add_msg(user_id, "danger", _("文件格式转换失败，请在QQ群里联系管理员."))
 
     @AsyncService.register_service
     def convert_and_save(self, user_id, book, fpath, new_fmt):
@@ -91,7 +91,7 @@ class ConvertService(AsyncService):
 
         ok = ConvertService().do_ebook_convert(fpath, new_path, progress_file)
         if not ok:
-            self.add_msg(user_id, "danger", u"文件格式转换失败！请重试，或到Github上提交问题报告")
+            self.add_msg(user_id, "danger", "文件格式转换失败！请重试，或到Github上提交问题报告")
             return
 
         with open(new_path, "rb") as f:

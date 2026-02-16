@@ -26,7 +26,7 @@ class SimpleBookFormatter:
         if not v:
             v = default_value
         if isinstance(v, datetime.datetime):
-            return f'{v.year:04}-{v.month:02}-{v.day:02}'
+            return f"{v.year:04}-{v.month:02}-{v.day:02}"
         return v
 
     def format(self):
@@ -44,7 +44,7 @@ class SimpleBookFormatter:
             "tag": " / ".join(b["tags"]),
             "tags": b["tags"],
             "publisher": self.val("publisher"),
-            "comments": self.val("comments", _(u"暂无简介")),
+            "comments": self.val("comments", _("暂无简介")),
             "series": self.val("series", None),
             "language": self.val("language", None),
             "isbn": self.val("isbn", None),
@@ -123,4 +123,4 @@ def compare_books_by_rating_or_id(x, y):
 def super_strip(s):
     # 删除掉所有不可见的字符
     # issue: https://github.com/talebook/talebook/issues/304
-    return ''.join(c for c in s.strip() if c.isprintable())
+    return "".join(c for c in s.strip() if c.isprintable())

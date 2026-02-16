@@ -5,8 +5,10 @@ import warnings
 from unittest import mock
 from tests.test_main import TestWithUserLogin, setUpModule as init, testdir
 
+
 def setUpModule():
     init()
+
 
 class TestUpload(TestWithUserLogin):
     @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
@@ -48,7 +50,7 @@ class TestUpload(TestWithUserLogin):
     @mock.patch("webserver.models.Item.save")
     @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
     def test_upload_new_file(self, m5, m4, m3, m2, m1):
-        warnings.simplefilter('ignore', ResourceWarning)
+        warnings.simplefilter("ignore", ResourceWarning)
         name = "new.epub"
         path = testdir + "/cases/new.epub"
         with open(path, "rb") as f:

@@ -42,9 +42,7 @@ class ImageHandler(BaseHandler):
                 width, height = map(int, fmt.split("_")[1:])
             except:
                 width, height = 60, 80
-            return self.get_cover(
-                id, thumbnail=True, thumb_width=width, thumb_height=height
-            )
+            return self.get_cover(id, thumbnail=True, thumb_width=width, thumb_height=height)
         if fmt == "cover":
             return self.get_cover(id)
         if fmt == "opf":
@@ -66,9 +64,7 @@ class ImageHandler(BaseHandler):
             self.set_header("Last-Modified", self.last_modified(updated))
 
             if thumbnail:
-                return generate_thumbnail(
-                    cover, width=thumb_width, height=thumb_height
-                )[-1]
+                return generate_thumbnail(cover, width=thumb_width, height=thumb_height)[-1]
             else:
                 return cover
         except Exception as err:
@@ -140,9 +136,7 @@ class EpubReader(BaseHandler):
         if self.current_user:
             if self.current_user.can_read():
                 if not self.current_user.is_active():
-                    raise web.HTTPError(
-                        403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。")
-                    )
+                    raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
             else:
                 raise web.HTTPError(403, reason=_("无权在线阅读"))
 

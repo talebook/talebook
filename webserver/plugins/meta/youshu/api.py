@@ -18,7 +18,7 @@ CHROME_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)"
-                  + "Chrome/66.0.3359.139 Safari/537.36",
+    + "Chrome/66.0.3359.139 Safari/537.36",
 }
 
 
@@ -26,10 +26,11 @@ class YoushuPage:
     """
     parse youshu.me book page
     """
+
     def __init__(self, url):
         self.url = url
         self.http = self._request(url)
-        self.soup = BeautifulSoup(self.http.text, 'html.parser')
+        self.soup = BeautifulSoup(self.http.text, "html.parser")
 
     def _request(self, url):
         try:
@@ -45,7 +46,7 @@ class YoushuPage:
         info = {"title": "", "author": ""}
 
         # 提取书名和作者
-        title = self.soup.find('span', style="font-size:20px;font-weight:bold;color:#f27622;").text
+        title = self.soup.find("span", style="font-size:20px;font-weight:bold;color:#f27622;").text
         author = self.soup.select_one('a:not([class])[href*="authorarticle.php"]').text
         info["title"] = title
         info["author"] = author
@@ -55,7 +56,7 @@ class YoushuPage:
         """
         extract book summary
         """
-        summary_div = self.soup.find('div', style="padding:3px;border:0;height:100%;width:100%;overflow-y:scroll;")
+        summary_div = self.soup.find("div", style="padding:3px;border:0;height:100%;width:100%;overflow-y:scroll;")
         if summary_div:
             return summary_div.text.strip()
         return ""
@@ -64,10 +65,10 @@ class YoushuPage:
         """
         extract book cover image
         """
-        img = self.soup.select_one('a.book-detail-img')
-        if img and img.has_attr('href'):
-            href = img['href']
-            url = re.sub(r'/300$', '/600', href)
+        img = self.soup.select_one("a.book-detail-img")
+        if img and img.has_attr("href"):
+            href = img["href"]
+            url = re.sub(r"/300$", "/600", href)
             return url
         return None
 
@@ -75,7 +76,7 @@ class YoushuPage:
         """
         extract book id
         """
-        match = re.search(r'/book/(\d+)', self.url)
+        match = re.search(r"/book/(\d+)", self.url)
         if match:
             return match.group(1)
         return "0000"
@@ -94,9 +95,9 @@ class YoushuPage:
         """
         extract book source site
         """
-        td = self.soup.find('td', string=lambda text: text and '首发网站' in text)
+        td = self.soup.find("td", string=lambda text: text and "首发网站" in text)
         if td:
-            source_site = td.text.split('：')[-1].strip()
+            source_site = td.text.split("：")[-1].strip()
             return source_site
 
         return ""
@@ -105,7 +106,7 @@ class YoushuPage:
         """
         extract book rating
         """
-        rt = self.soup.find('span', class_='ratenum')
+        rt = self.soup.find("span", class_="ratenum")
         if rt:
             return int(float(rt.text))
 
@@ -116,26 +117,23 @@ class YoushuSearch:
     """
     search books on youshu.me
     """
+
     def __init__(self):
         self.search_url = "https://www.youshu.me/modules/article/search.php"
 
     def search(self, keyword):
-        payload = {
-            "searchtype": "all",
-            "searchkey": keyword,
-            "t_btnsearch": ""
-        }
+        payload = {"searchtype": "all", "searchkey": keyword, "t_btnsearch": ""}
 
         try:
             response = requests.post(self.search_url, data=payload, headers=CHROME_HEADERS, timeout=10)
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(response.text, "html.parser")
 
             # check if multiple results
             if "搜索关键词" in response.text:
                 # multiple results, redirect to first result
-                first_result = soup.select_one('span.c_subject a')
-                if first_result and first_result.has_attr('href'):
-                    book_url = "https://www.youshu.me" + first_result['href']
+                first_result = soup.select_one("span.c_subject a")
+                if first_result and first_result.has_attr("href"):
+                    book_url = "https://www.youshu.me" + first_result["href"]
                     return YoushuPage(book_url)
                 return None
             else:
@@ -212,5 +210,5 @@ class YoushuApi:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     api = YoushuApi()
-    print(api.get_book(u"黜龙"))
-    print(api.get_book(u"一世之尊"))
+    print(api.get_book("黜龙"))
+    print(api.get_book("一世之尊"))

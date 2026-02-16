@@ -4,8 +4,10 @@
 from unittest import mock
 from tests.test_main import TestWithUserLogin, setUpModule as init
 
+
 def setUpModule():
     init()
+
 
 class TestAdmin(TestWithUserLogin):
     def test_book_list(self):

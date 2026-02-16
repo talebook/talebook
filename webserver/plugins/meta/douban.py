@@ -116,7 +116,7 @@ class DoubanBookApi(object):
 
     def get_book_detail(self, md):
         # 字典结构体，转化格式
-        douban_id = md['id'] if isinstance(md, dict) else md.douban_id
+        douban_id = md["id"] if isinstance(md, dict) else md.douban_id
         info = self.get_book_by_id(douban_id)
         return self._metadata(info)
 
@@ -158,7 +158,7 @@ class DoubanBookApi(object):
                     author = r.sub("", author)
                 authors.append(author)
         if not authors:
-            authors = [u"佚名"]
+            authors = ["佚名"]
 
         logging.debug("=================\nsource metadata:\n%s" % book)
 
@@ -180,7 +180,7 @@ class DoubanBookApi(object):
         mi.douban_author_intro = book["author_intro"]
         mi.douban_subtitle = book.get("subtitle", None)
         mi.website = "https://book.douban.com/subject/%s/" % book["id"]
-        mi.source = u"豆瓣"
+        mi.source = "豆瓣"
         mi.provider_key = KEY
         mi.provider_value = book["id"]
 

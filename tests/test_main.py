@@ -29,27 +29,27 @@ _mock_user = None
 _mock_mail = None
 _mock_service_async_mode = None
 
-'''
+"""
 1	EPUB	440912	Bai Nian Gu Du - Jia Xi Ya  Ma Er Ke Si
 2	TXT	298421	Man Man Zi You Lu - Unknown
 3	MOBI	2662851	An Tu Sheng Tong Hua - An Tu Sheng
 4	AZW3	344989	Mai Ken Xi Fang Fa (Jing Guan Tu Shu De Ch - Ai Sen _La Sai Er (Ethan M.Rasiel)
 5	PDF	6127496	E Yu Pa Pa Ya Yi Pa Pa - Unknown
 6	EPUB	324726	Tang Shi San Bai Shou - Wei Zhi
-'''
+"""
 BID_EPUB = 1
 BID_TXT = 2
 BID_MOBI = 3
 BID_AZW3 = 4
 BID_PDF = 5
-BIDS = list(range(1,6))
+BIDS = list(range(1, 6))
 
 
 def setup_server():
     global _app
     # copy new db
-    shutil.copyfile(testdir+"/cases/users.db", testdir+"/library/users.db")
-    shutil.copyfile(testdir+"/cases/metadata.db", testdir+"/library/metadata.db")
+    shutil.copyfile(testdir + "/cases/users.db", testdir + "/library/users.db")
+    shutil.copyfile(testdir + "/cases/metadata.db", testdir + "/library/metadata.db")
 
     # set env
     main.options.with_library = testdir + "/library/"
@@ -84,6 +84,7 @@ def setup_mock_sendmail():
 def setup_mock_service():
     global _mock_service_async_mode
     _mock_service_async_mode = mock.patch("webserver.services.AsyncService.async_mode")
+
 
 def get_db():
     return _app.settings["ScopedSession"]
@@ -123,8 +124,8 @@ class TestApp(testing.AsyncHTTPTestCase):
         return _app
 
     def json(self, url, *args, **kwargs):
-        if 'request_timeout' not in kwargs:
-            kwargs['request_timeout'] = 60
+        if "request_timeout" not in kwargs:
+            kwargs["request_timeout"] = 60
         rsp = self.fetch(url, *args, **kwargs)
         self.assertEqual(rsp.code, 200)
         return json.loads(rsp.body)
@@ -205,7 +206,7 @@ class TestAppWithoutLogin(TestApp):
     def test_recent(self):
         d = self.json("/api/recent")
         self.assert_book_list(d, 10)
-        
+
     def test_library(self):
         d = self.json("/api/library")
         self.assert_book_list(d, 10)
@@ -375,7 +376,6 @@ class TestBook(TestWithUserLogin):
         self.assertEqual(rsp.code, 206)
         self.assertEqual(rsp.body, book_body[1:])
 
-
     def test_download_permission(self):
         with mock_permission() as user:
             user.set_permission("S")  # forbid
@@ -517,7 +517,7 @@ class TestRefer(TestWithUserLogin):
         from tests.test_baike import BAIKE_PAGE
         from tests.test_youshu import YOUSHU_PAGE
 
-        m1.return_value = DOUBAN_SEARCH['books']
+        m1.return_value = DOUBAN_SEARCH["books"]
         m2.return_value = dict(DOUBAN_BOOK)
         m3.return_value = dict(DOUBAN_BOOK)
         m4.return_value = ("jpg", b"image-body")
@@ -619,6 +619,7 @@ class TestUserSignUp(TestWithUserLogin):
     def auth(self, s):
         return "Basic " + base64.encodebytes(s.encode("ascii")).decode("ascii")
 
+
 class TestWithAdminUser(TestApp):
     @classmethod
     def setUpClass(self):
@@ -668,14 +669,14 @@ class TestOpds(TestWithUserLogin):
     def test_opds_nav2(self):
         main.CONF["opds_max_ungrouped_items"] = 2
         navs = [
-                b'Nauthors',
-                b'Nlanguages',
-                b'Npublisher',
-                b'Nrating',
-                b'Nseries',
-                b'Ntags',
-                b'Onewest',
-                b'Otitle',
+            b"Nauthors",
+            b"Nlanguages",
+            b"Npublisher",
+            b"Nrating",
+            b"Nseries",
+            b"Ntags",
+            b"Onewest",
+            b"Otitle",
         ]
         groups = [
             2,
@@ -690,26 +691,26 @@ class TestOpds(TestWithUserLogin):
                 self.parse_xml(rsp.body)
 
     def test_opds_category(self):
-        a = b'tags'.hex()
-        b = b'I71:tags'.hex()
-        rsp = self.fetch("/opds/category/%s/%s" % (a,b))
+        a = b"tags".hex()
+        b = b"I71:tags".hex()
+        rsp = self.fetch("/opds/category/%s/%s" % (a, b))
         self.assertEqual(rsp.code, 200)
         self.parse_xml(rsp.body)
 
     @unittest.skip("category里的search功能暂时搞不懂，以后考虑删掉")
     def test_opds_category_search(self):
-        b = ("I"+urllib.parse.quote("韩寒")+":authors").encode("UTF-8").hex()
+        b = ("I" + urllib.parse.quote("韩寒") + ":authors").encode("UTF-8").hex()
         a = b"search".hex()
-        b = b'I5:authors'.hex()
+        b = b"I5:authors".hex()
         b = "I文学:tags".encode("UTF-8").hex()
         rsp = self.fetch("/opds/category/%s/%s" % (a, b))
         self.assertEqual(rsp.code, 200, rsp.body)
         self.parse_xml(rsp.body)
 
     def test_opds_category_group(self):
-        a = b'tags'.hex()
-        b = b'C'.hex()
-        rsp = self.fetch("/opds/categorygroup/%s/%s" % (a,b))
+        a = b"tags".hex()
+        b = b"C".hex()
+        rsp = self.fetch("/opds/categorygroup/%s/%s" % (a, b))
         self.assertEqual(rsp.code, 200)
         self.parse_xml(rsp.body)
 
@@ -725,7 +726,7 @@ class TestOpds(TestWithUserLogin):
     def test_opds_without_login(self):
         main.CONF["INVITE_MODE"] = True
         main.CONF["OPDS_ENABLED"] = False
-        rsp = self.fetch("/opds/nav/%s" % b'Otitle'.hex())
+        rsp = self.fetch("/opds/nav/%s" % b"Otitle".hex())
         self.assertEqual(rsp.code, 401)
         main.CONF["INVITE_MODE"] = False
 
@@ -798,11 +799,11 @@ def setUpModule():
 
 
 if __name__ == "__main__":
-    '''
+    """
     logging.basicConfig(
         level=logging.DEBUG,
         datefmt="%Y-%m-%d %H:%M:%S",
         filename="/data/log/unittest.log",
         format="%(asctime)s %(levelname)7s %(pathname)s:%(lineno)d %(message)s",
-    )'''
+    )"""
     unittest.main()

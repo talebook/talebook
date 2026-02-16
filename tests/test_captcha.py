@@ -274,15 +274,11 @@ class TestGeetestProvider(unittest.TestCase):
         provider = GeetestProvider(self.valid_settings)
 
         # 缺少 lot_number
-        result = provider.verify(
-            captcha_output="test-output", pass_token="test-token", gen_time="1234567890"
-        )
+        result = provider.verify(captcha_output="test-output", pass_token="test-token", gen_time="1234567890")
         self.assertFalse(result)
 
         # 缺少 captcha_output
-        result = provider.verify(
-            lot_number="test-lot", pass_token="test-token", gen_time="1234567890"
-        )
+        result = provider.verify(lot_number="test-lot", pass_token="test-token", gen_time="1234567890")
         self.assertFalse(result)
 
     def test_verify_not_configured(self):

@@ -59,10 +59,7 @@ class MetaList(ListHandler):
                 book_formats = self.db.new_api.formats(book_id)
                 for fmt in book_formats:
                     format_count[fmt] += 1
-            items = [
-                {"id": fmt, "name": fmt, "count": count}
-                for fmt, count in format_count.items()
-            ]
+            items = [{"id": fmt, "name": fmt, "count": count} for fmt, count in format_count.items()]
         else:
             items = self.get_category_with_count(meta)
         count = len(items)

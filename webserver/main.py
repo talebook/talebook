@@ -135,6 +135,7 @@ def make_app():
         logging.info("updating configs ...")
         # 触发一次空白配置更新
         from webserver.handlers.admin import SettingsSaverLogic
+
         logic = SettingsSaverLogic()
         logic.update_nuxtjs_env()
         logging.info("done")

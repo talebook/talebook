@@ -232,11 +232,15 @@ class TestDoubanApi(unittest.TestCase):
 
             d = api.get_book_by_isbn("123")
             self.assertEqual(d, case["result"])
-            mk.assert_called_with("baseurl/v2/book/isbn/123", timeout=10, headers=CHROME_HEADERS, params={"apikey": "key"})
+            mk.assert_called_with(
+                "baseurl/v2/book/isbn/123", timeout=10, headers=CHROME_HEADERS, params={"apikey": "key"}
+            )
 
             d = api.get_book_by_id("456")
             self.assertEqual(d, case["result"])
-            mk.assert_called_with("baseurl/v2/book/id/456", timeout=10, headers=CHROME_HEADERS, params={"apikey": "key"})
+            mk.assert_called_with(
+                "baseurl/v2/book/id/456", timeout=10, headers=CHROME_HEADERS, params={"apikey": "key"}
+            )
 
     @mock.patch("requests.get")
     def test_search_books(self, mk):

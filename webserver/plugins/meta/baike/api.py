@@ -21,7 +21,7 @@ CHROME_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)"
-                  + "Chrome/66.0.3359.139 Safari/537.36",
+    + "Chrome/66.0.3359.139 Safari/537.36",
 }
 
 
@@ -52,11 +52,11 @@ class BaiduBaikeApi:
         mi = Metadata(info["title"])
         plat = "网络平台"
         info.get("出版社", info.get("连载平台", plat))
-        mi.authors = [info.get(u"作者", u"佚名")]
+        mi.authors = [info.get("作者", "佚名")]
         mi.author_sort = mi.authors[0]
         mi.isbn = info.get("ISBN", BAIKE_ISBN)
         mi.tags = baike.get_tags()
-        pd = str2date(info.get(u"出版时间"))
+        pd = str2date(info.get("出版时间"))
         if pd is None:
             pd = utcnow()
         mi.pubdate = pd
@@ -64,13 +64,13 @@ class BaiduBaikeApi:
         mi.cover_url = baike.get_image()
         mi.comments = re.sub(r"\[\d+\]$", "", baike.get_summary())
         mi.website = baike.http.url
-        mi.source = u"百度百科"
+        mi.source = "百度百科"
         mi.provider_key = KEY
         mi.provider_value = baike.get_id()
         mi.cover_data = self.get_cover(mi.cover_url)
 
-        if u"完结" in info.get(u"连载状态", ""):
-            day = re.findall(r"\d*-\d*-\d*", info[u"连载状态"])
+        if "完结" in info.get("连载状态", ""):
+            day = re.findall(r"\d*-\d*-\d*", info["连载状态"])
             try:
                 mi.pubdate = strptime(day[0], "%Y-%m-%d")
             except:
@@ -99,5 +99,5 @@ class BaiduBaikeApi:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     api = BaiduBaikeApi()
-    print(api.get_book(u"法神重生"))
-    print(api.get_book(u"东周列国志"))
+    print(api.get_book("法神重生"))
+    print(api.get_book("东周列国志"))

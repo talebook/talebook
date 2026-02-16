@@ -105,9 +105,7 @@ class CaptchaVerifyHandler(CaptchaBaseHandler):
 
             # 检查是否过期（双重验证）
             try:
-                gen_time = datetime.datetime.fromtimestamp(
-                    float(generate_time.decode("utf-8"))
-                )
+                gen_time = datetime.datetime.fromtimestamp(float(generate_time.decode("utf-8")))
                 now = datetime.datetime.utcnow()
                 elapsed = (now - gen_time).total_seconds()
                 remaining = 60 - elapsed

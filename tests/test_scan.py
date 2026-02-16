@@ -19,6 +19,7 @@ def setUpModule():
     init()
     handlers.scan.SCAN_DIR_PREFIX = "/"
 
+
 class TestScan(TestWithUserLogin):
     NEW_ROW_ID = 69
     RECORDS_COUNT = 2
@@ -39,7 +40,7 @@ class TestScan(TestWithUserLogin):
 
     def test_list(self):
         d = self.json("/api/admin/scan/list?num=10000")
-        self.assertEqual(d['total'], self.RECORDS_COUNT)
+        self.assertEqual(d["total"], self.RECORDS_COUNT)
 
     def test_scan(self):
         d = self.json("/api/admin/scan/run", method="POST", body="")
@@ -49,10 +50,10 @@ class TestScan(TestWithUserLogin):
         self.assertEqual(row.status, ScanFile.READY)
 
         d = self.json("/api/admin/scan/list?num=10000")
-        self.assertGreaterEqual(d['total'], self.RECORDS_COUNT)
+        self.assertGreaterEqual(d["total"], self.RECORDS_COUNT)
 
-        titles = set([ '天行者', '我的一生', 'book', '凡人修仙之仙界篇', '语言哲学'])
-        scan_titles = set([ book['title'] for book in d['items'] ])
+        titles = set(["天行者", "我的一生", "book", "凡人修仙之仙界篇", "语言哲学"])
+        scan_titles = set([book["title"] for book in d["items"]])
 
     def test_scan_background(self):
         self.async_service.return_value = True
@@ -60,11 +61,11 @@ class TestScan(TestWithUserLogin):
         n = threading.active_count() + 1
         d = self.json("/api/admin/scan/run", method="POST", body="")
         self.assertEqual(d["err"], "ok")
-        self.assertEqual(n+1, threading.active_count())
+        self.assertEqual(n + 1, threading.active_count())
 
         # wait job done
         time.sleep(2)
-        q = ScanService().get_queue('do_scan')
+        q = ScanService().get_queue("do_scan")
         n = q.qsize()
         while n:
             n = q.qsize()
@@ -72,7 +73,7 @@ class TestScan(TestWithUserLogin):
 
         row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
         self.assertEqual(row.status, ScanFile.READY)
-        #self.assertEqual(row.status, ScanFile.DROP)
+        # self.assertEqual(row.status, ScanFile.DROP)
 
     def test_scan_status(self):
         d = self.json("/api/admin/scan/status")
@@ -139,4 +140,3 @@ class TestImport(TestWithUserLogin):
         req = {"hashlist": "all"}
         d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
-

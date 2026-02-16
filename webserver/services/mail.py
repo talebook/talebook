@@ -45,16 +45,16 @@ class MailService(AsyncService):
 
         smtp_port = 465
         relay = kwargs.get("relay", CONF.get("smtp_server", ""))
-        if relay and ':' in relay:
+        if relay and ":" in relay:
             # 处理IPv6地址和端口，如 [::1]:25
-            if relay.startswith('['):
+            if relay.startswith("["):
                 # IPv6地址格式：[IPv6]:port
-                addr_part, port_part = relay.rsplit(':', 1)
+                addr_part, port_part = relay.rsplit(":", 1)
                 relay = addr_part  # 保留[IPv6]格式
             else:
                 # 普通格式：host:port
-                parts = relay.split(':')
-                relay = ':'.join(parts[:-1])  # 处理多个冒号的情况
+                parts = relay.split(":")
+                relay = ":".join(parts[:-1])  # 处理多个冒号的情况
                 port_part = parts[-1]
             # 验证端口是否为数字
             try:
@@ -87,9 +87,9 @@ class MailService(AsyncService):
         from calibre.ebooks.metadata import authors_to_string
 
         # read meta info
-        author = authors_to_string(book["authors"] if book["authors"] else [_(u"佚名")])
-        title = book["title"] if book["title"] else _(u"无名书籍")
-        fname = u"%s - %s.%s" % (title, author, fmt)
+        author = authors_to_string(book["authors"] if book["authors"] else [_("佚名")])
+        title = book["title"] if book["title"] else _("无名书籍")
+        fname = "%s - %s.%s" % (title, author, fmt)
         with open(fpath, "rb") as f:
             fdata = f.read()
 
