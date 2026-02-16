@@ -484,7 +484,7 @@
         "goTo": "Please go to",
         "configurationPage": "developer configuration page",
         "getKeysAndSetCallback": ", get the keys and set the callback address to:",
-        "captchaInfo": "When enabled, users need to complete CAPTCHA verification on corresponding pages. Currently supports GeeTest."
+        "captchaInfo": "When enabled, users need to complete CAPTCHA verification on corresponding pages."
       }
     },
     "users": {

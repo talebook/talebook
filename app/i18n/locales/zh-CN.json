@@ -505,7 +505,7 @@
         "goTo": "请前往",
         "configurationPage": "的开发者配置页面",
         "getKeysAndSetCallback": "，获取密钥后设置回调地址为：",
-        "captchaInfo": "启用后，在对应页面需要完成人机验证才能继续操作。目前支持极验GeeTest。"
+        "captchaInfo": "启用后，在对应页面需要完成人机验证才能继续操作。"
       }
     },
     "users": {

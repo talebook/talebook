@@ -33,14 +33,41 @@ def check_captcha(handler, scene):
     # 检查是否是图形验证码
     captcha_code = handler.get_argument("captcha_code", "")
     if captcha_code:
-        # 检查是否已经通过验证码验证（由 /api/captcha/verify 设置标记）
-        captcha_verified = handler.get_secure_cookie("captcha_verified")
-        if not captcha_verified:
-            return False, _("请先完成验证码验证")
+        # 直接从cookie中获取正确答案进行验证
+        captcha_answer = handler.get_secure_cookie("captcha_answer")
+        generate_time = handler.get_secure_cookie("captcha_generate_time")
 
-        # 验证通过后清除标记，防止重复使用
-        handler.clear_cookie("captcha_verified")
-        return True, None
+        # 检查验证码是否存在
+        if not captcha_answer or not generate_time:
+            return False, _("验证码已过期，请刷新")
+
+        # 检查是否过期
+        try:
+            import datetime
+            gen_time = datetime.datetime.fromtimestamp(float(generate_time.decode('utf-8')))
+            now = datetime.datetime.utcnow()
+            elapsed = (now - gen_time).total_seconds()
+            if elapsed > 120:  # 超过2分钟
+                handler.clear_cookie("captcha_answer")
+                handler.clear_cookie("captcha_generate_time")
+                return False, _("验证码已过期，请刷新")
+        except Exception:
+            return False, _("验证码验证失败")
+
+        # 验证用户输入的验证码
+        result = captcha_module.verify_captcha(
+            CONF,
+            captcha_code=captcha_code,
+            captcha_answer=captcha_answer.decode('utf-8')
+        )
+
+        if result:
+            # 验证通过后清除cookie，防止重复使用
+            handler.clear_cookie("captcha_answer")
+            handler.clear_cookie("captcha_generate_time")
+            return True, None
+        else:
+            return False, _("验证码错误")
 
     # 极验验证码
     lot_number = handler.get_argument("lot_number", "")

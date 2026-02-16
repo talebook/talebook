@@ -53,9 +53,9 @@ class CaptchaImageHandler(CaptchaBaseHandler):
         provider = ImageCaptchaProvider(CONF)
         result = provider.generate()
 
-        # 将正确答案存入 cookie，1分钟过期
+        # 将正确答案存入 cookie，2分钟过期
         # 使用本地时间，因为 Tornado 的 expires 参数需要本地时间
-        expires = datetime.datetime.now() + datetime.timedelta(minutes=1)
+        expires = datetime.datetime.now() + datetime.timedelta(minutes=2)
         self.set_secure_cookie("captcha_answer", result["code"], expires=expires)
 
         # 同时存储生成时间，用于精确判断（使用 UTC 时间戳）
@@ -114,8 +114,8 @@ class CaptchaVerifyHandler(CaptchaBaseHandler):
                 logging.info(
                     f"验证码过期检查 - 生成时间: {gen_time}, 当前时间: {now}, 已过去: {elapsed:.1f}秒, 剩余: {remaining:.1f}秒"
                 )
-                if elapsed > 60:  # 超过60秒
-                    logging.info("验证码已过期 - 超过60秒")
+                if elapsed > 120:  # 超过2分钟
+                    logging.info("验证码已过期 - 超过2分钟")
                     self.clear_cookie("captcha_answer")
                     self.clear_cookie("captcha_generate_time")
                     return {"err": "captcha.expired", "msg": _("验证码已过期，请刷新")}
@@ -129,13 +129,8 @@ class CaptchaVerifyHandler(CaptchaBaseHandler):
                 captcha_answer=captcha_answer.decode("utf-8"),
             )
 
-            # 验证成功后设置验证通过标记，失败不清除（允许重试）
+            # 验证成功后保留cookie（供后续表单提交时验证），失败不清除（允许重试）
             if result:
-                # 设置验证通过标记，5分钟内有效
-                verify_expires = datetime.datetime.now() + datetime.timedelta(minutes=5)
-                self.set_secure_cookie("captcha_verified", "1", expires=verify_expires)
-                self.clear_cookie("captcha_answer")
-                self.clear_cookie("captcha_generate_time")
                 return {"err": "ok", "msg": _("验证通过")}
             else:
                 return {"err": "captcha.invalid", "msg": _("验证码错误，请重试")}

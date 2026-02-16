@@ -486,6 +486,7 @@ class OPDSImportService(AsyncService):
             shutil.move(file_path, target_path)
             logging.info(f"书籍已移动到扫描目录: {target_path}")
             # 如果此前在待处理列表中创建了对应的 ScanFile（status=downloading），更新其路径和状态
+            sess = None
             try:
                 from webserver.services.async_service import AsyncService
 
@@ -507,6 +508,9 @@ class OPDSImportService(AsyncService):
                             logging.error(f"更新 ScanFile 状态时出错，已回滚事务: {e}")
             except Exception as e:
                 logging.debug(f"无法更新 ScanFile 状态或不存在对应记录: {e}")
+            finally:
+                if sess:
+                    sess.close()
 
             # 创建扫描记录（如果需要）
             # 这里假设系统会自动扫描扫描目录中的新文件
