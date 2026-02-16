@@ -1,5 +1,17 @@
 <template>
     <div class="captcha-container">
+        <!-- 错误提示 -->
+        <div
+            v-if="error"
+            class="captcha-error mb-2"
+        >
+            <v-alert
+                type="error"
+                class="ma-2"
+            >
+                {{ error }}
+            </v-alert>
+        </div>
         <div
             v-if="loading"
             class="captcha-loading"
@@ -10,17 +22,6 @@
                 size="24"
             />
             <span class="ml-2">{{ t('captcha.loading') }}</span>
-        </div>
-        <div
-            v-else-if="error"
-            class="captcha-error"
-        >
-            <v-alert
-                type="error"
-                density="compact"
-            >
-                {{ error }}
-            </v-alert>
         </div>
         <!-- 图形验证码 -->
         <ImageCaptchaWidget
@@ -47,7 +48,7 @@ const { t } = useI18n();
 const { $backend } = useNuxtApp();
 
 const props = defineProps({
-    // 验证场景: 'register', 'login', 'welcome'
+    // 验证场景: 'register', 'login', 'welcome', 'reset'
     scene: {
         type: String,
         required: true
@@ -112,7 +113,8 @@ const initGeetest = async () => {
                     });
                 })
                 .onError(() => {
-                    emit('error', t('captcha.verifyFailed'));
+                    error.value = t('captcha.verifyFailed');
+                    emit('error', error.value);
                 })
                 .onClose(() => {
                     // 用户关闭验证框
@@ -126,11 +128,13 @@ const initGeetest = async () => {
 
 // 图形验证码验证成功
 const onImageVerify = (data) => {
+    error.value = '';
     emit('verify', data);
 };
 
 // 图形验证码错误
 const onImageError = (msg) => {
+    error.value = msg;
     emit('error', msg);
 };
 
@@ -151,6 +155,7 @@ const fetchConfig = async () => {
 
 // 重置验证码
 const reset = () => {
+    error.value = '';
     if (config.value && config.value.provider === 'image' && imageCaptchaRef.value) {
         imageCaptchaRef.value.reset();
     } else if (geetestInstance) {
@@ -158,9 +163,15 @@ const reset = () => {
     }
 };
 
+// 显示错误信息
+const showError = (msg) => {
+    error.value = msg;
+};
+
 // 暴露方法给父组件
 defineExpose({
-    reset
+    reset,
+    showError
 });
 
 onMounted(async () => {
@@ -186,6 +197,7 @@ onUnmounted(() => {
 .captcha-container {
     min-height: 50px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
 }

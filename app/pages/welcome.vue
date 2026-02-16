@@ -160,7 +160,8 @@ const captchaEnabled = ref(false);
 const captchaScenes = ref({
     register: false,
     login: false,
-    welcome: false
+    welcome: false,
+    reset: false
 });
 const captchaVerified = ref(false);
 const captchaData = ref(null);
@@ -228,9 +229,7 @@ const onWelcomeClick = () => {
 // 关闭验证码弹窗
 const closeCaptchaDialog = () => {
     showCaptchaDialog.value = false;
-    if (captchaRef.value) {
-        captchaRef.value.reset();
-    }
+    // 取消时不重置验证码，避免不必要的刷新
 };
 
 // 验证码验证成功回调
@@ -286,8 +285,13 @@ const welcome_login = async () => {
         if (rsp.err !== 'ok') {
             is_err.value = true;
             msg.value = rsp.msg || t('welcomePage.invalidCode');
-            // 重置验证码
-            if (captchaEnabled.value && captchaRef.value) {
+            // 如果是验证码错误，在验证码组件内显示错误
+            if (captchaEnabled.value && captchaRef.value && rsp.err === 'captcha.invalid') {
+                captchaRef.value.showError(rsp.msg);
+                captchaVerified.value = false;
+                captchaData.value = null;
+            } else if (captchaEnabled.value && captchaRef.value) {
+                // 其他错误只重置验证码
                 captchaRef.value.reset();
                 captchaVerified.value = false;
                 captchaData.value = null;

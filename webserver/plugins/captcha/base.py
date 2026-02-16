@@ -53,7 +53,7 @@ class BaseCaptchaProvider(ABC):
     def is_enabled_for(self, scene: str) -> bool:
         """
         检查某场景是否启用了验证
-        :param scene: 场景名称，可选值: 'register', 'login', 'welcome'
+        :param scene: 场景名称，可选值: 'register', 'login', 'welcome', 'reset'
         :return: True 如果该场景启用了验证
         """
         scene_key = f"CAPTCHA_ENABLE_FOR_{scene.upper()}"

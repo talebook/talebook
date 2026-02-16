@@ -458,6 +458,7 @@
         "captchaEnableForRegister": "Enable for Registration",
         "captchaEnableForLogin": "Enable for Login",
         "captchaEnableForWelcome": "Enable for Private Library",
+        "captchaEnableForReset": "Enable for Password Reset",
         "geetestCaptchaId": "GeeTest Captcha ID",
         "geetestCaptchaKey": "GeeTest Captcha Key"
       },

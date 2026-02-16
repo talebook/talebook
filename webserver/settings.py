@@ -129,6 +129,7 @@ settings = {
     'CAPTCHA_ENABLE_FOR_REGISTER': False,  # 注册界面启用认证
     'CAPTCHA_ENABLE_FOR_LOGIN': False,     # 登录页面启用认证
     'CAPTCHA_ENABLE_FOR_WELCOME': False,   # 私人图书馆界面启用认证
+    'CAPTCHA_ENABLE_FOR_RESET': False,     # 重置密码页面启用认证
     'GEETEST_CAPTCHA_ID': '',              # 极验 Captcha ID (公钥)
     'GEETEST_CAPTCHA_KEY': '',             # 极验 Captcha Key (私钥)
 

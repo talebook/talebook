@@ -479,6 +479,7 @@
         "captchaEnableForRegister": "注册界面启用认证",
         "captchaEnableForLogin": "登录页面启用认证",
         "captchaEnableForWelcome": "私人图书馆界面启用认证",
+        "captchaEnableForReset": "重置密码页面启用认证",
         "geetestCaptchaId": "极验 Captcha ID",
         "geetestCaptchaKey": "极验 Captcha Key"
       },
