@@ -26,7 +26,7 @@ CONF = loader.get_settings()
 def day_format(value, format="%Y-%m-%d"):
     try:
         return value.strftime(format)
-    except:
+    except (AttributeError, TypeError, ValueError):
         return "1990-01-01"
 
 
@@ -35,12 +35,18 @@ def website_format(value):
     for link in value.split(";"):
         if link.startswith("douban://"):
             douban_id = link.split("//")[-1]
-            links.append(u"<a target='_blank' href='https://book.douban.com/subject/%s/'>豆瓣</a> " % douban_id)
+            links.append(
+                "<a target='_blank' href='https://book.douban.com/subject/%s/'>豆瓣</a> "
+                % douban_id
+            )
         elif link.startswith("isbn://"):
             douban_id = link.split("//")[-1]
-            links.append(u"<a target='_blank' href='https://book.douban.com/isbn/%s/'>豆瓣</a> " % douban_id)
+            links.append(
+                "<a target='_blank' href='https://book.douban.com/isbn/%s/'>豆瓣</a> "
+                % douban_id
+            )
         elif link.startswith("http://"):
-            links.append(u"<a target='_blank' href='%s'>参考链接</a> " % link)
+            links.append("<a target='_blank' href='%s'>参考链接</a> " % link)
     return ";".join(links)
 
 
@@ -54,7 +60,8 @@ def js(func):
 
             logging.error(traceback.format_exc())
             msg = (
-                'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
+                'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>'
+                % traceback.format_exc()
             )
             rsp = {"err": "exception", "msg": msg}
             if isinstance(e, web.Finish):
@@ -73,7 +80,7 @@ def js(func):
 def auth(func):
     def do(self, *args, **kwargs):
         if not self.current_user:
-            return {"err": "user.need_login", "msg": _(u"请先登录")}
+            return {"err": "user.need_login", "msg": _("请先登录")}
         return func(self, *args, **kwargs)
 
     return do
@@ -82,9 +89,9 @@ def auth(func):
 def is_admin(func):
     def do(self, *args, **kwargs):
         if not self.current_user:
-            return {"err": "user.need_login", "msg": _(u"请先登录")}
+            return {"err": "user.need_login", "msg": _("请先登录")}
         if not self.admin_user:
-            return {"err": "permission.not_admin", "msg": _(u"当前用户非管理员")}
+            return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
         return func(self, *args, **kwargs)
 
     return do
@@ -112,7 +119,7 @@ class BaseHandler(web.RequestHandler):
 
     def get_argument(self, name, default=None, strip=True):
         value = super().get_argument(name, default, strip)
-        if value == 'null':
+        if value == "null":
             return default
         return value
 
@@ -121,9 +128,16 @@ class BaseHandler(web.RequestHandler):
             self.cookies_cache[key] = super(BaseHandler, self).get_secure_cookie(key)
         return self.cookies_cache[key]
 
-    def set_secure_cookie(self, key, val):
+    def set_secure_cookie(self, key, val, expires=None):
         self.cookies_cache[key] = val
-        super(BaseHandler, self).set_secure_cookie(key, val)
+        if expires:
+            # Tornado 使用 expires_days 参数，需要转换为天数
+            import datetime
+            now = datetime.datetime.now()
+            expires_days = (expires - now).total_seconds() / 86400
+            super(BaseHandler, self).set_secure_cookie(key, val, expires_days=expires_days)
+        else:
+            super(BaseHandler, self).set_secure_cookie(key, val)
         return None
 
     def head(self, *args, **kwargs):
@@ -145,7 +159,9 @@ class BaseHandler(web.RequestHandler):
         auth_header = self.request.headers.get("Authorization", "")
         if not auth_header.startswith("Basic "):
             return False
-        auth_decoded = base64.decodebytes(auth_header[6:].encode("ascii")).decode("UTF-8")
+        auth_decoded = base64.decodebytes(auth_header[6:].encode("ascii")).decode(
+            "UTF-8"
+        )
         username, password = auth_decoded.split(":", 2)
         user = self.session.query(Reader).filter(Reader.username == username).first()
         if not user:
@@ -231,7 +247,10 @@ class BaseHandler(web.RequestHandler):
         if not login_time or int(login_time) < int(time.time()) - 7 * 86400:
             return None
         uid = self.get_secure_cookie("user_id")
-        return int(uid) if uid and uid.isdigit() else None
+        if uid:
+            uid = uid.decode('utf-8') if isinstance(uid, bytes) else uid
+            return int(uid) if uid.isdigit() else None
+        return None
 
     def get_current_user(self):
         user_id = self.user_id()
@@ -254,7 +273,9 @@ class BaseHandler(web.RequestHandler):
         return self.current_user.is_admin()
 
     def login_user(self, user):
-        logging.info("LOGIN: %s - %d - %s" % (self.request.remote_ip, user.id, user.username))
+        logging.info(
+            "LOGIN: %s - %d - %s" % (self.request.remote_ip, user.id, user.username)
+        )
         self.set_secure_cookie("user_id", str(user.id))
         self.set_secure_cookie("lt", str(int(time.time())))
         user.access_time = datetime.datetime.now()
@@ -336,7 +357,9 @@ class BaseHandler(web.RequestHandler):
         if field not in self.db.field_metadata.sortable_field_keys():
             raise web.HTTPError(400, "%s is not a valid sort field" % field)
 
-        keyg = CSSortKeyGenerator([(field, order)], self.db.field_metadata, self.db.prefs)
+        keyg = CSSortKeyGenerator(
+            [(field, order)], self.db.field_metadata, self.db.prefs
+        )
         items.sort(key=keyg)
 
     def get_template_path(self):
@@ -377,7 +400,9 @@ class BaseHandler(web.RequestHandler):
         if request.user:
             request.user_extra = self.current_user.extra
             if not request.user.avatar:
-                request.user.avatar = "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
+                request.user.avatar = (
+                    "//tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
+                )
             else:
                 request.user.avatar = request.user.avatar.replace("http://", "//")
 
@@ -401,7 +426,7 @@ class BaseHandler(web.RequestHandler):
     def get_book(self, book_id):
         books = self.get_books(ids=[int(book_id)])
         if not books:
-            self.write({"err": "not_found", "msg": _(u"抱歉，这本书不存在")})
+            self.write({"err": "not_found", "msg": _("抱歉，这本书不存在")})
             self.set_status(200)
             raise web.Finish()
         return books[0]
@@ -420,14 +445,17 @@ class BaseHandler(web.RequestHandler):
         _ts = time.time()
         books = self.db.get_data_as_dict(*args, **kwargs)
         logging.debug(
-            "[%5d ms] select books from library  (count = %d)" % (int(1000 * (time.time() - _ts)), len(books))
+            "[%5d ms] select books from library  (count = %d)"
+            % (int(1000 * (time.time() - _ts)), len(books))
         )
 
         item = Item()
         empty_item = item.to_dict()
         empty_item["collector"] = self.session.query(Reader).order_by(Reader.id).first()
         ids = [book["id"] for book in books]
-        items = self.session.query(Item).filter(Item.book_id.in_(ids)).all() if ids else []
+        items = (
+            self.session.query(Item).filter(Item.book_id.in_(ids)).all() if ids else []
+        )
         maps = {}
         for b in items:
             d = b.to_dict()
@@ -437,7 +465,8 @@ class BaseHandler(web.RequestHandler):
         for book in books:
             book.update(maps.get(book["id"], empty_item))
         logging.debug(
-            "[%5d ms] select books from database (count = %d)" % (int(1000 * (time.time() - _ts)), len(books))
+            "[%5d ms] select books from database (count = %d)"
+            % (int(1000 * (time.time() - _ts)), len(books))
         )
         return books
 
@@ -528,7 +557,6 @@ class ListHandler(BaseHandler):
             self.do_sort(items, "id", False)
         return None
 
-    @js
     def render_book_list(self, all_books, ids=None, title=None, sort_by_id=False):
         start = self.get_argument_start()
         try:

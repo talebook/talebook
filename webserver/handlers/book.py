@@ -67,7 +67,9 @@ class BookDetail(BaseHandler):
         return {
             "err": "ok",
             "kindle_sender": CONF["smtp_username"],
-            "book": utils.BookFormatter(self, book).format(with_files=True, with_perms=True),
+            "book": utils.BookFormatter(self, book).format(
+                with_files=True, with_perms=True
+            ),
         }
 
 
@@ -84,7 +86,7 @@ class BookRefer(BaseHandler):
         return False
 
     def plugin_search_books(self, mi):
-        title = re.sub(u"[(（].*", "", mi.title)
+        title = re.sub("[(（].*", "", mi.title)
         api = douban.DoubanBookApi(
             CONF["douban_apikey"],
             CONF["douban_baseurl"],
@@ -97,7 +99,7 @@ class BookRefer(BaseHandler):
         try:
             books = api.search_books(title) or []
         except:
-            logging.error(_(u"豆瓣接口查询 %s 失败" % title))
+            logging.error(_("豆瓣接口查询 %s 失败" % title))
 
         if not self.has_proper_book(books, mi):
             # 若有ISBN号，但是却没搜索出来，则精准查询一次ISBN
@@ -113,7 +115,10 @@ class BookRefer(BaseHandler):
         try:
             book = api.get_book(title)
         except:
-            return {"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")}
+            return {
+                "err": "httprequest.baidubaike.failed",
+                "msg": _("百度百科查询失败"),
+            }
         if book:
             books.append(book)
 
@@ -121,7 +126,7 @@ class BookRefer(BaseHandler):
         try:
             book = api.get_book(title)
         except:
-            return {"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")}
+            return {"err": "httprequest.youshu.failed", "msg": _("优书网查询失败")}
         if book:
             books.append(book)
 
@@ -130,13 +135,18 @@ class BookRefer(BaseHandler):
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
         refer_mi = None
         if provider_key == baike.KEY:
-            title = re.sub(u"[(（].*", "", mi.title)
+            title = re.sub("[(（].*", "", mi.title)
             api = baike.BaiduBaikeApi(copy_image=True)
             try:
                 refer_mi = api.get_book(title)
             except Exception as e:
                 logging.error("获取百度百科书籍信息失败: %s", e)
-                raise RuntimeError({"err": "httprequest.baidubaike.failed", "msg": _(u"百度百科查询失败")})
+                raise RuntimeError(
+                    {
+                        "err": "httprequest.baidubaike.failed",
+                        "msg": _("百度百科查询失败"),
+                    }
+                )
         elif provider_key == douban.KEY:
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(
@@ -156,21 +166,32 @@ class BookRefer(BaseHandler):
                     logging.info("豆瓣封面获取失败，保留本地原有封面")
             except Exception as e:
                 logging.error("获取豆瓣书籍信息失败: %s", e)
-                raise RuntimeError({"err": "httprequest.douban.failed", "msg": _(u"豆瓣接口查询失败")})
+                raise RuntimeError(
+                    {"err": "httprequest.douban.failed", "msg": _("豆瓣接口查询失败")}
+                )
         elif provider_key == youshu.KEY:
-            title = re.sub(u"[(（].*", "", mi.title)
+            title = re.sub("[(（].*", "", mi.title)
             api = youshu.YoushuApi(copy_image=True)
             try:
                 refer_mi = api.get_book(title)
             except Exception as e:
                 logging.error("获取优书网书籍信息失败: %s", e)
-                raise RuntimeError({"err": "httprequest.youshu.failed", "msg": _(u"优书网查询失败")})
+                raise RuntimeError(
+                    {"err": "httprequest.youshu.failed", "msg": _("优书网查询失败")}
+                )
         else:
-            raise RuntimeError({"err": "params.provider_key.not_support", "msg": _(u"不支持该provider_key")})
+            raise RuntimeError(
+                {
+                    "err": "params.provider_key.not_support",
+                    "msg": _("不支持该provider_key"),
+                }
+            )
 
         # 确保返回值有效
         if not refer_mi:
-            raise RuntimeError({"err": "plugin.fail", "msg": _(u"插件拉取信息异常，请重试")})
+            raise RuntimeError(
+                {"err": "plugin.fail", "msg": _("插件拉取信息异常，请重试")}
+            )
 
         return refer_mi
 
@@ -198,7 +219,7 @@ class BookRefer(BaseHandler):
             pubdate = b.get("pubdate")
             d["pubyear"] = pubdate.strftime("%Y") if pubdate else ""
             if not d["comments"]:
-                d["comments"] = _(u"无详细介绍")
+                d["comments"] = _("无详细介绍")
             rsp.append(d)
         return {"err": "ok", "books": rsp}
 
@@ -211,23 +232,29 @@ class BookRefer(BaseHandler):
         only_cover = self.get_argument("only_cover", "")
         book_id = int(id)
         if not provider_key:
-            return {"err": "params.provider_key.invalid", "msg": _(u"provider_key参数错误")}
+            return {
+                "err": "params.provider_key.invalid",
+                "msg": _("provider_key参数错误"),
+            }
         if not provider_value:
-            return {"err": "params.provider_key.invalid", "msg": _(u"provider_value参数错误")}
+            return {
+                "err": "params.provider_key.invalid",
+                "msg": _("provider_value参数错误"),
+            }
         if only_meta == "yes" and only_cover == "yes":
-            return {"err": "params.conflict", "msg": _(u"参数冲突")}
+            return {"err": "params.conflict", "msg": _("参数冲突")}
 
         mi = self.db.get_metadata(book_id, index_is_id=True)
         if not mi:
-            return {"err": "params.book.invalid", "msg": _(u"书籍不存在")}
+            return {"err": "params.book.invalid", "msg": _("书籍不存在")}
         if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
-            return {"err": "user.no_permission", "msg": _(u"无权限")}
+            return {"err": "user.no_permission", "msg": _("无权限")}
 
         original_cover_data = mi.cover_data
         try:
             refer_mi = self.plugin_get_book_meta(provider_key, provider_value, mi)
         except RuntimeError as e:
-            return e.args[0]
+            return e.args[0] if e.args else {"err": "unknown.error", "msg": str(e)}
 
         cover_fallback = False
         if only_cover == "yes":
@@ -235,7 +262,7 @@ class BookRefer(BaseHandler):
             if refer_mi.cover_data and len(refer_mi.cover_data) > 0:
                 mi.cover_data = refer_mi.cover_data
             else:
-                return {"err": "cover.empty", "msg": _(u"获取到的封面数据为空")}
+                return {"err": "cover.empty", "msg": _("获取到的封面数据为空")}
         else:
             if only_meta == "yes":
                 refer_mi.cover_data = None
@@ -249,20 +276,25 @@ class BookRefer(BaseHandler):
                     refer_mi.cover_data = None
             if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
                 ts = []
-                for tag in CONF['BOOK_NAV'].replace("=", "/").replace("\n", "/").split("/"):
+                for tag in (
+                    CONF["BOOK_NAV"].replace("=", "/").replace("\n", "/").split("/")
+                ):
                     if tag in refer_mi.title or tag in refer_mi.comments:
                         ts.append(tag)
                     elif tag in refer_mi.authors:
                         ts.append(tag)
                 if len(ts) > 0:
                     mi.tags += ts[:8]
-                    logging.info("tags are %s" % ','.join(mi.tags))
+                    logging.info("tags are %s" % ",".join(mi.tags))
                     self.db.set_tags(book_id, mi.tags)
             mi.smart_update(refer_mi, replace_metadata=True)
 
         self.db.set_metadata(book_id, mi)
         if cover_fallback:
-            return {"err": "ok", "msg": _(u"书籍信息更新成功，但豆瓣封面获取失败，已使用本地原有封面")}
+            return {
+                "err": "ok",
+                "msg": _("书籍信息更新成功，但豆瓣封面获取失败，已使用本地原有封面"),
+            }
         return {"err": "ok"}
 
 
@@ -276,8 +308,10 @@ class BookEdit(BaseHandler):
             cid = book["collector"]["id"]
         else:
             cid = book["collector"].id
-        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
-            return {"err": "permission", "msg": _(u"无权操作")}
+        if not self.current_user.can_edit() or not (
+            self.is_admin() or self.is_book_owner(bid, cid)
+        ):
+            return {"err": "permission", "msg": _("无权操作")}
 
         # 处理封面图上传
         if self.request.files:
@@ -327,14 +361,19 @@ class BookEdit(BaseHandler):
             else:
                 content = douban.str2date(data["pubdate"])
                 if content is None:
-                    return {"err": "params.pudate.invalid", "msg": _(u"出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019")}
+                    return {
+                        "err": "params.pudate.invalid",
+                        "msg": _(
+                            "出版日期参数错误，格式应为 2019-05-10或2019-05或2019年或2019"
+                        ),
+                    }
                 mi.set("pubdate", content)
 
         if "tags" in data and not data["tags"]:
             self.db.set_tags(bid, [])
 
         self.db.set_metadata(bid, mi)
-        return {"err": "ok", "msg": _(u"更新成功")}
+        return {"err": "ok", "msg": _("更新成功")}
 
     def upload_cover(self, bid):
         """处理封面图上传"""
@@ -343,24 +382,45 @@ class BookEdit(BaseHandler):
 
         # 获取上传的文件
         if "cover" not in self.request.files:
-            return {"err": "params.cover.required", "msg": _(u"请选择要上传的封面图")}
+            return {"err": "params.cover.required", "msg": _("请选择要上传的封面图")}
 
         file_info = self.request.files["cover"][0]
         file_data = file_info["body"]
         file_name = file_info["filename"]
 
         # 检查文件类型
-        allowed_types = ["image/jpeg", "image/png", "image/gif", "image/jpg", "image/pjpeg", "image/x-png"]
+        allowed_types = [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/jpg",
+            "image/pjpeg",
+            "image/x-png",
+        ]
         file_type = file_info["content_type"]
         if file_type not in allowed_types:
             # 尝试从文件名后缀判断
             file_ext = file_name.split(".")[-1].lower() if "." in file_name else ""
-            if file_ext not in ["jpg", "jpeg", "png", "gif", "pjp", "jpe", "pjpeg", "jfif"]:
-                return {"err": "params.cover.type", "msg": _(u"只允许上传JPG、JPEG、PNG、GIF、PJP、PJPEG、JFIF、JPE格式的图片")}
+            if file_ext not in [
+                "jpg",
+                "jpeg",
+                "png",
+                "gif",
+                "pjp",
+                "jpe",
+                "pjpeg",
+                "jfif",
+            ]:
+                return {
+                    "err": "params.cover.type",
+                    "msg": _(
+                        "只允许上传JPG、JPEG、PNG、GIF、PJP、PJPEG、JFIF、JPE格式的图片"
+                    ),
+                }
 
         # 检查文件大小（限制为5MB）
         if len(file_data) > 5 * 1024 * 1024:
-            return {"err": "params.cover.size", "msg": _(u"封面图大小不能超过5MB")}
+            return {"err": "params.cover.size", "msg": _("封面图大小不能超过5MB")}
 
         try:
             # 获取书籍元数据
@@ -372,6 +432,7 @@ class BookEdit(BaseHandler):
 
             # 强制更新书籍的timestamp，确保封面图URL变化
             from datetime import datetime
+
             mi.timestamp = datetime.utcnow()
             mi.last_modified = datetime.utcnow()
 
@@ -381,13 +442,14 @@ class BookEdit(BaseHandler):
             # 清除缓存，确保下次获取书籍信息时从数据库读取最新数据
             self.cache.invalidate()
 
-            return {"err": "ok", "msg": _(u"封面图上传成功")}
+            return {"err": "ok", "msg": _("封面图上传成功")}
         except Exception as e:
             import traceback
+
             logging.error(f"上传封面图失败: {e}")
             logging.error(f"错误堆栈: {traceback.format_exc()}")
             # 尝试直接返回成功，因为实际封面可能已经保存
-            return {"err": "ok", "msg": _(u"封面图上传成功")}
+            return {"err": "ok", "msg": _("封面图上传成功")}
 
 
 class BookDelete(BaseHandler):
@@ -400,15 +462,19 @@ class BookDelete(BaseHandler):
             cid = book["collector"]["id"]
         else:
             cid = book["collector"].id
-        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
-            return {"err": "permission", "msg": _(u"无权操作")}
+        if not self.current_user.can_edit() or not (
+            self.is_admin() or self.is_book_owner(bid, cid)
+        ):
+            return {"err": "permission", "msg": _("无权操作")}
 
-        if not self.current_user.can_delete() or not (self.is_admin() or self.is_book_owner(bid, cid)):
-            return {"err": "permission", "msg": _(u"无权操作")}
+        if not self.current_user.can_delete() or not (
+            self.is_admin() or self.is_book_owner(bid, cid)
+        ):
+            return {"err": "permission", "msg": _("无权操作")}
 
         self.db.delete_book(bid)
-        self.add_msg("success", _(u"删除书籍《%s》") % book["title"])
-        return {"err": "ok", "msg": _(u"删除成功")}
+        self.add_msg("success", _("删除书籍《%s》") % book["title"])
+        return {"err": "ok", "msg": _("删除成功")}
 
 
 class BookDownload(BaseHandler, web.StaticFileHandler):
@@ -434,9 +500,11 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
         if self.current_user:
             if self.current_user.can_save():
                 if not self.current_user.is_active():
-                    raise web.HTTPError(403, reason=_(u"无权操作，请先登录注册邮箱激活账号。"))
+                    raise web.HTTPError(
+                        403, reason=_("无权操作，请先登录注册邮箱激活账号。")
+                    )
             else:
-                raise web.HTTPError(403, reason=_(u"无权操作"))
+                raise web.HTTPError(403, reason=_("无权操作"))
 
     def parse_url_path(self, url_path: str) -> str:
         filename = url_path.split("/")[-1]
@@ -448,15 +516,15 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
         self.user_history("download_history", book)
         self.count_increase(book_id, count_download=1)
         if "fmt_%s" % fmt not in book:
-            raise web.HTTPError(404, reason=_(u"%s格式无法下载" % fmt))
+            raise web.HTTPError(404, reason=_("%s格式无法下载" % fmt))
 
         path = book["fmt_%s" % fmt]
         book["fmt"] = fmt
         book["title"] = urllib.parse.quote_plus(book["title"])
         fname = "%(id)d-%(title)s.%(fmt)s" % book
-        att = u"attachment; filename=\"%s\"; filename*=UTF-8''%s" % (fname, fname)
+        att = "attachment; filename=\"%s\"; filename*=UTF-8''%s" % (fname, fname)
         if self.is_opds:
-            att = u'attachment; filename="%(id)d.%(fmt)s"' % book
+            att = 'attachment; filename="%(id)d.%(fmt)s"' % book
 
         self.set_header("Content-Disposition", att.encode("UTF-8"))
         self.set_header("Content-Type", "application/octet-stream")
@@ -473,7 +541,7 @@ class BookNav(ListHandler):
         tagmap = self.all_tags_with_count()
         navs = []
         done = set()
-        for line in CONF['BOOK_NAV'].split("\n"):
+        for line in CONF["BOOK_NAV"].split("\n"):
             line = utils.super_strip(line)
             p = line.split("=")
             if len(p) != 2:
@@ -481,38 +549,91 @@ class BookNav(ListHandler):
             h1, tags = p
             tags = [v.strip() for v in tags.split("/")]
             done.update(tags)
-            tag_items = [{"name": v, "count": tagmap.get(v, 0)} for v in tags if tagmap.get(v, 0) > 0]
+            tag_items = [
+                {"name": v, "count": tagmap.get(v, 0)}
+                for v in tags
+                if tagmap.get(v, 0) > 0
+            ]
             if tag_items:
                 navs.append({"legend": h1, "tags": tag_items})
 
-        tag_items = [{"name": tag, "count": cnt} for tag, cnt in tagmap.items() if tag not in done]
+        tag_items = [
+            {"name": tag, "count": cnt}
+            for tag, cnt in tagmap.items()
+            if tag not in done
+        ]
         navs.append({"legend": _("其他"), "tags": tag_items})
 
         return {"err": "ok", "navs": navs}
 
 
 class RecentBook(ListHandler):
+    @js
     def get(self):
-        title = _(u"新书推荐")
+        title = _("新书推荐")
         ids = self.books_by_id()
         return self.render_book_list([], ids=ids, title=title, sort_by_id=True)
 
 
+class LibraryBook(ListHandler):
+    @js
+    def get(self):
+        title = _("书库")
+
+        # 获取筛选参数
+        publisher = self.get_argument("publisher", None)
+        author = self.get_argument("author", None)
+        tag = self.get_argument("tag", None)
+        book_format = self.get_argument("format", None)
+
+        # 初始获取所有书籍ID
+        ids = self.books_by_id()
+
+        # 应用筛选条件
+        if publisher and publisher != "全部":
+            # 按出版社筛选
+            publisher_books = self.db.search_getting_ids(f"publisher:'{publisher}'", "")
+            ids = list(set(ids) & set(publisher_books))
+
+        if author and author != "全部":
+            # 按作者筛选
+            author_books = self.db.search_getting_ids(f"author:'{author}'", "")
+            ids = list(set(ids) & set(author_books))
+
+        if tag and tag != "全部":
+            # 按标签筛选
+            tag_books = self.db.search_getting_ids(f"tag:'{tag}'", "")
+            ids = list(set(ids) & set(tag_books))
+
+        if book_format and book_format != "全部":
+            # 按文件格式筛选
+            books = self.get_books(ids=ids)
+            ids = [book["id"] for book in books if f"fmt_{book_format.lower()}" in book]
+
+        return self.render_book_list([], ids=ids, title=title, sort_by_id=True)
+
+
 class SearchBook(ListHandler):
+    @js
     def get(self):
         name = self.get_argument("name", "")
         if not name.strip():
-            return self.write({"err": "params.invalid", "msg": _(u"请输入搜索关键字")})
+            return {"err": "params.invalid", "msg": _("请输入搜索关键字")}
 
-        title = _(u"搜索：%(name)s") % {"name": name}
+        title = _("搜索：%(name)s") % {"name": name}
         ids = self.cache.search(name)
         return self.render_book_list([], ids=ids, title=title)
 
 
 class HotBook(ListHandler):
+    @js
     def get(self):
-        title = _(u"热度榜单")
-        db_items = self.session.query(Item).filter(Item.count_visit > 1).order_by(Item.count_download.desc())
+        title = _("热度榜单")
+        db_items = (
+            self.session.query(Item)
+            .filter(Item.count_visit > 1)
+            .order_by(Item.count_download.desc())
+        )
         count = db_items.count()
         start = self.get_argument_start()
         delta = 60
@@ -549,16 +670,16 @@ class BookUpload(BaseHandler):
         # 检查访客上传权限
         if not self.current_user:
             if not CONF.get("ALLOW_GUEST_UPLOAD", False):
-                return {"err": "user.need_login", "msg": _(u"请先登录")}
+                return {"err": "user.need_login", "msg": _("请先登录")}
         elif not self.current_user.can_upload():
-            return {"err": "permission", "msg": _(u"无权操作")}
+            return {"err": "permission", "msg": _("无权操作")}
         name, data = self.get_upload_file()
         name = re.sub(r"[\x80-\xFF]+", BookUpload.convert, name)
         logging.error("upload book name = " + repr(name))
         fmt = os.path.splitext(name)[1]
         fmt = fmt[1:] if fmt else None
         if not fmt:
-            return {"err": "params.filename", "msg": _(u"文件名不合法")}
+            return {"err": "params.filename", "msg": _("文件名不合法")}
         fmt = fmt.lower()
 
         # save file
@@ -579,7 +700,7 @@ class BookUpload(BaseHandler):
             # 使用文件名提取标题，与批量导入逻辑保持一致
             fname = os.path.basename(fpath)
             mi.title = fname.replace("." + fmt, "")
-            mi.authors = [_(u"佚名")]
+            mi.authors = [_("佚名")]
             # 确保author_sort也被设置，与批量导入逻辑保持一致
             mi.author_sort = mi.authors[0] if mi.authors else ""
 
@@ -601,8 +722,9 @@ class BookUpload(BaseHandler):
                     if fmt.upper() in b.get("available_formats", ""):
                         return {
                             "err": "samebook",
-                            "msg": _(u"同名同作者书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
-                            "book_id": same_author_book_id
+                            "msg": _("同名同作者书籍《%s》已存在这一图书格式 %s")
+                            % (mi.title, fmt),
+                            "book_id": same_author_book_id,
                         }
                 else:
                     different_author_books.append(b)
@@ -610,7 +732,8 @@ class BookUpload(BaseHandler):
         # 如果存在同名同作者书籍，添加格式到该书籍
         if same_author_book_id:
             logging.info(
-                "import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
+                "import [%s] from %s with format %s", repr(mi.title), fpath, fmt
+            )
             self.db.add_format(same_author_book_id, fmt.upper(), fpath, True)
             book_id = same_author_book_id
         else:
@@ -621,7 +744,7 @@ class BookUpload(BaseHandler):
             item.book_id = book_id
             item.collector_id = self.user_id()
             item.save()
-        self.add_msg("success", _(u"导入书籍成功！"))
+        self.add_msg("success", _("导入书籍成功！"))
         AutoFillService().auto_fill(book_id)
         return {"err": "ok", "book_id": book_id}
 
@@ -634,9 +757,11 @@ class BookRead(BaseHandler):
         if self.current_user:
             if self.current_user.can_read():
                 if not self.current_user.is_active():
-                    raise web.HTTPError(403, reason=_(u"无权在线阅读，请先登录注册邮箱激活账号。"))
+                    raise web.HTTPError(
+                        403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。")
+                    )
             else:
-                raise web.HTTPError(403, reason=_(u"无权在线阅读"))
+                raise web.HTTPError(403, reason=_("无权在线阅读"))
 
         book = self.get_book(id)
         book_id = book["id"]
@@ -649,15 +774,17 @@ class BookRead(BaseHandler):
                 return self.redirect("/login")
 
             if self.current_user and not self.current_user.can_save():
-                raise web.HTTPError(403, reason=_(u"无权在线阅读PDF类书籍"))
+                raise web.HTTPError(403, reason=_("无权在线阅读PDF类书籍"))
 
-            pdf_url = urllib.parse.quote_plus(self.api_url + "/api/book/%(id)d.PDF" % book)
+            pdf_url = urllib.parse.quote_plus(
+                self.api_url + "/api/book/%(id)d.PDF" % book
+            )
             pdf_reader_url = CONF["PDF_VIEWER"] % {"pdf_url": pdf_url}
             return self.redirect(pdf_reader_url)
 
-        if 'fmt_txt' in book:
+        if "fmt_txt" in book:
             # TXT有专门的阅读器
-            txt_reader_url = f'/book/{book_id}/readtxt'
+            txt_reader_url = f"/book/{book_id}/readtxt"
             return self.redirect(txt_reader_url)
 
         # 其他格式，转换为EPUB进行在线阅读
@@ -666,18 +793,21 @@ class BookRead(BaseHandler):
             if not fpath:
                 continue
 
-            if fmt != 'epub':
+            if fmt != "epub":
                 ConvertService().convert_and_save(self.user_id(), book, fpath, "epub")
 
             # epub_dir is for javascript
             epub_dir = "/get/extract/%s" % book["id"]
-            return self.html_page("book/" + CONF["EPUB_VIEWER"], {
-                "book": book,
-                "epub_dir": epub_dir,
-                "is_ready": (fmt == 'epub'),
-                "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
-            })
-        raise web.HTTPError(404, reason=_(u"抱歉，在线阅读器暂不支持该格式的书籍"))
+            return self.html_page(
+                "book/" + CONF["EPUB_VIEWER"],
+                {
+                    "book": book,
+                    "epub_dir": epub_dir,
+                    "is_ready": (fmt == "epub"),
+                    "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
+                },
+            )
+        raise web.HTTPError(404, reason=_("抱歉，在线阅读器暂不支持该格式的书籍"))
 
 
 class TxtRead(BaseHandler):
@@ -692,7 +822,7 @@ class TxtRead(BaseHandler):
         fpath = book.get("fmt_txt", None)
         if not fpath:
             return {"err": "format error", "msg": "非txt书籍"}
-        with open(fpath, mode='rb') as file:
+        with open(fpath, mode="rb") as file:
             # 移动文件指针到起始位置
             file.seek(start)
             if end == -1:
@@ -703,7 +833,11 @@ class TxtRead(BaseHandler):
         if not content:
             return {"err": "format error", "msg": "空文件"}
         encode = get_content_encoding(content)
-        content = content.decode(encoding=encode, errors='ignore').replace("\r", "").replace("\n", "<br>")
+        content = (
+            content.decode(encoding=encode, errors="ignore")
+            .replace("\r", "")
+            .replace("\n", "<br>")
+        )
         return {"err": "ok", "content": content}
 
 
@@ -722,26 +856,34 @@ class BookTxtInit(BaseHandler):
         content_path = fdir + "/content.json"
         is_ready = os.path.isfile(content_path)
         if is_ready:
-            with open(content_path, 'r', encoding='utf8') as f:
+            with open(content_path, "r", encoding="utf8") as f:
                 meta = json.loads(f.read())
-            return {"err": "ok", "msg": "已解析", "data": {
-                "content": meta['toc'],
-                "encoding": meta['encoding'],
-                "name": book["title"]
-            }}
+            return {
+                "err": "ok",
+                "msg": "已解析",
+                "data": {
+                    "content": meta["toc"],
+                    "encoding": meta["encoding"],
+                    "name": book["title"],
+                },
+            }
         if test_ready != "0":
             return {"err": "ok", "msg": "未解析完成"}
 
         # 若未解析则计算预计等待时间，至少2分钟
         wait = min(120, os.path.getsize(fpath) / (1024 * 1024) * 15)
         ExtractService().parse_txt_content(bid, fpath)
-        que_len = ExtractService().get_queue('parse_txt_content').qsize()
-        return {"err": "ok", "msg": "已加入队列", "data": {
-            "wait": wait,
-            "name": book["title"],
-            "path": content_path,
-            "que": que_len
-        }}
+        que_len = ExtractService().get_queue("parse_txt_content").qsize()
+        return {
+            "err": "ok",
+            "msg": "已加入队列",
+            "data": {
+                "wait": wait,
+                "name": book["title"],
+                "path": content_path,
+                "que": que_len,
+            },
+        }
 
 
 class BookPush(BaseHandler):
@@ -749,16 +891,16 @@ class BookPush(BaseHandler):
     def post(self, id):
         if not CONF["ALLOW_GUEST_PUSH"]:
             if not self.current_user:
-                return {"err": "user.need_login", "msg": _(u"请先登录")}
+                return {"err": "user.need_login", "msg": _("请先登录")}
             else:
                 if not self.current_user.can_push():
-                    return {"err": "permission", "msg": _(u"无权操作")}
+                    return {"err": "permission", "msg": _("无权操作")}
                 elif not self.current_user.is_active():
-                    return {"err": "permission", "msg": _(u"无权操作，请先激活账号。")}
+                    return {"err": "permission", "msg": _("无权操作，请先激活账号。")}
 
         mail_to = self.get_argument("mail_to", None)
         if not mail_to:
-            return {"err": "params.error", "msg": _(u"参数错误")}
+            return {"err": "params.error", "msg": _("参数错误")}
 
         book = self.get_book(id)
         book_id = book["id"]
@@ -770,22 +912,35 @@ class BookPush(BaseHandler):
         for fmt in ["epub", "pdf"]:
             fpath = book.get("fmt_%s" % fmt, None)
             if fpath:
-                MailService().send_book(self.user_id(), self.site_url, book, mail_to, fmt, fpath)
-                return {"err": "ok", "msg": _(u"服务器后台正在推送了。您可关闭此窗口，继续浏览其他书籍。")}
+                MailService().send_book(
+                    self.user_id(), self.site_url, book, mail_to, fmt, fpath
+                )
+                return {
+                    "err": "ok",
+                    "msg": _(
+                        "服务器后台正在推送了。您可关闭此窗口，继续浏览其他书籍。"
+                    ),
+                }
 
         # we do no have formats for kindle
         if "fmt_azw3" not in book and "fmt_txt" not in book:
             return {
                 "err": "book.no_format_for_kindle",
-                "msg": _(u"抱歉，该书无可用于kindle阅读的格式"),
+                "msg": _("抱歉，该书无可用于kindle阅读的格式"),
             }
 
         ConvertService().convert_and_send(self.user_id(), self.site_url, book, mail_to)
         self.add_msg(
             "success",
-            _(u"服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
+            _("服务器正在推送《%(title)s》到%(email)s")
+            % {"title": book["title"], "email": mail_to},
         )
-        return {"err": "ok", "msg": _(u"服务器正在转换格式，稍后将自动推送。您可关闭此窗口，继续浏览其他书籍。")}
+        return {
+            "err": "ok",
+            "msg": _(
+                "服务器正在转换格式，稍后将自动推送。您可关闭此窗口，继续浏览其他书籍。"
+            ),
+        }
 
 
 def routes():
@@ -793,6 +948,7 @@ def routes():
         (r"/api/index", Index),
         (r"/api/search", SearchBook),
         (r"/api/recent", RecentBook),
+        (r"/api/library", LibraryBook),
         (r"/api/hot", HotBook),
         (r"/api/book/nav", BookNav),
         (r"/api/book/upload", BookUpload),

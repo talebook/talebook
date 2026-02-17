@@ -1,0 +1,49 @@
+{
+  "err": "ok",
+  "kindle_sender": "",
+  "book": {
+    "id": 4,
+    "title": "麦肯锡方法",
+    "rating": 7,
+    "timestamp": "2022-02-04 12:04:19.578748+00:00",
+    "pubdate": "2010-01-01 00:00:00+00:00",
+    "author": "艾森·拉塞尔",
+    "authors": [
+      "艾森·拉塞尔"
+    ],
+    "author_sort": "艾森·拉塞尔",
+    "tag": "麦肯锡 / 管理 / 思维 / 方法论 / 咨询 / 商业 / 管理咨询 / 职场",
+    "tags": [
+      "麦肯锡",
+      "管理",
+      "思维",
+      "方法论",
+      "咨询",
+      "商业",
+      "管理咨询",
+      "职场"
+    ],
+    "publisher": "机械工业出版社",
+    "comments": "本书从五大方面揭示了麦肯锡工作的小窍门，作者从麦肯锡思考问题的方法开始，不仅介绍了麦肯锡解决商业问题的方法，同时也介绍了其于无声处听有声的推销方法。想知道麦肯锡的生存之道吗？想知道如何敲开麦肯锡这个顶级公司的大门吗？想知道关于麦肯锡最有价值的回忆吗？在麦肯锡方法的背后透视和规划了职场人的职业之路，本书是走向职场的必读之物。",
+    "series": "麦肯锡学院",
+    "language": "zho",
+    "isbn": "",
+    "img": "/get/cover/4.jpg",
+    "thumb": "/get/thumb_60x80/4.jpg",
+    "collector": "admin",
+    "count_visit": 0,
+    "count_download": 0,
+    "available_formats": [
+      "azw3"
+    ],
+    "files": [
+      {
+        "format": "azw3",
+        "size": 344989,
+        "href": "/api/book/4.azw3"
+      }
+    ],
+    "is_public": true,
+    "is_owner": true
+  }
+}

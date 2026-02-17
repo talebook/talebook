@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - dev
-      - add-workflow-actions
+      - dev-*
   pull_request:
     branches:
       - master
@@ -21,6 +21,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory /__w/talebook/talebook
+
       - name: Inspect environment
         run: |
           which calibre
@@ -32,7 +35,7 @@ jobs:
         run: make init
 
       - name: Lint with flake8
-        run: make lint
+        run: make lint-py
 
       - name: Run tests with pytest
         run: make pytest
@@ -40,7 +43,7 @@ jobs:
   test-ui:
     runs-on: ubuntu-latest
     container:
-      image: node:16-alpine
+      image: node:20-alpine
 
     steps:
       - name: Checkout code

@@ -87,7 +87,7 @@ class Reader(Base, SQLAlchemyMixin):
 
     RE_EMAIL = r"[^@]+@[^@]+\.[^@]+"
     RE_USERNAME = r"[a-z][a-z0-9_]*"
-    RE_PASSWORD = r'[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};\':",./<>?\|]*'
+    RE_PASSWORD = r'[-a-zA-Z0-9!@#$%^&*()_+=[\]{};\':",./<>?\|]*'
 
     __tablename__ = "readers"
     id = Column(Integer, primary_key=True)
@@ -111,6 +111,8 @@ class Reader(Base, SQLAlchemyMixin):
     def shrink_column_extra(self):
         # check whether the length of `extra` column is out of limit 32KB
         text = json.dumps(self.extra)
+        if not text or len(text) == 0:
+            return
         shrink = min(self.OVERSIZE_SHRINK_RATE, self.SQLITE_MAX_LENGTH / len(text))
         if len(text) > self.SQLITE_MAX_LENGTH:
             for k, v in self.extra.items():
@@ -300,6 +302,8 @@ class ScanFile(Base, SQLAlchemyMixin):
     READY = "ready"
     EXIST = "exist"
     IMPORTED = "imported"
+    DOWNLOADING = "downloading"
+    FAILED = "failed"
 
     def __init__(self, path, hash_value, scan_id):
         super(ScanFile, self).__init__()

@@ -1,0 +1,113 @@
+<template>
+    <div>
+        <v-btn
+            class="upload-btn"
+            color="pink"
+            icon="mdi-upload"
+            size="large"
+            elevation="4"
+            @click="dialog = !dialog"
+        />
+        <v-dialog
+            v-model="dialog"
+            persistent
+            transition="dialog-bottom-transition"
+            width="300"
+        >
+            <v-card>
+                <v-toolbar
+                    flat
+                    density="compact"
+                    color="primary"
+                >
+                    <v-toolbar-title>{{ $t('messages.uploadBooks') }}</v-toolbar-title>
+                    <v-spacer />
+                    <v-btn
+                        variant="text"
+                        @click="dialog = false"
+                    >
+                        {{ $t('messages.dialogClose') }}
+                    </v-btn>
+                </v-toolbar>
+                <v-card-text>
+                    <p>{{ $t('messages.uploadNotice') }}</p>
+                    <v-form
+                        ref="form"
+                        @submit.prevent="do_upload"
+                    >
+                        <v-file-input
+                            v-model="ebooks"
+                            :label="$t('messages.selectEbook')"
+                        />
+                    </v-form>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn
+                        :loading="loading"
+                        color="primary"
+                        @click="do_upload"
+                    >
+                        {{ $t('actions.upload') }}
+                    </v-btn>
+                    <v-spacer />
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+    </div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+
+const { $backend, $alert } = useNuxtApp();
+const { t } = useI18n();
+const router = useRouter();
+
+const loading = ref(false);
+const dialog = ref(false);
+const ebooks = ref(null);
+
+function do_upload() {
+    loading.value = true;
+    var data = new FormData();
+    // Vuetify 3 file input returns array
+    if (ebooks.value) {
+        if (Array.isArray(ebooks.value)) {
+            data.append('ebook', ebooks.value[0]);
+        } else {
+            data.append('ebook', ebooks.value);
+        }
+    }
+    
+    $backend('/book/upload', {
+        method: 'POST',
+        body: data,
+    })
+        .then(rsp => {
+            dialog.value = false;
+            if (rsp.err === 'ok') {
+                $alert('success', t('messages.uploadSuccess'), '/book/' + rsp.book_id);
+                router.push('/book/' + rsp.book_id);
+            } else if (rsp.err === 'samebook') {
+                $alert('error', rsp.msg, '/book/' + rsp.book_id);
+                router.push('/book/' + rsp.book_id);
+            } else {
+                $alert('error', rsp.msg);
+            }
+        })
+        .finally(() => {
+            loading.value = false;
+        });
+}
+</script>
+
+<style scoped>
+.upload-btn {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 100;
+}
+</style>
