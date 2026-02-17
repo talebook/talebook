@@ -469,12 +469,6 @@ const cards = computed(() => [
     },
 
     {
-        key: 'sslManagement',
-        title: t('admin.settings.section.sslManagement'),
-        fields: [],
-        show_ssl: true,
-    },
-    {
         key: 'opdsSettings',
         title: t('admin.settings.section.opdsSettings'),
         fields: [
@@ -491,10 +485,10 @@ const cards = computed(() => [
         title: t('admin.settings.section.captchaSettings'),
         subtitle: t('admin.settings.message.captchaInfo'),
         fields: [
-            { 
-                icon: 'mdi-shield-check', 
-                key: 'CAPTCHA_PROVIDER', 
-                label: t('admin.settings.label.captchaProvider'), 
+            {
+                icon: 'mdi-shield-check',
+                key: 'CAPTCHA_PROVIDER',
+                label: t('admin.settings.label.captchaProvider'),
                 type: 'select',
                 items: captchaProviders
             },
@@ -525,6 +519,40 @@ const cards = computed(() => [
             { icon: 'mdi-key', key: 'GEETEST_CAPTCHA_ID', label: t('admin.settings.label.geetestCaptchaId'), show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
             { icon: 'mdi-lock', key: 'GEETEST_CAPTCHA_KEY', label: t('admin.settings.label.geetestCaptchaKey'), type: 'password', show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
         ],
+    },
+    {
+        key: 'advancedSettings',
+        title: t('admin.settings.section.advancedSettings'),
+        fields: [
+            { icon: 'mdi-home', key: 'static_host', label: t('admin.settings.label.staticHost') },
+            { icon: 'mdi-information', key: 'BOOK_NAMES_FORMAT', label: t('admin.settings.label.bookNamesFormat'), type: 'select',
+                items: [{text: t('admin.settings.option.pinyinDir'), value: 'en'}, {text: t('admin.settings.option.chineseDir'), value: 'utf8'} ]
+            },
+            { icon: 'mdi-information', key: 'EPUB_VIEWER', label: t('admin.settings.label.epubViewer'), type: 'select',
+                items: [{text: t('admin.settings.option.oldEpubReader'), value: 'epubjs.html'}, {text: t('admin.settings.option.candleReader'), value: 'creader.html'} ]
+            },
+            { icon: 'mdi-information', key: 'avatar_service', label: t('admin.settings.label.avatarService') },
+            { icon: 'mdi-information', key: 'MAX_UPLOAD_SIZE', label: t('admin.settings.label.maxUploadSize') },
+            { icon: 'mdi-lock', key: 'cookie_secret', label: t('admin.settings.label.cookieSecret') },
+            { icon: 'mdi-folder', key: 'scan_upload_path', label: t('admin.settings.label.scanUploadPath') },
+            { icon: 'mdi-information', key: 'push_title', label: t('admin.settings.label.pushTitle') },
+            { icon: 'mdi-information', key: 'push_content', label: t('admin.settings.label.pushContent') },
+            { icon: 'mdi-clock', key: 'convert_timeout', label: t('admin.settings.label.convertTimeout') },
+            { icon: '', key: 'autoreload', label: t('admin.settings.label.autoreload'), type: 'checkbox' },
+        ],
+        tips: [
+            {
+                text: t('admin.settings.message.logoInfo'),
+                link: 'https://github.com/talebook/talebook/blob/master/document/README.zh_CN.md#logo',
+            }
+        ],
+    },
+
+    {
+        key: 'sslManagement',
+        title: t('admin.settings.section.sslManagement'),
+        fields: [],
+        show_ssl: true,
     },
 ]);
 
