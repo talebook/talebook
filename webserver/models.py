@@ -168,6 +168,24 @@ class Reader(Base, SQLAlchemyMixin):
         hashed = bcrypt.hashpw(raw_password.encode("UTF-8"), bcrypt.gensalt())
         self.password = hashed.decode("UTF-8")
 
+    def migrate_password(self, raw_password):
+        """
+        检查并迁移密码从 SHA256 到 bcrypt
+        如果密码使用的是旧的 SHA256 哈希，则迁移到 bcrypt
+        :param raw_password: 原始密码
+        :return: bool - 是否进行了迁移
+        """
+        if self.salt == "__bcrypt__":
+            return False
+        
+        # 验证旧密码是否正确
+        if self.get_secure_password(raw_password) != self.password:
+            return False
+        
+        # 迁移到 bcrypt
+        self.set_secure_password(raw_password)
+        return True
+
     def init_avatar(self, social_user):
         anyone = "http://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
         url = social_user.extra_data.get("profile_image_url", anyone)
