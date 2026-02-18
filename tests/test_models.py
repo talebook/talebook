@@ -173,6 +173,66 @@ class TestUser(unittest.TestCase):
             b.password = p2
             self.assertEqual(b.get_secure_password(password), b.password)
 
+    def test_migrate_password_from_sha256_to_bcrypt(self):
+        """测试密码从 SHA256 迁移到 bcrypt"""
+        a = models.Reader()
+        a.salt = models.mksalt()
+        raw_password = "LegacyPassword1234"
+        
+        # 设置 SHA256 密码
+        p1 = hashlib.sha256(raw_password.encode("UTF-8")).hexdigest()
+        p2 = hashlib.sha256((a.salt + p1).encode("UTF-8")).hexdigest()
+        a.password = p2
+        
+        # 验证迁移前是 SHA256
+        self.assertNotEqual(a.salt, "__bcrypt__")
+        
+        # 执行迁移
+        result = a.migrate_password(raw_password)
+        
+        # 验证迁移成功
+        self.assertTrue(result)
+        self.assertEqual(a.salt, "__bcrypt__")
+        self.assertEqual(a.get_secure_password(raw_password), a.password)
+        
+    def test_migrate_password_already_bcrypt(self):
+        """测试已经是 bcrypt 的密码不会重复迁移"""
+        a = models.Reader()
+        raw_password = "SecureP@ssw0rd123!"
+        a.set_secure_password(raw_password)
+        
+        # 记录迁移前的密码
+        original_password = a.password
+        
+        # 尝试迁移
+        result = a.migrate_password(raw_password)
+        
+        # 验证没有进行迁移
+        self.assertFalse(result)
+        self.assertEqual(a.password, original_password)
+        self.assertEqual(a.salt, "__bcrypt__")
+        
+    def test_migrate_password_wrong_password(self):
+        """测试错误密码不会触发迁移"""
+        a = models.Reader()
+        a.salt = models.mksalt()
+        correct_password = "CorrectPassword123"
+        wrong_password = "WrongPassword456"
+        
+        # 设置 SHA256 密码
+        p1 = hashlib.sha256(correct_password.encode("UTF-8")).hexdigest()
+        p2 = hashlib.sha256((a.salt + p1).encode("UTF-8")).hexdigest()
+        a.password = p2
+        original_salt = a.salt
+        
+        # 使用错误密码尝试迁移
+        result = a.migrate_password(wrong_password)
+        
+        # 验证迁移未执行
+        self.assertFalse(result)
+        self.assertEqual(a.salt, original_salt)
+        self.assertEqual(a.password, p2)
+
 
 if __name__ == "__main__":
     logging.basicConfig(
