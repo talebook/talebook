@@ -7,6 +7,7 @@ import logging
 import time
 import json
 import os
+import bcrypt
 from gettext import gettext as _
 
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
@@ -147,13 +148,43 @@ class Reader(Base, SQLAlchemyMixin):
         return p
 
     def get_secure_password(self, raw_password):
-        p1 = hashlib.sha256(raw_password.encode("UTF-8")).hexdigest()
-        p2 = hashlib.sha256((self.salt + p1).encode("UTF-8")).hexdigest()
-        return p2
+        if self.salt == "__bcrypt__":
+            # 使用bcrypt验证
+            if bcrypt.checkpw(raw_password.encode("UTF-8"), self.password.encode("UTF-8")):
+                # 验证成功，返回self.password以保持向后兼容性
+                return self.password
+            else:
+                # 验证失败，返回一个不会匹配的值
+                return ""
+        else:
+            # 使用原有的SHA256+salt方法
+            p1 = hashlib.sha256(raw_password.encode("UTF-8")).hexdigest()
+            p2 = hashlib.sha256((self.salt + p1).encode("UTF-8")).hexdigest()
+            return p2
 
     def set_secure_password(self, raw_password):
-        self.salt = mksalt()
-        self.password = self.get_secure_password(raw_password)
+        # 使用bcrypt哈希密码
+        self.salt = "__bcrypt__"
+        hashed = bcrypt.hashpw(raw_password.encode("UTF-8"), bcrypt.gensalt())
+        self.password = hashed.decode("UTF-8")
+
+    def migrate_password(self, raw_password):
+        """
+        检查并迁移密码从 SHA256 到 bcrypt
+        如果密码使用的是旧的 SHA256 哈希，则迁移到 bcrypt
+        :param raw_password: 原始密码
+        :return: bool - 是否进行了迁移
+        """
+        if self.salt == "__bcrypt__":
+            return False
+
+        # 验证旧密码是否正确
+        if self.get_secure_password(raw_password) != self.password:
+            return False
+
+        # 迁移到 bcrypt
+        self.set_secure_password(raw_password)
+        return True
 
     def init_avatar(self, social_user):
         anyone = "http://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif"
@@ -164,7 +195,13 @@ class Reader(Base, SQLAlchemyMixin):
             self.avatar = "https://avatars.githubusercontent.com/u/%s" % social_user.extra_data["id"]
 
     def get_active_code(self):
-        return self.get_secure_password(self.create_time.strftime("%Y-%m-%d %H:%M:%S"))
+        # 激活码始终使用原有的SHA256方法，与密码哈希方法无关
+        # 这样可以确保激活码功能在任何情况下都能正常工作
+        p1 = hashlib.sha256(self.create_time.strftime("%Y-%m-%d %H:%M:%S").encode("UTF-8")).hexdigest()
+        # 如果有salt，使用原有的salt，如果没有（bcrypt情况），还是用一个固定的或者空字符串
+        salt_to_use = self.salt if self.salt != "__bcrypt__" else ""
+        p2 = hashlib.sha256((salt_to_use + p1).encode("UTF-8")).hexdigest()
+        return p2
 
     def get_social_username(self, si):
         for k in ["username", "login"]:

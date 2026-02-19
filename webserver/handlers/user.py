@@ -295,6 +295,11 @@ class SignIn(BaseHandler):
             return {"err": "permission", "msg": _("无权登录")}
         logging.debug("PERM = %s", user.permission)
 
+        # 检查并迁移密码从 SHA256 到 bcrypt
+        if user.migrate_password(password):
+            user.save()
+            logging.info("User (id=%d, username=%s) has been migrated from SHA256 to bcrypt", user.id, user.username)
+
         self.login_user(user)
         return {"err": "ok", "msg": "ok"}
 

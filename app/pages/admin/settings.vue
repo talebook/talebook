@@ -439,7 +439,58 @@ const cards = computed(() => [
             }
         ],
     },
-
+    {
+        key: 'opdsSettings',
+        title: t('admin.settings.section.opdsSettings'),
+        fields: [
+            { icon: 'mdi-book-open-variant', key: 'OPDS_ENABLED', label: t('admin.settings.label.opdsEnabled'), type: 'checkbox' },
+        ],
+        tips: [
+            {
+                text: t('admin.settings.message.opdsInfo'),
+            }
+        ],
+    },
+    {
+        key: 'captchaSettings',
+        title: t('admin.settings.section.captchaSettings'),
+        subtitle: t('admin.settings.message.captchaInfo'),
+        fields: [
+            {
+                icon: 'mdi-shield-check',
+                key: 'CAPTCHA_PROVIDER',
+                label: t('admin.settings.label.captchaProvider'),
+                type: 'select',
+                items: captchaProviders
+            },
+        ],
+        groups: [
+            {
+                key: 'CAPTCHA_ENABLE_FOR_REGISTER',
+                label: t('admin.settings.label.captchaEnableForRegister'),
+                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
+            },
+            {
+                key: 'CAPTCHA_ENABLE_FOR_LOGIN',
+                label: t('admin.settings.label.captchaEnableForLogin'),
+                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
+            },
+            {
+                key: 'CAPTCHA_ENABLE_FOR_WELCOME',
+                label: t('admin.settings.label.captchaEnableForWelcome'),
+                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
+            },
+            {
+                key: 'CAPTCHA_ENABLE_FOR_RESET',
+                label: t('admin.settings.label.captchaEnableForReset'),
+                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
+            },
+        ],
+        captcha_fields: [
+            { icon: 'mdi-key', key: 'GEETEST_CAPTCHA_ID', label: t('admin.settings.label.geetestCaptchaId'), show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
+            { icon: 'mdi-lock', key: 'GEETEST_CAPTCHA_KEY', label: t('admin.settings.label.geetestCaptchaKey'), type: 'password', show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
+        ],
+    },
     {
         key: 'advancedSettings',
         title: t('admin.settings.section.advancedSettings'),
@@ -473,58 +524,6 @@ const cards = computed(() => [
         title: t('admin.settings.section.sslManagement'),
         fields: [],
         show_ssl: true,
-    },
-    {
-        key: 'opdsSettings',
-        title: t('admin.settings.section.opdsSettings'),
-        fields: [
-            { icon: 'mdi-book-open-variant', key: 'OPDS_ENABLED', label: t('admin.settings.label.opdsEnabled'), type: 'checkbox' },
-        ],
-        tips: [
-            {
-                text: t('admin.settings.message.opdsInfo'),
-            }
-        ],
-    },
-    {
-        key: 'captchaSettings',
-        title: t('admin.settings.section.captchaSettings'),
-        subtitle: t('admin.settings.message.captchaInfo'),
-        fields: [
-            { 
-                icon: 'mdi-shield-check', 
-                key: 'CAPTCHA_PROVIDER', 
-                label: t('admin.settings.label.captchaProvider'), 
-                type: 'select',
-                items: captchaProviders
-            },
-        ],
-        groups: [
-            {
-                key: 'CAPTCHA_ENABLE_FOR_REGISTER',
-                label: t('admin.settings.label.captchaEnableForRegister'),
-                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
-            },
-            {
-                key: 'CAPTCHA_ENABLE_FOR_LOGIN',
-                label: t('admin.settings.label.captchaEnableForLogin'),
-                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
-            },
-            {
-                key: 'CAPTCHA_ENABLE_FOR_WELCOME',
-                label: t('admin.settings.label.captchaEnableForWelcome'),
-                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
-            },
-            {
-                key: 'CAPTCHA_ENABLE_FOR_RESET',
-                label: t('admin.settings.label.captchaEnableForReset'),
-                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
-            },
-        ],
-        captcha_fields: [
-            { icon: 'mdi-key', key: 'GEETEST_CAPTCHA_ID', label: t('admin.settings.label.geetestCaptchaId'), show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
-            { icon: 'mdi-lock', key: 'GEETEST_CAPTCHA_KEY', label: t('admin.settings.label.geetestCaptchaKey'), type: 'password', show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
-        ],
     },
 ]);
 
