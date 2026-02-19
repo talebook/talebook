@@ -177,11 +177,11 @@ class Reader(Base, SQLAlchemyMixin):
         """
         if self.salt == "__bcrypt__":
             return False
-        
+
         # 验证旧密码是否正确
         if self.get_secure_password(raw_password) != self.password:
             return False
-        
+
         # 迁移到 bcrypt
         self.set_secure_password(raw_password)
         return True
