@@ -20,9 +20,8 @@ RUN npm run build
 RUN ls -al
 RUN cp -r .output package* /app-ssr/
 RUN npm run build-spa
-RUN rm -rf dist && cp -r .output/public dist
-RUN if [ ! -f dist/index.html ]; then cp dist/200.html dist/index.html; fi
-RUN cp -r dist package* /app-static/
+RUN cp -r .output/public /app-static/
+RUN if [ ! -f /app-static/public/index.html ]; then cp /app-static/public/200.html /app-static/public/index.html; fi
 
 
 # ----------------------------------------
@@ -116,8 +115,8 @@ COPY webserver/ /var/www/talebook/webserver/
 COPY conf/nginx/ssl.* /data/books/ssl/
 COPY conf/nginx/talebook.conf /etc/nginx/conf.d/
 COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/
-COPY --from=builder /app-static/ /var/www/talebook/app/
-COPY --from=builder /app-static/dist/logo/ /data/books/logo/
+COPY --from=builder /app-static/public/ /var/www/talebook/app/
+COPY --from=builder /app-static/public/logo/ /data/books/logo/
 
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     cd /var/www/talebook/ && \
@@ -130,8 +129,8 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     python3 server.py --update-config  && \
     rm -f webserver/*.pyc && \
     rm -rf app/src && \
-    rm -rf app/dist/logo && \
-    ln -s /data/books/logo app/dist/logo && \
+    rm -rf app/logo && \
+    ln -s /data/books/logo app/logo && \
     mkdir -p /prebuilt/ && \
     mv /data/* /prebuilt/ && \
     chmod +x /var/www/talebook/docker/start.sh
