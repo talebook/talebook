@@ -166,3 +166,12 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
 COPY conf/nginx/server-side-render.conf /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/server-side-render.conf /etc/supervisor/conf.d/talebook.conf
 COPY --from=builder /app-ssr/ /var/www/talebook/app/
+
+# fix: symlink logo dir so user can override /data/books/logo/link.png
+RUN rm -rf /var/www/talebook/app/.output/public/logo && \
+    ln -s /data/books/logo /var/www/talebook/app/.output/public/logo
+
+
+# ----------------------------------------
+# 生产环境（spa版，作为默认 docker build 结果）
+FROM production AS production-spa
