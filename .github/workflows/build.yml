@@ -43,7 +43,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata
+      - name: Extract metadata (for SPA tags)
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -64,10 +64,13 @@ jobs:
           fi
           echo "build_args=GIT_VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build and push
+      # ----------------------------------------
+      # SPA 镜像：talebook/talebook:latest / <ver> / calibre-webserver:latest
+      - name: Build and push SPA
         uses: docker/build-push-action@v5
         with:
           context: .
+          target: production-spa
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           labels: ${{ steps.meta.outputs.labels }}
           push: ${{ github.event_name != 'pull_request' }}
@@ -78,4 +81,21 @@ jobs:
             ${{ steps.meta.outputs.tags }}
             ${{ github.repository == 'talebook/talebook' && startsWith(github.ref, 'refs/tags/') && format('{0}/talebook/calibre-webserver:latest', env.REGISTRY) || '' }}
             ${{ github.repository == 'talebook/talebook' && github.ref == 'refs/heads/master' && format('{0}/talebook/calibre-webserver:master', env.REGISTRY) || '' }}
+          build-args: ${{ steps.prep.outputs.build_args }}
+
+      # ----------------------------------------
+      # SSR 镜像：talebook/talebook:server-side-render / server-side-render-<ver>
+      - name: Build and push SSR
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: production-ssr
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          labels: ${{ steps.meta.outputs.labels }}
+          push: ${{ github.event_name != 'pull_request' }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/talebook/talebook:server-side-render
+          cache-to: type=inline,mode=max
+          provenance: false
+          tags: |
+            ${{ startsWith(github.ref, 'refs/tags/') && format('{0}/{1}:server-side-render', env.REGISTRY, env.IMAGE_NAME) || '' }}
           build-args: ${{ steps.prep.outputs.build_args }}
