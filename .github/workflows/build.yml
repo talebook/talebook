@@ -98,4 +98,7 @@ jobs:
           provenance: false
           tags: |
             ${{ startsWith(github.ref, 'refs/tags/') && format('{0}/{1}:server-side-render', env.REGISTRY, env.IMAGE_NAME) || '' }}
+            ${{ startsWith(github.ref, 'refs/tags/') && format('{0}/{1}:server-side-render-{2}', env.REGISTRY, env.IMAGE_NAME, github.ref_name) || '' }}
+            ${{ github.ref == 'refs/heads/master' && format('{0}/{1}:server-side-render', env.REGISTRY, env.IMAGE_NAME) || '' }}
+            ${{ startsWith(github.ref, 'refs/heads/dev-') && format('{0}/{1}:server-side-render-{2}', env.REGISTRY, env.IMAGE_NAME, github.ref_name) || '' }}
           build-args: ${{ steps.prep.outputs.build_args }}
