@@ -11,7 +11,7 @@ RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
     fi
 
 COPY app/package.json app/package-lock.json* ./
-RUN npm install
+RUN npm ci
 
 # spa build mode will clear ssr build data, run it first
 COPY app/ /build/
