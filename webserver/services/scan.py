@@ -55,8 +55,15 @@ class ScanService(AsyncService):
         # 先检查目录中是否有待扫描的书籍
         has_books = False
         tasks = []
-        for dirpath, __, filenames in os.walk(path_dir):
+        for dirpath, dirnames, filenames in os.walk(path_dir):
+            # 排除隐藏文件夹（以.开头或@__thumb等）
+            dirnames[:] = [d for d in dirnames if not (d.startswith('.') or d.startswith('@__'))]
+
             for fname in filenames:
+                # 排除隐藏文件
+                if fname.startswith('.'):
+                    continue
+
                 fpath = os.path.join(dirpath, fname)
                 if not os.path.isfile(fpath):
                     continue
