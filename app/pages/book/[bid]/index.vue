@@ -246,6 +246,7 @@
                             color="primary"
                             variant="elevated"
                             class="mx-2"
+                            :disabled="book.id === 0"
                             :href="is_txt ? '/book/' + book.id + '/readtxt' : '/read/' + book.id"
                             target="_blank"
                         >
@@ -439,6 +440,7 @@
                         >
                             <v-list density="compact">
                                 <v-list-item
+                                    v-if="book.id > 0"
                                     :href="'/read/' + book.id"
                                     target="_blank"
                                     class="w-100"
