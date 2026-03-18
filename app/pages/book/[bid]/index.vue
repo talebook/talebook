@@ -246,7 +246,7 @@
                             color="primary"
                             variant="elevated"
                             class="mx-2"
-                            :href="is_txt ? '/book/' + book.id + '/readtxt' : '/read/' + book.id"
+                            :href="is_txt ? '/book/' + effective_book_id + '/readtxt' : '/read/' + effective_book_id"
                             target="_blank"
                         >
                             <v-icon start>
@@ -271,7 +271,7 @@
                                     </v-btn>
                                 </template>
                                 <v-list density="compact">
-                                    <v-list-item :to="'/book/' + book.id + '/edit'">
+                                    <v-list-item :to="'/book/' + effective_book_id + '/edit'">
                                         <template #prepend>
                                             <v-icon>mdi-cog</v-icon>
                                         </template>
@@ -439,7 +439,7 @@
                         >
                             <v-list density="compact">
                                 <v-list-item
-                                    :href="'/read/' + book.id"
+                                    :href="'/read/' + effective_book_id"
                                     target="_blank"
                                     class="w-100"
                                 >
@@ -472,7 +472,7 @@
                         >
                             <v-list density="compact">
                                 <v-list-item
-                                    :href="'/book/' + book.id + '/readtxt'"
+                                    :href="'/book/' + effective_book_id + '/readtxt'"
                                     target="_blank"
                                     class="w-100"
                                 >
@@ -681,6 +681,9 @@ const is_txt = computed(() => {
     const formats = book.value.files.map(x => x.format.toLowerCase());
     return formats.includes('txt');
 });
+
+// Use bookid from route params as fallback when book.id is not yet loaded
+const effective_book_id = computed(() => book.value.id || bookid);
 
 const email_items = computed(() => {
     const emails = [mail_to.value].filter(Boolean);
