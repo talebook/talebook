@@ -650,8 +650,10 @@ watch(() => fetchData.value, (newData) => {
             mail_to.value = cookie.value;
         }
         
-        // 获取 TXT 解析状态
-        get_txt_parse_status();
+        // 仅 TXT 书籍才需要检查解析状态
+        if (newData.book.files && newData.book.files.some(f => f.format.toLowerCase() === 'txt')) {
+            get_txt_parse_status();
+        }
     }
 }, { immediate: true });
 

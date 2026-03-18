@@ -849,7 +849,7 @@ class BookTxtInit(BaseHandler):
         book = self.get_book(bid)
         fpath = book.get("fmt_txt", None)
         if not fpath:
-            return {"err": "format error", "msg": "非txt书籍"}
+            return {"err": "ok", "msg": "非txt书籍", "data": None}
         # 解压后的目录
         fdir = os.path.join(CONF["extract_path"], str(book["id"]))
         # txt 解析出的目录文件
