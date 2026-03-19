@@ -385,7 +385,9 @@
         "ready": "Ready",
         "exist": "Existing",
         "imported": "Imported",
-        "downloading": "Downloading"
+        "downloading": "Downloading",
+        "drop": "Duplicate",
+        "dropTooltip": "A file with the same hash already exists and was skipped. Delete the duplicate record and re-scan to import again."
       },
       "tab": {
         "todo": "Pending",
