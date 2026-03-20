@@ -473,6 +473,10 @@ class BookDelete(BaseHandler):
             return {"err": "permission", "msg": _("无权操作")}
 
         self.db.delete_book(bid)
+        # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
+        from webserver.models import ScanFile
+        self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
+        self.session.commit()
         self.add_msg("success", _("删除书籍《%s》") % book["title"])
         return {"err": "ok", "msg": _("删除成功")}
 
