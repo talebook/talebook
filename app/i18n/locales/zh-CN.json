@@ -406,7 +406,9 @@
         "ready": "可导入",
         "exist": "已存在",
         "imported": "导入成功",
-        "downloading": "下载中"
+        "downloading": "下载中",
+        "drop": "重复文件",
+        "dropTooltip": "检测到哈希值相同的重复文件，已自动跳过。如需重新导入，请删除重复记录后重新扫描。"
       },
       "tab": {
         "todo": "待处理",

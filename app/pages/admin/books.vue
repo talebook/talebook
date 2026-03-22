@@ -106,6 +106,21 @@
                 >
                     {{ t('admin.books.status.downloading') }}
                 </v-chip>
+                <v-tooltip
+                    v-else-if="item.status == 'drop'"
+                    :text="t('admin.imports.status.dropTooltip')"
+                    location="top"
+                >
+                    <template #activator="{ props }">
+                        <v-chip
+                            size="small"
+                            color="warning"
+                            v-bind="props"
+                        >
+                            {{ t('admin.imports.status.drop') }}
+                        </v-chip>
+                    </template>
+                </v-tooltip>
                 <v-chip
                     v-else
                     size="small"
