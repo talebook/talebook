@@ -137,10 +137,22 @@ class ScanService(AsyncService):
             existing = self.session.query(ScanFile).filter(ScanFile.hash == real_hash).first()
             if existing and existing.id != row.id:
                 # 如果已经有相同的真实哈希值记录，且不是当前记录
-                row.status = ScanFile.DROP
-                if not self.save_or_rollback(row):
+                # 需额外检查该旧记录关联的书籍是否仍存在
+                # 若书籍已被删除，旧记录应被清理，不应阻止重新导入
+                book_still_exists = False
+                if existing.book_id:
+                    books = self.db.get_data_as_dict(ids=[existing.book_id])
+                    book_still_exists = len(books) > 0
+                if book_still_exists:
+                    row.status = ScanFile.DROP
+                    if not self.save_or_rollback(row):
+                        continue
                     continue
-                continue
+                else:
+                    # 书籍已被删除，清理旧 ScanFile 记录，允许重新导入
+                    logging.info("书籍已删除，清理旧扫描记录并允许重新导入: %s", fpath)
+                    self.session.delete(existing)
+                    self.session.commit()
 
             # 更新为真实的哈希值
             row.hash = real_hash
