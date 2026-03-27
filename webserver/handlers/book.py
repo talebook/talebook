@@ -473,6 +473,10 @@ class BookDelete(BaseHandler):
             return {"err": "permission", "msg": _("无权操作")}
 
         self.db.delete_book(bid)
+        # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
+        from webserver.models import ScanFile
+        self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
+        self.session.commit()
         self.add_msg("success", _("删除书籍《%s》") % book["title"])
         return {"err": "ok", "msg": _("删除成功")}
 
@@ -526,8 +530,18 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
         if self.is_opds:
             att = 'attachment; filename="%(id)d.%(fmt)s"' % book
 
-        self.set_header("Content-Disposition", att.encode("UTF-8"))
-        self.set_header("Content-Type", "application/octet-stream")
+        # PDF 文件使用 application/pdf，允许浏览器内联预览（供 pdfjs 等在线阅读器使用）
+        # 其他格式使用 application/octet-stream 强制下载
+        if fmt == "pdf":
+            self.set_header("Content-Type", "application/pdf")
+            # 在线阅读时不附加 Content-Disposition attachment，避免触发下载
+            if not self.is_opds:
+                self.set_header("Content-Disposition", f"inline; filename=\"{fname}\"".encode("UTF-8"))
+            else:
+                self.set_header("Content-Disposition", att.encode("UTF-8"))
+        else:
+            self.set_header("Content-Disposition", att.encode("UTF-8"))
+            self.set_header("Content-Type", "application/octet-stream")
         return path
 
     @classmethod

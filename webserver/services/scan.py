@@ -126,10 +126,16 @@ class ScanService(AsyncService):
 
             # 读取文件，计算哈希值
             sha256 = hashlib.sha256()
-            with open(fpath, "rb") as f:
-                # Read and update hash string value in blocks of 4K
-                for byte_block in iter(lambda: f.read(4096), b""):
-                    sha256.update(byte_block)
+            try:
+                with open(fpath, "rb") as f:
+                    # Read and update hash string value in blocks of 4K
+                    for byte_block in iter(lambda: f.read(4096), b""):
+                        sha256.update(byte_block)
+            except FileNotFoundError:
+                logging.warning("扫描时文件已不存在，跳过: %s", fpath)
+                row.status = ScanFile.DROP
+                self.save_or_rollback(row)
+                continue
 
             real_hash = "sha256:" + sha256.hexdigest()
 
@@ -137,10 +143,22 @@ class ScanService(AsyncService):
             existing = self.session.query(ScanFile).filter(ScanFile.hash == real_hash).first()
             if existing and existing.id != row.id:
                 # 如果已经有相同的真实哈希值记录，且不是当前记录
-                row.status = ScanFile.DROP
-                if not self.save_or_rollback(row):
+                # 需额外检查该旧记录关联的书籍是否仍存在
+                # 若书籍已被删除，旧记录应被清理，不应阻止重新导入
+                book_still_exists = False
+                if existing.book_id:
+                    books = self.db.get_data_as_dict(ids=[existing.book_id])
+                    book_still_exists = len(books) > 0
+                if book_still_exists:
+                    row.status = ScanFile.DROP
+                    if not self.save_or_rollback(row):
+                        continue
                     continue
-                continue
+                else:
+                    # 书籍已被删除，清理旧 ScanFile 记录，允许重新导入
+                    logging.info("书籍已删除，清理旧扫描记录并允许重新导入: %s", fpath)
+                    self.session.delete(existing)
+                    self.session.commit()
 
             # 更新为真实的哈希值
             row.hash = real_hash
@@ -150,12 +168,18 @@ class ScanService(AsyncService):
             # 尝试解析metadata
             fmt = fpath.split(".")[-1].lower()
             mi = None
-            with open(fpath, "rb") as stream:
-                try:
-                    mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-                except Exception as err:
-                    logging.error("Failed to parse metadata for %s: %s", fpath, err)
-                    logging.exception("Error details:")
+            try:
+                with open(fpath, "rb") as stream:
+                    try:
+                        mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                    except Exception as err:
+                        logging.error("Failed to parse metadata for %s: %s", fpath, err)
+                        logging.exception("Error details:")
+            except FileNotFoundError:
+                logging.warning("解析元数据时文件已不存在，跳过: %s", fpath)
+                row.status = ScanFile.DROP
+                self.save_or_rollback(row)
+                continue
 
             if mi:
                 mi.title = utils.super_strip(mi.title)
@@ -218,26 +242,32 @@ class ScanService(AsyncService):
             fname = os.path.basename(row.path)
             fmt = fpath.split(".")[-1].lower()
             mi = None
-            with open(fpath, "rb") as stream:
-                try:
-                    mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-                except Exception as err:
-                    logging.error("Failed to parse metadata for %s during import: %s", fpath, err)
-                    logging.exception("Error details:")
-                    # 创建一个简单的metadata对象，避免导入失败
-                    from calibre.ebooks.metadata.book.base import Metadata
-                    mi = Metadata()
-                    mi.title = fname.replace("." + fmt, "")
-                    mi.authors = [_(u"佚名")]
-                else:
-                    # 处理metadata
-                    mi.title = utils.super_strip(mi.title)
-                    mi.authors = [utils.super_strip(s) for s in mi.authors]
-
-                    # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
-                    if fmt in ["txt", "pdf"]:
+            try:
+                with open(fpath, "rb") as stream:
+                    try:
+                        mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                    except Exception as err:
+                        logging.error("Failed to parse metadata for %s during import: %s", fpath, err)
+                        logging.exception("Error details:")
+                        # 创建一个简单的metadata对象，避免导入失败
+                        from calibre.ebooks.metadata.book.base import Metadata
+                        mi = Metadata()
                         mi.title = fname.replace("." + fmt, "")
                         mi.authors = [_(u"佚名")]
+                    else:
+                        # 处理metadata
+                        mi.title = utils.super_strip(mi.title)
+                        mi.authors = [utils.super_strip(s) for s in mi.authors]
+
+                        # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
+                        if fmt in ["txt", "pdf"]:
+                            mi.title = fname.replace("." + fmt, "")
+                            mi.authors = [_(u"佚名")]
+            except FileNotFoundError:
+                logging.warning("导入时文件已不存在，跳过: %s", fpath)
+                row.status = ScanFile.DROP
+                self.save_or_rollback(row)
+                continue
 
             # 再次检查是否有重复书籍
             ids = self.db.books_with_same_title(mi)
