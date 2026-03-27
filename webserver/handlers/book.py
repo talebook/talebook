@@ -672,7 +672,7 @@ def decode_filename(filename):
     """
     if not filename:
         return filename
-    
+
     try:
         # 尝试将 latin-1 编码的字节重新解释为 UTF-8
         # 这适用于 Tornado 将 UTF-8 字节错误解析为 latin-1 的情况
