@@ -683,13 +683,6 @@ def decode_filename(filename):
 
 
 class BookUpload(BaseHandler):
-    @classmethod
-    def convert(cls, s):
-        try:
-            return s.group(0).encode("latin1").decode("utf8")
-        except:
-            return s.group(0)
-
     def get_upload_file(self):
         # for unittest mock
         p = self.request.files["ebook"][0]
@@ -707,7 +700,6 @@ class BookUpload(BaseHandler):
         elif not self.current_user.can_upload():
             return {"err": "permission", "msg": _("无权操作")}
         name, data = self.get_upload_file()
-        name = re.sub(r"[\x80-\xFF]+", BookUpload.convert, name)
         logging.error("upload book name = " + repr(name))
         fmt = os.path.splitext(name)[1]
         fmt = fmt[1:] if fmt else None
