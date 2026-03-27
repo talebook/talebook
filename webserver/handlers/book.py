@@ -666,13 +666,12 @@ class HotBook(ListHandler):
 
 def decode_filename(filename):
     """处理中文文件名编码问题
-    
     Tornado 默认以 latin-1 解析 multipart/form-data 中的 filename，
     当文件名包含中文等非 ASCII 字符时，需要尝试解码为 UTF-8
     """
     if not filename:
         return filename
-    
+
     try:
         # 尝试将 latin-1 编码的字节重新解释为 UTF-8
         # 这适用于 Tornado 将 UTF-8 字节错误解析为 latin-1 的情况
