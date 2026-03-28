@@ -137,8 +137,8 @@ class TestTomatoNovelApi(unittest.TestCase):
         
         api = TomatoNovelApi(copy_image=False)
         
-        # 测试成功获取
-        with mock.patch.object(api, "get_book_by_id_direct") as mock_get:
+        # 测试成功获取 - mock get_book_by_id 而不是 get_book_by_id_direct
+        with mock.patch.object(api, "get_book_by_id") as mock_get:
             mock_get.return_value = mock.Mock(title="我不是戏神")
             
             result = api.get_book("我不是戏神", "三九音域")
