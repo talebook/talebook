@@ -16,6 +16,39 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from tornado import web
 from tornado.options import define, options
 
+# Monkey patch: 修复 Tornado 6.5 对中文文件名的严格验证
+# Tornado 6.5 引入了 RFC 9110 合规性检查，导致 UTF-8 编码的文件名被拒绝
+def patch_tornado_header_validation():
+    """放宽 Tornado 对 HTTP header value 的验证，以支持 UTF-8 编码的文件名"""
+    from tornado import httputil
+    import re
+    
+    # 保存原始的 add 方法
+    original_add = httputil.HTTPHeaders.add
+    
+    def patched_add(self, name, value):
+        """放宽 header value 验证，允许 UTF-8 字节序列"""
+        # 对于 Content-Disposition header，放宽验证
+        if name.lower() == 'content-disposition':
+            # 不验证，直接添加
+            norm_name = httputil._normalize_header(name)
+            self._last_key = norm_name
+            if norm_name in self:
+                self._dict[norm_name] = (
+                    httputil.native_str(self[norm_name]) + "," + httputil.native_str(value)
+                )
+                self._as_list[norm_name].append(value)
+            else:
+                self[norm_name] = value
+        else:
+            # 其他 header 保持原有验证
+            return original_add(self, name, value)
+    
+    # 应用 patch
+    httputil.HTTPHeaders.add = patched_add
+    logging.info("Patched Tornado HTTPHeaders.add to support UTF-8 filenames")
+
+
 from webserver import loader, models, social_routes, handlers
 from webserver.services import AsyncService
 
@@ -229,6 +262,10 @@ def setup_logging():
 def main():
     tornado.options.parse_command_line()
     setup_logging()
+    
+    # 应用 monkey patch 以支持中文文件名
+    patch_tornado_header_validation()
+    
     app = make_app()
     http_server = tornado.httpserver.HTTPServer(app, xheaders=True, max_buffer_size=get_upload_size())
     http_server.listen(options.port, options.host)
