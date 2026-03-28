@@ -22,8 +22,7 @@ USER_AGENTS = [
     "(KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) "
-    "Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
 ]
@@ -217,14 +216,18 @@ class Page(object):
         # 优先从 API 数据中获取封面
         if self.book_info:
             # 尝试从 API 响应中获取封面
-            cover_url = self.book_info.get("cover") or self.book_info.get("cover_url") or self.book_info.get("image_url")
+            cover_url = (
+                self.book_info.get("cover")
+                or self.book_info.get("cover_url")
+                or self.book_info.get("image_url")
+            )
             if cover_url:
                 return cover_url
-        
+
         # 备用：从网页解析中获取
         if not self.soup:
             return ""
-        
+
         # 从 script[type="application/ld+json"] 中提取图片 URL
         script = next(
             (
@@ -241,7 +244,7 @@ class Page(object):
                     return data["images"][0]
             except Exception:
                 pass
-        
+
         return ""
 
     def get_summary(self):
