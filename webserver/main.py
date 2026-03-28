@@ -22,7 +22,6 @@ from tornado.options import define, options
 def patch_tornado_header_validation():
     """放宽 Tornado 对 HTTP header value 的验证，以支持 UTF-8 编码的文件名"""
     from tornado import httputil
-    import re
 
     # 保存原始的 add 方法
     original_add = httputil.HTTPHeaders.add
@@ -109,7 +108,7 @@ def init_calibre():
 
         logging.error(traceback.format_exc())
         raise ImportError(
-            _("Can not import calibre. Please set the corrent options.\n%s" % e)
+            _("Can not import calibre. Please set the correct options.\n%s" % e)
         )
     if not options.with_library:
         sys.stderr.write(
@@ -304,14 +303,20 @@ def main():
     patch_tornado_header_validation()
 
     app = make_app()
+    
+    # 注册 Flask-SQLAlchemy 调试事件
+    try:
+        from flask.ext.sqlalchemy import _EngineDebuggingSignalEvents
+        _EngineDebuggingSignalEvents(app._engine, app.import_name).register()
+    except ImportError:
+        # Flask-SQLAlchemy 可能未安装，跳过注册
+        pass
+    
     http_server = tornado.httpserver.HTTPServer(
         app, xheaders=True, max_buffer_size=get_upload_size()
     )
     http_server.listen(options.port, options.host)
     tornado.ioloop.IOLoop.instance().start()
-    from flask.ext.sqlalchemy import _EngineDebuggingSignalEvents
-
-    _EngineDebuggingSignalEvents(app._engine, app.import_name).register()
 
 
 if __name__ == "__main__":
