@@ -214,7 +214,14 @@ class Page(object):
 
     def get_image(self):
         """获取封面图片 URL"""
-        # 如果没有 soup，返回空字符串
+        # 优先从 API 数据中获取封面
+        if self.book_info:
+            # 尝试从 API 响应中获取封面
+            cover_url = self.book_info.get("cover") or self.book_info.get("cover_url") or self.book_info.get("image_url")
+            if cover_url:
+                return cover_url
+        
+        # 备用：从网页解析中获取
         if not self.soup:
             return ""
         
