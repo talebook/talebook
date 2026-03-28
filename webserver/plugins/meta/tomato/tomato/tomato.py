@@ -214,6 +214,10 @@ class Page(object):
 
     def get_image(self):
         """获取封面图片 URL"""
+        # 如果没有 soup，返回空字符串
+        if not self.soup:
+            return ""
+        
         # 从 script[type="application/ld+json"] 中提取图片 URL
         script = next(
             (
@@ -230,7 +234,7 @@ class Page(object):
                     return data["images"][0]
             except Exception:
                 pass
-
+        
         return ""
 
     def get_summary(self):
