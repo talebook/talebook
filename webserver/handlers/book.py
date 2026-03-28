@@ -386,7 +386,7 @@ class BookEdit(BaseHandler):
 
         file_info = self.request.files["cover"][0]
         file_data = file_info["body"]
-        file_name = file_info["filename"]
+        file_name = decode_filename(file_info["filename"])
 
         # 检查文件类型
         allowed_types = [
@@ -664,18 +664,29 @@ class HotBook(ListHandler):
         return self.render_book_list(books, title=title)
 
 
-class BookUpload(BaseHandler):
-    @classmethod
-    def convert(cls, s):
-        try:
-            return s.group(0).encode("latin1").decode("utf8")
-        except:
-            return s.group(0)
+def decode_filename(filename):
+    """处理中文文件名编码问题
+    Tornado 默认以 latin-1 解析 multipart/form-data 中的 filename，
+    当文件名包含中文等非 ASCII 字符时，需要尝试解码为 UTF-8
+    """
+    if not filename:
+        return filename
 
+    try:
+        # 尝试将 latin-1 编码的字节重新解释为 UTF-8
+        # 这适用于 Tornado 将 UTF-8 字节错误解析为 latin-1 的情况
+        return filename.encode("latin1").decode("utf-8")
+    except (UnicodeDecodeError, UnicodeEncodeError, AttributeError):
+        # 如果已经是 UTF-8 或解码失败，保持原样
+        return filename
+
+
+class BookUpload(BaseHandler):
     def get_upload_file(self):
         # for unittest mock
         p = self.request.files["ebook"][0]
-        return (p["filename"], p["body"])
+        filename = decode_filename(p["filename"])
+        return (filename, p["body"])
 
     @js
     def post(self):
@@ -688,7 +699,6 @@ class BookUpload(BaseHandler):
         elif not self.current_user.can_upload():
             return {"err": "permission", "msg": _("无权操作")}
         name, data = self.get_upload_file()
-        name = re.sub(r"[\x80-\xFF]+", BookUpload.convert, name)
         logging.error("upload book name = " + repr(name))
         fmt = os.path.splitext(name)[1]
         fmt = fmt[1:] if fmt else None
