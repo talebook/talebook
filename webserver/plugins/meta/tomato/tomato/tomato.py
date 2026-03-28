@@ -9,7 +9,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
-from .tomatoexception import PageError
+from .tomatoexception import PageError, VerifyError
 
 
 # 官方 API 端点
@@ -53,15 +53,18 @@ class Page(object):
         """
         self.book_id = book_id
         self.cookie = cookie
+        self.book_info = None
 
-        # 使用官方 API 获取书籍信息
-        self.book_info = self._fetch_book_info()
+        # 直接访问网页获取信息（更可靠）
+        self._init_web_parser()
 
-        if not self.book_info:
+        # 如果没有成功获取页面，抛出错误
+        if not self.soup or not self.html:
             raise PageError(book_id)
 
-        # 构建网页解析器用于备用
-        self._init_web_parser()
+        # 检查是否需要验证
+        if "验证" in self.html or "vf" in self.html:
+            raise VerifyError(book_id)
 
     def _fetch_book_info(self):
         """从官方 API 获取书籍信息"""
@@ -82,7 +85,7 @@ class Page(object):
             }
 
             response = requests.get(
-                SEARCH_API, params=params, headers=headers, timeout=15, verify=False
+                SEARCH_API, params=params, headers=headers, timeout=15
             )
 
             if response.status_code == 200:
@@ -288,7 +291,7 @@ class Search(object):
 
         try:
             response = requests.get(
-                SEARCH_API, params=params, headers=headers, timeout=15, verify=False
+                SEARCH_API, params=params, headers=headers, timeout=15
             )
 
             if response.status_code == 200:

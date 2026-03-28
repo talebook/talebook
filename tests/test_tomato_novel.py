@@ -137,9 +137,16 @@ class TestTomatoNovelApi(unittest.TestCase):
         
         api = TomatoNovelApi(copy_image=False)
         
-        # 测试成功获取
-        with mock.patch.object(api, "get_book_by_id_direct") as mock_get:
-            mock_get.return_value = mock.Mock(title="我不是戏神")
+        # 测试成功获取 - mock get_book_by_id 返回一个完整的 Mock Page 对象
+        mock_page = mock.Mock()
+        mock_page.get_info.return_value = TOMATO_BOOK_INFO
+        mock_page.get_tags.return_value = TOMATO_BOOK_INFO["tags"]
+        mock_page.get_summary.return_value = TOMATO_BOOK_INFO["abstract"]
+        mock_page.get_image.return_value = "https://example.com/cover.jpg"
+        mock_page.get_id.return_value = TOMATO_BOOK_INFO["book_id"]
+        
+        with mock.patch.object(api, "get_book_by_id") as mock_get:
+            mock_get.return_value = mock_page
             
             result = api.get_book("我不是戏神", "三九音域")
             self.assertIsNotNone(result)
@@ -190,23 +197,32 @@ class TestTomatoPage(unittest.TestCase):
     
     @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.requests.get")
     def test_page_init_with_api(self, mk):
-        """测试 Page 初始化（使用 API）"""
-        # 模拟 API 响应
+        """测试 Page 初始化（使用网页访问）"""
+        # 模拟网页响应
         mock_response = mock.Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": {
-                "ret_data": [TOMATO_BOOK_INFO]
-            }
-        }
+        mock_response.text = """
+        <html>
+        <head><title>我不是戏神</title></head>
+        <body>
+        <h1>我不是戏神</h1>
+        <div class="author-name"><span class="author-name-text">三九音域</span></div>
+        <div class="page-abstract-content"><p>赤色流星划过天际，人类文明近乎停滞。</p></div>
+        </body>
+        </html>
+        """
         mk.return_value = mock_response
         
-        # 创建 Page 对象（应该使用 API 数据）
+        # 创建 Page 对象（应该使用网页解析）
         page = Page(TOMATO_BOOK_INFO["book_id"])
         
         self.assertEqual(page.book_id, TOMATO_BOOK_INFO["book_id"])
-        self.assertIsNotNone(page.book_info)
-        self.assertEqual(page.book_info["title"], TOMATO_BOOK_INFO["title"])
+        self.assertIsNotNone(page.soup)
+        self.assertIsNotNone(page.html)
+        
+        # 测试获取信息
+        info = page.get_info()
+        self.assertEqual(info["book_id"], TOMATO_BOOK_INFO["book_id"])
     
     def test_get_info(self):
         """测试获取书籍信息"""

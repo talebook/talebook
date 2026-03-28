@@ -2,6 +2,7 @@
 export default defineI18nConfig(() => ({
   legacy: false,
   locale: 'zh-CN',
+  fallbackLocale: 'zh-CN',
   
   // 日期时间格式化
   datetimeFormats: {

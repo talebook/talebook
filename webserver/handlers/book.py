@@ -19,7 +19,7 @@ from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.models import Item
-from webserver.plugins.meta import baike, douban, youshu
+from webserver.plugins.meta import baike, douban, tomato, youshu
 from webserver.plugins.parser.txt import get_content_encoding
 
 CONF = loader.get_settings()
@@ -130,6 +130,15 @@ class BookRefer(BaseHandler):
         if book:
             books.append(book)
 
+        # append tomato novel
+        api = tomato.TomatoNovelApi(copy_image=False)
+        try:
+            book = api.get_book(title)
+        except:
+            return {"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")}
+        if book:
+            books.append(book)
+
         return books
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
@@ -175,9 +184,19 @@ class BookRefer(BaseHandler):
             try:
                 refer_mi = api.get_book(title)
             except Exception as e:
-                logging.error("获取优书网书籍信息失败: %s", e)
+                logging.error("获取优书网书籍信息失败：%s", e)
                 raise RuntimeError(
                     {"err": "httprequest.youshu.failed", "msg": _("优书网查询失败")}
+                )
+        elif provider_key == tomato.KEY:
+            title = re.sub("[(（].*", "", mi.title)
+            api = tomato.TomatoNovelApi(copy_image=True)
+            try:
+                refer_mi = api.get_book(title)
+            except Exception as e:
+                logging.error("获取番茄小说书籍信息失败：%s", e)
+                raise RuntimeError(
+                    {"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")}
                 )
         else:
             raise RuntimeError(
