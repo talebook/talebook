@@ -3,7 +3,6 @@
 
 import logging
 import os
-import re
 import sys
 from gettext import gettext as _
 
