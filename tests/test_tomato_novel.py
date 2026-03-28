@@ -77,15 +77,15 @@ class TestTomatoNovelApi(unittest.TestCase):
     
     def test_api_init(self):
         """测试 API 初始化"""
-        # 不带参数初始化
+        # 不带参数初始化（默认值 copy_image=True）
         api = TomatoNovelApi()
-        self.assertFalse(api.copy_image)
+        self.assertTrue(api.copy_image)
         self.assertFalse(api.manual_select)
         self.assertIsNone(api.cookie)
         
         # 带参数初始化
-        api = TomatoNovelApi(copy_image=True, manual_select=True, cookie="test_cookie")
-        self.assertTrue(api.copy_image)
+        api = TomatoNovelApi(copy_image=False, manual_select=True, cookie="test_cookie")
+        self.assertFalse(api.copy_image)
         self.assertTrue(api.manual_select)
         self.assertEqual(api.cookie, "test_cookie")
     
@@ -110,7 +110,7 @@ class TestTomatoNovelApi(unittest.TestCase):
             result = api.get_book_by_id_direct("invalid_id")
             self.assertIsNone(result)
     
-    @mock.patch("webserver.plugins.meta.tomato.tomato.requests.get")
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.requests.get")
     def test_search_book(self, mk):
         """测试搜索功能"""
         # 模拟 API 响应
@@ -126,7 +126,7 @@ class TestTomatoNovelApi(unittest.TestCase):
         self.assertEqual(results[0]["title"], "我不是戏神")
         self.assertEqual(results[0]["book_id"], "7276384138653862966")
     
-    @mock.patch("webserver.plugins.meta.tomato.tomato.requests.get")
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.requests.get")
     def test_get_book(self, mk):
         """测试根据书名获取书籍"""
         # 模拟搜索响应
@@ -188,7 +188,7 @@ class TestTomatoNovelApi(unittest.TestCase):
 class TestTomatoPage(unittest.TestCase):
     """番茄小说 Page 类测试"""
     
-    @mock.patch("webserver.plugins.meta.tomato.tomato.requests.get")
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.requests.get")
     def test_page_init_with_api(self, mk):
         """测试 Page 初始化（使用 API）"""
         # 模拟 API 响应
@@ -240,7 +240,7 @@ class TestTomatoPage(unittest.TestCase):
 class TestTomatoSearch(unittest.TestCase):
     """番茄小说 Search 类测试"""
     
-    @mock.patch("webserver.plugins.meta.tomato.tomato.requests.get")
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.requests.get")
     def test_search_init(self, mk):
         """测试搜索初始化"""
         # 模拟 API 响应
@@ -255,7 +255,7 @@ class TestTomatoSearch(unittest.TestCase):
         self.assertEqual(searcher.max_results, 5)
         self.assertEqual(len(searcher.data), 2)
     
-    @mock.patch("webserver.plugins.meta.tomato.tomato.requests.get")
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.requests.get")
     def test_get_results(self, mk):
         """测试获取搜索结果"""
         # 模拟 API 响应
@@ -273,7 +273,7 @@ class TestTomatoSearch(unittest.TestCase):
         self.assertEqual(results[0]["book_id"], "7276384138653862966")
         self.assertIn("fanqienovel.com", results[0]["url"])
     
-    @mock.patch("webserver.plugins.meta.tomato.tomato.requests.get")
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.requests.get")
     def test_search_with_cookie(self, mk):
         """测试带 Cookie 的搜索"""
         # 模拟 API 响应
