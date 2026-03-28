@@ -3,6 +3,7 @@
 
 import logging
 import os
+import re
 import sys
 from gettext import gettext as _
 
@@ -15,26 +16,29 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from tornado import web
 from tornado.options import define, options
 
+
 # Monkey patch: 修复 Tornado 6.5 对中文文件名的严格验证
 # Tornado 6.5 引入了 RFC 9110 合规性检查，导致 UTF-8 编码的文件名被拒绝
 def patch_tornado_header_validation():
     """放宽 Tornado 对 HTTP header value 的验证，以支持 UTF-8 编码的文件名"""
     from tornado import httputil
     import re
-    
+
     # 保存原始的 add 方法
     original_add = httputil.HTTPHeaders.add
-    
+
     def patched_add(self, name, value):
         """放宽 header value 验证，允许 UTF-8 字节序列"""
         # 对于 Content-Disposition header，放宽验证
-        if name.lower() == 'content-disposition':
+        if name.lower() == "content-disposition":
             # 不验证，直接添加
             norm_name = httputil._normalize_header(name)
             self._last_key = norm_name
             if norm_name in self:
                 self._dict[norm_name] = (
-                    httputil.native_str(self[norm_name]) + "," + httputil.native_str(value)
+                    httputil.native_str(self[norm_name])
+                    + ","
+                    + httputil.native_str(value)
                 )
                 self._as_list[norm_name].append(value)
             else:
@@ -42,7 +46,7 @@ def patch_tornado_header_validation():
         else:
             # 其他 header 保持原有验证
             return original_add(self, name, value)
-    
+
     # 应用 patch
     httputil.HTTPHeaders.add = patched_add
     logging.info("Patched Tornado HTTPHeaders.add to support UTF-8 filenames")
@@ -54,13 +58,40 @@ from webserver.services import AsyncService
 CONF = loader.get_settings()
 define("host", default="", type=str, help=_("The host address on which to listen"))
 define("port", default=8080, type=int, help=_("The port on which to listen."))
-define("path-calibre", default="/usr/lib/calibre", type=str, help=_("Path to calibre package."))
-define("path-resources", default="/usr/share/calibre", type=str, help=_("Path to calibre resources."))
-define("path-plugins", default="/usr/lib/calibre/calibre/plugins", type=str, help=_("Path to calibre plugins."))
-define("path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary programs."))
-define("with-library", default=CONF["with_library"], type=str, help=_("Path to the library folder"))
+define(
+    "path-calibre",
+    default="/usr/lib/calibre",
+    type=str,
+    help=_("Path to calibre package."),
+)
+define(
+    "path-resources",
+    default="/usr/share/calibre",
+    type=str,
+    help=_("Path to calibre resources."),
+)
+define(
+    "path-plugins",
+    default="/usr/lib/calibre/calibre/plugins",
+    type=str,
+    help=_("Path to calibre plugins."),
+)
+define(
+    "path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary programs.")
+)
+define(
+    "with-library",
+    default=CONF["with_library"],
+    type=str,
+    help=_("Path to the library folder"),
+)
 define("syncdb", default=False, type=bool, help=_("Create all tables"))
-define("update-config", default=False, type=bool, help=_("update config when system upgrade"))
+define(
+    "update-config",
+    default=False,
+    type=bool,
+    help=_("update config when system upgrade"),
+)
 
 
 def init_calibre():
@@ -77,7 +108,9 @@ def init_calibre():
         import traceback
 
         logging.error(traceback.format_exc())
-        raise ImportError(_("Can not import calibre. Please set the corrent options.\n%s" % e))
+        raise ImportError(
+            _("Can not import calibre. Please set the corrent options.\n%s" % e)
+        )
     if not options.with_library:
         sys.stderr.write(
             _(
@@ -167,6 +200,7 @@ def make_app():
         logging.info("updating configs ...")
         # 触发一次空白配置更新
         from webserver.handlers.admin import SettingsSaverLogic
+
         logic = SettingsSaverLogic()
         logic.update_nuxtjs_env()
         logging.info("done")
@@ -174,7 +208,9 @@ def make_app():
 
     # build sql session factory
     engine = create_engine(auth_db_path, **CONF["db_engine_args"])
-    ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
+    ScopedSession = scoped_session(
+        sessionmaker(bind=engine, autoflush=True, autocommit=False)
+    )
     models.bind_session(ScopedSession)
     init_social(models.Base, ScopedSession, CONF)
 
@@ -226,7 +262,9 @@ def make_app():
 
     logging.info("Now, Running...")
     AsyncService().setup(book_db, ScopedSession)
-    app = web.Application(social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings)
+    app = web.Application(
+        social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings
+    )
     app._engine = engine
     return app
 
@@ -261,12 +299,14 @@ def setup_logging():
 def main():
     tornado.options.parse_command_line()
     setup_logging()
-    
+
     # 应用 monkey patch 以支持中文文件名
     patch_tornado_header_validation()
-    
+
     app = make_app()
-    http_server = tornado.httpserver.HTTPServer(app, xheaders=True, max_buffer_size=get_upload_size())
+    http_server = tornado.httpserver.HTTPServer(
+        app, xheaders=True, max_buffer_size=get_upload_size()
+    )
     http_server.listen(options.port, options.host)
     tornado.ioloop.IOLoop.instance().start()
     from flask.ext.sqlalchemy import _EngineDebuggingSignalEvents
