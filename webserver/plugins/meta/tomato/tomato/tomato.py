@@ -9,7 +9,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
-from .tomatoexception import PageError
+from .tomatoexception import PageError, VerifyError
 
 
 # 官方 API 端点
