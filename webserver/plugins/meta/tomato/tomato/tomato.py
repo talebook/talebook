@@ -54,16 +54,16 @@ class Page(object):
         self.book_id = book_id
         self.cookie = cookie
         self.book_info = None
-        
+
         # 直接访问网页获取信息（更可靠）
         self._init_web_parser()
-        
+
         # 如果没有成功获取页面，抛出错误
         if not self.soup or not self.html:
             raise PageError(book_id)
-        
+
         # 检查是否需要验证
-        if u"验证" in self.html or "vf" in self.html:
+        if "验证" in self.html or "vf" in self.html:
             raise VerifyError(book_id)
 
     def _fetch_book_info(self):
