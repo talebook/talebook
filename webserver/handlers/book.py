@@ -234,6 +234,11 @@ class BookRefer(BaseHandler):
         ]
         rsp = []
         for b in books:
+            # 确保 b 是字典对象
+            if not isinstance(b, dict):
+                logging.warning("跳过非字典类型的书籍信息：%s", type(b))
+                continue
+            
             d = dict((k, b.get(k, "")) for k in keys)
             pubdate = b.get("pubdate")
             d["pubyear"] = pubdate.strftime("%Y") if pubdate else ""
