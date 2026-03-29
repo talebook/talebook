@@ -233,18 +233,49 @@ class BookRefer(BaseHandler):
             "provider_value",
         ]
         rsp = []
-        for b in books:
+        logging.info("开始处理 %d 个书籍信息源", len(books))
+
+        for i, b in enumerate(books):
             # 确保 b 是字典对象
             if not isinstance(b, dict):
-                logging.warning("跳过非字典类型的书籍信息：%s", type(b))
+                logging.warning(
+                    "跳过第 %d 个书籍信息：类型不符 [type=%s, value=%r]",
+                    i,
+                    type(b).__name__,
+                    b,
+                )
                 continue
-            
-            d = dict((k, b.get(k, "")) for k in keys)
-            pubdate = b.get("pubdate")
-            d["pubyear"] = pubdate.strftime("%Y") if pubdate else ""
-            if not d["comments"]:
-                d["comments"] = _("无详细介绍")
-            rsp.append(d)
+
+            # 检查必要的字段
+            if "title" not in b or not b["title"]:
+                logging.warning("跳过第 %d 个书籍信息：缺少必要字段 title", i)
+                continue
+
+            try:
+                d = dict((k, b.get(k, "")) for k in keys)
+                pubdate = b.get("pubdate")
+                d["pubyear"] = pubdate.strftime("%Y") if pubdate else ""
+                if not d["comments"]:
+                    d["comments"] = _("无详细介绍")
+
+                # 记录成功处理的书籍信息
+                logging.debug(
+                    "成功处理书籍 [%s] by %s (provider=%s)",
+                    d["title"],
+                    d["author"],
+                    d.get("provider_key", "unknown"),
+                )
+                rsp.append(d)
+            except Exception as e:
+                logging.error(
+                    "处理第 %d 个书籍信息时出错 [title=%s, error=%s]",
+                    i,
+                    b.get("title", "unknown"),
+                    e,
+                )
+                continue
+
+        logging.info("成功处理 %d/%d 个书籍信息", len(rsp), len(books))
         return {"err": "ok", "books": rsp}
 
     @js
@@ -499,6 +530,7 @@ class BookDelete(BaseHandler):
         self.db.delete_book(bid)
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
         from webserver.models import ScanFile
+
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
         self.session.commit()
         self.add_msg("success", _("删除书籍《%s》") % book["title"])
@@ -560,7 +592,9 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
             self.set_header("Content-Type", "application/pdf")
             # 在线阅读时不附加 Content-Disposition attachment，避免触发下载
             if not self.is_opds:
-                self.set_header("Content-Disposition", f"inline; filename=\"{fname}\"".encode("UTF-8"))
+                self.set_header(
+                    "Content-Disposition", f'inline; filename="{fname}"'.encode("UTF-8")
+                )
             else:
                 self.set_header("Content-Disposition", att.encode("UTF-8"))
         else:
