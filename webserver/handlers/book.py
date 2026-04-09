@@ -743,7 +743,9 @@ class BookUpload(BaseHandler):
     def get_upload_file(self):
         # for unittest mock
         p = self.request.files["ebook"][0]
-        filename = decode_filename(p["filename"])
+        original_filename = self.get_argument("original_filename", None)
+        filename = original_filename or p["filename"]
+        filename = decode_filename(filename)
         return (filename, p["body"])
 
     @js
