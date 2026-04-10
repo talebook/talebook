@@ -31,6 +31,10 @@ class PiperTTSEngine(BaseTTSEngine):
     DEFAULT_RATE = 1.0
     DEFAULT_PITCH = 1.0
 
+    # 超时配置（秒）
+    DEFAULT_TIMEOUT = 300  # Piper 合成超时
+    DEFAULT_FFMPEG_TIMEOUT = 60  # ffmpeg 转换超时
+
     def __init__(
         self,
         voice: str = None,
@@ -86,7 +90,7 @@ class PiperTTSEngine(BaseTTSEngine):
                 piper_cmd,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 分钟超时
+                timeout=self.DEFAULT_TIMEOUT
             )
 
             if result.returncode != 0:
@@ -173,7 +177,7 @@ class PiperTTSEngine(BaseTTSEngine):
                 ffmpeg_cmd,
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=self.DEFAULT_FFMPEG_TIMEOUT
             )
 
             if result.returncode != 0:

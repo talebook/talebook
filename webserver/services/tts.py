@@ -220,11 +220,14 @@ class TTSService(AsyncService):
             args = ["ebook-convert", book_path, txt_path]
             logging.info("Converting epub: %s", " ".join("'%s'" % v for v in args))
 
+            # ebook-convert 超时
+            CONVERT_TIMEOUT = 300  # 5 分钟
+
             result = subprocess.run(
                 args,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=300
+                timeout=CONVERT_TIMEOUT
             )
 
             if result.returncode != 0:
@@ -448,6 +451,9 @@ class TTSService(AsyncService):
         try:
             import subprocess
 
+            # ffprobe 超时
+            FFPROBE_TIMEOUT = 10  # 秒
+
             result = subprocess.run(
                 [
                     'ffprobe',
@@ -458,7 +464,7 @@ class TTSService(AsyncService):
                 ],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=FFPROBE_TIMEOUT
             )
 
             if result.returncode == 0:
