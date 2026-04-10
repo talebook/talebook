@@ -274,53 +274,109 @@ class TTSService(AsyncService):
     def _extract_dialogues(self, text: str) -> list:
         """从文本中提取对话片段
 
-        Phase 1 仅使用正则匹配引号/标签，不区分说话人
+        Phase 1 仅识别引号/标签对白，不区分说话人
+        Phase 2 才做角色检测
+
+        Returns:
+            list: 对话片段列表，每项包含:
+                - id: 序号
+                - text: 对话文本
+                - pattern_type: 匹配的模式类型
+                - start: 在原文中的起始位置
+                - end: 在原文中的结束位置
         """
         import re
 
         dialogues = []
 
-        # 对话正则模式
+        # 对话正则模式（按优先级）
+        # 注意：长的模式要放在前面，避免短模式先匹配
         DIALOGUE_PATTERNS = [
-            # 中文双引号
-            (r'"([^""]+)"', 'zh_quote'),
-            # 中文单引号
-            (r"'([^'']+)'", 'zh_single_quote'),
-            # 英文双引号
-            (r'"([^""]+)"', 'en_quote'),
-            # 英文单引号
-            (r"'([^'']+)'", 'en_single_quote'),
-            # HTML/XML 标签内的对话
-            (r'<(?:p|span|div)[^>]*>([^<]+)</(?:p|span|div)>', 'tag'),
+            # 中文双引号「」
+            (r'「([^」]+)」', 'zh_bracket'),
+            # 中文双引号""
+            (r'"([^"]+)"', 'zh_quote'),
+            # 中文单引号『』
+            (r'『([^』]+)』', 'zh_bracket_single'),
+            # 中文单引号''
+            (r"'([^']+)'", 'zh_single_quote'),
+            # 英文双引号 ""
+            (r'"([^"]+)"', 'en_quote'),
+            # 英文单引号 ''
+            (r"'([^']+)'", 'en_single_quote'),
         ]
+
+        seen_texts = set()  # 用于去重
 
         for pattern, pattern_type in DIALOGUE_PATTERNS:
             for match in re.finditer(pattern, text, re.DOTALL):
                 dialogue_text = match.group(1).strip()
-                # 过滤太短或太长的文本
-                if 5 <= len(dialogue_text) <= 1000:
-                    dialogues.append({
-                        'id': len(dialogues),
-                        'text': dialogue_text,
-                        'pattern_type': pattern_type,
-                        'start': match.start(),
-                        'end': match.end(),
-                    })
 
-        # 按位置排序并去重
+                # 过滤无效文本
+                if not dialogue_text:
+                    continue
+
+                # 长度限制：5-1000 字符
+                if len(dialogue_text) < 5 or len(dialogue_text) > 1000:
+                    continue
+
+                # 去除可能的格式标记
+                dialogue_text = self._clean_dialogue_text(dialogue_text)
+
+                # 简单去重
+                if dialogue_text in seen_texts:
+                    continue
+                seen_texts.add(dialogue_text)
+
+                dialogues.append({
+                    'id': len(dialogues),
+                    'text': dialogue_text,
+                    'pattern_type': pattern_type,
+                    'start': match.start(),
+                    'end': match.end(),
+                })
+
+        # 按原文位置排序
         dialogues.sort(key=lambda x: x['start'])
 
-        # 合并重叠的对话（同一位置可能被多个模式匹配）
+        # 合并重叠的匹配（同一位置可能被多个模式匹配）
         merged = []
         for d in dialogues:
             if not merged or d['start'] >= merged[-1]['end']:
                 merged.append(d)
+            else:
+                # 如果重叠，保留较长的
+                if len(d['text']) > len(merged[-1]['text']):
+                    merged[-1] = d
 
         # 重新编号
         for i, d in enumerate(merged):
             d['id'] = i
 
         return merged
+
+    def _clean_dialogue_text(self, text: str) -> str:
+        """清理对话文本中的格式标记"""
+        import re
+
+        # 移除常见的格式标记
+        patterns_to_remove = [
+            r'\s+',  # 多余空白
+            r'\[.*?\]',  # [页脚] 等
+            r'\(.*?\)',  # (译者注) 等
+        ]
+
+        cleaned = text
+        for pattern in patterns_to_remove:
+            cleaned = re.sub(pattern, ' ', cleaned)
+
+        # 去除首尾空白和标点
+        cleaned = cleaned.strip()
+
+        # 去除首尾的引号（如果还有）
+        cleaned = cleaned.strip('""''「」『』')
+
+        return cleaned.strip()
 
     def _get_audio_dir(self, book_id: int) -> str:
         """获取音频输出目录
