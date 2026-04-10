@@ -9,6 +9,7 @@ Piper TTS 引擎插件
 import subprocess
 import os
 import logging
+import shutil
 from pathlib import Path
 from webserver.services.tts_engine import BaseTTSEngine, TTSEngineRegistry
 
@@ -158,7 +159,6 @@ class PiperTTSEngine(BaseTTSEngine):
         """使用 ffmpeg 将 WAV 转换为 MP3"""
         try:
             # 检查 ffmpeg 是否可用
-            import shutil
             if not shutil.which('ffmpeg'):
                 logging.error("ffmpeg not found in PATH")
                 return False
@@ -236,8 +236,6 @@ class PiperTTSEngine(BaseTTSEngine):
 
     def is_available(self) -> bool:
         """检查 Piper 和 ffmpeg 是否可用"""
-        import shutil
-
         piper_ok = shutil.which('piper') is not None
         ffmpeg_ok = shutil.which('ffmpeg') is not None
 
