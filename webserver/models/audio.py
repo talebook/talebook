@@ -6,7 +6,7 @@
 存储 TTS 生成的音频文件信息
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Float
 
@@ -38,8 +38,8 @@ class Audio(Base):
     pattern_type = Column(String(32), nullable=True)  # 匹配的模式类型
 
     # 时间戳
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f'<Audio {self.id}: book_id={self.book_id}>'
