@@ -120,6 +120,51 @@ class TTSService(AsyncService):
             self.add_msg(None, "error", f"错误: {str(e)}")
             return False
 
+    def _extract_text_from_txt(self, book_path: str) -> str:
+    """从 TXT 文件提取文本内容
+
+    复用 TxtParser 进行编码检测和章节位置解析
+    """
+    import re
+    from webserver.plugins.parser.txt import TxtParser
+
+    try:
+        parser = TxtParser()
+        result = parser.parse(book_path)
+
+        if not result:
+            return None
+
+        encoding = result.get('encoding', 'utf-8')
+        toc = result.get('toc', [])
+
+        # 读取文件内容
+        with open(book_path, 'r', encoding=encoding, errors='ignore', newline='\n') as f:
+            content = f.read()
+
+        # 如果有章节信息，按章节位置提取内容
+        if toc and len(toc) > 1:
+            texts = []
+            for chapter in toc:
+                start = chapter.get('start', 0)
+                end = chapter.get('end', -1)
+                if end == -1:
+                    # 最后一章，读取到文件末尾
+                    chapter_content = content[start:]
+                else:
+                    chapter_content = content[start:end]
+                if chapter_content.strip():
+                    texts.append(chapter_content.strip())
+
+            if texts:
+                content = '\n\n'.join(texts)
+
+        return content if content.strip() else None
+
+    except Exception as e:
+        logging.error(f"TXT extraction error: {e}", exc_info=True)
+        return None
+
     def _extract_text(self, book_id: int, chapter_id: int = None) -> str:
         """提取书籍文本内容
 
@@ -130,7 +175,6 @@ class TTSService(AsyncService):
         Returns:
             str: 提取的文本内容
         """
-        from .extract import ExtractService
         from .convert import ConvertService
 
         # 获取书籍信息
@@ -145,26 +189,14 @@ class TTSService(AsyncService):
         ext = os.path.splitext(book_path)[1].lower()
 
         if ext == '.txt':
-            # TXT 文件直接提取
-            extract_service = ExtractService(self.manager)
-            result = extract_service.extract(book_id)
-            return result.get('content', '') if result else None
+            # TXT 文件通过 TxtParser 提取
+            content = self._extract_text_from_txt(book_path)
+            return content
 
         elif ext == '.epub':
             # epub 需要先转换
-            convert_service = ConvertService(self.manager)
-            txt_path = convert_service.do_ebook_convert(book_path)
-
-            if txt_path and os.path.exists(txt_path):
-                try:
-                    with open(txt_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    # 清理临时文件
-                    os.remove(txt_path)
-                    return content
-                except Exception as e:
-                    logging.error(f"Failed to read converted txt: {e}")
-                    return None
+            content = self._extract_text_from_epub(book_path)
+            return content
 
         return None
 
