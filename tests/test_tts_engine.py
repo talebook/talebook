@@ -95,15 +95,13 @@ class TestTTSEngineRegistry:
 
     def test_register_engine(self):
         """测试引擎注册"""
-        engine = MockEngine()
-        TTSEngineRegistry.register(engine)
+        TTSEngineRegistry.register(MockEngine)
 
         assert "test_mock" in TTSEngineRegistry.list_engines()
 
     def test_get_registered_engine(self):
         """测试获取已注册引擎"""
-        engine = MockEngine()
-        TTSEngineRegistry.register(engine)
+        TTSEngineRegistry.register(MockEngine)
 
         retrieved = TTSEngineRegistry.get("test_mock")
         assert retrieved is not None
@@ -121,28 +119,25 @@ class TestTTSEngineRegistry:
 
     def test_get_default_with_engines(self):
         """测试有引擎时 get_default 返回第一个可用引擎"""
-        engine1 = MockEngine()
-        engine1.KEY = "first"
-        engine2 = MockEngine()
-        engine2.KEY = "second"
-
-        TTSEngineRegistry.register(engine1)
-        TTSEngineRegistry.register(engine2)
+        # 直接设置类（不是实例）- 使用 get_default 查找的键名
+        TTSEngineRegistry._engines["piper"] = type("PiperEngine", (BaseTTSEngine,), {"KEY": "piper", "synthesize": lambda self, t, o, **k: True, "get_voices": lambda self: []})
+        TTSEngineRegistry._engines["coqui"] = type("CoquiEngine", (BaseTTSEngine,), {"KEY": "coqui", "synthesize": lambda self, t, o, **k: True, "get_voices": lambda self: []})
 
         default = TTSEngineRegistry.get_default()
         assert default is not None
+        assert default.KEY == "piper"
 
     def test_list_engines_empty(self):
         """测试空注册表"""
+        TTSEngineRegistry._engines = {}
         engines = TTSEngineRegistry.list_engines()
         assert engines == []
 
     def test_list_engines_multiple(self):
         """测试多引擎注册"""
+        TTSEngineRegistry._engines = {}
         for key in ["engine1", "engine2", "engine3"]:
-            e = MockEngine()
-            e.KEY = key
-            TTSEngineRegistry.register(e)
+            TTSEngineRegistry._engines[key] = type("E", (BaseTTSEngine,), {"KEY": key, "synthesize": lambda self, t, o, **k: True, "get_voices": lambda self: []})
 
         engines = TTSEngineRegistry.list_engines()
         assert len(engines) == 3
