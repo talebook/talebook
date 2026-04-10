@@ -1,3 +1,16 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-04-10T07:16:53.889Z"
+progress:
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 3
+---
+
 # State
 
 ## Project Context
@@ -14,11 +27,13 @@
 ## Accumulated Context
 
 ### Key Decisions
+
 - TTS 服务本地化，V1 纯本地，V2 才加云端
 - 分享机制类似 npm publish
 - 先做 TTS，再做元数据
 
 ### Open Issues
+
 - None yet
 
 ### Recent Work
@@ -33,10 +48,12 @@
 ## Session Continuity
 
 ### Last Session
+
 - Completed project initialization
 - Discussed requirements and roadmap
 
 ### Next Action
+
 - `/gsd-discuss-phase 1` — gather context and clarify approach for Phase 1
 
 ---
