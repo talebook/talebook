@@ -200,6 +200,77 @@ class TTSService(AsyncService):
 
         return None
 
+    def _extract_text_from_epub(self, book_path: str) -> str:
+        """从 epub 文件提取文本内容
+
+        通过 calibre convert 将 epub 转为 txt，再提取内容
+        """
+        import subprocess
+        import tempfile
+
+        try:
+            # 创建临时文件用于存储转换后的 txt
+            with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as tmp:
+                txt_path = tmp.name
+
+            # 创建临时日志文件
+            log_path = txt_path + '.log'
+
+            # 调用 ebook-convert
+            args = ["ebook-convert", book_path, txt_path]
+            logging.info("Converting epub: %s", " ".join("'%s'" % v for v in args))
+
+            result = subprocess.run(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=300
+            )
+
+            if result.returncode != 0:
+                logging.error("ebook-convert failed: %s", result.stderr.decode('utf-8', errors='ignore'))
+                # 清理临时文件
+                if os.path.exists(txt_path):
+                    os.remove(txt_path)
+                if os.path.exists(log_path):
+                    os.remove(log_path)
+                return None
+
+            if not os.path.exists(txt_path):
+                logging.error("Conversion produced no output file")
+                return None
+
+            # 读取转换后的 txt 内容
+            content = None
+            for encoding in ['utf-8', 'gbk', 'gb2312', 'latin-1']:
+                try:
+                    with open(txt_path, 'r', encoding=encoding) as f:
+                        content = f.read()
+                    break
+                except UnicodeDecodeError:
+                    continue
+
+            # 清理临时文件
+            try:
+                os.remove(txt_path)
+            except Exception:
+                pass
+            try:
+                os.remove(log_path)
+            except Exception:
+                pass
+
+            if content:
+                return content.strip() if content.strip() else None
+            return None
+
+        except subprocess.TimeoutExpired:
+            logging.error("ebook-convert timeout for: %s", book_path)
+            return None
+        except Exception as e:
+            logging.error(f"epub extraction error: {e}", exc_info=True)
+            return None
+
     def _extract_dialogues(self, text: str) -> list:
         """从文本中提取对话片段
 
