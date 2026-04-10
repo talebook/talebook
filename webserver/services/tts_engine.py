@@ -40,10 +40,10 @@ class BaseTTSEngine(ABC):
         """
         pass
 
+    @abstractmethod
     def is_available(self) -> bool:
         """检查引擎是否可用（依赖是否安装等）"""
-        import shutil
-        return shutil.which('piper') is not None
+        pass
 
     def validate_text(self, text: str) -> bool:
         """验证文本是否适合合成"""
