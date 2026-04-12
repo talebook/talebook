@@ -127,7 +127,7 @@ class Reader(Base, SQLAlchemyMixin):
 
     def init_default_user(self):
         class DefaultUserInfo:
-            extra_data = {"username": _(u"默认用户")}
+            extra_data = {"username": _("默认用户")}
             provider = "qq"
             uid = 123456789
 
@@ -150,7 +150,9 @@ class Reader(Base, SQLAlchemyMixin):
     def get_secure_password(self, raw_password):
         if self.salt == "__bcrypt__":
             # 使用bcrypt验证
-            if bcrypt.checkpw(raw_password.encode("UTF-8"), self.password.encode("UTF-8")):
+            if bcrypt.checkpw(
+                raw_password.encode("UTF-8"), self.password.encode("UTF-8")
+            ):
                 # 验证成功，返回self.password以保持向后兼容性
                 return self.password
             else:
@@ -192,12 +194,17 @@ class Reader(Base, SQLAlchemyMixin):
         self.avatar = url.replace("http://q.qlogo.cn", "//q.qlogo.cn")
 
         if social_user.provider == "github":
-            self.avatar = "https://avatars.githubusercontent.com/u/%s" % social_user.extra_data["id"]
+            self.avatar = (
+                "https://avatars.githubusercontent.com/u/%s"
+                % social_user.extra_data["id"]
+            )
 
     def get_active_code(self):
         # 激活码始终使用原有的SHA256方法，与密码哈希方法无关
         # 这样可以确保激活码功能在任何情况下都能正常工作
-        p1 = hashlib.sha256(self.create_time.strftime("%Y-%m-%d %H:%M:%S").encode("UTF-8")).hexdigest()
+        p1 = hashlib.sha256(
+            self.create_time.strftime("%Y-%m-%d %H:%M:%S").encode("UTF-8")
+        ).hexdigest()
         # 如果有salt，使用原有的salt，如果没有（bcrypt情况），还是用一个固定的或者空字符串
         salt_to_use = self.salt if self.salt != "__bcrypt__" else ""
         p2 = hashlib.sha256((salt_to_use + p1).encode("UTF-8")).hexdigest()
@@ -355,25 +362,26 @@ class ScanFile(Base, SQLAlchemyMixin):
 
 class OpdsSource(Base, SQLAlchemyMixin):
     """OPDS 源配置表 - 用于保存用户配置的 OPDS 服务器信息"""
+
     __tablename__ = "opds_sources"
     id = Column(Integer, primary_key=True)
-    
+
     # 源名称，用户自定义
     name = Column(String(200), nullable=False)
-    
+
     # OPDS 目录 URL (完整的 URL，如 http://example.com:8080/opds)
     url = Column(String(1000), nullable=False)
-    
+
     # 描述信息
     description = Column(String(500), nullable=True)
-    
+
     # 是否启用
     active = Column(Boolean, default=True)
-    
+
     # 创建和更新时间
     create_time = Column(DateTime)
     update_time = Column(DateTime)
-    
+
     # 额外数据（如认证信息等）
     data = Column(MutableDict.as_mutable(JSONType), default={})
 
@@ -394,83 +402,88 @@ def migrate_opds_sources_table(engine):
     将旧的 host/port/path 字段合并为 url 字段
     """
     from sqlalchemy import inspect, text
-    
+
     try:
         inspector = inspect(engine)
         tables = inspector.get_table_names()
-        
+
         if "opds_sources" not in tables:
             # 表不存在，直接创建
             OpdsSource.__table__.create(engine)
             logging.info("创建 opds_sources 表")
             return
-        
+
         # 检查是否存在旧字段
-        columns = [col['name'] for col in inspector.get_columns('opds_sources')]
-        
-        if 'host' in columns and 'url' not in columns:
+        columns = [col["name"] for col in inspector.get_columns("opds_sources")]
+
+        if "host" in columns and "url" not in columns:
             # 需要迁移：存在旧字段 host，但没有新字段 url
             logging.info("开始迁移 opds_sources 表结构...")
-            
+
             # 1. 添加新字段 url
             with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE opds_sources ADD COLUMN url VARCHAR(1000)"))
+                conn.execute(
+                    text("ALTER TABLE opds_sources ADD COLUMN url VARCHAR(1000)")
+                )
                 conn.commit()
-            
+
             # 2. 将旧数据合并到 url 字段
             with engine.connect() as conn:
                 # 查询所有旧数据
-                result = conn.execute(text("SELECT id, host, port, path FROM opds_sources"))
+                result = conn.execute(
+                    text("SELECT id, host, port, path FROM opds_sources")
+                )
                 rows = result.fetchall()
-                
+
                 for row in rows:
-                    host = row[1] or ''
-                    port = row[2] or ''
-                    path = row[3] or ''
-                    
+                    host = row[1] or ""
+                    port = row[2] or ""
+                    path = row[3] or ""
+
                     # 构建完整 URL
                     if host:
-                        if not host.startswith(('http://', 'https://')):
-                            host = 'http://' + host
-                        
+                        if not host.startswith(("http://", "https://")):
+                            host = "http://" + host
+
                         # 如果有端口，添加到 URL 中
                         if port:
                             # 从 host 中移除可能已有的端口
-                            host = host.split(':')[0]
+                            host = host.split(":")[0]
                             url = f"{host}:{port}"
                         else:
                             url = host
-                        
+
                         # 添加路径
-                        if path and not path.startswith('/'):
-                            path = '/' + path
+                        if path and not path.startswith("/"):
+                            path = "/" + path
                         url = url + path
-                        
+
                         # 更新记录
                         conn.execute(
                             text("UPDATE opds_sources SET url = :url WHERE id = :id"),
-                            {"url": url, "id": row[0]}
+                            {"url": url, "id": row[0]},
                         )
-                
+
                 conn.commit()
-            
+
             # 3. 删除旧字段
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE opds_sources DROP COLUMN host"))
                 conn.execute(text("ALTER TABLE opds_sources DROP COLUMN port"))
                 conn.execute(text("ALTER TABLE opds_sources DROP COLUMN path"))
                 conn.commit()
-            
+
             logging.info("opds_sources 表迁移完成")
-        
+
         # 确保表结构正确 (如果表不存在则创建)
         if "opds_sources" not in tables:
             OpdsSource.__table__.create(engine)
             logging.info("创建 opds_sources 表")
-        
+
     except Exception as e:
         logging.error(f"迁移 opds_sources 表失败：{e}")
         import traceback
+
         logging.error(traceback.format_exc())
         raise
 
