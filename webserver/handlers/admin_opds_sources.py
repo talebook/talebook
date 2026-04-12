@@ -13,7 +13,7 @@ import tornado
 from gettext import gettext as _
 
 from webserver import loader
-from webserver.handlers.base import BaseHandler, auth, js, is_admin
+from webserver.handlers.base import BaseHandler, js, is_admin
 from webserver.models import OpdsSource
 
 CONF = loader.get_settings()
