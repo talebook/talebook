@@ -346,12 +346,19 @@
     },
     "imports": {
       "title": "导入图书",
+      "titles": {
+        "addOpdsSource": "添加 OPDS 源",
+        "editOpdsSource": "编辑 OPDS 源"
+      },
       "button": {
         "refresh": "刷新",
         "scanBooks": "扫描书籍",
         "importFromOpds": "从其他 OPDS 导入",
         "importSelectedBooks": "导入选中书籍",
-        "importAllBooks": "导入全部书籍"
+        "importAllBooks": "导入全部书籍",
+        "addSource": "添加 OPDS 源",
+        "use": "使用",
+        "save": "保存"
       },
       "label": {
         "deleteAfterImport": "导入后删除源文件",
@@ -361,17 +368,23 @@
         "time": "时间",
         "bookTitle": "书名",
         "author": "作者",
-        "cover": "封面"
+        "cover": "封面",
+        "savedOpdsSources": "已保存的 OPDS 源",
+        "sourceName": "源名称",
+        "description": "描述",
+        "sourceActive": "启用此源"
       },
-      "placeholder": {},
+      "placeholder": {
+        "sourceName": "例如：我的 Calibre 图书馆",
+        "description": "简短描述此 OPDS 源"
+      },
       "message": {
         "importDirInfo": "请将需要导入的书籍放入{0}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。",
         "importAsyncInfo": "请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。",
-        "calibreInfo": "另外，还可以使用 PC版Calibre软件 (https://calibre-ebook.com/) 管理书籍，但是请注意：使用完PC版后，需重启Web版方可生效。",
+        "calibreInfo": "另外，还可以使用 PC 版 Calibre 软件 (https://calibre-ebook.com/) 管理书籍，但是请注意：使用完 PC 版后，需重启 Web 版方可生效。",
         "selectFilesInfo": "请勾选需要处理的文件（默认情况下导入全部书籍即可。已存在的书籍，即使勾选了也不会重复导入）",
         "selectedCount": "共选择了{0}个",
-        "opdsTip": "提示：通常OPDS服务地址类似 http://example.com:8080/opds 或 http://example.com/opds/root.xml",
-        "opdsPortTip": "注意：如果端口为空，系统会根据协议自动填充默认端口（HTTP: 80, HTTPS: 443）",
+        "opdsTip": "提示：通常 OPDS 服务地址类似 http://example.com:8080/opds 或 http://example.com/opds/root.xml",
         "rootDirectory": "根目录",
         "backToParent": "返回上级目录",
         "loadingDirectory": "正在加载目录...",
@@ -399,7 +412,11 @@
         "connectFailed": "连接失败: ",
         "checkAddress": "请检查地址是否正确",
         "cannotNavigateMissingLink": "无法导航：缺少链接",
-        "navigateFailed": "导航失败: "
+        "navigateFailed": "导航失败：",
+        "noSavedOpdsSources": "暂无已保存的 OPDS 源，请点击上方按钮添加",
+        "saveFailed": "保存 OPDS 源失败",
+        "deleteFailed": "删除 OPDS 源失败",
+        "confirmDeleteSource": "确定要删除此 OPDS 源配置吗？"
       },
       "status": {
         "new": "待扫描",

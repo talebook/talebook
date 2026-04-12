@@ -19,6 +19,7 @@ from webserver.services.autofill import AutoFillService
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
+from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.models import Reader, ScanFile
 from webserver.utils import SimpleBookFormatter
 
@@ -784,16 +785,20 @@ class AdminOPDSImportFailedList(BaseHandler):
 
             items = []
             for sf in failed_items:
-                items.append({
-                    "id": sf.id,
-                    "title": sf.title,
-                    "author": sf.author,
-                    "path": sf.path,  # 原始下载链接
-                    "hash": sf.hash,
-                    "status": sf.status,
-                    "error": sf.data.get("error") if sf.data else None,
-                    "update_time": sf.update_time.isoformat() if sf.update_time else None,
-                })
+                items.append(
+                    {
+                        "id": sf.id,
+                        "title": sf.title,
+                        "author": sf.author,
+                        "path": sf.path,  # 原始下载链接
+                        "hash": sf.hash,
+                        "status": sf.status,
+                        "error": sf.data.get("error") if sf.data else None,
+                        "update_time": sf.update_time.isoformat()
+                        if sf.update_time
+                        else None,
+                    }
+                )
 
             return {"err": "ok", "items": items, "count": len(items)}
 
@@ -815,10 +820,15 @@ class AdminOPDSImportRetry(BaseHandler):
             item_hash = req.get("hash")
 
             if not item_id and not item_hash:
-                return {"err": "params.error", "msg": _("参数错误，需要提供记录ID或hash")}
+                return {
+                    "err": "params.error",
+                    "msg": _("参数错误，需要提供记录ID或hash"),
+                }
 
             # 查询失败的记录
-            query = self.session.query(ScanFile).filter(ScanFile.status == ScanFile.FAILED)
+            query = self.session.query(ScanFile).filter(
+                ScanFile.status == ScanFile.FAILED
+            )
             if item_id:
                 query = query.filter(ScanFile.id == item_id)
             else:
@@ -973,4 +983,5 @@ def routes():
         (r"/api/admin/opds/import/status", AdminOPDSImportStatus),
         (r"/api/admin/opds/import/failed", AdminOPDSImportFailedList),
         (r"/api/admin/opds/import/retry", AdminOPDSImportRetry),
+        (r"/api/admin/opds/sources", AdminOpdsSources),
     ]

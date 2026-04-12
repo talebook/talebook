@@ -210,49 +210,111 @@
                 </v-chip>
             </v-card-title>
             <v-card-text style="padding: 16px;">
-                <!-- 连接信息填写界面 -->
-                <div v-if="opdsImportState === 'connecting'">
-                    <v-row>
-                        <v-col cols="8">
-                            <v-text-field
-                                v-model="opdsHost"
-                                :label="t('admin.label.host')"
-                                :placeholder="t('admin.placeholder.host')"
+                <!-- OPDS 源列表界面 -->
+                <div v-if="opdsImportState === 'source_list'">
+                    <div class="d-flex align-center justify-space-between mb-2">
+                        <div class="text-h6">{{ t('admin.imports.label.savedOpdsSources') }}</div>
+                        <v-btn
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            @click="showAddOpdsSourceDialog"
+                        >
+                            <v-icon start>mdi-plus</v-icon>
+                            {{ t('admin.imports.button.addSource') }}
+                        </v-btn>
+                    </div>
+                    
+                    <!-- OPDS 源列表 -->
+                    <div v-if="opdsSources.length > 0" class="border rounded-lg pa-2" style="background-color: white;">
+                        <v-list class="bg-transparent">
+                            <v-list-item
+                                v-for="source in opdsSources"
+                                :key="source.id"
+                                class="mb-2 rounded-lg"
                                 variant="outlined"
-                                full-width
-                                @keyup.enter="connectToOpds"
-                                @blur="autoFillPortFromHost"
-                            />
-                        </v-col>
-                        <v-col cols="4">
-                            <v-text-field
-                                v-model="opdsPort"
-                                :label="t('admin.label.port')"
-                                :placeholder="t('admin.placeholder.port')"
-                                variant="outlined"
-                                full-width
-                                type="number"
-                                @keyup.enter="connectToOpds"
-                            />
-                        </v-col>
-                    </v-row>
-                    <v-text-field
-                        v-model="opdsPath"
-                        :label="t('admin.label.path')"
-                        :placeholder="t('admin.placeholder.path')"
-                        variant="outlined"
-                        full-width
-                        class="mt-4"
-                        @keyup.enter="connectToOpds"
-                    />
-                    <div class="text-body-2 text-gray-600 mt-2">
-                        {{ t('admin.imports.message.opdsTip') }}
-                        <br>{{ t('admin.imports.message.opdsPortTip') }}
+                                style="border-width: 1.5px; transition: all 0.2s; cursor: pointer;"
+                                :class="{'border-primary': source.active}"
+                                @click="selectOpdsSource(source)"
+                            >
+                                <template v-slot:prepend>
+                                    <v-icon
+                                        :color="source.active ? 'primary' : 'grey'"
+                                        size="large"
+                                    >
+                                        mdi-server
+                                    </v-icon>
+                                </template>
+                                
+                                <v-list-item-title class="font-weight-bold text-body-1 mb-1">
+                                    {{ source.name }}
+                                    <v-chip
+                                        v-if="!source.active"
+                                        size="x-small"
+                                        color="grey"
+                                        class="ml-2"
+                                        variant="flat"
+                                    >
+                                        {{ t('common.disabled') }}
+                                    </v-chip>
+                                </v-list-item-title>
+                                
+                                <v-list-item-subtitle class="text-body-2">
+                                    <div class="text-grey-darken-2 font-weight-medium">
+                                        {{ source.url }}
+                                    </div>
+                                    <div v-if="source.description" class="text-grey mt-1">
+                                        {{ source.description }}
+                                    </div>
+                                </v-list-item-subtitle>
+                                
+                                <template v-slot:append>
+                                    <v-menu location="end">
+                                        <template v-slot:activator="{ props }">
+                                            <v-btn
+                                                size="small"
+                                                variant="text"
+                                                icon="mdi-dots-vertical"
+                                                v-bind="props"
+                                            />
+                                        </template>
+                                        <v-list>
+                                            <v-list-item
+                                                @click="editOpdsSource(source)"
+                                                prepend-icon="mdi-pencil"
+                                                title="编辑"
+                                            />
+                                            <v-list-item
+                                                @click="deleteOpdsSource(source)"
+                                                prepend-icon="mdi-delete"
+                                                title="删除"
+                                                class="text-red"
+                                            />
+                                        </v-list>
+                                    </v-menu>
+                                </template>
+                            </v-list-item>
+                        </v-list>
+                    </div>
+                    
+                    <div v-else class="text-body-2 text-grey pa-4 text-center border rounded-lg">
+                        {{ t('admin.imports.message.noSavedOpdsSources') }}
                     </div>
                 </div>
                 
                 <!-- 目录浏览界面 -->
                 <div v-else-if="opdsImportState === 'browsing'">
+                    <!-- 返回按钮 -->
+                    <div class="mb-4">
+                        <v-btn
+                            size="small"
+                            variant="outlined"
+                            @click="backToSourceList"
+                        >
+                            <v-icon start>mdi-arrow-left</v-icon>
+                            返回源列表
+                        </v-btn>
+                    </div>
                     <!-- 自定义面包屑导航 -->
                     <div class="mb-4">
                         <div class="d-flex align-center flex-wrap pa-0">
@@ -592,6 +654,71 @@
             </v-card-actions>
         </v-card>
     </v-dialog>
+    
+    <!-- OPDS Source Management Dialog -->
+    <v-dialog
+        v-model="opdsSourceDialogVisible"
+        width="600"
+    >
+        <v-card>
+            <v-card-title>
+                {{ opdsSourceDialogTitle }}
+            </v-card-title>
+            <v-card-text>
+                <v-form ref="opdsSourceForm">
+                    <v-text-field
+                        v-model="currentOpdsSource.name"
+                        :label="t('admin.imports.label.sourceName')"
+                        :placeholder="t('admin.imports.placeholder.sourceName')"
+                        variant="outlined"
+                        required
+                        class="mb-4"
+                    />
+                    <v-text-field
+                        v-model="currentOpdsSource.url"
+                        label="OPDS 目录 URL"
+                        placeholder="例如：http://example.com:8080/opds"
+                        variant="outlined"
+                        required
+                        class="mb-4"
+                        hint="完整的 OPDS 目录地址，包含协议、主机、端口和路径"
+                        persistent-hint
+                    />
+                    <v-textarea
+                        v-model="currentOpdsSource.description"
+                        :label="t('admin.imports.label.description')"
+                        :placeholder="t('admin.imports.placeholder.description')"
+                        variant="outlined"
+                        rows="3"
+                        class="mb-4"
+                    />
+                    <v-checkbox
+                        v-model="currentOpdsSource.active"
+                        :label="t('admin.imports.label.sourceActive')"
+                        color="primary"
+                        hide-details
+                    />
+                </v-form>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer />
+                <v-btn
+                    color="grey"
+                    variant="outlined"
+                    @click="opdsSourceDialogVisible = false"
+                >
+                    {{ t('common.cancel') }}
+                </v-btn>
+                <v-btn
+                    color="primary"
+                    variant="elevated"
+                    @click="saveOpdsSource"
+                >
+                    {{ t('common.save') }}
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 </template>
 
 <script setup>
@@ -630,6 +757,20 @@ const selectedOpdsBooks = ref([]);
 const opdsConnection = ref(null);
 const opdsLoading = ref(false);
 const opdsError = ref('');
+
+// OPDS 源管理相关变量
+const opdsSources = ref([]);
+const opdsSourceDialogVisible = ref(false);
+const opdsSourceDialogTitle = ref('');
+const currentOpdsSource = ref({
+    id: null,
+    name: '',
+    host: '',
+    port: '',
+    path: '',
+    description: '',
+    active: true
+});
 
 // 新增：存储导航历史，用于构建面包屑
 const navigationHistory = ref([]);
@@ -1494,7 +1635,7 @@ const handleOpdsImportComplete = () => {
 };
 
 const resetOpdsImportState = () => {
-    opdsImportState.value = 'connecting';
+    opdsImportState.value = 'source_list'; // 初始显示源列表
     currentOpdsPath.value = '';
     originalOpdsPath.value = ''; // 重置原始路径
     opdsItems.value = [];
@@ -1516,8 +1657,150 @@ const resetOpdsImportState = () => {
     };
 };
 
+// 返回源列表
+const backToSourceList = () => {
+    opdsImportState.value = 'source_list';
+    resetOpdsImportState();
+};
+
+// ==================== OPDS 源管理函数 ====================
+
+// 加载 OPDS 源列表
+const loadOpdsSources = async () => {
+    try {
+        const response = await $backend('/admin/opds/sources');
+        if (response.err === 'ok') {
+            opdsSources.value = response.items || [];
+        }
+    } catch (error) {
+        console.error('加载 OPDS 源列表失败:', error);
+    }
+};
+
+// 显示添加 OPDS 源对话框
+const showAddOpdsSourceDialog = () => {
+    opdsSourceDialogTitle.value = t('admin.imports.titles.addOpdsSource');
+    currentOpdsSource.value = {
+        id: null,
+        name: '',
+        url: '',
+        description: '',
+        active: true
+    };
+    opdsSourceDialogVisible.value = true;
+};
+
+// 编辑 OPDS 源
+const editOpdsSource = (source) => {
+    opdsSourceDialogTitle.value = t('admin.imports.titles.editOpdsSource');
+    currentOpdsSource.value = {
+        id: source.id,
+        name: source.name,
+        url: source.url,
+        description: source.description || '',
+        active: source.active
+    };
+    opdsSourceDialogVisible.value = true;
+};
+
+// 保存 OPDS 源
+const saveOpdsSource = async () => {
+    try {
+        if (!currentOpdsSource.value.name || !currentOpdsSource.value.url) {
+            $alert('error', '名称和 OPDS URL 为必填项');
+            return;
+        }
+
+        const data = {
+            name: currentOpdsSource.value.name,
+            url: currentOpdsSource.value.url,
+            description: currentOpdsSource.value.description,
+            active: currentOpdsSource.value.active
+        };
+
+        let response;
+        if (currentOpdsSource.value.id) {
+            // 更新现有配置
+            data.id = currentOpdsSource.value.id;
+            response = await $backend('/admin/opds/sources', {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        } else {
+            // 创建新配置
+            response = await $backend('/admin/opds/sources', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+        }
+
+        if (response.err === 'ok') {
+            $alert('success', response.msg);
+            opdsSourceDialogVisible.value = false;
+            await loadOpdsSources();
+        } else {
+            $alert('error', response.msg);
+        }
+    } catch (error) {
+        console.error('保存 OPDS 源失败:', error);
+        $alert('error', t('admin.imports.message.saveFailed'));
+    }
+};
+
+// 删除 OPDS 源
+const deleteOpdsSource = async (source) => {
+    if (!confirm(t('admin.imports.message.confirmDeleteSource'))) {
+        return;
+    }
+
+    try {
+        const response = await $backend('/admin/opds/sources', {
+            method: 'DELETE',
+            body: JSON.stringify({ id: source.id })
+        });
+
+        if (response.err === 'ok') {
+            $alert('success', response.msg);
+            await loadOpdsSources();
+        } else {
+            $alert('error', response.msg);
+        }
+    } catch (error) {
+        console.error('删除 OPDS 源失败:', error);
+        $alert('error', t('admin.imports.message.deleteFailed'));
+    }
+};
+
+// 选择 OPDS 源并连接
+const selectOpdsSource = async (source) => {
+    // 直接使用保存的完整 URL 进行连接
+    try {
+        opdsLoading.value = true;
+        opdsError.value = '';
+        
+        // 解析 URL
+        const url = new URL(source.url);
+        opdsHost.value = url.origin;
+        opdsPort.value = url.port || (url.protocol === 'https:' ? '443' : '80');
+        opdsPath.value = url.pathname;
+        
+        // 切换到浏览状态
+        opdsImportState.value = 'browsing';
+        
+        // 开始连接
+        await connectToOpds();
+    } catch (error) {
+        console.error('解析 OPDS URL 失败:', error);
+        $alert('error', `无法解析 OPDS URL: ${source.url}`);
+        opdsLoading.value = false;
+        // 连接失败时返回源列表
+        opdsImportState.value = 'source_list';
+    }
+};
+
 onMounted(() => {
     getDataFromApi();
+    loadOpdsSources();
 });
 
 useHead(() => ({

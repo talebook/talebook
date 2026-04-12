@@ -127,7 +127,7 @@ class Reader(Base, SQLAlchemyMixin):
 
     def init_default_user(self):
         class DefaultUserInfo:
-            extra_data = {"username": _(u"默认用户")}
+            extra_data = {"username": _("默认用户")}
             provider = "qq"
             uid = 123456789
 
@@ -150,7 +150,9 @@ class Reader(Base, SQLAlchemyMixin):
     def get_secure_password(self, raw_password):
         if self.salt == "__bcrypt__":
             # 使用bcrypt验证
-            if bcrypt.checkpw(raw_password.encode("UTF-8"), self.password.encode("UTF-8")):
+            if bcrypt.checkpw(
+                raw_password.encode("UTF-8"), self.password.encode("UTF-8")
+            ):
                 # 验证成功，返回self.password以保持向后兼容性
                 return self.password
             else:
@@ -192,12 +194,17 @@ class Reader(Base, SQLAlchemyMixin):
         self.avatar = url.replace("http://q.qlogo.cn", "//q.qlogo.cn")
 
         if social_user.provider == "github":
-            self.avatar = "https://avatars.githubusercontent.com/u/%s" % social_user.extra_data["id"]
+            self.avatar = (
+                "https://avatars.githubusercontent.com/u/%s"
+                % social_user.extra_data["id"]
+            )
 
     def get_active_code(self):
         # 激活码始终使用原有的SHA256方法，与密码哈希方法无关
         # 这样可以确保激活码功能在任何情况下都能正常工作
-        p1 = hashlib.sha256(self.create_time.strftime("%Y-%m-%d %H:%M:%S").encode("UTF-8")).hexdigest()
+        p1 = hashlib.sha256(
+            self.create_time.strftime("%Y-%m-%d %H:%M:%S").encode("UTF-8")
+        ).hexdigest()
         # 如果有salt，使用原有的salt，如果没有（bcrypt情况），还是用一个固定的或者空字符串
         salt_to_use = self.salt if self.salt != "__bcrypt__" else ""
         p2 = hashlib.sha256((salt_to_use + p1).encode("UTF-8")).hexdigest()
@@ -351,6 +358,42 @@ class ScanFile(Base, SQLAlchemyMixin):
         self.status = self.NEW
         self.create_time = datetime.datetime.now()
         self.update_time = datetime.datetime.now()
+
+
+class OpdsSource(Base, SQLAlchemyMixin):
+    """OPDS 源配置表 - 用于保存用户配置的 OPDS 服务器信息"""
+
+    __tablename__ = "opds_sources"
+    id = Column(Integer, primary_key=True)
+
+    # 源名称，用户自定义
+    name = Column(String(200), nullable=False)
+
+    # OPDS 目录 URL (完整的 URL，如 http://example.com:8080/opds)
+    url = Column(String(1000), nullable=False)
+
+    # 描述信息
+    description = Column(String(500), nullable=True)
+
+    # 是否启用
+    active = Column(Boolean, default=True)
+
+    # 创建和更新时间
+    create_time = Column(DateTime)
+    update_time = Column(DateTime)
+
+    # 额外数据（如认证信息等）
+    data = Column(MutableDict.as_mutable(JSONType), default={})
+
+    def __init__(self, name, url, description=""):
+        super(OpdsSource, self).__init__()
+        self.name = name
+        self.url = url
+        self.description = description
+        self.active = True
+        self.create_time = datetime.datetime.now()
+        self.update_time = datetime.datetime.now()
+        self.data = {}
 
 
 def user_syncdb(engine):
