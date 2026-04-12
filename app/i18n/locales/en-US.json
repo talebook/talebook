@@ -326,12 +326,19 @@
     },
     "imports": {
       "title": "Import Books",
+      "titles": {
+        "addOpdsSource": "Add OPDS Source",
+        "editOpdsSource": "Edit OPDS Source"
+      },
       "button": {
         "refresh": "Refresh",
         "scanBooks": "Scan Books",
         "importFromOpds": "Import from OPDS",
         "importSelectedBooks": "Import Selected Books",
-        "importAllBooks": "Import All Books"
+        "importAllBooks": "Import All Books",
+        "addSource": "Add OPDS Source",
+        "use": "Use",
+        "save": "Save"
       },
       "label": {
         "deleteAfterImport": "Delete source files after import",
@@ -341,7 +348,15 @@
         "time": "Time",
         "bookTitle": "Book Title",
         "author": "Author",
-        "cover": "Cover"
+        "cover": "Cover",
+        "savedOpdsSources": "Saved OPDS Sources",
+        "sourceName": "Source Name",
+        "description": "Description",
+        "sourceActive": "Enable this source"
+      },
+      "placeholder": {
+        "sourceName": "e.g., My Calibre Library",
+        "description": "Brief description of this OPDS source"
       },
       "message": {
         "importDirInfo": "Please put books in {0} directory. Supported formats: azw/azw3/epub/mobi/pdf/txt.",
@@ -350,7 +365,6 @@
         "selectFilesInfo": "Please select files to process. Existing books won't be imported again.",
         "selectedCount": "Selected: {0}",
         "opdsTip": "OPDS address example: http://example.com:8080/opds",
-        "opdsPortTip": "Port is optional (default: HTTP=80, HTTPS=443)",
         "rootDirectory": "Root",
         "backToParent": "Back",
         "loadingDirectory": "Loading directory...",
@@ -378,7 +392,11 @@
         "enterHost": "Please enter host address",
         "hostProtocol": "Host address must start with http:// or https://",
         "navigateFailed": "Navigation failed: ",
-        "portRange": "Port must be between 1-65535"
+        "portRange": "Port must be between 1-65535",
+        "noSavedOpdsSources": "No saved OPDS sources, please click the button above to add one",
+        "saveFailed": "Failed to save OPDS source",
+        "deleteFailed": "Failed to delete OPDS source",
+        "confirmDeleteSource": "Are you sure you want to delete this OPDS source configuration?"
       },
       "status": {
         "new": "New",

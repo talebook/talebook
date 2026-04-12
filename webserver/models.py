@@ -353,5 +353,127 @@ class ScanFile(Base, SQLAlchemyMixin):
         self.update_time = datetime.datetime.now()
 
 
+class OpdsSource(Base, SQLAlchemyMixin):
+    """OPDS 源配置表 - 用于保存用户配置的 OPDS 服务器信息"""
+    __tablename__ = "opds_sources"
+    id = Column(Integer, primary_key=True)
+    
+    # 源名称，用户自定义
+    name = Column(String(200), nullable=False)
+    
+    # OPDS 目录 URL (完整的 URL，如 http://example.com:8080/opds)
+    url = Column(String(1000), nullable=False)
+    
+    # 描述信息
+    description = Column(String(500), nullable=True)
+    
+    # 是否启用
+    active = Column(Boolean, default=True)
+    
+    # 创建和更新时间
+    create_time = Column(DateTime)
+    update_time = Column(DateTime)
+    
+    # 额外数据（如认证信息等）
+    data = Column(MutableDict.as_mutable(JSONType), default={})
+
+    def __init__(self, name, url, description=""):
+        super(OpdsSource, self).__init__()
+        self.name = name
+        self.url = url
+        self.description = description
+        self.active = True
+        self.create_time = datetime.datetime.now()
+        self.update_time = datetime.datetime.now()
+        self.data = {}
+
+
+def migrate_opds_sources_table(engine):
+    """
+    迁移 OPDS 源配置表
+    将旧的 host/port/path 字段合并为 url 字段
+    """
+    from sqlalchemy import inspect, text
+    
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        
+        if "opds_sources" not in tables:
+            # 表不存在，直接创建
+            OpdsSource.__table__.create(engine)
+            logging.info("创建 opds_sources 表")
+            return
+        
+        # 检查是否存在旧字段
+        columns = [col['name'] for col in inspector.get_columns('opds_sources')]
+        
+        if 'host' in columns and 'url' not in columns:
+            # 需要迁移：存在旧字段 host，但没有新字段 url
+            logging.info("开始迁移 opds_sources 表结构...")
+            
+            # 1. 添加新字段 url
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE opds_sources ADD COLUMN url VARCHAR(1000)"))
+                conn.commit()
+            
+            # 2. 将旧数据合并到 url 字段
+            with engine.connect() as conn:
+                # 查询所有旧数据
+                result = conn.execute(text("SELECT id, host, port, path FROM opds_sources"))
+                rows = result.fetchall()
+                
+                for row in rows:
+                    host = row[1] or ''
+                    port = row[2] or ''
+                    path = row[3] or ''
+                    
+                    # 构建完整 URL
+                    if host:
+                        if not host.startswith(('http://', 'https://')):
+                            host = 'http://' + host
+                        
+                        # 如果有端口，添加到 URL 中
+                        if port:
+                            # 从 host 中移除可能已有的端口
+                            host = host.split(':')[0]
+                            url = f"{host}:{port}"
+                        else:
+                            url = host
+                        
+                        # 添加路径
+                        if path and not path.startswith('/'):
+                            path = '/' + path
+                        url = url + path
+                        
+                        # 更新记录
+                        conn.execute(
+                            text("UPDATE opds_sources SET url = :url WHERE id = :id"),
+                            {"url": url, "id": row[0]}
+                        )
+                
+                conn.commit()
+            
+            # 3. 删除旧字段
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE opds_sources DROP COLUMN host"))
+                conn.execute(text("ALTER TABLE opds_sources DROP COLUMN port"))
+                conn.execute(text("ALTER TABLE opds_sources DROP COLUMN path"))
+                conn.commit()
+            
+            logging.info("opds_sources 表迁移完成")
+        
+        # 确保表结构正确 (如果表不存在则创建)
+        if "opds_sources" not in tables:
+            OpdsSource.__table__.create(engine)
+            logging.info("创建 opds_sources 表")
+        
+    except Exception as e:
+        logging.error(f"迁移 opds_sources 表失败：{e}")
+        import traceback
+        logging.error(traceback.format_exc())
+        raise
+
+
 def user_syncdb(engine):
     Base.metadata.create_all(engine)

@@ -213,6 +213,9 @@ def make_app():
     models.bind_session(ScopedSession)
     init_social(models.Base, ScopedSession, CONF)
 
+    # 迁移 OPDS 源配置表
+    models.migrate_opds_sources_table(engine)
+
     if options.syncdb:
         models.user_syncdb(engine)
         logging.info("Create tables into DB")

@@ -19,7 +19,8 @@ from webserver.services.autofill import AutoFillService
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
 from webserver.handlers.base import BaseHandler, auth, js, is_admin
-from webserver.models import Reader, ScanFile
+from webserver.handlers.admin_opds_sources import AdminOpdsSources
+from webserver.models import Reader, ScanFile, OpdsSource
 from webserver.utils import SimpleBookFormatter
 
 CONF = loader.get_settings()
@@ -973,4 +974,5 @@ def routes():
         (r"/api/admin/opds/import/status", AdminOPDSImportStatus),
         (r"/api/admin/opds/import/failed", AdminOPDSImportFailedList),
         (r"/api/admin/opds/import/retry", AdminOPDSImportRetry),
+        (r"/api/admin/opds/sources", AdminOpdsSources),
     ]
