@@ -69,18 +69,38 @@ const loading = ref(false);
 const dialog = ref(false);
 const ebooks = ref(null);
 
+function getAsciiSafeFilename(file) {
+    const originalName = file?.name || 'upload.bin';
+    const extIndex = originalName.lastIndexOf('.');
+    const hasExt = extIndex > 0;
+    const ext = hasExt ? originalName.slice(extIndex) : '';
+    const base = hasExt ? originalName.slice(0, extIndex) : originalName;
+
+    const normalized = base
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Za-z0-9._-]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+
+    const safeBase = normalized || `upload_${Date.now()}`;
+    return `${safeBase}${ext}`;
+}
+
 function do_upload() {
     loading.value = true;
-    var data = new FormData();
-    // Vuetify 3 file input returns array
+    const data = new FormData();
+
+    let file = null;
     if (ebooks.value) {
-        if (Array.isArray(ebooks.value)) {
-            data.append('ebook', ebooks.value[0]);
-        } else {
-            data.append('ebook', ebooks.value);
-        }
+        file = Array.isArray(ebooks.value) ? ebooks.value[0] : ebooks.value;
     }
-    
+
+    if (file) {
+        const uploadName = getAsciiSafeFilename(file);
+        data.append('ebook', file, uploadName);
+        data.append('original_filename', file.name || uploadName);
+    }
+
     $backend('/book/upload', {
         method: 'POST',
         body: data,
