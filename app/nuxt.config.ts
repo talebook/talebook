@@ -1,4 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { readFileSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+
 export default defineNuxtConfig({
     compatibilityDate: '2024-04-03',
     devtools: { enabled: true },
@@ -64,6 +67,32 @@ export default defineNuxtConfig({
     devServer: {
         port: 9000,
         host: '0.0.0.0'
+    },
+    hooks: {
+        'nitro:config'(nitroConfig) {
+            nitroConfig.hooks ??= {}
+            nitroConfig.hooks['prerender:done'] = async () => {
+                const publicDir = resolve('.output/public')
+                const cacheDir = resolve('node_modules/.cache/nuxt/.nuxt/dist/client/_nuxt')
+                let hash = ''
+                try {
+                    const jsFiles = readdirSync(cacheDir).filter((f: string) => f.endsWith('.js'))
+                    for (const file of jsFiles) {
+                        const content = readFileSync(join(cacheDir, file), 'utf8')
+                        const match = content.match(/_i18n\/([A-Za-z0-9_-]+)\//)
+                        if (match) { hash = match[1]; break }
+                    }
+                } catch { }
+                if (!hash) return
+                const langDir = resolve('i18n/locales')
+                for (const locale of ['zh-CN', 'en-US']) {
+                    const outDir = join(publicDir, '_i18n', hash, locale)
+                    mkdirSync(outDir, { recursive: true })
+                    const messages = JSON.parse(readFileSync(join(langDir, `${locale}.json`), 'utf8'))
+                    writeFileSync(join(outDir, 'messages.json'), JSON.stringify({ [locale]: messages }))
+                }
+            }
+        }
     },
     nitro: {
         prerender: {
