@@ -429,8 +429,31 @@ const cards = computed(() => [
         title: t('admin.settings.section.bookInfoSources'),
         fields: [
             { icon: '', key: 'auto_fill_meta', label: t('admin.settings.label.autoFillMeta'), type: 'checkbox' },
-            { icon: 'mdi-information', key: 'douban_baseurl', label: t('admin.settings.label.doubanBaseurl') },
-            { icon: 'mdi-information', key: 'douban_max_count', label: t('admin.settings.label.doubanMaxCount') },
+        ],
+        groups: [
+            {
+                key: 'ENABLE_DOUBAN',
+                label: t('admin.settings.label.enableDouban'),
+                fields: [
+                    { icon: 'mdi-information', key: 'douban_baseurl', label: t('admin.settings.label.doubanBaseurl') },
+                    { icon: 'mdi-information', key: 'douban_max_count', label: t('admin.settings.label.doubanMaxCount') },
+                ],
+            },
+            {
+                key: 'ENABLE_TOMATO',
+                label: t('admin.settings.label.enableTomato'),
+                fields: [],
+            },
+            {
+                key: 'ENABLE_BAIKE',
+                label: t('admin.settings.label.enableBaike'),
+                fields: [],
+            },
+            {
+                key: 'ENABLE_YOUSHU',
+                label: t('admin.settings.label.enableYoushu'),
+                fields: [],
+            },
         ],
         tips: [
             {
