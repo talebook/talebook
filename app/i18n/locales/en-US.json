@@ -452,8 +452,6 @@
         "name": "Name",
         "link": "Link",
         "autoFillMeta": "Auto fill book info",
-        "bookInfoSources": "Book Info Sources",
-        "bookInfoSourcesSelect": "Select Book Info Sources",
         "enableDouban": "Enable Douban Plugin",
         "doubanBaseurl": "Douban API URL",
         "doubanMaxCount": "Douban API max results",

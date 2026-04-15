@@ -432,25 +432,6 @@ const cards = computed(() => [
         ],
         groups: [
             {
-                key: 'auto_fill_meta',
-                label: t('admin.settings.label.bookInfoSources'),
-                fields: [
-                    {
-                        icon: 'mdi-information',
-                        key: 'book_info_sources',
-                        label: t('admin.settings.label.bookInfoSourcesSelect'),
-                        type: 'select',
-                        items: [
-                            { text: '豆瓣', value: 'douban' },
-                            { text: '百度百科', value: 'baike' },
-                        ],
-                        multiple: true,
-                        chips: true,
-                        closableChips: true,
-                    },
-                ],
-            },
-            {
                 key: 'ENABLE_DOUBAN',
                 label: t('admin.settings.label.enableDouban'),
                 fields: [

@@ -346,7 +346,6 @@ class AdminSettings(BaseHandler):
             "douban_baseurl",
             "douban_max_count",
             "auto_fill_meta",
-            "book_info_sources",
             "push_title",
             "push_content",
             "site_title",

@@ -94,7 +94,6 @@ settings = {
     'douban_baseurl'    : "https://api.douban.com",
     'douban_max_count'  : 2,
     'auto_fill_meta'    : False,
-    'book_info_sources' : ['douban', 'baike'],
 
     'avatar_service'    : "https://cravatar.cn",
 
