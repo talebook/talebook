@@ -105,45 +105,53 @@ class AutoFillService(AsyncService):
 
     def plugin_search_best_book_info(self, mi):
         title = re.sub("[(（].*", "", mi.title)
-        api = douban.DoubanBookApi(
-            CONF["douban_apikey"],
-            CONF["douban_baseurl"],
-            copy_image=True,
-            manual_select=False,
-            maxCount=CONF["douban_max_count"],
-        )
-        book = None
-        books = []
 
-        # 1. 查询 ISBN
-        try:
-            book = api.get_book_by_isbn(mi.isbn)
-        except:
-            logging.error(_("douban 接口查询 %s 失败"), title)
+        # 获取用户选择的书籍源列表
+        sources = CONF.get('book_info_sources', ['douban', 'baike'])
 
-        if book:
-            return api.get_book_detail(book)
+        for source in sources:
+            if source == 'douban':
+                # 查询豆瓣
+                api = douban.DoubanBookApi(
+                    CONF["douban_apikey"],
+                    CONF["douban_baseurl"],
+                    copy_image=True,
+                    manual_select=False,
+                    maxCount=CONF["douban_max_count"],
+                )
+                book = None
+                books = []
 
-        # 2. 查 title
-        try:
-            books = api.search_books(title)
-        except:
-            logging.error(_("douban 接口查询 %s 失败"), title)
+                # 1. 查询 ISBN
+                try:
+                    book = api.get_book_by_isbn(mi.isbn)
+                except:
+                    logging.error(_("douban 接口查询 %s 失败"), title)
 
-        if books:
-            # 优先选择匹配度更高的书
-            for b in books:
-                if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
-                    return api.get_book_detail(b)
-            return api.get_book_detail(books[0])
+                if book:
+                    return api.get_book_detail(book)
 
-        # 3. 查 baidu
-        api = baike.BaiduBaikeApi(copy_image=True)
-        try:
-            book = api.get_book(title)
-            if book:
-                return book
-        except:
-            logging.error(_("baidu 接口查询 %s 失败"), title)
+                # 2. 查 title
+                try:
+                    books = api.search_books(title)
+                except:
+                    logging.error(_("douban 接口查询 %s 失败"), title)
+
+                if books:
+                    # 优先选择匹配度更高的书
+                    for b in books:
+                        if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
+                            return api.get_book_detail(b)
+                    return api.get_book_detail(books[0])
+
+            elif source == 'baike':
+                # 查 baidu
+                api = baike.BaiduBaikeApi(copy_image=True)
+                try:
+                    book = api.get_book(title)
+                    if book:
+                        return book
+                except:
+                    logging.error(_("baidu 接口查询 %s 失败"), title)
 
         return None
