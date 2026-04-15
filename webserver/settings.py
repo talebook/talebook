@@ -97,6 +97,7 @@ settings = {
     'ENABLE_TOMATO'     : True,
     'ENABLE_BAIKE'      : True,
     'ENABLE_YOUSHU'     : True,
+    'meta_sources_order': 'douban:true\ntomato:true\nbaike:false\nyoushu:false',
     'auto_fill_meta'    : False,
 
     'avatar_service'    : "https://cravatar.cn",

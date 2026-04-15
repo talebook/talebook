@@ -105,45 +105,91 @@ class AutoFillService(AsyncService):
 
     def plugin_search_best_book_info(self, mi):
         title = re.sub("[(（].*", "", mi.title)
-        api = douban.DoubanBookApi(
-            CONF["douban_apikey"],
-            CONF["douban_baseurl"],
-            copy_image=True,
-            manual_select=False,
-            maxCount=CONF["douban_max_count"],
-        )
-        book = None
-        books = []
 
-        # 1. 查询 ISBN
-        try:
-            book = api.get_book_by_isbn(mi.isbn)
-        except:
-            logging.error(_("douban 接口查询 %s 失败"), title)
+        # 解析书籍源获取顺序配置
+        sources_order = []
+        if CONF.get('meta_sources_order'):
+            for line in CONF['meta_sources_order'].strip().split('\n'):
+                line = line.strip()
+                if line:
+                    parts = line.split(':', 1)
+                    if len(parts) == 2:
+                        source = parts[0].strip()
+                        enabled = parts[1].strip().lower() == 'true'
+                        sources_order.append((source, enabled))
+        else:
+            # 默认顺序
+            sources_order = [
+                ('douban', CONF.get('ENABLE_DOUBAN', True)),
+                ('tomato', CONF.get('ENABLE_TOMATO', True)),
+                ('baike', CONF.get('ENABLE_BAIKE', False)),
+                ('youshu', CONF.get('ENABLE_YOUSHU', False)),
+            ]
 
-        if book:
-            return api.get_book_detail(book)
+        # 按照配置的顺序尝试各个书籍源
+        for source, enabled in sources_order:
+            if not enabled:
+                continue
 
-        # 2. 查 title
-        try:
-            books = api.search_books(title)
-        except:
-            logging.error(_("douban 接口查询 %s 失败"), title)
+            try:
+                if source == 'douban' and CONF.get('ENABLE_DOUBAN', True):
+                    api = douban.DoubanBookApi(
+                        CONF["douban_apikey"],
+                        CONF["douban_baseurl"],
+                        copy_image=True,
+                        manual_select=False,
+                        maxCount=CONF["douban_max_count"],
+                    )
 
-        if books:
-            # 优先选择匹配度更高的书
-            for b in books:
-                if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
-                    return api.get_book_detail(b)
-            return api.get_book_detail(books[0])
+                    # 1. 查询 ISBN
+                    try:
+                        book = api.get_book_by_isbn(mi.isbn)
+                        if book:
+                            return api.get_book_detail(book)
+                    except:
+                        logging.error(_("douban 接口查询 ISBN 失败"), title)
 
-        # 3. 查 baidu
-        api = baike.BaiduBaikeApi(copy_image=True)
-        try:
-            book = api.get_book(title)
-            if book:
-                return book
-        except:
-            logging.error(_("baidu 接口查询 %s 失败"), title)
+                    # 2. 查 title
+                    try:
+                        books = api.search_books(title)
+                        if books:
+                            # 优先选择匹配度更高的书
+                            for b in books:
+                                if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
+                                    return api.get_book_detail(b)
+                            return api.get_book_detail(books[0])
+                    except:
+                        logging.error(_("douban 接口查询 %s 失败"), title)
+
+                elif source == 'tomato' and CONF.get('ENABLE_TOMATO', True):
+                    from webserver.plugins.meta.tomato import api as tomato_api
+                    api = tomato_api.TomatoApi(copy_image=True)
+                    try:
+                        book = api.get_book(title)
+                        if book:
+                            return book
+                    except:
+                        logging.error(_("tomato 接口查询 %s 失败"), title)
+
+                elif source == 'baike' and CONF.get('ENABLE_BAIKE', True):
+                    api = baike.BaiduBaikeApi(copy_image=True)
+                    try:
+                        book = api.get_book(title)
+                        if book:
+                            return book
+                    except:
+                        logging.error(_("baidu 接口查询 %s 失败"), title)
+
+                elif source == 'youshu' and CONF.get('ENABLE_YOUSHU', True):
+                    from webserver.plugins.meta.youshu import api as youshu_api
+                    api = youshu_api.YoushuApi(copy_image=True)
+                    try:
+                        book = api.get_book(title)
+                        if book:
+                            return book
+                    except:
+                        logging.error(_("youshu 接口查询 %s 失败"), title)
+            except Exception as e:
+                logging.error(_("%s 接口查询失败: %s"), source, str(e))
 
         return None
