@@ -458,8 +458,6 @@
         "enableTomato": "Enable Tomato Novel",
         "enableBaike": "Enable Baidu Baike",
         "enableYoushu": "Enable You Shu",
-        "metaSourcesOrder": "Meta Sources Order",
-        "metaSourcesOrderDesc": "Please enter meta sources in priority order, one per line, format: source:enabled. For example:\ndouban:true\ntomato:true\nbaike:false\nyoushu:false",
 
         "staticHost": "CDN domain",
         "bookNamesFormat": "Directory naming format",

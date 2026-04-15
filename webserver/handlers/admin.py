@@ -342,7 +342,6 @@ class AdminSettings(BaseHandler):
             "ENABLE_TOMATO",
             "ENABLE_BAIKE",
             "ENABLE_YOUSHU",
-            "meta_sources_order",
             "autoreload",
             "cookie_secret",
             "scan_upload_path",

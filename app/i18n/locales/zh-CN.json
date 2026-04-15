@@ -478,9 +478,6 @@
         "enableTomato": "启用番茄小说",
         "enableBaike": "启用百度百科",
         "enableYoushu": "启用优书网",
-        "metaSourcesOrder": "书籍源获取顺序",
-        "metaSourcesOrderDesc": "请按优先级顺序输入书籍源，每行一个，格式为：源名称:启用状态。例如：\ndouban:true\ntomato:true\nbaike:false\nyoushu:false",
-
         "staticHost": "CDN域名",
         "bookNamesFormat": "目录和文件名模式",
         "epubViewer": "EPUB阅读器",

@@ -432,18 +432,6 @@ const cards = computed(() => [
         ],
         groups: [
             {
-                key: 'auto_fill_meta',
-                label: t('admin.settings.label.metaSourcesOrder'),
-                fields: [
-                    { 
-                        key: 'meta_sources_order', 
-                        label: t('admin.settings.label.metaSourcesOrderDesc'),
-                        type: 'textarea'
-                    },
-                ],
-                show_when: () => settings.value.auto_fill_meta,
-            },
-            {
                 key: 'ENABLE_DOUBAN',
                 label: t('admin.settings.label.enableDouban'),
                 fields: [
