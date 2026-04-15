@@ -452,6 +452,7 @@
         "name": "Name",
         "link": "Link",
         "autoFillMeta": "Auto fill book info",
+        "enableDouban": "Enable Douban Plugin",
         "doubanBaseurl": "Douban API URL",
         "doubanMaxCount": "Douban API max results",
         "staticHost": "CDN domain",

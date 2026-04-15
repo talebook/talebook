@@ -338,6 +338,7 @@ class AdminSettings(BaseHandler):
             "SOCIALS",
             "SHOW_SIDEBAR_SYS",
             "OPDS_ENABLED",
+            "ENABLE_DOUBAN",
             "autoreload",
             "cookie_secret",
             "scan_upload_path",
