@@ -455,6 +455,10 @@
         "enableDouban": "Enable Douban Plugin",
         "doubanBaseurl": "Douban API URL",
         "doubanMaxCount": "Douban API max results",
+        "enableTomato": "Enable Tomato Novel",
+        "enableBaike": "Enable Baidu Baike",
+        "enableYoushu": "Enable You Shu",
+
         "staticHost": "CDN domain",
         "bookNamesFormat": "Directory naming format",
         "epubViewer": "EPUB Reader",

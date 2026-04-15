@@ -439,6 +439,21 @@ const cards = computed(() => [
                     { icon: 'mdi-information', key: 'douban_max_count', label: t('admin.settings.label.doubanMaxCount') },
                 ],
             },
+            {
+                key: 'ENABLE_TOMATO',
+                label: t('admin.settings.label.enableTomato'),
+                fields: [],
+            },
+            {
+                key: 'ENABLE_BAIKE',
+                label: t('admin.settings.label.enableBaike'),
+                fields: [],
+            },
+            {
+                key: 'ENABLE_YOUSHU',
+                label: t('admin.settings.label.enableYoushu'),
+                fields: [],
+            },
         ],
         tips: [
             {
