@@ -339,6 +339,7 @@ class AdminSettings(BaseHandler):
             "SHOW_SIDEBAR_SYS",
             "OPDS_ENABLED",
             "ENABLE_DOUBAN",
+            "ENABLE_TOMATO",
             "autoreload",
             "cookie_secret",
             "scan_upload_path",
