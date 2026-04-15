@@ -432,15 +432,6 @@ const cards = computed(() => [
         ],
         groups: [
             {
-                key: 'auto_fill_meta',
-                label: t('admin.settings.label.bookSources'),
-                show_when: () => settings.value.auto_fill_meta,
-                fields: [
-                    { key: 'ENABLE_DOUBAN', label: t('admin.settings.label.enableDouban'), type: 'checkbox' },
-                    { key: 'ENABLE_TOMATO', label: t('admin.settings.label.enableTomato'), type: 'checkbox' },
-                ],
-            },
-            {
                 key: 'ENABLE_DOUBAN',
                 label: t('admin.settings.label.enableDouban'),
                 fields: [

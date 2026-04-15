@@ -94,8 +94,6 @@ settings = {
     'douban_baseurl'    : "https://api.douban.com",
     'douban_max_count'  : 2,
     'auto_fill_meta'    : False,
-    'ENABLE_DOUBAN'     : False,
-    'ENABLE_TOMATO'     : False,
 
     'avatar_service'    : "https://cravatar.cn",
 
