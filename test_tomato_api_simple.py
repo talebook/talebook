@@ -20,29 +20,42 @@ def test_tomato_api():
     
     # 测试 1: 搜索功能
     logging.info("测试搜索功能...")
+    results = None
     try:
-        results = api.search_book("吞噬星空", "我吃西红柿")
+        results = api.search_book("斗破苍穹", "天蚕土豆")
         logging.info(f"搜索结果数量: {len(results)}")
-        if results:
-            logging.info(f"第一个结果: {results[0]['title']} - {results[0]['author']}")
-        else:
-            logging.warning("搜索无结果")
+        for i, result in enumerate(results[:3]):
+            logging.info(f"结果 {i+1}: {result['title']} - {result['author']} (ID: {result['book_id']})")
     except Exception as e:
         logging.error(f"搜索功能测试失败: {e}")
     
     # 测试 2: 根据 ID 获取书籍信息
-    logging.info("测试根据 ID 获取书籍信息...")
-    try:
-        # 使用一个已知的书籍 ID
-        book_id = "7141319866317819927"  # 吞噬星空
-        page = api.get_book_by_id(book_id)
-        if page:
-            info = page.get_info()
-            logging.info(f"书籍信息: {info['title']} - {info['author']}")
-        else:
-            logging.warning("获取书籍信息失败")
-    except Exception as e:
-        logging.error(f"根据 ID 获取书籍信息测试失败: {e}")
+    if results and results[0]:
+        # 尝试多个书籍 ID
+        for i in range(min(3, len(results))):
+            book_id = results[i]['book_id']
+            logging.info(f"\n测试根据 ID {book_id} 获取书籍信息...")
+            try:
+                page = api.get_book_by_id(book_id)
+                if page:
+                    info = page.get_info()
+                    logging.info(f"书籍信息: {info['title']} - {info['author']}")
+                    logging.info(f"书籍简介: {info['summary'][:50]}...")
+                    logging.info(f"书籍标签: {info['tags']}")
+                    logging.info(f"书籍状态: {info['status']}")
+                    
+                    # 测试获取封面
+                    cover_url = page.get_image()
+                    if cover_url:
+                        logging.info(f"封面 URL: {cover_url}")
+                    
+                    # 如果这个成功了，就停止尝试
+                    if info['title'] != "未知书名":
+                        break
+                else:
+                    logging.warning("获取书籍信息失败")
+            except Exception as e:
+                logging.error(f"根据 ID 获取书籍信息测试失败: {e}")
 
 if __name__ == "__main__":
     test_tomato_api()
