@@ -236,8 +236,27 @@ class BookRefer(BaseHandler):
         logging.info("开始处理 %d 个书籍信息源", len(books))
 
         for i, b in enumerate(books):
+            # 处理 Metadata 对象
+            if hasattr(b, 'title') and hasattr(b, 'authors'):
+                # 将 Metadata 对象转换为字典
+                b_dict = {
+                    'title': b.title,
+                    'authors': b.authors,
+                    'author': b.author if hasattr(b, 'author') else b.authors[0] if b.authors else '',
+                    'author_sort': b.author_sort if hasattr(b, 'author_sort') else '',
+                    'publisher': b.publisher if hasattr(b, 'publisher') else '',
+                    'isbn': b.isbn if hasattr(b, 'isbn') else '',
+                    'comments': b.comments if hasattr(b, 'comments') else '',
+                    'cover_url': b.cover_url if hasattr(b, 'cover_url') else '',
+                    'source': b.source if hasattr(b, 'source') else '',
+                    'website': b.website if hasattr(b, 'website') else '',
+                    'provider_key': b.provider_key if hasattr(b, 'provider_key') else '',
+                    'provider_value': b.provider_value if hasattr(b, 'provider_value') else '',
+                    'pubdate': b.pubdate if hasattr(b, 'pubdate') else None
+                }
+                b = b_dict
             # 确保 b 是字典对象
-            if not isinstance(b, dict):
+            elif not isinstance(b, dict):
                 logging.warning(
                     "跳过第 %d 个书籍信息：类型不符 [type=%s, value=%r]",
                     i,
