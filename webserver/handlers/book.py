@@ -87,79 +87,63 @@ class BookRefer(BaseHandler):
 
     def plugin_search_books(self, mi):
         title = re.sub("[(（].*", "", mi.title)
+        api = douban.DoubanBookApi(
+            CONF["douban_apikey"],
+            CONF["douban_baseurl"],
+            copy_image=False,
+            manual_select=False,
+            maxCount=CONF["douban_max_count"],
+        )
+        # first, search title
         books = []
+        try:
+            books = api.search_books(title) or []
+        except:
+            logging.error(_("豆瓣接口查询 %s 失败" % title))
 
-        # 1. 搜索豆瓣
-        if CONF.get('ENABLE_DOUBAN', True):
-            api = douban.DoubanBookApi(
-                CONF["douban_apikey"],
-                CONF["douban_baseurl"],
-                copy_image=False,
-                manual_select=False,
-                maxCount=CONF["douban_max_count"],
-            )
-            # first, search title
-            try:
-                douban_books = api.search_books(title) or []
-            except:
-                logging.error(_("豆瓣接口查询 %s 失败" % title))
-                douban_books = []
+        if not self.has_proper_book(books, mi):
+            # 若有ISBN号，但是却没搜索出来，则精准查询一次ISBN
+            # 总是把最佳书籍放在第一位
+            book = api.get_book_by_isbn(mi.isbn)
+            if book:
+                books = list(books)
+                books.insert(0, book)
+        books = [api._metadata(b) for b in books]
 
-            if not self.has_proper_book(douban_books, mi):
-                # 若有ISBN号，但是却没搜索出来，则精准查询一次ISBN
-                # 总是把最佳书籍放在第一位
-                try:
-                    book = api.get_book_by_isbn(mi.isbn)
-                    if book:
-                        douban_books = list(douban_books)
-                        douban_books.insert(0, book)
-                except:
-                    logging.error(_("豆瓣ISBN查询 %s 失败" % mi.isbn))
-            douban_books = [api._metadata(b) for b in douban_books]
-            books.extend(douban_books)
+        # append baidu book
+        api = baike.BaiduBaikeApi(copy_image=False)
+        try:
+            book = api.get_book(title)
+        except:
+            return {
+                "err": "httprequest.baidubaike.failed",
+                "msg": _("百度百科查询失败"),
+            }
+        if book:
+            books.append(book)
 
-        # 2. 搜索百度百科
-        if CONF.get('ENABLE_BAIKE', True):
-            api = baike.BaiduBaikeApi(copy_image=False)
-            try:
-                book = api.get_book(title)
-                if book:
-                    books.append(book)
-            except:
-                logging.error(_("百度百科查询 %s 失败" % title))
+        api = youshu.YoushuApi(copy_image=True)
+        try:
+            book = api.get_book(title)
+        except:
+            return {"err": "httprequest.youshu.failed", "msg": _("优书网查询失败")}
+        if book:
+            books.append(book)
 
-        # 3. 搜索优书网
-        if CONF.get('ENABLE_YOUSHU', True):
-            api = youshu.YoushuApi(copy_image=True)
-            try:
-                book = api.get_book(title)
-                if book:
-                    books.append(book)
-            except:
-                logging.error(_("优书网查询 %s 失败" % title))
-
-        # 4. 搜索番茄小说
-        if CONF.get('ENABLE_TOMATO', True):
-            api = tomato.TomatoNovelApi(copy_image=False)
-            try:
-                book = api.get_book(title)
-                if book:
-                    books.append(book)
-            except:
-                logging.error(_("番茄小说查询 %s 失败" % title))
+        # append tomato novel
+        api = tomato.TomatoNovelApi(copy_image=False)
+        try:
+            book = api.get_book(title)
+        except:
+            return {"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")}
+        if book:
+            books.append(book)
 
         return books
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
         refer_mi = None
         if provider_key == baike.KEY:
-            if not CONF.get('ENABLE_BAIKE', True):
-                raise RuntimeError(
-                    {
-                        "err": "plugin.disabled",
-                        "msg": _("百度百科插件已禁用"),
-                    }
-                )
             title = re.sub("[(（].*", "", mi.title)
             api = baike.BaiduBaikeApi(copy_image=True)
             try:
@@ -173,13 +157,6 @@ class BookRefer(BaseHandler):
                     }
                 )
         elif provider_key == douban.KEY:
-            if not CONF.get('ENABLE_DOUBAN', True):
-                raise RuntimeError(
-                    {
-                        "err": "plugin.disabled",
-                        "msg": _("豆瓣插件已禁用"),
-                    }
-                )
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(
                 CONF["douban_apikey"],
@@ -202,13 +179,6 @@ class BookRefer(BaseHandler):
                     {"err": "httprequest.douban.failed", "msg": _("豆瓣接口查询失败")}
                 )
         elif provider_key == youshu.KEY:
-            if not CONF.get('ENABLE_YOUSHU', True):
-                raise RuntimeError(
-                    {
-                        "err": "plugin.disabled",
-                        "msg": _("优书网插件已禁用"),
-                    }
-                )
             title = re.sub("[(（].*", "", mi.title)
             api = youshu.YoushuApi(copy_image=True)
             try:
@@ -219,13 +189,6 @@ class BookRefer(BaseHandler):
                     {"err": "httprequest.youshu.failed", "msg": _("优书网查询失败")}
                 )
         elif provider_key == tomato.KEY:
-            if not CONF.get('ENABLE_TOMATO', True):
-                raise RuntimeError(
-                    {
-                        "err": "plugin.disabled",
-                        "msg": _("番茄小说插件已禁用"),
-                    }
-                )
             title = re.sub("[(（].*", "", mi.title)
             api = tomato.TomatoNovelApi(copy_image=True)
             try:
