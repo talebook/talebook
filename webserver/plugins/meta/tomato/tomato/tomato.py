@@ -362,7 +362,10 @@ class Page(object):
             finished = parse_finished_from_info_label(self.html)
             if finished is None:
                 # 尝试从数据中查找
-                status_val = find_int_by_key(self.parsed_data, ["status", "serial_status", "finish_status", "finishStatus", "is_finish", "is_finished"])
+                status_val = find_int_by_key(
+                self.parsed_data,
+                ["status", "serial_status", "finish_status", "finishStatus", "is_finish", "is_finished"]
+            )
                 if status_val is not None:
                     # 映射状态值
                     finished = status_val in (1, 2)
@@ -518,7 +521,12 @@ class Page(object):
                     pass
 
         # 5. 正则兜底
-        cover_url = regex_json_string_field(self.html, "thumb_url") or regex_json_string_field(self.html, "expand_thumb_url") or regex_json_string_field(self.html, "cover_url") or regex_json_string_field(self.html, "cover")
+        cover_url = (
+            regex_json_string_field(self.html, "thumb_url") or
+            regex_json_string_field(self.html, "expand_thumb_url") or
+            regex_json_string_field(self.html, "cover_url") or
+            regex_json_string_field(self.html, "cover")
+        )
         if not cover_url:
             thumb_uri = regex_json_string_field(self.html, "thumb_uri")
             if thumb_uri:
