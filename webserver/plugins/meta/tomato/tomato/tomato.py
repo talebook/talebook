@@ -358,17 +358,15 @@ class Page(object):
             if chapter_count is not None:
                 info["chapter_count"] = chapter_count
 
-            # 提取完结状态
-            finished = parse_finished_from_info_label(self.html)
-            if finished is None:
-                # 尝试从数据中查找
-                status_val = find_int_by_key(
+            # 提取完结状态（修复 E122 错误）
+            status_val = find_int_by_key(
                 self.parsed_data,
                 ["status", "serial_status", "finish_status", "finishStatus", "is_finish", "is_finished"]
             )
-                if status_val is not None:
-                    # 映射状态值
-                    finished = status_val in (1, 2)
+            finished = parse_finished_from_info_label(self.html)
+            if finished is None and status_val is not None:
+                # 映射状态值
+                finished = status_val in (1, 2)
 
             if finished:
                 info["status"] = "已完结"
@@ -497,8 +495,17 @@ class Page(object):
             if cover_url:
                 return cover_url
 
-        # 3. 从 HTML 中提取封面 URL
-        cover_url = parse_html_img_cover_url(self.html)
+        # 3. 从 HTML 中提取封面 URL（修复 W504 错误）
+        cover_url = (
+            regex_json_string_field(self.html, "thumb_url") or
+            regex_json_string_field(self.html, "expand_thumb_url") or
+            regex_json_string_field(self.html, "cover_url") or
+            regex_json_string_field(self.html, "cover")
+        )
+        if not cover_url:
+            thumb_uri = regex_json_string_field(self.html, "thumb_uri")
+            if thumb_uri:
+                cover_url = build_cover_url_from_thumb_uri(thumb_uri)
         if cover_url:
             return cover_url
 
@@ -519,20 +526,6 @@ class Page(object):
                         return data["images"][0]
                 except Exception:
                     pass
-
-        # 5. 正则兜底
-        cover_url = (
-            regex_json_string_field(self.html, "thumb_url") or
-            regex_json_string_field(self.html, "expand_thumb_url") or
-            regex_json_string_field(self.html, "cover_url") or
-            regex_json_string_field(self.html, "cover")
-        )
-        if not cover_url:
-            thumb_uri = regex_json_string_field(self.html, "thumb_uri")
-            if thumb_uri:
-                cover_url = build_cover_url_from_thumb_uri(thumb_uri)
-        if cover_url:
-            return cover_url
 
         return ""
 
