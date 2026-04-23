@@ -762,7 +762,9 @@ class BookUpload(BaseHandler):
     def get_upload_file(self):
         # for unittest mock
         p = self.request.files["ebook"][0]
-        filename = decode_filename(p["filename"])
+        original_filename = self.get_argument("original_filename", None)
+        filename = original_filename or p["filename"]
+        filename = decode_filename(filename)
         return (filename, p["body"])
 
     @js
@@ -777,6 +779,8 @@ class BookUpload(BaseHandler):
             return {"err": "permission", "msg": _("无权操作")}
         name, data = self.get_upload_file()
         logging.error("upload book name = " + repr(name))
+        # strip path components to prevent directory traversal
+        name = os.path.basename(name)
         fmt = os.path.splitext(name)[1]
         fmt = fmt[1:] if fmt else None
         if not fmt:
@@ -784,7 +788,10 @@ class BookUpload(BaseHandler):
         fmt = fmt.lower()
 
         # save file
-        fpath = os.path.join(CONF["upload_path"], name)
+        upload_dir = os.path.realpath(CONF["upload_path"])
+        fpath = os.path.realpath(os.path.join(upload_dir, name))
+        if not fpath.startswith(upload_dir + os.sep) and fpath != upload_dir:
+            return {"err": "params.filename", "msg": _("文件名不合法")}
         with open(fpath, "wb") as f:
             f.write(data)
         logging.debug("save upload file into [%s]", fpath)

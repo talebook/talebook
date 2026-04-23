@@ -310,6 +310,8 @@ class AdminSettings(BaseHandler):
     @js
     @auth
     def post(self):
+        if not self.admin_user:
+            return {"err": "permission", "msg": _("无权访问此接口")}
         data = tornado.escape.json_decode(self.request.body)
         KEYS = [
             "ALLOW_GUEST_DOWNLOAD",
