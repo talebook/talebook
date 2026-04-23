@@ -28,6 +28,7 @@ CHROME_HEADERS = {
 class BaiduBaikeApi:
     def __init__(self, copy_image=True, manual_select=False):
         self.copy_image = copy_image
+        self.manual_select = manual_select
 
     def get_book(self, title):
         baike = self._baike(title)

@@ -26,6 +26,32 @@ CLASS_INFO = ["basicInfo-item"]
 CLASS_SUMMARY_PIC = ["summary-pic"]
 CLASS_LEMMA_ID = ["lemmaWgt-promotion-rightPreciseAd"]
 
+def _match_class(class_list, target):
+    """
+    模糊匹配 class 名称（适配动态生成的 class，如 lemmaSummary_xxx）
+    :param class_list: BeautifulSoup 返回的 class 列表
+    :param target: 目标 class 名称（或部分匹配字符串）
+    :return: 是否匹配成功
+    """
+    if not class_list:
+        return False
+    if isinstance(class_list, str):
+        class_list = [class_list]
+    for cls in class_list:
+        if target in cls:
+            return True
+    return False
+
+
+def _find_by_class_pattern(soup, pattern):
+    """
+    根据 class 模式查找元素（支持部分匹配）
+    :param soup: BeautifulSoup 对象
+    :param pattern: 要匹配的 class 模式字符串
+    :return: 匹配的元素列表
+    """
+    return soup.find_all(class_=lambda x: _match_class(x, pattern))
+
 
 class Page(object):
     def __init__(self, string, encoding="utf-8"):
@@ -53,19 +79,25 @@ class Page(object):
 
     def parse_basic_info(self):
         """Get basic info of a page"""
-        divs = self.soup.find_all(class_=CLASS_INFO)
+        divs = _find_by_class_pattern(self.soup, "basicInfo")
         info = {}
         name = ""
+        
         for div in divs:
-            if "name" in div.get("class"):
-                name = div.get_text(strip=True).replace(u"\xa0", "")
-            if "value" in div.get("class"):
-                value = div.get_text(strip=True)
+            name_divs = div.find_all(class_=lambda x: _match_class(x, "name"))
+            value_divs = div.find_all(class_=lambda x: _match_class(x, "value"))
+            
+            for name_div in name_divs:
+                name = name_div.get_text(strip=True).replace(u"\xa0", "")
+            
+            for value_div in value_divs:
+                value = value_div.get_text(strip=True)
                 if not name:
                     logging.error("analyse error, no name for value[%s]" % value)
                     continue
                 info[name] = value
                 name = None
+        
         return info
 
     def get_info(self):
@@ -99,17 +131,20 @@ class Page(object):
         return "\n".join(content)
 
     def get_image(self):
-        divs = self.soup.find_all(class_=CLASS_SUMMARY_PIC)
+        divs = _find_by_class_pattern(self.soup, "coverPic")
         for div in divs:
             img = div.find("img")
-            url = img.attrs["src"]
-            if url:
-                return url
+            if img and img.has_attr("src"):
+                url = img.attrs["src"]
+                if url:
+                    return url
         return ""
 
     def get_summary(self):
         """Get summary infomation of a page"""
-        divs = self.soup.find_all(class_=CLASS_SUMMARY)
+        divs = _find_by_class_pattern(self.soup, "lemmaSummary")
+        if not divs:
+            divs = self.soup.find_all(class_="J-summary")
         return "\n".join(div.get_text(strip=True) for div in divs)
 
     def get_inurls(self):
@@ -125,8 +160,10 @@ class Page(object):
     def get_tags(self):
         """Get tags of the page"""
         tags = []
-        for tag in self.soup.find_all(class_=CLASS_TAG):
-            tags.append(tag.get_text(strip=True))
+        for tag in _find_by_class_pattern(self.soup, "taglist"):
+            tag_links = tag.find_all("a")
+            for link in tag_links:
+                tags.append(link.get_text(strip=True))
 
         return tags
 
@@ -144,7 +181,7 @@ class Page(object):
 
     def get_id(self):
         """Get id of the page"""
-        divs = self.soup.find_all(class_=CLASS_LEMMA_ID)
+        divs = _find_by_class_pattern(self.soup, "lemmaWgt-promotion-rightPreciseAd")
         for d in divs:
             id = d.get("data-lemmaid")
             if id:
@@ -167,23 +204,30 @@ class Search(object):
 
         self.http = requests.get(url, timeout=10, headers=CHROME_HEADERS, params=payload)
         self.html = self.http.content
-        self.soup = BeautifulSoup(self.html)
+        self.soup = BeautifulSoup(self.html, "lxml")
 
     def get_results(self):
         """Get searching results"""
-
         search_results = []
-        items = self.soup.find_all(class_="f")  # get results items
+        
+        items = self.soup.find_all(class_="f")
+        if not items:
+            logging.warning("百度百科搜索页面已改为 React 单页应用，无法直接解析搜索结果")
+            logging.warning("建议：使用确切书名直接访问词条，或改用 Selenium 等工具")
+            return search_results
 
         for item in items:
             result = {}
             a = item.find("a")
-            title = a.get_text()  # get result title
+            if not a:
+                continue
+            title = a.get_text()
             title = title[: title.rfind("_")]
             result["title"] = title
-            result["url"] = a.get("href")  # get result links
-            # get result discription
-            result["discription"] = item.find(class_="abstract").get_text().strip()
+            result["url"] = a.get("href")
+            desc_div = item.find(class_=lambda x: x and "abstract" in str(x).lower())
+            if desc_div:
+                result["discription"] = desc_div.get_text().strip()
             search_results.append(result)
 
         return search_results
