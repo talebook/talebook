@@ -225,6 +225,7 @@ class BookRefer(BaseHandler):
             "source",
             "website",
             "title",
+            "author",
             "author_sort",
             "publisher",
             "isbn",
