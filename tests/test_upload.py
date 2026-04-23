@@ -35,6 +35,29 @@ class TestDecodeFilename(unittest.TestCase):
         latin1_mangled = chinese.encode("utf-8").decode("latin-1")
         self.assertEqual(self.decode(latin1_mangled), chinese)
 
+
+class TestFilenameDecodeFlow(unittest.TestCase):
+    """模拟前端 encodeURIComponent → 后端 decode_filename + unquote 的完整流程"""
+
+    def _decode(self, filename):
+        import urllib.parse
+        from webserver.handlers.book import decode_filename
+        return urllib.parse.unquote(decode_filename(filename))
+
+    def test_percent_encoded_chinese(self):
+        # 前端 encodeURIComponent("DeepSeek打开财富密码.pdf") 的结果
+        encoded = "DeepSeek%E6%89%93%E5%BC%80%E8%B4%A2%E5%AF%8C%E5%AF%86%E7%A0%81.pdf"
+        self.assertEqual(self._decode(encoded), "DeepSeek打开财富密码.pdf")
+
+    def test_percent_encoded_chinese_only(self):
+        # 纯中文文件名
+        encoded = "%E7%B4%A2%E6%81%A9%C2%B7%E5%BE%B7%E5%9B%BD%E5%8F%B2.epub"
+        self.assertEqual(self._decode(encoded), "索恩·德国史.epub")
+
+    def test_plain_ascii_filename(self):
+        # ASCII 文件名不受影响
+        self.assertEqual(self._decode("book.epub"), "book.epub")
+
 class TestUpload(TestWithUserLogin):
     @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
     def test_upload_bad_filename(self, m1):
