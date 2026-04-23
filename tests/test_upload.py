@@ -1,12 +1,40 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import unittest
 import warnings
 from unittest import mock
 from tests.test_main import TestWithUserLogin, setUpModule as init, testdir
 
 def setUpModule():
     init()
+
+
+class TestDecodeFilename(unittest.TestCase):
+    def setUp(self):
+        from webserver.handlers.book import decode_filename
+        self.decode = decode_filename
+
+    def test_none_returns_none(self):
+        self.assertIsNone(self.decode(None))
+
+    def test_empty_string_returns_empty(self):
+        self.assertEqual(self.decode(""), "")
+
+    def test_ascii_filename_unchanged(self):
+        self.assertEqual(self.decode("book.epub"), "book.epub")
+
+    def test_chinese_already_utf8(self):
+        # Form field values arrive already decoded as UTF-8
+        chinese = "DeepSeek打开财富密码.pdf"
+        self.assertEqual(self.decode(chinese), chinese)
+
+    def test_chinese_misinterpreted_as_latin1(self):
+        # Tornado decodes multipart filename headers as latin-1;
+        # decode_filename re-interprets the bytes as UTF-8.
+        chinese = "索恩·德国史.epub"
+        latin1_mangled = chinese.encode("utf-8").decode("latin-1")
+        self.assertEqual(self.decode(latin1_mangled), chinese)
 
 class TestUpload(TestWithUserLogin):
     @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
