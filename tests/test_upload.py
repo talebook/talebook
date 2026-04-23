@@ -25,13 +25,12 @@ class TestDecodeFilename(unittest.TestCase):
         self.assertEqual(self.decode("book.epub"), "book.epub")
 
     def test_chinese_already_utf8(self):
-        # Form field values arrive already decoded as UTF-8
         chinese = "DeepSeek打开财富密码.pdf"
         self.assertEqual(self.decode(chinese), chinese)
 
     def test_chinese_misinterpreted_as_latin1(self):
         # Tornado decodes multipart filename headers as latin-1;
-        # decode_filename re-interprets the bytes as UTF-8.
+        # decode_filename recovers the original UTF-8 string.
         chinese = "索恩·德国史.epub"
         latin1_mangled = chinese.encode("utf-8").decode("latin-1")
         self.assertEqual(self.decode(latin1_mangled), chinese)
