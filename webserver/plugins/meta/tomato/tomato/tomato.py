@@ -358,7 +358,7 @@ class Page(object):
             if chapter_count is not None:
                 info["chapter_count"] = chapter_count
 
-            # 提取完结状态（修复 E122 错误）
+            # 提取完结状态
             status_val = find_int_by_key(
                 self.parsed_data,
                 ["status", "serial_status", "finish_status", "finishStatus", "is_finish", "is_finished"]
@@ -495,12 +495,12 @@ class Page(object):
             if cover_url:
                 return cover_url
 
-        # 3. 从 HTML 中提取封面 URL（修复 W504 错误）
+        # 3. 从 HTML 中提取封面 URL
         cover_url = (
-            regex_json_string_field(self.html, "thumb_url") or
-            regex_json_string_field(self.html, "expand_thumb_url") or
-            regex_json_string_field(self.html, "cover_url") or
-            regex_json_string_field(self.html, "cover")
+            regex_json_string_field(self.html, "thumb_url")
+            or regex_json_string_field(self.html, "expand_thumb_url")
+            or regex_json_string_field(self.html, "cover_url")
+            or regex_json_string_field(self.html, "cover")
         )
         if not cover_url:
             thumb_uri = regex_json_string_field(self.html, "thumb_uri")
