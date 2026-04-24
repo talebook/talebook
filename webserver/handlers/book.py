@@ -441,48 +441,33 @@ class BookEdit(BaseHandler):
 
         file_info = self.request.files["cover"][0]
         file_data = file_info["body"]
-        file_name = decode_filename(file_info["filename"])
-
-        # 检查文件类型
-        allowed_types = [
-            "image/jpeg",
-            "image/png",
-            "image/gif",
-            "image/jpg",
-            "image/pjpeg",
-            "image/x-png",
-        ]
-        file_type = file_info["content_type"]
-        if file_type not in allowed_types:
-            # 尝试从文件名后缀判断
-            file_ext = file_name.split(".")[-1].lower() if "." in file_name else ""
-            if file_ext not in [
-                "jpg",
-                "jpeg",
-                "png",
-                "gif",
-                "pjp",
-                "jpe",
-                "pjpeg",
-                "jfif",
-            ]:
-                return {
-                    "err": "params.cover.type",
-                    "msg": _(
-                        "只允许上传JPG、JPEG、PNG、GIF、PJP、PJPEG、JFIF、JPE格式的图片"
-                    ),
-                }
 
         # 检查文件大小（限制为5MB）
         if len(file_data) > 5 * 1024 * 1024:
             return {"err": "params.cover.size", "msg": _("封面图大小不能超过5MB")}
+
+        # 用魔数检测实际格式，不依赖用户可控的 content_type 或文件名
+        IMAGE_MAGIC = {
+            "jpeg": b"\xff\xd8\xff",
+            "png": b"\x89PNG\r\n\x1a\n",
+            "gif": b"GIF8",
+        }
+        file_ext = None
+        for ext, magic in IMAGE_MAGIC.items():
+            if file_data.startswith(magic):
+                file_ext = ext
+                break
+        if file_ext is None:
+            return {
+                "err": "params.cover.type",
+                "msg": _("只允许上传 JPEG、PNG、GIF 格式的图片"),
+            }
 
         try:
             # 获取书籍元数据
             mi = self.db.get_metadata(bid, index_is_id=True)
 
             # 设置封面数据
-            file_ext = file_name.split(".")[-1].lower() if "." in file_name else "jpg"
             mi.cover_data = (file_ext, file_data)
 
             # 强制更新书籍的timestamp，确保封面图URL变化
@@ -767,6 +752,19 @@ class BookUpload(BaseHandler):
         if not fmt:
             return {"err": "params.filename", "msg": _("文件名不合法")}
         fmt = fmt.lower()
+
+        # validate format against whitelist before touching disk
+        from webserver.handlers.scan import SCAN_EXT
+        if fmt not in SCAN_EXT:
+            return {"err": "params.format", "msg": _("不支持的文件格式: %s") % fmt}
+
+        # validate magic bytes for structured formats
+        EBOOK_MAGIC = {
+            "epub": b"PK\x03\x04",
+            "pdf": b"%PDF",
+        }
+        if fmt in EBOOK_MAGIC and not data.startswith(EBOOK_MAGIC[fmt]):
+            return {"err": "params.format", "msg": _("文件内容与格式不匹配")}
 
         # save file
         upload_dir = os.path.realpath(CONF["upload_path"])
