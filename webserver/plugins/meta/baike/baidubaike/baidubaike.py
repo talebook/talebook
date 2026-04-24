@@ -26,6 +26,7 @@ CLASS_INFO = ["basicInfo-item"]
 CLASS_SUMMARY_PIC = ["summary-pic"]
 CLASS_LEMMA_ID = ["lemmaWgt-promotion-rightPreciseAd"]
 
+
 def _match_class(class_list, target):
     """
     模糊匹配 class 名称（适配动态生成的 class，如 lemmaSummary_xxx）
@@ -82,14 +83,14 @@ class Page(object):
         divs = _find_by_class_pattern(self.soup, "basicInfo")
         info = {}
         name = ""
-        
+
         for div in divs:
             name_divs = div.find_all(class_=lambda x: _match_class(x, "name"))
             value_divs = div.find_all(class_=lambda x: _match_class(x, "value"))
-            
+
             for name_div in name_divs:
                 name = name_div.get_text(strip=True).replace(u"\xa0", "")
-            
+
             for value_div in value_divs:
                 value = value_div.get_text(strip=True)
                 if not name:
@@ -97,7 +98,7 @@ class Page(object):
                     continue
                 info[name] = value
                 name = None
-        
+
         return info
 
     def get_info(self):
@@ -209,7 +210,7 @@ class Search(object):
     def get_results(self):
         """Get searching results"""
         search_results = []
-        
+
         items = self.soup.find_all(class_="f")
         if not items:
             logging.warning("百度百科搜索页面已改为 React 单页应用，无法直接解析搜索结果")
