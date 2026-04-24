@@ -4,14 +4,7 @@ import logging
 
 
 def routes():
-    from . import book
-    from . import user
-    from . import meta
-    from . import files
-    from . import opds
-    from . import admin
-    from . import scan
-    from . import captcha
+    from . import admin, book, captcha, files, meta, opds, scan, user
 
     routes = []
     routes += admin.routes()

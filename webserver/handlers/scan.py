@@ -9,9 +9,10 @@ import sqlalchemy
 import tornado
 
 from webserver import loader
-from webserver.handlers.base import BaseHandler, auth, js, is_admin
+from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.models import ScanFile
 from webserver.services.scan import ScanService
+
 
 CONF = loader.get_settings()
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
@@ -71,9 +72,7 @@ class Scanner:
         return False
 
     def build_query(self, hashlist):
-        query = self.session.query(ScanFile).filter(
-            ScanFile.status == ScanFile.READY
-        )  # .filter(ScanFile.import_id == 0)
+        query = self.session.query(ScanFile).filter(ScanFile.status == ScanFile.READY)  # .filter(ScanFile.import_id == 0)
         if isinstance(hashlist, (list, tuple)):
             query = query.filter(ScanFile.hash.in_(hashlist))
         elif isinstance(hashlist, str):
@@ -92,9 +91,7 @@ class Scanner:
         import_id = self.session.query(sqlalchemy.func.max(ScanFile.import_id)).scalar()
         if import_id is None:
             return (0, {})
-        query = self.session.query(ScanFile.status).filter(
-            ScanFile.import_id == import_id
-        )
+        query = self.session.query(ScanFile.status).filter(ScanFile.import_id == import_id)
         return (import_id, self.count(query))
 
     def scan_status(self):
@@ -174,16 +171,8 @@ class ScanList(BaseHandler):
                 "tags": s.tags,
                 "status": s.status,
                 "book_id": s.book_id,
-                "create_time": (
-                    s.create_time.strftime("%Y-%m-%d %H:%M:%S")
-                    if s.create_time
-                    else "N/A"
-                ),
-                "update_time": (
-                    s.update_time.strftime("%Y-%m-%d %H:%M:%S")
-                    if s.update_time
-                    else "N/A"
-                ),
+                "create_time": (s.create_time.strftime("%Y-%m-%d %H:%M:%S") if s.create_time else "N/A"),
+                "update_time": (s.update_time.strftime("%Y-%m-%d %H:%M:%S") if s.update_time else "N/A"),
             }
             response.append(d)
 

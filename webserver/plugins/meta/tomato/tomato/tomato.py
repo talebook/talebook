@@ -20,8 +20,7 @@ BOOK_DETAIL_API = "https://fanqienovel.com/api/reader/directory/detail"
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
@@ -29,7 +28,7 @@ USER_AGENTS = [
 
 # 用于解析的正则表达式
 RE_NEXT_DATA = re.compile(r'(?s)<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>')
-RE_INITIAL_STATE = re.compile(r'(?s)window\.__INITIAL_STATE__\s*=\s*(\{.*?\})\s*;')
+RE_INITIAL_STATE = re.compile(r"(?s)window\.__INITIAL_STATE__\s*=\s*(\{.*?\})\s*;")
 RE_LD_JSON = re.compile(r'<script[^>]*type="application/ld\+json"[^>]*>\s*([\s\S]*?)\s*</script>')
 RE_INFO_LABEL_GREY = re.compile(r'<span[^>]*class="info-label-grey"[^>]*>([^<]+)</span>')
 RE_INFO_LABEL_YELLOW = re.compile(r'<span[^>]*class="info-label-yellow"[^>]*>([^<]+)</span>')
@@ -251,9 +250,7 @@ class Page(object):
                 "q": self.book_id,  # 使用 book_id 搜索
             }
 
-            response = requests.get(
-                SEARCH_API, params=params, headers=headers, timeout=15
-            )
+            response = requests.get(SEARCH_API, params=params, headers=headers, timeout=15)
 
             if response.status_code == 200:
                 data = response.json()
@@ -360,8 +357,7 @@ class Page(object):
 
             # 提取完结状态
             status_val = find_int_by_key(
-                self.parsed_data,
-                ["status", "serial_status", "finish_status", "finishStatus", "is_finish", "is_finished"]
+                self.parsed_data, ["status", "serial_status", "finish_status", "finishStatus", "is_finish", "is_finished"]
             )
             finished = parse_finished_from_info_label(self.html)
             if finished is None and status_val is not None:
@@ -475,7 +471,7 @@ class Page(object):
                     "detail_page_thumb_url",
                     "detail_cover_url",
                     "detail_thumb_url",
-                ]
+                ],
             )
             if not cover_url:
                 # 尝试从 thumb_uri 构建
@@ -487,11 +483,7 @@ class Page(object):
 
         # 2. 其次从 API 数据中获取封面
         if self.book_info:
-            cover_url = (
-                self.book_info.get("cover")
-                or self.book_info.get("cover_url")
-                or self.book_info.get("image_url")
-            )
+            cover_url = self.book_info.get("cover") or self.book_info.get("cover_url") or self.book_info.get("image_url")
             if cover_url:
                 return cover_url
 
@@ -512,11 +504,7 @@ class Page(object):
         # 4. 从 script[type="application/ld+json"] 中提取图片 URL
         if self.soup:
             script = next(
-                (
-                    s
-                    for s in self.soup.find_all("script", type="application/ld+json")
-                    if s.string and "images" in s.string
-                ),
+                (s for s in self.soup.find_all("script", type="application/ld+json") if s.string and "images" in s.string),
                 None,
             )
             if script:
@@ -569,9 +557,7 @@ class Search(object):
         }
 
         try:
-            response = requests.get(
-                SEARCH_API, params=params, headers=headers, timeout=15
-            )
+            response = requests.get(SEARCH_API, params=params, headers=headers, timeout=15)
 
             if response.status_code == 200:
                 data = response.json()

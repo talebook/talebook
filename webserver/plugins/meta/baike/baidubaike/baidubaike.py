@@ -73,7 +73,7 @@ class Page(object):
         # Exceptions
         if self.soup.find(class_=CLASS_DISAMBIGUATION):
             raise DisambiguationError(string.decode("utf-8"), self.get_inurls())
-        if u"百度百科尚未收录词条" in self.html:
+        if "百度百科尚未收录词条" in self.html:
             raise PageError(string)
         if self.soup.find(id="vf"):
             raise VerifyError(string)
@@ -89,7 +89,7 @@ class Page(object):
             value_divs = div.find_all(class_=lambda x: _match_class(x, "value"))
 
             for name_div in name_divs:
-                name = name_div.get_text(strip=True).replace(u"\xa0", "")
+                name = name_div.get_text(strip=True).replace("\xa0", "")
 
             for value_div in value_divs:
                 value = value_div.get_text(strip=True)

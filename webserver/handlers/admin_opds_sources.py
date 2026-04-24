@@ -8,13 +8,14 @@ OPDS 源配置管理 Handler
 import datetime
 import logging
 import traceback
-
-import tornado
 from gettext import gettext as _
 
+import tornado
+
 from webserver import loader
-from webserver.handlers.base import BaseHandler, js, is_admin
+from webserver.handlers.base import BaseHandler, is_admin, js
 from webserver.models import OpdsSource
+
 
 CONF = loader.get_settings()
 
@@ -27,11 +28,7 @@ class AdminOpdsSources(BaseHandler):
     def get(self):
         """获取所有 OPDS 源配置列表"""
         try:
-            sources = (
-                self.session.query(OpdsSource)
-                .order_by(OpdsSource.create_time.desc())
-                .all()
-            )
+            sources = self.session.query(OpdsSource).order_by(OpdsSource.create_time.desc()).all()
             items = []
             for src in sources:
                 items.append(
@@ -41,12 +38,8 @@ class AdminOpdsSources(BaseHandler):
                         "url": src.url,
                         "description": src.description or "",
                         "active": src.active,
-                        "create_time": src.create_time.strftime("%Y-%m-%d %H:%M:%S")
-                        if src.create_time
-                        else None,
-                        "update_time": src.update_time.strftime("%Y-%m-%d %H:%M:%S")
-                        if src.update_time
-                        else None,
+                        "create_time": src.create_time.strftime("%Y-%m-%d %H:%M:%S") if src.create_time else None,
+                        "update_time": src.update_time.strftime("%Y-%m-%d %H:%M:%S") if src.update_time else None,
                     }
                 )
             return {"err": "ok", "items": items, "count": len(items)}
@@ -76,9 +69,7 @@ class AdminOpdsSources(BaseHandler):
                 }
 
             # 检查名称是否已存在
-            existing = (
-                self.session.query(OpdsSource).filter(OpdsSource.name == name).first()
-            )
+            existing = self.session.query(OpdsSource).filter(OpdsSource.name == name).first()
             if existing:
                 return {"err": "params.name.exist", "msg": _("OPDS 源名称已存在")}
 
@@ -103,11 +94,7 @@ class AdminOpdsSources(BaseHandler):
             if not source_id:
                 return {"err": "params.error", "msg": _("需要提供配置 ID")}
 
-            source = (
-                self.session.query(OpdsSource)
-                .filter(OpdsSource.id == source_id)
-                .first()
-            )
+            source = self.session.query(OpdsSource).filter(OpdsSource.id == source_id).first()
             if not source:
                 return {"err": "params.not_found", "msg": _("未找到该 OPDS 源配置")}
 
@@ -117,11 +104,7 @@ class AdminOpdsSources(BaseHandler):
                 if not name:
                     return {"err": "params.error", "msg": _("名称不能为空")}
                 # 检查名称是否与其他配置冲突
-                existing = (
-                    self.session.query(OpdsSource)
-                    .filter(OpdsSource.name == name, OpdsSource.id != source_id)
-                    .first()
-                )
+                existing = self.session.query(OpdsSource).filter(OpdsSource.name == name, OpdsSource.id != source_id).first()
                 if existing:
                     return {"err": "params.name.exist", "msg": _("OPDS 源名称已存在")}
                 source.name = name
@@ -164,11 +147,7 @@ class AdminOpdsSources(BaseHandler):
             if not source_id:
                 return {"err": "params.error", "msg": _("需要提供配置 ID")}
 
-            source = (
-                self.session.query(OpdsSource)
-                .filter(OpdsSource.id == source_id)
-                .first()
-            )
+            source = self.session.query(OpdsSource).filter(OpdsSource.id == source_id).first()
             if not source:
                 return {"err": "params.not_found", "msg": _("未找到该 OPDS 源配置")}
 

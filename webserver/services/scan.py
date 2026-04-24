@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-import hashlib
-import os
-import logging
-import time
 import datetime
+import hashlib
+import logging
+import os
+import time
 from gettext import gettext as _
 
 from webserver import utils
 from webserver.models import Item, ScanFile
 from webserver.services import AsyncService
 from webserver.services.autofill import AutoFillService
+
 
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
 
@@ -36,9 +37,7 @@ class ScanService(AsyncService):
             return False
 
     def build_query(self, hashlist):
-        query = self.session.query(ScanFile).filter(
-            ScanFile.status == ScanFile.READY
-        )  # .filter(ScanFile.import_id == 0)
+        query = self.session.query(ScanFile).filter(ScanFile.status == ScanFile.READY)  # .filter(ScanFile.import_id == 0)
         if isinstance(hashlist, (list, tuple)):
             query = query.filter(ScanFile.hash.in_(hashlist))
         elif isinstance(hashlist, str):
@@ -57,11 +56,11 @@ class ScanService(AsyncService):
         tasks = []
         for dirpath, dirnames, filenames in os.walk(path_dir):
             # 排除隐藏文件夹（以.开头或@__thumb等）
-            dirnames[:] = [d for d in dirnames if not (d.startswith('.') or d.startswith('@__'))]
+            dirnames[:] = [d for d in dirnames if not (d.startswith(".") or d.startswith("@__"))]
 
             for fname in filenames:
                 # 排除隐藏文件
-                if fname.startswith('.'):
+                if fname.startswith("."):
                     continue
 
                 fpath = os.path.join(dirpath, fname)
@@ -207,7 +206,7 @@ class ScanService(AsyncService):
                     # 检查作者是否相同
                     if set(book_authors) == set(mi_authors):
                         if fmt.upper() in b.get("available_formats", ""):
-                            row.book_id = b['id']
+                            row.book_id = b["id"]
                             row.status = ScanFile.EXIST
                             break
 
@@ -251,9 +250,10 @@ class ScanService(AsyncService):
                         logging.exception("Error details:")
                         # 创建一个简单的metadata对象，避免导入失败
                         from calibre.ebooks.metadata.book.base import Metadata
+
                         mi = Metadata()
                         mi.title = fname.replace("." + fmt, "")
-                        mi.authors = [_(u"佚名")]
+                        mi.authors = [_("佚名")]
                     else:
                         # 处理metadata
                         mi.title = utils.super_strip(mi.title)
@@ -262,7 +262,7 @@ class ScanService(AsyncService):
                         # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
                         if fmt in ["txt", "pdf"]:
                             mi.title = fname.replace("." + fmt, "")
-                            mi.authors = [_(u"佚名")]
+                            mi.authors = [_("佚名")]
             except FileNotFoundError:
                 logging.warning("导入时文件已不存在，跳过: %s", fpath)
                 row.status = ScanFile.DROP
@@ -281,7 +281,7 @@ class ScanService(AsyncService):
 
                     # 检查作者是否相同
                     if set(book_authors) == set(mi_authors):
-                        same_author_book_id = b['id']
+                        same_author_book_id = b["id"]
                         if fmt.upper() in b.get("available_formats", ""):
                             row.status = ScanFile.EXIST
                             break
@@ -289,8 +289,7 @@ class ScanService(AsyncService):
                 if same_author_book_id and row.status != ScanFile.EXIST:
                     # 同名同作者，添加格式到现有书籍
                     row.book_id = same_author_book_id
-                    logging.info(
-                        "import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
+                    logging.info("import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
                     self.db.add_format(row.book_id, fmt.upper(), fpath, True)
                     row.status = ScanFile.IMPORTED
                     self.save_or_rollback(row)
