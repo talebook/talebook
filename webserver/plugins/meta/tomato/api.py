@@ -192,9 +192,7 @@ class TomatoNovelApi:
         try:
             rsp = requests.get(cover_url, timeout=10, headers=CHROME_HEADERS)
             if rsp.status_code != 200:
-                logging.error(
-                    _(f"获取封面失败：status_code[{rsp.status_code}] != 200 OK")
-                )
+                logging.error(_(f"获取封面失败：status_code[{rsp.status_code}] != 200 OK"))
                 return None
 
             img = rsp.content

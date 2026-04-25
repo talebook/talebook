@@ -34,11 +34,7 @@ def patch_tornado_header_validation():
             norm_name = httputil._normalize_header(name)
             self._last_key = norm_name
             if norm_name in self:
-                self._dict[norm_name] = (
-                    httputil.native_str(self[norm_name])
-                    + ","
-                    + httputil.native_str(value)
-                )
+                self._dict[norm_name] = httputil.native_str(self[norm_name]) + "," + httputil.native_str(value)
                 self._as_list[norm_name].append(value)
             else:
                 self[norm_name] = value
@@ -51,8 +47,9 @@ def patch_tornado_header_validation():
     logging.info("Patched Tornado HTTPHeaders.add to support UTF-8 filenames")
 
 
-from webserver import loader, models, social_routes, handlers
+from webserver import handlers, loader, models, social_routes
 from webserver.services import AsyncService
+
 
 CONF = loader.get_settings()
 define("host", default="", type=str, help=_("The host address on which to listen"))
@@ -75,9 +72,7 @@ define(
     type=str,
     help=_("Path to calibre plugins."),
 )
-define(
-    "path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary programs.")
-)
+define("path-bin", default="/usr/bin", type=str, help=_("Path to calibre binary programs."))
 define(
     "with-library",
     default=CONF["with_library"],
@@ -107,15 +102,10 @@ def init_calibre():
         import traceback
 
         logging.error(traceback.format_exc())
-        raise ImportError(
-            _("Can not import calibre. Please set the correct options.\n%s" % e)
-        )
+        raise ImportError(_("Can not import calibre. Please set the correct options.\n%s" % e))
     if not options.with_library:
         sys.stderr.write(
-            _(
-                "No saved library path. Use the --with-library option"
-                " to specify the path to the library you want to use."
-            )
+            _("No saved library path. Use the --with-library option to specify the path to the library you want to use.")
         )
         sys.stderr.write("\n")
         sys.exit(2)
@@ -207,9 +197,7 @@ def make_app():
 
     # build sql session factory
     engine = create_engine(auth_db_path, **CONF["db_engine_args"])
-    ScopedSession = scoped_session(
-        sessionmaker(bind=engine, autoflush=True, autocommit=False)
-    )
+    ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
     models.bind_session(ScopedSession)
     init_social(models.Base, ScopedSession, CONF)
 
@@ -261,9 +249,7 @@ def make_app():
 
     logging.info("Now, Running...")
     AsyncService().setup(book_db, ScopedSession)
-    app = web.Application(
-        social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings
-    )
+    app = web.Application(social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings)
     app._engine = engine
     return app
 
@@ -303,9 +289,7 @@ def main():
     patch_tornado_header_validation()
 
     app = make_app()
-    http_server = tornado.httpserver.HTTPServer(
-        app, xheaders=True, max_buffer_size=get_upload_size()
-    )
+    http_server = tornado.httpserver.HTTPServer(app, xheaders=True, max_buffer_size=get_upload_size())
     http_server.listen(options.port, options.host)
     tornado.ioloop.IOLoop.instance().start()
 

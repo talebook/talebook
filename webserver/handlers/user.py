@@ -9,12 +9,14 @@ from gettext import gettext as _
 
 import tornado.escape
 from tornado import web
+
 from webserver import loader
-from webserver.services.mail import MailService
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import Message, Reader
-from webserver.version import VERSION
 from webserver.plugins import captcha as captcha_module
+from webserver.services.mail import MailService
+from webserver.version import VERSION
+
 
 CONF = loader.get_settings()
 COOKIE_REDIRECT = "login_redirect"
@@ -44,7 +46,8 @@ def check_captcha(handler, scene):
         # 检查是否过期
         try:
             import datetime
-            gen_time = datetime.datetime.fromtimestamp(float(generate_time.decode('utf-8')))
+
+            gen_time = datetime.datetime.fromtimestamp(float(generate_time.decode("utf-8")))
             now = datetime.datetime.utcnow()
             elapsed = (now - gen_time).total_seconds()
             if elapsed > 120:  # 超过2分钟
@@ -55,11 +58,7 @@ def check_captcha(handler, scene):
             return False, _("验证码验证失败")
 
         # 验证用户输入的验证码
-        result = captcha_module.verify_captcha(
-            CONF,
-            captcha_code=captcha_code,
-            captcha_answer=captcha_answer.decode('utf-8')
-        )
+        result = captcha_module.verify_captcha(CONF, captcha_code=captcha_code, captcha_answer=captcha_answer.decode("utf-8"))
 
         if result:
             # 验证通过后清除cookie，防止重复使用
@@ -144,12 +143,7 @@ class UserUpdate(BaseHandler):
         if len(p0) > 0:
             if user.get_secure_password(p0) != user.password:
                 return {"err": "params.password.error", "msg": _("密码错误")}
-            if (
-                p1 != p2
-                or len(p1) < 8
-                or len(p1) > 20
-                or not re.match(Reader.RE_PASSWORD, p1)
-            ):
+            if p1 != p2 or len(p1) < 8 or len(p1) > 20 or not re.match(Reader.RE_PASSWORD, p1):
                 return {"err": "params.password.invalid", "msg": _("密码无效")}
             user.set_secure_password(p1)
 
@@ -213,17 +207,9 @@ class SignUp(BaseHandler):
 
         if not re.match(Reader.RE_EMAIL, email):
             return {"err": "params.email.invalid", "msg": _("Email无效")}
-        if (
-            len(username) < 5
-            or len(username) > 20
-            or not re.match(Reader.RE_USERNAME, username)
-        ):
+        if len(username) < 5 or len(username) > 20 or not re.match(Reader.RE_USERNAME, username):
             return {"err": "params.username.invalid", "msg": _("用户名无效")}
-        if (
-            len(password) < 8
-            or len(password) > 20
-            or not re.match(Reader.RE_PASSWORD, password)
-        ):
+        if len(password) < 8 or len(password) > 20 or not re.match(Reader.RE_PASSWORD, password):
             return {"err": "params.password.invalid", "msg": _("密码无效")}
 
         user = self.session.query(Reader).filter(Reader.username == username).first()
@@ -233,11 +219,7 @@ class SignUp(BaseHandler):
         user.username = username
         user.name = nickname
         user.email = email
-        user.avatar = (
-            CONF["avatar_service"]
-            + "/avatar/"
-            + hashlib.md5(email.encode("UTF-8")).hexdigest()
-        )
+        user.avatar = CONF["avatar_service"] + "/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
         user.create_time = datetime.datetime.now()
         user.update_time = datetime.datetime.now()
         user.access_time = datetime.datetime.now()
@@ -316,11 +298,7 @@ class UserReset(BaseHandler):
         username = self.get_argument("username", "").strip().lower()
         if not username or not email:
             return {"err": "params.invalid", "msg": _("用户名或邮箱错误")}
-        user = (
-            self.session.query(Reader)
-            .filter(Reader.username == username, Reader.email == email)
-            .first()
-        )
+        user = self.session.query(Reader).filter(Reader.username == username, Reader.email == email).first()
         if not user:
             return {"err": "params.no_user", "msg": _("无此用户")}
 
@@ -417,11 +395,7 @@ class UserInfo(BaseHandler):
         db = self.db
         last_week = datetime.datetime.now() - datetime.timedelta(days=7)
         count_all_users = self.session.query(func.count(Reader.id)).scalar()
-        count_hot_users = (
-            self.session.query(func.count(Reader.id))
-            .filter(Reader.access_time > last_week)
-            .scalar()
-        )
+        count_hot_users = self.session.query(func.count(Reader.id)).filter(Reader.access_time > last_week).scalar()
         # 获取格式数量
         sql = "SELECT COUNT(DISTINCT format) FROM data"
         # 使用BaseHandler的锁来保护数据库连接的访问
@@ -492,9 +466,7 @@ class UserInfo(BaseHandler):
         )
         if user and user.avatar:
             gravatar_url = "https://www.gravatar.com"
-            d["avatar"] = user.avatar.replace("http://", "https://").replace(
-                gravatar_url, CONF["avatar_service"]
-            )
+            d["avatar"] = user.avatar.replace("http://", "https://").replace(gravatar_url, CONF["avatar_service"])
         if user and user.extra:
             d["kindle_email"] = user.extra.get("kindle_email", "")
             if detail:
@@ -507,10 +479,7 @@ class UserInfo(BaseHandler):
                         for b in v:
                             if b["id"] not in show:
                                 continue
-                            b["img"] = (
-                                self.cdn_url
-                                + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
-                            )
+                            b["img"] = self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
                             b["href"] = "/book/%(id)s" % b
                             n.append(b)
                         v = n[:12]

@@ -68,9 +68,7 @@ class GeetestProvider(BaseCaptchaProvider):
         # 生成签名
         lotnumber_bytes = lot_number.encode()
         prikey_bytes = captcha_key.encode()
-        sign_token = hmac.new(
-            prikey_bytes, lotnumber_bytes, digestmod="SHA256"
-        ).hexdigest()
+        sign_token = hmac.new(prikey_bytes, lotnumber_bytes, digestmod="SHA256").hexdigest()
 
         # 构造请求参数
         query = {
@@ -97,9 +95,7 @@ class GeetestProvider(BaseCaptchaProvider):
             if gt_msg.get("result") == "success":
                 return True
             else:
-                logging.info(
-                    f"Geetest verification failed: {gt_msg.get('reason', 'unknown')}"
-                )
+                logging.info(f"Geetest verification failed: {gt_msg.get('reason', 'unknown')}")
                 return False
 
         except requests.RequestException as e:

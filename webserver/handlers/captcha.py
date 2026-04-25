@@ -13,6 +13,7 @@ from webserver.handlers.base import BaseHandler, js
 from webserver.plugins import captcha as captcha_module
 from webserver.plugins.captcha.image_captcha import ImageCaptchaProvider
 
+
 CONF = loader.get_settings()
 
 # 启动时记录验证码配置状态
@@ -105,9 +106,7 @@ class CaptchaVerifyHandler(CaptchaBaseHandler):
 
             # 检查是否过期（双重验证）
             try:
-                gen_time = datetime.datetime.fromtimestamp(
-                    float(generate_time.decode("utf-8"))
-                )
+                gen_time = datetime.datetime.fromtimestamp(float(generate_time.decode("utf-8")))
                 now = datetime.datetime.utcnow()
                 elapsed = (now - gen_time).total_seconds()
                 remaining = 60 - elapsed

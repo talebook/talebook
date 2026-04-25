@@ -9,9 +9,7 @@ class BaidubaikeException(Exception):
         self.error = error
 
     def __unicode__(self):
-        return 'An unknown error occured: "{0}". Please report it on GitHub!'.format(
-            self.error
-        )
+        return 'An unknown error occured: "{0}". Please report it on GitHub!'.format(self.error)
 
     if sys.version_info > (3, 0):
 
@@ -31,7 +29,7 @@ class PageError(BaidubaikeException):
         self.title = page_title
 
     def __unicode__(self):
-        return u'"{0}" does not match any pages.'.format(self.title)
+        return '"{0}" does not match any pages.'.format(self.title)
 
 
 class DisambiguationError(BaidubaikeException):
@@ -42,7 +40,7 @@ class DisambiguationError(BaidubaikeException):
         self.options = [" -- ".join(item) for item in may_refer_to.items()]
 
     def __unicode__(self):
-        return u'"{0}" may refer to: \n{1}'.format(self.title, "\n".join(self.options))
+        return '"{0}" may refer to: \n{1}'.format(self.title, "\n".join(self.options))
 
 
 class VerifyError(BaidubaikeException):
@@ -52,6 +50,4 @@ class VerifyError(BaidubaikeException):
         self.title = title
 
     def __unicode__(self):
-        return u'The page "{0}" requires verifying. Query may be too frequent'.format(
-            self.title
-        )
+        return 'The page "{0}" requires verifying. Query may be too frequent'.format(self.title)

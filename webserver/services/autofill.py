@@ -10,11 +10,13 @@ from webserver import loader
 from webserver.plugins.meta import baike, douban
 from webserver.services import AsyncService
 
+
 CONF = loader.get_settings()
 
 
 class AutoFillService(AsyncService):
     """自动从网上拉取书籍信息，填充到DB中"""
+
     def __init__(self):
         self.count_total = 0
         self.count_skip = 0
@@ -24,7 +26,7 @@ class AutoFillService(AsyncService):
     @AsyncService.register_service
     def auto_fill_all(self, idlist: list, qpm=60):
         # 检查是否启用了自动填充书籍信息
-        if not CONF['auto_fill_meta']:
+        if not CONF["auto_fill_meta"]:
             logging.info("自动填充书籍信息已关闭，跳过处理")
             return
 
@@ -55,7 +57,7 @@ class AutoFillService(AsyncService):
 
     @AsyncService.register_function
     def auto_fill(self, book_id):
-        if not CONF['auto_fill_meta']:
+        if not CONF["auto_fill_meta"]:
             return
         mi = self.db.get_metadata(book_id, index_is_id=True)
         return self.do_fill_metadata(book_id, mi)
