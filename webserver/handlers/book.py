@@ -769,6 +769,7 @@ class BookUpload(BaseHandler):
 
         # validate format against whitelist before touching disk
         from webserver.handlers.scan import SCAN_EXT
+
         if fmt not in SCAN_EXT:
             return {"err": "params.format", "msg": _("不支持的文件格式: %s") % fmt}
 
