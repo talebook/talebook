@@ -94,6 +94,24 @@ class BookRefer(BaseHandler):
                 return True
         return False
 
+    @staticmethod
+    def _count_active_sources(sources):
+        """计算实际会执行的信息源查询数量"""
+        count = 0
+        if META_SOURCE_DOUBAN in sources:
+            count += 1
+        if META_SOURCE_BAIDU in sources:
+            count += 1
+        if META_SOURCE_GOOGLE in sources or META_SOURCE_AMAZON in sources:
+            count += 1
+        if META_SOURCE_XHSD in sources:
+            count += 1
+        if hasattr(youshu, "YoushuApi"):
+            count += 1
+        if hasattr(tomato, "TomatoNovelApi"):
+            count += 1
+        return count
+
     def plugin_search_books(self, mi):
         # 获取配置的信息源列表
         sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
@@ -105,20 +123,7 @@ class BookRefer(BaseHandler):
         books = []
 
         # 计算实际会执行的信息源查询数量
-        total_sources = 0
-        if META_SOURCE_DOUBAN in sources:
-            total_sources += 1
-        if META_SOURCE_BAIDU in sources:
-            total_sources += 1
-        if META_SOURCE_GOOGLE in sources or META_SOURCE_AMAZON in sources:
-            total_sources += 1
-        if META_SOURCE_XHSD in sources:
-            total_sources += 1
-        if hasattr(youshu, "YoushuApi"):
-            total_sources += 1
-        if hasattr(tomato, "TomatoNovelApi"):
-            total_sources += 1
-
+        total_sources = self._count_active_sources(sources)
         current_index = 0
         logging.info("开始按信息源查询，共 %d 个信息源", total_sources)
 
