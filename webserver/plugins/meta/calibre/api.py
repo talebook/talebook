@@ -19,7 +19,6 @@ _SOURCE_TO_PLUGIN = {
 class CalibreMetadataApi:
     """使用 Calibre 内置的 Google Books 和 Amazon.com 插件查询书籍元数据"""
 
-    KEY = "Calibre"
     ALLOWED_PLUGINS = frozenset({"Google", "Amazon.com"})
     _patched = False
 

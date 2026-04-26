@@ -263,6 +263,18 @@ class BookRefer(BaseHandler):
                         "msg": _("百度百科查询失败"),
                     }
                 )
+        elif provider_key == baike.KEY:
+            api = baike.BaiduBaikeApi(copy_image=True)
+            try:
+                refer_mi = api.get_book(mi.title)
+            except Exception as e:
+                logging.error("获取百度百科书籍信息失败：%s", e)
+                raise RuntimeError(
+                    {
+                        "err": "httprequest.baidubaike.failed",
+                        "msg": _("百度百科查询失败"),
+                    }
+                )
         elif provider_key == douban.KEY:
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(
@@ -299,34 +311,6 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("获取番茄小说书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")})
-        elif provider_key == CalibreMetadataApi.KEY:
-            # Calibre (Google Books / Amazon.com) 查询
-            title = re.sub("[(（].*", "", mi.title)
-            try:
-                # 优先使用 ISBN 查询
-                results = CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=[provider_value])
-                if results:
-                    refer_mi = results[0]
-                    refer_mi.cover_data = CalibreMetadataApi.get_cover(refer_mi.cover_url) if refer_mi.cover_url else None
-                else:
-                    # 尝试书名查询
-                    results = CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=[provider_value])
-                    if results:
-                        refer_mi = results[0]
-                        refer_mi.cover_data = CalibreMetadataApi.get_cover(refer_mi.cover_url) if refer_mi.cover_url else None
-            except Exception as e:
-                logging.error("获取 Calibre 书籍信息失败：%s", e)
-                raise RuntimeError({"err": "httprequest.calibre.failed", "msg": _("Calibre 查询失败")})
-        elif provider_key == XhsdBookApi.KEY:
-            # 新华书店查询
-            try:
-                api = XhsdBookApi(copy_image=True)
-                refer_mi = api.get_book(provider_value or mi.isbn)
-                if refer_mi:
-                    refer_mi.cover_data = api.get_cover(refer_mi.cover_url) if refer_mi.cover_url else None
-            except Exception as e:
-                logging.error("获取新华书店书籍信息失败：%s", e)
-                raise RuntimeError({"err": "httprequest.xhsd.failed", "msg": _("新华书店查询失败")})
         else:
             raise RuntimeError(
                 {
