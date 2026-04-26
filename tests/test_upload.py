@@ -114,12 +114,13 @@ class TestUploadFormatSecurity(TestWithUserLogin):
         self.assertEqual(d["err"], "params.format")
 
     @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
+    @mock.patch("webserver.handlers.base.BaseHandler.user_history")
+    @mock.patch("webserver.handlers.base.BaseHandler.add_msg")
     @mock.patch("webserver.models.Item.save")
     @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
-    def test_upload_valid_epub_passes_magic(self, mock_import, mock_save, m):
+    def test_upload_valid_epub_passes_magic(self, mock_import, mock_save, mock_msg, mock_hist, m):
         """合法 EPUB 文件（ZIP 魔数）通过魔数校验"""
         mock_import.return_value = 9999
-        mock_save.return_value = True
         path = testdir + "/cases/new.epub"
         with open(path, "rb") as f:
             data = f.read()
@@ -128,12 +129,13 @@ class TestUploadFormatSecurity(TestWithUserLogin):
         self.assertNotEqual(d["err"], "params.format")
 
     @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
+    @mock.patch("webserver.handlers.base.BaseHandler.user_history")
+    @mock.patch("webserver.handlers.base.BaseHandler.add_msg")
     @mock.patch("webserver.models.Item.save")
     @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
-    def test_upload_valid_pdf_passes_magic(self, mock_import, mock_save, m):
+    def test_upload_valid_pdf_passes_magic(self, mock_import, mock_save, mock_msg, mock_hist, m):
         """合法 PDF 文件（%PDF 魔数）通过魔数校验"""
         mock_import.return_value = 9999
-        mock_save.return_value = True
         path = testdir + "/cases/title_has_0x00.pdf"
         with open(path, "rb") as f:
             data = f.read()
@@ -144,6 +146,18 @@ class TestUploadFormatSecurity(TestWithUserLogin):
 
 class TestCoverUploadSecurity(TestWithUserLogin):
     """封面图上传魔数校验的安全测试"""
+
+    def setUp(self):
+        super().setUp()
+        self._patcher_get = mock.patch("calibre.db.legacy.LibraryDatabase.get_metadata")
+        self._patcher_set = mock.patch("calibre.db.legacy.LibraryDatabase.set_metadata")
+        self._patcher_get.start().return_value = mock.MagicMock()
+        self._patcher_set.start()
+
+    def tearDown(self):
+        self._patcher_set.stop()
+        self._patcher_get.stop()
+        super().tearDown()
 
     def _upload_cover(self, filename, content_type, data, bid=1):
         boundary = "----TalebookTestBoundary"
