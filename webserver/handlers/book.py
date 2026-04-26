@@ -23,8 +23,7 @@ from webserver.constants import (
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Item
-from webserver.plugins.meta import baike, douban, tomato, youshu
-from webserver.plugins.meta import calibre, xhsd
+from webserver.plugins.meta import baike, calibre, douban, tomato, xhsd, youshu
 from webserver.plugins.parser.txt import get_content_encoding
 from webserver.services.autofill import AutoFillService
 from webserver.services.convert import ConvertService
@@ -178,19 +177,23 @@ class BookRefer(BaseHandler):
             logging.info("[%d/%d] 查询 Calibre (Google/Amazon)...", current_index, total_sources)
             try:
                 # 优先使用 ISBN 查询
-                results = CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
+                results = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
                 if results:
                     for result in results:
-                        result.cover_data = CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
+                        result.cover_data = (
+                            calibre.CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
+                        )
                         books.append(result)
                     logging.info("Calibre(ISBN) 查询结果：%d 条", len(results))
 
                 # 如果没找到，尝试书名查询
                 if not results:
-                    results = CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
+                    results = calibre.CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
                     if results:
                         for result in results:
-                            result.cover_data = CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
+                            result.cover_data = (
+                                calibre.CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
+                            )
                             books.append(result)
                         logging.info("Calibre(书名) 查询结果：%d 条", len(results))
                     else:
@@ -203,7 +206,7 @@ class BookRefer(BaseHandler):
             current_index += 1
             logging.info("[%d/%d] 查询新华书店...", current_index, total_sources)
             try:
-                api = XhsdBookApi(copy_image=False)
+                api = xhsd.XhsdBookApi(copy_image=False)
                 book = api.get_book(mi.isbn or title)
                 if book:
                     books.append(book)
@@ -306,7 +309,7 @@ class BookRefer(BaseHandler):
                     logging.error("获取 Calibre 书籍信息失败（ISBN）：%s", e)
                     refer_mi = None
                 if refer_mi:
-                    cover_url = getattr(refer_mi, 'cover_url', None)
+                    cover_url = getattr(refer_mi, "cover_url", None)
                     if cover_url:
                         try:
                             refer_mi.cover_data = calibre.CalibreMetadataApi.get_cover(cover_url)
