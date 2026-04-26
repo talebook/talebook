@@ -9,7 +9,6 @@ from webserver.models import Message
 
 
 class SingletonType(type):
-
     _instances = {}
 
     def __call__(cls, *args, **kwargs):
@@ -25,7 +24,7 @@ class AsyncService(metaclass=SingletonType):
     running = {}  # name -> (thread, queue)
 
     def __init__(self):
-        self.scoped_session = lambda : 'no-session'
+        self.scoped_session = lambda: "no-session"
 
     def setup(self, calibre_db=None, scoped_session=None):
         self.db = calibre_db
@@ -75,7 +74,7 @@ class AsyncService(metaclass=SingletonType):
 
     # 注册服务
     def async_mode(self):
-        ''' for unittest '''
+        """for unittest"""
         return True
 
     @staticmethod
@@ -108,4 +107,5 @@ class AsyncService(metaclass=SingletonType):
             q = ins.start_service(service_func)
             q.put((args, kwargs))
             return None
+
         return func_wrapper

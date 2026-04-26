@@ -5,7 +5,9 @@ import ssl
 import subprocess
 import warnings
 from unittest import mock
-from tests.test_main import TestWithAdminUser, setUpModule as init, testdir
+
+from tests.test_main import TestWithAdminUser, testdir
+from tests.test_main import setUpModule as init
 from webserver.handlers.admin import SSLHandlerLogic
 
 

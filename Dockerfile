@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 # ----------------------------------------
 # 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
 FROM node:20-alpine AS builder
@@ -11,7 +12,7 @@ RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
     fi
 
 COPY app/package.json app/package-lock.json* ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # spa build mode will clear ssr build data, run it first
 COPY app/ /build/
@@ -64,8 +65,7 @@ fi && \
 
 # install python packages
 COPY requirements.txt /tmp/
-RUN pip install -r /tmp/requirements.txt && \
-    rm -rf /root/.cache
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r /tmp/requirements.txt
 
 
 # ----------------------------------------
@@ -175,3 +175,5 @@ RUN rm -rf /var/www/talebook/app/.output/public/logo && \
 # ----------------------------------------
 # 生产环境（spa版，作为默认 docker build 结果）
 FROM production AS production-spa
+# no more actions
+

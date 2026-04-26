@@ -8,7 +8,7 @@ dependencies = [
     "bs4>=0.0.2",
     "chardet>=5.2.0",
     "apsw>=3.51.2.0",
-    "flake8>=7.3.0",
+    "ruff>=0.1.0",
     "jinja2==3.1.6",
     "pymysql>=1.1.2",
     "msgpack>=1.1.2",
@@ -22,5 +22,56 @@ dependencies = [
 ]
 
 [tool.black]
-line-length = 120
+line-length = 127
+
+[tool.ruff]
+# 行长度限制，替代 flake8 的 E501
+line-length = 127
+
+[tool.ruff.lint]
+# 启用的规则集
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "B",   # flake8-bugbear
+    "I",   # isort (导入排序)
+]
+
+# 忽略的规则
+ignore = [
+    "E501",  # 行过长（由 Ruff formatter 处理，长正则表达式等需要忽略）
+    "E722",  # 不要使用 bare except
+    "E203",  # 冒号前的空格（与 Black/Ruff 格式化风格冲突）
+    "E401",  # 一行多个导入
+    "B904",  # 在 except 块中使用 raise without arguments
+    "B008",  # 函数参数中不要有函数调用
+    "B007",  # 循环变量未使用
+    "E402",  # 导入不在文件顶部
+    "B012",  # 不要在 except 块中使用 return/continue/break
+    "B016",  # 不能使用非布尔值的类型作为断言
+    "B006",  # 函数参数默认值中不要有可变对象
+]
+
+# 允许自动修复的规则
+fixable = ["ALL"]
+unfixable = []
+
+# 针对特定文件的忽略
+[tool.ruff.lint.per-file-ignores]
+# 测试文件允许 assert 和缺少文档字符串
+"**/test_*.py" = ["S101", "D100", "D101", "D102", "D103"]
+"**/*_test.py" = ["S101", "D100", "D101", "D102", "D103"]
+# 工具脚本允许缺少文档字符串
+"tools/*.py" = ["D100", "D101", "D102", "D103"]
+# 第三方插件允许缺少文档字符串和导入排序
+"webserver/plugins/**/*.py" = ["D100", "D101", "D102", "D103", "I001"]
+
+# isort 配置
+[tool.ruff.lint.isort]
+# 第一方模块，需要根据项目实际包名调整
+known-first-party = ["webserver", "app", "tools"]
+# 导入排序风格
+force-single-line = false
+lines-after-imports = 2
 

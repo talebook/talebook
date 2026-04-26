@@ -24,7 +24,7 @@ class ImageCaptchaProvider(BaseCaptchaProvider):
 
     # 验证码字符集（去除容易混淆的字符）
     CHAR_SET = string.ascii_uppercase + string.digits
-    CHAR_SET = CHAR_SET.replace('0', '').replace('O', '').replace('I', '').replace('1', '').replace('L', '')
+    CHAR_SET = CHAR_SET.replace("0", "").replace("O", "").replace("I", "").replace("1", "").replace("L", "")
 
     def __init__(self, settings: Dict[str, Any]):
         super().__init__(settings)
@@ -53,10 +53,10 @@ class ImageCaptchaProvider(BaseCaptchaProvider):
         :return: 包含验证码图片(base64)和正确答案的字典
         """
         # 生成随机验证码
-        code = ''.join(random.choices(self.CHAR_SET, k=self.code_length))
+        code = "".join(random.choices(self.CHAR_SET, k=self.code_length))
 
         # 创建图片
-        image = Image.new('RGB', (self.image_width, self.image_height), self._random_background())
+        image = Image.new("RGB", (self.image_width, self.image_height), self._random_background())
         draw = ImageDraw.Draw(image)
 
         # 绘制干扰线
@@ -64,10 +64,10 @@ class ImageCaptchaProvider(BaseCaptchaProvider):
             draw.line(
                 [
                     (random.randint(0, self.image_width), random.randint(0, self.image_height)),
-                    (random.randint(0, self.image_width), random.randint(0, self.image_height))
+                    (random.randint(0, self.image_width), random.randint(0, self.image_height)),
                 ],
                 fill=self._random_color(),
-                width=1
+                width=1,
             )
 
         # 绘制验证码字符
@@ -94,7 +94,7 @@ class ImageCaptchaProvider(BaseCaptchaProvider):
             angle = random.randint(-15, 15)
 
             # 创建字符图片
-            char_image = Image.new('RGBA', (font_size, font_size), (0, 0, 0, 0))
+            char_image = Image.new("RGBA", (font_size, font_size), (0, 0, 0, 0))
             char_draw = ImageDraw.Draw(char_image)
             char_draw.text((0, 0), char, font=font, fill=color)
 
@@ -114,14 +114,10 @@ class ImageCaptchaProvider(BaseCaptchaProvider):
 
         # 转换为 base64
         buffer = io.BytesIO()
-        image.save(buffer, format='PNG')
-        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        image.save(buffer, format="PNG")
+        image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-        return {
-            "image": f"data:image/png;base64,{image_base64}",
-            "code": code,
-            "captcha_id": self._generate_id()
-        }
+        return {"image": f"data:image/png;base64,{image_base64}", "code": code, "captcha_id": self._generate_id()}
 
     def verify(self, **kwargs) -> bool:
         """
@@ -141,29 +137,18 @@ class ImageCaptchaProvider(BaseCaptchaProvider):
 
     def _random_background(self) -> tuple:
         """生成随机浅色背景"""
-        return (
-            random.randint(200, 255),
-            random.randint(200, 255),
-            random.randint(200, 255)
-        )
+        return (random.randint(200, 255), random.randint(200, 255), random.randint(200, 255))
 
     def _random_color(self) -> tuple:
         """生成随机颜色"""
-        return (
-            random.randint(0, 255),
-            random.randint(0, 255),
-            random.randint(0, 255)
-        )
+        return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
     def _random_dark_color(self) -> tuple:
         """生成随机深色（用于文字）"""
-        return (
-            random.randint(0, 100),
-            random.randint(0, 100),
-            random.randint(0, 100)
-        )
+        return (random.randint(0, 100), random.randint(0, 100), random.randint(0, 100))
 
     def _generate_id(self) -> str:
         """生成唯一 ID"""
         import uuid
+
         return str(uuid.uuid4())

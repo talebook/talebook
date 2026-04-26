@@ -4,19 +4,20 @@
 人机验证模块单元测试
 """
 
-import unittest
-from unittest.mock import Mock, patch, MagicMock
+import os
 
 # 直接测试验证码模块，不依赖 webserver 其他组件
 import sys
-import os
+import unittest
+from unittest.mock import MagicMock, Mock, patch
+
 
 # 添加项目路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from webserver.plugins import captcha as captcha_module
 from webserver.plugins.captcha.base import BaseCaptchaProvider
 from webserver.plugins.captcha.geetest import GeetestProvider
-from webserver.plugins import captcha as captcha_module
 
 
 class MockCaptchaProvider(BaseCaptchaProvider):
@@ -274,15 +275,11 @@ class TestGeetestProvider(unittest.TestCase):
         provider = GeetestProvider(self.valid_settings)
 
         # 缺少 lot_number
-        result = provider.verify(
-            captcha_output="test-output", pass_token="test-token", gen_time="1234567890"
-        )
+        result = provider.verify(captcha_output="test-output", pass_token="test-token", gen_time="1234567890")
         self.assertFalse(result)
 
         # 缺少 captcha_output
-        result = provider.verify(
-            lot_number="test-lot", pass_token="test-token", gen_time="1234567890"
-        )
+        result = provider.verify(lot_number="test-lot", pass_token="test-token", gen_time="1234567890")
         self.assertFalse(result)
 
     def test_verify_not_configured(self):

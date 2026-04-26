@@ -15,13 +15,14 @@ from gettext import gettext as _
 import tornado
 
 from webserver import loader
+from webserver.handlers.admin_opds_sources import AdminOpdsSources
+from webserver.handlers.base import BaseHandler, auth, is_admin, js
+from webserver.models import Reader, ScanFile
 from webserver.services.autofill import AutoFillService
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
-from webserver.handlers.base import BaseHandler, auth, js, is_admin
-from webserver.handlers.admin_opds_sources import AdminOpdsSources
-from webserver.models import Reader, ScanFile
 from webserver.utils import SimpleBookFormatter
+
 
 CONF = loader.get_settings()
 
@@ -76,15 +77,9 @@ class AdminUsers(BaseHandler):
                 "provider": user.social_auth[0].provider
                 if hasattr(user, "social_auth") and user.social_auth.count()
                 else "register",
-                "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S")
-                if user.create_time
-                else "N/A",
-                "update_time": user.update_time.strftime("%Y-%m-%d %H:%M:%S")
-                if user.update_time
-                else "N/A",
-                "access_time": user.access_time.strftime("%Y-%m-%d %H:%M:%S")
-                if user.access_time
-                else "N/A",
+                "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S") if user.create_time else "N/A",
+                "update_time": user.update_time.strftime("%Y-%m-%d %H:%M:%S") if user.update_time else "N/A",
+                "access_time": user.access_time.strftime("%Y-%m-%d %H:%M:%S") if user.access_time else "N/A",
             }
             for attr in dir(user):
                 if attr.startswith("can_"):
@@ -122,9 +117,7 @@ class AdminUsers(BaseHandler):
             email = data["email"]
 
             # 检查用户名是否已存在
-            existing_user = (
-                self.session.query(Reader).filter(Reader.username == username).first()
-            )
+            existing_user = self.session.query(Reader).filter(Reader.username == username).first()
             if existing_user:
                 return {"err": "params.user.exist", "msg": _("用户名已存在")}
 
@@ -166,11 +159,7 @@ class AdminUsers(BaseHandler):
         if "admin" in data:
             was_admin = user.admin
             user.admin = data["admin"]
-            if (
-                was_admin is True
-                and data["admin"] is False
-                and self.user_id() == user.id
-            ):
+            if was_admin is True and data["admin"] is False and self.user_id() == user.id:
                 return {
                     "err": "params.user.invalid",
                     "msg": _("不允许取消自己的管理员权限"),
@@ -410,17 +399,9 @@ class AdminInstall(BaseHandler):
             return {"err": "params.invalid", "msg": _("填写的内容有误")}
         if not re.match(Reader.RE_EMAIL, email):
             return {"err": "params.email.invalid", "msg": _("Email无效")}
-        if (
-            len(username) < 5
-            or len(username) > 20
-            or not re.match(Reader.RE_USERNAME, username)
-        ):
+        if len(username) < 5 or len(username) > 20 or not re.match(Reader.RE_USERNAME, username):
             return {"err": "params.username.invalid", "msg": _("用户名无效")}
-        if (
-            len(password) < 8
-            or len(password) > 20
-            or not re.match(Reader.RE_PASSWORD, password)
-        ):
+        if len(password) < 8 or len(password) > 20 or not re.match(Reader.RE_PASSWORD, password):
             return {"err": "params.password.invalid", "msg": _("密码无效")}
 
         # 避免重复创建
@@ -433,11 +414,7 @@ class AdminInstall(BaseHandler):
 
         # 设置admin user的信息
         user.email = email
-        user.avatar = (
-            CONF["avatar_service"]
-            + "/avatar/"
-            + hashlib.md5(email.encode("UTF-8")).hexdigest()
-        )
+        user.avatar = CONF["avatar_service"] + "/avatar/" + hashlib.md5(email.encode("UTF-8")).hexdigest()
         user.update_time = datetime.datetime.now()
         user.access_time = datetime.datetime.now()
         user.active = True
@@ -640,10 +617,7 @@ class AdminBookList(BaseHandler):
             end = start + num
             page_ids = all_ids[start:end]
         if page_ids:
-            books = [
-                SimpleBookFormatter(b, self.cdn_url).format()
-                for b in self.get_books(ids=page_ids)
-            ]
+            books = [SimpleBookFormatter(b, self.cdn_url).format() for b in self.get_books(ids=page_ids)]
 
         return {"err": "ok", "items": books, "total": total}
 
@@ -796,9 +770,7 @@ class AdminOPDSImportFailedList(BaseHandler):
                         "hash": sf.hash,
                         "status": sf.status,
                         "error": sf.data.get("error") if sf.data else None,
-                        "update_time": sf.update_time.isoformat()
-                        if sf.update_time
-                        else None,
+                        "update_time": sf.update_time.isoformat() if sf.update_time else None,
                     }
                 )
 
@@ -828,9 +800,7 @@ class AdminOPDSImportRetry(BaseHandler):
                 }
 
             # 查询失败的记录
-            query = self.session.query(ScanFile).filter(
-                ScanFile.status == ScanFile.FAILED
-            )
+            query = self.session.query(ScanFile).filter(ScanFile.status == ScanFile.FAILED)
             if item_id:
                 query = query.filter(ScanFile.id == item_id)
             else:
@@ -901,9 +871,7 @@ class AdminOPDSImport(BaseHandler):
             if not opds_url:
                 return {"err": "params.error", "msg": _("参数错误，OPDS URL不能为空")}
 
-            logging.info(
-                f"OPDS导入请求: url={opds_url}, books={len(books)}本, delete_after={delete_after}"
-            )
+            logging.info(f"OPDS导入请求: url={opds_url}, books={len(books)}本, delete_after={delete_after}")
 
             # 在开始异步下载前，将选中书籍插入到待处理列表并标记为downloading
             try:
@@ -916,9 +884,7 @@ class AdminOPDSImport(BaseHandler):
                         if href:
                             h = hashlib.sha256(href.encode("utf-8")).hexdigest()
                         else:
-                            h = hashlib.sha256(
-                                (title + author + str(uuid.uuid4())).encode("utf-8")
-                            ).hexdigest()
+                            h = hashlib.sha256((title + author + str(uuid.uuid4())).encode("utf-8")).hexdigest()
                         # 创建ScanFile记录，path暂存为href，status为downloading
                         # ScanFile __init__ 接受 (path, hash_value, scan_id)
                         sf = ScanFile(href, h[:64], 0)
@@ -943,22 +909,16 @@ class AdminOPDSImport(BaseHandler):
                 opds_service = OPDSImportService.get_instance()
                 opds_service.reset_counters()
                 if books:
-                    opds_service.import_selected_books(
-                        opds_url, self.user_id(), delete_after, books
-                    )
+                    opds_service.import_selected_books(opds_url, self.user_id(), delete_after, books)
                 else:
-                    opds_service.import_from_opds(
-                        opds_url, self.user_id(), delete_after
-                    )
+                    opds_service.import_from_opds(opds_url, self.user_id(), delete_after)
 
             thread = threading.Thread(target=import_task, daemon=True)
             thread.start()
 
             # 立即返回，避免阻塞HTTP请求
             if books:
-                msg = _("已开始异步导入选中的 {} 本书籍，请稍后查看进度").format(
-                    len(books)
-                )
+                msg = _("已开始异步导入选中的 {} 本书籍，请稍后查看进度").format(len(books))
             else:
                 msg = _("已开始异步导入所有书籍，请稍后查看进度")
 

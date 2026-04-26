@@ -3,17 +3,17 @@
 
 import datetime
 import hashlib
-import logging
-import time
 import json
+import logging
 import os
-import bcrypt
+import time
 from gettext import gettext as _
 
+import bcrypt
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.mutable import Mutable
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 
 
 def mksalt():
@@ -150,9 +150,7 @@ class Reader(Base, SQLAlchemyMixin):
     def get_secure_password(self, raw_password):
         if self.salt == "__bcrypt__":
             # 使用bcrypt验证
-            if bcrypt.checkpw(
-                raw_password.encode("UTF-8"), self.password.encode("UTF-8")
-            ):
+            if bcrypt.checkpw(raw_password.encode("UTF-8"), self.password.encode("UTF-8")):
                 # 验证成功，返回self.password以保持向后兼容性
                 return self.password
             else:
@@ -194,17 +192,12 @@ class Reader(Base, SQLAlchemyMixin):
         self.avatar = url.replace("http://q.qlogo.cn", "//q.qlogo.cn")
 
         if social_user.provider == "github":
-            self.avatar = (
-                "https://avatars.githubusercontent.com/u/%s"
-                % social_user.extra_data["id"]
-            )
+            self.avatar = "https://avatars.githubusercontent.com/u/%s" % social_user.extra_data["id"]
 
     def get_active_code(self):
         # 激活码始终使用原有的SHA256方法，与密码哈希方法无关
         # 这样可以确保激活码功能在任何情况下都能正常工作
-        p1 = hashlib.sha256(
-            self.create_time.strftime("%Y-%m-%d %H:%M:%S").encode("UTF-8")
-        ).hexdigest()
+        p1 = hashlib.sha256(self.create_time.strftime("%Y-%m-%d %H:%M:%S").encode("UTF-8")).hexdigest()
         # 如果有salt，使用原有的salt，如果没有（bcrypt情况），还是用一个固定的或者空字符串
         salt_to_use = self.salt if self.salt != "__bcrypt__" else ""
         p2 = hashlib.sha256((salt_to_use + p1).encode("UTF-8")).hexdigest()

@@ -136,7 +136,7 @@
                                 <p class="mb-4">
                                     {{ t('book.selectMatchingBook') }}
                                 </p>
-                                <BookCards :books="refer_books">
+                                <BookCards_Small :books="refer_books" :max-columns="2">
                                     <template #actions="{ book: referBook }">
                                         <v-card-actions>
                                             <v-chip
@@ -207,7 +207,7 @@
                                             </v-menu>
                                         </v-card-actions>
                                     </template>
-                                </BookCards>
+                                </BookCards_Small>
                             </template>
                         </v-card-text>
                     </v-card>
@@ -567,7 +567,7 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useAsyncData, useCookie, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
-import BookCards from '~/components/BookCards.vue';
+import BookCards_Small from '~/components/BookCards_Small.vue';
 
 const route = useRoute();
 const router = useRouter();

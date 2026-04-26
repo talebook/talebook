@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import hashlib
 import logging
 import os
+import re
+import shutil
 import tempfile
+import threading
 import traceback
 import urllib.parse
-import hashlib
-import threading
 import uuid
-import shutil
-import re
-from datetime import datetime
 from contextlib import contextmanager
+from datetime import datetime
 
 import requests
 from lxml import etree
@@ -20,6 +20,7 @@ from lxml import etree
 from webserver import loader
 from webserver.models import ScanFile
 from webserver.services.async_service import AsyncService
+
 
 CONF = loader.get_settings()
 
@@ -53,7 +54,7 @@ class OPDSImportService(AsyncService):
         """上下文管理器确保会话正确创建和关闭"""
         # 获取 AsyncService 单例的 scoped_session
         async_service = AsyncService()
-        session = getattr(self._local, 'session', None)
+        session = getattr(self._local, "session", None)
         if session is None:
             session = async_service.scoped_session()
             self._local.session = session
@@ -119,9 +120,7 @@ class OPDSImportService(AsyncService):
         try:
             if books:
                 # 导入指定的书籍
-                return self.import_selected_books(
-                    opds_url, user_id, delete_after, books
-                )
+                return self.import_selected_books(opds_url, user_id, delete_after, books)
             else:
                 # 导入整个OPDS源
                 return self.import_from_opds(opds_url, user_id, delete_after)
@@ -168,9 +167,7 @@ class OPDSImportService(AsyncService):
                         with self._lock:
                             self.count_skip += 1
                 except Exception as e:
-                    logging.error(
-                        f"导入书籍失败: {book.get('title', '未知')}, 错误: {e}"
-                    )
+                    logging.error(f"导入书籍失败: {book.get('title', '未知')}, 错误: {e}")
                     with self._lock:
                         self.count_fail += 1
 
@@ -181,9 +178,7 @@ class OPDSImportService(AsyncService):
                 skip = self.count_skip
                 fail = self.count_fail
 
-            logging.info(
-                f"OPDS导入完成: 总计 {total}, 成功 {done}, 跳过 {skip}, 失败 {fail}"
-            )
+            logging.info(f"OPDS导入完成: 总计 {total}, 成功 {done}, 跳过 {skip}, 失败 {fail}")
             return {
                 "err": "ok",
                 "msg": f"成功添加 {done} 本书籍到待处理列表",
@@ -251,9 +246,7 @@ class OPDSImportService(AsyncService):
                         item_type = "folder"
 
                 # 检查是否是书籍（有acquisition链接）
-                acquisition_links = entry.xpath(
-                    'atom:link[@rel="http://opds-spec.org/acquisition"]', namespaces=ns
-                )
+                acquisition_links = entry.xpath('atom:link[@rel="http://opds-spec.org/acquisition"]', namespaces=ns)
                 if acquisition_links:
                     item_type = "book"
 
@@ -322,9 +315,7 @@ class OPDSImportService(AsyncService):
                 )
                 if cover_links:
                     cover_href = cover_links[0].get("href")
-                    if cover_href and not cover_href.startswith(
-                        ("http://", "https://")
-                    ):
+                    if cover_href and not cover_href.startswith(("http://", "https://")):
                         cover_href = urllib.parse.urljoin(base_url, cover_href)
                     cover_link = cover_href
 
@@ -339,9 +330,7 @@ class OPDSImportService(AsyncService):
                     content_elem = entry.find("atom:content", namespaces=ns)
                     if content_elem is not None and content_elem.text:
                         summary = content_elem.text
-                    elif (
-                        content_elem is not None and content_elem.get("type") == "xhtml"
-                    ):
+                    elif content_elem is not None and content_elem.get("type") == "xhtml":
                         # 处理xhtml格式的content
                         div_elem = content_elem.find(".//div", namespaces=ns)
                         if div_elem is not None and div_elem.text:
@@ -395,9 +384,7 @@ class OPDSImportService(AsyncService):
 
                         # 使用与上面相同的确定性短ID算法
                         try:
-                            short_id = hashlib.sha256(
-                                link_href.encode("utf-8")
-                            ).hexdigest()[:12]
+                            short_id = hashlib.sha256(link_href.encode("utf-8")).hexdigest()[:12]
                         except Exception:
                             short_id = str(abs(hash(link_href)) % 1000000)
 
@@ -453,9 +440,7 @@ class OPDSImportService(AsyncService):
                         book["author"] = name_elem.text
 
                 # 提取获取链接
-                acquisition_links = entry.xpath(
-                    'atom:link[@rel="http://opds-spec.org/acquisition"]', namespaces=ns
-                )
+                acquisition_links = entry.xpath('atom:link[@rel="http://opds-spec.org/acquisition"]', namespaces=ns)
                 for link in acquisition_links:
                     href = link.get("href")
                     type_ = link.get("type")
@@ -465,9 +450,7 @@ class OPDSImportService(AsyncService):
                         break
 
                 # 提取封面链接
-                cover_links = entry.xpath(
-                    'atom:link[@rel="http://opds-spec.org/cover"]', namespaces=ns
-                )
+                cover_links = entry.xpath('atom:link[@rel="http://opds-spec.org/cover"]', namespaces=ns)
                 if cover_links:
                     book["cover_link"] = cover_links[0].get("href")
 
@@ -564,9 +547,7 @@ class OPDSImportService(AsyncService):
         except Exception as e:
             logging.error(f"更新 ScanFile 状态时出错: {e}")
 
-    def import_selected_books(
-        self, opds_url, user_id=None, delete_after=False, books=None
-    ):
+    def import_selected_books(self, opds_url, user_id=None, delete_after=False, books=None):
         """导入用户选中的书籍"""
         logging.info(f"开始导入选中的书籍: {len(books)}本")
 
@@ -605,14 +586,10 @@ class OPDSImportService(AsyncService):
 
                     # 如果href是相对路径，构建完整URL
                     if book_data["acquisition_link"].startswith("/"):
-                        book_data["acquisition_link"] = (
-                            base_url + book_data["acquisition_link"]
-                        )
+                        book_data["acquisition_link"] = base_url + book_data["acquisition_link"]
                     else:
                         # 尝试其他方式构建URL
-                        book_data["acquisition_link"] = (
-                            base_url + "/" + book_data["acquisition_link"]
-                        )
+                        book_data["acquisition_link"] = base_url + "/" + book_data["acquisition_link"]
 
                 logging.info(f"下载链接: {book_data['acquisition_link']}")
 
@@ -629,9 +606,7 @@ class OPDSImportService(AsyncService):
                     logging.warning(f"跳过导入: {book_data['title']}")
 
             except Exception as e:
-                logging.error(
-                    f"导入书籍失败: {book_info.get('title', '未知')}, 错误: {e}"
-                )
+                logging.error(f"导入书籍失败: {book_info.get('title', '未知')}, 错误: {e}")
                 logging.error(traceback.format_exc())
                 with self._lock:
                     self.count_fail += 1
@@ -643,9 +618,7 @@ class OPDSImportService(AsyncService):
             skip = self.count_skip
             fail = self.count_fail
 
-        logging.info(
-            f"OPDS导入完成: 总计 {total}, 成功 {done}, 跳过 {skip}, 失败 {fail}"
-        )
+        logging.info(f"OPDS导入完成: 总计 {total}, 成功 {done}, 跳过 {skip}, 失败 {fail}")
 
         return {
             "err": "ok",
@@ -757,9 +730,7 @@ class OPDSImportService(AsyncService):
                 book["author"] = "未知作者"
 
             # 提取获取链接
-            acquisition_links = entry.xpath(
-                'atom:link[@rel="http://opds-spec.org/acquisition"]', namespaces=ns
-            )
+            acquisition_links = entry.xpath('atom:link[@rel="http://opds-spec.org/acquisition"]', namespaces=ns)
             for link in acquisition_links:
                 href = link.get("href")
                 type_ = link.get("type")
@@ -780,9 +751,7 @@ class OPDSImportService(AsyncService):
             book = {}
 
             # 查找所有acquisition链接
-            acquisition_links = root.xpath(
-                '//atom:link[@rel="http://opds-spec.org/acquisition"]', namespaces=ns
-            )
+            acquisition_links = root.xpath('//atom:link[@rel="http://opds-spec.org/acquisition"]', namespaces=ns)
             if acquisition_links:
                 for link in acquisition_links:
                     href = link.get("href")
@@ -853,9 +822,7 @@ class OPDSImportService(AsyncService):
                 safe_title = "unknown_book"
 
             # 使用 mkstemp 创建唯一临时文件，避免并发下载时重名
-            fd, file_path = tempfile.mkstemp(
-                prefix=f"opds_{safe_title}_", suffix=f".{format_}"
-            )
+            fd, file_path = tempfile.mkstemp(prefix=f"opds_{safe_title}_", suffix=f".{format_}")
             os.close(fd)
 
             # 下载文件
@@ -882,9 +849,7 @@ class OPDSImportService(AsyncService):
 
             # 检查文件是否成功下载
             if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                logging.info(
-                    f"书籍下载成功: {file_path}, 大小: {os.path.getsize(file_path)} bytes"
-                )
+                logging.info(f"书籍下载成功: {file_path}, 大小: {os.path.getsize(file_path)} bytes")
                 return file_path
             else:
                 logging.error(f"文件下载失败或为空: {file_path}")

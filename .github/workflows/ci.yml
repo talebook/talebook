@@ -34,7 +34,7 @@ jobs:
       - name: Install Python dependencies
         run: make init
 
-      - name: Lint with flake8
+      - name: Lint with ruff
         run: make lint-py
 
       - name: Run tests with pytest

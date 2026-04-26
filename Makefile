@@ -35,8 +35,8 @@ lint-ui:
 	cd app && npm run lint
 
 lint-py:
-	flake8 webserver --count --select=E9,F63,F7,F82 --show-source --statistics
-	flake8 webserver --count --statistics --config .style.yapf
+	ruff check ./webserver --no-cache
+	ruff format --diff ./webserver --output-format concise --no-cache
 
 check-i18n:
 	uv run check_i18n_translation_missing.py

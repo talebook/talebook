@@ -24,8 +24,10 @@ from calibre.utils.icu import sort_key
 from lxml import etree, html
 from lxml.builder import ElementMaker
 from tornado import web
+
 from webserver import loader
 from webserver.handlers.base import BaseHandler
+
 
 CONF = loader.get_settings()
 
@@ -76,11 +78,7 @@ def format_tag_string(tags, sep, ignore_max=False, no_tag_count=False, joinval="
     if no_tag_count:
         return joinval.join(tlist) if tlist else ""
     else:
-        return (
-            "%s:&:%s" % (tweaks["opds_max_tags_shown"], joinval.join(tlist))
-            if tlist
-            else ""
-        )
+        return "%s:&:%s" % (tweaks["opds_max_tags_shown"], joinval.join(tlist)) if tlist else ""
 
 
 def url_for(name, **kwargs):
@@ -173,9 +171,7 @@ def html_to_lxml(raw):
     raw = "<div>%s</div>" % raw
     root = html.fragment_fromstring(raw)
     root.set("xmlns", "http://www.w3.org/1999/xhtml")
-    raw = etree.tostring(
-        root, pretty_print=True, encoding="utf-8", xml_declaration=True
-    )
+    raw = etree.tostring(root, pretty_print=True, encoding="utf-8", xml_declaration=True)
     try:
         return etree.fromstring(raw)
     except:
@@ -186,9 +182,7 @@ def html_to_lxml(raw):
                     remove.append(attr)
             for a in remove:
                 del x.attrib[a]
-        raw = etree.tostring(
-            root, pretty_print=True, encoding="utf-8", xml_declaration=True
-        )
+        raw = etree.tostring(root, pretty_print=True, encoding="utf-8", xml_declaration=True)
         try:
             return etree.fromstring(raw)
         except:
@@ -197,9 +191,7 @@ def html_to_lxml(raw):
             return _html4_parse(raw)
 
 
-def CATALOG_ENTRY(
-    item, item_kind, base_href, updated, ignore_count=False, add_kind=False
-):
+def CATALOG_ENTRY(item, item_kind, base_href, updated, ignore_count=False, add_kind=False):
     id_ = "calibre:category:" + item.name
     iid = "N" + item.name
     if item.id is not None:
@@ -251,15 +243,11 @@ def ACQUISITION_ENTRY(item, db, updated, CFM, CKEYS, prefix):
         extra.append(_("RATING: %s<br />") % rating)
     tags = item[FM["tags"]]
     if tags:
-        extra.append(
-            _("TAGS: %s<br />")
-            % xml(format_tag_string(tags, ",", ignore_max=True, no_tag_count=True))
-        )
+        extra.append(_("TAGS: %s<br />") % xml(format_tag_string(tags, ",", ignore_max=True, no_tag_count=True)))
     series = item[FM["series"]]
     if series:
         extra.append(
-            _("SERIES: %(series)s [%(sidx)s]<br />")
-            % dict(series=xml(series), sidx=fmt_sidx(float(item[FM["series_index"]])))
+            _("SERIES: %(series)s [%(sidx)s]<br />") % dict(series=xml(series), sidx=fmt_sidx(float(item[FM["series_index"]])))
         )
     for key in CKEYS:
         mi = db.get_metadata(item[CFM["id"]["rec_index"]], index_is_id=True)
@@ -283,8 +271,7 @@ def ACQUISITION_ENTRY(item, db, updated, CFM, CKEYS, prefix):
                     )
                 )
             elif datatype == "comments" or (
-                CFM[key]["datatype"] == "composite"
-                and CFM[key]["display"].get("contains_html", False)
+                CFM[key]["datatype"] == "composite" and CFM[key]["display"].get("contains_html", False)
             ):
                 extra.append("%s: %s<br />" % (xml(name), comments_to_html(val)))
             else:
@@ -369,9 +356,7 @@ class Feed(object):
             self.root.insert(1, SUBTITLE(subtitle))
 
     def __bytes__(self):
-        return etree.tostring(
-            self.root, pretty_print=True, encoding="utf-8", xml_declaration=True
-        )
+        return etree.tostring(self.root, pretty_print=True, encoding="utf-8", xml_declaration=True)
 
 
 class TopLevel(Feed):
@@ -386,8 +371,7 @@ class TopLevel(Feed):
 
         subc = partial(NAVCATALOG_ENTRY, self.base_href, updated)
         subcatalogs = [
-            subc(_("By {0}").format(title), _("Books sorted by {0}").format(desc), q)
-            for title, desc, q in categories
+            subc(_("By {0}").format(title), _("Books sorted by {0}").format(desc), q) for title, desc, q in categories
         ]
         for x in subcatalogs:
             self.root.append(x)
@@ -408,25 +392,16 @@ class NavFeed(Feed):
 
 
 class AcquisitionFeed(NavFeed):
-    def __init__(
-        self, updated, id_, items, offsets, page_url, up_url, db, prefix, title=None
-    ):
+    def __init__(self, updated, id_, items, offsets, page_url, up_url, db, prefix, title=None):
         NavFeed.__init__(self, id_, updated, offsets, page_url, up_url, title=title)
         CFM = db.field_metadata
-        CKEYS = [
-            key
-            for key in sorted(
-                custom_fields_to_display(db), key=lambda x: sort_key(CFM[x]["name"])
-            )
-        ]
+        CKEYS = [key for key in sorted(custom_fields_to_display(db), key=lambda x: sort_key(CFM[x]["name"]))]
         for item in items:
             self.root.append(ACQUISITION_ENTRY(item, db, updated, CFM, CKEYS, prefix))
 
 
 class CategoryFeed(NavFeed):
-    def __init__(
-        self, items, which, id_, updated, offsets, page_url, up_url, db, title=None
-    ):
+    def __init__(self, items, which, id_, updated, offsets, page_url, up_url, db, title=None):
         NavFeed.__init__(self, id_, updated, offsets, page_url, up_url, title=title)
         base_href = self.base_href + "/category/" + hexlify(which)
         ignore_count = False
@@ -446,9 +421,7 @@ class CategoryFeed(NavFeed):
 
 
 class CategoryGroupFeed(NavFeed):
-    def __init__(
-        self, items, which, id_, updated, offsets, page_url, up_url, title=None
-    ):
+    def __init__(self, items, which, id_, updated, offsets, page_url, up_url, title=None):
         NavFeed.__init__(self, id_, updated, offsets, page_url, up_url, title=title)
         base_href = self.base_href + "/categorygroup/" + hexlify(which)
         for item in items:
@@ -501,9 +474,7 @@ class OpdsHandler(BaseHandler):
         items = items[offsets.offset : offsets.offset + max_items]
         updated = self.db.last_modified()
         self.set_header("Last-Modified", self.last_modified(updated))
-        self.set_header(
-            "Content-Type", "application/atom+xml; profile=opds-catalog; charset=UTF-8"
-        )
+        self.set_header("Content-Type", "application/atom+xml; profile=opds-catalog; charset=UTF-8")
         return bytes(
             AcquisitionFeed(
                 updated,
@@ -530,9 +501,7 @@ class OpdsHandler(BaseHandler):
         except:
             raise web.HTTPError(404, reason="Search: %r not understood" % query)
         page_url = url_for("opdssearch", query=query)
-        return self.get_opds_acquisition_feed(
-            ids, offset, page_url, url_for("opds"), "calibre-search:" + query
-        )
+        return self.get_opds_acquisition_feed(ids, offset, page_url, url_for("opds"), "calibre-search:" + query)
 
     def get_opds_all_books(self, which, page_url, up_url, offset=0):
         try:
@@ -576,11 +545,7 @@ class OpdsHandler(BaseHandler):
         meta = category_meta.get(category, {})
         category_name = meta.get("name", which)
         which = unhexlify(which)
-        feed_title = (
-            default_feed_title
-            + " :: "
-            + (_("By {0} :: {1}").format(category_name, which))
-        )
+        feed_title = default_feed_title + " :: " + (_("By {0} :: {1}").format(category_name, which))
         owhich = hexlify("N" + which)
         up_url = url_for("opdsnavcatalog", which=owhich)
         items = categories[category]
@@ -590,9 +555,7 @@ class OpdsHandler(BaseHandler):
 
         items = [x for x in items if belongs(x, which)]
         if not items:
-            raise web.HTTPError(
-                404, reason="No items in group %r:%r" % (category, which)
-            )
+            raise web.HTTPError(404, reason="No items in group %r:%r" % (category, which))
         updated = self.db.last_modified()
 
         id_ = "calibre-category-group-feed:" + category + ":" + which
@@ -686,9 +649,7 @@ class OpdsHandler(BaseHandler):
             max_items = CONF["opds_max_items"]
             offsets = Offsets(offset, max_items, len(items))
             items = items[offsets.offset : offsets.offset + max_items]
-            ans = CategoryGroupFeed(
-                items, which, id_, updated, offsets, page_url, up_url, title=feed_title
-            )
+            ans = CategoryGroupFeed(items, which, id_, updated, offsets, page_url, up_url, title=feed_title)
 
         self.set_header("Last-Modified", self.last_modified(updated))
         self.set_header("Content-Type", "application/atom+xml; charset=UTF-8")
@@ -719,10 +680,7 @@ class OpdsHandler(BaseHandler):
                 which = int(which[:p])
             except:
                 # Might be a composite column, where we have the lookup key
-                if not (
-                    category in self.db.field_metadata
-                    and self.db.field_metadata[category]["datatype"] == "composite"
-                ):
+                if not (category in self.db.field_metadata and self.db.field_metadata[category]["datatype"] == "composite"):
                     raise web.HTTPError(404, reason="Tag %r not found" % which)
 
         categories = self.db.get_categories()
@@ -734,9 +692,7 @@ class OpdsHandler(BaseHandler):
                 ids = self.search_for_books('search:"%s"' % which)
             except:
                 raise web.HTTPError(404, reason="Search: %r not understood" % which)
-            return self.get_opds_acquisition_feed(
-                ids, offset, page_url, up_url, "calibre-search:" + which
-            )
+            return self.get_opds_acquisition_feed(ids, offset, page_url, up_url, "calibre-search:" + which)
 
         if type_ != "I":
             raise web.HTTPError(404, reason="Non id categories not supported")
@@ -778,9 +734,7 @@ class OpdsHandler(BaseHandler):
             meta = category_meta.get(category, None)
             if meta is None:
                 continue
-            if category_meta.is_ignorable_field(
-                category
-            ) and category not in custom_fields_to_display(self.db):
+            if category_meta.is_ignorable_field(category) and category not in custom_fields_to_display(self.db):
                 continue
             name = _(meta["name"])
             cats.append((name, name, "N" + category))
