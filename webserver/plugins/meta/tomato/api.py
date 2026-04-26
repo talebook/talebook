@@ -127,13 +127,23 @@ class TomatoNovelApi:
         将 Page 对象转换为 Calibre Metadata 对象
 
         :param page: Page 对象
-        :return: Metadata 对象
+        :return: Metadata 对象或 None（如果是无效结果）
         """
         from calibre.ebooks.metadata.book.base import Metadata
         from calibre.utils.date import utcnow
 
         info = page.get_info()
         logging.debug("\n" + "\n".join("%s:\t%s" % v for v in info.items()))
+
+        # 检查是否是无效的推广页面
+        title = info.get("title", "")
+        comments = page.get_summary()
+
+        # 如果标题包含"番茄小说"且简介包含推广内容，说明是无效结果
+        if title and ("番茄小说" in title or title.startswith("未知")):
+            if comments and ("番茄小说是抖音旗下" in comments or "海量正版小说" in comments or "书荒广场" in comments):
+                logging.info("检测到番茄小说无效推广页面，跳过：%s", title)
+                return None
 
         # 创建 Metadata 对象
         mi = Metadata(info["title"])

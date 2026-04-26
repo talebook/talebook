@@ -425,11 +425,14 @@
         "advancedSettings": "Advanced Settings",
         "sslManagement": "SSL Management",
         "opdsSettings": "OPDS Settings",
-        "captchaSettings": "CAPTCHA Settings"
+        "captchaSettings": "CAPTCHA Settings",
+        "trashManagement": "Trash Management"
       },
       "button": {
         "saveSettings": "Save Settings",
-        "testEmail": "Test Email"
+        "testEmail": "Test Email",
+        "trashClear": "Clear Trash",
+        "trashClearConfirm": "Confirm Clear"
       },
       "label": {
         "siteTitle": "Site Title",
@@ -452,7 +455,9 @@
         "name": "Name",
         "link": "Link",
         "autoFillMeta": "Auto fill book info",
+        "metaSelectedSource": "Select enabled metadata sources",
         "doubanBaseurl": "Douban API URL",
+        "doubanApiKey": "Douban API Key",
         "doubanMaxCount": "Douban API max results",
         "staticHost": "CDN domain",
         "bookNamesFormat": "Directory naming format",
@@ -480,7 +485,10 @@
         "captchaEnableForWelcome": "Enable for Private Library",
         "captchaEnableForReset": "Enable for Password Reset",
         "geetestCaptchaId": "GeeTest Captcha ID",
-        "geetestCaptchaKey": "GeeTest Captcha Key"
+        "geetestCaptchaKey": "GeeTest Captcha Key",
+        "trashCalibreSize": "Calibre Trash Size",
+        "trashUploadSize": "Upload Temp Directory Size",
+        "trashUnknown": "Unknown"
       },
       "option": {
         "ssl": "SSL",
@@ -496,6 +504,7 @@
       "message": {
         "emailServiceInfo": "Email registration and Kindle push rely on this configuration (SMTP server address can include port or not, default is 465)",
         "bookCategoriesInfo": "Configure preset categories for the 'Categories' page. When adding books, if the book title or author name contains these categories, the corresponding tags will be automatically added.",
+        "bookInfoSourcesInfo": "Configure sources for fetching book metadata from the internet. Multiple sources can be enabled simultaneously.",
         "doubanPluginInfo": "To enable Douban plugin, please refer to the installation documentation. If it fails, you can try changing the mirror, such as talebook/douban-api-rs",
         "logoInfo": "To adjust the logo, please refer to the installation documentation.",
         "opdsInfo": "OPDS (Open Publication Distribution System) is an open standard for ebook distribution. When disabled, OPDS clients will not be able to access the library.",
@@ -504,7 +513,16 @@
         "goTo": "Please go to",
         "configurationPage": "developer configuration page",
         "getKeysAndSetCallback": ", get the keys and set the callback address to:",
-        "captchaInfo": "When enabled, users need to complete CAPTCHA verification on corresponding pages."
+        "captchaInfo": "When enabled, users need to complete CAPTCHA verification on corresponding pages.",
+        "trashDescription": "Clear Calibre trash (library/.caltrash) and upload temporary directory (upload/), free up disk space. Can only clear when total size exceeds 10MB.",
+        "trashClearConfirm": "Confirm clearing trash and upload temporary directory? This action cannot be undone!"
+      },
+      "meta_source": {
+        "douban": "Douban",
+        "baidu": "Baidu Baike",
+        "google": "Google Books",
+        "amazon": "Amazon",
+        "xinhua": "Xinhua Bookstore"
       }
     },
     "users": {

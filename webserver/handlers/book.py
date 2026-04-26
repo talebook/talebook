@@ -7,15 +7,23 @@ import os
 import random
 import re
 import urllib
-from gettext import gettext as _
 
 import tornado.escape
 from tornado import web
 
 from webserver import loader, utils
+from webserver.constants import (
+    META_SELECTED_SOURCES,
+    META_SOURCE_AMAZON,
+    META_SOURCE_BAIDU,
+    META_SOURCE_DOUBAN,
+    META_SOURCE_GOOGLE,
+    META_SOURCE_XHSD,
+)
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
+from webserver.i18n import _
 from webserver.models import Item
-from webserver.plugins.meta import baike, douban, tomato, youshu
+from webserver.plugins.meta import baike, calibre, douban, tomato, xhsd, youshu
 from webserver.plugins.parser.txt import get_content_encoding
 from webserver.services.autofill import AutoFillService
 from webserver.services.convert import ConvertService
@@ -84,59 +92,161 @@ class BookRefer(BaseHandler):
                 return True
         return False
 
+    @staticmethod
+    def _count_active_sources(sources):
+        """计算实际会执行的信息源查询数量"""
+        count = 0
+        if META_SOURCE_DOUBAN in sources:
+            count += 1
+        if META_SOURCE_BAIDU in sources:
+            count += 1
+        if META_SOURCE_GOOGLE in sources or META_SOURCE_AMAZON in sources:
+            count += 1
+        if META_SOURCE_XHSD in sources:
+            count += 1
+        if hasattr(youshu, "YoushuApi"):
+            count += 1
+        if hasattr(tomato, "TomatoNovelApi"):
+            count += 1
+        return count
+
     def plugin_search_books(self, mi):
+        # 获取配置的信息源列表
+        sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
+        logging.info("META_SELECTED_SOURCES 配置：%s", sources)
+        if not sources:
+            return []
+
         title = re.sub("[(（].*", "", mi.title)
-        api = douban.DoubanBookApi(
-            CONF["douban_apikey"],
-            CONF["douban_baseurl"],
-            copy_image=False,
-            manual_select=False,
-            maxCount=CONF["douban_max_count"],
-        )
-        # first, search title
         books = []
-        try:
-            books = api.search_books(title) or []
-        except:
-            logging.error(_("豆瓣接口查询 %s 失败" % title))
 
-        if not self.has_proper_book(books, mi):
-            # 若有ISBN号，但是却没搜索出来，则精准查询一次ISBN
-            # 总是把最佳书籍放在第一位
-            book = api.get_book_by_isbn(mi.isbn)
-            if book:
-                books = list(books)
-                books.insert(0, book)
-        books = [api._metadata(b) for b in books]
+        # 计算实际会执行的信息源查询数量
+        total_sources = self._count_active_sources(sources)
+        current_index = 0
+        logging.info("开始按信息源查询，共 %d 个信息源", total_sources)
 
-        # append baidu book
-        api = baike.BaiduBaikeApi(copy_image=False)
-        try:
-            book = api.get_book(title)
-        except:
-            return {
-                "err": "httprequest.baidubaike.failed",
-                "msg": _("百度百科查询失败"),
-            }
-        if book:
-            books.append(book)
+        # 1. 豆瓣查询
+        if META_SOURCE_DOUBAN in sources:
+            current_index += 1
+            logging.info("[%d/%d] 查询豆瓣...", current_index, total_sources)
+            try:
+                api = douban.DoubanBookApi(
+                    CONF["douban_apikey"],
+                    CONF["douban_baseurl"],
+                    copy_image=False,
+                    manual_select=False,
+                    maxCount=CONF["douban_max_count"],
+                )
+                # first, search title
+                try:
+                    books = api.search_books(title) or []
+                except:
+                    logging.error(_("豆瓣接口查询 %s 失败" % title))
 
-        api = youshu.YoushuApi(copy_image=True)
-        try:
-            book = api.get_book(title)
-        except:
-            return {"err": "httprequest.youshu.failed", "msg": _("优书网查询失败")}
-        if book:
-            books.append(book)
+                if not self.has_proper_book(books, mi):
+                    # 若有 ISBN 号，但是却没搜索出来，则精准查询一次 ISBN
+                    # 总是把最佳书籍放在第一位
+                    book = api.get_book_by_isbn(mi.isbn)
+                    if book:
+                        books = list(books)
+                        books.insert(0, book)
+                books = [api._metadata(b) for b in books]
+                logging.info("豆瓣查询结果：%d 条", len(books))
+            except Exception as e:
+                logging.error(_("豆瓣查询失败：%s"), e)
 
-        # append tomato novel
-        api = tomato.TomatoNovelApi(copy_image=False)
-        try:
-            book = api.get_book(title)
-        except:
-            return {"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")}
-        if book:
-            books.append(book)
+        # 2. 百度百科查询
+        if META_SOURCE_BAIDU in sources:
+            current_index += 1
+            logging.info("[%d/%d] 查询百度百科...", current_index, total_sources)
+            api = baike.BaiduBaikeApi(copy_image=False)
+            try:
+                book = api.get_book(title)
+                if book:
+                    books.append(book)
+                    logging.info("百度百科查询结果：1 条")
+                else:
+                    logging.info("百度百科查询结果：0 条")
+            except Exception as e:
+                logging.error(_("百度百科查询失败：%s"), e)
+
+        # 3. Calibre (Google Books & Amazon.com) 查询
+        calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
+        if calibre_sources:
+            current_index += 1
+            logging.info("[%d/%d] 查询 Calibre (Google/Amazon)...", current_index, total_sources)
+            try:
+                # 优先使用 ISBN 查询
+                results = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
+                if results:
+                    for result in results:
+                        result.cover_data = (
+                            calibre.CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
+                        )
+                        books.append(result)
+                    logging.info("Calibre(ISBN) 查询结果：%d 条", len(results))
+
+                # 如果没找到，尝试书名查询
+                if not results:
+                    results = calibre.CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
+                    if results:
+                        for result in results:
+                            result.cover_data = (
+                                calibre.CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
+                            )
+                            books.append(result)
+                        logging.info("Calibre(书名) 查询结果：%d 条", len(results))
+                    else:
+                        logging.info("Calibre 查询结果：0 条")
+            except Exception as e:
+                logging.error(_("Calibre 查询失败：%s"), e)
+
+        # 4. 新华书店查询
+        if META_SOURCE_XHSD in sources:
+            current_index += 1
+            logging.info("[%d/%d] 查询新华书店...", current_index, total_sources)
+            try:
+                api = xhsd.XhsdBookApi(copy_image=False)
+                book = api.get_book(mi.isbn or title)
+                if book:
+                    books.append(book)
+                    logging.info("新华书店查询结果：1 条")
+                else:
+                    logging.info("新华书店查询结果：0 条")
+            except Exception as e:
+                logging.error(_("新华书店查询失败：%s"), e)
+
+        # 5. 优书网查询
+        if hasattr(youshu, "YoushuApi"):
+            current_index += 1
+            logging.info("[%d/%d] 查询优书网...", current_index, total_sources)
+            api = youshu.YoushuApi(copy_image=True)
+            try:
+                book = api.get_book(title)
+                if book:
+                    books.append(book)
+                    logging.info("优书网查询结果：1 条")
+                else:
+                    logging.info("优书网查询结果：0 条")
+            except Exception as e:
+                logging.error(_("优书网查询失败：%s"), e)
+
+        # 6. 番茄小说查询
+        if hasattr(tomato, "TomatoNovelApi"):
+            current_index += 1
+            logging.info("[%d/%d] 查询番茄小说...", current_index, total_sources)
+            api = tomato.TomatoNovelApi(copy_image=False)
+            try:
+                book = api.get_book(title)
+                if book:
+                    books.append(book)
+                    logging.info("番茄小说查询结果：1 条")
+                else:
+                    logging.info("番茄小说查询结果：0 条")
+            except Exception as e:
+                logging.error(_("番茄小说查询失败：%s"), e)
+
+        logging.info("所有信息源查询完成，共找到 %d 条结果", len(books))
 
         return books
 
@@ -191,6 +301,33 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("获取番茄小说书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")})
+        elif provider_key == calibre.KEY:
+            if mi.isbn:
+                try:
+                    refer_mi = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn)
+                except Exception as e:
+                    logging.error("获取 Calibre 书籍信息失败（ISBN）：%s", e)
+                    refer_mi = None
+                if refer_mi:
+                    cover_url = getattr(refer_mi, "cover_url", None)
+                    if cover_url:
+                        try:
+                            refer_mi.cover_data = calibre.CalibreMetadataApi.get_cover(cover_url)
+                        except Exception as e:
+                            logging.error("获取 Calibre 封面失败：%s", e)
+            if not refer_mi:
+                try:
+                    refer_mi = calibre.CalibreMetadataApi.get_book_by_title(mi.title, authors=mi.authors)
+                except Exception as e:
+                    logging.error("获取 Calibre 书籍信息失败（书名）：%s", e)
+                    raise RuntimeError({"err": "httprequest.calibre.failed", "msg": _("Calibre 查询失败")})
+        elif provider_key == xhsd.KEY:
+            api = xhsd.XhsdBookApi(copy_image=True)
+            try:
+                refer_mi = api.get_book(mi.isbn or mi.title)
+            except Exception as e:
+                logging.error("获取新华书店书籍信息失败：%s", e)
+                raise RuntimeError({"err": "httprequest.xhsd.failed", "msg": _("新华书店查询失败")})
         else:
             raise RuntimeError(
                 {
@@ -266,6 +403,12 @@ class BookRefer(BaseHandler):
                 d = dict((k, b.get(k, "")) for k in keys)
                 pubdate = b.get("pubdate")
                 d["pubyear"] = pubdate.strftime("%Y") if pubdate else ""
+
+                # 过滤掉百度百科的无详细介绍结果
+                if d["title"].startswith("百度百科"):
+                    logging.info("跳过百度百科无详细介绍的书籍：%s", d["title"])
+                    continue
+
                 if not d["comments"]:
                     d["comments"] = _("无详细介绍")
 

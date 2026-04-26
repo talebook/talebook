@@ -1,7 +1,7 @@
 
 <template>
     <v-card>
-        <v-card-title>
+        <v-card-title class="pl-4">
             {{ t('admin.books.title') }} <v-chip
                 size="small"
                 variant="elevated"
@@ -11,8 +11,8 @@
                 Beta
             </v-chip>
         </v-card-title>
-        <v-card-text> {{ t('admin.books.message.bookTableInfo') }}</v-card-text>
-        <v-card-actions>
+        <v-card-text class="pb-0"> {{ t('admin.books.message.bookTableInfo') }}</v-card-text>
+        <v-card-actions class="pt-0">
             <v-btn
                 :disabled="loading"
                 variant="outlined"
@@ -366,6 +366,7 @@
                     density="compact"
                     dark
                     color="primary"
+                    class="pl-4"
                 >
                     {{ t('common.info') }}
                 </v-toolbar>
@@ -420,6 +421,7 @@
                     density="compact"
                     dark
                     color="error"
+                    class="pl-4"
                 >
                     {{ t('actions.confirmDelete') }}
                 </v-toolbar>
