@@ -176,3 +176,4 @@ RUN rm -rf /var/www/talebook/app/.output/public/logo && \
 # 生产环境（spa版，作为默认 docker build 结果）
 FROM production AS production-spa
 # no more actions
+
