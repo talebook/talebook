@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 import json
+import unittest
 import warnings
 from unittest import mock
 from tests.test_main import TestWithUserLogin, setUpModule as init, testdir, get_db
@@ -113,8 +114,12 @@ class TestUploadFormatSecurity(TestWithUserLogin):
         self.assertEqual(d["err"], "params.format")
 
     @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
-    def test_upload_valid_epub_passes_magic(self, m):
+    @mock.patch("webserver.models.Item.save")
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
+    def test_upload_valid_epub_passes_magic(self, mock_import, mock_save, m):
         """合法 EPUB 文件（ZIP 魔数）通过魔数校验"""
+        mock_import.return_value = 9999
+        mock_save.return_value = True
         path = testdir + "/cases/new.epub"
         with open(path, "rb") as f:
             data = f.read()
@@ -123,8 +128,12 @@ class TestUploadFormatSecurity(TestWithUserLogin):
         self.assertNotEqual(d["err"], "params.format")
 
     @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
-    def test_upload_valid_pdf_passes_magic(self, m):
+    @mock.patch("webserver.models.Item.save")
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
+    def test_upload_valid_pdf_passes_magic(self, mock_import, mock_save, m):
         """合法 PDF 文件（%PDF 魔数）通过魔数校验"""
+        mock_import.return_value = 9999
+        mock_save.return_value = True
         path = testdir + "/cases/title_has_0x00.pdf"
         with open(path, "rb") as f:
             data = f.read()
@@ -186,7 +195,7 @@ class TestCoverUploadSecurity(TestWithUserLogin):
         self.assertNotEqual(d["err"], "params.cover.type")
 
 
-class TestProxyImageWhitelist(TestWithUserLogin):
+class TestProxyImageWhitelist(unittest.TestCase):
     """ProxyImageHandler.is_whitelist 修复验证（直接测试 files.py 中的实现）"""
 
     def setUp(self):
