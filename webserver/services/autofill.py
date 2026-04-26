@@ -17,12 +17,13 @@ from webserver.constants import (
 from webserver.i18n import _
 from webserver.plugins.meta import baike, douban
 from webserver.plugins.meta.calibre.api import CalibreMetadataApi
+from webserver.services import AsyncService
 
 
 CONF = loader.get_settings()
 
 
-class AutoFillService:
+class AutoFillService(AsyncService):
     """自动从网上拉取书籍信息，填充到 DB 中"""
 
     def __init__(self):
@@ -30,7 +31,26 @@ class AutoFillService:
         self.count_skip = 0
         self.count_done = 0
         self.count_fail = 0
+        self.is_running = False
+        self.current_book_id = None
+        self.start_time = None
+        self.task_id = None
+        AsyncService.__init__(self)
 
+    def status(self):
+        """获取运行状态及处理的进度信息"""
+        return {
+            "is_running": self.is_running,
+            "current_book_id": self.current_book_id,
+            "start_time": self.start_time,
+            "count_total": self.count_total,
+            "count_skip": self.count_skip,
+            "count_done": self.count_done,
+            "count_fail": self.count_fail,
+            "task_id": self.task_id,
+        }
+
+    @AsyncService.register_service
     def auto_fill_all(self, idlist: list, qpm=60):
         # 检查是否启用了自动填充书籍信息
         if not CONF.get("auto_fill_meta", False):
@@ -62,6 +82,7 @@ class AutoFillService:
                 self.count_fail += 1
                 logging.error(_("执行异常：%s"), err)
 
+    @AsyncService.register_function
     def auto_fill(self, book_id):
         if not CONF.get("auto_fill_meta", False):
             return
