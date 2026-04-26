@@ -69,23 +69,6 @@ const loading = ref(false);
 const dialog = ref(false);
 const ebooks = ref(null);
 
-function getAsciiSafeFilename(file) {
-    const originalName = file?.name || 'upload.bin';
-    const extIndex = originalName.lastIndexOf('.');
-    const hasExt = extIndex > 0;
-    const ext = hasExt ? originalName.slice(extIndex) : '';
-    const base = hasExt ? originalName.slice(0, extIndex) : originalName;
-
-    const normalized = base
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^A-Za-z0-9._-]+/g, '_')
-        .replace(/^_+|_+$/g, '');
-
-    const safeBase = normalized || `upload_${Date.now()}`;
-    return `${safeBase}${ext}`;
-}
-
 function do_upload() {
     loading.value = true;
     const data = new FormData();
@@ -96,9 +79,7 @@ function do_upload() {
     }
 
     if (file) {
-        const uploadName = getAsciiSafeFilename(file);
-        data.append('ebook', file, uploadName);
-        data.append('original_filename', file.name || uploadName);
+        data.append('ebook', file, encodeURIComponent(file.name || 'upload.bin'));
     }
 
     $backend('/book/upload', {
