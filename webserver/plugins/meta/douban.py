@@ -11,8 +11,28 @@ import logging
 import re
 import sys
 from gettext import gettext as _
+from urllib.parse import urlparse
+from pathlib import Path
 
 import requests
+
+
+DEFAULT_COVER_SUFFIX = "/book-default-"
+UPDATE_IMAGE_SUFFIX = "/update_image"
+
+
+def get_filename_from_url(url):
+    parsed = urlparse(url)
+    return Path(parsed.path).name
+
+
+def get_extension_from_url(url):
+    filename = get_filename_from_url(url)
+    if not filename:
+        return ""
+    if "." not in filename:
+        return ""
+    return filename.split(".")[-1]
 
 CHROME_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",

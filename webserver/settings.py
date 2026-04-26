@@ -94,6 +94,7 @@ settings = {
     'douban_baseurl'    : "https://api.douban.com",
     'douban_max_count'  : 2,
     'auto_fill_meta'    : False,
+    'META_SELECTED_SOURCES': ["douban", "baidu", "google", "amazon", "xinhua"],
 
     'avatar_service'    : "https://cravatar.cn",
 

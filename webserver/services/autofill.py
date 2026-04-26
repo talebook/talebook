@@ -4,18 +4,21 @@
 import logging
 import re
 import time
-from gettext import gettext as _
+import traceback
+from webserver.i18n import _
 
-from webserver import loader
+from webserver import loader, utils
 from webserver.plugins.meta import baike, douban
-from webserver.services import AsyncService
+from webserver.plugins.meta.bookbarn_tags import BookBarnTags
+from webserver.plugins.meta.calibre.api import CalibreMetadataApi
+from webserver.constants import META_SELECTED_SOURCES, META_SOURCE_DOUBAN, META_SOURCE_BAIDU, META_SOURCE_GOOGLE, META_SOURCE_AMAZON
 
 
 CONF = loader.get_settings()
 
 
-class AutoFillService(AsyncService):
-    """自动从网上拉取书籍信息，填充到DB中"""
+class AutoFillService:
+    """自动从网上拉取书籍信息，填充到 DB 中"""
 
     def __init__(self):
         self.count_total = 0
@@ -23,14 +26,13 @@ class AutoFillService(AsyncService):
         self.count_done = 0
         self.count_fail = 0
 
-    @AsyncService.register_service
     def auto_fill_all(self, idlist: list, qpm=60):
         # 检查是否启用了自动填充书籍信息
-        if not CONF["auto_fill_meta"]:
+        if not CONF.get("auto_fill_meta", False):
             logging.info("自动填充书籍信息已关闭，跳过处理")
             return
 
-        # 根据qpm，计算更新的间隔，避免刷爆豆瓣等服务
+        # 根据 qpm，计算更新的间隔，避免刷爆豆瓣等服务
         sleep_seconds = 60.0 / qpm
 
         self.count_total = len(idlist)
@@ -53,11 +55,10 @@ class AutoFillService(AsyncService):
                     self.count_fail += 1
             except Exception as err:
                 self.count_fail += 1
-                logging.error(_("执行异常: %s"), err)
+                logging.error(_("执行异常：%s"), err)
 
-    @AsyncService.register_function
     def auto_fill(self, book_id):
-        if not CONF["auto_fill_meta"]:
+        if not CONF.get("auto_fill_meta", False):
             return
         mi = self.db.get_metadata(book_id, index_is_id=True)
         return self.do_fill_metadata(book_id, mi)
@@ -67,7 +68,8 @@ class AutoFillService(AsyncService):
 
         try:
             refer_mi = self.plugin_search_best_book_info(mi)
-        except:
+        except Exception as e:
+            logging.error(_("自动填充元数据时出错 id=%d: %s"), book_id, e)
             return False
 
         if not refer_mi:
@@ -78,19 +80,23 @@ class AutoFillService(AsyncService):
             logging.info(_("忽略更新书籍 id=%d : 无法获取封面"), book_id)
             return False
 
-        # 自动填充tag
+        # 自动填充 tag
+        self.do_fill_tags(book_id, refer_mi, need_commit=False)
         if len(refer_mi.tags) == 0 and len(mi.tags) == 0:
             mi.tags = self.guess_tags(refer_mi)
-        # 保留书名不修改（万一出BUG，还能抢救一下）
-        refer_mi.title = mi.title
+
+        # 保留书名不修改（万一出 BUG，还能抢救一下）
+        title = utils.remove_zlibrary_suffix(mi.title)
+        refer_mi.title = title
+        refer_mi.title_sort = utils.get_title_sort(refer_mi.title)
 
         mi.smart_update(refer_mi, replace_metadata=True)
-        self.db.set_metadata(book_id, mi)
+        self.db.set_metadata(book_id, mi, ignore_errors=True)
         logging.info(_("自动更新书籍 id=[%d] 的信息，title=%s"), book_id, mi.title)
         return True
 
     def should_update(self, mi):
-        if not mi.comments or not mi.has_cover:
+        if not mi.comments or not mi.has_cover or not mi.authors or mi.authors[0] in ("佚名", "未知", "Unknown"):
             return True
         return False
 
@@ -105,47 +111,113 @@ class AutoFillService(AsyncService):
                 break
         return ts
 
+    def do_fill_tags(self, book_id, mi, need_commit=False):
+        try:
+            tags = self.plugin_search_book_tag(mi)
+            if tags:
+                mi.tags = tags
+                if need_commit:
+                    self.db.set_metadata(book_id, mi, ignore_errors=True)
+                logging.info(_("自动更新书籍 id=[%d] 的标签，title=%s"), book_id, mi.title)
+                return True
+            else:
+                logging.info(_("忽略更新书籍 id=%d : 无法获取标签，title=%s"), book_id, mi.title)
+        except Exception as e:
+            logging.error(_("bookbarn_tags 接口查询 %s 失败：%s"), mi.title, e)
+        return False
+
     def plugin_search_best_book_info(self, mi):
+        sources = CONF.get(META_SELECTED_SOURCES, [])
+        if not sources:
+            return None
+
         title = re.sub("[(（].*", "", mi.title)
-        api = douban.DoubanBookApi(
-            CONF["douban_apikey"],
-            CONF["douban_baseurl"],
-            copy_image=True,
-            manual_select=False,
-            maxCount=CONF["douban_max_count"],
-        )
         book = None
         books = []
 
-        # 1. 查询 ISBN
+        # 1. 豆瓣查询 ISBN
+        if META_SOURCE_DOUBAN in sources:
+            try:
+                api = douban.DoubanBookApi(
+                    CONF["douban_apikey"],
+                    CONF["douban_baseurl"],
+                    copy_image=True,
+                    manual_select=False,
+                    maxCount=CONF["douban_max_count"],
+                )
+                book = api.get_book_by_isbn(mi.isbn)
+                if book:
+                    book_detail_mi = api.get_book_detail(book)
+                    if book_detail_mi:
+                        if not book_detail_mi.authors or book_detail_mi.authors[0] in ("佚名", ""):
+                            book_detail_mi.authors = mi.authors
+                            book_detail_mi.author_sort = mi.author_sort
+                    return book_detail_mi
+
+                # 2. 豆瓣查询 title
+                books = api.search_books(title)
+                if books:
+                    book_detail_mi = None
+                    for b in books:
+                        if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
+                            book_detail_mi = api.get_book_detail(b)
+                            break
+                    if not book_detail_mi:
+                        book_detail_mi = api.get_book_detail(books[0])
+                    if book_detail_mi:
+                        if not book_detail_mi.authors or book_detail_mi.authors[0] in ("佚名", ""):
+                            book_detail_mi.authors = mi.authors
+                            book_detail_mi.author_sort = mi.author_sort
+                    return book_detail_mi
+            except Exception:
+                logging.error(_("douban 接口查询 %s 失败"), title)
+
+        # 3 & 4. 使用 Google Books 和 Amazon.com 查询
+        calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
+        if calibre_sources:
+            try:
+                if META_SOURCE_AMAZON not in calibre_sources:
+                    # 只有在没有 amazon 时才使用 google 查询
+                    try:
+                        results = CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
+                        if results:
+                            return results[0]
+                    except Exception:
+                        logging.error(_("calibre 插件 ISBN 查询 %s 失败"), title)
+
+                results = CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
+                if results:
+                    result = results[0]
+                    result.cover_data = CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
+                    return result
+            except Exception as e:
+                logging.error(_("calibre 插件书名查询 %s 失败：%s"), title, e)
+                logging.error(traceback.format_exc())
+
+        # 5. 百度百科查询
+        if META_SOURCE_BAIDU in sources:
+            api = baike.BaiduBaikeApi(copy_image=True)
+            try:
+                book = api.get_book(title)
+                if book:
+                    return book
+            except Exception:
+                logging.error(_("baidu 接口查询 %s 失败"), title)
+
+        return None
+
+    def plugin_search_book_tag(self, mi):
+        if not mi.isbn and not mi.title and not mi.authors:
+            logging.info(_("忽略获取标签书籍 id=%d : 无有效数据"), mi.id)
+            return None
+
+        api = BookBarnTags(token=CONF.get("BOOKBARN_TOKEN", ""))
         try:
-            book = api.get_book_by_isbn(mi.isbn)
-        except:
-            logging.error(_("douban 接口查询 %s 失败"), title)
-
-        if book:
-            return api.get_book_detail(book)
-
-        # 2. 查 title
-        try:
-            books = api.search_books(title)
-        except:
-            logging.error(_("douban 接口查询 %s 失败"), title)
-
-        if books:
-            # 优先选择匹配度更高的书
-            for b in books:
-                if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
-                    return api.get_book_detail(b)
-            return api.get_book_detail(books[0])
-
-        # 3. 查 baidu
-        api = baike.BaiduBaikeApi(copy_image=True)
-        try:
-            book = api.get_book(title)
-            if book:
-                return book
-        except:
-            logging.error(_("baidu 接口查询 %s 失败"), title)
-
+            author = mi.authors[0] if mi.authors else ""
+            logging.info(_("调用 bookbarn_tags 接口查询 %s, %s, %s"), mi.title, author, mi.isbn)
+            tags = api.get_tags(mi.isbn, mi.title, author)
+            logging.info(f"bookbarn_tags 返回标签：{tags}")
+            return tags.split(",") if tags else None
+        except Exception:
+            logging.error(_("bookbarn_tags 接口查询 %s 失败"), mi.title)
         return None

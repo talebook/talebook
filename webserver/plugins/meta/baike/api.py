@@ -1,36 +1,28 @@
 #!/usr/bin/python3
 # -*- coding: UTF-8 -*-
-
-"""
-This is the standard runscript for all of calibre's tools.
-Do not modify it unless you know what you are doing.
-"""
-
 import logging
 import re
 import requests
-from gettext import gettext as _
+from webserver.i18n import _
 
 from webserver.plugins.meta.douban import str2date
+from webserver.constants import CHROME_MOBILE_HEADERS
 from .baidubaike.baidubaike import Page
 
 BAIKE_ISBN = "0000000000001"
 KEY = "BaiduBaike"
 
-CHROME_HEADERS = {
-    "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko)"
-    + "Chrome/66.0.3359.139 Safari/537.36",
-}
-
 
 class BaiduBaikeApi:
-    def __init__(self, copy_image=True, manual_select=False):
+    def __init__(self, copy_image=True):
         self.copy_image = copy_image
-        self.manual_select = manual_select
 
     def get_book(self, title):
+        logging.debug(f"BaiduBaikeApi.get_book called with title: {repr(title)}")
+        # Check if the title is start with *[0-9][_-] then remote the prefix
+        if re.match(r"^\d*+[_-]", title):
+            title = re.sub(r"^\d*+[_-]", "", title)
+            logging.debug(f"Stripped title prefix, new title: {repr(title)}")
         baike = self._baike(title)
         if not baike:
             return None
@@ -40,64 +32,87 @@ class BaiduBaikeApi:
         try:
             return Page(title)
         except Exception as err:
-            logging.error(_(f"百科接口异常: {err}"))
+            logging.error(_(f"百科接口异常：{err}"))
             return None
 
     def _metadata(self, baike):
         from calibre.ebooks.metadata.book.base import Metadata
-        from calibre.utils.date import utcnow, strptime
+        from calibre.utils.date import utcnow
 
         info = baike.get_info()
         logging.debug("\n" + "\n".join("%s:\t%s" % v for v in info.items()))
 
-        mi = Metadata(info["title"])
-        plat = "网络平台"
-        info.get("出版社", info.get("连载平台", plat))
-        mi.authors = [info.get("作者", "佚名")]
+        # 使用 info.get() 获取字段，如果不存在则使用备选字段或默认值
+        title = info.get(u"中文名", info.get("title", ""))
+        if not title:
+            logging.info("No title found in info, means not a valid Baidu Baike page")
+            return None
+        mi = Metadata(title)
+        mi.publisher = info.get(u"出版社", "")
+        mi.authors = [info.get(u"作者", u"佚名")]
         mi.author_sort = mi.authors[0]
         mi.isbn = info.get("ISBN", BAIKE_ISBN)
-        mi.tags = baike.get_tags()
-        pd = str2date(info.get("出版时间"))
+        mi.tags = []
+        pd = str2date(info.get(u"出版时间"))
         if pd is None:
             pd = utcnow()
         mi.pubdate = pd
         mi.timestamp = mi.pubdate
         mi.cover_url = baike.get_image()
-        mi.comments = re.sub(r"\[\d+\]$", "", baike.get_summary())
+        mi.comments = baike.get_summary()
         mi.website = baike.http.url
-        mi.source = "百度百科"
+        mi.source = u"百度百科"
         mi.provider_key = KEY
         mi.provider_value = baike.get_id()
-        mi.cover_data = self.get_cover(mi.cover_url)
-
-        if "完结" in info.get("连载状态", ""):
-            day = re.findall(r"\d*-\d*-\d*", info["连载状态"])
-            try:
-                mi.pubdate = strptime(day[0], "%Y-%m-%d")
-            except:
-                pass
+        try:
+            mi.cover_data = self.get_cover(mi.cover_url) if self.copy_image else None
+        except Exception as e:
+            logging.error(f"Failed to get cover data: {e}")
+            mi.cover_data = None
         return mi
 
-    def get_cover(self, cover_url):
-        if not self.copy_image or not cover_url:
+    @staticmethod
+    def get_cover(cover_url):
+        if not cover_url:
             return None
-        try:
-            rsp = requests.get(cover_url, timeout=10, headers=CHROME_HEADERS)
-            if rsp.status_code != 200:
-                logging.error(_(f"获取封面失败: status_code[{rsp.status_code}] != 200 OK"))
-                return None
-            img = rsp.content
-            if not img or len(img) == 0:
-                logging.error(_("获取封面失败: 封面数据为空"))
-                return None
-            img_fmt = cover_url.split(".")[-1]
-            return (img_fmt, img)
-        except Exception as e:
-            logging.warning(_(f"获取封面失败: {e}"))
+        # 检测 cover_url 的有效性，只支持 https 协议
+        if not cover_url.lower().startswith("https://"):
+            logging.error("Invalid cover url: %s", cover_url)
             return None
+        img = requests.get(cover_url, timeout=10, headers=CHROME_MOBILE_HEADERS).content
+        img_fmt = 'jpg' if cover_url.lower().endswith('.jpeg') else 'png'
+        # Convert PNG to JPEG if necessary
+        if img_fmt == 'png':
+            from PIL import Image
+            from io import BytesIO
+            try:
+                image = Image.open(BytesIO(img))
+                if image.mode in ("RGBA", "P"):
+                    image = image.convert("RGB")
+                width, height = image.size
+                if height / width < 1.2:
+                    # crop the image to a square centered on the middle of the image
+                    min_dim = min(width, height)
+                    left = (width - min_dim) / 2
+                    top = (height - min_dim) / 2
+                    right = (width + min_dim) / 2
+                    bottom = (height + min_dim) / 2
+                    image = image.crop((left, top, right, bottom))
+                output = BytesIO()
+                image.save(output, format='JPEG')
+                img = output.getvalue()
+                img_fmt = 'jpg'
+            except Exception as e:
+                logging.error(f"Failed to convert PNG to JPEG: {e}")
+                return None
+        return (img_fmt, img)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    api = BaiduBaikeApi()
+    print(api.get_book(u"法神重生"))
+    print(api.get_book(u"东周列国志"))
     logging.basicConfig(level=logging.DEBUG)
     api = BaiduBaikeApi()
     print(api.get_book("法神重生"))

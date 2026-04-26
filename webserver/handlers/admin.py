@@ -15,16 +15,20 @@ from gettext import gettext as _
 import tornado
 
 from webserver import loader
+from webserver import utils
 from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.models import Reader, ScanFile
 from webserver.services.autofill import AutoFillService
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
-from webserver.utils import SimpleBookFormatter
 
 
 CONF = loader.get_settings()
+
+# 元数据源配置
+META_ALL_SOURCES = ["douban", "baidu", "google", "amazon", "xinhua"]
+DEFAULT_META_SOURCES = ["douban", "baidu", "xinhua"]
 
 
 class AdminUsers(BaseHandler):
@@ -294,7 +298,13 @@ class AdminSettings(BaseHandler):
                 "link": "https://developers.weixin.qq.com/doc/offiaccount/OA_Web_Apps/Wechat_webpage_authorization.html",
             },
         ]
-        return {"err": "ok", "settings": CONF, "sns": sns, "site_url": self.site_url}
+        # 添加元数据源配置
+        settings_dict = dict(CONF)
+        settings_dict["META_ALL_SOURCES"] = META_ALL_SOURCES
+        if "META_SELECTED_SOURCES" not in settings_dict:
+            settings_dict["META_SELECTED_SOURCES"] = DEFAULT_META_SOURCES
+        
+        return {"err": "ok", "settings": settings_dict, "sns": sns, "site_url": self.site_url}
 
     @js
     @auth
@@ -336,6 +346,7 @@ class AdminSettings(BaseHandler):
             "douban_baseurl",
             "douban_max_count",
             "auto_fill_meta",
+            "META_SELECTED_SOURCES",
             "push_title",
             "push_content",
             "site_title",

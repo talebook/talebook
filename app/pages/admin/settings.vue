@@ -75,6 +75,22 @@
                                 item-title="text"
                                 item-value="value"
                             />
+                            <template
+                                v-else-if="f.type === 'meta_sources'"
+                            >
+                                <v-select
+                                    v-model="settings['META_SELECTED_SOURCES']"
+                                    :items="metaSourceItems"
+                                    :label="f.label"
+                                    :prepend-icon="f.icon"
+                                    multiple
+                                    chips
+                                    closable-chips
+                                    item-title="text"
+                                    item-value="value"
+                                >
+                                </v-select>
+                            </template>
                             <v-text-field
                                 v-else
                                 v-model="settings[f.key]"
@@ -427,9 +443,17 @@ const cards = computed(() => [
     {
         key: 'bookInfoSources',
         title: t('admin.settings.section.bookInfoSources'),
+        subtitle: t('admin.settings.message.bookInfoSourcesInfo'),
         fields: [
             { icon: '', key: 'auto_fill_meta', label: t('admin.settings.label.autoFillMeta'), type: 'checkbox' },
+            { 
+                icon: 'mdi-source-branch',
+                key: 'META_SELECTED_SOURCES',
+                label: t('admin.settings.label.metaSelectedSource'),
+                type: 'meta_sources'
+            },
             { icon: 'mdi-information', key: 'douban_baseurl', label: t('admin.settings.label.doubanBaseurl') },
+            { icon: 'mdi-key', key: 'douban_apikey', label: t('admin.settings.label.doubanApiKey') },
             { icon: 'mdi-information', key: 'douban_max_count', label: t('admin.settings.label.doubanMaxCount') },
         ],
         tips: [
@@ -526,6 +550,21 @@ const cards = computed(() => [
         show_ssl: true,
     },
 ]);
+
+// 元数据源选项
+const metaSourceItems = computed(() => {
+    const allSources = settings.value['META_ALL_SOURCES'] || [
+        'douban',
+        'baidu',
+        'google',
+        'amazon',
+        'xinhua',
+    ];
+    return allSources.map((source) => ({
+        text: t('admin.settings.meta_source.' + source),
+        value: source,
+    }));
+});
 
 onMounted(() => {
     $backend('/admin/settings').then(rsp => {
