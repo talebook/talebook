@@ -300,6 +300,29 @@
                         <template v-if="card.show_ssl">
                             <SSLManager />
                         </template>
+
+                        <template v-if="card.show_trash">
+                            <div class="text-center">
+                                <p v-html="t('admin.settings.message.trashDescription')" style="margin-bottom: 16px"></p>
+                                <div style="font-size: 1.2em; margin-bottom: 8px">
+                                    {{ t("admin.settings.label.trashCalibreSize") }}
+                                    <span style="font-weight: bold; color: #1976d2; margin-left: 8px">{{ trashSizeTexts.trash }}</span>
+                                </div>
+                                <div style="font-size: 1.2em; margin-bottom: 16px">
+                                    {{ t("admin.settings.label.trashUploadSize") }}
+                                    <span style="font-weight: bold; color: #1976d2; margin-left: 8px">{{ trashSizeTexts.upload }}</span>
+                                </div>
+                                <v-btn
+                                    color="red"
+                                    dark
+                                    @click="trashConfirmDialog = true"
+                                    style="margin-bottom: 24px"
+                                    :disabled="trashSizes.trash + trashSizes.upload <= 10 * 1048576"
+                                >
+                                    <v-icon start>mdi-delete</v-icon>{{ t("admin.settings.button.trashClear") }}
+                                </v-btn>
+                            </div>
+                        </template>
                     </v-card-text>
                 </div>
             </v-expand-transition>
@@ -315,6 +338,26 @@
                 {{ t('admin.settings.button.saveSettings') }}
             </v-btn>
         </div>
+
+        <v-dialog v-model="trashConfirmDialog" max-width="400" persistent>
+            <v-card>
+                <v-card-title class="headline">{{
+                    t("admin.settings.button.trashClearConfirm")
+                }}</v-card-title>
+                <v-card-text>{{
+                    t("admin.settings.message.trashClearConfirm")
+                }}</v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="trashConfirmDialog = false">{{
+                        t('common.cancel')
+                    }}</v-btn>
+                    <v-btn color="red" dark @click="clearTrash">{{
+                        t("admin.settings.button.trashClearConfirm")
+                    }}</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -333,6 +376,10 @@ store.setNavbar(true);
 const sns_items = ref([]);
 const settings = ref({ FRIENDS: [], SOCIALS: [] }); // Init with defaults to avoid v-if errors
 const site_url = ref('');
+const trashSizes = ref({ trash: 0, upload: 0 });
+const trashSizeTexts = ref({ trash: '', upload: '' });
+const trashLoading = ref(false);
+const trashConfirmDialog = ref(false);
 
 // Store card expand/collapse states separately from computed cards
 const cardShows = ref({
@@ -347,6 +394,7 @@ const cardShows = ref({
     sslManagement: false,
     opdsSettings: false,
     captchaSettings: false,
+    trashManagement: false,
 });
 
 // 人机验证提供商选项
@@ -549,6 +597,12 @@ const cards = computed(() => [
         fields: [],
         show_ssl: true,
     },
+    {
+        key: 'trashManagement',
+        title: t('admin.settings.section.trashManagement'),
+        fields: [],
+        show_trash: true,
+    },
 ]);
 
 // 元数据源选项
@@ -593,6 +647,8 @@ onMounted(() => {
             settings.value.FRIENDS = [];
         }
     });
+    
+    fetchTrashSize();
 });
 
 const save_settings = () => {
@@ -634,9 +690,55 @@ const test_email = () => {
     });
 };
 
-// Map function names to methods
 const run = (func) => {
     if (func === 'test_email') test_email();
+};
+
+const fetchTrashSize = () => {
+    trashLoading.value = true;
+    $backend('/admin/trash/size').then(rsp => {
+        trashLoading.value = false;
+        if (rsp && rsp.err === 'ok' && rsp.sizes) {
+            trashSizes.value = rsp.sizes;
+            trashSizeTexts.value = {
+                trash: formatTrashSize(rsp.sizes.trash),
+                upload: formatTrashSize(rsp.sizes.upload),
+            };
+            // 开发模式下显示实际路径用于调试
+            if (process.dev) {
+                console.log('Trash paths:', {
+                    trash: rsp.trash_path,
+                    upload: rsp.upload_path,
+                });
+            }
+        } else {
+            trashSizeTexts.value = {
+                trash: t('admin.settings.label.trashUnknown'),
+                upload: t('admin.settings.label.trashUnknown'),
+            };
+        }
+    });
+};
+
+const formatTrashSize = (size) => {
+    if (size < 1024) return size + ' B';
+    if (size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
+    if (size < 1024 * 1024 * 1024) return (size / 1024 / 1024).toFixed(2) + ' MB';
+    return (size / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+};
+
+const clearTrash = () => {
+    trashConfirmDialog.value = false;
+    $backend('/admin/trash/clear', {
+        method: 'POST',
+    }).then(rsp => {
+        if (rsp && rsp.err === 'ok') {
+            if ($alert) $alert('success', rsp.msg);
+            fetchTrashSize();
+        } else {
+            if ($alert) $alert('error', rsp.msg);
+        }
+    });
 };
 
 useHead(() => ({

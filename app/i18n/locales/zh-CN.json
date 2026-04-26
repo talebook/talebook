@@ -443,13 +443,16 @@
         "friendshipLinks": "友情链接",
         "bookInfoSources": "互联网书籍信息源",
         "advancedSettings": "高级配置项",
-        "sslManagement": "SSL证书管理",
+        "sslManagement": "SSL 证书管理",
         "opdsSettings": "OPDS 设置",
-        "captchaSettings": "人机验证设置"
+        "captchaSettings": "人机验证设置",
+        "trashManagement": "回收站管理"
       },
       "button": {
         "saveSettings": "保存配置",
-        "testEmail": "测试邮件"
+        "testEmail": "测试邮件",
+        "trashClear": "清理回收站",
+        "trashClearConfirm": "确认清理"
       },
       "label": {
         "siteTitle": "网站标题",
@@ -502,7 +505,10 @@
         "captchaEnableForWelcome": "私人图书馆界面启用认证",
         "captchaEnableForReset": "重置密码页面启用认证",
         "geetestCaptchaId": "极验 Captcha ID",
-        "geetestCaptchaKey": "极验 Captcha Key"
+        "geetestCaptchaKey": "极验 Captcha Key",
+        "trashCalibreSize": "Calibre 回收站占用空间",
+        "trashUploadSize": "上传临时目录占用空间",
+        "trashUnknown": "未知"
       },
       "option": {
         "ssl": "SSL",
@@ -527,7 +533,9 @@
         "goTo": "请前往",
         "configurationPage": "的开发者配置页面",
         "getKeysAndSetCallback": "，获取密钥后设置回调地址为：",
-        "captchaInfo": "启用后，在对应页面需要完成人机验证才能继续操作。"
+        "captchaInfo": "启用后，在对应页面需要完成人机验证才能继续操作。",
+        "trashDescription": "清理 Calibre 回收站（library/.caltrash）和上传临时目录（upload/），释放磁盘空间。当总大小超过 10MB 时方可清理。",
+        "trashClearConfirm": "确认清理回收站和上传临时目录？此操作不可逆！"
       },
       "meta_source": {
         "douban": "豆瓣",

@@ -425,11 +425,14 @@
         "advancedSettings": "Advanced Settings",
         "sslManagement": "SSL Management",
         "opdsSettings": "OPDS Settings",
-        "captchaSettings": "CAPTCHA Settings"
+        "captchaSettings": "CAPTCHA Settings",
+        "trashManagement": "Trash Management"
       },
       "button": {
         "saveSettings": "Save Settings",
-        "testEmail": "Test Email"
+        "testEmail": "Test Email",
+        "trashClear": "Clear Trash",
+        "trashClearConfirm": "Confirm Clear"
       },
       "label": {
         "siteTitle": "Site Title",
@@ -482,7 +485,10 @@
         "captchaEnableForWelcome": "Enable for Private Library",
         "captchaEnableForReset": "Enable for Password Reset",
         "geetestCaptchaId": "GeeTest Captcha ID",
-        "geetestCaptchaKey": "GeeTest Captcha Key"
+        "geetestCaptchaKey": "GeeTest Captcha Key",
+        "trashCalibreSize": "Calibre Trash Size",
+        "trashUploadSize": "Upload Temp Directory Size",
+        "trashUnknown": "Unknown"
       },
       "option": {
         "ssl": "SSL",
@@ -507,7 +513,9 @@
         "goTo": "Please go to",
         "configurationPage": "developer configuration page",
         "getKeysAndSetCallback": ", get the keys and set the callback address to:",
-        "captchaInfo": "When enabled, users need to complete CAPTCHA verification on corresponding pages."
+        "captchaInfo": "When enabled, users need to complete CAPTCHA verification on corresponding pages.",
+        "trashDescription": "Clear Calibre trash (library/.caltrash) and upload temporary directory (upload/), free up disk space. Can only clear when total size exceeds 10MB.",
+        "trashClearConfirm": "Confirm clearing trash and upload temporary directory? This action cannot be undone!"
       },
       "meta_source": {
         "douban": "Douban",

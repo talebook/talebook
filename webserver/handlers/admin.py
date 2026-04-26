@@ -15,6 +15,7 @@ from gettext import gettext as _
 import tornado
 
 from webserver import loader, utils
+from webserver.base.trash_manager import TrashManager
 from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.models import Reader, ScanFile
@@ -935,9 +936,44 @@ class AdminOPDSImport(BaseHandler):
             return {"err": "ok", "msg": msg, "async": True}
 
         except Exception as e:
-            logging.error(f"OPDS导入失败: {e}")
+            logging.error(f"OPDS 导入失败：{e}")
             logging.error(traceback.format_exc())
-            return {"err": "error", "msg": _("OPDS导入失败: {}").format(str(e))}
+            return {"err": "error", "msg": _("OPDS 导入失败：{}").format(str(e))}
+
+
+class AdminTrashSize(BaseHandler):
+    """获取回收站和上传目录大小"""
+
+    @js
+    @auth
+    def get(self):
+        if not self.admin_user:
+            return {"err": "ok", "sizes": {}, "msg": _("非管理员用户")}
+        sizes = TrashManager.get_trash_sizes()
+        # 返回实际路径用于调试
+        return {
+            "err": "ok",
+            "sizes": sizes,
+            "trash_path": TrashManager.TRASH_PATH,
+            "upload_path": TrashManager.UPLOAD_TRASH_PATH,
+        }
+
+
+class AdminTrashClear(BaseHandler):
+    """清理回收站和上传目录"""
+
+    @js
+    @auth
+    def post(self):
+        if not self.admin_user:
+            return {
+                "err": "permission.not_admin",
+                "msg": _("当前用户非管理员，无权操作"),
+            }
+        errors = TrashManager.clear_trashs()
+        if errors:
+            return {"err": "error", "msg": _("清理失败：%s") % "; ".join(errors)}
+        return {"err": "ok", "msg": _("已清理 Calibre 回收站及上传目录")}
 
 
 def routes():
@@ -956,4 +992,6 @@ def routes():
         (r"/api/admin/opds/import/failed", AdminOPDSImportFailedList),
         (r"/api/admin/opds/import/retry", AdminOPDSImportRetry),
         (r"/api/admin/opds/sources", AdminOpdsSources),
+        (r"/api/admin/trash/size", AdminTrashSize),
+        (r"/api/admin/trash/clear", AdminTrashClear),
     ]
