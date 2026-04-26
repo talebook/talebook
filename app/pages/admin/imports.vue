@@ -1,6 +1,6 @@
 <template>
     <v-card>
-        <v-card-title>
+        <v-card-title class="pl-4">
             {{ t('admin.imports.title') }} <v-chip
                 size="small"
                 variant="elevated"
