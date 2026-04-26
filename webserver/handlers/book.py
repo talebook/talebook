@@ -24,8 +24,7 @@ from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Item
 from webserver.plugins.meta import baike, douban, tomato, youshu
-from webserver.plugins.meta.calibre.api import CalibreMetadataApi
-from webserver.plugins.meta.xhsd.api import XhsdBookApi
+from webserver.plugins.meta import calibre, xhsd
 from webserver.plugins.parser.txt import get_content_encoding
 from webserver.services.autofill import AutoFillService
 from webserver.services.convert import ConvertService
@@ -263,18 +262,6 @@ class BookRefer(BaseHandler):
                         "msg": _("百度百科查询失败"),
                     }
                 )
-        elif provider_key == baike.KEY:
-            api = baike.BaiduBaikeApi(copy_image=True)
-            try:
-                refer_mi = api.get_book(mi.title)
-            except Exception as e:
-                logging.error("获取百度百科书籍信息失败：%s", e)
-                raise RuntimeError(
-                    {
-                        "err": "httprequest.baidubaike.failed",
-                        "msg": _("百度百科查询失败"),
-                    }
-                )
         elif provider_key == douban.KEY:
             mi.douban_id = provider_value
             api = douban.DoubanBookApi(
@@ -311,6 +298,33 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("获取番茄小说书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")})
+        elif provider_key == calibre.KEY:
+            if mi.isbn:
+                try:
+                    refer_mi = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn)
+                except Exception as e:
+                    logging.error("获取 Calibre 书籍信息失败（ISBN）：%s", e)
+                    refer_mi = None
+                if refer_mi:
+                    cover_url = getattr(refer_mi, 'cover_url', None)
+                    if cover_url:
+                        try:
+                            refer_mi.cover_data = calibre.CalibreMetadataApi.get_cover(cover_url)
+                        except Exception as e:
+                            logging.error("获取 Calibre 封面失败：%s", e)
+            if not refer_mi:
+                try:
+                    refer_mi = calibre.CalibreMetadataApi.get_book_by_title(mi.title, authors=mi.authors)
+                except Exception as e:
+                    logging.error("获取 Calibre 书籍信息失败（书名）：%s", e)
+                    raise RuntimeError({"err": "httprequest.calibre.failed", "msg": _("Calibre 查询失败")})
+        elif provider_key == xhsd.KEY:
+            api = xhsd.XhsdBookApi(copy_image=True)
+            try:
+                refer_mi = api.get_book(mi.isbn or mi.title)
+            except Exception as e:
+                logging.error("获取新华书店书籍信息失败：%s", e)
+                raise RuntimeError({"err": "httprequest.xhsd.failed", "msg": _("新华书店查询失败")})
         else:
             raise RuntimeError(
                 {
