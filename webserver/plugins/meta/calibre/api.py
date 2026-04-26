@@ -19,7 +19,7 @@ _SOURCE_TO_PLUGIN = {
 class CalibreMetadataApi:
     """使用 Calibre 内置的 Google Books 和 Amazon.com 插件查询书籍元数据"""
 
-    ALLOWED_PLUGINS = frozenset({'Google', 'Amazon.com'})
+    ALLOWED_PLUGINS = frozenset({"Google", "Amazon.com"})
     _patched = False
 
     @classmethod
@@ -27,6 +27,7 @@ class CalibreMetadataApi:
         if not cls._patched:
             try:
                 from calibre.ebooks.metadata.sources.update import patch_plugins
+
                 patch_plugins()
                 cls._patched = True
             except Exception as e:
@@ -37,14 +38,16 @@ class CalibreMetadataApi:
         from io import BytesIO
         from threading import Event
         from calibre.ebooks.metadata.sources.base import create_log
+
         return create_log(BytesIO()), Event()
 
     @classmethod
     def _get_amazon_plugin(cls):
         from calibre.customize.ui import metadata_plugins
+
         amazon_plugin = None
-        for plugin in metadata_plugins({'identify'}):
-            if plugin.name == 'Amazon.com':
+        for plugin in metadata_plugins({"identify"}):
+            if plugin.name == "Amazon.com":
                 amazon_plugin = plugin
                 break
         return amazon_plugin
@@ -52,6 +55,7 @@ class CalibreMetadataApi:
     @classmethod
     def _identify(cls, timeout=30, source=None, **kwargs):
         from calibre.ebooks.metadata.sources.identify import identify
+
         cls._ensure_patched()
         log, abort = cls._make_log_abort()
         return identify(log, abort, allowed_plugins={source}, timeout=timeout, **kwargs)
@@ -70,7 +74,7 @@ class CalibreMetadataApi:
             logging.error("Get cover fail, status_code[%s] != 200 OK", response.status_code)
             return None
         img = response.content
-        return ('jpg', img)
+        return ("jpg", img)
 
     @classmethod
     def get_book_by_isbn(cls, isbn, sources=None, timeout=30):
@@ -81,7 +85,7 @@ class CalibreMetadataApi:
         if not isbn:
             return None
         try:
-            results = cls._identify(identifiers={'isbn': isbn}, timeout=timeout, source="Google")
+            results = cls._identify(identifiers={"isbn": isbn}, timeout=timeout, source="Google")
             if not results:
                 return None
             if results:
@@ -106,9 +110,9 @@ class CalibreMetadataApi:
         if not title:
             return None
         try:
-            kwargs = {'title': title}
+            kwargs = {"title": title}
             if authors:
-                kwargs['authors'] = authors if isinstance(authors, list) else [authors]
+                kwargs["authors"] = authors if isinstance(authors, list) else [authors]
             results = cls._identify(timeout=timeout, source="Amazon.com", **kwargs)
             if not results:
                 return None

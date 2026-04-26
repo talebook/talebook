@@ -5,13 +5,19 @@ import logging
 import re
 import time
 import traceback
-from webserver.i18n import _
 
 from webserver import loader, utils
+from webserver.constants import (
+    META_SELECTED_SOURCES,
+    META_SOURCE_AMAZON,
+    META_SOURCE_BAIDU,
+    META_SOURCE_DOUBAN,
+    META_SOURCE_GOOGLE,
+)
+from webserver.i18n import _
 from webserver.plugins.meta import baike, douban
 from webserver.plugins.meta.bookbarn_tags import BookBarnTags
 from webserver.plugins.meta.calibre.api import CalibreMetadataApi
-from webserver.constants import META_SELECTED_SOURCES, META_SOURCE_DOUBAN, META_SOURCE_BAIDU, META_SOURCE_GOOGLE, META_SOURCE_AMAZON
 
 
 CONF = loader.get_settings()

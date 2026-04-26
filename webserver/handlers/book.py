@@ -7,14 +7,21 @@ import os
 import random
 import re
 import urllib
-from webserver.i18n import _
 
 import tornado.escape
 from tornado import web
 
 from webserver import loader, utils
-from webserver.constants import META_SELECTED_SOURCES, META_SOURCE_DOUBAN, META_SOURCE_BAIDU, META_SOURCE_GOOGLE, META_SOURCE_AMAZON, META_SOURCE_XHSD
+from webserver.constants import (
+    META_SELECTED_SOURCES,
+    META_SOURCE_AMAZON,
+    META_SOURCE_BAIDU,
+    META_SOURCE_DOUBAN,
+    META_SOURCE_GOOGLE,
+    META_SOURCE_XHSD,
+)
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
+from webserver.i18n import _
 from webserver.models import Item
 from webserver.plugins.meta import baike, douban, tomato, youshu
 from webserver.plugins.meta.calibre.api import CalibreMetadataApi
@@ -96,7 +103,7 @@ class BookRefer(BaseHandler):
 
         title = re.sub("[(（].*", "", mi.title)
         books = []
-        
+
         # 计算实际会执行的信息源查询数量
         total_sources = 0
         if META_SOURCE_DOUBAN in sources:
@@ -107,11 +114,11 @@ class BookRefer(BaseHandler):
             total_sources += 1
         if META_SOURCE_XHSD in sources:
             total_sources += 1
-        if hasattr(youshu, 'YoushuApi'):
+        if hasattr(youshu, "YoushuApi"):
             total_sources += 1
-        if hasattr(tomato, 'TomatoNovelApi'):
+        if hasattr(tomato, "TomatoNovelApi"):
             total_sources += 1
-        
+
         current_index = 0
         logging.info("开始按信息源查询，共 %d 个信息源", total_sources)
 
@@ -173,7 +180,7 @@ class BookRefer(BaseHandler):
                         result.cover_data = CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
                         books.append(result)
                     logging.info("Calibre(ISBN) 查询结果：%d 条", len(results))
-                
+
                 # 如果没找到，尝试书名查询
                 if not results:
                     results = CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
@@ -203,7 +210,7 @@ class BookRefer(BaseHandler):
                 logging.error(_("新华书店查询失败：%s"), e)
 
         # 5. 优书网查询
-        if hasattr(youshu, 'YoushuApi'):
+        if hasattr(youshu, "YoushuApi"):
             current_index += 1
             logging.info("[%d/%d] 查询优书网...", current_index, total_sources)
             api = youshu.YoushuApi(copy_image=True)
@@ -218,7 +225,7 @@ class BookRefer(BaseHandler):
                 logging.error(_("优书网查询失败：%s"), e)
 
         # 6. 番茄小说查询
-        if hasattr(tomato, 'TomatoNovelApi'):
+        if hasattr(tomato, "TomatoNovelApi"):
             current_index += 1
             logging.info("[%d/%d] 查询番茄小说...", current_index, total_sources)
             api = tomato.TomatoNovelApi(copy_image=False)
@@ -362,12 +369,12 @@ class BookRefer(BaseHandler):
                 d = dict((k, b.get(k, "")) for k in keys)
                 pubdate = b.get("pubdate")
                 d["pubyear"] = pubdate.strftime("%Y") if pubdate else ""
-                
+
                 # 过滤掉百度百科的无详细介绍结果
                 if d["title"].startswith("百度百科"):
                     logging.info("跳过百度百科无详细介绍的书籍：%s", d["title"])
                     continue
-                
+
                 if not d["comments"]:
                     d["comments"] = _("无详细介绍")
 

@@ -43,17 +43,17 @@ class BaiduBaikeApi:
         logging.debug("\n" + "\n".join("%s:\t%s" % v for v in info.items()))
 
         # 使用 info.get() 获取字段，如果不存在则使用备选字段或默认值
-        title = info.get(u"中文名", info.get("title", ""))
+        title = info.get("中文名", info.get("title", ""))
         if not title:
             logging.info("No title found in info, means not a valid Baidu Baike page")
             return None
         mi = Metadata(title)
-        mi.publisher = info.get(u"出版社", "")
-        mi.authors = [info.get(u"作者", u"佚名")]
+        mi.publisher = info.get("出版社", "")
+        mi.authors = [info.get("作者", "佚名")]
         mi.author_sort = mi.authors[0]
         mi.isbn = info.get("ISBN", BAIKE_ISBN)
         mi.tags = []
-        pd = str2date(info.get(u"出版时间"))
+        pd = str2date(info.get("出版时间"))
         if pd is None:
             pd = utcnow()
         mi.pubdate = pd
@@ -61,7 +61,7 @@ class BaiduBaikeApi:
         mi.cover_url = baike.get_image()
         mi.comments = baike.get_summary()
         mi.website = baike.http.url
-        mi.source = u"百度百科"
+        mi.source = "百度百科"
         mi.provider_key = KEY
         mi.provider_value = baike.get_id()
         try:
@@ -80,11 +80,12 @@ class BaiduBaikeApi:
             logging.error("Invalid cover url: %s", cover_url)
             return None
         img = requests.get(cover_url, timeout=10, headers=CHROME_MOBILE_HEADERS).content
-        img_fmt = 'jpg' if cover_url.lower().endswith('.jpeg') else 'png'
+        img_fmt = "jpg" if cover_url.lower().endswith(".jpeg") else "png"
         # Convert PNG to JPEG if necessary
-        if img_fmt == 'png':
+        if img_fmt == "png":
             from PIL import Image
             from io import BytesIO
+
             try:
                 image = Image.open(BytesIO(img))
                 if image.mode in ("RGBA", "P"):
@@ -99,9 +100,9 @@ class BaiduBaikeApi:
                     bottom = (height + min_dim) / 2
                     image = image.crop((left, top, right, bottom))
                 output = BytesIO()
-                image.save(output, format='JPEG')
+                image.save(output, format="JPEG")
                 img = output.getvalue()
-                img_fmt = 'jpg'
+                img_fmt = "jpg"
             except Exception as e:
                 logging.error(f"Failed to convert PNG to JPEG: {e}")
                 return None
@@ -111,8 +112,8 @@ class BaiduBaikeApi:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     api = BaiduBaikeApi()
-    print(api.get_book(u"法神重生"))
-    print(api.get_book(u"东周列国志"))
+    print(api.get_book("法神重生"))
+    print(api.get_book("东周列国志"))
     logging.basicConfig(level=logging.DEBUG)
     api = BaiduBaikeApi()
     print(api.get_book("法神重生"))

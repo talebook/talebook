@@ -57,13 +57,7 @@ class BookBarnTags:
             return None
         title = self.normalize_title(title)
         author = self.normalize_author(author)
-        params = {
-            "version": VERSION,
-            "token": self.token,
-            "isbn": isbn if isbn else "",
-            "title": title,
-            "author": author
-        }
+        params = {"version": VERSION, "token": self.token, "isbn": isbn if isbn else "", "title": title, "author": author}
         return self.send_request(self.TAGS_API, params)
 
     def send_request(self, url, params=None):

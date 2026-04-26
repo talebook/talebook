@@ -138,7 +138,7 @@ class TomatoNovelApi:
         # 检查是否是无效的推广页面
         title = info.get("title", "")
         comments = page.get_summary()
-        
+
         # 如果标题包含"番茄小说"且简介包含推广内容，说明是无效结果
         if title and ("番茄小说" in title or title.startswith("未知")):
             if comments and ("番茄小说是抖音旗下" in comments or "海量正版小说" in comments or "书荒广场" in comments):

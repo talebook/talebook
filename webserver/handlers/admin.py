@@ -14,8 +14,7 @@ from gettext import gettext as _
 
 import tornado
 
-from webserver import loader
-from webserver import utils
+from webserver import loader, utils
 from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.models import Reader, ScanFile
@@ -303,7 +302,7 @@ class AdminSettings(BaseHandler):
         settings_dict["META_ALL_SOURCES"] = META_ALL_SOURCES
         if "META_SELECTED_SOURCES" not in settings_dict:
             settings_dict["META_SELECTED_SOURCES"] = DEFAULT_META_SOURCES
-        
+
         return {"err": "ok", "settings": settings_dict, "sns": sns, "site_url": self.site_url}
 
     @js
@@ -628,7 +627,7 @@ class AdminBookList(BaseHandler):
             end = start + num
             page_ids = all_ids[start:end]
         if page_ids:
-            books = [SimpleBookFormatter(b, self.cdn_url).format() for b in self.get_books(ids=page_ids)]
+            books = [utils.SimpleBookFormatter(b, self.cdn_url).format() for b in self.get_books(ids=page_ids)]
 
         return {"err": "ok", "items": books, "total": total}
 

@@ -34,6 +34,7 @@ def get_extension_from_url(url):
         return ""
     return filename.split(".")[-1]
 
+
 CHROME_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.6",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
