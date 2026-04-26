@@ -14,8 +14,9 @@ KEY = "BaiduBaike"
 
 
 class BaiduBaikeApi:
-    def __init__(self, copy_image=True):
+    def __init__(self, copy_image=True, manual_select=False):
         self.copy_image = copy_image
+        self.manual_select = manual_select
 
     def get_book(self, title):
         logging.debug(f"BaiduBaikeApi.get_book called with title: {repr(title)}")
