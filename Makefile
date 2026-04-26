@@ -38,6 +38,10 @@ lint-py:
 	ruff check ./webserver --no-cache
 	ruff format --diff ./webserver --output-format concise --no-cache
 
+lint-py-fix:
+	ruff check ./webserver --fix
+	ruff format ./webserver
+
 check-i18n:
 	uv run check_i18n_translation_missing.py
 	uv run check_i18n_translation_useless.py
