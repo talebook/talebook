@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
-import os
 import logging
+import os
 import shutil
 import threading
 import time
-from webserver.i18n import _
 
 from webserver import loader
+from webserver.i18n import _
+
+
 CONF = loader.get_settings()
 
 
@@ -91,7 +93,7 @@ class TrashManager:
         upload_path = os.path.abspath(TrashManager.UPLOAD_TRASH_PATH)
 
         if trash_path != TrashManager.TRASH_PATH:
-            msg = _(u"配置的 Calibre Library 不是绝对路径，为了安全起见，跳过清理!")
+            msg = _("配置的 Calibre Library 不是绝对路径，为了安全起见，跳过清理!")
             logging.error(msg)
             errors.append(msg)
             return errors
