@@ -51,6 +51,16 @@ class Index(BaseHandler):
         random_books = []
         new_books = []
 
+        # 过滤掉其他用户标记为 sole 的书籍
+        user_id = self.user_id()
+        if ids:
+            if user_id:
+                sole_book_ids = set(item.book_id for item in self.session.query(Item).filter(Item.sole == 1, Item.collector_id != user_id).all())
+                ids = [book_id for book_id in ids if book_id not in sole_book_ids]
+            else:
+                sole_book_ids = set(item.book_id for item in self.session.query(Item).filter(Item.sole == 1).all())
+                ids = [book_id for book_id in ids if book_id not in sole_book_ids]
+
         if ids:
             random_ids = random.sample(ids, min(cnt_random, len(ids)))
             random_books = [b for b in self.get_books(ids=random_ids)]
@@ -891,7 +901,17 @@ class HotBook(ListHandler):
     @js
     def get(self):
         title = _("热度榜单")
-        db_items = self.session.query(Item).filter(Item.count_visit > 1).order_by(Item.count_download.desc())
+        user_id = self.user_id()
+        
+        # 过滤掉其他用户标记为 sole 的书籍
+        if user_id:
+            db_items = self.session.query(Item).filter(
+                Item.count_visit > 1,
+                Item.sole == 0 | (Item.collector_id == user_id)
+            ).order_by(Item.count_download.desc())
+        else:
+            db_items = self.session.query(Item).filter(Item.count_visit > 1, Item.sole == 0).order_by(Item.count_download.desc())
+        
         count = db_items.count()
         start = self.get_argument_start()
         delta = 60
@@ -1214,6 +1234,85 @@ class BookPush(BaseHandler):
         }
 
 
+class BookSetSole(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        try:
+            book = self.get_book(bid)
+        except web.Finish:
+            return {"err": "params.book.invalid", "msg": _(u"书籍已不存在")}
+        
+        bid = book["id"]
+        if isinstance(book["collector"], dict):
+            cid = book["collector"]["id"]
+        else:
+            cid = book["collector"].id
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
+            return {"err": "permission", "msg": _(u"无权操作")}
+
+        succeed = False
+        try:
+            self.session.query(Item).filter(Item.book_id == bid).update({"sole": not book["sole"]})
+            self.session.commit()
+            succeed = True
+        except Exception as e:
+            self.session.rollback()
+            logging.error("set book %d sole failed: %s" % (bid, e))
+
+        if succeed:
+            return {"err": "ok", "msg": _(u"更新成功")}
+        else:
+            return {"err": "db.update.failed", "msg": _(u"更新失败，请稍后再试")}
+
+
+class BookSoled(BaseHandler):
+    @js
+    @auth
+    def get(self):
+        """获取当前用户设为 soled 的所有图书信息"""
+        user_id = self.user_id()
+        title = _(u"私有书籍")
+
+        # 查询当前用户设为 sole 的所有图书，按书籍 ID 倒序排列
+        db_items = self.session.query(Item).filter(
+            Item.collector_id == user_id,
+            Item.sole == 1
+        ).order_by(Item.book_id.desc())
+
+        try:
+            start = self.get_argument_start()
+            delta = 60
+            items = db_items.limit(delta).offset(start).all()
+            ids = [item.book_id for item in items]
+            total_items = 0
+
+            if len(ids) > 0:
+                # 获取总数用于分页
+                total_items = self.session.query(Item).filter(
+                    Item.collector_id == user_id,
+                    Item.sole == 1
+                ).count()
+
+            books = self.get_books(ids=ids)
+            books.sort(key=lambda x: x["id"], reverse=True)
+
+            books_result = []
+            for book in books:
+                book_data = utils.BookFormatter(self, book).format()
+                books_result.append(book_data)
+
+            return {"err": "ok",
+                    "title": title,
+                    "total": total_items,
+                    "books": books_result}
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            logging.error("Failed to get soled books: %s", e)
+            return {"err": "internal", "msg": _(u"获取私有书籍失败")}
+
+
 def routes():
     return [
         (r"/api/index", Index),
@@ -1221,11 +1320,13 @@ def routes():
         (r"/api/recent", RecentBook),
         (r"/api/library", LibraryBook),
         (r"/api/hot", HotBook),
+        (r"/api/soledbooks", BookSoled),
         (r"/api/book/nav", BookNav),
         (r"/api/book/upload", BookUpload),
         (r"/api/book/([0-9]+)", BookDetail),
         (r"/api/book/([0-9]+)/delete", BookDelete),
         (r"/api/book/([0-9]+)/edit", BookEdit),
+        (r"/api/book/([0-9]+)/setsole", BookSetSole),
         (r"/api/book/([0-9]+\..+)", BookDownload),
         (r"/api/book/([0-9]+)/push", BookPush),
         (r"/api/book/([0-9]+)/refer", BookRefer),

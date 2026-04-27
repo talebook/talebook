@@ -303,6 +303,7 @@ class Item(Base, SQLAlchemyMixin):
 
     collector_id = Column(Integer, ForeignKey("readers.id"))
     collector = relationship(Reader, backref="items")
+    sole = Column(Boolean, default=False, nullable=False)
 
     def __init__(self):
         super(Item, self).__init__()
@@ -310,6 +311,7 @@ class Item(Base, SQLAlchemyMixin):
         self.count_visit = 0
         self.count_download = 0
         self.collector_id = 1
+        self.sole = False
 
 
 class ScanFile(Base, SQLAlchemyMixin):

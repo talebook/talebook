@@ -83,7 +83,9 @@
     "parsingMessage": "First time reading, parsing table of contents, please wait... {seconds}",
     "timeoutMessage": "Timeout, please wait and refresh to try again",
     "parseTimeout": "Parsing Timeout",
-    "viewDetails": "View Details"
+    "viewDetails": "View Details",
+    "setSole": "Set as Private",
+    "setPublic": "Set as Public"
   },
   "library": {
     "title": "Library",
@@ -119,7 +121,8 @@
     "browse": "Categories",
     "users": "User Management",
     "books": "Book Management",
-    "import": "Import Books"
+    "import": "Import Books",
+    "soledBooks": "Private Books"
   },
   "user": {
     "history": {
@@ -152,7 +155,8 @@
       "nicknameMinLength": "Nickname must be at least 2 characters",
       "invalidEmailFormat": "Invalid email format",
       "passwordsNotSame": "Passwords do not match",
-      "activationEmailSent": "Activation email has been sent!"
+      "activationEmailSent": "Activation email has been sent!",
+      "soledBooks": "My Private Books"
     }
   },
   "auth": {
@@ -184,6 +188,7 @@
     "pleaseLogin": "Please Login",
     "userCenter": "User Center",
     "readingHistory": "Reading History",
+    "soledBooks": "Private Books",
     "feedback": "Feedback",
     "adminEntry": "Admin Entry",
     "logout": "Logout",

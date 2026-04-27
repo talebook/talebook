@@ -288,6 +288,12 @@
                                         </template>
                                         <v-list-item-title>{{ t('book.updateFromInternet') }}</v-list-item-title>
                                     </v-list-item>
+                                    <v-list-item @click="set_sole">
+                                        <template #prepend>
+                                            <v-icon>{{ book.sole ? 'mdi-earth-off' : 'mdi-earth' }}</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ book.sole ? t('book.setPublic') : t('book.setSole') }}</v-list-item-title>
+                                    </v-list-item>
                                     <v-divider />
                                     <v-list-item @click="delete_book">
                                         <template #prepend>
@@ -779,6 +785,27 @@ const set_refer = async (provider_key, provider_value, opt = {}) => {
         if ($alert) $alert('error', '设置失败');
     } finally {
         refer_books_setting_btn_loading.value = false;
+    }
+};
+
+const set_sole = async () => {
+    try {
+        const rsp = await $backend(`/book/${bookid}/setsole`, {
+            method: 'POST',
+        });
+
+        if (rsp.err === 'ok') {
+            if ($alert) $alert('success', rsp.msg);
+            // 刷新书籍信息以更新 sole 状态
+            const refreshRsp = await $backend(`/book/${bookid}`);
+            if (refreshRsp.err === 'ok') {
+                book.value = refreshRsp;
+            }
+        } else {
+            if ($alert) $alert('error', rsp.msg);
+        }
+    } catch (e) {
+        if ($alert) $alert('error', '设置失败');
     }
 };
 

@@ -129,6 +129,22 @@
                     :rules="[rules.email]"
                 />
             </v-col>
+
+            <v-col cols="3">
+                <div class="text-subtitle-2 text-medium-emphasis pa-0 float-right">
+                    {{ t('user.detail.kindleAddress') }}
+                </div>
+            </v-col>
+            <v-col cols="9">
+                <v-text-field
+                    v-model="user.kindle_email"
+                    solo
+                    :label="t('user.detail.kindle')"
+                    type="text"
+                    autocomplete="new-email"
+                    :rules="[rules.email]"
+                />
+            </v-col>
             <v-col cols="12">
                 <div class="text-center">
                     <v-btn
