@@ -79,11 +79,6 @@ JSON Schema for known books:
   "rating": 4.5
 }
 
-IMPORTANT RATING GUIDELINES:
-1. Rating should be a number between 0 and 5
-2. Use decimal format if necessary (e.g., 4.5)
-3. If no rating information is available, omit the rating field
-
 JSON Schema for unknown books:
 {
   "unknown": true
@@ -168,12 +163,7 @@ Please return the appropriate JSON response based on the book information you ha
         # 处理评分
         rating = book.get("rating", 0)
         if rating:
-            # 确保评分在0-5之间
-            rating_value = float(rating)
-            if 0 <= rating_value <= 5:
-                mi.rating = int(round(rating_value))
-            else:
-                mi.rating = 0
+            mi.rating = int(float(rating))
         
         # 处理简介
         mi.comments = book.get("summary", "")
