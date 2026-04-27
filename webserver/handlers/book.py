@@ -19,7 +19,9 @@ from webserver.constants import (
     META_SOURCE_DOUBAN,
     META_SOURCE_GOOGLE,
     META_SOURCE_XHSD,
+    META_SOURCE_AI,
 )
+from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Item
@@ -107,6 +109,8 @@ class BookRefer(BaseHandler):
         if hasattr(youshu, "YoushuApi"):
             count += 1
         if hasattr(tomato, "TomatoNovelApi"):
+            count += 1
+        if META_SOURCE_AI in sources:
             count += 1
         return count
 
@@ -246,6 +250,27 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error(_("番茄小说查询失败：%s"), e)
 
+        # 7. AI 查询
+        if META_SOURCE_AI in sources:
+            current_index += 1
+            logging.info("[%d/%d] 查询 AI...", current_index, total_sources)
+            try:
+                api = AIBookApi(
+                    api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
+                    api_key=CONF.get("ai_api_key", ""),
+                    model=CONF.get("ai_model", "gpt-3.5-turbo"),
+                    use_thinking=CONF.get("ai_use_thinking", False),
+                    copy_image=False
+                )
+                book = api.get_book(title, mi.authors[0] if mi.authors else None)
+                if book:
+                    books.append(book)
+                    logging.info("AI 查询结果：1 条")
+                else:
+                    logging.info("AI 查询结果：0 条")
+            except Exception as e:
+                logging.error(_("AI 查询失败：%s"), e)
+
         logging.info("所有信息源查询完成，共找到 %d 条结果", len(books))
 
         return books
@@ -328,6 +353,25 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("获取新华书店书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.xhsd.failed", "msg": _("新华书店查询失败")})
+        elif provider_key == AIBookApi.KEY:
+            title = re.sub("[(（].*", "", mi.title)
+            api = AIBookApi(
+                api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
+                api_key=CONF.get("ai_api_key", ""),
+                model=CONF.get("ai_model", "gpt-3.5-turbo"),
+                use_thinking=CONF.get("ai_use_thinking", False),
+                copy_image=True
+            )
+            try:
+                refer_mi = api.get_book(title, mi.authors[0] if mi.authors else None)
+            except Exception as e:
+                logging.error("获取AI书籍信息失败: %s", e)
+                raise RuntimeError(
+                    {
+                        "err": "httprequest.ai.failed",
+                        "msg": _("AI查询失败"),
+                    }
+                )
         else:
             raise RuntimeError(
                 {

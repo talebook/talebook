@@ -27,7 +27,7 @@ from webserver.services.opds_import import OPDSImportService
 CONF = loader.get_settings()
 
 # 元数据源配置
-META_ALL_SOURCES = ["douban", "baidu", "google", "amazon", "xinhua"]
+META_ALL_SOURCES = ["douban", "baidu", "google", "amazon", "xinhua", "ai"]
 DEFAULT_META_SOURCES = ["douban", "baidu", "xinhua"]
 
 
@@ -347,6 +347,10 @@ class AdminSettings(BaseHandler):
             "douban_max_count",
             "auto_fill_meta",
             "META_SELECTED_SOURCES",
+            "ai_api_url",
+            "ai_api_key",
+            "ai_model",
+            "ai_use_thinking",
             "push_title",
             "push_content",
             "site_title",

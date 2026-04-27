@@ -503,6 +503,10 @@ const cards = computed(() => [
             { icon: 'mdi-information', key: 'douban_baseurl', label: t('admin.settings.label.doubanBaseurl') },
             { icon: 'mdi-key', key: 'douban_apikey', label: t('admin.settings.label.doubanApiKey') },
             { icon: 'mdi-information', key: 'douban_max_count', label: t('admin.settings.label.doubanMaxCount') },
+            { icon: 'mdi-information', key: 'ai_api_url', label: 'AI API 地址' },
+            { icon: 'mdi-key', key: 'ai_api_key', label: 'AI API Key' },
+            { icon: 'mdi-information', key: 'ai_model', label: 'AI 模型' },
+            { key: 'ai_use_thinking', label: '启用思考模式', type: 'checkbox' },
         ],
         tips: [
             {
@@ -613,9 +617,10 @@ const metaSourceItems = computed(() => {
         'google',
         'amazon',
         'xinhua',
+        'ai',
     ];
     return allSources.map((source) => ({
-        text: t('admin.settings.meta_source.' + source),
+        text: source === 'ai' ? 'AI' : t('admin.settings.meta_source.' + source),
         value: source,
     }));
 });
