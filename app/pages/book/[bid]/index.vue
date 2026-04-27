@@ -190,7 +190,10 @@
                                                     </v-btn>
                                                 </template>
                                                 <v-list density="compact">
-                                                    <v-list-item @click="set_refer(referBook.provider_key, referBook.provider_value)">
+                                                    <v-list-item 
+                                                        v-if="referBook.cover_url" 
+                                                        @click="set_refer(referBook.provider_key, referBook.provider_value)"
+                                                    >
                                                         <v-list-item-title>{{ t('book.setInfoAndImage') }}</v-list-item-title>
                                                     </v-list-item>
                                                     <v-list-item
@@ -199,6 +202,7 @@
                                                         <v-list-item-title>{{ t('book.setOnlyInfo') }}</v-list-item-title>
                                                     </v-list-item>
                                                     <v-list-item
+                                                        v-if="referBook.cover_url"
                                                         @click="set_refer(referBook.provider_key, referBook.provider_value, { only_cover: 'yes' })"
                                                     >
                                                         <v-list-item-title>{{ t('book.setOnlyImage') }}</v-list-item-title>
@@ -733,7 +737,12 @@ const get_refer = async () => {
         const rsp = await $backend(`/book/${bookid}/refer`);
         refer_books.value = rsp.books.map((b) => {
             b.href = '';
-            b.img = '/get/pcover?url=' + encodeURIComponent(b.cover_url);
+            // 如果没有封面地址，使用默认封面
+            if (!b.cover_url || b.cover_url === '') {
+                b.img = '/get/cover/0';
+            } else {
+                b.img = '/get/pcover?url=' + encodeURIComponent(b.cover_url);
+            }
             return b;
         });
     } catch (e) {

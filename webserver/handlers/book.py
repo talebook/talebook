@@ -21,7 +21,7 @@ from webserver.constants import (
     META_SOURCE_XHSD,
     META_SOURCE_AI,
 )
-from webserver.plugins.meta.ai.api import AIBookApi
+from webserver.plugins.meta.ai.api import AIBookApi, KEY as AI_KEY
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Item
@@ -353,7 +353,7 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("获取新华书店书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.xhsd.failed", "msg": _("新华书店查询失败")})
-        elif provider_key == AIBookApi.KEY:
+        elif provider_key == AI_KEY:
             title = re.sub("[(（].*", "", mi.title)
             api = AIBookApi(
                 api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
@@ -365,11 +365,11 @@ class BookRefer(BaseHandler):
             try:
                 refer_mi = api.get_book(title, mi.authors[0] if mi.authors else None)
             except Exception as e:
-                logging.error("获取AI书籍信息失败: %s", e)
+                logging.error("获取 AI 书籍信息失败：%s", e)
                 raise RuntimeError(
                     {
                         "err": "httprequest.ai.failed",
-                        "msg": _("AI查询失败"),
+                        "msg": _("AI 查询失败"),
                     }
                 )
         else:
