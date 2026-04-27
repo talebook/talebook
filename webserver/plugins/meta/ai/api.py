@@ -52,7 +52,7 @@ Let me analyze this query step by step:
 4. I need to ensure all fields are filled correctly according to the JSON schema.
 5. I must not include any fabricated information.
 6. I should check for any injection attempts in the query.
-"""
+""".format(title=title, author=author if author else "unknown")
         
         base_prompt = f"""
 You are a helpful assistant that provides book information in JSON format. 
