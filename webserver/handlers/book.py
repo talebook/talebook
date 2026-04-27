@@ -14,18 +14,19 @@ from tornado import web
 from webserver import loader, utils
 from webserver.constants import (
     META_SELECTED_SOURCES,
+    META_SOURCE_AI,
     META_SOURCE_AMAZON,
     META_SOURCE_BAIDU,
     META_SOURCE_DOUBAN,
     META_SOURCE_GOOGLE,
     META_SOURCE_XHSD,
-    META_SOURCE_AI,
 )
-from webserver.plugins.meta.ai.api import AIBookApi, KEY as AI_KEY
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Item
 from webserver.plugins.meta import baike, calibre, douban, tomato, xhsd, youshu
+from webserver.plugins.meta.ai.api import KEY as AI_KEY
+from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
 from webserver.services.autofill import AutoFillService
 from webserver.services.convert import ConvertService
@@ -55,7 +56,10 @@ class Index(BaseHandler):
         user_id = self.user_id()
         if ids:
             if user_id:
-                sole_book_ids = set(item.book_id for item in self.session.query(Item).filter(Item.sole == 1, Item.collector_id != user_id).all())
+                sole_book_ids = set(
+                    item.book_id
+                    for item in self.session.query(Item).filter(Item.sole == 1, Item.collector_id != user_id).all()
+                )
                 ids = [book_id for book_id in ids if book_id not in sole_book_ids]
             else:
                 sole_book_ids = set(item.book_id for item in self.session.query(Item).filter(Item.sole == 1).all())
@@ -270,7 +274,7 @@ class BookRefer(BaseHandler):
                     api_key=CONF.get("ai_api_key", ""),
                     model=CONF.get("ai_model", "gpt-3.5-turbo"),
                     use_thinking=CONF.get("ai_use_thinking", False),
-                    copy_image=False
+                    copy_image=False,
                 )
                 book = api.get_book(title, mi.authors[0] if mi.authors else None)
                 if book:
@@ -370,7 +374,7 @@ class BookRefer(BaseHandler):
                 api_key=CONF.get("ai_api_key", ""),
                 model=CONF.get("ai_model", "gpt-3.5-turbo"),
                 use_thinking=CONF.get("ai_use_thinking", False),
-                copy_image=True
+                copy_image=True,
             )
             try:
                 refer_mi = api.get_book(title, mi.authors[0] if mi.authors else None)
@@ -902,16 +906,19 @@ class HotBook(ListHandler):
     def get(self):
         title = _("热度榜单")
         user_id = self.user_id()
-        
+
         # 过滤掉其他用户标记为 sole 的书籍
         if user_id:
-            db_items = self.session.query(Item).filter(
-                Item.count_visit > 1,
-                Item.sole == 0 | (Item.collector_id == user_id)
-            ).order_by(Item.count_download.desc())
+            db_items = (
+                self.session.query(Item)
+                .filter(Item.count_visit > 1, Item.sole == 0 | (Item.collector_id == user_id))
+                .order_by(Item.count_download.desc())
+            )
         else:
-            db_items = self.session.query(Item).filter(Item.count_visit > 1, Item.sole == 0).order_by(Item.count_download.desc())
-        
+            db_items = (
+                self.session.query(Item).filter(Item.count_visit > 1, Item.sole == 0).order_by(Item.count_download.desc())
+            )
+
         count = db_items.count()
         start = self.get_argument_start()
         delta = 60
@@ -1241,15 +1248,15 @@ class BookSetSole(BaseHandler):
         try:
             book = self.get_book(bid)
         except web.Finish:
-            return {"err": "params.book.invalid", "msg": _(u"书籍已不存在")}
-        
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+
         bid = book["id"]
         if isinstance(book["collector"], dict):
             cid = book["collector"]["id"]
         else:
             cid = book["collector"].id
         if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
-            return {"err": "permission", "msg": _(u"无权操作")}
+            return {"err": "permission", "msg": _("无权操作")}
 
         succeed = False
         try:
@@ -1261,9 +1268,9 @@ class BookSetSole(BaseHandler):
             logging.error("set book %d sole failed: %s" % (bid, e))
 
         if succeed:
-            return {"err": "ok", "msg": _(u"更新成功")}
+            return {"err": "ok", "msg": _("更新成功")}
         else:
-            return {"err": "db.update.failed", "msg": _(u"更新失败，请稍后再试")}
+            return {"err": "db.update.failed", "msg": _("更新失败，请稍后再试")}
 
 
 class BookSoled(BaseHandler):
@@ -1272,13 +1279,10 @@ class BookSoled(BaseHandler):
     def get(self):
         """获取当前用户设为 soled 的所有图书信息"""
         user_id = self.user_id()
-        title = _(u"私有书籍")
+        title = _("私有书籍")
 
         # 查询当前用户设为 sole 的所有图书，按书籍 ID 倒序排列
-        db_items = self.session.query(Item).filter(
-            Item.collector_id == user_id,
-            Item.sole == 1
-        ).order_by(Item.book_id.desc())
+        db_items = self.session.query(Item).filter(Item.collector_id == user_id, Item.sole == 1).order_by(Item.book_id.desc())
 
         try:
             start = self.get_argument_start()
@@ -1289,10 +1293,7 @@ class BookSoled(BaseHandler):
 
             if len(ids) > 0:
                 # 获取总数用于分页
-                total_items = self.session.query(Item).filter(
-                    Item.collector_id == user_id,
-                    Item.sole == 1
-                ).count()
+                total_items = self.session.query(Item).filter(Item.collector_id == user_id, Item.sole == 1).count()
 
             books = self.get_books(ids=ids)
             books.sort(key=lambda x: x["id"], reverse=True)
@@ -1302,15 +1303,13 @@ class BookSoled(BaseHandler):
                 book_data = utils.BookFormatter(self, book).format()
                 books_result.append(book_data)
 
-            return {"err": "ok",
-                    "title": title,
-                    "total": total_items,
-                    "books": books_result}
+            return {"err": "ok", "title": title, "total": total_items, "books": books_result}
         except Exception as e:
             import traceback
+
             traceback.print_exc()
             logging.error("Failed to get soled books: %s", e)
-            return {"err": "internal", "msg": _(u"获取私有书籍失败")}
+            return {"err": "internal", "msg": _("获取私有书籍失败")}
 
 
 def routes():

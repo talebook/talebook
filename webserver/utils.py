@@ -103,15 +103,16 @@ class BookFormatter:
             data["files"] = self.get_files()
         if with_perms:
             data.update(self.get_permissions())
-        
+
         # 添加 sole 字段
         try:
             from webserver.models import Item
+
             item = self.handler.session.query(Item).filter(Item.book_id == self.book["id"]).first()
             data["sole"] = item.sole if item else False
         except:
             data["sole"] = False
-        
+
         return data
 
 
