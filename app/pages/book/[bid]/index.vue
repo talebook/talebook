@@ -798,8 +798,8 @@ const set_sole = async () => {
             if ($alert) $alert('success', rsp.msg);
             // 刷新书籍信息以更新 sole 状态
             const refreshRsp = await $backend(`/book/${bookid}`);
-            if (refreshRsp.err === 'ok') {
-                book.value = refreshRsp;
+            if (refreshRsp.err === 'ok' && refreshRsp.book) {
+                book.value = refreshRsp.book;
             }
         } else {
             if ($alert) $alert('error', rsp.msg);
