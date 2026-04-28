@@ -98,8 +98,18 @@ class MetaBooks(ListHandler):
         else:
             category = meta + "s" if meta in ["tag", "author"] else meta
             if meta in ["rating"]:
-                name = int(name)
-            books = self.get_item_books(category, name)
+                # rating 字段需要使用 rating 值查找对应的 item_id
+                rating_value = int(name)
+                rating_map = self.cache.get_item_name_map("rating")
+                # rating_map 的 key 可能是整数或字符串，尝试两种可能
+                item_id = rating_map.get(rating_value) or rating_map.get(str(rating_value))
+                if item_id:
+                    ids = self.db.get_books_for_category("rating", item_id)
+                    books = self.db.get_data_as_dict(ids=ids)
+                else:
+                    books = []
+            else:
+                books = self.get_item_books(category, name)
 
         books.sort(key=cmp_to_key(utils.compare_books_by_rating_or_id), reverse=True)
         return self.render_book_list(books, title=title)
