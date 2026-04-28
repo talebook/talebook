@@ -247,10 +247,10 @@
                         </v-btn>
 
                         <v-btn
+                            v-if="book.id > 0"
                             color="primary"
                             variant="elevated"
                             class="mx-2"
-                            :disabled="book.id === 0"
                             :href="is_txt ? '/book/' + book.id + '/readtxt' : '/read/' + book.id"
                             target="_blank"
                         >
@@ -417,10 +417,10 @@
                             </v-card-text>
                             <v-card-text>
                                 <p
-                                    v-if="book.comments"
+                                    v-if="book.id > 0 && book.comments && book.comments !== '暂无简介'"
                                     v-html="book.comments"
                                 />
-                                <p v-else>
+                                <p v-else-if="book.id > 0">
                                     {{ t('book.viewDetails') }}
                                 </p>
                             </v-card-text>
@@ -438,7 +438,7 @@
             <v-col cols="12">
                 <v-row justify="space-around">
                     <v-col
-                        v-if="!is_txt"
+                        v-if="book.id > 0 && !is_txt"
                         cols="12"
                         sm="6"
                         md="auto"
@@ -450,7 +450,6 @@
                         >
                             <v-list density="compact">
                                 <v-list-item
-                                    v-if="book.id > 0"
                                     :href="'/read/' + book.id"
                                     target="_blank"
                                     class="w-100"
@@ -472,7 +471,7 @@
                     </v-col>
 
                     <v-col
-                        v-if="is_txt"
+                        v-if="book.id > 0 && is_txt"
                         cols="12"
                         sm="6"
                         md="auto"
@@ -572,7 +571,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useAsyncData, useCookie, useNuxtApp } from 'nuxt/app';
@@ -641,7 +640,7 @@ const get_txt_parse_status = async () => {
 };
 
 // 数据获取逻辑
-const { data: fetchData, error: fetchError, pending: fetchPending } = useAsyncData(`book-${bookid}`, async () => {
+const { data: fetchData, error: fetchError, pending: fetchPending, refresh } = useAsyncData(`book-${bookid}`, async () => {
     const response = await $backend(`/book/${bookid}`);
     
     if (response.err === 'ok') {
@@ -649,12 +648,18 @@ const { data: fetchData, error: fetchError, pending: fetchPending } = useAsyncDa
     } else {
         throw new Error(response.msg || '获取书籍信息失败');
     }
+}, {
+    lazy: false,
+    default: () => null,
+    server: true,
+    getCachedData: key => useNuxtData(key).data.value
 });
 
-// 监听数据变化
+// 监听数据变化并更新 book.value
 watch(() => fetchData.value, (newData) => {
     if (newData && newData.book) {
-        book.value = newData.book;
+        // 直接更新 book.value 的所有属性，保持响应式
+        Object.assign(book.value, newData.book);
         mail_to.value = newData.user?.kindle_email || '';
         kindle_sender.value = newData.kindle_sender || '';
         
@@ -799,7 +804,7 @@ const set_sole = async () => {
             // 刷新书籍信息以更新 sole 状态
             const refreshRsp = await $backend(`/book/${bookid}`);
             if (refreshRsp.err === 'ok' && refreshRsp.book) {
-                book.value = refreshRsp.book;
+                Object.assign(book.value, refreshRsp.book);
             }
         } else {
             if ($alert) $alert('error', rsp.msg);
