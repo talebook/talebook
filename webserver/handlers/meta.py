@@ -108,7 +108,7 @@ class MetaBooks(ListHandler):
                 except AttributeError:
                     # 如果 get_item_name_map 不存在，使用 get_item_id 替代
                     item_id = self.cache.get_item_id("rating", str(rating_value))
-                
+
                 if item_id:
                     ids = self.db.get_books_for_category("rating", item_id)
                     books = self.db.get_data_as_dict(ids=ids)
