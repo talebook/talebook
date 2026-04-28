@@ -14,6 +14,7 @@ from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import declarative_base, relationship
+
 from webserver.constants import BOOK_TYPE_EBOOK
 
 
