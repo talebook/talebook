@@ -300,7 +300,7 @@ class TestWithUserLogin(TestApp):
     def tearDownClass(self):
         _mock_user.stop()
         _mock_mail.stop()
-        _mock_service_async_mode.start()
+        _mock_service_async_mode.stop()
 
 
 class TestUser(TestWithUserLogin):
