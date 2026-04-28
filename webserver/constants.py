@@ -24,6 +24,10 @@ META_SOURCE_DOUBAN = "douban"
 META_SOURCE_BAIDU = "baidu"
 META_SOURCE_AI = "ai"
 
+# 书籍类型
+BOOK_TYPE_EBOOK = 0  # 电子书
+BOOK_TYPE_PHYSICAL = 1  # 实体书
+
 # 配置键名
 META_SELECTED_SOURCES = "META_SELECTED_SOURCES"
 AUTO_FILL_META = "auto_fill_meta"

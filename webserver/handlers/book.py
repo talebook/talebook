@@ -1260,7 +1260,14 @@ class BookSetSole(BaseHandler):
 
         succeed = False
         try:
-            self.session.query(Item).filter(Item.book_id == bid).update({"sole": not book["sole"]})
+            item = self.session.query(Item).filter(Item.book_id == bid).first()
+            if item:
+                item.sole = not item.sole
+            else:
+                item = Item()
+                item.book_id = bid
+                item.sole = True
+                self.session.add(item)
             self.session.commit()
             succeed = True
         except Exception as e:

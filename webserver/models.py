@@ -14,6 +14,7 @@ from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import declarative_base, relationship
+from webserver.constants import BOOK_TYPE_EBOOK
 
 
 def mksalt():
@@ -304,6 +305,10 @@ class Item(Base, SQLAlchemyMixin):
     collector_id = Column(Integer, ForeignKey("readers.id"))
     collector = relationship(Reader, backref="items")
     sole = Column(Boolean, default=False, nullable=False)
+    book_type = Column(Integer, default=0, nullable=False)
+    book_count = Column(Integer, default=1, nullable=False)
+    create_time = Column(DateTime)
+    src_path = Column(String(4096), default="", nullable=False)
 
     def __init__(self):
         super(Item, self).__init__()
@@ -312,6 +317,10 @@ class Item(Base, SQLAlchemyMixin):
         self.count_download = 0
         self.collector_id = 1
         self.sole = False
+        self.book_type = BOOK_TYPE_EBOOK
+        self.book_count = 1
+        self.create_time = datetime.datetime.now()
+        self.src_path = ""
 
 
 class ScanFile(Base, SQLAlchemyMixin):
