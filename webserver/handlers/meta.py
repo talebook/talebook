@@ -100,9 +100,15 @@ class MetaBooks(ListHandler):
             if meta in ["rating"]:
                 # rating 字段需要使用 rating 值查找对应的 item_id
                 rating_value = int(name)
-                rating_map = self.cache.get_item_name_map("rating")
-                # rating_map 的 key 可能是整数或字符串，尝试两种可能
-                item_id = rating_map.get(rating_value) or rating_map.get(str(rating_value))
+                # 使用 get_item_name_map 获取 rating 映射，如果方法不存在则使用替代方案
+                try:
+                    rating_map = self.cache.get_item_name_map("rating")
+                    # rating_map 的 key 可能是整数或字符串，尝试两种可能
+                    item_id = rating_map.get(rating_value) or rating_map.get(str(rating_value))
+                except AttributeError:
+                    # 如果 get_item_name_map 不存在，使用 get_item_id 替代
+                    item_id = self.cache.get_item_id("rating", str(rating_value))
+                
                 if item_id:
                     ids = self.db.get_books_for_category("rating", item_id)
                     books = self.db.get_data_as_dict(ids=ids)
