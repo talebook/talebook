@@ -36,21 +36,22 @@ def get_column_type(column):
     """Convert SQLAlchemy Column type to SQLite type string"""
     from sqlalchemy import Integer, String, Boolean, DateTime, Float, Text
     
-    type_map = {
-        Integer: 'INTEGER',
-        String: lambda col: f'VARCHAR({col.length})' if col.length else 'VARCHAR(255)',
-        Boolean: 'BOOLEAN',
-        DateTime: 'DATETIME',
-        Float: 'FLOAT',
-        Text: 'TEXT',
-    }
-    
     col_type = type(column.type)
-    if col_type in type_map:
-        handler = type_map[col_type]
-        if callable(handler):
-            return handler(column)
-        return handler
+    
+    if col_type == Integer:
+        return 'INTEGER'
+    elif col_type == String:
+        # Access length from the type object, not the column
+        length = column.type.length if hasattr(column.type, 'length') else 255
+        return f'VARCHAR({length})' if length else 'VARCHAR(255)'
+    elif col_type == Boolean:
+        return 'BOOLEAN'
+    elif col_type == DateTime:
+        return 'DATETIME'
+    elif col_type == Float:
+        return 'FLOAT'
+    elif col_type == Text:
+        return 'TEXT'
     
     # Default to VARCHAR
     return 'VARCHAR(255)'
@@ -65,16 +66,27 @@ def get_model_columns():
         if not hasattr(model_class, '__tablename__'):
             continue
         
+        # Skip if model doesn't have __table__ attribute
+        if not hasattr(model_class, '__table__'):
+            continue
+        
         tablename = model_class.__tablename__
         columns = {}
         
         for column in model_class.__table__.columns:
-            columns[column.name] = {
-                'type': get_column_type(column),
-                'nullable': column.nullable,
-                'default': column.default.arg if column.default else None,
-                'primary_key': column.primary_key,
-            }
+            # Skip if not a Column object
+            if not hasattr(column, 'type'):
+                continue
+            
+            try:
+                columns[column.name] = {
+                    'type': get_column_type(column),
+                    'nullable': column.nullable,
+                    'default': column.default.arg if column.default else None,
+                    'primary_key': column.primary_key,
+                }
+            except Exception as e:
+                logger.warning(f"Skipping column {tablename}.{column.name}: {e}")
         
         model_columns[tablename] = columns
     
@@ -83,18 +95,41 @@ def get_model_columns():
 
 def get_database_columns(engine):
     """Get column definitions from actual database"""
+    from sqlalchemy import inspect
+    
     inspector = inspect(engine)
     db_columns = {}
     
     for table_name in inspector.get_table_names():
         columns = {}
-        for column in inspector.get_columns(table_name):
-            columns[column.name] = {
-                'type': str(column.type),
-                'nullable': column.nullable,
-                'default': column.default.arg if column.default else None,
-                'primary_key': column.primary_key,
-            }
+        
+        for col in inspector.get_columns(table_name):
+            # inspector.get_columns() returns dict, not Column object
+            try:
+                col_name = col['name']
+                col_type = str(col['type'])
+                col_nullable = col.get('nullable', True)
+                col_default = col.get('default')
+                col_primary_key = col.get('primary_key', False)
+                
+                # Handle default value - it can be a string or an object with .arg attribute
+                default_value = None
+                if col_default is not None:
+                    if hasattr(col_default, 'arg'):
+                        default_value = col_default.arg
+                    else:
+                        # It's already a string representation
+                        default_value = col_default
+                
+                columns[col_name] = {
+                    'type': col_type,
+                    'nullable': col_nullable,
+                    'default': default_value,
+                    'primary_key': col_primary_key,
+                }
+            except Exception as e:
+                logger.warning(f"Skipping database column {table_name}.{col.get('name', 'unknown')}: {e}")
+        
         db_columns[table_name] = columns
     
     return db_columns
@@ -126,9 +161,6 @@ def compare_and_migrate(engine):
                     'column': col_name,
                     'definition': col_def,
                 })
-            else:
-                # Check type matching (optional, for future enhancement)
-                db_col = db_columns[table_name][col_name]
     
     # Perform migration
     if not migrations_needed:
