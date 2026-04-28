@@ -10,8 +10,8 @@ TAG2 := talebook/talebook:server-side-render-$(VER)
 all: build up
 
 init:
-	python3 -m pip install --upgrade pip
 	pip3 install -r requirements.txt
+	#python3 -m pip install --upgrade pip
 	#uv sync
 
 build: test

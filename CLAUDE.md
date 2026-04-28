@@ -51,3 +51,7 @@ cd app && npm run lint   # 前端：eslint 必须通过
 - Python 行宽上限 120 字符（见 `pyproject.toml` black 配置）。
 - 后端新增接口统一使用 `@js` + `@auth` 装饰器，返回 `{"err": "ok", ...}`，禁止直接抛出 HTTP 异常。
 - 前端 API 调用统一使用 `plugins/talebook.js` 的 `backend()` 函数，禁止直接使用 `fetch`。
+
+### 目录规范
+- scripts 目录存放临时使用的脚本，例如迁移、构造数据、临时测试的脚本；
+- document 目录存放所有技术方案和进展文档，按日期整理，例如 document/20260429/merge_summary.md
