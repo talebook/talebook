@@ -75,12 +75,8 @@ If the book EXISTS and you KNOW it, return JSON in this format:
   "pubdate": "YYYY-MM-DD format",
   "isbn": "REAL ISBN-13",
   "summary": "REAL book summary/description",
-  "tags": ["REAL genre/tags"],
-  "cover_url": "",
-  "rating": REAL rating number (0-5)
+  "tags": ["REAL genre/tags"]
 }}
-
-IMPORTANT: Always set "cover_url" to an EMPTY STRING "" because you cannot know the actual cover image URL.
 
 If you DON'T KNOW the book or are UNSURE, return ONLY:
 {{
@@ -128,6 +124,8 @@ Remember: If you're not sure, ALWAYS return {{"unknown": true}} instead of makin
     def _parse_ai_response(self, response):
         try:
             data = json.loads(response)
+            # 强制设置封面为空，AI 无法知道实际封面 URL
+            data["cover_url"] = ""
             return data
         except json.JSONDecodeError as err:
             logging.error(f"AI response JSON decode error: {err}")
