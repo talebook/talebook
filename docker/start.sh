@@ -84,7 +84,7 @@ gosu talebook:talebook /var/www/talebook/server.py --syncdb
 echo
 echo "====== Migrate Database Schema ===="
 echo "Checking for missing columns and adding them..."
-gosu talebook:talebook python /var/www/talebook/webserver/migrate_db.py
+gosu talebook:talebook /var/www/talebook/webserver/migrate_db.py
 
 echo
 echo "====== Update Server Config ===="
