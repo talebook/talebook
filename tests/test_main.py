@@ -555,6 +555,7 @@ class TestUserSignUp(TestWithUserLogin):
     @classmethod
     def tearDownClass(self):
         self.delete_user()
+        _mock_user.stop()
         _mock_mail.stop()
 
     @classmethod
