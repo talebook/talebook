@@ -309,6 +309,7 @@ class Item(Base, SQLAlchemyMixin):
     book_type = Column(Integer, default=0, nullable=False)
     book_count = Column(Integer, default=1, nullable=False)
     create_time = Column(DateTime)
+    createtime = Column(DateTime)
     src_path = Column(String(4096), default="", nullable=False)
 
     def __init__(self):
@@ -320,7 +321,9 @@ class Item(Base, SQLAlchemyMixin):
         self.sole = False
         self.book_type = BOOK_TYPE_EBOOK
         self.book_count = 1
-        self.create_time = datetime.datetime.now()
+        now = datetime.datetime.now()
+        self.create_time = now
+        self.createtime = now
         self.src_path = ""
 
 
