@@ -28,7 +28,7 @@ RUN cp -r dist package* /app-static/
 
 # ----------------------------------------
 # 第二阶段，构建环境
-FROM talebook/calibre-docker:v8.x AS server
+FROM talebook/calibre-docker:v8.5 AS server
 ARG BUILD_COUNTRY=""
 ARG TARGETARCH
 ARG TARGETVARIANT
