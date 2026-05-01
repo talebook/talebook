@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import datetime
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ from tornado import web
 from webserver import loader, utils
 from webserver.constants import (
     META_SELECTED_SOURCES,
+    META_SOURCE_AI,
     META_SOURCE_AMAZON,
     META_SOURCE_BAIDU,
     META_SOURCE_DOUBAN,
@@ -24,6 +26,8 @@ from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Item
 from webserver.plugins.meta import baike, calibre, douban, tomato, xhsd, youshu
+from webserver.plugins.meta.ai.api import KEY as AI_KEY
+from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
 from webserver.services.autofill import AutoFillService
 from webserver.services.convert import ConvertService
@@ -48,6 +52,19 @@ class Index(BaseHandler):
         ids = list(self.cache.search(""))
         random_books = []
         new_books = []
+
+        # 过滤掉其他用户标记为 scope=private 的书籍
+        user_id = self.user_id()
+        if ids:
+            if user_id:
+                private_book_ids = set(
+                    item.book_id
+                    for item in self.session.query(Item).filter(Item.scope == "private", Item.collector_id != user_id).all()
+                )
+                ids = [book_id for book_id in ids if book_id not in private_book_ids]
+            else:
+                private_book_ids = set(item.book_id for item in self.session.query(Item).filter(Item.scope == "private").all())
+                ids = [book_id for book_id in ids if book_id not in private_book_ids]
 
         if ids:
             random_ids = random.sample(ids, min(cnt_random, len(ids)))
@@ -107,6 +124,8 @@ class BookRefer(BaseHandler):
         if hasattr(youshu, "YoushuApi"):
             count += 1
         if hasattr(tomato, "TomatoNovelApi"):
+            count += 1
+        if META_SOURCE_AI in sources:
             count += 1
         return count
 
@@ -246,6 +265,27 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error(_("番茄小说查询失败：%s"), e)
 
+        # 7. AI 查询
+        if META_SOURCE_AI in sources:
+            current_index += 1
+            logging.info("[%d/%d] 查询 AI...", current_index, total_sources)
+            try:
+                api = AIBookApi(
+                    api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
+                    api_key=CONF.get("ai_api_key", ""),
+                    model=CONF.get("ai_model", "gpt-3.5-turbo"),
+                    use_thinking=CONF.get("ai_use_thinking", False),
+                    copy_image=False,
+                )
+                book = api.get_book(title, mi.authors[0] if mi.authors else None)
+                if book:
+                    books.append(book)
+                    logging.info("AI 查询结果：1 条")
+                else:
+                    logging.info("AI 查询结果：0 条")
+            except Exception as e:
+                logging.error(_("AI 查询失败：%s"), e)
+
         logging.info("所有信息源查询完成，共找到 %d 条结果", len(books))
 
         return books
@@ -328,6 +368,25 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("获取新华书店书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.xhsd.failed", "msg": _("新华书店查询失败")})
+        elif provider_key == AI_KEY:
+            title = re.sub("[(（].*", "", mi.title)
+            api = AIBookApi(
+                api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
+                api_key=CONF.get("ai_api_key", ""),
+                model=CONF.get("ai_model", "gpt-3.5-turbo"),
+                use_thinking=CONF.get("ai_use_thinking", False),
+                copy_image=True,
+            )
+            try:
+                refer_mi = api.get_book(title, mi.authors[0] if mi.authors else None)
+            except Exception as e:
+                logging.error("获取 AI 书籍信息失败：%s", e)
+                raise RuntimeError(
+                    {
+                        "err": "httprequest.ai.failed",
+                        "msg": _("AI 查询失败"),
+                    }
+                )
         else:
             raise RuntimeError(
                 {
@@ -847,7 +906,22 @@ class HotBook(ListHandler):
     @js
     def get(self):
         title = _("热度榜单")
-        db_items = self.session.query(Item).filter(Item.count_visit > 1).order_by(Item.count_download.desc())
+        user_id = self.user_id()
+
+        # 过滤掉其他用户标记为 scope=private 的书籍
+        if user_id:
+            db_items = (
+                self.session.query(Item)
+                .filter(Item.count_visit > 1, (Item.scope != "private") | (Item.collector_id == user_id))
+                .order_by(Item.count_download.desc())
+            )
+        else:
+            db_items = (
+                self.session.query(Item)
+                .filter(Item.count_visit > 1, Item.scope != "private")
+                .order_by(Item.count_download.desc())
+            )
+
         count = db_items.count()
         start = self.get_argument_start()
         delta = 60
@@ -984,6 +1058,10 @@ class BookUpload(BaseHandler):
             item = Item()
             item.book_id = book_id
             item.collector_id = self.user_id()
+            try:
+                item.create_time = self.cache.field_for("timestamp", book_id)
+            except Exception:
+                item.create_time = datetime.datetime.now()
             item.save()
         self.add_msg("success", _("导入书籍成功！"))
         AutoFillService().auto_fill(book_id)
@@ -1169,6 +1247,91 @@ class BookPush(BaseHandler):
         }
 
 
+class BookSetScope(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        book = self.get_book(int(bid))
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+
+        bid = book["id"]
+        if isinstance(book["collector"], dict):
+            cid = book["collector"]["id"]
+        else:
+            cid = book["collector"].id
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
+            return {"err": "permission", "msg": _("无权操作")}
+
+        succeed = False
+        try:
+            item = self.session.query(Item).filter(Item.book_id == bid).first()
+            if item:
+                item.scope = "public" if item.scope == "private" else "private"
+            else:
+                item = Item()
+                item.book_id = bid
+                item.scope = "private"
+                try:
+                    item.create_time = self.cache.field_for("timestamp", bid)
+                except Exception:
+                    item.create_time = datetime.datetime.now()
+                self.session.add(item)
+            self.session.commit()
+            succeed = True
+        except Exception as e:
+            self.session.rollback()
+            logging.error("set book %d scope failed: %s" % (bid, e))
+
+        if succeed:
+            return {"err": "ok", "msg": _("更新成功")}
+        else:
+            return {"err": "db.update.failed", "msg": _("更新失败，请稍后再试")}
+
+
+class BookScoped(BaseHandler):
+    @js
+    @auth
+    def get(self):
+        """获取当前用户设为 scope=private 的所有图书信息"""
+        user_id = self.user_id()
+        title = _("私有书籍")
+
+        # 查询当前用户设为 scope=private 的所有图书，按书籍 ID 倒序排列
+        db_items = (
+            self.session.query(Item)
+            .filter(Item.collector_id == user_id, Item.scope == "private")
+            .order_by(Item.book_id.desc())
+        )
+
+        try:
+            start = self.get_argument_start()
+            delta = 60
+            items = db_items.limit(delta).offset(start).all()
+            ids = [item.book_id for item in items]
+            total_items = 0
+
+            if len(ids) > 0:
+                # 获取总数用于分页
+                total_items = self.session.query(Item).filter(Item.collector_id == user_id, Item.scope == "private").count()
+
+            books = self.get_books(ids=ids)
+            books.sort(key=lambda x: x["id"], reverse=True)
+
+            books_result = []
+            for book in books:
+                book_data = utils.BookFormatter(self, book).format()
+                books_result.append(book_data)
+
+            return {"err": "ok", "title": title, "total": total_items, "books": books_result}
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            logging.error("Failed to get soled books: %s", e)
+            return {"err": "internal", "msg": _("获取私有书籍失败")}
+
+
 def routes():
     return [
         (r"/api/index", Index),
@@ -1176,11 +1339,13 @@ def routes():
         (r"/api/recent", RecentBook),
         (r"/api/library", LibraryBook),
         (r"/api/hot", HotBook),
+        (r"/api/scopedbooks", BookScoped),
         (r"/api/book/nav", BookNav),
         (r"/api/book/upload", BookUpload),
         (r"/api/book/([0-9]+)", BookDetail),
         (r"/api/book/([0-9]+)/delete", BookDelete),
         (r"/api/book/([0-9]+)/edit", BookEdit),
+        (r"/api/book/([0-9]+)/setscope", BookSetScope),
         (r"/api/book/([0-9]+\..+)", BookDownload),
         (r"/api/book/([0-9]+)/push", BookPush),
         (r"/api/book/([0-9]+)/refer", BookRefer),

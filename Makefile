@@ -1,6 +1,6 @@
 .PHONY: all build push test
 
-VER := $(shell git branch --show-current)
+VER := $(shell git branch --show-current | tr '/' '-')
 IMAGE := talebook/talebook:$(VER)
 REPO1 := talebook/talebook:latest
 REPO2 := talebook/calibre-webserver:latest

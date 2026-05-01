@@ -25,6 +25,13 @@ class ImageHandler(BaseHandler):
         raise web.Finish()
 
     def get(self, fmt, id, **kwargs):
+        # 处理默认封面请求
+        if id == "default" or id == "0":
+            self.set_header("Content-Type", "image/jpeg")
+            self.set_header("Content-Length", str(len(self.default_cover)))
+            self.write(self.default_cover)
+            return
+
         self.write(self.get_data(fmt, id, **kwargs))
 
     def get_data(self, fmt, id, **kwargs):

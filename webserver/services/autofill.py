@@ -9,6 +9,7 @@ import traceback
 from webserver import loader, utils
 from webserver.constants import (
     META_SELECTED_SOURCES,
+    META_SOURCE_AI,
     META_SOURCE_AMAZON,
     META_SOURCE_BAIDU,
     META_SOURCE_DOUBAN,
@@ -16,6 +17,7 @@ from webserver.constants import (
 )
 from webserver.i18n import _
 from webserver.plugins.meta import baike, douban
+from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.meta.calibre.api import CalibreMetadataApi
 from webserver.services import AsyncService
 
@@ -209,5 +211,21 @@ class AutoFillService(AsyncService):
                     return book
             except Exception:
                 logging.error(_("baidu 接口查询 %s 失败"), title)
+
+        # 6. AI 查询
+        if META_SOURCE_AI in sources:
+            try:
+                api = AIBookApi(
+                    api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
+                    api_key=CONF.get("ai_api_key", ""),
+                    model=CONF.get("ai_model", "gpt-3.5-turbo"),
+                    use_thinking=CONF.get("ai_use_thinking", False),
+                    copy_image=True,
+                )
+                book = api.get_book(title, mi.authors[0] if mi.authors else None)
+                if book:
+                    return book
+            except Exception as e:
+                logging.error(_("AI 接口查询 %s 失败: %s"), title, e)
 
         return None

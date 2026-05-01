@@ -54,14 +54,14 @@
     "coverImage": "封面图片",
     "selectCover": "选择封面图",
     "uploadCover": "上传封面",
-    "coverSupported": "支持JPG、PNG、GIF格式，大小不超过5MB",
+    "coverSupported": "支持 JPG、PNG、GIF 格式，大小不超过 5MB",
     "uploadCoverFailed": "封面上传失败",
     "enterNewName": "输入新名称",
     "enterNewTagName": "输入新标签名称",
     "addTag": "添加标签",
     "kindle": {
-      "push": "推送到Kindle",
-      "emailPlaceholder": "填写Kindle收件人邮箱地址："
+      "push": "推送到 Kindle",
+      "emailPlaceholder": "填写 Kindle 收件人邮箱地址："
     },
     "noDownloadFormats": "本书暂无可供下载的文件格式",
     "internetSync": "从互联网同步书籍信息",
@@ -74,10 +74,10 @@
     "updateFromInternet": "从互联网更新信息",
     "deleteBook": "删除此书",
     "onlineRead": "在线阅读",
-    "txtOnlineRead": "Txt在线阅读",
+    "txtOnlineRead": "Txt 在线阅读",
     "parsed": "已解析",
     "unparsed": "未解析",
-    "pushToKindle": "推送至Kindle",
+    "pushToKindle": "推送至 Kindle",
     "loading": "加载中...",
     "previousChapter": "上一章",
     "nextChapter": "下一章",
@@ -87,7 +87,9 @@
     "parsingMessage": "首次阅读，正在解析目录，请稍后... {seconds}",
     "timeoutMessage": "超时未完成，可继续等待稍后刷新尝试",
     "parseTimeout": "解析超时",
-    "viewDetails": "浏览详情"
+    "viewDetails": "浏览详情",
+    "setPrivate": "设为私有",
+    "setPublic": "设为公开"
   },
   "library": {
     "title": "图书馆",
@@ -124,7 +126,8 @@
     "browse": "分类导览",
     "users": "用户管理",
     "books": "图书管理",
-    "import": "导入图书"
+    "import": "导入图书",
+    "scopedBooks": "私有书籍"
   },
   "user": {
     "history": {
@@ -150,14 +153,15 @@
       "newPassword": "新密码",
       "confirmPassword": "确认密码",
       "nickname": "昵称",
-      "kindleAddress": "Kindle地址",
+      "kindleAddress": "Kindle 地址",
       "kindle": "Kindle",
       "save": "保存",
-      "passwordMinLength": "密码长度至少为8个字符",
-      "nicknameMinLength": "昵称长度至少为2个字符",
+      "passwordMinLength": "密码长度至少为 8 个字符",
+      "nicknameMinLength": "昵称长度至少为 2 个字符",
       "invalidEmailFormat": "邮箱格式不正确",
       "passwordsNotSame": "两次输入的密码不一致",
-      "activationEmailSent": "激活邮件已发出！"
+      "activationEmailSent": "激活邮件已发出！",
+      "scopedBooks": "个人私有书籍"
     }
   },
   "auth": {
@@ -189,6 +193,7 @@
     "pleaseLogin": "请登录",
     "userCenter": "用户中心",
     "readingHistory": "阅读记录",
+    "scopedBooks": "私有书籍",
     "feedback": "反馈",
     "adminEntry": "管理员入口",
     "logout": "退出",
@@ -196,7 +201,7 @@
     "system": "系统",
     "systemVersion": "系统版本",
     "userCount": "用户数",
-    "opdsIntroduction": "OPDS介绍",
+    "opdsIntroduction": "OPDS 介绍",
     "all": "全部",
     "collapse": "收起",
     "more": "更多",
@@ -206,13 +211,13 @@
     "colon": "：",
     "nickname": "昵称",
     "showAll": "显示全部...",
-    "updateSsl": "更新SSL证书",
+    "updateSsl": "更新 SSL 证书",
     "selectCertFile": "请选择证书文件",
     "selectKeyFile": "请选择私钥文件",
-    "certFileError": "证书文件(.crt)异常，文件内容不是PEM格式",
-    "keyFileError": "私钥文件(.key)异常，文件内容不是PEM格式",
+    "certFileError": "证书文件 (.crt) 异常，文件内容不是 PEM 格式",
+    "keyFileError": "私钥文件 (.key) 异常，文件内容不是 PEM 格式",
     "uploadSuccess": "上传成功！",
-    "uploadNotice": "受限于服务器能力，请勿上传超过100MB的大文件。",
+    "uploadNotice": "受限于服务器能力，请勿上传超过 100MB 的大文件。",
     "selectEbook": "请选择要上传的电子书",
     "uploadBooks": "上传书籍",
     "activateSuccess": "激活成功",

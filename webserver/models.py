@@ -15,6 +15,8 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import declarative_base, relationship
 
+from webserver.constants import BOOK_TYPE_EBOOK
+
 
 def mksalt():
     import random
@@ -303,6 +305,10 @@ class Item(Base, SQLAlchemyMixin):
 
     collector_id = Column(Integer, ForeignKey("readers.id"))
     collector = relationship(Reader, backref="items")
+    scope = Column(String(50), default="public", nullable=False)
+    book_type = Column(String(20), default="ebook", nullable=False)
+    create_time = Column(DateTime)
+    src_path = Column(String(4096), default="", nullable=False)
 
     def __init__(self):
         super(Item, self).__init__()
@@ -310,6 +316,9 @@ class Item(Base, SQLAlchemyMixin):
         self.count_visit = 0
         self.count_download = 0
         self.collector_id = 1
+        self.scope = "public"
+        self.book_type = BOOK_TYPE_EBOOK
+        self.src_path = ""
 
 
 class ScanFile(Base, SQLAlchemyMixin):

@@ -190,7 +190,10 @@
                                                     </v-btn>
                                                 </template>
                                                 <v-list density="compact">
-                                                    <v-list-item @click="set_refer(referBook.provider_key, referBook.provider_value)">
+                                                    <v-list-item 
+                                                        v-if="referBook.cover_url" 
+                                                        @click="set_refer(referBook.provider_key, referBook.provider_value)"
+                                                    >
                                                         <v-list-item-title>{{ t('book.setInfoAndImage') }}</v-list-item-title>
                                                     </v-list-item>
                                                     <v-list-item
@@ -199,6 +202,7 @@
                                                         <v-list-item-title>{{ t('book.setOnlyInfo') }}</v-list-item-title>
                                                     </v-list-item>
                                                     <v-list-item
+                                                        v-if="referBook.cover_url"
                                                         @click="set_refer(referBook.provider_key, referBook.provider_value, { only_cover: 'yes' })"
                                                     >
                                                         <v-list-item-title>{{ t('book.setOnlyImage') }}</v-list-item-title>
@@ -243,10 +247,10 @@
                         </v-btn>
 
                         <v-btn
+                            v-if="book.id > 0"
                             color="primary"
                             variant="elevated"
                             class="mx-2"
-                            :disabled="book.id === 0"
                             :href="is_txt ? '/book/' + book.id + '/readtxt' : '/read/' + book.id"
                             target="_blank"
                         >
@@ -283,6 +287,12 @@
                                             <v-icon>mdi-apps</v-icon>
                                         </template>
                                         <v-list-item-title>{{ t('book.updateFromInternet') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item @click="set_scope">
+                                        <template #prepend>
+                                            <v-icon>{{ book.scope === 'private' ? 'mdi-earth-off' : 'mdi-earth' }}</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ book.scope === 'private' ? t('book.setPublic') : t('book.setPrivate') }}</v-list-item-title>
                                     </v-list-item>
                                     <v-divider />
                                     <v-list-item @click="delete_book">
@@ -407,10 +417,10 @@
                             </v-card-text>
                             <v-card-text>
                                 <p
-                                    v-if="book.comments"
+                                    v-if="book.id > 0 && book.comments && book.comments !== '暂无简介'"
                                     v-html="book.comments"
                                 />
-                                <p v-else>
+                                <p v-else-if="book.id > 0">
                                     {{ t('book.viewDetails') }}
                                 </p>
                             </v-card-text>
@@ -428,7 +438,7 @@
             <v-col cols="12">
                 <v-row justify="space-around">
                     <v-col
-                        v-if="!is_txt"
+                        v-if="book.id > 0 && !is_txt"
                         cols="12"
                         sm="6"
                         md="auto"
@@ -440,7 +450,6 @@
                         >
                             <v-list density="compact">
                                 <v-list-item
-                                    v-if="book.id > 0"
                                     :href="'/read/' + book.id"
                                     target="_blank"
                                     class="w-100"
@@ -462,7 +471,7 @@
                     </v-col>
 
                     <v-col
-                        v-if="is_txt"
+                        v-if="book.id > 0 && is_txt"
                         cols="12"
                         sm="6"
                         md="auto"
@@ -562,7 +571,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useAsyncData, useCookie, useNuxtApp } from 'nuxt/app';
@@ -631,7 +640,7 @@ const get_txt_parse_status = async () => {
 };
 
 // 数据获取逻辑
-const { data: fetchData, error: fetchError, pending: fetchPending } = useAsyncData(`book-${bookid}`, async () => {
+const { data: fetchData, error: fetchError, pending: fetchPending, refresh } = useAsyncData(`book-${bookid}`, async () => {
     const response = await $backend(`/book/${bookid}`);
     
     if (response.err === 'ok') {
@@ -639,12 +648,18 @@ const { data: fetchData, error: fetchError, pending: fetchPending } = useAsyncDa
     } else {
         throw new Error(response.msg || '获取书籍信息失败');
     }
+}, {
+    lazy: false,
+    default: () => null,
+    server: true,
+    getCachedData: key => useNuxtData(key).data.value
 });
 
-// 监听数据变化
+// 监听数据变化并更新 book.value
 watch(() => fetchData.value, (newData) => {
     if (newData && newData.book) {
-        book.value = newData.book;
+        // 直接更新 book.value 的所有属性，保持响应式
+        Object.assign(book.value, newData.book);
         mail_to.value = newData.user?.kindle_email || '';
         kindle_sender.value = newData.kindle_sender || '';
         
@@ -733,7 +748,12 @@ const get_refer = async () => {
         const rsp = await $backend(`/book/${bookid}/refer`);
         refer_books.value = rsp.books.map((b) => {
             b.href = '';
-            b.img = '/get/pcover?url=' + encodeURIComponent(b.cover_url);
+            // 如果没有封面地址，使用默认封面
+            if (!b.cover_url || b.cover_url === '') {
+                b.img = '/get/cover/0';
+            } else {
+                b.img = '/get/pcover?url=' + encodeURIComponent(b.cover_url);
+            }
             return b;
         });
     } catch (e) {
@@ -770,6 +790,26 @@ const set_refer = async (provider_key, provider_value, opt = {}) => {
         if ($alert) $alert('error', '设置失败');
     } finally {
         refer_books_setting_btn_loading.value = false;
+    }
+};
+
+const set_scope = async () => {
+    try {
+        const rsp = await $backend(`/book/${bookid}/setscope`, {
+            method: 'POST',
+        });
+
+        if (rsp.err === 'ok') {
+            if ($alert) $alert('success', rsp.msg);
+            const refreshRsp = await $backend(`/book/${bookid}`);
+            if (refreshRsp.err === 'ok' && refreshRsp.book) {
+                Object.assign(book.value, refreshRsp.book);
+            }
+        } else {
+            if ($alert) $alert('error', rsp.msg);
+        }
+    } catch (e) {
+        if ($alert) $alert('error', '设置失败');
     }
 };
 

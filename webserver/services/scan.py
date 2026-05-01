@@ -313,6 +313,10 @@ class ScanService(AsyncService):
                     item.book_id = row.book_id
                     item.collector_id = user_id
                     try:
+                        item.create_time = self.db.new_api.field_for("timestamp", row.book_id)
+                    except Exception:
+                        pass
+                    try:
                         item.save()
                         imported.append(row.book_id)
 
@@ -336,6 +340,10 @@ class ScanService(AsyncService):
                 item = Item()
                 item.book_id = row.book_id
                 item.collector_id = user_id
+                try:
+                    item.create_time = self.db.new_api.field_for("timestamp", row.book_id)
+                except Exception:
+                    pass
                 try:
                     item.save()
                     imported.append(row.book_id)

@@ -95,6 +95,10 @@ settings = {
     'douban_max_count'  : 2,
     'auto_fill_meta'    : False,
     'META_SELECTED_SOURCES': ["douban", "baidu", "google", "amazon", "xinhua"],
+    'ai_api_url'        : "https://api.openai.com/v1/chat/completions",
+    'ai_api_key'        : "",
+    'ai_model'          : "gpt-3.5-turbo",
+    'ai_use_thinking'   : False,
 
     'avatar_service'    : "https://cravatar.cn",
 

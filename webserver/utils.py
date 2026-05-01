@@ -103,6 +103,16 @@ class BookFormatter:
             data["files"] = self.get_files()
         if with_perms:
             data.update(self.get_permissions())
+
+        # 添加 scope 字段
+        try:
+            from webserver.models import Item
+
+            item = self.handler.session.query(Item).filter(Item.book_id == self.book["id"]).first()
+            data["scope"] = item.scope if item else "public"
+        except:
+            data["scope"] = "public"
+
         return data
 
 

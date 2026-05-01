@@ -219,6 +219,11 @@
                                 prepend-icon="mdi-history"
                             />
                             <v-list-item
+                                to="/scopedbooks"
+                                :title="$t('navigation.scopedBooks')"
+                                prepend-icon="mdi-shield-account"
+                            />
+                            <v-list-item
                                 v-if="store.sys.allow.FEEDBACK"
                                 target="_blank"
                                 :href="store.sys.FEEDBACK_URL"
