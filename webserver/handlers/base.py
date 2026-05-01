@@ -452,7 +452,7 @@ class BaseHandler(web.RequestHandler):
             item = Item()
             item.book_id = book_id
             try:
-                item.create_time = self.cache.field_for('timestamp', book_id)
+                item.create_time = self.cache.field_for("timestamp", book_id)
             except Exception:
                 item.create_time = datetime.datetime.now()
 

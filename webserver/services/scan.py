@@ -313,7 +313,7 @@ class ScanService(AsyncService):
                     item.book_id = row.book_id
                     item.collector_id = user_id
                     try:
-                        item.create_time = self.db.new_api.field_for('timestamp', row.book_id)
+                        item.create_time = self.db.new_api.field_for("timestamp", row.book_id)
                     except Exception:
                         pass
                     try:
@@ -341,7 +341,7 @@ class ScanService(AsyncService):
                 item.book_id = row.book_id
                 item.collector_id = user_id
                 try:
-                    item.create_time = self.db.new_api.field_for('timestamp', row.book_id)
+                    item.create_time = self.db.new_api.field_for("timestamp", row.book_id)
                 except Exception:
                     pass
                 try:

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import datetime
 import json
 import logging
 import os
@@ -916,7 +917,9 @@ class HotBook(ListHandler):
             )
         else:
             db_items = (
-                self.session.query(Item).filter(Item.count_visit > 1, Item.scope != "private").order_by(Item.count_download.desc())
+                self.session.query(Item)
+                .filter(Item.count_visit > 1, Item.scope != "private")
+                .order_by(Item.count_download.desc())
             )
 
         count = db_items.count()
@@ -1056,7 +1059,7 @@ class BookUpload(BaseHandler):
             item.book_id = book_id
             item.collector_id = self.user_id()
             try:
-                item.create_time = self.cache.field_for('timestamp', book_id)
+                item.create_time = self.cache.field_for("timestamp", book_id)
             except Exception:
                 item.create_time = datetime.datetime.now()
             item.save()
@@ -1270,7 +1273,7 @@ class BookSetScope(BaseHandler):
                 item.book_id = bid
                 item.scope = "private"
                 try:
-                    item.create_time = self.cache.field_for('timestamp', bid)
+                    item.create_time = self.cache.field_for("timestamp", bid)
                 except Exception:
                     item.create_time = datetime.datetime.now()
                 self.session.add(item)
@@ -1295,7 +1298,11 @@ class BookScoped(BaseHandler):
         title = _("私有书籍")
 
         # 查询当前用户设为 scope=private 的所有图书，按书籍 ID 倒序排列
-        db_items = self.session.query(Item).filter(Item.collector_id == user_id, Item.scope == "private").order_by(Item.book_id.desc())
+        db_items = (
+            self.session.query(Item)
+            .filter(Item.collector_id == user_id, Item.scope == "private")
+            .order_by(Item.book_id.desc())
+        )
 
         try:
             start = self.get_argument_start()

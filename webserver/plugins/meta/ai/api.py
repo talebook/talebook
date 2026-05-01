@@ -1,10 +1,12 @@
 #!/usr/bin/python3
 # -*- coding: UTF-8 -*-
-import logging
 import json
+import logging
+
 import requests
 
 from webserver.plugins.meta.douban import str2date
+
 
 KEY = "ai"
 
@@ -59,7 +61,7 @@ Response format - wrap your JSON in <json_response> tags:
 
 If the book EXISTS and you KNOW it:
 <json_response>
-{
+{{
   "status": "ok",
   "title": "REAL book title here",
   "authors": ["REAL author names"],
@@ -68,14 +70,14 @@ If the book EXISTS and you KNOW it:
   "isbn": "REAL ISBN-13",
   "summary": "REAL book summary/description",
   "tags": ["REAL genre/tags"]
-}
+}}
 </json_response>
 
 If you DON'T KNOW the book or are UNSURE:
 <json_response>
-{
+{{
   "status": "unknown"
-}
+}}
 </json_response>
 
 The book to look up: "{title}" by {author}.
@@ -127,6 +129,7 @@ Let me analyze this query step by step:
     def _parse_ai_response(self, response):
         try:
             import re
+
             match = re.search(r"<json_response>(.*?)</json_response>", response, re.DOTALL)
             if match:
                 json_str = match.group(1).strip()
