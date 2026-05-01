@@ -451,6 +451,10 @@ class BaseHandler(web.RequestHandler):
         except:
             item = Item()
             item.book_id = book_id
+            try:
+                item.create_time = self.cache.field_for('timestamp', book_id)
+            except Exception:
+                item.create_time = datetime.datetime.now()
 
         item.count_guest += kwargs.get("count_guest", 0)
         item.count_visit += kwargs.get("count_visit", 0)
@@ -542,14 +546,14 @@ class ListHandler(BaseHandler):
 
         if ids:
             ids = list(ids)
-            # 过滤掉其他用户标记为 sole 的书籍
+            # 过滤掉其他用户标记为 scope=private 的书籍
             user_id = self.user_id()
             if user_id:
-                sole_book_ids = set(
+                private_book_ids = set(
                     item.book_id
-                    for item in self.session.query(Item).filter(Item.sole == 1, Item.collector_id != user_id).all()
+                    for item in self.session.query(Item).filter(Item.scope == "private", Item.collector_id != user_id).all()
                 )
-                ids = [book_id for book_id in ids if book_id not in sole_book_ids]
+                ids = [book_id for book_id in ids if book_id not in private_book_ids]
 
             count = len(ids)
             books = self.get_books(ids=ids[start : start + delta])

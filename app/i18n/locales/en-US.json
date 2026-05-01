@@ -122,7 +122,7 @@
     "users": "User Management",
     "books": "Book Management",
     "import": "Import Books",
-    "soledBooks": "Private Books"
+    "scopedBooks": "Private Books"
   },
   "user": {
     "history": {
@@ -156,7 +156,7 @@
       "invalidEmailFormat": "Invalid email format",
       "passwordsNotSame": "Passwords do not match",
       "activationEmailSent": "Activation email has been sent!",
-      "soledBooks": "My Private Books"
+      "scopedBooks": "My Private Books"
     }
   },
   "auth": {
@@ -188,7 +188,7 @@
     "pleaseLogin": "Please Login",
     "userCenter": "User Center",
     "readingHistory": "Reading History",
-    "soledBooks": "Private Books",
+    "scopedBooks": "Private Books",
     "feedback": "Feedback",
     "adminEntry": "Admin Entry",
     "logout": "Logout",

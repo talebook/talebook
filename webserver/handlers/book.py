@@ -52,18 +52,18 @@ class Index(BaseHandler):
         random_books = []
         new_books = []
 
-        # 过滤掉其他用户标记为 sole 的书籍
+        # 过滤掉其他用户标记为 scope=private 的书籍
         user_id = self.user_id()
         if ids:
             if user_id:
-                sole_book_ids = set(
+                private_book_ids = set(
                     item.book_id
-                    for item in self.session.query(Item).filter(Item.sole == 1, Item.collector_id != user_id).all()
+                    for item in self.session.query(Item).filter(Item.scope == "private", Item.collector_id != user_id).all()
                 )
-                ids = [book_id for book_id in ids if book_id not in sole_book_ids]
+                ids = [book_id for book_id in ids if book_id not in private_book_ids]
             else:
-                sole_book_ids = set(item.book_id for item in self.session.query(Item).filter(Item.sole == 1).all())
-                ids = [book_id for book_id in ids if book_id not in sole_book_ids]
+                private_book_ids = set(item.book_id for item in self.session.query(Item).filter(Item.scope == "private").all())
+                ids = [book_id for book_id in ids if book_id not in private_book_ids]
 
         if ids:
             random_ids = random.sample(ids, min(cnt_random, len(ids)))
@@ -907,16 +907,16 @@ class HotBook(ListHandler):
         title = _("热度榜单")
         user_id = self.user_id()
 
-        # 过滤掉其他用户标记为 sole 的书籍
+        # 过滤掉其他用户标记为 scope=private 的书籍
         if user_id:
             db_items = (
                 self.session.query(Item)
-                .filter(Item.count_visit > 1, Item.sole == 0 | (Item.collector_id == user_id))
+                .filter(Item.count_visit > 1, (Item.scope != "private") | (Item.collector_id == user_id))
                 .order_by(Item.count_download.desc())
             )
         else:
             db_items = (
-                self.session.query(Item).filter(Item.count_visit > 1, Item.sole == 0).order_by(Item.count_download.desc())
+                self.session.query(Item).filter(Item.count_visit > 1, Item.scope != "private").order_by(Item.count_download.desc())
             )
 
         count = db_items.count()
@@ -1055,6 +1055,10 @@ class BookUpload(BaseHandler):
             item = Item()
             item.book_id = book_id
             item.collector_id = self.user_id()
+            try:
+                item.create_time = self.cache.field_for('timestamp', book_id)
+            except Exception:
+                item.create_time = datetime.datetime.now()
             item.save()
         self.add_msg("success", _("导入书籍成功！"))
         AutoFillService().auto_fill(book_id)
@@ -1240,13 +1244,12 @@ class BookPush(BaseHandler):
         }
 
 
-class BookSetSole(BaseHandler):
+class BookSetScope(BaseHandler):
     @js
     @auth
     def post(self, bid):
-        try:
-            book = self.get_book(bid)
-        except web.Finish:
+        book = self.get_book(int(bid))
+        if not book:
             return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
 
         bid = book["id"]
@@ -1261,17 +1264,21 @@ class BookSetSole(BaseHandler):
         try:
             item = self.session.query(Item).filter(Item.book_id == bid).first()
             if item:
-                item.sole = not item.sole
+                item.scope = "public" if item.scope == "private" else "private"
             else:
                 item = Item()
                 item.book_id = bid
-                item.sole = True
+                item.scope = "private"
+                try:
+                    item.create_time = self.cache.field_for('timestamp', bid)
+                except Exception:
+                    item.create_time = datetime.datetime.now()
                 self.session.add(item)
             self.session.commit()
             succeed = True
         except Exception as e:
             self.session.rollback()
-            logging.error("set book %d sole failed: %s" % (bid, e))
+            logging.error("set book %d scope failed: %s" % (bid, e))
 
         if succeed:
             return {"err": "ok", "msg": _("更新成功")}
@@ -1279,16 +1286,16 @@ class BookSetSole(BaseHandler):
             return {"err": "db.update.failed", "msg": _("更新失败，请稍后再试")}
 
 
-class BookSoled(BaseHandler):
+class BookScoped(BaseHandler):
     @js
     @auth
     def get(self):
-        """获取当前用户设为 soled 的所有图书信息"""
+        """获取当前用户设为 scope=private 的所有图书信息"""
         user_id = self.user_id()
         title = _("私有书籍")
 
-        # 查询当前用户设为 sole 的所有图书，按书籍 ID 倒序排列
-        db_items = self.session.query(Item).filter(Item.collector_id == user_id, Item.sole == 1).order_by(Item.book_id.desc())
+        # 查询当前用户设为 scope=private 的所有图书，按书籍 ID 倒序排列
+        db_items = self.session.query(Item).filter(Item.collector_id == user_id, Item.scope == "private").order_by(Item.book_id.desc())
 
         try:
             start = self.get_argument_start()
@@ -1299,7 +1306,7 @@ class BookSoled(BaseHandler):
 
             if len(ids) > 0:
                 # 获取总数用于分页
-                total_items = self.session.query(Item).filter(Item.collector_id == user_id, Item.sole == 1).count()
+                total_items = self.session.query(Item).filter(Item.collector_id == user_id, Item.scope == "private").count()
 
             books = self.get_books(ids=ids)
             books.sort(key=lambda x: x["id"], reverse=True)
@@ -1325,13 +1332,13 @@ def routes():
         (r"/api/recent", RecentBook),
         (r"/api/library", LibraryBook),
         (r"/api/hot", HotBook),
-        (r"/api/soledbooks", BookSoled),
+        (r"/api/scopedbooks", BookScoped),
         (r"/api/book/nav", BookNav),
         (r"/api/book/upload", BookUpload),
         (r"/api/book/([0-9]+)", BookDetail),
         (r"/api/book/([0-9]+)/delete", BookDelete),
         (r"/api/book/([0-9]+)/edit", BookEdit),
-        (r"/api/book/([0-9]+)/setsole", BookSetSole),
+        (r"/api/book/([0-9]+)/setscope", BookSetScope),
         (r"/api/book/([0-9]+\..+)", BookDownload),
         (r"/api/book/([0-9]+)/push", BookPush),
         (r"/api/book/([0-9]+)/refer", BookRefer),

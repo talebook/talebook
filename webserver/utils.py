@@ -104,14 +104,14 @@ class BookFormatter:
         if with_perms:
             data.update(self.get_permissions())
 
-        # 添加 sole 字段
+        # 添加 scope 字段
         try:
             from webserver.models import Item
 
             item = self.handler.session.query(Item).filter(Item.book_id == self.book["id"]).first()
-            data["sole"] = item.sole if item else False
+            data["scope"] = item.scope if item else "public"
         except:
-            data["sole"] = False
+            data["scope"] = "public"
 
         return data
 

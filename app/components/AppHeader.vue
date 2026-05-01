@@ -219,8 +219,8 @@
                                 prepend-icon="mdi-history"
                             />
                             <v-list-item
-                                to="/soledbooks"
-                                :title="$t('navigation.soledBooks')"
+                                to="/scopedbooks"
+                                :title="$t('navigation.scopedBooks')"
                                 prepend-icon="mdi-shield-account"
                             />
                             <v-list-item

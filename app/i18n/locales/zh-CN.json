@@ -88,7 +88,7 @@
     "timeoutMessage": "超时未完成，可继续等待稍后刷新尝试",
     "parseTimeout": "解析超时",
     "viewDetails": "浏览详情",
-    "setSole": "设为私藏",
+    "setPrivate": "设为私有",
     "setPublic": "设为公开"
   },
   "library": {
@@ -127,7 +127,7 @@
     "users": "用户管理",
     "books": "图书管理",
     "import": "导入图书",
-    "soledBooks": "私藏书籍"
+    "scopedBooks": "私有书籍"
   },
   "user": {
     "history": {
@@ -161,7 +161,7 @@
       "invalidEmailFormat": "邮箱格式不正确",
       "passwordsNotSame": "两次输入的密码不一致",
       "activationEmailSent": "激活邮件已发出！",
-      "soledBooks": "个人私藏书籍"
+      "scopedBooks": "个人私有书籍"
     }
   },
   "auth": {
@@ -193,7 +193,7 @@
     "pleaseLogin": "请登录",
     "userCenter": "用户中心",
     "readingHistory": "阅读记录",
-    "soledBooks": "私藏书籍",
+    "scopedBooks": "私有书籍",
     "feedback": "反馈",
     "adminEntry": "管理员入口",
     "logout": "退出",
