@@ -72,7 +72,7 @@ JSON schema (example):
   "tags": ["..."]
 }}
 
-Book to look up: "{title}"{author_hint}
+Book to look up: {title}{author_hint}
 """.format(title=title, author_hint=author_hint)
         return prompt
 
