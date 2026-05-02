@@ -92,6 +92,8 @@ Book to look up: {title}{author_hint}
                 ],
                 "temperature": 0.3,
             }
+            if self.use_thinking:
+                payload["thinking"] = {"type": "enabled", "budget_tokens": 8000}
 
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=25)
 

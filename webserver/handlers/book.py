@@ -115,26 +115,6 @@ class BookRefer(BaseHandler):
                 return True
         return False
 
-    @staticmethod
-    def _count_active_sources(sources):
-        """计算实际会执行的信息源查询数量"""
-        count = 0
-        if META_SOURCE_DOUBAN in sources:
-            count += 1
-        if META_SOURCE_BAIDU in sources:
-            count += 1
-        if META_SOURCE_GOOGLE in sources or META_SOURCE_AMAZON in sources:
-            count += 1
-        if META_SOURCE_XHSD in sources:
-            count += 1
-        if hasattr(youshu, "YoushuApi"):
-            count += 1
-        if hasattr(tomato, "TomatoNovelApi"):
-            count += 1
-        if META_SOURCE_AI in sources:
-            count += 1
-        return count
-
     REFER_TIMEOUT = 30  # 并行查询总超时秒数（需大于 AI HTTP timeout）
 
     def plugin_search_books(self, mi):
@@ -374,6 +354,10 @@ class BookRefer(BaseHandler):
     @auth
     def get(self, id):
         book_id = int(id)
+        item = self.session.query(Item).filter(Item.book_id == book_id).first()
+        if item and item.scope == "private":
+            if item.collector_id != self.user_id():
+                return {"err": "book.not_found", "msg": _("书籍不存在")}
         mi = self.db.get_metadata(book_id, index_is_id=True)
         books = self.plugin_search_books(mi)
         keys = [
