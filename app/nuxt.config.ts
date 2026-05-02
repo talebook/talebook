@@ -37,14 +37,14 @@ export default defineNuxtConfig({
     },
     runtimeConfig: {
         public: {
-            api_url: process.env.API_URL || 'http://127.0.0.1:8000',
+            api_url: process.env.API_URL || 'http://127.0.0.1:8080',
             site_title: process.env.TITLE || 'talebook',
         }
     },
     routeRules: {
-        '/api/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8000') + '/api/**' },
-        '/get/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8000') + '/get/**' },
-        '/read/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8000') + '/read/**' },
+        '/api/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/api/**' },
+        '/get/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/get/**' },
+        '/read/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/read/**' },
     },
     app: {
         head: {

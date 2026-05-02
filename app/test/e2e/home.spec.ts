@@ -13,7 +13,7 @@ const apiIndex = JSON.parse(fs.readFileSync(path.join(mockDir, 'api_index.json')
 test.describe('Homepage', () => {
     test.beforeEach(async ({ request }) => {
     // Reset mock server to installed state
-        const response = await request.post('http://127.0.0.1:8000/_test/reset', {
+        const response = await request.post('http://127.0.0.1:8080/_test/reset', {
             data: { installed: true }
         });
         expect(response.ok()).toBeTruthy();
