@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Install Flow', () => {
     test.beforeEach(async ({ request }) => {
     // Reset mock server to not installed state
-        const response = await request.post('http://127.0.0.1:8000/_test/reset', {
+        const response = await request.post('http://127.0.0.1:8080/_test/reset', {
             data: { installed: false }
         });
         expect(response.ok()).toBeTruthy();

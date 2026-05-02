@@ -32,7 +32,7 @@ npx playwright test
 - 统一处理 413/502 等错误状态码并弹出提示
 - 自动转发 cookie 和 X-Forwarded-* 请求头（SSR 场景）
 
-URL 路由在 `nuxt.config.ts` 的 `routeRules` 中将 `/api/**`、`/get/**`、`/read/**` 代理到后端，开发环境默认代理到 `http://127.0.0.1:8000`。
+URL 路由在 `nuxt.config.ts` 的 `routeRules` 中将 `/api/**`、`/get/**`、`/read/**` 代理到后端，开发环境默认代理到 `http://127.0.0.1:8080`。
 
 ### 全局状态
 
@@ -95,7 +95,7 @@ import { test, expect } from '@playwright/test';
 test.describe('My Page', () => {
     test.beforeEach(async ({ request }) => {
         // 重置 mock server 状态
-        await request.post('http://127.0.0.1:8000/_test/reset', {
+        await request.post('http://127.0.0.1:8080/_test/reset', {
             data: { installed: true }
         });
     });
