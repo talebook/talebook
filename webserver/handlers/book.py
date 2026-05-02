@@ -149,6 +149,7 @@ class BookRefer(BaseHandler):
         tasks = {}  # name -> callable
 
         if META_SOURCE_DOUBAN in sources:
+
             def _douban():
                 api = douban.DoubanBookApi(
                     CONF["douban_apikey"],
@@ -167,17 +168,21 @@ class BookRefer(BaseHandler):
                     if book:
                         result = [book] + list(result)
                 return [api._metadata(b) for b in result]
+
             tasks["douban"] = _douban
 
         if META_SOURCE_BAIDU in sources:
+
             def _baidu():
                 api = baike.BaiduBaikeApi(copy_image=False)
                 book = api.get_book(title)
                 return [book] if book else []
+
             tasks["baidu"] = _baidu
 
         calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
         if calibre_sources:
+
             def _calibre():
                 results = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
                 if not results:
@@ -188,30 +193,38 @@ class BookRefer(BaseHandler):
                     # 但 plugin_get_book_meta 只识别 calibre.KEY，统一覆盖
                     r.provider_key = calibre.KEY
                 return list(results) if results else []
+
             tasks["calibre"] = _calibre
 
         if META_SOURCE_XHSD in sources:
+
             def _xhsd():
                 api = xhsd.XhsdBookApi(copy_image=False)
                 book = api.get_book(mi.isbn or title)
                 return [book] if book else []
+
             tasks["xhsd"] = _xhsd
 
         if hasattr(youshu, "YoushuApi"):
+
             def _youshu():
                 api = youshu.YoushuApi(copy_image=True)
                 book = api.get_book(title)
                 return [book] if book else []
+
             tasks["youshu"] = _youshu
 
         if hasattr(tomato, "TomatoNovelApi"):
+
             def _tomato():
                 api = tomato.TomatoNovelApi(copy_image=False)
                 book = api.get_book(title)
                 return [book] if book else []
+
             tasks["tomato"] = _tomato
 
         if META_SOURCE_AI in sources:
+
             def _ai():
                 logging.info("查询 AI 信息源，title=%s", title)
                 api = AIBookApi(
@@ -224,6 +237,7 @@ class BookRefer(BaseHandler):
                 book = api.get_book(title, mi.authors[0] if mi.authors else None)
                 logging.info("AI 查询结果：%d 条", 1 if book else 0)
                 return [book] if book else []
+
             tasks["ai"] = _ai
 
         logging.info("并行查询 %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
