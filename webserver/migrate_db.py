@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 
 def get_column_type(column):
     """Convert SQLAlchemy Column type to SQLite type string"""
-    from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
     from social_sqlalchemy.storage import JSONType
+    from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
 
     col_type = type(column.type)
 
