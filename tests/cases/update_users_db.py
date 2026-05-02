@@ -24,6 +24,8 @@ TARGET_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.db")
 
 
 def get_column_type(column):
+    from social_sqlalchemy.storage import JSONType
+
     col_type = type(column.type)
 
     if col_type == Integer:
@@ -38,6 +40,8 @@ def get_column_type(column):
     elif col_type == Float:
         return "FLOAT"
     elif col_type == Text:
+        return "TEXT"
+    elif col_type == JSONType:
         return "TEXT"
 
     return "VARCHAR(255)"
@@ -63,7 +67,7 @@ def get_model_columns():
                 columns[column.name] = {
                     "type": get_column_type(column),
                     "nullable": column.nullable,
-                    "default": column.default.arg if column.default else None,
+                    "default": getattr(column.default, "arg", None) if column.default else None,
                     "primary_key": column.primary_key,
                 }
             except Exception as e:
