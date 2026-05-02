@@ -14,6 +14,7 @@ Features:
     4. Will not delete existing fields (data safety guaranteed)
 """
 
+import json
 import logging
 import os
 import sys
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 def get_column_type(column):
     """Convert SQLAlchemy Column type to SQLite type string"""
+    from social_sqlalchemy.storage import JSONType
     from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
 
     col_type = type(column.type)
@@ -40,7 +42,6 @@ def get_column_type(column):
     if col_type == Integer:
         return "INTEGER"
     elif col_type == String:
-        # Access length from the type object, not the column
         length = column.type.length if hasattr(column.type, "length") else 255
         return f"VARCHAR({length})" if length else "VARCHAR(255)"
     elif col_type == Boolean:
@@ -51,8 +52,9 @@ def get_column_type(column):
         return "FLOAT"
     elif col_type == Text:
         return "TEXT"
+    elif col_type == JSONType:
+        return "TEXT"
 
-    # Default to VARCHAR
     return "VARCHAR(255)"
 
 
@@ -81,7 +83,7 @@ def get_model_columns():
                 columns[column.name] = {
                     "type": get_column_type(column),
                     "nullable": column.nullable,
-                    "default": column.default.arg if column.default else None,
+                    "default": getattr(column.default, "arg", None) if column.default else None,
                     "primary_key": column.primary_key,
                 }
             except Exception as e:
@@ -209,6 +211,8 @@ def add_column(engine, migration):
             sql_parts.append(f"DEFAULT '{default_value}'")
         elif isinstance(default_value, bool):
             sql_parts.append(f"DEFAULT {1 if default_value else 0}")
+        elif isinstance(default_value, (dict, list)):
+            sql_parts.append(f"DEFAULT '{json.dumps(default_value)}'")
         else:
             sql_parts.append(f"DEFAULT {default_value}")
 

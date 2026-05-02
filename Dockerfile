@@ -134,7 +134,9 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     ln -s /data/books/logo app/dist/logo && \
     mkdir -p /prebuilt/ && \
     mv /data/* /prebuilt/ && \
-    chmod +x /var/www/talebook/docker/start.sh
+    chmod +x /var/www/talebook/docker/start.sh && \
+    chmod +x /var/www/talebook/server.py && \
+    chmod +x /var/www/talebook/webserver/migrate_db.py
 
 EXPOSE 80 443
 
