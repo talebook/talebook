@@ -55,16 +55,12 @@ class AIBookApi:
 
         prompt = """You are a book metadata assistant. Look up the book and return its information as JSON.
 
-Book to look up: "{title}"{author_hint}
-
 Instructions:
-- Return a JSON object wrapped in <json_response> tags.
+- Output ONLY a valid JSON object, no other text.
 - If you know the book, fill in all fields with accurate data.
 - If the book is completely unknown to you, set status to "unknown".
-- Output ONLY the <json_response> block, no other text.
 
-Schema:
-<json_response>
+JSON schema (example):
 {{
   "status": "ok",
   "title": "...",
@@ -75,7 +71,8 @@ Schema:
   "summary": "...",
   "tags": ["..."]
 }}
-</json_response>
+
+Book to look up: "{title}"{author_hint}
 """.format(title=title, author_hint=author_hint)
         return prompt
 
