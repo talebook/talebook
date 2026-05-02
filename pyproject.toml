@@ -12,7 +12,7 @@ dependencies = [
     "jinja2==3.1.6",
     "pymysql>=1.1.2",
     "msgpack>=1.1.2",
-    "pytest==9.0.3",
+    "pytest==7.4.4",
     "pytest-cov>=4.1.0",
     "python-dateutil>=2.9.0",
     "social-auth-app-tornado==1.0.0",
