@@ -514,7 +514,10 @@ class TestRefer(TestWithUserLogin):
     @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi._baike")
     @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi.get_cover")
     @mock.patch("webserver.plugins.meta.youshu.YoushuApi._youshu")
-    def test_refer(self, m7, m6, m5, m4, m3, m2, m1):
+    @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_isbn")
+    @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_title")
+    @mock.patch("webserver.plugins.meta.tomato.TomatoNovelApi.get_book")
+    def test_refer(self, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
         from tests.test_baike import BAIKE_PAGE
         from tests.test_douban import DOUBAN_BOOK, DOUBAN_SEARCH
         from tests.test_youshu import YOUSHU_PAGE
@@ -528,6 +531,9 @@ class TestRefer(TestWithUserLogin):
         m6.return_value = ("jpg", b"image-body")
 
         m7.return_value = YOUSHU_PAGE
+        m_calibre_isbn.return_value = []
+        m_calibre_title.return_value = []
+        m_tomato.return_value = None
 
         # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
         # main.CONF["douban_baseurl"] = self.douban_url
@@ -792,6 +798,98 @@ class TestInviteMode(TestApp):
 
         r = self.fetch("/opds/nav/4e617574686f7273?offset=1")
         self.assertEqual(r.code, 401)
+
+
+class TestBookDetailScope(TestApp):
+    """私有书籍详情页访问权限测试"""
+
+    def _set_book_scope(self, book_id, scope, collector_id=1):
+        from webserver.models import Item
+
+        session = get_db()
+        item = session.query(Item).filter(Item.book_id == book_id).first()
+        if item is None:
+            item = Item()
+            item.book_id = book_id
+            session.add(item)
+        item.scope = scope
+        item.collector_id = collector_id
+        session.commit()
+
+    def _clear_book_scope(self, book_id):
+        from webserver.models import Item
+
+        session = get_db()
+        item = session.query(Item).filter(Item.book_id == book_id).first()
+        if item:
+            item.scope = "public"
+            session.commit()
+
+    def test_guest_cannot_access_private_book(self):
+        self._set_book_scope(BID_EPUB, "private", collector_id=1)
+        try:
+            d = self.json("/api/book/%d" % BID_EPUB)
+            self.assertNotEqual(d["err"], "ok")
+        finally:
+            self._clear_book_scope(BID_EPUB)
+
+    def test_owner_can_access_private_book(self):
+        self._set_book_scope(BID_EPUB, "private", collector_id=1)
+        try:
+            with mock.patch.object(BaseHandler, "user_id", return_value=1):
+                d = self.json("/api/book/%d" % BID_EPUB)
+                self.assertEqual(d["err"], "ok")
+        finally:
+            self._clear_book_scope(BID_EPUB)
+
+    def test_other_user_cannot_access_private_book(self):
+        self._set_book_scope(BID_EPUB, "private", collector_id=1)
+        try:
+            with mock.patch.object(BaseHandler, "user_id", return_value=2):
+                d = self.json("/api/book/%d" % BID_EPUB)
+                self.assertNotEqual(d["err"], "ok")
+        finally:
+            self._clear_book_scope(BID_EPUB)
+
+    def test_guest_can_access_public_book(self):
+        self._set_book_scope(BID_EPUB, "public", collector_id=1)
+        try:
+            d = self.json("/api/book/%d" % BID_EPUB)
+            self.assertEqual(d["err"], "ok")
+        finally:
+            self._clear_book_scope(BID_EPUB)
+
+    def test_library_hides_private_book_from_guest(self):
+        self._set_book_scope(BID_EPUB, "private", collector_id=1)
+        try:
+            d = self.json("/api/library")
+            self.assertEqual(d["err"], "ok")
+            ids = [b["id"] for b in d["books"]]
+            self.assertNotIn(BID_EPUB, ids)
+        finally:
+            self._clear_book_scope(BID_EPUB)
+
+    def test_library_shows_private_book_to_owner(self):
+        self._set_book_scope(BID_EPUB, "private", collector_id=1)
+        try:
+            with mock.patch.object(BaseHandler, "user_id", return_value=1):
+                d = self.json("/api/library")
+                self.assertEqual(d["err"], "ok")
+                ids = [b["id"] for b in d["books"]]
+                self.assertIn(BID_EPUB, ids)
+        finally:
+            self._clear_book_scope(BID_EPUB)
+
+    def test_library_hides_private_book_from_other_user(self):
+        self._set_book_scope(BID_EPUB, "private", collector_id=1)
+        try:
+            with mock.patch.object(BaseHandler, "user_id", return_value=2):
+                d = self.json("/api/library")
+                self.assertEqual(d["err"], "ok")
+                ids = [b["id"] for b in d["books"]]
+                self.assertNotIn(BID_EPUB, ids)
+        finally:
+            self._clear_book_scope(BID_EPUB)
 
 
 def setUpModule():

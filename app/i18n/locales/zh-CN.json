@@ -102,7 +102,9 @@
     "parseTimeout": "解析超时",
     "viewDetails": "浏览详情",
     "setPrivate": "设为私有",
-    "setPublic": "设为公开"
+    "setPublic": "设为公开",
+    "scopePrivate": "私有书籍",
+    "scopePublic": "公共书籍"
   },
   "library": {
     "title": "图书馆",

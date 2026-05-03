@@ -489,6 +489,18 @@
                                             {{ tag }}
                                         </v-chip>
                                     </template>
+                                    <v-chip
+                                        v-if="book.scope"
+                                        class="ma-1"
+                                        size="small"
+                                        :color="book.scope === 'private' ? 'orange' : 'teal'"
+                                        variant="flat"
+                                    >
+                                        <v-icon start>
+                                            {{ book.scope === 'private' ? 'mdi-earth-off' : 'mdi-earth' }}
+                                        </v-icon>
+                                        {{ book.scope === 'private' ? t('book.scopePrivate') : t('book.scopePublic') }}
+                                    </v-chip>
                                 </div>
                             </v-card-text>
                             <v-card-text>

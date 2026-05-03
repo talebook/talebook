@@ -417,6 +417,16 @@ class BaseHandler(web.RequestHandler):
                 return None
         return books[0]
 
+    def _get_private_book_ids(self):
+        """返回当前用户无权查看的 scope=private 书籍 ID 集合"""
+        user_id = self.user_id()
+        if user_id:
+            return set(
+                item.book_id
+                for item in self.session.query(Item).filter(Item.scope == "private", Item.collector_id != user_id).all()
+            )
+        return set(item.book_id for item in self.session.query(Item).filter(Item.scope == "private").all())
+
     def is_book_owner(self, book_id, user_id):
         auto = int(CONF.get("auto_login", 0))
         if auto:
@@ -547,23 +557,16 @@ class ListHandler(BaseHandler):
             size = 60
         delta = min(max(size, 60), 100)
 
+        private_book_ids = self._get_private_book_ids()
         if ids:
-            ids = list(ids)
-            # 过滤掉其他用户标记为 scope=private 的书籍
-            user_id = self.user_id()
-            if user_id:
-                private_book_ids = set(
-                    item.book_id
-                    for item in self.session.query(Item).filter(Item.scope == "private", Item.collector_id != user_id).all()
-                )
-                ids = [book_id for book_id in ids if book_id not in private_book_ids]
-
+            ids = [book_id for book_id in ids if book_id not in private_book_ids]
             count = len(ids)
             books = self.get_books(ids=ids[start : start + delta])
             if sort_by_id:
                 # 归一化，按照 id 从大到小排列。
                 self.do_sort(books, "id", False)
         else:
+            all_books = [b for b in all_books if b["id"] not in private_book_ids]
             count = len(all_books)
             books = all_books[start : start + delta]
         return {

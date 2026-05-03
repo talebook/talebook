@@ -487,7 +487,7 @@ const addUser = async () => {
     
     // 构建权限字符串
     let permissionStr = '';
-    for (let perm of permissions) {
+    for (let perm of permissions.value) {
         if (newUser.value.permissions[perm.name]) {
             permissionStr += perm.code.toLowerCase();
         } else {

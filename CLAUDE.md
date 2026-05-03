@@ -41,8 +41,9 @@ make dev     # 挂载 webserver/ 进容器，用于后端开发调试
 ### 提交前检查
 
 ```bash
-make lint-py   # 后端：flake8 必须通过，不允许提交有 lint 错误的代码
-make pytest    # 后端：所有测试必须通过
+make lint-py-fix  # 后端：用 black + isort 自动修复格式，开发完代码后必须执行
+make lint-py      # 后端：flake8 必须通过，不允许提交有 lint 错误的代码
+make pytest       # 后端：所有测试必须通过
 cd app && npm run lint   # 前端：eslint 必须通过
 ```
 

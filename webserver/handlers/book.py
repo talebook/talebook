@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import concurrent.futures
 import datetime
 import json
 import logging
@@ -90,6 +91,11 @@ class BookDetail(BaseHandler):
     @js
     def get(self, id):
         book = self.get_book(id)
+        item = self.session.query(Item).filter(Item.book_id == int(id)).first()
+        if item and item.scope == "private":
+            user_id = self.user_id()
+            if not user_id or item.collector_id != user_id:
+                return {"err": "book.not_found", "msg": _("书籍不存在")}
         return {
             "err": "ok",
             "kindle_sender": CONF["smtp_username"],
@@ -109,46 +115,22 @@ class BookRefer(BaseHandler):
                 return True
         return False
 
-    @staticmethod
-    def _count_active_sources(sources):
-        """计算实际会执行的信息源查询数量"""
-        count = 0
-        if META_SOURCE_DOUBAN in sources:
-            count += 1
-        if META_SOURCE_BAIDU in sources:
-            count += 1
-        if META_SOURCE_GOOGLE in sources or META_SOURCE_AMAZON in sources:
-            count += 1
-        if META_SOURCE_XHSD in sources:
-            count += 1
-        if hasattr(youshu, "YoushuApi"):
-            count += 1
-        if hasattr(tomato, "TomatoNovelApi"):
-            count += 1
-        if META_SOURCE_AI in sources:
-            count += 1
-        return count
+    REFER_TIMEOUT = 30  # 并行查询总超时秒数（需大于 AI HTTP timeout）
 
     def plugin_search_books(self, mi):
-        # 获取配置的信息源列表
         sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
         logging.info("META_SELECTED_SOURCES 配置：%s", sources)
         if not sources:
             return []
 
         title = re.sub("[(（].*", "", mi.title)
-        books = []
 
-        # 计算实际会执行的信息源查询数量
-        total_sources = self._count_active_sources(sources)
-        current_index = 0
-        logging.info("开始按信息源查询，共 %d 个信息源", total_sources)
+        # 将每个数据源封装为独立 callable，返回 list
+        tasks = {}  # name -> callable
 
-        # 1. 豆瓣查询
         if META_SOURCE_DOUBAN in sources:
-            current_index += 1
-            logging.info("[%d/%d] 查询豆瓣...", current_index, total_sources)
-            try:
+
+            def _douban():
                 api = douban.DoubanBookApi(
                     CONF["douban_apikey"],
                     CONF["douban_baseurl"],
@@ -156,120 +138,75 @@ class BookRefer(BaseHandler):
                     manual_select=False,
                     maxCount=CONF["douban_max_count"],
                 )
-                # first, search title
                 try:
-                    books = api.search_books(title) or []
-                except:
+                    result = api.search_books(title) or []
+                except Exception:
                     logging.error(_("豆瓣接口查询 %s 失败" % title))
-
-                if not self.has_proper_book(books, mi):
-                    # 若有 ISBN 号，但是却没搜索出来，则精准查询一次 ISBN
-                    # 总是把最佳书籍放在第一位
+                    result = []
+                if not self.has_proper_book(result, mi):
                     book = api.get_book_by_isbn(mi.isbn)
                     if book:
-                        books = list(books)
-                        books.insert(0, book)
-                books = [api._metadata(b) for b in books]
-                logging.info("豆瓣查询结果：%d 条", len(books))
-            except Exception as e:
-                logging.error(_("豆瓣查询失败：%s"), e)
+                        result = [book] + list(result)
+                return [api._metadata(b) for b in result]
 
-        # 2. 百度百科查询
+            tasks["douban"] = _douban
+
         if META_SOURCE_BAIDU in sources:
-            current_index += 1
-            logging.info("[%d/%d] 查询百度百科...", current_index, total_sources)
-            api = baike.BaiduBaikeApi(copy_image=False)
-            try:
-                book = api.get_book(title)
-                if book:
-                    books.append(book)
-                    logging.info("百度百科查询结果：1 条")
-                else:
-                    logging.info("百度百科查询结果：0 条")
-            except Exception as e:
-                logging.error(_("百度百科查询失败：%s"), e)
 
-        # 3. Calibre (Google Books & Amazon.com) 查询
+            def _baidu():
+                api = baike.BaiduBaikeApi(copy_image=False)
+                book = api.get_book(title)
+                return [book] if book else []
+
+            tasks["baidu"] = _baidu
+
         calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
         if calibre_sources:
-            current_index += 1
-            logging.info("[%d/%d] 查询 Calibre (Google/Amazon)...", current_index, total_sources)
-            try:
-                # 优先使用 ISBN 查询
-                results = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
-                if results:
-                    for result in results:
-                        result.cover_data = (
-                            calibre.CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
-                        )
-                        books.append(result)
-                    logging.info("Calibre(ISBN) 查询结果：%d 条", len(results))
 
-                # 如果没找到，尝试书名查询
+            def _calibre():
+                results = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
                 if not results:
                     results = calibre.CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
-                    if results:
-                        for result in results:
-                            result.cover_data = (
-                                calibre.CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
-                            )
-                            books.append(result)
-                        logging.info("Calibre(书名) 查询结果：%d 条", len(results))
-                    else:
-                        logging.info("Calibre 查询结果：0 条")
-            except Exception as e:
-                logging.error(_("Calibre 查询失败：%s"), e)
+                for r in results or []:
+                    r.cover_data = calibre.CalibreMetadataApi.get_cover(r.cover_url) if getattr(r, "cover_url", None) else None
+                    # calibre 插件内部按子数据源设置 provider_key（"google"/"amazon"），
+                    # 但 plugin_get_book_meta 只识别 calibre.KEY，统一覆盖
+                    r.provider_key = calibre.KEY
+                return list(results) if results else []
 
-        # 4. 新华书店查询
+            tasks["calibre"] = _calibre
+
         if META_SOURCE_XHSD in sources:
-            current_index += 1
-            logging.info("[%d/%d] 查询新华书店...", current_index, total_sources)
-            try:
+
+            def _xhsd():
                 api = xhsd.XhsdBookApi(copy_image=False)
                 book = api.get_book(mi.isbn or title)
-                if book:
-                    books.append(book)
-                    logging.info("新华书店查询结果：1 条")
-                else:
-                    logging.info("新华书店查询结果：0 条")
-            except Exception as e:
-                logging.error(_("新华书店查询失败：%s"), e)
+                return [book] if book else []
 
-        # 5. 优书网查询
+            tasks["xhsd"] = _xhsd
+
         if hasattr(youshu, "YoushuApi"):
-            current_index += 1
-            logging.info("[%d/%d] 查询优书网...", current_index, total_sources)
-            api = youshu.YoushuApi(copy_image=True)
-            try:
-                book = api.get_book(title)
-                if book:
-                    books.append(book)
-                    logging.info("优书网查询结果：1 条")
-                else:
-                    logging.info("优书网查询结果：0 条")
-            except Exception as e:
-                logging.error(_("优书网查询失败：%s"), e)
 
-        # 6. 番茄小说查询
+            def _youshu():
+                api = youshu.YoushuApi(copy_image=True)
+                book = api.get_book(title)
+                return [book] if book else []
+
+            tasks["youshu"] = _youshu
+
         if hasattr(tomato, "TomatoNovelApi"):
-            current_index += 1
-            logging.info("[%d/%d] 查询番茄小说...", current_index, total_sources)
-            api = tomato.TomatoNovelApi(copy_image=False)
-            try:
-                book = api.get_book(title)
-                if book:
-                    books.append(book)
-                    logging.info("番茄小说查询结果：1 条")
-                else:
-                    logging.info("番茄小说查询结果：0 条")
-            except Exception as e:
-                logging.error(_("番茄小说查询失败：%s"), e)
 
-        # 7. AI 查询
+            def _tomato():
+                api = tomato.TomatoNovelApi(copy_image=False)
+                book = api.get_book(title)
+                return [book] if book else []
+
+            tasks["tomato"] = _tomato
+
         if META_SOURCE_AI in sources:
-            current_index += 1
-            logging.info("[%d/%d] 查询 AI...", current_index, total_sources)
-            try:
+
+            def _ai():
+                logging.info("查询 AI 信息源，title=%s", title)
                 api = AIBookApi(
                     api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
                     api_key=CONF.get("ai_api_key", ""),
@@ -278,16 +215,28 @@ class BookRefer(BaseHandler):
                     copy_image=False,
                 )
                 book = api.get_book(title, mi.authors[0] if mi.authors else None)
-                if book:
-                    books.append(book)
-                    logging.info("AI 查询结果：1 条")
-                else:
-                    logging.info("AI 查询结果：0 条")
-            except Exception as e:
-                logging.error(_("AI 查询失败：%s"), e)
+                logging.info("AI 查询结果：%d 条", 1 if book else 0)
+                return [book] if book else []
+
+            tasks["ai"] = _ai
+
+        logging.info("并行查询 %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
+        books = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+            future_map = {executor.submit(fn): name for name, fn in tasks.items()}
+            done, not_done = concurrent.futures.wait(future_map, timeout=self.REFER_TIMEOUT)
+            for f in not_done:
+                logging.warning("查询 %s 超时，已跳过", future_map[f])
+            for f in done:
+                name = future_map[f]
+                try:
+                    result = f.result()
+                    books.extend(result)
+                    logging.info("%s 查询完成：%d 条", name, len(result))
+                except Exception as e:
+                    logging.error("%s 查询失败：%s", name, e)
 
         logging.info("所有信息源查询完成，共找到 %d 条结果", len(books))
-
         return books
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
@@ -405,6 +354,10 @@ class BookRefer(BaseHandler):
     @auth
     def get(self, id):
         book_id = int(id)
+        item = self.session.query(Item).filter(Item.book_id == book_id).first()
+        if item and item.scope == "private":
+            if item.collector_id != self.user_id():
+                return {"err": "book.not_found", "msg": _("书籍不存在")}
         mi = self.db.get_metadata(book_id, index_is_id=True)
         books = self.plugin_search_books(mi)
         keys = [
