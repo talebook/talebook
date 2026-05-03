@@ -10,11 +10,11 @@ from gettext import gettext as _
 
 import psutil
 
-from webserver import loader
-from webserver import utils
+from webserver import loader, utils
 from webserver.services import AsyncService
 from webserver.services.background_service import BackgroundService, BackgroundTask
 from webserver.services.mail import MailService
+
 
 EBOOK_CONVERT_CMD = "ebook-convert"
 DEFAULT_CONVERT_TIMEOUT = 3000
@@ -38,9 +38,9 @@ class ConvertService(AsyncService):
             "book-%s-" % book["id"],
         )
         found = False
-        for process in psutil.process_iter(['cmdline']):
+        for process in psutil.process_iter(["cmdline"]):
             try:
-                cmdline = process.info['cmdline']
+                cmdline = process.info["cmdline"]
                 if cmdline and any(converted_book_path_prefix in arg for arg in cmdline):
                     logging.info("Found process with string '%s': PID %s", converted_book_path_prefix, process.pid)
                     found = True
@@ -56,15 +56,13 @@ class ConvertService(AsyncService):
         if new_path.lower().endswith(".epub"):
             args += ["--epub-version", "2"]
             if old_path.lower().endswith(".txt"):
-                args += ["--chapter-mark", "pagebreak",
-                         "--output-profile", "kindle",
-                         "--flow-size", "260"]
+                args += ["--chapter-mark", "pagebreak", "--output-profile", "kindle", "--flow-size", "260"]
             else:
                 args += ["--flow-size", "0"]
         elif new_path.lower().endswith(".azw3"):
             args += ["--enable-heuristics", "--output-profile", "kindle"]
         elif new_path.lower().endswith(".pdf"):
-            cn_font_name = "\"WenQuanYi Micro Hei,文泉驛微米黑,文泉驿微米黑\""
+            cn_font_name = '"WenQuanYi Micro Hei,文泉驛微米黑,文泉驿微米黑"'
             args += ["--paper-size=a5"]
             args += ["--pdf-page-margin-left=15"]
             args += ["--pdf-page-margin-top=15"]
@@ -73,8 +71,8 @@ class ConvertService(AsyncService):
             args += ["--no-chapters-in-toc"]
             args += ["--base-font-size=12"]
             args += ["--filter-css=font-family"]
-            args += [f"--pdf-sans-family=\"{cn_font_name}\""]
-            args += [f"--pdf-serif-family=\"{cn_font_name}\""]
+            args += [f'--pdf-sans-family="{cn_font_name}"']
+            args += [f'--pdf-serif-family="{cn_font_name}"']
 
         timeout = DEFAULT_CONVERT_TIMEOUT
         try:
@@ -94,7 +92,7 @@ class ConvertService(AsyncService):
                 p.kill()
                 logging.info("ebook-convert timeout: %s" % new_path)
                 log.info("ebook-convert timeout: %s" % new_path)
-                log.write(u"\n服务器转换书本格式时超时了。请在配置管理页面调大超时时间。\n[FINISH]")
+                log.write("\n服务器转换书本格式时超时了。请在配置管理页面调大超时时间。\n[FINISH]")
                 return False
             return True
 
@@ -128,7 +126,8 @@ class ConvertService(AsyncService):
         if new_fmt == "":
             new_fmt = "epub"
         new_path = os.path.join(
-            CONF["convert_path"], "book-%s-%s.%s" % (book["id"], int(time.time()), new_fmt),
+            CONF["convert_path"],
+            "book-%s-%s.%s" % (book["id"], int(time.time()), new_fmt),
         )
         progress_file = ConvertService().get_path_progress(book["id"])
         logging.info("convert book: %s => %s, progress: %s" % (fpath, new_path, progress_file))
@@ -142,7 +141,7 @@ class ConvertService(AsyncService):
         if task:
             BackgroundService().complete_task(task.id)
         if not ok:
-            self.add_msg(user_id, "danger", u"[%s]文件格式转换失败！请查看日志，或到公众号上私信联系" % service_item)
+            self.add_msg(user_id, "danger", "[%s]文件格式转换失败！请查看日志，或到公众号上私信联系" % service_item)
             return
 
         with open(new_path, "rb") as f:
