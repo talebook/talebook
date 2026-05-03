@@ -85,7 +85,9 @@
     "parseTimeout": "Parsing Timeout",
     "viewDetails": "View Details",
     "setSole": "Set as Private",
-    "setPublic": "Set as Public"
+    "setPublic": "Set as Public",
+    "scopePrivate": "Private",
+    "scopePublic": "Public"
   },
   "library": {
     "title": "Library",

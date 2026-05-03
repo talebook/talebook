@@ -500,6 +500,8 @@ class OpdsHandler(BaseHandler):
             ids = self.search_for_books(query)
         except:
             raise web.HTTPError(404, reason="Search: %r not understood" % query)
+        private_ids = self._get_private_book_ids()
+        ids = [i for i in ids if i not in private_ids]
         page_url = url_for("opdssearch", query=query)
         return self.get_opds_acquisition_feed(ids, offset, page_url, url_for("opds"), "calibre-search:" + query)
 
@@ -515,6 +517,8 @@ class OpdsHandler(BaseHandler):
         feed_title = {"newest": _("Newest"), "title": _("Title")}.get(which, which)
         feed_title = default_feed_title + " :: " + _("By {0}").format(feed_title)
         ids = list(self.cache.search(""))
+        private_ids = self._get_private_book_ids()
+        ids = [i for i in ids if i not in private_ids]
         return self.get_opds_acquisition_feed(
             ids,
             offset,
@@ -692,6 +696,8 @@ class OpdsHandler(BaseHandler):
                 ids = self.search_for_books('search:"%s"' % which)
             except:
                 raise web.HTTPError(404, reason="Search: %r not understood" % which)
+            private_ids = self._get_private_book_ids()
+            ids = [i for i in ids if i not in private_ids]
             return self.get_opds_acquisition_feed(ids, offset, page_url, up_url, "calibre-search:" + which)
 
         if type_ != "I":
@@ -701,6 +707,8 @@ class OpdsHandler(BaseHandler):
         if q == "news":
             q = "tags"
         ids = self.db.get_books_for_category(q, which)
+        private_ids = self._get_private_book_ids()
+        ids = [i for i in ids if i not in private_ids]
         sort_by = "series" if category == "series" else "title"
 
         return self.get_opds_acquisition_feed(
