@@ -4,11 +4,12 @@
 import datetime
 import logging
 import threading
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 
 class BackgroundTask:
     """后台任务记录模型"""
+
     # 服务类型
     SERVICE_TYPE_AUTOFILL = "autofill"  # 图书信息刮削
     SERVICE_TYPE_SCAN = "scan"  # 批量图书导入
@@ -53,12 +54,13 @@ class BackgroundTask:
             "progress_data": self.progress_data,
             "create_time": self.create_time.isoformat() if self.create_time else None,
             "update_time": self.update_time.isoformat() if self.update_time else None,
-            "error_message": self.error_message
+            "error_message": self.error_message,
         }
 
 
 class BackgroundService:
     """后台任务管理服务"""
+
     _instance = None
     _lock = threading.Lock()
 
@@ -70,7 +72,7 @@ class BackgroundService:
         return cls._instance
 
     def __init__(self):
-        if not hasattr(self, '_initialized'):
+        if not hasattr(self, "_initialized"):
             self._tasks = {}  # task_id -> BackgroundTask
             self._tasks_lock = threading.Lock()
             self._initialized = True
@@ -82,10 +84,7 @@ class BackgroundService:
                 service_item=service_item,
                 book_id=book_id,
                 progress=0,
-                progress_data={
-                    "total": 1,
-                    "done": 0
-                }
+                progress_data={"total": 1, "done": 0},
             )
             logging.info(f"Added background task: {service_item}")
             return task
@@ -93,9 +92,15 @@ class BackgroundService:
             logging.error(f"Failed to add background task: {service_item}, error: {e}")
             return None
 
-    def update_task(self, service_type: str, service_item: str, book_id: int = 0,
-                    progress: int = 0, progress_data: Optional[Dict] = None,
-                    error_message: Optional[str] = None) -> BackgroundTask:
+    def update_task(
+        self,
+        service_type: str,
+        service_item: str,
+        book_id: int = 0,
+        progress: int = 0,
+        progress_data: Optional[Dict] = None,
+        error_message: Optional[str] = None,
+    ) -> BackgroundTask:
         """
         更新或创建任务状态
 
@@ -119,7 +124,8 @@ class BackgroundService:
             ]:
                 # 删除该类型的现有运行中任务
                 tasks_to_remove = [
-                    task_id for task_id, task in self._tasks.items()
+                    task_id
+                    for task_id, task in self._tasks.items()
                     if task.service_type == service_type and task.status == BackgroundTask.STATUS_RUNNING
                 ]
                 for task_id in tasks_to_remove:
@@ -131,7 +137,7 @@ class BackgroundService:
                 service_item=service_item,
                 book_id=book_id,
                 progress=progress,
-                progress_data=progress_data or {}
+                progress_data=progress_data or {},
             )
 
             if error_message:
@@ -147,9 +153,9 @@ class BackgroundService:
             logging.info(f"Created background task: {service_type} - {service_item}, progress: {progress}%")
             return task
 
-    def update_progress(self, task_id: int, progress: int,
-                        progress_data: Optional[Dict] = None,
-                        error_message: Optional[str] = None) -> bool:
+    def update_progress(
+        self, task_id: int, progress: int, progress_data: Optional[Dict] = None, error_message: Optional[str] = None
+    ) -> bool:
         """
         更新任务进度
 
@@ -252,6 +258,7 @@ class BackgroundService:
                 if task.service_type == BackgroundTask.SERVICE_TYPE_AUDIO and task.service_book_id > 0:
                     try:
                         from webserver.handlers.audio import AudioConversion
+
                         progress = AudioConversion.get_progress(task.service_book_id)
                         if progress and "converted_chapters" in progress and "total_chapters" in progress:
                             total_chapters = int(progress["total_chapters"])
@@ -302,7 +309,8 @@ class BackgroundService:
         with self._tasks_lock:
             # 查找匹配的运行中任务
             matching_tasks = [
-                task for task in self._tasks.values()
+                task
+                for task in self._tasks.values()
                 if task.service_type == service_type
                 and task.service_item == service_item
                 and task.status == BackgroundTask.STATUS_RUNNING
@@ -321,10 +329,7 @@ class BackgroundService:
         time_threshold = datetime.datetime.now() - datetime.timedelta(hours=24)
 
         # 获取所有音频任务，按更新时间倒序
-        audio_tasks = [
-            task for task in self._tasks.values()
-            if task.service_type == BackgroundTask.SERVICE_TYPE_AUDIO
-        ]
+        audio_tasks = [task for task in self._tasks.values() if task.service_type == BackgroundTask.SERVICE_TYPE_AUDIO]
         audio_tasks.sort(key=lambda t: t.update_time, reverse=True)
 
         # 删除超过24小时且排名在前10之后的记录
@@ -354,12 +359,11 @@ class BackgroundService:
             time_threshold = datetime.datetime.now() - datetime.timedelta(days=days)
 
             tasks_to_remove = [
-                task_id for task_id, task in self._tasks.items()
-                if task.status in [
-                    BackgroundTask.STATUS_COMPLETED,
-                    BackgroundTask.STATUS_CANCELLED,
-                    BackgroundTask.STATUS_FAILED
-                ] and task.update_time < time_threshold
+                task_id
+                for task_id, task in self._tasks.items()
+                if task.status
+                in [BackgroundTask.STATUS_COMPLETED, BackgroundTask.STATUS_CANCELLED, BackgroundTask.STATUS_FAILED]
+                and task.update_time < time_threshold
             ]
 
             for task_id in tasks_to_remove:

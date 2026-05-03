@@ -126,7 +126,7 @@ class BookConverter(BaseHandler):
                 fmts.append(fmt)
                 paths.append(book_path)
 
-        if ('epub' in fmts) and ('azw3' in fmts):
+        if ("epub" in fmts) and ("azw3" in fmts):
             return {"err": "params.book.invalid", "msg": _("本书已有EPUB及Kindle版本, 不需要转换")}
 
         if fmts[0] == "epub":
@@ -1657,7 +1657,7 @@ class BookSeparate(BaseHandler):
 
         except Exception as e:
             logging.error("[SEPARATE] Failed to separate format %s from book %d: %s", fmt, book_id, e)
-            if 'upload_path' in dir() and os.path.exists(upload_path):
+            if "upload_path" in dir() and os.path.exists(upload_path):
                 try:
                     os.remove(upload_path)
                 except Exception:
