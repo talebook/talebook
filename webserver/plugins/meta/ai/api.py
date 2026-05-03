@@ -93,7 +93,7 @@ Book to look up: {title}{author_hint}
                 "temperature": 0.3,
             }
             if self.use_thinking:
-                payload["thinking"] = {"type": "enabled", "budget_tokens": 8000}
+                payload["thinking"] = {"type": "enabled"}
 
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=25)
 
@@ -102,7 +102,11 @@ Book to look up: {title}{author_hint}
                 return None
 
             data = response.json()
-            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            message = data.get("choices", [{}])[0].get("message", {})
+            content = message.get("content", "")
+            reasoning = message.get("reasoning_content", "")
+            if reasoning:
+                logging.debug("AI reasoning:\n%s", reasoning)
             logging.debug("AI response:\n%s", content)
             return content
 
