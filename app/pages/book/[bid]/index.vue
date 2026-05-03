@@ -110,7 +110,7 @@
                             </v-btn>
                             <v-btn
                                 color="primary"
-                                variant="text"
+                                variant="flat"
                                 :loading="sending_to_device"
                                 @click="sendToDevice"
                                 :disabled="!canSendToDevice"
@@ -292,6 +292,172 @@
                     </v-card>
                 </v-dialog>
 
+                <!-- Upload New Format Dialog -->
+                <v-dialog
+                    v-model="dialog_upload_format"
+                    persistent
+                    max-width="500"
+                >
+                    <v-card>
+                        <v-card-title>
+                            <v-icon class="mr-2">
+                                mdi-file-upload-outline
+                            </v-icon>
+                            {{ t('book.uploadNewFormat') }}
+                        </v-card-title>
+                        <v-card-text>
+                            <p class="mb-4">
+                                {{ t('book.uploadNewFormatDesc') }}
+                            </p>
+                            <v-file-input
+                                v-model="upload_format_file"
+                                :label="t('book.selectFile')"
+                                variant="outlined"
+                                density="compact"
+                                show-size
+                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt"
+                                prepend-icon="mdi-file-document"
+                            />
+                            <v-alert
+                                type="info"
+                                variant="tonal"
+                                density="compact"
+                                class="mt-4"
+                            >
+                                {{ t('book.supportedFormatsUpload') }}
+                            </v-alert>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer />
+                            <v-btn
+                                variant="text"
+                                @click="dialog_upload_format = false"
+                            >
+                                {{ t('common.cancel') }}
+                            </v-btn>
+                            <v-btn
+                                color="primary"
+                                variant="text"
+                                :loading="uploading_format"
+                                :disabled="!upload_format_file"
+                                @click="confirmUploadFormat"
+                            >
+                                {{ t('book.upload') }}
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Separate Format Dialog -->
+                <v-dialog
+                    v-model="dialog_separate"
+                    persistent
+                    max-width="500"
+                >
+                    <v-card>
+                        <v-card-title>
+                            <v-icon class="mr-2">
+                                mdi-content-copy
+                            </v-icon>
+                            {{ t('book.seperate') }}
+                        </v-card-title>
+                        <v-card-text>
+                            <p class="mb-4">
+                                {{ t('book.selectFormatToSeparate') }}
+                            </p>
+                            <v-radio-group v-model="selectedSeparateFormat">
+                                <v-radio
+                                    v-for="file in book.files"
+                                    :key="'sep-' + file.format"
+                                    :value="file.format.toLowerCase()"
+                                    :label="`${file.format} - ${formatFileSize(file.size)}`"
+                                />
+                            </v-radio-group>
+                            <v-alert
+                                type="info"
+                                variant="tonal"
+                                density="compact"
+                                class="mt-4"
+                            >
+                                {{ t('book.separateHint') }}
+                            </v-alert>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer />
+                            <v-btn
+                                variant="text"
+                                @click="dialog_separate = false"
+                            >
+                                {{ t('common.cancel') }}
+                            </v-btn>
+                            <v-btn
+                                color="primary"
+                                variant="text"
+                                :loading="separating_book"
+                                :disabled="!selectedSeparateFormat"
+                                @click="confirmSeparate"
+                            >
+                                {{ t('common.ok') }}
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Delete Format Dialog -->
+                <v-dialog
+                    v-model="dialog_delete_format"
+                    persistent
+                    max-width="500"
+                >
+                    <v-card>
+                        <v-card-title>
+                            <v-icon class="mr-2">
+                                mdi-file-document-remove-outline
+                            </v-icon>
+                            {{ t('book.deleteFormat') }}
+                        </v-card-title>
+                        <v-card-text>
+                            <p class="mb-4">
+                                {{ t('book.selectFormatToDelete') }}
+                            </p>
+                            <v-radio-group v-model="selectedDeletedFormat">
+                                <v-radio
+                                    v-for="file in book.files"
+                                    :key="'del-' + file.format"
+                                    :value="file.format.toLowerCase()"
+                                    :label="`${file.format} - ${formatFileSize(file.size)}`"
+                                />
+                            </v-radio-group>
+                            <v-alert
+                                type="warning"
+                                variant="tonal"
+                                density="compact"
+                                class="mt-4"
+                            >
+                                {{ t('book.deleteFormatWarning') }}
+                            </v-alert>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer />
+                            <v-btn
+                                variant="text"
+                                @click="dialog_delete_format = false"
+                            >
+                                {{ t('common.cancel') }}
+                            </v-btn>
+                            <v-btn
+                                color="error"
+                                variant="text"
+                                :loading="deleting_format"
+                                :disabled="!selectedDeletedFormat"
+                                @click="confirmDeleteFormat"
+                            >
+                                {{ t('common.delete') }}
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
                 <!-- Main Book Info -->
                 <v-card>
                     <v-toolbar
@@ -313,7 +479,6 @@
                             color="primary"
                             variant="elevated"
                             class="mx-2"
-                            :disabled="!hasCompatibleFormats"
                             @click="dialog_send_to_device = !dialog_send_to_device"
                         >
                             <v-icon start>
@@ -337,6 +502,63 @@
                         </v-btn>
 
                         <template v-if="book.is_owner">
+                            <v-menu offset-y>
+                                <template #activator="{ props }">
+                                    <v-btn
+                                        v-bind="props"
+                                        color="primary"
+                                        variant="elevated"
+                                        class="ml-2"
+                                    >
+                                        <v-icon start>
+                                            mdi-file-cog
+                                        </v-icon>
+                                        {{ t('book.process') }}
+                                        <v-icon size="small">
+                                            mdi-dots-vertical
+                                        </v-icon>
+                                    </v-btn>
+                                </template>
+                                <v-list density="compact">
+                                    <v-list-item :disabled="!hasEpubAzw3OrPDF" @click="save_meta_to_file">
+                                        <template #prepend>
+                                            <v-icon>mdi-file-sync</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.saveMetaToFile') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item :disabled="!hasEBooks" @click="convert_book">
+                                        <template #prepend>
+                                            <v-icon>mdi-swap-horizontal</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.convert') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item :disabled="!hasEBooks || hasPDF" @click="convert_to_pdf">
+                                        <template #prepend>
+                                            <v-icon>mdi-file-pdf-box</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.convert_to_pdf') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item @click="seperate_book" :disabled="book.files && book.files.length <= 1">
+                                        <template #prepend>
+                                            <v-icon>mdi-content-copy</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.seperate') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item @click="show_delete_format_dialog" :disabled="book.files && book.files.length <= 1">
+                                        <template #prepend>
+                                            <v-icon>mdi-file-document-remove-outline</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.deleteFormat') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item @click="show_upload_format_dialog">
+                                        <template #prepend>
+                                            <v-icon>mdi-file-upload-outline</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.uploadNewFormat') }}</v-list-item-title>
+                                    </v-list-item>
+                                </v-list>
+                            </v-menu>
+
                             <v-menu offset-y>
                                 <template #activator="{ props }">
                                     <v-btn
@@ -635,17 +857,16 @@
                             <v-list density="compact">
                                 <v-list-item
                                     class="w-100"
-                                    :disabled="!hasCompatibleFormats"
                                     @click="dialog_send_to_device = !dialog_send_to_device"
                                 >
                                     <template #prepend>
-                                        <v-avatar :color="!hasCompatibleFormats ? 'grey' : 'primary'">
+                                        <v-avatar color="primary">
                                             <v-icon color="white">
                                                 mdi-devices
                                             </v-icon>
                                         </v-avatar>
                                     </template>
-                                    <v-list-item-title :class="{ 'text-medium-emphasis': !hasCompatibleFormats }">
+                                    <v-list-item-title>
                                         {{ t('book.sendToDevice') }}
                                     </v-list-item-title>
                                     <template #append>
@@ -728,6 +949,21 @@ const refer_books = ref([]);
 
 // TXT
 const txt_parse_inited = ref(false);
+
+// Upload format
+const dialog_upload_format = ref(false);
+const upload_format_file = ref(null);
+const uploading_format = ref(false);
+
+// Separate format
+const dialog_separate = ref(false);
+const selectedSeparateFormat = ref('');
+const separating_book = ref(false);
+
+// Delete format
+const dialog_delete_format = ref(false);
+const selectedDeletedFormat = ref('');
+const deleting_format = ref(false);
 
 // 数据获取状态
 const pending = ref(true);
@@ -833,6 +1069,27 @@ const canSendToDevice = computed(() => {
     if (!device) return false;
     if (device.type === 'kindle') return !!device.mailbox;
     return !!(device.ip && device.port);
+});
+
+const hasEBooks = computed(() => {
+    if (!book.value || !book.value.files) {
+        return false;
+    }
+    if (book.value.files.length === 0) {
+        return false;
+    }
+    return true;
+});
+
+const hasPDF = computed(() => {
+    if (!book.value || !book.value.files) return false;
+    return book.value.files.some(file => file.format.toLowerCase() === 'pdf');
+});
+
+const hasEpubAzw3OrPDF = computed(() => {
+    if (!book.value || !book.value.files) return false;
+    const formats = book.value.files.map(f => f.format.toLowerCase());
+    return formats.some(f => ['epub', 'azw3', 'pdf'].includes(f));
 });
 
 useHead({
@@ -1038,6 +1295,162 @@ const delete_book = async () => {
         }
     } catch (e) {
         if ($alert) $alert('error', '删除失败');
+    }
+};
+
+const convert_book = () => {
+    // 转换书籍格式
+    $backend('/book/' + book.value.id + '/convert', {
+        method: 'POST',
+        body: new URLSearchParams({reset: 'yes'}),
+    }).then((rsp) => {
+        if (rsp.err === 'ok') {
+            $alert('success', t('book.convertSuccessful'));
+            router.push('/book/' + book.value.id);
+        } else {
+            $alert('error', rsp.msg);
+        }
+    });
+};
+
+const convert_to_pdf = () => {
+    // 转换为PDF
+    $backend('/book/' + book.value.id + '/topdf', {
+        method: 'POST',
+        body: new URLSearchParams({reset: 'yes'}),
+    }).then((rsp) => {
+        if (rsp.err === 'ok') {
+            $alert('success', t('book.convertSuccessful'));
+        } else {
+            $alert('error', rsp.msg);
+        }
+    });
+};
+
+const save_meta_to_file = () => {
+    $backend('/book/' + book.value.id + '/savemeta', {
+        method: 'POST',
+    }).then((rsp) => {
+        if (rsp.err === 'ok') {
+            $alert('success', rsp.msg || t('book.saveMetaSuccess'));
+        } else {
+            $alert('error', rsp.msg || t('book.saveMetaFailed'));
+        }
+    }).catch(() => {
+        $alert('error', t('book.saveMetaFailed'));
+    });
+};
+
+const show_upload_format_dialog = () => {
+    upload_format_file.value = null;
+    dialog_upload_format.value = true;
+};
+
+const confirmUploadFormat = async () => {
+    if (!upload_format_file.value) {
+        $alert('error', t('book.selectFileToUpload'));
+        return;
+    }
+
+    uploading_format.value = true;
+    try {
+        const data = new FormData();
+        data.append('ebook', upload_format_file.value);
+
+        const rsp = await $backend('/book/upload?bid=' + book.value.id, {
+            method: 'POST',
+            body: data,
+        });
+
+        if (rsp.err === 'ok') {
+            dialog_upload_format.value = false;
+            $alert('success', rsp.msg || t('book.uploadSuccess'));
+            location.reload();
+        } else if (rsp.err === 'samebook') {
+            $alert('error', rsp.msg || t('book.formatAlreadyExists'));
+        } else {
+            $alert('error', rsp.msg || t('book.uploadFailed'));
+        }
+    } catch (err) {
+        console.error('Upload error:', err);
+        $alert('error', t('book.uploadFailed'));
+    } finally {
+        uploading_format.value = false;
+    }
+};
+
+const formatFileSize = (size) => {
+    if (size >= 1048576) {
+        return parseInt(size / 1048576) + 'MB';
+    } else if (size >= 1024) {
+        return parseInt(size / 1024) + 'KB';
+    }
+    return size + 'B';
+};
+
+const seperate_book = () => {
+    selectedSeparateFormat.value = '';
+    dialog_separate.value = true;
+};
+
+const confirmSeparate = async () => {
+    if (!selectedSeparateFormat.value) {
+        $alert('error', t('book.selectFormatFirst'));
+        return;
+    }
+
+    separating_book.value = true;
+    try {
+        const rsp = await $backend('/book/' + book.value.id + '/separate', {
+            method: 'POST',
+            body: JSON.stringify({ format: selectedSeparateFormat.value }),
+        });
+
+        if (rsp.err === 'ok') {
+            dialog_separate.value = false;
+            $alert('success', rsp.msg || t('book.separateSuccess'));
+            location.reload();
+        } else {
+            $alert('error', rsp.msg || t('book.separateFailed'));
+        }
+    } catch (err) {
+        console.error('Separate error:', err);
+        $alert('error', t('book.separateFailed'));
+    } finally {
+        separating_book.value = false;
+    }
+};
+
+const show_delete_format_dialog = () => {
+    selectedDeletedFormat.value = '';
+    dialog_delete_format.value = true;
+};
+
+const confirmDeleteFormat = async () => {
+    if (!selectedDeletedFormat.value) {
+        $alert('error', t('book.selectFormatFirst'));
+        return;
+    }
+
+    deleting_format.value = true;
+    try {
+        const rsp = await $backend('/book/' + book.value.id + '/delete_format', {
+            method: 'POST',
+            body: JSON.stringify({ format: selectedDeletedFormat.value }),
+        });
+
+        if (rsp.err === 'ok') {
+            dialog_delete_format.value = false;
+            $alert('success', rsp.msg || t('book.deleteFormatSuccess'));
+            location.reload();
+        } else {
+            $alert('error', rsp.msg || t('book.deleteFormatFailed'));
+        }
+    } catch (err) {
+        console.error('Delete format error:', err);
+        $alert('error', t('book.deleteFormatFailed'));
+    } finally {
+        deleting_format.value = false;
     }
 };
 

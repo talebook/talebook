@@ -16,6 +16,8 @@ CHROME_MOBILE_HEADERS = {
     + "Version/14.0 Mobile/15E148 Safari/604.1",
 }
 
+CALIBRE_ERROR_FLAG = "<*ERROR*>"
+
 # 书籍来源
 META_SOURCE_GOOGLE = "google"
 META_SOURCE_AMAZON = "amazon"
@@ -27,6 +29,9 @@ META_SOURCE_AI = "ai"
 # 书籍类型
 BOOK_TYPE_EBOOK = "ebook"
 BOOK_TYPE_PHYSICAL = "physical"
+
+# 支持的电子书格式
+SUPPORTED_EBOOK_FORMATS = ["azw3", "epub", "mobi", "pdf", "txt", "azw"]
 
 # 配置键名
 META_SELECTED_SOURCES = "META_SELECTED_SOURCES"

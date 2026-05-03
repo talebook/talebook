@@ -8,6 +8,7 @@ import logging
 import os
 import random
 import re
+import shutil
 import urllib
 
 import tornado.escape
@@ -15,6 +16,7 @@ from tornado import web
 
 from webserver import loader, utils
 from webserver.constants import (
+    CALIBRE_ERROR_FLAG,
     META_SELECTED_SOURCES,
     META_SOURCE_AI,
     META_SOURCE_AMAZON,
@@ -22,6 +24,7 @@ from webserver.constants import (
     META_SOURCE_DOUBAN,
     META_SOURCE_GOOGLE,
     META_SOURCE_XHSD,
+    SUPPORTED_EBOOK_FORMATS,
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
@@ -101,6 +104,83 @@ class BookDetail(BaseHandler):
             "kindle_sender": CONF["smtp_username"],
             "book": utils.BookFormatter(self, book).format(with_files=True, with_perms=True),
         }
+
+
+class BookConverter(BaseHandler):
+    @js
+    @auth
+    def post(self, id):
+        book_id = int(id)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍不存在")}
+
+        if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
+            return {"err": "user.no_permission", "msg": _("无权限")}
+
+        fmts = []
+        paths = []
+        for fmt in SUPPORTED_EBOOK_FORMATS:
+            book_path = book.get("fmt_%s" % fmt, None)
+            if book_path:
+                fmts.append(fmt)
+                paths.append(book_path)
+
+        if ('epub' in fmts) and ('azw3' in fmts):
+            return {"err": "params.book.invalid", "msg": _("本书已有EPUB及Kindle版本, 不需要转换")}
+
+        if fmts[0] == "epub":
+            fmt = "azw3"
+        elif fmts[0] == "pdf":
+            fmt = "epub"
+        else:
+            fmt = "epub"
+
+        fpath = paths[0]
+
+        service = ConvertService()
+        if service.is_book_converting(book):
+            return {"err": "params.book.converting", "msg": _("本书正在转换中，请稍后再试")}
+        service.convert_and_save(self.user_id(), book, fpath, fmt)
+        return {"err": "ok", "content": "%s" % _("转换成功，请稍后刷新页面查看")}
+
+
+class BookToPDF(BaseHandler):
+    @js
+    @auth
+    def post(self, id):
+        book_id = int(id)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍不存在")}
+
+        if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
+            return {"err": "user.no_permission", "msg": _("无权限")}
+
+        fmts = []
+        paths = []
+        has_pdf = False
+        for fmt in ["epub", "azw3", "mobi", "azw", "pdf"]:
+            book_path = book.get("fmt_%s" % fmt, None)
+            if not book_path:
+                continue
+            if fmt == "pdf":
+                has_pdf = True
+                continue
+            fmts.append(fmt)
+            paths.append(book_path)
+
+        if has_pdf:
+            return {"err": "params.book.invalid", "msg": _("本书已有PDF版本, 不需要转换")}
+        if len(fmts) == 0:
+            return {"err": "params.book.invalid", "msg": _("本书不支持转换，仅支持EPUB及Kindle使用的格式转换为PDF")}
+
+        fpath = paths[0]
+        service = ConvertService()
+        if service.is_book_converting(book):
+            return {"err": "params.book.converting", "msg": _("本书正在转换中，请稍后再试")}
+        service.convert_and_save(self.user_id(), book, fpath, "pdf")
+        return {"err": "ok", "content": "%s" % _("转换成功，请稍后刷新页面查看")}
 
 
 class BookRefer(BaseHandler):
@@ -1436,6 +1516,167 @@ class BookSetScope(BaseHandler):
             return {"err": "db.update.failed", "msg": _("更新失败，请稍后再试")}
 
 
+class BookDeleteFormat(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        book = self.get_book(bid, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+        bid = book["id"]
+
+        if isinstance(book["collector"], dict):
+            cid = book["collector"]["id"]
+        else:
+            cid = book["collector"].id
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
+            return {"err": "permission", "msg": _("无权操作")}
+
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+            fmt = data.get("format", "").strip().lower()
+        except Exception:
+            return {"err": "params.invalid", "msg": _("请求参数格式错误")}
+
+        if not fmt:
+            return {"err": "params.missing", "msg": _("格式参数不能为空")}
+
+        fmt_key = "fmt_%s" % fmt
+        if fmt_key not in book:
+            return {"err": "format.not_found", "msg": _("书籍不包含 %s 格式") % fmt.upper()}
+
+        available_formats = book.get("available_formats", "")
+        available_formats = [f.strip() for f in available_formats if f.strip()]
+        if len(available_formats) <= 1:
+            return {"err": "last.format", "msg": _("书籍只有一个格式，无法刪除")}
+
+        try:
+            self.cache.remove_formats({bid: [fmt.upper()]})
+            self.add_msg("success", _("删除书籍《%s》的%s格式") % (book["title"], fmt))
+            return {"err": "ok", "msg": _("删除%s格式成功") % fmt}
+        except Exception as e:
+            logging.error("删除书籍《%s》的%s格式失败: %s", book["title"], fmt, e)
+            return {"err": "fail", "msg": _("删除%s格式失败，请查看日志") % fmt}
+
+
+class BookSeparate(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        from calibre.ebooks.metadata.meta import get_metadata
+
+        book_id = int(bid)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+
+        if isinstance(book["collector"], dict):
+            cid = book["collector"]["id"]
+        else:
+            cid = book["collector"].id
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(book_id, cid)):
+            return {"err": "permission", "msg": _("无权操作")}
+
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+            fmt = data.get("format", "").strip().lower()
+        except Exception:
+            return {"err": "params.invalid", "msg": _("请求参数格式错误")}
+
+        if not fmt:
+            return {"err": "params.missing", "msg": _("格式参数不能为空")}
+
+        fmt_key = "fmt_%s" % fmt
+        if fmt_key not in book:
+            return {"err": "format.not_found", "msg": _("书籍不包含 %s 格式") % fmt.upper()}
+
+        original_path = book[fmt_key]
+        if not os.path.exists(original_path):
+            return {"err": "file.missing", "msg": _("格式文件不存在: %s") % original_path}
+
+        available_formats = book.get("available_formats", "")
+        available_formats = [f.strip() for f in available_formats if f.strip()]
+        if len(available_formats) <= 1:
+            return {"err": "last.format", "msg": _("书籍只有一个格式，无法分离")}
+
+        try:
+            filename = os.path.basename(original_path)
+            upload_path = os.path.join(CONF["upload_path"], filename)
+
+            if os.path.exists(upload_path):
+                timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                name, ext = os.path.splitext(filename)
+                upload_path = os.path.join(CONF["upload_path"], f"{name}_{timestamp}{ext}")
+
+            shutil.copy2(original_path, upload_path)
+            logging.info("[SEPARATE] Copied format file from %s to %s", original_path, upload_path)
+
+            failed = False
+            with open(upload_path, "rb") as stream:
+                mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                if mi.title and mi.title == CALIBRE_ERROR_FLAG:
+                    logging.error("Failed to get metadata for %s, reason:%s", upload_path, mi.comments)
+                    failed = True
+                mi.title = utils.super_strip(mi.title)
+                if mi.author_sort == "Unknown" and mi.authors and len(mi.authors) > 0:
+                    mi.authors = [utils.super_strip(a) for a in mi.authors]
+                else:
+                    mi.authors = [utils.super_strip(mi.author_sort)]
+
+            if failed:
+                return {"err": "book.invalid", "msg": _("此书籍文件无法识别，或者受DRM保护无法处理")}
+
+            if fmt in ["txt", "pdf"]:
+                mi.title = filename.replace("." + fmt, "")
+                mi.authors = [_("佚名")]
+
+            fpaths = [upload_path]
+            new_book_id = self.db.import_book(mi, fpaths)
+
+            if new_book_id is None:
+                if os.path.exists(upload_path):
+                    os.remove(upload_path)
+                return {"err": "book.create.failed", "msg": _("创建新书籍失败")}
+
+            item = Item()
+            item.book_id = new_book_id
+            item.collector_id = self.user_id()
+            self.session.add(item)
+            self.session.commit()
+
+            self.cache.remove_formats({book_id: [fmt.upper()]})
+
+            logging.info("[SEPARATE] Successfully separated format %s from book %d to new book %d", fmt, book_id, new_book_id)
+            self.add_msg("success", _("成功将 %s 格式分离为新书籍") % fmt.upper())
+            return {
+                "err": "ok",
+                "msg": _("格式分离成功"),
+                "original_book_id": book_id,
+                "new_book_id": new_book_id,
+            }
+
+        except Exception as e:
+            logging.error("[SEPARATE] Failed to separate format %s from book %d: %s", fmt, book_id, e)
+            if 'upload_path' in dir() and os.path.exists(upload_path):
+                try:
+                    os.remove(upload_path)
+                except Exception:
+                    pass
+            return {"err": "internal", "msg": _("分离格式时发生错误: %s") % str(e)}
+
+
+class BookSaveMeta(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        book_id = int(bid)
+        if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
+            return {"err": "user.no_permission", "msg": _("无权限，非管理员或书籍所有者无法操作")}
+
+        fmt = self.get_argument("fmt", None)
+        return self.save_book_meta(book_id, fmt=fmt)
+
+
 class BookScoped(BaseHandler):
     @js
     @auth
@@ -1497,6 +1738,11 @@ def routes():
         (r"/api/book/([0-9]+)/send_to_device", BookSendToDevice),
         (r"/api/book/([0-9]+)/mailto", BookSendToMail),
         (r"/api/book/([0-9]+)/refer", BookRefer),
+        (r"/api/book/([0-9]+)/convert", BookConverter),
+        (r"/api/book/([0-9]+)/topdf", BookToPDF),
+        (r"/api/book/([0-9]+)/delete_format", BookDeleteFormat),
+        (r"/api/book/([0-9]+)/separate", BookSeparate),
+        (r"/api/book/([0-9]+)/savemeta", BookSaveMeta),
         (r"/read/([0-9]+)", BookRead),
         (r"/api/read/txt", TxtRead),
         (r"/api/book/txt/init", BookTxtInit),

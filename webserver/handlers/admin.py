@@ -20,6 +20,7 @@ from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.models import Reader, ScanFile
 from webserver.services.autofill import AutoFillService
+from webserver.services.batch_convert import BatchConvertService
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
 
@@ -981,6 +982,53 @@ class AdminTrashClear(BaseHandler):
         return {"err": "ok", "msg": _("已清理 Calibre 回收站及上传目录")}
 
 
+class AdminBookConvert(BaseHandler):
+    """Admin API: 批量转换Kindle格式为EPUB"""
+
+    @js
+    @is_admin
+    def get(self):
+        status = BatchConvertService().status()
+        return {
+            "err": "ok",
+            "status": {
+                "total": status["count_total"],
+                "skip": status["count_skip"],
+                "done": status["count_done"],
+                "fail": status["count_fail"],
+                "running": status["is_running"],
+            },
+        }
+
+    @js
+    @is_admin
+    def post(self):
+        req = tornado.escape.json_decode(self.request.body)
+        idlist = req.get("idlist", [])
+        convert_status = BatchConvertService().status()
+        if convert_status["is_running"]:
+            return {"err": "task.running", "msg": _("有转换任务正在运行中，请稍后再试")}
+
+        if idlist:
+            if not isinstance(idlist, list):
+                return {
+                    "err": "params.error.idlist",
+                    "msg": _("参数错误, 未指定正确的id列表"),
+                }
+            for bid in idlist:
+                if not isinstance(bid, int):
+                    return {
+                        "err": "params.error.idlist",
+                        "msg": _("参数错误, id列表中包含无效的id"),
+                    }
+
+        if not idlist:
+            idlist = list(self.calibre_db_cache.all_book_ids())
+
+        BatchConvertService().convert_all(self.current_user.id, idlist)
+        return {"err": "ok", "msg": _("Kindle转EPUB任务已启动，右上角可以查看进度")}
+
+
 def routes():
     return [
         (r"/api/admin/ssl", AdminSSL),
@@ -991,6 +1039,7 @@ def routes():
         (r"/api/admin/book/list", AdminBookList),
         (r"/api/admin/book/fill", AdminBookFill),
         (r"/api/admin/book/delete", AdminBookDelete),
+        (r"/api/admin/book/kindleconvert", AdminBookConvert),
         (r"/api/admin/opds/browse", AdminOPDSBrowse),
         (r"/api/admin/opds/import", AdminOPDSImport),
         (r"/api/admin/opds/import/status", AdminOPDSImportStatus),

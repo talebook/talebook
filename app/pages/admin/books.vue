@@ -34,6 +34,16 @@
                 </v-icon>{{ t('admin.books.button.autoUpdateBookInfo') }}
             </v-btn>
             <v-btn
+                :disabled="loading"
+                variant="outlined"
+                color="info"
+                @click="show_kindle_convert_dialog"
+            >
+                <v-icon start>
+                    mdi-book-sync
+                </v-icon>{{ t('admin.books.kindleConvert') }}
+            </v-btn>
+            <v-btn
                 v-if="books_selected.length > 0"
                 :disabled="loading"
                 variant="outlined"
@@ -409,6 +419,45 @@
             </v-card>
         </v-dialog>
 
+        <!-- Kindle格式转EPUB确认对话框 -->
+        <v-dialog
+            v-model="kindle_convert_dialog"
+            persistent
+            width="500"
+        >
+            <v-card>
+                <v-toolbar
+                    flat
+                    density="compact"
+                    dark
+                    color="info"
+                    class="pl-4"
+                >
+                    {{ t('admin.books.reminderTitle') }}
+                </v-toolbar>
+                <v-card-text class="pt-4">
+                    <p v-if="books_selected.length > 0">
+                        {{ t('admin.books.kindleConvertSelectedConfirm', { count: books_selected.length }) }}
+                    </p>
+                    <p v-else>
+                        {{ t('admin.books.kindleConvertAllConfirm') }}
+                    </p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-btn @click="kindle_convert_dialog = false">
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                    <v-spacer />
+                    <v-btn
+                        color="info"
+                        @click="kindleConvert"
+                    >
+                        {{ t('admin.books.execute') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <!-- 批量删除确认对话框 -->
         <v-dialog
             v-model="delete_dialog"
@@ -464,6 +513,7 @@ const snackColor = ref('');
 const snackText = ref('');
 const meta_dialog = ref(false);
 const delete_dialog = ref(false);
+const kindle_convert_dialog = ref(false);
 const coverFile = ref(null);
 
 const books_selected = ref([]);
@@ -720,6 +770,39 @@ const saveCover = () => {
         loading.value = false;
         coverFile.value = null;
     });
+};
+
+const show_kindle_convert_dialog = () => {
+    kindle_convert_dialog.value = true;
+};
+
+const kindleConvert = () => {
+    loading.value = true;
+    kindle_convert_dialog.value = false;
+
+    const body = {};
+    if (books_selected.value.length > 0) {
+        body.idlist = books_selected.value.map((book) => book.id);
+    }
+
+    $backend('/admin/book/kindleconvert', {
+        method: 'POST',
+        body: JSON.stringify(body),
+    })
+        .then((rsp) => {
+            if (rsp.err === 'ok') {
+                snack.value = true;
+                snackColor.value = 'success';
+                snackText.value = rsp.msg;
+                books_selected.value = [];
+                getDataFromApi();
+            } else {
+                if ($alert) $alert('error', rsp.msg);
+            }
+        })
+        .finally(() => {
+            loading.value = false;
+        });
 };
 
 watch(search, () => {
