@@ -218,7 +218,7 @@ class TestAppWithoutLogin(TestApp):
         self.assertEqual(rsp.code, 302)
 
     def test_push(self):
-        d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
+        d = self.json("/api/book/1/mailto", method="POST", body=json.dumps({"email": "unittest@gmail.com"}))
         self.assertEqual(d["err"], "user.need_login")
 
     def test_user_info(self):
@@ -407,26 +407,26 @@ class TestBook(TestWithUserLogin):
         return MockConvertPath()
 
     def test_push(self):
-        with self.mock_convert() as m:
-            d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
+        with mock.patch("webserver.services.mail.MailService.send_book", return_value="Yo") as m:
+            d = self.json("/api/book/1/mailto", method="POST", body=json.dumps({"email": "unittest@gmail.com"}))
             self.assertEqual(d["err"], "ok")
-            self.assertTrue(m.call_count + self.mail.call_count <= 2)
+            self.assertEqual(m.call_count, 1)
 
     def test_push_permission(self):
-        with self.mock_convert():
+        with mock.patch("webserver.services.mail.MailService.send_book", return_value="Yo"):
             with mock_permission() as user:
                 # forbid
                 user.set_permission("P")
-                d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
+                d = self.json("/api/book/1/mailto", method="POST", body=json.dumps({"email": "unittest@gmail.com"}))
                 self.assertEqual(d["err"], "permission")
 
-        with self.mock_convert() as m:
+        with mock.patch("webserver.services.mail.MailService.send_book", return_value="Yo") as m:
             with mock_permission() as user:
                 # allow
                 user.set_permission("p")
-                d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
+                d = self.json("/api/book/1/mailto", method="POST", body=json.dumps({"email": "unittest@gmail.com"}))
                 self.assertEqual(d["err"], "ok")
-                self.assertTrue(m.call_count + self.mail.call_count <= 2)
+                self.assertEqual(m.call_count, 1)
 
     def test_delete(self):
         global _app
