@@ -10,6 +10,7 @@ from webserver.services import AsyncService
 from webserver.services.background_service import BackgroundService, BackgroundTask
 from webserver.services.convert import ConvertService
 
+
 CONF = loader.get_settings()
 
 
@@ -50,14 +51,14 @@ class BatchConvertService(AsyncService):
                 return (False, None, None)
 
             formats_lower = [f.lower() for f in formats]
-            if 'epub' in formats_lower:
+            if "epub" in formats_lower:
                 return (False, None, None)
 
             kindle_format = None
-            if 'azw3' in formats_lower:
-                kindle_format = 'azw3'
-            elif 'mobi' in formats_lower:
-                kindle_format = 'mobi'
+            if "azw3" in formats_lower:
+                kindle_format = "azw3"
+            elif "mobi" in formats_lower:
+                kindle_format = "mobi"
 
             if not kindle_format:
                 return (False, None, None)
@@ -92,9 +93,7 @@ class BatchConvertService(AsyncService):
     def _convert_one_book(self, book_id: int, kindle_format: str, kindle_path: str) -> bool:
         try:
             logging.info("[BatchConvert] Converting book id=%d from %s to epub", book_id, kindle_format)
-            new_path = os.path.join(
-                CONF["convert_path"], f"batch-convert-{book_id}-{int(time.time())}.epub"
-            )
+            new_path = os.path.join(CONF["convert_path"], f"batch-convert-{book_id}-{int(time.time())}.epub")
             progress_file = ConvertService().get_path_progress(book_id)
             ok = ConvertService().do_ebook_convert(kindle_path, new_path, progress_file)
             if not ok:
@@ -160,7 +159,10 @@ class BatchConvertService(AsyncService):
             self._update_task_progress()
 
         self._finish_task()
-        msg = _("Kindle转EPUB任务已完成，成功转换%d本书，%d本书转换失败，%d本书跳过" % (self.count_done, self.count_fail, self.count_skip))
+        msg = _(
+            "Kindle转EPUB任务已完成，成功转换%d本书，%d本书转换失败，%d本书跳过"
+            % (self.count_done, self.count_fail, self.count_skip)
+        )
         if self.count_fail + self.count_skip > 0:
             self.add_msg(user_id, "warning", msg)
         else:
