@@ -125,6 +125,7 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     echo "ARCH = \"$TARGETARCH$TARGETVARIANT\"" >> webserver/version.py && \
     echo 'settings = {}' > /data/books/settings/auto.py && \
     chmod a+w /data/books/settings/auto.py && \
+    rm -f /data/books/library/metadata.db.lock /data/books/library/metadata_db_lock* && \
     calibredb add --library-path=/data/books/library/ -r docker/book/ && \
     python3 server.py --syncdb  && \
     python3 server.py --update-config  && \
