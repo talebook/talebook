@@ -24,7 +24,8 @@
     "done": "Done",
     "manage": "Manage",
     "read": "Read",
-    "retry": "Retry"
+    "retry": "Retry",
+    "kindle": "Kindle"
   },
   "book": {
     "publisher": "Publisher",
@@ -74,6 +75,18 @@
     "parsed": "Parsed",
     "unparsed": "Unparsed",
     "pushToKindle": "Push to Kindle",
+    "sendToDevice": "Send to Device",
+    "selectDevice": "Select Device",
+    "noDevices": "No devices configured yet",
+    "configDeviceDesc": "Please configure reading devices in system settings or User Center first",
+    "temporaryDevice": "Temporary Device",
+    "deviceType": "Device Type",
+    "deviceIP": "Device IP Address",
+    "devicePort": "Device Port",
+    "deviceTypeRequired": "Please select device type",
+    "deviceIPRequired": "Please enter device IP address",
+    "devicePortRequired": "Please enter device port",
+    "kindleNotSupportTemporary": "Kindle does not support temporary connection. Please save device info in settings.",
     "loading": "Loading...",
     "previousChapter": "Previous Chapter",
     "nextChapter": "Next Chapter",
@@ -157,7 +170,10 @@
       "passwordsNotSame": "Passwords do not match",
       "activationEmailSent": "Activation email has been sent!",
       "scopedBooks": "My Private Books"
-    }
+    },
+    "basicInfo": "Basic Info",
+    "deviceMgt": "Reading Devices",
+    "deviceMgtDescription": "Manage your personal reading devices. Only visible to you. Global devices are configured by admins and available to all users."
   },
   "auth": {
     "signIn": "Sign In",
@@ -232,7 +248,8 @@
       "publisher": "All Publishers",
       "format": "All Formats"
     },
-    "confirmPassword": "Confirm Password"
+    "confirmPassword": "Confirm Password",
+    "willSendFormat": "Will send {format} format"
   },
   "index": {
     "newReleases": "New Releases",
@@ -630,6 +647,23 @@
     "configWriteSuccess": "Configuration written successfully!",
     "checkingServer": "Checking server...",
     "networkError": "Network error"
+  },
+  "settings": {
+    "deviceMgt": "Global Device Management",
+    "deviceMgtDescription": "Manage global reading devices available to all users. Users can also configure their own devices in their User Center.",
+    "deviceName": "Name",
+    "deviceIp": "IP",
+    "devicePort": "Port",
+    "deviceType": "Type",
+    "deviceSchema": "Schema",
+    "defaultReaderName": "Reader",
+    "deviceMailbox": "Email Address (should end with {'@'}kindle.com)",
+    "deviceTypeDuokan": "Duokan Reader",
+    "deviceTypeIreader": "iReader",
+    "deviceTypeHanwang": "Hanwang Reader",
+    "deviceTypeBoox": "Boox Reader",
+    "deviceTypeDangdang": "Dangdang Reader",
+    "add": "Add"
   },
   "captcha": {
     "title": "CAPTCHA",

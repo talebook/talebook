@@ -148,6 +148,8 @@ settings = {
     ],
     'SOCIALS': [
     ],
+    'DEVICES': [
+    ],
 
     'SIGNUP_MAIL_TITLE': u'欢迎注册奇异书屋',
     'SIGNUP_MAIL_CONTENT': u'''

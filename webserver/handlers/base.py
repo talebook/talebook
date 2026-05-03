@@ -406,12 +406,15 @@ class BaseHandler(web.RequestHandler):
         del vals["self"]
         self.write(self.render_string(template, **vals))
 
-    def get_book(self, book_id):
+    def get_book(self, book_id, raise_exception=True):
         books = self.get_books(ids=[int(book_id)])
         if not books:
-            self.write({"err": "not_found", "msg": _("抱歉，这本书不存在")})
-            self.set_status(200)
-            raise web.Finish()
+            if raise_exception:
+                self.write({"err": "not_found", "msg": _("抱歉，这本书不存在")})
+                self.set_status(200)
+                raise web.Finish()
+            else:
+                return None
         return books[0]
 
     def is_book_owner(self, book_id, user_id):

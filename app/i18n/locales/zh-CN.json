@@ -24,7 +24,8 @@
     "book": "书籍",
     "done": "完成",
     "manage": "管理",
-    "retry": "重试"
+    "retry": "重试",
+    "kindle": "Kindle"
   },
   "error": {
     "otherError": "其他错误",
@@ -78,6 +79,18 @@
     "parsed": "已解析",
     "unparsed": "未解析",
     "pushToKindle": "推送至 Kindle",
+    "sendToDevice": "发送到设备",
+    "selectDevice": "选择设备",
+    "noDevices": "还没有配置任何设备",
+    "configDeviceDesc": "请先在系统设置或我的账户中配置阅读设备",
+    "temporaryDevice": "临时设备",
+    "deviceType": "设备类型",
+    "deviceIP": "设备IP地址",
+    "devicePort": "设备端口",
+    "deviceTypeRequired": "请选择设备类型",
+    "deviceIPRequired": "请输入设备IP地址",
+    "devicePortRequired": "请输入设备端口",
+    "kindleNotSupportTemporary": "Kindle设备不支持临时连接，请在设置中保存设备信息",
     "loading": "加载中...",
     "previousChapter": "上一章",
     "nextChapter": "下一章",
@@ -162,7 +175,10 @@
       "passwordsNotSame": "两次输入的密码不一致",
       "activationEmailSent": "激活邮件已发出！",
       "scopedBooks": "个人私有书籍"
-    }
+    },
+    "basicInfo": "基本信息",
+    "deviceMgt": "阅读设备",
+    "deviceMgtDescription": "管理您的个人阅读设备，仅对您自己可见。全局设备由管理员统一配置，所有用户均可使用。"
   },
   "auth": {
     "signIn": "登录",
@@ -237,7 +253,8 @@
       "publisher": "全部出版社",
       "format": "全部格式"
     },
-    "confirmPassword": "确认密码"
+    "confirmPassword": "确认密码",
+    "willSendFormat": "将发送 {format} 格式"
   },
   "index": {
     "newReleases": "新书推荐",
@@ -640,6 +657,23 @@
     "configWriteSuccess": "配置写入成功！",
     "checkingServer": "正在检测服务器...",
     "networkError": "网络错误"
+  },
+  "settings": {
+    "deviceMgt": "全局设备管理",
+    "deviceMgtDescription": "管理全局阅读设备，所有用户均可使用。用户也可在我的账户中配置自己的私人设备。",
+    "deviceName": "名称",
+    "deviceIp": "IP地址",
+    "devicePort": "端口",
+    "deviceType": "类型",
+    "deviceSchema": "访问协议",
+    "defaultReaderName": "阅读器",
+    "deviceMailbox": "邮箱地址(注意应当以{'@'}kindle.com结尾)",
+    "deviceTypeDuokan": "多看阅读器",
+    "deviceTypeIreader": "掌阅",
+    "deviceTypeHanwang": "汉王",
+    "deviceTypeBoox": "文石Boox",
+    "deviceTypeDangdang": "当当",
+    "add": "添加"
   },
   "captcha": {
     "title": "人机验证",

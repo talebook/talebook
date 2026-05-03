@@ -371,6 +371,7 @@ class AdminSettings(BaseHandler):
             "CAPTCHA_ENABLE_FOR_RESET",
             "GEETEST_CAPTCHA_ID",
             "GEETEST_CAPTCHA_KEY",
+            "DEVICES",
         ]
 
         args = loader.SettingsLoader()
