@@ -529,10 +529,6 @@ class Welcome(BaseHandler):
         return {"err": "ok", "msg": ""}
 
 
-# In-memory cache for user devices, keyed by user_id
-_user_devices_cache = {}
-
-
 class UserDevices(BaseHandler):
     """管理当前用户的阅读设备"""
 
@@ -540,10 +536,8 @@ class UserDevices(BaseHandler):
     @auth
     def get(self):
         user_id = self.user_id()
-        if user_id not in _user_devices_cache:
-            devices = self.session.query(Device).filter(Device.reader_id == user_id).all()
-            _user_devices_cache[user_id] = [d.to_dict() for d in devices]
-        personal = _user_devices_cache[user_id]
+        devices = self.session.query(Device).filter(Device.reader_id == user_id).all()
+        personal = [d.to_dict() for d in devices]
         # Merge global devices from admin settings (not cached, so changes take effect immediately)
         global_devices = CONF.get("DEVICES", []) or []
         used_names = {d["name"] for d in personal}
@@ -580,8 +574,6 @@ class UserDevices(BaseHandler):
             result.append(device.to_dict())
         try:
             self.session.commit()
-            # Refresh cache
-            _user_devices_cache[user_id] = result
             return {"err": "ok", "msg": _("设备保存成功")}
         except Exception as e:
             logging.error("Save user devices failed: %s", e)
