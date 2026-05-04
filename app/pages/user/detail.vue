@@ -127,22 +127,6 @@
                             />
                         </v-col>
 
-                        <v-col cols="3">
-                            <div class="text-subtitle-2 text-medium-emphasis pa-0 float-right">
-                                Kindle Email
-                            </div>
-                        </v-col>
-                        <v-col cols="9">
-                            <v-text-field
-                                v-model="user.kindle_email"
-                                solo
-                                label="Kindle Email"
-                                type="text"
-                                autocomplete="new-email"
-                                :rules="[rules.email]"
-                            />
-                        </v-col>
-
                         <v-col cols="12">
                             <div class="text-center">
                                 <v-btn
@@ -369,7 +353,6 @@ const save = async () => {
         'password1': user.value.password1,
         'password2': user.value.password2,
         'nickname': user.value.nickname,
-        'kindle_email': user.value.kindle_email,
     };
 
     $backend('/user/update', {
