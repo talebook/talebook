@@ -63,7 +63,7 @@ class TestBookDeleteFormat(TestWithUserLogin):
                 "collector": {"id": 1},
                 "fmt_epub": "/tmp/test.epub",
                 "fmt_azw3": "/tmp/test.azw3",
-                "available_formats": " EPUB , AZW3 ",
+                "available_formats": ["EPUB", "AZW3"],
             }
             with mock.patch.object(BaseHandler, "get_book", return_value=mock_book):
                 d = self.json(
@@ -125,7 +125,7 @@ class TestBookSeparate(TestWithUserLogin):
                     "collector": {"id": 1},
                     "fmt_epub": "/tmp/test.epub",
                     "fmt_azw3": "/tmp/test.azw3",
-                    "available_formats": " EPUB , AZW3 ",
+                    "available_formats": ["EPUB", "AZW3"],
                 }
                 with mock.patch.object(BaseHandler, "get_book", return_value=mock_book):
                     with mock.patch.object(

@@ -1542,8 +1542,7 @@ class BookDeleteFormat(BaseHandler):
         if fmt_key not in book:
             return {"err": "format.not_found", "msg": _("书籍不包含 %s 格式") % fmt.upper()}
 
-        available_formats = book.get("available_formats", "")
-        available_formats = [f.strip() for f in available_formats if f.strip()]
+        available_formats = book.get("available_formats", [])
         if len(available_formats) <= 1:
             return {"err": "last.format", "msg": _("书籍只有一个格式，无法刪除")}
 
@@ -1591,8 +1590,7 @@ class BookSeparate(BaseHandler):
         if not os.path.exists(original_path):
             return {"err": "file.missing", "msg": _("格式文件不存在: %s") % original_path}
 
-        available_formats = book.get("available_formats", "")
-        available_formats = [f.strip() for f in available_formats if f.strip()]
+        available_formats = book.get("available_formats", [])
         if len(available_formats) <= 1:
             return {"err": "last.format", "msg": _("书籍只有一个格式，无法分离")}
 
