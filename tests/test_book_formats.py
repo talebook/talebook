@@ -106,11 +106,13 @@ class TestBookSeparate(TestWithUserLogin):
         cache = self._app.settings["legacy"].new_api
         with mock.patch.object(cache, "remove_formats", return_value=None) as mock_remove:
             with mock.patch(
-                "webserver.handlers.book.get_metadata"
+                "calibre.ebooks.metadata.meta.get_metadata"
             ) as mock_get_meta, mock.patch(
-                "webserver.handlers.book.shutil.copy2"
-            ) as mock_copy, mock.patch(
-                "webserver.handlers.book.os.path.exists", return_value=True
+                "shutil.copy2"
+            ), mock.patch(
+                "os.path.exists", return_value=True
+            ), mock.patch(
+                "builtins.open", mock.mock_open(read_data=b"fake")
             ):
                 mock_get_meta.return_value = mock.MagicMock()
                 mock_get_meta.return_value.title = "Separated Book"
@@ -294,7 +296,7 @@ class TestAdminKindleConvert(TestWithUserLogin):
                 method="POST",
                 body=json.dumps({"idlist": [BID_AZW3, BID_MOBI]}),
             )
-            self.assertEqual(d["err"], "permission")
+            self.assertEqual(d["err"], "permission.not_admin")
         finally:
             user.admin = original_admin
             session.commit()
