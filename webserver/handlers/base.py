@@ -5,6 +5,7 @@
 import base64
 import datetime
 import logging
+import os
 import threading
 import time
 from collections import defaultdict
@@ -406,12 +407,15 @@ class BaseHandler(web.RequestHandler):
         del vals["self"]
         self.write(self.render_string(template, **vals))
 
-    def get_book(self, book_id):
+    def get_book(self, book_id, raise_exception=True):
         books = self.get_books(ids=[int(book_id)])
         if not books:
-            self.write({"err": "not_found", "msg": _("抱歉，这本书不存在")})
-            self.set_status(200)
-            raise web.Finish()
+            if raise_exception:
+                self.write({"err": "not_found", "msg": _("抱歉，这本书不存在")})
+                self.set_status(200)
+                raise web.Finish()
+            else:
+                return None
         return books[0]
 
     def _get_private_book_ids(self):
@@ -433,6 +437,76 @@ class BaseHandler(web.RequestHandler):
         query = query.filter(Item.book_id == book_id)
         query = query.filter(Item.collector_id == user_id)
         return query.count() > 0
+
+    def save_book_meta(self, book_id, fmt=None, cover=None):
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "book.not_found", "msg": _("书籍不存在")}
+
+        logging.info("[SAVE_META] save meta for book id:%d, fmt:%s", book_id, fmt if fmt else "ALL")
+
+        supported_formats = []
+        for f in ["epub", "azw3", "pdf"]:
+            if fmt and f != fmt.lower():
+                continue
+            fmt_key = "fmt_%s" % f
+            if fmt_key in book:
+                supported_formats.append((f, book[fmt_key]))
+
+        if not supported_formats:
+            if fmt:
+                return {"err": "format.not_supported", "msg": _("书籍没有指定的格式：%s") % fmt.upper()}
+            return {"err": "format.not_supported", "msg": _("书籍没有支持的格式（需要 EPUB、AZW3 或 PDF）")}
+
+        try:
+            from calibre.ebooks.metadata.meta import set_metadata
+
+            mi = self.db.get_metadata(book_id, index_is_id=True)
+            if not mi:
+                return {"err": "book.meta.not_found", "msg": _("无法获取书籍元数据")}
+
+            success_formats = []
+            failed_formats = []
+
+            for f, file_path in supported_formats:
+                try:
+                    if not os.path.exists(file_path):
+                        logging.warning("[SAVE_META] File not found: %s", file_path)
+                        failed_formats.append(f.upper())
+                        continue
+
+                    if mi.title:
+                        mi.title_sort = utils.super_strip(mi.title)
+                    if mi.authors:
+                        mi.author_sort = utils.super_strip(mi.authors[0])
+                    if not mi.comments:
+                        mi.comments = "<>"
+                    if cover:
+                        cover_data = cover
+                    else:
+                        cover_data = self.db.cover(book_id, index_is_id=True)
+                    if cover_data:
+                        mi.cover_data = ("jpeg", cover_data)
+
+                    with open(file_path, "rb+") as stream:
+                        set_metadata(stream, mi, stream_type=f)
+
+                    success_formats.append(f.upper())
+                except Exception as e:
+                    logging.error("[SAVE_META] Failed to save to %s: %s", f.upper(), e)
+                    failed_formats.append(f.upper())
+
+            if success_formats:
+                msg = _("成功将元数据同步到文件：%s") % ", ".join(success_formats)
+                if failed_formats:
+                    msg += _("；失败：%s") % ", ".join(failed_formats)
+                return {"err": "ok", "msg": msg}
+            else:
+                return {"err": "save.failed", "msg": _("同步元数据失败：%s") % ", ".join(failed_formats)}
+
+        except Exception as e:
+            logging.error("[SAVE_META] Error: %s", e)
+            return {"err": "internal", "msg": _("同步元数据时发生错误: %s") % str(e)}
 
     def get_books(self, *args, **kwargs):
         _ts = time.time()

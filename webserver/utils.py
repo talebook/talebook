@@ -68,7 +68,7 @@ class BookFormatter:
     def get_files(self):
         files = []
         book_id = self.book["id"]
-        for fmt in self.book.get("available_formats", ""):
+        for fmt in self.book.get("available_formats", []):
             try:
                 filesize = self.db.sizeof_format(book_id, fmt, index_is_id=True)
             except:

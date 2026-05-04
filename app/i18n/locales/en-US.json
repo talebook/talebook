@@ -24,7 +24,8 @@
     "done": "Done",
     "manage": "Manage",
     "read": "Read",
-    "retry": "Retry"
+    "retry": "Retry",
+    "kindle": "Kindle"
   },
   "book": {
     "publisher": "Publisher",
@@ -74,6 +75,22 @@
     "parsed": "Parsed",
     "unparsed": "Unparsed",
     "pushToKindle": "Push to Kindle",
+    "process": "File Processing",
+    "convert": "Convert to EPUB/Kindle",
+    "convert_to_pdf": "Convert to PDF",
+    "convertSuccessful": "Conversion started, please refresh the page later",
+    "sendToDevice": "Send to Device",
+    "selectDevice": "Select Device",
+    "noDevices": "No devices configured yet",
+    "configDeviceDesc": "Please configure reading devices in system settings or User Center first",
+    "temporaryDevice": "Temporary Device",
+    "deviceType": "Device Type",
+    "deviceIP": "Device IP Address",
+    "devicePort": "Device Port",
+    "deviceTypeRequired": "Please select device type",
+    "deviceIPRequired": "Please enter device IP address",
+    "devicePortRequired": "Please enter device port",
+    "kindleNotSupportTemporary": "Kindle does not support temporary connection. Please save device info in settings.",
     "loading": "Loading...",
     "previousChapter": "Previous Chapter",
     "nextChapter": "Next Chapter",
@@ -87,7 +104,39 @@
     "setSole": "Set as Private",
     "setPublic": "Set as Public",
     "scopePrivate": "Private",
-    "scopePublic": "Public"
+    "scopePublic": "Public",
+    "saveMetaToFile": "Save Metadata to File",
+    "saveMetaSuccess": "Metadata saved successfully!",
+    "saveMetaFailed": "Failed to save metadata",
+    "uploadNewFormat": "Upload New Format",
+    "uploadNewFormatDesc": "Select a file to upload as a new format for this book",
+    "selectFile": "Select File",
+    "supportedFormatsUpload": "Supported formats: EPUB, MOBI, AZW, AZW3, PDF, TXT",
+    "upload": "Upload",
+    "selectFileToUpload": "Please select a file to upload",
+    "uploadSuccess": "Upload successful!",
+    "formatAlreadyExists": "This format already exists",
+    "uploadFailed": "Upload failed",
+    "seperate": "Separate Format",
+    "selectFormatToSeparate": "Select a format to separate from this book and create a new book:",
+    "separateHint": "After separation, the original book will retain all formats except the selected one.",
+    "separateSuccess": "Format separated successfully!",
+    "separateFailed": "Failed to separate format",
+    "deleteFormat": "Delete Format",
+    "selectFormatToDelete": "Select a format to delete:",
+    "deleteFormatWarning": "This operation cannot be undone. Please confirm.",
+    "deleteFormatSuccess": "Format deleted successfully!",
+    "deleteFormatFailed": "Failed to delete format",
+    "selectFormatFirst": "Please select a format",
+    "sendToDeviceSuccess": "Book successfully sent to {deviceName}",
+    "sendFailed": "Send failed",
+    "sendRetry": "Send failed, please try again later",
+    "fetchBookFailed": "Failed to fetch book information",
+    "setSuccess": "Set successfully!",
+    "setFailed": "Set failed",
+    "deleteSuccess": "Deleted successfully",
+    "deleteFailed": "Delete failed",
+    "confirmDelete": "Are you sure you want to delete this book?"
   },
   "library": {
     "title": "Library",
@@ -159,7 +208,10 @@
       "passwordsNotSame": "Passwords do not match",
       "activationEmailSent": "Activation email has been sent!",
       "scopedBooks": "My Private Books"
-    }
+    },
+    "basicInfo": "Basic Info",
+    "deviceMgt": "Reading Devices",
+    "deviceMgtDescription": "Manage your personal reading devices. Only visible to you. Global devices are configured by admins and available to all users."
   },
   "auth": {
     "signIn": "Sign In",
@@ -234,7 +286,8 @@
       "publisher": "All Publishers",
       "format": "All Formats"
     },
-    "confirmPassword": "Confirm Password"
+    "confirmPassword": "Confirm Password",
+    "willSendFormat": "Will send {format} format"
   },
   "index": {
     "newReleases": "New Releases",
@@ -305,6 +358,12 @@
         "tags": "Tags",
         "comments": "Description"
       },
+      "kindleConvert": "Kindle to EPUB",
+      "kindleConvertSelectedConfirm": "This will convert {count} selected books that have Kindle formats (azw3/mobi) but no EPUB format to EPUB. This may take some time. Continue?",
+      "kindleConvertAllConfirm": "This will scan all books and convert those with Kindle formats (azw3/mobi) but no EPUB format to EPUB. This may take a long time. Continue?",
+      "execute": "Execute",
+      "reminderTitle": "Reminder",
+      "cancel": "Cancel",
       "message": {
         "bookTableInfo": "This table shows only some fields. Click to edit. See book details page for complete info.",
         "aboutToFetch": "About to fetch book information from the internet...",
@@ -632,6 +691,25 @@
     "configWriteSuccess": "Configuration written successfully!",
     "checkingServer": "Checking server...",
     "networkError": "Network error"
+  },
+  "settings": {
+    "deviceMgt": "Global Device Management",
+    "deviceMgtDescription": "Manage global reading devices available to all users. Users can also configure their own devices in their User Center.",
+    "deviceName": "Name",
+    "deviceIp": "IP",
+    "devicePort": "Port",
+    "deviceType": "Type",
+    "deviceSchema": "Schema",
+    "defaultReaderName": "Reader",
+    "deviceMailbox": "Email Address (should end with {'@'}kindle.com)",
+    "deviceTypeDuokan": "Duokan Reader",
+    "deviceTypeIreader": "iReader",
+    "deviceTypeHanwang": "Hanwang Reader",
+    "deviceTypeBoox": "Boox Reader",
+    "deviceTypeDangdang": "Dangdang Reader",
+    "deviceTypeKindle": "Kindle",
+    "deviceTypePurelibro": "PureLibro",
+    "add": "Add"
   },
   "captcha": {
     "title": "CAPTCHA",

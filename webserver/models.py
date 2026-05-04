@@ -398,5 +398,55 @@ class OpdsSource(Base, SQLAlchemyMixin):
         self.data = {}
 
 
+class Device(Base, SQLAlchemyMixin):
+    """用户阅读设备"""
+
+    __tablename__ = "devices"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), nullable=False)
+    name = Column(String(64), nullable=False, default="")
+    device_type = Column(String(32), nullable=False, default="duokan")
+    ip = Column(String(128), default="")
+    port = Column(Integer, default=12121)
+    schema = Column(String(8), default="http")
+    mailbox = Column(String(256), default="")
+    create_time = Column(DateTime, default=datetime.datetime.now)
+    update_time = Column(DateTime, default=datetime.datetime.now)
+
+    reader = relationship(Reader, backref="devices")
+
+    def __init__(
+        self,
+        reader_id,
+        name,
+        device_type="duokan",
+        ip="",
+        port=12121,
+        schema="http",
+        mailbox="",
+    ):
+        super(Device, self).__init__()
+        self.reader_id = reader_id
+        self.name = name
+        self.device_type = device_type
+        self.ip = ip
+        self.port = port
+        self.schema = schema
+        self.mailbox = mailbox
+        self.create_time = datetime.datetime.now()
+        self.update_time = datetime.datetime.now()
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "type": self.device_type,
+            "ip": self.ip,
+            "port": self.port,
+            "schema": self.schema,
+            "mailbox": self.mailbox,
+        }
+
+
 def user_syncdb(engine):
     Base.metadata.create_all(engine)

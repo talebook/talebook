@@ -218,7 +218,20 @@ class TestAppWithoutLogin(TestApp):
         self.assertEqual(rsp.code, 302)
 
     def test_push(self):
-        d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
+        d = self.json("/api/book/1/mailto", method="POST", body=json.dumps({"email": "unittest@gmail.com"}))
+        self.assertEqual(d["err"], "user.need_login")
+
+    def test_send_to_device(self):
+        data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+        d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+        self.assertEqual(d["err"], "user.need_login")
+
+    def test_user_devices_get(self):
+        d = self.json("/api/user/devices")
+        self.assertEqual(d["err"], "user.need_login")
+
+    def test_user_devices_post(self):
+        d = self.json("/api/user/devices", method="POST", body="{}")
         self.assertEqual(d["err"], "user.need_login")
 
     def test_user_info(self):
@@ -342,6 +355,38 @@ class TestUser(TestWithUserLogin):
         d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "ok")
 
+    def test_devices_get(self):
+        d = self.json("/api/user/devices")
+        self.assertEqual(d["err"], "ok")
+        self.assertIn("devices", d)
+        self.assertIsInstance(d["devices"], list)
+
+    def test_devices_post_save(self):
+        devices_data = [
+            {
+                "name": "My Boox",
+                "type": "boox",
+                "ip": "192.168.1.100",
+                "port": 8080,
+                "schema": "http",
+                "mailbox": "",
+            }
+        ]
+        d = self.json("/api/user/devices", method="POST", body=json.dumps({"devices": devices_data}))
+        self.assertEqual(d["err"], "ok")
+
+    def test_devices_post_invalid_json(self):
+        d = self.json("/api/user/devices", method="POST", body="not json")
+        self.assertEqual(d["err"], "params.invalid")
+
+    def test_devices_post_invalid_devices(self):
+        d = self.json("/api/user/devices", method="POST", body=json.dumps({"devices": "not_a_list"}))
+        self.assertEqual(d["err"], "params.invalid")
+
+    def test_devices_post_empty_list(self):
+        d = self.json("/api/user/devices", method="POST", body=json.dumps({"devices": []}))
+        self.assertEqual(d["err"], "ok")
+
 
 class TestFile(TestWithUserLogin):
     def test_get_cover(self):
@@ -407,26 +452,71 @@ class TestBook(TestWithUserLogin):
         return MockConvertPath()
 
     def test_push(self):
-        with self.mock_convert() as m:
-            d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
+        with mock.patch("webserver.services.mail.MailService.send_book", return_value="Yo") as m:
+            d = self.json("/api/book/1/mailto", method="POST", body=json.dumps({"email": "unittest@gmail.com"}))
             self.assertEqual(d["err"], "ok")
-            self.assertTrue(m.call_count + self.mail.call_count <= 2)
+            self.assertEqual(m.call_count, 1)
 
     def test_push_permission(self):
-        with self.mock_convert():
+        with mock.patch("webserver.services.mail.MailService.send_book", return_value="Yo"):
             with mock_permission() as user:
                 # forbid
                 user.set_permission("P")
-                d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
+                d = self.json("/api/book/1/mailto", method="POST", body=json.dumps({"email": "unittest@gmail.com"}))
                 self.assertEqual(d["err"], "permission")
 
-        with self.mock_convert() as m:
+        with mock.patch("webserver.services.mail.MailService.send_book", return_value="Yo") as m:
             with mock_permission() as user:
                 # allow
                 user.set_permission("p")
-                d = self.json("/api/book/1/push", method="POST", body="mail_to=unittest@gmail.com")
+                d = self.json("/api/book/1/mailto", method="POST", body=json.dumps({"email": "unittest@gmail.com"}))
                 self.assertEqual(d["err"], "ok")
-                self.assertTrue(m.call_count + self.mail.call_count <= 2)
+                self.assertEqual(m.call_count, 1)
+
+    def test_send_to_device_kindle(self):
+        with mock.patch("webserver.services.mail.MailService.send_book", return_value="Yo") as m:
+            data = {"device_type": "kindle", "mailbox": "unittest@kindle.com"}
+            d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual(m.call_count, 1)
+
+    def test_send_to_device_wifi(self):
+        with mock.patch("webserver.plugins.sending.uploader.BooxUploader") as MockBoox:
+            mock_instance = MockBoox.return_value
+            mock_instance.get_upload_url.return_value = "http://192.168.1.1:8080/upload"
+            mock_instance.upload.return_value = {"success": True}
+
+            data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+            d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+            self.assertEqual(d["err"], "ok")
+            MockBoox.assert_called_once()
+
+    def test_send_to_device_missing_params(self):
+        d = self.json("/api/book/1/send_to_device", method="POST", body="")
+        self.assertEqual(d["err"], "params.invalid")
+
+    def test_send_to_device_kindle_missing_mailbox(self):
+        data = {"device_type": "kindle", "mailbox": ""}
+        d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+        self.assertEqual(d["err"], "params.missing")
+
+    def test_send_to_device_missing_type_url(self):
+        data = {"device_type": "", "device_url": ""}
+        d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+        self.assertEqual(d["err"], "params.missing")
+
+    def test_send_to_device_unsupported_type(self):
+        data = {"device_type": "invalid_device", "device_url": "192.168.1.1:8080"}
+        d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+        self.assertEqual(d["err"], "device.unsupported")
+
+    def test_send_to_device_permission(self):
+        with mock.patch("webserver.services.mail.MailService.send_book", return_value="Yo"):
+            with mock_permission() as user:
+                user.set_permission("P")
+                data = {"device_type": "kindle", "mailbox": "unittest@kindle.com"}
+                d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+                self.assertEqual(d["err"], "permission")
 
     def test_delete(self):
         global _app

@@ -12,7 +12,7 @@ from tornado import web
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
-from webserver.models import Message, Reader
+from webserver.models import Device, Message, Reader
 from webserver.plugins import captcha as captcha_module
 from webserver.services.mail import MailService
 from webserver.version import VERSION
@@ -529,6 +529,58 @@ class Welcome(BaseHandler):
         return {"err": "ok", "msg": ""}
 
 
+class UserDevices(BaseHandler):
+    """管理当前用户的阅读设备"""
+
+    @js
+    @auth
+    def get(self):
+        user_id = self.user_id()
+        devices = self.session.query(Device).filter(Device.reader_id == user_id).all()
+        personal = [d.to_dict() for d in devices]
+        # Merge global devices from admin settings (not cached, so changes take effect immediately)
+        global_devices = CONF.get("DEVICES", []) or []
+        used_names = {d["name"] for d in personal}
+        result = personal + [g for g in global_devices if g.get("name") not in used_names]
+        return {"err": "ok", "devices": result}
+
+    @js
+    @auth
+    def post(self):
+        user_id = self.user_id()
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+        except Exception:
+            return {"err": "params.invalid", "msg": _("参数无效")}
+
+        devices_data = data.get("devices", [])
+        if not isinstance(devices_data, list):
+            return {"err": "params.invalid", "msg": _("参数无效")}
+
+        # Replace all existing devices for this user
+        self.session.query(Device).filter(Device.reader_id == user_id).delete()
+        result = []
+        for d in devices_data:
+            device = Device(
+                reader_id=user_id,
+                name=d.get("name", ""),
+                device_type=d.get("type", "duokan"),
+                ip=d.get("ip", ""),
+                port=int(d.get("port", 12121)),
+                schema=d.get("schema", "http"),
+                mailbox=d.get("mailbox", ""),
+            )
+            self.session.add(device)
+            result.append(device.to_dict())
+        try:
+            self.session.commit()
+            return {"err": "ok", "msg": _("设备保存成功")}
+        except Exception as e:
+            logging.error("Save user devices failed: %s", e)
+            self.session.rollback()
+            return {"err": "db.error", "msg": _("数据库操作异常，请重试")}
+
+
 def routes():
     return [
         (r"/api/welcome", Welcome),
@@ -539,6 +591,7 @@ def routes():
         (r"/api/user/sign_out", SignOut),
         (r"/api/user/update", UserUpdate),
         (r"/api/user/reset", UserReset),
+        (r"/api/user/devices", UserDevices),
         (r"/api/user/active/send", UserSendActive),
         (r"/api/active/(.*)/(.*)", UserActive),
         (r"/api/done/", Done),

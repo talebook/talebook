@@ -8,6 +8,7 @@ import logging
 import os
 import random
 import re
+import shutil
 import urllib
 
 import tornado.escape
@@ -15,6 +16,7 @@ from tornado import web
 
 from webserver import loader, utils
 from webserver.constants import (
+    CALIBRE_ERROR_FLAG,
     META_SELECTED_SOURCES,
     META_SOURCE_AI,
     META_SOURCE_AMAZON,
@@ -22,6 +24,7 @@ from webserver.constants import (
     META_SOURCE_DOUBAN,
     META_SOURCE_GOOGLE,
     META_SOURCE_XHSD,
+    SUPPORTED_EBOOK_FORMATS,
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
@@ -101,6 +104,83 @@ class BookDetail(BaseHandler):
             "kindle_sender": CONF["smtp_username"],
             "book": utils.BookFormatter(self, book).format(with_files=True, with_perms=True),
         }
+
+
+class BookConverter(BaseHandler):
+    @js
+    @auth
+    def post(self, id):
+        book_id = int(id)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍不存在")}
+
+        if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
+            return {"err": "user.no_permission", "msg": _("无权限")}
+
+        fmts = []
+        paths = []
+        for fmt in SUPPORTED_EBOOK_FORMATS:
+            book_path = book.get("fmt_%s" % fmt, None)
+            if book_path:
+                fmts.append(fmt)
+                paths.append(book_path)
+
+        if ("epub" in fmts) and ("azw3" in fmts):
+            return {"err": "params.book.invalid", "msg": _("本书已有EPUB及Kindle版本, 不需要转换")}
+
+        if fmts[0] == "epub":
+            fmt = "azw3"
+        elif fmts[0] == "pdf":
+            fmt = "epub"
+        else:
+            fmt = "epub"
+
+        fpath = paths[0]
+
+        service = ConvertService()
+        if service.is_book_converting(book):
+            return {"err": "params.book.converting", "msg": _("本书正在转换中，请稍后再试")}
+        service.convert_and_save(self.user_id(), book, fpath, fmt)
+        return {"err": "ok", "content": "%s" % _("转换成功，请稍后刷新页面查看")}
+
+
+class BookToPDF(BaseHandler):
+    @js
+    @auth
+    def post(self, id):
+        book_id = int(id)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍不存在")}
+
+        if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
+            return {"err": "user.no_permission", "msg": _("无权限")}
+
+        fmts = []
+        paths = []
+        has_pdf = False
+        for fmt in ["epub", "azw3", "mobi", "azw", "pdf"]:
+            book_path = book.get("fmt_%s" % fmt, None)
+            if not book_path:
+                continue
+            if fmt == "pdf":
+                has_pdf = True
+                continue
+            fmts.append(fmt)
+            paths.append(book_path)
+
+        if has_pdf:
+            return {"err": "params.book.invalid", "msg": _("本书已有PDF版本, 不需要转换")}
+        if len(fmts) == 0:
+            return {"err": "params.book.invalid", "msg": _("本书不支持转换，仅支持EPUB及Kindle使用的格式转换为PDF")}
+
+        fpath = paths[0]
+        service = ConvertService()
+        if service.is_book_converting(book):
+            return {"err": "params.book.converting", "msg": _("本书正在转换中，请稍后再试")}
+        service.convert_and_save(self.user_id(), book, fpath, "pdf")
+        return {"err": "ok", "content": "%s" % _("转换成功，请稍后刷新页面查看")}
 
 
 class BookRefer(BaseHandler):
@@ -1150,9 +1230,16 @@ class BookTxtInit(BaseHandler):
         }
 
 
-class BookPush(BaseHandler):
+class BookSendToDevice(BaseHandler):
     @js
-    def post(self, id):
+    def post(self, bid):
+        """发送书籍到指定设备"""
+        book_id = int(bid)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "book.not_found", "msg": _("书籍已不存在")}
+
+        # 检查用户权限
         if not CONF["ALLOW_GUEST_PUSH"]:
             if not self.current_user:
                 return {"err": "user.need_login", "msg": _("请先登录")}
@@ -1162,42 +1249,226 @@ class BookPush(BaseHandler):
                 elif not self.current_user.is_active():
                     return {"err": "permission", "msg": _("无权操作，请先激活账号。")}
 
-        mail_to = self.get_argument("mail_to", None)
-        if not mail_to:
-            return {"err": "params.error", "msg": _("参数错误")}
+        # 解析请求参数
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+            device_type = data.get("device_type", "").lower()
+            device_url = data.get("device_url", "")
+            mailbox = data.get("mailbox", "")
+        except Exception:
+            return {"err": "params.invalid", "msg": _("请求参数格式错误")}
 
-        book = self.get_book(id)
-        book_id = book["id"]
+        # Kindle设备使用邮箱地址，其他设备使用device_url
+        if device_type == "kindle":
+            if not mailbox:
+                return {"err": "params.missing", "msg": _("Kindle设备需要提供邮箱地址")}
+        else:
+            if not device_type or not device_url:
+                return {"err": "params.missing", "msg": _("设备类型和设备地址不能为空")}
 
+        # 支持的设备类型
+        supported_types = ["duokan", "ireader", "hanwang", "boox", "dangdang", "kindle", "purelibro"]
+        if device_type not in supported_types:
+            return {"err": "device.unsupported", "msg": _("不支持的设备类型: %s") % device_type}
+
+        # Kindle设备通过邮件发送
+        if device_type == "kindle":
+            return self._send_to_kindle(book, book_id, mailbox)
+        else:
+            return self._send_to_other_device(book, book_id, device_type, device_url)
+
+    def _send_to_kindle(self, book, book_id, mail_to):
+        """通过邮件发送书籍到Kindle设备"""
         self.user_history("push_history", book)
         self.count_increase(book_id, count_download=1)
 
-        # https://www.amazon.cn/gp/help/customer/display.html?ref_=hp_left_v4_sib&nodeId=G5WYD9SAF7PGXRNA
-        for fmt in ["epub", "pdf"]:
-            fpath = book.get("fmt_%s" % fmt, None)
-            if fpath:
+        # epub、pdf、txt格式可以直接发送，不需要转换
+        for fmt in ["epub", "pdf", "txt"]:
+            fmt_key = "fmt_%s" % fmt
+            if fmt_key in book:
+                fpath = book[fmt_key]
                 MailService().send_book(self.user_id(), self.site_url, book, mail_to, fmt, fpath)
-                return {
-                    "err": "ok",
-                    "msg": _("服务器后台正在推送了。您可关闭此窗口，继续浏览其他书籍。"),
-                }
+                self.add_msg(
+                    "success",
+                    _("服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
+                )
+                return {"err": "ok", "msg": _("服务器后台正在推送。您可关闭此窗口，继续浏览其他书籍。")}
 
-        # we do no have formats for kindle
-        if "fmt_azw3" not in book and "fmt_txt" not in book:
-            return {
-                "err": "book.no_format_for_kindle",
-                "msg": _("抱歉，该书无可用于kindle阅读的格式"),
+        # 如果没有可直接发送的格式，检查是否有azw3或mobi格式需要转换
+        if "fmt_azw3" in book or "fmt_mobi" in book:
+            fmt = "azw3" if "fmt_azw3" in book else "mobi"
+            logging.info("[SEND_TO_KINDLE] found %s format, needs conversion to epub", fmt)
+            ConvertService().convert_and_send(self.user_id(), self.site_url, book, mail_to)
+            self.add_msg(
+                "success",
+                _("服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
+            )
+            return {"err": "ok", "msg": _("服务器正在转换格式，稍后将自动推送。您可关闭此窗口，继续浏览其他书籍。")}
+
+        # 没有Kindle支持的格式
+        return {"err": "format.not_supported", "msg": _("书籍没有Kindle支持的格式!")}
+
+    def _send_to_other_device(self, book, book_id, device_type, device_url):
+        """通过WiFi上传发送书籍到其他设备"""
+
+        # 查找合适的文件格式（优先级：epub > azw3 > pdf > txt）
+        file_path = None
+        file_format = None
+        format_priority = ["epub", "azw3", "pdf", "txt"]
+        for fmt in format_priority:
+            fmt_key = "fmt_%s" % fmt
+            if fmt_key in book:
+                file_path = book[fmt_key]
+                file_format = fmt
+                break
+
+        if not file_path:
+            return {"err": "file.not_found", "msg": _("书籍没有支持的文件格式（epub/azw3/pdf/txt）")}
+
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            return {"err": "file.missing", "msg": _("书籍文件不存在: %s") % file_path}
+
+        # 导入对应的上传器
+        try:
+            from webserver.plugins.sending.uploader import (
+                BooxUploader,
+                DangdangUploader,
+                DuokanUploader,
+                HanwangUploader,
+                IReaderUploader,
+                PureLibroUploader,
+            )
+
+            uploader_map = {
+                "duokan": DuokanUploader,
+                "ireader": IReaderUploader,
+                "hanwang": HanwangUploader,
+                "boox": BooxUploader,
+                "dangdang": DangdangUploader,
+                "purelibro": PureLibroUploader,
             }
 
-        ConvertService().convert_and_send(self.user_id(), self.site_url, book, mail_to)
+            uploader_class = uploader_map.get(device_type)
+            if not uploader_class:
+                return {"err": "uploader.not_found", "msg": _("找不到对应的上传器: %s") % device_type}
+
+            # 创建上传器实例
+            book_name = book.get("title", "")
+            if len(book_name) > 120:
+                book_name = ""
+            if not book_name:
+                book_name = None
+            else:
+                book_name += os.path.splitext(file_path)[-1]
+            uploader = uploader_class(file_path, file_name=book_name)
+
+            # 构建设备上传URL
+            if not device_url.startswith(("http://", "https://")):
+                device_url = "http://" + device_url
+
+            # 执行上传
+            logging.info(
+                "[SEND_TO_DEVICE] sending book %s (%s) to device %s: %s", book_id, file_format, device_type, device_url
+            )
+            result = uploader.upload(device_url)
+
+            if result.get("success"):
+                logging.info("[SEND_TO_DEVICE] success: %s -> %s", book_id, device_type)
+                return {"err": "ok", "msg": _("书籍发送成功")}
+            else:
+                error_type = result.get("error_type", "unknown")
+                error_msg = result.get("message", _("发送失败"))
+
+                if error_type == "connection":
+                    return {"err": "connection.failed", "msg": _("无法连接到设备。请确认IP地址正确，且设备已开启WiFi上传功能")}
+                elif error_type == "timeout":
+                    return {"err": "upload.timeout", "msg": _("上传超时。请检查网络连接和设备状态")}
+                elif error_type == "http":
+                    status_code = result.get("status_code", 0)
+                    return {"err": "upload.failed", "msg": _("上传失败 (HTTP %d)。请查看日志获取详细信息") % status_code}
+                else:
+                    return {"err": "upload.error", "msg": _("上传过程出错: %s。请查看日志获取详细信息") % error_msg}
+
+        except ImportError as e:
+            logging.error("[SEND_TO_DEVICE] import uploader failed: %s", e)
+            return {"err": "uploader.import_error", "msg": _("设备上传功能不可用")}
+        except Exception as e:
+            logging.error("[SEND_TO_DEVICE] send failed: %s", e)
+            return {"err": "upload.error", "msg": _("发送过程出错，请查看日志获取详细信息")}
+
+
+class BookSendToMail(BaseHandler):
+    @js
+    def post(self, bid):
+        """发送书籍到指定邮箱"""
+        book_id = int(bid)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "book.not_found", "msg": _("书籍已不存在")}
+
+        if not CONF["ALLOW_GUEST_PUSH"]:
+            if not self.current_user:
+                return {"err": "user.need_login", "msg": _("请先登录")}
+            else:
+                if not self.current_user.can_push():
+                    return {"err": "permission", "msg": _("无权限进行推送，请联系管理员检查权限")}
+                elif not self.current_user.is_active():
+                    return {"err": "permission", "msg": _("无权限进行操作，请先激活账号。")}
+
+        # 解析请求参数
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+            mail_to = data.get("email", "").strip()
+        except Exception:
+            return {"err": "params.invalid", "msg": _("没有指定邮箱地址")}
+
+        if not mail_to:
+            return {"err": "params.missing", "msg": _("邮箱地址不能为空")}
+
+        # 验证邮箱地址格式
+        email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(email_pattern, mail_to):
+            return {"err": "email.invalid", "msg": _("邮箱地址格式不正确")}
+
+        # 按优先级查找可用格式: EPUB > AZW3 > PDF > MOBI > TXT
+        format_priority = ["epub", "azw3", "pdf", "mobi", "txt"]
+        file_path = None
+        file_format = None
+
+        for fmt in format_priority:
+            fmt_key = "fmt_%s" % fmt
+            if fmt_key in book:
+                file_path = book[fmt_key]
+                file_format = fmt
+                break
+
+        if not file_path:
+            return {"err": "format.not_found", "msg": _("书籍没有支持的文件格式（EPUB/AZW3/PDF/MOBI/TXT）")}
+
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            return {"err": "file.missing", "msg": _("书籍文件不存在")}
+
+        # 检查文件大小（50MB = 52428800 bytes）
+        file_size = os.path.getsize(file_path)
+        max_size = 50 * 1024 * 1024  # 50MB
+        if file_size > max_size:
+            size_mb = file_size / (1024 * 1024)
+            return {"err": "file.too_large", "msg": _("附件过大（%.1fMB），邮件附件大小不能超过50MB") % size_mb}
+
+        # 记录推送历史和增加统计
+        self.user_history("push_history", book)
+        self.count_increase(book_id, count_download=1)
+        logging.info("[SEND_TO_MAIL] sending book %s (%s, %s bytes) to %s", book_id, file_format, file_size, mail_to)
+        MailService().send_book(self.user_id(), self.site_url, book, mail_to, file_format, file_path)
+
         self.add_msg(
             "success",
-            _("服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
+            _("已开始推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
         )
-        return {
-            "err": "ok",
-            "msg": _("服务器正在转换格式，稍后将自动推送。您可关闭此窗口，继续浏览其他书籍。"),
-        }
+
+        return {"err": "ok", "msg": _("后台正在推送，稍后可以刷新页面，在通知消息中查看结果。")}
 
 
 class BookSetScope(BaseHandler):
@@ -1240,6 +1511,165 @@ class BookSetScope(BaseHandler):
             return {"err": "ok", "msg": _("更新成功")}
         else:
             return {"err": "db.update.failed", "msg": _("更新失败，请稍后再试")}
+
+
+class BookDeleteFormat(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        book = self.get_book(bid, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+        bid = book["id"]
+
+        if isinstance(book["collector"], dict):
+            cid = book["collector"]["id"]
+        else:
+            cid = book["collector"].id
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(bid, cid)):
+            return {"err": "permission", "msg": _("无权操作")}
+
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+            fmt = data.get("format", "").strip().lower()
+        except Exception:
+            return {"err": "params.invalid", "msg": _("请求参数格式错误")}
+
+        if not fmt:
+            return {"err": "params.missing", "msg": _("格式参数不能为空")}
+
+        fmt_key = "fmt_%s" % fmt
+        if fmt_key not in book:
+            return {"err": "format.not_found", "msg": _("书籍不包含 %s 格式") % fmt.upper()}
+
+        available_formats = book.get("available_formats", [])
+        if len(available_formats) <= 1:
+            return {"err": "last.format", "msg": _("书籍只有一个格式，无法刪除")}
+
+        try:
+            self.cache.remove_formats({bid: [fmt.upper()]})
+            self.add_msg("success", _("删除书籍《%s》的%s格式") % (book["title"], fmt))
+            return {"err": "ok", "msg": _("删除%s格式成功") % fmt}
+        except Exception as e:
+            logging.error("删除书籍《%s》的%s格式失败: %s", book["title"], fmt, e)
+            return {"err": "fail", "msg": _("删除%s格式失败，请查看日志") % fmt}
+
+
+class BookSeparate(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        from calibre.ebooks.metadata.meta import get_metadata
+
+        book_id = int(bid)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+
+        if isinstance(book["collector"], dict):
+            cid = book["collector"]["id"]
+        else:
+            cid = book["collector"].id
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(book_id, cid)):
+            return {"err": "permission", "msg": _("无权操作")}
+
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+            fmt = data.get("format", "").strip().lower()
+        except Exception:
+            return {"err": "params.invalid", "msg": _("请求参数格式错误")}
+
+        if not fmt:
+            return {"err": "params.missing", "msg": _("格式参数不能为空")}
+
+        fmt_key = "fmt_%s" % fmt
+        if fmt_key not in book:
+            return {"err": "format.not_found", "msg": _("书籍不包含 %s 格式") % fmt.upper()}
+
+        original_path = book[fmt_key]
+        if not os.path.exists(original_path):
+            return {"err": "file.missing", "msg": _("格式文件不存在: %s") % original_path}
+
+        available_formats = book.get("available_formats", [])
+        if len(available_formats) <= 1:
+            return {"err": "last.format", "msg": _("书籍只有一个格式，无法分离")}
+
+        try:
+            filename = os.path.basename(original_path)
+            upload_path = os.path.join(CONF["upload_path"], filename)
+
+            if os.path.exists(upload_path):
+                timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                name, ext = os.path.splitext(filename)
+                upload_path = os.path.join(CONF["upload_path"], f"{name}_{timestamp}{ext}")
+
+            shutil.copy2(original_path, upload_path)
+            logging.info("[SEPARATE] Copied format file from %s to %s", original_path, upload_path)
+
+            failed = False
+            with open(upload_path, "rb") as stream:
+                mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                if mi.title and mi.title == CALIBRE_ERROR_FLAG:
+                    logging.error("Failed to get metadata for %s, reason:%s", upload_path, mi.comments)
+                    failed = True
+                mi.title = utils.super_strip(mi.title)
+                if mi.author_sort == "Unknown" and mi.authors and len(mi.authors) > 0:
+                    mi.authors = [utils.super_strip(a) for a in mi.authors]
+                else:
+                    mi.authors = [utils.super_strip(mi.author_sort)]
+
+            if failed:
+                return {"err": "book.invalid", "msg": _("此书籍文件无法识别，或者受DRM保护无法处理")}
+
+            if fmt in ["txt", "pdf"]:
+                mi.title = filename.replace("." + fmt, "")
+                mi.authors = [_("佚名")]
+
+            fpaths = [upload_path]
+            new_book_id = self.db.import_book(mi, fpaths)
+
+            if new_book_id is None:
+                if os.path.exists(upload_path):
+                    os.remove(upload_path)
+                return {"err": "book.create.failed", "msg": _("创建新书籍失败")}
+
+            item = Item()
+            item.book_id = new_book_id
+            item.collector_id = self.user_id()
+            self.session.add(item)
+            self.session.commit()
+
+            self.cache.remove_formats({book_id: [fmt.upper()]})
+
+            logging.info("[SEPARATE] Successfully separated format %s from book %d to new book %d", fmt, book_id, new_book_id)
+            self.add_msg("success", _("成功将 %s 格式分离为新书籍") % fmt.upper())
+            return {
+                "err": "ok",
+                "msg": _("格式分离成功"),
+                "original_book_id": book_id,
+                "new_book_id": new_book_id,
+            }
+
+        except Exception as e:
+            logging.error("[SEPARATE] Failed to separate format %s from book %d: %s", fmt, book_id, e)
+            if "upload_path" in locals() and os.path.exists(upload_path):
+                try:
+                    os.remove(upload_path)
+                except Exception:
+                    pass
+            return {"err": "internal", "msg": _("分离格式时发生错误: %s") % str(e)}
+
+
+class BookSaveMeta(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        book_id = int(bid)
+        if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
+            return {"err": "user.no_permission", "msg": _("无权限，非管理员或书籍所有者无法操作")}
+
+        fmt = self.get_argument("fmt", None)
+        return self.save_book_meta(book_id, fmt=fmt)
 
 
 class BookScoped(BaseHandler):
@@ -1300,8 +1730,14 @@ def routes():
         (r"/api/book/([0-9]+)/edit", BookEdit),
         (r"/api/book/([0-9]+)/setscope", BookSetScope),
         (r"/api/book/([0-9]+\..+)", BookDownload),
-        (r"/api/book/([0-9]+)/push", BookPush),
+        (r"/api/book/([0-9]+)/send_to_device", BookSendToDevice),
+        (r"/api/book/([0-9]+)/mailto", BookSendToMail),
         (r"/api/book/([0-9]+)/refer", BookRefer),
+        (r"/api/book/([0-9]+)/convert", BookConverter),
+        (r"/api/book/([0-9]+)/topdf", BookToPDF),
+        (r"/api/book/([0-9]+)/delete_format", BookDeleteFormat),
+        (r"/api/book/([0-9]+)/separate", BookSeparate),
+        (r"/api/book/([0-9]+)/savemeta", BookSaveMeta),
         (r"/read/([0-9]+)", BookRead),
         (r"/api/read/txt", TxtRead),
         (r"/api/book/txt/init", BookTxtInit),

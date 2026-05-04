@@ -3,42 +3,117 @@
         <!-- Main Content -->
         <v-row align="start">
             <v-col cols="12">
-                <!-- Kindle Push Dialog -->
+                <!-- Send to Device Dialog -->
                 <v-dialog
-                    v-model="dialog_kindle"
+                    v-model="dialog_send_to_device"
                     persistent
-                    width="300"
+                    max-width="600"
                 >
                     <v-card>
-                        <v-card-title>{{ t('book.kindle.push') }}</v-card-title>
+                        <v-card-title>
+                            <v-icon class="mr-2">
+                                mdi-devices
+                            </v-icon>
+                            {{ t('book.sendToDevice') }}
+                        </v-card-title>
                         <v-card-text>
                             <p class="mb-4">
-                                {{ t('book.kindle.emailPlaceholder') }}
+                                {{ t('book.selectDevice') }}:
+                                <span class="text-caption text-medium-emphasis">
+                                    ({{ t('messages.willSendFormat', { format: selectedFormat }) }})
+                                </span>
                             </p>
-                            <v-combobox
-                                v-model="mail_to"
-                                :items="email_items"
-                                :rules="[check_email]"
-                                variant="outlined"
-                                density="compact"
-                                label="Email*"
-                                auto-select-first
-                                required
-                            />
-                            <small>* 请先将本站邮箱加入到Kindle发件人中:<br>{{ kindle_sender }}</small>
+                            <v-radio-group v-model="selectedDeviceOption">
+                                <v-radio
+                                    v-for="(device, idx) in devices"
+                                    :key="'device-' + idx"
+                                    :value="'saved-' + idx"
+                                >
+                                    <template #label>
+                                        <span v-if="device.type === 'kindle'">
+                                            {{ device.name }} ({{ getDeviceTypeText(device.type) }}) - {{ device.mailbox }}
+                                        </span>
+                                        <span v-else>
+                                            {{ device.name }} ({{ getDeviceTypeText(device.type) }}) - {{ device.ip }}:{{ device.port }}
+                                        </span>
+                                    </template>
+                                </v-radio>
+                                <v-radio
+                                    value="temporary"
+                                    :label="t('book.temporaryDevice')"
+                                />
+                            </v-radio-group>
+
+                            <!-- 临时设备输入框 -->
+                            <div
+                                v-if="selectedDeviceOption === 'temporary'"
+                                class="mt-4 pl-8"
+                            >
+                                <v-select
+                                    v-model="tempDevice.type"
+                                    :items="deviceTypes"
+                                    item-title="text"
+                                    item-value="value"
+                                    :label="t('book.deviceType') + ' *'"
+                                    variant="outlined"
+                                    density="compact"
+                                />
+                                <v-text-field
+                                    v-model="tempDevice.ip"
+                                    :label="t('book.deviceIP') + ' *'"
+                                    variant="outlined"
+                                    density="compact"
+                                    placeholder="192.168.1.100"
+                                />
+                                <v-text-field
+                                    v-model="tempDevice.port"
+                                    :label="t('book.devicePort') + ' *'"
+                                    variant="outlined"
+                                    density="compact"
+                                    type="number"
+                                    placeholder="8080"
+                                />
+                                <v-alert
+                                    v-if="tempDevice.type === 'kindle'"
+                                    type="info"
+                                    variant="tonal"
+                                    density="compact"
+                                    class="mt-2"
+                                >
+                                    {{ t('book.kindleNotSupportTemporary') }}
+                                </v-alert>
+                            </div>
+
+                            <div
+                                v-if="devices.length === 0 && selectedDeviceOption !== 'temporary'"
+                                class="text-center py-4"
+                            >
+                                <v-icon
+                                    size="48"
+                                    color="grey"
+                                >
+                                    mdi-device-unknown
+                                </v-icon>
+                                <p class="mt-2 text-medium-emphasis">
+                                    {{ t('book.noDevices') }}<br>
+                                    {{ t('book.configDeviceDesc') }}
+                                </p>
+                            </div>
                         </v-card-text>
                         <v-card-actions>
+                            <v-spacer />
                             <v-btn
                                 variant="text"
-                                @click="dialog_kindle = false"
+                                @click="closeDeviceDialog"
                             >
                                 {{ t('common.cancel') }}
                             </v-btn>
-                            <v-spacer />
                             <v-btn
                                 color="primary"
-                                variant="text"
-                                @click="sendto_kindle"
+                                variant="flat"
+                                :loading="sending_to_device"
+                                @click="sendToDevice"
+                                :disabled="!canSendToDevice"
                             >
                                 {{ t('common.send') }}
                             </v-btn>
@@ -217,6 +292,172 @@
                     </v-card>
                 </v-dialog>
 
+                <!-- Upload New Format Dialog -->
+                <v-dialog
+                    v-model="dialog_upload_format"
+                    persistent
+                    max-width="500"
+                >
+                    <v-card>
+                        <v-card-title>
+                            <v-icon class="mr-2">
+                                mdi-file-upload-outline
+                            </v-icon>
+                            {{ t('book.uploadNewFormat') }}
+                        </v-card-title>
+                        <v-card-text>
+                            <p class="mb-4">
+                                {{ t('book.uploadNewFormatDesc') }}
+                            </p>
+                            <v-file-input
+                                v-model="upload_format_file"
+                                :label="t('book.selectFile')"
+                                variant="outlined"
+                                density="compact"
+                                show-size
+                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt"
+                                prepend-icon="mdi-file-document"
+                            />
+                            <v-alert
+                                type="info"
+                                variant="tonal"
+                                density="compact"
+                                class="mt-4"
+                            >
+                                {{ t('book.supportedFormatsUpload') }}
+                            </v-alert>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer />
+                            <v-btn
+                                variant="text"
+                                @click="dialog_upload_format = false"
+                            >
+                                {{ t('common.cancel') }}
+                            </v-btn>
+                            <v-btn
+                                color="primary"
+                                variant="text"
+                                :loading="uploading_format"
+                                :disabled="!upload_format_file"
+                                @click="confirmUploadFormat"
+                            >
+                                {{ t('book.upload') }}
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Separate Format Dialog -->
+                <v-dialog
+                    v-model="dialog_separate"
+                    persistent
+                    max-width="500"
+                >
+                    <v-card>
+                        <v-card-title>
+                            <v-icon class="mr-2">
+                                mdi-content-copy
+                            </v-icon>
+                            {{ t('book.seperate') }}
+                        </v-card-title>
+                        <v-card-text>
+                            <p class="mb-4">
+                                {{ t('book.selectFormatToSeparate') }}
+                            </p>
+                            <v-radio-group v-model="selectedSeparateFormat">
+                                <v-radio
+                                    v-for="file in book.files"
+                                    :key="'sep-' + file.format"
+                                    :value="file.format.toLowerCase()"
+                                    :label="`${file.format} - ${formatFileSize(file.size)}`"
+                                />
+                            </v-radio-group>
+                            <v-alert
+                                type="info"
+                                variant="tonal"
+                                density="compact"
+                                class="mt-4"
+                            >
+                                {{ t('book.separateHint') }}
+                            </v-alert>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer />
+                            <v-btn
+                                variant="text"
+                                @click="dialog_separate = false"
+                            >
+                                {{ t('common.cancel') }}
+                            </v-btn>
+                            <v-btn
+                                color="primary"
+                                variant="text"
+                                :loading="separating_book"
+                                :disabled="!selectedSeparateFormat"
+                                @click="confirmSeparate"
+                            >
+                                {{ t('common.ok') }}
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
+                <!-- Delete Format Dialog -->
+                <v-dialog
+                    v-model="dialog_delete_format"
+                    persistent
+                    max-width="500"
+                >
+                    <v-card>
+                        <v-card-title>
+                            <v-icon class="mr-2">
+                                mdi-file-document-remove-outline
+                            </v-icon>
+                            {{ t('book.deleteFormat') }}
+                        </v-card-title>
+                        <v-card-text>
+                            <p class="mb-4">
+                                {{ t('book.selectFormatToDelete') }}
+                            </p>
+                            <v-radio-group v-model="selectedDeletedFormat">
+                                <v-radio
+                                    v-for="file in book.files"
+                                    :key="'del-' + file.format"
+                                    :value="file.format.toLowerCase()"
+                                    :label="`${file.format} - ${formatFileSize(file.size)}`"
+                                />
+                            </v-radio-group>
+                            <v-alert
+                                type="warning"
+                                variant="tonal"
+                                density="compact"
+                                class="mt-4"
+                            >
+                                {{ t('book.deleteFormatWarning') }}
+                            </v-alert>
+                        </v-card-text>
+                        <v-card-actions>
+                            <v-spacer />
+                            <v-btn
+                                variant="text"
+                                @click="dialog_delete_format = false"
+                            >
+                                {{ t('common.cancel') }}
+                            </v-btn>
+                            <v-btn
+                                color="error"
+                                variant="text"
+                                :loading="deleting_format"
+                                :disabled="!selectedDeletedFormat"
+                                @click="confirmDeleteFormat"
+                            >
+                                {{ t('common.delete') }}
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
                 <!-- Main Book Info -->
                 <v-card>
                     <v-toolbar
@@ -238,12 +479,12 @@
                             color="primary"
                             variant="elevated"
                             class="mx-2"
-                            @click="dialog_kindle = !dialog_kindle"
+                            @click="dialog_send_to_device = !dialog_send_to_device"
                         >
                             <v-icon start>
-                                mdi-email
+                                mdi-devices
                             </v-icon>
-                            {{ t('common.push') }}
+                            {{ t('book.sendToDevice') }}
                         </v-btn>
 
                         <v-btn
@@ -261,6 +502,63 @@
                         </v-btn>
 
                         <template v-if="book.is_owner">
+                            <v-menu offset-y>
+                                <template #activator="{ props }">
+                                    <v-btn
+                                        v-bind="props"
+                                        color="primary"
+                                        variant="elevated"
+                                        class="ml-2"
+                                    >
+                                        <v-icon start>
+                                            mdi-file-cog
+                                        </v-icon>
+                                        {{ t('book.process') }}
+                                        <v-icon size="small">
+                                            mdi-dots-vertical
+                                        </v-icon>
+                                    </v-btn>
+                                </template>
+                                <v-list density="compact">
+                                    <v-list-item :disabled="!hasEpubAzw3OrPDF" @click="save_meta_to_file">
+                                        <template #prepend>
+                                            <v-icon>mdi-file-sync</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.saveMetaToFile') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item :disabled="!hasEBooks" @click="convert_book">
+                                        <template #prepend>
+                                            <v-icon>mdi-swap-horizontal</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.convert') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item :disabled="!hasEBooks || hasPDF" @click="convert_to_pdf">
+                                        <template #prepend>
+                                            <v-icon>mdi-file-pdf-box</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.convert_to_pdf') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item @click="seperate_book" :disabled="book.files && book.files.length <= 1">
+                                        <template #prepend>
+                                            <v-icon>mdi-content-copy</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.seperate') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item @click="show_delete_format_dialog" :disabled="book.files && book.files.length <= 1">
+                                        <template #prepend>
+                                            <v-icon>mdi-file-document-remove-outline</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.deleteFormat') }}</v-list-item-title>
+                                    </v-list-item>
+                                    <v-list-item @click="show_upload_format_dialog">
+                                        <template #prepend>
+                                            <v-icon>mdi-file-upload-outline</v-icon>
+                                        </template>
+                                        <v-list-item-title>{{ t('book.uploadNewFormat') }}</v-list-item-title>
+                                    </v-list-item>
+                                </v-list>
+                            </v-menu>
+
                             <v-menu offset-y>
                                 <template #activator="{ props }">
                                     <v-btn
@@ -559,16 +857,18 @@
                             <v-list density="compact">
                                 <v-list-item
                                     class="w-100"
-                                    @click="dialog_kindle = !dialog_kindle"
+                                    @click="dialog_send_to_device = !dialog_send_to_device"
                                 >
                                     <template #prepend>
                                         <v-avatar color="primary">
                                             <v-icon color="white">
-                                                mdi-email
+                                                mdi-devices
                                             </v-icon>
                                         </v-avatar>
                                     </template>
-                                    <v-list-item-title>{{ t('book.pushToKindle') }}</v-list-item-title>
+                                    <v-list-item-title>
+                                        {{ t('book.sendToDevice') }}
+                                    </v-list-item-title>
                                     <template #append>
                                         <v-icon>mdi-chevron-right</v-icon>
                                     </template>
@@ -586,7 +886,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { useAsyncData, useCookie, useNuxtApp } from 'nuxt/app';
+import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 import BookCards_Small from '~/components/BookCards_Small.vue';
 
@@ -595,7 +895,6 @@ const router = useRouter();
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
 const { t } = useI18n();
-const cookie = useCookie('last_mailto');
 
 const bookid = route.params.bid;
 const book = ref({
@@ -618,12 +917,22 @@ const book = ref({
 
 // Dialogs
 const dialog_download = ref(false);
-const dialog_kindle = ref(false);
+const dialog_send_to_device = ref(false);
 const dialog_refer = ref(false);
 
-// Kindle
-const mail_to = ref('');
+// Kindle sender for reference
 const kindle_sender = ref('');
+
+// Device management
+const sending_to_device = ref(false);
+const devices = ref([]);
+const selectedDeviceOption = ref(null);
+const tempDevice = ref({
+    type: '',
+    ip: '',
+    port: ''
+});
+const deviceTypes = ref([]);
 
 // Refer books
 const refer_books_loading = ref(false);
@@ -632,6 +941,21 @@ const refer_books = ref([]);
 
 // TXT
 const txt_parse_inited = ref(false);
+
+// Upload format
+const dialog_upload_format = ref(false);
+const upload_format_file = ref(null);
+const uploading_format = ref(false);
+
+// Separate format
+const dialog_separate = ref(false);
+const selectedSeparateFormat = ref('');
+const separating_book = ref(false);
+
+// Delete format
+const dialog_delete_format = ref(false);
+const selectedDeletedFormat = ref('');
+const deleting_format = ref(false);
 
 // 数据获取状态
 const pending = ref(true);
@@ -672,13 +996,8 @@ watch(() => fetchData.value, (newData) => {
     if (newData && newData.book) {
         // 直接更新 book.value 的所有属性，保持响应式
         Object.assign(book.value, newData.book);
-        mail_to.value = newData.user?.kindle_email || '';
         kindle_sender.value = newData.kindle_sender || '';
-        
-        if (cookie.value) {
-            mail_to.value = cookie.value;
-        }
-        
+
         // 获取 TXT 解析状态
         get_txt_parse_status();
     }
@@ -688,7 +1007,7 @@ watch(() => fetchData.value, (newData) => {
 watch(() => fetchError.value, (newError) => {
     error.value = newError;
     if (newError && $alert) {
-        $alert('error', newError.message || '获取书籍信息失败');
+        $alert('error', newError.message || t('book.fetchBookFailed'));
     }
 });
 
@@ -711,44 +1030,172 @@ const is_txt = computed(() => {
     return formats.includes('txt');
 });
 
-const email_items = computed(() => {
-    const emails = [mail_to.value].filter(Boolean);
-    if (cookie.value && !emails.includes(cookie.value)) {
-        emails.push(cookie.value);
+const hasCompatibleFormats = computed(() => {
+    if (!book.value || !book.value.files) return false;
+    const formats = book.value.files.map(x => x.format.toLowerCase());
+    const compatible = ['epub', 'azw3', 'pdf', 'txt', 'mobi', 'azw'];
+    return formats.some(f => compatible.includes(f));
+});
+
+const selectedFormat = computed(() => {
+    if (!book.value || !book.value.files) return 'N/A';
+    const formats = book.value.files.map(x => x.format.toLowerCase());
+    const priority = ['epub', 'azw3', 'pdf', 'txt', 'mobi'];
+    for (const fmt of priority) {
+        if (formats.includes(fmt)) return fmt.toUpperCase();
     }
-    return emails;
+    return formats[0]?.toUpperCase() || 'N/A';
+});
+
+const canSendToDevice = computed(() => {
+    if (!selectedDeviceOption.value) return false;
+
+    if (selectedDeviceOption.value === 'temporary') {
+        if (!tempDevice.value.type) return false;
+        if (tempDevice.value.type === 'kindle') return false;
+        return !!(tempDevice.value.ip && tempDevice.value.port);
+    }
+
+    const idx = parseInt(selectedDeviceOption.value.replace('saved-', ''));
+    const device = devices.value[idx];
+    if (!device) return false;
+    if (device.type === 'kindle') return !!device.mailbox;
+    return !!(device.ip && device.port);
+});
+
+const hasEBooks = computed(() => {
+    if (!book.value || !book.value.files) {
+        return false;
+    }
+    if (book.value.files.length === 0) {
+        return false;
+    }
+    return true;
+});
+
+const hasPDF = computed(() => {
+    if (!book.value || !book.value.files) return false;
+    return book.value.files.some(file => file.format.toLowerCase() === 'pdf');
+});
+
+const hasEpubAzw3OrPDF = computed(() => {
+    if (!book.value || !book.value.files) return false;
+    const formats = book.value.files.map(f => f.format.toLowerCase());
+    return formats.some(f => ['epub', 'azw3', 'pdf'].includes(f));
 });
 
 useHead({
     title: () => book.value.title || t('book.detailsTitle')
 });
 
-// Other methods
-const sendto_kindle = async () => {
-    if (!mail_to.value) {
-        if ($alert) $alert('error', '请填写邮箱地址');
+// Device methods
+const getDeviceTypeText = (type) => {
+    const keyMap = {
+        'duokan': 'settings.deviceTypeDuokan',
+        'ireader': 'settings.deviceTypeIreader',
+        'hanwang': 'settings.deviceTypeHanwang',
+        'boox': 'settings.deviceTypeBoox',
+        'dangdang': 'settings.deviceTypeDangdang',
+        'kindle': 'common.kindle',
+        'purelibro': 'settings.deviceTypePurelibro',
+    };
+    if (keyMap[type]) return t(keyMap[type]) || type;
+    return type;
+};
+
+const loadUserDevices = async () => {
+    try {
+        const rsp = await $backend('/user/devices');
+        if (rsp.err === 'ok') {
+            devices.value = rsp.devices || [];
+        }
+    } catch (e) {
+        console.error('Failed to load user devices:', e);
+    }
+};
+
+const loadDevicePreferences = () => {
+    if (typeof localStorage === 'undefined') return;
+    try {
+        const savedOption = localStorage.getItem('last_selected_device_option');
+        if (savedOption) {
+            // Check if the saved option is still valid
+            if (savedOption === 'temporary') {
+                selectedDeviceOption.value = 'temporary';
+            } else if (savedOption.startsWith('saved-') && devices.value.length > 0) {
+                const idx = parseInt(savedOption.replace('saved-', ''));
+                if (idx < devices.value.length) {
+                    selectedDeviceOption.value = savedOption;
+                }
+            }
+        }
+        const savedTempDevice = localStorage.getItem('temp_device_info');
+        if (savedTempDevice) {
+            tempDevice.value = JSON.parse(savedTempDevice);
+        }
+    } catch (e) {
+        console.error('Failed to load device preferences:', e);
+    }
+};
+
+const closeDeviceDialog = () => {
+    dialog_send_to_device.value = false;
+};
+
+const sendToDevice = async () => {
+    if (!canSendToDevice.value) {
+        if ($alert) $alert('error', t('book.completeDeviceInfo'));
         return;
     }
 
-    cookie.value = mail_to.value;
-
+    sending_to_device.value = true;
     try {
-        const rsp = await $backend(`/book/${bookid}/push`, {
+        let deviceInfo;
+        let deviceName;
+
+        if (selectedDeviceOption.value === 'temporary') {
+            deviceInfo = {
+                type: tempDevice.value.type,
+                ip: tempDevice.value.ip,
+                port: tempDevice.value.port,
+                schema: 'http'
+            };
+            deviceName = t('book.temporaryDevice');
+        } else {
+            const deviceIndex = parseInt(selectedDeviceOption.value.replace('saved-', ''));
+            deviceInfo = devices.value[deviceIndex];
+            deviceName = deviceInfo.name;
+        }
+
+        let requestBody;
+        if (deviceInfo.type === 'kindle') {
+            requestBody = {
+                device_type: deviceInfo.type,
+                mailbox: deviceInfo.mailbox
+            };
+        } else {
+            const url = `${deviceInfo.schema || 'http'}://${deviceInfo.ip}:${deviceInfo.port}`;
+            requestBody = {
+                device_type: deviceInfo.type,
+                device_url: url
+            };
+        }
+
+        const response = await $backend(`/book/${bookid}/send_to_device`, {
             method: 'POST',
-            body: `mail_to=${encodeURIComponent(mail_to.value)}`,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
+            body: JSON.stringify(requestBody),
         });
 
-        dialog_kindle.value = false;
-        if (rsp.err === 'ok') {
-            if ($alert) $alert('success', rsp.msg, '#');
+        if (response.err === 'ok') {
+            if ($alert) $alert('success', t('book.sendToDeviceSuccess', { deviceName }));
+            dialog_send_to_device.value = false;
         } else {
-            if ($alert) $alert('error', rsp.msg, '#');
+            if ($alert) $alert('error', response.msg || t('book.sendFailed'));
         }
-    } catch (e) {
-        if ($alert) $alert('error', '发送失败');
+    } catch (error) {
+        if ($alert) $alert('error', t('book.sendRetry'));
+    } finally {
+        sending_to_device.value = false;
     }
 };
 
@@ -792,14 +1239,14 @@ const set_refer = async (provider_key, provider_value, opt = {}) => {
 
         dialog_refer.value = false;
         if (rsp.err === 'ok') {
-            if ($alert) $alert('success', '设置成功！');
+            if ($alert) $alert('success', t('book.setSuccess'));
             router.push(`/book/${bookid}`);
             location.reload();
         } else {
             if ($alert) $alert('error', rsp.msg);
         }
     } catch (e) {
-        if ($alert) $alert('error', '设置失败');
+        if ($alert) $alert('error', t('book.setFailed'));
     } finally {
         refer_books_setting_btn_loading.value = false;
     }
@@ -821,12 +1268,12 @@ const set_scope = async () => {
             if ($alert) $alert('error', rsp.msg);
         }
     } catch (e) {
-        if ($alert) $alert('error', '设置失败');
+        if ($alert) $alert('error', t('book.setFailed'));
     }
 };
 
 const delete_book = async () => {
-    if (!confirm('确定要删除这本书吗？')) return;
+    if (!confirm(t('book.confirmDelete'))) return;
 
     try {
         const rsp = await $backend(`/book/${bookid}/delete`, {
@@ -834,23 +1281,239 @@ const delete_book = async () => {
         });
 
         if (rsp.err === 'ok') {
-            if ($alert) $alert('success', '删除成功');
+            if ($alert) $alert('success', t('book.deleteSuccess'));
             router.push('/');
         } else {
             if ($alert) $alert('error', rsp.msg);
         }
     } catch (e) {
-        if ($alert) $alert('error', '删除失败');
+        if ($alert) $alert('error', t('book.deleteFailed'));
     }
 };
 
-const check_email = (email) => {
-    if (email === kindle_sender.value) {
-        return '发件邮件不可作为收件人';
-    }
-    const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-    return re.test(email) || 'Email格式错误';
+const convert_book = () => {
+    // 转换书籍格式
+    $backend('/book/' + book.value.id + '/convert', {
+        method: 'POST',
+        body: new URLSearchParams({reset: 'yes'}),
+    }).then((rsp) => {
+        if (rsp.err === 'ok') {
+            $alert('success', t('book.convertSuccessful'));
+            router.push('/book/' + book.value.id);
+        } else {
+            $alert('error', rsp.msg);
+        }
+    });
 };
+
+const convert_to_pdf = () => {
+    // 转换为PDF
+    $backend('/book/' + book.value.id + '/topdf', {
+        method: 'POST',
+        body: new URLSearchParams({reset: 'yes'}),
+    }).then((rsp) => {
+        if (rsp.err === 'ok') {
+            $alert('success', t('book.convertSuccessful'));
+        } else {
+            $alert('error', rsp.msg);
+        }
+    });
+};
+
+const save_meta_to_file = () => {
+    $backend('/book/' + book.value.id + '/savemeta', {
+        method: 'POST',
+    }).then((rsp) => {
+        if (rsp.err === 'ok') {
+            $alert('success', rsp.msg || t('book.saveMetaSuccess'));
+        } else {
+            $alert('error', rsp.msg || t('book.saveMetaFailed'));
+        }
+    }).catch(() => {
+        $alert('error', t('book.saveMetaFailed'));
+    });
+};
+
+const show_upload_format_dialog = () => {
+    upload_format_file.value = null;
+    dialog_upload_format.value = true;
+};
+
+const confirmUploadFormat = async () => {
+    if (!upload_format_file.value) {
+        $alert('error', t('book.selectFileToUpload'));
+        return;
+    }
+
+    uploading_format.value = true;
+    try {
+        const data = new FormData();
+        data.append('ebook', upload_format_file.value);
+
+        const rsp = await $backend('/book/upload?bid=' + book.value.id, {
+            method: 'POST',
+            body: data,
+        });
+
+        if (rsp.err === 'ok') {
+            dialog_upload_format.value = false;
+            $alert('success', rsp.msg || t('book.uploadSuccess'));
+            location.reload();
+        } else if (rsp.err === 'samebook') {
+            $alert('error', rsp.msg || t('book.formatAlreadyExists'));
+        } else {
+            $alert('error', rsp.msg || t('book.uploadFailed'));
+        }
+    } catch (err) {
+        console.error('Upload error:', err);
+        $alert('error', t('book.uploadFailed'));
+    } finally {
+        uploading_format.value = false;
+    }
+};
+
+const formatFileSize = (size) => {
+    if (size >= 1048576) {
+        return parseInt(size / 1048576) + 'MB';
+    } else if (size >= 1024) {
+        return parseInt(size / 1024) + 'KB';
+    }
+    return size + 'B';
+};
+
+const seperate_book = () => {
+    selectedSeparateFormat.value = '';
+    dialog_separate.value = true;
+};
+
+const confirmSeparate = async () => {
+    if (!selectedSeparateFormat.value) {
+        $alert('error', t('book.selectFormatFirst'));
+        return;
+    }
+
+    separating_book.value = true;
+    try {
+        const rsp = await $backend('/book/' + book.value.id + '/separate', {
+            method: 'POST',
+            body: JSON.stringify({ format: selectedSeparateFormat.value }),
+        });
+
+        if (rsp.err === 'ok') {
+            dialog_separate.value = false;
+            $alert('success', rsp.msg || t('book.separateSuccess'));
+            location.reload();
+        } else {
+            $alert('error', rsp.msg || t('book.separateFailed'));
+        }
+    } catch (err) {
+        console.error('Separate error:', err);
+        $alert('error', t('book.separateFailed'));
+    } finally {
+        separating_book.value = false;
+    }
+};
+
+const show_delete_format_dialog = () => {
+    selectedDeletedFormat.value = '';
+    dialog_delete_format.value = true;
+};
+
+const confirmDeleteFormat = async () => {
+    if (!selectedDeletedFormat.value) {
+        $alert('error', t('book.selectFormatFirst'));
+        return;
+    }
+
+    deleting_format.value = true;
+    try {
+        const rsp = await $backend('/book/' + book.value.id + '/delete_format', {
+            method: 'POST',
+            body: JSON.stringify({ format: selectedDeletedFormat.value }),
+        });
+
+        if (rsp.err === 'ok') {
+            dialog_delete_format.value = false;
+            $alert('success', rsp.msg || t('book.deleteFormatSuccess'));
+            location.reload();
+        } else {
+            $alert('error', rsp.msg || t('book.deleteFormatFailed'));
+        }
+    } catch (err) {
+        console.error('Delete format error:', err);
+        $alert('error', t('book.deleteFormatFailed'));
+    } finally {
+        deleting_format.value = false;
+    }
+};
+
+// Watch tempDevice changes, auto-fill port based on type
+watch(() => tempDevice.value.type, (newType) => {
+    const portMap = {
+        duokan: '12121',
+        boox: '8085',
+        hanwang: '9310',
+        ireader: '10123',
+        dangdang: '11111',
+    };
+    if (portMap[newType]) {
+        tempDevice.value.port = portMap[newType];
+    }
+});
+
+// Watch dialog_send_to_device open, auto-select default device
+watch(dialog_send_to_device, (isOpen) => {
+    if (!isOpen) return;
+    if (selectedDeviceOption.value) return;
+
+    if (devices.value && devices.value.length > 0) {
+        selectedDeviceOption.value = 'saved-0';
+    } else {
+        selectedDeviceOption.value = 'temporary';
+    }
+});
+
+// Watch tempDevice changes, persist to localStorage
+watch(tempDevice, (newVal) => {
+    if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('temp_device_info', JSON.stringify(newVal));
+    }
+}, { deep: true });
+
+// Watch selectedDeviceOption changes, persist to localStorage
+watch(selectedDeviceOption, (newValue) => {
+    if (typeof localStorage !== 'undefined' && newValue) {
+        localStorage.setItem('last_selected_device_option', newValue);
+    }
+});
+
+// Load devices on mount
+const loadDevices = async () => {
+    if (store.user?.is_login) {
+        await loadUserDevices();
+        loadDevicePreferences();
+    }
+};
+
+// Watch user login state
+watch(() => store.user?.is_login, async (isLogin) => {
+    if (isLogin) {
+        await loadDevices();
+    }
+});
+
+onMounted(async () => {
+    deviceTypes.value = [
+        { text: t('settings.deviceTypeDuokan'), value: 'duokan' },
+        { text: t('settings.deviceTypeIreader'), value: 'ireader' },
+        { text: t('settings.deviceTypeHanwang'), value: 'hanwang' },
+        { text: t('settings.deviceTypeBoox'), value: 'boox' },
+        { text: t('settings.deviceTypeDangdang'), value: 'dangdang' },
+        { text: t('common.kindle') || 'Kindle', value: 'kindle' },
+        { text: t('settings.deviceTypePurelibro') || 'PureLibro', value: 'purelibro' },
+    ];
+    await loadDevices();
+});
 </script>
 
 <style scoped>
