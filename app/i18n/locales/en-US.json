@@ -127,7 +127,16 @@
     "deleteFormatWarning": "This operation cannot be undone. Please confirm.",
     "deleteFormatSuccess": "Format deleted successfully!",
     "deleteFormatFailed": "Failed to delete format",
-    "selectFormatFirst": "Please select a format"
+    "selectFormatFirst": "Please select a format",
+    "sendToDeviceSuccess": "Book successfully sent to {deviceName}",
+    "sendFailed": "Send failed",
+    "sendRetry": "Send failed, please try again later",
+    "fetchBookFailed": "Failed to fetch book information",
+    "setSuccess": "Set successfully!",
+    "setFailed": "Set failed",
+    "deleteSuccess": "Deleted successfully",
+    "deleteFailed": "Delete failed",
+    "confirmDelete": "Are you sure you want to delete this book?"
   },
   "library": {
     "title": "Library",
@@ -698,6 +707,8 @@
     "deviceTypeHanwang": "Hanwang Reader",
     "deviceTypeBoox": "Boox Reader",
     "deviceTypeDangdang": "Dangdang Reader",
+    "deviceTypeKindle": "Kindle",
+    "deviceTypePurelibro": "PureLibro",
     "add": "Add"
   },
   "captcha": {

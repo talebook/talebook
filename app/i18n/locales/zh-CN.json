@@ -131,7 +131,16 @@
     "deleteFormatWarning": "删除后不可恢复，请确认操作。",
     "deleteFormatSuccess": "格式删除成功！",
     "deleteFormatFailed": "格式删除失败",
-    "selectFormatFirst": "请选择一个格式"
+    "selectFormatFirst": "请选择一个格式",
+    "sendToDeviceSuccess": "书籍已成功发送到 {deviceName}",
+    "sendFailed": "发送失败",
+    "sendRetry": "发送失败，请稍后重试",
+    "fetchBookFailed": "获取书籍信息失败",
+    "setSuccess": "设置成功！",
+    "setFailed": "设置失败",
+    "deleteSuccess": "删除成功",
+    "deleteFailed": "删除失败",
+    "confirmDelete": "确定要删除这本书吗？"
   },
   "library": {
     "title": "图书馆",
@@ -708,6 +717,8 @@
     "deviceTypeHanwang": "汉王",
     "deviceTypeBoox": "文石Boox",
     "deviceTypeDangdang": "当当",
+    "deviceTypeKindle": "Kindle",
+    "deviceTypePurelibro": "PureLibro",
     "add": "添加"
   },
   "captcha": {

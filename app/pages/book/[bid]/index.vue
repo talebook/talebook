@@ -932,15 +932,7 @@ const tempDevice = ref({
     ip: '',
     port: ''
 });
-const deviceTypes = [
-    { text: '多看阅读器', value: 'duokan' },
-    { text: '掌阅', value: 'ireader' },
-    { text: '汉王', value: 'hanwang' },
-    { text: '文石Boox', value: 'boox' },
-    { text: '当当阅读器', value: 'dangdang' },
-    { text: 'Kindle', value: 'kindle' },
-    { text: 'PureLibro', value: 'purelibro' },
-];
+const deviceTypes = ref([]);
 
 // Refer books
 const refer_books_loading = ref(false);
@@ -1015,7 +1007,7 @@ watch(() => fetchData.value, (newData) => {
 watch(() => fetchError.value, (newError) => {
     error.value = newError;
     if (newError && $alert) {
-        $alert('error', newError.message || '获取书籍信息失败');
+        $alert('error', newError.message || t('book.fetchBookFailed'));
     }
 });
 
@@ -1098,16 +1090,17 @@ useHead({
 
 // Device methods
 const getDeviceTypeText = (type) => {
-    const typeMap = {
-        'duokan': '多看阅读器',
-        'ireader': '掌阅',
-        'hanwang': '汉王',
-        'boox': '文石Boox',
-        'dangdang': '当当阅读器',
-        'kindle': 'Kindle',
-        'purelibro': 'PureLibro',
+    const keyMap = {
+        'duokan': 'settings.deviceTypeDuokan',
+        'ireader': 'settings.deviceTypeIreader',
+        'hanwang': 'settings.deviceTypeHanwang',
+        'boox': 'settings.deviceTypeBoox',
+        'dangdang': 'settings.deviceTypeDangdang',
+        'kindle': 'common.kindle',
+        'purelibro': 'settings.deviceTypePurelibro',
     };
-    return typeMap[type] || type;
+    if (keyMap[type]) return t(keyMap[type]) || type;
+    return type;
 };
 
 const loadUserDevices = async () => {
@@ -1151,7 +1144,7 @@ const closeDeviceDialog = () => {
 
 const sendToDevice = async () => {
     if (!canSendToDevice.value) {
-        if ($alert) $alert('error', '请完整填写设备信息');
+        if ($alert) $alert('error', t('book.completeDeviceInfo'));
         return;
     }
 
@@ -1194,13 +1187,13 @@ const sendToDevice = async () => {
         });
 
         if (response.err === 'ok') {
-            if ($alert) $alert('success', `书籍已成功发送到 ${deviceName}`);
+            if ($alert) $alert('success', t('book.sendToDeviceSuccess', { deviceName }));
             dialog_send_to_device.value = false;
         } else {
-            if ($alert) $alert('error', response.msg || '发送失败');
+            if ($alert) $alert('error', response.msg || t('book.sendFailed'));
         }
     } catch (error) {
-        if ($alert) $alert('error', '发送失败，请稍后重试');
+        if ($alert) $alert('error', t('book.sendRetry'));
     } finally {
         sending_to_device.value = false;
     }
@@ -1246,14 +1239,14 @@ const set_refer = async (provider_key, provider_value, opt = {}) => {
 
         dialog_refer.value = false;
         if (rsp.err === 'ok') {
-            if ($alert) $alert('success', '设置成功！');
+            if ($alert) $alert('success', t('book.setSuccess'));
             router.push(`/book/${bookid}`);
             location.reload();
         } else {
             if ($alert) $alert('error', rsp.msg);
         }
     } catch (e) {
-        if ($alert) $alert('error', '设置失败');
+        if ($alert) $alert('error', t('book.setFailed'));
     } finally {
         refer_books_setting_btn_loading.value = false;
     }
@@ -1275,12 +1268,12 @@ const set_scope = async () => {
             if ($alert) $alert('error', rsp.msg);
         }
     } catch (e) {
-        if ($alert) $alert('error', '设置失败');
+        if ($alert) $alert('error', t('book.setFailed'));
     }
 };
 
 const delete_book = async () => {
-    if (!confirm('确定要删除这本书吗？')) return;
+    if (!confirm(t('book.confirmDelete'))) return;
 
     try {
         const rsp = await $backend(`/book/${bookid}/delete`, {
@@ -1288,13 +1281,13 @@ const delete_book = async () => {
         });
 
         if (rsp.err === 'ok') {
-            if ($alert) $alert('success', '删除成功');
+            if ($alert) $alert('success', t('book.deleteSuccess'));
             router.push('/');
         } else {
             if ($alert) $alert('error', rsp.msg);
         }
     } catch (e) {
-        if ($alert) $alert('error', '删除失败');
+        if ($alert) $alert('error', t('book.deleteFailed'));
     }
 };
 
@@ -1510,6 +1503,15 @@ watch(() => store.user?.is_login, async (isLogin) => {
 });
 
 onMounted(async () => {
+    deviceTypes.value = [
+        { text: t('settings.deviceTypeDuokan'), value: 'duokan' },
+        { text: t('settings.deviceTypeIreader'), value: 'ireader' },
+        { text: t('settings.deviceTypeHanwang'), value: 'hanwang' },
+        { text: t('settings.deviceTypeBoox'), value: 'boox' },
+        { text: t('settings.deviceTypeDangdang'), value: 'dangdang' },
+        { text: t('common.kindle') || 'Kindle', value: 'kindle' },
+        { text: t('settings.deviceTypePurelibro') || 'PureLibro', value: 'purelibro' },
+    ];
     await loadDevices();
 });
 </script>
