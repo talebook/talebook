@@ -1367,12 +1367,9 @@ class BookSendToDevice(BaseHandler):
             if not device_url.startswith(("http://", "https://")):
                 device_url = "http://" + device_url
 
-            # 使用uploader的get_upload_url方法构建完整URL
-            upload_url = uploader.get_upload_url(device_url)
-
             # 执行上传
             logging.info(
-                "[SEND_TO_DEVICE] sending book %s (%s) to device %s: %s", book_id, file_format, device_type, upload_url
+                "[SEND_TO_DEVICE] sending book %s (%s) to device %s: %s", book_id, file_format, device_type, device_url
             )
             result = uploader.upload(device_url)
 
