@@ -1023,7 +1023,7 @@ class AdminBookConvert(BaseHandler):
                     }
 
         if not idlist:
-            idlist = list(self.calibre_db_cache.all_book_ids())
+            idlist = list(self.cache.all_book_ids())
 
         BatchConvertService().convert_all(self.current_user.id, idlist)
         return {"err": "ok", "msg": _("Kindle转EPUB任务已启动，右上角可以查看进度")}
