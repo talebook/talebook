@@ -75,6 +75,7 @@ class BackgroundService:
         if not hasattr(self, "_initialized"):
             self._tasks = {}  # task_id -> BackgroundTask
             self._tasks_lock = threading.Lock()
+            self._last_cleanup = datetime.datetime.now()
             self._initialized = True
 
     def add_task(self, service_type: str, service_item: str, book_id: int = 0):
@@ -114,6 +115,12 @@ class BackgroundService:
         Returns:
             BackgroundTask: 任务对象
         """
+        # 每小时触发一次清理，避免 _tasks 无限增长
+        now = datetime.datetime.now()
+        if (now - self._last_cleanup).total_seconds() > 3600:
+            self.cleanup_old_tasks()
+            self._last_cleanup = now
+
         with self._tasks_lock:
             # 对于 autofill、scan 和 ai_fill 等类型，替换现有任务
             if service_type in [
