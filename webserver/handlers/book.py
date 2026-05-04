@@ -1652,7 +1652,7 @@ class BookSeparate(BaseHandler):
 
         except Exception as e:
             logging.error("[SEPARATE] Failed to separate format %s from book %d: %s", fmt, book_id, e)
-            if "upload_path" in dir() and os.path.exists(upload_path):
+            if "upload_path" in locals() and os.path.exists(upload_path):
                 try:
                     os.remove(upload_path)
                 except Exception:
