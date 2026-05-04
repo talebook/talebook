@@ -174,7 +174,9 @@ class BatchConvertService(AsyncService):
 
         self._finish_task()
         msg = _("Kindle转EPUB任务已完成，成功转换%d本书，%d本书转换失败，%d本书跳过") % (
-            self.count_done, self.count_fail, self.count_skip
+            self.count_done,
+            self.count_fail,
+            self.count_skip,
         )
         if self.count_fail + self.count_skip > 0:
             self.add_msg(user_id, "warning", msg)
