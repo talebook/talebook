@@ -201,6 +201,16 @@ class TestBookConvert(TestWithUserLogin):
                 d = self.json(f"/api/book/{BID_EPUB}/convert", method="POST", body="")
                 self.assertEqual(d["err"], "user.no_permission")
 
+    def test_convert_no_supported_formats(self):
+        """Book with no supported ebook formats should be rejected."""
+        mock_book = {
+            "id": BID_EPUB,
+            "title": "Test",
+        }
+        with mock.patch.object(BaseHandler, "get_book", return_value=mock_book):
+            d = self.json(f"/api/book/{BID_EPUB}/convert", method="POST", body="")
+            self.assertEqual(d["err"], "params.book.invalid")
+
     def test_convert_already_has_epub_and_azw3(self):
         """Book with both EPUB and AZW3 should be rejected."""
         mock_book = {
