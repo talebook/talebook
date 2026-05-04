@@ -16,6 +16,15 @@ import json
 
 from webserver import models
 
+
+class RawSQL:
+    """Marker for SQL expressions that should be inserted without quotes."""
+    def __init__(self, sql):
+        self.sql = sql
+
+    def __str__(self):
+        return self.sql
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger(__name__)
 
@@ -64,10 +73,18 @@ def get_model_columns():
                 continue
 
             try:
+                default_val = getattr(column.default, "arg", None) if column.default else None
+                if callable(default_val) and not isinstance(default_val, type):
+                    # Convert known callables to SQL equivalents
+                    qualname = getattr(default_val, '__qualname__', '')
+                    if qualname == 'datetime.now':
+                        default_val = RawSQL("CURRENT_TIMESTAMP")
+                    else:
+                        default_val = None
                 columns[column.name] = {
                     "type": get_column_type(column),
                     "nullable": column.nullable,
-                    "default": getattr(column.default, "arg", None) if column.default else None,
+                    "default": default_val,
                     "primary_key": column.primary_key,
                 }
             except Exception as e:
@@ -187,7 +204,9 @@ def add_column(engine, migration):
 
     if col_def["default"] is not None:
         default_value = col_def["default"]
-        if isinstance(default_value, str):
+        if isinstance(default_value, RawSQL):
+            sql_parts.append(f"DEFAULT {default_value.sql}")
+        elif isinstance(default_value, str):
             sql_parts.append(f"DEFAULT '{default_value}'")
         elif isinstance(default_value, bool):
             sql_parts.append(f"DEFAULT {1 if default_value else 0}")
@@ -221,7 +240,9 @@ def create_table(engine, table_name, columns):
 
         if col_def["default"] is not None:
             default_value = col_def["default"]
-            if isinstance(default_value, str):
+            if isinstance(default_value, RawSQL):
+                line += f" DEFAULT {default_value.sql}"
+            elif isinstance(default_value, str):
                 line += f" DEFAULT '{default_value}'"
             elif isinstance(default_value, bool):
                 line += f" DEFAULT {1 if default_value else 0}"
