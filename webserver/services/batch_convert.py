@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 import logging
 import os
+import threading
 import time
 from gettext import gettext as _
 
@@ -17,7 +18,19 @@ CONF = loader.get_settings()
 class BatchConvertService(AsyncService):
     """批量转换Kindle格式(azw3/mobi)为EPUB格式的服务"""
 
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self):
+        if hasattr(self, "_initialized"):
+            return
         self.count_total = 0
         self.count_skip = 0
         self.count_done = 0
@@ -26,6 +39,7 @@ class BatchConvertService(AsyncService):
         self.current_book_id = None
         self.start_time = None
         self.task_id = None
+        self._initialized = True
         AsyncService.__init__(self)
 
     def status(self):
