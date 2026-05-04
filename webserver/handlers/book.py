@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
 import concurrent.futures
@@ -125,6 +124,9 @@ class BookConverter(BaseHandler):
             if book_path:
                 fmts.append(fmt)
                 paths.append(book_path)
+
+        if not fmts:
+            return {"err": "params.book.invalid", "msg": _("本书没有支持的电子书格式")}
 
         if ("epub" in fmts) and ("azw3" in fmts):
             return {"err": "params.book.invalid", "msg": _("本书已有EPUB及Kindle版本, 不需要转换")}
