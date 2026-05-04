@@ -76,8 +76,8 @@ class BatchConvertService(AsyncService):
         books_to_convert = []
 
         if idlist is None or len(idlist) == 0:
-            all_book_ids = list()
-            logging.info("[BatchConvert] Not specify books to convert formats")
+            all_book_ids = list(self.db.all_book_ids())
+            logging.info("[BatchConvert] Scanning all books for Kindle formats")
         else:
             all_book_ids = idlist
             logging.info("[BatchConvert] Scanning %d specified books for Kindle formats", len(all_book_ids))
