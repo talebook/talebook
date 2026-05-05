@@ -52,7 +52,7 @@ class ConvertService(AsyncService):
     def do_ebook_convert(self, old_path, new_path, log_path):
         """convert book, and block, and wait"""
         args = [EBOOK_CONVERT_CMD, old_path, new_path]
-        args += ["--book-producer", "Talebook/Talebook(https://github.com/talebook/talebook/)"]
+        args += ["--book-producer", "PoxenStudio/Talebook(https://mybooks.top),Talebook/Talebook(https://github.com/talebook/talebook/)"]
         if new_path.lower().endswith(".epub"):
             args += ["--epub-version", "2"]
             if old_path.lower().endswith(".txt"):
