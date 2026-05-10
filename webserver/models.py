@@ -453,7 +453,7 @@ class Device(Base, SQLAlchemyMixin):
         }
 
 
-class ReadingState(Base, SQLAlchemyMixin):
+class ReadingState(Base):
     __tablename__ = "reading_state"
 
     book_id = Column(Integer, primary_key=True)
@@ -470,7 +470,6 @@ class ReadingState(Base, SQLAlchemyMixin):
     reader = relationship(Reader, backref="reading_states")
 
     def __init__(self, book_id, reader_id):
-        super(ReadingState, self).__init__()
         self.book_id = book_id
         self.reader_id = reader_id
         self.favorite = 0
