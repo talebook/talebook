@@ -1764,7 +1764,7 @@ class BookFavorite(BaseHandler):
 
     @js
     @auth
-    def get(self):
+    def get(self, id=None):
         user_id = self.user_id()
         reading_states = (
             self.session.query(ReadingState)
@@ -1810,7 +1810,7 @@ class BookWantToRead(BaseHandler):
 
     @js
     @auth
-    def get(self):
+    def get(self, id=None):
         user_id = self.user_id()
         reading_states = (
             self.session.query(ReadingState)
