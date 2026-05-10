@@ -104,7 +104,7 @@
     "parsingMessage": "首次阅读，正在解析目录，请稍后... {seconds}",
     "timeoutMessage": "超时未完成，可继续等待稍后刷新尝试",
     "parseTimeout": "解析超时",
-    "viewDetails": "浏览详情",
+    "viewDetails": "暂无简介",
     "setPrivate": "设为私有",
     "setPublic": "设为公开",
     "scopePrivate": "私有书籍",
@@ -140,7 +140,27 @@
     "setFailed": "设置失败",
     "deleteSuccess": "删除成功",
     "deleteFailed": "删除失败",
-    "confirmDelete": "确定要删除这本书吗？"
+    "confirmDelete": "确定要删除这本书吗？",
+    "wantToRead": "待读",
+    "removeFromWantToRead": "取消待读",
+    "setAsReading": "设为在读",
+    "markAsFinished": "标记读完",
+    "currentlyReading": "在读",
+    "alreadyFinished": "已读完"
+  },
+  "readingState": {
+    "reading": "在读",
+    "none": "未读",
+    "done": "已读",
+    "finished": "读完",
+    "cancel": "取消阅读",
+    "setReading": "设为在读",
+    "setDone": "标记读完",
+    "favoriteHint": "点击收藏或取消收藏",
+    "wantsHint": "点击添加到待读清单或从待读清单移除",
+    "readingDays": "已阅读 {days} 天",
+    "readingWithinOneDay": "已阅读不足一天",
+    "completedReading": "本书已在 {date} 读完"
   },
   "library": {
     "title": "图书馆",
@@ -216,7 +236,27 @@
     },
     "basicInfo": "基本信息",
     "deviceMgt": "阅读设备",
-    "deviceMgtDescription": "管理您的个人阅读设备，仅对您自己可见。全局设备由管理员统一配置，所有用户均可使用。"
+    "deviceMgtDescription": "管理您的个人阅读设备，仅对您自己可见。全局设备由管理员统一配置，所有用户均可使用。",
+    "history": {
+      "pageTitle": "阅读记录",
+      "noHistory": "暂无阅读历史。请尽情畅游书籍的海洋吧~",
+      "exploreBooks": "",
+      "exploreBooksEnd": "",
+      "noRecords": "暂无记录",
+      "onlineReading": "在线阅读",
+      "pushedBooks": "推送过的书",
+      "browseHistory": "浏览记录"
+    },
+    "readingRecord": {
+      "pageTitle": "阅读记录",
+      "currentlyReading": "在读",
+      "wantToRead": "待读",
+      "finishedReading": "已读完",
+      "readingRecord": "阅读记录",
+      "noCurrentlyReading": "暂无在读的书籍",
+      "noWantToRead": "暂无待读的书籍",
+      "noFinishedReading": "暂无已读完的书籍"
+    }
   },
   "auth": {
     "signIn": "登录",
@@ -574,15 +614,18 @@
         "geetestCaptchaKey": "极验 Captcha Key",
         "trashCalibreSize": "Calibre 回收站占用空间",
         "trashUploadSize": "上传临时目录占用空间",
-        "trashUnknown": "未知"
+        "trashUnknown": "未知",
+        "mainPageRandomCount": "首页 - 随机推荐图书数量（为 0 时隐藏）",
+        "mainPageRecentCount": "首页 - 新书推荐显示数量",
+        "defaultPageSize": "书籍列表中分页大小"
       },
       "option": {
         "ssl": "SSL",
         "tls": "TLS(多数邮箱为此选项)",
         "pinyinDir": "使用拼音字母目录名 (兼容性高)",
-        "chineseDir": "使用中文目录名 (UTF8编码，更美观)",
+        "chineseDir": "使用中文目录名 (UTF8 编码，更美观)",
         "oldEpubReader": "Epub Reader（旧版）",
-        "candleReader": "Candle Reader（Beta版，支持章评功能）",
+        "candleReader": "Candle Reader（Beta 版，支持章评功能）",
         "none": "不启用",
         "image": "图形验证码 (无需配置)",
         "geetest": "GeeTest (极验)"

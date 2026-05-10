@@ -8,7 +8,7 @@ Youshu.me metadata plugin for Talebook
 import logging
 import re
 import requests
-from gettext import gettext as _
+from webserver.i18n import _
 from bs4 import BeautifulSoup
 
 YOUSHU_ISBN = "0000000000002"

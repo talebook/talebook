@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import time
-from gettext import gettext as _
 
 import bcrypt
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
@@ -16,6 +15,12 @@ from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import declarative_base, relationship
 
 from webserver.constants import BOOK_TYPE_EBOOK
+from webserver.i18n import _
+
+
+READ_STATE_UNREAD = 0
+READ_STATE_READING = 1
+READ_STATE_FINISHED = 2
 
 
 def mksalt():
@@ -446,6 +451,61 @@ class Device(Base, SQLAlchemyMixin):
             "schema": self.schema,
             "mailbox": self.mailbox,
         }
+
+
+class ReadingState(Base, SQLAlchemyMixin):
+    __tablename__ = "reading_state"
+
+    book_id = Column(Integer, primary_key=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), primary_key=True)
+    favorite = Column(Integer, default=0)
+    favorite_date = Column(DateTime)
+    wants = Column(Integer, default=0)
+    wants_date = Column(DateTime)
+    read_state = Column(Integer, default=0, nullable=False)
+    read_date = Column(DateTime)
+    online_read = Column(Integer, default=0)
+    download = Column(Integer, default=0)
+
+    reader = relationship(Reader, backref="reading_states")
+
+    def __init__(self, book_id, reader_id):
+        super(ReadingState, self).__init__()
+        self.book_id = book_id
+        self.reader_id = reader_id
+        self.favorite = 0
+        self.wants = 0
+        self.read_state = 0
+
+    def set_favorite(self, favorite_status):
+        self.favorite = 1 if favorite_status else 0
+        self.favorite_date = datetime.datetime.now()
+
+    def is_favorite(self):
+        return self.favorite == 1
+
+    def set_wants(self, wants_status):
+        self.wants = 1 if wants_status else 0
+        self.wants_date = datetime.datetime.now()
+
+    def is_wants(self):
+        return self.wants == 1
+
+    def set_read_state(self, read_state):
+        if read_state in [0, 1, 2]:
+            self.read_state = read_state
+            self.read_date = datetime.datetime.now()
+        if read_state > READ_STATE_UNREAD:
+            self.wants = 0
+
+    def get_read_state(self):
+        return self.read_state
+
+    def set_online_read(self, online_read_status):
+        self.online_read = 1 if online_read_status else 0
+
+    def set_download(self, download_status):
+        self.download = 1 if download_status else 0
 
 
 def user_syncdb(engine):

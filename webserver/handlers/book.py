@@ -27,7 +27,7 @@ from webserver.constants import (
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
-from webserver.models import Item
+from webserver.models import Item, ReadingState
 from webserver.plugins.meta import baike, calibre, douban, tomato, xhsd, youshu
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
@@ -47,8 +47,13 @@ class Index(BaseHandler):
 
     @js
     def get(self):
-        cnt_random = min(int(self.get_argument("random", 8)), 30)
-        cnt_recent = min(int(self.get_argument("recent", 10)), 30)
+        # 从配置中获取首页设置，如果未设置则使用默认值
+        setting_random_count = CONF.get("MAIN_PAGE_RANDOM_COUNT", 12)
+        setting_recent_count = CONF.get("MAIN_PAGE_RECENT_COUNT", 12)
+
+        # 允许通过 URL 参数覆盖配置（用于兼容旧接口），但不超过配置值
+        cnt_random = min(int(self.get_argument("random", setting_random_count)), setting_random_count)
+        cnt_recent = min(int(self.get_argument("recent", setting_recent_count)), 200)
 
         # nav = "index"
         # title = _(u"全部书籍")
@@ -70,9 +75,11 @@ class Index(BaseHandler):
                 ids = [book_id for book_id in ids if book_id not in private_book_ids]
 
         if ids:
-            random_ids = random.sample(ids, min(cnt_random, len(ids)))
-            random_books = [b for b in self.get_books(ids=random_ids)]
-            random_books.sort(key=lambda x: x["id"], reverse=True)
+            # 如果配置为 0，则不显示随机推荐
+            if cnt_random > 0:
+                random_ids = random.sample(ids, min(cnt_random, len(ids)))
+                random_books = [b for b in self.get_books(ids=random_ids)]
+                random_books.sort(key=lambda x: x["id"], reverse=True)
 
             ids.sort(reverse=True)
             # 确保不会尝试从空列表中取样
@@ -98,10 +105,26 @@ class BookDetail(BaseHandler):
             user_id = self.user_id()
             if not user_id or item.collector_id != user_id:
                 return {"err": "book.not_found", "msg": _("书籍不存在")}
+        book_info = utils.BookFormatter(self, book).format(with_files=True, with_perms=True)
+        reading_state = None
+        user_id = self.user_id()
+        if user_id:
+            state = (
+                self.session.query(ReadingState)
+                .filter(
+                    ReadingState.book_id == int(id),
+                    ReadingState.reader_id == user_id,
+                )
+                .first()
+            )
+            if state:
+                reading_state = utils.ReadingStateFormatter.format_reading_state(state)
+        if reading_state:
+            book_info["state"] = reading_state
         return {
             "err": "ok",
             "kindle_sender": CONF["smtp_username"],
-            "book": utils.BookFormatter(self, book).format(with_files=True, with_perms=True),
+            "book": book_info,
         }
 
 
@@ -1717,6 +1740,282 @@ class BookScoped(BaseHandler):
             return {"err": "internal", "msg": _("获取私有书籍失败")}
 
 
+class BookFavorite(BaseHandler):
+    @js
+    @auth
+    def post(self, id):
+        book_id = int(id)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+        user_id = self.user_id()
+        data = tornado.escape.json_decode(self.request.body)
+        favorite_status = data.get("favorite", False)
+        reading_state = (
+            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
+        )
+        if not reading_state:
+            reading_state = ReadingState(book_id, user_id)
+            self.session.add(reading_state)
+        reading_state.set_favorite(favorite_status)
+        self.session.commit()
+        action = "收藏" if favorite_status else "取消收藏"
+        return {"err": "ok", "msg": _("%s成功") % action}
+
+    @js
+    @auth
+    def get(self):
+        user_id = self.user_id()
+        reading_states = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.reader_id == user_id, ReadingState.favorite == 1)
+            .order_by(ReadingState.favorite_date.desc())
+            .all()
+        )
+        book_ids = [state.book_id for state in reading_states]
+        books_dict = {book["id"]: book for book in self.get_books(ids=book_ids)}
+        state_dict = {state.book_id: state for state in reading_states}
+        favorite_books = []
+        for book_id in book_ids:
+            book = books_dict.get(book_id)
+            if not book:
+                continue
+            book_data = utils.BookFormatter(self, book).format()
+            book_data["state"] = utils.ReadingStateFormatter.format_reading_state(state_dict[book_id])
+            favorite_books.append(book_data)
+        return {"err": "ok", "title": _("我的收藏"), "total": len(favorite_books), "books": favorite_books}
+
+
+class BookWantToRead(BaseHandler):
+    @js
+    @auth
+    def post(self, id):
+        book_id = int(id)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+        user_id = self.user_id()
+        data = tornado.escape.json_decode(self.request.body)
+        wants_status = data.get("wants", False)
+        reading_state = (
+            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
+        )
+        if not reading_state:
+            reading_state = ReadingState(book_id, user_id)
+            self.session.add(reading_state)
+        reading_state.set_wants(wants_status)
+        self.session.commit()
+        action = "标记为待读" if wants_status else "取消待读"
+        return {"err": "ok", "msg": _("%s成功") % action}
+
+    @js
+    @auth
+    def get(self):
+        user_id = self.user_id()
+        reading_states = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.reader_id == user_id, ReadingState.wants == 1)
+            .order_by(ReadingState.wants_date.desc())
+            .all()
+        )
+        book_ids = [state.book_id for state in reading_states]
+        books_dict = {book["id"]: book for book in self.get_books(ids=book_ids)}
+        state_dict = {state.book_id: state for state in reading_states}
+        wants_books = []
+        for book_id in book_ids:
+            book = books_dict.get(book_id)
+            if not book:
+                continue
+            book_data = utils.BookFormatter(self, book).format()
+            book_data["state"] = utils.ReadingStateFormatter.format_reading_state(state_dict[book_id])
+            wants_books.append(book_data)
+        return {"err": "ok", "title": _("待读书籍"), "total": len(wants_books), "books": wants_books}
+
+
+class BookReading(BaseHandler):
+    @js
+    @auth
+    def get(self):
+        user_id = self.user_id()
+        reading_states = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.reader_id == user_id, ReadingState.read_state == 1)
+            .order_by(ReadingState.read_date.desc())
+            .all()
+        )
+        book_ids = [state.book_id for state in reading_states]
+        books_dict = {book["id"]: book for book in self.get_books(ids=book_ids)}
+        state_dict = {state.book_id: state for state in reading_states}
+        reading_books = []
+        for book_id in book_ids:
+            book = books_dict.get(book_id)
+            if not book:
+                continue
+            book_data = utils.BookFormatter(self, book).format()
+            book_data["state"] = utils.ReadingStateFormatter.format_reading_state(state_dict[book_id])
+            reading_books.append(book_data)
+        return {"err": "ok", "title": _("在读书籍"), "total": len(reading_books), "books": reading_books}
+
+
+class BookReadDone(BaseHandler):
+    @js
+    @auth
+    def get(self):
+        user_id = self.user_id()
+        reading_states = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.reader_id == user_id, ReadingState.read_state == 2)
+            .order_by(ReadingState.read_date.desc())
+            .all()
+        )
+        book_ids = [state.book_id for state in reading_states]
+        books_dict = {book["id"]: book for book in self.get_books(ids=book_ids)}
+        state_dict = {state.book_id: state for state in reading_states}
+        read_done_books = []
+        for book_id in book_ids:
+            book = books_dict.get(book_id)
+            if not book:
+                continue
+            book_data = utils.BookFormatter(self, book).format()
+            book_data["state"] = utils.ReadingStateFormatter.format_reading_state(state_dict[book_id])
+            read_done_books.append(book_data)
+        return {"err": "ok", "title": _("已读完书籍"), "total": len(read_done_books), "books": read_done_books}
+
+
+class BookReadingState(BaseHandler):
+    @js
+    @auth
+    def post(self, id):
+        book_id = int(id)
+        book = self.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+        user_id = self.user_id()
+        data = tornado.escape.json_decode(self.request.body)
+        read_state = data.get("read_state", 0)
+        if read_state not in [0, 1, 2]:
+            return {"err": "params.invalid", "msg": _("阅读状态参数错误")}
+        reading_state = (
+            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
+        )
+        if not reading_state:
+            reading_state = ReadingState(book_id, user_id)
+            self.session.add(reading_state)
+        reading_state.set_read_state(read_state)
+        if data.get("online_read") is not None:
+            reading_state.set_online_read(data["online_read"])
+        if data.get("download") is not None:
+            reading_state.set_download(data["download"])
+        self.session.commit()
+        state_names = {0: "未读", 1: "在读", 2: "已读完"}
+        return {"err": "ok", "msg": _("阅读状态已设置为：%s") % state_names[read_state]}
+
+    @js
+    @auth
+    def get(self, id):
+        book_id = int(id)
+        user_id = self.user_id()
+        reading_state = (
+            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
+        )
+        return utils.ReadingStateFormatter.format_reading_state_with_api_format(reading_state)
+
+
+class BookReadingStats(BaseHandler):
+    @js
+    @auth
+    def get(self):
+        from sqlalchemy import extract
+
+        user_id = self.user_id()
+        now = datetime.datetime.now()
+        current_year = now.year
+        current_month = now.month
+
+        total_reading = (
+            self.session.query(ReadingState).filter(ReadingState.reader_id == user_id, ReadingState.read_state == 1).count()
+        )
+
+        total_read_done = (
+            self.session.query(ReadingState).filter(ReadingState.reader_id == user_id, ReadingState.read_state == 2).count()
+        )
+
+        month_reading = (
+            self.session.query(ReadingState)
+            .filter(
+                ReadingState.reader_id == user_id,
+                ReadingState.read_state == 1,
+                extract("year", ReadingState.read_date) == current_year,
+                extract("month", ReadingState.read_date) == current_month,
+            )
+            .count()
+        )
+
+        month_read_done = (
+            self.session.query(ReadingState)
+            .filter(
+                ReadingState.reader_id == user_id,
+                ReadingState.read_state == 2,
+                extract("year", ReadingState.read_date) == current_year,
+                extract("month", ReadingState.read_date) == current_month,
+            )
+            .count()
+        )
+
+        month_read_done_states = (
+            self.session.query(ReadingState)
+            .filter(
+                ReadingState.reader_id == user_id,
+                ReadingState.read_state == 2,
+                extract("year", ReadingState.read_date) == current_year,
+                extract("month", ReadingState.read_date) == current_month,
+            )
+            .order_by(ReadingState.read_date.desc())
+            .limit(12)
+            .all()
+        )
+
+        month_read_done_books = []
+        for state in month_read_done_states:
+            book = self.get_book(state.book_id, raise_exception=False)
+            if not book:
+                continue
+            book_data = utils.BookFormatter(self, book).format()
+            book_data["state"] = utils.ReadingStateFormatter.format_reading_state(state)
+            month_read_done_books.append(book_data)
+
+        current_reading_states = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.reader_id == user_id, ReadingState.read_state == 1)
+            .order_by(ReadingState.read_date.desc())
+            .limit(12)
+            .all()
+        )
+
+        current_reading_books = []
+        for state in current_reading_states:
+            book = self.get_book(state.book_id, raise_exception=False)
+            if not book:
+                continue
+            book_data = utils.BookFormatter(self, book).format()
+            book_data["state"] = utils.ReadingStateFormatter.format_reading_state(state)
+            current_reading_books.append(book_data)
+
+        return {
+            "err": "ok",
+            "stats": {
+                "total_reading": total_reading,
+                "total_read_done": total_read_done,
+                "month_reading": month_reading,
+                "month_read_done": month_read_done,
+                "current_year": current_year,
+                "current_month": current_month,
+            },
+            "month_read_done_books": month_read_done_books,
+            "current_reading_books": current_reading_books,
+        }
+
+
 def routes():
     return [
         (r"/api/index", Index),
@@ -1743,4 +2042,12 @@ def routes():
         (r"/read/([0-9]+)", BookRead),
         (r"/api/read/txt", TxtRead),
         (r"/api/book/txt/init", BookTxtInit),
+        (r"/api/book/([0-9]+)/favorite", BookFavorite),
+        (r"/api/book/([0-9]+)/wants", BookWantToRead),
+        (r"/api/book/([0-9]+)/readstate", BookReadingState),
+        (r"/api/favorites", BookFavorite),
+        (r"/api/wants", BookWantToRead),
+        (r"/api/reading", BookReading),
+        (r"/api/read-done", BookReadDone),
+        (r"/api/reading/stats", BookReadingStats),
     ]

@@ -3,9 +3,9 @@
 
 import hashlib
 import logging
-from gettext import gettext as _
 
 from webserver import loader
+from webserver.i18n import _
 from webserver.services import AsyncService
 
 

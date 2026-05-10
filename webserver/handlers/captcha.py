@@ -6,10 +6,10 @@
 
 import datetime
 import logging
-from gettext import gettext as _
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, js
+from webserver.i18n import _
 from webserver.plugins import captcha as captcha_module
 from webserver.plugins.captcha.image_captcha import ImageCaptchaProvider
 

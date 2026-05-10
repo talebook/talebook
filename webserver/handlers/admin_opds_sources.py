@@ -8,12 +8,12 @@ OPDS 源配置管理 Handler
 import datetime
 import logging
 import traceback
-from gettext import gettext as _
 
 import tornado
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, is_admin, js
+from webserver.i18n import _
 from webserver.models import OpdsSource
 
 

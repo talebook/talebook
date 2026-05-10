@@ -5,7 +5,6 @@ import logging
 import os
 import re
 import sys
-from gettext import gettext as _
 
 import tornado.httpserver
 import tornado.ioloop
@@ -15,6 +14,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tornado import web
 from tornado.options import define, options
+
+from webserver.i18n import _
 
 
 # Monkey patch: 修复 Tornado 6.5 对中文文件名的严格验证

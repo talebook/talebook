@@ -10,7 +10,6 @@ import subprocess
 import tempfile
 import traceback
 import uuid
-from gettext import gettext as _
 
 import tornado
 
@@ -18,6 +17,7 @@ from webserver import loader, utils
 from webserver.base.trash_manager import TrashManager
 from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
+from webserver.i18n import _
 from webserver.models import Reader, ScanFile
 from webserver.services.autofill import AutoFillService
 from webserver.services.batch_convert import BatchConvertService
@@ -373,6 +373,10 @@ class AdminSettings(BaseHandler):
             "GEETEST_CAPTCHA_ID",
             "GEETEST_CAPTCHA_KEY",
             "DEVICES",
+            # 首页设置
+            "MAIN_PAGE_RANDOM_COUNT",
+            "MAIN_PAGE_RECENT_COUNT",
+            "DEFAULT_PAGE_SIZE",
         ]
 
         args = loader.SettingsLoader()

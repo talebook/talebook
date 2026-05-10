@@ -10,8 +10,8 @@ import logging
 import os
 from typing import Dict
 
-SUPPORTED_LANGUAGES = ("zh", "zh-TW", "en")
-DEFAULT_LANGUAGE = "zh"
+SUPPORTED_LANGUAGES = ("zh-CN", "en-US")
+DEFAULT_LANGUAGE = "zh-CN"
 TEXT_DOMAIN = "messages"
 
 _current_language = contextvars.ContextVar("talebook_i18n_language", default=None)
@@ -52,38 +52,6 @@ Hi, %(username)s！
 ''',
 }
 
-_DEFAULT_SETTINGS_ZH_TW = {
-    "site_title": "Talebook",
-    "push_title": "%(site_title)s：推送給您一本書《%(title)s》",
-    "push_content": "为您奉上一本《%(title)s》, 欢迎常来访问%(site_title)s！%(site_url)s",
-    'BOOK_NAV': '''經濟金融=經濟學/管理/經濟/金融/商業/投資
-教育=小學書單/高中書單/初中書單/書單/小學語文閱讀推薦/教育/古籍/繪本/國學/音樂/戲劇/繪畫/藝術史/國學入門/少兒/童書/文藝/兒童/宋詞/唐詩
-心理學=心理學/心理/勵志/女性/自我管理/治癒/成長/個人成長/職場/溝通/成功/人生
-社科=人文社科/哲學/傳記/社會學/文化/設計/藝術/政治/社會/建築/宗教/電影/數學/政治學/回憶錄
-歷史=歷史/中國歷史/近代史/思想/二戰/考古/中國/世界歷史/美國/日本/英國/法國/世界史/史學理論
-科技=科普/網際網路/程式設計/科學
-文學=文學藝術/小說/外國文學/文學/隨筆/中國文學
-''',
-    "INVITE_MESSAGE": "本站為私人圖書館，需輸入密碼才可進行訪問",
-    'FRIENDS': [
-        {"text": "Google Books", "href": "https://books.google.com"},
-    ],
-    "SIGNUP_MAIL_TITLE": "歡迎註冊個人書屋",
-    "RESET_MAIL_TITLE": "密碼重置",
-    'SIGNUP_MAIL_CONTENT': '''
-Hi, %(username)s！
-歡迎註冊%(site_title)s，這裡雖然是個小小的圖書館，但是希望你找到所愛。
-
-點擊鏈接激活你的賬號：%(active_link)s
-''',
-
-    'RESET_MAIL_CONTENT': '''
-Hi, %(username)s！
-
-你剛剛在網站上提交了密碼重置，請妥善保存你的新密碼：%(password)s
-''',
-}
-
 _DEFAULT_SETTINGS_EN = {
     "site_title": "My Books",
     "push_title": "%(site_title)s：Send you [%(title)s]",
@@ -117,12 +85,10 @@ def normalize_language(lang: str) -> str:
     if not lang:
         return ""
     lang = str(lang).strip().lower().replace("_", "-")
-    if lang in ("zh-tw", "zh-hant", "zh-hk", "zh-mo"):
-        return "zh-TW"
     if lang.startswith("zh"):
-        return "zh"
+        return "zh-CN"
     if lang.startswith("en"):
-        return "en"
+        return "en-US"
     return ""
 
 
@@ -148,10 +114,6 @@ def detect_system_language() -> str:
 def _load_catalog(lang: str) -> Dict[str, str]:
     lang = normalize_language(lang) or DEFAULT_LANGUAGE
     if lang in _catalog_cache:
-        return _catalog_cache[lang]
-
-    if lang == "zh":
-        _catalog_cache[lang] = {}
         return _catalog_cache[lang]
 
     base_dir = os.path.join(os.path.dirname(__file__), "i18n")
@@ -225,10 +187,8 @@ def choose_language(site_language: str = "", accept_language: str = "") -> str:
 
 def apply_localized_default_settings(conf: dict, lang: str):
     lang = normalize_language(lang)
-    if lang == "en":
+    if lang == "en-US":
         target = _DEFAULT_SETTINGS_EN
-    elif lang == "zh-TW":
-        target = _DEFAULT_SETTINGS_ZH_TW
     else:
         return
     for key, zh_val in _DEFAULT_SETTINGS_ZH.items():
@@ -238,16 +198,14 @@ def apply_localized_default_settings(conf: dict, lang: str):
 
 def get_default_settings(lang: str) -> dict:
     lang = normalize_language(lang)
-    if lang == "en":
+    if lang == "en-US":
         return dict(_DEFAULT_SETTINGS_EN)
-    if lang == "zh-TW":
-        return dict(_DEFAULT_SETTINGS_ZH_TW)
     return dict(_DEFAULT_SETTINGS_ZH)
 
 
 def gettext(message: str) -> str:
     lang = get_language()
-    if lang == "zh" or not message:
+    if lang == "zh-CN" or not message:
         return message
     catalog = _load_catalog(lang)
     # zh-TW falls back to zh (original) if no translation found

@@ -8,7 +8,7 @@
 
 import logging
 import requests
-from gettext import gettext as _
+from webserver.i18n import _
 from .tomato.tomato import Page, Search
 from .tomato.tomatoexception import VerifyError, PageError
 

@@ -10,7 +10,7 @@ import json
 import logging
 import re
 import sys
-from gettext import gettext as _
+from webserver.i18n import _
 from urllib.parse import urlparse
 from pathlib import Path
 

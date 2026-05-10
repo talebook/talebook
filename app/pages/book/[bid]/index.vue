@@ -488,6 +488,17 @@
                         </v-btn>
 
                         <v-btn
+                            v-if="book.id > 0 && store.user.is_login"
+                            color="primary"
+                            variant="elevated"
+                            class="mx-2"
+                            :loading="readingStateLoading"
+                            @click="handleReadingStateChange"
+                        >
+                            {{ readingStateButtonText }}
+                        </v-btn>
+
+                        <v-btn
                             v-if="book.id > 0"
                             color="primary"
                             variant="elevated"
@@ -611,23 +622,80 @@
                             cols="8"
                             sm="4"
                         >
-                            <v-img
-                                class="book-img"
-                                :src="book.img"
-                                :aspect-ratio="11 / 15"
-                                max-height="500px"
-                                contain
-                            />
+                            <div style="position: relative; display: inline-block; width: 100%;">
+                                <v-img
+                                    class="book-img"
+                                    :src="book.img"
+                                    :aspect-ratio="11 / 15"
+                                    max-height="500px"
+                                    contain
+                                    style="border-radius: 14px;"
+                                />
+                                <div
+                                    v-if="readingState === READING_STATE.FINISHED"
+                                    style="
+                                        position: absolute;
+                                        top: 95%;
+                                        left: 0;
+                                        right: 0;
+                                        height: 40px;
+                                        background: rgba(158, 158, 158, 0.7);
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        z-index: 2;
+                                        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                                        backdrop-filter: blur(2px);
+                                    "
+                                >
+                                    <span
+                                        style="
+                                            color: white;
+                                            font-size: 1.2rem;
+                                            font-weight: bold;
+                                            text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+                                            line-height: 1;
+                                            letter-spacing: 2px;
+                                        "
+                                    >
+                                        {{ t('readingState.finished') }}
+                                    </span>
+                                </div>
+                            </div>
                         </v-col>
                         <v-col
                             cols="12"
                             sm="8"
                         >
                             <v-card-text>
-                                <div>
+                                <div v-if="book.id > 0 && store.user.is_login">
+                                    <p class="text-h5 mb-2">
+                                        {{ book.title }}
+                                        <v-tooltip bottom>
+                                            <template #activator="{ props }">
+                                                <v-btn
+                                                    v-bind="props"
+                                                    icon
+                                                    size="x-small"
+                                                    class="ml-2"
+                                                    :color="isWants ? 'orange' : 'grey'"
+                                                    @click="toggleWants"
+                                                >
+                                                    <v-icon>
+                                                        {{ isWants ? 'mdi-bookmark-plus' : 'mdi-bookmark-plus-outline' }}
+                                                    </v-icon>
+                                                </v-btn>
+                                            </template>
+                                            <span>{{ t('readingState.wantsHint') }}</span>
+                                        </v-tooltip>
+                                    </p>
+                                </div>
+                                <div v-else>
                                     <p class="text-h5 mb-2">
                                         {{ book.title }}
                                     </p>
+                                </div>
+                                <div>
                                     <span class="text-grey">{{ book.author }}著，{{ pub_year }}年版</span>
                                     <span
                                         v-if="book.files && book.files.length > 0"
@@ -642,6 +710,40 @@
                                     density="compact"
                                     size="small"
                                 />
+                                <div
+                                    v-if="readingState === READING_STATE.READING"
+                                    class="mt-2"
+                                >
+                                    <v-chip
+                                        size="small"
+                                        color="indigo"
+                                    >
+                                        <v-icon
+                                            size="small"
+                                            start
+                                        >
+                                            mdi-book-open
+                                        </v-icon>
+                                        {{ readingDaysText }}
+                                    </v-chip>
+                                </div>
+                                <div
+                                    v-else-if="readingState === READING_STATE.FINISHED"
+                                    class="mt-2"
+                                >
+                                    <v-chip
+                                        size="small"
+                                        color="grey"
+                                    >
+                                        <v-icon
+                                            size="small"
+                                            start
+                                        >
+                                            mdi-check
+                                        </v-icon>
+                                        {{ completedReadingText }}
+                                    </v-chip>
+                                </div>
                                 <br>
                                 <div class="tag-chips mt-2">
                                     <v-chip
@@ -877,6 +979,49 @@
                         </v-card>
                     </v-col>
                 </v-row>
+            </v-col>
+        </v-row>
+
+        <v-row v-if="book.id > 0 && store.user.is_login" class="mt-4">
+            <v-col cols="12">
+                <v-card variant="outlined">
+                    <v-card-text>
+                        <div class="d-flex flex-wrap align-center ga-2">
+                            <v-btn
+                                variant="tonal"
+                                :color="isWants ? 'orange' : 'grey'"
+                                size="small"
+                                @click="toggleWants"
+                            >
+                                <v-icon start>
+                                    {{ isWants ? 'mdi-bookmark' : 'mdi-bookmark-outline' }}
+                                </v-icon>
+                                {{ isWants ? t('book.removeFromWantToRead') : t('book.wantToRead') }}
+                            </v-btn>
+
+                            <v-btn
+                                variant="tonal"
+                                :color="readingStateText.color"
+                                size="small"
+                                @click="handleReadingStateChange"
+                            >
+                                <v-icon start>
+                                    {{ readingStateText.icon }}
+                                </v-icon>
+                                {{ readingStateText.label }}
+                            </v-btn>
+
+                            <v-chip
+                                v-if="readingState > 0"
+                                size="small"
+                                :color="readingState === 1 ? 'blue' : 'grey'"
+                                class="ml-2"
+                            >
+                                {{ readingState === 1 ? t('book.currentlyReading') : t('book.alreadyFinished') }}
+                            </v-chip>
+                        </div>
+                    </v-card-text>
+                </v-card>
             </v-col>
         </v-row>
     </div>
@@ -1484,6 +1629,124 @@ watch(tempDevice, (newVal) => {
 watch(selectedDeviceOption, (newValue) => {
     if (typeof localStorage !== 'undefined' && newValue) {
         localStorage.setItem('last_selected_device_option', newValue);
+    }
+});
+
+const READING_STATE = { UNREAD: 0, READING: 1, FINISHED: 2 };
+
+const isWants = ref(false);
+const readingState = ref(0);
+const readingStateLoading = ref(false);
+const readDays = ref(0);
+const lastReadTime = ref('');
+
+const loadReadingState = async () => {
+    if (!store.user.is_login || !book.value.id) return;
+    try {
+        const rsp = await $backend(`/book/${book.value.id}/readstate`);
+        if (rsp.err === 'ok') {
+            isWants.value = !!rsp.wants;
+            readingState.value = rsp.read_state || 0;
+            readDays.value = rsp.read_days || 0;
+            lastReadTime.value = rsp.read_date || '';
+        }
+        if (book.value.state) {
+            if (!rsp || rsp.err !== 'ok') {
+                isWants.value = !!book.value.state.wants;
+                readingState.value = book.value.state.read_state || 0;
+            }
+            readDays.value = book.value.state.read_days || 0;
+            lastReadTime.value = book.value.state.last_read_time || '';
+        }
+    } catch (e) {
+        console.error('Failed to load reading state:', e);
+    }
+};
+
+const toggleWants = async () => {
+    readingStateLoading.value = true;
+    try {
+        const rsp = await $backend(`/book/${book.value.id}/wants`, {
+            method: 'POST',
+            body: JSON.stringify({ wants: !isWants.value }),
+        });
+        if (rsp.err === 'ok') {
+            isWants.value = !isWants.value;
+        }
+    } catch (e) {
+        console.error('Wants error:', e);
+    } finally {
+        readingStateLoading.value = false;
+    }
+};
+
+const handleReadingStateChange = async () => {
+    readingStateLoading.value = true;
+    try {
+        let newState = READING_STATE.READING;
+        if (readingState.value === READING_STATE.READING) {
+            newState = READING_STATE.FINISHED;
+        } else if (readingState.value === READING_STATE.FINISHED) {
+            newState = READING_STATE.UNREAD;
+        }
+
+        const rsp = await $backend(`/book/${book.value.id}/readstate`, {
+            method: 'POST',
+            body: JSON.stringify({ read_state: newState }),
+        });
+        if (rsp.err === 'ok') {
+            readingState.value = newState;
+            if (newState === READING_STATE.READING) {
+                isWants.value = false;
+                readDays.value = 0;
+            }
+            if (newState === READING_STATE.FINISHED) {
+                readDays.value = 0;
+                lastReadTime.value = new Date().toISOString().slice(0, 10);
+            }
+            if (newState === READING_STATE.UNREAD) {
+                readDays.value = 0;
+                lastReadTime.value = '';
+            }
+        }
+    } catch (e) {
+        console.error('Reading state error:', e);
+    } finally {
+        readingStateLoading.value = false;
+    }
+};
+
+const readingStateText = computed(() => {
+    if (readingState.value === READING_STATE.UNREAD || readingState.value === READING_STATE.FINISHED) {
+        return { label: t('book.setAsReading'), icon: 'mdi-book-open-outline', color: 'primary' };
+    }
+    return { label: t('book.markAsFinished'), icon: 'mdi-check-circle-outline', color: 'success' };
+});
+
+const readingDaysText = computed(() => {
+    if (readingState.value !== READING_STATE.READING) return '';
+    const days = readDays.value;
+    if (days === 0) {
+        return t('readingState.readingWithinOneDay');
+    }
+    return t('readingState.readingDays', { days });
+});
+
+const completedReadingText = computed(() => {
+    if (readingState.value !== READING_STATE.FINISHED) return '';
+    return t('readingState.completedReading', { date: lastReadTime.value });
+});
+
+const readingStateButtonText = computed(() => {
+    if (readingState.value === READING_STATE.READING) {
+        return t('readingState.setDone');
+    }
+    return t('readingState.setReading');
+});
+
+watch(() => book.value.id, (newId) => {
+    if (newId) {
+        loadReadingState();
     }
 });
 

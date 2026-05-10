@@ -3,7 +3,34 @@
 
 
 import datetime
-from gettext import gettext as _
+import logging
+import re
+
+from webserver.i18n import _
+
+
+# 匹配包含z-library的括号内容，例如 (z-library.sk, 1lib.sk, z-lib.sk)
+ZLIBRARY_PATTERN = re.compile(r"\([^)]*?(?:z-?lib(?:rary)?|1lib)[^)]*?\)", re.IGNORECASE)
+
+
+def remove_zlibrary_suffix(text):
+    """移除文件名中包含z-library的括号内容"""
+    if not text:
+        return text
+    return ZLIBRARY_PATTERN.sub("", text).strip()
+
+
+def get_title_sort(title):
+    """获取标题的排序字符串"""
+    if not title:
+        return title
+    try:
+        from calibre.utils.filenames import ascii_text
+
+        return ascii_text(title).lower()
+    except Exception as e:
+        logging.error(f"Error converting title to ASCII for sorting: {e}")
+        return title
 
 
 class SimpleBookFormatter:
@@ -134,3 +161,56 @@ def super_strip(s):
     # 删除掉所有不可见的字符
     # issue: https://github.com/talebook/talebook/issues/304
     return "".join(c for c in s.strip() if c.isprintable())
+
+
+class ReadingStateFormatter:
+    @staticmethod
+    def format_reading_state(reading_state):
+        if not reading_state:
+            return {
+                "favorite": 0,
+                "favorite_date": None,
+                "wants": 0,
+                "wants_date": None,
+                "read_state": 0,
+                "read_date": None,
+                "online_read": 0,
+                "download": 0,
+            }
+        return {
+            "favorite": reading_state.favorite,
+            "favorite_date": reading_state.favorite_date.isoformat() if reading_state.favorite_date else None,
+            "wants": reading_state.wants,
+            "wants_date": reading_state.wants_date.isoformat() if reading_state.wants_date else None,
+            "read_state": reading_state.read_state,
+            "read_date": reading_state.read_date.isoformat() if reading_state.read_date else None,
+            "online_read": reading_state.online_read or 0,
+            "download": reading_state.download or 0,
+        }
+
+    @staticmethod
+    def format_reading_state_with_api_format(reading_state):
+        if reading_state:
+            return {
+                "err": "ok",
+                "read_state": reading_state.get_read_state(),
+                "favorite": reading_state.is_favorite(),
+                "wants": reading_state.is_wants(),
+                "online_read": reading_state.online_read or 0,
+                "download": reading_state.download or 0,
+                "read_date": reading_state.read_date.isoformat() if reading_state.read_date else None,
+                "favorite_date": reading_state.favorite_date.isoformat() if reading_state.favorite_date else None,
+                "wants_date": reading_state.wants_date.isoformat() if reading_state.wants_date else None,
+            }
+        else:
+            return {
+                "err": "ok",
+                "read_state": 0,
+                "favorite": False,
+                "wants": False,
+                "online_read": 0,
+                "download": 0,
+                "read_date": None,
+                "favorite_date": None,
+                "wants_date": None,
+            }

@@ -120,7 +120,7 @@ onMounted(() => {
 
 // 修复: 直接使用 useAsyncData 不添加 await
 const { data: indexData } = useAsyncData('index', () => 
-    $backend('/index?random=12&recent=12')
+    $backend('/index')
 );
 
 store.setNavbar(true);

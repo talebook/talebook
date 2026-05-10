@@ -100,7 +100,7 @@
     "parsingMessage": "First time reading, parsing table of contents, please wait... {seconds}",
     "timeoutMessage": "Timeout, please wait and refresh to try again",
     "parseTimeout": "Parsing Timeout",
-    "viewDetails": "View Details",
+    "viewDetails": "No introduction yet",
     "setSole": "Set as Private",
     "setPublic": "Set as Public",
     "scopePrivate": "Private",
@@ -136,7 +136,27 @@
     "setFailed": "Set failed",
     "deleteSuccess": "Deleted successfully",
     "deleteFailed": "Delete failed",
-    "confirmDelete": "Are you sure you want to delete this book?"
+    "confirmDelete": "Are you sure you want to delete this book?",
+    "wantToRead": "Want to Read",
+    "removeFromWantToRead": "Remove from Want to Read",
+    "setAsReading": "Set as Reading",
+    "markAsFinished": "Mark as Finished",
+    "currentlyReading": "Currently Reading",
+    "alreadyFinished": "Already Finished"
+  },
+  "readingState": {
+    "reading": "Reading",
+    "none": "Not Read",
+    "done": "Read",
+    "finished": "Finished",
+    "cancel": "Cancel Reading",
+    "setReading": "Set as Reading",
+    "setDone": "Mark as Finished",
+    "favoriteHint": "Click to favorite or remove from favorites",
+    "wantsHint": "Click to add to or remove from want-to-read list",
+    "readingDays": "Read for {days} days",
+    "readingWithinOneDay": "Read for less than a day",
+    "completedReading": "Finished reading on {date}"
   },
   "library": {
     "title": "Library",
@@ -185,6 +205,16 @@
       "onlineReading": "Online Reading",
       "pushedBooks": "Pushed Books",
       "browseHistory": "Browse History"
+    },
+    "readingRecord": {
+      "pageTitle": "Reading Record",
+      "currentlyReading": "Currently Reading",
+      "wantToRead": "Want to Read",
+      "finishedReading": "Finished Reading",
+      "readingRecord": "Reading Record",
+      "noCurrentlyReading": "No currently reading books",
+      "noWantToRead": "No want-to-read books",
+      "noFinishedReading": "No finished reading books"
     },
     "detail": {
       "pageTitle": "User Center",
@@ -554,7 +584,10 @@
         "geetestCaptchaKey": "GeeTest Captcha Key",
         "trashCalibreSize": "Calibre Trash Size",
         "trashUploadSize": "Upload Temp Directory Size",
-        "trashUnknown": "Unknown"
+        "trashUnknown": "Unknown",
+        "mainPageRandomCount": "Random Books Count (0 to hide)",
+        "mainPageRecentCount": "New Books Count",
+        "defaultPageSize": "Book List Page Size"
       },
       "option": {
         "ssl": "SSL",

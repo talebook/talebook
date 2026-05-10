@@ -67,11 +67,11 @@
                             <v-select
                                 v-else-if="f.type === 'select' "
                                 v-model="settings[f.key]"
-                                hide-details
-                                class="mb-4"
                                 :prepend-icon="f.icon"
                                 :items="f.items"
                                 :label="f.label"
+                                hide-details
+                                class="mb-4"
                                 item-title="text"
                                 item-value="value"
                             />
@@ -91,6 +91,13 @@
                                 >
                                 </v-select>
                             </template>
+                            <v-text-field
+                                v-else-if="f.type === 'number'"
+                                v-model.number="settings[f.key]"
+                                :prepend-icon="f.icon"
+                                :label="f.label"
+                                type="number"
+                            />
                             <v-text-field
                                 v-else
                                 v-model="settings[f.key]"
@@ -550,6 +557,16 @@ const cards = computed(() => [
             { icon: 'mdi-copyright', key: 'FOOTER', label: t('admin.settings.label.siteFooter'), type: 'textarea' },
             { icon: 'mdi-code-tags', key: 'FOOTER_EXTRA_HTML', label: t('admin.settings.label.footerExtraHtml'), type: 'textarea' },
             { icon: 'mdi-code-tags', key: 'SIDEBAR_EXTRA_HTML', label: t('admin.settings.label.sidebarExtraHtml'), type: 'textarea' },
+            // 首页设置
+            { icon: 'mdi-shuffle', key: 'MAIN_PAGE_RANDOM_COUNT', label: t('admin.settings.label.mainPageRandomCount'), type: 'select',
+                items: [0, 12, 24, 48, 96, 192, 768].map((v) => ({ text: String(v), value: v }))
+            },
+            { icon: 'mdi-book-multiple', key: 'MAIN_PAGE_RECENT_COUNT', label: t('admin.settings.label.mainPageRecentCount'), type: 'select',
+                items: [12, 24, 48, 96, 192].map((v) => ({ text: String(v), value: v }))
+            },
+            { icon: 'mdi-book-multiple', key: 'DEFAULT_PAGE_SIZE', label: t('admin.settings.label.defaultPageSize'), type: 'select',
+                items: [60, 100, 200, 500, 1000].map((v) => ({ text: String(v), value: v }))
+            },
             { key: 'SHOW_SIDEBAR_SYS', label: t('admin.settings.label.showSidebarSys'), type: 'checkbox' },
         ],
         groups: [

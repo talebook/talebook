@@ -129,6 +129,11 @@ settings = {
     'SIDEBAR_EXTRA_HTML': '<img class="ma-auto footer-logo" style="max-width: 130px; height: auto;" src="/logo/link.png">',
     'SHOW_SIDEBAR_SYS': True,
 
+    # 首页设置
+    'MAIN_PAGE_RANDOM_COUNT': 12,
+    'MAIN_PAGE_RECENT_COUNT': 12,
+    'DEFAULT_PAGE_SIZE': 60,
+
     # 人机验证配置
     'CAPTCHA_PROVIDER': '',  # 验证提供商，可选值: 'geetest' 或空字符串表示不启用
     'CAPTCHA_ENABLE_FOR_REGISTER': False,  # 注册界面启用认证

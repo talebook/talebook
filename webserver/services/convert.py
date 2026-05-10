@@ -6,11 +6,11 @@ import os
 import subprocess
 import time
 import traceback
-from gettext import gettext as _
 
 import psutil
 
 from webserver import loader, utils
+from webserver.i18n import _
 from webserver.services import AsyncService
 from webserver.services.background_service import BackgroundService, BackgroundTask
 from webserver.services.mail import MailService
@@ -143,7 +143,7 @@ class ConvertService(AsyncService):
         if task:
             BackgroundService().complete_task(task.id)
         if not ok:
-            self.add_msg(user_id, "danger", "[%s]文件格式转换失败！请查看日志，或到公众号上私信联系" % service_item)
+            self.add_msg(user_id, "danger", "[%s]文件格式转换失败！请查看日志，或前往项目ISSUE页面反馈" % service_item)
             return
 
         with open(new_path, "rb") as f:
