@@ -59,21 +59,21 @@ class BaiduBaikeApi:
             pd = utcnow()
         mi.pubdate = pd
         mi.timestamp = mi.pubdate
-        mi.cover_url = baike.get_image()
+        normal_cover, mi.cover_url = baike.get_image()
         mi.comments = baike.get_summary()
         mi.website = baike.http.url
         mi.source = "百度百科"
         mi.provider_key = KEY
         mi.provider_value = baike.get_id()
         try:
-            mi.cover_data = self.get_cover(mi.cover_url) if self.copy_image else None
+            mi.cover_data = self.get_cover(mi.cover_url, normal_cover) if self.copy_image else None
         except Exception as e:
             logging.error(f"Failed to get cover data: {e}")
             mi.cover_data = None
         return mi
 
     @staticmethod
-    def get_cover(cover_url):
+    def get_cover(cover_url, normal_cover=True):
         if not cover_url:
             return None
         # 检测 cover_url 的有效性，只支持 https 协议
@@ -92,7 +92,7 @@ class BaiduBaikeApi:
                 if image.mode in ("RGBA", "P"):
                     image = image.convert("RGB")
                 width, height = image.size
-                if height / width < 1.2:
+                if height / width < 1.2 and normal_cover:
                     # crop the image to a square centered on the middle of the image
                     min_dim = min(width, height)
                     left = (width - min_dim) / 2
