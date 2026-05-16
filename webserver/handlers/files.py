@@ -6,12 +6,12 @@ import logging
 import os
 import re
 import zipfile
-from webserver.i18n import _
 
 from tornado import web
 
 from webserver import constants, loader
 from webserver.handlers.base import BaseHandler
+from webserver.i18n import _
 from webserver.services.convert import ConvertService
 
 

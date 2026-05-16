@@ -104,7 +104,7 @@
     "parsingMessage": "首次阅读，正在解析目录，请稍后... {seconds}",
     "timeoutMessage": "超时未完成，可继续等待稍后刷新尝试",
     "parseTimeout": "解析超时",
-    "viewDetails": "浏览详情",
+    "viewDetails": "暂无简介",
     "setPrivate": "设为私有",
     "setPublic": "设为公开",
     "scopePrivate": "私有书籍",

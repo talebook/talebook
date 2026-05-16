@@ -241,12 +241,13 @@ def add_column(engine, migration):
 def create_table(engine, table_name, columns):
     sql_parts = [f"CREATE TABLE {table_name} ("]
     col_lines = []
+    pk_columns = []
 
     for col_name, col_def in columns.items():
         line = f"    {col_name} {col_def['type']}"
 
         if col_def["primary_key"]:
-            line += " PRIMARY KEY"
+            pk_columns.append(col_name)
 
         if col_def["default"] is not None:
             default_value = col_def["default"]
@@ -265,6 +266,15 @@ def create_table(engine, table_name, columns):
             line += " NOT NULL"
 
         col_lines.append(line)
+
+    # Handle primary key(s) - use table-level constraint for composite keys
+    if len(pk_columns) == 1:
+        for i, line in enumerate(col_lines):
+            if pk_columns[0] in line:
+                col_lines[i] = line + " PRIMARY KEY"
+                break
+    elif len(pk_columns) > 1:
+        col_lines.append(f"    PRIMARY KEY ({', '.join(pk_columns)})")
 
     sql_parts.append(",\n".join(col_lines))
     sql_parts.append(")")

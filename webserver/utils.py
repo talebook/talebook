@@ -8,15 +8,16 @@ import re
 
 from webserver.i18n import _
 
+
 # 匹配包含z-library的括号内容，例如 (z-library.sk, 1lib.sk, z-lib.sk)
-ZLIBRARY_PATTERN = re.compile(r'\([^)]*?(?:z-?lib(?:rary)?|1lib)[^)]*?\)', re.IGNORECASE)
+ZLIBRARY_PATTERN = re.compile(r"\([^)]*?(?:z-?lib(?:rary)?|1lib)[^)]*?\)", re.IGNORECASE)
 
 
 def remove_zlibrary_suffix(text):
     """移除文件名中包含z-library的括号内容"""
     if not text:
         return text
-    return ZLIBRARY_PATTERN.sub('', text).strip()
+    return ZLIBRARY_PATTERN.sub("", text).strip()
 
 
 def get_title_sort(title):
@@ -25,6 +26,7 @@ def get_title_sort(title):
         return title
     try:
         from calibre.utils.filenames import ascii_text
+
         return ascii_text(title).lower()
     except Exception as e:
         logging.error(f"Error converting title to ASCII for sorting: {e}")

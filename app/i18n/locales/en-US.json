@@ -100,7 +100,7 @@
     "parsingMessage": "First time reading, parsing table of contents, please wait... {seconds}",
     "timeoutMessage": "Timeout, please wait and refresh to try again",
     "parseTimeout": "Parsing Timeout",
-    "viewDetails": "View Details",
+    "viewDetails": "No introduction yet",
     "setSole": "Set as Private",
     "setPublic": "Set as Public",
     "scopePrivate": "Private",

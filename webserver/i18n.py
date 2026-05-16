@@ -10,8 +10,8 @@ import logging
 import os
 from typing import Dict
 
-SUPPORTED_LANGUAGES = ("zh", "en")
-DEFAULT_LANGUAGE = "zh"
+SUPPORTED_LANGUAGES = ("zh-CN", "en-US")
+DEFAULT_LANGUAGE = "zh-CN"
 TEXT_DOMAIN = "messages"
 
 _current_language = contextvars.ContextVar("talebook_i18n_language", default=None)
@@ -86,9 +86,9 @@ def normalize_language(lang: str) -> str:
         return ""
     lang = str(lang).strip().lower().replace("_", "-")
     if lang.startswith("zh"):
-        return "zh"
+        return "zh-CN"
     if lang.startswith("en"):
-        return "en"
+        return "en-US"
     return ""
 
 
@@ -187,7 +187,7 @@ def choose_language(site_language: str = "", accept_language: str = "") -> str:
 
 def apply_localized_default_settings(conf: dict, lang: str):
     lang = normalize_language(lang)
-    if lang == "en":
+    if lang == "en-US":
         target = _DEFAULT_SETTINGS_EN
     else:
         return
@@ -198,14 +198,14 @@ def apply_localized_default_settings(conf: dict, lang: str):
 
 def get_default_settings(lang: str) -> dict:
     lang = normalize_language(lang)
-    if lang == "en":
+    if lang == "en-US":
         return dict(_DEFAULT_SETTINGS_EN)
     return dict(_DEFAULT_SETTINGS_ZH)
 
 
 def gettext(message: str) -> str:
     lang = get_language()
-    if lang == "zh" or not message:
+    if lang == "zh-CN" or not message:
         return message
     catalog = _load_catalog(lang)
     # zh-TW falls back to zh (original) if no translation found

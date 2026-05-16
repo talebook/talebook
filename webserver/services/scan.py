@@ -6,9 +6,9 @@ import hashlib
 import logging
 import os
 import time
-from webserver.i18n import _
 
 from webserver import utils
+from webserver.i18n import _
 from webserver.models import Item, ScanFile
 from webserver.services import AsyncService
 from webserver.services.autofill import AutoFillService

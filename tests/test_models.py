@@ -236,6 +236,77 @@ class TestUser(unittest.TestCase):
         self.assertEqual(a.password, p2)
 
 
+class TestReadingState(unittest.TestCase):
+    def _make_state(self, book_id=1, reader_id=1):
+        from webserver.models import ReadingState
+
+        return ReadingState(book_id, reader_id)
+
+    def test_initial_values(self):
+        s = self._make_state()
+        self.assertEqual(s.book_id, 1)
+        self.assertEqual(s.reader_id, 1)
+        self.assertEqual(s.favorite, 0)
+        self.assertEqual(s.wants, 0)
+        self.assertEqual(s.read_state, 0)
+
+    def test_set_favorite(self):
+        s = self._make_state()
+        s.set_favorite(True)
+        self.assertEqual(s.favorite, 1)
+        self.assertTrue(s.is_favorite())
+        self.assertIsNotNone(s.favorite_date)
+
+        s.set_favorite(False)
+        self.assertEqual(s.favorite, 0)
+        self.assertFalse(s.is_favorite())
+
+    def test_set_wants(self):
+        s = self._make_state()
+        s.set_wants(True)
+        self.assertEqual(s.wants, 1)
+        self.assertTrue(s.is_wants())
+        self.assertIsNotNone(s.wants_date)
+
+        s.set_wants(False)
+        self.assertEqual(s.wants, 0)
+        self.assertFalse(s.is_wants())
+
+    def test_set_read_state_valid(self):
+        s = self._make_state()
+        for state in [0, 1, 2]:
+            s.set_read_state(state)
+            self.assertEqual(s.get_read_state(), state)
+            self.assertIsNotNone(s.read_date)
+
+    def test_set_read_state_invalid_ignored(self):
+        s = self._make_state()
+        s.set_read_state(1)
+        s.set_read_state(99)
+        self.assertEqual(s.get_read_state(), 1)
+
+    def test_set_read_state_clears_wants(self):
+        s = self._make_state()
+        s.set_wants(True)
+        self.assertEqual(s.wants, 1)
+        s.set_read_state(1)
+        self.assertEqual(s.wants, 0)
+
+    def test_set_online_read(self):
+        s = self._make_state()
+        s.set_online_read(True)
+        self.assertEqual(s.online_read, 1)
+        s.set_online_read(False)
+        self.assertEqual(s.online_read, 0)
+
+    def test_set_download(self):
+        s = self._make_state()
+        s.set_download(True)
+        self.assertEqual(s.download, 1)
+        s.set_download(False)
+        self.assertEqual(s.download, 0)
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.DEBUG,

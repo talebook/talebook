@@ -5,13 +5,13 @@ import datetime
 import hashlib
 import logging
 import re
-from webserver.i18n import _
 
 import tornado.escape
 from tornado import web
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
+from webserver.i18n import _
 from webserver.models import Device, Message, Reader
 from webserver.plugins import captcha as captcha_module
 from webserver.services.mail import MailService

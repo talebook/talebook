@@ -50,7 +50,7 @@ class Index(BaseHandler):
         # 从配置中获取首页设置，如果未设置则使用默认值
         setting_random_count = CONF.get("MAIN_PAGE_RANDOM_COUNT", 12)
         setting_recent_count = CONF.get("MAIN_PAGE_RECENT_COUNT", 12)
-        
+
         # 允许通过 URL 参数覆盖配置（用于兼容旧接口），但不超过配置值
         cnt_random = min(int(self.get_argument("random", setting_random_count)), setting_random_count)
         cnt_recent = min(int(self.get_argument("recent", setting_recent_count)), 200)
@@ -109,10 +109,14 @@ class BookDetail(BaseHandler):
         reading_state = None
         user_id = self.user_id()
         if user_id:
-            state = self.session.query(ReadingState).filter(
-                ReadingState.book_id == int(id),
-                ReadingState.reader_id == user_id,
-            ).first()
+            state = (
+                self.session.query(ReadingState)
+                .filter(
+                    ReadingState.book_id == int(id),
+                    ReadingState.reader_id == user_id,
+                )
+                .first()
+            )
             if state:
                 reading_state = utils.ReadingStateFormatter.format_reading_state(state)
         if reading_state:
@@ -1747,9 +1751,9 @@ class BookFavorite(BaseHandler):
         user_id = self.user_id()
         data = tornado.escape.json_decode(self.request.body)
         favorite_status = data.get("favorite", False)
-        reading_state = self.session.query(ReadingState).filter(
-            ReadingState.book_id == book_id, ReadingState.reader_id == user_id
-        ).first()
+        reading_state = (
+            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
+        )
         if not reading_state:
             reading_state = ReadingState(book_id, user_id)
             self.session.add(reading_state)
@@ -1760,11 +1764,14 @@ class BookFavorite(BaseHandler):
 
     @js
     @auth
-    def get(self):
+    def get(self, id=None):
         user_id = self.user_id()
-        reading_states = self.session.query(ReadingState).filter(
-            ReadingState.reader_id == user_id, ReadingState.favorite == 1
-        ).order_by(ReadingState.favorite_date.desc()).all()
+        reading_states = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.reader_id == user_id, ReadingState.favorite == 1)
+            .order_by(ReadingState.favorite_date.desc())
+            .all()
+        )
         book_ids = [state.book_id for state in reading_states]
         books_dict = {book["id"]: book for book in self.get_books(ids=book_ids)}
         state_dict = {state.book_id: state for state in reading_states}
@@ -1790,9 +1797,9 @@ class BookWantToRead(BaseHandler):
         user_id = self.user_id()
         data = tornado.escape.json_decode(self.request.body)
         wants_status = data.get("wants", False)
-        reading_state = self.session.query(ReadingState).filter(
-            ReadingState.book_id == book_id, ReadingState.reader_id == user_id
-        ).first()
+        reading_state = (
+            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
+        )
         if not reading_state:
             reading_state = ReadingState(book_id, user_id)
             self.session.add(reading_state)
@@ -1803,11 +1810,14 @@ class BookWantToRead(BaseHandler):
 
     @js
     @auth
-    def get(self):
+    def get(self, id=None):
         user_id = self.user_id()
-        reading_states = self.session.query(ReadingState).filter(
-            ReadingState.reader_id == user_id, ReadingState.wants == 1
-        ).order_by(ReadingState.wants_date.desc()).all()
+        reading_states = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.reader_id == user_id, ReadingState.wants == 1)
+            .order_by(ReadingState.wants_date.desc())
+            .all()
+        )
         book_ids = [state.book_id for state in reading_states]
         books_dict = {book["id"]: book for book in self.get_books(ids=book_ids)}
         state_dict = {state.book_id: state for state in reading_states}
@@ -1827,9 +1837,12 @@ class BookReading(BaseHandler):
     @auth
     def get(self):
         user_id = self.user_id()
-        reading_states = self.session.query(ReadingState).filter(
-            ReadingState.reader_id == user_id, ReadingState.read_state == 1
-        ).order_by(ReadingState.read_date.desc()).all()
+        reading_states = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.reader_id == user_id, ReadingState.read_state == 1)
+            .order_by(ReadingState.read_date.desc())
+            .all()
+        )
         book_ids = [state.book_id for state in reading_states]
         books_dict = {book["id"]: book for book in self.get_books(ids=book_ids)}
         state_dict = {state.book_id: state for state in reading_states}
@@ -1849,9 +1862,12 @@ class BookReadDone(BaseHandler):
     @auth
     def get(self):
         user_id = self.user_id()
-        reading_states = self.session.query(ReadingState).filter(
-            ReadingState.reader_id == user_id, ReadingState.read_state == 2
-        ).order_by(ReadingState.read_date.desc()).all()
+        reading_states = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.reader_id == user_id, ReadingState.read_state == 2)
+            .order_by(ReadingState.read_date.desc())
+            .all()
+        )
         book_ids = [state.book_id for state in reading_states]
         books_dict = {book["id"]: book for book in self.get_books(ids=book_ids)}
         state_dict = {state.book_id: state for state in reading_states}
@@ -1879,9 +1895,9 @@ class BookReadingState(BaseHandler):
         read_state = data.get("read_state", 0)
         if read_state not in [0, 1, 2]:
             return {"err": "params.invalid", "msg": _("阅读状态参数错误")}
-        reading_state = self.session.query(ReadingState).filter(
-            ReadingState.book_id == book_id, ReadingState.reader_id == user_id
-        ).first()
+        reading_state = (
+            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
+        )
         if not reading_state:
             reading_state = ReadingState(book_id, user_id)
             self.session.add(reading_state)
@@ -1899,9 +1915,9 @@ class BookReadingState(BaseHandler):
     def get(self, id):
         book_id = int(id)
         user_id = self.user_id()
-        reading_state = self.session.query(ReadingState).filter(
-            ReadingState.book_id == book_id, ReadingState.reader_id == user_id
-        ).first()
+        reading_state = (
+            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
+        )
         return utils.ReadingStateFormatter.format_reading_state_with_api_format(reading_state)
 
 
@@ -1916,27 +1932,35 @@ class BookReadingStats(BaseHandler):
         current_year = now.year
         current_month = now.month
 
-        total_reading = self.session.query(ReadingState).filter(
-            ReadingState.reader_id == user_id, ReadingState.read_state == 1
-        ).count()
+        total_reading = (
+            self.session.query(ReadingState).filter(ReadingState.reader_id == user_id, ReadingState.read_state == 1).count()
+        )
 
-        total_read_done = self.session.query(ReadingState).filter(
-            ReadingState.reader_id == user_id, ReadingState.read_state == 2
-        ).count()
+        total_read_done = (
+            self.session.query(ReadingState).filter(ReadingState.reader_id == user_id, ReadingState.read_state == 2).count()
+        )
 
-        month_reading = self.session.query(ReadingState).filter(
-            ReadingState.reader_id == user_id,
-            ReadingState.read_state == 1,
-            extract("year", ReadingState.read_date) == current_year,
-            extract("month", ReadingState.read_date) == current_month,
-        ).count()
+        month_reading = (
+            self.session.query(ReadingState)
+            .filter(
+                ReadingState.reader_id == user_id,
+                ReadingState.read_state == 1,
+                extract("year", ReadingState.read_date) == current_year,
+                extract("month", ReadingState.read_date) == current_month,
+            )
+            .count()
+        )
 
-        month_read_done = self.session.query(ReadingState).filter(
-            ReadingState.reader_id == user_id,
-            ReadingState.read_state == 2,
-            extract("year", ReadingState.read_date) == current_year,
-            extract("month", ReadingState.read_date) == current_month,
-        ).count()
+        month_read_done = (
+            self.session.query(ReadingState)
+            .filter(
+                ReadingState.reader_id == user_id,
+                ReadingState.read_state == 2,
+                extract("year", ReadingState.read_date) == current_year,
+                extract("month", ReadingState.read_date) == current_month,
+            )
+            .count()
+        )
 
         month_read_done_states = (
             self.session.query(ReadingState)

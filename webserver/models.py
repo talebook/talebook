@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import time
-from webserver.i18n import _
 
 import bcrypt
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
@@ -16,6 +15,8 @@ from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import declarative_base, relationship
 
 from webserver.constants import BOOK_TYPE_EBOOK
+from webserver.i18n import _
+
 
 READ_STATE_UNREAD = 0
 READ_STATE_READING = 1
@@ -469,7 +470,6 @@ class ReadingState(Base, SQLAlchemyMixin):
     reader = relationship(Reader, backref="reading_states")
 
     def __init__(self, book_id, reader_id):
-        super(ReadingState, self).__init__()
         self.book_id = book_id
         self.reader_id = reader_id
         self.favorite = 0

@@ -3,13 +3,13 @@
 
 import logging
 import traceback
-from webserver.i18n import _
 
 import sqlalchemy
 import tornado
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
+from webserver.i18n import _
 from webserver.models import ScanFile
 from webserver.services.scan import ScanService
 

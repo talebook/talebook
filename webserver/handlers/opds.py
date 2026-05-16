@@ -10,7 +10,6 @@ import hashlib
 import sys
 from collections import defaultdict
 from functools import partial
-from webserver.i18n import _
 from itertools import repeat
 
 from calibre import guess_type
@@ -27,6 +26,7 @@ from tornado import web
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler
+from webserver.i18n import _
 
 
 CONF = loader.get_settings()
