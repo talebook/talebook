@@ -150,7 +150,11 @@ class Page(object):
             # <meta property="og:image" content="https://xxx" />
             og_images = self.soup.find_all("meta", property="og:image")
             for og_image in og_images:
-                if og_image and og_image.has_attr("content") and og_image["content"].lower().startswith("https://bkimg.cdn.bcebos.com/"):
+                if (
+                    og_image
+                    and og_image.has_attr("content")
+                    and og_image["content"].lower().startswith("https://bkimg.cdn.bcebos.com/")
+                ):
                     url = og_image["content"]
                     break
         return normal_type, url
