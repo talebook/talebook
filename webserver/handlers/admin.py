@@ -313,6 +313,13 @@ class AdminSettings(BaseHandler):
         if not self.admin_user:
             return {"err": "permission", "msg": _("无权访问此接口")}
         data = tornado.escape.json_decode(self.request.body)
+
+        # 验证：如果启用了私人图书馆模式，访问码不能为空
+        invite_mode = data.get("INVITE_MODE", False)
+        invite_code = data.get("INVITE_CODE", "")
+        if invite_mode and not invite_code:
+            return {"err": "params.invite_code_required", "msg": _("访问码不能为空")}
+
         KEYS = [
             "ALLOW_GUEST_DOWNLOAD",
             "ALLOW_GUEST_PUSH",
