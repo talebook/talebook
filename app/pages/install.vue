@@ -103,6 +103,7 @@
                                     :label="$t('install.accessCode')"
                                     type="text"
                                     autocomplete="new-code"
+                                    :rules="[rules.code]"
                                 />
                             </template>
                             <div
@@ -165,6 +166,7 @@ let retry = 20;
 const rules = {
     user: v => ( v && 20 >= v.length && v.length >= 5) || $t('install.userRule'),
     pass: v => ( v && 20 >= v.length && v.length >= 8) || $t('install.passRule'),
+    code: v => (invite.value && v && v.trim()) || $t('install.codeRule'),
     email: function (email) {
         var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
         return re.test(email) || $t('install.emailRule');
