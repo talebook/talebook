@@ -733,7 +733,7 @@
     "adminEmail": "管理员Email",
     "enablePrivateLibrary": "开启私人图书馆模式",
     "accessCode": "访问码",
-    "codeRule": "启用私人图书馆模式时，访问码不能为空",
+    "codeRule": "访问码不能为空",
     "completeSetup": "完成设置",
     "userRule": "6 ~ 20 characters",
     "passRule": "8 ~ 20 characters",

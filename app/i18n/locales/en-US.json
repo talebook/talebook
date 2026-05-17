@@ -713,7 +713,7 @@
     "adminEmail": "Admin Email",
     "enablePrivateLibrary": "Enable Private Library Mode",
     "accessCode": "Access Code",
-    "codeRule": "Access code is required when Private Library mode is enabled",
+    "codeRule": "Access code is required",
     "completeSetup": "Complete Setup",
     "userRule": "6 ~ 20 characters",
     "passRule": "8 ~ 20 characters",

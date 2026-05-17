@@ -318,7 +318,7 @@ class AdminSettings(BaseHandler):
         invite_mode = data.get("INVITE_MODE", False)
         invite_code = data.get("INVITE_CODE", "")
         if invite_mode and not invite_code:
-            return {"err": "params.invite_code_required", "msg": _("启用私人图书馆模式时，访问码不能为空")}
+            return {"err": "params.invite_code_required", "msg": _("访问码不能为空")}
 
         KEYS = [
             "ALLOW_GUEST_DOWNLOAD",
