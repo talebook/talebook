@@ -68,6 +68,10 @@ class Page(object):
 
         self.http = requests.get(url, timeout=10, headers=CHROME_HEADERS, params=payload)
         self.html = self.http.text
+        logging.info(f"Fetched content length: {len(self.html)} characters")
+        # write content to /data/baike.html for debugging
+        with open("/data/baike.html", "w", encoding="utf-8") as f:
+            f.write(self.html)
         self.soup = BeautifulSoup(self.html, "lxml")
 
         # Exceptions
@@ -132,14 +136,28 @@ class Page(object):
         return "\n".join(content)
 
     def get_image(self):
-        divs = _find_by_class_pattern(self.soup, "coverPic")
+        normal_type = True
+        url = ""
+        divs = self.soup.find_all(class_=CLASS_SUMMARY_PIC)
         for div in divs:
-            img = div.find("img")
-            if img and img.has_attr("src"):
-                url = img.attrs["src"]
-                if url:
-                    return url
-        return ""
+            url = div.attrs.get("data-src", "")
+            if not url:
+                continue
+            break
+        if not url:
+            normal_type = False
+            # 查找页面的meta如下信息，获取图片url
+            # <meta property="og:image" content="https://xxx" />
+            og_images = self.soup.find_all("meta", property="og:image")
+            for og_image in og_images:
+                if (
+                    og_image
+                    and og_image.has_attr("content")
+                    and og_image["content"].lower().startswith("https://bkimg.cdn.bcebos.com/")
+                ):
+                    url = og_image["content"]
+                    break
+        return normal_type, url
 
     def get_summary(self):
         """Get summary infomation of a page"""
