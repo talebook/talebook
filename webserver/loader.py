@@ -51,7 +51,7 @@ class SettingsLoader(dict):
             pass
 
     def dumpfile(self, filename="auto.py"):
-        s = "\n".join("%-30s: %s," % ("'" + k + "'", repr(v)) for k, v in sorted(self.items()))
+        s = "\n".join("%-30s: %s," % (repr(k), repr(v)) for k, v in sorted(self.items()))
         code = (
             """#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
