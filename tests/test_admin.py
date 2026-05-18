@@ -2,8 +2,13 @@
 # -*- coding: UTF-8 -*-
 
 import json
+import os
+import tempfile
 from unittest import mock
-from tests.test_main import TestWithUserLogin, TestWithAdminUser, setUpModule as init, get_db
+
+from tests.test_main import TestWithAdminUser, TestWithUserLogin, get_db
+from tests.test_main import setUpModule as init
+from webserver import loader
 
 
 def setUpModule():
@@ -57,3 +62,31 @@ class TestAdminSettingsSecurity(TestWithAdminUser):
             d = self.json("/api/admin/settings", method="POST", body=req)
             self.assertEqual(d["err"], "ok")
             self.assertNotIn("not_in_whitelist", d["rsp"])
+
+    def test_settings_rejects_malformed_social_auth_key(self):
+        """SOCIAL_AUTH 动态字段必须是普通配置名，不能携带 Python 语法"""
+        key = "SOCIAL_AUTH_BAD_KEY' : {}, }\nexec('raise RuntimeError')\nsettings = {'SOCIAL_AUTH_FINAL_KEY"
+        with mock.patch("webserver.loader.SettingsLoader.set_store_path", return_value="/tmp/"):
+            req = json.dumps({"site_title": "ok", key: "injected"})
+            d = self.json("/api/admin/settings", method="POST", body=req)
+            self.assertEqual(d["err"], "ok")
+            self.assertNotIn(key, d["rsp"])
+
+    def test_settings_dumpfile_quotes_keys_safely(self):
+        """配置写盘时 key 必须用 repr 转义，避免生成可执行注入代码"""
+        key = "SOCIAL_AUTH_BAD_KEY' : {}, }\nexec('raise RuntimeError')\nsettings = {'SOCIAL_AUTH_FINAL_KEY"
+        settings = loader.SettingsLoader()
+        settings.clear()
+        settings[key] = "value"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.object(settings, "set_store_path", return_value=tmpdir):
+                settings.dumpfile()
+
+            path = os.path.join(tmpdir, "auto.py")
+            namespace = {}
+            with open(path) as f:
+                code = f.read()
+            exec(compile(code, path, "exec"), namespace)
+
+        self.assertEqual(namespace["settings"][key], "value")
