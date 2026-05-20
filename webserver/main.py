@@ -250,6 +250,10 @@ def make_app():
 
     logging.info("Now, Running...")
     AsyncService().setup(book_db, ScopedSession)
+
+    from webserver.services.update_checker import UpdateChecker
+    UpdateChecker().start_background_check()
+
     app = web.Application(social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings)
     app._engine = engine
     return app

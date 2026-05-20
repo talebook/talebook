@@ -433,6 +433,52 @@
                             <SSLManager />
                         </template>
 
+                        <template v-if="card.show_update">
+                            <div class="pa-2">
+                                <div class="d-flex align-center mb-2">
+                                    <v-icon color="primary" class="mr-2">mdi-update</v-icon>
+                                    <span class="text-subtitle-2 font-weight-medium">{{ t('admin.settings.label.currentVersion') }}:</span>
+                                    <v-chip size="small" class="ml-2" color="primary">{{ updateInfo.current_version || '—' }}</v-chip>
+                                </div>
+                                <div v-if="updateInfo.has_update" class="d-flex align-center mb-2">
+                                    <v-icon color="success" class="mr-2">mdi-arrow-up-bold</v-icon>
+                                    <span class="text-subtitle-2 font-weight-medium">{{ t('admin.settings.label.latestVersion') }}:</span>
+                                    <v-chip size="small" class="ml-2" color="success">{{ updateInfo.latest_version }}</v-chip>
+                                    <v-btn
+                                        v-if="updateInfo.latest_release_url"
+                                        variant="text"
+                                        size="small"
+                                        class="ml-2"
+                                        :href="updateInfo.latest_release_url"
+                                        target="_blank"
+                                    >
+                                        <v-icon start size="small">mdi-open-in-new</v-icon>{{ t('admin.settings.button.viewRelease') }}
+                                    </v-btn>
+                                </div>
+                                <div v-else-if="updateInfo.latest_version" class="d-flex align-center mb-2">
+                                    <v-icon color="success" class="mr-2">mdi-check-circle</v-icon>
+                                    <span class="text-success">{{ t('admin.settings.message.upToDate') }}</span>
+                                </div>
+                                <p v-if="updateInfo.check_error" class="text-error text-caption mb-2">
+                                    {{ t('admin.settings.message.checkError') }}: {{ updateInfo.check_error }}
+                                </p>
+                                <p v-if="updateInfo.last_check_time" class="text-caption text-medium-emphasis mb-2">
+                                    {{ t('admin.settings.label.lastCheckTime') }}: {{ formatCheckTime(updateInfo.last_check_time) }}
+                                </p>
+                                <div v-if="updateInfo.has_update && updateInfo.latest_release_body" class="mb-2">
+                                    <p class="text-caption font-weight-medium mb-1">{{ t('admin.settings.label.releaseNotes') }}:</p>
+                                    <div class="text-caption text-medium-emensity" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">{{ updateInfo.latest_release_body }}</div>
+                                </div>
+                                <v-btn
+                                    color="primary"
+                                    :loading="updateChecking"
+                                    @click="checkForUpdate"
+                                >
+                                    <v-icon start>mdi-refresh</v-icon>{{ t('admin.settings.button.checkUpdate') }}
+                                </v-btn>
+                            </div>
+                        </template>
+
                         <template v-if="card.show_trash">
                             <div class="text-center">
                                 <p v-html="t('admin.settings.message.trashDescription')" style="margin-bottom: 16px"></p>
@@ -522,9 +568,21 @@ const trashSizes = ref({ trash: 0, upload: 0 });
 const trashSizeTexts = ref({ trash: '', upload: '' });
 const trashLoading = ref(false);
 const trashConfirmDialog = ref(false);
+const updateInfo = ref({
+    current_version: '',
+    latest_version: '',
+    has_update: false,
+    latest_release_url: '',
+    latest_release_name: '',
+    latest_release_body: '',
+    check_error: null,
+    last_check_time: null,
+});
+const updateChecking = ref(false);
 
 // Store card expand/collapse states separately from computed cards
 const cardShows = ref({
+    updateCheck: true,
     basicInfo: false,
     userSettings: false,
     socialLogin: false,
@@ -548,6 +606,12 @@ const captchaProviders = [
 ];
 
 const cards = computed(() => [
+    {
+        key: 'updateCheck',
+        title: t('admin.settings.section.updateCheck'),
+        fields: [],
+        show_update: true,
+    },
     {
         key: 'basicInfo',
         title: t('admin.settings.section.basicInfo'),
@@ -818,6 +882,7 @@ onMounted(() => {
     });
     
     fetchTrashSize();
+    fetchUpdateStatus();
 });
 
 const save_settings = () => {
@@ -908,6 +973,41 @@ const clearTrash = () => {
             if ($alert) $alert('error', rsp.msg);
         }
     });
+};
+
+const fetchUpdateStatus = () => {
+    $backend('/admin/update').then(rsp => {
+        if (rsp && rsp.err === 'ok' && rsp.status) {
+            updateInfo.value = rsp.status;
+        }
+    });
+};
+
+const checkForUpdate = () => {
+    updateChecking.value = true;
+    $backend('/admin/update', {
+        method: 'POST',
+    }).then(rsp => {
+        updateChecking.value = false;
+        if (rsp && rsp.err === 'ok' && rsp.status) {
+            updateInfo.value = rsp.status;
+            if (rsp.status.has_update) {
+                if ($alert) $alert('info', t('admin.settings.message.updateAvailable', { version: rsp.status.latest_version }));
+            } else if (rsp.status.check_error) {
+                if ($alert) $alert('error', t('admin.settings.message.checkError') + ': ' + rsp.status.check_error);
+            } else {
+                if ($alert) $alert('success', t('admin.settings.message.upToDate'));
+            }
+        }
+    }).catch(() => {
+        updateChecking.value = false;
+    });
+};
+
+const formatCheckTime = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString();
 };
 
 useHead(() => ({

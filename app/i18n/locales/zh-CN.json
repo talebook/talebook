@@ -552,13 +552,16 @@
         "sslManagement": "SSL 证书管理",
         "opdsSettings": "OPDS 设置",
         "captchaSettings": "人机验证设置",
-        "trashManagement": "回收站管理"
+        "trashManagement": "回收站管理",
+        "updateCheck": "检查更新"
       },
       "button": {
         "saveSettings": "保存配置",
         "testEmail": "测试邮件",
         "trashClear": "清理回收站",
-        "trashClearConfirm": "确认清理"
+        "trashClearConfirm": "确认清理",
+        "checkUpdate": "检查更新",
+        "viewRelease": "查看发布"
       },
       "label": {
         "siteTitle": "网站标题",
@@ -617,7 +620,11 @@
         "trashUnknown": "未知",
         "mainPageRandomCount": "首页 - 随机推荐图书数量（为 0 时隐藏）",
         "mainPageRecentCount": "首页 - 新书推荐显示数量",
-        "defaultPageSize": "书籍列表中分页大小"
+        "defaultPageSize": "书籍列表中分页大小",
+        "currentVersion": "当前版本",
+        "latestVersion": "最新版本",
+        "lastCheckTime": "上次检查时间",
+        "releaseNotes": "更新说明"
       },
       "option": {
         "ssl": "SSL",
@@ -644,7 +651,10 @@
         "getKeysAndSetCallback": "，获取密钥后设置回调地址为：",
         "captchaInfo": "启用后，在对应页面需要完成人机验证才能继续操作。",
         "trashDescription": "清理 Calibre 回收站（library/.caltrash）和上传临时目录（upload/），释放磁盘空间。当总大小超过 10MB 时方可清理。",
-        "trashClearConfirm": "确认清理回收站和上传临时目录？此操作不可逆！"
+        "trashClearConfirm": "确认清理回收站和上传临时目录？此操作不可逆！",
+        "upToDate": "已是最新版本",
+        "updateAvailable": "发现新版本 {version}，请及时更新以获取最新功能和安全修复",
+        "checkError": "检查更新失败"
       },
       "meta_source": {
         "douban": "豆瓣",
