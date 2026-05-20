@@ -45,6 +45,11 @@ class UpdateChecker:
             self.last_check_time = None
             self._check_thread = None
             self._stop_event = threading.Event()
+            # 创建绕过代理的 opener，直连 GitHub API
+            self._opener = urllib.request.build_opener(
+                urllib.request.HTTPSHandler(context=_UNVERIFIED_CONTEXT),
+                urllib.request.ProxyHandler({}),  # 禁用所有代理
+            )
             self._initialized = True
 
     def check_for_updates(self):
@@ -59,7 +64,7 @@ class UpdateChecker:
                     "User-Agent": "TaleBook-UpdateChecker",
                 },
             )
-            with urllib.request.urlopen(req, timeout=10, context=_UNVERIFIED_CONTEXT) as response:
+            with self._opener.open(req, timeout=10) as response:
                 status_code = response.getcode()
                 raw_body = response.read().decode("utf-8")
 
