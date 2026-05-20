@@ -59,7 +59,19 @@ class UpdateChecker:
                 },
             )
             with urllib.request.urlopen(req, timeout=10, context=_UNVERIFIED_CONTEXT) as response:
-                data = json.loads(response.read().decode("utf-8"))
+                raw_body = response.read().decode("utf-8")
+
+            if not raw_body or not raw_body.strip():
+                self.check_error = "GitHub API returned empty response (rate limited?)"
+                logging.error("Update check failed: %s", self.check_error)
+                return
+
+            data = json.loads(raw_body)
+
+            if not isinstance(data, dict):
+                self.check_error = f"Unexpected API response type: {type(data).__name__}"
+                logging.error("Update check failed: %s", self.check_error)
+                return
 
             self.latest_version = data.get("tag_name", "").lstrip("v")
             self.latest_release_url = data.get("html_url", "")
@@ -80,6 +92,9 @@ class UpdateChecker:
 
             self.check_error = None
 
+        except json.JSONDecodeError as e:
+            self.check_error = f"GitHub API returned invalid JSON: {e}"
+            logging.error("Update check failed: %s", self.check_error)
         except urllib.error.HTTPError as e:
             self.check_error = f"GitHub API error: {e.code} {e.reason}"
             logging.error("Update check failed: %s", self.check_error)
