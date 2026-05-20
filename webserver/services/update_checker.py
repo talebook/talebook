@@ -3,6 +3,7 @@
 
 import json
 import logging
+import os
 import ssl
 import threading
 import time
@@ -50,6 +51,14 @@ class UpdateChecker:
     def check_for_updates(self):
         """Check GitHub for the latest release"""
         raw_body = None
+
+        # Temporarily clear proxy env vars to bypass local proxy
+        original_proxy_vars = {}
+        proxy_keys = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "no_proxy", "NO_PROXY"]
+        for key in proxy_keys:
+            if key in os.environ:
+                original_proxy_vars[key] = os.environ.pop(key)
+
         try:
             logging.info("Checking for updates on GitHub...")
             req = urllib.request.Request(
@@ -121,6 +130,9 @@ class UpdateChecker:
         except Exception as e:
             self.check_error = f"Unknown error: {str(e)}"
             logging.error("Update check failed: %s", self.check_error)
+        finally:
+            for key, value in original_proxy_vars.items():
+                os.environ[key] = value
 
     def start_background_check(self):
         """Start periodic background update checking"""
