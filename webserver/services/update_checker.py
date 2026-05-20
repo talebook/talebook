@@ -3,6 +3,7 @@
 
 import json
 import logging
+import ssl
 import threading
 import time
 import urllib.error
@@ -14,6 +15,11 @@ from webserver.version import VERSION
 GITHUB_REPO = "talebook/talebook"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 CHECK_INTERVAL_SECONDS = 3 * 3600  # 3 hours
+
+# Docker 环境中可能缺少 CA 证书，跳过 SSL 验证
+_UNVERIFIED_CONTEXT = ssl.create_default_context()
+_UNVERIFIED_CONTEXT.check_hostname = False
+_UNVERIFIED_CONTEXT.verify_mode = ssl.CERT_NONE
 
 
 class UpdateChecker:
@@ -52,7 +58,7 @@ class UpdateChecker:
                     "User-Agent": "TaleBook-UpdateChecker",
                 },
             )
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=10, context=_UNVERIFIED_CONTEXT) as response:
                 data = json.loads(response.read().decode("utf-8"))
 
             self.latest_version = data.get("tag_name", "").lstrip("v")

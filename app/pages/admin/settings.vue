@@ -582,7 +582,6 @@ const updateChecking = ref(false);
 
 // Store card expand/collapse states separately from computed cards
 const cardShows = ref({
-    updateCheck: true,
     basicInfo: false,
     userSettings: false,
     socialLogin: false,
@@ -596,6 +595,7 @@ const cardShows = ref({
     opdsSettings: false,
     captchaSettings: false,
     trashManagement: false,
+    updateCheck: false,
 });
 
 // 人机验证提供商选项
@@ -606,12 +606,6 @@ const captchaProviders = [
 ];
 
 const cards = computed(() => [
-    {
-        key: 'updateCheck',
-        title: t('admin.settings.section.updateCheck'),
-        fields: [],
-        show_update: true,
-    },
     {
         key: 'basicInfo',
         title: t('admin.settings.section.basicInfo'),
@@ -831,6 +825,12 @@ const cards = computed(() => [
         title: t('admin.settings.section.trashManagement'),
         fields: [],
         show_trash: true,
+    },
+    {
+        key: 'updateCheck',
+        title: t('admin.settings.section.updateCheck'),
+        fields: [],
+        show_update: true,
     },
 ]);
 
