@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import json
 import logging
 import threading
 import time
-import urllib.request
 import urllib.error
-import json
+import urllib.request
 
 from webserver.version import VERSION
 
