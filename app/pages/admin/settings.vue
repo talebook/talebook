@@ -465,15 +465,9 @@
                                 <p v-if="updateInfo.last_check_time" class="text-caption text-medium-emphasis mb-2">
                                     {{ t('admin.settings.label.lastCheckTime') }}: {{ formatCheckTime(updateInfo.last_check_time) }}
                                 </p>
-                                <div v-if="updateInfo.has_update && updateInfo.latest_release_url" class="mb-2">
-                                    <v-btn
-                                        variant="text"
-                                        size="small"
-                                        :href="updateInfo.latest_release_url"
-                                        target="_blank"
-                                    >
-                                        <v-icon start size="small">mdi-open-in-new</v-icon>{{ t('admin.settings.button.viewRelease') }}
-                                    </v-btn>
+                                <div v-if="updateInfo.has_update && updateInfo.latest_release_body" class="mb-2">
+                                    <p class="text-caption font-weight-medium mb-1">{{ t('admin.settings.label.releaseNotes') }}:</p>
+                                    <div class="text-caption text-medium-emensity" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;" v-html="marked(updateInfo.latest_release_body)"></div>
                                 </div>
                                 <v-btn
                                     color="primary"
