@@ -623,8 +623,7 @@
         "defaultPageSize": "书籍列表中分页大小",
         "currentVersion": "当前版本",
         "latestVersion": "最新版本",
-        "lastCheckTime": "上次检查时间",
-        "releaseNotes": "更新说明"
+        "lastCheckTime": "上次检查时间"
       },
       "option": {
         "ssl": "SSL",

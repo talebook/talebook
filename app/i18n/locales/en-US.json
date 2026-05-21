@@ -593,8 +593,7 @@
         "defaultPageSize": "Book List Page Size",
         "currentVersion": "Current Version",
         "latestVersion": "Latest Version",
-        "lastCheckTime": "Last Check Time",
-        "releaseNotes": "Release Notes"
+        "lastCheckTime": "Last Check Time"
       },
       "option": {
         "ssl": "SSL",
