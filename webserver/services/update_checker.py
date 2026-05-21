@@ -49,7 +49,6 @@ class UpdateChecker:
 
     def check_for_updates(self):
         """Check GitHub for the latest release"""
-        raw_body = None
         try:
             logging.info("Checking for updates on GitHub...")
             req = urllib.request.Request(
@@ -60,32 +59,17 @@ class UpdateChecker:
                 },
             )
             with urllib.request.urlopen(req, timeout=10, context=_UNVERIFIED_CONTEXT) as response:
-                status_code = response.getcode()
                 raw_body = response.read().decode("utf-8")
 
-            if status_code != 200:
-                self.check_error = f"GitHub API returned HTTP {status_code}: {raw_body[:200]}"
+            if not raw_body or not raw_body.strip():
+                self.check_error = "GitHub API returned empty response (rate limited?)"
                 logging.error("Update check failed: %s", self.check_error)
                 return
 
-            stripped = raw_body.strip()
-            if not stripped:
-                self.check_error = "GitHub API returned empty response"
-                logging.error("Update check failed: %s", self.check_error)
-                return
-
-            # Log first 100 chars of response for debugging
-            logging.debug("GitHub API response (first 100 chars): %s", stripped[:100])
-
-            data = json.loads(stripped)
+            data = json.loads(raw_body)
 
             if not isinstance(data, dict):
-                self.check_error = f"Unexpected API response type: {type(data).__name__}, body={stripped[:200]}"
-                logging.error("Update check failed: %s", self.check_error)
-                return
-
-            if "message" in data and "tag_name" not in data:
-                self.check_error = f"GitHub API error: {data.get('message', 'unknown')}"
+                self.check_error = f"Unexpected API response type: {type(data).__name__}"
                 logging.error("Update check failed: %s", self.check_error)
                 return
 
@@ -109,8 +93,7 @@ class UpdateChecker:
             self.check_error = None
 
         except json.JSONDecodeError as e:
-            body_preview = (raw_body or "")[:300]
-            self.check_error = f"GitHub API returned invalid JSON: {e}. Response preview: {body_preview}"
+            self.check_error = f"GitHub API returned invalid JSON: {e}"
             logging.error("Update check failed: %s", self.check_error)
         except urllib.error.HTTPError as e:
             self.check_error = f"GitHub API error: {e.code} {e.reason}"
