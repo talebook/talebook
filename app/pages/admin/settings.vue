@@ -467,7 +467,7 @@
                                 </p>
                                 <div v-if="updateInfo.has_update && updateInfo.latest_release_body" class="mb-2">
                                     <p class="text-caption font-weight-medium mb-1">{{ t('admin.settings.label.releaseNotes') }}:</p>
-                                    <div class="text-caption text-medium-emensity" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">{{ updateInfo.latest_release_body }}</div>
+                                    <div class="text-caption text-medium-emensity" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;" v-html="marked(updateInfo.latest_release_body)"></div>
                                 </div>
                                 <v-btn
                                     color="primary"
@@ -541,6 +541,8 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { marked } from 'marked';
+marked.setOptions({ breaks: true, gfm: true });
 import { useI18n } from 'vue-i18n';
 import SSLManager from '~/components/SSLManager.vue';
 import { useMainStore } from '@/stores/main';
