@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import datetime
 import json
 import logging
 import ssl
@@ -15,11 +16,29 @@ from webserver.version import VERSION
 GITHUB_REPO = "talebook/talebook"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 CHECK_INTERVAL_SECONDS = 3 * 3600  # 3 hours
+UPDATE_NOTIFY_STATUS = "system_update"
+UPDATE_NOTIFY_VERSION_KEY = "update_version"
+UPDATE_NOTIFY_URL_KEY = "update_url"
+UPDATE_NOTIFY_BODY_KEY = "update_body"
 
-# Docker 环境中可能缺少 CA 证书，跳过 SSL 验证
 _UNVERIFIED_CONTEXT = ssl.create_default_context()
 _UNVERIFIED_CONTEXT.check_hostname = False
 _UNVERIFIED_CONTEXT.verify_mode = ssl.CERT_NONE
+
+
+def _compare_versions(v1, v2):
+    """Compare two version strings, return True if v2 > v1"""
+    try:
+        parts1 = [int(x) for x in v1.split(".")]
+        parts2 = [int(x) for x in v2.split(".")]
+        for p1, p2 in zip(parts1, parts2, strict=True):
+            if p2 > p1:
+                return True
+            if p2 < p1:
+                return False
+        return len(parts2) > len(parts1)
+    except Exception:
+        return v2 != v1
 
 
 class UpdateChecker:
@@ -43,9 +62,13 @@ class UpdateChecker:
             self.has_update = False
             self.check_error = None
             self.last_check_time = None
+            self._scoped_session = None
             self._check_thread = None
             self._stop_event = threading.Event()
             self._initialized = True
+
+    def set_scoped_session(self, scoped_session):
+        self._scoped_session = scoped_session
 
     def check_for_updates(self):
         """Check GitHub for the latest release"""
@@ -105,6 +128,59 @@ class UpdateChecker:
             self.check_error = f"Unknown error: {str(e)}"
             logging.error("Update check failed: %s", self.check_error)
 
+    def _notify_admins(self):
+        """Send update notifications to all admin users (only called in background loop)"""
+        if not self._scoped_session or not self.has_update:
+            return
+
+        try:
+            session = self._scoped_session()
+            from webserver.models import Message, Reader
+
+            admins = session.query(Reader).filter(Reader.admin == True).all()  # noqa: E712
+            if not admins:
+                logging.warning("No admin users found for update notification")
+                return
+
+            for admin in admins:
+                existing = (
+                    session.query(Message)
+                    .filter(Message.reader_id == admin.id, Message.status == UPDATE_NOTIFY_STATUS)
+                    .first()
+                )
+
+                if existing:
+                    existing_version = existing.data.get(UPDATE_NOTIFY_VERSION_KEY, "")
+                    if existing_version == self.latest_version:
+                        continue
+                    if _compare_versions(existing_version, self.latest_version):
+                        existing.data[UPDATE_NOTIFY_VERSION_KEY] = self.latest_version
+                        existing.data[UPDATE_NOTIFY_URL_KEY] = self.latest_release_url
+                        existing.data[UPDATE_NOTIFY_BODY_KEY] = self.latest_release_body
+                        existing.data["message"] = f"发现新版本 {self.latest_version}，请及时更新"
+                        existing.update_time = datetime.datetime.now()
+                        existing.unread = True
+                        existing.save()
+                        logging.info("Updated notification for admin %s: version %s", admin.username, self.latest_version)
+                else:
+                    msg = Message(
+                        user_id=admin.id,
+                        status=UPDATE_NOTIFY_STATUS,
+                        msg=f"发现新版本 {self.latest_version}，请及时更新",
+                    )
+                    msg.data[UPDATE_NOTIFY_VERSION_KEY] = self.latest_version
+                    msg.data[UPDATE_NOTIFY_URL_KEY] = self.latest_release_url
+                    msg.data[UPDATE_NOTIFY_BODY_KEY] = self.latest_release_body
+                    session.add(msg)
+                    logging.info("Created notification for admin %s: version %s", admin.username, self.latest_version)
+
+            session.commit()
+        except Exception as e:
+            logging.error("Failed to send update notifications: %s", e)
+        finally:
+            if self._scoped_session:
+                self._scoped_session.remove()
+
     def start_background_check(self):
         """Start periodic background update checking"""
         if self._check_thread and self._check_thread.is_alive():
@@ -129,13 +205,14 @@ class UpdateChecker:
 
     def _background_loop(self):
         """Background loop that periodically checks for updates"""
-        # Check immediately on startup
         self.check_for_updates()
+        self._notify_admins()
 
         while not self._stop_event.is_set():
             self._stop_event.wait(CHECK_INTERVAL_SECONDS)
             if not self._stop_event.is_set():
                 self.check_for_updates()
+                self._notify_admins()
 
     def get_status(self):
         """Get update status information"""
