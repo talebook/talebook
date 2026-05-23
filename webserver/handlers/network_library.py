@@ -191,6 +191,53 @@ class NetworkContent(NetworkBaseHandler):
         return {"err": "ok", "title": title, "content": content}
 
 
+class NetworkSave(NetworkBaseHandler):
+    """把网络小说保存到本地书库（后台任务）。"""
+
+    @js
+    @auth
+    def post(self):
+        import tornado
+
+        if self.current_user and not self.current_user.can_save():
+            return {"err": "permission.not_permit", "msg": _("无保存权限")}
+        req = tornado.escape.json_decode(self.request.body)
+        source = self.get_source(req.get("source_id"))
+        if not source:
+            return {"err": "params.not_found", "msg": _("书源不存在或未启用")}
+        book_url = (req.get("book_url") or "").strip()
+        if not book_url:
+            return {"err": "params.error", "msg": _("缺少书籍 URL")}
+        fmt = req.get("fmt", "txt")
+        if fmt not in ("txt", "epub"):
+            return {"err": "params.error", "msg": _("仅支持 txt / epub")}
+        clean = bool(req.get("clean", True))
+
+        from webserver.services.booksource.save_service import SaveOnlineBookService
+
+        SaveOnlineBookService().save_online_book(self.user_id(), source.raw, book_url, fmt, clean)
+        return {"err": "ok", "msg": _("已开始后台保存，完成后将通知您")}
+
+
+class NetworkLibraryOnline(NetworkBaseHandler):
+    """本地已保存的网络书列表，可按连载状态筛选。"""
+
+    @js
+    @auth
+    def get(self):
+        status = self.get_argument("status", "")
+        query = self.session.query(OnlineBookMeta)
+        if status in (OnlineBookMeta.SERIAL, OnlineBookMeta.FINISHED, OnlineBookMeta.UNKNOWN):
+            query = query.filter(OnlineBookMeta.serialize_status == status)
+        metas = query.all()
+        status_map = {m.book_id: m.serialize_status for m in metas}
+        ids = sorted(status_map.keys(), reverse=True)
+        rsp = self.render_book_list([], ids=ids, title=_("网络书库"), sort_by_id=True)
+        for book in rsp.get("books", []):
+            book["serialize_status"] = status_map.get(book["id"], "unknown")
+        return rsp
+
+
 class NetworkStatus(NetworkBaseHandler):
     """读取 / 修改本地网络书的连载状态。"""
 
@@ -240,5 +287,7 @@ def routes():
         (r"/api/network/book", NetworkBook),
         (r"/api/network/toc", NetworkToc),
         (r"/api/network/content", NetworkContent),
+        (r"/api/network/save", NetworkSave),
         (r"/api/network/status", NetworkStatus),
+        (r"/api/library/online", NetworkLibraryOnline),
     ]
