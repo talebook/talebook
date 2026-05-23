@@ -3,7 +3,10 @@
 """网络书库 Handler（普通用户）：搜索 / 发现 / 详情 / 目录 / 正文 / 保存。"""
 
 import concurrent.futures
+import datetime
 import logging
+
+import tornado.escape
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
@@ -197,8 +200,6 @@ class NetworkSave(NetworkBaseHandler):
     @js
     @auth
     def post(self):
-        import tornado
-
         if self.current_user and not self.current_user.can_save():
             return {"err": "permission.not_permit", "msg": _("无保存权限")}
         req = tornado.escape.json_decode(self.request.body)
@@ -253,10 +254,6 @@ class NetworkStatus(NetworkBaseHandler):
     @js
     @auth
     def post(self):
-        import datetime
-
-        import tornado
-
         req = tornado.escape.json_decode(self.request.body)
         book_id = req.get("book_id")
         status = req.get("serialize_status")
