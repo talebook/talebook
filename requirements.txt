@@ -5,6 +5,8 @@ social-auth-storage-sqlalchemy==1.1.0
 tornado==6.5
 bs4
 chardet
+lxml
+jsonpath-ng
 ruff
 
 # build-in support for MYSQL
