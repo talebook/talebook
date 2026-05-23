@@ -1,0 +1,42 @@
+[
+  {
+    "bookSourceName": "示例书源(www.example-novel.com)",
+    "bookSourceUrl": "https://www.example-novel.com",
+    "bookSourceGroup": "示例",
+    "bookSourceType": 0,
+    "bookSourceComment": "内置示例书源，演示 Legado 规则结构。请在书源管理中导入真实书源后使用。",
+    "enabled": true,
+    "enabledExplore": true,
+    "weight": 0,
+    "searchUrl": "/search?key={{key}}&page={{page}}",
+    "exploreUrl": "玄幻::/explore/xuanhuan?page={{page}}\n都市::/explore/dushi?page={{page}}",
+    "ruleSearch": {
+      "bookList": "@css:ul.search-list li.book-item",
+      "name": "@css:.book-name a@text",
+      "author": "@css:.author@text",
+      "kind": "@css:.kind@text",
+      "lastChapter": "@css:.last@text",
+      "intro": "@css:.intro@text",
+      "coverUrl": "@css:img@src",
+      "bookUrl": "@css:.book-name a@href"
+    },
+    "ruleBookInfo": {
+      "name": "@css:.book-detail .name@text",
+      "author": "@css:.book-detail .author@text",
+      "kind": "@css:.book-detail .kind@text",
+      "lastChapter": "@css:.book-detail .last-chapter@text",
+      "intro": "@css:.book-detail .intro@text",
+      "coverUrl": "@css:.book-detail .cover@src",
+      "tocUrl": "@css:.book-detail .toc-link@href"
+    },
+    "ruleToc": {
+      "chapterList": "@css:.chapter-list a.chapter",
+      "chapterName": "text",
+      "chapterUrl": "href"
+    },
+    "ruleContent": {
+      "content": "@css:#content@text",
+      "replaceRegex": "(?i)请记住本站.*\n(?i)最快更新.*"
+    }
+  }
+]

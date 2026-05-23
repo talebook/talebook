@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+# -*- coding: UTF-8 -*-
+"""网络书库用户接口测试。"""
+
+import json
+import urllib.parse
+from unittest import mock
+
+from tests.test_booksource_admin import CSS_SOURCE
+from tests.test_booksource_engine import FakeSession, text
+from tests.test_main import TestWithUserLogin, get_db
+from tests.test_main import setUpModule as init
+from webserver import models
+
+
+def setUpModule():
+    init()
+
+
+def Q(s):
+    return urllib.parse.quote(str(s).encode("UTF-8"))
+
+
+def make_source(raw=None):
+    session = get_db()
+    session.query(models.BookSourceModel).delete()
+    session.commit()
+    source = models.BookSourceModel(raw or CSS_SOURCE)
+    source.save()
+    return source.id
+
+
+class TestNetworkLibrary(TestWithUserLogin):
+    def setUp(self):
+        super().setUp()
+        self.sid = make_source()
+
+    def _fake(self):
+        return FakeSession(
+            {
+                "/search": text("search.html"),
+                "/book/1001": text("bookinfo.html"),
+                "/toc": text("toc.html"),
+                "/c/1": text("content.html"),
+            }
+        )
+
+    def test_sources(self):
+        d = self.json("/api/network/sources")
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["items"][0]["id"], self.sid)
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_search(self, m_session):
+        m_session.return_value = self._fake()
+        d = self.json("/api/network/search?key=%s" % Q("剑来"))
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(len(d["results"]), 1)
+        self.assertEqual(d["results"][0]["books"][0]["name"], "剑来")
+
+    def test_search_empty_key(self):
+        d = self.json("/api/network/search?key=")
+        self.assertEqual(d["err"], "params.error")
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_search_partial_on_failure(self, m_session):
+        m_session.return_value = FakeSession({})  # 无任何响应 -> 空结果
+        d = self.json("/api/network/search?key=%s" % Q("剑来"))
+        self.assertEqual(d["err"], "ok")
+        # 空 HTML 解析不到书，归类为正常空结果（books 为空），不应抛错
+        self.assertTrue("results" in d and "partial" in d)
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_book(self, m_session):
+        m_session.return_value = self._fake()
+        d = self.json("/api/network/book?source_id=%d&book_url=%s" % (self.sid, Q("/book/1001")))
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["book"]["name"], "剑来")
+        self.assertTrue(d["toc_url"].endswith("/toc"))
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_toc(self, m_session):
+        m_session.return_value = self._fake()
+        d = self.json("/api/network/toc?source_id=%d&toc_url=%s" % (self.sid, Q("http://x.com/toc")))
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(len(d["chapters"]), 3)
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_content(self, m_session):
+        m_session.return_value = self._fake()
+        url = "/api/network/content?source_id=%d&chapter_url=%s" % (self.sid, Q("http://x.com/c/1"))
+        d = self.json(url)
+        self.assertEqual(d["err"], "ok")
+        self.assertIn("正文第一段", d["content"])
+        self.assertNotIn("www.example.com", d["content"])
+
+    def test_source_not_found(self):
+        d = self.json("/api/network/book?source_id=99999&book_url=%s" % Q("/x"))
+        self.assertEqual(d["err"], "params.not_found")
+
+    def test_status_get_set(self):
+        session = get_db()
+        meta = models.OnlineBookMeta(book_id=123456, source_url="http://x.com")
+        meta.save()
+
+        d = self.json("/api/network/status?book_id=123456")
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["meta"]["serialize_status"], "unknown")
+
+        body = json.dumps({"book_id": 123456, "serialize_status": "finished"})
+        d = self.json("/api/network/status", method="POST", body=body)
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["meta"]["serialize_status"], "finished")
+        self.assertTrue(d["meta"]["status_manual"])
+
+        session.query(models.OnlineBookMeta).filter(models.OnlineBookMeta.book_id == 123456).delete()
+        session.commit()
