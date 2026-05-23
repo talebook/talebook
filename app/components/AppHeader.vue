@@ -471,8 +471,8 @@ const items = computed(() => {
         { icon: 'mdi-home', href: '/', text: $t('navigation.home') },
     ];
     var library_links = [
-        // home
-        { icon: 'mdi-book', href: '/library', text: $t('navigation.library') },
+        { icon: 'mdi-book', href: '/library', text: $t('navigation.localLibrary') },
+        { icon: 'mdi-cloud-search', href: '/network', text: $t('navigation.networkLibrary') },
     ];
     var admin_links = [
         {
@@ -484,6 +484,7 @@ const items = computed(() => {
                 { icon: 'mdi-human-greeting', href: '/admin/users', text: $t('navigation.users') },
                 { icon: 'mdi-library-shelves', href: '/admin/books', text: $t('navigation.books') },
                 { icon: 'mdi-import', href: '/admin/imports', text: $t('navigation.import') },
+                { icon: 'mdi-book-cog', href: '/admin/booksources', text: $t('navigation.bookSources') },
             ],
         },
     ];

@@ -272,6 +272,67 @@ router.get('/api/book/:id', eventHandler((event) => {
   return { err: 'ok', msg: 'mock action' };
 }));
 
+// Network library (book sources)
+router.get('/api/network/sources', eventHandler(() => {
+  return { err: 'ok', items: [{ id: 1, name: '测试书源', group: '测试' }] };
+}));
+
+router.get('/api/network/search', eventHandler((event) => {
+  const query = getQuery(event);
+  const key = query.key || '';
+  return {
+    err: 'ok',
+    results: [
+      {
+        source_id: 1,
+        source_name: '测试书源',
+        books: [
+          {
+            name: `${key}的故事`,
+            author: '测试作者',
+            intro: '一段网络小说简介',
+            cover_url: '',
+            book_url: 'http://x.com/book/1',
+          },
+        ],
+      },
+    ],
+    partial: [],
+  };
+}));
+
+router.get('/api/network/book', eventHandler(() => {
+  return {
+    err: 'ok',
+    book: {
+      name: '测试网络小说',
+      author: '测试作者',
+      kind: '玄幻',
+      last_chapter: '第3章 大结局',
+      intro: '这是一本用于测试的网络小说。',
+      cover_url: '',
+      book_url: 'http://x.com/book/1',
+    },
+    toc_url: 'http://x.com/book/1/toc',
+  };
+}));
+
+router.get('/api/network/toc', eventHandler(() => {
+  return {
+    err: 'ok',
+    serialize_status: 'finished',
+    chapters: [
+      { name: '第1章 惊蛰', url: 'http://x.com/c/1', is_vip: false, update_time: '' },
+      { name: '第2章 小镇', url: 'http://x.com/c/2', is_vip: false, update_time: '' },
+      { name: '第3章 大结局', url: 'http://x.com/c/3', is_vip: false, update_time: '' },
+    ],
+  };
+}));
+
+router.get('/api/network/content', eventHandler(() => {
+  return { err: 'ok', title: '第1章 惊蛰', content: '这是正文第一段。\n这是正文第二段。' };
+}));
+
 app.use(router.handler);
 
 listen(toNodeListener(app), { hostname: '0.0.0.0', port: 8000 });
