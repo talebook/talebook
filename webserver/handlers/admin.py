@@ -23,6 +23,7 @@ from webserver.services.autofill import AutoFillService
 from webserver.services.batch_convert import BatchConvertService
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
+from webserver.services.update_checker import UpdateChecker
 
 
 CONF = loader.get_settings()
@@ -1040,6 +1041,27 @@ class AdminBookConvert(BaseHandler):
         return {"err": "ok", "msg": _("Kindle转EPUB任务已启动，右上角可以查看进度")}
 
 
+class AdminUpdateCheck(BaseHandler):
+    @js
+    @auth
+    def get(self):
+        if not self.admin_user:
+            return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
+        checker = UpdateChecker()
+        status = checker.get_status()
+        return {"err": "ok", "status": status}
+
+    @js
+    @auth
+    def post(self):
+        if not self.admin_user:
+            return {"err": "permission.not_admin", "msg": _("当前用户非管理员")}
+        checker = UpdateChecker()
+        checker.check_for_updates()
+        status = checker.get_status()
+        return {"err": "ok", "status": status}
+
+
 def routes():
     return [
         (r"/api/admin/ssl", AdminSSL),
@@ -1047,6 +1069,7 @@ def routes():
         (r"/api/admin/install", AdminInstall),
         (r"/api/admin/settings", AdminSettings),
         (r"/api/admin/testmail", AdminTestMail),
+        (r"/api/admin/update", AdminUpdateCheck),
         (r"/api/admin/book/list", AdminBookList),
         (r"/api/admin/book/fill", AdminBookFill),
         (r"/api/admin/book/delete", AdminBookDelete),
