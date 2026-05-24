@@ -3,6 +3,7 @@ User Guide
 ===========
 
 [中文](README.zh_CN.md) | English
+
 This article mainly introduces the usage instructions of the talebook program and common issues. For manual installation or submitting PRs, please refer to the [Developer Guide](./Development.en_US.md).
 
 
