@@ -1,5 +1,7 @@
 使用指南
 ===========
+
+[English Version](README.en_US.md) | 中文版本
 本文主要介绍talebook程序的使用说明，以及常见问题。如需手动安装或者提交PR，请参阅[开发者指南](./Development.zh_CN.md)。
 
 
