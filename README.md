@@ -7,7 +7,7 @@
 
 # Tale Book: My Calibre WebServer
 
-中文版本 | [English Version](README_EN.md)
+中文 | [English](README_EN.md)
 
 A better online books library management website built on Calibre + Vue
 
