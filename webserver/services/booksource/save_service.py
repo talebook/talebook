@@ -15,6 +15,7 @@ from webserver.services import AsyncService
 from webserver.services.background_service import BackgroundService, BackgroundTask
 from webserver.services.booksource.book_source import BookSource
 from webserver.services.booksource.engine import BookSourceEngine
+from webserver.services.convert import ConvertService
 
 
 CONF = loader.get_settings()
@@ -133,8 +134,6 @@ class SaveOnlineBookService(AsyncService):
         self._save_meta(book_id, user_id, engine, detail, chapters)
 
         if fmt == "epub":
-            from webserver.services.convert import ConvertService
-
             ConvertService().convert_and_save(user_id, {"id": book_id, "title": detail.name}, txt_path, "epub")
             self.add_msg(user_id, "success", _("《%s》已保存，正在后台转换为 EPUB") % detail.name)
         else:

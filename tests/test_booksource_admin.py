@@ -107,12 +107,14 @@ class TestBookSourceAdmin(TestWithAdminUser):
 
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_source(self, m_session):
+        # 注意：FakeSession 取第一个子串匹配的 key，更具体的路径需放在前面，
+        # 否则 /book/1001/toc、/book/1001/c/1 会被 /book/1001 抢先命中。
         m_session.return_value = FakeSession(
             {
-                "/search": text("search.html"),
-                "/book/1001": text("bookinfo.html"),
-                "/toc": text("toc.html"),
                 "/c/1": text("content.html"),
+                "/toc": text("toc.html"),
+                "/book/1001": text("bookinfo.html"),
+                "/search": text("search.html"),
             }
         )
         sid = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))["id"]

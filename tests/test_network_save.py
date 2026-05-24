@@ -31,11 +31,12 @@ class TestNetworkSave(TestWithUserLogin):
         self.sid = source.id
 
     def _fake_session(self):
+        # 更具体的路径放前面：/book/1001/toc、/book/1001/c/1 不能被 /book/1001 抢先命中
         return FakeSession(
             {
-                "/book/1001": text("bookinfo.html"),
-                "/toc": text("toc.html"),
                 "/c/": text("content.html"),
+                "/toc": text("toc.html"),
+                "/book/1001": text("bookinfo.html"),
             }
         )
 
