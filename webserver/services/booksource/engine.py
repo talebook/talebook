@@ -285,9 +285,7 @@ class BookSourceEngine:
     # ------------------------------------------------------------------
     def detect_serialization(self, detail, chapters=None):
         """根据书源元数据 + 目录判断连载状态：serial / finished / unknown。"""
-        haystack = " ".join(
-            str(x) for x in [getattr(detail, "kind", ""), getattr(detail, "last_chapter", "")] if x
-        )
+        haystack = " ".join(str(x) for x in [getattr(detail, "kind", ""), getattr(detail, "last_chapter", "")] if x)
         if chapters:
             last = chapters[-1].name if hasattr(chapters[-1], "name") else ""
             haystack += " " + (last or "")

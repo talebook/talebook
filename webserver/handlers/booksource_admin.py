@@ -172,9 +172,7 @@ class BookSourceCRUD(BaseHandler):
             ids = [single] if single else []
         if not ids:
             return {"err": "params.error", "msg": _("需要提供 id 或 ids")}
-        deleted = self.session.query(BookSourceModel).filter(BookSourceModel.id.in_(ids)).delete(
-            synchronize_session=False
-        )
+        deleted = self.session.query(BookSourceModel).filter(BookSourceModel.id.in_(ids)).delete(synchronize_session=False)
         self.session.commit()
         return {"err": "ok", "deleted": deleted}
 

@@ -20,16 +20,20 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 _ATTR_TEXT = {"text", "textnodes", "owntext"}
 _ATTR_HTML = {"html", "outerhtml", "innerhtml", "all"}
 # 可识别为"取当前节点属性"的关键字
-_KNOWN_ATTRS = _ATTR_TEXT | _ATTR_HTML | {
-    "href",
-    "src",
-    "title",
-    "alt",
-    "value",
-    "content",
-    "data-src",
-    "data-original",
-}
+_KNOWN_ATTRS = (
+    _ATTR_TEXT
+    | _ATTR_HTML
+    | {
+        "href",
+        "src",
+        "title",
+        "alt",
+        "value",
+        "content",
+        "data-src",
+        "data-original",
+    }
+)
 
 
 def is_json_doc(doc):
