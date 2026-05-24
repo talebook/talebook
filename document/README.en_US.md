@@ -3,12 +3,12 @@ User Guide
 ===========
 
 [中文](README.zh_CN.md) | English
-This article mainly introduces the usage instructions of the talebook program and common issues. For manual installation or submitting PRs, please refer to the [Developer Guide](./Development.zh_CN.md).
+This article mainly introduces the usage instructions of the talebook program and common issues. For manual installation or submitting PRs, please refer to the [Developer Guide](./Development.en_US.md).
 
 
 Common Configuration Guide
 ===========
-This article mainly introduces the usage instructions of the talebook program and common issues. For manual installation or submitting PRs, please refer to the [Developer Guide](./Development.zh_CN.md).
+This article mainly introduces the usage instructions of the talebook program and common issues. For manual installation or submitting PRs, please refer to the [Developer Guide](./Development.en_US.md).
 
 ### Configure Kindle Push Function
 Taking QQ Mail push as an example, go to [QQ Mail website](http://service.mail.qq.com/cgi-bin/help?subtype=1&amp;&amp;no=1001256&amp;&amp;id=28), apply for an SMTP account, and then configure it in the admin interface.

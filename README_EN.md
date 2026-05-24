@@ -57,7 +57,7 @@ For example
 
 For frequently asked questions, please refer to the [User Guide](document/README.en_US.md). If you can't solve it, please submit an ISSUE.
 
-For manual installation, please refer to the [Developer Guide](document/Development.zh_CN.md)
+For manual installation, please refer to the [Developer Guide](document/Development.en_US.md)
 
 **If you think this project is great, welcome to support the author!**
 

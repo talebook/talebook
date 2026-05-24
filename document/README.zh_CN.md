@@ -2,7 +2,7 @@
 ===========
 
 中文 | [English](README.en_US.md)
-本文主要介绍talebook程序的使用说明，以及常见问题。如需手动安装或者提交PR，请参阅[开发者指南](./Development.zh_CN.md)。
+本文主要介绍talebook程序的使用说明，以及常见问题。如需手动安装或者提交PR，请参阅[开发者指南](./Development.zh_CN.md)（[English](./Development.en_US.md)）。
 
 
 NAS用户，可以参阅网友们写的指南：
