@@ -165,11 +165,19 @@ class BookSourceCRUD(BaseHandler):
     @js
     @is_admin
     def delete(self):
-        req = tornado.escape.json_decode(self.request.body)
-        ids = req.get("ids")
-        if not ids:
-            single = req.get("id")
-            ids = [single] if single else []
+        # DELETE 优先从查询参数取 id/ids（Tornado 测试客户端不允许 DELETE 带 body），
+        # 同时兼容请求体中的 JSON。
+        ids = self.get_arguments("ids")
+        single = self.get_argument("id", None)
+        if single:
+            ids.append(single)
+        if not ids and self.request.body:
+            try:
+                req = tornado.escape.json_decode(self.request.body)
+                ids = req.get("ids") or ([req["id"]] if req.get("id") else [])
+            except Exception:
+                ids = []
+        ids = [int(i) for i in ids if str(i).strip()]
         if not ids:
             return {"err": "params.error", "msg": _("需要提供 id 或 ids")}
         deleted = self.session.query(BookSourceModel).filter(BookSourceModel.id.in_(ids)).delete(synchronize_session=False)

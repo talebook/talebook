@@ -100,7 +100,7 @@ class TestBookSourceAdmin(TestWithAdminUser):
 
     def test_delete(self):
         sid = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))["id"]
-        d = self.json("/api/admin/booksource", method="DELETE", body=json.dumps({"id": sid}))
+        d = self.json("/api/admin/booksource?id=%d" % sid, method="DELETE")
         self.assertEqual(d["err"], "ok")
         self.assertEqual(d["deleted"], 1)
         self.assertEqual(self.json("/api/admin/booksource/list")["count"], 0)

@@ -180,9 +180,8 @@ const toggle = async (item) => {
 
 const remove = async (item) => {
     if (!confirm(t('booksource.deleteConfirm'))) return;
-    const rsp = await $backend('/admin/booksource', {
+    const rsp = await $backend('/admin/booksource?id=' + item.id, {
         method: 'DELETE',
-        body: JSON.stringify({ id: item.id }),
     });
     if (rsp.err === 'ok') load();
     else if ($alert) $alert('error', rsp.msg || rsp.err);
