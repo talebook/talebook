@@ -69,9 +69,6 @@ class Page(object):
         self.http = requests.get(url, timeout=10, headers=CHROME_HEADERS, params=payload)
         self.html = self.http.text
         logging.info(f"Fetched content length: {len(self.html)} characters")
-        # write content to /data/baike.html for debugging
-        with open("/data/baike.html", "w", encoding="utf-8") as f:
-            f.write(self.html)
         self.soup = BeautifulSoup(self.html, "lxml")
 
         # Exceptions

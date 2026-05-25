@@ -820,7 +820,7 @@ class TestOpds(TestWithUserLogin):
         self.parse_xml(rsp.body)
 
     def test_opds_search_not_found(self):
-        rsp = self.fetch("/opds/search/%s" % urllib.parse.quote("豪士"))
+        rsp = self.fetch("/opds/search/%s" % urllib.parse.quote("TALEBOOK_NOEXIST_QUERY_XYZ"))
         self.assertEqual(rsp.code, 404)
 
     def test_opds_without_login(self):

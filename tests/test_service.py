@@ -21,6 +21,18 @@ class TestConvert(TestWithUserLogin):
 
 
 class TestExtract(TestWithUserLogin):
+    def setUp(self):
+        super().setUp()
+        import shutil
+
+        shutil.rmtree("/tmp/666", ignore_errors=True)
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree("/tmp/666", ignore_errors=True)
+        super().tearDown()
+
     def test_convert(self):
         bid = 666
         fpath = testdir + "/cases/book.txt"
