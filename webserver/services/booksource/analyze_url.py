@@ -21,7 +21,7 @@ from .http_client import build_session, decode_response
 
 
 _JS_MARKERS = ("@js:", "<js>", "{{js.", "{{java")
-_TEMPLATE_RE = re.compile(r"\{\{(.+?)\}\}")
+_TEMPLATE_RE = re.compile(r"\{\{([^{}]+)\}\}")
 _GET_RE = re.compile(r"@get:\{([^}]+)\}")
 
 DEFAULT_TIMEOUT = 20

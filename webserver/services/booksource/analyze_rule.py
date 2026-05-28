@@ -21,7 +21,7 @@ from .exceptions import JsRuleUnsupported
 _JS_MARKERS = ("@js:", "<js>", "{{js.", "{{java")
 _GET_RE = re.compile(r"@get:\{([^}]+)\}")
 _PUT_RE = re.compile(r"@put:\{([^:]+):(.+)\}$")
-_TEMPLATE_RE = re.compile(r"\{\{(.+?)\}\}")
+_TEMPLATE_RE = re.compile(r"\{\{([^{}]+)\}\}")
 
 
 def _has_js(rule):
