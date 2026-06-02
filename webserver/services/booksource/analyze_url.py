@@ -13,7 +13,6 @@ url 规则形如：
 
 import json
 import logging
-import re
 from urllib.parse import urljoin
 
 from .exceptions import JsRuleUnsupported, SourceHttpError
@@ -21,8 +20,6 @@ from .http_client import build_session, decode_response
 
 
 _JS_MARKERS = ("@js:", "<js>", "{{js.", "{{java")
-_TEMPLATE_RE = re.compile(r"\{\{([^{}]+)\}\}")
-_GET_RE = re.compile(r"@get:\{([^}]+)\}")
 
 DEFAULT_TIMEOUT = 20
 
@@ -65,15 +62,38 @@ class AnalyzeUrl:
         return rule, {}
 
     def _substitute(self, text):
-        def repl(m):
-            expr = m.group(1).strip()
-            if expr.lower().startswith(("js.", "java")):
-                raise JsRuleUnsupported(expr)
-            return str(self._lookup(expr))
+        """O(n) 手写线性扫描替换 `{{...}}` 与 `@get:{...}`。
 
-        text = _TEMPLATE_RE.sub(repl, text)
-        text = _GET_RE.sub(lambda m: str(self.variables.get(m.group(1).strip(), "")), text)
-        return text
+        不使用 re.sub，避免攻击者构造的 `@get:{@get:{...|...` 这类输入触发
+        CodeQL py/polynomial-redos 担心的多项式回溯。
+        """
+        if not text:
+            return text
+        out = []
+        i = 0
+        n = len(text)
+        while i < n:
+            ch = text[i]
+            if ch == "{" and i + 1 < n and text[i + 1] == "{":
+                end = text.find("}}", i + 2)
+                if end != -1:
+                    expr = text[i + 2 : end].strip()
+                    if expr and "{" not in expr and "}" not in expr:
+                        if expr.lower().startswith(("js.", "java")):
+                            raise JsRuleUnsupported(expr)
+                        out.append(str(self._lookup(expr)))
+                        i = end + 2
+                        continue
+            elif ch == "@" and text.startswith("@get:{", i):
+                end = text.find("}", i + 6)
+                if end != -1:
+                    name = text[i + 6 : end].strip()
+                    out.append(str(self.variables.get(name, "")))
+                    i = end + 1
+                    continue
+            out.append(ch)
+            i += 1
+        return "".join(out)
 
     def _lookup(self, name):
         aliases = {"searchKey": "key", "searchPage": "page"}
