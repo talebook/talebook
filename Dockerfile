@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1.6
+# 基础镜像源码见本仓库 Dockerfile.base，独立构建并推送，避免重复编译 calibre
+ARG BASE_IMAGE=talebook/talebook-base:8.5
 # ----------------------------------------
 # 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
 FROM node:20-alpine AS builder
@@ -28,7 +30,7 @@ RUN cp -r dist package* /app-static/
 
 # ----------------------------------------
 # 第二阶段，构建环境
-FROM talebook/calibre-docker:8.5 AS server
+FROM ${BASE_IMAGE} AS server
 ARG BUILD_COUNTRY=""
 ARG TARGETARCH
 ARG TARGETVARIANT
