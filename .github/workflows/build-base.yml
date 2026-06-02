@@ -1,5 +1,8 @@
 name: Build and Push Base Image
 
+permissions:
+  contents: read
+
 # 基础镜像（Dockerfile.base）独立构建，只在以下情况触发，避免日常改 app 时重复编译：
 #   - 改动了 Dockerfile.base（push 到 master）
 #   - 打 base-v* 形式的 tag 发布版本（如 base-v8.5.0）
