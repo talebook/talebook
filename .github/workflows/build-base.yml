@@ -1,0 +1,72 @@
+name: Build and Push Base Image
+
+permissions:
+  contents: read
+
+# 基础镜像（Dockerfile.base）独立构建，只在以下情况触发，避免日常改 app 时重复编译：
+#   - 改动了 Dockerfile.base（push 到 master）
+#   - 打 base-v* 形式的 tag 发布版本（如 base-v8.5.0）
+#   - 手动触发
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "Dockerfile.base"
+      - ".github/workflows/build-base.yml"
+    tags:
+      - "base-v*"
+  workflow_dispatch:
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: talebook/talebook-base
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # base-v8.5.0 -> 8 / 8.5 / 8.5.0；master push -> latest / master
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=master,enable=${{ github.ref == 'refs/heads/master' }}
+            type=match,pattern=base-v(\d+),group=1
+            type=match,pattern=base-v(\d+\.\d+),group=1
+            type=match,pattern=base-v(\d+\.\d+\.\d+),group=1
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          file: ./Dockerfile.base
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-to: type=inline,mode=max
