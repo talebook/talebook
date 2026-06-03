@@ -98,6 +98,20 @@ class TestNetworkLibrary(TestWithUserLogin):
         d = self.json("/api/network/book?source_id=99999&book_url=%s" % Q("/x"))
         self.assertEqual(d["err"], "params.not_found")
 
+    def test_categories(self):
+        # 替换默认 fixture：让当前源带有 exploreUrl
+        session = get_db()
+        session.query(models.BookSourceModel).delete()
+        session.commit()
+        raw = dict(CSS_SOURCE, exploreUrl="玄幻::/explore/xuanhuan?page={{page}}\n都市::/explore/dushi")
+        source = models.BookSourceModel(raw)
+        source.save()
+        sid = source.id
+        d = self.json("/api/network/categories?source_id=%d" % sid)
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(len(d["items"]), 2)
+        self.assertEqual(d["items"][0]["name"], "玄幻")
+
     def test_status_get_set(self):
         session = get_db()
         meta = models.OnlineBookMeta(book_id=123456, source_url="http://x.com")

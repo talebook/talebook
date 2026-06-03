@@ -6,6 +6,8 @@
 由 AnalyzeRule / AnalyzeUrl 负责解释。
 """
 
+import json
+
 
 def _get(d, *keys, default=None):
     """从 dict 中按多个候选键取第一个非空值。"""
@@ -84,6 +86,43 @@ class BookSource:
     @property
     def explore_url(self):
         return _get(self.raw, "exploreUrl", default="") or ""
+
+    def explore_categories(self):
+        """解析 exploreUrl 为发现页分类列表 [{'name','url'}, ...]。
+
+        兼容两种 Legado 格式：
+          1. 换行分隔的 `name::url` 文本
+          2. JSON 数组 [{title|name: ..., url: ...}, ...]
+        含 @js: 的条目会被跳过（本引擎不支持 JS 规则）。
+        """
+        raw = self.explore_url
+        if not raw:
+            return []
+        text = raw.strip()
+        if text.startswith("["):
+            try:
+                arr = json.loads(text)
+                out = []
+                if isinstance(arr, list):
+                    for item in arr:
+                        if not isinstance(item, dict):
+                            continue
+                        name = (item.get("title") or item.get("name") or "").strip()
+                        url = (item.get("url") or "").strip()
+                        if name and url and "@js:" not in url and "<js>" not in url:
+                            out.append({"name": name, "url": url})
+                return out
+            except (ValueError, TypeError):
+                pass
+        out = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or "@js:" in line or "<js>" in line:
+                continue
+            parts = line.split("::", 1)
+            if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+                out.append({"name": parts[0].strip(), "url": parts[1].strip()})
+        return out
 
     # ---- 规则组 ----
     @property

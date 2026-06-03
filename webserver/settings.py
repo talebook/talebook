@@ -142,6 +142,7 @@ settings = {
     'BOOKSOURCE_MAX_WORKERS': 6,             # 多书源搜索并发数
     'BOOKSOURCE_SEARCH_TIMEOUT': 15,         # 单书源搜索超时(秒)
     'BOOKSOURCE_MAX_SAVE_CHAPTERS': 5000,    # 保存到本地时的最大章节数
+    'BOOKSOURCE_BUILTIN_URL': os.getenv('BOOKSOURCE_BUILTIN_URL', ''),  # 启动时从该 URL 拉取并导入书源（仅当本地无书源时）
     'BOOKSOURCE_AD_PATTERNS': [              # 全局去广告黑名单(正则，命中整行删除)
         r'(?i)请记住本站',
         r'(?i)请记住域名',

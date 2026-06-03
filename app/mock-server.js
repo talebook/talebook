@@ -277,6 +277,16 @@ router.get('/api/network/sources', eventHandler(() => {
   return { err: 'ok', items: [{ id: 1, name: '测试书源', group: '测试' }] };
 }));
 
+router.get('/api/network/categories', eventHandler(() => {
+  return {
+    err: 'ok',
+    items: [
+      { name: '玄幻', url: 'http://x.com/category/xuanhuan?page={{page}}' },
+      { name: '都市', url: 'http://x.com/category/dushi?page={{page}}' },
+    ],
+  };
+}));
+
 router.get('/api/network/search', eventHandler((event) => {
   const query = getQuery(event);
   const key = query.key || '';

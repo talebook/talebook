@@ -129,6 +129,34 @@ class TestAnalyzeRuleHtml(unittest.TestCase):
             self.ar.get_elements("<js>foo()</js>")
 
 
+class TestExploreCategories(unittest.TestCase):
+    def test_newline_format(self):
+        src = BookSource(
+            {
+                "bookSourceUrl": "http://x.com",
+                "bookSourceName": "T",
+                "exploreUrl": "玄幻::/cat/1\n都市::/cat/2\n# 注释行\n@js:notSupported::/x",
+            }
+        )
+        cats = src.explore_categories()
+        self.assertEqual(cats, [{"name": "玄幻", "url": "/cat/1"}, {"name": "都市", "url": "/cat/2"}])
+
+    def test_json_format(self):
+        src = BookSource(
+            {
+                "bookSourceUrl": "http://x.com",
+                "bookSourceName": "T",
+                "exploreUrl": '[{"title":"科幻","url":"/sci"},{"name":"奇幻","url":"/fan"}]',
+            }
+        )
+        cats = src.explore_categories()
+        self.assertEqual(cats, [{"name": "科幻", "url": "/sci"}, {"name": "奇幻", "url": "/fan"}])
+
+    def test_empty(self):
+        src = BookSource({"bookSourceUrl": "http://x.com", "bookSourceName": "T"})
+        self.assertEqual(src.explore_categories(), [])
+
+
 class TestAnalyzeRuleJson(unittest.TestCase):
     def setUp(self):
         import json

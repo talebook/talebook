@@ -252,7 +252,54 @@ def make_app():
     AsyncService().setup(book_db, ScopedSession)
     app = web.Application(social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings)
     app._engine = engine
+    _auto_import_builtin_booksources(ScopedSession)
     return app
+
+
+def _auto_import_builtin_booksources(scoped_session):
+    """启动时若配置 BOOKSOURCE_BUILTIN_URL 且本地书源表为空，后台拉取并导入。
+
+    在守护线程里执行，避免网络问题阻塞启动；失败仅记日志、不抛错。
+    """
+    url = (CONF.get("BOOKSOURCE_BUILTIN_URL") or "").strip()
+    if not url:
+        return
+
+    import threading
+
+    def run():
+        import time
+
+        import requests
+
+        from webserver.handlers.booksource_admin import import_sources
+        from webserver.models import BookSourceModel
+
+        time.sleep(2)  # 让 app 完成初始化
+        session = scoped_session()
+        try:
+            if session.query(BookSourceModel).count() > 0:
+                logging.info("booksource: 本地已有书源，跳过 BOOKSOURCE_BUILTIN_URL 自动导入")
+                return
+            logging.info("booksource: 正在从 %s 拉取内置书源...", url)
+            resp = requests.get(url, timeout=CONF.get("BOOKSOURCE_HTTP_TIMEOUT", 20))
+            resp.raise_for_status()
+            data = resp.json()
+            result = import_sources(session, data, overwrite=False)
+            logging.info(
+                "booksource: 内置书源导入完成: added=%s updated=%s skipped=%s failed=%s",
+                result.get("added"),
+                result.get("updated"),
+                result.get("skipped"),
+                len(result.get("failed") or []),
+            )
+        except Exception as e:
+            logging.warning("booksource: 内置书源自动导入失败: %s", e)
+        finally:
+            scoped_session.remove()
+
+    t = threading.Thread(target=run, daemon=True, name="booksource-builtin-import")
+    t.start()
 
 
 def get_upload_size():

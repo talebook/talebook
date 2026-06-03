@@ -126,6 +126,19 @@ class NetworkExplore(NetworkBaseHandler):
         return {"err": "ok", "books": [b.to_dict() for b in books]}
 
 
+class NetworkCategories(NetworkBaseHandler):
+    """返回一个书源的发现页分类列表（解析自 exploreUrl）。"""
+
+    @js
+    @auth
+    def get(self):
+        source = self.get_source(_int(self.get_argument("source_id", "0"), 0))
+        if not source:
+            return {"err": "params.not_found", "msg": _("书源不存在或未启用")}
+        categories = BookSource(source.raw).explore_categories()
+        return {"err": "ok", "items": categories}
+
+
 class NetworkBook(NetworkBaseHandler):
     @js
     @auth
@@ -281,6 +294,7 @@ def routes():
         (r"/api/network/sources", NetworkSources),
         (r"/api/network/search", NetworkSearch),
         (r"/api/network/explore", NetworkExplore),
+        (r"/api/network/categories", NetworkCategories),
         (r"/api/network/book", NetworkBook),
         (r"/api/network/toc", NetworkToc),
         (r"/api/network/content", NetworkContent),
