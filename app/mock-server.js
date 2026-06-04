@@ -345,4 +345,4 @@ router.get('/api/network/content', eventHandler(() => {
 
 app.use(router.handler);
 
-listen(toNodeListener(app), { hostname: '0.0.0.0', port: 8000 });
+listen(toNodeListener(app), { hostname: '0.0.0.0', port: Number(process.env.PORT) || 8000 });
