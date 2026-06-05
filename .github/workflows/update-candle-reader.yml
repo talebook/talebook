@@ -76,8 +76,13 @@ jobs:
           
           # 清理临时文件
           rm -rf dist dist.zip
-          
+
           echo "${{ env.REPO }} files updated successfully"
+
+          # creader.html 资源引用中预留了 ?v=CANDLE_READER_VERSION 占位符，替换为当前版本号（cache-busting）
+          # 锚定在 ?v= 上：首次替换占位符，之后每次替换上一版的值，幂等且支持版本升级
+          echo "Stamping ${VERSION} into creader.html for cache-busting..."
+          sed -i -E 's/\?v=[^"]*/?v='"${VERSION}"'/g' webserver/resources/book/creader.html
       
       - name: Update version file
         if: steps.compare.outputs.needs_update == 'true'
@@ -90,6 +95,7 @@ jobs:
         run: |
           git add -f ${{ env.TARGET_DIR }}/
           git add ${{ env.VERSION_FILE }}
+          git add webserver/resources/book/creader.html
           echo "Files added to git (forced)"
       
       - name: Create Pull Request
@@ -111,6 +117,7 @@ jobs:
             ### 更新内容
             - 下载并解压了最新的 dist.zip 到 `${{ env.TARGET_DIR }}/`
             - 更新了版本记录文件
+            - 在 `creader.html` 的静态资源引用上注入了 `?v=` 版本号（cache-busting）
             
             请审查更改日志并测试后再合并。
           branch: update-${{ env.REPO }}-${{ steps.get-latest.outputs.latest_version }}
