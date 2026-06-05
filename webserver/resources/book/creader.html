@@ -12,15 +12,15 @@
   <link rel="icon" href="{{RES}}/logo/favicon.ico" />
   <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="anonymous">
   <link rel="preload" as="style" onload="this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap">
-  <link rel="stylesheet" crossorigin href="style.css">
+  <link rel="stylesheet" crossorigin href="style.css?v=v1.0.2">
 
-  <script src="js/epub-v0.3.88.js"></script>
+  <script src="js/epub-v0.3.88.js?v=v1.0.2"></script>
   <script  type="module">
-    import { Reader } from "./candle-reader.es.js"
+    import { Reader } from "./candle-reader.es.js?v=v1.0.2"
     new Reader('#app', {
       debug: false,
       server: "{{CANDLE_READER_SERVER}}",
-      themes_css: "{{RES}}/static/candle-reader/css/themes.css",
+      themes_css: "{{RES}}/static/candle-reader/css/themes.css?v=v1.0.2",
       book_url: "{{RES}}{{epub_dir}}/",
       display: "",
     })
