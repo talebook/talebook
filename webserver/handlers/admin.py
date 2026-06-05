@@ -31,6 +31,7 @@ CONF = loader.get_settings()
 # 元数据源配置
 META_ALL_SOURCES = ["douban", "baidu", "google", "amazon", "xinhua", "ai"]
 DEFAULT_META_SOURCES = ["douban", "baidu", "xinhua"]
+SOCIAL_AUTH_SETTING_RE = re.compile(r"^SOCIAL_AUTH_[A-Z0-9_]+_(KEY|SECRET)$")
 
 
 class AdminUsers(BaseHandler):
@@ -391,9 +392,8 @@ class AdminSettings(BaseHandler):
         args.clear()
 
         for key, val in data.items():
-            if key.startswith("SOCIAL_AUTH"):
-                if key.endswith("_KEY") or key.endswith("_SECRET"):
-                    args[key] = val
+            if SOCIAL_AUTH_SETTING_RE.match(key):
+                args[key] = val
             elif key in KEYS:
                 args[key] = val
 

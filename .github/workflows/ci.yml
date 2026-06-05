@@ -14,7 +14,7 @@ jobs:
   test-server:
     runs-on: ubuntu-latest
     container:
-      image: talebook/calibre-docker:latest
+      image: talebook/talebook-base:latest
       options: --user root
 
     steps:

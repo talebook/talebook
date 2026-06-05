@@ -75,16 +75,16 @@ export default defineNuxtPlugin((nuxtApp) => {
 
       if (data.err === 'not_installed') {
         console.log('[Talebook] Redirecting to /install');
-        await nuxtApp.runWithContext(() => navigateTo('/install', { redirectCode: 301 }));
+        await nuxtApp.runWithContext(() => navigateTo('/install', { redirectCode: 302 }));
       } else if (data.err === 'not_invited') {
         const route = useRoute();
         var next = route.fullPath;
         next = next ? '?next=' + next : '';
         if (route.path !== '/welcome') {
-          await nuxtApp.runWithContext(() => navigateTo('/welcome' + next, { redirectCode: 301 }));
+          await nuxtApp.runWithContext(() => navigateTo('/welcome' + next, { redirectCode: 302 }));
         }
       } else if (data.err === 'user.need_login') {
-        await nuxtApp.runWithContext(() => navigateTo('/login', { redirectCode: 301 }));
+        await nuxtApp.runWithContext(() => navigateTo('/login', { redirectCode: 302 }));
       } else if (data.err === 'exception') {
         store.setAlert({ type: 'error', msg: data.msg, to: null });
       }
