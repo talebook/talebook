@@ -33,6 +33,31 @@ test.describe('Install Flow', () => {
         await expect(page.getByText('安装 TaleBook')).toBeVisible();
     });
 
+    test('Install redirect uses 302, not a cacheable 301', async ({ page }) => {
+        // Regression: a 301 (Moved Permanently) gets cached by the browser, so once a
+        // fresh user hits "/" while not_installed, "/" -> "/install" is pinned permanently
+        // and never re-checked — leaving them stuck on the install page even after setup.
+        const installRedirectStatuses: number[] = [];
+        page.on('response', response => {
+            const status = response.status();
+            if (status >= 300 && status < 400) {
+                const location = response.headers()['location'] || '';
+                if (location.includes('/install')) {
+                    installRedirectStatuses.push(status);
+                }
+            }
+        });
+
+        await page.goto('/');
+        await expect(page).toHaveURL(/\/install/, { timeout: 10000 });
+
+        expect(installRedirectStatuses.length).toBeGreaterThan(0);
+        expect(installRedirectStatuses).not.toContain(301);
+        for (const status of installRedirectStatuses) {
+            expect(status).toBe(302);
+        }
+    });
+
     test('Can complete installation', async ({ page }) => {
         page.on('console', msg => console.log('Browser Console:', msg.text()));
         page.on('response', response => {
