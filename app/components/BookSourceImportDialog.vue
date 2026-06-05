@@ -10,11 +10,11 @@
                     v-model="tab"
                     density="compact"
                 >
-                    <v-tab value="json">
-                        {{ $t('booksource.importJson') }}
-                    </v-tab>
                     <v-tab value="url">
                         {{ $t('booksource.importUrl') }}
+                    </v-tab>
+                    <v-tab value="json">
+                        {{ $t('booksource.importJson') }}
                     </v-tab>
                     <v-tab value="seed">
                         {{ $t('booksource.importSeed') }}
@@ -25,19 +25,19 @@
                     v-model="tab"
                     class="mt-4"
                 >
+                    <v-window-item value="url">
+                        <v-text-field
+                            v-model="url"
+                            :placeholder="$t('booksource.urlPlaceholder')"
+                            variant="outlined"
+                            hide-details
+                        />
+                    </v-window-item>
                     <v-window-item value="json">
                         <v-textarea
                             v-model="jsonText"
                             :placeholder="$t('booksource.jsonPlaceholder')"
                             rows="8"
-                            variant="outlined"
-                            hide-details
-                        />
-                    </v-window-item>
-                    <v-window-item value="url">
-                        <v-text-field
-                            v-model="url"
-                            :placeholder="$t('booksource.urlPlaceholder')"
                             variant="outlined"
                             hide-details
                         />
@@ -85,7 +85,7 @@ const { t } = useI18n();
 const emit = defineEmits(['imported']);
 
 const dialog = ref(false);
-const tab = ref('json');
+const tab = ref('url');
 const jsonText = ref('');
 const url = ref('');
 const overwrite = ref(true);
@@ -94,20 +94,38 @@ const loading = ref(false);
 const open = () => {
     dialog.value = true;
 };
-defineExpose({ open });
 
 const doImport = async () => {
     const { $backend, $alert } = useNuxtApp();
+
+    // 提交前在前端校验输入，避免把空内容或非法 JSON 丢给后端
+    let body;
+    if (tab.value === 'url') {
+        const u = url.value.trim();
+        if (!u) {
+            if ($alert) $alert('error', t('booksource.urlRequired'));
+            return;
+        }
+        body = { url: u, overwrite: overwrite.value };
+    } else if (tab.value === 'json') {
+        const text = jsonText.value.trim();
+        if (!text) {
+            if ($alert) $alert('error', t('booksource.jsonRequired'));
+            return;
+        }
+        try {
+            JSON.parse(text);
+        } catch (e) {
+            if ($alert) $alert('error', t('booksource.jsonInvalid', { msg: e.message }));
+            return;
+        }
+        body = { json: text, overwrite: overwrite.value };
+    } else {
+        body = null;
+    }
+
     loading.value = true;
     try {
-        let body;
-        if (tab.value === 'url') {
-            body = { url: url.value, overwrite: overwrite.value };
-        } else if (tab.value === 'json') {
-            body = { json: jsonText.value, overwrite: overwrite.value };
-        } else {
-            body = null;
-        }
         const endpoint = tab.value === 'seed' ? '/admin/booksource/seed' : '/admin/booksource/import';
         const rsp = await $backend(endpoint, {
             method: 'POST',
@@ -131,4 +149,6 @@ const doImport = async () => {
         loading.value = false;
     }
 };
+
+defineExpose({ open, doImport, tab, jsonText, url });
 </script>
