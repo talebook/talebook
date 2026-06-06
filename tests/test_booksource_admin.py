@@ -105,6 +105,39 @@ class TestBookSourceAdmin(TestWithAdminUser):
         self.assertEqual(d["deleted"], 1)
         self.assertEqual(self.json("/api/admin/booksource/list")["count"], 0)
 
+    def _two_sources(self):
+        s1 = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))["id"]
+        raw2 = dict(CSS_SOURCE, bookSourceUrl="http://other.example.com/", bookSourceName="源2")
+        s2 = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": raw2}))["id"]
+        return s1, s2
+
+    def test_toggle_batch(self):
+        s1, s2 = self._two_sources()
+        d = self.json(
+            "/api/admin/booksource/toggle", method="POST", body=json.dumps({"ids": [s1, s2], "enabled": False})
+        )
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["updated"], 2)
+        items = {i["id"]: i for i in self.json("/api/admin/booksource/list")["items"]}
+        self.assertFalse(items[s1]["enabled"])
+        self.assertFalse(items[s2]["enabled"])
+
+    def test_delete_batch(self):
+        s1, s2 = self._two_sources()
+        d = self.json("/api/admin/booksource?ids=%d&ids=%d" % (s1, s2), method="DELETE")
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["deleted"], 2)
+        self.assertEqual(self.json("/api/admin/booksource/list")["count"], 0)
+
+    def test_list_pagination(self):
+        for i in range(3):
+            raw = dict(CSS_SOURCE, bookSourceUrl="http://p%d.example.com/" % i, bookSourceName="源%d" % i)
+            self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": raw}))
+        d = self.json("/api/admin/booksource/list?page=1&size=2")
+        self.assertEqual(d["count"], 3)  # count 为过滤后总数
+        self.assertEqual(len(d["items"]), 2)
+        self.assertEqual(len(self.json("/api/admin/booksource/list?page=2&size=2")["items"]), 1)
+
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_source(self, m_session):
         # 注意：FakeSession 取第一个子串匹配的 key，更具体的路径需放在前面，

@@ -107,10 +107,21 @@ class BookSourceList(BaseHandler):
         if keyword:
             like = "%%%s%%" % keyword
             query = query.filter(BookSourceModel.name.like(like))
-        sources = query.order_by(BookSourceModel.weight.desc(), BookSourceModel.id.asc()).all()
+        total = query.count()
+        try:
+            page = max(1, int(self.get_argument("page", 1)))
+            size = min(200, max(1, int(self.get_argument("size", 50))))
+        except (ValueError, TypeError):
+            page, size = 1, 50
+        sources = (
+            query.order_by(BookSourceModel.weight.desc(), BookSourceModel.id.asc())
+            .offset((page - 1) * size)
+            .limit(size)
+            .all()
+        )
         items = [s.to_summary_dict() for s in sources]
-        groups = sorted({s.group for s in self.session.query(BookSourceModel).all() if s.group})
-        return {"err": "ok", "items": items, "count": len(items), "groups": groups}
+        groups = sorted({g for (g,) in self.session.query(BookSourceModel.group).distinct() if g})
+        return {"err": "ok", "items": items, "count": total, "page": page, "size": size, "groups": groups}
 
 
 class BookSourceCRUD(BaseHandler):
@@ -231,16 +242,39 @@ class BookSourceSeed(BaseHandler):
 
 
 class BookSourceToggle(BaseHandler):
-    """启用/禁用书源。"""
+    """启用/禁用书源（支持单个 id 或批量 ids）。"""
 
     @js
     @is_admin
     def post(self):
         req = tornado.escape.json_decode(self.request.body)
-        source = self.session.query(BookSourceModel).filter(BookSourceModel.id == req.get("id")).first()
+        ids = req.get("ids")
+        if not ids and req.get("id") is not None:
+            ids = [req["id"]]
+        ids = [int(i) for i in (ids or []) if str(i).strip()]
+        if not ids:
+            return {"err": "params.error", "msg": _("需要提供 id 或 ids")}
+
+        if "enabled" in req:
+            enabled = bool(req["enabled"])
+            updated = (
+                self.session.query(BookSourceModel)
+                .filter(BookSourceModel.id.in_(ids))
+                .update(
+                    {BookSourceModel.enabled: enabled, BookSourceModel.update_time: datetime.datetime.now()},
+                    synchronize_session=False,
+                )
+            )
+            self.session.commit()
+            return {"err": "ok", "updated": updated, "enabled": enabled}
+
+        # 未指定 enabled：仅单个时按当前状态取反（兼容旧的单行开关）
+        if len(ids) != 1:
+            return {"err": "params.error", "msg": _("批量操作需指定 enabled")}
+        source = self.session.query(BookSourceModel).filter(BookSourceModel.id == ids[0]).first()
         if not source:
             return {"err": "params.not_found", "msg": _("未找到该书源")}
-        source.enabled = bool(req.get("enabled", not source.enabled))
+        source.enabled = not source.enabled
         source.update_time = datetime.datetime.now()
         source.save()
         return {"err": "ok", "enabled": bool(source.enabled)}
