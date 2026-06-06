@@ -74,6 +74,49 @@
         </v-card-actions>
 
         <v-card-text>
+            <v-alert
+                type="info"
+                variant="tonal"
+                density="comfortable"
+                class="mb-4"
+            >
+                <div class="text-body-2">
+                    {{ $t('booksource.aboutIntro') }}
+                </div>
+                <div class="text-body-2 mt-1">
+                    {{ $t('booksource.aboutFormats') }}
+                </div>
+                <div class="text-caption text-medium-emphasis mt-1">
+                    {{ $t('booksource.aboutJsNote') }}
+                </div>
+                <div class="mt-2 d-flex flex-wrap ga-4">
+                    <a
+                        href="https://github.com/gedoor/legado"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-primary text-decoration-none d-inline-flex align-center"
+                    >
+                        <v-icon
+                            size="small"
+                            icon="mdi-github"
+                            class="mr-1"
+                        />{{ $t('booksource.refLegado') }}
+                    </a>
+                    <a
+                        href="https://github.com/gedoor/legado/wiki"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-primary text-decoration-none d-inline-flex align-center"
+                    >
+                        <v-icon
+                            size="small"
+                            icon="mdi-book-open-variant"
+                            class="mr-1"
+                        />{{ $t('booksource.refRules') }}
+                    </a>
+                </div>
+            </v-alert>
+
             <v-tabs
                 v-model="sourceTab"
                 density="compact"

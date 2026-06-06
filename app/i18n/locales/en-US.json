@@ -252,6 +252,11 @@
   },
   "booksource": {
     "title": "Book Sources",
+    "aboutIntro": "Network Library searches, reads and saves web novels from third-party sites via \"book sources\". Import, manage and validate them here; invalid sources are disabled after validation and excluded from search.",
+    "aboutFormats": "Compatible with 「阅读」(Legado) 3.0 book-source JSON (single object or array). Import by pasting JSON, from a subscription URL, or the built-in seed. Parsing rules support CSS, jsoup (class./id./tag.), XPath, JSONPath and regex ad-cleaning.",
+    "aboutJsNote": "Book-source rules written in JavaScript are not supported yet; sources or fields containing JS are skipped.",
+    "refLegado": "Legado (阅读) project",
+    "refRules": "Book source rule docs",
     "import": "Import sources",
     "importJson": "Paste JSON",
     "importUrl": "From URL",

@@ -257,6 +257,11 @@
   },
   "booksource": {
     "title": "书源管理",
+    "aboutIntro": "网络书库通过「书源」从第三方网站搜索、阅读并保存网络小说。在此导入、管理与检测书源；失效书源会在检测后被自动停用，不参与搜索。",
+    "aboutFormats": "兼容「阅读」(Legado) 3.0 书源 JSON 格式（单个对象或数组）。可粘贴 JSON、从订阅 URL 导入，或一键导入内置书源。解析规则支持 CSS、jsoup(class./id./tag.)、XPath、JSONPath 及正则去广告。",
+    "aboutJsNote": "暂不支持以 JavaScript 编写的书源规则，含 JS 脚本的书源或字段会被自动跳过。",
+    "refLegado": "阅读 (Legado) 项目",
+    "refRules": "书源规则说明",
     "import": "导入书源",
     "importJson": "粘贴 JSON 导入",
     "importUrl": "从 URL 导入",
