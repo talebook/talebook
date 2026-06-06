@@ -142,19 +142,16 @@
                 @keyup.enter="doSearch"
                 @click:clear="doSearch"
             />
-            <v-data-table-server
+            <v-data-table
                 v-model="selected"
                 :headers="headers"
                 :items="items"
-                :items-length="total"
                 :loading="loading"
-                :items-per-page="pageSize"
-                :page="page"
+                :items-per-page="-1"
                 show-select
                 item-value="id"
                 density="compact"
                 class="elevation-1 text-body-2"
-                @update:page="changePage"
             >
                 <!-- 名称列 -->
                 <template #item.name="{ item }">
@@ -233,11 +230,33 @@
                     <v-alert
                         type="info"
                         variant="tonal"
+                        class="my-2"
                     >
                         {{ emptyText }}
                     </v-alert>
                 </template>
-            </v-data-table-server>
+
+                <!-- 关闭自带分页（改用服务端分页 + 下方 v-pagination） -->
+                <template #bottom />
+            </v-data-table>
+
+            <!-- 分页 -->
+            <div
+                v-if="total > 0"
+                class="d-flex align-center flex-wrap ga-2 mt-3"
+            >
+                <span class="text-caption text-medium-emphasis">
+                    {{ $t('booksource.totalCount', { n: total }) }}
+                </span>
+                <v-spacer />
+                <v-pagination
+                    v-model="page"
+                    :length="pageCount"
+                    :total-visible="7"
+                    density="compact"
+                    @update:model-value="changePage"
+                />
+            </div>
         </v-card-text>
 
         <BookSourceImportDialog
@@ -325,11 +344,11 @@ const selected = ref([]);
 const q = ref('');
 const sourceTab = ref('available');
 const page = ref(1);
+const pageSize = 50;
 const total = ref(0);
 const loading = ref(false);
 const checkingSources = ref(false);
 const checkPollTimer = ref(null);
-const pageSize = 50;
 const allSelected = computed(() => items.value.length > 0 && selected.value.length === items.value.length);
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 const enabledFilter = computed(() => (sourceTab.value === 'invalid' ? 'false' : 'true'));
@@ -507,9 +526,11 @@ const testSource = async (item) => {
     }
 };
 
+// 切换 tab：回到第 1 页、清空选择与搜索词，重新加载
 watch(sourceTab, () => {
     page.value = 1;
     selected.value = [];
+    q.value = '';
     load();
 });
 

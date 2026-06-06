@@ -257,6 +257,7 @@
     "aboutJsNote": "Book-source rules written in JavaScript are not supported yet; sources or fields containing JS are skipped.",
     "refLegado": "Legado (阅读) project",
     "refRules": "Book source rule docs",
+    "totalCount": "{n} sources in total",
     "import": "Import sources",
     "importJson": "Paste JSON",
     "importUrl": "From URL",

@@ -262,6 +262,7 @@
     "aboutJsNote": "暂不支持以 JavaScript 编写的书源规则，含 JS 脚本的书源或字段会被自动跳过。",
     "refLegado": "阅读 (Legado) 项目",
     "refRules": "书源规则说明",
+    "totalCount": "共 {n} 个书源",
     "import": "导入书源",
     "importJson": "粘贴 JSON 导入",
     "importUrl": "从 URL 导入",
