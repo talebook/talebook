@@ -126,6 +126,22 @@ class BookSourceEngine:
             logging.info("booksource[%s]: skip js rule: %s", self.source.book_source_name, rule)
             return ""
 
+    def _make_context(self, text, page_url, rule, hint_rule=""):
+        doc = make_doc(text, hint_rule)
+        ctx = AnalyzeRule(doc, base_url=page_url)
+        init_rule = rule.get("init")
+        if not init_rule:
+            return ctx
+
+        try:
+            elements = ctx.get_elements(init_rule)
+        except JsRuleUnsupported:
+            logging.info("booksource[%s]: init rule uses js", self.source.book_source_name)
+            return ctx
+        if elements:
+            return ctx.child(elements[0])
+        return ctx
+
     # ------------------------------------------------------------------
     def search(self, key, page=1):
         variables = {"key": key, "page": page}
@@ -161,8 +177,7 @@ class BookSourceEngine:
 
     def _parse_book_list(self, text, page_url, rule):
         book_list_rule = rule.get("bookList")
-        doc = make_doc(text, book_list_rule)
-        ctx = AnalyzeRule(doc, base_url=page_url)
+        ctx = self._make_context(text, page_url, rule, book_list_rule)
         results = []
         try:
             elements = ctx.get_elements(book_list_rule) if book_list_rule else []
@@ -192,8 +207,7 @@ class BookSourceEngine:
         resp = au.fetch()
         rule = self.source.rule_book_info
         name_rule = rule.get("name")
-        doc = make_doc(resp.text, name_rule)
-        ctx = AnalyzeRule(doc, base_url=resp.url)
+        ctx = self._make_context(resp.text, resp.url, rule, name_rule)
         detail = BookDetail(
             name=self._safe(ctx, rule.get("name")),
             author=self._safe(ctx, rule.get("author")),
@@ -222,8 +236,7 @@ class BookSourceEngine:
             pages += 1
             au = AnalyzeUrl(url, base_url=self.base_url, source=self.source, session=self.session, timeout=self.timeout)
             resp = au.fetch()
-            doc = make_doc(resp.text, chapter_list_rule)
-            ctx = AnalyzeRule(doc, base_url=resp.url)
+            ctx = self._make_context(resp.text, resp.url, rule, chapter_list_rule)
             try:
                 elements = ctx.get_elements(chapter_list_rule) if chapter_list_rule else []
             except JsRuleUnsupported:
@@ -261,8 +274,7 @@ class BookSourceEngine:
             pages += 1
             au = AnalyzeUrl(url, base_url=self.base_url, source=self.source, session=self.session, timeout=self.timeout)
             resp = au.fetch()
-            doc = make_doc(resp.text, content_rule)
-            ctx = AnalyzeRule(doc, base_url=resp.url)
+            ctx = self._make_context(resp.text, resp.url, rule, content_rule)
             try:
                 parts.append(ctx.get_string(content_rule))
             except JsRuleUnsupported:

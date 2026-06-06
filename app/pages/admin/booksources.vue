@@ -77,94 +77,101 @@
                 @keyup.enter="doSearch"
                 @click:clear="doSearch"
             />
-            <v-table v-if="items.length > 0">
-                <thead>
-                    <tr>
-                        <th style="width: 1%">
-                            <v-checkbox-btn
-                                :model-value="allSelected"
-                                :indeterminate="someSelected"
-                                density="compact"
-                                @update:model-value="toggleSelectAll"
-                            />
-                        </th>
-                        <th>{{ $t('booksource.name') }}</th>
-                        <th>{{ $t('booksource.group') }}</th>
-                        <th>{{ $t('booksource.weight') }}</th>
-                        <th>{{ $t('booksource.enabled') }}</th>
-                        <th>{{ $t('booksource.actions') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr
-                        v-for="item in items"
-                        :key="item.id"
-                    >
-                        <td>
-                            <v-checkbox-btn
-                                :model-value="selected.includes(item.id)"
-                                density="compact"
-                                @update:model-value="toggleOne(item.id)"
-                            />
-                        </td>
-                        <td>
-                            {{ item.name }}
-                            <div class="text-caption text-grey">
-                                {{ item.url }}
-                            </div>
-                        </td>
-                        <td>{{ item.group }}</td>
-                        <td>{{ item.weight }}</td>
-                        <td>
-                            <v-switch
-                                :model-value="item.enabled"
-                                color="primary"
-                                hide-details
-                                density="compact"
-                                @update:model-value="toggle(item)"
-                            />
-                        </td>
-                        <td>
-                            <v-btn
-                                size="small"
-                                variant="text"
-                                color="primary"
-                                @click="testSource(item)"
-                            >
-                                {{ $t('booksource.test') }}
-                            </v-btn>
-                            <v-btn
-                                size="small"
-                                variant="text"
-                                color="error"
-                                @click="remove(item)"
-                            >
-                                {{ $t('booksource.delete') }}
-                            </v-btn>
-                        </td>
-                    </tr>
-                </tbody>
-            </v-table>
-            <v-alert
-                v-else
-                type="info"
-                variant="tonal"
+            <v-data-table
+                v-model="selected"
+                :headers="headers"
+                :items="items"
+                :loading="loading"
+                :items-per-page="pageSize"
+                :page="page"
+                show-select
+                item-value="id"
+                density="compact"
+                class="elevation-1 text-body-2"
+                @update:page="changePage"
             >
-                {{ $t('booksource.empty') }}
-            </v-alert>
+                <!-- 名称列 -->
+                <template #item.name="{ item }">
+                    {{ item.name }}
+                    <div class="text-caption text-grey">
+                        {{ item.url }}
+                    </div>
+                </template>
 
-            <div
-                v-if="pageCount > 1"
-                class="d-flex justify-center mt-4"
-            >
-                <v-pagination
-                    :model-value="page"
-                    :length="pageCount"
-                    :total-visible="7"
-                    density="compact"
-                    @update:model-value="changePage"
-                />
-            </div>
+                <!-- 检测状态列 -->
+                <template #item.check="{ item }">
+                    <div class="check-cell">
+                        <v-chip
+                            size="x-small"
+                            :color="checkColor(item)"
+                            variant="tonal"
+                        >
+                            {{ checkText(item) }}
+                        </v-chip>
+                        <div
+                            v-if="item.check_message"
+                            class="text-caption text-medium-emphasis mt-1 check-message"
+                        >
+                            {{ item.check_message }}
+                        </div>
+                        <div
+                            v-if="item.check_tags?.length"
+                            class="check-tags mt-1"
+                        >
+                            <v-chip
+                                v-for="tag in item.check_tags.slice(0, 4)"
+                                :key="tag"
+                                size="x-small"
+                                variant="outlined"
+                                class="mr-1 mb-1"
+                            >
+                                {{ tag }}
+                            </v-chip>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- 启用状态列 -->
+                <template #item.enabled="{ item }">
+                    <v-switch
+                        :model-value="item.enabled"
+                        color="primary"
+                        hide-details
+                        density="compact"
+                        @update:model-value="toggle(item)"
+                    />
+                </template>
+
+                <!-- 操作列 -->
+                <template #item.actions="{ item }">
+                    <v-btn
+                        size="small"
+                        variant="text"
+                        color="primary"
+                        @click="testSource(item)"
+                    >
+                        {{ $t('booksource.test') }}
+                    </v-btn>
+                    <v-btn
+                        size="small"
+                        variant="text"
+                        color="error"
+                        @click="remove(item)"
+                    >
+                        {{ $t('booksource.delete') }}
+                    </v-btn>
+                </template>
+
+                <!-- 空数据 -->
+                <template #no-data>
+                    <v-alert
+                        type="info"
+                        variant="tonal"
+                    >
+                        {{ $t('booksource.empty') }}
+                    </v-alert>
+                </template>
+            </v-data-table>
         </v-card-text>
 
         <BookSourceImportDialog
@@ -237,14 +244,24 @@ const { $backend, $alert } = useNuxtApp();
 
 store.setNavbar(true);
 
+// 表格列定义
+const headers = [
+    { title: t('booksource.name'), key: 'name', sortable: false },
+    { title: t('booksource.group'), key: 'group', sortable: false, width: '180px' },
+    { title: t('booksource.weight'), key: 'weight', sortable: false, width: '80px' },
+    { title: t('booksource.check'), key: 'check', sortable: false, width: '220px' },
+    { title: t('booksource.enabled'), key: 'enabled', sortable: false, width: '100px' },
+    { title: t('booksource.actions'), key: 'actions', sortable: false, width: '150px' },
+];
+
 const items = ref([]);
 const selected = ref([]);
 const q = ref('');
 const page = ref(1);
 const total = ref(0);
+const loading = ref(false);
 const pageSize = 50;
 const allSelected = computed(() => items.value.length > 0 && selected.value.length === items.value.length);
-const someSelected = computed(() => selected.value.length > 0 && !allSelected.value);
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 const importDialog = ref(null);
 const testDialog = ref(false);
@@ -253,16 +270,21 @@ const testRsp = ref({});
 const testKey = ref('剑来');
 
 const load = async () => {
-    const url = `/admin/booksource/list?page=${page.value}&size=${pageSize}&q=${encodeURIComponent(q.value.trim())}`;
-    const rsp = await $backend(url);
-    if (rsp.err === 'ok') {
-        items.value = rsp.items || [];
-        total.value = rsp.count || 0;
-        // 批量删除后当前页可能越界，回退到最后一页
-        if (items.value.length === 0 && total.value > 0 && page.value > 1) {
-            page.value = pageCount.value;
-            return load();
+    loading.value = true;
+    try {
+        const url = `/admin/booksource/list?page=${page.value}&size=${pageSize}&q=${encodeURIComponent(q.value.trim())}`;
+        const rsp = await $backend(url);
+        if (rsp.err === 'ok') {
+            items.value = rsp.items || [];
+            total.value = rsp.count || 0;
+            // 批量删除后当前页可能越界，回退到最后一页
+            if (items.value.length === 0 && total.value > 0 && page.value > 1) {
+                page.value = pageCount.value;
+                return load();
+            }
         }
+    } finally {
+        loading.value = false;
     }
 };
 
@@ -300,12 +322,6 @@ const toggleSelectAll = () => {
     selected.value = allSelected.value ? [] : items.value.map((i) => i.id);
 };
 
-const toggleOne = (id) => {
-    const i = selected.value.indexOf(id);
-    if (i >= 0) selected.value.splice(i, 1);
-    else selected.value.push(id);
-};
-
 const batchEnable = async (enabled) => {
     if (selected.value.length === 0) return;
     const rsp = await $backend('/admin/booksource/toggle', {
@@ -327,6 +343,21 @@ const batchRemove = async () => {
     } else if ($alert) {
         $alert('error', rsp.msg || rsp.err);
     }
+};
+
+const checkColor = (item) => {
+    if (item.check_status === 'ok' || item.last_check_ok) return 'success';
+    if (item.check_status === 'js_unsupported' || item.check_status === 'incomplete') return 'warning';
+    return 'error';
+};
+
+const checkText = (item) => {
+    if (item.check_status === 'ok' || item.last_check_ok) return t('booksource.checkOk');
+    if (item.check_status === 'js_unsupported') return t('booksource.checkJs');
+    if (item.check_status === 'incomplete') return t('booksource.checkIncomplete');
+    if (item.check_status === 'dns_failed') return t('booksource.checkDns');
+    if (item.check_status === 'connect_failed') return t('booksource.checkConnect');
+    return t('booksource.checkFailed');
 };
 
 const testSource = async (item) => {
@@ -355,5 +386,17 @@ useHead(() => ({ title: t('booksource.title') }));
     max-height: 200px;
     overflow-y: auto;
     font-size: 12px;
+}
+.check-cell {
+    min-width: 180px;
+}
+.check-message {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.check-tags {
+    line-height: 1.5;
 }
 </style>

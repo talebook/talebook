@@ -6,7 +6,10 @@ import datetime
 import json
 import logging
 import os
+import socket
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse, urlunparse
 
 import requests
 import tornado
@@ -16,6 +19,7 @@ from webserver.handlers.base import BaseHandler, is_admin, js
 from webserver.i18n import _
 from webserver.models import BookSourceModel
 from webserver.services.booksource import BookSource, BookSourceEngine, JsRuleUnsupported
+from webserver.services.booksource.http_client import build_session
 
 
 CONF = loader.get_settings()
@@ -36,12 +40,215 @@ def _requires_js(raw):
     """判断书源的关键规则是否只能靠 JS 完成（无法用本引擎解析）。"""
     rule_search = raw.get("ruleSearch") or {}
     rule_content = raw.get("ruleContent") or {}
-    essentials = [
-        raw.get("searchUrl", ""),
-        rule_search.get("bookList", ""),
-        rule_content.get("content", ""),
+    search_url = raw.get("searchUrl", "")
+    search_js_blocked = _has_unsupported_js(search_url) or (
+        _has_js(search_url) and not str(search_url).strip().startswith("@js:")
+    )
+    return (
+        search_js_blocked or _has_js(rule_search.get("bookList", "")) or _has_unsupported_js(rule_content.get("content", ""))
+    )
+
+
+def _has_unsupported_js(value):
+    if not isinstance(value, str):
+        return False
+    low = value.lower()
+    return "<js>" in low or "{{js." in low or "{{java" in low or "java.ajax" in low or "java.post" in low
+
+
+def _iter_rule_values(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from _iter_rule_values(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from _iter_rule_values(v)
+
+
+def _source_rule_values(raw):
+    keys = ("searchUrl", "exploreUrl", "header", "loginUrl", "ruleSearch", "ruleBookInfo", "ruleToc", "ruleContent")
+    for key in keys:
+        yield from _iter_rule_values(raw.get(key))
+
+
+def _source_tags(raw):
+    tags = []
+    if not isinstance(raw, dict):
+        return tags
+    if raw.get("bookSourceType") is not None:
+        tags.append("text" if str(raw.get("bookSourceType") or "0") == "0" else "non-text")
+    url = (raw.get("bookSourceUrl") or "").strip()
+    if url.lower().startswith("https://"):
+        tags.append("https")
+    elif url:
+        tags.append("http")
+
+    rule_search = raw.get("ruleSearch") or {}
+    rule_book = raw.get("ruleBookInfo") or {}
+    rule_toc = raw.get("ruleToc") or {}
+    rule_content = raw.get("ruleContent") or {}
+    if raw.get("searchUrl") and rule_search.get("bookList"):
+        tags.append("search")
+    if rule_book:
+        tags.append("info")
+    if rule_toc.get("chapterList"):
+        tags.append("toc")
+    if rule_content.get("content"):
+        tags.append("content")
+    if raw.get("exploreUrl"):
+        tags.append("explore")
+
+    values = list(_source_rule_values(raw))
+    if any(v.strip().startswith(("$", "@json:")) for v in values):
+        tags.append("json")
+    if any("@css:" in v or "class." in v or "tag." in v or "id." in v for v in values):
+        tags.append("html")
+    if _requires_js(raw):
+        tags.append("js-blocked")
+    elif any(_has_js(v) for v in values):
+        tags.append("js-runtime")
+    return tags
+
+
+def _missing_required_features(raw):
+    rule_search = raw.get("ruleSearch") or {}
+    rule_book = raw.get("ruleBookInfo") or {}
+    rule_toc = raw.get("ruleToc") or {}
+    rule_content = raw.get("ruleContent") or {}
+    checks = [
+        ("searchUrl", raw.get("searchUrl")),
+        ("ruleSearch.bookList", rule_search.get("bookList")),
+        ("ruleSearch.bookUrl", rule_search.get("bookUrl")),
+        ("ruleBookInfo.name", rule_book.get("name")),
+        ("ruleToc.chapterList", rule_toc.get("chapterList")),
+        ("ruleToc.chapterUrl", rule_toc.get("chapterUrl")),
+        ("ruleContent.content", rule_content.get("content")),
     ]
-    return any(_has_js(v) for v in essentials)
+    return [name for name, value in checks if not value]
+
+
+def _normalized_probe_url(source_url):
+    url = (source_url or "").strip()
+    if url and "://" not in url:
+        url = "http://" + url
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return "", None
+    return urlunparse((parsed.scheme, parsed.netloc, "/", "", "", "")), parsed
+
+
+def _probe_source_network(raw, timeout):
+    source_url = (raw.get("bookSourceUrl") or "").strip()
+    probe_url, parsed = _normalized_probe_url(source_url)
+    tags = []
+    if not parsed:
+        return {"ok": False, "status": "invalid", "message": _("书源 URL 无效"), "tags": tags}
+
+    host = parsed.hostname
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        socket.getaddrinfo(host, port)
+        tags.append("dns-ok")
+    except OSError as err:
+        tags.append("dns-failed")
+        return {
+            "ok": False,
+            "status": "dns_failed",
+            "message": _("DNS 解析失败：{}").format(str(err)),
+            "tags": tags,
+        }
+
+    try:
+        session = build_session(BookSource(raw))
+        resp = session.get(probe_url, timeout=timeout, allow_redirects=True, stream=True)
+        resp.close()
+        tags.append("connect-ok")
+        tags.append("http-%s" % resp.status_code)
+        return {
+            "ok": resp.status_code < 500,
+            "status": "ok" if resp.status_code < 500 else "connect_failed",
+            "message": _("HTTP 状态 {}").format(resp.status_code),
+            "tags": tags,
+        }
+    except Exception as err:
+        tags.append("connect-failed")
+        return {
+            "ok": False,
+            "status": "connect_failed",
+            "message": _("连通性测试失败：{}").format(str(err)),
+            "tags": tags,
+        }
+
+
+def validate_source_raw(raw):
+    if not isinstance(raw, dict):
+        return {"ok": False, "status": "invalid", "message": _("书源格式无效"), "tags": []}
+    tags = _source_tags(raw)
+    if not (raw.get("bookSourceName") or "").strip() or not (raw.get("bookSourceUrl") or "").strip():
+        return {"ok": False, "status": "invalid", "message": _("缺少 bookSourceName 或 bookSourceUrl"), "tags": tags}
+
+    timeout = min(8, CONF.get("BOOKSOURCE_HTTP_TIMEOUT", 20))
+    network = _probe_source_network(raw, timeout)
+    tags = sorted(set(tags + network.get("tags", [])))
+
+    missing = _missing_required_features(raw)
+    if _requires_js(raw):
+        return {
+            "ok": False,
+            "status": "js_unsupported",
+            "message": _("关键规则依赖 JS，暂不支持"),
+            "tags": tags,
+        }
+    if missing:
+        return {
+            "ok": False,
+            "status": "incomplete",
+            "message": _("缺少关键规则：{}").format(", ".join(missing[:4])),
+            "tags": tags,
+        }
+    if not network.get("ok"):
+        return {
+            "ok": False,
+            "status": network.get("status") or "connect_failed",
+            "message": network.get("message") or _("连通性测试失败"),
+            "tags": tags,
+        }
+    return {"ok": True, "status": "ok", "message": network.get("message") or _("检测通过"), "tags": tags}
+
+
+def _validate_sources_concurrently(items):
+    if not items:
+        return {}
+    max_workers = min(len(items), CONF.get("BOOKSOURCE_IMPORT_CHECK_WORKERS", 20))
+    results = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(validate_source_raw, raw): idx for idx, raw in items}
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                results[idx] = future.result()
+            except Exception as err:
+                results[idx] = {
+                    "ok": False,
+                    "status": "check_failed",
+                    "message": _("检测异常：{}").format(str(err)),
+                    "tags": ["check-failed"],
+                }
+    return results
+
+
+def _apply_check_result(source, check):
+    raw = dict(source.raw or {})
+    raw["_talebook_check"] = {
+        "status": check.get("status") or "unknown",
+        "message": check.get("message") or "",
+        "tags": check.get("tags") or [],
+    }
+    source.raw = raw
+    source.last_check_time = datetime.datetime.now()
+    source.last_check_ok = bool(check.get("ok"))
 
 
 def import_sources(session, data, overwrite=True):
@@ -51,9 +258,9 @@ def import_sources(session, data, overwrite=True):
     if not isinstance(data, list):
         return {"err": "params.error", "msg": _("书源格式应为 JSON 数组或对象")}
 
-    added = updated = skipped = 0
+    candidates = []
     failed = []
-    for raw in data:
+    for idx, raw in enumerate(data):
         if not isinstance(raw, dict):
             failed.append({"name": str(raw)[:40], "reason": "invalid"})
             continue
@@ -62,22 +269,37 @@ def import_sources(session, data, overwrite=True):
         if not name or not url:
             failed.append({"name": name or url or "unknown", "reason": "missing_fields"})
             continue
-        if _requires_js(raw):
-            failed.append({"name": name, "reason": "js_unsupported"})
-            continue
+        candidates.append((idx, raw))
+
+    checks = _validate_sources_concurrently(candidates)
+    added = updated = skipped = disabled = 0
+    for idx, raw in candidates:
+        check = checks.get(idx) or {"ok": False, "status": "check_failed", "message": _("检测失败"), "tags": []}
+        name = (raw.get("bookSourceName") or "").strip()
+        url = (raw.get("bookSourceUrl") or "").strip()
         existing = session.query(BookSourceModel).filter(BookSourceModel.url == url).first()
         if existing:
             if not overwrite:
                 skipped += 1
                 continue
             existing.apply_raw(raw)
+            _apply_check_result(existing, check)
+            existing.enabled = bool(raw.get("enabled", True)) and bool(check.get("ok"))
             existing.save()
             updated += 1
+            if not existing.enabled:
+                disabled += 1
         else:
             source = BookSourceModel(raw)
+            _apply_check_result(source, check)
+            source.enabled = bool(raw.get("enabled", True)) and bool(check.get("ok"))
             source.save()
             added += 1
-    return {"err": "ok", "added": added, "updated": updated, "skipped": skipped, "failed": failed}
+            if not source.enabled:
+                disabled += 1
+        if not check.get("ok"):
+            failed.append({"name": name, "reason": check.get("status"), "message": check.get("message")})
+    return {"err": "ok", "added": added, "updated": updated, "skipped": skipped, "disabled": disabled, "failed": failed}
 
 
 def _engine_config():
@@ -114,10 +336,7 @@ class BookSourceList(BaseHandler):
         except (ValueError, TypeError):
             page, size = 1, 50
         sources = (
-            query.order_by(BookSourceModel.weight.desc(), BookSourceModel.id.asc())
-            .offset((page - 1) * size)
-            .limit(size)
-            .all()
+            query.order_by(BookSourceModel.weight.desc(), BookSourceModel.id.asc()).offset((page - 1) * size).limit(size).all()
         )
         items = [s.to_summary_dict() for s in sources]
         groups = sorted({g for (g,) in self.session.query(BookSourceModel.group).distinct() if g})
@@ -314,8 +533,16 @@ class BookSourceTest(BaseHandler):
             result["msg"] = str(e)
         result["elapsed_ms"] = int((time.time() - start) * 1000)
 
-        source.last_check_time = datetime.datetime.now()
-        source.last_check_ok = result["err"] == "ok" and bool(result.get("search"))
+        ok = result["err"] == "ok" and bool(result.get("search"))
+        _apply_check_result(
+            source,
+            {
+                "ok": ok,
+                "status": "ok" if ok else result["err"],
+                "message": _("测试通过") if ok else (result.get("msg") or result["err"]),
+                "tags": _source_tags(source.raw),
+            },
+        )
         source.save()
         return result
 

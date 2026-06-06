@@ -8,7 +8,7 @@ url 规则形如：
     /relative?q={{key}}           # 相对路径，自动 urljoin(baseUrl)
 
 支持变量：{{key}}/{{searchKey}}、{{page}}/{{searchPage}}、{{baseUrl}}、@get:{name}。
-遇到 JS（@js: / <js> / {{js.* / {{java*）抛 JsRuleUnsupported。
+支持受限 `@js:` URL 生成；遇到 `<js>`、`java.ajax` 等外部副作用规则抛 JsRuleUnsupported。
 """
 
 import json
@@ -17,6 +17,7 @@ from urllib.parse import urljoin
 
 from .exceptions import JsRuleUnsupported, SourceHttpError
 from .http_client import build_session, decode_response
+from .js_runtime import run_js
 
 
 _JS_MARKERS = ("@js:", "<js>", "{{js.", "{{java")
@@ -40,10 +41,13 @@ class AnalyzeUrl:
         self.session = session or build_session(source)
         self.timeout = timeout
 
-        if _has_js(self.raw_rule):
+        rule = self.raw_rule
+        if rule.startswith("@js:"):
+            rule = self._eval_url_js(rule[4:])
+        elif _has_js(rule):
             raise JsRuleUnsupported(self.raw_rule)
 
-        url_part, self.options = self._split_options(self.raw_rule)
+        url_part, self.options = self._split_options(rule)
         self.url = self._build_url(url_part)
 
     # ------------------------------------------------------------------
@@ -108,6 +112,12 @@ class AnalyzeUrl:
             url = urljoin(self.base_url, url)
         return url
 
+    def _eval_url_js(self, code):
+        if _has_unsupported_js(code):
+            raise JsRuleUnsupported(self.raw_rule)
+        code = self._substitute(code)
+        return run_js(code, variables=self.variables, base_url=self.base_url)
+
     # ------------------------------------------------------------------
     def fetch(self):
         method = str(self.options.get("method", "GET")).upper()
@@ -135,3 +145,8 @@ class AnalyzeUrl:
 def _has_js(rule):
     low = rule.lower()
     return any(m in low for m in _JS_MARKERS)
+
+
+def _has_unsupported_js(rule):
+    low = rule.lower()
+    return "<js>" in low or "{{js." in low or "{{java" in low or "java.ajax" in low or "java.post" in low

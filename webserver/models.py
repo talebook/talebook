@@ -556,6 +556,9 @@ class BookSourceModel(Base, SQLAlchemyMixin):
         self.update_time = datetime.datetime.now()
 
     def to_summary_dict(self):
+        check = self.raw.get("_talebook_check") if isinstance(self.raw, dict) else {}
+        if not isinstance(check, dict):
+            check = {}
         return {
             "id": self.id,
             "name": self.name,
@@ -566,6 +569,9 @@ class BookSourceModel(Base, SQLAlchemyMixin):
             "weight": self.weight,
             "comment": self.comment or "",
             "last_check_ok": bool(self.last_check_ok),
+            "check_status": check.get("status") or ("ok" if self.last_check_ok else "failed"),
+            "check_message": check.get("message") or "",
+            "check_tags": check.get("tags") if isinstance(check.get("tags"), list) else [],
             "create_time": self.create_time.strftime("%Y-%m-%d %H:%M:%S") if self.create_time else None,
             "update_time": self.update_time.strftime("%Y-%m-%d %H:%M:%S") if self.update_time else None,
         }

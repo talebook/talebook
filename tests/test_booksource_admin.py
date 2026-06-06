@@ -67,15 +67,30 @@ class TestBookSourceAdmin(TestWithAdminUser):
         d = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))
         self.assertEqual(d["err"], "params.exist")
 
-    def test_import_array_and_js_skipped(self):
+    @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
+    def test_import_array_and_js_disabled(self, m_check):
+        def fake_check(raw):
+            if raw.get("bookSourceName") == "JS源":
+                return {"ok": False, "status": "js_unsupported", "message": "关键规则依赖 JS", "tags": ["js-blocked"]}
+            return {"ok": True, "status": "ok", "message": "HTTP 状态 200", "tags": ["dns-ok", "connect-ok"]}
+
+        m_check.side_effect = fake_check
         body = json.dumps({"json": json.dumps([CSS_SOURCE, JS_SOURCE])})
         d = self.json("/api/admin/booksource/import", method="POST", body=body)
         self.assertEqual(d["err"], "ok")
-        self.assertEqual(d["added"], 1)
+        self.assertEqual(d["added"], 2)
+        self.assertEqual(d["disabled"], 1)
         self.assertEqual(len(d["failed"]), 1)
         self.assertEqual(d["failed"][0]["reason"], "js_unsupported")
+        items = {i["name"]: i for i in self.json("/api/admin/booksource/list")["items"]}
+        self.assertTrue(items["测试源"]["enabled"])
+        self.assertFalse(items["JS源"]["enabled"])
+        self.assertEqual(items["JS源"]["check_status"], "js_unsupported")
+        self.assertIn("js-blocked", items["JS源"]["check_tags"])
 
-    def test_import_overwrite(self):
+    @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
+    def test_import_overwrite(self, m_check):
+        m_check.return_value = {"ok": True, "status": "ok", "message": "HTTP 状态 200", "tags": ["dns-ok"]}
         self.json("/api/admin/booksource/import", method="POST", body=json.dumps({"json": json.dumps([CSS_SOURCE])}))
         changed = dict(CSS_SOURCE, bookSourceName="改名后")
         d = self.json(
@@ -87,7 +102,9 @@ class TestBookSourceAdmin(TestWithAdminUser):
         d = self.json("/api/admin/booksource/list")
         self.assertEqual(d["items"][0]["name"], "改名后")
 
-    def test_seed_import(self):
+    @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
+    def test_seed_import(self, m_check):
+        m_check.return_value = {"ok": True, "status": "ok", "message": "HTTP 状态 200", "tags": ["dns-ok"]}
         d = self.json("/api/admin/booksource/seed", method="POST", body="{}")
         self.assertEqual(d["err"], "ok")
         self.assertGreaterEqual(d["added"], 1)
@@ -113,9 +130,7 @@ class TestBookSourceAdmin(TestWithAdminUser):
 
     def test_toggle_batch(self):
         s1, s2 = self._two_sources()
-        d = self.json(
-            "/api/admin/booksource/toggle", method="POST", body=json.dumps({"ids": [s1, s2], "enabled": False})
-        )
+        d = self.json("/api/admin/booksource/toggle", method="POST", body=json.dumps({"ids": [s1, s2], "enabled": False}))
         self.assertEqual(d["err"], "ok")
         self.assertEqual(d["updated"], 2)
         items = {i["id"]: i for i in self.json("/api/admin/booksource/list")["items"]}

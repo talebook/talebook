@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 """书源规则引擎单元测试（不依赖 Tornado / Calibre）。"""
 
+import json
 import os
 import unittest
 
@@ -128,6 +129,28 @@ class TestAnalyzeRuleHtml(unittest.TestCase):
         with self.assertRaises(JsRuleUnsupported):
             self.ar.get_elements("<js>foo()</js>")
 
+    def test_inline_js_postprocess(self):
+        import json
+
+        ar = AnalyzeRule(json.loads('{"category_name":"悬疑灵异","status":50,"update_time":"2023-07-27 11:38:13"}'))
+        out = ar.get_string(
+            "{{$.category_name}},{{$.status}},{{$.update_time}}@js:"
+            'result.replace(/30/,"连载").replace(/50/,"完结").replace(/\\s..:.*/,"")'
+        )
+        self.assertEqual(out, "悬疑灵异,完结,2023-07-27")
+
+    def test_inline_js_can_build_url_from_result_and_base_url(self):
+        ar = AnalyzeRule(BeautifulSoup("<a data-bid='123'></a>", "html.parser"), base_url="https://m.qidian.com/book/1/")
+        self.assertEqual(
+            ar.get_string("a@data-bid@js:'https://m.qidian.com/book/'+result+'/'"), "https://m.qidian.com/book/123/"
+        )
+        self.assertEqual(ar.get_string("@js:baseUrl.replace('/book/','/chapters/')"), "https://m.qidian.com/chapters/1/")
+
+    def test_inline_js_java_put_get(self):
+        ar = AnalyzeRule(BeautifulSoup("<p>123</p>", "html.parser"))
+        self.assertEqual(ar.get_string("p@text@js:java.put('id', result); result"), "123")
+        self.assertEqual(ar.get_string("@get:{id}"), "123")
+
 
 class TestExploreCategories(unittest.TestCase):
     def test_newline_format(self):
@@ -217,6 +240,16 @@ class TestAnalyzeUrl(unittest.TestCase):
         with self.assertRaises(JsRuleUnsupported):
             AnalyzeUrl("http://x.com/s,{<js>1</js>}", source=self._source(), session=FakeSession({}))
 
+    def test_js_url_runtime(self):
+        au = AnalyzeUrl(
+            "@js:baseUrl + '/search?key=' + encodeURIComponent(key) + '&page=' + page",
+            base_url="http://x.com",
+            variables={"key": "剑来", "page": 2},
+            source=self._source(),
+            session=FakeSession({}),
+        )
+        self.assertEqual(au.url, "http://x.com/search?key=%E5%89%91%E6%9D%A5&page=2")
+
 
 # --------------------------------------------------------------------------
 # Cleaner
@@ -279,6 +312,29 @@ CSS_SOURCE = {
     },
 }
 
+KUWO_SOURCE = {
+    "bookSourceUrl": "http://appi.kuwo.cn",
+    "bookSourceName": "酷我小说",
+    "bookSourceType": 0,
+    "ruleBookInfo": {
+        "init": "$.data",
+        "name": "$.title",
+        "author": "$.author_name",
+        "intro": "$.intro",
+        "lastChapter": "$.new_chapter_name",
+        "tocUrl": "/novels/api/book/{{$.book_id}}/chapters?paging=0",
+    },
+    "ruleToc": {
+        "chapterList": "$.data",
+        "chapterName": "$.chapter_title",
+        "chapterUrl": "/novels/api/book/{{$.book_id}}/chapters/{{$.chapter_id}}",
+        "updateTime": "{{$.volume_name}}•{{$.original_words}}字",
+    },
+    "ruleContent": {
+        "content": "$.data.content",
+    },
+}
+
 
 class TestEngineWithMock(unittest.TestCase):
     def _engine(self, mapping):
@@ -318,6 +374,53 @@ class TestEngineWithMock(unittest.TestCase):
         eng = self._engine({"/c/2": (gbk, "gbk")})
         body = eng.content("/c/2", clean=False)
         self.assertIn("编码自动识别", body)
+
+    def test_book_info_json_init(self):
+        detail_json = json.dumps(
+            {
+                "code": 200,
+                "data": {
+                    "book_id": "19634101901880004",
+                    "title": "神秘复苏：我为阎王",
+                    "author_name": "酒乱神",
+                    "intro": "诡异复苏，罪孽横行。",
+                    "new_chapter_name": "第23章：陈氏……",
+                },
+            }
+        )
+        eng = BookSourceEngine(BookSource(KUWO_SOURCE), session=FakeSession({"/novels/api/book/196": detail_json}))
+        detail = eng.book_info("/novels/api/book/19634101901880004")
+        self.assertEqual(detail.name, "神秘复苏：我为阎王")
+        self.assertEqual(detail.author, "酒乱神")
+        self.assertEqual(
+            detail.toc_url,
+            "http://appi.kuwo.cn/novels/api/book/19634101901880004/chapters?paging=0",
+        )
+
+    def test_toc_json_template_urls(self):
+        toc_json = json.dumps(
+            {
+                "code": 200,
+                "data": [
+                    {
+                        "book_id": "19634101901880004",
+                        "chapter_id": "52707058868795030",
+                        "chapter_title": "第1章：神符系统！",
+                        "volume_name": "现在世界",
+                        "original_words": 2028,
+                    }
+                ],
+            }
+        )
+        eng = BookSourceEngine(BookSource(KUWO_SOURCE), session=FakeSession({"/chapters?paging=0": toc_json}))
+        chapters = eng.toc("/novels/api/book/19634101901880004/chapters?paging=0")
+        self.assertEqual(len(chapters), 1)
+        self.assertEqual(chapters[0].name, "第1章：神符系统！")
+        self.assertEqual(
+            chapters[0].url,
+            "http://appi.kuwo.cn/novels/api/book/19634101901880004/chapters/52707058868795030",
+        )
+        self.assertEqual(chapters[0].update_time, "现在世界•2028字")
 
 
 class TestDetectSerialization(unittest.TestCase):

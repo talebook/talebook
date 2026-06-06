@@ -137,6 +137,7 @@ const doImport = async () => {
                     added: rsp.added || 0,
                     updated: rsp.updated || 0,
                     skipped: rsp.skipped || 0,
+                    disabled: rsp.disabled || 0,
                     failed: (rsp.failed || []).length,
                 }));
             }

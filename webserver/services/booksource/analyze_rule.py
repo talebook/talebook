@@ -9,13 +9,16 @@
   - 模板：含 `{{子规则}}` 的字符串按模板拼接
   - 尾部正则：`rule##pattern##replacement`（replacement 可空表示删除）
 
-遇到 JS 规则（@js: / <js>）抛 JsRuleUnsupported，由调用方决定跳过。
+支持受限字段 JS：`规则@js:result.replace(...)`。遇到 `<js>` 块、
+`java.ajax` 等外部副作用规则抛 JsRuleUnsupported，由调用方决定跳过。
 """
 
+import json
 import re
 
 from . import rule_dispatch as rd
 from .exceptions import JsRuleUnsupported
+from .js_runtime import run_js
 
 
 _JS_MARKERS = ("@js:", "<js>", "{{js.", "{{java")
@@ -27,6 +30,11 @@ _TEMPLATE_RE = re.compile(r"\{\{([^{}]+)\}\}")
 def _has_js(rule):
     low = rule.lower()
     return any(m in low for m in _JS_MARKERS)
+
+
+def _has_unsupported_js(rule):
+    low = rule.lower()
+    return "<js>" in low or "{{js." in low or "{{java" in low
 
 
 def _split_top(rule, sep):
@@ -52,7 +60,7 @@ class AnalyzeRule:
         rule = str(rule).strip()
         if not rule:
             return ""
-        if _has_js(rule):
+        if _has_unsupported_js(rule):
             raise JsRuleUnsupported(rule)
 
         # @put / @get
@@ -65,6 +73,18 @@ class AnalyzeRule:
             m = _GET_RE.match(rule)
             if m:
                 return str(self.variables.get(m.group(1).strip(), ""))
+
+        js_parts = self._split_inline_js(rule)
+        if js_parts:
+            main_rule, js_code, pattern, replacement = js_parts
+            value = self.get_string(main_rule) if main_rule else self._doc_string()
+            value = run_js(js_code, result=value, variables=self.variables, base_url=self.base_url)
+            if pattern is not None:
+                try:
+                    value = re.sub(pattern, replacement, value)
+                except re.error:
+                    pass
+            return value.strip()
 
         # 模板：包含字面文本 + {{子规则}}
         if "{{" in rule and "}}" in rule:
@@ -80,6 +100,23 @@ class AnalyzeRule:
             except re.error:
                 pass
         return value.strip()
+
+    def _split_inline_js(self, rule):
+        idx = rule.find("@js:")
+        if idx < 0:
+            return None
+        main = rule[:idx].strip()
+        js_code = rule[idx + 4 :].strip()
+        pattern = replacement = None
+        if "##" in js_code:
+            js_code, _, spec = js_code.partition("##")
+            pattern, _, replacement = spec.partition("##")
+        return main, js_code.strip(), pattern, replacement
+
+    def _doc_string(self):
+        if rd.is_json_doc(self.doc):
+            return json.dumps(self.doc, ensure_ascii=False)
+        return str(self.doc or "")
 
     def _eval_template(self, rule):
         def repl(m):
