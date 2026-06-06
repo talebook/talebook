@@ -306,6 +306,7 @@ def _apply_pending_check(source):
             "tags": ["check-pending"],
         },
     )
+    source.enabled = True
 
 
 class BookSourceCheckService(AsyncService):
@@ -462,14 +463,12 @@ def import_sources(session, data, overwrite=False):
                 continue
             existing.apply_raw(raw)
             _apply_pending_check(existing)
-            existing.enabled = bool(raw.get("enabled", True))
             session.add(existing)
             updated += 1
             touched.append(existing)
         else:
             source = BookSourceModel(raw)
             _apply_pending_check(source)
-            source.enabled = bool(raw.get("enabled", True))
             session.add(source)
             existing_by_url[url] = source
             added += 1

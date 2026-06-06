@@ -70,20 +70,27 @@ class TestBookSourceAdmin(TestWithAdminUser):
     @mock.patch("webserver.handlers.booksource_admin.schedule_source_checks")
     @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
     def test_import_array_queues_checks(self, m_check, m_schedule):
-        body = json.dumps({"json": json.dumps([CSS_SOURCE, JS_SOURCE])})
+        disabled_pending = dict(CSS_SOURCE, bookSourceName="禁用待检测", bookSourceUrl="http://disabled-pending.com", enabled=False)
+        body = json.dumps({"json": json.dumps([CSS_SOURCE, JS_SOURCE, disabled_pending])})
         d = self.json("/api/admin/booksource/import", method="POST", body=body)
         self.assertEqual(d["err"], "ok")
-        self.assertEqual(d["added"], 2)
+        self.assertEqual(d["added"], 3)
         self.assertEqual(d["disabled"], 0)
-        self.assertEqual(d["checking"], 2)
+        self.assertEqual(d["checking"], 3)
         self.assertEqual(len(d["failed"]), 0)
         self.assertFalse(m_check.called)
-        self.assertEqual(len(m_schedule.call_args[0][0]), 2)
+        self.assertEqual(len(m_schedule.call_args[0][0]), 3)
         items = {i["name"]: i for i in self.json("/api/admin/booksource/list")["items"]}
         self.assertTrue(items["测试源"]["enabled"])
         self.assertTrue(items["JS源"]["enabled"])
         self.assertEqual(items["JS源"]["check_status"], "pending")
         self.assertIn("check-pending", items["JS源"]["check_tags"])
+        self.assertTrue(items["禁用待检测"]["enabled"])
+
+        available = {i["name"] for i in self.json("/api/admin/booksource/list?enabled=true")["items"]}
+        invalid = {i["name"] for i in self.json("/api/admin/booksource/list?enabled=false")["items"]}
+        self.assertIn("禁用待检测", available)
+        self.assertNotIn("禁用待检测", invalid)
 
     @mock.patch("webserver.handlers.booksource_admin.schedule_source_checks")
     def test_import_duplicate_url_skips_without_overwrite(self, m_schedule):
