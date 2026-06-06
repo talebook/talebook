@@ -2,9 +2,7 @@
 # -*- coding: UTF-8 -*-
 """网络书库 Handler（普通用户）：搜索 / 发现 / 详情 / 目录 / 正文 / 保存。"""
 
-import concurrent.futures
 import datetime
-import logging
 
 import tornado.escape
 
@@ -13,6 +11,7 @@ from webserver.handlers.base import BaseHandler, auth, js
 from webserver.i18n import _
 from webserver.models import BookSourceModel, OnlineBookMeta
 from webserver.services.booksource import BookSource, BookSourceEngine, JsRuleUnsupported
+from webserver.services.booksource_search import SearchTaskService
 
 
 CONF = loader.get_settings()
@@ -57,6 +56,8 @@ class NetworkSources(NetworkBaseHandler):
 
 
 class NetworkSearch(NetworkBaseHandler):
+    """创建网络书库搜索任务：后台线程池并发各源，立即返回 task_id（前端轮询进度）。"""
+
     @js
     @auth
     def get(self):
@@ -65,47 +66,59 @@ class NetworkSearch(NetworkBaseHandler):
             return {"err": "params.error", "msg": _("请输入搜索关键字")}
         page = _int(self.get_argument("page", "1"), 1)
         ids = self.get_argument("sources", "")
+        group = self.get_argument("group", "").strip()
+        mode = self.get_argument("mode", "top")
 
+        order = (BookSourceModel.weight.desc(), BookSourceModel.id.asc())
         query = self.session.query(BookSourceModel).filter(BookSourceModel.enabled.is_(True))
         if ids:
+            # 手选：搜指定的书源
             id_list = [int(i) for i in ids.split(",") if i.strip().isdigit()]
-            query = query.filter(BookSourceModel.id.in_(id_list))
-        sources = query.order_by(BookSourceModel.weight.desc(), BookSourceModel.id.asc()).all()
+            sources = query.filter(BookSourceModel.id.in_(id_list)).order_by(*order).all()
+        elif group:
+            # 按分组搜索
+            sources = query.filter(BookSourceModel.group == group).order_by(*order).all()
+        elif mode == "all":
+            # 全部：搜所有启用的书源（前端轮询到全部完成）
+            sources = query.order_by(*order).all()
+        else:
+            # 近期可用（默认）：按权重取 TOP K
+            top_k = CONF.get("BOOKSOURCE_SEARCH_TOP_K", 50)
+            sources = query.order_by(*order).limit(top_k).all()
+
         if not sources:
-            return {"err": "ok", "results": [], "partial": []}
+            return {"err": "ok", "task_id": "", "total": 0, "mode": mode}
 
         # 把所需数据先取出来，避免在子线程里使用 SQLAlchemy session
         source_data = [(s.id, s.name, s.raw) for s in sources]
-        cfg = engine_config()
+        service = SearchTaskService()
+        service.configure(CONF.get("BOOKSOURCE_MAX_WORKERS", 10))
+        task = service.create_task(key, page, source_data, engine_config())
+        return {"err": "ok", "mode": mode, **task}
 
-        def run_one(item):
-            sid, name, raw = item
-            try:
-                engine = BookSourceEngine(BookSource(raw), config=cfg)
-                books = engine.search(key, page)
-                return {"source_id": sid, "source_name": name, "books": [b.to_dict() for b in books]}
-            except JsRuleUnsupported:
-                return {"source_id": sid, "source_name": name, "error": "js_unsupported"}
-            except Exception as e:
-                logging.info("network search [%s] failed: %s", name, e)
-                return {"source_id": sid, "source_name": name, "error": "fetch_failed"}
 
-        results, partial = [], []
-        max_workers = max(1, min(CONF.get("BOOKSOURCE_MAX_WORKERS", 6), len(source_data)))
-        timeout = CONF.get("BOOKSOURCE_SEARCH_TIMEOUT", 15)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_map = {executor.submit(run_one, item): item for item in source_data}
-            done, not_done = concurrent.futures.wait(future_map, timeout=timeout)
-            for f in not_done:
-                item = future_map[f]
-                partial.append({"source_id": item[0], "source_name": item[1], "error": "timeout"})
-            for f in done:
-                r = f.result()
-                if "books" in r:
-                    results.append(r)
-                else:
-                    partial.append(r)
-        return {"err": "ok", "results": results, "partial": partial}
+class NetworkSearchStatus(NetworkBaseHandler):
+    """查询搜索任务进度：返回已完成源结果、失败源、仍在搜索的源。"""
+
+    @js
+    @auth
+    def get(self):
+        task_id = self.get_argument("task_id", "")
+        if not task_id:
+            return {"err": "params.error", "msg": _("缺少 task_id")}
+        service = SearchTaskService()
+        status = service.get_status(task_id)
+        if status is None:
+            return {"err": "task.not_found", "msg": _("搜索任务不存在或已过期")}
+        # 任务完成后给「有结果」的源权重 +1（只结算一次），下次“近期可用”排前面
+        if status["finished"]:
+            hit_ids = service.pop_weight_updates(task_id)
+            if hit_ids:
+                self.session.query(BookSourceModel).filter(BookSourceModel.id.in_(hit_ids)).update(
+                    {BookSourceModel.weight: BookSourceModel.weight + 1}, synchronize_session=False
+                )
+                self.session.commit()
+        return {"err": "ok", **status}
 
 
 class NetworkExplore(NetworkBaseHandler):
@@ -292,6 +305,7 @@ def _int(value, default=0):
 def routes():
     return [
         (r"/api/network/sources", NetworkSources),
+        (r"/api/network/search/status", NetworkSearchStatus),
         (r"/api/network/search", NetworkSearch),
         (r"/api/network/explore", NetworkExplore),
         (r"/api/network/categories", NetworkCategories),

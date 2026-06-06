@@ -287,18 +287,30 @@ router.get('/api/network/categories', eventHandler(() => {
   };
 }));
 
+// 网络书库搜索改为任务化：创建任务返回 task_id，前端轮询 status 拿结果
+let lastSearchKey = '';
 router.get('/api/network/search', eventHandler((event) => {
   const query = getQuery(event);
-  const key = query.key || '';
+  lastSearchKey = query.key || '';
+  return { err: 'ok', task_id: 'mock-task', total: 1 };
+}));
+
+router.get('/api/network/search/status', eventHandler(() => {
   return {
     err: 'ok',
+    task_id: 'mock-task',
+    total: 1,
+    done: 1,
+    finished: true,
+    pending: [],
+    partial: [],
     results: [
       {
         source_id: 1,
         source_name: '测试书源',
         books: [
           {
-            name: `${key}的故事`,
+            name: `${lastSearchKey}的故事`,
             author: '测试作者',
             intro: '一段网络小说简介',
             cover_url: '',
@@ -307,7 +319,6 @@ router.get('/api/network/search', eventHandler((event) => {
         ],
       },
     ],
-    partial: [],
   };
 }));
 

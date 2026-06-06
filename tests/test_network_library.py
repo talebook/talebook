@@ -3,6 +3,7 @@
 """网络书库用户接口测试。"""
 
 import json
+import time
 import urllib.parse
 from unittest import mock
 
@@ -45,6 +46,15 @@ class TestNetworkLibrary(TestWithUserLogin):
             }
         )
 
+    def _wait_finished(self, task_id, timeout=5):
+        # 搜索任务在后台线程池执行，轮询 status 直到完成（mock 很快）
+        deadline = time.time() + timeout
+        d = self.json("/api/network/search/status?task_id=%s" % task_id)
+        while not d.get("finished") and time.time() < deadline:
+            time.sleep(0.05)
+            d = self.json("/api/network/search/status?task_id=%s" % task_id)
+        return d
+
     def test_sources(self):
         d = self.json("/api/network/sources")
         self.assertEqual(d["err"], "ok")
@@ -53,22 +63,47 @@ class TestNetworkLibrary(TestWithUserLogin):
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_search(self, m_session):
         m_session.return_value = self._fake()
+        # 创建任务：立即返回 task_id，不阻塞
         d = self.json("/api/network/search?key=%s" % Q("剑来"))
         self.assertEqual(d["err"], "ok")
-        self.assertEqual(len(d["results"]), 1)
-        self.assertEqual(d["results"][0]["books"][0]["name"], "剑来")
+        self.assertTrue(d["task_id"])
+        self.assertEqual(d["total"], 1)
+        # 轮询进度，拿到已完成源的结果
+        s = self._wait_finished(d["task_id"])
+        self.assertTrue(s["finished"])
+        self.assertEqual(len(s["results"]), 1)
+        self.assertEqual(s["results"][0]["books"][0]["name"], "剑来")
 
     def test_search_empty_key(self):
         d = self.json("/api/network/search?key=")
         self.assertEqual(d["err"], "params.error")
 
     @mock.patch("webserver.services.booksource.engine.build_session")
-    def test_search_partial_on_failure(self, m_session):
+    def test_search_empty_result(self, m_session):
         m_session.return_value = FakeSession({})  # 无任何响应 -> 空结果
         d = self.json("/api/network/search?key=%s" % Q("剑来"))
         self.assertEqual(d["err"], "ok")
-        # 空 HTML 解析不到书，归类为正常空结果（books 为空），不应抛错
-        self.assertTrue("results" in d and "partial" in d)
+        s = self._wait_finished(d["task_id"])
+        self.assertTrue(s["finished"])
+        # 空 HTML 解析不到书：源成功完成但 books 为空，不进 results 也不进 partial
+        self.assertEqual(len(s["results"]), 0)
+
+    def test_search_status_not_found(self):
+        d = self.json("/api/network/search/status?task_id=not-exist")
+        self.assertEqual(d["err"], "task.not_found")
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_search_weight_increment(self, m_session):
+        m_session.return_value = self._fake()
+        # 搜索并等完成：命中的源权重应 +1（用于“近期可用”排序）
+        d = self.json("/api/network/search?key=%s" % Q("剑来"))
+        s = self._wait_finished(d["task_id"])
+        self.assertTrue(s["finished"])
+        self.assertEqual(len(s["results"]), 1)
+        session = get_db()
+        session.expire_all()
+        src = session.query(models.BookSourceModel).filter(models.BookSourceModel.id == self.sid).first()
+        self.assertEqual(src.weight, 1)
 
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_book(self, m_session):

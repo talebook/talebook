@@ -32,37 +32,61 @@
                 </v-form>
             </v-col>
 
-            <v-col
-                v-if="sources.length > 0"
-                cols="12"
-            >
-                <div class="d-flex align-center flex-wrap">
-                    <span class="mr-3">{{ $t('network.sources') }}{{ $t('messages.colon') }}</span>
-                    <v-chip
-                        :color="selected.length === 0 ? 'primary' : undefined"
-                        label
-                        size="small"
-                        class="mr-1 mb-1"
-                        @click="selected = []"
+            <!-- 搜索范围：近期可用 / 全部 / 手选 -->
+            <v-col cols="12">
+                <div class="d-flex align-center flex-wrap ga-2">
+                    <span class="text-body-2 mr-1">{{ $t('network.searchScope') }}{{ $t('messages.colon') }}</span>
+                    <v-btn-toggle
+                        v-model="searchMode"
+                        density="compact"
+                        color="primary"
+                        variant="outlined"
+                        mandatory
+                        divided
                     >
-                        {{ $t('network.allSources') }}
-                    </v-chip>
-                    <v-chip
-                        v-for="s in sources"
-                        :key="s.id"
-                        :color="selected.includes(s.id) ? 'primary' : undefined"
-                        label
-                        size="small"
-                        class="mr-1 mb-1"
-                        @click="toggleSource(s.id)"
+                        <v-btn
+                            value="top"
+                            size="small"
+                        >
+                            {{ $t('network.modeTop') }}
+                        </v-btn>
+                        <v-btn
+                            value="all"
+                            size="small"
+                        >
+                            {{ $t('network.modeAll') }}
+                        </v-btn>
+                        <v-btn
+                            value="custom"
+                            size="small"
+                        >
+                            {{ $t('network.modeCustom') }}
+                        </v-btn>
+                    </v-btn-toggle>
+                    <span
+                        v-if="sources.length > 0"
+                        class="text-caption text-medium-emphasis"
                     >
-                        {{ s.name }}
-                    </v-chip>
+                        {{ $t('network.sourceCount', { n: sources.length }) }}
+                    </span>
                 </div>
+                <v-autocomplete
+                    v-if="searchMode === 'custom'"
+                    v-model="selected"
+                    :items="sourceItems"
+                    :label="$t('network.pickSources')"
+                    multiple
+                    chips
+                    closable-chips
+                    clearable
+                    density="compact"
+                    hide-details
+                    class="mt-3"
+                />
             </v-col>
 
             <v-col
-                v-else
+                v-if="sources.length === 0"
                 cols="12"
             >
                 <v-alert
@@ -74,6 +98,29 @@
             </v-col>
 
             <v-col
+                v-if="loading && searchProgress.total > 0"
+                cols="12"
+            >
+                <v-progress-linear
+                    :model-value="searchProgress.total ? (searchProgress.done / searchProgress.total * 100) : 0"
+                    color="primary"
+                    height="6"
+                    rounded
+                />
+                <div class="d-flex align-center text-caption text-medium-emphasis mt-1">
+                    <span>{{ $t('network.searchProgress', { done: searchProgress.done, total: searchProgress.total }) }}</span>
+                    <v-spacer />
+                    <v-btn
+                        size="x-small"
+                        variant="text"
+                        @click="stopSearch"
+                    >
+                        {{ $t('network.stopSearch') }}
+                    </v-btn>
+                </div>
+            </v-col>
+
+            <v-col
                 v-if="partial.length > 0"
                 cols="12"
             >
@@ -82,7 +129,7 @@
                     variant="tonal"
                     density="compact"
                 >
-                    {{ $t('network.partialFailed') }}：{{ partial.map(p => p.source_name).join('、') }}
+                    {{ $t('network.partialFailedCount', { n: partial.length }) }}
                 </v-alert>
             </v-col>
 
@@ -231,12 +278,21 @@ store.setNavbar(true);
 
 const sources = ref([]);
 const selected = ref([]);
+const searchMode = ref('top');
 const keyword = ref('');
 const results = ref([]);
 const partial = ref([]);
+const searchProgress = ref({ done: 0, total: 0 });
 const loading = ref(false);
 const searched = ref(false);
 const searchPage = ref(1);
+
+// 自增标记：每次新搜索 +1，进行中的轮询发现 token 失配即退出，避免串台
+let searchToken = 0;
+const SEARCH_POLL_INTERVAL = 1000;
+// 上限放大到 10 分钟，支持「全部」模式把上千个书源搜完；用户也可随时点“停止”
+const SEARCH_POLL_TIMEOUT = 600000;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const exploreSourceId = ref(null);
 const categories = ref([]);
@@ -245,11 +301,8 @@ const exploreBooks = ref([]);
 const explorePage = ref(1);
 const exploreLoading = ref(false);
 
-const toggleSource = (id) => {
-    const i = selected.value.indexOf(id);
-    if (i >= 0) selected.value.splice(i, 1);
-    else selected.value.push(id);
-};
+// 手选模式下供 autocomplete 过滤选择（2000+ 源由 autocomplete 内置虚拟滚动处理）
+const sourceItems = computed(() => sources.value.map((s) => ({ value: s.id, title: s.name })));
 
 const toCards = (group) => {
     return (group.books || []).map((b) => ({
@@ -271,30 +324,66 @@ const toExploreCards = (books) => {
     }));
 };
 
+// 轮询搜索任务进度，逐步把已完成源的结果渲染出来，直到完成 / 超时 / 被新搜索取代
+const pollSearch = async (taskId, token) => {
+    const { $backend } = useNuxtApp();
+    const deadline = Date.now() + SEARCH_POLL_TIMEOUT;
+    while (token === searchToken && Date.now() < deadline) {
+        const s = await $backend(`/network/search/status?task_id=${taskId}`);
+        if (token !== searchToken) return;
+        if (s.err !== 'ok') break;
+        results.value = (s.results || []).filter((g) => (g.books || []).length > 0);
+        partial.value = s.partial || [];
+        searchProgress.value = { done: s.done || 0, total: s.total || 0 };
+        if (s.finished) break;
+        await sleep(SEARCH_POLL_INTERVAL);
+    }
+};
+
 const fetchSearch = async (page) => {
     const { $backend, $alert } = useNuxtApp();
+    const token = ++searchToken;
     loading.value = true;
+    results.value = [];
+    partial.value = [];
+    searchProgress.value = { done: 0, total: 0 };
     try {
-        let url = `/network/search?key=${encodeURIComponent(keyword.value.trim())}&page=${page}`;
-        if (selected.value.length > 0) url += `&sources=${selected.value.join(',')}`;
+        let url = `/network/search?key=${encodeURIComponent(keyword.value.trim())}&page=${page}&mode=${searchMode.value}`;
+        if (searchMode.value === 'custom' && selected.value.length > 0) {
+            url += `&sources=${selected.value.join(',')}`;
+        }
         const rsp = await $backend(url);
-        if (rsp.err === 'ok') {
-            results.value = (rsp.results || []).filter((g) => (g.books || []).length > 0);
-            partial.value = rsp.partial || [];
-            searchPage.value = page;
-        } else if ($alert) {
-            $alert('error', rsp.msg || rsp.err);
+        if (token !== searchToken) return;
+        if (rsp.err !== 'ok') {
+            if ($alert) $alert('error', rsp.msg || rsp.err);
+            return;
+        }
+        searchPage.value = page;
+        searchProgress.value = { done: 0, total: rsp.total || 0 };
+        if (rsp.task_id && rsp.total > 0) {
+            await pollSearch(rsp.task_id, token);
         }
     } finally {
-        loading.value = false;
+        if (token === searchToken) loading.value = false;
     }
 };
 
 const doSearch = () => {
     const key = (keyword.value || '').trim();
     if (!key) return;
+    if (searchMode.value === 'custom' && selected.value.length === 0) {
+        const { $alert } = useNuxtApp();
+        if ($alert) $alert('warning', t('network.pickSourcesFirst'));
+        return;
+    }
     searched.value = true;
     fetchSearch(1);
+};
+
+const stopSearch = () => {
+    // 让进行中的轮询因 token 失配而退出
+    searchToken += 1;
+    loading.value = false;
 };
 
 const changeSearchPage = (n) => {
@@ -345,6 +434,11 @@ onMounted(async () => {
     const { $backend } = useNuxtApp();
     const rsp = await $backend('/network/sources');
     if (rsp.err === 'ok') sources.value = rsp.items || [];
+});
+
+onBeforeUnmount(() => {
+    // 让进行中的轮询因 token 失配而退出
+    searchToken += 1;
 });
 
 useHead(() => ({ title: t('network.title') }));
