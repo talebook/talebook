@@ -442,7 +442,7 @@ def import_sources(session, data, overwrite=False):
     added = updated = skipped = disabled = 0
     urls = []
     seen_urls = set()
-    for _, raw in candidates:
+    for _idx, raw in candidates:
         url = (raw.get("bookSourceUrl") or "").strip()
         if url not in seen_urls:
             urls.append(url)
@@ -454,7 +454,7 @@ def import_sources(session, data, overwrite=False):
         existing_by_url = {s.url: s for s in sources}
 
     touched = []
-    for _, raw in candidates:
+    for _idx, raw in candidates:
         url = (raw.get("bookSourceUrl") or "").strip()
         existing = existing_by_url.get(url)
         if existing:
