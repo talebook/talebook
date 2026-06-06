@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import socket
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse, urlunparse
@@ -18,6 +19,7 @@ from webserver import loader
 from webserver.handlers.base import BaseHandler, is_admin, js
 from webserver.i18n import _
 from webserver.models import BookSourceModel
+from webserver.services.async_service import AsyncService
 from webserver.services.booksource import BookSource, BookSourceEngine, JsRuleUnsupported
 from webserver.services.booksource.http_client import build_session
 
@@ -172,6 +174,14 @@ def _probe_source_network(raw, timeout):
             "message": _("HTTP 状态 {}").format(resp.status_code),
             "tags": tags,
         }
+    except requests.exceptions.SSLError as err:
+        tags.append("ssl-failed")
+        return {
+            "ok": False,
+            "status": "ssl_failed",
+            "message": _("SSL 校验失败：{}").format(str(err)),
+            "tags": tags,
+        }
     except Exception as err:
         tags.append("connect-failed")
         return {
@@ -218,24 +228,59 @@ def validate_source_raw(raw):
     return {"ok": True, "status": "ok", "message": network.get("message") or _("检测通过"), "tags": tags}
 
 
-def _validate_sources_concurrently(items):
+def _normalize_source_ids(source_ids):
+    ids = []
+    seen = set()
+    for source_id in source_ids or []:
+        try:
+            source_id = int(source_id)
+        except (TypeError, ValueError):
+            continue
+        if source_id and source_id not in seen:
+            ids.append(source_id)
+            seen.add(source_id)
+    return ids
+
+
+def _validate_source_item(item):
+    source_id, name, url, raw = item
+    raw = dict(raw or {})
+    raw["bookSourceName"] = raw.get("bookSourceName") or name
+    raw["bookSourceUrl"] = raw.get("bookSourceUrl") or url
+    try:
+        check = validate_source_raw(raw)
+    except Exception as err:
+        check = {
+            "ok": False,
+            "status": "check_failed",
+            "message": _("检测异常：{}").format(str(err)),
+            "tags": ["check-failed"],
+        }
+    check["tags"] = sorted(set(_source_tags(raw) + (check.get("tags") or [])))
+    return source_id, check
+
+
+def _validate_sources_concurrently(items, progress=None):
     if not items:
         return {}
     max_workers = min(len(items), CONF.get("BOOKSOURCE_IMPORT_CHECK_WORKERS", 20))
     results = {}
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(validate_source_raw, raw): idx for idx, raw in items}
+        futures = {executor.submit(_validate_source_item, item): item[0] for item in items}
         for future in as_completed(futures):
-            idx = futures[future]
+            source_id = futures[future]
             try:
-                results[idx] = future.result()
+                source_id, check = future.result()
             except Exception as err:
-                results[idx] = {
+                check = {
                     "ok": False,
                     "status": "check_failed",
                     "message": _("检测异常：{}").format(str(err)),
                     "tags": ["check-failed"],
                 }
+            results[source_id] = check
+            if progress:
+                progress()
     return results
 
 
@@ -251,8 +296,130 @@ def _apply_check_result(source, check):
     source.last_check_ok = bool(check.get("ok"))
 
 
-def import_sources(session, data, overwrite=True):
+def _apply_pending_check(source):
+    _apply_check_result(
+        source,
+        {
+            "ok": False,
+            "status": "pending",
+            "message": _("等待后台检测"),
+            "tags": ["check-pending"],
+        },
+    )
+
+
+class BookSourceCheckService(AsyncService):
+    def __init__(self):
+        super(BookSourceCheckService, self).__init__()
+        self._state_lock = threading.Lock()
+        self._running = False
+        self._pending_ids = set()
+        self._total = 0
+        self._done = 0
+        self._last_start = None
+        self._last_end = None
+        self._last_error = ""
+
+    def _snapshot_unlocked(self):
+        return {
+            "running": self._running,
+            "total": self._total,
+            "done": self._done,
+            "pending": len(self._pending_ids),
+            "last_start": self._last_start.strftime("%Y-%m-%d %H:%M:%S") if self._last_start else None,
+            "last_end": self._last_end.strftime("%Y-%m-%d %H:%M:%S") if self._last_end else None,
+            "last_error": self._last_error,
+        }
+
+    def status(self):
+        with self._state_lock:
+            return self._snapshot_unlocked()
+
+    def enqueue(self, source_ids):
+        source_ids = _normalize_source_ids(source_ids)
+        if not source_ids:
+            return False, self.status()
+
+        with self._state_lock:
+            if self._running:
+                self._pending_ids.update(source_ids)
+                return False, self._snapshot_unlocked()
+            self._running = True
+            self._pending_ids.clear()
+            self._total = len(source_ids)
+            self._done = 0
+            self._last_start = datetime.datetime.now()
+            self._last_end = None
+            self._last_error = ""
+            status = self._snapshot_unlocked()
+
+        self.check_sources(source_ids)
+        return True, status
+
+    def _mark_done(self):
+        with self._state_lock:
+            self._done += 1
+
+    def _run_check_batch(self, source_ids):
+        source_ids = _normalize_source_ids(source_ids)
+        if not source_ids:
+            return
+
+        sources = self.session.query(BookSourceModel).filter(BookSourceModel.id.in_(source_ids)).all()
+        source_data = [(s.id, s.name, s.url, s.raw) for s in sources]
+        with self._state_lock:
+            self._total = len(source_data)
+            self._done = 0
+
+        checks = _validate_sources_concurrently(source_data, progress=self._mark_done)
+        for source in sources:
+            check = checks.get(source.id)
+            if not check:
+                continue
+            _apply_check_result(source, check)
+            source.enabled = bool(check.get("ok"))
+            source.update_time = datetime.datetime.now()
+            self.session.add(source)
+        self.session.commit()
+
+    @AsyncService.register_service
+    def check_sources(self, source_ids):
+        next_ids = None
+        try:
+            self._run_check_batch(source_ids)
+        except Exception as err:
+            logging.exception("book source check failed: %s", err)
+            with self._state_lock:
+                self._last_error = str(err)
+        finally:
+            with self._state_lock:
+                if self._pending_ids:
+                    next_ids = sorted(self._pending_ids)
+                    self._pending_ids.clear()
+                    self._total = len(next_ids)
+                    self._done = 0
+                    self._last_start = datetime.datetime.now()
+                    self._last_end = None
+                    self._last_error = ""
+                else:
+                    self._running = False
+                    self._last_end = datetime.datetime.now()
+
+        if next_ids:
+            self.check_sources(next_ids)
+
+
+def schedule_source_checks(source_ids):
+    source_ids = _normalize_source_ids(source_ids)
+    if source_ids:
+        return BookSourceCheckService().enqueue(source_ids)
+    return False, BookSourceCheckService().status()
+
+
+def import_sources(session, data, overwrite=False):
     """批量导入 Legado 书源数组，返回统计结果。"""
+    # 旧接口保留 overwrite 参数做兼容，但同 URL 书源始终跳过，避免导入订阅覆盖本地已维护的书源。
+    overwrite = False
     if isinstance(data, dict):
         data = [data]
     if not isinstance(data, list):
@@ -271,35 +438,63 @@ def import_sources(session, data, overwrite=True):
             continue
         candidates.append((idx, raw))
 
-    checks = _validate_sources_concurrently(candidates)
     added = updated = skipped = disabled = 0
-    for idx, raw in candidates:
-        check = checks.get(idx) or {"ok": False, "status": "check_failed", "message": _("检测失败"), "tags": []}
-        name = (raw.get("bookSourceName") or "").strip()
+    urls = []
+    seen_urls = set()
+    for _, raw in candidates:
         url = (raw.get("bookSourceUrl") or "").strip()
-        existing = session.query(BookSourceModel).filter(BookSourceModel.url == url).first()
+        if url not in seen_urls:
+            urls.append(url)
+            seen_urls.add(url)
+
+    existing_by_url = {}
+    if urls:
+        sources = session.query(BookSourceModel).filter(BookSourceModel.url.in_(urls)).all()
+        existing_by_url = {s.url: s for s in sources}
+
+    touched = []
+    for _, raw in candidates:
+        url = (raw.get("bookSourceUrl") or "").strip()
+        existing = existing_by_url.get(url)
         if existing:
             if not overwrite:
                 skipped += 1
                 continue
             existing.apply_raw(raw)
-            _apply_check_result(existing, check)
-            existing.enabled = bool(raw.get("enabled", True)) and bool(check.get("ok"))
-            existing.save()
+            _apply_pending_check(existing)
+            existing.enabled = bool(raw.get("enabled", True))
+            session.add(existing)
             updated += 1
-            if not existing.enabled:
-                disabled += 1
+            touched.append(existing)
         else:
             source = BookSourceModel(raw)
-            _apply_check_result(source, check)
-            source.enabled = bool(raw.get("enabled", True)) and bool(check.get("ok"))
-            source.save()
+            _apply_pending_check(source)
+            source.enabled = bool(raw.get("enabled", True))
+            session.add(source)
+            existing_by_url[url] = source
             added += 1
-            if not source.enabled:
-                disabled += 1
-        if not check.get("ok"):
-            failed.append({"name": name, "reason": check.get("status"), "message": check.get("message")})
-    return {"err": "ok", "added": added, "updated": updated, "skipped": skipped, "disabled": disabled, "failed": failed}
+            touched.append(source)
+
+    check_ids = []
+    if touched:
+        session.flush()
+        seen_ids = set()
+        for source in touched:
+            if source.id and source.id not in seen_ids:
+                check_ids.append(source.id)
+                seen_ids.add(source.id)
+        session.commit()
+    schedule_source_checks(check_ids)
+    return {
+        "err": "ok",
+        "added": added,
+        "updated": updated,
+        "skipped": skipped,
+        "disabled": disabled,
+        "failed": failed,
+        "checking": len(check_ids),
+        "check_task": "queued" if check_ids else "",
+    }
 
 
 def _engine_config():
@@ -340,7 +535,15 @@ class BookSourceList(BaseHandler):
         )
         items = [s.to_summary_dict() for s in sources]
         groups = sorted({g for (g,) in self.session.query(BookSourceModel.group).distinct() if g})
-        return {"err": "ok", "items": items, "count": total, "page": page, "size": size, "groups": groups}
+        return {
+            "err": "ok",
+            "items": items,
+            "count": total,
+            "page": page,
+            "size": size,
+            "groups": groups,
+            "check_task": BookSourceCheckService().status(),
+        }
 
 
 class BookSourceCRUD(BaseHandler):
@@ -422,7 +625,6 @@ class BookSourceImport(BaseHandler):
     @is_admin
     def post(self):
         req = tornado.escape.json_decode(self.request.body)
-        overwrite = bool(req.get("overwrite", True))
         raw_text = req.get("json")
         url = req.get("url")
 
@@ -442,7 +644,7 @@ class BookSourceImport(BaseHandler):
         else:
             return {"err": "params.error", "msg": _("请提供 json 或 url")}
 
-        return import_sources(self.session, data, overwrite)
+        return import_sources(self.session, data, overwrite=False)
 
 
 class BookSourceSeed(BaseHandler):
@@ -457,7 +659,7 @@ class BookSourceSeed(BaseHandler):
         except Exception as e:
             logging.error("load seed book sources failed: %s", e)
             return {"err": "seed.load_failed", "msg": _("加载内置书源失败：{}").format(str(e))}
-        return import_sources(self.session, data, overwrite=True)
+        return import_sources(self.session, data, overwrite=False)
 
 
 class BookSourceToggle(BaseHandler):
@@ -497,6 +699,30 @@ class BookSourceToggle(BaseHandler):
         source.update_time = datetime.datetime.now()
         source.save()
         return {"err": "ok", "enabled": bool(source.enabled)}
+
+
+class BookSourceCheckAll(BaseHandler):
+    """触发全量书源有效性检测。"""
+
+    @js
+    @is_admin
+    def post(self):
+        source_ids = [i for (i,) in self.session.query(BookSourceModel.id).order_by(BookSourceModel.id.asc()).all()]
+        started, status = BookSourceCheckService().enqueue(source_ids)
+        return {"err": "ok", "checked": len(source_ids), "checking": len(source_ids), "started": started, **status}
+
+
+class BookSourceCheckStatus(BaseHandler):
+    """查询书源检测任务状态。"""
+
+    @js
+    @is_admin
+    def get(self):
+        return {"err": "ok", **BookSourceCheckService().status()}
+
+
+class BookSourceCleanInvalid(BookSourceCheckAll):
+    """兼容旧接口：只触发检测，不再删除书源。"""
 
 
 class BookSourceTest(BaseHandler):
@@ -553,6 +779,9 @@ def routes():
         (r"/api/admin/booksource/import", BookSourceImport),
         (r"/api/admin/booksource/seed", BookSourceSeed),
         (r"/api/admin/booksource/toggle", BookSourceToggle),
+        (r"/api/admin/booksource/check/status", BookSourceCheckStatus),
+        (r"/api/admin/booksource/check", BookSourceCheckAll),
+        (r"/api/admin/booksource/clean-invalid", BookSourceCleanInvalid),
         (r"/api/admin/booksource/test", BookSourceTest),
         (r"/api/admin/booksource", BookSourceCRUD),
     ]

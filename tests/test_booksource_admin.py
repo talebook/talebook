@@ -67,47 +67,47 @@ class TestBookSourceAdmin(TestWithAdminUser):
         d = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))
         self.assertEqual(d["err"], "params.exist")
 
+    @mock.patch("webserver.handlers.booksource_admin.schedule_source_checks")
     @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
-    def test_import_array_and_js_disabled(self, m_check):
-        def fake_check(raw):
-            if raw.get("bookSourceName") == "JS源":
-                return {"ok": False, "status": "js_unsupported", "message": "关键规则依赖 JS", "tags": ["js-blocked"]}
-            return {"ok": True, "status": "ok", "message": "HTTP 状态 200", "tags": ["dns-ok", "connect-ok"]}
-
-        m_check.side_effect = fake_check
+    def test_import_array_queues_checks(self, m_check, m_schedule):
         body = json.dumps({"json": json.dumps([CSS_SOURCE, JS_SOURCE])})
         d = self.json("/api/admin/booksource/import", method="POST", body=body)
         self.assertEqual(d["err"], "ok")
         self.assertEqual(d["added"], 2)
-        self.assertEqual(d["disabled"], 1)
-        self.assertEqual(len(d["failed"]), 1)
-        self.assertEqual(d["failed"][0]["reason"], "js_unsupported")
+        self.assertEqual(d["disabled"], 0)
+        self.assertEqual(d["checking"], 2)
+        self.assertEqual(len(d["failed"]), 0)
+        self.assertFalse(m_check.called)
+        self.assertEqual(len(m_schedule.call_args[0][0]), 2)
         items = {i["name"]: i for i in self.json("/api/admin/booksource/list")["items"]}
         self.assertTrue(items["测试源"]["enabled"])
-        self.assertFalse(items["JS源"]["enabled"])
-        self.assertEqual(items["JS源"]["check_status"], "js_unsupported")
-        self.assertIn("js-blocked", items["JS源"]["check_tags"])
+        self.assertTrue(items["JS源"]["enabled"])
+        self.assertEqual(items["JS源"]["check_status"], "pending")
+        self.assertIn("check-pending", items["JS源"]["check_tags"])
 
-    @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
-    def test_import_overwrite(self, m_check):
-        m_check.return_value = {"ok": True, "status": "ok", "message": "HTTP 状态 200", "tags": ["dns-ok"]}
+    @mock.patch("webserver.handlers.booksource_admin.schedule_source_checks")
+    def test_import_duplicate_url_skips_without_overwrite(self, m_schedule):
         self.json("/api/admin/booksource/import", method="POST", body=json.dumps({"json": json.dumps([CSS_SOURCE])}))
+        m_schedule.reset_mock()
         changed = dict(CSS_SOURCE, bookSourceName="改名后")
         d = self.json(
             "/api/admin/booksource/import",
             method="POST",
             body=json.dumps({"json": json.dumps([changed]), "overwrite": True}),
         )
-        self.assertEqual(d["updated"], 1)
+        self.assertEqual(d["updated"], 0)
+        self.assertEqual(d["skipped"], 1)
+        self.assertEqual(d["checking"], 0)
+        self.assertFalse(m_schedule.called)
         d = self.json("/api/admin/booksource/list")
-        self.assertEqual(d["items"][0]["name"], "改名后")
+        self.assertEqual(d["items"][0]["name"], "测试源")
 
-    @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
-    def test_seed_import(self, m_check):
-        m_check.return_value = {"ok": True, "status": "ok", "message": "HTTP 状态 200", "tags": ["dns-ok"]}
+    @mock.patch("webserver.handlers.booksource_admin.schedule_source_checks")
+    def test_seed_import(self, m_schedule):
         d = self.json("/api/admin/booksource/seed", method="POST", body="{}")
         self.assertEqual(d["err"], "ok")
         self.assertGreaterEqual(d["added"], 1)
+        self.assertGreaterEqual(d["checking"], 1)
 
     def test_toggle(self):
         sid = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))["id"]
@@ -143,6 +143,41 @@ class TestBookSourceAdmin(TestWithAdminUser):
         self.assertEqual(d["err"], "ok")
         self.assertEqual(d["deleted"], 2)
         self.assertEqual(self.json("/api/admin/booksource/list")["count"], 0)
+
+    @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
+    def test_check_sources_marks_invalid(self, m_check):
+        def fake_check(raw):
+            if raw["bookSourceName"] == "源2":
+                return {"ok": False, "status": "dns_failed", "message": "DNS 解析失败", "tags": ["dns-failed"]}
+            if raw["bookSourceName"] == "源3":
+                return {"ok": False, "status": "ssl_failed", "message": "SSL 校验失败", "tags": ["ssl-failed"]}
+            return {"ok": True, "status": "ok", "message": "DNS/SSL 检测通过", "tags": ["dns-ok", "ssl-ok"]}
+
+        m_check.side_effect = fake_check
+        self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))
+        raw2 = dict(CSS_SOURCE, bookSourceUrl="http://bad-dns.example.com/", bookSourceName="源2")
+        raw3 = dict(CSS_SOURCE, bookSourceUrl="https://bad-ssl.example.com/", bookSourceName="源3")
+        self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": raw2}))
+        self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": raw3}))
+
+        d = self.json("/api/admin/booksource/check", method="POST", body="{}")
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["checked"], 3)
+        self.assertEqual(d["checking"], 3)
+
+        available = self.json("/api/admin/booksource/list?enabled=true")
+        self.assertEqual(available["count"], 1)
+        self.assertEqual(available["items"][0]["name"], "测试源")
+        self.assertEqual(available["items"][0]["check_status"], "ok")
+        self.assertIn("ssl-ok", available["items"][0]["check_tags"])
+
+        invalid = self.json("/api/admin/booksource/list?enabled=false")
+        self.assertEqual(invalid["count"], 2)
+        self.assertEqual({i["check_status"] for i in invalid["items"]}, {"dns_failed", "ssl_failed"})
+
+        status = self.json("/api/admin/booksource/check/status")
+        self.assertEqual(status["err"], "ok")
+        self.assertFalse(status["running"])
 
     def test_list_pagination(self):
         for i in range(3):

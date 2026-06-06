@@ -22,6 +22,17 @@
                     mdi-import
                 </v-icon>{{ $t('booksource.import') }}
             </v-btn>
+            <v-btn
+                variant="outlined"
+                color="warning"
+                :loading="checkingSources"
+                :disabled="checkingSources"
+                @click="checkSourceValidity"
+            >
+                <v-icon start>
+                    mdi-shield-check
+                </v-icon>{{ $t('booksource.checkValidity') }}
+            </v-btn>
             <v-spacer />
             <template v-if="items.length > 0">
                 <span class="text-caption text-medium-emphasis mr-2">
@@ -64,6 +75,19 @@
         </v-card-actions>
 
         <v-card-text>
+            <v-tabs
+                v-model="sourceTab"
+                density="compact"
+                class="mb-3"
+            >
+                <v-tab value="available">
+                    {{ $t('booksource.availableSources') }}
+                </v-tab>
+                <v-tab value="invalid">
+                    {{ $t('booksource.invalidSources') }}
+                </v-tab>
+            </v-tabs>
+
             <v-text-field
                 v-model="q"
                 :placeholder="$t('booksource.searchPlaceholder')"
@@ -77,10 +101,11 @@
                 @keyup.enter="doSearch"
                 @click:clear="doSearch"
             />
-            <v-data-table
+            <v-data-table-server
                 v-model="selected"
                 :headers="headers"
                 :items="items"
+                :items-length="total"
                 :loading="loading"
                 :items-per-page="pageSize"
                 :page="page"
@@ -168,10 +193,10 @@
                         type="info"
                         variant="tonal"
                     >
-                        {{ $t('booksource.empty') }}
+                        {{ emptyText }}
                     </v-alert>
                 </template>
-            </v-data-table>
+            </v-data-table-server>
         </v-card-text>
 
         <BookSourceImportDialog
@@ -233,7 +258,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BookSourceImportDialog from '~/components/BookSourceImportDialog.vue';
 import { useMainStore } from '@/stores/main';
@@ -257,26 +282,66 @@ const headers = [
 const items = ref([]);
 const selected = ref([]);
 const q = ref('');
+const sourceTab = ref('available');
 const page = ref(1);
 const total = ref(0);
 const loading = ref(false);
+const checkingSources = ref(false);
+const checkPollTimer = ref(null);
 const pageSize = 50;
 const allSelected = computed(() => items.value.length > 0 && selected.value.length === items.value.length);
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
+const enabledFilter = computed(() => (sourceTab.value === 'invalid' ? 'false' : 'true'));
+const emptyText = computed(() => (
+    sourceTab.value === 'invalid' ? t('booksource.emptyInvalid') : t('booksource.emptyAvailable')
+));
 const importDialog = ref(null);
 const testDialog = ref(false);
 const testing = ref(false);
 const testRsp = ref({});
 const testKey = ref('剑来');
 
+const clearCheckPoll = () => {
+    if (checkPollTimer.value) {
+        clearTimeout(checkPollTimer.value);
+        checkPollTimer.value = null;
+    }
+};
+
+const scheduleCheckPoll = () => {
+    clearCheckPoll();
+    if (!checkingSources.value) return;
+    checkPollTimer.value = setTimeout(async () => {
+        await pollCheckStatus();
+    }, 3000);
+};
+
+const applyCheckTask = (task) => {
+    checkingSources.value = Boolean(task?.running);
+    if (checkingSources.value) scheduleCheckPoll();
+    else clearCheckPoll();
+};
+
+const pollCheckStatus = async () => {
+    const rsp = await $backend('/admin/booksource/check/status');
+    if (rsp.err !== 'ok') return;
+    const wasChecking = checkingSources.value;
+    applyCheckTask(rsp);
+    if (wasChecking && !rsp.running) {
+        selected.value = [];
+        await load();
+    }
+};
+
 const load = async () => {
     loading.value = true;
     try {
-        const url = `/admin/booksource/list?page=${page.value}&size=${pageSize}&q=${encodeURIComponent(q.value.trim())}`;
+        const url = `/admin/booksource/list?page=${page.value}&size=${pageSize}&enabled=${enabledFilter.value}&q=${encodeURIComponent(q.value.trim())}`;
         const rsp = await $backend(url);
         if (rsp.err === 'ok') {
             items.value = rsp.items || [];
             total.value = rsp.count || 0;
+            applyCheckTask(rsp.check_task);
             // 批量删除后当前页可能越界，回退到最后一页
             if (items.value.length === 0 && total.value > 0 && page.value > 1) {
                 page.value = pageCount.value;
@@ -305,7 +370,7 @@ const toggle = async (item) => {
         method: 'POST',
         body: JSON.stringify({ id: item.id, enabled: !item.enabled }),
     });
-    if (rsp.err === 'ok') item.enabled = rsp.enabled;
+    if (rsp.err === 'ok') load();
     else if ($alert) $alert('error', rsp.msg || rsp.err);
 };
 
@@ -345,17 +410,43 @@ const batchRemove = async () => {
     }
 };
 
+const checkSourceValidity = async () => {
+    if (!confirm(t('booksource.checkValidityConfirm'))) return;
+    checkingSources.value = true;
+    try {
+        const rsp = await $backend('/admin/booksource/check', {
+            method: 'POST',
+            body: JSON.stringify({}),
+        });
+        if (rsp.err === 'ok') {
+            selected.value = [];
+            applyCheckTask(rsp);
+            await load();
+            if ($alert) {
+                $alert('success', t('booksource.checkValidityStarted', { n: rsp.checking || rsp.checked || 0 }));
+            }
+        } else if ($alert) {
+            $alert('error', rsp.msg || rsp.err);
+            checkingSources.value = false;
+        }
+    } finally {
+        scheduleCheckPoll();
+    }
+};
+
 const checkColor = (item) => {
-    if (item.check_status === 'ok' || item.last_check_ok) return 'success';
-    if (item.check_status === 'js_unsupported' || item.check_status === 'incomplete') return 'warning';
+    if (item.check_status === 'ok') return 'success';
+    if (item.check_status === 'pending' || item.check_status === 'js_unsupported' || item.check_status === 'incomplete') return 'warning';
     return 'error';
 };
 
 const checkText = (item) => {
-    if (item.check_status === 'ok' || item.last_check_ok) return t('booksource.checkOk');
+    if (item.check_status === 'ok') return t('booksource.checkOk');
+    if (item.check_status === 'pending') return t('booksource.checkPending');
     if (item.check_status === 'js_unsupported') return t('booksource.checkJs');
     if (item.check_status === 'incomplete') return t('booksource.checkIncomplete');
     if (item.check_status === 'dns_failed') return t('booksource.checkDns');
+    if (item.check_status === 'ssl_failed') return t('booksource.checkSsl');
     if (item.check_status === 'connect_failed') return t('booksource.checkConnect');
     return t('booksource.checkFailed');
 };
@@ -375,7 +466,14 @@ const testSource = async (item) => {
     }
 };
 
+watch(sourceTab, () => {
+    page.value = 1;
+    selected.value = [];
+    load();
+});
+
 onMounted(load);
+onBeforeUnmount(clearCheckPoll);
 
 useHead(() => ({ title: t('booksource.title') }));
 </script>

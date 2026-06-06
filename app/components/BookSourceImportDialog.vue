@@ -48,14 +48,6 @@
                         </p>
                     </v-window-item>
                 </v-window>
-
-                <v-switch
-                    v-model="overwrite"
-                    :label="$t('booksource.overwrite')"
-                    color="primary"
-                    hide-details
-                    class="mt-2"
-                />
             </v-card-text>
             <v-card-actions>
                 <v-spacer />
@@ -88,7 +80,6 @@ const dialog = ref(false);
 const tab = ref('url');
 const jsonText = ref('');
 const url = ref('');
-const overwrite = ref(true);
 const loading = ref(false);
 
 const open = () => {
@@ -106,7 +97,7 @@ const doImport = async () => {
             if ($alert) $alert('error', t('booksource.urlRequired'));
             return;
         }
-        body = { url: u, overwrite: overwrite.value };
+        body = { url: u };
     } else if (tab.value === 'json') {
         const text = jsonText.value.trim();
         if (!text) {
@@ -119,7 +110,7 @@ const doImport = async () => {
             if ($alert) $alert('error', t('booksource.jsonInvalid', { msg: e.message }));
             return;
         }
-        body = { json: text, overwrite: overwrite.value };
+        body = { json: text };
     } else {
         body = null;
     }
@@ -139,6 +130,7 @@ const doImport = async () => {
                     skipped: rsp.skipped || 0,
                     disabled: rsp.disabled || 0,
                     failed: (rsp.failed || []).length,
+                    checking: rsp.checking || 0,
                 }));
             }
             emit('imported');
