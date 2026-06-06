@@ -1,30 +1,31 @@
 
 <template>
     <v-card>
-        <v-card-title class="d-flex justify-space-between align-center">
-            <span> {{ t('admin.users.title') }} </span>
-            <div>
-                <v-btn
-                    color="primary"
-                    class="mr-2"
-                    @click="showGuestPermissionDialog = true"
-                >
-                    <v-icon start>
-                        mdi-account-group
-                    </v-icon>
-                    {{ t('admin.users.button.guestPermission') }}
-                </v-btn>
-                <v-btn
-                    color="primary"
-                    @click="showAddDialog = true"
-                >
-                    <v-icon start>
-                        mdi-plus
-                    </v-icon>
-                    {{ t('admin.users.button.addUser') }}
-                </v-btn>
-            </div>
+        <v-card-title class="pl-4">
+            {{ t('admin.users.title') }}
         </v-card-title>
+        <v-card-actions class="px-4">
+            <v-spacer />
+            <v-btn
+                color="primary"
+                class="mr-2"
+                @click="showGuestPermissionDialog = true"
+            >
+                <v-icon start>
+                    mdi-account-group
+                </v-icon>
+                {{ t('admin.users.button.guestPermission') }}
+            </v-btn>
+            <v-btn
+                color="primary"
+                @click="showAddDialog = true"
+            >
+                <v-icon start>
+                    mdi-plus
+                </v-icon>
+                {{ t('admin.users.button.addUser') }}
+            </v-btn>
+        </v-card-actions>
         
         <!-- 添加用户对话框 -->
         <v-dialog

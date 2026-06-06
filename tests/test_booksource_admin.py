@@ -186,6 +186,43 @@ class TestBookSourceAdmin(TestWithAdminUser):
         self.assertEqual(status["err"], "ok")
         self.assertFalse(status["running"])
 
+    @mock.patch("webserver.services.AsyncService.async_mode", return_value=False)
+    @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
+    def test_resume_pending_checks_demotes_dead_sources(self, m_check, _m_async):
+        """启动兜底：重排卡在 pending 的书源，死源应被置为 enabled=False。"""
+        from webserver.main import _enqueue_pending_booksource_checks
+        from tests.test_main import get_db
+
+        alive = dict(CSS_SOURCE, bookSourceName="活源", bookSourceUrl="http://alive.com")
+        dead = dict(CSS_SOURCE, bookSourceName="死源", bookSourceUrl="http://dead.com")
+        # 用 import 端点导入，并把后台体检 mock 掉，让书源保持 pending（enabled=True 但 last_check_ok=False）
+        with mock.patch("webserver.handlers.booksource_admin.schedule_source_checks"):
+            body = json.dumps({"json": json.dumps([alive, dead])})
+            self.json("/api/admin/booksource/import", method="POST", body=body)
+
+        pending = self.json("/api/admin/booksource/list?enabled=true")
+        self.assertEqual(pending["count"], 2)
+        self.assertTrue(all(not i["last_check_ok"] for i in pending["items"]))
+
+        def fake_check(raw):
+            if raw["bookSourceName"] == "死源":
+                return {"ok": False, "status": "connect_failed", "message": "连不上", "tags": []}
+            return {"ok": True, "status": "ok", "message": "", "tags": []}
+
+        m_check.side_effect = fake_check
+
+        # 启动兜底：重排 pending 源，真实体检把死源置为 enabled=False
+        ids = _enqueue_pending_booksource_checks(get_db())
+        self.assertEqual(len(ids), 2)
+
+        available = {i["name"] for i in self.json("/api/admin/booksource/list?enabled=true")["items"]}
+        invalid = {i["name"] for i in self.json("/api/admin/booksource/list?enabled=false")["items"]}
+        self.assertEqual(available, {"活源"})
+        self.assertEqual(invalid, {"死源"})
+
+        # 收敛：活源已通过、死源已禁用，再次重排不应有待检测书源
+        self.assertEqual(_enqueue_pending_booksource_checks(get_db()), [])
+
     def test_list_pagination(self):
         for i in range(3):
             raw = dict(CSS_SOURCE, bookSourceUrl="http://p%d.example.com/" % i, bookSourceName="源%d" % i)

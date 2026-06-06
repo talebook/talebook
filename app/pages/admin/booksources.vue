@@ -1,60 +1,7 @@
 <template>
     <v-card>
-        <v-card-title class="pl-4">
-            {{ $t('booksource.title') }}
-        </v-card-title>
-        <v-card-text class="booksource-intro pt-2 pb-1">
-            <div class="font-weight-medium mb-1">
-                {{ $t('booksource.introTitle') }}
-            </div>
-            <p class="text-body-2 text-medium-emphasis mb-2">
-                {{ $t('booksource.introSummary') }}
-            </p>
-            <div class="d-flex flex-wrap align-center ga-2 text-body-2 mb-2">
-                <span class="text-medium-emphasis">{{ $t('booksource.compatibleFormats') }}</span>
-                <v-chip
-                    size="small"
-                    variant="tonal"
-                    color="primary"
-                >
-                    {{ $t('booksource.formatLegadoJson') }}
-                </v-chip>
-                <v-chip
-                    size="small"
-                    variant="tonal"
-                    color="primary"
-                >
-                    {{ $t('booksource.formatTextSource') }}
-                </v-chip>
-                <v-chip
-                    size="small"
-                    variant="tonal"
-                >
-                    {{ $t('booksource.formatCssXpathJsonpath') }}
-                </v-chip>
-            </div>
-            <p class="text-body-2 text-medium-emphasis mb-2">
-                {{ $t('booksource.unsupportedFormats') }}
-            </p>
-            <div class="booksource-links text-body-2">
-                <span class="text-medium-emphasis">{{ $t('booksource.references') }}</span>
-                <a
-                    href="https://docs.legadoteam.org/guide/file-structure.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    {{ $t('booksource.referenceLegadoFile') }}
-                </a>
-                <span class="text-medium-emphasis">/</span>
-                <a
-                    href="https://mgz0227.github.io/The-tutorial-of-Legado/Rule/source.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    {{ $t('booksource.referenceLegadoRule') }}
-                </a>
-            </div>
-        </v-card-text>
+        <v-card-title class="pl-4"> {{ $t('booksource.title') }} </v-card-title>
+        <v-divider class="mt-3 mb-2" />
         <v-card-actions class="flex-wrap">
             <v-btn
                 variant="outlined"
@@ -548,13 +495,5 @@ useHead(() => ({ title: t('booksource.title') }));
 }
 .check-tags {
     line-height: 1.5;
-}
-.booksource-intro {
-    border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-}
-.booksource-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
 }
 </style>

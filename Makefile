@@ -68,7 +68,8 @@ down:
 	docker compose stop
 
 dev: build
-	docker-compose -f dev.yml up
+	docker-compose -f dev.yml up # stable server env with develop code
+	npm run dev # run app dev
 
 dev-ui:
 	cd app && npm run dev

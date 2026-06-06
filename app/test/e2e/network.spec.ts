@@ -18,6 +18,29 @@ test.describe('Network Library', () => {
         await expect(page.getByText('剑来的故事')).toBeVisible();
     });
 
+    test('search and browse tabs', async ({ page }) => {
+        await page.goto('/network');
+        // 默认在「搜索」tab，搜索框可见
+        await expect(page.getByRole('tab', { name: '搜索' })).toBeVisible();
+        await expect(page.getByPlaceholder('输入书名或作者，回车搜索')).toBeVisible();
+        // 切到「浏览」tab，发现功能的书源选择器可见
+        await page.getByRole('tab', { name: '浏览' }).click();
+        await expect(page.getByText('选择书源').first()).toBeVisible();
+    });
+
+    test('search results are cached and restored after navigating back', async ({ page }) => {
+        await page.goto('/network');
+        await page.getByPlaceholder('输入书名或作者，回车搜索').fill('剑来');
+        await page.getByRole('button', { name: '搜索' }).first().click();
+        await expect(page.getByText('剑来的故事')).toBeVisible();
+
+        // 离开页面再返回，应从本地缓存即时恢复上次的关键词与结果
+        await page.goto('/');
+        await page.goto('/network');
+        await expect(page.getByPlaceholder('输入书名或作者，回车搜索')).toHaveValue('剑来');
+        await expect(page.getByText('剑来的故事')).toBeVisible();
+    });
+
     test('book detail shows chapters and read button', async ({ page }) => {
         await page.goto('/network/book?source_id=1&book_url=' + encodeURIComponent('http://x.com/book/1'));
 

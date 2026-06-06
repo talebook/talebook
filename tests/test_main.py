@@ -68,6 +68,7 @@ def setup_server():
     main.CONF["INVITE_MODE"] = False
     main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
     main.CONF["ALLOW_REGISTER"] = True
+    main.CONF["BOOKSOURCE_RESUME_PENDING_CHECK_ON_START"] = False  # 测试不触发启动时的后台书源体检
     # main.CONF["db_engine_args"] = {"echo": True}
     if _app is None:
         _app = main.make_app()

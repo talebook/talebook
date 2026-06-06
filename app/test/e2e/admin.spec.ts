@@ -26,6 +26,11 @@ test.describe('Admin Pages', () => {
         await expect(page.locator('tbody tr').first()).toBeVisible();
         // Check if email is present in the table row
         await expect(page.locator('tbody tr').first()).toContainText('admin@example.com');
+        // 回归保护：头部操作按钮不应放进 v-card-title（否则会继承标题字号导致文字超大）
+        const addUserBtn = page.getByRole('button', { name: '添加用户' });
+        await expect(addUserBtn).toBeVisible();
+        const fontSize = await addUserBtn.evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+        expect(fontSize).toBeLessThanOrEqual(18);
 
         // 3. Books
         const booksPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/book/list'));
