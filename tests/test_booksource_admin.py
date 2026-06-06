@@ -151,8 +151,9 @@ class TestBookSourceAdmin(TestWithAdminUser):
         self.assertEqual(d["deleted"], 2)
         self.assertEqual(self.json("/api/admin/booksource/list")["count"], 0)
 
+    @mock.patch("webserver.services.AsyncService.async_mode", return_value=False)
     @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
-    def test_check_sources_marks_invalid(self, m_check):
+    def test_check_sources_marks_invalid(self, m_check, _m_async):
         def fake_check(raw):
             if raw["bookSourceName"] == "源2":
                 return {"ok": False, "status": "dns_failed", "message": "DNS 解析失败", "tags": ["dns-failed"]}

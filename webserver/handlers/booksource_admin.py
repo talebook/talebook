@@ -483,7 +483,8 @@ def import_sources(session, data, overwrite=False):
                 check_ids.append(source.id)
                 seen_ids.add(source.id)
         session.commit()
-    schedule_source_checks(check_ids)
+    if check_ids:
+        schedule_source_checks(check_ids)
     return {
         "err": "ok",
         "added": added,
