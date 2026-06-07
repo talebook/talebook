@@ -384,7 +384,7 @@ class UserMessages(BaseHandler):
 
         msg.unread = False
         msg.update_time = datetime.datetime.now()
-        self.session.commit()
+        msg.save()
         return {"err": "ok"}
 
 
