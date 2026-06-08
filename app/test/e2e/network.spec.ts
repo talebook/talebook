@@ -9,7 +9,8 @@ test.describe('Network Library', () => {
 
     test('search shows results from a source', async ({ page }) => {
         await page.goto('/network');
-        await expect(page.getByText('网络书库').first()).toBeVisible();
+        // 等书源加载完成（也确保 Vue 已完成 hydration，否则 fill 会被注水重置）
+        await expect(page.getByText('共 1 个书源')).toBeVisible();
 
         await page.getByPlaceholder('输入书名或作者，回车搜索').fill('剑来');
         await page.getByRole('button', { name: '搜索' }).first().click();
@@ -20,16 +21,18 @@ test.describe('Network Library', () => {
 
     test('search and browse tabs', async ({ page }) => {
         await page.goto('/network');
-        // 默认在「搜索」tab，搜索框可见
+        // 默认在「搜索」tab，搜索框可见；等书源加载（hydration 完成）后再交互
         await expect(page.getByRole('tab', { name: '搜索' })).toBeVisible();
         await expect(page.getByPlaceholder('输入书名或作者，回车搜索')).toBeVisible();
-        // 切到「浏览」tab，发现功能的书源选择器可见
+        await expect(page.getByText('共 1 个书源')).toBeVisible();
+        // 切到「浏览」tab，发现功能的书源选择器可见（取可见的非浮动 label）
         await page.getByRole('tab', { name: '浏览' }).click();
-        await expect(page.getByText('选择书源').first()).toBeVisible();
+        await expect(page.getByText('选择书源').last()).toBeVisible();
     });
 
     test('search results are cached and restored after navigating back', async ({ page }) => {
         await page.goto('/network');
+        await expect(page.getByText('共 1 个书源')).toBeVisible();
         await page.getByPlaceholder('输入书名或作者，回车搜索').fill('剑来');
         await page.getByRole('button', { name: '搜索' }).first().click();
         await expect(page.getByText('剑来的故事')).toBeVisible();

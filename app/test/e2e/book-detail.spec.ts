@@ -32,8 +32,8 @@ test.describe('Book Detail Page', () => {
             await expect(page.getByText(apiBook.book.publisher).first()).toBeVisible();
         }
     
-        // Check reading button
-        await expect(page.getByText('阅读')).toBeVisible();
+        // Check reading button（“阅读”按钮，exact 避免匹配“在线阅读”菜单项）
+        await expect(page.getByText('阅读', { exact: true })).toBeVisible();
     
         // Check download button (dialog trigger)
         await expect(page.getByText('下载').first()).toBeVisible();
