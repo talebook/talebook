@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const MOCK_DIR = path.join(__dirname, 'test/e2e/mocks');
+const MOCK_DIR = path.join(__dirname, 'e2e/mocks');
 
 // State
 let isInstalled = true;
