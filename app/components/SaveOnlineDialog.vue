@@ -52,14 +52,13 @@
 
 <script setup>
 import { ref } from 'vue';
-import { useI18n } from 'vue-i18n';
-
-const { t } = useI18n();
 
 const props = defineProps({
     sourceId: { type: [Number, String], default: 0 },
     bookUrl: { type: String, default: '' },
 });
+
+const emit = defineEmits(['started']);
 
 const dialog = ref(false);
 const fmt = ref('txt');
@@ -86,8 +85,9 @@ const save = async () => {
             }),
         });
         if (rsp.err === 'ok') {
-            if ($alert) $alert('success', t('network.save.started'));
             dialog.value = false;
+            // 由详情页接管进度展示（按 tag 轮询）
+            emit('started', rsp.tag);
         } else if ($alert) {
             $alert('error', rsp.msg || rsp.err);
         }

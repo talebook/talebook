@@ -55,4 +55,16 @@ test.describe('Network Library', () => {
         await page.getByText('第1章 惊蛰').first().click();
         await expect(page.getByText('这是正文第一段。')).toBeVisible();
     });
+
+    test('save to local shows progress then completion', async ({ page }) => {
+        await page.goto('/network/book?source_id=1&book_url=' + encodeURIComponent('http://x.com/book/1'));
+        await page.getByRole('button', { name: '保存到本地' }).click();
+        // 对话框中确认开始保存
+        await page.getByRole('button', { name: '开始保存' }).click();
+        // 先看到进行中的进度（done/total）
+        await expect(page.getByText('已保存 40/100 章')).toBeVisible();
+        // 再看到完成态与查看链接
+        await expect(page.getByText('已保存到本地书库')).toBeVisible();
+        await expect(page.getByRole('link', { name: '查看本地书籍' })).toBeVisible();
+    });
 });

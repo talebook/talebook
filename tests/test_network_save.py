@@ -53,6 +53,7 @@ class TestNetworkSave(TestWithUserLogin):
         body = json.dumps({"source_id": self.sid, "book_url": "/book/1001", "fmt": "txt", "clean": True})
         d = self.json("/api/network/save", method="POST", body=body)
         self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["tag"], "online_save:%d:/book/1001" % self.sid)
 
         m_import.assert_called()
         meta = get_db().query(models.OnlineBookMeta).filter(models.OnlineBookMeta.book_id == FAKE_BOOK_ID).first()
@@ -89,3 +90,23 @@ class TestNetworkSave(TestWithUserLogin):
         body = json.dumps({"source_id": self.sid, "book_url": "/book/1001", "fmt": "mobi"})
         d = self.json("/api/network/save", method="POST", body=body)
         self.assertEqual(d["err"], "params.error")
+
+    def test_save_status_not_found(self):
+        d = self.json("/api/network/save/status?source_id=%d&book_url=/none" % self.sid)
+        self.assertEqual(d["err"], "ok")
+        self.assertFalse(d["found"])
+
+    def test_save_status_reports_progress(self):
+        from webserver.services.background_service import BackgroundService, BackgroundTask
+        from webserver.services.booksource.save_service import SaveOnlineBookService
+
+        tag = SaveOnlineBookService.make_tag(self.sid, "/book/2002")
+        task = BackgroundService().add_task(BackgroundTask.SERVICE_TYPE_ONLINE_SAVE, "[online]x", tag=tag)
+        BackgroundService().update_progress(task.id, 40, {"total": 100, "done": 40})
+
+        d = self.json("/api/network/save/status?source_id=%d&book_url=/book/2002" % self.sid)
+        self.assertEqual(d["err"], "ok")
+        self.assertTrue(d["found"])
+        self.assertEqual(d["status"], "running")
+        self.assertEqual(d["done"], 40)
+        self.assertEqual(d["total"], 100)

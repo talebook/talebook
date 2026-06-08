@@ -12,6 +12,8 @@ const MOCK_DIR = path.join(__dirname, 'test/e2e/mocks');
 // State
 let isInstalled = true;
 let users = [];
+let saveStarted = false;
+let saveStatusPolls = 0;
 
 const app = createApp();
 const router = createRouter();
@@ -35,6 +37,8 @@ router.post('/_test/reset', eventHandler(async (event) => {
   }
   console.log('[Mock] isInstalled set to:', isInstalled);
   users = [];
+  saveStarted = false;
+  saveStatusPolls = 0;
   return { status: 'ok' };
 }));
 
@@ -352,6 +356,24 @@ router.get('/api/network/toc', eventHandler(() => {
 
 router.get('/api/network/content', eventHandler(() => {
   return { err: 'ok', title: '第1章 惊蛰', content: '这是正文第一段。\n这是正文第二段。' };
+}));
+
+// 保存到本地：返回 tag，前端按 tag 轮询；状态先 running（含 done/total）后 completed
+router.post('/api/network/save', eventHandler(() => {
+  saveStarted = true;
+  saveStatusPolls = 0;
+  return { err: 'ok', tag: 'online_save:1:http://x.com/book/1', msg: '已开始后台保存，完成后将通知您' };
+}));
+
+router.get('/api/network/save/status', eventHandler(() => {
+  if (!saveStarted) {
+    return { err: 'ok', found: false };
+  }
+  saveStatusPolls += 1;
+  if (saveStatusPolls < 2) {
+    return { err: 'ok', found: true, status: 'running', progress: 40, done: 40, total: 100, book_id: 0, error: '' };
+  }
+  return { err: 'ok', found: true, status: 'completed', progress: 100, done: 100, total: 100, book_id: 1, error: '' };
 }));
 
 app.use(router.handler);

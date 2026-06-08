@@ -240,10 +240,56 @@ class NetworkSave(NetworkBaseHandler):
             return {"err": "params.error", "msg": _("仅支持 txt / epub")}
         clean = bool(req.get("clean", True))
 
+        from webserver.services.background_service import BackgroundService, BackgroundTask
         from webserver.services.booksource.save_service import SaveOnlineBookService
 
-        SaveOnlineBookService().save_online_book(self.user_id(), source.raw, book_url, fmt, clean)
-        return {"err": "ok", "msg": _("已开始后台保存，完成后将通知您")}
+        source_id = req.get("source_id")
+        tag = SaveOnlineBookService.make_tag(source_id, book_url)
+
+        # 去重：同一本书已有运行中的保存任务则直接复用，避免并发重复整本抓取
+        existing = BackgroundService().get_task_by_tag(tag)
+        if existing and existing.get("status") == BackgroundTask.STATUS_RUNNING:
+            return {"err": "ok", "tag": tag, "msg": _("该书籍正在保存中")}
+
+        # 在请求线程里同步创建任务，保证前端随后轮询时任务已存在（消除注册竞态）
+        title = (source.raw.get("bookSourceName") or "")[:20]
+        task = BackgroundService().add_task(BackgroundTask.SERVICE_TYPE_ONLINE_SAVE, "[online]%s" % title, tag=tag)
+        SaveOnlineBookService().save_online_book(
+            self.user_id(), source.raw, book_url, fmt, clean, task_id=task.id if task else None
+        )
+        return {"err": "ok", "tag": tag, "msg": _("已开始后台保存，完成后将通知您")}
+
+
+class NetworkSaveStatus(NetworkBaseHandler):
+    """查询「保存到本地」后台任务进度（内存版，按 source_id + book_url 定位）。"""
+
+    @js
+    @auth
+    def get(self):
+        from webserver.services.background_service import BackgroundService
+        from webserver.services.booksource.save_service import SaveOnlineBookService
+
+        source_id = self.get_argument("source_id", "")
+        book_url = (self.get_argument("book_url", "") or "").strip()
+        if not source_id or not book_url:
+            return {"err": "params.error", "msg": _("缺少 source_id 或 book_url")}
+
+        tag = SaveOnlineBookService.make_tag(source_id, book_url)
+        task = BackgroundService().get_task_by_tag(tag)
+        if not task:
+            return {"err": "ok", "found": False}
+
+        data = task.get("progress_data") or {}
+        return {
+            "err": "ok",
+            "found": True,
+            "status": task.get("status"),
+            "progress": task.get("progress", 0),
+            "done": data.get("done", 0),
+            "total": data.get("total", 0),
+            "book_id": data.get("book_id", 0),
+            "error": task.get("error_message") or "",
+        }
 
 
 class NetworkLibraryOnline(NetworkBaseHandler):
@@ -312,6 +358,7 @@ def routes():
         (r"/api/network/book", NetworkBook),
         (r"/api/network/toc", NetworkToc),
         (r"/api/network/content", NetworkContent),
+        (r"/api/network/save/status", NetworkSaveStatus),
         (r"/api/network/save", NetworkSave),
         (r"/api/network/status", NetworkStatus),
         (r"/api/library/online", NetworkLibraryOnline),

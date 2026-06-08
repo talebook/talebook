@@ -12,7 +12,7 @@ from webserver import loader
 from webserver.i18n import _
 from webserver.models import Item, OnlineBookMeta
 from webserver.services import AsyncService
-from webserver.services.background_service import BackgroundService, BackgroundTask
+from webserver.services.background_service import BackgroundService
 from webserver.services.booksource.book_source import BookSource
 from webserver.services.booksource.engine import BookSourceEngine
 from webserver.services.convert import ConvertService
@@ -78,27 +78,31 @@ def _attach_cover(mi, engine, cover_url):
 
 
 class SaveOnlineBookService(AsyncService):
+    @staticmethod
+    def make_tag(source_id, book_url):
+        """前后端一致的任务定位键：按书源 + 书籍 URL 唯一。"""
+        return "online_save:%s:%s" % (source_id, book_url)
+
     @AsyncService.register_service
-    def save_online_book(self, user_id, source_raw, book_url, fmt="txt", clean=True):
-        title = (source_raw.get("bookSourceName") or "")[:20]
-        task = BackgroundService().add_task(BackgroundTask.SERVICE_TYPE_ONLINE_SAVE, "[online]%s" % title)
+    def save_online_book(self, user_id, source_raw, book_url, fmt="txt", clean=True, task_id=None):
+        # 任务由调用方（handler）在请求线程里同步创建并传入 task_id，避免前端轮询早于任务注册的竞态
         try:
-            self._do_save(user_id, source_raw, book_url, fmt, clean, task)
+            self._do_save(user_id, source_raw, book_url, fmt, clean, task_id)
+            if task_id:
+                BackgroundService().complete_task(task_id)
         except Exception as e:
             logging.error("save online book failed: %s", e)
             logging.error(traceback.format_exc())
             self.add_msg(user_id, "danger", _("网络小说保存失败：%s") % str(e))
-        finally:
-            if task:
-                BackgroundService().complete_task(task.id)
+            if task_id:
+                BackgroundService().complete_task(task_id, error_message=str(e))
 
-    def _do_save(self, user_id, source_raw, book_url, fmt, clean, task):
+    def _do_save(self, user_id, source_raw, book_url, fmt, clean, task_id):
         engine = BookSourceEngine(BookSource(source_raw), config=_engine_config())
         detail = engine.book_info(book_url)
         chapters = engine.toc(detail.toc_url)
         if not chapters:
-            self.add_msg(user_id, "danger", _("未能解析到任何章节，保存终止"))
-            return
+            raise RuntimeError(_("未能解析到任何章节，保存终止"))
 
         max_chapters = CONF.get("BOOKSOURCE_MAX_SAVE_CHAPTERS", 5000)
         if len(chapters) > max_chapters:
@@ -121,17 +125,18 @@ class SaveOnlineBookService(AsyncService):
                     logging.info("save online: chapter failed %s: %s", ch.url, e)
                     body = ""
                 f.write("\n\n%s\n\n%s\n" % (ch.name, body))
-                if task and (idx % 20 == 0 or idx == total - 1):
+                if task_id and (idx % 20 == 0 or idx == total - 1):
                     BackgroundService().update_progress(
-                        task.id, int((idx + 1) * 100 / total), {"total": total, "done": idx + 1}
+                        task_id, int((idx + 1) * 100 / total), {"total": total, "done": idx + 1}
                     )
 
         book_id = self._import_txt(detail, txt_path)
         if not book_id:
-            self.add_msg(user_id, "danger", _("导入本地书库失败"))
-            return
+            raise RuntimeError(_("导入本地书库失败"))
 
         self._save_meta(book_id, user_id, engine, detail, chapters)
+        if task_id:
+            BackgroundService().update_progress(task_id, 100, {"total": total, "done": total, "book_id": book_id})
 
         if fmt == "epub":
             ConvertService().convert_and_save(user_id, {"id": book_id, "title": detail.name}, txt_path, "epub")

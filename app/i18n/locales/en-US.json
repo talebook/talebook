@@ -247,7 +247,13 @@
       "epub": "EPUB",
       "clean": "Smart ad removal",
       "started": "Saving in background, you will be notified when done",
-      "confirm": "Start saving"
+      "confirm": "Start saving",
+      "preparing": "Preparing…",
+      "progress": "Saved {done}/{total} chapters",
+      "completed": "Saved to local library",
+      "failed": "Save failed: {msg}",
+      "viewBook": "View local book",
+      "lost": "Unable to fetch progress (it may have finished or the server restarted); check notifications"
     }
   },
   "booksource": {

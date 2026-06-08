@@ -252,7 +252,13 @@
       "epub": "EPUB 电子书",
       "clean": "智能去广告",
       "started": "已开始后台保存，完成后将通知您",
-      "confirm": "开始保存"
+      "confirm": "开始保存",
+      "preparing": "正在准备…",
+      "progress": "已保存 {done}/{total} 章",
+      "completed": "已保存到本地书库",
+      "failed": "保存失败：{msg}",
+      "viewBook": "查看本地书籍",
+      "lost": "无法获取进度（可能已完成或服务重启），请查看通知"
     }
   },
   "booksource": {
