@@ -5,6 +5,8 @@ on:
     branches:
       - master
       - dev/*
+      - claude/*
+      - codex/*
     tags:
       - "v*"
   pull_request:
@@ -64,7 +66,7 @@ jobs:
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=raw,value=master,enable=${{ github.ref == 'refs/heads/master' }}
             type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=raw,value=${{ steps.prep.outputs.safe_ref_name }},enable=${{ startsWith(github.ref, 'refs/heads/dev/') }}
+            type=raw,value=${{ steps.prep.outputs.safe_ref_name }},enable=${{ startsWith(github.ref, 'refs/heads/dev/') || startsWith(github.ref, 'refs/heads/claude/') || startsWith(github.ref, 'refs/heads/codex/') }}
 
       - name: Set build platforms
         id: platforms
@@ -109,7 +111,7 @@ jobs:
             ${{ startsWith(github.ref, 'refs/tags/') && format('{0}/{1}:server-side-render', env.REGISTRY, env.IMAGE_NAME) || '' }}
             ${{ startsWith(github.ref, 'refs/tags/') && format('{0}/{1}:server-side-render-{2}', env.REGISTRY, env.IMAGE_NAME, github.ref_name) || '' }}
             ${{ github.ref == 'refs/heads/master' && format('{0}/{1}:server-side-render', env.REGISTRY, env.IMAGE_NAME) || '' }}
-            ${{ startsWith(github.ref, 'refs/heads/dev/') && format('{0}/{1}:server-side-render-{2}', env.REGISTRY, env.IMAGE_NAME, steps.prep.outputs.safe_ref_name) || '' }}
+            ${{ (startsWith(github.ref, 'refs/heads/dev/') || startsWith(github.ref, 'refs/heads/claude/') || startsWith(github.ref, 'refs/heads/codex/')) && format('{0}/{1}:server-side-render-{2}', env.REGISTRY, env.IMAGE_NAME, steps.prep.outputs.safe_ref_name) || '' }}
           build-args: ${{ steps.prep.outputs.build_args }}
           cache-from: type=gha,scope=ssr
           cache-to: type=gha,scope=ssr,mode=max
