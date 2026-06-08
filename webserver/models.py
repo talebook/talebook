@@ -523,6 +523,9 @@ class BookSourceModel(Base, SQLAlchemyMixin):
     comment = Column(String(500), default="")
     last_check_time = Column(DateTime)
     last_check_ok = Column(Boolean, default=True)
+    check_status = Column(String(20), default="")  # 体检状态：ok/failed/pending/unknown，空=未体检
+    check_message = Column(String(500), default="")  # 体检说明
+    check_tags = Column(JSONType, default=list)  # 体检标签列表
     create_time = Column(DateTime)
     update_time = Column(DateTime)
     raw = Column(MutableDict.as_mutable(JSONType), default={})  # 完整 Legado JSON
@@ -556,9 +559,6 @@ class BookSourceModel(Base, SQLAlchemyMixin):
         self.update_time = datetime.datetime.now()
 
     def to_summary_dict(self):
-        check = self.raw.get("_talebook_check") if isinstance(self.raw, dict) else {}
-        if not isinstance(check, dict):
-            check = {}
         return {
             "id": self.id,
             "name": self.name,
@@ -569,9 +569,9 @@ class BookSourceModel(Base, SQLAlchemyMixin):
             "weight": self.weight,
             "comment": self.comment or "",
             "last_check_ok": bool(self.last_check_ok),
-            "check_status": check.get("status") or ("ok" if self.last_check_ok else "failed"),
-            "check_message": check.get("message") or "",
-            "check_tags": check.get("tags") if isinstance(check.get("tags"), list) else [],
+            "check_status": self.check_status or ("ok" if self.last_check_ok else "failed"),
+            "check_message": self.check_message or "",
+            "check_tags": self.check_tags if isinstance(self.check_tags, list) else [],
             "create_time": self.create_time.strftime("%Y-%m-%d %H:%M:%S") if self.create_time else None,
             "update_time": self.update_time.strftime("%Y-%m-%d %H:%M:%S") if self.update_time else None,
         }

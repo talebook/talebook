@@ -285,13 +285,9 @@ def _validate_sources_concurrently(items, progress=None):
 
 
 def _apply_check_result(source, check):
-    raw = dict(source.raw or {})
-    raw["_talebook_check"] = {
-        "status": check.get("status") or "unknown",
-        "message": check.get("message") or "",
-        "tags": check.get("tags") or [],
-    }
-    source.raw = raw
+    source.check_status = check.get("status") or "unknown"
+    source.check_message = (check.get("message") or "")[:500]
+    source.check_tags = list(check.get("tags") or [])
     source.last_check_time = datetime.datetime.now()
     source.last_check_ok = bool(check.get("ok"))
 
