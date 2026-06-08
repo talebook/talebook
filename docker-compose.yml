@@ -16,8 +16,6 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Asia/Shanghai
-      # 启动时若本地无书源，则从此 URL 自动拉取一份内置书源（Legado 数组格式）
-      - BOOKSOURCE_BUILTIN_URL=https://cdn.jsdmirror.com/gh/XIU2/Yuedu/shuyuan
     depends_on:
       - douban-rs-api
 

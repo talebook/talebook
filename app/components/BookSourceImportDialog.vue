@@ -76,10 +76,13 @@ import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 const emit = defineEmits(['imported']);
 
+// 默认书源订阅 URL，预填进输入框供用户直接使用（XIU2/Yuedu 开源书源）
+const DEFAULT_BOOKSOURCE_URL = 'https://cdn.jsdmirror.com/gh/XIU2/Yuedu/shuyuan';
+
 const dialog = ref(false);
 const tab = ref('url');
 const jsonText = ref('');
-const url = ref('');
+const url = ref(DEFAULT_BOOKSOURCE_URL);
 const loading = ref(false);
 
 const open = () => {

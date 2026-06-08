@@ -78,10 +78,18 @@ describe('BookSourceImportDialog.vue', () => {
         wrapper.unmount();
     });
 
+    it('prefills the url tab with the default booksource URL', async () => {
+        const wrapper = mountDialog();
+        const vm = wrapper.vm as unknown as DialogVm;
+        expect(vm.url).toBe('https://cdn.jsdmirror.com/gh/XIU2/Yuedu/shuyuan');
+        wrapper.unmount();
+    });
+
     it('rejects an empty URL on the url tab without calling the backend', async () => {
         const wrapper = mountDialog();
         const vm = wrapper.vm as unknown as DialogVm;
-        // default tab is already 'url'
+        // default tab is already 'url'; clear the prefilled URL to test the empty path
+        vm.url = '';
         await vm.doImport();
         expect(backendMock).not.toHaveBeenCalled();
         expect(alertMock).toHaveBeenCalledWith('error', 'booksource.urlRequired');
