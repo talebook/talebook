@@ -640,13 +640,16 @@
         "sslManagement": "SSL Management",
         "opdsSettings": "OPDS Settings",
         "captchaSettings": "CAPTCHA Settings",
-        "trashManagement": "Trash Management"
+        "trashManagement": "Trash Management",
+        "updateCheck": "Check for Updates"
       },
       "button": {
         "saveSettings": "Save Settings",
         "testEmail": "Test Email",
         "trashClear": "Clear Trash",
-        "trashClearConfirm": "Confirm Clear"
+        "trashClearConfirm": "Confirm Clear",
+        "checkUpdate": "Check for Updates",
+        "viewRelease": "View Release"
       },
       "label": {
         "siteTitle": "Site Title",
@@ -705,7 +708,10 @@
         "trashUnknown": "Unknown",
         "mainPageRandomCount": "Random Books Count (0 to hide)",
         "mainPageRecentCount": "New Books Count",
-        "defaultPageSize": "Book List Page Size"
+        "defaultPageSize": "Book List Page Size",
+        "currentVersion": "Current Version",
+        "latestVersion": "Latest Version",
+        "lastCheckTime": "Last Check Time"
       },
       "option": {
         "ssl": "SSL",
@@ -732,7 +738,10 @@
         "getKeysAndSetCallback": ", get the keys and set the callback address to:",
         "captchaInfo": "When enabled, users need to complete CAPTCHA verification on corresponding pages.",
         "trashDescription": "Clear Calibre trash (library/.caltrash) and upload temporary directory (upload/), free up disk space. Can only clear when total size exceeds 10MB.",
-        "trashClearConfirm": "Confirm clearing trash and upload temporary directory? This action cannot be undone!"
+        "trashClearConfirm": "Confirm clearing trash and upload temporary directory? This action cannot be undone!",
+        "upToDate": "Already up to date",
+        "updateAvailable": "New version {version} available. Please update to get the latest features and security fixes.",
+        "checkError": "Failed to check for updates"
       },
       "meta_source": {
         "douban": "Douban",

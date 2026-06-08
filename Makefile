@@ -1,4 +1,4 @@
-.PHONY: all build push test
+.PHONY: all build push test build-base push-base
 
 VER := $(shell git branch --show-current | tr '/' '-')
 IMAGE := talebook/talebook:$(VER)
@@ -6,6 +6,7 @@ REPO1 := talebook/talebook:latest
 REPO2 := talebook/calibre-webserver:latest
 TAG1 := talebook/talebook:server-side-render
 TAG2 := talebook/talebook:server-side-render-$(VER)
+BASE := talebook/talebook-base
 
 all: lint-py-fix build up
 
@@ -15,6 +16,15 @@ init:
 	#uv sync
 
 build: test build-spa build-ssr
+
+# 基础镜像：本地构建/发布。主 Dockerfile 默认 FROM talebook/talebook-base:8.5，
+# 首次切换镜像名后需先执行 make build-base push-base 引导出 :8.5 标签。
+build-base:
+	docker build -f Dockerfile.base -t $(BASE):latest -t $(BASE):8.5 .
+
+push-base:
+	docker push $(BASE):latest
+	docker push $(BASE):8.5
 
 build-spa:
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
