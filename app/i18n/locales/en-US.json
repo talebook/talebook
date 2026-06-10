@@ -769,7 +769,7 @@
     "loading": "Loading...",
     "dataFooter": {
       "itemsPerPageText": "Items per page",
-      "pageText": "Page {0} of {1}",
+      "pageText": "{0}-{1} of {2}",
       "itemsPerPageAll": "All",
       "firstPage": "First page",
       "prevPage": "Previous page",
