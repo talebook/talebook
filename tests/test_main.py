@@ -546,6 +546,19 @@ class TestBook(TestWithUserLogin):
                 rsp = self.fetch("/read/%s" % bid, follow_redirects=False)
                 self.assertEqual(rsp.code, 302 if bid == BID_PDF or bid == BID_TXT else 200)
 
+    def test_read_waits_for_conversion(self):
+        with mock.patch("webserver.services.convert.ConvertService.convert_and_save", return_value="Yo"):
+            # 非EPUB书籍：转换尚未完成，页面应包含轮询等待逻辑，不能直接初始化阅读器
+            for bid in [BID_MOBI, BID_AZW3]:
+                rsp = self.fetch("/read/%s" % bid)
+                self.assertEqual(rsp.code, 200)
+                self.assertIn("waitReady", rsp.body.decode("utf-8"))
+
+            # EPUB书籍：已就绪，直接初始化阅读器，无需轮询
+            rsp = self.fetch("/read/%s" % BID_EPUB)
+            self.assertEqual(rsp.code, 200)
+            self.assertNotIn("waitReady", rsp.body.decode("utf-8"))
+
     def test_edit(self):
         body = {
             "id": 5,

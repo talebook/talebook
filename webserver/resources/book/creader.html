@@ -17,16 +17,82 @@
   <script src="js/epub-v0.3.88.js"></script>
   <script  type="module">
     import { Reader } from "./candle-reader.es.js?v=v1.0.2"
-    new Reader('#app', {
-      debug: false,
-      server: "{{CANDLE_READER_SERVER}}",
-      themes_css: "{{RES}}/static/candle-reader/css/themes.css?v=v1.0.2",
-      book_url: "{{RES}}{{epub_dir}}/",
-      display: "",
-    })
+
+    function startReader() {
+      document.getElementById('converting').style.display = 'none'
+      new Reader('#app', {
+        debug: false,
+        server: "{{CANDLE_READER_SERVER}}",
+        themes_css: "{{RES}}/static/candle-reader/css/themes.css?v=v1.0.2",
+        book_url: "{{RES}}{{epub_dir}}/",
+        display: "",
+      })
+    }
+
+    {% if is_ready %}
+    startReader()
+    {% else %}
+    // 本书无EPUB格式，服务器正在后台转换；轮询等待EPUB就绪后再初始化阅读器，
+    // 避免阅读器在转换完成前请求书籍文件而报"加载超时"
+    document.getElementById('converting').style.display = 'flex'
+    let retries = 180
+    function waitReady() {
+      fetch("{{RES}}{{epub_dir}}/META-INF/container.xml?t=" + Date.now())
+        .then(function(rsp) {
+          if (rsp.ok) {
+            startReader()
+            return
+          }
+          retry()
+        })
+        .catch(retry)
+    }
+    function retry() {
+      retries -= 1
+      if (retries <= 0) {
+        document.getElementById('converting-msg').textContent = "转换超时，请刷新页面重试，或联系管理员查看转换日志"
+        return
+      }
+      setTimeout(waitReady, 2000)
+    }
+    waitReady()
+    {% endif %}
   </script>
+  <style>
+    #converting {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #fafafa;
+      color: #333;
+      font-family: Roboto, sans-serif;
+      text-align: center;
+      padding: 0 24px;
+    }
+    #converting .spinner {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 24px;
+      border: 4px solid #ddd;
+      border-top-color: #1976d2;
+      border-radius: 50%;
+      animation: converting-spin 1s linear infinite;
+    }
+    @keyframes converting-spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
   <div id="app"></div>
+  <div id="converting">
+    <div class="spinner"></div>
+    <h3>{{ book.title }}</h3>
+    <p id="converting-msg">首次在线阅读，服务器正在将本书转换为 EPUB 格式，<br>预计需要 1~2 分钟，请耐心等待，转换完成后将自动打开。</p>
+  </div>
 </body>
 </html>
