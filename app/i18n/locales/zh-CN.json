@@ -789,7 +789,7 @@
     "loading": "加载中...",
     "dataFooter": {
       "itemsPerPageText": "每页条目",
-      "pageText": "第 {0} 页，共 {1} 页",
+      "pageText": "第 {0}-{1} 条，共 {2} 条",
       "itemsPerPageAll": "全部",
       "firstPage": "首页",
       "prevPage": "上一页",
