@@ -198,7 +198,10 @@ def make_app():
 
     # build sql session factory
     engine = create_engine(auth_db_path, **CONF["db_engine_args"])
-    ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
+    SessionMaker = sessionmaker(bind=engine, autoflush=True, autocommit=False)
+    # ScopedSession（线程级注册表）仅供 social-auth 存储层及 models.save() 对新建对象的兜底；
+    # 业务代码（handler / 后台服务）一律通过 SessionMaker 创建各自独立的 session
+    ScopedSession = scoped_session(SessionMaker)
     models.bind_session(ScopedSession)
     init_social(models.Base, ScopedSession, CONF)
 
@@ -243,13 +246,14 @@ def make_app():
             "legacy": book_db,
             "cache": cache,
             "ScopedSession": ScopedSession,
+            "SessionMaker": SessionMaker,
             "build_time": fromtimestamp(os.stat(path).st_mtime),
             "default_cover": default_cover,
         }
     )
 
     logging.info("Now, Running...")
-    AsyncService().setup(book_db, ScopedSession)
+    AsyncService().setup(book_db, SessionMaker)
 
     from webserver.services.update_checker import UpdateChecker
 
@@ -257,7 +261,7 @@ def make_app():
         pass
 
     checker = UpdateChecker()
-    checker.set_scoped_session(ScopedSession)
+    checker.set_session_maker(SessionMaker)
     checker.start_background_check()
 
     app = web.Application(social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings)

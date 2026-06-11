@@ -89,7 +89,12 @@ def setup_mock_service():
 
 
 def get_db():
-    return _app.settings["ScopedSession"]
+    session = _app.settings["ScopedSession"]
+    # handler 使用独立 session 后，测试 session 需结束当前事务（释放快照与写锁），
+    # 才能读到 handler 刚提交的数据；未显式 commit 的脏改动也会被清掉，
+    # 因此测试中通过本 session 修改数据后必须立即 commit
+    session.rollback()
+    return session
 
 
 def Q(s):
@@ -280,6 +285,21 @@ class TestMeta(TestApp):
         self.assert_meta("rating", 3)
 
 
+class CommittingReader:
+    """代理 Reader：set_permission 后立即提交，使 handler 的独立 session 可见"""
+
+    def __init__(self, user, session):
+        object.__setattr__(self, "_user", user)
+        object.__setattr__(self, "_session", session)
+
+    def set_permission(self, operations):
+        self._user.set_permission(operations)
+        self._session.commit()
+
+    def __getattr__(self, name):
+        return getattr(self._user, name)
+
+
 class AutoResetPermission:
     def __init__(self, arg):
         if not arg:
@@ -287,12 +307,15 @@ class AutoResetPermission:
         self.arg = arg
 
     def __enter__(self):
-        self.user = get_db().query(models.Reader).filter(self.arg).first()
+        self.session = get_db()
+        self.user = self.session.query(models.Reader).filter(self.arg).first()
         self.user.permission = ""
-        return self.user
+        self.session.commit()
+        return CommittingReader(self.user, self.session)
 
     def __exit__(self, type, value, trace):
         self.user.permission = ""
+        self.session.commit()
 
 
 def mock_permission(arg=None):
@@ -339,19 +362,25 @@ class TestUser(TestWithUserLogin):
         # self.assertEqual(rsp.code, 302)
         self.add_user()
 
-        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
+        session = get_db()
+        user = session.query(models.Reader).filter(models.Reader.username == "active").first()
         user.permission = ""
+        session.commit()
         d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "ok")
 
-        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
+        session = get_db()
+        user = session.query(models.Reader).filter(models.Reader.username == "active").first()
         user.set_permission("L")
+        session.commit()
         logging.debug("user[%s] id[%s] permission[%s]", user.username, user.id, user.permission)
         d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "permission")
 
-        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
+        session = get_db()
+        user = session.query(models.Reader).filter(models.Reader.username == "active").first()
         user.set_permission("l")
+        session.commit()
         d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "ok")
 
@@ -674,8 +703,9 @@ class TestUserSignUp(TestWithUserLogin):
 
     @classmethod
     def delete_user(self):
-        self.get_user().delete()
-        get_db().commit()
+        session = get_db()
+        session.query(models.Reader).filter(models.Reader.username == "unittest").delete()
+        session.commit()
 
     def test_signup(self):
         self.delete_user()

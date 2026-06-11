@@ -62,13 +62,13 @@ class UpdateChecker:
             self.has_update = False
             self.check_error = None
             self.last_check_time = None
-            self._scoped_session = None
+            self._session_maker = None
             self._check_thread = None
             self._stop_event = threading.Event()
             self._initialized = True
 
-    def set_scoped_session(self, scoped_session):
-        self._scoped_session = scoped_session
+    def set_session_maker(self, session_maker):
+        self._session_maker = session_maker
 
     def check_for_updates(self):
         """Check GitHub for the latest release"""
@@ -130,11 +130,11 @@ class UpdateChecker:
 
     def _notify_admins(self):
         """Send update notifications to all admin users (only called in background loop)"""
-        if not self._scoped_session or not self.has_update:
+        if not self._session_maker or not self.has_update:
             return
 
+        session = self._session_maker()
         try:
-            session = self._scoped_session()
             from webserver.models import Message, Reader
 
             admins = session.query(Reader).filter(Reader.admin == True).all()  # noqa: E712
@@ -178,8 +178,7 @@ class UpdateChecker:
         except Exception as e:
             logging.error("Failed to send update notifications: %s", e)
         finally:
-            if self._scoped_session:
-                self._scoped_session.remove()
+            session.close()
 
     def start_background_check(self):
         """Start periodic background update checking"""

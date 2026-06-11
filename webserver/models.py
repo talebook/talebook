@@ -51,7 +51,12 @@ def bind_session(session):
         # 因此优先用对象自身所属的 session 保存。
         db = object_session(instance) or session
         db.add(instance)
-        db.commit()
+        try:
+            db.commit()
+        except Exception:
+            # 回滚以免 session（可能是长生命周期的注册表 session）滞留在失败事务中
+            db.rollback()
+            raise
         return instance
 
     Base._session = classmethod(_session)
