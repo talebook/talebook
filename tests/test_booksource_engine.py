@@ -446,5 +446,206 @@ class TestDetectSerialization(unittest.TestCase):
         self.assertEqual(BookSourceEngine(BookSource(CSS_SOURCE)).detect_serialization(d, chapters), "finished")
 
 
+# --------------------------------------------------------------------------
+# Legado 兼容性移植（2026-06-11）：索引语法 / ### / $N / text. / textNodes
+# --------------------------------------------------------------------------
+LIST_HTML = """
+<div>
+  <ul>
+    <li><a href="/c/0">最新章节甲</a></li>
+    <li><a href="/c/1">最新章节乙</a></li>
+    <li><a href="/c/2">第1章</a></li>
+    <li><a href="/c/3">第2章</a></li>
+    <li><a href="/c/4">第3章</a></li>
+    <li><a href="/c/5">第4章</a></li>
+  </ul>
+  <p>简介开头<span>跳过我</span>简介结尾</p>
+  <div class="page"><a>上一页</a><a href="/toc_2">下一页</a></div>
+</div>
+"""
+
+
+class TestLegadoIndexSyntax(unittest.TestCase):
+    def setUp(self):
+        self.ar = AnalyzeRule(BeautifulSoup(LIST_HTML, "html.parser"), base_url="http://x.com")
+
+    def test_exclude_legacy(self):
+        # 排除前两个 li（页首"最新章节"块）
+        els = self.ar.get_elements("li!0:1@a")
+        self.assertEqual([e.get_text() for e in els], ["第1章", "第2章", "第3章", "第4章"])
+
+    def test_multi_index_legacy(self):
+        els = self.ar.get_elements("tag.li.0:2")
+        self.assertEqual([e.get_text() for e in els], ["最新章节甲", "第1章"])
+
+    def test_negative_index_legacy(self):
+        els = self.ar.get_elements("tag.li.-1")
+        self.assertEqual([e.get_text() for e in els], ["第4章"])
+
+    def test_bracket_range(self):
+        els = self.ar.get_elements("tag.li[2:4]")
+        self.assertEqual([e.get_text() for e in els], ["第1章", "第2章", "第3章"])
+
+    def test_bracket_exclude(self):
+        els = self.ar.get_elements("tag.li[!0,1]")
+        self.assertEqual(len(els), 4)
+        self.assertEqual(els[0].get_text(), "第1章")
+
+    def test_bracket_reverse(self):
+        els = self.ar.get_elements("tag.li[-1:0]")
+        self.assertEqual(els[0].get_text(), "第4章")
+        self.assertEqual(els[-1].get_text(), "最新章节甲")
+
+    def test_bracket_not_confused_with_css_attr(self):
+        # [href] 是 CSS 属性选择器，不是索引
+        els = self.ar.get_elements("@css:.page a[href]")
+        self.assertEqual(len(els), 1)
+
+    def test_text_step_contains_own_text(self):
+        # Legado text.XXX：按自有文本筛选元素
+        self.assertEqual(self.ar.get_string("text.下一页@href"), "/toc_2")
+
+    def test_textnodes_only_direct(self):
+        # textNodes 仅取直接子文本节点，不含 <span> 内文本
+        out = self.ar.get_string("tag.p@textNodes")
+        self.assertEqual(out, "简介开头\n简介结尾")
+
+    def test_replace_first_tail_regex(self):
+        ar = AnalyzeRule(BeautifulSoup("<p>第12章 惊蛰(修)</p>", "html.parser"))
+        # ###：取首个匹配段再替换，未匹配部分丢弃
+        self.assertEqual(ar.get_string("tag.p@text##第(\\d+)章##第$1回###"), "第12回")
+
+    def test_java_style_group_reference(self):
+        ar = AnalyzeRule(BeautifulSoup("<p>卷一 第3章</p>", "html.parser"))
+        self.assertEqual(ar.get_string("tag.p@text##卷一 第(\\d+)章##chapter-$1"), "chapter-3")
+
+    def test_get_string_list_multivalue(self):
+        urls = self.ar.get_string_list("tag.li@a@href")
+        self.assertEqual(len(urls), 6)
+        self.assertEqual(urls[0], "/c/0")
+
+
+class TestAnalyzeUrlPageSegments(unittest.TestCase):
+    def test_page_segment_picks_by_page(self):
+        au1 = AnalyzeUrl("/s?q={{key}}<,&page={{page}}>", base_url="http://x.com", variables={"key": "k", "page": 1})
+        self.assertEqual(au1.url, "http://x.com/s?q=k")
+        au2 = AnalyzeUrl("/s?q={{key}}<,&page={{page}}>", base_url="http://x.com", variables={"key": "k", "page": 3})
+        self.assertEqual(au2.url, "http://x.com/s?q=k&page=3")
+
+    def test_page_segment_overflow_uses_last(self):
+        au = AnalyzeUrl("/list<one.html,two_{{page}}.html>", base_url="http://x.com", variables={"page": 9})
+        self.assertEqual(au.url, "http://x.com/listtwo_9.html")
+
+    def test_no_page_variable_keeps_url(self):
+        au = AnalyzeUrl("/book/1/", base_url="http://x.com", variables={})
+        self.assertEqual(au.url, "http://x.com/book/1/")
+
+
+# --------------------------------------------------------------------------
+# 目录翻页语义（m.jhsssd.com 回归：option 下拉一次给出全部分页）
+# --------------------------------------------------------------------------
+SELECT_PAGED_SOURCE = {
+    "bookSourceUrl": "http://x.com",
+    "bookSourceName": "select分页源",
+    "bookSourceType": 0,
+    "ruleToc": {
+        "chapterList": ".chapter li a",
+        "chapterName": "text",
+        "chapterUrl": "href",
+        "nextTocUrl": "option@value",
+    },
+    "ruleContent": {"content": "@css:#content@text", "nextContentUrl": "text.下一页@href"},
+}
+
+
+def _toc_page(chapters, options=True):
+    lis = "".join('<li><a href="/c/%d">第%d章</a></li>' % (i, i) for i in chapters)
+    opts = (
+        '<select><option value="http://x.com/toc/p1">1</option>'
+        '<option value="http://x.com/toc/p2">2</option>'
+        '<option value="http://x.com/toc/p3">3</option></select>'
+        if options
+        else ""
+    )
+    return '<div class="chapter"><ul>%s</ul></div>%s' % (lis, opts)
+
+
+class TestTocPagination(unittest.TestCase):
+    def _engine(self, mapping):
+        return BookSourceEngine(BookSource(SELECT_PAGED_SOURCE), session=FakeSession(mapping))
+
+    def test_multi_url_next_toc_fetches_all_pages(self):
+        eng = self._engine(
+            {
+                "/toc/p1": _toc_page(range(1, 4)),
+                "/toc/p2": _toc_page(range(4, 7)),
+                "/toc/p3": _toc_page(range(7, 10)),
+            }
+        )
+        chapters = eng.toc("/toc/p1")
+        self.assertEqual(len(chapters), 9)
+        self.assertEqual(chapters[0].name, "第1章")
+        self.assertEqual(chapters[-1].name, "第9章")
+
+    def test_single_next_url_still_loops(self):
+        source = dict(SELECT_PAGED_SOURCE)
+        source["ruleToc"] = dict(source["ruleToc"], nextTocUrl="text.下一页@href")
+        page1 = '<div class="chapter"><ul><li><a href="/c/1">第1章</a></li></ul></div><a href="/toc/p2">下一页</a>'
+        page2 = '<div class="chapter"><ul><li><a href="/c/2">第2章</a></li></ul></div>'
+        eng = BookSourceEngine(BookSource(source), session=FakeSession({"/toc/p1": page1, "/toc/p2": page2}))
+        chapters = eng.toc("/toc/p1")
+        self.assertEqual([c.name for c in chapters], ["第1章", "第2章"])
+
+    def test_dedupe_keeps_later_occurrence(self):
+        # 页首"最新章节"块与正文列表重复，去重后保留正文列表中的位置
+        html = (
+            '<div class="chapter"><ul>'
+            '<li><a href="/c/3">第3章</a></li>'
+            '<li><a href="/c/1">第1章</a></li>'
+            '<li><a href="/c/2">第2章</a></li>'
+            '<li><a href="/c/3">第3章</a></li>'
+            "</ul></div>"
+        )
+        eng = self._engine({"/toc/p1": html})
+        chapters = eng.toc("/toc/p1")
+        self.assertEqual([c.name for c in chapters], ["第1章", "第2章", "第3章"])
+
+    def test_reverse_prefix_flips_order(self):
+        source = dict(SELECT_PAGED_SOURCE)
+        source["ruleToc"] = dict(source["ruleToc"], chapterList="-.chapter li a", nextTocUrl="")
+        html = (
+            '<div class="chapter"><ul>'
+            '<li><a href="/c/2">第2章</a></li>'
+            '<li><a href="/c/1">第1章</a></li>'
+            "</ul></div>"
+        )
+        eng = BookSourceEngine(BookSource(source), session=FakeSession({"/toc/p1": html}))
+        chapters = eng.toc("/toc/p1")
+        self.assertEqual([c.name for c in chapters], ["第1章", "第2章"])
+
+    def test_toc_page_limit_respected(self):
+        eng = BookSourceEngine(
+            BookSource(SELECT_PAGED_SOURCE),
+            session=FakeSession(
+                {
+                    "/toc/p1": _toc_page([1]),
+                    "/toc/p2": _toc_page([2]),
+                    "/toc/p3": _toc_page([3]),
+                }
+            ),
+            config={"BOOKSOURCE_MAX_TOC_PAGES": 2},
+        )
+        chapters = eng.toc("/toc/p1")
+        self.assertEqual(len(chapters), 2)
+
+    def test_content_multi_page_next_url(self):
+        page1 = '<div id="content">上半段</div><a href="/c/1_2">下一页</a>'
+        page2 = '<div id="content">下半段</div>'
+        eng = self._engine({"/c/1_2": page2, "/c/1": page1})
+        body = eng.content("/c/1", clean=False)
+        self.assertIn("上半段", body)
+        self.assertIn("下半段", body)
+
+
 if __name__ == "__main__":
     unittest.main()

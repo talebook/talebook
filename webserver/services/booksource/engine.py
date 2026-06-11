@@ -4,6 +4,7 @@
 
 import json
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
@@ -20,7 +21,7 @@ from .http_client import build_session
 FINISHED_KEYWORDS = ("完本", "完结", "全本", "已完结", "番外", "尾声", "终章", "大结局")
 SERIAL_KEYWORDS = ("连载", "連載", "更新中", "连载中")
 
-DEFAULT_MAX_TOC_PAGES = 30
+DEFAULT_MAX_TOC_PAGES = 200
 DEFAULT_MAX_CONTENT_PAGES = 20
 
 
@@ -76,6 +77,19 @@ class ChapterContent:
         return {"title": self.title, "content": self.content}
 
 
+def _dedupe_chapters(chapters):
+    """章节去重，重复项保留靠后出现的一项。
+
+    对应 Legado 的"反转 + LinkedHashSet + 再反转"语义：目录页顶部常有
+    "最新章节"块，与正文列表重复，应保留正文列表中的那份以维持顺序。
+    """
+    last_index = {}
+    for i, ch in enumerate(chapters):
+        last_index[(ch.name, ch.url)] = i
+    keep = set(last_index.values())
+    return [ch for i, ch in enumerate(chapters) if i in keep]
+
+
 def make_doc(text, rule_hint=""):
     """根据规则提示把响应文本解析为 JSON 对象或 BeautifulSoup。"""
     hint = (rule_hint or "").strip()
@@ -125,6 +139,14 @@ class BookSourceEngine:
         except JsRuleUnsupported:
             logging.info("booksource[%s]: skip js rule: %s", self.source.book_source_name, rule)
             return ""
+
+    def _safe_list(self, rule_ctx, rule):
+        """安全求值多值字段（如 nextTocUrl），JS 规则跳过返回空列表。"""
+        try:
+            return rule_ctx.get_string_list(rule)
+        except JsRuleUnsupported:
+            logging.info("booksource[%s]: skip js rule: %s", self.source.book_source_name, rule)
+            return []
 
     def _make_context(self, text, page_url, rule, hint_rule=""):
         doc = make_doc(text, hint_rule)
@@ -225,13 +247,22 @@ class BookSourceEngine:
     # ------------------------------------------------------------------
     def toc(self, toc_url):
         rule = self.source.rule_toc
-        chapter_list_rule = rule.get("chapterList")
+        chapter_list_rule = (rule.get("chapterList") or "").strip()
+        # Legado：`-` 前缀表示站点目录是倒序的，解析后需翻正；`+` 为占位前缀
+        reverse = chapter_list_rule.startswith("-")
+        if chapter_list_rule[:1] in ("-", "+"):
+            chapter_list_rule = chapter_list_rule[1:]
         next_rule = rule.get("nextTocUrl")
         chapters = []
         seen = set()
-        url = self._resolve(toc_url)
+        # nextTocUrl 两种语义：单 URL 是"下一页"逐页跟进；多 URL 是一次给出的全部分页列表。
+        # 统一用队列处理：每页解析出的 URL 全部入队，seen 防环。
+        queue = deque([self._resolve(toc_url)])
         pages = 0
-        while url and pages < self.max_toc_pages and url not in seen:
+        while queue and pages < self.max_toc_pages:
+            url = queue.popleft()
+            if not url or url in seen:
+                continue
             seen.add(url)
             pages += 1
             au = AnalyzeUrl(url, base_url=self.base_url, source=self.source, session=self.session, timeout=self.timeout)
@@ -253,11 +284,14 @@ class BookSourceEngine:
                 if ch.name or ch.url:
                     chapters.append(ch)
             # 翻页
-            next_url = ""
             if next_rule:
-                next_url = self._safe(ctx, next_rule)
-            url = self._resolve(next_url, resp.url) if next_url else ""
-        return chapters
+                for next_url in self._safe_list(ctx, next_rule):
+                    resolved = self._resolve(next_url, resp.url)
+                    if resolved and resolved not in seen:
+                        queue.append(resolved)
+        if reverse:
+            chapters.reverse()
+        return _dedupe_chapters(chapters)
 
     # ------------------------------------------------------------------
     def content(self, chapter_url, clean=True):
@@ -267,9 +301,13 @@ class BookSourceEngine:
         replace_regex = rule.get("replaceRegex")
         parts = []
         seen = set()
-        url = self._resolve(chapter_url)
+        # 与目录翻页一致：nextContentUrl 单 URL 逐页跟进，多 URL 视为全部分页列表
+        queue = deque([self._resolve(chapter_url)])
         pages = 0
-        while url and pages < self.max_content_pages and url not in seen:
+        while queue and pages < self.max_content_pages:
+            url = queue.popleft()
+            if not url or url in seen:
+                continue
             seen.add(url)
             pages += 1
             au = AnalyzeUrl(url, base_url=self.base_url, source=self.source, session=self.session, timeout=self.timeout)
@@ -280,8 +318,11 @@ class BookSourceEngine:
             except JsRuleUnsupported:
                 logging.info("booksource[%s]: content rule uses js", self.source.book_source_name)
                 break
-            next_url = self._safe(ctx, next_rule) if next_rule else ""
-            url = self._resolve(next_url, resp.url) if next_url else ""
+            if next_rule:
+                for next_url in self._safe_list(ctx, next_rule):
+                    resolved = self._resolve(next_url, resp.url)
+                    if resolved and resolved not in seen:
+                        queue.append(resolved)
         text = "\n".join(p for p in parts if p)
         if clean:
             text = cleaner.clean(
