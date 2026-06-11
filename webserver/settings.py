@@ -137,7 +137,7 @@ settings = {
     # 网络书库 / 书源配置
     'BOOKSOURCE_CLEAN_ENABLED': True,        # 保存正文时是否去广告
     'BOOKSOURCE_HTTP_TIMEOUT': 20,           # 单次请求超时(秒)
-    'BOOKSOURCE_MAX_TOC_PAGES': 30,          # 目录翻页上限
+    'BOOKSOURCE_MAX_TOC_PAGES': 1000,        # 目录翻页上限（select 分页站点每页仅 20 章，长篇书目录分页可达数百页）
     'BOOKSOURCE_MAX_CONTENT_PAGES': 20,      # 单章正文翻页上限
     'BOOKSOURCE_MAX_WORKERS': 6,             # 多书源搜索并发数
     'BOOKSOURCE_SEARCH_TIMEOUT': 15,         # 单书源搜索超时(秒)

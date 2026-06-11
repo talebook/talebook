@@ -13,6 +13,7 @@ url 规则形如：
 
 import json
 import logging
+import re
 from urllib.parse import urljoin
 
 from .exceptions import JsRuleUnsupported, SourceHttpError
@@ -21,6 +22,7 @@ from .js_runtime import run_js
 
 
 _JS_MARKERS = ("@js:", "<js>", "{{js.", "{{java")
+_PAGE_SEGMENT_RE = re.compile(r"<([^<>]*)>")
 
 DEFAULT_TIMEOUT = 20
 
@@ -108,9 +110,31 @@ class AnalyzeUrl:
 
     def _build_url(self, url_part):
         url = self._substitute(url_part).strip()
+        url = self._apply_page_segments(url)
         if self.base_url and not url.lower().startswith(("http://", "https://")):
             url = urljoin(self.base_url, url)
         return url
+
+    def _apply_page_segments(self, url):
+        """Legado 分页占位 `<a,b,c>`：按当前页码选取分段，越界取最后一段。
+
+        如 `/s?q={{key}}<,&page={{page}}>`：第 1 页取空段，之后取 `&page=N`。
+        仅在变量中有页码时生效。
+        """
+        if "<" not in url or ">" not in url:
+            return url
+        try:
+            page = int(self.variables.get("page"))
+        except (TypeError, ValueError):
+            return url
+        if page < 1:
+            return url
+
+        def pick(m):
+            segments = [s.strip() for s in m.group(1).split(",")]
+            return segments[page - 1] if page <= len(segments) else segments[-1]
+
+        return _PAGE_SEGMENT_RE.sub(pick, url)
 
     def _eval_url_js(self, code):
         if _has_unsupported_js(code):

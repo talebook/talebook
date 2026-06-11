@@ -42,6 +42,27 @@ def _split_top(rule, sep):
     return rule.split(sep)
 
 
+def _java_replacement(repl):
+    """Java 风格替换串 `$1` 转 Python 的 `\\1`。"""
+    return re.sub(r"\$(\d{1,2})", r"\\\1", repl or "")
+
+
+def _apply_tail_regex(value, pattern, replacement, replace_first):
+    """应用尾部正则。replace_first 对应 Legado `##p##r###`：取首个匹配段再替换。"""
+    if pattern is None:
+        return value
+    repl = _java_replacement(replacement)
+    try:
+        if replace_first:
+            m = re.search(pattern, value)
+            if not m:
+                return ""
+            return re.sub(pattern, repl, m.group(0), count=1)
+        return re.sub(pattern, repl, value)
+    except re.error:
+        return value
+
+
 class AnalyzeRule:
     def __init__(self, doc, variables=None, base_url=""):
         self.doc = doc
@@ -76,30 +97,31 @@ class AnalyzeRule:
 
         js_parts = self._split_inline_js(rule)
         if js_parts:
-            main_rule, js_code, pattern, replacement = js_parts
+            main_rule, js_code, pattern, replacement, replace_first = js_parts
             value = self.get_string(main_rule) if main_rule else self._doc_string()
             value = run_js(js_code, result=value, variables=self.variables, base_url=self.base_url)
-            if pattern is not None:
-                try:
-                    value = re.sub(pattern, replacement, value)
-                except re.error:
-                    pass
-            return value.strip()
+            return _apply_tail_regex(value, pattern, replacement, replace_first).strip()
 
         # 模板：包含字面文本 + {{子规则}}
         if "{{" in rule and "}}" in rule:
             return self._eval_template(rule)
 
         # 尾部正则
-        main, pattern, replacement = self._split_regex(rule)
+        main, pattern, replacement, replace_first = self._split_regex(rule)
 
         value = self._eval_string_alts(main)
-        if pattern is not None:
-            try:
-                value = re.sub(pattern, replacement, value)
-            except re.error:
-                pass
-        return value.strip()
+        return _apply_tail_regex(value, pattern, replacement, replace_first).strip()
+
+    def get_string_list(self, rule):
+        """求值规则并按行拆为字符串列表。
+
+        Legado 中多匹配结果以换行串联；nextTocUrl/nextContentUrl 等多值场景
+        需要拿到列表逐个处理，而不是当成单个值。
+        """
+        value = self.get_string(rule)
+        if not value:
+            return []
+        return [line.strip() for line in value.splitlines() if line.strip()]
 
     def _split_inline_js(self, rule):
         idx = rule.find("@js:")
@@ -107,11 +129,14 @@ class AnalyzeRule:
             return None
         main = rule[:idx].strip()
         js_code = rule[idx + 4 :].strip()
-        pattern = replacement = None
+        pattern, replacement, replace_first = None, "", False
         if "##" in js_code:
             js_code, _, spec = js_code.partition("##")
-            pattern, _, replacement = spec.partition("##")
-        return main, js_code.strip(), pattern, replacement
+            parts = spec.split("##")
+            pattern = parts[0]
+            replacement = parts[1] if len(parts) > 1 else ""
+            replace_first = len(parts) > 2
+        return main, js_code.strip(), pattern, replacement, replace_first
 
     def _doc_string(self):
         if rd.is_json_doc(self.doc):
@@ -129,12 +154,15 @@ class AnalyzeRule:
         return _TEMPLATE_RE.sub(repl, rule).strip()
 
     def _split_regex(self, rule):
-        """拆出尾部 `##pattern##replacement`。"""
+        """拆出尾部 `##pattern##replacement[###]`，末尾 ### 表示只替换首个匹配段。"""
         if "##" not in rule:
-            return rule, None, None
-        main, _, spec = rule.partition("##")
-        pattern, _, replacement = spec.partition("##")
-        return main, pattern, replacement
+            return rule, None, "", False
+        parts = rule.split("##")
+        main = parts[0]
+        pattern = parts[1] if len(parts) > 1 else None
+        replacement = parts[2] if len(parts) > 2 else ""
+        replace_first = len(parts) > 3
+        return main, pattern, replacement, replace_first
 
     def _eval_string_alts(self, rule):
         for alt in _split_top(rule, "||"):

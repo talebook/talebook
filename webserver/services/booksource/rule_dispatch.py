@@ -58,6 +58,14 @@ def extract_attr(node, attr):
         # 默认取文本
         return node.get_text("\n", strip=True) if isinstance(node, Tag) else str(node)
     key = attr.lower()
+    if key == "textnodes" and isinstance(node, Tag):
+        # Legado textNodes：仅直接子文本节点，逐条 trim 后用换行拼接
+        parts = [str(c).strip() for c in node.children if isinstance(c, NavigableString)]
+        return "\n".join(p for p in parts if p)
+    if key == "owntext" and isinstance(node, Tag):
+        # Legado ownText：仅直接子文本节点，空白规整为单空格
+        parts = [str(c).strip() for c in node.children if isinstance(c, NavigableString)]
+        return " ".join(p for p in parts if p)
     if key in _ATTR_TEXT:
         return node.get_text("\n", strip=True) if isinstance(node, Tag) else str(node)
     if key in _ATTR_HTML:
@@ -83,33 +91,122 @@ def _split_css_attr(rule):
     return rule, ""
 
 
-def _legado_step_to_css(step):
-    """把单个 Legado 步骤转换为 (css, index)。
+# Legado 索引语法（ElementsSingle 移植）：
+#   旧写法  tag.div.0 / tag.div.-1:10:2（`:` 分隔多个独立索引）/ tag.div!0:3（`!` 排除）
+#   []写法  tag.div[1,3:5,-1]（区间 start:end:step，支持负数与反向 [-1:0]，[! 开头表示排除）
+_INDEX_LEGACY_RE = re.compile(r"^(.+?)([.!])(-?\d+(?::-?\d+)*)$")
+_INDEX_BRACKET_RE = re.compile(r"\[(!?)\s*([\d\s:,-]*)\]$")
 
-    支持 class.NAME[.idx] / id.NAME / tag.NAME[.idx] / 纯标签名。
+
+def _split_index_spec(step):
+    """剥离步骤尾部的索引说明，返回 (前置规则, 模式, 索引项列表)。
+
+    模式：'' 无索引、'.' 选择、'!' 排除。索引项为 int 或 (start, end, step) 区间元组。
     """
-    index = None
-    m = re.match(r"^(class|id|tag|text|children)\.(.+)$", step)
+    s = step.strip()
+    m = _INDEX_BRACKET_RE.search(s)
+    if m and re.search(r"\d", m.group(2)):
+        items = _parse_bracket_items(m.group(2))
+        if items is not None:
+            return s[: m.start()].strip(), ("!" if m.group(1) else "."), items
+    m = _INDEX_LEGACY_RE.match(s)
     if m:
-        kind, rest = m.group(1), m.group(2)
-        parts = rest.rsplit(".", 1)
-        if len(parts) == 2 and re.match(r"^-?\d+$", parts[1]):
-            rest, index = parts[0], int(parts[1])
-        if kind == "class":
-            return "." + rest.strip(), index
-        if kind == "id":
-            return "#" + rest.strip(), index
-        if kind == "tag":
-            return rest.strip(), index
-        if kind == "children":
-            return "> *", index
-        # text 当作标签处理
-        return rest.strip(), index
-    # 末尾可能是 .N 索引
-    m = re.match(r"^(.*)\.(-?\d+)$", step)
-    if m and m.group(1):
-        return m.group(1).strip(), int(m.group(2))
-    return step.strip(), None
+        items = [int(x) for x in m.group(3).split(":")]
+        return m.group(1).strip(), m.group(2), items
+    return s, "", []
+
+
+def _parse_bracket_items(content):
+    """解析 [] 内的索引项；含非法片段时返回 None（视作 CSS 属性选择器）。"""
+    items = []
+    for part in content.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        bits = part.split(":")
+        try:
+            if len(bits) == 1:
+                items.append(int(bits[0]))
+            elif len(bits) <= 3:
+                start = int(bits[0]) if bits[0].strip() else None
+                end = int(bits[1]) if bits[1].strip() else None
+                step = int(bits[2]) if len(bits) == 3 and bits[2].strip() else 1
+                items.append((start, end, step))
+            else:
+                return None
+        except ValueError:
+            return None
+    return items or None
+
+
+def _expand_indexes(items, length):
+    """把索引项展开为去重保序的下标列表（越界裁剪、负数转正、区间可反向）。"""
+    out = []
+    seen = set()
+
+    def add(i):
+        if i not in seen:
+            seen.add(i)
+            out.append(i)
+
+    for item in items:
+        if isinstance(item, int):
+            if 0 <= item < length:
+                add(item)
+            elif item < 0 and length >= -item:
+                add(item + length)
+            continue
+        start, end, step = item
+        start = 0 if start is None else (start + length if start < 0 else start)
+        end = (length - 1) if end is None else (end + length if end < 0 else end)
+        if (start < 0 and end < 0) or (start >= length and end >= length):
+            continue
+        start = min(max(start, 0), length - 1)
+        end = min(max(end, 0), length - 1)
+        if start == end or step >= length:
+            add(start)
+            continue
+        step = step if step > 0 else (step + length if -step < length else 1)
+        rng = range(start, end + 1, step) if end > start else range(start, end - 1, -step)
+        for i in rng:
+            add(i)
+    return out
+
+
+def _apply_index_filter(found, mode, items):
+    if not items or mode not in (".", "!"):
+        return found
+    idxs = _expand_indexes(items, len(found))
+    if mode == "!":
+        excluded = set(idxs)
+        return [el for i, el in enumerate(found) if i not in excluded]
+    return [found[i] for i in idxs]
+
+
+def _own_text(tag):
+    return " ".join(s for s in (str(c).strip() for c in tag.children if isinstance(c, NavigableString)) if s)
+
+
+def _resolve_step_nodes(node, before):
+    """按 Legado 步骤前置规则取节点列表：children/class/id/tag/text 关键字，否则按 CSS。"""
+    if not isinstance(node, Tag):
+        return []
+    if not before or before == "children":
+        return [c for c in node.children if isinstance(c, Tag)]
+    head, _, rest = before.partition(".")
+    name = rest.split(".")[0].strip() if rest else ""
+    if head == "class" and name:
+        return node.find_all(class_=name)
+    if head == "id" and name:
+        return node.find_all(id=name)
+    if head == "tag" and name:
+        return node.find_all(name)
+    if head == "text" and name:
+        return [el for el in node.find_all(True) if name in _own_text(el)]
+    try:
+        return node.select(before)
+    except Exception:
+        return []
 
 
 def _is_attr_token(token):
@@ -160,21 +257,11 @@ def legado_select(node, rule):
 
     current = [soup]
     for step in steps:
-        css, index = _legado_step_to_css(step)
+        before, mode, items = _split_index_spec(step)
         nxt = []
         for n in current:
-            if not isinstance(n, Tag):
-                continue
-            try:
-                found = n.select(css) if css else [n]
-            except Exception:
-                found = []
-            if index is not None and found:
-                try:
-                    found = [found[index]]
-                except IndexError:
-                    found = []
-            nxt.extend(found)
+            found = _resolve_step_nodes(n, before)
+            nxt.extend(_apply_index_filter(found, mode, items))
         current = nxt
         if not current:
             break
