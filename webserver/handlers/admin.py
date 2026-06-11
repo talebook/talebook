@@ -1062,6 +1062,59 @@ class AdminUpdateCheck(BaseHandler):
         return {"err": "ok", "status": status}
 
 
+MAX_LOG_LINES = 2000
+DEFAULT_LOG_LINES = 500
+
+
+def _get_log_file():
+    from tornado.options import options as tornado_options
+
+    return getattr(tornado_options, "log_file_prefix", None) or "/data/log/talebook.log"
+
+
+class AdminSystemLog(BaseHandler):
+    @js
+    @is_admin
+    def get(self):
+        log_file = _get_log_file()
+        lines_count = int(self.get_argument("lines", DEFAULT_LOG_LINES))
+        lines_count = min(lines_count, MAX_LOG_LINES)
+
+        if not os.path.exists(log_file):
+            return {"err": "ok", "lines": [], "total": 0, "file": log_file}
+
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            all_lines = f.readlines()
+
+        tail = [line.rstrip("\n") for line in all_lines[-lines_count:]]
+        return {"err": "ok", "lines": tail, "total": len(all_lines), "file": log_file}
+
+
+class AdminSystemLogDownload(BaseHandler):
+    def get(self):
+        if not self.current_user:
+            self.set_status(403)
+            self.finish({"err": "user.need_login", "msg": _("请先登录")})
+            return
+        if not self.admin_user:
+            self.set_status(403)
+            self.finish({"err": "permission.not_admin", "msg": _("当前用户非管理员")})
+            return
+
+        log_file = _get_log_file()
+
+        if not os.path.exists(log_file):
+            self.set_status(404)
+            self.finish()
+            return
+
+        self.set_header("Content-Type", "text/plain; charset=utf-8")
+        self.set_header("Content-Disposition", 'attachment; filename="talebook.log"')
+        with open(log_file, "rb") as f:
+            self.write(f.read())
+        self.finish()
+
+
 def routes():
     return [
         (r"/api/admin/ssl", AdminSSL),
@@ -1082,4 +1135,6 @@ def routes():
         (r"/api/admin/opds/sources", AdminOpdsSources),
         (r"/api/admin/trash/size", AdminTrashSize),
         (r"/api/admin/trash/clear", AdminTrashClear),
+        (r"/api/admin/log", AdminSystemLog),
+        (r"/api/admin/log/download", AdminSystemLogDownload),
     ]
