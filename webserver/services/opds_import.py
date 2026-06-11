@@ -45,17 +45,11 @@ class OPDSImportService(AsyncService):
         self.count_fail = 0
         self.scan_dir = CONF.get("scan_upload_path", "/data/books/imports/")
         self._lock = threading.Lock()
-        self._local = threading.local()
 
     @contextmanager
     def get_session(self):
         """上下文管理器确保会话正确创建和关闭"""
-        async_service = AsyncService()
-        session = getattr(self._local, "session", None)
-        if session is None:
-            session = async_service.scoped_session()
-            self._local.session = session
-
+        session = AsyncService().session_maker()
         try:
             yield session
             session.commit()
@@ -64,8 +58,6 @@ class OPDSImportService(AsyncService):
             raise
         finally:
             session.close()
-            async_service.scoped_session.remove()
-            self._local.session = None
 
     def browse_opds_catalog(self, host, port=None, path=""):
         """浏览 OPDS 目录结构"""
