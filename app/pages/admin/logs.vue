@@ -56,17 +56,17 @@
                 class="log-container"
             >
                 <div
-                    v-for="(line, idx) in lines"
+                    v-for="(entry, idx) in lines"
                     :key="idx"
-                    :class="['log-line', levelClass(line)]"
-                >{{ line || ' ' }}</div>
+                    :class="['log-line', entry.cls]"
+                >{{ entry.text }}</div>
             </div>
         </v-card-text>
     </v-card>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 
@@ -84,7 +84,7 @@ const logContainer = ref(null);
 
 const lineOptions = [100, 200, 500, 1000, 2000];
 
-const downloadUrl = computed(() => '/api/admin/log/download');
+const downloadUrl = '/api/admin/log/download';
 
 const levelClass = (line) => {
     if (/\[E\]|\[ERROR\]|ERROR/.test(line)) return 'log-error';
@@ -102,7 +102,7 @@ const loadLogs = async () => {
             errorMsg.value = rsp.msg || t('admin.logs.message.loadError');
             lines.value = [];
         } else {
-            lines.value = rsp.lines || [];
+            lines.value = (rsp.lines || []).map(line => ({ text: line || ' ', cls: levelClass(line) }));
             await nextTick();
             if (logContainer.value) {
                 logContainer.value.scrollTop = logContainer.value.scrollHeight;
@@ -110,6 +110,7 @@ const loadLogs = async () => {
         }
     } catch {
         errorMsg.value = t('admin.logs.message.loadError');
+        lines.value = [];
     } finally {
         loading.value = false;
     }

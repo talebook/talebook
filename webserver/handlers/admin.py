@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import collections
 import datetime
 import hashlib
 import logging
+import os
 import re
 import ssl
 import subprocess
@@ -12,6 +14,7 @@ import traceback
 import uuid
 
 import tornado
+from tornado.options import options as tornado_options
 
 from webserver import loader, utils
 from webserver.base.trash_manager import TrashManager
@@ -1067,8 +1070,6 @@ DEFAULT_LOG_LINES = 500
 
 
 def _get_log_file():
-    from tornado.options import options as tornado_options
-
     return getattr(tornado_options, "log_file_prefix", None) or "/data/log/talebook.log"
 
 
@@ -1077,21 +1078,28 @@ class AdminSystemLog(BaseHandler):
     @is_admin
     def get(self):
         log_file = _get_log_file()
-        lines_count = int(self.get_argument("lines", DEFAULT_LOG_LINES))
-        lines_count = min(lines_count, MAX_LOG_LINES)
+        try:
+            lines_count = int(self.get_argument("lines", DEFAULT_LOG_LINES))
+        except (ValueError, TypeError):
+            lines_count = DEFAULT_LOG_LINES
+        lines_count = max(1, min(lines_count, MAX_LOG_LINES))
 
         if not os.path.exists(log_file):
             return {"err": "ok", "lines": [], "total": 0, "file": log_file}
 
+        total = 0
+        tail_deque = collections.deque(maxlen=lines_count)
         with open(log_file, "r", encoding="utf-8", errors="replace") as f:
-            all_lines = f.readlines()
+            for line in f:
+                total += 1
+                tail_deque.append(line)
 
-        tail = [line.rstrip("\n") for line in all_lines[-lines_count:]]
-        return {"err": "ok", "lines": tail, "total": len(all_lines), "file": log_file}
+        tail = [line.rstrip("\n") for line in tail_deque]
+        return {"err": "ok", "lines": tail, "total": total, "file": log_file}
 
 
 class AdminSystemLogDownload(BaseHandler):
-    def get(self):
+    async def get(self):
         if not self.current_user:
             self.set_status(403)
             self.finish({"err": "user.need_login", "msg": _("请先登录")})
@@ -1108,10 +1116,18 @@ class AdminSystemLogDownload(BaseHandler):
             self.finish()
             return
 
+        file_size = os.path.getsize(log_file)
         self.set_header("Content-Type", "text/plain; charset=utf-8")
         self.set_header("Content-Disposition", 'attachment; filename="talebook.log"')
+        self.set_header("Content-Length", str(file_size))
+        chunk_size = 64 * 1024
         with open(log_file, "rb") as f:
-            self.write(f.read())
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                self.write(chunk)
+                await self.flush()
         self.finish()
 
 
