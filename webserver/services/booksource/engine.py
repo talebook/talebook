@@ -21,7 +21,7 @@ from .http_client import build_session
 FINISHED_KEYWORDS = ("完本", "完结", "全本", "已完结", "番外", "尾声", "终章", "大结局")
 SERIAL_KEYWORDS = ("连载", "連載", "更新中", "连载中")
 
-DEFAULT_MAX_TOC_PAGES = 200
+DEFAULT_MAX_TOC_PAGES = 1000
 DEFAULT_MAX_CONTENT_PAGES = 20
 
 

@@ -97,7 +97,7 @@ URL 请求，第二页起即失败。由此触发本次全面对比。
 | D3 | nextContentUrl 同样的列表语义 | 同 D1/D2 | ❌→✅(本次) | |
 | D4 | 章节去重 | 双反转 + LinkedHashSet：保留靠后出现的重复项（剔掉页首"最新章节"块） | ❌→✅(本次) | m.jhsssd.com 首页 25 项中 5 项是重复 |
 | D5 | chapterList `-` 前缀（倒序目录翻正）/ `+` 前缀 | | ❌→✅(本次) | |
-| D6 | 目录页数上限 | App 无上限（页列表一次取回） | 🟡 | 我方 BOOKSOURCE_MAX_TOC_PAGES=30，本次默认提至 200 |
+| D6 | 目录页数上限 | App 无上限（页列表一次取回） | 🟡 | 我方 BOOKSOURCE_MAX_TOC_PAGES=30，本次默认提至 1000 |
 | D7 | isVolume 卷标记、章节 url 缺省回退 | | ❌ | 影响有卷结构的书的保存排版，可后补 |
 | D8 | isPay（isVip 之外） | | ❌ | 我方有 isVip |
 | D9 | formatJs 章节标题格式化 | JS | ❌ | 依赖 JS 运行时 |
@@ -138,7 +138,7 @@ URL 请求，第二页起即失败。由此触发本次全面对比。
    兼容"单链接逐页"与"多链接一次全发"两种语义，URL 去重防环。
 2. **D4**：章节按 (name,url) 去重，保留靠后出现项（Legado 双反转语义）。
 3. **D5**：chapterList `-`/`+` 前缀。
-4. **D6**：`BOOKSOURCE_MAX_TOC_PAGES` 默认 30 → 200。
+4. **D6**：`BOOKSOURCE_MAX_TOC_PAGES` 默认 30 → 1000。
 5. **A2**：`text.XXX` 改为"含指定自有文本的元素"。
 6. **A5/A6/A7**：完整移植 ElementsSingle 索引语义（`!` 排除、`:` 多索引、`[]` 区间/步长/反向）。
 7. **A13**：`###` replaceFirst。
