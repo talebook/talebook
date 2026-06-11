@@ -266,10 +266,40 @@
                         </div>
                     </template>
                 </div>
+
+                <!-- 连载状态筛选（网络书） -->
+                <div class="mb-3">
+                    <div class="d-flex align-center">
+                        <span class="mr-3">{{ $t('network.status.label') }}{{ $t('messages.colon') }}</span>
+                        <v-chip-group
+                            :column="false"
+                            class="flex-grow-1"
+                        >
+                            <v-chip
+                                v-for="opt in statusOptions"
+                                :key="opt.value"
+                                :class="statusFilter === opt.value ? 'filter-chip-active' : 'filter-chip-inactive'"
+                                density="compact"
+                                label
+                                small
+                                @click="updateStatus(opt.value)"
+                            >
+                                {{ opt.text }}
+                            </v-chip>
+                        </v-chip-group>
+                    </div>
+                </div>
             </v-col>
 
             <v-col>
-                <BookCards :books="books" />
+                <BookCards :books="books">
+                    <template #introduce="{ book }">
+                        <SerializeStatusBadge
+                            v-if="book.serialize_status"
+                            :status="book.serialize_status"
+                        />
+                    </template>
+                </BookCards>
             </v-col>
 
             <v-col cols="12">
@@ -290,6 +320,7 @@
 
 <script setup>
 import BookCards from '~/components/BookCards.vue';
+import SerializeStatusBadge from '~/components/SerializeStatusBadge.vue';
 import { useMainStore } from '@/stores/main';
 import { useI18n } from 'vue-i18n';
 
@@ -329,6 +360,18 @@ const expanded = ref({
     format: false
 });
 
+const statusFilter = ref('all');
+const statusOptions = computed(() => [
+    { value: 'all', text: t('network.status.all') },
+    { value: 'serial', text: t('network.status.serial') },
+    { value: 'finished', text: t('network.status.finished') }
+]);
+
+const updateStatus = (value) => {
+    statusFilter.value = value;
+    fetchBooks(1);
+};
+
 // 监听total变化，动态更新page_cnt
 watch(total, (newTotal) => {
     page_cnt.value = newTotal > 0 ? Math.max(1, Math.ceil(newTotal / page_size)) : 0;
@@ -349,13 +392,20 @@ const fetchBooks = async (p = 1) => {
         }
     });
   
+    // 连载状态筛选走网络书专用接口
+    if (statusFilter.value !== 'all') {
+        query.status = statusFilter.value;
+    }
+
     // 构建查询字符串
     const queryString = Object.keys(query)
         .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(query[key])}`)
         .join('&');
-  
+
+    const endpoint = statusFilter.value !== 'all' ? '/library/online' : '/library';
+
     try {
-        const rsp = await $backend(`/library?${queryString}`);
+        const rsp = await $backend(`${endpoint}?${queryString}`);
         if (rsp.err === 'exception' || rsp.err === 'network_error') {
             if ($alert) $alert('error', rsp.msg || t('errors.networkError'));
             return;

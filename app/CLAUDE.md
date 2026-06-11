@@ -19,7 +19,7 @@ npm run lint:fix     # eslint 自动修复
 # 单元测试（vitest + happy-dom）
 npx vitest run test/components/
 
-# E2E 测试（Playwright，需先启动 mock server）
+# E2E 测试（Playwright，需先启动 mock server：node test/mock-server.js）
 npx playwright test
 ```
 
@@ -52,7 +52,7 @@ URL 路由在 `nuxt.config.ts` 的 `routeRules` 中将 `/api/**`、`/get/**`、`
 ### 测试
 
 - **单元测试**：`test/components/`，使用 vitest + `@nuxt/test-utils`，运行环境为 `happy-dom`
-- **E2E 测试**：`test/e2e/`，使用 Playwright，依赖项目根目录下的 `mock-server.js` 模拟后端（需先启动 `node mock-server.js`）；测试数据在 `test/e2e/mocks/` 下的 JSON 文件中
+- **E2E 测试**：`test/e2e/`，使用 Playwright，依赖 `test/mock-server.js` 模拟后端（需先启动 `node test/mock-server.js`）；测试数据在 `test/e2e/mocks/` 下的 JSON 文件中
 
 ## 测试要求
 
@@ -87,7 +87,7 @@ describe('MyComponent.vue', () => {
 
 ### E2E 页面测试（`test/e2e/`）
 
-适用于新增或修改 `pages/` 下的页面。使用 Playwright，测试前需启动 mock server（`node mock-server.js`），如需新的接口数据，在 `test/e2e/mocks/` 下添加对应 JSON 文件：
+适用于新增或修改 `pages/` 下的页面。使用 Playwright，测试前需启动 mock server（`node test/mock-server.js`），如需新的接口数据，在 `test/e2e/mocks/` 下添加对应 JSON 文件：
 
 ```typescript
 import { test, expect } from '@playwright/test';

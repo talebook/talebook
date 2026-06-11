@@ -502,6 +502,8 @@ class OpdsHandler(BaseHandler):
             raise web.HTTPError(404, reason="Search: %r not understood" % query)
         private_ids = self._get_private_book_ids()
         ids = [i for i in ids if i not in private_ids]
+        if not ids:
+            raise web.HTTPError(404, reason="No results found")
         page_url = url_for("opdssearch", query=query)
         return self.get_opds_acquisition_feed(ids, offset, page_url, url_for("opds"), "calibre-search:" + query)
 

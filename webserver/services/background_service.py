@@ -18,6 +18,7 @@ class BackgroundTask:
     SERVICE_TYPE_CONVERT = "convert"  # 图书转换
     SERVICE_TYPE_AI_FILL = "ai_fill"  # AI 更新
     SERVICE_TYPE_TITLE_SORT_UPDATE = "title_sort_update"  # 更新拼音书名
+    SERVICE_TYPE_ONLINE_SAVE = "online_save"  # 网络小说保存到本地
 
     # 任务状态
     STATUS_RUNNING = "running"  # 运行中
@@ -28,13 +29,14 @@ class BackgroundTask:
     _id_counter = 0
     _id_lock = threading.Lock()
 
-    def __init__(self, service_type, service_item, book_id=0, progress=0, progress_data=None):
+    def __init__(self, service_type, service_item, book_id=0, progress=0, progress_data=None, tag=""):
         with BackgroundTask._id_lock:
             BackgroundTask._id_counter += 1
             self.id = BackgroundTask._id_counter
 
         self.service_type = service_type
         self.service_item = service_item
+        self.tag = tag  # 调用方自定义的定位键（如 online_save:{source_id}:{book_url}），用于按请求参数查找任务
         self.status = self.STATUS_RUNNING
         self.progress = progress
         self.progress_data = progress_data or {}
@@ -48,6 +50,7 @@ class BackgroundTask:
             "id": self.id,
             "service_type": self.service_type,
             "service_item": self.service_item,
+            "tag": self.tag,
             "service_book_id": self.service_book_id,
             "status": self.status,
             "progress": self.progress,
@@ -78,7 +81,7 @@ class BackgroundService:
             self._last_cleanup = datetime.datetime.now()
             self._initialized = True
 
-    def add_task(self, service_type: str, service_item: str, book_id: int = 0):
+    def add_task(self, service_type: str, service_item: str, book_id: int = 0, tag: str = ""):
         try:
             task = self.update_task(
                 service_type=service_type,
@@ -86,6 +89,7 @@ class BackgroundService:
                 book_id=book_id,
                 progress=0,
                 progress_data={"total": 1, "done": 0},
+                tag=tag,
             )
             logging.info(f"Added background task: {service_item}")
             return task
@@ -101,6 +105,7 @@ class BackgroundService:
         progress: int = 0,
         progress_data: Optional[Dict] = None,
         error_message: Optional[str] = None,
+        tag: str = "",
     ) -> BackgroundTask:
         """
         更新或创建任务状态
@@ -145,6 +150,7 @@ class BackgroundService:
                 book_id=book_id,
                 progress=progress,
                 progress_data=progress_data or {},
+                tag=tag,
             )
 
             if error_message:
@@ -329,6 +335,22 @@ class BackgroundService:
             # 返回最新创建的任务
             matching_tasks.sort(key=lambda t: t.create_time, reverse=True)
             return matching_tasks[0].to_dict()
+
+    def get_task_by_tag(self, tag: str) -> Optional[Dict]:
+        """按 tag 获取最近一条任务（优先运行中，否则取最近更新的一条）。
+
+        用于前端按请求参数（如 online_save:{source_id}:{book_url}）定位任务并轮询进度。
+        """
+        if not tag:
+            return None
+        with self._tasks_lock:
+            matching = [task for task in self._tasks.values() if task.tag == tag]
+            if not matching:
+                return None
+            running = [t for t in matching if t.status == BackgroundTask.STATUS_RUNNING]
+            pool = running or matching
+            pool.sort(key=lambda t: t.update_time, reverse=True)
+            return pool[0].to_dict()
 
     def _cleanup_audio_tasks(self):
         """清理音频转换任务的旧记录，保留24小时内的记录，最多保留10条"""

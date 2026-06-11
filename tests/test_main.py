@@ -68,6 +68,7 @@ def setup_server():
     main.CONF["INVITE_MODE"] = False
     main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
     main.CONF["ALLOW_REGISTER"] = True
+    main.CONF["BOOKSOURCE_RESUME_PENDING_CHECK_ON_START"] = False  # 测试不触发启动时的后台书源体检
     # main.CONF["db_engine_args"] = {"echo": True}
     if _app is None:
         _app = main.make_app()
@@ -863,7 +864,7 @@ class TestOpds(TestWithUserLogin):
         self.parse_xml(rsp.body)
 
     def test_opds_search_not_found(self):
-        rsp = self.fetch("/opds/search/%s" % urllib.parse.quote("豪士"))
+        rsp = self.fetch("/opds/search/%s" % urllib.parse.quote("TALEBOOK_NOEXIST_QUERY_XYZ"))
         self.assertEqual(rsp.code, 404)
 
     def test_opds_without_login(self):
