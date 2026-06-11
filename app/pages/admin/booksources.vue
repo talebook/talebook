@@ -66,11 +66,20 @@
             <v-btn
                 variant="outlined"
                 color="warning"
-                :loading="checkingSources"
                 :disabled="checkingSources"
                 @click="checkSourceValidity"
             >
-                <v-icon start>
+                <v-progress-circular
+                    v-if="checkingSources"
+                    indeterminate
+                    size="16"
+                    width="2"
+                    class="mr-2"
+                />
+                <v-icon
+                    v-else
+                    start
+                >
                     mdi-shield-check
                 </v-icon>{{ $t('booksource.checkValidity') }}
             </v-btn>

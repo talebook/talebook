@@ -14,6 +14,8 @@ let isInstalled = true;
 let users = [];
 let saveStarted = false;
 let saveStatusPolls = 0;
+let booksourceCheckRunning = false;
+let booksourceCheckPolls = 0;
 
 const app = createApp();
 const router = createRouter();
@@ -39,6 +41,8 @@ router.post('/_test/reset', eventHandler(async (event) => {
   users = [];
   saveStarted = false;
   saveStatusPolls = 0;
+  booksourceCheckRunning = false;
+  booksourceCheckPolls = 0;
   return { status: 'ok' };
 }));
 
@@ -274,6 +278,40 @@ router.get('/api/book/:id', eventHandler((event) => {
   }
     
   return { err: 'ok', msg: 'mock action' };
+}));
+
+// Admin book sources
+router.get('/api/admin/booksource/list', eventHandler(() => ({
+  err: 'ok',
+  count: 1,
+  items: [
+    {
+      id: 1,
+      name: '测试书源',
+      url: 'http://x.com',
+      group: '测试',
+      enabled: true,
+      check_status: 'ok',
+      check_message: '',
+      check_tags: [],
+    },
+  ],
+  check_task: { running: booksourceCheckRunning },
+})));
+
+router.post('/api/admin/booksource/check', eventHandler(() => {
+  booksourceCheckRunning = true;
+  booksourceCheckPolls = 0;
+  return { err: 'ok', running: true, checking: 1 };
+}));
+
+router.get('/api/admin/booksource/check/status', eventHandler(() => {
+  // 首次轮询后结束检测，便于用例观察"检测中→完成"的状态切换
+  if (booksourceCheckRunning) {
+    booksourceCheckPolls += 1;
+    if (booksourceCheckPolls >= 1) booksourceCheckRunning = false;
+  }
+  return { err: 'ok', running: booksourceCheckRunning };
 }));
 
 // Network library (book sources)
