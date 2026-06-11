@@ -15,18 +15,31 @@ A better online books library management website built on Calibre + Vue
 ## A Simple and User-Friendly Personal Book Management System
 
 This is a simple personal book management system based on Calibre, supporting **online reading**. Main features:
-* Beautiful interface: Since Calibre's built-in webpage is too ugly and hard to use, a new interface was independently written based on Vue, supporting both PC and mobile browsing;
-* Multi-user support: To make it more convenient for users, multi-user functionality was developed, supporting login via social platforms like ~~Douban~~ (deprecated), QQ, Weibo, Github, etc.;
-* Online reading support: With the help of [epub.js](https://github.com/intity/epubreader-js) library, supports reading e-books online in the browser (chapter review feature under development);
-* Batch scan and import of books;
-* Email push support: Easily push to Kindle;
-* OPDS support: Use apps like [KyBooks](http://kybook-reader.com/) for convenient reading;
-* One-click installation, web-based initial configuration, easy website setup;
+* Beautiful interface: A modern interface rebuilt with Nuxt 4 + Vue 3 + Vuetify, supporting both PC and mobile browsing, with multi-language (Chinese/English) support and light/dark theme switching;
+* Multi-user support: Multi-user functionality with login via social platforms like ~~Douban~~ (deprecated), QQ, Weibo, Github, etc.; full user management and guest permission control, bcrypt password storage, image captcha and GeeTest verification;
+* Online reading support: Built-in [candle-reader](https://github.com/talebook/candle-reader) for reading e-books in the browser, with automatic conversion for non-EPUB formats;
+* Online library with book sources: Import [Legado](https://github.com/gedoor/legado)-style book sources to search and read web novels online, and save them to the library as txt/epub with one click; book source management UI with batch import, enable/disable and validity checks;
+* Batch scan and import of books, with automatic metadata filling, recycle bin and batch deletion;
+* Email push support: Manage multiple Kindle and other receiving devices, one-click push with automatic batch format conversion;
+* OPDS support: Use apps like [KyBooks](http://kybook-reader.com/) for convenient reading; also browse and import books from other OPDS libraries;
+* One-click installation, web-based initial configuration, easy website setup, with online update checking;
 * Optimized file storage path for large libraries, can be categorized by alphabet or keep Chinese filenames;
-* Quick update of book information: Support searching and importing basic book information from Baidu Encyclopedia and Douban;
-* Private mode support: Requires access code to enter the website, convenient for small group sharing;
+* Quick update of book information: Search and import metadata in parallel from multiple sources (Douban, Baidu Encyclopedia, Xinhua Bookstore, Tomato Novel), with optional AI-powered book information recognition;
+* Private mode support: Requires access code to enter the website, convenient for small group sharing; individual books can also be marked as private, visible only to yourself;
 
 This project was previously named: calibre-webserver
+
+## Highlights of the Past Year
+
+* **Online library & book sources**: New Legado-style book source parsing engine — search and read web novels online and save them to the library as txt/epub; book source management UI (batch enable/disable/delete, validity checks, paginated search).
+* **Frontend rewrite**: Upgraded from Nuxt 2 to Nuxt 4 + Vue 3 + Vuetify 3, full i18n (Chinese/English), light/dark theme switching, redesigned login/signup and book editing pages.
+* **AI & multi-source metadata**: New AI-powered book information API; metadata sources extended to Douban, Baidu Encyclopedia, Xinhua Bookstore, Tomato Novel and Calibre, queried in parallel.
+* **Online reading**: Default EPUB reader switched to [candle-reader](https://github.com/talebook/candle-reader); non-EPUB books are converted automatically before online reading.
+* **Push & conversion**: New user device management with multi-device push; background batch conversion of Kindle-proprietary formats to EPUB.
+* **OPDS import**: Add external OPDS sources, browse and batch import books, with failure retry and progress tracking.
+* **Security hardening**: Automatic password migration from SHA256 to bcrypt; image captcha and GeeTest verification for login/signup/password reset; multiple security fixes (ReDoS, code injection, etc.).
+* **Admin enhancements**: User management UI, guest upload permission control, recycle bin, batch book deletion, update checking, and a user feedback entry.
+* **Infrastructure**: Upgraded to Tornado 6.5, switched to uv for Python dependency management, added database migration tooling; Docker base image consolidated into `talebook/talebook-base` for faster builds.
 
 
 ## Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/talebook.svg)
