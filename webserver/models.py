@@ -12,7 +12,7 @@ import bcrypt
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.mutable import Mutable
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base, object_session, relationship
 
 from webserver.constants import BOOK_TYPE_EBOOK
 from webserver.i18n import _
@@ -43,8 +43,20 @@ def bind_session(session):
     def _session(self):
         return session
 
+    def _save_instance(cls, instance):
+        # Tornado 同一线程内多个并发请求共享 scoped session：请求 A 结束时 on_finish
+        # 调用 remove()，会把请求 B 在 initialize 中已捕获的 session 从注册表摘除。
+        # 此后 B 查询出的对象仍属于旧 session，若再用注册表里的新 session add，
+        # 会抛 "Object is already attached to session"（issue #782）。
+        # 因此优先用对象自身所属的 session 保存。
+        db = object_session(instance) or session
+        db.add(instance)
+        db.commit()
+        return instance
+
     Base._session = classmethod(_session)
     SQLAlchemyMixin._session = classmethod(_session)
+    SQLAlchemyMixin._save_instance = classmethod(_save_instance)
     logging.info("Bind modles._session()")
 
 
