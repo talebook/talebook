@@ -610,6 +610,20 @@ class TestTocPagination(unittest.TestCase):
         chapters = eng.toc("/toc/p1")
         self.assertEqual([c.name for c in chapters], ["第1章", "第2章", "第3章"])
 
+    def test_dedupe_keeps_same_name_different_url(self):
+        # 同名但 URL 不同的章节是不同内容，不能被去重合并
+        html = (
+            '<div class="chapter"><ul>'
+            '<li><a href="/c/1">第1章</a></li>'
+            '<li><a href="/c/2">番外</a></li>'
+            '<li><a href="/c/3">番外</a></li>'
+            "</ul></div>"
+        )
+        eng = self._engine({"/toc/p1": html})
+        chapters = eng.toc("/toc/p1")
+        self.assertEqual([c.name for c in chapters], ["第1章", "番外", "番外"])
+        self.assertEqual([c.url for c in chapters[1:]], ["http://x.com/c/2", "http://x.com/c/3"])
+
     def test_reverse_prefix_flips_order(self):
         source = dict(SELECT_PAGED_SOURCE)
         source["ruleToc"] = dict(source["ruleToc"], chapterList="-.chapter li a", nextTocUrl="")
