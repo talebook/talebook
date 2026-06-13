@@ -3,6 +3,8 @@
 
 import json
 import logging
+import os
+import tempfile
 import threading
 import time
 import unittest
@@ -141,3 +143,57 @@ class TestImport(TestWithUserLogin):
         req = {"hashlist": "all"}
         d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
+
+
+class TestScanPDFTitle(TestWithUserLogin):
+    """PDF文件扫描时应使用文件名作为书名，而不是PDF元数据中的书名（issue #770）"""
+
+    def setUp(self):
+        self.session = self.get_app().settings["ScopedSession"]
+        self.session.rollback()
+        return super().setUp()
+
+    @mock.patch("calibre.ebooks.metadata.meta.get_metadata")
+    def test_pdf_scan_uses_filename_not_metadata_title(self, mock_get_metadata):
+        """当PDF元数据书名为'副本'等无意义值时，扫描记录应使用文件名作为书名"""
+        from calibre.ebooks.metadata.book.base import Metadata
+
+        bad_mi = Metadata("副本", ["某作者"])
+        bad_mi.tags = []
+        bad_mi.publisher = None
+        mock_get_metadata.return_value = bad_mi
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pdf_path = os.path.join(tmpdir, "my_real_book.pdf")
+            with open(pdf_path, "wb") as f:
+                f.write(b"%PDF-1.4 minimal pdf")
+
+            ScanService().do_scan(tmpdir)
+
+            self.session.rollback()
+            row = self.session.query(ScanFile).filter(ScanFile.path == pdf_path).first()
+            self.assertIsNotNone(row, "应当创建ScanFile记录")
+            self.assertEqual(row.title, "my_real_book", "PDF书名应使用文件名，不应是元数据中的'副本'")
+
+            self.session.delete(row)
+            self.session.commit()
+
+    @mock.patch("calibre.ebooks.metadata.meta.get_metadata")
+    def test_pdf_scan_uses_filename_when_metadata_fails(self, mock_get_metadata):
+        """当PDF元数据解析失败时，扫描记录应使用文件名（不含扩展名）作为书名"""
+        mock_get_metadata.side_effect = Exception("failed to parse PDF metadata")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pdf_path = os.path.join(tmpdir, "my_book_file.pdf")
+            with open(pdf_path, "wb") as f:
+                f.write(b"%PDF-1.4 minimal pdf")
+
+            ScanService().do_scan(tmpdir)
+
+            self.session.rollback()
+            row = self.session.query(ScanFile).filter(ScanFile.path == pdf_path).first()
+            self.assertIsNotNone(row, "应当创建ScanFile记录")
+            self.assertEqual(row.title, "my_book_file", "PDF解析失败时书名应使用文件名（不含扩展名）")
+
+            self.session.delete(row)
+            self.session.commit()
