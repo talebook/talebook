@@ -255,6 +255,10 @@ def make_app():
     logging.info("Now, Running...")
     AsyncService().setup(book_db, SessionMaker)
 
+    from webserver.services.webdav_service import start_if_enabled
+
+    start_if_enabled()
+
     from webserver.services.update_checker import UpdateChecker
 
     class _UpdateCheckerWithDB(UpdateChecker):

@@ -449,6 +449,7 @@
     "formats": "{count} formats"
   },
   "opdsPage": {
+    "pageTitle": "Library Connection Help",
     "title": "OPDS Guide",
     "links": "OPDS Links",
     "yourLink": "Your OPDS link:",
@@ -467,7 +468,21 @@
     "closedTitle": "OPDS Disabled",
     "closedMessage": "The OPDS service is currently disabled. Contact the administrator to enable OPDS.",
     "iosReaderDesc": "E-book reader for iOS and macOS",
-    "androidReaderDesc": "Powerful e-book reader for Android platform"
+    "androidReaderDesc": "Powerful e-book reader for Android platform",
+    "webdavTitle": "WebDAV Connection",
+    "webdavYourLink": "Your WebDAV connection address:",
+    "webdavNote": "If username and password are configured, enter them when connecting.",
+    "webdavClients": "WebDAV-compatible Clients",
+    "webdavClientES": "ES File Explorer (Android)",
+    "webdavClientDocuments": "Documents (iOS)",
+    "webdavClientJidu": "Moon+ Reader (Android)",
+    "webdavClientFinder": "Finder / File Explorer (macOS / Windows can mount directly)",
+    "webdavSteps": "Connection Steps",
+    "webdavStepUrl": "Add a WebDAV connection in your client and enter the address above",
+    "webdavStepAuth": "If username and password are set, enter the credentials",
+    "webdavStepBrowse": "Once connected, browse and download files from the library",
+    "webdavDisabledTitle": "WebDAV Service Not Enabled",
+    "webdavDisabledMessage": "The WebDAV service is currently not enabled. Contact the administrator to enable and start the WebDAV service in system settings."
   },
   "welcomePage": {
     "inputTitle": "Enter access password",
@@ -639,6 +654,7 @@
         "advancedSettings": "Advanced Settings",
         "sslManagement": "SSL Management",
         "opdsSettings": "OPDS Settings",
+        "webdavSettings": "WebDAV Settings",
         "captchaSettings": "CAPTCHA Settings",
         "trashManagement": "Trash Management",
         "updateCheck": "Check for Updates"
@@ -649,7 +665,9 @@
         "trashClear": "Clear Trash",
         "trashClearConfirm": "Confirm Clear",
         "checkUpdate": "Check for Updates",
-        "viewRelease": "View Release"
+        "viewRelease": "View Release",
+        "webdavStart": "Start Service",
+        "webdavStop": "Stop Service"
       },
       "label": {
         "siteTitle": "Site Title",
@@ -688,6 +706,10 @@
         "convertTimeout": "Convert timeout",
         "autoreload": "Auto restart",
         "opdsEnabled": "Enable OPDS",
+        "webdavEnabled": "Enable WebDAV Service",
+        "webdavPort": "WebDAV Port",
+        "webdavUsername": "Username (leave blank for anonymous access)",
+        "webdavPassword": "Password",
         "smtpServer": "SMTP Server (e.g., smtp-mail.outlook.com:587)",
         "smtpUsername": "SMTP Username (e.g., user{'@'}gmail.com)",
         "smtpPassword": "SMTP Password",
@@ -731,6 +753,10 @@
         "doubanPluginInfo": "To enable Douban plugin, please refer to the installation documentation. If it fails, you can try changing the mirror, such as talebook/douban-api-rs",
         "logoInfo": "To adjust the logo, please refer to the installation documentation.",
         "opdsInfo": "OPDS (Open Publication Distribution System) is an open standard for ebook distribution. When disabled, OPDS clients will not be able to access the library.",
+        "webdavInfo": "WebDAV is a file sharing protocol. When enabled, other devices can mount the library like a network drive using tools like ES File Explorer, Documents, or Moon+ Reader. After changing settings, click Start Service to apply; on server restart, the service will start automatically based on the Enable toggle.",
+        "webdavRunning": "WebDAV service is running",
+        "webdavStopped": "WebDAV service is stopped",
+        "webdavAddress": "Connection address",
         "socialLoginInfo": "Enabled social networks will automatically display buttons on the login page.",
         "saveSuccess": "Saved successfully",
         "goTo": "Please go to",

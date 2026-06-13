@@ -190,6 +190,75 @@
                             </div>
                         </template>
 
+                        <!-- WebDAV 配置 -->
+                        <template v-if="card.show_webdav">
+                            <v-checkbox
+                                v-model="settings.WEBDAV_ENABLED"
+                                density="compact"
+                                hide-details
+                                class="mb-2"
+                                :label="t('admin.settings.label.webdavEnabled')"
+                                color="primary"
+                            />
+                            <v-text-field
+                                v-model.number="settings.WEBDAV_PORT"
+                                prepend-icon="mdi-ethernet"
+                                :label="t('admin.settings.label.webdavPort')"
+                                type="number"
+                                hide-details
+                                class="mb-2"
+                            />
+                            <v-text-field
+                                v-model="settings.WEBDAV_USERNAME"
+                                prepend-icon="mdi-account"
+                                :label="t('admin.settings.label.webdavUsername')"
+                                hide-details
+                                class="mb-2"
+                            />
+                            <v-text-field
+                                v-model="settings.WEBDAV_PASSWORD"
+                                prepend-icon="mdi-lock"
+                                :label="t('admin.settings.label.webdavPassword')"
+                                type="password"
+                                hide-details
+                                class="mb-4"
+                            />
+                            <div class="mt-2 pa-3 border rounded">
+                                <div class="d-flex align-center mb-2">
+                                    <v-icon
+                                        :color="webdavRunning ? 'success' : 'grey'"
+                                        class="mr-2"
+                                    >
+                                        {{ webdavRunning ? 'mdi-check-circle' : 'mdi-stop-circle' }}
+                                    </v-icon>
+                                    <span>{{ webdavRunning ? t('admin.settings.message.webdavRunning') : t('admin.settings.message.webdavStopped') }}</span>
+                                </div>
+                                <p
+                                    v-if="webdavRunning"
+                                    class="text-caption mb-3"
+                                >
+                                    {{ t('admin.settings.message.webdavAddress') }}: <code>webdav://[IP]:{{ settings.WEBDAV_PORT }}</code>
+                                </p>
+                                <v-btn
+                                    color="success"
+                                    class="mr-2"
+                                    :loading="webdavLoading"
+                                    :disabled="webdavRunning"
+                                    @click="startWebDAV"
+                                >
+                                    <v-icon start>mdi-play</v-icon>{{ t('admin.settings.button.webdavStart') }}
+                                </v-btn>
+                                <v-btn
+                                    color="error"
+                                    :loading="webdavLoading"
+                                    :disabled="!webdavRunning"
+                                    @click="stopWebDAV"
+                                >
+                                    <v-icon start>mdi-stop</v-icon>{{ t('admin.settings.button.webdavStop') }}
+                                </v-btn>
+                            </div>
+                        </template>
+
                         <template v-if="card.show_friends">
                             <v-row
                                 v-for="(friend, idx) in settings.FRIENDS"
@@ -580,6 +649,8 @@ const updateInfo = ref({
     last_check_time: null,
 });
 const updateChecking = ref(false);
+const webdavRunning = ref(false);
+const webdavLoading = ref(false);
 
 // Store card expand/collapse states separately from computed cards
 const cardShows = ref({
@@ -594,6 +665,7 @@ const cardShows = ref({
     advancedSettings: false,
     sslManagement: false,
     opdsSettings: false,
+    webdavSettings: false,
     captchaSettings: false,
     trashManagement: false,
     updateCheck: false,
@@ -748,6 +820,17 @@ const cards = computed(() => [
         ],
     },
     {
+        key: 'webdavSettings',
+        title: t('admin.settings.section.webdavSettings'),
+        fields: [],
+        show_webdav: true,
+        tips: [
+            {
+                text: t('admin.settings.message.webdavInfo'),
+            }
+        ],
+    },
+    {
         key: 'captchaSettings',
         title: t('admin.settings.section.captchaSettings'),
         subtitle: t('admin.settings.message.captchaInfo'),
@@ -861,7 +944,7 @@ onMounted(() => {
         rsp.sns.forEach(function(ele){
             m[ele.value] = ele;
         });
-        
+
         // Populate link info for selected socials if available
         if (settings.value.SOCIALS) {
             settings.value.SOCIALS.forEach(function(ele){
@@ -873,7 +956,7 @@ onMounted(() => {
         } else {
             settings.value.SOCIALS = [];
         }
-        
+
         if (!settings.value.FRIENDS) {
             settings.value.FRIENDS = [];
         }
@@ -881,9 +964,10 @@ onMounted(() => {
             settings.value.DEVICES = [];
         }
     });
-    
+
     fetchTrashSize();
     fetchUpdateStatus();
+    fetchWebDAVStatus();
 });
 
 const save_settings = () => {
@@ -927,6 +1011,50 @@ const test_email = () => {
 
 const run = (func) => {
     if (func === 'test_email') test_email();
+};
+
+const fetchWebDAVStatus = () => {
+    $backend('/admin/webdav').then(rsp => {
+        if (rsp && rsp.err === 'ok') {
+            webdavRunning.value = rsp.running;
+        }
+    });
+};
+
+const startWebDAV = () => {
+    webdavLoading.value = true;
+    $backend('/admin/webdav', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'start' }),
+    }).then(rsp => {
+        webdavLoading.value = false;
+        if (rsp.err === 'ok') {
+            webdavRunning.value = true;
+            if ($alert) $alert('success', rsp.msg);
+        } else {
+            if ($alert) $alert('error', rsp.msg);
+        }
+    }).catch(() => {
+        webdavLoading.value = false;
+    });
+};
+
+const stopWebDAV = () => {
+    webdavLoading.value = true;
+    $backend('/admin/webdav', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'stop' }),
+    }).then(rsp => {
+        webdavLoading.value = false;
+        if (rsp.err === 'ok') {
+            webdavRunning.value = false;
+            if ($alert) $alert('success', rsp.msg);
+        } else {
+            if ($alert) $alert('error', rsp.msg);
+        }
+    }).catch(() => {
+        webdavLoading.value = false;
+    });
 };
 
 const fetchTrashSize = () => {

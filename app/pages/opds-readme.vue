@@ -1,6 +1,7 @@
 
 <template>
     <div class="opds-page">
+        <!-- OPDS Section -->
         <template v-if="opdsEnabled">
             <h1>{{ t('opdsPage.title') }}</h1>
             <section>
@@ -50,6 +51,42 @@
                 </div>
             </section>
         </template>
+
+        <hr class="my-6">
+
+        <!-- WebDAV Section -->
+        <template v-if="webdavRunning">
+            <h1>{{ t('opdsPage.webdavTitle') }}</h1>
+            <section>
+                <p>{{ t('opdsPage.webdavYourLink') }} <code>{{ webdavUrl }}</code></p>
+                <p class="mt-2">{{ t('opdsPage.webdavNote') }}</p>
+            </section>
+            <section>
+                <h2>{{ t('opdsPage.webdavClients') }}</h2>
+                <ul>
+                    <li>{{ t('opdsPage.webdavClientES') }}</li>
+                    <li>{{ t('opdsPage.webdavClientDocuments') }}</li>
+                    <li>{{ t('opdsPage.webdavClientJidu') }}</li>
+                    <li>{{ t('opdsPage.webdavClientFinder') }}</li>
+                </ul>
+            </section>
+            <section>
+                <h2>{{ t('opdsPage.webdavSteps') }}</h2>
+                <ol>
+                    <li>{{ t('opdsPage.webdavStepUrl') }}</li>
+                    <li>{{ t('opdsPage.webdavStepAuth') }}</li>
+                    <li>{{ t('opdsPage.webdavStepBrowse') }}</li>
+                </ol>
+            </section>
+        </template>
+        <template v-else>
+            <h1>{{ t('opdsPage.webdavDisabledTitle') }}</h1>
+            <section>
+                <div class="error-message">
+                    <p>{{ t('opdsPage.webdavDisabledMessage') }}</p>
+                </div>
+            </section>
+        </template>
     </div>
 </template>
 
@@ -63,48 +100,25 @@ const opdsUrl = `${url.protocol}//${url.host}/opds/`;
 const { $backend } = useNuxtApp();
 const { t } = useI18n();
 const opdsEnabled = ref(true);
+const webdavRunning = ref(false);
+const webdavUrl = ref('');
 
 onMounted(() => {
-    // 获取OPDS服务状态
     $backend('/admin/settings').then(rsp => {
         if (rsp.err === 'ok') {
             opdsEnabled.value = rsp.settings.OPDS_ENABLED !== false;
         }
     });
+
+    $backend('/admin/webdav').then(rsp => {
+        if (rsp && rsp.err === 'ok') {
+            webdavRunning.value = rsp.running;
+            webdavUrl.value = `${url.protocol}//${url.hostname}:${rsp.port}`;
+        }
+    });
 });
 
 useHead(() => ({
-    title: t('opdsPage.title')
+    title: t('opdsPage.pageTitle')
 }));
 </script>
-
-<style scoped>
-.opds-page {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-h1 {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-section {
-  margin-bottom: 30px;
-}
-
-h2 {
-  margin-bottom: 15px;
-}
-
-ul, ol {
-  padding-left: 20px;
-}
-
-code {
-  background: #f5f5f5;
-  padding: 2px 5px;
-  border-radius: 3px;
-}
-</style>

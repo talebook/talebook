@@ -9,6 +9,7 @@ lxml
 jsonpath-ng
 quickjs
 ruff
+wsgidav
 
 # build-in support for MYSQL
 pymysql

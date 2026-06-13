@@ -4,10 +4,11 @@ import logging
 
 
 def routes():
-    from . import admin, book, booksource_admin, captcha, files, meta, network_library, opds, scan, user
+    from . import admin, admin_webdav, book, booksource_admin, captcha, files, meta, network_library, opds, scan, user
 
     routes = []
     routes += admin.routes()
+    routes += admin_webdav.routes()
     routes += scan.routes()
     routes += opds.routes()
     routes += book.routes()

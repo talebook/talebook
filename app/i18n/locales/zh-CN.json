@@ -464,6 +464,7 @@
     "formats": "{count} 种格式"
   },
   "opdsPage": {
+    "pageTitle": "书库连接帮助",
     "title": "OPDS 介绍",
     "links": "OPDS 链接",
     "yourLink": "您的 OPDS 链接为：",
@@ -482,7 +483,21 @@
     "closedTitle": "OPDS 服务已关闭",
     "closedMessage": "当前 OPDS 服务已关闭，您需要联系管理员开启 OPDS 服务后才能使用。",
     "iosReaderDesc": "支持 iOS 和 macOS 的电子书阅读器",
-    "androidReaderDesc": "Android 平台上功能强大的电子书阅读器"
+    "androidReaderDesc": "Android 平台上功能强大的电子书阅读器",
+    "webdavTitle": "WebDAV 连接",
+    "webdavYourLink": "您的 WebDAV 连接地址为：",
+    "webdavNote": "如需账号密码验证，请在连接时输入管理员配置的用户名和密码。",
+    "webdavClients": "支持 WebDAV 的客户端",
+    "webdavClientES": "ES 文件浏览器（Android）",
+    "webdavClientDocuments": "Documents（iOS）",
+    "webdavClientJidu": "静读天下（Android）",
+    "webdavClientFinder": "Finder / 文件资源管理器（macOS / Windows 可直接挂载）",
+    "webdavSteps": "连接步骤",
+    "webdavStepUrl": "在客户端添加 WebDAV 连接，输入上方地址",
+    "webdavStepAuth": "如已设置用户名和密码，填写对应凭据",
+    "webdavStepBrowse": "连接成功后即可浏览和下载书库中的文件",
+    "webdavDisabledTitle": "WebDAV 服务未启用",
+    "webdavDisabledMessage": "当前 WebDAV 服务未启用，请联系管理员在系统设置中开启并启动 WebDAV 服务。"
   },
   "welcomePage": {
     "inputTitle": "请输入访问密码",
@@ -669,6 +684,7 @@
         "advancedSettings": "高级配置项",
         "sslManagement": "SSL 证书管理",
         "opdsSettings": "OPDS 设置",
+        "webdavSettings": "WebDAV 设置",
         "captchaSettings": "人机验证设置",
         "trashManagement": "回收站管理",
         "updateCheck": "检查更新"
@@ -679,7 +695,9 @@
         "trashClear": "清理回收站",
         "trashClearConfirm": "确认清理",
         "checkUpdate": "检查更新",
-        "viewRelease": "查看发布"
+        "viewRelease": "查看发布",
+        "webdavStart": "启动服务",
+        "webdavStop": "停止服务"
       },
       "label": {
         "siteTitle": "网站标题",
@@ -718,6 +736,10 @@
         "convertTimeout": "书籍转换格式的最大超时时间（秒）",
         "autoreload": "更新配置后自动重启服务器",
         "opdsEnabled": "启用 OPDS 服务",
+        "webdavEnabled": "启用 WebDAV 服务",
+        "webdavPort": "WebDAV 端口",
+        "webdavUsername": "用户名（留空则允许匿名访问）",
+        "webdavPassword": "密码",
         "smtpServer": "SMTP 服务器（例如 smtp-mail.outlook.com:587）",
         "smtpUsername": "SMTP 用户名（例如 user{'@'}gmail.com）",
         "smtpPassword": "SMTP 密码",
@@ -761,6 +783,10 @@
         "doubanPluginInfo": "若需要启用豆瓣插件，请参阅安装文档的说明。若出现失败，可尝试更换镜像，例如 talebook/douban-api-rs ",
         "logoInfo": "若需要调整 Logo，请参阅安装文档的说明。",
         "opdsInfo": "OPDS（Open Publication Distribution System）是一种用于电子书分发的开放标准，关闭后将无法通过 OPDS 客户端访问书库。",
+        "webdavInfo": "WebDAV 是一种文件共享协议，启用后其他设备可以像访问网络硬盘一样挂载书库，支持 ES 文件浏览器、Documents、静读天下等工具直接连接。配置修改后需点击"启动服务"使其生效；服务器重启后将根据"启用 WebDAV 服务"开关自动处理。",
+        "webdavRunning": "WebDAV 服务运行中",
+        "webdavStopped": "WebDAV 服务未启动",
+        "webdavAddress": "连接地址",
         "socialLoginInfo": "所启用的社交网络将会在登录页面自动显示按钮。",
         "saveSuccess": "保存成功",
         "goTo": "请前往",
