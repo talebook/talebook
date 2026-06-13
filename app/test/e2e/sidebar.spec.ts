@@ -58,7 +58,7 @@ test.describe('Navigation Sidebar', () => {
 
         // 5. System Links (if sidebar_sys is true)
         await expect(page.locator('nav').getByRole('link', { name: 'OPDS 介绍' })).toBeVisible();
-        await expect(page.locator('nav').getByRole('link', { name: 'OPDS 介绍' })).toHaveAttribute('href', '/opds-readme');
+        await expect(page.locator('nav').getByRole('link', { name: 'OPDS 介绍' })).toHaveAttribute('href', '/connect-readme');
 
     });
 
@@ -77,7 +77,7 @@ test.describe('Navigation Sidebar', () => {
             { name: '热门', url: '/hot', expectedText: '热门' },
             { name: '最近', url: '/recent', expectedText: '最近' },
         // OPDS is target=_blank, might be harder to test navigation in same tab, skipping for now or test attribute
-        // { name: 'OPDS介绍', url: '/opds-readme', expectedText: 'OPDS' }, 
+        // { name: 'OPDS介绍', url: '/connect-readme', expectedText: 'OPDS' }, 
         ];
 
         for (const link of linksToTest) {

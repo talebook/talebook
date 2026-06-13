@@ -514,7 +514,7 @@ const items = computed(() => {
         { heading: $t('messages.system') },
         { icon: 'mdi-history', text: $t('messages.systemVersion'), href: '', count: store.sys.version },
         { icon: 'mdi-human', text: $t('messages.userCount'), href: '', count: store.sys.users },
-        { icon: 'mdi-cellphone', text: $t('messages.opdsIntroduction'), href: '/opds-readme', count: 'OPDS', target: '_blank' },
+        { icon: 'mdi-cellphone', text: $t('messages.opdsIntroduction'), href: '/connect-readme', count: 'OPDS', target: '_blank' },
     ];
 
     return home_links

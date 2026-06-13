@@ -10,6 +10,21 @@ from webserver.i18n import _
 CONF = loader.get_settings()
 
 
+class WebDAVStatus(BaseHandler):
+    """公开的 WebDAV 状态查询接口，无需登录即可访问。"""
+
+    @js
+    def get(self):
+        from webserver.services.webdav_service import WebDAVService
+
+        service = WebDAVService.instance()
+        return {
+            "err": "ok",
+            "running": service.is_running(),
+            "port": service.get_port() or CONF.get("WEBDAV_PORT", 8083),
+        }
+
+
 class AdminWebDAV(BaseHandler):
     @js
     @auth
@@ -45,7 +60,12 @@ class AdminWebDAV(BaseHandler):
             library_path = CONF.get("with_library", "/data/books/library/")
             ok = service.start(library_path, port, username or None, password or None)
             if ok:
-                return {"err": "ok", "msg": _("WebDAV 服务已启动"), "running": True}
+                return {
+                    "err": "ok",
+                    "msg": _("WebDAV 服务已启动"),
+                    "running": True,
+                    "port": service.get_port() or port,
+                }
             return {"err": "start_failed", "msg": _("WebDAV 服务启动失败，请检查日志"), "running": False}
 
         if action == "stop":
@@ -57,5 +77,6 @@ class AdminWebDAV(BaseHandler):
 
 def routes():
     return [
+        (r"/api/webdav/status", WebDAVStatus),
         (r"/api/admin/webdav", AdminWebDAV),
     ]

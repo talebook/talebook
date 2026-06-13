@@ -52,7 +52,10 @@
             </section>
         </template>
 
-        <hr class="my-6">
+        <hr
+            v-if="opdsEnabled"
+            class="my-6"
+        >
 
         <!-- WebDAV Section -->
         <template v-if="webdavRunning">
@@ -110,7 +113,7 @@ onMounted(() => {
         }
     });
 
-    $backend('/admin/webdav').then(rsp => {
+    $backend('/webdav/status').then(rsp => {
         if (rsp && rsp.err === 'ok') {
             webdavRunning.value = rsp.running;
             webdavUrl.value = `${url.protocol}//${url.hostname}:${rsp.port}`;

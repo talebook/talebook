@@ -4,7 +4,7 @@
 import json
 from unittest import mock
 
-from tests.test_main import TestWithAdminUser, TestWithUserLogin
+from tests.test_main import TestApp, TestWithAdminUser, TestWithUserLogin
 from tests.test_main import setUpModule as init
 
 
@@ -100,3 +100,54 @@ class TestAdminWebDAV(TestWithAdminUser):
             self.assertIn("WEBDAV_PORT", d["rsp"])
             self.assertIn("WEBDAV_USERNAME", d["rsp"])
             self.assertIn("WEBDAV_PASSWORD", d["rsp"])
+
+
+class TestWebDAVPublicStatus(TestApp):
+    def test_public_status_no_auth(self):
+        """公开状态接口无需登录即可访问"""
+        d = self.json("/api/webdav/status")
+        self.assertEqual(d["err"], "ok")
+        self.assertIn("running", d)
+        self.assertIn("port", d)
+        self.assertIsInstance(d["running"], bool)
+
+    def test_public_status_returns_port(self):
+        """公开状态接口返回默认端口"""
+        d = self.json("/api/webdav/status")
+        self.assertEqual(d["err"], "ok")
+        self.assertIsInstance(d["port"], int)
+
+
+class TestStartIfEnabled(TestApp):
+    @mock.patch("webserver.services.webdav_service.WebDAVService.start")
+    def test_start_if_enabled_true(self, mock_start):
+        """WEBDAV_ENABLED=True 时应调用 start"""
+        from webserver.services import webdav_service
+
+        with mock.patch.dict(
+            webdav_service.CONF,
+            {"WEBDAV_ENABLED": True, "WEBDAV_PORT": 8083, "WEBDAV_USERNAME": "", "WEBDAV_PASSWORD": ""},
+        ):
+            webdav_service.start_if_enabled()
+        mock_start.assert_called_once()
+
+    @mock.patch("webserver.services.webdav_service.WebDAVService.start")
+    def test_start_if_enabled_false(self, mock_start):
+        """WEBDAV_ENABLED=False 时不应调用 start"""
+        from webserver.services import webdav_service
+
+        with mock.patch.dict(webdav_service.CONF, {"WEBDAV_ENABLED": False}):
+            webdav_service.start_if_enabled()
+        mock_start.assert_not_called()
+
+    @mock.patch("webserver.services.webdav_service.WebDAVService.start")
+    def test_start_if_enabled_missing_key(self, mock_start):
+        """WEBDAV_ENABLED 未配置时不应调用 start"""
+        from webserver.services import webdav_service
+
+        original = webdav_service.CONF.get("WEBDAV_ENABLED", "MISSING")
+        # 确保 key 不存在
+        conf_copy = {k: v for k, v in webdav_service.CONF.items() if k != "WEBDAV_ENABLED"}
+        with mock.patch.dict(webdav_service.CONF, conf_copy, clear=True):
+            webdav_service.start_if_enabled()
+        mock_start.assert_not_called()

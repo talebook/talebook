@@ -237,7 +237,7 @@
                                     v-if="webdavRunning"
                                     class="text-caption mb-3"
                                 >
-                                    {{ t('admin.settings.message.webdavAddress') }}: <code>webdav://[IP]:{{ settings.WEBDAV_PORT }}</code>
+                                    {{ t('admin.settings.message.webdavAddress') }}: <code>webdav://[IP]:{{ webdavRunningPort || settings.WEBDAV_PORT }}</code>
                                 </p>
                                 <v-btn
                                     color="success"
@@ -650,6 +650,7 @@ const updateInfo = ref({
 });
 const updateChecking = ref(false);
 const webdavRunning = ref(false);
+const webdavRunningPort = ref(0);
 const webdavLoading = ref(false);
 
 // Store card expand/collapse states separately from computed cards
@@ -1017,6 +1018,7 @@ const fetchWebDAVStatus = () => {
     $backend('/admin/webdav').then(rsp => {
         if (rsp && rsp.err === 'ok') {
             webdavRunning.value = rsp.running;
+            webdavRunningPort.value = rsp.port;
         }
     });
 };
@@ -1030,12 +1032,14 @@ const startWebDAV = () => {
         webdavLoading.value = false;
         if (rsp.err === 'ok') {
             webdavRunning.value = true;
+            webdavRunningPort.value = rsp.port;
             if ($alert) $alert('success', rsp.msg);
         } else {
             if ($alert) $alert('error', rsp.msg);
         }
     }).catch(() => {
         webdavLoading.value = false;
+        if ($alert) $alert('error', t('admin.settings.message.requestFailed'));
     });
 };
 
@@ -1054,6 +1058,7 @@ const stopWebDAV = () => {
         }
     }).catch(() => {
         webdavLoading.value = false;
+        if ($alert) $alert('error', t('admin.settings.message.requestFailed'));
     });
 };
 

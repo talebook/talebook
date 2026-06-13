@@ -10,6 +10,7 @@ jsonpath-ng
 quickjs
 ruff
 wsgidav
+cheroot
 
 # build-in support for MYSQL
 pymysql

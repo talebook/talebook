@@ -84,6 +84,7 @@ class WebDAVService:
             return True
         except Exception as e:
             logging.error("WebDAV 服务启动失败: %s", e)
+            self._server = None
             self._port = None
             return False
 
@@ -98,6 +99,8 @@ class WebDAVService:
                 self._port = None
         if self._thread is not None:
             self._thread.join(timeout=5)
+            if self._thread.is_alive():
+                logging.warning("WebDAV 服务线程未能在 5 秒内停止")
             self._thread = None
 
 

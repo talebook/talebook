@@ -759,6 +759,7 @@
         "webdavAddress": "Connection address",
         "socialLoginInfo": "Enabled social networks will automatically display buttons on the login page.",
         "saveSuccess": "Saved successfully",
+        "requestFailed": "Request failed, please check your network",
         "goTo": "Please go to",
         "configurationPage": "developer configuration page",
         "getKeysAndSetCallback": ", get the keys and set the callback address to:",
