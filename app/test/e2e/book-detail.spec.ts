@@ -39,3 +39,33 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByText('下载').first()).toBeVisible();
     });
 });
+
+test.describe('Convert to PDF menu item', () => {
+    // mock 中 book 1 仅有 epub 格式：hasEBooks=true、hasPDF=false，
+    // “转为PDF格式”是否可用只取决于 sys.pdf_convert
+    const openProcessMenu = async (page) => {
+        await page.goto(`/book/${bookId}`);
+        const btn = page.getByRole('button', { name: '文件处理' });
+        await btn.scrollIntoViewIfNeeded();
+        await btn.click();
+        return page.locator('.v-list-item', { hasText: '转为PDF格式' });
+    };
+
+    test('enabled by default (full image)', async ({ page, request }) => {
+        await request.post('http://127.0.0.1:8080/_test/reset', {
+            data: { installed: true }
+        });
+        const item = await openProcessMenu(page);
+        await expect(item).toBeVisible();
+        await expect(item).not.toHaveClass(/v-list-item--disabled/);
+    });
+
+    test('disabled when sys.pdf_convert is false (slim image)', async ({ page, request }) => {
+        await request.post('http://127.0.0.1:8080/_test/reset', {
+            data: { installed: true, pdf_convert: false }
+        });
+        const item = await openProcessMenu(page);
+        await expect(item).toBeVisible();
+        await expect(item).toHaveClass(/v-list-item--disabled/);
+    });
+});

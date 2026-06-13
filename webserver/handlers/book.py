@@ -174,6 +174,10 @@ class BookToPDF(BaseHandler):
     @js
     @auth
     def post(self, id):
+        # slim 镜像移除了 PDF 输出所需的 QtWebEngine，构建时设置了该环境变量
+        if os.environ.get("TALEBOOK_PDF_CONVERT", "1") == "0":
+            return {"err": "params.convert.unsupported", "msg": _("当前服务器为slim版镜像，不支持转换为PDF格式")}
+
         book_id = int(id)
         book = self.get_book(book_id, raise_exception=False)
         if not book:

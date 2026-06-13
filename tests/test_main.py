@@ -245,10 +245,16 @@ class TestAppWithoutLogin(TestApp):
         self.assertEqual(d["user"]["is_login"], False)
         self.assertEqual(d["user"]["is_admin"], False)
         self.assertEqual(d["sys"]["books"], 13)
+        self.assertEqual(d["sys"]["pdf_convert"], True)
 
         d = self.json("/api/user/info?detail=1")
         self.assertEqual(d["user"]["is_login"], False)
         self.assertEqual(d["sys"], {})
+
+    def test_user_info_pdf_convert_disabled_on_slim(self):
+        with mock.patch.dict(os.environ, {"TALEBOOK_PDF_CONVERT": "0"}):
+            d = self.json("/api/user/info")
+            self.assertEqual(d["sys"]["pdf_convert"], False)
 
     def test_book(self):
         d = self.json("/api/book/1")

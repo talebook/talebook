@@ -8,16 +8,30 @@ FROM debian:13-slim
 
 ARG TARGETARCH
 ARG TARGETVARIANT
+ARG BUILD_COUNTRY=""
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
-# 安装基础系统（包含 PyQt5 系统包）
+RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
+        echo "using repo mirrors for ${BUILD_COUNTRY}"; \
+        sed -i "s@deb.debian.org@mirrors.aliyun.com@g" /etc/apt/sources.list.d/debian.sources; \
+    fi
+
+# 安装基础系统。
+# 全程 --no-install-recommends：apt 的 Recommends 会拖进 scipy/matplotlib/GPU 驱动等
+# 数百 MB 与运行无关的包。Debian 13 的 calibre 使用 Qt6/PyQt6，原先显式安装的
+# python3-pyqt5* 是 Debian 12 时代的遗留（等于重复装一整套 Qt5/Chromium），已移除。
+# build-essential/python3-dev 原先由 python3-pip 的 Recommends 隐式提供，
+# 主 Dockerfile 中 pip 安装 requirements.txt 时部分包（如 quickjs）无预编译
+# wheel 需要源码编译，故显式保留。
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
         tzdata \
         python3 \
         python3-pip \
         python3-venv \
+        python3-dev \
+        build-essential \
         nginx \
         supervisor \
         sqlite3 \
@@ -26,10 +40,6 @@ RUN apt-get update && \
         unzip \
         git \
         ca-certificates \
-        python3-pyqt5 \
-        python3-pyqt5.qtwebengine \
-        python3-pyqt5.qtsql \
-        python3-pyqt5.qtmultimedia \
         python3-dateutil \
         python3-cssselect \
         python3-lxml \
@@ -47,10 +57,14 @@ RUN ver="$(dpkg-query -W -f='${Version}' nginx)" && \
     dpkg --compare-versions "$ver" ge 1.26.3-3+deb13u5 || \
     { echo "ERROR: nginx $ver 仍受 CVE-2026-42945 影响，需 >= 1.26.3-3+deb13u5" && exit 1; }
 
-# 根据架构安装 Calibre
+# 根据架构安装 Calibre。
+# --no-install-recommends 实测可将 calibre 相关安装体积从 ~2.4GB 降到 ~1.3GB，
+# epub/txt/mobi/azw3/PDF 转换均验证正常。
+# fonts-wqy-microhei：services/convert.py 转 PDF 时硬编码了文泉驿微米黑字体，
+# 此前镜像中并未安装该字体（中文 PDF 排版会退化为 fallback 字体），此处补上。
 RUN echo "Installing Calibre via apt for $TARGETARCH $TARGETVARIANT" && \
     apt-get update && \
-    apt-get install -y calibre && \
+    apt-get install -y --no-install-recommends calibre fonts-wqy-microhei && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*;
 
@@ -64,10 +78,10 @@ RUN echo "Verifying Calibre installation..." && \
         exit 1; \
     fi
 
-# 验证 PyQt5 安装
-RUN echo "Verifying PyQt5 installation..." && \
-    python3 -c "import PyQt5; print('PyQt5 imported successfully')" && \
-    python3 -c "import PyQt5.QtWebEngine; print('PyQt5.QtWebEngine imported successfully')"
+# 验证 PyQt6 安装（Debian 13 的 calibre 依赖 Qt6，作为 calibre 的依赖自动安装）
+RUN echo "Verifying PyQt6 installation..." && \
+    python3 -c "import PyQt6; print('PyQt6 imported successfully')" && \
+    python3 -c "from PyQt6 import QtWebEngineCore; print('PyQt6.QtWebEngineCore imported successfully')"
 
 # 安装 Python 包（使用 --break-system-packages）
 RUN pip3 install --no-cache-dir --break-system-packages \
