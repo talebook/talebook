@@ -122,6 +122,7 @@ class ScanService(AsyncService):
         # 检查文件哈希值，检查DB重复情况
         for row in rows:
             fpath = row.path
+            fname = os.path.basename(fpath)
 
             # 读取文件，计算哈希值
             sha256 = hashlib.sha256()
@@ -186,7 +187,7 @@ class ScanService(AsyncService):
 
                 # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
                 if fmt in ["txt", "pdf"]:
-                    mi.title = fname.replace("." + fmt, "")
+                    mi.title = os.path.splitext(fname)[0]
 
                 row.title = mi.title
                 # 使用mi.authors列表而不是mi.author_sort，避免作者信息丢失
@@ -195,7 +196,7 @@ class ScanService(AsyncService):
                 row.tags = ", ".join(mi.tags)
                 row.status = ScanFile.READY  # 设置为可处理
             else:
-                row.title = fname.replace("." + fmt, "")
+                row.title = os.path.splitext(fname)[0]
                 row.author = "Unknown"
                 row.status = ScanFile.READY  # 设置为可处理，尽管解析失败
                 self.save_or_rollback(row)

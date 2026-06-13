@@ -197,3 +197,33 @@ class TestScanPDFTitle(TestWithUserLogin):
 
             self.session.delete(row)
             self.session.commit()
+
+    @mock.patch("calibre.ebooks.metadata.meta.get_metadata")
+    def test_pdf_scan_multiple_files_use_own_filename(self, mock_get_metadata):
+        """多文件扫描时，每个PDF都应使用自己的文件名作为书名，而非最后一个文件的文件名"""
+        from calibre.ebooks.metadata.book.base import Metadata
+
+        mock_get_metadata.side_effect = lambda stream, stream_type, use_libprs_metadata: Metadata("副本", ["某作者"])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pdf_a = os.path.join(tmpdir, "book_a.pdf")
+            pdf_b = os.path.join(tmpdir, "book_b.pdf")
+            for p in [pdf_a, pdf_b]:
+                with open(p, "wb") as f:
+                    f.write(b"%PDF-1.4 minimal pdf")
+
+            ScanService().do_scan(tmpdir)
+
+            self.session.rollback()
+            row_a = self.session.query(ScanFile).filter(ScanFile.path == pdf_a).first()
+            row_b = self.session.query(ScanFile).filter(ScanFile.path == pdf_b).first()
+
+            self.assertIsNotNone(row_a, "应当为 book_a.pdf 创建ScanFile记录")
+            self.assertIsNotNone(row_b, "应当为 book_b.pdf 创建ScanFile记录")
+            self.assertEqual(row_a.title, "book_a", "book_a.pdf 的书名应为 book_a，而非其他文件的文件名")
+            self.assertEqual(row_b.title, "book_b", "book_b.pdf 的书名应为 book_b")
+
+            for row in [row_a, row_b]:
+                if row:
+                    self.session.delete(row)
+            self.session.commit()
