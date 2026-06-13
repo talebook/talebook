@@ -178,6 +178,16 @@ def bind_topdir_book_names(cache):
     return
 
 
+def build_db_engine_args(db_url):
+    """Return SQLAlchemy engine kwargs appropriate for the given database URL."""
+    args = {"echo": False, "pool_size": 10, "max_overflow": 20, "pool_recycle": 3600}
+    if db_url.startswith("sqlite"):
+        args["connect_args"] = {"check_same_thread": False, "timeout": 30}
+    else:
+        args["pool_pre_ping"] = True
+    return args
+
+
 def make_app():
     auth_db_path = CONF["user_database"]
     logging.debug("Init library with [%s]" % options.with_library)
@@ -197,7 +207,7 @@ def make_app():
         sys.exit(0)
 
     # build sql session factory
-    engine = create_engine(auth_db_path, **CONF["db_engine_args"])
+    engine = create_engine(auth_db_path, **build_db_engine_args(auth_db_path))
     SessionMaker = sessionmaker(bind=engine, autoflush=True, autocommit=False)
     # ScopedSession（线程级注册表）仅供 social-auth 存储层及 models.save() 对新建对象的兜底；
     # 业务代码（handler / 后台服务）一律通过 SessionMaker 创建各自独立的 session

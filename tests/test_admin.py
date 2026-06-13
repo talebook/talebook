@@ -4,6 +4,7 @@
 import json
 import os
 import tempfile
+import urllib.parse
 from unittest import mock
 
 from tests.test_main import TestWithAdminUser, TestWithUserLogin, get_db
@@ -90,3 +91,132 @@ class TestAdminSettingsSecurity(TestWithAdminUser):
             exec(compile(code, path, "exec"), namespace)
 
         self.assertEqual(namespace["settings"][key], "value")
+
+
+class TestAdminTestDB(TestWithAdminUser):
+    """AdminTestDB 接口测试"""
+
+    def test_sqlite_always_ok(self):
+        """SQLite 类型直接返回 ok"""
+        body = urllib.parse.urlencode({"db_type": "sqlite"})
+        d = self.json("/api/admin/testdb", method="POST", body=body)
+        self.assertEqual(d["err"], "ok")
+
+    def test_mysql_missing_params(self):
+        """缺少必填参数时返回 params.invalid"""
+        body = urllib.parse.urlencode({"db_type": "mysql", "db_host": "localhost"})
+        d = self.json("/api/admin/testdb", method="POST", body=body)
+        self.assertEqual(d["err"], "params.invalid")
+
+    def test_mysql_connect_failed(self):
+        """MySQL 连接失败时返回 db.connect_failed"""
+        body = urllib.parse.urlencode(
+            {
+                "db_type": "mysql",
+                "db_host": "127.0.0.1",
+                "db_port": "3306",
+                "db_name": "nonexistent_db",
+                "db_user": "bad_user",
+                "db_pass": "bad_pass",
+            }
+        )
+        d = self.json("/api/admin/testdb", method="POST", body=body)
+        self.assertEqual(d["err"], "db.connect_failed")
+
+    def test_requires_admin_after_install(self):
+        """安装后非管理员无法访问"""
+        from webserver import models
+
+        session = get_db()
+        user = session.query(models.Reader).filter(models.Reader.id == 1).first()
+        original_admin = user.admin
+        user.admin = False
+        session.commit()
+        try:
+            body = urllib.parse.urlencode({"db_type": "sqlite"})
+            d = self.json("/api/admin/testdb", method="POST", body=body)
+            self.assertEqual(d["err"], "permission")
+        finally:
+            user.admin = original_admin
+            session.commit()
+
+
+class TestAdminMigrateDB(TestWithAdminUser):
+    """AdminMigrateDB 接口测试"""
+
+    def test_sqlite_target_rejected(self):
+        """目标类型为 sqlite 时返回 params.invalid"""
+        body = urllib.parse.urlencode({"db_type": "sqlite"})
+        d = self.json("/api/admin/migratedb", method="POST", body=body)
+        self.assertEqual(d["err"], "params.invalid")
+
+    def test_missing_params_rejected(self):
+        """缺少必填参数时返回 params.invalid"""
+        body = urllib.parse.urlencode({"db_type": "mysql", "db_host": "localhost"})
+        d = self.json("/api/admin/migratedb", method="POST", body=body)
+        self.assertEqual(d["err"], "params.invalid")
+
+    def test_bad_connection_returns_error(self):
+        """无法连接的 MySQL 返回 db.migrate_failed 或 db.connect_failed 类错误"""
+        body = urllib.parse.urlencode(
+            {
+                "db_type": "mysql",
+                "db_host": "127.0.0.1",
+                "db_port": "3306",
+                "db_name": "nonexistent_db",
+                "db_user": "bad_user",
+                "db_pass": "bad_pass",
+            }
+        )
+        d = self.json("/api/admin/migratedb", method="POST", body=body)
+        self.assertIn(d["err"], ("db.migrate_failed",))
+
+    def test_migrate_success_via_mock(self):
+        """使用 mock 测试迁移逻辑: 迁移成功时返回 ok 并写入 user_database 配置"""
+        import tempfile
+
+        from webserver import loader, main
+
+        original_db_url = main.CONF["user_database"]
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+
+                def fake_migrate(source_url, target_url):
+                    pass
+
+                with mock.patch("webserver.migrate_db.migrate_data", side_effect=fake_migrate):
+                    with mock.patch("webserver.loader.SettingsLoader.set_store_path", return_value=tmpdir):
+                        body = urllib.parse.urlencode(
+                            {
+                                "db_type": "mysql",
+                                "db_host": "localhost",
+                                "db_port": "3306",
+                                "db_name": "testdb",
+                                "db_user": "root",
+                                "db_pass": "pass",
+                            }
+                        )
+                        d = self.json("/api/admin/migratedb", method="POST", body=body)
+                self.assertEqual(d["err"], "ok")
+                self.assertTrue(d.get("need_restart"))
+        finally:
+            # restore original db url in CONF
+            main.CONF["user_database"] = original_db_url
+            loader.get_settings()["user_database"] = original_db_url
+
+    def test_requires_admin(self):
+        """非管理员无法访问"""
+        from webserver import models
+
+        session = get_db()
+        user = session.query(models.Reader).filter(models.Reader.id == 1).first()
+        original_admin = user.admin
+        user.admin = False
+        session.commit()
+        try:
+            body = urllib.parse.urlencode({"db_type": "mysql"})
+            d = self.json("/api/admin/migratedb", method="POST", body=body)
+            self.assertEqual(d["err"], "permission")
+        finally:
+            user.admin = original_admin
+            session.commit()

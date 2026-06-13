@@ -284,6 +284,55 @@ def main():
         return False
 
 
+def build_engine_args(db_url):
+    """Return SQLAlchemy engine kwargs appropriate for the given database URL."""
+    args = {"echo": False, "pool_size": 5, "max_overflow": 10, "pool_recycle": 3600}
+    if db_url.startswith("sqlite"):
+        args["connect_args"] = {"check_same_thread": False, "timeout": 30}
+    else:
+        args["pool_pre_ping"] = True
+    return args
+
+
+def migrate_data(source_url, target_url):
+    """Copy all data from source database to target database.
+
+    Creates all tables in the target, then copies every row.  The target is
+    cleared table-by-table before inserting so the operation is idempotent.
+    """
+    from sqlalchemy import text
+
+    logger.info(f"Migrating data: {source_url!r} -> {target_url!r}")
+
+    source_engine = create_engine(source_url, **build_engine_args(source_url))
+    target_engine = create_engine(target_url, **build_engine_args(target_url))
+
+    models.Base.metadata.create_all(target_engine)
+    logger.info("Tables created in target database")
+
+    is_mysql_target = not target_url.startswith("sqlite")
+
+    with source_engine.connect() as src:
+        with target_engine.connect() as tgt:
+            if is_mysql_target:
+                tgt.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+
+            for table in models.Base.metadata.sorted_tables:
+                rows = src.execute(table.select()).fetchall()
+                tgt.execute(table.delete())
+                if rows:
+                    tgt.execute(table.insert(), [dict(r._mapping) for r in rows])
+                logger.info(f"Migrated table {table.name}: {len(rows)} rows")
+
+            if is_mysql_target:
+                tgt.execute(text("SET FOREIGN_KEY_CHECKS=1"))
+            tgt.commit()
+
+    source_engine.dispose()
+    target_engine.dispose()
+    logger.info("Migration completed successfully")
+
+
 if __name__ == "__main__":
     success = main()
     sys.exit(0 if success else 1)

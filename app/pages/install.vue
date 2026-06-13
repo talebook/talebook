@@ -106,6 +106,71 @@
                                     :rules="[rules.code]"
                                 />
                             </template>
+
+                            <v-divider class="my-4" />
+                            <div class="text-subtitle-2 mb-2">
+                                {{ $t('install.dbConfig') }}
+                            </div>
+                            <v-select
+                                v-model="db_type"
+                                prepend-icon="mdi-database"
+                                :label="$t('install.dbType')"
+                                :items="dbTypeItems"
+                                item-title="text"
+                                item-value="value"
+                                hide-details
+                                class="mb-4"
+                            />
+                            <template v-if="db_type !== 'sqlite'">
+                                <v-row dense>
+                                    <v-col cols="9">
+                                        <v-text-field
+                                            v-model="db_host"
+                                            prepend-icon="mdi-server"
+                                            :label="$t('install.dbHost')"
+                                            type="text"
+                                        />
+                                    </v-col>
+                                    <v-col cols="3">
+                                        <v-text-field
+                                            v-model="db_port"
+                                            :label="$t('install.dbPort')"
+                                            type="number"
+                                        />
+                                    </v-col>
+                                </v-row>
+                                <v-text-field
+                                    v-model="db_name"
+                                    prepend-icon="mdi-database"
+                                    :label="$t('install.dbName')"
+                                    type="text"
+                                />
+                                <v-text-field
+                                    v-model="db_user"
+                                    prepend-icon="mdi-account"
+                                    :label="$t('install.dbUser')"
+                                    type="text"
+                                    autocomplete="off"
+                                />
+                                <v-text-field
+                                    v-model="db_pass"
+                                    prepend-icon="mdi-lock"
+                                    :label="$t('install.dbPass')"
+                                    type="password"
+                                    autocomplete="new-password"
+                                />
+                                <div class="mb-4">
+                                    <v-btn
+                                        variant="outlined"
+                                        :loading="dbTesting"
+                                        @click="testDbConnection"
+                                    >
+                                        <v-icon start>mdi-connection</v-icon>
+                                        {{ $t('install.testConnection') }}
+                                    </v-btn>
+                                </div>
+                            </template>
+
                             <div
                                 align="center"
                                 class="mt-4"
@@ -141,7 +206,7 @@ import { useI18n } from '#i18n';
 const router = useRouter();
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
-const { locale, locales, setLocale } = useI18n();
+const { locale, locales, setLocale, t } = useI18n();
 
 // 多语言相关
 const allLocales = computed(() => {
@@ -161,7 +226,19 @@ const invite = ref(false);
 const title = ref('TaleBook');
 const tips = ref('');
 const loading = ref(false);
+const dbTesting = ref(false);
+const db_type = ref('sqlite');
+const db_host = ref('localhost');
+const db_port = ref(3306);
+const db_name = ref('talebook');
+const db_user = ref('');
+const db_pass = ref('');
 let retry = 20;
+
+const dbTypeItems = computed(() => [
+    { text: t('install.dbTypeSqlite'), value: 'sqlite' },
+    { text: t('install.dbTypeMysql'), value: 'mysql' },
+]);
 
 const rules = {
     user: v => ( v && 20 >= v.length && v.length >= 5) || $t('install.userRule'),
@@ -200,6 +277,29 @@ const check_install = () => {
     });
 };
 
+const testDbConnection = async () => {
+    dbTesting.value = true;
+    var data = new URLSearchParams();
+    data.append('db_type', db_type.value);
+    data.append('db_host', db_host.value);
+    data.append('db_port', db_port.value);
+    data.append('db_name', db_name.value);
+    data.append('db_user', db_user.value);
+    data.append('db_pass', db_pass.value);
+    try {
+        const rsp = await $backend('/admin/testdb', { method: 'POST', body: data });
+        if (rsp.err === 'ok') {
+            if ($alert) $alert('success', $t('install.dbConnectSuccess'));
+        } else {
+            if ($alert) $alert('error', rsp.msg || $t('install.dbConnectFailed'));
+        }
+    } catch (e) {
+        if ($alert) $alert('error', $t('install.networkError'));
+    } finally {
+        dbTesting.value = false;
+    }
+};
+
 const do_install = async () => {
     const { valid } = await form.value.validate();
     if (!valid) return;
@@ -212,15 +312,23 @@ const do_install = async () => {
     data.append('code', code.value);
     data.append('invite', invite.value);
     data.append('title', title.value);
-    
+    data.append('db_type', db_type.value);
+    if (db_type.value !== 'sqlite') {
+        data.append('db_host', db_host.value);
+        data.append('db_port', db_port.value);
+        data.append('db_name', db_name.value);
+        data.append('db_user', db_user.value);
+        data.append('db_pass', db_pass.value);
+    }
+
     tips.value = $t('install.writingConfig');
-    
+
     try {
         const rsp = await $backend('/admin/install', {
             method: 'POST',
             body: data,
         });
-        
+
         if ( rsp.err != 'ok' ) {
             if ($alert) $alert('error', rsp.msg);
             loading.value = false;
