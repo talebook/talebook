@@ -28,7 +28,7 @@ from webserver.constants import (
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Item, ReadingState
-from webserver.plugins.meta import baike, calibre, douban, tomato, xhsd, youshu
+from webserver.plugins.meta import baike, calibre, douban, qimao, tomato, xhsd, youshu
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
@@ -308,6 +308,15 @@ class BookRefer(BaseHandler):
 
             tasks["tomato"] = _tomato
 
+        if hasattr(qimao, "QimaoNovelApi"):
+
+            def _qimao():
+                api = qimao.QimaoNovelApi(copy_image=False)
+                book = api.get_book(title)
+                return [book] if book else []
+
+            tasks["qimao"] = _qimao
+
         if META_SOURCE_AI in sources:
 
             def _ai():
@@ -395,6 +404,14 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("获取番茄小说书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")})
+        elif provider_key == qimao.KEY:
+            title = re.sub("[(（].*", "", mi.title)
+            api = qimao.QimaoNovelApi(copy_image=True)
+            try:
+                refer_mi = api.get_book_by_id(provider_value) or api.get_book(title)
+            except Exception as e:
+                logging.error("获取七猫小说书籍信息失败：%s", e)
+                raise RuntimeError({"err": "httprequest.qimao.failed", "msg": _("七猫小说查询失败")})
         elif provider_key == calibre.KEY:
             if mi.isbn:
                 try:
