@@ -783,7 +783,7 @@
         "doubanPluginInfo": "若需要启用豆瓣插件，请参阅安装文档的说明。若出现失败，可尝试更换镜像，例如 talebook/douban-api-rs ",
         "logoInfo": "若需要调整 Logo，请参阅安装文档的说明。",
         "opdsInfo": "OPDS（Open Publication Distribution System）是一种用于电子书分发的开放标准，关闭后将无法通过 OPDS 客户端访问书库。",
-        "webdavInfo": "WebDAV 是一种文件共享协议，启用后其他设备可以像访问网络硬盘一样挂载书库，支持 ES 文件浏览器、Documents、静读天下等工具直接连接。配置修改后需点击"启动服务"使其生效；服务器重启后将根据"启用 WebDAV 服务"开关自动处理。",
+        "webdavInfo": "WebDAV 是一种文件共享协议，启用后其他设备可以像访问网络硬盘一样挂载书库，支持 ES 文件浏览器、Documents、静读天下等工具直接连接。配置修改后需点击“启动服务”使其生效；服务器重启后将根据"启用 WebDAV 服务"开关自动处理。",
         "webdavRunning": "WebDAV 服务运行中",
         "webdavStopped": "WebDAV 服务未启动",
         "webdavAddress": "连接地址",
