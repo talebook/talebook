@@ -208,9 +208,13 @@ class TestScanPDFTitle(TestWithUserLogin):
         with tempfile.TemporaryDirectory() as tmpdir:
             pdf_a = os.path.join(tmpdir, "book_a.pdf")
             pdf_b = os.path.join(tmpdir, "book_b.pdf")
-            for p in [pdf_a, pdf_b]:
-                with open(p, "wb") as f:
-                    f.write(b"%PDF-1.4 minimal pdf")
+            # Use different content so each file gets a distinct SHA256 hash;
+            # identical content would trigger the duplicate-hash cleanup path in do_scan()
+            # and cause the first file's ScanFile record to be deleted.
+            with open(pdf_a, "wb") as f:
+                f.write(b"%PDF-1.4 minimal pdf for book_a")
+            with open(pdf_b, "wb") as f:
+                f.write(b"%PDF-1.4 minimal pdf for book_b")
 
             ScanService().do_scan(tmpdir)
 
