@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import collections
 import datetime
 import hashlib
 import logging
+import os
 import re
 import ssl
 import subprocess
@@ -12,6 +14,7 @@ import traceback
 import uuid
 
 import tornado
+from tornado.options import options as tornado_options
 
 from webserver import loader, utils
 from webserver.base.trash_manager import TrashManager
@@ -1220,6 +1223,72 @@ class AdminUpdateCheck(BaseHandler):
         return {"err": "ok", "status": status}
 
 
+MAX_LOG_LINES = 2000
+DEFAULT_LOG_LINES = 500
+
+
+def _get_log_file():
+    return getattr(tornado_options, "log_file_prefix", None) or "/data/log/talebook.log"
+
+
+class AdminSystemLog(BaseHandler):
+    @js
+    @is_admin
+    def get(self):
+        log_file = _get_log_file()
+        try:
+            lines_count = int(self.get_argument("lines", DEFAULT_LOG_LINES))
+        except (ValueError, TypeError):
+            lines_count = DEFAULT_LOG_LINES
+        lines_count = max(1, min(lines_count, MAX_LOG_LINES))
+
+        if not os.path.exists(log_file):
+            return {"err": "ok", "lines": [], "total": 0, "file": log_file}
+
+        total = 0
+        tail_deque = collections.deque(maxlen=lines_count)
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                total += 1
+                tail_deque.append(line)
+
+        tail = [line.rstrip("\n") for line in tail_deque]
+        return {"err": "ok", "lines": tail, "total": total, "file": log_file}
+
+
+class AdminSystemLogDownload(BaseHandler):
+    async def get(self):
+        if not self.current_user:
+            self.set_status(403)
+            self.finish({"err": "user.need_login", "msg": _("请先登录")})
+            return
+        if not self.admin_user:
+            self.set_status(403)
+            self.finish({"err": "permission.not_admin", "msg": _("当前用户非管理员")})
+            return
+
+        log_file = _get_log_file()
+
+        if not os.path.exists(log_file):
+            self.set_status(404)
+            self.finish()
+            return
+
+        file_size = os.path.getsize(log_file)
+        self.set_header("Content-Type", "text/plain; charset=utf-8")
+        self.set_header("Content-Disposition", 'attachment; filename="talebook.log"')
+        self.set_header("Content-Length", str(file_size))
+        chunk_size = 64 * 1024
+        with open(log_file, "rb") as f:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                self.write(chunk)
+                await self.flush()
+        self.finish()
+
+
 def routes():
     return [
         (r"/api/admin/ssl", AdminSSL),
@@ -1242,4 +1311,6 @@ def routes():
         (r"/api/admin/opds/sources", AdminOpdsSources),
         (r"/api/admin/trash/size", AdminTrashSize),
         (r"/api/admin/trash/clear", AdminTrashClear),
+        (r"/api/admin/log", AdminSystemLog),
+        (r"/api/admin/log/download", AdminSystemLogDownload),
     ]
