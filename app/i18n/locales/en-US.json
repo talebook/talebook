@@ -642,7 +642,8 @@
         "opdsSettings": "OPDS Settings",
         "captchaSettings": "CAPTCHA Settings",
         "trashManagement": "Trash Management",
-        "updateCheck": "Check for Updates"
+        "updateCheck": "Check for Updates",
+        "databaseManagement": "Database Management"
       },
       "button": {
         "saveSettings": "Save Settings",
@@ -650,7 +651,10 @@
         "trashClear": "Clear Trash",
         "trashClearConfirm": "Confirm Clear",
         "checkUpdate": "Check for Updates",
-        "viewRelease": "View Release"
+        "viewRelease": "View Release",
+        "testDbConnection": "Test Connection",
+        "migrateDb": "Migrate Database",
+        "forceMigrateDb": "Force Migrate"
       },
       "label": {
         "siteTitle": "Site Title",
@@ -712,10 +716,18 @@
         "defaultPageSize": "Book List Page Size",
         "currentVersion": "Current Version",
         "latestVersion": "Latest Version",
-        "lastCheckTime": "Last Check Time"
+        "lastCheckTime": "Last Check Time",
+        "dbType": "Database Type",
+        "dbHost": "Database Host",
+        "dbPort": "Port",
+        "dbName": "Database Name",
+        "dbUser": "Database Username",
+        "dbPass": "Database Password"
       },
       "option": {
         "ssl": "SSL",
+        "dbSqlite": "SQLite",
+        "dbMysql": "MySQL / MariaDB",
         "tls": "TLS (most email services use this)",
         "pinyinDir": "Use Pinyin directory names (better compatibility)",
         "chineseDir": "Use Chinese directory names (UTF8, more beautiful)",
@@ -742,7 +754,16 @@
         "trashClearConfirm": "Confirm clearing trash and upload temporary directory? This action cannot be undone!",
         "upToDate": "Already up to date",
         "updateAvailable": "New version {version} available. Please update to get the latest features and security fixes.",
-        "checkError": "Failed to check for updates"
+        "checkError": "Failed to check for updates",
+        "dbInfo": "Talebook's own data (users, bookshelves, configuration) can be migrated to MySQL/MariaDB. Calibre book metadata remains in SQLite. A server restart is required after migration.",
+        "dbMigrateWarning": "Migration will copy all current database data to the new database. A server restart is required. This action cannot be undone — please backup first!",
+        "dbMigrateConfirmTitle": "Confirm database migration?",
+        "dbMigrateSuccess": "Migration successful. Please restart the server for changes to take effect.",
+        "dbConnectSuccess": "Database connection successful",
+        "currentDb": "Current Database",
+        "newDbConfig": "Migrate to New Database",
+        "dbForceTitle": "Target database has existing data — confirm forced migration?",
+        "dbForceWarning": "The target database already contains {count} records. A forced migration will permanently erase all existing data before writing. This cannot be undone — please back up first!"
       },
       "meta_source": {
         "douban": "Douban",
@@ -867,7 +888,19 @@
     "writingConfig": "Writing configuration file...",
     "configWriteSuccess": "Configuration written successfully!",
     "checkingServer": "Checking server...",
-    "networkError": "Network error"
+    "networkError": "Network error",
+    "dbConfig": "Database Configuration",
+    "dbType": "Database Type",
+    "dbTypeSqlite": "SQLite (default, suitable for personal use)",
+    "dbTypeMysql": "MySQL / MariaDB (suitable for high concurrency)",
+    "dbHost": "Database Host",
+    "dbPort": "Port",
+    "dbName": "Database Name",
+    "dbUser": "Database Username",
+    "dbPass": "Database Password",
+    "testConnection": "Test Connection",
+    "dbConnectSuccess": "Database connection successful",
+    "dbConnectFailed": "Database connection failed"
   },
   "settings": {
     "deviceMgt": "Global Device Management",

@@ -404,6 +404,133 @@ class AdminSettings(BaseHandler):
         return logic.save_extra_settings(args)
 
 
+def _build_mysql_url(db_host, db_port, db_name, db_user, db_pass):
+    """Construct a MySQL+pymysql connection URL from individual parameters."""
+    import urllib.parse
+
+    safe_pass = urllib.parse.quote(db_pass, safe="")
+    safe_user = urllib.parse.quote(db_user, safe="")
+    return f"mysql+pymysql://{safe_user}:{safe_pass}@{db_host}:{db_port}/{db_name}?charset=utf8mb4"
+
+
+class AdminTestDB(BaseHandler):
+    """Test whether a database connection is reachable.
+
+    Accessible before install (for the install wizard) and by admins after install.
+    """
+
+    def should_be_installed(self):
+        pass
+
+    @js
+    def post(self):
+        # Before install: allow without auth (install wizard use case)
+        # After install: require admin
+        if CONF.get("installed", True):
+            if not self.current_user:
+                return {"err": "user.need_login", "msg": _("请先登录")}
+            if not self.admin_user:
+                return {"err": "permission", "msg": _("无权访问此接口")}
+
+        db_type = self.get_argument("db_type", "sqlite")
+        if db_type == "sqlite":
+            return {"err": "ok", "msg": _("SQLite 无需测试连接")}
+
+        db_host = self.get_argument("db_host", "localhost").strip()
+        db_port = self.get_argument("db_port", "3306").strip()
+        db_name = self.get_argument("db_name", "").strip()
+        db_user = self.get_argument("db_user", "").strip()
+        db_pass = self.get_argument("db_pass", "").strip()
+
+        if not db_name or not db_user:
+            return {"err": "params.invalid", "msg": _("数据库连接参数不完整")}
+
+        try:
+            db_port = int(db_port)
+        except ValueError:
+            return {"err": "params.invalid", "msg": _("端口号无效")}
+        if not (1 <= db_port <= 65535):
+            return {"err": "params.invalid", "msg": _("端口号范围无效，应在 1-65535 之间")}
+
+        db_url = _build_mysql_url(db_host, db_port, db_name, db_user, db_pass)
+        try:
+            from sqlalchemy import create_engine, text
+
+            engine = create_engine(db_url, pool_pre_ping=True, pool_size=1, max_overflow=0)
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            engine.dispose()
+            return {"err": "ok", "msg": _("数据库连接成功")}
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return {"err": "db.connect_failed", "msg": str(e)}
+
+
+class AdminMigrateDB(BaseHandler):
+    """Migrate all Talebook user-data tables from the current database to a new one."""
+
+    @js
+    @auth
+    def post(self):
+        if not self.admin_user:
+            return {"err": "permission", "msg": _("无权访问此接口")}
+
+        db_type = self.get_argument("db_type", "").strip()
+        if not db_type or db_type == "sqlite":
+            return {"err": "params.invalid", "msg": _("请选择有效的目标数据库类型")}
+
+        db_host = self.get_argument("db_host", "localhost").strip()
+        db_port = self.get_argument("db_port", "3306").strip()
+        db_name = self.get_argument("db_name", "").strip()
+        db_user = self.get_argument("db_user", "").strip()
+        db_pass = self.get_argument("db_pass", "").strip()
+
+        if not db_name or not db_user:
+            return {"err": "params.invalid", "msg": _("数据库连接参数不完整")}
+
+        try:
+            db_port = int(db_port)
+        except ValueError:
+            return {"err": "params.invalid", "msg": _("端口号无效")}
+        if not (1 <= db_port <= 65535):
+            return {"err": "params.invalid", "msg": _("端口号范围无效，应在 1-65535 之间")}
+
+        force = self.get_argument("force", "0").strip() == "1"
+
+        new_db_url = _build_mysql_url(db_host, db_port, db_name, db_user, db_pass)
+        source_url = CONF["user_database"]
+
+        if new_db_url == source_url:
+            return {"err": "params.invalid", "msg": _("目标数据库与当前数据库相同")}
+
+        try:
+            from webserver.migrate_db import TargetNotEmptyError, migrate_data
+
+            migrate_data(source_url, new_db_url, force=force)
+        except TargetNotEmptyError as e:
+            return {
+                "err": "db.target_has_data",
+                "count": e.count,
+                "msg": _("目标数据库已有 %d 条记录，继续迁移将清空这些数据。如需强制迁移，请再次确认。") % e.count,
+            }
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return {"err": "db.migrate_failed", "msg": _("数据迁移失败: %s") % str(e)}
+
+        # Persist new user_database — load ALL current settings so other keys aren't lost
+        try:
+            args = loader.SettingsLoader()
+            args["user_database"] = new_db_url
+            args["installed"] = True
+            args.dumpfile()
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return {"err": "file.permission", "msg": _("保存配置失败: %s") % str(e)}
+
+        CONF["user_database"] = new_db_url
+        return {"err": "ok", "msg": _("数据迁移成功，请重启服务器以生效"), "need_restart": True}
+
+
 class AdminInstall(BaseHandler):
     def should_be_invited(self):
         pass
@@ -436,8 +563,45 @@ class AdminInstall(BaseHandler):
         if len(password) < 8 or len(password) > 20 or not re.match(Reader.RE_PASSWORD, password):
             return {"err": "params.password.invalid", "msg": _("密码无效")}
 
+        # Optional database configuration
+        db_type = self.get_argument("db_type", "sqlite").strip()
+        target_session = self.session
+        target_db_url = None
+
+        if db_type in ("mysql", "mariadb"):
+            db_host = self.get_argument("db_host", "localhost").strip()
+            db_port = self.get_argument("db_port", "3306").strip()
+            db_name = self.get_argument("db_name", "").strip()
+            db_user = self.get_argument("db_user", "").strip()
+            db_pass = self.get_argument("db_pass", "").strip()
+
+            if not db_name or not db_user:
+                return {"err": "params.invalid", "msg": _("数据库连接参数不完整")}
+
+            try:
+                db_port = int(db_port)
+            except ValueError:
+                return {"err": "params.invalid", "msg": _("端口号无效")}
+            if not (1 <= db_port <= 65535):
+                return {"err": "params.invalid", "msg": _("端口号范围无效，应在 1-65535 之间")}
+
+            target_db_url = _build_mysql_url(db_host, db_port, db_name, db_user, db_pass)
+            try:
+                from sqlalchemy import create_engine
+                from sqlalchemy.orm import sessionmaker
+
+                from webserver import models
+
+                new_engine = create_engine(target_db_url, pool_pre_ping=True, pool_size=1, max_overflow=0)
+                models.user_syncdb(new_engine)
+                NewSession = sessionmaker(bind=new_engine, autoflush=True, autocommit=False)
+                target_session = NewSession()
+            except Exception as e:
+                logging.error(traceback.format_exc())
+                return {"err": "db.connect_failed", "msg": _("数据库连接失败: %s") % str(e)}
+
         # 避免重复创建
-        user = self.session.query(Reader).filter(Reader.username == username).first()
+        user = target_session.query(Reader).filter(Reader.username == username).first()
         if not user:
             user = Reader()
             user.username = username
@@ -454,8 +618,13 @@ class AdminInstall(BaseHandler):
         user.extra = {"kindle_email": ""}
         user.set_secure_password(password)
         try:
-            user.save()
-        except:
+            if target_session is self.session:
+                user.save()
+            else:
+                target_session.add(user)
+                target_session.commit()
+                target_session.close()
+        except Exception:
             logging.error(traceback.format_exc())
             return {"err": "db.error", "msg": _("系统异常，请重试或更换注册信息")}
 
@@ -478,6 +647,9 @@ class AdminInstall(BaseHandler):
             args["INVITE_CODE"] = code
         else:
             args["INVITE_MODE"] = False
+
+        if target_db_url:
+            args["user_database"] = target_db_url
 
         logic = SettingsSaverLogic()
         return logic.save_extra_settings(args)
@@ -1138,6 +1310,8 @@ def routes():
         (r"/api/admin/install", AdminInstall),
         (r"/api/admin/settings", AdminSettings),
         (r"/api/admin/testmail", AdminTestMail),
+        (r"/api/admin/testdb", AdminTestDB),
+        (r"/api/admin/migratedb", AdminMigrateDB),
         (r"/api/admin/update", AdminUpdateCheck),
         (r"/api/admin/book/list", AdminBookList),
         (r"/api/admin/book/fill", AdminBookFill),

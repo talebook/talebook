@@ -429,6 +429,98 @@
                             </div>
                         </template>
 
+                        <template v-if="card.show_db">
+                            <div class="pa-2">
+                                <p class="text-body-2 text-medium-emphasis mb-4">
+                                    {{ t('admin.settings.message.dbInfo') }}
+                                </p>
+                                <div class="mb-4">
+                                    <span class="text-subtitle-2 font-weight-medium">{{ t('admin.settings.message.currentDb') }}:</span>
+                                    <v-chip
+                                        size="small"
+                                        class="ml-2"
+                                        color="primary"
+                                    >
+                                        {{ settings.user_database && settings.user_database.startsWith('sqlite') ? t('admin.settings.option.dbSqlite') : t('admin.settings.option.dbMysql') }}
+                                    </v-chip>
+                                </div>
+                                <p class="text-subtitle-2 font-weight-medium mb-2">
+                                    {{ t('admin.settings.message.newDbConfig') }}
+                                </p>
+                                <v-select
+                                    v-model="dbNewType"
+                                    prepend-icon="mdi-database"
+                                    :label="t('admin.settings.label.dbType')"
+                                    :items="dbTypeOptions"
+                                    item-title="text"
+                                    item-value="value"
+                                    hide-details
+                                    class="mb-4"
+                                />
+                                <template v-if="dbNewType === 'mysql'">
+                                    <v-row dense>
+                                        <v-col cols="9">
+                                            <v-text-field
+                                                v-model="dbNewHost"
+                                                prepend-icon="mdi-server"
+                                                :label="t('admin.settings.label.dbHost')"
+                                                density="compact"
+                                                hide-details
+                                            />
+                                        </v-col>
+                                        <v-col cols="3">
+                                            <v-text-field
+                                                v-model.number="dbNewPort"
+                                                :label="t('admin.settings.label.dbPort')"
+                                                type="number"
+                                                density="compact"
+                                                hide-details
+                                            />
+                                        </v-col>
+                                    </v-row>
+                                    <v-text-field
+                                        v-model="dbNewName"
+                                        prepend-icon="mdi-database"
+                                        :label="t('admin.settings.label.dbName')"
+                                        density="compact"
+                                        class="mt-2"
+                                    />
+                                    <v-text-field
+                                        v-model="dbNewUser"
+                                        prepend-icon="mdi-account"
+                                        :label="t('admin.settings.label.dbUser')"
+                                        density="compact"
+                                    />
+                                    <v-text-field
+                                        v-model="dbNewPass"
+                                        prepend-icon="mdi-lock"
+                                        :label="t('admin.settings.label.dbPass')"
+                                        type="password"
+                                        density="compact"
+                                    />
+                                    <div class="mt-2 d-flex gap-2">
+                                        <v-btn
+                                            variant="outlined"
+                                            :loading="dbTesting"
+                                            class="mr-2"
+                                            @click="testDbConnection"
+                                        >
+                                            <v-icon start>mdi-connection</v-icon>
+                                            {{ t('admin.settings.button.testDbConnection') }}
+                                        </v-btn>
+                                        <v-btn
+                                            color="warning"
+                                            :loading="dbMigrating"
+                                            @click="dbMigrateDialog = true"
+                                        >
+                                            <v-icon start>mdi-database-arrow-right</v-icon>
+                                            {{ t('admin.settings.button.migrateDb') }}
+                                        </v-btn>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
                         <template v-if="card.show_ssl">
                             <SSLManager />
                         </template>
@@ -535,6 +627,30 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
+
+        <v-dialog v-model="dbMigrateDialog" max-width="440" persistent>
+            <v-card>
+                <v-card-title>{{ t('admin.settings.message.dbMigrateConfirmTitle') }}</v-card-title>
+                <v-card-text>{{ t('admin.settings.message.dbMigrateWarning') }}</v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="dbMigrateDialog = false">{{ t('common.cancel') }}</v-btn>
+                    <v-btn color="warning" dark @click="migrateDb(false)">{{ t('admin.settings.button.migrateDb') }}</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog v-model="dbForceDialog" max-width="480" persistent>
+            <v-card>
+                <v-card-title>{{ t('admin.settings.message.dbForceTitle') }}</v-card-title>
+                <v-card-text>{{ t('admin.settings.message.dbForceWarning', { count: dbTargetDataCount }) }}</v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="dbForceDialog = false">{{ t('common.cancel') }}</v-btn>
+                    <v-btn color="error" dark @click="forceMigrateDb">{{ t('admin.settings.button.forceMigrateDb') }}</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -597,7 +713,25 @@ const cardShows = ref({
     captchaSettings: false,
     trashManagement: false,
     updateCheck: false,
+    databaseManagement: false,
 });
+
+// Database management state
+const dbNewType = ref('mysql');
+const dbNewHost = ref('localhost');
+const dbNewPort = ref(3306);
+const dbNewName = ref('talebook');
+const dbNewUser = ref('');
+const dbNewPass = ref('');
+const dbTesting = ref(false);
+const dbMigrating = ref(false);
+const dbMigrateDialog = ref(false);
+const dbForceDialog = ref(false);
+const dbTargetDataCount = ref(0);
+const dbTypeOptions = computed(() => [
+    { text: t('admin.settings.option.dbSqlite'), value: 'sqlite' },
+    { text: t('admin.settings.option.dbMysql'), value: 'mysql' },
+]);
 
 // 人机验证提供商选项
 const captchaProviders = [
@@ -816,6 +950,12 @@ const cards = computed(() => [
     },
 
     {
+        key: 'databaseManagement',
+        title: t('admin.settings.section.databaseManagement'),
+        fields: [],
+        show_db: true,
+    },
+    {
         key: 'sslManagement',
         title: t('admin.settings.section.sslManagement'),
         fields: [],
@@ -927,6 +1067,57 @@ const test_email = () => {
 
 const run = (func) => {
     if (func === 'test_email') test_email();
+};
+
+const testDbConnection = () => {
+    dbTesting.value = true;
+    var data = new URLSearchParams();
+    data.append('db_type', dbNewType.value);
+    data.append('db_host', dbNewHost.value);
+    data.append('db_port', dbNewPort.value);
+    data.append('db_name', dbNewName.value);
+    data.append('db_user', dbNewUser.value);
+    data.append('db_pass', dbNewPass.value);
+    $backend('/admin/testdb', { method: 'POST', body: data })
+        .then(rsp => {
+            if (rsp.err === 'ok') {
+                if ($alert) $alert('success', t('admin.settings.message.dbConnectSuccess'));
+            } else {
+                if ($alert) $alert('error', rsp.msg);
+            }
+        })
+        .finally(() => { dbTesting.value = false; });
+};
+
+const migrateDb = (force = false) => {
+    dbMigrateDialog.value = false;
+    dbMigrating.value = true;
+    var data = new URLSearchParams();
+    data.append('db_type', dbNewType.value);
+    data.append('db_host', dbNewHost.value);
+    data.append('db_port', dbNewPort.value);
+    data.append('db_name', dbNewName.value);
+    data.append('db_user', dbNewUser.value);
+    data.append('db_pass', dbNewPass.value);
+    if (force) data.append('force', '1');
+    $backend('/admin/migratedb', { method: 'POST', body: data })
+        .then(rsp => {
+            if (rsp.err === 'ok') {
+                if ($alert) $alert('success', t('admin.settings.message.dbMigrateSuccess'));
+                settings.value.user_database = `mysql+pymysql://${dbNewUser.value}:***@${dbNewHost.value}:${dbNewPort.value}/${dbNewName.value}`;
+            } else if (rsp.err === 'db.target_has_data') {
+                dbTargetDataCount.value = rsp.count || 0;
+                dbForceDialog.value = true;
+            } else {
+                if ($alert) $alert('error', rsp.msg);
+            }
+        })
+        .finally(() => { dbMigrating.value = false; });
+};
+
+const forceMigrateDb = () => {
+    dbForceDialog.value = false;
+    migrateDb(true);
 };
 
 const fetchTrashSize = () => {
