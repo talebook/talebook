@@ -673,6 +673,7 @@ class ListHandler(BaseHandler):
         self.set_header("Access-Control-Allow-Credentials", "true")
         self.set_header("Cache-Control", "max-age=0")
         self.set_header("Content-Type", "application/x-ndjson")
+        self.set_header("X-Accel-Buffering", "no")
 
         meta = {
             "err": "ok",

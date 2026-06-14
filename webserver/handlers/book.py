@@ -559,6 +559,7 @@ class BookRefer(BaseHandler):
             self.set_header("Access-Control-Allow-Credentials", "true")
             self.set_header("Cache-Control", "max-age=0")
             self.set_header("Content-Type", "application/x-ndjson")
+            self.set_header("X-Accel-Buffering", "no")
 
             self.write(json.dumps({"err": "ok"}, ensure_ascii=False) + "\n")
             await self.flush()
@@ -1815,6 +1816,7 @@ class BookScoped(BaseHandler):
                 self.set_header("Access-Control-Allow-Credentials", "true")
                 self.set_header("Cache-Control", "max-age=0")
                 self.set_header("Content-Type", "application/x-ndjson")
+                self.set_header("X-Accel-Buffering", "no")
 
                 meta = {"err": "ok", "title": title, "total": total_items}
                 self.write(json.dumps(meta, ensure_ascii=False) + "\n")
