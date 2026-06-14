@@ -256,15 +256,21 @@ class BookRefer(BaseHandler):
         logging.info("并行查询(流式) %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
             future_map = {executor.submit(fn): name for name, fn in tasks.items()}
-            for f in concurrent.futures.as_completed(future_map, timeout=self.REFER_TIMEOUT):
-                name = future_map[f]
-                try:
-                    result = f.result()
-                    logging.info("%s 查询完成：%d 条", name, len(result))
-                    for b in result:
-                        yield b
-                except Exception as e:
-                    logging.error("%s 查询失败：%s", name, e)
+            pending = set(future_map.keys())
+            try:
+                for f in concurrent.futures.as_completed(future_map, timeout=self.REFER_TIMEOUT):
+                    name = future_map[f]
+                    pending.discard(f)
+                    try:
+                        result = f.result()
+                        logging.info("%s 查询完成：%d 条", name, len(result))
+                        for b in result:
+                            yield b
+                    except Exception as e:
+                        logging.error("%s 查询失败：%s", name, e)
+            except TimeoutError:
+                for f in pending:
+                    logging.warning("查询 %s 超时，已跳过", future_map[f])
 
     def _build_search_tasks(self, mi):
         sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
