@@ -281,6 +281,15 @@
                                 </v-btn>
                             </div>
                         </div>
+                        <v-alert
+                            v-else-if="exploreCategoryUrl && !exploreLoading"
+                            type="info"
+                            variant="tonal"
+                            density="compact"
+                            class="mt-3"
+                        >
+                            {{ $t('network.exploreNoBooks') }}
+                        </v-alert>
                     </v-col>
                 </v-row>
             </v-tabs-window-item>

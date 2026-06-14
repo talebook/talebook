@@ -231,6 +231,7 @@
     "partialFailedCount": "{n} 个书源未返回结果",
     "explorePickSource": "选择书源",
     "exploreEmpty": "该书源未配置发现分类",
+    "exploreNoBooks": "该分类下暂无书籍，可能是书源规则不支持分类页解析",
     "prevPage": "上一页",
     "nextPage": "下一页",
     "page": "第 {n} 页",
