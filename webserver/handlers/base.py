@@ -681,11 +681,14 @@ class ListHandler(BaseHandler):
         }
         self.write(json.dumps(meta, ensure_ascii=False) + "\n")
         await self.flush()
+        logging.info("[STREAM] 书单元信息已发送 (total=%d)", count)
 
         for b in books:
+            title_val = b.get("title", "?")
             book_json = json.dumps(self.fmt(b), ensure_ascii=False)
             self.write(book_json + "\n")
             await self.flush()
+            logging.info("[STREAM] 已发送: %s", title_val)
 
         self.finish()
 

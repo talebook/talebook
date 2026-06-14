@@ -562,12 +562,14 @@ class BookRefer(BaseHandler):
 
             self.write(json.dumps({"err": "ok"}, ensure_ascii=False) + "\n")
             await self.flush()
+            logging.info("[STREAM] 元信息已发送")
 
             async for b in self.plugin_search_books_stream(mi):
                 d = self._fmt_refer_book(b)
                 if d:
                     self.write(json.dumps(d, ensure_ascii=False) + "\n")
                     await self.flush()
+                    logging.info("[STREAM] 已发送: %s (source=%s)", d.get("title", "?"), d.get("source", "?"))
 
             self.finish()
             return None
@@ -1817,11 +1819,14 @@ class BookScoped(BaseHandler):
                 meta = {"err": "ok", "title": title, "total": total_items}
                 self.write(json.dumps(meta, ensure_ascii=False) + "\n")
                 await self.flush()
+                logging.info("[STREAM] scopedbooks 元信息已发送 (total=%d)", total_items)
 
                 for book in books:
+                    title_val = book.get("title", "?")
                     book_data = utils.BookFormatter(self, book).format()
                     self.write(json.dumps(book_data, ensure_ascii=False) + "\n")
                     await self.flush()
+                    logging.info("[STREAM] scopedbooks 已发送: %s", title_val)
 
                 self.finish()
                 return None
