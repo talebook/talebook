@@ -128,6 +128,8 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     echo "ARCH = \"$TARGETARCH$TARGETVARIANT\"" >> webserver/version.py && \
     echo 'settings = {}' > /data/books/settings/auto.py && \
     chmod a+w /data/books/settings/auto.py && \
+    pkill -9 -f calibre 2>/dev/null || true && \
+    rm -rf /tmp/calibre* /root/.config/calibre 2>/dev/null || true && \
     calibredb add --library-path=/data/books/library/ -r docker/book/ && \
     python3 server.py --syncdb  && \
     python3 server.py --update-config  && \

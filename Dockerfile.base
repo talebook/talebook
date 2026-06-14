@@ -64,6 +64,9 @@ RUN echo "Verifying Calibre installation..." && \
         exit 1; \
     fi
 
+# 清理 calibre 验证遗留的临时文件，防止被打入镜像层影响后续 calibredb 调用
+RUN rm -rf /tmp/calibre* /root/.config/calibre 2>/dev/null; true
+
 # 验证 PyQt5 安装
 RUN echo "Verifying PyQt5 installation..." && \
     python3 -c "import PyQt5; print('PyQt5 imported successfully')" && \
