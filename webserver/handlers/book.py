@@ -427,14 +427,14 @@ class BookRefer(BaseHandler):
                 refer_mi = plugin.get_metadata_by_provider(provider_value, mi)
             except Exception as e:
                 logging.error("DoubanV2 query failed: %s", e)
-                raise RuntimeError({"err": "httprequest.douban_v2.failed", "msg": _("??V2??????")})
+                raise RuntimeError({"err": "httprequest.douban_v2.failed", "msg": _("豆瓣V2查询失败")})
         elif provider_key == neodb.KEY:
             plugin = neodb.NeodbMetaPlugin()
             try:
                 refer_mi = plugin.get_metadata_by_provider(provider_value, mi)
             except Exception as e:
                 logging.error("NeoDB query failed: %s", e)
-                raise RuntimeError({"err": "httprequest.neodb.failed", "msg": _("NeoDB????")})
+                raise RuntimeError({"err": "httprequest.neodb.failed", "msg": _("NeoDB查询失败")})
         elif provider_key == calibre.KEY:
             if mi.isbn:
                 try:

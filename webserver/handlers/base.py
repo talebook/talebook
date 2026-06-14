@@ -50,15 +50,20 @@ def js(func):
     def do(self, *args, **kwargs):
         try:
             rsp = func(self, *args, **kwargs)
-            rsp["msg"] = rsp.get("msg", "")
-        except Exception as e:
+            if rsp is None:
+                return
+            if isinstance(rsp, dict):
+                rsp["msg"] = rsp.get("msg", "")
+        except web.Finish:
+            return
+        except Exception:
             import traceback
 
             logging.error(traceback.format_exc())
             msg = 'Exception:<br><pre style="white-space:pre-wrap;word-break:keep-all">%s</pre>' % traceback.format_exc()
             rsp = {"err": "exception", "msg": msg}
-            if isinstance(e, web.Finish):
-                rsp = ""
+        if self._finished:
+            return
         origin = self.request.headers.get("origin", "*")
         self.set_header("Access-Control-Allow-Origin", origin)
         self.set_header("Access-Control-Allow-Credentials", "true")

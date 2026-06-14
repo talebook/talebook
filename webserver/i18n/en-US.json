@@ -256,6 +256,8 @@
     "请输入搜索关键字": "Please enter search keywords",
     "请选择要上传的封面图": "Please select a cover image to upload",
     "豆瓣接口查询失败": "Douban API query failed",
+    "豆瓣V2查询失败": "Douban V2 query failed",
+    "NeoDB查询失败": "NeoDB query failed",
     "转换成功，请稍后刷新页面查看": "Conversion successful, please refresh the page later",
     "这是一封测试邮件，验证邮件参数是否配置正确。": "This is a test email to verify that email parameters are configured correctly.",
     "邮箱地址不能为空": "Email address cannot be empty",
