@@ -225,15 +225,55 @@ class BookRefer(BaseHandler):
     REFER_TIMEOUT = 30  # 并行查询总超时秒数（需大于 AI HTTP timeout）
 
     def plugin_search_books(self, mi):
+        tasks = self._build_search_tasks(mi)
+        if not tasks:
+            return []
+
+        logging.info("并行查询 %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
+        books = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+            future_map = {executor.submit(fn): name for name, fn in tasks.items()}
+            done, not_done = concurrent.futures.wait(future_map, timeout=self.REFER_TIMEOUT)
+            for f in not_done:
+                logging.warning("查询 %s 超时，已跳过", future_map[f])
+            for f in done:
+                name = future_map[f]
+                try:
+                    result = f.result()
+                    books.extend(result)
+                    logging.info("%s 查询完成：%d 条", name, len(result))
+                except Exception as e:
+                    logging.error("%s 查询失败：%s", name, e)
+
+        logging.info("所有信息源查询完成，共找到 %d 条结果", len(books))
+        return books
+
+    def plugin_search_books_stream(self, mi):
+        tasks = self._build_search_tasks(mi)
+        if not tasks:
+            return
+
+        logging.info("并行查询(流式) %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+            future_map = {executor.submit(fn): name for name, fn in tasks.items()}
+            for f in concurrent.futures.as_completed(future_map, timeout=self.REFER_TIMEOUT):
+                name = future_map[f]
+                try:
+                    result = f.result()
+                    logging.info("%s 查询完成：%d 条", name, len(result))
+                    for b in result:
+                        yield b
+                except Exception as e:
+                    logging.error("%s 查询失败：%s", name, e)
+
+    def _build_search_tasks(self, mi):
         sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
         logging.info("META_SELECTED_SOURCES 配置：%s", sources)
         if not sources:
-            return []
+            return {}
 
         title = re.sub("[(（].*", "", mi.title)
-
-        # 将每个数据源封装为独立 callable，返回 list
-        tasks = {}  # name -> callable
+        tasks = {}
 
         if META_SOURCE_DOUBAN in sources:
 
@@ -288,8 +328,6 @@ class BookRefer(BaseHandler):
                     results = calibre.CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
                 for r in results or []:
                     r.cover_data = calibre.CalibreMetadataApi.get_cover(r.cover_url) if getattr(r, "cover_url", None) else None
-                    # calibre 插件内部按子数据源设置 provider_key（"google"/"amazon"），
-                    # 但 plugin_get_book_meta 只识别 calibre.KEY，统一覆盖
                     r.provider_key = calibre.KEY
                 return list(results) if results else []
 
@@ -351,24 +389,7 @@ class BookRefer(BaseHandler):
 
             tasks["ai"] = _ai
 
-        logging.info("并行查询 %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
-        books = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
-            future_map = {executor.submit(fn): name for name, fn in tasks.items()}
-            done, not_done = concurrent.futures.wait(future_map, timeout=self.REFER_TIMEOUT)
-            for f in not_done:
-                logging.warning("查询 %s 超时，已跳过", future_map[f])
-            for f in done:
-                name = future_map[f]
-                try:
-                    result = f.result()
-                    books.extend(result)
-                    logging.info("%s 查询完成：%d 条", name, len(result))
-                except Exception as e:
-                    logging.error("%s 查询失败：%s", name, e)
-
-        logging.info("所有信息源查询完成，共找到 %d 条结果", len(books))
-        return books
+        return tasks
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
         refer_mi = None
@@ -497,14 +518,48 @@ class BookRefer(BaseHandler):
 
     @js
     @auth
-    def get(self, id):
+    async def get(self, id):
         book_id = int(id)
         item = self.session.query(Item).filter(Item.book_id == book_id).first()
         if item and item.scope == "private":
             if item.collector_id != self.user_id():
                 return {"err": "book.not_found", "msg": _("书籍不存在")}
         mi = self.db.get_metadata(book_id, index_is_id=True)
+
+        stream = self.get_argument("stream", None)
+        if stream == "1":
+            import json
+
+            origin = self.request.headers.get("origin", "*")
+            self.set_header("Access-Control-Allow-Origin", origin)
+            self.set_header("Access-Control-Allow-Credentials", "true")
+            self.set_header("Cache-Control", "max-age=0")
+            self.set_header("Content-Type", "application/x-ndjson")
+
+            self.write(json.dumps({"err": "ok"}, ensure_ascii=False) + "\n")
+            await self.flush()
+
+            for b in self.plugin_search_books_stream(mi):
+                d = self._fmt_refer_book(b)
+                if d:
+                    self.write(json.dumps(d, ensure_ascii=False) + "\n")
+                    await self.flush()
+
+            self.finish()
+            return None
+
         books = self.plugin_search_books(mi)
+        logging.info("开始处理 %d 个书籍信息源", len(books))
+        rsp = []
+        for b in books:
+            d = self._fmt_refer_book(b)
+            if d:
+                rsp.append(d)
+
+        logging.info("成功处理 %d/%d 个书籍信息", len(rsp), len(books))
+        return {"err": "ok", "books": rsp}
+
+    def _fmt_refer_book(self, b):
         keys = [
             "cover_url",
             "source",
@@ -518,76 +573,41 @@ class BookRefer(BaseHandler):
             "provider_key",
             "provider_value",
         ]
-        rsp = []
-        logging.info("开始处理 %d 个书籍信息源", len(books))
+        if hasattr(b, "title") and hasattr(b, "authors"):
+            b = {
+                "title": b.title,
+                "authors": b.authors,
+                "author": b.author if hasattr(b, "author") else b.authors[0] if b.authors else "",
+                "author_sort": b.author_sort if hasattr(b, "author_sort") else "",
+                "publisher": b.publisher if hasattr(b, "publisher") else "",
+                "isbn": b.isbn if hasattr(b, "isbn") else "",
+                "comments": b.comments if hasattr(b, "comments") else "",
+                "cover_url": b.cover_url if hasattr(b, "cover_url") else "",
+                "source": b.source if hasattr(b, "source") else "",
+                "website": b.website if hasattr(b, "website") else "",
+                "provider_key": b.provider_key if hasattr(b, "provider_key") else "",
+                "provider_value": b.provider_value if hasattr(b, "provider_value") else "",
+                "pubdate": b.pubdate if hasattr(b, "pubdate") else None,
+            }
+        elif not isinstance(b, dict):
+            return None
 
-        for i, b in enumerate(books):
-            # 处理 Metadata 对象
-            if hasattr(b, "title") and hasattr(b, "authors"):
-                # 将 Metadata 对象转换为字典
-                b_dict = {
-                    "title": b.title,
-                    "authors": b.authors,
-                    "author": b.author if hasattr(b, "author") else b.authors[0] if b.authors else "",
-                    "author_sort": b.author_sort if hasattr(b, "author_sort") else "",
-                    "publisher": b.publisher if hasattr(b, "publisher") else "",
-                    "isbn": b.isbn if hasattr(b, "isbn") else "",
-                    "comments": b.comments if hasattr(b, "comments") else "",
-                    "cover_url": b.cover_url if hasattr(b, "cover_url") else "",
-                    "source": b.source if hasattr(b, "source") else "",
-                    "website": b.website if hasattr(b, "website") else "",
-                    "provider_key": b.provider_key if hasattr(b, "provider_key") else "",
-                    "provider_value": b.provider_value if hasattr(b, "provider_value") else "",
-                    "pubdate": b.pubdate if hasattr(b, "pubdate") else None,
-                }
-                b = b_dict
-            # 确保 b 是字典对象
-            elif not isinstance(b, dict):
-                logging.warning(
-                    "跳过第 %d 个书籍信息：类型不符 [type=%s, value=%r]",
-                    i,
-                    type(b).__name__,
-                    b,
-                )
-                continue
+        if "title" not in b or not b["title"]:
+            return None
 
-            # 检查必要的字段
-            if "title" not in b or not b["title"]:
-                logging.warning("跳过第 %d 个书籍信息：缺少必要字段 title", i)
-                continue
+        try:
+            d = dict((k, b.get(k, "")) for k in keys)
+            pubdate = b.get("pubdate")
+            d["pubyear"] = pubdate.strftime("%Y") if pubdate else ""
 
-            try:
-                d = dict((k, b.get(k, "")) for k in keys)
-                pubdate = b.get("pubdate")
-                d["pubyear"] = pubdate.strftime("%Y") if pubdate else ""
+            if d["title"].startswith("百度百科"):
+                return None
 
-                # 过滤掉百度百科的无详细介绍结果
-                if d["title"].startswith("百度百科"):
-                    logging.info("跳过百度百科无详细介绍的书籍：%s", d["title"])
-                    continue
-
-                if not d["comments"]:
-                    d["comments"] = _("无详细介绍")
-
-                # 记录成功处理的书籍信息
-                logging.debug(
-                    "成功处理书籍 [%s] by %s (provider=%s)",
-                    d["title"],
-                    d["author"],
-                    d.get("provider_key", "unknown"),
-                )
-                rsp.append(d)
-            except Exception as e:
-                logging.error(
-                    "处理第 %d 个书籍信息时出错 [title=%s, error=%s]",
-                    i,
-                    b.get("title", "unknown"),
-                    e,
-                )
-                continue
-
-        logging.info("成功处理 %d/%d 个书籍信息", len(rsp), len(books))
-        return {"err": "ok", "books": rsp}
+            if not d["comments"]:
+                d["comments"] = _("无详细介绍")
+            return d
+        except Exception:
+            return None
 
     @js
     @auth

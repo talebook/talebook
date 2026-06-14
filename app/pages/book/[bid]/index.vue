@@ -1347,19 +1347,56 @@ const sendToDevice = async () => {
 const get_refer = async () => {
     dialog_refer.value = true;
     refer_books_loading.value = true;
+    refer_books.value = [];
+
+    const config = useRuntimeConfig();
+    const server = import.meta.server ? config.public.api_url : window.location.origin;
+    const fullUrl = server + `/api/book/${bookid}/refer?stream=1`;
 
     try {
-        const rsp = await $backend(`/book/${bookid}/refer`);
-        refer_books.value = rsp.books.map((b) => {
-            b.href = '';
-            // 如果没有封面地址，使用默认封面
-            if (!b.cover_url || b.cover_url === '') {
-                b.img = '/get/cover/0';
-            } else {
-                b.img = '/get/pcover?url=' + encodeURIComponent(b.cover_url);
-            }
-            return b;
+        const response = await fetch(fullUrl, {
+            mode: 'cors', redirect: 'follow', credentials: 'include',
         });
+
+        if (!response.ok) {
+            refer_books_loading.value = false;
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let firstLine = true;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const data = JSON.parse(line);
+                    if (firstLine) {
+                        firstLine = false;
+                        refer_books_loading.value = false;
+                    } else {
+                        data.href = '';
+                        if (!data.cover_url || data.cover_url === '') {
+                            data.img = '/get/cover/0';
+                        } else {
+                            data.img = '/get/pcover?url=' + encodeURIComponent(data.cover_url);
+                        }
+                        refer_books.value.push(data);
+                    }
+                } catch (e) {
+                    // skip malformed lines
+                }
+            }
+        }
     } catch (e) {
         console.error(e);
     } finally {
