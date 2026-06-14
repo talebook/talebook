@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 
+import asyncio
 import base64
 import datetime
 import logging
@@ -47,9 +48,11 @@ def website_format(value):
 
 
 def js(func):
-    def do(self, *args, **kwargs):
+    async def do(self, *args, **kwargs):
         try:
             rsp = func(self, *args, **kwargs)
+            if asyncio.iscoroutine(rsp):
+                rsp = await rsp
             if rsp is None:
                 return
             if isinstance(rsp, dict):
@@ -646,6 +649,45 @@ class ListHandler(BaseHandler):
             "total": count,
             "books": [self.fmt(b) for b in books],
         }
+
+    async def stream_book_list(self, all_books, ids=None, title=None, sort_by_id=False):
+        import json
+
+        start = self.get_argument_start()
+        delta = 60
+
+        private_book_ids = self._get_private_book_ids()
+        if ids:
+            ids = [book_id for book_id in ids if book_id not in private_book_ids]
+            count = len(ids)
+            books = self.get_books(ids=ids[start : start + delta])
+            if sort_by_id:
+                self.do_sort(books, "id", False)
+        else:
+            all_books = [b for b in all_books if b["id"] not in private_book_ids]
+            count = len(all_books)
+            books = all_books[start : start + delta]
+
+        origin = self.request.headers.get("origin", "*")
+        self.set_header("Access-Control-Allow-Origin", origin)
+        self.set_header("Access-Control-Allow-Credentials", "true")
+        self.set_header("Cache-Control", "max-age=0")
+        self.set_header("Content-Type", "application/x-ndjson")
+
+        meta = {
+            "err": "ok",
+            "title": title,
+            "total": count,
+        }
+        self.write(json.dumps(meta, ensure_ascii=False) + "\n")
+        await self.flush()
+
+        for b in books:
+            book_json = json.dumps(self.fmt(b), ensure_ascii=False)
+            self.write(book_json + "\n")
+            await self.flush()
+
+        self.finish()
 
     def fmt(self, b):
         return utils.BookFormatter(self, b).format()

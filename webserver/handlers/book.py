@@ -952,38 +952,35 @@ class RecentBook(ListHandler):
 
 class LibraryBook(ListHandler):
     @js
-    def get(self):
+    async def get(self):
         title = _("书库")
 
-        # 获取筛选参数
         publisher = self.get_argument("publisher", None)
         author = self.get_argument("author", None)
         tag = self.get_argument("tag", None)
         book_format = self.get_argument("format", None)
+        stream = self.get_argument("stream", None)
 
-        # 初始获取所有书籍ID
         ids = self.books_by_id()
 
-        # 应用筛选条件
         if publisher and publisher != "全部":
-            # 按出版社筛选
             publisher_books = self.db.search_getting_ids(f"publisher:'{publisher}'", "")
             ids = list(set(ids) & set(publisher_books))
 
         if author and author != "全部":
-            # 按作者筛选
             author_books = self.db.search_getting_ids(f"author:'{author}'", "")
             ids = list(set(ids) & set(author_books))
 
         if tag and tag != "全部":
-            # 按标签筛选
             tag_books = self.db.search_getting_ids(f"tag:'{tag}'", "")
             ids = list(set(ids) & set(tag_books))
 
         if book_format and book_format != "全部":
-            # 按文件格式筛选
             books = self.get_books(ids=ids)
             ids = [book["id"] for book in books if f"fmt_{book_format.lower()}" in book]
+
+        if stream == "1":
+            return await self.stream_book_list([], ids=ids, title=title, sort_by_id=True)
 
         return self.render_book_list([], ids=ids, title=title, sort_by_id=True)
 
@@ -1740,12 +1737,13 @@ class BookSaveMeta(BaseHandler):
 class BookScoped(BaseHandler):
     @js
     @auth
-    def get(self):
-        """获取当前用户设为 scope=private 的所有图书信息"""
+    async def get(self):
+        import json
+
         user_id = self.user_id()
         title = _("私有书籍")
+        stream = self.get_argument("stream", None)
 
-        # 查询当前用户设为 scope=private 的所有图书，按书籍 ID 倒序排列
         db_items = (
             self.session.query(Item)
             .filter(Item.collector_id == user_id, Item.scope == "private")
@@ -1760,11 +1758,29 @@ class BookScoped(BaseHandler):
             total_items = 0
 
             if len(ids) > 0:
-                # 获取总数用于分页
                 total_items = self.session.query(Item).filter(Item.collector_id == user_id, Item.scope == "private").count()
 
             books = self.get_books(ids=ids)
             books.sort(key=lambda x: x["id"], reverse=True)
+
+            if stream == "1":
+                origin = self.request.headers.get("origin", "*")
+                self.set_header("Access-Control-Allow-Origin", origin)
+                self.set_header("Access-Control-Allow-Credentials", "true")
+                self.set_header("Cache-Control", "max-age=0")
+                self.set_header("Content-Type", "application/x-ndjson")
+
+                meta = {"err": "ok", "title": title, "total": total_items}
+                self.write(json.dumps(meta, ensure_ascii=False) + "\n")
+                await self.flush()
+
+                for book in books:
+                    book_data = utils.BookFormatter(self, book).format()
+                    self.write(json.dumps(book_data, ensure_ascii=False) + "\n")
+                    await self.flush()
+
+                self.finish()
+                return None
 
             books_result = []
             for book in books:
