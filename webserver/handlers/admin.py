@@ -29,7 +29,7 @@ from webserver.services.update_checker import UpdateChecker
 CONF = loader.get_settings()
 
 # 元数据源配置
-META_ALL_SOURCES = ["douban", "baidu", "google", "amazon", "xinhua", "ai"]
+META_ALL_SOURCES = ["douban", "douban_v2", "baidu", "google", "amazon", "xinhua", "ai", "neodb"]
 DEFAULT_META_SOURCES = ["douban", "baidu", "xinhua"]
 SOCIAL_AUTH_SETTING_RE = re.compile(r"^SOCIAL_AUTH_[A-Z0-9_]+_(KEY|SECRET)$")
 

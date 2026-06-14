@@ -839,11 +839,13 @@ const cards = computed(() => [
 const metaSourceItems = computed(() => {
     const allSources = settings.value['META_ALL_SOURCES'] || [
         'douban',
+        'douban_v2',
         'baidu',
         'google',
         'amazon',
         'xinhua',
         'ai',
+        'neodb',
     ];
     return allSources.map((source) => ({
         text: source === 'ai' ? 'AI' : t('admin.settings.meta_source.' + source),

@@ -21,14 +21,16 @@ from webserver.constants import (
     META_SOURCE_AMAZON,
     META_SOURCE_BAIDU,
     META_SOURCE_DOUBAN,
+    META_SOURCE_DOUBAN_V2,
     META_SOURCE_GOOGLE,
+    META_SOURCE_NEODB,
     META_SOURCE_XHSD,
     SUPPORTED_EBOOK_FORMATS,
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Item, ReadingState
-from webserver.plugins.meta import baike, calibre, douban, tomato, xhsd, youshu
+from webserver.plugins.meta import baike, calibre, douban, douban_v2, neodb, tomato, xhsd, youshu
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
@@ -256,6 +258,18 @@ class BookRefer(BaseHandler):
 
             tasks["douban"] = _douban
 
+        if META_SOURCE_DOUBAN_V2 in sources:
+
+            def _douban_v2():
+                plugin = douban_v2.DoubanV2MetaPlugin()
+                try:
+                    return plugin.search(title=title, isbn=mi.isbn, publisher=mi.publisher)
+                except Exception:
+                    logging.error("DoubanV2 query %s failed" % title)
+                    return []
+
+            tasks["douban_v2"] = _douban_v2
+
         if META_SOURCE_BAIDU in sources:
 
             def _baidu():
@@ -307,6 +321,18 @@ class BookRefer(BaseHandler):
                 return [book] if book else []
 
             tasks["tomato"] = _tomato
+
+        if META_SOURCE_NEODB in sources:
+
+            def _neodb():
+                plugin = neodb.NeodbMetaPlugin()
+                try:
+                    return plugin.search(title=title, isbn=mi.isbn, publisher=mi.publisher)
+                except Exception:
+                    logging.error("NeoDB query %s failed" % title)
+                    return []
+
+            tasks["neodb"] = _neodb
 
         if META_SOURCE_AI in sources:
 
@@ -395,6 +421,20 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("获取番茄小说书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")})
+        elif provider_key == douban_v2.KEY:
+            plugin = douban_v2.DoubanV2MetaPlugin()
+            try:
+                refer_mi = plugin.get_metadata_by_provider(provider_value, mi)
+            except Exception as e:
+                logging.error("DoubanV2 query failed: %s", e)
+                raise RuntimeError({"err": "httprequest.douban_v2.failed", "msg": _("??V2??????")})
+        elif provider_key == neodb.KEY:
+            plugin = neodb.NeodbMetaPlugin()
+            try:
+                refer_mi = plugin.get_metadata_by_provider(provider_value, mi)
+            except Exception as e:
+                logging.error("NeoDB query failed: %s", e)
+                raise RuntimeError({"err": "httprequest.neodb.failed", "msg": _("NeoDB????")})
         elif provider_key == calibre.KEY:
             if mi.isbn:
                 try:

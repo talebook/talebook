@@ -630,7 +630,9 @@
         "baidu": "Baidu Baike",
         "google": "Google Books",
         "amazon": "Amazon",
-        "xinhua": "Xinhua Bookstore"
+        "xinhua": "Xinhua Bookstore",
+        "douban_v2": "Douban V2",
+        "neodb": "NeoDB"
       }
     },
     "users": {

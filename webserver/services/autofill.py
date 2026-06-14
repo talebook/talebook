@@ -13,10 +13,12 @@ from webserver.constants import (
     META_SOURCE_AMAZON,
     META_SOURCE_BAIDU,
     META_SOURCE_DOUBAN,
+    META_SOURCE_DOUBAN_V2,
     META_SOURCE_GOOGLE,
+    META_SOURCE_NEODB,
 )
 from webserver.i18n import _
-from webserver.plugins.meta import baike, douban
+from webserver.plugins.meta import baike, douban, douban_v2, neodb
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.meta.calibre.api import CalibreMetadataApi
 from webserver.services import AsyncService
@@ -180,6 +182,16 @@ class AutoFillService(AsyncService):
             except Exception:
                 logging.error(_("douban 接口查询 %s 失败"), title)
 
+        # 2.5. 豆瓣V2 查询
+        if META_SOURCE_DOUBAN_V2 in sources:
+            try:
+                plugin = douban_v2.DoubanV2MetaPlugin()
+                book = plugin.search_best(mi)
+                if book:
+                    return book
+            except Exception:
+                logging.error(_("douban_v2 接口查询 %s 失败"), title)
+
         # 3 & 4. 使用 Google Books 和 Amazon.com 查询
         calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
         if calibre_sources:
@@ -211,6 +223,16 @@ class AutoFillService(AsyncService):
                     return book
             except Exception:
                 logging.error(_("baidu 接口查询 %s 失败"), title)
+
+        # 5.5 NeoDB 查询
+        if META_SOURCE_NEODB in sources:
+            try:
+                plugin = neodb.NeodbMetaPlugin()
+                book = plugin.search_best(mi)
+                if book:
+                    return book
+            except Exception:
+                logging.error(_("neodb 接口查询 %s 失败"), title)
 
         # 6. AI 查询
         if META_SOURCE_AI in sources:

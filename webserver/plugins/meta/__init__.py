@@ -9,3 +9,6 @@ from .calibre.api import CalibreMetadataApi, KEY as CALIBRE_KEY  # noqa: F401
 
 # Xinhua Bookstore metadata plugin
 from .xhsd.api import XhsdBookApi, KEY as XHSD_KEY, XHSD_ISBN  # noqa: F401
+
+# Douban metadata plugin
+from .douban.api import DoubanBookApi, KEY as DOUBAN_KEY, str2date  # noqa: F401
