@@ -269,6 +269,12 @@
             </v-col>
 
             <v-col>
+                <v-progress-linear
+                    v-if="loading"
+                    indeterminate
+                    color="primary"
+                    class="mb-3"
+                />
                 <BookCards :books="books" />
             </v-col>
 
@@ -307,6 +313,7 @@ const total = ref(0);
 const page_size = 60;
 const page_cnt = ref(1);
 const inited = ref(false);
+const loading = ref(false);
 
 const filters = ref({
     publisher: t('messages.all'),
@@ -336,20 +343,20 @@ watch(total, (newTotal) => {
 
 // 获取书籍数据
 const fetchBooks = async (p = 1) => {
-    // 构建查询参数
+    loading.value = true;
+    books.value = [];
+
     const query = {
         start: (p - 1) * page_size,
         size: page_size
     };
   
-    // 添加筛选条件
     Object.keys(filters.value).forEach(key => {
         if (filters.value[key] !== t('messages.all')) {
             query[key] = filters.value[key];
         }
     });
   
-    // 构建查询字符串
     const queryString = Object.keys(query)
         .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(query[key])}`)
         .join('&');
@@ -358,17 +365,25 @@ const fetchBooks = async (p = 1) => {
         const rsp = await $backend(`/library?${queryString}`);
         if (rsp.err === 'exception' || rsp.err === 'network_error') {
             if ($alert) $alert('error', rsp.msg || t('errors.networkError'));
+            loading.value = false;
             return;
         }
     
-        books.value = rsp.books || [];
         total.value = rsp.total || 0;
         page_cnt.value = total.value > 0 ? Math.max(1, Math.ceil(total.value / page_size)) : 0;
         page.value = p;
         title.value = rsp.title || t('library.title');
+
+        const allBooks = rsp.books || [];
+        for (const book of allBooks) {
+            books.value.push(book);
+            await nextTick();
+        }
     } catch (error) {
         console.error('Failed to fetch books:', error);
         if ($alert) $alert('error', t('library.message.fetchBooksFailed'));
+    } finally {
+        loading.value = false;
     }
 };
 
