@@ -778,7 +778,9 @@
         "baidu": "百度百科",
         "google": "Google Books",
         "amazon": "Amazon",
-        "xinhua": "新华书店"
+        "xinhua": "新华书店",
+        "tomato": "番茄小说",
+        "qimao": "七猫小说"
       }
     },
     "users": {

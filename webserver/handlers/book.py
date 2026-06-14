@@ -22,6 +22,8 @@ from webserver.constants import (
     META_SOURCE_BAIDU,
     META_SOURCE_DOUBAN,
     META_SOURCE_GOOGLE,
+    META_SOURCE_QIMAO,
+    META_SOURCE_TOMATO,
     META_SOURCE_XHSD,
     SUPPORTED_EBOOK_FORMATS,
 )
@@ -299,7 +301,7 @@ class BookRefer(BaseHandler):
 
             tasks["youshu"] = _youshu
 
-        if hasattr(tomato, "TomatoNovelApi"):
+        if META_SOURCE_TOMATO in sources:
 
             def _tomato():
                 api = tomato.TomatoNovelApi(copy_image=False)
@@ -308,7 +310,7 @@ class BookRefer(BaseHandler):
 
             tasks["tomato"] = _tomato
 
-        if hasattr(qimao, "QimaoNovelApi"):
+        if META_SOURCE_QIMAO in sources:
 
             def _qimao():
                 api = qimao.QimaoNovelApi(copy_image=False)

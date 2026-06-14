@@ -843,6 +843,8 @@ const metaSourceItems = computed(() => {
         'google',
         'amazon',
         'xinhua',
+        'tomato',
+        'qimao',
         'ai',
     ];
     return allSources.map((source) => ({
