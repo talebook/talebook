@@ -12,7 +12,7 @@ import bcrypt
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.mutable import Mutable
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base, object_session, relationship
 
 from webserver.constants import BOOK_TYPE_EBOOK
 from webserver.i18n import _
@@ -43,8 +43,25 @@ def bind_session(session):
     def _session(self):
         return session
 
+    def _save_instance(cls, instance):
+        # Tornado 同一线程内多个并发请求共享 scoped session：请求 A 结束时 on_finish
+        # 调用 remove()，会把请求 B 在 initialize 中已捕获的 session 从注册表摘除。
+        # 此后 B 查询出的对象仍属于旧 session，若再用注册表里的新 session add，
+        # 会抛 "Object is already attached to session"（issue #782）。
+        # 因此优先用对象自身所属的 session 保存。
+        db = object_session(instance) or session
+        db.add(instance)
+        try:
+            db.commit()
+        except Exception:
+            # 回滚以免 session（可能是长生命周期的注册表 session）滞留在失败事务中
+            db.rollback()
+            raise
+        return instance
+
     Base._session = classmethod(_session)
     SQLAlchemyMixin._session = classmethod(_session)
+    SQLAlchemyMixin._save_instance = classmethod(_save_instance)
     logging.info("Bind modles._session()")
 
 
@@ -506,6 +523,118 @@ class ReadingState(Base, SQLAlchemyMixin):
 
     def set_download(self, download_status):
         self.download = 1 if download_status else 0
+
+
+class BookSourceModel(Base, SQLAlchemyMixin):
+    """网络书源（Legado 书源 JSON）。"""
+
+    __tablename__ = "book_sources"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False, index=True)
+    url = Column(String(1000), nullable=False, index=True)  # bookSourceUrl，导入时按此 upsert
+    group = Column(String(200), default="", index=True)
+    source_type = Column(Integer, default=0)
+    enabled = Column(Boolean, default=True, index=True)
+    weight = Column(Integer, default=0)
+    comment = Column(String(500), default="")
+    last_check_time = Column(DateTime)
+    last_check_ok = Column(Boolean, default=True)
+    check_status = Column(String(20), default="")  # 体检状态：ok/failed/pending/unknown，空=未体检
+    check_message = Column(String(500), default="")  # 体检说明
+    check_tags = Column(JSONType, default=list)  # 体检标签列表
+    create_time = Column(DateTime)
+    update_time = Column(DateTime)
+    raw = Column(MutableDict.as_mutable(JSONType), default={})  # 完整 Legado JSON
+
+    def __init__(self, raw=None):
+        super(BookSourceModel, self).__init__()
+        self.create_time = datetime.datetime.now()
+        self.update_time = datetime.datetime.now()
+        self.enabled = True
+        self.weight = 0
+        self.raw = raw or {}
+        if raw:
+            self.apply_raw(raw)
+
+    def apply_raw(self, raw):
+        """从 Legado JSON 同步索引字段。"""
+        self.raw = raw
+        self.name = (raw.get("bookSourceName") or "").strip() or self.name or ""
+        self.url = (raw.get("bookSourceUrl") or "").strip() or self.url or ""
+        self.group = (raw.get("bookSourceGroup") or "").strip()
+        try:
+            self.source_type = int(raw.get("bookSourceType") or 0)
+        except (ValueError, TypeError):
+            self.source_type = 0
+        try:
+            self.weight = int(raw.get("weight") or 0)
+        except (ValueError, TypeError):
+            self.weight = 0
+        comment = raw.get("bookSourceComment") or ""
+        self.comment = comment[:500] if comment else ""
+        self.update_time = datetime.datetime.now()
+
+    def to_summary_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "url": self.url,
+            "group": self.group or "",
+            "source_type": self.source_type,
+            "enabled": bool(self.enabled),
+            "weight": self.weight,
+            "comment": self.comment or "",
+            "last_check_ok": bool(self.last_check_ok),
+            "check_status": self.check_status or ("ok" if self.last_check_ok else "failed"),
+            "check_message": self.check_message or "",
+            "check_tags": self.check_tags if isinstance(self.check_tags, list) else [],
+            "create_time": self.create_time.strftime("%Y-%m-%d %H:%M:%S") if self.create_time else None,
+            "update_time": self.update_time.strftime("%Y-%m-%d %H:%M:%S") if self.update_time else None,
+        }
+
+
+class OnlineBookMeta(Base, SQLAlchemyMixin):
+    """保存到本地的网络书的来源与连载状态。"""
+
+    __tablename__ = "online_book_meta"
+
+    # STATUS
+    SERIAL = "serial"
+    FINISHED = "finished"
+    UNKNOWN = "unknown"
+
+    book_id = Column(Integer, primary_key=True)  # calibre book id
+    source_url = Column(String(1000), default="")
+    origin_book_url = Column(String(1000), default="")
+    serialize_status = Column(String(20), default="unknown", nullable=False)
+    status_manual = Column(Boolean, default=False)
+    last_chapter = Column(String(300), default="")
+    create_time = Column(DateTime)
+    update_time = Column(DateTime)
+    data = Column(MutableDict.as_mutable(JSONType), default={})
+
+    def __init__(self, book_id, source_url="", origin_book_url=""):
+        super(OnlineBookMeta, self).__init__()
+        self.book_id = book_id
+        self.source_url = source_url
+        self.origin_book_url = origin_book_url
+        self.serialize_status = self.UNKNOWN
+        self.status_manual = False
+        self.last_chapter = ""
+        self.create_time = datetime.datetime.now()
+        self.update_time = datetime.datetime.now()
+        self.data = {}
+
+    def to_dict(self):
+        return {
+            "book_id": self.book_id,
+            "source_url": self.source_url or "",
+            "origin_book_url": self.origin_book_url or "",
+            "serialize_status": self.serialize_status or self.UNKNOWN,
+            "status_manual": bool(self.status_manual),
+            "last_chapter": self.last_chapter or "",
+        }
 
 
 def user_syncdb(engine):

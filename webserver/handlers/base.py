@@ -215,8 +215,7 @@ class BaseHandler(web.RequestHandler):
             set_language(lang)
 
     def initialize(self):
-        ScopedSession = self.settings["ScopedSession"]
-        self.session = ScopedSession()  # new sql session
+        self.session = self.settings["SessionMaker"]()  # 每个请求独立的 sql session
         self.db = self.settings["legacy"]
         self.cache = self.db.new_api
         self.build_time = self.settings["build_time"]
@@ -225,9 +224,7 @@ class BaseHandler(web.RequestHandler):
         self.cookies_cache = {}
 
     def on_finish(self):
-        ScopedSession = self.settings["ScopedSession"]
         self.session.close()
-        ScopedSession.remove()
 
     def static_url(self, path, **kwargs):
         if path.endswith("/"):
@@ -277,7 +274,8 @@ class BaseHandler(web.RequestHandler):
     def add_msg(self, status, msg):
         m = Message(self.user_id(), status, msg)
         if m.reader_id:
-            m.save()
+            self.session.add(m)
+            self.session.commit()
 
     def pop_messages(self):
         if not self.current_user:

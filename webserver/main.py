@@ -198,7 +198,10 @@ def make_app():
 
     # build sql session factory
     engine = create_engine(auth_db_path, **CONF["db_engine_args"])
-    ScopedSession = scoped_session(sessionmaker(bind=engine, autoflush=True, autocommit=False))
+    SessionMaker = sessionmaker(bind=engine, autoflush=True, autocommit=False)
+    # ScopedSession（线程级注册表）仅供 social-auth 存储层及 models.save() 对新建对象的兜底；
+    # 业务代码（handler / 后台服务）一律通过 SessionMaker 创建各自独立的 session
+    ScopedSession = scoped_session(SessionMaker)
     models.bind_session(ScopedSession)
     init_social(models.Base, ScopedSession, CONF)
 
@@ -243,13 +246,14 @@ def make_app():
             "legacy": book_db,
             "cache": cache,
             "ScopedSession": ScopedSession,
+            "SessionMaker": SessionMaker,
             "build_time": fromtimestamp(os.stat(path).st_mtime),
             "default_cover": default_cover,
         }
     )
 
     logging.info("Now, Running...")
-    AsyncService().setup(book_db, ScopedSession)
+    AsyncService().setup(book_db, SessionMaker)
 
     from webserver.services.update_checker import UpdateChecker
 
@@ -257,12 +261,68 @@ def make_app():
         pass
 
     checker = UpdateChecker()
-    checker.set_scoped_session(ScopedSession)
+    checker.set_session_maker(SessionMaker)
     checker.start_background_check()
 
     app = web.Application(social_routes.SOCIAL_AUTH_ROUTES + handlers.routes(), **app_settings)
     app._engine = engine
+    _resume_pending_booksource_checks(ScopedSession)
     return app
+
+
+def _resume_pending_booksource_checks(scoped_session):
+    """启动时重排"已启用但上次体检未通过"的书源，让失效源被置为 enabled=False。
+
+    书源体检服务是内存线程队列：导入时书源先标成 enabled=True + status=pending 并调度
+    后台体检，但后端一旦在体检完成前重启，内存队列即丢失，这些书源会永久停在
+    pending（enabled=True 却从未真正验证）。由于搜索按 enabled 过滤，这些失效源会被一起
+    搜索。这里在守护线程里把它们重新入队，体检会把死源置为 enabled=False。
+
+    仅针对 enabled=True 且 last_check_ok=False 的书源；体检完成后它们不再满足该条件，
+    因此是一次性收敛，不会每次启动都重复全量体检。可用配置
+    BOOKSOURCE_RESUME_PENDING_CHECK_ON_START 关闭（书源限频时按需手动触发"检测全部"）。
+    """
+    if not CONF.get("BOOKSOURCE_RESUME_PENDING_CHECK_ON_START", True):
+        return
+
+    import threading
+
+    def run():
+        import time
+
+        time.sleep(3)  # 让 app 初始化与自动导入先就绪
+        _enqueue_pending_booksource_checks(scoped_session)
+
+    t = threading.Thread(target=run, daemon=True, name="booksource-resume-check")
+    t.start()
+
+
+def _enqueue_pending_booksource_checks(scoped_session):
+    """把"已启用但上次体检未通过"的书源重新入队体检，返回入队的书源 id 列表。
+
+    与 _resume_pending_booksource_checks 的线程封装分离，便于单测同步调用。
+    """
+    from webserver.handlers.booksource_admin import schedule_source_checks
+    from webserver.models import BookSourceModel
+
+    session = scoped_session()
+    try:
+        rows = (
+            session.query(BookSourceModel.id)
+            .filter(BookSourceModel.enabled.is_(True), BookSourceModel.last_check_ok.is_(False))
+            .all()
+        )
+        pending_ids = [i for (i,) in rows]
+        if not pending_ids:
+            return []
+        logging.info("booksource: 重排 %d 个待检测书源", len(pending_ids))
+        schedule_source_checks(pending_ids)
+        return pending_ids
+    except Exception as e:
+        logging.warning("booksource: 待检测书源重排失败: %s", e)
+        return []
+    finally:
+        scoped_session.remove()
 
 
 def get_upload_size():

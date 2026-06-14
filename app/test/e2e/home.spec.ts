@@ -24,8 +24,8 @@ test.describe('Homepage', () => {
     test('displays random and recent books', async ({ page }) => {
         await page.goto('/');
 
-        // Check headers
-        await expect(page.getByText('随便推荐')).toBeVisible();
+        // Check headers（首页“推荐”板块标题来自 navigation.recommended）
+        await expect(page.getByText('推荐', { exact: true }).first()).toBeVisible();
         await expect(page.getByText('新书推荐')).toBeVisible();
         await expect(page.getByText('分类浏览').first()).toBeVisible();
 

@@ -74,10 +74,9 @@ test('Main content should be to the right of Navigation Drawer', async ({ page }
     
     console.log('Main Style:', mainStyle);
     
-    // 验证 Main 确实被推到了右边
-    // 注意：Drawer 宽度通常是 240px
-    // 如果是 temporary drawer (mobile)，Main 不会被推挤
-    // 这里是 desktop，drawer 是 persistent
-    
-    expect(parseInt(mainStyle.paddingLeft || '0')).toBeGreaterThanOrEqual(drawerBox.width);
+    // 验证 Main 确实被推到了右边（padding-left 等于 Drawer 宽度）。
+    // v-main 的 padding-left 是带过渡动画的，需轮询等其稳定，避免测到动画中途的值（flaky）。
+    await expect.poll(async () => {
+        return await main.evaluate((el) => parseInt(window.getComputedStyle(el).paddingLeft || '0'));
+    }).toBeGreaterThanOrEqual(drawerBox.width);
 });

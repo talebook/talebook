@@ -16,9 +16,11 @@ test.describe('Navigation Sidebar', () => {
         await expect(page.locator('nav').getByRole('link', { name: '首页' })).toBeVisible();
         await expect(page.locator('nav').getByRole('link', { name: '首页' })).toHaveAttribute('href', '/');
 
-        // 2. Library
-        await expect(page.locator('nav').getByRole('link', { name: '书库' })).toBeVisible();
-        await expect(page.locator('nav').getByRole('link', { name: '书库' })).toHaveAttribute('href', '/library');
+        // 2. Library（导航已拆分为「本地书库」与「网络书库」）
+        await expect(page.locator('nav').getByRole('link', { name: '本地书库' })).toBeVisible();
+        await expect(page.locator('nav').getByRole('link', { name: '本地书库' })).toHaveAttribute('href', '/library');
+        await expect(page.locator('nav').getByRole('link', { name: '网络书库' })).toBeVisible();
+        await expect(page.locator('nav').getByRole('link', { name: '网络书库' })).toHaveAttribute('href', '/network');
 
         // 3. Category Links
         const links = [
@@ -48,23 +50,23 @@ test.describe('Navigation Sidebar', () => {
         await expect(page.locator('nav').getByRole('link', { name: '评分' })).toBeVisible();
         await expect(page.locator('nav').getByRole('link', { name: '评分' })).toHaveAttribute('href', '/rating');
 
-        await expect(page.locator('nav').getByRole('link', { name: '热度榜单' })).toBeVisible();
-        await expect(page.locator('nav').getByRole('link', { name: '热度榜单' })).toHaveAttribute('href', '/hot');
+        await expect(page.locator('nav').getByRole('link', { name: '热门' })).toBeVisible();
+        await expect(page.locator('nav').getByRole('link', { name: '热门' })).toHaveAttribute('href', '/hot');
 
-        await expect(page.locator('nav').getByRole('link', { name: '所有书籍' })).toBeVisible();
-        await expect(page.locator('nav').getByRole('link', { name: '所有书籍' })).toHaveAttribute('href', '/recent');
+        await expect(page.locator('nav').getByRole('link', { name: '最近' })).toBeVisible();
+        await expect(page.locator('nav').getByRole('link', { name: '最近' })).toHaveAttribute('href', '/recent');
 
         // 5. System Links (if sidebar_sys is true)
-        // { icon: "mdi-cellphone", text: "OPDS介绍", href: "/opds-readme", count: "OPDS", target: "_blank" },
-        await expect(page.locator('nav').getByRole('link', { name: 'OPDS介绍' })).toBeVisible();
-        await expect(page.locator('nav').getByRole('link', { name: 'OPDS介绍' })).toHaveAttribute('href', '/opds-readme');
+        await expect(page.locator('nav').getByRole('link', { name: 'OPDS 介绍' })).toBeVisible();
+        await expect(page.locator('nav').getByRole('link', { name: 'OPDS 介绍' })).toHaveAttribute('href', '/opds-readme');
 
     });
 
     test('Can navigate via all sidebar links', async ({ page }) => {
     // Define all links to test
         const linksToTest = [
-            { name: '书库', url: '/library', expectedText: '书库' },
+            { name: '本地书库', url: '/library', expectedText: '本地书库' },
+            { name: '网络书库', url: '/network', expectedText: '网络书库' },
             { name: '分类导览', url: '/nav', expectedText: '分类导览' },
             { name: '出版社', url: '/publisher', expectedText: '出版社' },
             { name: '作者', url: '/author', expectedText: '作者' },
@@ -72,8 +74,8 @@ test.describe('Navigation Sidebar', () => {
             { name: '文件格式', url: '/format', expectedText: '文件格式' },
             { name: '丛书', url: '/series', expectedText: '丛书' },
             { name: '评分', url: '/rating', expectedText: '评分' },
-            { name: '热度榜单', url: '/hot', expectedText: '热度榜单' },
-            { name: '所有书籍', url: '/recent', expectedText: '所有书籍' },
+            { name: '热门', url: '/hot', expectedText: '热门' },
+            { name: '最近', url: '/recent', expectedText: '最近' },
         // OPDS is target=_blank, might be harder to test navigation in same tab, skipping for now or test attribute
         // { name: 'OPDS介绍', url: '/opds-readme', expectedText: 'OPDS' }, 
         ];

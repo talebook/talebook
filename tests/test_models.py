@@ -307,6 +307,54 @@ class TestReadingState(unittest.TestCase):
         self.assertEqual(s.download, 0)
 
 
+class TestSaveAcrossScopedSessionRemove(unittest.TestCase):
+    """issue #782：并发请求下 scoped session 被 remove 后 save() 报 already attached"""
+
+    def setUp(self):
+        from social_sqlalchemy.storage import SQLAlchemyMixin
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import scoped_session, sessionmaker
+
+        self.engine = create_engine("sqlite://")
+        models.Base.metadata.create_all(self.engine)
+        self.ScopedSession = scoped_session(sessionmaker(bind=self.engine))
+        # 保存并在 tearDown 中恢复全局绑定，避免影响其它用例
+        self._old_bindings = [
+            (cls, name, vars(cls).get(name))
+            for cls, name in [
+                (models.Base, "_session"),
+                (SQLAlchemyMixin, "_session"),
+                (SQLAlchemyMixin, "_save_instance"),
+            ]
+        ]
+        models.bind_session(self.ScopedSession)
+
+    def tearDown(self):
+        self.ScopedSession.remove()
+        for cls, name, old in self._old_bindings:
+            if old is None:
+                delattr(cls, name)
+            else:
+                setattr(cls, name, old)
+
+    def test_save_after_scoped_session_removed(self):
+        seed = self.ScopedSession()
+        seed.add(models.Message(1, "success", "hello"))
+        seed.commit()
+
+        # 请求 B 在 initialize 时捕获了注册表中的当前 session
+        stale = self.ScopedSession()
+        # 请求 A 结束，on_finish 调用 remove()，该 session 被从注册表摘除
+        self.ScopedSession.remove()
+        # 请求 B 继续处理：用持有的旧 session 查询并保存，不应抛 InvalidRequestError
+        msg = stale.query(models.Message).first()
+        msg.unread = False
+        msg.save()
+
+        check = self.ScopedSession().query(models.Message).first()
+        self.assertFalse(check.unread)
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.DEBUG,

@@ -98,3 +98,6 @@ ssr.yml
 app_old
 *.swp
 .claude/
+
+# 本地 dev 固化的 demo 种子环境（含 db 与 secret，勿提交）
+docker/seed/

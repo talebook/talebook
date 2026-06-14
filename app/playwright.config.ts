@@ -17,6 +17,10 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
         baseURL: 'http://localhost:3000',
 
+        /* 固定中文环境：用例断言中文文案，避免受宿主/浏览器语言影响（i18n 开启了 detectBrowserLanguage） */
+        locale: 'zh-CN',
+        extraHTTPHeaders: { 'Accept-Language': 'zh-CN' },
+
         /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'on-first-retry',
     },

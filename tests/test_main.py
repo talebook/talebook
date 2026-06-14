@@ -68,6 +68,7 @@ def setup_server():
     main.CONF["INVITE_MODE"] = False
     main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
     main.CONF["ALLOW_REGISTER"] = True
+    main.CONF["BOOKSOURCE_RESUME_PENDING_CHECK_ON_START"] = False  # 测试不触发启动时的后台书源体检
     # main.CONF["db_engine_args"] = {"echo": True}
     if _app is None:
         _app = main.make_app()
@@ -89,7 +90,12 @@ def setup_mock_service():
 
 
 def get_db():
-    return _app.settings["ScopedSession"]
+    session = _app.settings["ScopedSession"]
+    # handler 使用独立 session 后，测试 session 需结束当前事务（释放快照与写锁），
+    # 才能读到 handler 刚提交的数据；未显式 commit 的脏改动也会被清掉，
+    # 因此测试中通过本 session 修改数据后必须立即 commit
+    session.rollback()
+    return session
 
 
 def Q(s):
@@ -280,6 +286,21 @@ class TestMeta(TestApp):
         self.assert_meta("rating", 3)
 
 
+class CommittingReader:
+    """代理 Reader：set_permission 后立即提交，使 handler 的独立 session 可见"""
+
+    def __init__(self, user, session):
+        object.__setattr__(self, "_user", user)
+        object.__setattr__(self, "_session", session)
+
+    def set_permission(self, operations):
+        self._user.set_permission(operations)
+        self._session.commit()
+
+    def __getattr__(self, name):
+        return getattr(self._user, name)
+
+
 class AutoResetPermission:
     def __init__(self, arg):
         if not arg:
@@ -287,12 +308,15 @@ class AutoResetPermission:
         self.arg = arg
 
     def __enter__(self):
-        self.user = get_db().query(models.Reader).filter(self.arg).first()
+        self.session = get_db()
+        self.user = self.session.query(models.Reader).filter(self.arg).first()
         self.user.permission = ""
-        return self.user
+        self.session.commit()
+        return CommittingReader(self.user, self.session)
 
     def __exit__(self, type, value, trace):
         self.user.permission = ""
+        self.session.commit()
 
 
 def mock_permission(arg=None):
@@ -339,19 +363,25 @@ class TestUser(TestWithUserLogin):
         # self.assertEqual(rsp.code, 302)
         self.add_user()
 
-        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
+        session = get_db()
+        user = session.query(models.Reader).filter(models.Reader.username == "active").first()
         user.permission = ""
+        session.commit()
         d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "ok")
 
-        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
+        session = get_db()
+        user = session.query(models.Reader).filter(models.Reader.username == "active").first()
         user.set_permission("L")
+        session.commit()
         logging.debug("user[%s] id[%s] permission[%s]", user.username, user.id, user.permission)
         d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "permission")
 
-        user = get_db().query(models.Reader).filter(models.Reader.username == "active").first()
+        session = get_db()
+        user = session.query(models.Reader).filter(models.Reader.username == "active").first()
         user.set_permission("l")
+        session.commit()
         d = self.json("/api/user/sign_in", method="POST", body="username=active&password=active66")
         self.assertEqual(d["err"], "ok")
 
@@ -546,6 +576,19 @@ class TestBook(TestWithUserLogin):
                 rsp = self.fetch("/read/%s" % bid, follow_redirects=False)
                 self.assertEqual(rsp.code, 302 if bid == BID_PDF or bid == BID_TXT else 200)
 
+    def test_read_waits_for_conversion(self):
+        with mock.patch("webserver.services.convert.ConvertService.convert_and_save", return_value="Yo"):
+            # 非EPUB书籍：转换尚未完成，页面应包含轮询等待逻辑，不能直接初始化阅读器
+            for bid in [BID_MOBI, BID_AZW3]:
+                rsp = self.fetch("/read/%s" % bid)
+                self.assertEqual(rsp.code, 200)
+                self.assertIn("waitReady", rsp.body.decode("utf-8"))
+
+            # EPUB书籍：已就绪，直接初始化阅读器，无需轮询
+            rsp = self.fetch("/read/%s" % BID_EPUB)
+            self.assertEqual(rsp.code, 200)
+            self.assertNotIn("waitReady", rsp.body.decode("utf-8"))
+
     def test_edit(self):
         body = {
             "id": 5,
@@ -661,8 +704,9 @@ class TestUserSignUp(TestWithUserLogin):
 
     @classmethod
     def delete_user(self):
-        self.get_user().delete()
-        get_db().commit()
+        session = get_db()
+        session.query(models.Reader).filter(models.Reader.username == "unittest").delete()
+        session.commit()
 
     def test_signup(self):
         self.delete_user()
@@ -820,7 +864,7 @@ class TestOpds(TestWithUserLogin):
         self.parse_xml(rsp.body)
 
     def test_opds_search_not_found(self):
-        rsp = self.fetch("/opds/search/%s" % urllib.parse.quote("豪士"))
+        rsp = self.fetch("/opds/search/%s" % urllib.parse.quote("TALEBOOK_NOEXIST_QUERY_XYZ"))
         self.assertEqual(rsp.code, 404)
 
     def test_opds_without_login(self):

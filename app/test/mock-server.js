@@ -7,11 +7,15 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const MOCK_DIR = path.join(__dirname, 'test/e2e/mocks');
+const MOCK_DIR = path.join(__dirname, 'e2e/mocks');
 
 // State
 let isInstalled = true;
 let users = [];
+let saveStarted = false;
+let saveStatusPolls = 0;
+let booksourceCheckRunning = false;
+let booksourceCheckPolls = 0;
 
 const app = createApp();
 const router = createRouter();
@@ -35,6 +39,10 @@ router.post('/_test/reset', eventHandler(async (event) => {
   }
   console.log('[Mock] isInstalled set to:', isInstalled);
   users = [];
+  saveStarted = false;
+  saveStatusPolls = 0;
+  booksourceCheckRunning = false;
+  booksourceCheckPolls = 0;
   return { status: 'ok' };
 }));
 
@@ -272,6 +280,140 @@ router.get('/api/book/:id', eventHandler((event) => {
   return { err: 'ok', msg: 'mock action' };
 }));
 
+// Admin book sources
+router.get('/api/admin/booksource/list', eventHandler(() => ({
+  err: 'ok',
+  count: 1,
+  items: [
+    {
+      id: 1,
+      name: '测试书源',
+      url: 'http://x.com',
+      group: '测试',
+      enabled: true,
+      check_status: 'ok',
+      check_message: '',
+      check_tags: [],
+    },
+  ],
+  check_task: { running: booksourceCheckRunning },
+})));
+
+router.post('/api/admin/booksource/check', eventHandler(() => {
+  booksourceCheckRunning = true;
+  booksourceCheckPolls = 0;
+  return { err: 'ok', running: true, checking: 1 };
+}));
+
+router.get('/api/admin/booksource/check/status', eventHandler(() => {
+  // 首次轮询后结束检测，便于用例观察"检测中→完成"的状态切换
+  if (booksourceCheckRunning) {
+    booksourceCheckPolls += 1;
+    if (booksourceCheckPolls >= 1) booksourceCheckRunning = false;
+  }
+  return { err: 'ok', running: booksourceCheckRunning };
+}));
+
+// Network library (book sources)
+router.get('/api/network/sources', eventHandler(() => {
+  return { err: 'ok', items: [{ id: 1, name: '测试书源', group: '测试' }] };
+}));
+
+router.get('/api/network/categories', eventHandler(() => {
+  return {
+    err: 'ok',
+    items: [
+      { name: '玄幻', url: 'http://x.com/category/xuanhuan?page={{page}}' },
+      { name: '都市', url: 'http://x.com/category/dushi?page={{page}}' },
+    ],
+  };
+}));
+
+// 网络书库搜索改为任务化：创建任务返回 task_id，前端轮询 status 拿结果
+let lastSearchKey = '';
+router.get('/api/network/search', eventHandler((event) => {
+  const query = getQuery(event);
+  lastSearchKey = query.key || '';
+  return { err: 'ok', task_id: 'mock-task', total: 1 };
+}));
+
+router.get('/api/network/search/status', eventHandler(() => {
+  return {
+    err: 'ok',
+    task_id: 'mock-task',
+    total: 1,
+    done: 1,
+    finished: true,
+    pending: [],
+    partial: [],
+    results: [
+      {
+        source_id: 1,
+        source_name: '测试书源',
+        books: [
+          {
+            name: `${lastSearchKey}的故事`,
+            author: '测试作者',
+            intro: '一段网络小说简介',
+            cover_url: '',
+            book_url: 'http://x.com/book/1',
+          },
+        ],
+      },
+    ],
+  };
+}));
+
+router.get('/api/network/book', eventHandler(() => {
+  return {
+    err: 'ok',
+    book: {
+      name: '测试网络小说',
+      author: '测试作者',
+      kind: '玄幻',
+      last_chapter: '第3章 大结局',
+      intro: '这是一本用于测试的网络小说。',
+      cover_url: '',
+      book_url: 'http://x.com/book/1',
+    },
+    toc_url: 'http://x.com/book/1/toc',
+  };
+}));
+
+router.get('/api/network/toc', eventHandler(() => {
+  return {
+    err: 'ok',
+    serialize_status: 'finished',
+    chapters: [
+      { name: '第1章 惊蛰', url: 'http://x.com/c/1', is_vip: false, update_time: '' },
+      { name: '第2章 小镇', url: 'http://x.com/c/2', is_vip: false, update_time: '' },
+      { name: '第3章 大结局', url: 'http://x.com/c/3', is_vip: false, update_time: '' },
+    ],
+  };
+}));
+
+router.get('/api/network/content', eventHandler(() => {
+  return { err: 'ok', title: '第1章 惊蛰', content: '这是正文第一段。\n这是正文第二段。' };
+}));
+
+// 保存到本地：返回 tag，前端按 tag 轮询；状态先 running（含 done/total）后 completed
+router.post('/api/network/save', eventHandler(() => {
+  saveStarted = true;
+  saveStatusPolls = 0;
+  return { err: 'ok', tag: 'online_save:1:http://x.com/book/1', msg: '已开始后台保存，完成后将通知您' };
+}));
+
+router.get('/api/network/save/status', eventHandler(() => {
+  if (!saveStarted) {
+    return { err: 'ok', found: false };
+  }
+  saveStatusPolls += 1;
+  if (saveStatusPolls < 2) {
+    return { err: 'ok', found: true, status: 'running', progress: 40, done: 40, total: 100, book_id: 0, error: '' };
+  }
+  return { err: 'ok', found: true, status: 'completed', progress: 100, done: 100, total: 100, book_id: 1, error: '' };
+}));
+
 app.use(router.handler);
 
-listen(toNodeListener(app), { hostname: '0.0.0.0', port: 8000 });
+listen(toNodeListener(app), { hostname: '0.0.0.0', port: Number(process.env.PORT) || 8000 });

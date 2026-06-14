@@ -1,0 +1,9 @@
+{
+  "code": 0,
+  "data": {
+    "books": [
+      {"id": "2001", "title": "诡秘之主", "author": "爱潜水的乌贼", "cat": "玄幻", "status": "已完结", "cover": "/c/2001.png", "desc": "克莱恩的非凡之路。"},
+      {"id": "2002", "title": "雪中悍刀行", "author": "烽火戏诸侯", "cat": "武侠", "status": "连载", "cover": "/c/2002.png", "desc": "江湖。"}
+    ]
+  }
+}
