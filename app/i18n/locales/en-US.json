@@ -749,7 +749,9 @@
         "baidu": "Baidu Baike",
         "google": "Google Books",
         "amazon": "Amazon",
-        "xinhua": "Xinhua Bookstore"
+        "xinhua": "Xinhua Bookstore",
+        "tomato": "Tomato Novel",
+        "qimao": "Qimao Novel"
       }
     },
     "users": {

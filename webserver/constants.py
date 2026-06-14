@@ -25,6 +25,8 @@ META_SOURCE_XHSD = "xinhua"
 META_SOURCE_DOUBAN = "douban"
 META_SOURCE_BAIDU = "baidu"
 META_SOURCE_AI = "ai"
+META_SOURCE_TOMATO = "tomato"
+META_SOURCE_QIMAO = "qimao"
 
 # 书籍类型
 BOOK_TYPE_EBOOK = "ebook"
