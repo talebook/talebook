@@ -203,10 +203,10 @@
   "user": {
     "history": {
       "pageTitle": "阅读记录",
-      "noHistory": "暂无阅读历史。请尽情畅游书籍的海洋吧~",
-      "exploreBooks": "",
-      "exploreBooksEnd": "",
-      "noRecords": "暂无记录",
+      "noHistory": "暂无阅读历史。请尽情",
+      "exploreBooks": "畅游书籍的海洋",
+      "exploreBooksEnd": "吧~",
+      "noRecords": "无记录",
       "onlineReading": "在线阅读",
       "pushedBooks": "推送过的书",
       "browseHistory": "浏览记录"
@@ -237,6 +237,16 @@
     "basicInfo": "基本信息",
     "deviceMgt": "阅读设备",
     "deviceMgtDescription": "管理您的个人阅读设备，仅对您自己可见。全局设备由管理员统一配置，所有用户均可使用。",
+    "history": {
+      "pageTitle": "阅读记录",
+      "noHistory": "暂无阅读历史。请尽情畅游书籍的海洋吧~",
+      "exploreBooks": "",
+      "exploreBooksEnd": "",
+      "noRecords": "暂无记录",
+      "onlineReading": "在线阅读",
+      "pushedBooks": "推送过的书",
+      "browseHistory": "浏览记录"
+    },
     "readingRecord": {
       "pageTitle": "阅读记录",
       "currentlyReading": "在读",
