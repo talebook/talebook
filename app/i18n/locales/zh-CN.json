@@ -201,7 +201,8 @@
     "scopedBooks": "私有书籍",
     "localLibrary": "本地书库",
     "networkLibrary": "网络书库",
-    "bookSources": "书源管理"
+    "bookSources": "书源管理",
+    "systemLogs": "系统日志"
   },
   "network": {
     "title": "网络书库",
@@ -850,6 +851,21 @@
       },
       "actions": {},
       "permissions": {}
+    },
+    "logs": {
+      "title": "系统日志",
+      "button": {
+        "refresh": "刷新",
+        "download": "下载日志"
+      },
+      "label": {
+        "lines": "显示最近行数",
+        "file": "日志文件"
+      },
+      "message": {
+        "noLogs": "暂无日志内容",
+        "loadError": "加载日志失败"
+      }
     }
   },
   "install": {

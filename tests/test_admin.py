@@ -90,3 +90,58 @@ class TestAdminSettingsSecurity(TestWithAdminUser):
             exec(compile(code, path, "exec"), namespace)
 
         self.assertEqual(namespace["settings"][key], "value")
+
+
+class TestAdminSystemLog(TestWithAdminUser):
+    def test_log_returns_ok_when_file_missing(self):
+        """日志文件不存在时，接口应返回 ok 且 lines 为空列表"""
+        with mock.patch("webserver.handlers.admin._get_log_file", return_value="/nonexistent/talebook.log"):
+            d = self.json("/api/admin/log")
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["lines"], [])
+
+    def test_log_returns_lines_from_file(self):
+        """日志文件存在时，接口应返回对应行数"""
+        log_content = "\n".join(["line %d" % i for i in range(10)])
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
+            f.write(log_content)
+            log_path = f.name
+        try:
+            with mock.patch("webserver.handlers.admin._get_log_file", return_value=log_path):
+                d = self.json("/api/admin/log?lines=5")
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual(len(d["lines"]), 5)
+            self.assertEqual(d["total"], 10)
+        finally:
+            os.unlink(log_path)
+
+    def test_log_download_returns_file(self):
+        """下载接口应以附件形式返回日志文件内容"""
+        log_content = "test log line\n"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
+            f.write(log_content)
+            log_path = f.name
+        try:
+            with mock.patch("webserver.handlers.admin._get_log_file", return_value=log_path):
+                rsp = self.fetch("/api/admin/log/download")
+            self.assertEqual(rsp.code, 200)
+            self.assertIn(b"test log line", rsp.body)
+            self.assertIn("attachment", rsp.headers.get("Content-Disposition", ""))
+        finally:
+            os.unlink(log_path)
+
+    def test_log_permission_denied_for_non_admin(self):
+        """普通用户不能访问系统日志"""
+        from webserver import models
+
+        session = get_db()
+        user = session.query(models.Reader).filter(models.Reader.id == 1).first()
+        original_admin = user.admin
+        user.admin = False
+        session.commit()
+        try:
+            d = self.json("/api/admin/log")
+            self.assertNotEqual(d["err"], "ok")
+        finally:
+            user.admin = original_admin
+            session.commit()

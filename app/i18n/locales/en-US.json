@@ -196,7 +196,8 @@
     "scopedBooks": "Private Books",
     "localLibrary": "Local Library",
     "networkLibrary": "Network Library",
-    "bookSources": "Book Sources"
+    "bookSources": "Book Sources",
+    "systemLogs": "System Logs"
   },
   "network": {
     "title": "Network Library",
@@ -830,6 +831,21 @@
       "host": "Enter host address",
       "path": "Enter path",
       "port": "Enter port"
+    },
+    "logs": {
+      "title": "System Logs",
+      "button": {
+        "refresh": "Refresh",
+        "download": "Download Logs"
+      },
+      "label": {
+        "lines": "Show last N lines",
+        "file": "Log file"
+      },
+      "message": {
+        "noLogs": "No log content available",
+        "loadError": "Failed to load logs"
+      }
     }
   },
   "install": {
