@@ -10,6 +10,7 @@ import os
 import sys
 import unittest
 from unittest import mock
+from urllib.parse import urlparse
 
 testdir = os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + "/../../../")
 sys.path.append(testdir)
@@ -107,7 +108,9 @@ class TestBiqugePage(unittest.TestCase):
         )
         page = self._make_page(html=html)
         img = page.get_image()
-        self.assertTrue(img.startswith("http://www.xbiqugu.la"))
+        parsed = urlparse(img)
+        self.assertEqual(parsed.scheme, "http")
+        self.assertEqual(parsed.hostname, "www.xbiqugu.la")
 
     def test_get_image_none_when_missing(self):
         html = "<html><body></body></html>"
