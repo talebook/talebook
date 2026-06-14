@@ -4,6 +4,7 @@
 import datetime
 import hashlib
 import logging
+import os
 import re
 
 import tornado.escape
@@ -428,6 +429,8 @@ class UserInfo(BaseHandler):
             "header": CONF["HEADER"],
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
             "FEEDBACK_URL": CONF["FEEDBACK_URL"],
+            # slim 镜像不含 QtWebEngine，无法转换输出 PDF，前端据此隐藏入口
+            "pdf_convert": os.environ.get("TALEBOOK_PDF_CONVERT", "1") != "0",
             "allow": {
                 "register": CONF["ALLOW_REGISTER"],
                 "download": CONF["ALLOW_GUEST_DOWNLOAD"],

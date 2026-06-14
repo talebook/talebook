@@ -16,6 +16,7 @@ let saveStarted = false;
 let saveStatusPolls = 0;
 let booksourceCheckRunning = false;
 let booksourceCheckPolls = 0;
+let pdfConvert = true; // slim 镜像该能力为 false
 
 const app = createApp();
 const router = createRouter();
@@ -37,6 +38,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   } else {
     isInstalled = true;
   }
+  pdfConvert = body && body.pdf_convert !== undefined ? body.pdf_convert : true;
   console.log('[Mock] isInstalled set to:', isInstalled);
   users = [];
   saveStarted = false;
@@ -71,7 +73,8 @@ router.get('/api/user/info', eventHandler(() => ({
     version: '1.0.0',
     users: 5,
     friends: [],
-    allow: { register: true, download: true, push: true, read: true }
+    allow: { register: true, download: true, push: true, read: true },
+    pdf_convert: pdfConvert
   },
   user: {
     is_login: true,
@@ -86,6 +89,17 @@ router.get('/api/user/messages', eventHandler(() => ({
   err: 'ok',
   total: 0,
   messages: []
+})));
+
+router.get('/api/user/devices', eventHandler(() => ({
+  err: 'ok',
+  devices: []
+})));
+
+// book 1 为 epub 格式，返回非 txt 即可（避免书籍详情页弹出 404 错误对话框）
+router.get('/api/book/txt/init', eventHandler(() => ({
+  err: 'format error',
+  msg: '非txt书籍'
 })));
 
 router.get('/get/cover/:id', eventHandler((event) => {

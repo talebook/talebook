@@ -269,6 +269,12 @@ class TestBookToPDF(TestWithUserLogin):
             d = self.json(f"/api/book/{BID_PDF}/topdf", method="POST", body="")
             self.assertEqual(d["err"], "params.book.invalid")
 
+    def test_topdf_rejected_on_slim_image(self):
+        """slim 镜像设置 TALEBOOK_PDF_CONVERT=0，应直接拒绝转换请求。"""
+        with mock.patch.dict(os.environ, {"TALEBOOK_PDF_CONVERT": "0"}):
+            d = self.json(f"/api/book/{BID_EPUB}/topdf", method="POST", body="")
+            self.assertEqual(d["err"], "params.convert.unsupported")
+
     def test_topdf_success(self):
         """Book with EPUB format should be convertible to PDF."""
         mock_book = {

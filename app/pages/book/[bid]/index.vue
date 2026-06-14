@@ -543,7 +543,8 @@
                                         </template>
                                         <v-list-item-title>{{ t('book.convert') }}</v-list-item-title>
                                     </v-list-item>
-                                    <v-list-item :disabled="!hasEBooks || hasPDF" @click="convert_to_pdf">
+                                    <!-- slim 版镜像无 QtWebEngine，后端 sys.pdf_convert 为 false 时禁用转PDF入口 -->
+                                    <v-list-item :disabled="!hasEBooks || hasPDF || store.sys.pdf_convert === false" @click="convert_to_pdf">
                                         <template #prepend>
                                             <v-icon>mdi-file-pdf-box</v-icon>
                                         </template>

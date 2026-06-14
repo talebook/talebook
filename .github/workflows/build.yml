@@ -97,6 +97,48 @@ jobs:
           cache-to: type=gha,scope=spa,mode=max
 
       # ----------------------------------------
+      # SLIM 镜像：talebook/talebook:slim / slim-<ver>
+      # 不支持转换输出 PDF（移除 QtWebEngine/Chromium 等依赖），体积约为完整版的一半。
+      - name: Build and push SLIM
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: production-slim
+          platforms: ${{ steps.platforms.outputs.platforms }}
+          labels: ${{ steps.meta.outputs.labels }}
+          push: ${{ github.event_name != 'pull_request' }}
+          provenance: false
+          tags: |
+            ${{ startsWith(github.ref, 'refs/tags/') && format('{0}/{1}:slim', env.REGISTRY, env.IMAGE_NAME) || '' }}
+            ${{ startsWith(github.ref, 'refs/tags/') && format('{0}/{1}:slim-{2}', env.REGISTRY, env.IMAGE_NAME, github.ref_name) || '' }}
+            ${{ github.ref == 'refs/heads/master' && format('{0}/{1}:slim', env.REGISTRY, env.IMAGE_NAME) || '' }}
+            ${{ (startsWith(github.ref, 'refs/heads/dev/') || startsWith(github.ref, 'refs/heads/claude/') || startsWith(github.ref, 'refs/heads/codex/')) && format('{0}/{1}:slim-{2}', env.REGISTRY, env.IMAGE_NAME, steps.prep.outputs.safe_ref_name) || '' }}
+          build-args: ${{ steps.prep.outputs.build_args }}
+          cache-from: |
+            type=gha,scope=spa
+            type=gha,scope=slim
+          cache-to: type=gha,scope=slim,mode=max
+
+      # SLIM 镜像冒烟测试（amd64）：强删依赖的清单一旦误伤转换功能，在此拦截
+      - name: Load SLIM image for smoke test
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: production-slim
+          platforms: linux/amd64
+          load: true
+          tags: talebook-slim-smoke:ci
+          build-args: ${{ steps.prep.outputs.build_args }}
+          cache-from: |
+            type=gha,scope=spa
+            type=gha,scope=slim
+
+      - name: Run conversion smoke test on SLIM image
+        run: |
+          docker run --rm -v "$PWD/tools/convert_smoke.sh:/smoke.sh:ro" \
+            --entrypoint sh talebook-slim-smoke:ci /smoke.sh
+
+      # ----------------------------------------
       # SSR 镜像：talebook/talebook:server-side-render / server-side-render-<ver>
       - name: Build and push SSR
         uses: docker/build-push-action@v5

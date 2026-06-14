@@ -1,4 +1,4 @@
-.PHONY: all build push test build-base push-base
+.PHONY: all build push test build-base push-base build-slim smoke-convert
 
 VER := $(shell git branch --show-current | tr '/' '-')
 IMAGE := talebook/talebook:$(VER)
@@ -33,6 +33,16 @@ build-spa:
 build-ssr:
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
 		-f Dockerfile -t $(TAG1) -t $(TAG2) --target production-ssr .
+
+# slim 镜像：不支持转换输出 PDF，体积约为完整版的一半，详见 Dockerfile 的 production-slim
+build-slim:
+	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
+		-f Dockerfile -t talebook/talebook:slim --target production-slim .
+
+# 转换链冒烟测试：验证镜像内 ebook-convert 六条互转链（slim 必跑，防止强删清单误伤）
+smoke-convert:
+	docker run --rm -v "$$PWD/tools/convert_smoke.sh:/smoke.sh:ro" \
+		--entrypoint sh talebook/talebook:slim /smoke.sh
 
 push:
 	docker push $(IMAGE)

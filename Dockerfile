@@ -29,7 +29,7 @@ RUN cp -r dist package* /app-static/
 # ----------------------------------------
 # 第二阶段，构建环境
 # 基础镜像源码见本仓库 Dockerfile.base，独立构建并推送，避免重复编译 calibre
-FROM talebook/talebook-base:8.5 AS server
+FROM talebook/talebook-base:8.6 AS server
 ARG BUILD_COUNTRY=""
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -181,4 +181,63 @@ RUN rm -rf /var/www/talebook/app/.output/public/logo && \
 # 生产环境（spa版，作为默认 docker build 结果）
 FROM production AS production-spa
 # no more actions
+
+
+# ----------------------------------------
+# 生产环境（slim 版：不支持转换输出 PDF，体积减少约 700MB）
+#
+# PDF 输出是 calibre 中唯一需要 QtWebEngine（无头 Chromium）渲染的转换路径，
+# epub/txt/mobi/azw3 互转只需 Qt6 Core/Gui。据此强删以下三组包（均已实测验证
+# 六条转换链 txt->epub/azw3、epub->azw3/mobi、azw3->epub、mobi->epub 正常）：
+#   1. QtWebEngine/Chromium 及其专属的 Quick/Qml 栈（~300MB）
+#   2. scipy（no-install-recommends 下仍被装入）、sympy（calibre->fonttools 硬依赖链）
+#   3. Mesa 软渲染驱动 + LLVM + z3（libqt6gui6->libgl1 链拖入，QImage 用不到 GL）、
+#      qtmultimedia + ffmpeg 编解码库（calibre GUI 的 TTS 朗读用，转换用不到）
+#
+# 注意：
+#   - libgl1/libegl1/libglx0（glvnd 调度层）是 libQt6Gui.so 的 ELF 硬依赖，不可删，
+#     删除后所有涉及封面图片的转换都会失败（cannot import QBuffer from qt.core）。
+#   - dpkg -r --force-depends 会留下不一致的依赖状态，本层之后镜像内不可再
+#     执行 apt-get install；如需加包请基于 production 阶段构建。
+#   - TALEBOOK_PDF_CONVERT=0 供 webserver 屏蔽"转换为PDF"功能入口。
+#   - 关键：dpkg -r 删除发生在新层，被删字节仍保留在 production 的下层中，
+#     docker 镜像/拉取体积不会减小（仅容器内 rootfs 变小）。因此本阶段先在
+#     slim-strip 中删包，再用 `FROM scratch + COPY / /` 把瘦身后的 rootfs 压成
+#     单层，使被删字节真正从镜像中消失（约 2.6GB -> 约 1.0GB）。
+FROM production AS slim-strip
+
+RUN dpkg -l | awk '/^ii/ {print $2}' \
+        | grep -E 'webengine|webchannel|qt6.*(quick|qml|declarative)|qml6|pyqt6-dev|sympy|scipy|multimedia|texttospeech|speech' \
+        | xargs -r dpkg -r --force-depends && \
+    dpkg -l | awk '/^ii/ {print $2}' \
+        | grep -E 'llvm|mesa|vulkan|libz3|codec2|libavcodec|libavformat|libavutil|libswresample|x265|x264|libvpx|libaom|dav1d|rav1e|svt' \
+        | grep -vE '^libgl1$|^libegl1$|^libglx0$|glvnd' \
+        | xargs -r dpkg -r --force-depends && \
+    # 编译工具链只在 server 阶段 pip 安装时需要，运行期可整体移除（约 225MB）。
+    # 第二段 grep 排除运行时必需且名字相近的包：gcc-14-base（C 运行时基础）、
+    # libgcc-s1（libgcc 运行时，几乎所有二进制都链接它）。注意 cc1 实体在
+    # gcc-14-<arch> 中，gcc/gcc-14 仅为包装器，故用前缀匹配连同 -<arch> 变体一并删除。
+    dpkg -l | awk '/^ii/ {print $2}' \
+        | grep -E '^(binutils|libbinutils|build-essential|cpp|g\+\+|gcc|make|dpkg-dev|libc6-dev|linux-libc-dev|libgcc-[0-9]+-dev|libstdc\+\+-[0-9]+-dev|python3-dev|python3\.[0-9]+-dev|libpython3-dev|libpython3\.[0-9]+-dev|python3-numpy-dev)([-.:].*)?$' \
+        | grep -vE '^(gcc-[0-9]+-base|libgcc-s1)([-.:].*)?$' \
+        | xargs -r dpkg -r --force-depends && \
+    rm -rf /usr/share/doc /usr/share/man /usr/share/qt6/resources /usr/share/qt6/translations
+
+# 把瘦身后的 rootfs 压成单层。scratch 不带任何元数据，故需重新声明 production
+# 阶段的全部运行时元数据（ENV / WORKDIR / EXPOSE / VOLUME / CMD）。
+FROM scratch AS production-slim
+COPY --from=slim-strip / /
+
+ENV TZ=Asia/Shanghai
+ENV LANG=C.UTF-8
+ENV PUID=1000
+ENV PGID=1000
+ENV TALEBOOK_PDF_CONVERT=0
+
+WORKDIR /var/www/talebook
+
+EXPOSE 80 443
+VOLUME ["/data"]
+
+CMD ["/var/www/talebook/docker/start.sh"]
 
