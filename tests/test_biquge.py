@@ -240,7 +240,7 @@ class TestBiqugeApi(unittest.TestCase):
         self.assertEqual(mi.source, "笔趣阁")
         self.assertEqual(mi.provider_key, KEY)
         self.assertEqual(mi.provider_value, "3/3459")
-        self.assertIsNone(mi.cover_data)  # copy_image=False
+        self.assertEqual(mi.cover_data, (None, None))  # copy_image=False — Calibre normalizes to (None, None)
         self.assertIsNone(mi.rating)
 
     @mock.patch.object(BiqugeSearch, "search")
