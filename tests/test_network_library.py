@@ -147,6 +147,52 @@ class TestNetworkLibrary(TestWithUserLogin):
         self.assertEqual(len(d["items"]), 2)
         self.assertEqual(d["items"][0]["name"], "玄幻")
 
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_explore(self, m_session):
+        # 分类 URL 含 {{page}} 模板，后端应替换为实际页码后再发 HTTP 请求
+        session = get_db()
+        session.query(models.BookSourceModel).delete()
+        session.commit()
+        raw = dict(CSS_SOURCE, exploreUrl="玄幻::/explore/{{page}}.html")
+        source = models.BookSourceModel(raw)
+        source.save()
+        sid = source.id
+        m_session.return_value = FakeSession({"/explore/1.html": text("search.html")})
+        category_url = "/explore/{{page}}.html"
+        d = self.json("/api/network/explore?source_id=%d&url=%s&page=1" % (sid, Q(category_url)))
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(len(d["books"]), 2)
+        self.assertEqual(d["books"][0]["name"], "剑来")
+        # 验证 {{page}} 被替换为 1，即访问了 /explore/1.html
+        calls = m_session.return_value.calls
+        self.assertTrue(any("explore/1.html" in url for _, url in calls))
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_explore_page_substitution(self, m_session):
+        # page=2 时，{{page}} 应替换为 2，访问不同 URL
+        session = get_db()
+        session.query(models.BookSourceModel).delete()
+        session.commit()
+        raw = dict(CSS_SOURCE, exploreUrl="玄幻::/explore/{{page}}.html")
+        source = models.BookSourceModel(raw)
+        source.save()
+        sid = source.id
+        m_session.return_value = FakeSession({"/explore/2.html": text("search.html")})
+        category_url = "/explore/{{page}}.html"
+        d = self.json("/api/network/explore?source_id=%d&url=%s&page=2" % (sid, Q(category_url)))
+        self.assertEqual(d["err"], "ok")
+        calls = m_session.return_value.calls
+        self.assertTrue(any("explore/2.html" in url for _, url in calls))
+        self.assertFalse(any("explore/1.html" in url for _, url in calls))
+
+    def test_explore_missing_source(self):
+        d = self.json("/api/network/explore?source_id=99999&url=%s&page=1" % Q("/x"))
+        self.assertEqual(d["err"], "params.not_found")
+
+    def test_explore_missing_url(self):
+        d = self.json("/api/network/explore?source_id=%d&url=&page=1" % self.sid)
+        self.assertEqual(d["err"], "params.error")
+
     def test_status_get_set(self):
         session = get_db()
         meta = models.OnlineBookMeta(book_id=123456, source_url="http://x.com")

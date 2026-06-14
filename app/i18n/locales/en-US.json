@@ -226,6 +226,7 @@
     "partialFailedCount": "{n} sources returned no result",
     "explorePickSource": "Pick a source",
     "exploreEmpty": "This source has no explore categories",
+    "exploreNoBooks": "No books found in this category. The source rules may not support category page parsing.",
     "prevPage": "Prev",
     "nextPage": "Next",
     "page": "Page {n}",
