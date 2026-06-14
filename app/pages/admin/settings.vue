@@ -635,7 +635,19 @@
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="dbMigrateDialog = false">{{ t('common.cancel') }}</v-btn>
-                    <v-btn color="warning" dark @click="migrateDb">{{ t('admin.settings.button.migrateDb') }}</v-btn>
+                    <v-btn color="warning" dark @click="migrateDb(false)">{{ t('admin.settings.button.migrateDb') }}</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog v-model="dbForceDialog" max-width="480" persistent>
+            <v-card>
+                <v-card-title>{{ t('admin.settings.message.dbForceTitle') }}</v-card-title>
+                <v-card-text>{{ t('admin.settings.message.dbForceWarning', { count: dbTargetDataCount }) }}</v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="dbForceDialog = false">{{ t('common.cancel') }}</v-btn>
+                    <v-btn color="error" dark @click="forceMigrateDb">{{ t('admin.settings.button.forceMigrateDb') }}</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -714,6 +726,8 @@ const dbNewPass = ref('');
 const dbTesting = ref(false);
 const dbMigrating = ref(false);
 const dbMigrateDialog = ref(false);
+const dbForceDialog = ref(false);
+const dbTargetDataCount = ref(0);
 const dbTypeOptions = computed(() => [
     { text: t('admin.settings.option.dbSqlite'), value: 'sqlite' },
     { text: t('admin.settings.option.dbMysql'), value: 'mysql' },
@@ -1075,7 +1089,7 @@ const testDbConnection = () => {
         .finally(() => { dbTesting.value = false; });
 };
 
-const migrateDb = () => {
+const migrateDb = (force = false) => {
     dbMigrateDialog.value = false;
     dbMigrating.value = true;
     var data = new URLSearchParams();
@@ -1085,16 +1099,25 @@ const migrateDb = () => {
     data.append('db_name', dbNewName.value);
     data.append('db_user', dbNewUser.value);
     data.append('db_pass', dbNewPass.value);
+    if (force) data.append('force', '1');
     $backend('/admin/migratedb', { method: 'POST', body: data })
         .then(rsp => {
             if (rsp.err === 'ok') {
                 if ($alert) $alert('success', t('admin.settings.message.dbMigrateSuccess'));
                 settings.value.user_database = `mysql+pymysql://${dbNewUser.value}:***@${dbNewHost.value}:${dbNewPort.value}/${dbNewName.value}`;
+            } else if (rsp.err === 'db.target_has_data') {
+                dbTargetDataCount.value = rsp.count || 0;
+                dbForceDialog.value = true;
             } else {
                 if ($alert) $alert('error', rsp.msg);
             }
         })
         .finally(() => { dbMigrating.value = false; });
+};
+
+const forceMigrateDb = () => {
+    dbForceDialog.value = false;
+    migrateDb(true);
 };
 
 const fetchTrashSize = () => {

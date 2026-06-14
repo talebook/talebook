@@ -123,6 +123,21 @@ class TestAdminTestDB(TestWithAdminUser):
         d = self.json("/api/admin/testdb", method="POST", body=body)
         self.assertEqual(d["err"], "db.connect_failed")
 
+    def test_invalid_port_rejected(self):
+        """端口号超出范围时返回 params.invalid"""
+        body = urllib.parse.urlencode(
+            {
+                "db_type": "mysql",
+                "db_host": "localhost",
+                "db_port": "0",
+                "db_name": "testdb",
+                "db_user": "root",
+                "db_pass": "pass",
+            }
+        )
+        d = self.json("/api/admin/testdb", method="POST", body=body)
+        self.assertEqual(d["err"], "params.invalid")
+
     def test_requires_admin_after_install(self):
         """安装后非管理员无法访问"""
         from webserver import models
@@ -201,6 +216,86 @@ class TestAdminMigrateDB(TestWithAdminUser):
                 self.assertTrue(d.get("need_restart"))
         finally:
             # restore original db url in CONF
+            main.CONF["user_database"] = original_db_url
+            loader.get_settings()["user_database"] = original_db_url
+
+    def test_invalid_port_rejected(self):
+        """端口号超出范围时返回 params.invalid"""
+        body = urllib.parse.urlencode(
+            {
+                "db_type": "mysql",
+                "db_host": "localhost",
+                "db_port": "99999",
+                "db_name": "testdb",
+                "db_user": "root",
+                "db_pass": "pass",
+            }
+        )
+        d = self.json("/api/admin/migratedb", method="POST", body=body)
+        self.assertEqual(d["err"], "params.invalid")
+
+    def test_target_has_data_warning(self):
+        """目标库有数据且不带 force 时，返回 db.target_has_data 警告"""
+        import tempfile
+
+        from webserver import loader, main
+        from webserver.migrate_db import TargetNotEmptyError
+
+        original_db_url = main.CONF["user_database"]
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+
+                def fake_migrate_nonempty(source_url, target_url, force=False):
+                    raise TargetNotEmptyError(42)
+
+                with mock.patch("webserver.migrate_db.migrate_data", side_effect=fake_migrate_nonempty):
+                    with mock.patch("webserver.loader.SettingsLoader.set_store_path", return_value=tmpdir):
+                        body = urllib.parse.urlencode(
+                            {
+                                "db_type": "mysql",
+                                "db_host": "localhost",
+                                "db_port": "3306",
+                                "db_name": "testdb",
+                                "db_user": "root",
+                                "db_pass": "pass",
+                            }
+                        )
+                        d = self.json("/api/admin/migratedb", method="POST", body=body)
+                self.assertEqual(d["err"], "db.target_has_data")
+                self.assertEqual(d["count"], 42)
+        finally:
+            main.CONF["user_database"] = original_db_url
+            loader.get_settings()["user_database"] = original_db_url
+
+    def test_target_has_data_force_succeeds(self):
+        """目标库有数据且带 force=1 时，迁移正常完成"""
+        import tempfile
+
+        from webserver import loader, main
+
+        original_db_url = main.CONF["user_database"]
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+
+                def fake_migrate(source_url, target_url, force=False):
+                    pass
+
+                with mock.patch("webserver.migrate_db.migrate_data", side_effect=fake_migrate):
+                    with mock.patch("webserver.loader.SettingsLoader.set_store_path", return_value=tmpdir):
+                        body = urllib.parse.urlencode(
+                            {
+                                "db_type": "mysql",
+                                "db_host": "localhost",
+                                "db_port": "3306",
+                                "db_name": "testdb",
+                                "db_user": "root",
+                                "db_pass": "pass",
+                                "force": "1",
+                            }
+                        )
+                        d = self.json("/api/admin/migratedb", method="POST", body=body)
+                self.assertEqual(d["err"], "ok")
+        finally:
             main.CONF["user_database"] = original_db_url
             loader.get_settings()["user_database"] = original_db_url
 

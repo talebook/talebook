@@ -653,7 +653,8 @@
         "checkUpdate": "Check for Updates",
         "viewRelease": "View Release",
         "testDbConnection": "Test Connection",
-        "migrateDb": "Migrate Database"
+        "migrateDb": "Migrate Database",
+        "forceMigrateDb": "Force Migrate"
       },
       "label": {
         "siteTitle": "Site Title",
@@ -760,7 +761,9 @@
         "dbMigrateSuccess": "Migration successful. Please restart the server for changes to take effect.",
         "dbConnectSuccess": "Database connection successful",
         "currentDb": "Current Database",
-        "newDbConfig": "Migrate to New Database"
+        "newDbConfig": "Migrate to New Database",
+        "dbForceTitle": "Target database has existing data — confirm forced migration?",
+        "dbForceWarning": "The target database already contains {count} records. A forced migration will permanently erase all existing data before writing. This cannot be undone — please back up first!"
       },
       "meta_source": {
         "douban": "Douban",

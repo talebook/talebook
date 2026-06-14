@@ -449,6 +449,8 @@ class AdminTestDB(BaseHandler):
             db_port = int(db_port)
         except ValueError:
             return {"err": "params.invalid", "msg": _("端口号无效")}
+        if not (1 <= db_port <= 65535):
+            return {"err": "params.invalid", "msg": _("端口号范围无效，应在 1-65535 之间")}
 
         db_url = _build_mysql_url(db_host, db_port, db_name, db_user, db_pass)
         try:
@@ -490,6 +492,10 @@ class AdminMigrateDB(BaseHandler):
             db_port = int(db_port)
         except ValueError:
             return {"err": "params.invalid", "msg": _("端口号无效")}
+        if not (1 <= db_port <= 65535):
+            return {"err": "params.invalid", "msg": _("端口号范围无效，应在 1-65535 之间")}
+
+        force = self.get_argument("force", "0").strip() == "1"
 
         new_db_url = _build_mysql_url(db_host, db_port, db_name, db_user, db_pass)
         source_url = CONF["user_database"]
@@ -498,9 +504,15 @@ class AdminMigrateDB(BaseHandler):
             return {"err": "params.invalid", "msg": _("目标数据库与当前数据库相同")}
 
         try:
-            from webserver.migrate_db import migrate_data
+            from webserver.migrate_db import TargetNotEmptyError, migrate_data
 
-            migrate_data(source_url, new_db_url)
+            migrate_data(source_url, new_db_url, force=force)
+        except TargetNotEmptyError as e:
+            return {
+                "err": "db.target_has_data",
+                "count": e.count,
+                "msg": _("目标数据库已有 %d 条记录，继续迁移将清空这些数据。如需强制迁移，请再次确认。") % e.count,
+            }
         except Exception as e:
             logging.error(traceback.format_exc())
             return {"err": "db.migrate_failed", "msg": _("数据迁移失败: %s") % str(e)}
@@ -570,6 +582,8 @@ class AdminInstall(BaseHandler):
                 db_port = int(db_port)
             except ValueError:
                 return {"err": "params.invalid", "msg": _("端口号无效")}
+            if not (1 <= db_port <= 65535):
+                return {"err": "params.invalid", "msg": _("端口号范围无效，应在 1-65535 之间")}
 
             target_db_url = _build_mysql_url(db_host, db_port, db_name, db_user, db_pass)
             try:

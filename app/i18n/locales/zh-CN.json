@@ -683,7 +683,8 @@
         "checkUpdate": "检查更新",
         "viewRelease": "查看发布",
         "testDbConnection": "测试连接",
-        "migrateDb": "迁移数据库"
+        "migrateDb": "迁移数据库",
+        "forceMigrateDb": "强制迁移"
       },
       "label": {
         "siteTitle": "网站标题",
@@ -790,7 +791,9 @@
         "dbMigrateSuccess": "数据迁移成功，请重启服务器以生效",
         "dbConnectSuccess": "数据库连接成功",
         "currentDb": "当前数据库",
-        "newDbConfig": "迁移到新数据库"
+        "newDbConfig": "迁移到新数据库",
+        "dbForceTitle": "目标数据库已有数据，确认强制迁移？",
+        "dbForceWarning": "目标数据库中已存在 {count} 条记录，强制迁移将永久清空这些数据后再写入。操作不可逆，请确认已备份！"
       },
       "meta_source": {
         "douban": "豆瓣",

@@ -42,6 +42,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
+class TargetNotEmptyError(Exception):
+    """Raised when the target database already has data and force=False."""
+
+    def __init__(self, count):
+        self.count = count
+        super().__init__(f"Target database has {count} existing rows")
+
+
 def get_column_type(column):
     """Convert SQLAlchemy Column type to SQLite type string"""
     from social_sqlalchemy.storage import JSONType
@@ -294,11 +302,15 @@ def build_engine_args(db_url):
     return args
 
 
-def migrate_data(source_url, target_url):
+def migrate_data(source_url, target_url, force=False):
     """Copy all data from source database to target database.
 
     Creates all tables in the target, then copies every row.  The target is
     cleared table-by-table before inserting so the operation is idempotent.
+
+    If the target already contains data and force=False, raises TargetNotEmptyError
+    with the total existing row count so the caller can prompt for confirmation.
+    Pass force=True to skip the check and overwrite existing data.
     """
     from sqlalchemy import text
 
@@ -311,6 +323,17 @@ def migrate_data(source_url, target_url):
     logger.info("Tables created in target database")
 
     is_mysql_target = not target_url.startswith("sqlite")
+
+    if not force:
+        total_existing = 0
+        with target_engine.connect() as check_conn:
+            for table in models.Base.metadata.sorted_tables:
+                count = check_conn.execute(text(f"SELECT COUNT(*) FROM `{table.name}`")).scalar()
+                total_existing += count or 0
+        if total_existing > 0:
+            source_engine.dispose()
+            target_engine.dispose()
+            raise TargetNotEmptyError(total_existing)
 
     with source_engine.connect() as src:
         with target_engine.connect() as tgt:
