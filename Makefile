@@ -17,15 +17,14 @@ init:
 
 build: test build-spa build-ssr
 
-# 基础镜像：本地构建/发布。主 Dockerfile 默认 FROM talebook/talebook-base:8.6，
-# 基础镜像有变更时需先执行 make build-base push-base 引导出对应版本标签。
-BASE_VER := 8.6
+# 基础镜像：本地构建/发布。主 Dockerfile 默认 FROM talebook/talebook-base:8.5，
+# 首次切换镜像名后需先执行 make build-base push-base 引导出 :8.5 标签。
 build-base:
-	docker build -f Dockerfile.base --build-arg BUILD_COUNTRY=CN -t $(BASE):latest -t $(BASE):$(BASE_VER) .
+	docker build -f Dockerfile.base -t $(BASE):latest -t $(BASE):8.5 .
 
 push-base:
 	docker push $(BASE):latest
-	docker push $(BASE):$(BASE_VER)
+	docker push $(BASE):8.5
 
 build-spa:
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
