@@ -122,6 +122,7 @@ class ScanService(AsyncService):
         # 检查文件哈希值，检查DB重复情况
         for row in rows:
             fpath = row.path
+            fname = os.path.basename(fpath)
 
             # 读取文件，计算哈希值
             sha256 = hashlib.sha256()
@@ -184,6 +185,10 @@ class ScanService(AsyncService):
                 mi.title = utils.super_strip(mi.title)
                 mi.authors = [utils.super_strip(s) for s in mi.authors]
 
+                # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
+                if fmt in ["txt", "pdf"]:
+                    mi.title = os.path.splitext(fname)[0]
+
                 row.title = mi.title
                 # 使用mi.authors列表而不是mi.author_sort，避免作者信息丢失
                 row.author = mi.authors[0] if mi.authors else ""
@@ -191,9 +196,11 @@ class ScanService(AsyncService):
                 row.tags = ", ".join(mi.tags)
                 row.status = ScanFile.READY  # 设置为可处理
             else:
-                row.title = fname
+                row.title = os.path.splitext(fname)[0]
                 row.author = "Unknown"
                 row.status = ScanFile.READY  # 设置为可处理，尽管解析失败
+                self.save_or_rollback(row)
+                continue
 
             # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
             ids = self.db.books_with_same_title(mi)
