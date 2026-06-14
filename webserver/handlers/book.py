@@ -28,7 +28,7 @@ from webserver.constants import (
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Item, ReadingState
-from webserver.plugins.meta import baike, calibre, douban, tomato, xhsd, youshu
+from webserver.plugins.meta import baike, biquge, calibre, douban, tomato, xhsd, youshu
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
@@ -308,6 +308,15 @@ class BookRefer(BaseHandler):
 
             tasks["tomato"] = _tomato
 
+        if hasattr(biquge, "BiqugeApi"):
+
+            def _biquge():
+                api = biquge.BiqugeApi(copy_image=False)
+                book = api.get_book(title)
+                return [book] if book else []
+
+            tasks["biquge"] = _biquge
+
         if META_SOURCE_AI in sources:
 
             def _ai():
@@ -395,6 +404,14 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("获取番茄小说书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.tomato.failed", "msg": _("番茄小说查询失败")})
+        elif provider_key == biquge.KEY:
+            title = re.sub("[(（].*", "", mi.title)
+            api = biquge.BiqugeApi(copy_image=True)
+            try:
+                refer_mi = api.get_book(title)
+            except Exception as e:
+                logging.error("获取笔趣阁书籍信息失败：%s", e)
+                raise RuntimeError({"err": "httprequest.biquge.failed", "msg": _("笔趣阁查询失败")})
         elif provider_key == calibre.KEY:
             if mi.isbn:
                 try:
