@@ -196,7 +196,7 @@ class TestAdminMigrateDB(TestWithAdminUser):
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
 
-                def fake_migrate(source_url, target_url):
+                def fake_migrate(source_url, target_url, force=False):
                     pass
 
                 with mock.patch("webserver.migrate_db.migrate_data", side_effect=fake_migrate):
