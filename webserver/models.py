@@ -532,7 +532,9 @@ class BookSourceModel(Base, SQLAlchemyMixin):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False, index=True)
-    url = Column(String(767), nullable=False, index=True)  # bookSourceUrl，导入时按此 upsert；767×4=3068 ≤ MySQL utf8mb4 索引上限 3072 字节
+    url = Column(
+        String(767), nullable=False, index=True
+    )  # bookSourceUrl，导入时按此 upsert；767×4=3068 ≤ MySQL utf8mb4 索引上限 3072 字节
     group = Column(String(200), default="", index=True)
     source_type = Column(Integer, default=0)
     enabled = Column(Boolean, default=True, index=True)
