@@ -1,7 +1,9 @@
 # -*- coding: UTF-8 -*-
 
+import asyncio
 import concurrent.futures
 import datetime
+import time
 import json
 import logging
 import os
@@ -248,29 +250,45 @@ class BookRefer(BaseHandler):
         logging.info("所有信息源查询完成，共找到 %d 条结果", len(books))
         return books
 
-    def plugin_search_books_stream(self, mi):
+    async def plugin_search_books_stream(self, mi):
         tasks = self._build_search_tasks(mi)
         if not tasks:
             return
 
         logging.info("并行查询(流式) %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
-            future_map = {executor.submit(fn): name for name, fn in tasks.items()}
-            pending = set(future_map.keys())
-            try:
-                for f in concurrent.futures.as_completed(future_map, timeout=self.REFER_TIMEOUT):
-                    name = future_map[f]
-                    pending.discard(f)
+        loop = asyncio.get_event_loop()
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks))
+        try:
+            pending_map = {
+                loop.run_in_executor(executor, fn): name
+                for name, fn in tasks.items()
+            }
+            deadline = time.time() + self.REFER_TIMEOUT
+
+            while pending_map:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    for fut in pending_map:
+                        logging.warning("查询 %s 超时，已跳过", pending_map[fut])
+                    break
+
+                done_set, _ = await asyncio.wait(
+                    pending_map.keys(),
+                    timeout=remaining,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+
+                for fut in done_set:
+                    name = pending_map.pop(fut)
                     try:
-                        result = f.result()
+                        result = fut.result()
                         logging.info("%s 查询完成：%d 条", name, len(result))
                         for b in result:
                             yield b
                     except Exception as e:
                         logging.error("%s 查询失败：%s", name, e)
-            except TimeoutError:
-                for f in pending:
-                    logging.warning("查询 %s 超时，已跳过", future_map[f])
+        finally:
+            executor.shutdown(wait=False)
 
     def _build_search_tasks(self, mi):
         sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
@@ -545,7 +563,7 @@ class BookRefer(BaseHandler):
             self.write(json.dumps({"err": "ok"}, ensure_ascii=False) + "\n")
             await self.flush()
 
-            for b in self.plugin_search_books_stream(mi):
+            async for b in self.plugin_search_books_stream(mi):
                 d = self._fmt_refer_book(b)
                 if d:
                     self.write(json.dumps(d, ensure_ascii=False) + "\n")
