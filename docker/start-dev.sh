@@ -48,13 +48,13 @@ if [ "x$permission" != "x$PUID:$PGID" ]; then
     echo "$PUID:$PGID" > $permission_file
 fi
 
-# 设置系统文件的权限
+# 设置系统文件的权限。不要递归 chown bind-mounted app/ 或 webserver/，
+# 避免修改宿主机工作树所有权。
 chown -R talebook:talebook \
   /data/log/ \
   /var/lib/nginx \
   /root/.config/calibre \
   /root/.npm \
-  /var/www/talebook/webserver \
   /var/www/talebook/server.py \
   /usr/lib/calibre \
   /usr/share/calibre
