@@ -80,6 +80,11 @@ fi
 export PYTHONDONTWRITEBYTECODE=1
 echo
 echo "====== Check config ===="
+# 若 nginx 配置未通过 bind mount 提供，则使用镜像内置的默认配置
+if [ ! -f /etc/nginx/conf.d/talebook.conf ]; then
+  echo "No bind-mounted nginx config found, using built-in default."
+  cp /etc/nginx/talebook.conf.default /etc/nginx/conf.d/talebook.conf
+fi
 nginx -t || exit 1
 
 echo

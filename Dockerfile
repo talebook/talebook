@@ -248,7 +248,7 @@ COPY server.py /var/www/talebook/
 COPY docker/ /var/www/talebook/docker/
 COPY webserver/ /var/www/talebook/webserver/
 COPY conf/nginx/ssl.* /data/books/ssl/
-COPY conf/nginx/dev.conf /etc/nginx/conf.d/talebook.conf
+COPY conf/nginx/dev.conf /etc/nginx/talebook.conf.default
 COPY conf/supervisor/dev.conf /etc/supervisor/conf.d/talebook.conf
 
 # 预先安装 npm 依赖（当 app/ 目录未被外部挂载时作为回退）
