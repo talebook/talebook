@@ -19,6 +19,8 @@ services:
       - ./app:/var/www/talebook/app
       # 挂载本地 webserver/ 目录，修改后端代码后 tornado 自动重启
       - ./webserver:/var/www/talebook/webserver
+      # 挂载 nginx 配置，新增路由前缀后只需 docker compose exec talebook-dev nginx -s reload
+      - ./conf/nginx/dev.conf:/etc/nginx/conf.d/talebook.conf
     ports:
       - "8080:80"
       - "8443:443"
