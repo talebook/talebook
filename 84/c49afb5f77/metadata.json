@@ -1,0 +1,49 @@
+{
+  "checkpoint_id": "84c49afb5f77",
+  "strategy": "manual-commit",
+  "branch": "codex/pr-821-fix",
+  "checkpoints_count": 19,
+  "files_touched": [
+    "app/components/AppHeader.vue",
+    "app/components/Upload.vue",
+    "app/components/themes/BuiltinThemeFooter.vue",
+    "app/components/themes/BuiltinThemeHeader.vue",
+    "app/components/themes/cloudflare-radar/AppFooter.vue",
+    "app/components/themes/cloudflare-radar/AppHeader.vue",
+    "app/components/themes/hacker-news-compact/AppFooter.vue",
+    "app/components/themes/hacker-news-compact/AppHeader.vue",
+    "app/components/themes/mybooks-midnight/AppFooter.vue",
+    "app/components/themes/mybooks-midnight/AppHeader.vue",
+    "app/i18n/locales/en-US.json",
+    "app/i18n/locales/zh-CN.json",
+    "app/layouts/default.vue",
+    "app/pages/admin/themes.vue",
+    "app/stores/theme.ts",
+    "app/test/components/Upload.spec.ts",
+    "app/test/mock-server.js",
+    "app/test/stores/theme.spec.ts",
+    "app/test/utils/builtin-themes.spec.ts",
+    "app/test/utils/theme-display.spec.ts",
+    "app/utils/builtin-themes.ts",
+    "app/utils/theme-display.ts",
+    "tests/test_theme.py",
+    "tests/test_upload.py",
+    "webserver/handlers/book.py",
+    "webserver/handlers/theme.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/84/c49afb5f77/0/metadata.json",
+      "prompt": "/84/c49afb5f77/0/prompt.txt",
+      "transcript": "/84/c49afb5f77/0/full.jsonl",
+      "content_hash": "/84/c49afb5f77/0/content_hash.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 3996947,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 74482560,
+    "output_tokens": 198558,
+    "api_call_count": 630
+  }
+}

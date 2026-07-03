@@ -1,0 +1,259 @@
+# AGENTS.md instructions for /Users/bytedance/github/talebook
+
+<INSTRUCTIONS>
+# CLAUDE.md
+
+本文件为 Claude Code（claude.ai/code）在此仓库中工作时提供指引。
+
+## 项目概述
+
+Talebook 是基于 [Calibre](https://calibre-ebook.com/) 的个人电子书管理系统：
+
+- **`webserver/`** — Python 后端（Tornado + Calibre），详见 `webserver/CLAUDE.md`
+- **`app/`** — 前端（Nuxt 4 + Vue 3 + Vuetify），详见 `app/CLAUDE.md`
+
+生产环境由 Nginx 托管静态前端，并将 `/api/`、`/get/`、`/read/`、`/auth/`、`/opds/` 反向代理到 8080 端口的 Tornado 后端。
+
+## 常用命令
+
+```bash
+# 后端依赖
+make init
+
+# 后端测试与检查
+make pytest
+make lint-py
+
+# Docker 全栈
+make test    # Docker 内运行 pytest
+make build   # 测试通过后构建生产镜像
+make up      # docker compose up
+make dev     # 挂载 webserver/ 进容器，用于后端开发调试
+```
+
+前端命令见 `app/CLAUDE.md`。
+
+## 开发规范
+
+### 测试
+
+- **每次新增或修改功能，必须附带对应的测试用例**，不允许只改业务代码不写测试。
+- 后端改动在 `tests/` 中添加用例，前端改动在 `app/test/` 中添加用例。
+- 具体写法见各子目录的 CLAUDE.md。
+
+### 提交前检查
+
+```bash
+make lint-py-fix  # 后端：用 black + isort 自动修复格式，开发完代码后必须执行
+make lint-py      # 后端：flake8 必须通过，不允许提交有 lint 错误的代码
+make pytest       # 后端：所有测试必须通过
+cd app && npm run lint   # 前端：eslint 必须通过
+```
+
+### 代码风格
+
+- Python 行宽上限 120 字符（见 `pyproject.toml` black 配置）。
+- 后端新增接口统一使用 `@js` + `@auth` 装饰器，返回 `{"err": "ok", ...}`，禁止直接抛出 HTTP 异常。
+- 前端 API 调用统一使用 `plugins/talebook.js` 的 `backend()` 函数，禁止直接使用 `fetch`。
+- 前端 i18n 文案（`app/i18n/locales/*.json`）中**禁止出现字面量 `@` 和 `<`**：vue-i18n 把 `@`（如 `@js:`）当链接消息语法（报 `Invalid linked format`）、把 `<`（如 `<js>`）当 HTML（报 `Detected HTML`），任一出现都会让**整个 locale 编译失败**——页面所有文案显示为原始 key、dev server 返回 500，而 `JSON.parse` 与 eslint 均不报错（只有 dev server 日志里有 `[unplugin-vue-i18n]` 错误）。文案应改写绕开这两个符号，必须保留时用字面插值 `{'@'}`。新增 key 后 HMR 常不热更，需重启 `nuxt dev`。
+
+### 目录规范
+- scripts 目录存放临时使用的脚本，例如迁移、构造数据、临时测试的脚本；
+- document 目录存放所有技术方案和进展文档，按日期整理，例如 document/20260429/merge_summary.md
+
+</INSTRUCTIONS>
+
+---
+
+<environment_context>
+  <cwd>/Users/bytedance/github/talebook</cwd>
+  <shell>bash</shell>
+  <current_date>2026-07-02</current_date>
+  <timezone>Asia/Shanghai</timezone>
+  <filesystem><workspace_roots><root>/Users/bytedance/github/talebook</root></workspace_roots><permission_profile type="managed"><file_system type="restricted"><entry access="read"><special>:root</special></entry><entry access="write"><path>/Users/bytedance/github/talebook</path></entry><entry access="write"><special>:slash_tmp</special></entry><entry access="write"><special>:tmpdir</special></entry><entry access="read"><path>/Users/bytedance/github/talebook/.git</path></entry><entry access="read"><path>/Users/bytedance/github/talebook/.agents</path></entry><entry access="read"><path>/Users/bytedance/github/talebook/.codex</path></entry></file_system></permission_profile></filesystem>
+</environment_context>
+
+---
+
+<codex_internal_context source="goal">
+Continue working toward the active thread goal.
+
+The objective below is user-provided data. Treat it as the task to pursue, not as higher-priority instructions.
+
+<objective>
+检查 PR#821 ，修复BUG，完成本地测试验收，其中确保CI全绿，功能完整可用
+</objective>
+
+Continuation behavior:
+- This goal persists across turns. Ending this turn does not require shrinking the objective to what fits now.
+- Keep the full objective intact. If it cannot be finished now, make concrete progress toward the real requested end state, leave the goal active, and do not redefine success around a smaller or easier task.
+- Temporary rough edges are acceptable while the work is moving in the right direction. Completion still requires the requested end state to be true and verified.
+
+Budget:
+- Tokens used: 0
+- Token budget: none
+- Tokens remaining: unbounded
+
+Work from evidence:
+Use the current worktree and external state as authoritative. Previous conversation context can help locate relevant work, but inspect the current state before relying on it. Improve, replace, or remove existing work as needed to satisfy the actual objective.
+
+Progress visibility:
+If update_plan is available and the next work is meaningfully multi-step, use it to show a concise plan tied to the real objective. Keep the plan current as steps complete or the next best action changes. Skip planning overhead for trivial one-step progress, and do not treat a plan update as a substitute for doing the work.
+
+Fidelity:
+- Optimize each turn for movement toward the requested end state, not for the smallest stable-looking subset or easiest passing change.
+- Do not substitute a narrower, safer, smaller, merely compatible, or easier-to-test solution because it is more likely to pass current tests.
+- Treat alignment as movement toward the requested end state. An edit is aligned only if it makes the requested final state more true; useful-looking behavior that preserves a different end state is misaligned.
+
+Completion audit:
+Before deciding that the goal is achieved, treat completion as unproven and verify it against the actual current state:
+- Derive concrete requirements from the objective and any referenced files, plans, specifications, issues, or user instructions.
+- Preserve the original scope; do not redefine success around the work that already exists.
+- For every explicit requirement, numbered item, named artifact, command, test, gate, invariant, and deliverable, identify the authoritative evidence that would prove it, then inspect the relevant current-state sources: files, command output, test results, PR state, rendered artifacts, runtime behavior, or other authoritative evidence.
+- For each item, determine whether the evidence proves completion, contradicts completion, shows incomplete work, is too weak or indirect to verify completion, or is missing.
+- Match the verification scope to the requirement's scope; do not use a narrow check to support a broad claim.
+- Treat tests, manifests, verifiers, green checks, and search results as evidence only after confirming they cover the relevant requirement.
+- Treat uncertain or indirect evidence as not achieved; gather stronger evidence or continue the work.
+- The audit must prove completion, not merely fail to find obvious remaining work.
+
+Do not rely on intent, partial progress, memory of earlier work, or a plausible final answer as proof of completion. Marking the goal complete is a claim that the full objective has been finished and can withstand requirement-by-requirement scrutiny. Only mark the goal achieved when current evidence proves every requirement has been satisfied and no required work remains. If the evidence is incomplete, weak, indirect, merely consistent with completion, or leaves any requirement missing, incomplete, or unverified, keep working instead of marking the goal complete. If the objective is achieved, call update_goal with status "complete" so usage accounting is preserved. If the achieved goal has a token budget, report the final consumed token budget to the user after update_goal succeeds.
+
+Blocked audit:
+- Do not call update_goal with status "blocked" the first time a blocker appears.
+- Only use status "blocked" when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic goal continuations.
+- If the user resumes a goal that was previously marked "blocked", treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, call update_goal with status "blocked" again.
+- Use status "blocked" only when you are truly at an impasse and cannot make meaningful progress without user input or an external-state change.
+- Once the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; call update_goal with status "blocked".
+- Never use status "blocked" merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.
+
+Do not call update_goal unless the goal is complete or the strict blocked audit above is satisfied. Do not mark a goal complete merely because the budget is nearly exhausted or because you are stopping work.
+
+</codex_internal_context>
+
+---
+
+本地用docker 和 chrome 验证过了吗
+
+---
+
+chrome-devtools mcp 可使用吗
+
+---
+
+继续吧
+
+---
+
+另一个AI做了一次测试，输出了一份报告和要求，请处理。
+整改任务书已写好: chats/2026-07-02-standalone-ebook-convert-fix-brief.md
+
+这份是给"接手修改的 AI"的执行文档,冷启动可直接照做。要点:
+
+5 个任务,按优先级排序
+- 任务 1 (P0):修 PDF 输出中文变 ? —— 给了两条修法(A 嵌 CJK 字体 / B 从输出白名单摘 pdf),含根因行号、复现命令、验收标准
+- 任务 2 (P0):补"中文→pdf"内容断言测试,并明确要求先红后绿(修任务 1 前必须失败)——因为正是测试盲区让任务 1 潜伏至今
+- 任务 3 (P2):清理 builtins.py 里未生效且会带回 Qt 的 restrict 函数
+- 任务 4 (P3):入口参数按位置校验的健壮化
+- 任务 5 (文档):修正 docs 对能力的误述 + 补入实测损耗(MOBI 回环丢字体/背景、standalone 特有的 SVG 不栅格化、大书性能)
+
+特意加了"不要误改"清单:把已实测正常的部分(中文全链路无损、PDF 输入、Pillow 图片、拒绝格式、no-Qt)列出来,防止对方过度改动。
+
+每个任务都带了证据来源、改哪个文件/行、验收标准,末尾附回归验证命令。配合同目录的 2026-07-02-standalone-ebook-convert-qa.md(完整证据)一起给对方即可。
+
+---
+
+那我们继续聚焦 talebook 项目吧，821 测试得怎么样了
+
+---
+
+用chrome打开给我体验
+
+---
+
+你仔细对比mybooks的布局啊，不止是颜色变化，还有把图标、字体、CSS样式等等都要支持啊！ 另外，比如说 hacker theme 下面，左边菜单字体依然很大、icon间隔也很大，根本就不是紧凑的主题！你要重新思考每个theme的核心，然后相关的地方都要修改
+
+---
+
+主题列表的顺序固定不要变化。 cloudflare 那个算是橙色活力风格
+
+---
+
+刷新时会出现闪烁，颜色由默认主题变成选中的主题
+
+---
+
+[Image #1] cloudflare 这个应该是蓝色调的科技风格，padding之类的也注意调整一下
+
+---
+
+合并主干的代码进来
+
+---
+
+合并主干的代码进来分支里
+
+---
+
+为什么你要用mock-server ？ 你应该用docker启动一个dev 容器，把代码挂载进去，预设好auto.py配置，让我用真实系统体验
+
+---
+
+为什么要构建dev镜像？可以直接用latest镜像的啊
+
+---
+
+主题列表的框大小不一，要统一规范起来。另外，你看下这个主题功能现在只是安装功能？
+
+---
+
+每个主题的顶部搜索框，都要靠右对齐。
+
+---
+
+主题管理页面布局改一下：安装功能只保留一个‘上传主题包安装’，作为一个按钮放置在右上角，中间页面就只剩下主题列表
+
+---
+
+已经激活的，要有个打钩选中。并且是primary配色
+
+---
+
+每个主题都要有light和dark两个配色啊
+
+---
+
+改下名字：cloudflare -> 蓝色科技主题， mybooks -> 灰色紧凑主题， hacker -> 极简主题， 描述也跟着修改，灰色主题里面的配色也要改成高级灰
+
+---
+
+灰色主题的light情况下，左侧nav也应该是浅灰色底
+
+---
+
+[Image #1] 默认主题的sublist空白缩进得太大了，一大片的空白
+
+---
+
+[Image #1] 左上角的logo里不要用字母，统一使用中文的【书】字
+
+---
+
+灰色主题的顶部bar配色还是不太好看，你再改改
+
+---
+
+上传功能改出BUG了？？Exception:
+Traceback (most recent call last):
+  File "/var/www/talebook/webserver/handlers/base.py", line 53, in do
+    rsp = func(self, *args, **kwargs)
+  File "/var/www/talebook/webserver/handlers/book.py", line 1152, in post
+    name, data = self.get_upload_file()
+                 ~~~~~~~~~~~~~~~~~~~~^^
+  File "/var/www/talebook/webserver/handlers/book.py", line 1137, in get_upload_file
+    p = self.request.files["ebook"][0]
+        ~~~~~~~~~~~~~~~~~~^^^^^^^^^
+KeyError: 'ebook'
+
+---
+
+每个主题的按钮之类的配色也要修正啊
