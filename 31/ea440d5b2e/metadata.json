@@ -1,0 +1,22 @@
+{
+  "checkpoint_id": "31ea440d5b2e",
+  "strategy": "manual-commit",
+  "branch": "codex/pr-821-fix",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "sessions": [
+    {
+      "metadata": "/31/ea440d5b2e/0/metadata.json",
+      "prompt": "/31/ea440d5b2e/0/prompt.txt",
+      "transcript": "/31/ea440d5b2e/0/full.jsonl",
+      "content_hash": "/31/ea440d5b2e/0/content_hash.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 31946,
+    "cache_creation_tokens": 453045,
+    "cache_read_tokens": 52560241,
+    "output_tokens": 252364,
+    "api_call_count": 232
+  }
+}

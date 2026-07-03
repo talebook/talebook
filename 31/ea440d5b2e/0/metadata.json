@@ -1,0 +1,183 @@
+{
+  "checkpoint_id": "31ea440d5b2e",
+  "session_id": "39ec3936-9dbd-4101-a937-9e81aa4fb79d",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-03T04:42:23.509Z",
+  "branch": "codex/pr-821-fix",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8",
+  "turn_id": "787e81b0c6fe",
+  "is_task": false,
+  "tool_use_id": "",
+  "transcript_identifier_at_start": "",
+  "checkpoint_transcript_start": 0,
+  "transcript_lines_at_start": 0,
+  "token_usage": {
+    "input_tokens": 31946,
+    "cache_creation_tokens": 453045,
+    "cache_read_tokens": 52560241,
+    "output_tokens": 252364,
+    "api_call_count": 232
+  },
+  "session_metrics": {
+    "duration_ms": 5796571,
+    "turn_count": 10,
+    "context_tokens": 0,
+    "context_window_size": 0,
+    "active_duration_ms": 3633265,
+    "turn_metrics": [
+      {
+        "turn_id": "8d000e12beab",
+        "started_at": "2026-07-03T02:05:08.000Z",
+        "ended_at": "2026-07-03T02:10:22.426Z",
+        "duration_ms": 314426
+      },
+      {
+        "turn_id": "fc66692bca8e",
+        "started_at": "2026-07-03T02:12:31.000Z",
+        "ended_at": "2026-07-03T02:29:52.846Z",
+        "duration_ms": 1041846
+      },
+      {
+        "turn_id": "97d62a6dc76d",
+        "started_at": "2026-07-03T02:30:33.000Z",
+        "ended_at": "2026-07-03T02:31:44.516Z",
+        "duration_ms": 71516
+      },
+      {
+        "turn_id": "ef3bfd1b6540",
+        "started_at": "2026-07-03T02:32:52.000Z",
+        "ended_at": "2026-07-03T02:42:23.676Z",
+        "duration_ms": 571676
+      },
+      {
+        "turn_id": "d3407cf0c7b5",
+        "started_at": "2026-07-03T02:44:04.000Z",
+        "ended_at": "2026-07-03T02:44:41.429Z",
+        "duration_ms": 37429
+      },
+      {
+        "turn_id": "bf3408052d79",
+        "started_at": "2026-07-03T02:45:12.000Z",
+        "ended_at": "2026-07-03T02:46:37.921Z",
+        "duration_ms": 85921
+      },
+      {
+        "turn_id": "5cd50a4dd5db",
+        "started_at": "2026-07-03T02:49:35.000Z",
+        "ended_at": "2026-07-03T02:52:51.327Z",
+        "duration_ms": 196327
+      },
+      {
+        "turn_id": "f24424460539",
+        "started_at": "2026-07-03T02:55:00.000Z",
+        "ended_at": "2026-07-03T03:02:56.773Z",
+        "duration_ms": 476773
+      },
+      {
+        "turn_id": "ed4183cbbb82",
+        "started_at": "2026-07-03T03:25:41.000Z",
+        "ended_at": "2026-07-03T03:36:46.186Z",
+        "duration_ms": 665186
+      },
+      {
+        "turn_id": "dd8e7d4a3acf",
+        "started_at": "2026-07-03T03:38:19.000Z",
+        "ended_at": "2026-07-03T03:41:11.165Z",
+        "duration_ms": 172165
+      }
+    ],
+    "checkpoint_turn_start": 9,
+    "checkpoint_turn_end": 10,
+    "checkpoint_active_duration_ms": 172165,
+    "checkpoint_duration_ms": 172165
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 296,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".codex/config.toml": 3,
+        ".codex/hooks.json": 52,
+        ".story/.gitignore": 4,
+        ".story/settings.json": 4,
+        ".trae/hooks.json": 66,
+        "demo-data/.permission": 1,
+        "demo-data/books/settings/auto.py": 117,
+        "demo-data/books/ssl/ssl.crt": 22,
+        "demo-data/books/ssl/ssl.key": 27
+      },
+      "user_removed_per_file": {}
+    }
+  ],
+  "skill_events": [
+    {
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "frontend-design"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "collapse": {
+        "target": "user_message",
+        "default_collapsed": true,
+        "label": "/frontend-design"
+      },
+      "id": "prompt-skill-claude-code-frontend-design-2026-07-03T02:04:34.376Z",
+      "timestamp": "2026-07-03T02:04:34.376Z",
+      "native": {
+        "command": "/frontend-design"
+      }
+    },
+    {
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "frontend-design"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "collapse": {
+        "target": "user_message",
+        "default_collapsed": true,
+        "label": "/frontend-design"
+      },
+      "id": "prompt-skill-claude-code-frontend-design-2026-07-03T02:05:08.023Z",
+      "timestamp": "2026-07-03T02:05:08.023Z",
+      "native": {
+        "command": "/frontend-design"
+      }
+    },
+    {
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "artifact-design"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "default_collapsed": true,
+        "label": "Skill: artifact-design"
+      },
+      "id": "claude-skill-tool-artifact-design-toolu_0115at2iC4jAXzQ55ghhAyjV",
+      "timestamp": "2026-07-03T02:06:27.022Z",
+      "transcript_anchor": {
+        "tool_use_id": "toolu_0115at2iC4jAXzQ55ghhAyjV"
+      }
+    }
+  ]
+}
