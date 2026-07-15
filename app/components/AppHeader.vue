@@ -660,7 +660,7 @@ function toggleTheme() {
 
 /* 默认侧边栏二级菜单：保留层级，但不要使用 Vuetify 默认的大幅缩进 */
 :deep(.app-navigation-drawer) .app-navigation-group .v-list-group__items .v-list-item {
-    padding-inline-start: 24px !important;
+    padding-inline-start: 40px !important;
 }
 :deep(.app-navigation-drawer) .app-navigation-group .v-list-group__items .v-list-item__prepend {
     width: auto !important;
