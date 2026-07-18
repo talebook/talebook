@@ -27,4 +27,24 @@ test.describe('Search Page', () => {
         // "百年" should match "百年孤独" which is first book
         await expect(page.getByText(books[0].title).first()).toBeVisible();
     });
+
+    test('builtin theme header sends the search term with the name query', async ({ page, request }) => {
+        await request.post('http://127.0.0.1:8080/_test/reset', {
+            data: { installed: true },
+        });
+        await request.post('http://127.0.0.1:8080/api/themes/activate', {
+            data: { name: 'minimal' },
+        });
+        await page.goto('/');
+
+        const searchInput = page.locator('.tb-theme-hn-search input');
+        await expect(searchInput).toBeVisible();
+        await searchInput.fill(realKeyword);
+        await searchInput.press('Enter');
+
+        await page.waitForURL(url => url.pathname === '/search');
+        expect(new URL(page.url()).searchParams.get('name')).toBe(realKeyword);
+        await expect(page.getByText(`搜索：${realKeyword}`)).toBeVisible();
+        await expect(page.getByText(books[0].title).first()).toBeVisible();
+    });
 });

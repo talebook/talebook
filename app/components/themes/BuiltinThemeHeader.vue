@@ -401,12 +401,12 @@ function toggleDrawer() {
 }
 
 function doSearch() {
-    let keyword = search.value.trim();
-    if (!keyword) return;
+    let name = search.value.trim();
+    if (!name) return;
     if (isLightGray.value && searchCategory.value !== 'all') {
-        keyword = `${searchCategory.value}:${keyword.replace(/^(title:|author:|isbn:|tag:)/i, '').trim()}`;
+        name = `${searchCategory.value}:${name.replace(/^(title:|author:|isbn:|tag:)/i, '').trim()}`;
     }
-    router.push({ path: '/search', query: { keyword } });
+    router.push({ path: '/search', query: { name } });
 }
 
 let injectedStyle = null;
