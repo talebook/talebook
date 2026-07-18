@@ -265,6 +265,10 @@ def make_app():
     logging.info("Now, Running...")
     AsyncService().setup(book_db, SessionMaker)
 
+    from webserver.services.audiobook import AudiobookScheduler
+
+    AudiobookScheduler().setup(book_db, SessionMaker)
+
     from webserver.services.update_checker import UpdateChecker
 
     class _UpdateCheckerWithDB(UpdateChecker):

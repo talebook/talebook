@@ -71,9 +71,12 @@ def setup_server():
     main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
     main.CONF["ALLOW_REGISTER"] = True
     main.CONF["BOOKSOURCE_RESUME_PENDING_CHECK_ON_START"] = False  # 测试不触发启动时的后台书源体检
+    main.CONF["AUDIOBOOK_PATH"] = testdir + "/library/audiobooks"
+    main.CONF["AUDIOBOOK_RUNNER_ENABLED"] = False
     # main.CONF["db_engine_args"] = {"echo": True}
     if _app is None:
         _app = main.make_app()
+        models.Base.metadata.create_all(_app.settings["SessionMaker"].kw["bind"])
 
 
 def setup_mock_user():
@@ -1142,10 +1145,11 @@ class TestBookDetailScope(TestApp):
 
 def setUpModule():
     os.environ["ASYNC_TEST_TIMEOUT"] = "60"
-    setup_server()
-    setup_mock_user()
-    setup_mock_sendmail()
-    setup_mock_service()
+    if _app is None:
+        setup_server()
+        setup_mock_user()
+        setup_mock_sendmail()
+        setup_mock_service()
 
 
 class TestGetUploadSize(unittest.TestCase):
