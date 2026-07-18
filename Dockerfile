@@ -27,9 +27,9 @@ RUN cp -r dist package* /app-static/
 
 
 # ----------------------------------------
-# 第二阶段，构建环境
+# 第二阶段，应用运行基线
 # 基础镜像由 https://github.com/talebook/talebook-base 独立维护和发布
-FROM talebook/talebook-base:slim-v8.5.0 AS server
+FROM talebook/talebook-base:slim-v8.5.0 AS application-base
 ARG BUILD_COUNTRY=""
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -72,9 +72,43 @@ RUN if ! id -u talebook > /dev/null 2>&1; then \
 fi && \
     sed -i "s/user www-data;/user talebook;/g" /etc/nginx/nginx.conf
 
-# install python packages
+
+# ----------------------------------------
+# Python wheel 构建阶段
+# ARMv7 上 psutil、cffi 等依赖没有可用的预编译 wheel；工具链只保留在本阶段。
+FROM application-base AS python-wheel-build
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+USER root
+RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+            build-essential \
+            libffi-dev \
+            python3-dev \
+            python3-wheel; \
+    fi && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt /tmp/
-RUN --mount=type=cache,target=/root/.cache/pip pip install -r /tmp/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python3 -m pip wheel --wheel-dir /opt/wheels psutil "cffi>=2.0.0"
+
+
+# ----------------------------------------
+# 第三阶段，应用服务运行环境
+# 只挂载 wheel 构建产物，编译器和 Python headers 不进入本阶段及其后代镜像。
+FROM application-base AS server
+
+COPY requirements.txt /tmp/
+RUN --mount=from=python-wheel-build,source=/opt/wheels,target=/tmp/talebook-wheels,ro \
+    --mount=type=cache,target=/root/.cache/pip \
+    python3 -m pip install \
+        --no-index \
+        --find-links=/tmp/talebook-wheels \
+        psutil cffi && \
+    python3 -m pip install -r /tmp/requirements.txt
 
 
 # ----------------------------------------
