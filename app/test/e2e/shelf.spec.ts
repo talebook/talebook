@@ -9,10 +9,11 @@ const __dirname = path.dirname(__filename);
 const mockDir = path.join(__dirname, 'mocks');
 const books = JSON.parse(fs.readFileSync(path.join(mockDir, 'books.json'), 'utf-8'));
 const book = books[0];
+const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
 
 test.describe('Shelf', () => {
     test.beforeEach(async ({ request }) => {
-        await request.post('http://127.0.0.1:8080/_test/reset', {
+        await request.post(`${mockApi}/_test/reset`, {
             data: { installed: true }
         });
     });
@@ -21,7 +22,7 @@ test.describe('Shelf', () => {
         await page.goto('/user/shelf');
         await expect(page.getByText('书架上还没有书，快去加入吧！')).toBeVisible();
 
-        await request.post(`http://127.0.0.1:8080/api/book/${book.id}/shelf`, {
+        await request.post(`${mockApi}/api/book/${book.id}/shelf`, {
             data: { shelf: true }
         });
 
@@ -40,7 +41,7 @@ test.describe('Shelf', () => {
         await shelfResponse;
 
         await expect(page.getByRole('button', { name: '移除书架' }).first()).toBeVisible();
-        const rsp = await request.get('http://127.0.0.1:8080/api/shelf');
+        const rsp = await request.get(`${mockApi}/api/shelf`);
         const data = await rsp.json();
         expect(data.books.some((item: { id: number }) => item.id === book.id)).toBe(true);
     });

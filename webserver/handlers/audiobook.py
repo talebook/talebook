@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import uuid
 from email.utils import format_datetime
+from pathlib import Path
 from urllib.parse import quote
 from xml.sax.saxutils import escape
 
@@ -90,7 +91,7 @@ def _chapter_dict(chapter):
         "title": chapter.title,
         "duration_ms": chapter.duration_ms,
         "size_bytes": chapter.size_bytes,
-        "audio_url": f"/audiobooks/{chapter.edition_id}/chapters/{chapter.number}.mp3",
+        "audio_url": f"/api/audiobooks/{chapter.edition_id}/chapters/{chapter.number}/audio",
         "timeline_url": f"/api/audiobooks/{chapter.edition_id}/chapters/{chapter.number}/timeline",
     }
 
@@ -997,7 +998,7 @@ class AudiobookVoices(BaseHandler):
         process = VoicebookProcess(AudiobookStorage())
         try:
             result = subprocess.run(
-                process.command + ["voices", "--format", "json"],
+                process.command + ["voices", "--format", "json", "--include-paths"],
                 capture_output=True,
                 text=True,
                 timeout=10,
@@ -1007,8 +1008,40 @@ class AudiobookVoices(BaseHandler):
         except (OSError, subprocess.SubprocessError, ValueError) as exc:
             return {"err": "voicebook.unavailable", "msg": str(exc), "catalog": {"voices": [], "scene_definitions": []}}
         for voice in catalog.get("voices", []):
-            voice.pop("preview_path", None)
+            preview_path = voice.pop("preview_path", None)
+            if preview_path:
+                voice["preview_url"] = (
+                    f"/audiobook-voice-previews/{quote(str(voice['engine']))}/{quote(str(voice['voice_id']))}.mp3"
+                )
         return {"err": "ok", "catalog": catalog}
+
+
+class AudiobookVoicePreview(BaseHandler):
+    @auth
+    def get(self, engine, voice_id):
+        process = VoicebookProcess(AudiobookStorage())
+        try:
+            result = subprocess.run(
+                process.command + ["voices", "--engine", engine, "--format", "json", "--include-paths"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=True,
+            )
+            catalog = json.loads(result.stdout)
+            voice = next(
+                item
+                for item in catalog.get("voices", [])
+                if item.get("engine") == engine and item.get("voice_id") == voice_id
+            )
+            path = Path(voice["preview_path"]).resolve()
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, StopIteration):
+            raise tornado.web.HTTPError(404)
+        if not path.is_file() or path.suffix.lower() != ".mp3":
+            raise tornado.web.HTTPError(404)
+        _range(self, path)
+
+    head = get
 
 
 class AudiobookMyStats(BaseHandler):
@@ -1063,7 +1096,7 @@ def routes():
         (r"/api/audiobook-editions/([0-9]+)", AudiobookEditionAction),
         (r"/api/audiobooks/([0-9]+)/manifest", AudiobookManifest),
         (r"/api/audiobooks/([0-9]+)/chapters/([0-9]+)/timeline", AudiobookTimeline),
-        (r"/audiobooks/([0-9]+)/chapters/([0-9]+)\.mp3", AudiobookAudio),
+        (r"/api/audiobooks/([0-9]+)/chapters/([0-9]+)/audio", AudiobookAudio),
         (r"/api/audiobooks/([0-9]+)/sessions", PlaybackSessionCreate),
         (r"/api/audiobook-sessions/([a-f0-9]+)", PlaybackSessionUpdate),
         (r"/api/audiobook-sessions/([a-f0-9]+)/close", PlaybackSessionUpdate),
@@ -1073,6 +1106,7 @@ def routes():
         (r"/podcast/v1/([^/]+)/covers/([0-9]+)\.jpg", PodcastCover),
         (r"/podcast/v1/([^/]+)/audio/([0-9]+)/([0-9]+)\.mp3", PodcastAudio),
         (r"/api/audiobook-voices", AudiobookVoices),
+        (r"/audiobook-voice-previews/([a-z0-9]+)/([A-Za-z0-9_.-]+)\.mp3", AudiobookVoicePreview),
         (r"/api/audiobook-stats/me", AudiobookMyStats),
         (r"/api/admin/audiobook-stats", AudiobookAdminStats),
         (r"/api/admin/podcast-audit", PodcastAudit),

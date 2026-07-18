@@ -1,10 +1,12 @@
 
 import { test, expect } from '@playwright/test';
 
+const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+
 test.describe('Admin Pages', () => {
     test.beforeEach(async ({ request }) => {
     // Ensure installed and logged in as admin (mock default)
-        await request.post('http://127.0.0.1:8080/_test/reset', {
+        await request.post(`${mockApi}/_test/reset`, {
             data: { installed: true }
         });
     });

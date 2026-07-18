@@ -59,6 +59,7 @@
             </v-dialog>
         </v-main>
         <Upload v-if="store.nav" />
+        <AudiobookPlayer />
     </v-app>
 </template>
 
@@ -71,6 +72,7 @@ import { useDisplay } from 'vuetify';
 import Loading from '@/components/Loading.vue';
 import AppHeader from '@/components/AppHeader.vue';
 import AppFooter from '@/components/AppFooter.vue';
+import AudiobookPlayer from '@/components/AudiobookPlayer.vue';
 import { isBuiltinTheme, loadBuiltinThemeComponent } from '@/utils/builtin-themes';
 import { clearInjectedThemeStyles, resolveThemeModuleUrl } from '@/utils/theme-runtime';
 

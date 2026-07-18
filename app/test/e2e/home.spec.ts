@@ -9,11 +9,12 @@ const __dirname = path.dirname(__filename);
 
 const mockDir = path.join(__dirname, 'mocks');
 const apiIndex = JSON.parse(fs.readFileSync(path.join(mockDir, 'api_index.json'), 'utf-8'));
+const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
 
 test.describe('Homepage', () => {
     test.beforeEach(async ({ request }) => {
     // Reset mock server to installed state
-        const response = await request.post('http://127.0.0.1:8080/_test/reset', {
+        const response = await request.post(`${mockApi}/_test/reset`, {
             data: { installed: true }
         });
         expect(response.ok()).toBeTruthy();

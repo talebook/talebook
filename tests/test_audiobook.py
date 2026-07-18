@@ -260,7 +260,7 @@ description: 高级模式测试
         timeline = self.json(f"/api/audiobooks/{edition.id}/chapters/1/timeline")
         self.assertEqual(timeline["timeline"]["segments"][0]["locator"]["css_selector"], "#p-1")
 
-        audio_url = f"/audiobooks/{edition.id}/chapters/1.mp3"
+        audio_url = f"/api/audiobooks/{edition.id}/chapters/1/audio"
         full = self.fetch(audio_url)
         self.assertEqual(full.code, 200)
         ranged = self.fetch(audio_url, headers={"Range": "bytes=3-9"})

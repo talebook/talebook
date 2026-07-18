@@ -46,6 +46,7 @@ export default defineNuxtConfig({
         '/get/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/get/**' },
         '/read/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/read/**' },
         '/books/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/books/**' },
+        '/audiobook-voice-previews/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/audiobook-voice-previews/**' },
         '/static/themes/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/static/themes/**' },
     },
     app: {
