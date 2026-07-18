@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Talebook 有声书、Voicebook 转换与 Candle Reader 音文同步方案</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #252421;
+        --muted: #6f6d66;
+        --line: #dedbd2;
+        --surface: #fffdf8;
+        --soft: #f7f4ec;
+        --paper: #ffffff;
+        --purple: #534586;
+        --purple-soft: #eee9f8;
+        --blue: #275f8e;
+        --blue-soft: #e8f2fa;
+        --green: #2d6d53;
+        --green-soft: #e7f3ed;
+        --orange: #9b5527;
+        --orange-soft: #faeee4;
+        --gold: #8a6518;
+        --gold-soft: #faf2d9;
+        --red: #99453f;
+        --red-soft: #faece9;
+        --shadow: 0 16px 44px rgba(62, 54, 40, 0.08);
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--surface);
+        font-family: "Anthropic Sans", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.72;
+      }
+      a { color: var(--blue); text-underline-offset: 3px; }
+      code {
+        padding: 0.12rem 0.36rem;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--soft);
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.88em;
+        overflow-wrap: anywhere;
+      }
+      pre {
+        margin: 18px 0;
+        padding: 18px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #211f1b;
+        color: #f8f3e8;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      pre code { padding: 0; border: 0; background: transparent; color: inherit; }
+      h1, h2, h3, h4 { margin-top: 0; line-height: 1.28; }
+      h1 { max-width: 900px; margin-bottom: 16px; font-size: clamp(32px, 5vw, 52px); font-weight: 600; }
+      h2 { margin-bottom: 18px; font-size: 28px; font-weight: 600; }
+      h3 { margin-bottom: 10px; font-size: 20px; font-weight: 600; }
+      h4 { margin-bottom: 8px; font-size: 16px; font-weight: 600; }
+      p { margin: 0 0 14px; }
+      ul, ol { margin: 12px 0 18px; padding-left: 22px; }
+      li + li { margin-top: 6px; }
+
+      .hero {
+        border-bottom: 1px solid var(--line);
+        background:
+          radial-gradient(circle at 85% 14%, rgba(83, 69, 134, 0.11), transparent 26%),
+          radial-gradient(circle at 5% 85%, rgba(45, 109, 83, 0.09), transparent 30%),
+          var(--soft);
+      }
+      .hero-inner, main { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
+      .hero-inner { padding: 58px 0 42px; }
+      .eyebrow { margin-bottom: 10px; color: var(--purple); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; }
+      .lede { max-width: 880px; color: var(--muted); font-size: 19px; }
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 30px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--line);
+      }
+      .meta div { min-width: 0; padding: 14px 16px; background: rgba(255, 255, 255, 0.9); }
+      .meta dt { color: var(--muted); font-size: 12px; }
+      .meta dd { margin: 4px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+      .status { display: inline-flex; align-items: center; gap: 8px; color: var(--orange); }
+      .status::before { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); content: ""; }
+
+      main { padding: 30px 0 84px; }
+      nav {
+        position: sticky;
+        top: 12px;
+        z-index: 2;
+        margin-bottom: 14px;
+        padding: 12px 16px;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 253, 248, 0.94);
+        box-shadow: 0 8px 24px rgba(62, 54, 40, 0.06);
+        backdrop-filter: blur(12px);
+      }
+      nav ol { display: flex; gap: 18px; width: max-content; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+      nav a { color: var(--ink); text-decoration: none; }
+      nav a:hover { color: var(--purple); }
+      section { padding: 46px 0; border-bottom: 1px solid var(--line); }
+      section:last-child { border-bottom: 0; }
+      .section-intro { max-width: 880px; color: var(--muted); }
+
+      .grid { display: grid; gap: 16px; }
+      .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .card {
+        min-width: 0;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--paper);
+      }
+      .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+      .card.accent-purple { border-top: 3px solid var(--purple); }
+      .card.accent-blue { border-top: 3px solid var(--blue); }
+      .card.accent-green { border-top: 3px solid var(--green); }
+      .card.accent-orange { border-top: 3px solid var(--orange); }
+      .callout {
+        margin: 20px 0;
+        padding: 16px 18px;
+        border-left: 4px solid var(--blue);
+        border-radius: 0 9px 9px 0;
+        background: var(--blue-soft);
+      }
+      .callout.warning { border-color: var(--orange); background: var(--orange-soft); }
+      .callout.success { border-color: var(--green); background: var(--green-soft); }
+      .callout.danger { border-color: var(--red); background: var(--red-soft); }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--purple-soft);
+        color: var(--purple);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .badge.green { background: var(--green-soft); color: var(--green); }
+      .badge.orange { background: var(--orange-soft); color: var(--orange); }
+      .badge.red { background: var(--red-soft); color: var(--red); }
+
+      .table-wrap { margin: 20px 0; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+      table { width: 100%; border-collapse: collapse; background: var(--paper); font-size: 14px; }
+      th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      tr:last-child td { border-bottom: 0; }
+      th { background: var(--soft); font-weight: 600; white-space: nowrap; }
+      td:first-child { font-weight: 500; }
+
+      .diagram {
+        margin: 24px 0;
+        padding: 20px;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--soft);
+      }
+      .diagram svg { display: block; min-width: 680px; margin: 0 auto; }
+      .caption { margin: 10px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
+
+      .wireframe {
+        margin: 22px 0;
+        overflow: hidden;
+        border: 1px solid #cbc6ba;
+        border-radius: 16px;
+        background: #f7f5ef;
+        box-shadow: var(--shadow);
+      }
+      .wire-top { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #ece8de; }
+      .wire-dot { width: 9px; height: 9px; border-radius: 50%; background: #b6b0a4; }
+      .wire-body { display: grid; grid-template-columns: 180px 1fr; min-height: 390px; }
+      .wire-side { padding: 18px 12px; border-right: 1px solid var(--line); background: #f0ede5; }
+      .wire-menu { margin: 0 0 7px; padding: 9px 10px; border-radius: 8px; color: var(--muted); font-size: 13px; }
+      .wire-menu.active { background: var(--purple-soft); color: var(--purple); font-weight: 600; }
+      .wire-main { min-width: 0; padding: 22px; }
+      .wire-title { width: 42%; height: 20px; margin-bottom: 18px; border-radius: 5px; background: #3f3b34; }
+      .wire-shelf { margin-bottom: 20px; }
+      .wire-label { width: 130px; height: 12px; margin-bottom: 10px; border-radius: 4px; background: #999185; }
+      .wire-books { display: grid; grid-template-columns: repeat(5, minmax(68px, 1fr)); gap: 12px; }
+      .wire-book { min-width: 0; }
+      .wire-cover { aspect-ratio: 2 / 3; border-radius: 7px; background: linear-gradient(145deg, #8978b2, #d7caed); }
+      .wire-book:nth-child(2n) .wire-cover { background: linear-gradient(145deg, #6796b8, #c7e3ef); }
+      .wire-book:nth-child(3n) .wire-cover { background: linear-gradient(145deg, #6f9d82, #cce5d5); }
+      .wire-line { height: 7px; margin-top: 7px; border-radius: 3px; background: #c5c0b7; }
+      .wire-line.short { width: 62%; }
+      .wire-player { display: grid; grid-template-columns: 62px 1fr auto; gap: 14px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--line); background: #272521; color: white; }
+      .wire-player-cover { width: 62px; height: 62px; border-radius: 8px; background: #8a78b3; }
+      .wire-progress { height: 5px; margin-top: 10px; overflow: hidden; border-radius: 4px; background: #5d5a55; }
+      .wire-progress span { display: block; width: 38%; height: 100%; background: #d6c8ff; }
+      .wire-controls { display: flex; gap: 8px; }
+      .wire-button { padding: 8px 11px; border-radius: 999px; background: #4c4842; font-size: 12px; }
+
+      .form-demo { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; margin: 20px 0; }
+      .panel { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+      .field { margin-bottom: 12px; }
+      .field label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 12px; }
+      .input { min-height: 36px; padding: 7px 10px; border: 1px solid #c9c4b9; border-radius: 7px; background: white; font-size: 13px; }
+      .role-row { display: grid; grid-template-columns: 1.2fr 0.8fr 1fr 1fr auto; gap: 7px; align-items: center; margin-bottom: 8px; font-size: 12px; }
+      .role-cell { padding: 7px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--soft); text-overflow: ellipsis; white-space: nowrap; }
+      .script-editor { min-height: 210px; padding: 13px; border: 1px solid #c8c2b7; border-radius: 8px; background: #23211e; color: #f5efe4; font: 12px/1.75 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; }
+
+      .checklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 18px; padding: 0; list-style: none; }
+      .checklist li { position: relative; margin: 0; padding-left: 24px; }
+      .checklist li::before { position: absolute; left: 0; top: 0.22em; width: 15px; height: 15px; border: 1px solid var(--orange); border-radius: 4px; content: ""; }
+      .footnote { color: var(--muted); font-size: 13px; }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+      @media (max-width: 820px) {
+        .meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .grid.two, .grid.three, .form-demo { grid-template-columns: 1fr; }
+        .wire-body { grid-template-columns: 1fr; }
+        .wire-side { display: flex; gap: 6px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+        .wire-menu { flex: 0 0 auto; margin: 0; }
+        .wire-books { grid-template-columns: repeat(3, minmax(68px, 1fr)); }
+        .wire-book:nth-child(n + 4) { display: none; }
+        .role-row { grid-template-columns: 1fr 1fr; }
+        .checklist { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 520px) {
+        .hero-inner, main { width: min(100% - 24px, 1160px); }
+        .hero-inner { padding-top: 38px; }
+        .meta { grid-template-columns: 1fr; }
+        section { padding: 34px 0; }
+        .diagram { margin-left: -4px; margin-right: -4px; padding: 12px; }
+        .wire-main { padding: 16px; }
+        .wire-player { grid-template-columns: 48px 1fr; }
+        .wire-player-cover { width: 48px; height: 48px; }
+        .wire-controls { grid-column: 1 / -1; justify-content: center; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero-inner">
+        <p class="eyebrow">10XDEV · CROSS-REPOSITORY DESIGN</p>
+        <h1>Talebook 有声书、Voicebook 转换与 Candle Reader 音文同步方案</h1>
+        <p class="lede">把现有 EPUB/TXT 书籍转为可管理、可续播、可跨页面播放的多角色章节 MP3；在阅读器中按句段同步高亮，并通过每用户一个站点级私人 Podcast RSS 向 Apple Podcasts 等客户端分发。</p>
+        <dl class="meta">
+          <div><dt>状态</dt><dd><span class="status">WIP · 等待审查</span></dd></div>
+          <div><dt>创建日期</dt><dd>2026-07-18</dd></div>
+          <div><dt>主仓库</dt><dd>talebook</dd></div>
+          <div><dt>影响范围</dt><dd>talebook / voicebook / candle-reader</dd></div>
+        </dl>
+      </div>
+    </header>
+
+    <main>
+      <nav aria-label="文档目录">
+        <ol>
+          <li><a href="#summary">结论</a></li>
+          <li><a href="#scope">范围</a></li>
+          <li><a href="#architecture">架构</a></li>
+          <li><a href="#domain">数据模型</a></li>
+          <li><a href="#workflow">生成流程</a></li>
+          <li><a href="#contract">Voicebook 协议</a></li>
+          <li><a href="#ui">Talebook 界面</a></li>
+          <li><a href="#reader">音文同步</a></li>
+          <li><a href="#podcast">Podcast RSS</a></li>
+          <li><a href="#stats">统计</a></li>
+          <li><a href="#security">安全与性能</a></li>
+          <li><a href="#delivery">交付与测试</a></li>
+        </ol>
+      </nav>
+
+      <section id="summary">
+        <h2>1. 方案结论</h2>
+        <p class="section-intro">有声书是现有文字书的衍生媒体版本，复用 Talebook 的书目、封面、作者、系列与访问权限；转换、播放、同步、统计与 Podcast 分发使用独立领域模型，不污染 Calibre 格式字段。</p>
+        <div class="grid three">
+          <article class="card accent-purple">
+            <h3>生成</h3>
+            <p>默认 EdgeTTS，支持 Qwen3TTS。快速模式自动完成；高级模式先识别，再通过角色 UI 和单章 TXT 编辑器审查。</p>
+          </article>
+          <article class="card accent-blue">
+            <h3>播放与同步</h3>
+            <p>章节 MP3 + 句段时间轴。Talebook 提供详情播放器和全站迷你播放器；Candle Reader 自动定位、高亮与“从这里听”。</p>
+          </article>
+          <article class="card accent-green">
+            <h3>开放收听</h3>
+            <p>每用户一个私人 RSS；每书一个 Season、每章一个 Episode。第一方精确统计与外部 HTTP 传输估算严格分开。</p>
+          </article>
+        </div>
+        <div class="callout warning"><strong>审查门：</strong>本文仍是 WIP，业务实现、真实 TTS、浏览器验收和 Apple Podcasts 真机验收都尚未执行。用户明确批准本文后才能进入编码。</div>
+      </section>
+
+      <section id="scope">
+        <h2>2. 原始诉求、已确认范围与非目标</h2>
+        <h3>2.1 原始诉求</h3>
+        <p>Talebook 左侧增加“有声书”，参考 Audiobookshelf 提供浏览、详情、播放和管理；存量文字书可通过 Voicebook 后台排队生成；Candle Reader 支持音文同步高亮；提供丰富默认与自定义选项；补充收听统计，并兼容 Apple Podcasts 的“通过 URL 关注播客”。</p>
+
+        <h3>2.2 Grill 后确定的不变量</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>主题</th><th>已确认决策</th></tr></thead>
+            <tbody>
+              <tr><td>输入</td><td>首版只从 Talebook 现有 EPUB/TXT 生成；不导入已有 MP3/M4B。TXT 为实现音文同步，先转换为 Talebook 的规范 EPUB 后再生成。</td></tr>
+              <tr><td>同步粒度</td><td>按句子/对白逻辑片段高亮，不承诺逐字卡拉 OK。</td></tr>
+              <tr><td>权限</td><td>播放跟随原书查看权限；管理员默认可生成；站点开关可允许书籍所有者生成。普通用户仅看自己的任务，管理员看全站。</td></tr>
+              <tr><td>模式</td><td>快速模式直接生成；高级模式先识别、等待审查。高级模式不暴露完整 book.script，只提供角色结构化 UI 与单章 TXT 对白编辑。</td></tr>
+              <tr><td>版本</td><td>一本书可有多个有声版本；首次完整版本自动发布，后续成功结果是候选版本，试听后手动发布，可回滚。</td></tr>
+              <tr><td>部分章节</td><td>允许选章与续补；配置一致才可补入同一版本。部分版本默认不可发布，管理员可例外发布。</td></tr>
+              <tr><td>队列</td><td>数据库持久化；默认全站并发 1，可配 1–3；支持优先级、取消、失败重试、重启恢复与片段缓存续跑。</td></tr>
+              <tr><td>音色试听</td><td>57 个现有音色 × 10 种固定场景全部预生成；角色实际对白可动态试听并缓存。</td></tr>
+              <tr><td>播放器</td><td>详情完整播放器 + 全站迷你播放器；刷新恢复但不自动播放；Candle Reader 使用阅读器内播放器。</td></tr>
+              <tr><td>进度</td><td>文字阅读与收听进度独立；边听边读不覆盖文字位置，用户可显式“从此处继续阅读”。</td></tr>
+              <tr><td>Podcast</td><td>每用户一个站点级私人 RSS；一本书一个 Season、一章一个 Episode；不生成整书合并 MP3。</td></tr>
+              <tr><td>统计与审计</td><td>第一方真实收听统计和外部 RSS 传输估算分开；保存原始 IP，默认 90 天，可配置并支持安全保全。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="grid two">
+          <article class="card">
+            <h3>首版包含</h3>
+            <ul>
+              <li>有声书首页、详情、章节播放、搜索筛选、继续收听。</li>
+              <li>快速/高级生成、版本、持久队列、管理操作。</li>
+              <li>角色 UI、单章脚本编辑、57 × 10 场景试听。</li>
+              <li>句段同步、书签、临时播放队列、睡眠定时。</li>
+              <li>用户/管理员/书籍所有者统计视图。</li>
+              <li>站点级私人 Podcast RSS 与请求审计。</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>首版不包含</h3>
+            <ul>
+              <li>独立音频导入、播客抓取、公开 Podcast 目录提交。</li>
+              <li>HLS/实时转码、Chromecast、M4B、整书合并 MP3。</li>
+              <li>逐字时间轴、自动字幕、Apple 播放进度回传。</li>
+              <li>持久播放列表、公开分享、DRM 或防复制承诺。</li>
+              <li>把 Audiobookshelf 作为外部服务部署或复制其媒体扫描器。</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2>3. 跨仓总体架构</h2>
+        <p class="section-intro">Talebook 是产品与状态权威，Voicebook 是可取消、可恢复的媒体生成器，Candle Reader 是音文同步渲染器。三者只通过稳定协议连接，避免 Talebook 依赖 Voicebook 内部 Python 对象。</p>
+        <div class="diagram">
+          <svg width="100%" viewBox="0 0 680 690" role="img" xmlns="http://www.w3.org/2000/svg">
+            <title>Talebook 有声书跨仓分层架构</title>
+            <desc>从 Talebook 前端、后端领域服务、Voicebook 子进程，到媒体存储和外部播放器的分层关系。</desc>
+            <defs>
+              <marker id="arch-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </marker>
+            </defs>
+            <rect x="40" y="25" width="600" height="118" rx="16" fill="rgb(238,233,248)" stroke="rgb(178,165,214)" stroke-width="0.5" />
+            <text x="60" y="52" font-size="14" font-weight="500" fill="rgb(55,45,90)">交互层 · talebook app / candle-reader / Podcast 客户端</text>
+            <rect x="60" y="69" width="165" height="50" rx="8" fill="white" stroke="rgb(178,165,214)" stroke-width="0.5" />
+            <text x="77" y="91" font-size="12" fill="rgb(55,45,90)">有声书页面 + 全站播放器</text><text x="77" y="108" font-size="11" fill="rgb(103,96,119)">Nuxt / Vue / Vuetify</text>
+            <rect x="257" y="69" width="165" height="50" rx="8" fill="white" stroke="rgb(178,165,214)" stroke-width="0.5" />
+            <text x="275" y="91" font-size="12" fill="rgb(55,45,90)">阅读器内音频与高亮</text><text x="275" y="108" font-size="11" fill="rgb(103,96,119)">epub.js + HTMLAudio</text>
+            <rect x="455" y="69" width="165" height="50" rx="8" fill="white" stroke="rgb(178,165,214)" stroke-width="0.5" />
+            <text x="473" y="91" font-size="12" fill="rgb(55,45,90)">Apple Podcasts 等客户端</text><text x="473" y="108" font-size="11" fill="rgb(103,96,119)">私人 RSS + Range MP3</text>
+
+            <path d="M340 143V172" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arch-arrow)" />
+            <rect x="40" y="174" width="600" height="174" rx="16" fill="rgb(232,242,250)" stroke="rgb(145,184,211)" stroke-width="0.5" />
+            <text x="60" y="202" font-size="14" font-weight="500" fill="rgb(30,78,118)">产品与领域层 · talebook webserver</text>
+            <rect x="60" y="220" width="165" height="48" rx="8" fill="white" stroke="rgb(145,184,211)" stroke-width="0.5" />
+            <text x="78" y="243" font-size="12" fill="rgb(30,78,118)">馆藏 / 版本 / 权限 API</text><text x="78" y="259" font-size="11" fill="rgb(92,117,133)">浏览、发布、回滚</text>
+            <rect x="257" y="220" width="165" height="48" rx="8" fill="white" stroke="rgb(145,184,211)" stroke-width="0.5" />
+            <text x="275" y="243" font-size="12" fill="rgb(30,78,118)">持久任务调度器</text><text x="275" y="259" font-size="11" fill="rgb(92,117,133)">租约、恢复、取消、重试</text>
+            <rect x="455" y="220" width="165" height="48" rx="8" fill="white" stroke="rgb(145,184,211)" stroke-width="0.5" />
+            <text x="473" y="243" font-size="12" fill="rgb(30,78,118)">播放 / 统计 / RSS</text><text x="473" y="259" font-size="11" fill="rgb(92,117,133)">会话、进度、Token、审计</text>
+            <rect x="60" y="284" width="560" height="42" rx="8" fill="rgb(246,251,255)" stroke="rgb(145,184,211)" stroke-width="0.5" />
+            <text x="80" y="309" font-size="12" fill="rgb(30,78,118)">SQLAlchemy 状态库是唯一事实来源；推送/轮询、子进程 PID 与缓存都不是状态权威</text>
+
+            <path d="M340 348V377" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arch-arrow)" />
+            <rect x="40" y="379" width="600" height="118" rx="16" fill="rgb(231,243,237)" stroke="rgb(143,191,165)" stroke-width="0.5" />
+            <text x="60" y="407" font-size="14" font-weight="500" fill="rgb(35,91,67)">生成层 · voicebook-tool 独立子进程</text>
+            <rect x="60" y="425" width="165" height="48" rx="8" fill="white" stroke="rgb(143,191,165)" stroke-width="0.5" />
+            <text x="78" y="447" font-size="12" fill="rgb(35,91,67)">EPUB 解析 + 角色识别</text><text x="78" y="464" font-size="11" fill="rgb(89,124,105)">保留正文定位锚点</text>
+            <rect x="257" y="425" width="165" height="48" rx="8" fill="white" stroke="rgb(143,191,165)" stroke-width="0.5" />
+            <text x="275" y="447" font-size="12" fill="rgb(35,91,67)">Edge / Qwen 合成</text><text x="275" y="464" font-size="11" fill="rgb(89,124,105)">片段缓存 + 取消检查</text>
+            <rect x="455" y="425" width="165" height="48" rx="8" fill="white" stroke="rgb(143,191,165)" stroke-width="0.5" />
+            <text x="473" y="447" font-size="12" fill="rgb(35,91,67)">MP3 + timeline v2</text><text x="473" y="464" font-size="11" fill="rgb(89,124,105)">JSONL 进度事件</text>
+
+            <path d="M340 497V526" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arch-arrow)" />
+            <rect x="40" y="528" width="600" height="126" rx="16" fill="rgb(250,242,217)" stroke="rgb(215,190,118)" stroke-width="0.5" />
+            <text x="60" y="556" font-size="14" font-weight="500" fill="rgb(112,79,12)">持久资源层 · /data/books/audiobooks</text>
+            <rect x="60" y="574" width="165" height="55" rx="8" fill="white" stroke="rgb(215,190,118)" stroke-width="0.5" />
+            <text x="78" y="597" font-size="12" fill="rgb(112,79,12)">版本与章节 MP3</text><text x="78" y="615" font-size="11" fill="rgb(130,111,69)">不可变发布资产</text>
+            <rect x="257" y="574" width="165" height="55" rx="8" fill="white" stroke="rgb(215,190,118)" stroke-width="0.5" />
+            <text x="275" y="597" font-size="12" fill="rgb(112,79,12)">book.script / manifest</text><text x="275" y="615" font-size="11" fill="rgb(130,111,69)">逐章 timeline JSON</text>
+            <rect x="455" y="574" width="165" height="55" rx="8" fill="white" stroke="rgb(215,190,118)" stroke-width="0.5" />
+            <text x="473" y="597" font-size="12" fill="rgb(112,79,12)">缓存 / 日志 / 试听</text><text x="473" y="615" font-size="11" fill="rgb(130,111,69)">按策略定时清理</text>
+          </svg>
+          <p class="caption">调用向下、事件向上；业务状态只写 Talebook 数据库，媒体与时间轴使用版本化文件。</p>
+        </div>
+      </section>
+
+      <section id="domain">
+        <h2>4. 领域模型与存储</h2>
+        <p class="section-intro">不把 MP3 塞入 Calibre 的电子书格式字段。所有路径均保存为相对 <code>AUDIOBOOK_PATH</code> 的安全路径，服务端解析后再次执行目录包含校验。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>模型</th><th>关键字段</th><th>约束与用途</th></tr></thead>
+            <tbody>
+              <tr><td>AudiobookEdition</td><td>id, book_id, status, engine, config_json, source_fingerprint, script_path, manifest_path, chapter_count, completed_count, duration_ms, size_bytes, created_by, published_at</td><td>Book 1:N Edition；同一 book 同时仅一个 published；候选和历史版本可回滚。</td></tr>
+              <tr><td>AudiobookChapter</td><td>edition_id, source_key, number, title, audio_path, timeline_path, duration_ms, size_bytes, content_hash, episode_guid, first_published_at</td><td><code>(edition_id, number)</code> 唯一；发布资产 URL 版本化且不可变。</td></tr>
+              <tr><td>AudiobookJob</td><td>book_id, edition_id, creator_id, mode, status, phase, priority, config_json, chapter_selection, config_hash, progress, lease_owner, lease_until, cancel_requested, attempts, error_code/message, log_path, timestamps</td><td>持久队列真相；活跃任务按 book + config_hash 去重；租约支持崩溃恢复。</td></tr>
+              <tr><td>AudiobookProgress</td><td>user_id, edition_id, chapter_id, position_ms, segment_id, listened_ms, is_finished, version, updated_at</td><td>用户与版本唯一；乐观版本避免多设备旧进度覆盖新进度。</td></tr>
+              <tr><td>AudiobookBookmark</td><td>user_id, edition_id, chapter_id, position_ms, segment_id, note, created_at</td><td>跨设备书签；跟随有声版本，不写入原文字书进度。</td></tr>
+              <tr><td>PlaybackSession</td><td>uuid, user_id, edition_id, source, device_id, ip, user_agent, started_at, ended_at, current_ms, listened_ms, completed</td><td>第一方真实统计；播放中增量同步，暂停/后台/关闭时收口。</td></tr>
+              <tr><td>PodcastSubscription</td><td>user_id, token_hash, token_hint, active, hidden_books_json, created_at, last_access_at, revoked_at</td><td>每用户一个活跃站点 Feed Token；数据库不存明文 Token。</td></tr>
+              <tr><td>PodcastAccessLog</td><td>subscription_id, book/edition/chapter, kind, method, status, range_start/end, bytes_sent, ip, user_agent, protected, created_at</td><td>外部传输估算与安全审计；原始 IP 默认 90 天，保全记录不清理。</td></tr>
+              <tr><td>AudiobookDailyStat</td><td>date, scope, user/book/chapter, source, listened_ms, sessions, starts, completes, requests, bytes</td><td>长期聚合；第一方与 podcast_estimated 来源绝不混算。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout"><strong>句段不入库：</strong>每章可能有数千句，直接写数据库会放大迁移、查询与备份成本。句段放在逐章 timeline JSON 中，章节表只保存路径、哈希与数量；客户端按需加载当前章。</div>
+
+        <h3>4.1 目录布局</h3>
+        <pre><code>/data/books/audiobooks/
+├── editions/{edition_id}/
+│   ├── book.script
+│   ├── manifest.v2.json
+│   ├── cover.jpg
+│   ├── chapters/0001.mp3
+│   └── timelines/0001.json
+├── jobs/{job_id}/events.jsonl
+├── cache/segments/{fingerprint}.wav
+├── cache/dynamic-previews/{fingerprint}.mp3
+└── audit/...</code></pre>
+      </section>
+
+      <section id="workflow">
+        <h2>5. 生成流程与持久队列</h2>
+        <div class="grid two">
+          <article class="card accent-green">
+            <h3>快速模式</h3>
+            <ol>
+              <li>选择引擎、章节、整体语速、主角音与音质预设。</li>
+              <li>创建任务和候选 Edition。</li>
+              <li>自动 inspect、选角、逐章生成和打包。</li>
+              <li>首次完整版本自动发布；否则进入候选试听。</li>
+            </ol>
+          </article>
+          <article class="card accent-purple">
+            <h3>高级模式</h3>
+            <ol>
+              <li>后台 inspect 后进入“等待确认”。</li>
+              <li>角色表用结构化 UI 编辑和试听。</li>
+              <li>正文按单章 TXT 编辑，逐章保存与校验。</li>
+              <li>确认后锁定脚本修订并进入生成队列。</li>
+            </ol>
+          </article>
+        </div>
+
+        <div class="diagram">
+          <svg width="100%" viewBox="0 0 680 830" role="img" xmlns="http://www.w3.org/2000/svg">
+            <title>有声书任务状态机</title>
+            <desc>快速和高级任务从排队到识别、审查、生成、发布或失败取消的状态变化。</desc>
+            <defs>
+              <marker id="flow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </marker>
+            </defs>
+            <rect x="285" y="26" width="110" height="42" rx="21" fill="rgb(83,69,134)" />
+            <text x="340" y="52" text-anchor="middle" font-size="13" font-weight="500" fill="white">创建任务</text>
+            <path d="M340 68V100" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <rect x="250" y="102" width="180" height="54" rx="9" fill="rgb(238,233,248)" stroke="rgb(178,165,214)" stroke-width="0.5" />
+            <text x="340" y="128" text-anchor="middle" font-size="13" fill="rgb(55,45,90)">QUEUED · 排队</text><text x="340" y="145" text-anchor="middle" font-size="11" fill="rgb(103,96,119)">优先级 + 租约抢占</text>
+            <path d="M340 156V188" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <rect x="250" y="190" width="180" height="54" rx="9" fill="rgb(232,242,250)" stroke="rgb(145,184,211)" stroke-width="0.5" />
+            <text x="340" y="216" text-anchor="middle" font-size="13" fill="rgb(30,78,118)">INSPECTING · 解析识别</text><text x="340" y="233" text-anchor="middle" font-size="11" fill="rgb(92,117,133)">EPUB 锚点 + 角色画像</text>
+            <path d="M340 244V276" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <polygon points="340,278 433,328 340,378 247,328" fill="rgb(250,242,217)" stroke="rgb(215,190,118)" stroke-width="0.5" />
+            <text x="340" y="323" text-anchor="middle" font-size="13" fill="rgb(112,79,12)">高级模式？</text><text x="340" y="341" text-anchor="middle" font-size="11" fill="rgb(130,111,69)">需要人工确认</text>
+            <path d="M247 328H166" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <text x="207" y="318" text-anchor="middle" font-size="11" fill="rgb(115,114,108)">是</text>
+            <rect x="50" y="301" width="116" height="54" rx="9" fill="rgb(250,238,228)" stroke="rgb(219,168,128)" stroke-width="0.5" />
+            <text x="108" y="325" text-anchor="middle" font-size="12" fill="rgb(128,68,29)">AWAITING_REVIEW</text><text x="108" y="343" text-anchor="middle" font-size="11" fill="rgb(143,96,65)">角色 UI + 单章 TXT</text>
+            <path d="M108 355V414H250" fill="none" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <text x="154" y="404" font-size="11" fill="rgb(115,114,108)">确认并锁定修订</text>
+            <path d="M340 378V414" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <text x="351" y="402" font-size="11" fill="rgb(115,114,108)">否</text>
+            <rect x="250" y="416" width="180" height="62" rx="9" fill="rgb(231,243,237)" stroke="rgb(143,191,165)" stroke-width="0.5" />
+            <text x="340" y="442" text-anchor="middle" font-size="13" fill="rgb(35,91,67)">GENERATING · 逐章合成</text><text x="340" y="460" text-anchor="middle" font-size="11" fill="rgb(89,124,105)">片段缓存 / 进度事件 / 取消点</text>
+            <path d="M340 478V510" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <rect x="250" y="512" width="180" height="54" rx="9" fill="rgb(232,242,250)" stroke="rgb(145,184,211)" stroke-width="0.5" />
+            <text x="340" y="538" text-anchor="middle" font-size="13" fill="rgb(30,78,118)">FINALIZING · 验证落盘</text><text x="340" y="555" text-anchor="middle" font-size="11" fill="rgb(92,117,133)">ffprobe + manifest 原子替换</text>
+            <path d="M340 566V598" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <polygon points="340,600 433,650 340,700 247,650" fill="rgb(250,242,217)" stroke="rgb(215,190,118)" stroke-width="0.5" />
+            <text x="340" y="645" text-anchor="middle" font-size="13" fill="rgb(112,79,12)">完整且首次？</text><text x="340" y="663" text-anchor="middle" font-size="11" fill="rgb(130,111,69)">决定自动发布</text>
+            <path d="M247 650H160" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <text x="205" y="640" text-anchor="middle" font-size="11" fill="rgb(115,114,108)">否</text>
+            <rect x="50" y="623" width="110" height="54" rx="9" fill="rgb(238,233,248)" stroke="rgb(178,165,214)" stroke-width="0.5" />
+            <text x="105" y="648" text-anchor="middle" font-size="12" fill="rgb(55,45,90)">READY / PARTIAL</text><text x="105" y="666" text-anchor="middle" font-size="11" fill="rgb(103,96,119)">候选试听</text>
+            <path d="M433 650H520" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#flow-arrow)" />
+            <text x="475" y="640" text-anchor="middle" font-size="11" fill="rgb(115,114,108)">是</text>
+            <rect x="520" y="623" width="110" height="54" rx="9" fill="rgb(231,243,237)" stroke="rgb(143,191,165)" stroke-width="0.5" />
+            <text x="575" y="648" text-anchor="middle" font-size="12" fill="rgb(35,91,67)">PUBLISHED</text><text x="575" y="666" text-anchor="middle" font-size="11" fill="rgb(89,124,105)">当前版本</text>
+
+            <rect x="250" y="754" width="180" height="50" rx="9" fill="rgb(250,236,233)" stroke="rgb(218,157,150)" stroke-width="0.5" />
+            <text x="340" y="777" text-anchor="middle" font-size="12" fill="rgb(126,52,47)">FAILED / CANCELLED</text><text x="340" y="794" text-anchor="middle" font-size="11" fill="rgb(143,91,86)">可重试；缓存保留</text>
+            <path d="M430 217H605V779H430" fill="none" stroke="rgba(153,69,63,0.7)" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#flow-arrow)" />
+            <text x="515" y="207" font-size="11" fill="rgb(126,52,47)">任一阶段失败 / 取消</text>
+            <path d="M250 779H218V129H250" fill="none" stroke="rgba(83,69,134,0.55)" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#flow-arrow)" />
+            <text x="64" y="739" font-size="11" fill="rgb(83,69,134)">失败重试或重启恢复：回到队列，复用缓存</text>
+          </svg>
+          <p class="caption">运行进程失联后租约过期，任务回到 QUEUED；不会把“进程已死”误当成仍在生成。</p>
+        </div>
+
+        <h3>5.1 队列执行规则</h3>
+        <ul>
+          <li>调度器按优先级、创建时间获取任务，以数据库 compare-and-set 取得短租约并定期心跳续租。</li>
+          <li>默认只运行一本书；配置范围 1–3。本数并发与 Voicebook 内部片段并发分别限流。</li>
+          <li>取消先写 <code>cancel_requested</code> 并创建取消信号文件；Voicebook 在片段与章节边界退出。超时后才发送 TERM，最后才 KILL。</li>
+          <li>服务重启时，租约过期的 RUNNING 任务重新排队；已完成片段通过内容/引擎/音色/语速指纹命中缓存。</li>
+          <li>同一 book + config_hash 的活跃任务返回原任务，避免双击重复计费；配置变化创建新 Edition。</li>
+        </ul>
+      </section>
+
+      <section id="contract">
+        <h2>6. Voicebook 稳定协议</h2>
+        <h3>6.1 依赖与进程边界</h3>
+        <ul>
+          <li>Voicebook 默认核心依赖保持轻量；Torch、Transformers、Hugging Face 与 CSI 模型移到 <code>csi</code> 可选依赖。</li>
+          <li>Talebook 固定 Voicebook 版本并以子进程调用，不直接导入内部模块。</li>
+          <li>CLI 新增机器模式、JSONL 事件输出、取消信号、恢复目录与明确退出码；普通人类日志写 stderr。</li>
+        </ul>
+        <pre><code>voicebook-tool generate book.script \
+  -o /data/books/audiobooks/editions/42 \
+  --engine edgetts \
+  --chapters 1-20 \
+  --progress-format jsonl \
+  --cancel-file /data/books/audiobooks/jobs/99/cancel \
+  --resume</code></pre>
+
+        <h3>6.2 JSONL 事件</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>事件</th><th>必需字段</th><th>Talebook 行为</th></tr></thead>
+            <tbody>
+              <tr><td>phase_started</td><td>schema, seq, job_phase, at</td><td>更新阶段与心跳。</td></tr>
+              <tr><td>chapter_started</td><td>chapter_number, title, total_segments</td><td>显示当前章节与进度分母。</td></tr>
+              <tr><td>segment_completed</td><td>chapter_number, segment_index, cache_hit</td><td>限频聚合后写库，避免每句提交事务。</td></tr>
+              <tr><td>chapter_completed</td><td>audio, timeline, duration_ms, size_bytes, sha256</td><td>校验路径、ffprobe 和哈希后登记章节。</td></tr>
+              <tr><td>warning</td><td>code, message, context</td><td>任务继续，UI 显示可审查警告。</td></tr>
+              <tr><td>failed</td><td>code, message, retryable</td><td>收口 FAILED，保留缓存与脱敏错误。</td></tr>
+              <tr><td>completed</td><td>manifest, chapter_count, duration_ms</td><td>读取并验证 manifest，进入 FINALIZING。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>所有事件包含单调递增 <code>seq</code>、协议版本和 UTC 时间；Talebook 按 seq 幂等消费。未知事件可忽略但记录，主版本不兼容则拒绝任务。</p>
+
+        <h3>6.3 manifest v2 与逐章 timeline</h3>
+        <pre><code>{
+  "format": "voicebook-project",
+  "version": 2,
+  "engine": "edgetts",
+  "script_sha256": "...",
+  "cast": { "韩立": { "voice": "zh-CN-YunxiNeural", "speed": 1.05 } },
+  "chapters": [{
+    "number": 1,
+    "source_key": "OEBPS/chapter01.xhtml#chapter-1",
+    "title": "第一章 山边小村",
+    "audio": "chapters/0001.mp3",
+    "timeline": "timelines/0001.json",
+    "duration_ms": 328420,
+    "size_bytes": 2631080,
+    "sha256": "..."
+  }]
+}</code></pre>
+        <pre><code>{
+  "format": "voicebook-timeline",
+  "version": 1,
+  "chapter_number": 1,
+  "duration_ms": 328420,
+  "segments": [{
+    "id": "seg-000042",
+    "index": 42,
+    "start_ms": 123400,
+    "end_ms": 128920,
+    "text": "黛玉听了，不觉又喜又惊。",
+    "character": "旁白",
+    "voice": "zh-CN-YunjianNeural",
+    "speed": 1.0,
+    "locator": {
+      "type": "epub-dom-text",
+      "href": "OEBPS/chapter01.xhtml",
+      "element_id": "p-37",
+      "dom_path": "body/section[1]/p[37]",
+      "start_char": 0,
+      "end_char": 13,
+      "text_sha256": "..."
+    }
+  }]
+}</code></pre>
+        <div class="callout"><strong>时间基准：</strong>以拼接后的 24 kHz PCM 逻辑片段和实际留白累计时间为准，再对最终 MP3 做 ffprobe。高亮只覆盖发声区间，片段间留白时清除高亮。编码与浏览器解码误差验收阈值为 150 ms。</div>
+
+        <h3>6.4 音色预览资产</h3>
+        <p>Voicebook 包内携带 57 个 MP3 预览包和一个目录 JSON。每个文件包含旁白、日常、喜悦、愤怒、悲伤、恐惧、低语、急切、威严、温柔十段场景及时间索引。Talebook 通过 Voicebook 机器命令发现资源并安全提供，不复制二进制到前端源码。角色实际对白预览按引擎、音色、语速、文本指纹动态缓存。</p>
+      </section>
+
+      <section id="ui">
+        <h2>7. Talebook 产品界面</h2>
+        <h3>7.1 有声书首页与全站播放器</h3>
+        <div class="wireframe" role="img" aria-label="有声书首页线框图">
+          <div class="wire-top"><span class="wire-dot"></span><span class="wire-dot"></span><span class="wire-dot"></span></div>
+          <div class="wire-body">
+            <aside class="wire-side">
+              <div class="wire-menu">首页</div><div class="wire-menu">本地图书馆</div><div class="wire-menu active">🎧 有声书</div><div class="wire-menu">我的书架</div><div class="wire-menu">管理</div>
+            </aside>
+            <div class="wire-main">
+              <div class="wire-title"></div>
+              <div class="wire-shelf"><div class="wire-label"></div><div class="wire-books">
+                <div class="wire-book"><div class="wire-cover"></div><div class="wire-line"></div><div class="wire-line short"></div></div>
+                <div class="wire-book"><div class="wire-cover"></div><div class="wire-line"></div><div class="wire-line short"></div></div>
+                <div class="wire-book"><div class="wire-cover"></div><div class="wire-line"></div><div class="wire-line short"></div></div>
+                <div class="wire-book"><div class="wire-cover"></div><div class="wire-line"></div><div class="wire-line short"></div></div>
+                <div class="wire-book"><div class="wire-cover"></div><div class="wire-line"></div><div class="wire-line short"></div></div>
+              </div></div>
+              <div class="wire-shelf"><div class="wire-label"></div><div class="wire-books">
+                <div class="wire-book"><div class="wire-cover"></div><div class="wire-line"></div></div><div class="wire-book"><div class="wire-cover"></div><div class="wire-line"></div></div><div class="wire-book"><div class="wire-cover"></div><div class="wire-line"></div></div>
+              </div></div>
+            </div>
+          </div>
+          <div class="wire-player"><div class="wire-player-cover"></div><div><strong>第一章 · 山边小村</strong><div class="footnote" style="color:#c7c2b9">凡人修仙传 · 12:28 / 32:40</div><div class="wire-progress"><span></span></div></div><div class="wire-controls"><span class="wire-button">−15s</span><span class="wire-button">▶</span><span class="wire-button">+30s</span><span class="wire-button">1.0×</span></div></div>
+        </div>
+        <p class="caption">首页分区：继续收听、最近生成、最近加入、已完成；全站迷你播放器跨路由保留，刷新后恢复但不自动播放。</p>
+
+        <h3>7.2 详情页</h3>
+        <div class="grid three">
+          <article class="card"><h4>主播放器</h4><p>封面、章节、进度、上一/下一章、±15/30 秒、0.5–3.0×、睡眠定时、音量、错误重试。</p></article>
+          <article class="card"><h4>版本与资源</h4><p>当前/候选/历史版本、引擎、角色数、时长、文件大小、生成时间、发布、回滚、删除。</p></article>
+          <article class="card"><h4>继续动作</h4><p>边听边读、添加书签、稍后播放、复制 Podcast URL、从 Feed 隐藏、重新生成。</p></article>
+        </div>
+
+        <h3>7.3 高级生成工作台</h3>
+        <div class="form-demo">
+          <div class="panel">
+            <h4>角色与音色</h4>
+            <div class="role-row"><span class="role-cell">角色</span><span class="role-cell">定位</span><span class="role-cell">音色</span><span class="role-cell">语速</span><span class="badge">试听</span></div>
+            <div class="role-row"><span class="role-cell">旁白</span><span class="role-cell">旁白</span><span class="role-cell">云健</span><span class="role-cell">x1.0</span><span class="badge green">▶ 10 场景</span></div>
+            <div class="role-row"><span class="role-cell">韩立</span><span class="role-cell">男主角</span><span class="role-cell">云希</span><span class="role-cell">x1.05</span><span class="badge green">▶ 对白</span></div>
+            <div class="role-row"><span class="role-cell">机械守卫</span><span class="role-cell">机器人</span><span class="role-cell">陕西方言</span><span class="role-cell">x0.9</span><span class="badge green">▶ 对白</span></div>
+            <div class="field"><label>角色属性</label><div class="input">类型 · 性别 · 年龄 · 地域 · 音色描述 · 主角保留音</div></div>
+          </div>
+          <div class="panel">
+            <h4>单章对白 TXT</h4>
+            <div class="field"><label>章节</label><div class="input">0001 第一章 山边小村　✓ 已保存</div></div>
+            <div class="script-editor">[旁白] 二愣子睁大了双眼。<br>[韩立] 这里是什么地方？<br>[韩立@低语] 先别出声。<br>[?] 外面有人吗？<br>[音] 砰！</div>
+            <p class="footnote">未定义角色、无效标签、空章节与冲突修改逐行报错；后端保存时重组 book.script，用户无法破坏 YAML 和角色表结构。</p>
+          </div>
+        </div>
+
+        <h3>7.4 任务管理</h3>
+        <p>有声书页提供“我的任务”；管理员导航增加“有声书任务”。列表支持状态/提交人/引擎/日期筛选，显示当前阶段、章节进度、预计剩余、警告与脱敏错误，并提供取消、重试、优先级、查看日志和进入审查。所有管理动作由后端重新鉴权。</p>
+      </section>
+
+      <section id="reader">
+        <h2>8. Candle Reader 音文同步</h2>
+        <p class="section-intro">Candle Reader 接收 Edition 与清单 URL，不自行猜测音频结构。当前章 timeline 是唯一时间到文本的映射依据；epub.js CFI 只在运行时由 locator 解析生成。</p>
+        <div class="diagram">
+          <svg width="100%" viewBox="0 0 680 560" role="img" xmlns="http://www.w3.org/2000/svg">
+            <title>Candle Reader 音文同步时序</title>
+            <desc>从加载播放清单、播放音频、定位高亮，到用户手动翻页和从这里听的交互时序。</desc>
+            <defs>
+              <marker id="seq-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </marker>
+            </defs>
+            <g font-size="12" text-anchor="middle">
+              <rect x="35" y="28" width="125" height="40" rx="8" fill="rgb(238,233,248)" stroke="rgb(178,165,214)" stroke-width="0.5" /><text x="97" y="53" fill="rgb(55,45,90)">用户</text>
+              <rect x="190" y="28" width="125" height="40" rx="8" fill="rgb(232,242,250)" stroke="rgb(145,184,211)" stroke-width="0.5" /><text x="252" y="53" fill="rgb(30,78,118)">Audio Player</text>
+              <rect x="345" y="28" width="125" height="40" rx="8" fill="rgb(231,243,237)" stroke="rgb(143,191,165)" stroke-width="0.5" /><text x="407" y="53" fill="rgb(35,91,67)">epub.js Rendition</text>
+              <rect x="500" y="28" width="145" height="40" rx="8" fill="rgb(250,242,217)" stroke="rgb(215,190,118)" stroke-width="0.5" /><text x="572" y="53" fill="rgb(112,79,12)">Talebook API</text>
+            </g>
+            <g stroke="rgba(31,30,29,0.25)" stroke-width="0.5" stroke-dasharray="4,4"><path d="M97 68V530"/><path d="M252 68V530"/><path d="M407 68V530"/><path d="M572 68V530"/></g>
+            <g font-size="11" fill="rgb(70,68,63)">
+              <path d="M97 100H564" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="330" y="91" text-anchor="middle">打开“边听边读”</text>
+              <path d="M564 132H260" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="412" y="123" text-anchor="middle">manifest + progress + 当前章 timeline</text>
+              <path d="M252 175H105" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="178" y="166" text-anchor="middle">恢复章节与位置，等待播放</text>
+              <path d="M97 214H244" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="170" y="205" text-anchor="middle">播放</text>
+              <path d="M252 252H399" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="326" y="243" text-anchor="middle">二分时间轴 → locator</text>
+              <path d="M407 286H260" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="333" y="277" text-anchor="middle">定位 Range / CFI，返回可见性</text>
+              <path d="M252 320H399" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="326" y="311" text-anchor="middle">应用 active-speaking；必要时 display</text>
+              <path d="M252 356H564" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="408" y="347" text-anchor="middle">每 10 秒 / 暂停 / 后台 / 退出同步会话</text>
+              <path d="M97 402H399" stroke="rgb(155,85,39)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="248" y="393" text-anchor="middle">手动翻页</text>
+              <path d="M407 435H105" stroke="rgb(155,85,39)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="256" y="426" text-anchor="middle">暂停自动跟随；显示“回到朗读位置”</text>
+              <path d="M97 480H244" stroke="rgb(83,69,134)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="170" y="471" text-anchor="middle">选中文字 → 从这里听</text>
+              <path d="M252 512H399" stroke="rgb(83,69,134)" stroke-width="1.5" marker-end="url(#seq-arrow)" /><text x="326" y="503" text-anchor="middle">反查 locator → seek(start_ms)</text>
+            </g>
+          </svg>
+          <p class="caption">播放跟随和手动阅读互不抢控制权；用户离开朗读位置时音频继续，自动翻页暂停。</p>
+        </div>
+
+        <h3>8.1 Reader API 与组件</h3>
+        <ul>
+          <li><code>Reader</code> 新增 <code>book_id</code>、<code>audiobook_edition_id</code> 和清单入口；Talebook 的 <code>creader.html</code> 注入当前发布版本。</li>
+          <li>新增独立 <code>AudiobookPlayer.vue</code> 与 timeline/locator 工具，避免继续膨胀现有 EpubReader。</li>
+          <li>播放时每 100–200 ms 更新句段索引，但只在 segment 变化时操作 DOM；章节切换才请求新 timeline。</li>
+          <li>优先用 element_id，回退 dom_path + 文本哈希模糊定位；定位失败清除高亮并记录一次警告，不阻断音频。</li>
+          <li>支持 Media Session、键盘、屏幕阅读器标签和触摸目标；主题中高亮色使用半透明背景与描边，避免覆盖文字颜色。</li>
+        </ul>
+      </section>
+
+      <section id="podcast">
+        <h2>9. 站点级私人 Podcast RSS</h2>
+        <p class="section-intro">用户只复制一个 URL。Feed 是该用户可访问有声书的动态视图，不是公开 Podcast 目录，也不是永久绕过权限的下载链接。</p>
+        <div class="grid three">
+          <article class="card accent-purple"><h3>Channel</h3><p>站点标题、站点封面、<code>itunes:type=serial</code>、<code>itunes:block=Yes</code>、稳定 Feed GUID、UTF-8 RSS 2.0。</p></article>
+          <article class="card accent-blue"><h3>Season = 书</h3><p><code>itunes:season=book_id</code>，书籍封面用于 item image；用户可按书隐藏，版本只取当前已发布。</p></article>
+          <article class="card accent-green"><h3>Episode = 章</h3><p>标题“《书名》·章节名”，<code>itunes:episode</code> 为章节号，enclosure 直接使用章节 MP3。</p></article>
+        </div>
+        <div class="callout warning"><strong>兼容性取舍：</strong>Apple 的 Season 没有一等“书名”字段，界面可能显示 Season 编号。因此 Episode 标题始终包含书名，并提供书封面；真实 Apple Podcasts iPhone/Mac 验收是发布门槛。</div>
+
+        <h3>9.1 路由与 Token</h3>
+        <pre><code>GET/HEAD /podcast/v1/{token}/feed.xml
+GET/HEAD /podcast/v1/{token}/covers/{book_id}.jpg
+GET/HEAD /podcast/v1/{token}/audio/{edition_id}/{chapter_id}.mp3</code></pre>
+        <ul>
+          <li>Token 至少 128 bit 随机熵，仅以哈希入库。持有 URL 即拥有该用户当前可访问音频的下载能力；UI 必须明确提醒并支持撤销/重置。</li>
+          <li>每次请求重新校验 Token、用户状态、书籍查看权限、已发布版本和个人隐藏列表；Feed 中不出现候选版本。</li>
+          <li>Feed 支持 HEAD、ETag、Last-Modified、304 与 gzip；音频支持 HEAD、206 Range、Content-Range、416 和不可变缓存。</li>
+          <li>chapter GUID 由稳定站点 UUID + book_id + source chapter key 生成，版本更新不变；enclosure URL 随二进制版本变化。</li>
+          <li>Feed 使用 RFC 2822 日期、ASCII URL、<code>audio/mpeg</code>、真实 length/duration，并通过 XML 与 Podcast 校验器。</li>
+        </ul>
+        <p class="footnote">Apple 官方资料与取舍记录见 <code>research/apple-podcast-rss-20260718/findings.md</code>。用户确认的“站点 Feed / 书 Season / 章 Episode”优先于调研阶段的整书 Episode 推荐。</p>
+      </section>
+
+      <section id="stats">
+        <h2>10. 收听统计与审计</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>来源</th><th>可可信统计</th><th>明确不能声称</th></tr></thead>
+            <tbody>
+              <tr><td>Talebook / Candle Reader</td><td>播放会话、前台收听秒数、章节位置、完成率、倍速、暂停/跳转、设备、用户、IP。</td><td>客户端异常退出后的未同步片段只能按最后心跳收口。</td></tr>
+              <tr><td>Apple Podcasts / 外部 RSS</td><td>Feed 拉取、音频请求、Range 覆盖、传输字节、疑似下载、请求章节、Token 用户、IP、User-Agent。</td><td>真实播放位置、收听时长、是否听完、倍速、Apple 跨设备进度、独立听众数。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="grid three">
+          <article class="card"><h3>用户</h3><p>我的总收听时长、完成率、连续天数、最近会话、书籍排行与收听日历。</p></article>
+          <article class="card"><h3>管理员</h3><p>全站趋势、活跃听众、热门书/章、来源与设备、生成任务成功率、耗时与磁盘。</p></article>
+          <article class="card"><h3>书籍所有者</h3><p>自己书籍的匿名聚合，不暴露具体用户名、IP 或单条会话。</p></article>
+        </div>
+        <p>统计页面将“第一方收听”和“Podcast 传输估算”分栏显示，不做一个误导性的合计。原始 IP 与 User-Agent 只在管理员安全审计页可见。</p>
+      </section>
+
+      <section id="security">
+        <h2>11. 权限、安全、性能与运维</h2>
+        <div class="grid two">
+          <article class="card accent-red">
+            <h3>权限与隐私</h3>
+            <ul>
+              <li>提交、审查、确认、取消、重试、发布、回滚、删除、播放和下载逐端点鉴权。</li>
+              <li>任务快照只保存服务端凭据引用，不保存 Qwen Token 或 Cookie。</li>
+              <li>Podcast Token 不出现在普通日志；访问日志关联 subscription id。</li>
+              <li>只信任配置的反向代理提供的 X-Forwarded-For，防止伪造源 IP。</li>
+              <li>原始 IP 默认保留 90 天，可配置；安全保全记录跳过清理。</li>
+            </ul>
+          </article>
+          <article class="card accent-orange">
+            <h3>容量与清理</h3>
+            <ul>
+              <li>发布/候选版本永久保留至显式删除，并在 UI 显示空间。</li>
+              <li>成功片段缓存默认 30 天，失败临时文件 7 天。</li>
+              <li>任务前检查可用磁盘，低于阈值拒绝启动；写入使用临时文件 + 原子替换。</li>
+              <li>删除版本同时删除媒体和专属缓存，但任务审计记录保留。</li>
+              <li>Range 流量和 Feed 访问限速；对单 Token / IP 的异常访问可冻结。</li>
+            </ul>
+          </article>
+        </div>
+
+        <h3>11.1 配置</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>配置</th><th>默认</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>AUDIOBOOK_ENABLED</td><td>true</td><td>总开关；CLI 健康检查失败时生成按钮禁用并显示原因，已有音频仍可播放。</td></tr>
+              <tr><td>AUDIOBOOK_PATH</td><td>/data/books/audiobooks</td><td>版本、任务、缓存与审计根目录。</td></tr>
+              <tr><td>AUDIOBOOK_OWNER_GENERATE</td><td>false</td><td>是否允许书籍所有者生成；管理员始终可用。</td></tr>
+              <tr><td>AUDIOBOOK_WORKERS</td><td>1</td><td>整书并发，范围 1–3。</td></tr>
+              <tr><td>AUDIOBOOK_MIN_FREE_GB</td><td>5</td><td>低于阈值不启动新任务。</td></tr>
+              <tr><td>AUDIOBOOK_CACHE_DAYS</td><td>30</td><td>成功片段缓存保留期。</td></tr>
+              <tr><td>AUDIOBOOK_FAILED_TEMP_DAYS</td><td>7</td><td>失败任务临时文件保留期。</td></tr>
+              <tr><td>PODCAST_ENABLED</td><td>true</td><td>私人站点 RSS 开关。</td></tr>
+              <tr><td>PODCAST_IP_RETENTION_DAYS</td><td>90</td><td>原始 IP 保留期；保全记录除外。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="delivery">
+        <h2>12. API、实施顺序、发布与回滚</h2>
+        <h3>12.1 主要 API</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>域</th><th>端点</th><th>用途</th></tr></thead>
+            <tbody>
+              <tr><td>馆藏</td><td>GET /api/audiobooks/home<br>GET /api/audiobooks<br>GET /api/audiobooks/{book_id}</td><td>个性化分区、分页筛选、详情与版本。</td></tr>
+              <tr><td>任务</td><td>POST /api/books/{book_id}/audiobook-jobs<br>GET /api/audiobook-jobs<br>PATCH /api/audiobook-jobs/{id}</td><td>创建、查询、取消、重试、优先级。</td></tr>
+              <tr><td>审查</td><td>GET/PATCH /api/audiobook-jobs/{id}/characters<br>GET/PATCH /api/audiobook-jobs/{id}/chapters/{number}<br>POST /api/audiobook-jobs/{id}/confirm</td><td>角色结构化编辑、单章 TXT、确认生成。</td></tr>
+              <tr><td>播放</td><td>GET /api/audiobooks/{edition_id}/manifest<br>GET /api/audiobooks/{edition_id}/chapters/{id}/timeline<br>GET/HEAD /audiobooks/{edition_id}/chapters/{id}.mp3</td><td>清单、按章时间轴、受保护 Range 音频。</td></tr>
+              <tr><td>进度</td><td>POST /api/audiobooks/{edition_id}/sessions<br>PATCH /api/audiobook-sessions/{id}<br>POST /api/audiobook-sessions/{id}/close</td><td>第一方会话、进度和真实收听统计。</td></tr>
+              <tr><td>Podcast</td><td>POST/DELETE /api/me/podcast-subscription<br>GET /podcast/v1/{token}/feed.xml</td><td>签发/撤销站点 Feed 与 RSS 输出。</td></tr>
+              <tr><td>统计</td><td>GET /api/audiobook-stats/me<br>GET /api/admin/audiobook-stats<br>GET /api/books/{id}/audiobook-stats</td><td>个人、管理员和匿名书籍汇总。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>12.2 三仓实施顺序</h3>
+        <ol>
+          <li><strong>voicebook：</strong>依赖拆分、定位锚点、manifest/timeline、JSONL、取消恢复、预览资产与测试；先发布固定版本。</li>
+          <li><strong>candle-reader：</strong>播放器组件、同步定位、交互与完整 e2e；打 tag 发布 dist。</li>
+          <li><strong>talebook：</strong>模型迁移、调度器、API、页面、统计、Podcast、Docker 固定 Voicebook、更新 Candle Reader dist。</li>
+          <li><strong>联合验收：</strong>真实两章 EdgeTTS、跨页面播放、Candle 高亮、RSS/Range、统计和重启恢复。</li>
+        </ol>
+        <p>Talebook 更新 Candle Reader 沿用现有 release + repository dispatch 流程；不手工维护来源不明的打包文件。</p>
+
+        <h3>12.3 发布与回滚</h3>
+        <ul>
+          <li>数据库迁移只新增表/列；启动时 create_all/migrate 创建。旧版本忽略新表。</li>
+          <li>发布顺序为 Voicebook → Candle Reader → Talebook。Talebook 固定依赖版本，避免跨仓漂移。</li>
+          <li>回滚先停止调度器并关闭 UI 入口；不删除数据库与媒体。运行任务标记 interrupted，可由新版本恢复。</li>
+          <li>新发布版本出错时切回旧有声版本；Podcast GUID 保持稳定，enclosure 回到旧不可变资产。</li>
+        </ul>
+
+        <h3>12.4 计划验证项（当前均待验证）</h3>
+        <ul class="checklist">
+          <li>Voicebook 单元：locator、时间轴、JSONL、取消、恢复、缓存、依赖拆分。</li>
+          <li>57 × 10 预览资产：数量、目录时间索引、ffprobe、场景抽听。</li>
+          <li>Talebook 模型迁移：SQLite 与 MySQL 新库/旧库升级。</li>
+          <li>权限：访客、普通用户、所有者、管理员全部端点矩阵。</li>
+          <li>调度器：去重、并发、租约过期、重启恢复、取消、重试、优先级。</li>
+          <li>音频：HEAD、完整 GET、首/中/尾 Range、416、MIME、不可变缓存。</li>
+          <li>高级工作台：角色 UI、单章保存、冲突、逐行错误、试听。</li>
+          <li>播放器：跨路由、刷新恢复、不自动播放、倍速、睡眠、队列、书签。</li>
+          <li>Candle e2e：高亮、自动翻页、手动脱离、回到朗读位置、从这里听。</li>
+          <li>同步偏差：真实 EdgeTTS 两章音频，句段边界误差不超过 150 ms。</li>
+          <li>进度：Web/Candle 跨设备冲突、文字进度独立、显式从此阅读。</li>
+          <li>RSS：XML/RSS 校验、稳定 GUID、权限过滤、隐藏书籍、ETag/304/gzip。</li>
+          <li>Apple Podcasts iPhone/Mac：添加 URL、Season/章节选择、封面、seek、增量刷新。</li>
+          <li>统计：第一方真实指标、RSS 估算分栏、原始 IP、90 天清理与保全。</li>
+          <li>容量：磁盘阈值、缓存清理、版本删除、路径穿越和 Token 泄露检查。</li>
+          <li>仓库门禁：Talebook Python lint/pytest、Nuxt lint/测试/Chrome；Candle 全量 e2e。</li>
+        </ul>
+        <div class="callout danger"><strong>当前测试结果：待验证。</strong>本轮只完成现状调查、官方资料调研、需求决策与 WIP 方案；未运行任何实现测试，也未生成新的试听音频。</div>
+
+        <h3>12.5 审查请求</h3>
+        <p>请重点确认：数据模型、站点 RSS 的 Season/Episode 映射、Voicebook v2 协议、首版页面与测试门槛。批准后才会在三个隔离 worktree 中开始实现；任何实质偏离都先更新本文再继续。</p>
+      </section>
+    </main>
+  </body>
+</html>
