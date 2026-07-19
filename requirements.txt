@@ -15,5 +15,9 @@ bcrypt
 psutil
 requests-toolbelt
 
+# Voicebook host protocol v2 and packaged EdgeTTS preview assets.
+# Pin the immutable commit so production generation cannot drift between builds.
+voicebook-tool @ https://github.com/talebook/voicebook/archive/034269fbf55bfedbed26fe519ac74a9a6c7ef635.tar.gz
+
 # WebDAV service (mount the book library over WebDAV)
 WsgiDAV>=4.0.0

@@ -252,7 +252,7 @@
         <h1>Talebook 有声书、Voicebook 转换与 Candle Reader 音文同步方案</h1>
         <p class="lede">把现有 EPUB/TXT 书籍转为可管理、可续播、可跨页面播放的多角色章节 MP3；在阅读器中按句段同步高亮，并通过每用户一个站点级私人 Podcast RSS 向 Apple Podcasts 等客户端分发。</p>
         <dl class="meta">
-          <div><dt>状态</dt><dd><span class="status">WIP · 等待审查</span></dd></div>
+          <div><dt>状态</dt><dd><span class="status">WIP · 外部验收阻塞</span></dd></div>
           <div><dt>创建日期</dt><dd>2026-07-18</dd></div>
           <div><dt>主仓库</dt><dd>talebook</dd></div>
           <div><dt>影响范围</dt><dd>talebook / voicebook / candle-reader</dd></div>
@@ -295,7 +295,7 @@
             <p>每用户一个私人 RSS；每书一个 Season、每章一个 Episode。第一方精确统计与外部 HTTP 传输估算严格分开。</p>
           </article>
         </div>
-        <div class="callout warning"><strong>审查门：</strong>本文仍是 WIP，业务实现、真实 TTS、浏览器验收和 Apple Podcasts 真机验收都尚未执行。用户明确批准本文后才能进入编码。</div>
+        <div class="callout warning"><strong>当前结论：</strong>三仓实现、自动化测试、EdgeTTS 真实长音频和 GitHub Pages 播放已完成；本文仍保持 WIP，因为 Qwen3TTS 云服务返回 <code>Arrearage</code>，49 个 Qwen 音色的十场景资产无法真实生成，Apple Podcasts 真机订阅也仍需外部验收。不得把这两项伪报为通过。</div>
       </section>
 
       <section id="scope">
@@ -608,7 +608,8 @@
         <div class="callout"><strong>时间基准：</strong>以拼接后的 24 kHz PCM 逻辑片段和实际留白累计时间为准，再对最终 MP3 做 ffprobe。高亮只覆盖发声区间，片段间留白时清除高亮。编码与浏览器解码误差验收阈值为 150 ms。</div>
 
         <h3>6.4 音色预览资产</h3>
-        <p>Voicebook 包内携带 57 个 MP3 预览包和一个目录 JSON。每个文件包含旁白、日常、喜悦、愤怒、悲伤、恐惧、低语、急切、威严、温柔十段场景及时间索引。Talebook 通过 Voicebook 机器命令发现资源并安全提供，不复制二进制到前端源码。角色实际对白预览按引擎、音色、语速、文本指纹动态缓存。</p>
+        <p>目标仍是 Voicebook 包内携带 57 个 MP3 预览包和一个目录 JSON。每个文件包含旁白、日常、喜悦、愤怒、悲伤、恐惧、低语、急切、威严、温柔十段场景及目录信息。Talebook 通过 Voicebook 机器命令发现资源并安全提供，不复制二进制到前端源码；角色实际对白预览按引擎、音色、语速、文本指纹动态缓存。</p>
+        <div class="callout warning"><strong>实际资产：</strong>当前已生成并校验 8 个 EdgeTTS 音色 × 10 场景，共 80 段对白；49 个 Qwen3TTS 音色因云 API 实际返回 HTTP 500 / <code>Arrearage</code> 暂无资产。实现不会使用 Edge 音色冒充 Qwen，也不会静默回退。</div>
       </section>
 
       <section id="ui">
@@ -836,29 +837,36 @@ GET/HEAD /podcast/v1/{token}/audio/{edition_id}/{chapter_id}.mp3</code></pre>
           <li>新发布版本出错时切回旧有声版本；Podcast GUID 保持稳定，enclosure 回到旧不可变资产。</li>
         </ul>
 
-        <h3>12.4 计划验证项（当前均待验证）</h3>
-        <ul class="checklist">
-          <li>Voicebook 单元：locator、时间轴、JSONL、取消、恢复、缓存、依赖拆分。</li>
-          <li>57 × 10 预览资产：数量、目录时间索引、ffprobe、场景抽听。</li>
-          <li>Talebook 模型迁移：SQLite 与 MySQL 新库/旧库升级。</li>
-          <li>权限：访客、普通用户、所有者、管理员全部端点矩阵。</li>
-          <li>调度器：去重、并发、租约过期、重启恢复、取消、重试、优先级。</li>
-          <li>音频：HEAD、完整 GET、首/中/尾 Range、416、MIME、不可变缓存。</li>
-          <li>高级工作台：角色 UI、单章保存、冲突、逐行错误、试听。</li>
-          <li>播放器：跨路由、刷新恢复、不自动播放、倍速、睡眠、队列、书签。</li>
-          <li>Candle e2e：高亮、自动翻页、手动脱离、回到朗读位置、从这里听。</li>
-          <li>同步偏差：真实 EdgeTTS 两章音频，句段边界误差不超过 150 ms。</li>
-          <li>进度：Web/Candle 跨设备冲突、文字进度独立、显式从此阅读。</li>
-          <li>RSS：XML/RSS 校验、稳定 GUID、权限过滤、隐藏书籍、ETag/304/gzip。</li>
-          <li>Apple Podcasts iPhone/Mac：添加 URL、Season/章节选择、封面、seek、增量刷新。</li>
-          <li>统计：第一方真实指标、RSS 估算分栏、原始 IP、90 天清理与保全。</li>
-          <li>容量：磁盘阈值、缓存清理、版本删除、路径穿越和 Token 泄露检查。</li>
-          <li>仓库门禁：Talebook Python lint/pytest、Nuxt lint/测试/Chrome；Candle 全量 e2e。</li>
-        </ul>
-        <div class="callout danger"><strong>当前测试结果：待验证。</strong>本轮只完成现状调查、官方资料调研、需求决策与 WIP 方案；未运行任何实现测试，也未生成新的试听音频。</div>
+        <h3>12.4 实际验证结果</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>范围</th><th>2026-07-19 实际结果</th><th>结论</th></tr></thead>
+            <tbody>
+              <tr><td>Voicebook</td><td>全量单元测试 39/39；compileall 通过；0.4.0 wheel 构建通过并包含 8 个 Edge 音色的十场景 MP3 与目录信息。</td><td><span class="badge green">通过</span></td></tr>
+              <tr><td>Talebook 后端</td><td>Docker 真实环境全量 pytest：627 passed、1 skipped；新增有声书定向测试 7/7；Ruff lint/format 通过。</td><td><span class="badge green">通过</span></td></tr>
+              <tr><td>Talebook Web</td><td>Nuxt 构建通过；Playwright 全量 E2E 34/34，覆盖任务、高级编辑、章节播放器、Podcast 与统计主要路径。</td><td><span class="badge green">通过</span></td></tr>
+              <tr><td>Candle Reader</td><td>构建通过；Playwright 全量 E2E 37/37，覆盖 timeline 高亮、自动翻页、手动脱离、回到朗读位置和“从这里听”。</td><td><span class="badge green">通过</span></td></tr>
+              <tr><td>真实长音频</td><td>3 部公版小说 × 完整前两章，共 6 个 MP3、160.3 分钟、73.4 MiB；24 kHz / 单声道 / 64 kbps，Pages 报告与 MP3 均返回 HTTP 200。</td><td><span class="badge green">通过</span></td></tr>
+              <tr><td>Qwen 预览资产</td><td>真实短文本冒烟返回 HTTP 500 / <code>Arrearage</code>；49 × 10 未生成，未伪造成功。</td><td><span class="badge">阻塞</span></td></tr>
+              <tr><td>Apple Podcasts</td><td>RSS、Range、稳定 GUID、权限与审计由后端自动化测试覆盖；iPhone/Mac “添加 URL 关注播客”尚未真机执行。</td><td><span class="badge">待外部验收</span></td></tr>
+              <tr><td>集成镜像</td><td>测试镜像真实构建通过；容器内报告 Voicebook 0.4.0、ffmpeg/ffprobe 7.1.5、8 个 Edge 十场景资产；同一最终镜像全量后端 627 passed、1 skipped。</td><td><span class="badge green">通过</span></td></tr>
+              <tr><td>发布链</td><td>Voicebook PR #2、Candle Reader PR #17 已创建；Talebook 已固定 Voicebook 0.4.0 的不可变提交，Candle dist 必须在 PR 合并发布后同步。</td><td><span class="badge">部分待合并</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout"><strong>E2E 门禁已实现：</strong>Talebook 与 Candle Reader 均运行全量 Chromium E2E，而不是只提交测试文件；三仓构建和后端全量回归也均已实际执行。</div>
+        <div class="callout warning"><strong>镜像体积风险：</strong>为了跨架构提供转换与 ffprobe 校验，当前使用 Debian 完整 ffmpeg 包；本机测试镜像从 555,042,310 字节增至 1,020,822,276 字节，约增加 466 MB。功能与构建已验证，但后续可单独评估带校验和的多架构静态二进制以缩小镜像，不能为减体积牺牲可复现性。</div>
 
-        <h3>12.5 审查请求</h3>
-        <p>请重点确认：数据模型、站点 RSS 的 Season/Episode 映射、Voicebook v2 协议、首版页面与测试门槛。批准后才会在三个隔离 worktree 中开始实现；任何实质偏离都先更新本文再继续。</p>
+        <h3>12.5 三部小说完整两章试听</h3>
+        <p>以下链接直接打开 GitHub Pages 上的 MP3，可用浏览器原生播放器收听；完整播放器排版、媒体哈希与复现记录见 <a href="https://talebook.github.io/voicebook/design/20260716-voicebook-tool.active.html#full-book-demos">Voicebook 试听报告</a>。方案文档必须保持单文件离线可读，因此不把 73.4 MiB 外部音频嵌入本文。</p>
+        <div class="grid three">
+          <article class="card"><h4>《西游记》</h4><p>吴承恩 · 58.84 分钟</p><ul><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/xiyouji/0001-第一回-靈根育孕源流出-心性修持大道生.mp3">▶ 第一回</a></li><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/xiyouji/0002-第二回-悟徹菩提真妙理-斷魔歸本合元神.mp3">▶ 第二回</a></li><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/xiyouji/book.script">查看 book.script</a></li></ul></article>
+          <article class="card"><h4>《儒林外史》</h4><p>吴敬梓 · 50.89 分钟</p><ul><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/rulinwaishi/0001-第一回-說楔子敷陳大義-借名流隱括全文.mp3">▶ 第一回</a></li><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/rulinwaishi/0002-第二回-王孝廉村學識同科-周蒙師暮年登上第.mp3">▶ 第二回</a></li><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/rulinwaishi/book.script">查看 book.script</a></li></ul></article>
+          <article class="card"><h4>《红楼梦》</h4><p>曹雪芹 · 50.60 分钟</p><ul><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/hongloumeng/0001-第一回-甄士隱夢幻識通靈-賈雨村風塵懷閨秀.mp3">▶ 第一回</a></li><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/hongloumeng/0002-第二回-賈夫人仙逝揚州城-冷子興演說榮國府.mp3">▶ 第二回</a></li><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/hongloumeng/book.script">查看 book.script</a></li></ul></article>
+        </div>
+
+        <h3>12.6 剩余发布门</h3>
+        <p>先合并 <a href="https://github.com/talebook/voicebook/pull/2">Voicebook PR #2</a> 与 <a href="https://github.com/talebook/candle-reader/pull/17">Candle Reader PR #17</a>；Voicebook 0.4.0 当前以不可变提交固定，Candle Reader 发布后还需同步 dist。随后需要恢复 Qwen 账户可用性以补齐 49 × 10 真实资产，并由用户在 Apple Podcasts 真机完成 URL 订阅验收；在这些偏差被解决或明确接受前，本文保持 WIP。</p>
       </section>
     </main>
   </body>

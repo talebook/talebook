@@ -161,7 +161,9 @@ class AudiobookHome(BaseHandler):
         if self.current_user:
             rows = (
                 self.session.query(AudiobookProgress)
-                .filter(AudiobookProgress.reader_id == self.user_id(), AudiobookProgress.edition_id.in_([e.id for e in visible]))
+                .filter(
+                    AudiobookProgress.reader_id == self.user_id(), AudiobookProgress.edition_id.in_([e.id for e in visible])
+                )
                 .all()
             )
             progress = {row.edition_id: row for row in rows}
@@ -173,19 +175,25 @@ class AudiobookHome(BaseHandler):
             value = utils.BookFormatter(self, book).format()
             value["edition"] = _edition_dict(edition)
             row = progress.get(edition.id)
-            value["listening_progress"] = {
-                "chapter_id": row.chapter_id,
-                "position_ms": row.position_ms,
-                "listened_ms": row.listened_ms,
-                "finished": bool(row.is_finished),
-            } if row else None
+            value["listening_progress"] = (
+                {
+                    "chapter_id": row.chapter_id,
+                    "position_ms": row.position_ms,
+                    "listened_ms": row.listened_ms,
+                    "finished": bool(row.is_finished),
+                }
+                if row
+                else None
+            )
             return value
 
         items = [value for value in (item(edition) for edition in visible) if value]
         return {
             "err": "ok",
             "enabled": bool(CONF.get("AUDIOBOOK_ENABLED", True)),
-            "continue_listening": [value for value in items if value["listening_progress"] and not value["listening_progress"]["finished"]],
+            "continue_listening": [
+                value for value in items if value["listening_progress"] and not value["listening_progress"]["finished"]
+            ],
             "recent": items[:24],
             "completed": [value for value in items if value["listening_progress"] and value["listening_progress"]["finished"]],
         }
@@ -197,14 +205,20 @@ class AudiobookList(BaseHandler):
         query = self.session.query(AudiobookEdition).filter(AudiobookEdition.status == "published")
         editions = query.order_by(AudiobookEdition.published_at.desc()).all()
         editions = [edition for edition in editions if self.can_view_book(edition.book_id)]
-        books = {book["id"]: book for book in self.get_books(ids=[edition.book_id for edition in editions])} if editions else {}
+        books = (
+            {book["id"]: book for book in self.get_books(ids=[edition.book_id for edition in editions])} if editions else {}
+        )
         values = []
         keyword = self.get_argument("keyword", "").strip().lower()
         for edition in editions:
             book = books.get(edition.book_id)
             if not book:
                 continue
-            if keyword and keyword not in str(book.get("title", "")).lower() and keyword not in str(book.get("author", "")).lower():
+            if (
+                keyword
+                and keyword not in str(book.get("title", "")).lower()
+                and keyword not in str(book.get("author", "")).lower()
+            ):
                 continue
             value = utils.BookFormatter(self, book).format()
             value["edition"] = _edition_dict(edition)
@@ -484,7 +498,9 @@ class AudiobookManifest(BaseHandler):
                 "listened_ms": progress.listened_ms,
                 "finished": bool(progress.is_finished),
                 "version": progress.version,
-            } if progress else None,
+            }
+            if progress
+            else None,
         }
 
 
@@ -772,7 +788,9 @@ def _subscription(handler, token):
     return row, reader
 
 
-def _audit(handler, subscription, *, kind, status, book_id=None, edition_id=None, chapter_id=None, size=0, start=None, end=None):
+def _audit(
+    handler, subscription, *, kind, status, book_id=None, edition_id=None, chapter_id=None, size=0, start=None, end=None
+):
     handler.session.add(
         PodcastAccessLog(
             subscription_id=subscription.id,
@@ -818,8 +836,16 @@ class PodcastFeed(PodcastBaseHandler):
             .order_by(AudiobookEdition.book_id, AudiobookEdition.published_at.desc())
             .all()
         )
-        editions = [item for item in editions if item.book_id not in hidden and _can_subscription_view(self.session, reader, item.book_id)]
-        books = {book["id"]: book for book in self.get_books(ids=[item.book_id for item in editions], check_permission=False)} if editions else {}
+        editions = [
+            item
+            for item in editions
+            if item.book_id not in hidden and _can_subscription_view(self.session, reader, item.book_id)
+        ]
+        books = (
+            {book["id"]: book for book in self.get_books(ids=[item.book_id for item in editions], check_permission=False)}
+            if editions
+            else {}
+        )
         feed_dates = []
         items = []
         for edition in editions:
@@ -845,14 +871,14 @@ class PodcastFeed(PodcastBaseHandler):
                         (
                             "<item>",
                             f"<title>{escape('《' + book['title'] + '》·' + chapter.title)}</title>",
-                            f"<guid isPermaLink=\"false\">{escape(chapter.episode_guid)}</guid>",
+                            f'<guid isPermaLink="false">{escape(chapter.episode_guid)}</guid>',
                             f"<pubDate>{format_datetime(pubdate)}</pubDate>",
-                            f"<enclosure url=\"{escape(audio_url)}\" length=\"{chapter.size_bytes}\" type=\"audio/mpeg\" />",
+                            f'<enclosure url="{escape(audio_url)}" length="{chapter.size_bytes}" type="audio/mpeg" />',
                             f"<itunes:season>{edition.book_id}</itunes:season>",
                             f"<itunes:episode>{chapter.number}</itunes:episode>",
                             "<itunes:episodeType>full</itunes:episodeType>",
                             f"<itunes:duration>{duration_text}</itunes:duration>",
-                            f"<itunes:image href=\"{escape(self.site_url + '/podcast/v1/' + quote(token) + '/covers/' + str(edition.book_id) + '.jpg')}\" />",
+                            f'<itunes:image href="{escape(self.site_url + "/podcast/v1/" + quote(token) + "/covers/" + str(edition.book_id) + ".jpg")}" />',
                             "</item>",
                         )
                     )
@@ -860,8 +886,8 @@ class PodcastFeed(PodcastBaseHandler):
         title = f"{CONF.get('site_title', 'Talebook')} · 私人有声书"
         build_date = max(feed_dates, default=datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc))
         body = (
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-            "<rss version=\"2.0\" xmlns:itunes=\"http://www.itunes.com/dtds/podcast-1.0.dtd\">"
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">'
             f"<channel><title>{escape(title)}</title><link>{escape(self.site_url)}</link>"
             "<description>你的 Talebook 私人有声书馆藏</description><language>zh-cn</language>"
             "<itunes:type>serial</itunes:type><itunes:block>Yes</itunes:block>"
@@ -1030,9 +1056,7 @@ class AudiobookVoicePreview(BaseHandler):
             )
             catalog = json.loads(result.stdout)
             voice = next(
-                item
-                for item in catalog.get("voices", [])
-                if item.get("engine") == engine and item.get("voice_id") == voice_id
+                item for item in catalog.get("voices", []) if item.get("engine") == engine and item.get("voice_id") == voice_id
             )
             path = Path(voice["preview_path"]).resolve()
         except (OSError, subprocess.SubprocessError, ValueError, KeyError, StopIteration):
@@ -1053,7 +1077,9 @@ class AudiobookMyStats(BaseHandler):
         return {
             "err": "ok",
             "first_party": {
-                "listened_ms": sessions.with_entities(func.coalesce(func.sum(AudiobookPlaybackSession.listened_ms), 0)).scalar(),
+                "listened_ms": sessions.with_entities(
+                    func.coalesce(func.sum(AudiobookPlaybackSession.listened_ms), 0)
+                ).scalar(),
                 "sessions": sessions.count(),
                 "completed_books": progress.filter(AudiobookProgress.is_finished.is_(True)).count(),
             },
@@ -1106,7 +1132,9 @@ def routes():
         (r"/podcast/v1/([^/]+)/covers/([0-9]+)\.jpg", PodcastCover),
         (r"/podcast/v1/([^/]+)/audio/([0-9]+)/([0-9]+)\.mp3", PodcastAudio),
         (r"/api/audiobook-voices", AudiobookVoices),
-        (r"/audiobook-voice-previews/([a-z0-9]+)/([A-Za-z0-9_.-]+)\.mp3", AudiobookVoicePreview),
+        # Qwen voice IDs may contain spaces. The handler resolves the decoded ID
+        # against Voicebook's catalog before serving the catalog-owned MP3 path.
+        (r"/audiobook-voice-previews/([a-z0-9]+)/([^/]+)\.mp3", AudiobookVoicePreview),
         (r"/api/audiobook-stats/me", AudiobookMyStats),
         (r"/api/admin/audiobook-stats", AudiobookAdminStats),
         (r"/api/admin/podcast-audit", PodcastAudit),

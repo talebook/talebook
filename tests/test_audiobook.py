@@ -106,6 +106,34 @@ class AudiobookFixture:
 
 
 class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
+    def test_reader_page_injects_published_audiobook(self):
+        edition_id = self.seed_published_edition()
+        response = self.fetch(f"/read/{test_main.BID_EPUB}")
+        self.assertEqual(response.code, 200)
+        page = response.body.decode("utf-8")
+        self.assertIn(f"book_id: {test_main.BID_EPUB}", page)
+        self.assertIn(f"audiobook_edition_id: {edition_id}", page)
+        self.assertIn(f'"/api/audiobooks/{edition_id}/manifest"', page)
+
+    def test_voice_preview_accepts_qwen_voice_id_with_spaces(self):
+        preview = AudiobookStorage().root / "qwen-preview.mp3"
+        preview.write_bytes(b"ID3" + bytes(range(64)))
+        catalog = {
+            "voices": [
+                {
+                    "engine": "qwen3tts",
+                    "voice_id": "Eldric Sage",
+                    "preview_path": str(preview),
+                }
+            ]
+        }
+        result = mock.Mock(stdout=json.dumps(catalog))
+        with mock.patch("webserver.handlers.audiobook.subprocess.run", return_value=result):
+            response = self.fetch("/audiobook-voice-previews/qwen3tts/Eldric%20Sage.mp3")
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.headers["Content-Type"], "audio/mpeg")
+        self.assertEqual(response.body, preview.read_bytes())
+
     def test_create_deduplicate_cancel_and_retry_job(self):
         body = json.dumps({"mode": "quick", "engine": "edgetts", "speed": "x1.0"})
         created = self.json(

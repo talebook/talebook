@@ -25,7 +25,10 @@
         server: "{{CANDLE_READER_SERVER}}",
         themes_css: "{{RES}}/static/candle-reader/css/themes.css?v=v1.0.2",
         book_url: "{{RES}}{{epub_dir}}/",
-        display: "",
+        display_url: "",
+        book_id: {{book.id}},
+        audiobook_edition_id: {% if audiobook_edition_id %}{{audiobook_edition_id}}{% else %}null{% endif %},
+        audiobook_manifest_url: {% if audiobook_edition_id %}"{{RES}}/api/audiobooks/{{audiobook_edition_id}}/manifest"{% else %}""{% endif %},
       })
     }
 
