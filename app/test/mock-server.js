@@ -618,9 +618,50 @@ router.get('/api/recent', eventHandler(() => {
   return readJson('api_recent.json') || { err: 'error', msg: 'mock not found' };
 }));
 
+router.get('/api/library', eventHandler(() => {
+  const data = readJson('api_recent.json') || { title: '本地书库', total: 0, books: [] };
+  const books = (data.books || []).map((book, index) => ({
+    ...book,
+    state: { read_state: index === 0 ? 2 : 0 },
+  }));
+  const lines = [
+    JSON.stringify({ err: 'ok', title: '本地书库', total: books.length }),
+    ...books.map(book => JSON.stringify(book)),
+  ];
+  return new Response(`${lines.join('\n')}\n`, {
+    headers: { 'Content-Type': 'application/x-ndjson' },
+  });
+}));
+
+for (const filter of ['publisher', 'author', 'tag', 'format']) {
+  router.get(`/api/${filter}`, eventHandler(() => ({
+    err: 'ok',
+    items: [],
+  })));
+}
+
 router.get('/api/hot', eventHandler(() => {
   return readJson('api_hot.json') || { err: 'error', msg: 'mock not found' };
 }));
+
+const getFinishedBooks = () => {
+  const books = readJson('books.json') || [];
+  return books.slice(0, 1).map(book => ({
+    ...book,
+    state: { read_state: 2 },
+  }));
+};
+
+router.get('/api/read-done', eventHandler(() => {
+  const books = getFinishedBooks();
+  return { err: 'ok', total: books.length, books };
+}));
+
+router.get('/api/reading', eventHandler(() => ({
+  err: 'ok',
+  total: 0,
+  books: [],
+})));
 
 // Search
 router.get('/api/search', eventHandler((event) => {

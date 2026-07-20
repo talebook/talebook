@@ -258,10 +258,14 @@ class TestAppWithoutLogin(TestApp):
     def test_recent(self):
         d = self.json("/api/recent")
         self.assert_book_list(d, 10)
+        for book in d["books"]:
+            self.assertEqual(book["state"]["read_state"], 0)
 
     def test_library(self):
         d = self.json("/api/library")
         self.assert_book_list(d, 10)
+        for book in d["books"]:
+            self.assertEqual(book["state"]["read_state"], 0)
 
     def test_download(self):
         rsp = self.fetch("/api/book/1.epub", follow_redirects=False)

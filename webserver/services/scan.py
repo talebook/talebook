@@ -181,26 +181,30 @@ class ScanService(AsyncService):
                 self.save_or_rollback(row)
                 continue
 
-            if mi:
-                mi.title = utils.super_strip(mi.title)
-                mi.authors = [utils.super_strip(s) for s in mi.authors]
+            if not mi:
+                # 解析失败时构造与do_import()解析失败分支一致的兜底metadata（文件名+“佚名”），
+                # 避免这里另用"Unknown"作者且跳过查重，导致已入库的解析失败文件无法被判定为重复
+                from calibre.ebooks.metadata.book.base import Metadata
 
-                # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
-                if fmt in ["txt", "pdf"]:
-                    mi.title = os.path.splitext(fname)[0]
+                mi = Metadata(os.path.splitext(fname)[0], [_("佚名")])
 
-                row.title = mi.title
-                # 使用mi.authors列表而不是mi.author_sort，避免作者信息丢失
-                row.author = mi.authors[0] if mi.authors else ""
-                row.publisher = mi.publisher
-                row.tags = ", ".join(mi.tags)
-                row.status = ScanFile.READY  # 设置为可处理
-            else:
-                row.title = os.path.splitext(fname)[0]
-                row.author = "Unknown"
-                row.status = ScanFile.READY  # 设置为可处理，尽管解析失败
-                self.save_or_rollback(row)
-                continue
+            mi.title = utils.super_strip(mi.title)
+            mi.authors = [utils.super_strip(s) for s in mi.authors]
+
+            # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
+            # 作者也需要强制置为“佚名”，与do_import()保持一致，
+            # 否则本步骤的查重会用文件原始（不可靠）的作者信息比对，
+            # 与实际入库时使用的“佚名”作者不一致，导致已入库文件永远无法被判定为重复
+            if fmt in ["txt", "pdf"]:
+                mi.title = os.path.splitext(fname)[0]
+                mi.authors = [_("佚名")]
+
+            row.title = mi.title
+            # 使用mi.authors列表而不是mi.author_sort，避免作者信息丢失
+            row.author = mi.authors[0] if mi.authors else ""
+            row.publisher = mi.publisher
+            row.tags = ", ".join(mi.tags)
+            row.status = ScanFile.READY  # 设置为可处理
 
             # TODO calibre提供的书籍重复接口只有对比title；应当提前对整个书库的文件做哈希，才能准确去重
             ids = self.db.books_with_same_title(mi)
@@ -218,9 +222,11 @@ class ScanService(AsyncService):
                             break
 
                 # 如果是同名不同作者，不标记为已存在，允许导入
-            if row.status == ScanFile.EXIST:
-                continue
+            # 无论是否已存在（EXIST），都必须先落库，否则book_id/status变更会在
+            # 会话关闭时被回滚，导致扫描列表仍显示为可导入
             if not self.save_or_rollback(row):
+                continue
+            if row.status == ScanFile.EXIST:
                 continue
 
     @AsyncService.register_service

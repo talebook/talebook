@@ -19,7 +19,7 @@ from webserver import loader, utils
 from webserver.i18n import _, set_language
 
 # import social_tornado.handlers
-from webserver.models import Item, Message, Reader
+from webserver.models import Item, Message, Reader, ReadingState
 
 
 messages = defaultdict(list)
@@ -556,6 +556,20 @@ class BaseHandler(web.RequestHandler):
         logging.debug("[%5d ms] select books from database (count = %d)" % (int(1000 * (time.time() - _ts)), len(books)))
         return books
 
+    def attach_reading_states(self, formatted_books):
+        """给已格式化的书籍列表附加当前登录用户的阅读状态（收藏/书架/已读等），用于封面角标展示。"""
+        user_id = self.user_id()
+        state_map = {}
+        if user_id and formatted_books:
+            ids = [b["id"] for b in formatted_books]
+            states = (
+                self.session.query(ReadingState).filter(ReadingState.reader_id == user_id, ReadingState.book_id.in_(ids)).all()
+            )
+            state_map = {s.book_id: s for s in states}
+        for b in formatted_books:
+            b["state"] = utils.ReadingStateFormatter.format_reading_state(state_map.get(b["id"]))
+        return formatted_books
+
     def count_increase(self, book_id, **kwargs):
         try:
             item = self.session.query(Item).filter(Item.book_id == book_id).one()
@@ -672,7 +686,7 @@ class ListHandler(BaseHandler):
             "err": "ok",
             "title": title,
             "total": count,
-            "books": [self.fmt(b) for b in books],
+            "books": self.attach_reading_states([self.fmt(b) for b in books]),
         }
 
     async def stream_book_list(self, all_books, ids=None, title=None, sort_by_id=False):
@@ -709,9 +723,10 @@ class ListHandler(BaseHandler):
         await self.flush()
         logging.info("[STREAM] 书单元信息已发送 (total=%d)", count)
 
-        for b in books:
+        formatted_books = self.attach_reading_states([self.fmt(b) for b in books])
+        for b in formatted_books:
             title_val = b.get("title", "?")
-            book_json = json.dumps(self.fmt(b), ensure_ascii=False)
+            book_json = json.dumps(b, ensure_ascii=False)
             self.write(book_json + "\n")
             await self.flush()
             logging.info("[STREAM] 已发送: %s", title_val)

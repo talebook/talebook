@@ -5,6 +5,7 @@
   "random_books": [
     {
       "id": 1,
+      "state": { "read_state": 2 },
       "title": "百年孤独",
       "rating": 9,
       "timestamp": "2022-02-04 12:01:26.561079+00:00",
@@ -436,6 +437,7 @@
   "new_books": [
     {
       "id": 1,
+      "state": { "read_state": 2 },
       "title": "百年孤独",
       "rating": 9,
       "timestamp": "2022-02-04 12:01:26.561079+00:00",

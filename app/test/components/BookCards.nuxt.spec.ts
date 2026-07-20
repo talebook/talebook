@@ -82,4 +82,29 @@ describe('BookCards.vue', () => {
         expect(vCards.length).toBeGreaterThan(0);
         expect(vCards[0].props('to')).toBe('/book/1');
     });
+
+    it('marks read-done books with a badge and chip, leaves others untouched (User Experience: Read Status Badge)', () => {
+        const books = [
+            { id: 1, title: 'Book 1', img: 'img1.jpg', comments: 'comment 1', state: { read_state: 2 } },
+            { id: 2, title: 'Book 2', img: 'img2.jpg', comments: 'comment 2', state: { read_state: 0 } },
+            { id: 3, title: 'Book 3', img: 'img3.jpg', comments: 'comment 3' },
+        ];
+        const wrapper = mount(BookCards, {
+            global: {
+                plugins: [vuetify],
+                mocks: {
+                    $t: (key: string) => ({
+                        'readingState.done': '已读',
+                    }[key] || key),
+                },
+            },
+            props: {
+                books
+            }
+        });
+
+        expect(wrapper.findAll('.book-read-badge').length).toBe(1);
+        expect(wrapper.findAll('.read-chip').length).toBe(1);
+        expect(wrapper.text()).toContain('已读');
+    });
 });

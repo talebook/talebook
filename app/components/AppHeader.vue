@@ -459,6 +459,7 @@ const messages = computed(() => store.messages);
 
 const mobile_search = ref(null);
 const search_input = ref(null);
+const readDoneCount = ref(0);
 
 // 多语言相关
 const availableLocales = computed(() => {
@@ -500,6 +501,14 @@ const items = computed(() => {
     ];
     var nav_links = [
         { heading: $t('navigation.categories') },
+        ...(store.user.is_login
+            ? [{
+                icon: 'mdi-check-circle',
+                href: '/user/history?tab=finished',
+                text: $t('navigation.readBooks'),
+                count: readDoneCount.value,
+            }]
+            : []),
         { icon: 'mdi-widgets', href: '/nav', text: $t('navigation.browse'), count: store.sys.books },
         { icon: 'mdi-home-group', href: '/publisher', text: $t('navigation.publishers'), count: store.sys.publishers },
         { icon: 'mdi-human-greeting', href: '/author', text: $t('navigation.authors'), count: store.sys.authors },
@@ -542,6 +551,14 @@ onMounted(() => {
     sidebar.value = display.mdAndUp.value;
     store.bootstrap().then((rsp) => {
         err.value = rsp.err;
+        if (store.user.is_login) {
+            const { $backend } = useNuxtApp();
+            $backend('/read-done').then((rsp) => {
+                if (rsp.err === 'ok') {
+                    readDoneCount.value = rsp.total || 0;
+                }
+            }).catch(() => {});
+        }
     });
 });
 

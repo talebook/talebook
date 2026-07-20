@@ -7,6 +7,7 @@
   <style>
     :root{--paper:#f4f3ee;--panel:#fffef9;--ink:#20231f;--muted:#666a62;--line:#d5d8cf;--blue:#315f73;--blue-soft:#e6f0f4;--amber:#8b6024;--amber-soft:#f7eddb;--green:#35654c;--green-soft:#e8f2eb;--red:#86433b;--red-soft:#f7e9e5;--code:#ecece6}
     *{box-sizing:border-box}body{margin:0;padding:52px 20px 84px;color:var(--ink);background:var(--paper);font:16px/1.68 ui-serif,Georgia,"Songti SC",serif}main{max-width:980px;margin:auto}header{padding-bottom:26px;border-bottom:1px solid var(--line)}h1{margin:12px 0 8px;font-size:clamp(30px,5vw,44px);line-height:1.15}h2{margin:42px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--line);font-size:23px}p{margin:0 0 14px}ul{padding-left:24px}li{margin:7px 0}.eyebrow,.meta,code,th,figcaption{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.eyebrow{color:var(--blue);font-size:11px;letter-spacing:.14em}.subtitle{max-width:820px;color:var(--muted);font-size:18px}.meta{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px;font-size:12px}.tag{padding:5px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}.active{color:var(--green);border-color:#a8c6b2;background:var(--green-soft)}.summary,.callout{margin:24px 0;padding:18px 20px;border:1px solid var(--line);background:var(--panel)}.summary{border-left:4px solid var(--blue);background:var(--blue-soft)}.decision{border-color:#a8c6b2;background:var(--green-soft)}.warning{border-color:#d7b77f;background:var(--amber-soft)}code{padding:1px 5px;border-radius:3px;background:var(--code);font-size:.86em}table{width:100%;margin:16px 0;border-collapse:collapse;font-size:14px}th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--muted);font-size:11px}figure{margin:22px 0;border:1px solid var(--line);background:#fff}svg{display:block;width:100%;height:auto}figcaption{padding:10px 13px;color:var(--muted);background:#f0f0eb;font-size:11px}footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}@media(max-width:720px){body{padding:28px 13px 58px}table{display:block;overflow-x:auto}.subtitle{font-size:16px}}
+    .superseded{color:var(--amber);border-color:#d7b77f;background:var(--amber-soft)}
   </style>
 </head>
 <body>
@@ -16,7 +17,7 @@
     <h1>Codex 运行时预算调优</h1>
     <p class="subtitle">基于 PR #871 的真实超时数据，为复杂实现任务增加执行预算，并降低默认推理强度；保留发布收尾与失败恢复空间。</p>
     <div class="meta">
-      <span class="tag active">状态 · ACTIVE</span>
+      <span class="tag superseded">状态 · SUPERSEDED</span>
       <span class="tag">创建日期 · 2026-07-17</span>
       <span class="tag">所属模块 · project</span>
       <span class="tag">需求来源 · PR #871 超时复盘</span>
@@ -95,7 +96,7 @@
     <p>发布使用独立分支正常提 PR，不 force push。若新预算导致排队或 runner 成本不可接受，以新方案恢复 15/20 分钟组合；若仅 high 效果不佳，可通过 repository variable 临时切换，不必改 workflow。</p>
   </section>
 
-  <footer>替代：design/project/20260716-codex-review-hardening.superseded.html 。本方案经用户确认后实施；fast 经验证可用但因 credits 成本明确不启用。</footer>
+  <footer>本方案曾替代 design/project/20260716-codex-review-hardening.superseded.html；现由 design/project/20260718-codex-app-comment-identity.active.html 替代。后续方案继续继承本方案的运行时预算、high 默认值与 Standard tier 决策。</footer>
 </main>
 </body>
 </html>

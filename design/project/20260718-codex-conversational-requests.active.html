@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Codex 纯问答与代码发布解耦方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5f6b7a;
+      --paper: #f4f7fb;
+      --card: #ffffff;
+      --line: #d9e1ec;
+      --brand: #2457d6;
+      --brand-soft: #e9efff;
+      --warn: #a65300;
+      --warn-soft: #fff2dc;
+      --good: #167052;
+      --good-soft: #e4f6ef;
+      --bad: #a12a38;
+      --bad-soft: #fdecef;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { width: min(1080px, calc(100% - 32px)); margin: 32px auto 64px; }
+    header, section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 8px 28px rgba(23, 32, 51, .06);
+    }
+    header { padding: 30px; border-top: 5px solid var(--brand); }
+    section { margin-top: 18px; padding: 24px 28px; }
+    h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.25; }
+    h2 { margin: 0 0 14px; font-size: 21px; }
+    h3 { margin: 20px 0 8px; font-size: 16px; }
+    p { margin: 8px 0; }
+    ul, ol { margin: 8px 0; padding-left: 22px; }
+    li + li { margin-top: 5px; }
+    code {
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: #eef2f7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+    }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill {
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .pill.wip { background: var(--warn-soft); color: var(--warn); }
+    .callout {
+      margin: 14px 0;
+      padding: 13px 15px;
+      border-left: 4px solid var(--brand);
+      border-radius: 8px;
+      background: var(--brand-soft);
+    }
+    .callout.bad { border-color: var(--bad); background: var(--bad-soft); }
+    .callout.good { border-color: var(--good); background: var(--good-soft); }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td { padding: 10px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #eef3fa; }
+    .flow { overflow-x: auto; margin-top: 16px; }
+    .flow svg { width: 100%; min-width: 900px; height: auto; display: block; }
+    .small { color: var(--muted); font-size: 13px; }
+    .status-pending { color: var(--warn); font-weight: 700; }
+    @media (max-width: 640px) {
+      main { width: min(100% - 20px, 1080px); margin-top: 10px; }
+      header, section { padding: 20px; border-radius: 10px; }
+      h1 { font-size: 25px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Codex 纯问答与代码发布解耦方案</h1>
+    <p>让已授权的 Issue 评论始终进入 Codex；只有在确实产生仓库改动时，才用分支状态决定能否发布。</p>
+    <div class="meta">
+      <span class="pill">状态：ACTIVE</span>
+      <span class="pill">创建日期：2026-07-18</span>
+      <span class="pill">所属模块：project</span>
+      <span class="pill">影响范围：GitHub Actions / Codex 提示词 / 工作流测试</span>
+    </div>
+    <p class="small">需求来源：GitHub Issue #875 第二次提及 Codex 的失败回复；前置方案为 <code>design/project/20260718-codex-app-comment-identity.active.html</code> 。</p>
+  </header>
+
+  <section>
+    <h2>原始诉求</h2>
+    <p>Issue #875 中第二次评论仅询问“你的模型详细版本”，没有要求提交代码。工作流却在 Codex 执行前发现历史分支关联已关闭或已合并的 Pull Request，于是直接回复分支冲突。期望行为是：纯问答正常由 Codex App 身份回复；只有需要提交代码时才处理分支冲突或发布限制。</p>
+    <div class="callout bad">
+      <strong>已复现：</strong>评论没有进入 Codex，<code>Resolve request context</code> 先把历史分支判为不支持目标，随后 <code>Explain unsupported target</code> 发布固定错误文本。
+    </div>
+  </section>
+
+  <section>
+    <h2>根因与设计约束</h2>
+    <ol>
+      <li><code>supportedTarget</code> 同时表达“能否执行请求”和“能否把代码发布到某条分支”，两个不同阶段被错误地合并。</li>
+      <li>Issue 的旧 Codex 分支只要关联过已关闭或已合并 PR，就会被当作当前请求的硬错误；实际上它应当是历史记录。</li>
+      <li>现有结果协议只描述可发布代码，纯问答只能伪造 feature、提交信息和测试记录，最终回复也会带上不自然的发布提示。</li>
+      <li>不能依赖“修复、提交、为什么”等关键词判断用户意图；同一句自然语言可能既需要解释，也可能在执行后才发现需要改代码。</li>
+    </ol>
+    <div class="callout good">
+      <strong>已确认的原则：</strong>所有通过权限校验的提及都执行 Codex；执行后根据真实 diff 和 Codex 的交付类型决定是否进入发布门禁。
+    </div>
+  </section>
+
+  <section>
+    <h2>目标与非目标</h2>
+    <table>
+      <thead><tr><th>类型</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>目标</td><td>纯问答在存在历史分支或多个活动分支时仍能正常执行和回复。</td></tr>
+        <tr><td>目标</td><td>已关闭或已合并 PR 对应的 Issue 分支视为历史分支，不参与当前目标选择。</td></tr>
+        <tr><td>目标</td><td>只有实际产生代码改动时才应用发布阻断，并确保阻断前不会创建 PR 或写分支。</td></tr>
+        <tr><td>目标</td><td>结果协议明确区分 <code>reply</code> 与 <code>publish</code>，纯问答回复不显示伪造的测试或提交元数据。</td></tr>
+        <tr><td>非目标</td><td>不通过关键词或模型调用前的分类器猜测评论意图。</td></tr>
+        <tr><td>非目标</td><td>不改变 PR 评论对 fork、关闭 PR、缺失 head repository 的现有安全限制。</td></tr>
+        <tr><td>非目标</td><td>不删除历史远端分支，也不自动重开或覆盖已关闭 PR。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>方案</h2>
+    <h3>1. 将执行目标和发布限制拆开</h3>
+    <p>Issue 评论的上下文解析始终给出可 checkout 的安全目标，并新增 <code>publishBlockReason</code>。它只是一条延迟到 diff 产生后的发布限制，不再让 <code>supportedTarget</code> 变为 false。</p>
+    <table>
+      <thead><tr><th>Issue 分支状态</th><th>checkout 目标</th><th>发布限制</th></tr></thead>
+      <tbody>
+        <tr><td>没有活动分支</td><td>默认分支</td><td>无</td></tr>
+        <tr><td>恰好一个活动分支</td><td>该分支</td><td>无；沿用现有 PR 或恢复缺失 PR</td></tr>
+        <tr><td>多个活动分支</td><td>默认分支</td><td>若产生改动则拒绝发布，并列出分支；无改动则正常回复</td></tr>
+        <tr><td>仅有已关闭或已合并 PR 对应分支</td><td>默认分支</td><td>无；这些分支记为历史，不参与选择。若新任务生成同名发布分支，则追加本次 GitHub run ID，避免覆盖历史分支。</td></tr>
+      </tbody>
+    </table>
+    <p>“活动分支”包括关联 open PR 的分支，以及从未关联 PR 的孤立分支。若同一分支同时存在历史 PR 和 open PR，以 open PR 为准。</p>
+    <p>上下文同时把现有 Issue 分支名作为 JSON 数组传给发布门禁。首次发布根据 feature 生成基础分支名；若该名称已被历史分支占用，门禁生成 <code>基础分支名-run-id</code>。重跑时该分支会成为唯一活动分支并被继续使用，因此不会覆盖历史提交，也不会为同一执行反复派生名称。</p>
+
+    <h3>2. 增加显式交付类型</h3>
+    <p><code>.codex-result.json</code> 用枚举 <code>delivery</code> 替代含义模糊的 <code>ready_to_publish</code>：</p>
+    <table>
+      <thead><tr><th>delivery</th><th>约束</th><th>最终行为</th></tr></thead>
+      <tbody>
+        <tr><td><code>reply</code></td><td>任务已完成但不需要仓库改动；feature 和 commit_message 为空，tests 可以为空，暂存 diff 必须为空。</td><td>只发布 summary；存在真实验证记录时才附加验证段落。</td></tr>
+        <tr><td><code>publish</code></td><td>任务需要发布仓库改动；feature、Conventional Commit 和至少一条测试记录继续采用现有校验。</td><td>通过 diff、设计、测试、分支和 PR 门禁后提交并发布。</td></tr>
+      </tbody>
+    </table>
+    <p>若 Codex 计划发布但无法完成，仍输出 <code>publish</code>，通过失败测试或缺失改动由现有 fail-closed 门禁拒绝；不允许用 <code>reply</code> 掩盖已产生的改动。</p>
+
+    <h3>3. 发布门禁后移到真实 diff 之后</h3>
+    <div class="flow" aria-label="请求执行与发布流程图">
+      <svg viewBox="0 0 1020 320" role="img" aria-labelledby="flow-title flow-desc">
+        <title id="flow-title">Codex 请求执行与发布解耦流程</title>
+        <desc id="flow-desc">授权评论先解析安全 checkout 目标并运行 Codex，之后根据交付类型和真实 diff 分流；纯问答直接回复，代码改动才检查发布限制并创建或更新 PR。</desc>
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L9,3 z" fill="#718096"/>
+          </marker>
+        </defs>
+        <g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14" text-anchor="middle">
+          <rect x="24" y="118" width="142" height="70" rx="12" fill="#e9efff" stroke="#2457d6"/>
+          <text x="95" y="147" fill="#172033"><tspan x="95">授权评论</tspan><tspan x="95" dy="20">解析安全目标</tspan></text>
+          <rect x="222" y="118" width="142" height="70" rx="12" fill="#e9efff" stroke="#2457d6"/>
+          <text x="293" y="147" fill="#172033"><tspan x="293">运行 Codex</tspan><tspan x="293" dy="20">产出结果协议</tspan></text>
+          <polygon points="466,105 548,153 466,201 384,153" fill="#fff2dc" stroke="#a65300"/>
+          <text x="466" y="149" fill="#172033"><tspan x="466">delivery</tspan><tspan x="466" dy="19">与真实 diff</tspan></text>
+          <rect x="610" y="34" width="166" height="70" rx="12" fill="#e4f6ef" stroke="#167052"/>
+          <text x="693" y="63" fill="#172033"><tspan x="693">reply 且无改动</tspan><tspan x="693" dy="20">发布正常评论</tspan></text>
+          <rect x="610" y="202" width="166" height="70" rx="12" fill="#fff2dc" stroke="#a65300"/>
+          <text x="693" y="231" fill="#172033"><tspan x="693">publish 且有改动</tspan><tspan x="693" dy="20">检查发布限制</tspan></text>
+          <rect x="832" y="202" width="166" height="70" rx="12" fill="#e4f6ef" stroke="#167052"/>
+          <text x="915" y="231" fill="#172033"><tspan x="915">提交并创建</tspan><tspan x="915" dy="20">或更新 PR</tspan></text>
+          <rect x="832" y="34" width="166" height="70" rx="12" fill="#fdecef" stroke="#a12a38"/>
+          <text x="915" y="63" fill="#172033"><tspan x="915">协议与 diff 冲突</tspan><tspan x="915" dy="20">拒绝并说明原因</tspan></text>
+        </g>
+        <g fill="none" stroke="#718096" stroke-width="2" marker-end="url(#arrow)">
+          <path d="M166 153 H214"/>
+          <path d="M364 153 H377"/>
+          <path d="M506 129 C548 90 565 69 602 69"/>
+          <path d="M506 177 C548 216 565 237 602 237"/>
+          <path d="M776 237 H824"/>
+          <path d="M776 69 H824"/>
+        </g>
+        <g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="12" fill="#5f6b7a">
+          <text x="544" y="88">正常回复</text>
+          <text x="542" y="221">代码交付</text>
+          <text x="792" y="226">允许</text>
+          <text x="793" y="58">不一致</text>
+        </g>
+      </svg>
+    </div>
+    <ul>
+      <li><code>reply</code> 且无 diff：忽略 <code>publishBlockReason</code>，正常回复并成功结束。</li>
+      <li><code>reply</code> 但有 diff：拒绝，防止代码改动绕过发布门禁。</li>
+      <li><code>publish</code> 且有 diff：先应用 <code>publishBlockReason</code>，再执行现有设计、测试、分支和 PR 门禁。</li>
+      <li><code>publish</code> 但无 diff：沿用“未产生仓库改动”的失败说明，不伪装成纯问答。</li>
+    </ul>
+
+    <h3>4. 限制所有写操作</h3>
+    <p>GitHub App token 获取、缺失 PR 恢复、新建 Issue PR、提交和 push 的条件全部增加 <code>delivery == publish</code>。因此纯问答只有评论写入，不会意外恢复旧 PR、创建新分支或推送提交。</p>
+
+    <h3>5. 提示词与最终回复</h3>
+    <ul>
+      <li>提示词明确允许信息查询、解释和状态回答，不要求为纯问答创建不相关的设计、测试或仓库改动。</li>
+      <li>提示词仍要求先实际检查仓库和上下文，再选择 <code>reply</code> 或 <code>publish</code>，而不是根据关键词预分类。</li>
+      <li>纯问答最终评论仅使用经过协议校验的 summary；tests 非空时才显示“验证”，不追加“未发布”“无需提交仓库改动”等机械文本。</li>
+      <li>代码交付继续保留现有 PR 链接、验证摘要和失败原因。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>兼容性与安全性</h2>
+    <ul>
+      <li>身份不变：进度、最终回复和 PR 仍由专用 GitHub App token 发布，继承前置方案。</li>
+      <li>权限不变：未授权用户仍在 Codex 执行前退出。</li>
+      <li>PR 评论不放宽：关闭 PR、fork PR 和缺失 head repository 仍是执行前硬阻断，因为这些目标无法安全 checkout。</li>
+      <li>Issue 评论更安全：多个活动分支时只 checkout 默认分支，避免在不明确分支上修改；若无改动则可以回答，有改动则拒绝发布。</li>
+      <li>结果协议为仓库内部工作流接口，无外部 API、数据库或产品数据迁移。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>实施范围</h2>
+    <table>
+      <thead><tr><th>文件</th><th>计划改动</th></tr></thead>
+      <tbody>
+        <tr><td><code>.github/workflows/codex.yml</code></td><td>区分活动/历史 Issue 分支，传递延迟发布限制；校验 delivery；调整发布门禁、写操作条件、最终回复和最终状态。</td></tr>
+        <tr><td><code>.github/codex/prompts/comment-response.md</code></td><td>增加纯问答规则并更新结果 JSON 协议。</td></tr>
+        <tr><td><code>tests/test_codex_workflow.py</code></td><td>补充历史分支、多个活动分支、reply 无 diff、reply 有 diff、publish 分流和写操作限制的静态回归测试，并在临时 Git 工作树中真实执行发布门禁的四种分流。</td></tr>
+        <tr><td>本方案</td><td>已回写真实测试结果并转为 ACTIVE；前置身份方案保持 ACTIVE。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>测试结果</h2>
+    <p><strong>当前状态：验证完成</strong></p>
+    <table>
+      <thead><tr><th>验证项</th><th>计划命令或方式</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td>工作流回归测试</td><td><code>python3 -m pytest -q tests/test_codex_workflow.py</code></td><td>通过：25 passed；其中行为测试在临时 Git 工作树中验证 reply 零 diff、reply 有 diff、publish 冲突和正常 publish。</td></tr>
+        <tr><td>Actions 静态检查</td><td><code>env GOMODCACHE=/private/tmp/talebook-actionlint-gomodcache go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -config-file .github/actionlint.yaml .github/workflows/codex.yml</code>；审查修正后从已下载模块源码复检。</td><td>通过：两次均无错误输出。</td></tr>
+        <tr><td>Python 格式化</td><td><code>make lint-py-fix</code></td><td>通过：ruff check 与 format 均无改动或错误。</td></tr>
+        <tr><td>Python lint</td><td><code>make lint-py</code></td><td>通过：96 个后端文件已格式化，ruff 无错误。</td></tr>
+        <tr><td>本机全量测试入口</td><td><code>make pytest</code>；随后执行等价的 <code>python3 -m pytest tests -v --cov=webserver --cov-report=term-missing</code></td><td>环境未满足：本机没有 pytest 控制台入口；Python 模块入口又因缺少 Calibre、QuickJS 与 tomllib 在收集阶段退出。未发现本次工作流测试失败。</td></tr>
+        <tr><td>Docker 全量测试</td><td><code>make test</code></td><td>通过：627 passed、2 skipped、31 warnings，耗时 108.56 秒。Docker 镜像没有 jq，故新增行为测试在容器中跳过；同一测试已在本机通过。</td></tr>
+        <tr><td>补丁完整性</td><td><code>git diff --check</code></td><td>通过：无空白错误。</td></tr>
+        <tr><td>设计约束检查</td><td><code>make check-design</code></td><td>通过：ACTIVE 路径、HTML 结构和单文件资源约束均通过。</td></tr>
+        <tr><td>历史分支同名发布</td><td>在发布门禁行为测试中提供已占用的基础分支名，验证派生分支包含 run ID；随后重新执行工作流测试、Ruff、actionlint 和设计检查。</td><td>通过：先观察到同名分支未派生的失败断言；实现后聚焦测试 2 passed，工作流全量 25 passed。</td></tr>
+        <tr><td>真实 Issue 纯问答</td><td>合并后在 Issue #875 再次提及 Codex，确认正常回答且不创建分支或 PR。</td><td>合并后由维护者验收；这是唯一无法在 PR 合并前模拟的线上事件验证。</td></tr>
+      </tbody>
+    </table>
+    <h3>残余风险与替代验证</h3>
+    <ul>
+      <li>本地全量 Python 环境缺少 Calibre、QuickJS 与 tomllib；已改用仓库标准 <code>make test</code> Docker 入口完成 627 项通过验证，覆盖后端全量回归。</li>
+      <li>标准 Docker 测试镜像不含 jq，因此真实执行发布门禁的行为测试在容器内跳过；同一测试已在本机具备 bash、git、jq 的环境中通过，另由 actionlint 验证工作流语法。残余风险是本机与 GitHub Ubuntu runner 的工具版本差异。</li>
+      <li>GitHub API 的真实分支、PR 状态和评论更新无法在合并前端到端模拟；静态契约测试覆盖上下文路由，合并后仍需在 Issue #875 执行一次纯问答验收。若异常，可回滚本工作流提交，不影响仓库业务数据。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>审查结论</h2>
+    <ul>
+      <li>使用显式 <code>delivery: reply | publish</code> 结果协议，不做关键词分类。</li>
+      <li>已关闭或已合并 PR 对应分支自动视为历史分支。</li>
+      <li>多个活动分支时允许纯问答，但实际代码改动仍拒绝发布。</li>
+      <li>纯问答只显示自然语言 summary，不显示空的测试和发布说明。</li>
+    </ul>
+    <p>提交前双轴审查发现两项：规范轴指出残余风险记录不完整，已补充“残余风险与替代验证”；规格轴指出历史分支同名时仍会阻断新发布，已增加 run ID 派生分支并完成红绿测试。其余安全和规格项未发现硬性问题。</p>
+    <p class="small">维护者于 2026-07-18 确认初版 WIP 方案；提交前审查修正与复验已经完成，本方案现为 ACTIVE。</p>
+  </section>
+</main>
+</body>
+</html>

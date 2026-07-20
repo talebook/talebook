@@ -89,8 +89,8 @@ class Index(BaseHandler):
         return {
             "random_books_count": len(random_books),
             "new_books_count": len(new_books),
-            "random_books": [self.fmt(b) for b in random_books],
-            "new_books": [self.fmt(b) for b in new_books],
+            "random_books": self.attach_reading_states([self.fmt(b) for b in random_books]),
+            "new_books": self.attach_reading_states([self.fmt(b) for b in new_books]),
         }
 
 
@@ -2094,6 +2094,7 @@ class BookScoped(BaseHandler):
 
             books = self.get_books(ids=ids)
             books.sort(key=lambda x: x["id"], reverse=True)
+            books_result = self.attach_reading_states([utils.BookFormatter(self, book).format() for book in books])
 
             if stream == "1":
                 origin = self.request.headers.get("origin", "*")
@@ -2108,20 +2109,14 @@ class BookScoped(BaseHandler):
                 await self.flush()
                 logging.info("[STREAM] scopedbooks 元信息已发送 (total=%d)", total_items)
 
-                for book in books:
-                    title_val = book.get("title", "?")
-                    book_data = utils.BookFormatter(self, book).format()
+                for book_data in books_result:
+                    title_val = book_data.get("title", "?")
                     self.write(json.dumps(book_data, ensure_ascii=False) + "\n")
                     await self.flush()
                     logging.info("[STREAM] scopedbooks 已发送: %s", title_val)
 
                 self.finish()
                 return None
-
-            books_result = []
-            for book in books:
-                book_data = utils.BookFormatter(self, book).format()
-                books_result.append(book_data)
 
             return {"err": "ok", "title": title, "total": total_items, "books": books_result}
         except Exception as e:

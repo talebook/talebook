@@ -10,8 +10,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 jobs:
   codex:
@@ -21,7 +19,7 @@ jobs:
       group: codex-${{ github.repository }}-${{ github.event.issue.number || github.event.pull_request.number }}
       cancel-in-progress: false
     if: |
-      github.actor != 'github-actions[bot]' &&
+      !endsWith(github.actor, '[bot]') &&
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association) &&
       (
         (
@@ -55,12 +53,23 @@ jobs:
       CODEX_MODEL: ${{ vars.CODEX_MODEL || 'gpt-5.6-sol' }}
       CODEX_REASONING_EFFORT: ${{ vars.CODEX_REASONING_EFFORT || 'high' }}
     steps:
+      - id: interaction_token
+        name: Create short-lived interaction token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.CODEX_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CODEX_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-issues: write
+          permission-pull-requests: write
+
       - id: context
         name: Resolve request context
         uses: actions/github-script@v7
         env:
           WORKFLOW_SHA: ${{ github.workflow_sha }}
         with:
+          github-token: ${{ steps.interaction_token.outputs.token }}
           script: |
             const fs = require("fs");
             const owner = context.repo.owner;
@@ -93,6 +102,10 @@ jobs:
             let targetSha = "";
             let existingIssueBranch = "";
             let existingIssuePrNumber = "";
+            let publishBlockReason = "";
+            let activeIssueBranches = [];
+            let issueBranches = [];
+            const historicalIssueBranches = [];
             const defaultBranch = payload.repository.default_branch;
 
             if (eventName === "issue_comment") {
@@ -205,29 +218,39 @@ jobs:
                 ref: refPrefix,
                 per_page: 100,
               });
+              issueBranches = refs.map((ref) => ref.ref.replace(/^refs\/heads\//, ""));
 
-              if (refs.length > 1) {
-                blockReason = `Issue #${issueNumber} 已存在多个 Codex 分支，请先处理冲突分支再重试。`;
-              } else if (refs.length === 1) {
-                existingIssueBranch = refs[0].ref.replace(/^refs\/heads\//, "");
+              const activeIssueTargets = [];
+              for (const ref of refs) {
+                const branchName = ref.ref.replace(/^refs\/heads\//, "");
                 const pulls = await github.paginate(github.rest.pulls.list, {
                   owner,
                   repo,
                   state: "all",
-                  head: `${owner}:${existingIssueBranch}`,
+                  head: `${owner}:${branchName}`,
                   per_page: 100,
                 });
-                const closedPull = pulls.find((pull) => pull.state !== "open");
                 const openPull = pulls.find((pull) => pull.state === "open");
 
-                if (closedPull) {
-                  blockReason = `分支 ${existingIssueBranch} 属于已关闭或已合并的 Pull Request，请删除或重命名后重试。`;
+                if (!openPull && pulls.length > 0) {
+                  historicalIssueBranches.push(branchName);
                 } else {
-                  supportedTarget = true;
-                  targetRef = existingIssueBranch;
-                  targetSha = refs[0].object.sha;
-                  existingIssuePrNumber = openPull ? String(openPull.number) : "";
+                  activeIssueTargets.push({
+                    branchName,
+                    sha: ref.object.sha,
+                    openPullNumber: openPull ? String(openPull.number) : "",
+                  });
                 }
+              }
+
+              activeIssueBranches = activeIssueTargets.map((target) => target.branchName);
+              if (activeIssueTargets.length === 1) {
+                const activeTarget = activeIssueTargets[0];
+                supportedTarget = true;
+                targetRef = activeTarget.branchName;
+                targetSha = activeTarget.sha;
+                existingIssueBranch = activeTarget.branchName;
+                existingIssuePrNumber = activeTarget.openPullNumber;
               } else {
                 const branch = await github.rest.repos.getBranch({
                   owner,
@@ -237,6 +260,9 @@ jobs:
                 supportedTarget = true;
                 targetRef = defaultBranch;
                 targetSha = branch.data.commit.sha;
+                if (activeIssueTargets.length > 1) {
+                  publishBlockReason = `Issue #${issueNumber} 已存在多个活动 Codex 分支：${activeIssueBranches.join(", ")}。纯问答可以继续，但发布改动前必须先处理冲突分支。`;
+                }
               }
             }
 
@@ -257,6 +283,10 @@ jobs:
                 sha: targetSha,
                 existingIssueBranch,
                 existingIssuePrNumber,
+                publishBlockReason,
+                activeIssueBranches,
+                historicalIssueBranches,
+                issueBranches,
               },
               pullRequest: pr ? {
                 number: pr.number,
@@ -364,6 +394,8 @@ jobs:
             core.setOutput("target_sha", targetSha);
             core.setOutput("existing_issue_branch", existingIssueBranch);
             core.setOutput("existing_issue_pr_number", existingIssuePrNumber);
+            core.setOutput("publish_block_reason", publishBlockReason);
+            core.setOutput("issue_branches_json", JSON.stringify(issueBranches));
             core.setOutput("default_branch", defaultBranch);
             core.setOutput("issue_title", issueTitle);
             core.setOutput("progress_comment_id", progressCommentId);
@@ -375,6 +407,7 @@ jobs:
           ISSUE_NUMBER: ${{ steps.context.outputs.issue_number }}
           BLOCK_REASON: ${{ steps.context.outputs.block_reason }}
         with:
+          github-token: ${{ steps.interaction_token.outputs.token }}
           script: |
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -544,7 +577,7 @@ jobs:
         continue-on-error: true
         env:
           CODEX_PROGRESS_COMMENT_ID: ${{ steps.context.outputs.progress_comment_id }}
-          CODEX_PROGRESS_TOKEN: ${{ github.token }}
+          CODEX_PROGRESS_TOKEN: ${{ steps.interaction_token.outputs.token }}
           GITHUB_API_URL: ${{ github.api_url }}
         run: |
           set -euo pipefail
@@ -569,6 +602,9 @@ jobs:
           IS_PR: ${{ steps.context.outputs.is_pr }}
           ISSUE_NUMBER: ${{ steps.context.outputs.issue_number }}
           EXISTING_ISSUE_BRANCH: ${{ steps.context.outputs.existing_issue_branch }}
+          PUBLISH_BLOCK_REASON: ${{ steps.context.outputs.publish_block_reason }}
+          ISSUE_BRANCHES_JSON: ${{ steps.context.outputs.issue_branches_json }}
+          RUN_ID: ${{ github.run_id }}
           RESULT_FILE: .codex-result.json
         run: |
           set -uo pipefail
@@ -577,6 +613,7 @@ jobs:
           contract_valid=false
           no_changes=false
           reason=""
+          delivery=""
           feature=""
           commit_message=""
           publish_branch=""
@@ -593,28 +630,40 @@ jobs:
             reject "Codex 未生成 .codex-result.json。"
           elif ! jq -e '
             type == "object" and
-            (keys | sort) == ["commit_message", "feature", "ready_to_publish", "summary", "tests"] and
-            (.ready_to_publish | type == "boolean") and
+            (keys | sort) == ["commit_message", "delivery", "feature", "summary", "tests"] and
+            (.delivery == "reply" or .delivery == "publish") and
             (.feature | type == "string") and
-            (.feature | length >= 3 and length <= 48 and test("^[a-z0-9]+(-[a-z0-9]+)*$")) and
             (.commit_message | type == "string") and
-            (.commit_message | length >= 1 and length <= 120 and (test("[\\r\\n]") | not)) and
-            (.commit_message | test("^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\([a-z0-9._/-]+\\))?!?: .+")) and
             (.summary | type == "string") and
             (.summary | length >= 1 and length <= 1000) and
             (.tests | type == "array") and
-            (.tests | length >= 1) and
             ([.tests[] |
+              type == "object" and
               (.command | type == "string") and
               (.command | length >= 1) and
               (.result == "passed" or .result == "failed" or .result == "not_run") and
               (if .result == "not_run" then (.details | type == "string" and length >= 1) else true end)
             ] | all) and
-            (if .ready_to_publish then ([.tests[] | select(.result == "failed")] | length == 0) else true end)
+            (if .delivery == "reply" then
+              .feature == "" and
+              .commit_message == ""
+            else
+              (.feature | length >= 3 and length <= 48 and test("^[a-z0-9]+(-[a-z0-9]+)*$")) and
+              (.commit_message | length >= 1 and length <= 120 and (test("[\\r\\n]") | not)) and
+              (.commit_message | test("^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\([a-z0-9._/-]+\\))?!?: .+")) and
+              (.tests | length >= 1)
+            end)
           ' "$RESULT_FILE" >/dev/null; then
             reject "Codex 结果不符合发布契约或 Conventional Commit 规则。"
-          elif ! jq -e '.ready_to_publish == true' "$RESULT_FILE" >/dev/null; then
-            reject "Codex 将任务标记为尚不可发布。"
+          else
+            contract_valid=true
+            delivery="$(jq -r '.delivery' "$RESULT_FILE")"
+            feature="$(jq -r '.feature' "$RESULT_FILE")"
+            commit_message="$(jq -r '.commit_message' "$RESULT_FILE")"
+          fi
+
+          if [ -z "$reason" ] && [ "$delivery" = "publish" ] && jq -e '.tests | any(.result == "failed")' "$RESULT_FILE" >/dev/null; then
+            reject "Codex 报告存在失败的测试。"
           fi
 
           current_sha="$(git rev-parse HEAD 2>/dev/null || true)"
@@ -626,26 +675,36 @@ jobs:
             reject "Git 无法暂存候选改动。"
           fi
 
-          if [ -z "$reason" ]; then
-            contract_valid=true
-            feature="$(jq -r '.feature' "$RESULT_FILE")"
-            commit_message="$(jq -r '.commit_message' "$RESULT_FILE")"
+          if [ -z "$reason" ] && [ "$delivery" = "publish" ]; then
             if [ "$IS_PR" = "true" ]; then
               publish_branch="$TARGET_REF"
             elif [ -n "$EXISTING_ISSUE_BRANCH" ]; then
               publish_branch="$EXISTING_ISSUE_BRANCH"
             else
               publish_branch="codex/issue-${ISSUE_NUMBER}-${feature}"
+              if jq -e --arg branch "$publish_branch" 'index($branch) != null' <<< "$ISSUE_BRANCHES_JSON" >/dev/null; then
+                publish_branch="${publish_branch}-${RUN_ID}"
+              fi
             fi
           fi
 
-          if [ -z "$reason" ] && find design -type f -name '*.wip.html' -print -quit | grep -q .; then
+          if [ -z "$reason" ] && [ "$delivery" = "publish" ] && find design -type f -name '*.wip.html' -print -quit | grep -q .; then
             reject "仓库中仍存在 WIP 方案文档。"
           fi
 
           if [ -z "$reason" ] && git diff --cached --quiet; then
             no_changes=true
-            reject "未产生仓库改动。"
+            if [ "$delivery" = "publish" ]; then
+              reject "未产生仓库改动。"
+            fi
+          fi
+
+          if [ -z "$reason" ] && [ "$delivery" = "reply" ] && [ "$no_changes" != "true" ]; then
+            reject "回复模式不得产生仓库改动。"
+          fi
+
+          if [ -z "$reason" ] && [ "$delivery" = "publish" ] && [ -n "$PUBLISH_BLOCK_REASON" ]; then
+            reject "$PUBLISH_BLOCK_REASON"
           fi
 
           if [ -z "$reason" ]; then
@@ -661,7 +720,7 @@ jobs:
             reject "git diff --cached --check 未通过。"
           fi
 
-          if [ -z "$reason" ]; then
+          if [ -z "$reason" ] && [ "$delivery" = "publish" ]; then
             ready=true
           fi
 
@@ -677,6 +736,7 @@ jobs:
           fi
           echo "no_changes=$no_changes" >> "$GITHUB_OUTPUT"
           echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          echo "delivery=$delivery" >> "$GITHUB_OUTPUT"
           echo "feature=$feature" >> "$GITHUB_OUTPUT"
           echo "commit_message=$commit_message" >> "$GITHUB_OUTPUT"
           echo "publish_branch=$publish_branch" >> "$GITHUB_OUTPUT"
@@ -684,13 +744,18 @@ jobs:
       - id: app_token
         name: Create short-lived publisher token
         if: |
-          steps.publish_gate.outputs.ready == 'true' ||
           (
-            steps.publish_gate.outputs.contract_valid == 'true' &&
-            steps.publish_gate.outputs.no_changes == 'true' &&
-            steps.context.outputs.is_pr != 'true' &&
-            steps.context.outputs.existing_issue_branch != '' &&
-            steps.context.outputs.existing_issue_pr_number == ''
+            steps.publish_gate.outputs.delivery == 'publish' &&
+            (
+              steps.publish_gate.outputs.ready == 'true' ||
+              (
+                steps.publish_gate.outputs.contract_valid == 'true' &&
+                steps.publish_gate.outputs.no_changes == 'true' &&
+                steps.context.outputs.is_pr != 'true' &&
+                steps.context.outputs.existing_issue_branch != '' &&
+                steps.context.outputs.existing_issue_pr_number == ''
+              )
+            )
           )
         # v3 recommends client-id; actionlint 1.7.12 still carries older app-id metadata.
         uses: actions/create-github-app-token@v3
@@ -753,6 +818,7 @@ jobs:
       - id: create_issue_pr
         name: Create Draft PR for issue work
         if: |
+          steps.publish_gate.outputs.delivery == 'publish' &&
           steps.app_token.outcome == 'success' &&
           steps.context.outputs.is_pr != 'true' &&
           steps.context.outputs.existing_issue_pr_number == '' &&
@@ -825,6 +891,7 @@ jobs:
           CODEX_RESULT_FILE: .codex-result.json
           CODEX_RUN_OUTCOME: ${{ steps.run_codex.outcome }}
           CODEX_CONTRACT_VALID: ${{ steps.publish_gate.outputs.contract_valid }}
+          CODEX_DELIVERY: ${{ steps.publish_gate.outputs.delivery }}
           CODEX_GATE_READY: ${{ steps.publish_gate.outputs.ready }}
           CODEX_GATE_REASON: ${{ steps.publish_gate.outputs.reason }}
           CODEX_NO_CHANGES: ${{ steps.publish_gate.outputs.no_changes }}
@@ -842,6 +909,7 @@ jobs:
           ISSUE_NUMBER: ${{ steps.context.outputs.issue_number }}
           CODEX_PROGRESS_COMMENT_ID: ${{ steps.context.outputs.progress_comment_id }}
         with:
+          github-token: ${{ steps.interaction_token.outputs.token }}
           script: |
             const fs = require("fs");
 
@@ -869,14 +937,17 @@ jobs:
 
             let body = "";
             if (validatedResult) {
-              const testLines = validatedResult.tests.map((test) => {
-                let line = `- <code>${escapeHtml(test.command)}</code> — <strong>${escapeHtml(test.result)}</strong>`;
-                if (typeof test.details === "string" && test.details.trim()) {
-                  line += ` — ${escapeHtml(test.details.trim())}`;
-                }
-                return line;
-              });
-              body = `${escapeHtml(validatedResult.summary)}\n\n### 验证\n\n${testLines.join("\n")}`;
+              body = escapeHtml(validatedResult.summary);
+              if (validatedResult.tests.length > 0) {
+                const testLines = validatedResult.tests.map((test) => {
+                  let line = `- <code>${escapeHtml(test.command)}</code> — <strong>${escapeHtml(test.result)}</strong>`;
+                  if (typeof test.details === "string" && test.details.trim()) {
+                    line += ` — ${escapeHtml(test.details.trim())}`;
+                  }
+                  return line;
+                });
+                body += `\n\n### 验证\n\n${testLines.join("\n")}`;
+              }
             } else {
               body = finalMessage;
               if (!body) {
@@ -888,7 +959,9 @@ jobs:
               }
             }
 
-            if (process.env.CODEX_PUBLISH_OUTCOME === "success") {
+            if (process.env.CODEX_DELIVERY === "reply" && process.env.CODEX_CONTRACT_VALID === "true" && process.env.CODEX_NO_CHANGES === "true") {
+              // 纯问答直接使用 summary，不追加发布状态。
+            } else if (process.env.CODEX_PUBLISH_OUTCOME === "success") {
               const shortSha = process.env.CODEX_COMMIT_SHA.slice(0, 7);
               const commitUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/commit/${process.env.CODEX_COMMIT_SHA}`;
               body += `\n\n---\n已发布提交 [\`${shortSha}\`](${commitUrl}) 到 \`${process.env.CODEX_PUBLISH_BRANCH}\`。`;
@@ -903,7 +976,7 @@ jobs:
                   body += " 分支已推送，但 Draft PR 创建失败；请查看 workflow 日志。";
                 }
               }
-            } else if (process.env.CODEX_NO_CHANGES === "true") {
+            } else if (process.env.CODEX_DELIVERY === "publish" && process.env.CODEX_NO_CHANGES === "true") {
               if (process.env.IS_PR !== "true" && process.env.EXISTING_ISSUE_BRANCH && !process.env.EXISTING_PR_NUMBER) {
                 if (process.env.CREATED_PR_URL) {
                   body += `\n\n---\n无需提交仓库改动；已补建缺失的 Draft PR：${process.env.CREATED_PR_URL}`;
@@ -911,7 +984,7 @@ jobs:
                   body += "\n\n---\n未发布：无法为现有 Issue 分支创建 Draft PR；请查看 workflow 日志。";
                 }
               } else {
-                body += "\n\n---\n无需提交仓库改动。";
+                body += `\n\n---\n未发布：${process.env.CODEX_GATE_REASON || "未产生仓库改动。"}`;
               }
             } else {
               let reason = process.env.CODEX_GATE_REASON;
@@ -961,6 +1034,8 @@ jobs:
         if: always() && steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
         env:
           CODEX_OUTCOME: ${{ steps.run_codex.outcome }}
+          DELIVERY: ${{ steps.publish_gate.outputs.delivery }}
+          CONTRACT_VALID: ${{ steps.publish_gate.outputs.contract_valid }}
           GATE_READY: ${{ steps.publish_gate.outputs.ready }}
           GATE_NO_CHANGES: ${{ steps.publish_gate.outputs.no_changes }}
           APP_TOKEN_OUTCOME: ${{ steps.app_token.outcome }}
@@ -974,13 +1049,19 @@ jobs:
           if [ "$CODEX_OUTCOME" != "success" ]; then
             exit 1
           fi
-          if [ "$GATE_NO_CHANGES" = "true" ]; then
-            if [ "$IS_PR" != "true" ] && [ -n "$EXISTING_ISSUE_BRANCH" ] && [ -z "$EXISTING_PR_NUMBER" ]; then
-              if [ "$APP_TOKEN_OUTCOME" != "success" ] || [ "$CREATED_PR_OUTCOME" != "success" ]; then
-                exit 1
-              fi
+          if [ "$DELIVERY" = "reply" ]; then
+            if [ "$CONTRACT_VALID" != "true" ] || [ "$GATE_NO_CHANGES" != "true" ]; then
+              exit 1
             fi
             exit 0
+          fi
+          if [ "$DELIVERY" = "publish" ] && [ "$GATE_NO_CHANGES" = "true" ]; then
+            if [ "$IS_PR" != "true" ] && [ -n "$EXISTING_ISSUE_BRANCH" ] && [ -z "$EXISTING_PR_NUMBER" ]; then
+              if [ "$CREATED_PR_OUTCOME" = "success" ]; then
+                exit 0
+              fi
+            fi
+            exit 1
           fi
           if [ "$GATE_READY" != "true" ]; then
             exit 1

@@ -303,6 +303,7 @@ const miniVariant = ref(false);
 const mobileSearch = ref(false);
 const search = ref('');
 const searchCategory = ref('all');
+const readDoneCount = ref(0);
 
 const isLightGray = computed(() => props.variant === 'light-gray');
 const isMinimal = computed(() => props.variant === 'minimal');
@@ -356,6 +357,17 @@ const navItems = computed(() => {
     }
     items.push(
         { key: 'categories', heading: t('navigation.categories') },
+    );
+    if (store.user.is_login) {
+        items.push({
+            key: 'read-books',
+            icon: 'mdi-check-circle',
+            href: '/user/history?tab=finished',
+            text: t('navigation.readBooks'),
+            count: readDoneCount.value,
+        });
+    }
+    items.push(
         { key: 'nav', icon: 'mdi-widgets', href: '/nav', text: t('navigation.browse'), count: store.sys.books },
         { key: 'publisher', icon: 'mdi-home-group', href: '/publisher', text: t('navigation.publishers'), count: store.sys.publishers },
         { key: 'author', icon: 'mdi-human-greeting', href: '/author', text: t('navigation.authors'), count: store.sys.authors },
@@ -446,6 +458,14 @@ onMounted(() => {
         syncThemeBodyClasses,
         { immediate: true },
     );
+    if (store.user.is_login) {
+        const { $backend } = useNuxtApp();
+        $backend('/read-done').then((rsp) => {
+            if (rsp.err === 'ok') {
+                readDoneCount.value = rsp.total || 0;
+            }
+        }).catch(() => {});
+    }
 });
 
 onUnmounted(() => {

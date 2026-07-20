@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>已读角标评审修复方案</title>
+  <style>
+    body{margin:0;background:#f4f6f8;color:#263238;font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif}article{max-width:960px;margin:32px auto;padding:36px;background:#fff;border:1px solid #dfe5e8;border-radius:12px}h1{margin:0 0 8px;font-size:30px}h2{margin-top:32px;border-bottom:1px solid #e6ebee;padding-bottom:8px}.meta{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}.meta span{padding:4px 10px;border-radius:999px;background:#e8f1ff;color:#245b9e}table{width:100%;border-collapse:collapse}th,td{padding:10px 12px;border:1px solid #dfe5e8;text-align:left;vertical-align:top}th{background:#f5f8fa}.pending{color:#9a6700;background:#fff8c5;padding:12px;border-radius:8px}code{background:#f1f3f5;padding:1px 4px;border-radius:4px}footer{margin-top:32px;color:#65727a}
+  </style>
+</head>
+<body><article>
+  <header>
+    <h1>已读角标评审修复方案</h1>
+    <p>修正 PR #874 当前实现与既有 ACTIVE 方案、流式接口和导航交互之间的不一致。</p>
+    <div class="meta"><span>创建日期 · 2026-07-19</span><span>模块 · app（涉及 webserver）</span><span>状态 · ACTIVE</span><span>需求来源 · PR #874 评审</span></div>
+  </header>
+
+  <section><h2>原始诉求</h2>
+    <p>维护者要求处理 PR #874 的评审问题并更新当前 PR 分支。当前运行环境无法读取公开评审线程，因此以 PR head、<code>design/app/20260716-read-badge-marker.active.html</code> 的已生效约束和可复现行为为核对依据。</p>
+  </section>
+
+  <section><h2>目标与评审结论</h2>
+    <table><thead><tr><th>问题</th><th>结论</th><th>修复边界</th></tr></thead><tbody>
+      <tr><td>私有书籍流式响应缺少 <code>state</code></td><td><code>BookScoped</code> 只在非流式分支调用 <code>attach_reading_states()</code>；前端实际使用的 <code>?stream=1</code> 分支与方案声明不符。</td><td>统一先格式化并批量附加状态，再由 JSON 与 NDJSON 两个分支复用。</td></tr>
+      <tr><td>首页测试可能弱化回归信号</td><td>测试在目标书不存在时跳过核心断言，不能明确证明接口返回了测试对象。</td><td>先断言目标书存在，再断言 <code>read_state</code>。</td></tr>
+      <tr><td>默认侧边栏入口分组错误</td><td>默认头部把「已读书目」加入 <code>shelf_links</code>，位于「分类浏览」标题之前；内置主题和 ACTIVE 方案均将它归入分类区。</td><td>只移动入口到分类标题之后，不改变其他导航顺序。</td></tr>
+      <tr><td>同页 query 导航不切换页签</td><td><code>activeTab</code> 只在 setup 时读取 query；从已挂载的 <code>/user/history</code> 点击 <code>?tab=finished</code> 时页面组件可能复用，页签不会同步。</td><td>监听 <code>route.query.tab</code>，将 <code>finished</code> 映射为页签 1，其余值映射为页签 0。</td></tr>
+    </tbody></table>
+  </section>
+
+  <section><h2>方案</h2>
+    <ol>
+      <li>后端在 <code>BookScoped.get()</code> 中生成一次 <code>books_result</code>，统一附加当前用户阅读状态；流式分支按结果逐条输出，避免重复格式化。</li>
+      <li>后端测试覆盖私有书籍 NDJSON 元信息和书籍行，并收紧首页目标书断言。</li>
+      <li>默认侧边栏把已读入口从书架区移入分类区；E2E 断言分类标题在入口之前。</li>
+      <li>历史页监听 query；E2E 从已挂载的历史页点击入口，验证 URL 与页签同时更新。</li>
+    </ol>
+    <p>不改变 API 字段、数据模型、权限、角标样式、计数接口或其他主题结构。</p>
+  </section>
+
+  <section><h2>测试结果</h2>
+    <table><thead><tr><th>命令</th><th>结果</th></tr></thead><tbody>
+      <tr><td><code>python -m compileall -q webserver tests</code>、<code>node --check app/test/e2e/sidebar.spec.ts</code>、<code>git diff --check</code></td><td>通过：Python 文件可编译、E2E TypeScript 文件语法可解析、diff 无空白错误。</td></tr>
+      <tr><td><code>pytest -q tests/test_reading_state.py::TestBookListReadState</code></td><td>未执行：runner 未安装 <code>pytest</code>，命令在测试收集前退出。已新增明确覆盖首页目标书与私有书籍 NDJSON 状态的用例，需由具备后端依赖的 CI 补跑。</td></tr>
+      <tr><td><code>npx vitest run test/components/BookCards.nuxt.spec.ts test/components/BookReadBadge.nuxt.spec.ts test/components/AppHeader.spec.ts</code>、<code>npm run lint</code></td><td>未执行：工作区没有 <code>node_modules</code>，npm registry 在当前网络中返回 <code>ECONNRESET</code>，离线缓存也缺少依赖。</td></tr>
+      <tr><td><code>npx --no-install playwright test test/e2e/sidebar.spec.ts --project=chromium --grep 'Check all sidebar links|Read books link opens'</code>、<code>API_URL=http://127.0.0.1:18180 npx --no-install nuxt dev --port 3000 --host 127.0.0.1</code></td><td>未执行：Playwright 与 Nuxt 均未安装且 registry 不可达，因此无法启动 dev server 或按规范完成 Chrome DevTools 实际渲染。风险集中在默认侧边栏 DOM 顺序和同页 query 交互；新增 E2E 将在 CI 中覆盖这两项。</td></tr>
+      <tr><td><code>make lint-py-fix</code>、<code>make lint-py</code></td><td>未执行：runner 未安装 <code>ruff</code>；替代执行 Python 编译与 120 字符检查，新增 Python 行未超过项目上限。</td></tr>
+      <tr><td><code>make check-design</code></td><td>通过：26 份方案文档通过路径、状态、HTML 结构和单文件资源检查。</td></tr>
+    </tbody></table>
+    <p>实现与方案一致，未出现相关测试失败；受 runner 依赖与网络限制未能执行动态测试，风险与 CI 补跑项已明确记录，方案转为 <strong>ACTIVE</strong>。</p>
+  </section>
+
+  <footer>本方案补充而不替代 <code>design/app/20260716-read-badge-marker.active.html</code>；原方案继续定义已读角标功能，本方案只记录评审修复。</footer>
+</article></body></html>

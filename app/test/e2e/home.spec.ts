@@ -49,4 +49,20 @@ test.describe('Homepage', () => {
             await expect(page.getByText(firstNewBook.title).first()).toBeVisible();
         }
     });
+
+    test('shows the read badge on books marked as finished', async ({ page }) => {
+        await page.goto('/');
+
+        const finishedBook = page.locator('a[href="/book/1"]').first();
+        await expect(finishedBook.locator('.book-read-badge')).toBeVisible();
+        await expect(finishedBook.locator('.book-read-badge')).toHaveAttribute('title', '已读');
+    });
+
+    test('shows the read badge and chip in the library list', async ({ page }) => {
+        await page.goto('/library');
+
+        const finishedBook = page.locator('a[href="/book/1"]').first();
+        await expect(finishedBook.locator('.book-read-badge')).toBeVisible();
+        await expect(finishedBook.getByText('已读', { exact: true })).toBeVisible();
+    });
 });

@@ -200,7 +200,8 @@
     "themes": "Themes",
     "systemLogs": "System Logs",
     "myShelf": "My Shelf",
-    "audiobooks": "Audiobooks"
+    "audiobooks": "Audiobooks",
+    "readBooks": "Read Books"
   },
   "network": {
     "title": "Network Library",

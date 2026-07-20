@@ -63,22 +63,27 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import BookCoverGrid from '@/components/BookCoverGrid.vue';
 import { useMainStore } from '@/stores/main';
 import { useI18n } from 'vue-i18n';
 
 const { $backend } = useNuxtApp();
 const mainStore = useMainStore();
+const route = useRoute();
 const { t } = useI18n();
 
-const activeTab = ref(0);
+const activeTab = ref(route.query.tab === 'finished' ? 1 : 0);
 const user = ref({});
 const readingBooks = ref([]);
 const finishedBooks = ref([]);
 
 const readingCount = computed(() => readingBooks.value.length);
 const finishedCount = computed(() => finishedBooks.value.length);
+
+watch(() => route.query.tab, (tab) => {
+    activeTab.value = tab === 'finished' ? 1 : 0;
+});
 
 useHead({
     title: t('user.readingRecord.pageTitle'),

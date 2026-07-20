@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude 自动评审允许受信任 Codex Bot 触发</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1f2937; background: #f6f7f9; }
+    body { max-width: 920px; margin: 0 auto; padding: 32px 20px 64px; line-height: 1.65; }
+    header, section { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; margin-bottom: 18px; }
+    h1, h2 { line-height: 1.25; margin-top: 0; }
+    h1 { font-size: 28px; } h2 { font-size: 19px; }
+    .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 20px; color: #4b5563; }
+    .status { color: #067647; font-weight: 700; }
+    code { background: #f3f4f6; border-radius: 4px; padding: 2px 5px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; vertical-align: top; border-bottom: 1px solid #e5e7eb; padding: 10px 8px; }
+    th { background: #f9fafb; }
+    .passed { border-left: 4px solid #059669; background: #ecfdf5; padding: 12px 16px; }
+    svg { display: block; width: 100%; max-width: 760px; height: auto; margin: 12px auto 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Claude 自动评审允许受信任 Codex Bot 触发</h1>
+    <div class="meta">
+      <span><strong>创建日期：</strong>2026-07-20</span>
+      <span><strong>所属模块：</strong>project</span>
+      <span><strong>状态：</strong><span class="status">ACTIVE</span></span>
+      <span><strong>需求来源：</strong>PR #874 CI 红灯排查</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>原始诉求与根因</h2>
+    <p>用户发现 PR #874 再次出现 CI 红灯，要求继续处理。失败日志显示，业务测试、方案检查、CodeQL 和多架构镜像均通过，唯一失败项为 <code>claude-review</code>。该次 <code>synchronize</code> 事件由仓库受信任的 <code>codex-talebook[bot]</code> 提交评审修复触发，而 <code>anthropics/claude-code-action@v1</code> 默认拒绝所有 bot，因而在真正执行评审前退出。</p>
+  </section>
+
+  <section>
+    <h2>目标与边界</h2>
+    <ul>
+      <li>允许仓库自己的 <code>codex-talebook[bot]</code> 触发 Claude PR 自动评审。</li>
+      <li>不使用通配符，不允许其他 GitHub App 或 bot 获得相同能力。</li>
+      <li>不扩大 workflow 的 GitHub Token 权限，不改变业务代码和生产运行行为。</li>
+      <li>保留现有对 <code>claude[bot]</code> 的 job 级排除，避免 Claude 自身提交形成评审循环。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>方案</h2>
+    <table>
+      <thead><tr><th>位置</th><th>修改</th><th>安全约束</th></tr></thead>
+      <tbody>
+        <tr><td><code>.github/workflows/claude-code-review.yml</code></td><td>为 Claude Action 增加 <code>allowed_bots: 'codex-talebook[bot]'</code>。</td><td>显式单账号白名单；禁止 <code>*</code>。</td></tr>
+        <tr><td><code>tests/test_claude_review_workflow.py</code></td><td>固定 action 版本、白名单值和无通配符约束。</td><td>防止后续回退成默认拒绝或无边界放开。</td></tr>
+      </tbody>
+    </table>
+    <svg viewBox="0 0 760 180" role="img" aria-labelledby="flow-title flow-desc">
+      <title id="flow-title">受信任 bot 自动评审流程</title>
+      <desc id="flow-desc">Codex bot 推送后通过精确白名单，进入 Claude Review；其他 bot 被拒绝。</desc>
+      <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs>
+      <rect x="20" y="50" width="180" height="70" rx="10" fill="#eff6ff" stroke="#3b82f6"/>
+      <text x="110" y="78" text-anchor="middle" font-size="14" fill="#1e3a8a">synchronize 事件</text>
+      <text x="110" y="102" text-anchor="middle" font-size="12" fill="#475569">读取 github.actor</text>
+      <path d="M200 85 H285" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+      <rect x="290" y="35" width="190" height="100" rx="10" fill="#fff7ed" stroke="#f97316"/>
+      <text x="385" y="69" text-anchor="middle" font-size="14" fill="#9a3412">精确白名单</text>
+      <text x="385" y="93" text-anchor="middle" font-size="12" fill="#475569">codex-talebook[bot]</text>
+      <text x="385" y="115" text-anchor="middle" font-size="12" fill="#475569">其他 bot 拒绝</text>
+      <path d="M480 85 H565" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+      <rect x="570" y="50" width="170" height="70" rx="10" fill="#ecfdf5" stroke="#10b981"/>
+      <text x="655" y="78" text-anchor="middle" font-size="14" fill="#065f46">Claude Review</text>
+      <text x="655" y="102" text-anchor="middle" font-size="12" fill="#475569">保持只读权限</text>
+    </svg>
+  </section>
+
+  <section>
+    <h2>测试结果</h2>
+    <div class="passed"><strong>本地验证通过：</strong>契约测试完成红—绿循环，workflow 语义、Python lint 和完整 Calibre 容器测试均通过。真实 bot actor 只能由 GitHub 事件产生，推送后继续观察远端自动评审结果。</div>
+    <table>
+      <thead><tr><th>验证项</th><th>预期</th><th>当前结果</th></tr></thead>
+      <tbody>
+        <tr><td>配置契约测试</td><td>只允许 <code>codex-talebook[bot]</code>，不含通配符</td><td>PASS；修改前因缺少键失败，修改后 1 passed</td></tr>
+        <tr><td><code>go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/claude-code-review.yml</code></td><td>Actions 语法及 action 输入有效</td><td>PASS，无输出</td></tr>
+        <tr><td><code>make lint-py-fix</code>、<code>make lint-py</code>，并单独检查新增测试</td><td>通过</td><td>PASS</td></tr>
+        <tr><td><code>make test</code></td><td>在 Calibre 容器中执行完整后端测试</td><td>PASS；626 passed，1 skipped，32 warnings</td></tr>
+        <tr><td><code>make pytest</code></td><td>宿主直接执行完整后端测试</td><td>未执行；宿主缺少 <code>pytest</code> 可执行文件。已由同测试集的 <code>make test</code> 替代</td></tr>
+        <tr><td><code>make check-design</code></td><td>ACTIVE 后通过</td><td>PASS；27 个方案文档通过</td></tr>
+        <tr><td>GitHub Actions</td><td><code>claude-review</code> 不再因 bot 身份立即失败</td><td>真实 bot actor 无法本地伪造；官方参数文档、精确契约测试和 actionlint 已覆盖，推送后继续观察</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

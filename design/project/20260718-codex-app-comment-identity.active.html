@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex GitHub App 统一身份方案</title>
+  <style>
+    :root{--paper:#f4f3ee;--panel:#fffef9;--ink:#20231f;--muted:#666a62;--line:#d5d8cf;--blue:#315f73;--blue-soft:#e6f0f4;--amber:#8b6024;--amber-soft:#f7eddb;--green:#35654c;--green-soft:#e8f2eb;--red:#86433b;--red-soft:#f7e9e5;--purple:#654b87;--purple-soft:#eee8f6;--code:#ecece6}
+    *{box-sizing:border-box}
+    body{margin:0;padding:52px 20px 84px;color:var(--ink);background:var(--paper);font:16px/1.68 ui-serif,Georgia,"Songti SC",serif}
+    main{max-width:980px;margin:auto}
+    header{padding-bottom:26px;border-bottom:1px solid var(--line)}
+    h1{margin:12px 0 8px;font-size:clamp(30px,5vw,44px);line-height:1.15}
+    h2{margin:42px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--line);font-size:23px}
+    h3{margin:25px 0 10px;font-size:17px}
+    p{margin:0 0 14px}
+    ul{padding-left:24px}
+    li{margin:7px 0}
+    .eyebrow,.meta,code,th,figcaption{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .eyebrow{color:var(--blue);font-size:11px;letter-spacing:.14em}
+    .subtitle{max-width:840px;color:var(--muted);font-size:18px}
+    .meta{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px;font-size:12px}
+    .tag{padding:5px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+    .active{color:var(--green);border-color:#a8c6b2;background:var(--green-soft)}
+    .summary,.callout{margin:24px 0;padding:18px 20px;border:1px solid var(--line);background:var(--panel)}
+    .summary{border-left:4px solid var(--blue);background:var(--blue-soft)}
+    .decision{border-color:#a8c6b2;background:var(--green-soft)}
+    .warning{border-color:#d7b77f;background:var(--amber-soft)}
+    .danger{border-color:#dfaca3;background:var(--red-soft)}
+    code{padding:1px 5px;border-radius:3px;background:var(--code);font-size:.86em}
+    table{width:100%;margin:16px 0;border-collapse:collapse;font-size:14px}
+    th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);font-size:11px}
+    figure{margin:22px 0;border:1px solid var(--line);background:#fff}
+    svg{display:block;width:100%;height:auto}
+    figcaption{padding:10px 13px;color:var(--muted);background:#f0f0eb;font-size:11px}
+    footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+    @media(max-width:720px){body{padding:28px 13px 58px}table{display:block;overflow-x:auto}figure{overflow-x:auto}figure svg{min-width:680px}.subtitle{font-size:16px}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">TALEBOOK · PROJECT DESIGN</div>
+    <h1>Codex GitHub App 统一身份</h1>
+    <p class="subtitle">让仓库自定义 Codex 工作流的确认反应、异常提示、实时进度、最终答复、提交与 Draft PR 全部归因于已安装的专用 GitHub App，同时保留发布凭据的最小权限与后置门禁。</p>
+    <div class="meta">
+      <span class="tag active">状态 · ACTIVE</span>
+      <span class="tag">创建日期 · 2026-07-18</span>
+      <span class="tag">所属模块 · project</span>
+      <span class="tag">需求来源 · Issue #875 / 用户会话确认</span>
+      <span class="tag">影响范围 · GitHub Actions / GitHub App 权限 / tests / design</span>
+      <span class="tag">工作分支 · fix/20260718-codex-app-comment-identity</span>
+    </div>
+  </header>
+
+  <div class="summary">
+    <strong>原始诉求</strong>
+    <p>Issue #875 中通过 <code>@codex</code> 触发仓库自定义 workflow 后，进度与答复显示为 <code>github-actions[bot]</code>，而不是维护者已安装并配置凭据的专用 GitHub App。用户要求提交 PR，使所有有身份归因的 GitHub 写操作统一显示为专用 App Bot。</p>
+  </div>
+
+  <section>
+    <h2>01 · 已确认事实、目标与边界</h2>
+    <table>
+      <thead><tr><th>议题</th><th>已确认事实或决策</th><th>验收口径</th></tr></thead>
+      <tbody>
+        <tr><td>当前评论身份</td><td><code>Resolve request context</code>、实时 reporter 与 <code>Post Codex response</code> 使用默认 <code>github.token</code>；因此评论归因于 GitHub Actions App。</td><td>新触发请求不再由 <code>github-actions[bot]</code> 创建或更新可见评论。</td></tr>
+        <tr><td>现有专用 App</td><td>现有 <code>app_token</code> 在 publish gate 后创建，已用于受控提交、推送和 Draft PR；仓库 Secrets 已配置完成。</td><td>保留现有发布门禁、fast-forward 与 App Bot commit author 行为。</td></tr>
+        <tr><td>统一范围</td><td>用户明确确认：🚀 确认反应、目标不支持提示、初始/实时/最终评论、提交与 Draft PR 均使用同一个专用 App 身份。</td><td>所有可见写操作显示相同的 <code>app-slug[bot]</code>。</td></tr>
+        <tr><td>历史数据</td><td>GitHub 评论作者在创建时确定；切换 Token 不追溯改变 Issue #875 中现有评论的作者。</td><td>仅保证改动生效后的新执行；不迁移或删除历史评论。</td></tr>
+        <tr><td>防递归</td><td>App Bot 的回复不应因正文偶然包含触发词再次启动 workflow。</td><td>job 明确拒绝所有以 <code>[bot]</code> 结尾的 actor，并保留维护者权限复核。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout decision"><strong>核心决策</strong>不把带 <code>contents: write</code> 的发布 Token 提前暴露到完整任务周期。新增一个同 App、低权限的早期交互 Token；现有高权限 publisher Token 继续只在 publish gate 通过后创建。两个 Token 的 GitHub 显示身份相同，但权限和生命周期职责分离。</div>
+  </section>
+
+  <section>
+    <h2>02 · Token 与身份流</h2>
+    <figure>
+      <svg width="100%" viewBox="0 0 680 570" role="img" xmlns="http://www.w3.org/2000/svg">
+        <title>Codex workflow 的双 Token 统一 App 身份流程</title>
+        <desc>专用 App 凭据在任务开始生成低权限交互 Token，供确认、上下文、进度和答复使用；发布门禁通过后另行生成发布 Token，供提交和 Draft PR 使用；默认 GITHUB_TOKEN 仅保留 checkout 读取权限。</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <rect width="680" height="570" fill="#fff"/>
+        <g font-family="Anthropic Sans",-apple-system,system-ui,"Segoe UI",sans-serif>
+          <text x="40" y="35" fill="#666a62" font-size="12" font-weight="400">同一 GitHub App · 两类最小权限 Token · 一个对外 Bot 身份</text>
+
+          <rect x="210" y="58" width="260" height="62" rx="14" fill="#eee8f6" stroke="#b9a8cf" stroke-width=".5"/>
+          <text x="340" y="83" text-anchor="middle" fill="#654b87" font-size="14" font-weight="500">CODEX_APP_CLIENT_ID + PRIVATE_KEY</text>
+          <text x="340" y="104" text-anchor="middle" fill="#666a62" font-size="12" font-weight="400">已安装在当前仓库的专用 GitHub App</text>
+
+          <rect x="48" y="170" width="260" height="78" rx="10" fill="#e6f0f4" stroke="#86a9b9" stroke-width=".5"/>
+          <text x="178" y="197" text-anchor="middle" fill="#315f73" font-size="14" font-weight="500">interaction_token · job 开始</text>
+          <text x="178" y="219" text-anchor="middle" fill="#666a62" font-size="12" font-weight="400">contents read · issues write</text>
+          <text x="178" y="237" text-anchor="middle" fill="#666a62" font-size="12" font-weight="400">pull requests write</text>
+
+          <rect x="372" y="170" width="260" height="78" rx="10" fill="#f7eddb" stroke="#c8a56b" stroke-width=".5"/>
+          <text x="502" y="197" text-anchor="middle" fill="#8b6024" font-size="14" font-weight="500">publisher app_token · 门禁后</text>
+          <text x="502" y="219" text-anchor="middle" fill="#666a62" font-size="12" font-weight="400">contents write · issues write</text>
+          <text x="502" y="237" text-anchor="middle" fill="#666a62" font-size="12" font-weight="400">pull requests write</text>
+
+          <rect x="48" y="318" width="260" height="150" rx="14" fill="#e8f2eb" stroke="#8eb39c" stroke-width=".5"/>
+          <text x="178" y="348" text-anchor="middle" fill="#35654c" font-size="14" font-weight="500">App Bot 交互面</text>
+          <text x="178" y="377" text-anchor="middle" fill="#20231f" font-size="12" font-weight="400">🚀 确认反应 · 权限与上下文读取</text>
+          <text x="178" y="401" text-anchor="middle" fill="#20231f" font-size="12" font-weight="400">目标不支持提示 · 初始进度评论</text>
+          <text x="178" y="425" text-anchor="middle" fill="#20231f" font-size="12" font-weight="400">60 秒实时更新 · 最终结果替换</text>
+          <text x="178" y="451" text-anchor="middle" fill="#35654c" font-size="12" font-weight="500">显示 app-slug[bot]</text>
+
+          <rect x="372" y="318" width="260" height="150" rx="14" fill="#e8f2eb" stroke="#8eb39c" stroke-width=".5"/>
+          <text x="502" y="348" text-anchor="middle" fill="#35654c" font-size="14" font-weight="500">App Bot 发布面</text>
+          <text x="502" y="389" text-anchor="middle" fill="#20231f" font-size="12" font-weight="400">单次受控 commit</text>
+          <text x="502" y="413" text-anchor="middle" fill="#20231f" font-size="12" font-weight="400">fast-forward push</text>
+          <text x="502" y="437" text-anchor="middle" fill="#20231f" font-size="12" font-weight="400">创建或更新 Draft PR</text>
+          <text x="502" y="451" text-anchor="middle" fill="#35654c" font-size="12" font-weight="500">显示同一 app-slug[bot]</text>
+
+          <rect x="210" y="505" width="260" height="42" rx="8" fill="#f4f3ee" stroke="#d5d8cf" stroke-width=".5"/>
+          <text x="340" y="531" text-anchor="middle" fill="#666a62" font-size="12" font-weight="400">GITHUB_TOKEN：仅 contents read，不能代发评论</text>
+        </g>
+        <g fill="none" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)">
+          <path d="M305 120L205 168"/>
+          <path d="M375 120L475 168"/>
+          <path d="M178 248V316"/>
+          <path d="M502 248V316"/>
+        </g>
+        <path d="M308 209H340V286H502V316" fill="none" stroke="rgba(31,30,29,.3)" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrow)"/>
+        <text x="349" y="280" fill="#666a62" font-family="Anthropic Sans",-apple-system,system-ui,sans-serif font-size="12">publish gate</text>
+      </svg>
+      <figcaption>FIG 1 · 同一 App 的交互与发布凭据分权。身份统一不等于提前扩大写权限；Codex 子进程仍显式移除评论 Token。</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>03 · 实现方案</h2>
+    <table>
+      <thead><tr><th>位置</th><th>变更</th><th>不变量</th></tr></thead>
+      <tbody>
+        <tr><td>job permissions</td><td>把默认 <code>GITHUB_TOKEN</code> 收敛为仅 <code>contents: read</code>，使漏传 App Token 的写操作 fail closed，而不是回退成 <code>github-actions[bot]</code>。</td><td><code>actions/checkout</code> 仍可读取仓库；不持久化凭据。</td></tr>
+        <tr><td>job trigger</td><td>将仅排除 <code>github-actions[bot]</code> 改为排除所有 <code>[bot]</code> actor，防止专用 App 回复正文含触发词时递归。</td><td>仍要求事件作者关联为 OWNER、MEMBER 或 COLLABORATOR，并在脚本内复核 write 级权限。</td></tr>
+        <tr><td>interaction_token</td><td>在 <code>context</code> 前通过现有 App Secrets 创建低权限 Token；用于所有 <code>actions/github-script</code> 交互步骤和 progress reporter。</td><td>不提供 <code>contents: write</code>；Token 不进入 Codex 子进程。</td></tr>
+        <tr><td>context / unsupported</td><td>为 <code>Resolve request context</code> 与 <code>Explain unsupported target</code> 显式设置 <code>github-token: interaction_token</code>。</td><td>权限检查、目标解析、受信任资源 SHA、中文失败路径保持原逻辑。</td></tr>
+        <tr><td>实时进度</td><td><code>CODEX_PROGRESS_TOKEN</code> 改为 <code>interaction_token</code>；Python reporter 继续只持有评论 ID 与短期 Token。</td><td><code>env -u CODEX_PROGRESS_TOKEN codex exec</code> 保持，避免 agent 读取凭据。</td></tr>
+        <tr><td>最终答复</td><td>为 <code>Post Codex response</code> 显式传入 <code>interaction_token</code>，继续更新同一条由 App 创建的进度评论。</td><td>结构化结果、发布状态、补丁 artifact 和 64K 截断保持不变。</td></tr>
+        <tr><td>publisher app_token</td><td>保留 publish gate 后的 Token 创建条件与现有发布/PR 用法，仅调整测试名称以明确职责。</td><td>未通过门禁时不产生 <code>contents: write</code> Token；禁止 force push。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>04 · 安全、失败处理与兼容性</h2>
+    <ul>
+      <li><strong>凭据隔离：</strong>交互 Token 只传给受信任的 GitHub Script 和默认分支版本固定的 reporter；Codex 进程继续通过 <code>env -u</code> 删除该变量，shell 环境排除规则继续覆盖所有 Token。</li>
+      <li><strong>失败关闭：</strong>交互 Token 创建失败时，不允许用默认 <code>GITHUB_TOKEN</code> 降级发言；job 在任何 App 可见写操作前失败，Actions 日志给出凭据错误。</li>
+      <li><strong>发布失败可见：</strong>publisher Token 或 push 失败时，独立的 interaction Token 仍能以 App 身份写入最终失败说明与恢复补丁信息。</li>
+      <li><strong>已有评论：</strong>历史评论作者不可重写；新 workflow 仅影响新触发执行。更新旧评论不作为本 PR 的迁移目标。</li>
+      <li><strong>App 权限：</strong>复用当前已安装 App；若安装范围移除仓库或权限不足，Token action 失败并按失败关闭处理，不回退到个人 PAT。</li>
+      <li><strong>运行时：</strong>25 分钟 job 与 20 分钟 Codex 预算不变；两个短期 Token 均在同一有界 job 内使用。</li>
+    </ul>
+    <div class="callout warning"><strong>发布与回滚</strong>本 PR 只调整 workflow 凭据路由、契约测试和方案生命周期，不改变 Codex Prompt、模型、sandbox 或发布分支策略。若上线后 App 评论权限异常，通过新替代方案恢复原 Token 路由；ACTIVE 方案不得直接删除或回写核心决策。</div>
+  </section>
+
+  <section>
+    <h2>05 · 测试结果与验收</h2>
+    <div class="callout decision"><strong>当前状态：实现与本地验证已完成</strong>双 Token workflow、契约测试和移动端方案可读性修正均已完成；本地相关检查与 Docker 全量测试通过。PR checks 与真实 App 身份仍需在托管环境继续验收。</div>
+    <table>
+      <thead><tr><th>计划验证</th><th>目标</th><th>当前结果</th></tr></thead>
+      <tbody>
+        <tr><td><code>python3 -m pytest tests/test_codex_progress_reporter.py tests/test_codex_workflow.py tests/test_check_design_docs.py -q</code></td><td>锁定双 Token 权限、步骤顺序、所有交互步骤显式使用 App Token、防递归、agent 凭据隔离与设计契约。</td><td>PASS，44 passed</td></tr>
+        <tr><td><code>ruff check tests/test_codex_workflow.py --no-cache</code> 与 <code>ruff format --check tests/test_codex_workflow.py</code></td><td>相关 Python 测试静态检查与格式。</td><td>PASS；首次 format check 发现差异，执行 <code>ruff format</code> 后复验通过</td></tr>
+        <tr><td><code>go run github.com/rhysd/actionlint/cmd/actionlint@latest .github/workflows/codex.yml</code></td><td>Actions 表达式、Token 输出引用、权限输入和步骤顺序。</td><td>PASS；沙箱内首次因 DNS 无法访问 Go proxy，获准联网后无输出通过</td></tr>
+        <tr><td><code>make lint-py-fix</code> 与 <code>make lint-py</code></td><td>仓库规定的后端格式修复与静态检查；确认本次测试改动未引入后端格式漂移。</td><td>PASS，96 个 webserver 文件保持不变</td></tr>
+        <tr><td><code>make pytest</code> / <code>python3 -m pytest tests -v --cov=webserver --cov-report=term-missing</code></td><td>尝试本机全量后端测试。</td><td>环境限制：Make 调用的 <code>pytest</code> 不在 PATH；模块方式因本机 Python 3.9 缺少 Calibre、QuickJS 与 tomllib，在收集阶段中止</td></tr>
+        <tr><td><code>make test</code></td><td>使用仓库标准 Docker test stage 补齐 Calibre 与 Python 版本依赖，运行全部测试。</td><td>PASS，621 passed、1 skipped、31 warnings</td></tr>
+        <tr><td><code>make check-design</code> 与 <code>git diff --check</code></td><td>方案路径、状态、单文件资源、WIP 门禁与补丁质量。</td><td>PASS，24 份方案通过；WIP 阶段唯一失败为预期合并门禁，切换 ACTIVE 后复验通过</td></tr>
+        <tr><td><code>python3 /private/tmp/codex_app_identity_html_qa.py</code></td><td>Chrome 桌面 1440px 与移动 390px 渲染；检查正文溢出、SVG 尺寸和 console error。</td><td>PASS；两种视口均无正文溢出或 console error。首次移动端 SVG 文字过小，改为图内横向滚动后复验通过</td></tr>
+        <tr><td>PR checks</td><td>仓库 CI、CodeQL 与 Actions 静态检查无新增失败。</td><td>待创建 PR 后验证</td></tr>
+        <tr><td>合并后新建 <code>@codex</code> 请求</td><td>🚀、进度、最终评论与生成 PR 均显示同一个专用 <code>app-slug[bot]</code>。</td><td>本 PR 阶段无法使用默认分支 Secrets 做端到端验证；合并后人工验收</td></tr>
+      </tbody>
+    </table>
+    <p>本方案已转为 ACTIVE，并替代 <code>design/project/20260717-codex-runtime-tuning.superseded.html</code>；该历史方案中的 25/20 分钟预算、<code>high</code> 默认推理强度与 Standard tier 决策继续有效。</p>
+  </section>
+
+  <footer>ACTIVE · 已经用户显式确认并完成本地验证。替代 design/project/20260717-codex-runtime-tuning.superseded.html；运行时预算、模型与 Standard tier 决策保持不变。</footer>
+</main>
+</body>
+</html>

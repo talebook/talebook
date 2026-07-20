@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>扫描查重作者与入库行为一致性方案</title>
+  <style>
+    :root{--paper:#f7f7f5;--edge:#efefea;--ink:#1a1a1a;--soft:#4a4a4a;--faint:#7a7a7a;--rule:#d8d8d2;--rule2:#e8e8e2;--accent:#6f9bb8;--accent-bg:#eef4f8;--warn:#b88a4a;--warn-bg:#f5ecdc;--code:#ececea}*{box-sizing:border-box}body{margin:0;padding:64px 24px 96px;background:var(--paper);color:var(--ink);font:16px/1.65 ui-serif,Charter,Georgia,"Songti SC","Source Han Serif SC",serif}.doc{max-width:920px;margin:auto}header{padding-bottom:28px;margin-bottom:48px;border-bottom:1px solid var(--rule)}.eyebrow,.meta,.label,th,code,figcaption,.num{font-family:ui-monospace,Menlo,"PingFang SC",monospace}.eyebrow{font-size:11px;letter-spacing:.12em;color:var(--faint)}h1{font-size:32px;line-height:1.2;margin:14px 0 8px}.subtitle{color:var(--soft);font-style:italic}.meta{display:flex;gap:20px;flex-wrap:wrap;font-size:11px;color:var(--faint);margin-top:18px}.tldr{padding:20px 24px;margin-bottom:52px;background:var(--accent-bg);border-left:2px solid var(--accent)}.label{font-size:10.5px;letter-spacing:.12em;color:var(--accent);font-weight:600;margin-bottom:7px}section{margin-bottom:52px}h2{font-size:22px;border-bottom:1px solid var(--rule);padding-bottom:10px}.num{font-size:12px;color:var(--faint);margin-right:14px}h3{font-size:16px;margin-top:28px}p{margin:0 0 14px}li{margin-bottom:7px}table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}th,td{padding:10px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule2)}th{font-size:11px;color:var(--faint)}code{font-size:13px;background:var(--code);padding:1px 5px}.warn{padding:16px 18px;background:var(--warn-bg);border:1px solid #e6d4a8;margin:16px 0}.warn .label{color:var(--warn)}footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--rule);font-size:12px;color:var(--faint)}@media(max-width:720px){body{padding:32px 16px 64px}h1{font-size:25px}th,td{font-size:12px;padding:8px 5px}}
+  </style>
+</head>
+<body><article class="doc">
+  <header>
+    <div class="eyebrow">TALEBOOK · WEBSERVER DESIGN</div>
+    <h1>扫描查重作者与入库行为一致性方案</h1>
+    <p class="subtitle">让 do_scan() 的查重判定始终反映 do_import() 实际会做的事，避免“显示可导入、点击却失败”</p>
+    <div class="meta"><span>状态 · ACTIVE</span><span>创建日期 · 2026-07-16</span><span>需求来源 · issue #855 / PR #861 review</span></div>
+  </header>
+
+  <div class="tldr"><div class="label">TL;DR</div>
+    <code>do_import()</code> 对 PDF/TXT 强制使用“佚名”作为作者写入书库，解析元数据失败时也统一退化为“文件名 + 佚名”。<code>do_scan()</code> 的查重必须使用与 <code>do_import()</code> 完全相同的（标题、作者）组合，否则两者判定不一致：已入库文件在扫描列表中仍显示为“可导入”，点击导入后才因书籍已存在而失败。本方案覆盖三轮修复：查重作者归一化、EXIST 状态落库时机、元数据解析失败兜底一致性。
+  </div>
+
+  <section><h2><span class="num">01</span>原始诉求</h2>
+    <p>图书馆中已有的 PDF/TXT 书籍，在扫描结果中仍显示为“可导入”，实际点击导入会因书籍已存在而失败（issue #855）。PR #861 提交后，Codex 自动 review 又连续发现两个关联问题：EXIST 状态未真正落库、元数据解析失败时的兜底逻辑与 <code>do_import()</code> 不一致。本方案作为这一系列关联修复的统一记录。</p>
+  </section>
+
+  <section><h2><span class="num">02</span>目标</h2>
+    <ul>
+      <li>扫描阶段（<code>do_scan()</code>）对同一物理文件计算出的（标题、作者）必须与导入阶段（<code>do_import()</code>）实际写入书库时使用的值一致，查重结果才有意义。</li>
+      <li>EXIST 状态一旦在内存中被判定，必须在返回前完成落库，不能因为提前 <code>continue</code> 被会话回滚吞掉。</li>
+      <li>元数据解析失败（<code>get_metadata()</code> 抛异常）时，扫描与导入要走同一套“文件名 + 佚名”兜底，且扫描时仍需执行查重，不能跳过。</li>
+      <li>不改变 <code>do_import()</code> 自身的导入策略，只让 <code>do_scan()</code> 的预测与它对齐。</li>
+    </ul>
+  </section>
+
+  <section><h2><span class="num">03</span>现状与三轮修复</h2>
+    <table>
+      <thead><tr><th>轮次</th><th>问题</th><th>修复</th><th>代码位置</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>PDF/TXT 查重用文件原始（不可靠）作者比对，而 <code>do_import()</code> 写入时强制用“佚名”，两者永远对不上</td><td><code>do_scan()</code> 对 PDF/TXT 也强制 <code>mi.authors = [_("佚名")]</code>，与 <code>do_import()</code> 保持一致</td><td><code>webserver/services/scan.py</code> 元数据成功解析分支</td></tr>
+        <tr><td>2</td><td><code>row.status = ScanFile.EXIST</code> 后立即 <code>continue</code>，从未调用 <code>save_or_rollback(row)</code>，变更只留在内存对象上，会话结束即被回滚</td><td>调整顺序：先无条件 <code>save_or_rollback(row)</code>，再判断是否 <code>EXIST</code> 决定是否 <code>continue</code></td><td>同上，查重代码块末尾</td></tr>
+        <tr><td>3</td><td><code>get_metadata()</code> 解析失败时，<code>do_scan()</code> 走独立的 <code>else</code> 分支，用 <code>"Unknown"</code> 作者且完全跳过查重；而 <code>do_import()</code> 的解析失败分支会退化为“文件名 + 佚名”并照常查重——同一份解析失败文件，扫描与导入的“可见状态”不一致</td><td>解析失败时构造与 <code>do_import()</code> 相同的兜底 <code>Metadata(文件名, [佚名])</code>，复用后续统一的标题/作者归一化与查重逻辑，不再单独短路</td><td>同上，<code>if not mi:</code> 分支</td></tr>
+      </tbody>
+    </table>
+
+    <h3>统一后的处理流程</h3>
+    <ol>
+      <li>读取文件真实哈希，命中已存在真实哈希且对应书籍仍在库时标记 <code>DROP</code>。</li>
+      <li>尝试 <code>get_metadata()</code>；成功则使用其返回的 <code>mi</code>，失败则构造 <code>Metadata(文件名, [佚名])</code> 兜底 —— 两条路径此后共用同一段逻辑。</li>
+      <li>PDF/TXT 统一将标题改写为文件名、作者改写为“佚名”，与 <code>do_import()</code> 的写入结果对齐。</li>
+      <li>调用 <code>books_with_same_title()</code> 查重，标题和作者集合完全一致且格式已存在时标记 <code>EXIST</code> 并记录 <code>book_id</code>。</li>
+      <li>无论是否 <code>EXIST</code>，先 <code>save_or_rollback(row)</code> 落库，再决定是否 <code>continue</code>。</li>
+    </ol>
+
+    <div class="warn"><div class="label">已知局限（本轮不修复）</div>
+    对于书库中已存在、但作者是“真实作者”而非“佚名”的旧版 PDF/TXT（例如直接用 Calibre 导入，或在引入“强制佚名”策略之前导入的书籍），重新扫描同一物理文件时，查重会因为作者不匹配而不标记为 <code>EXIST</code>，扫描列表显示为可导入。这与 <code>do_import()</code> 自身的行为是一致的：<code>do_import()</code> 对 PDF/TXT 永远写入“佚名”，再次导入同一文件本来就不会合并进那本“真实作者”的旧书，而是产生一本新的“佚名”作者书。也就是说，扫描给出的“可导入”提示准确反映了导入后会发生的事，并不构成新的不一致；若要让这类旧书也被判定为重复，需要重新设计整个查重策略（例如引入基于哈希的书库级去重），超出本次缺陷修复范围，留作后续独立方案。</div>
+
+    <h3>方案文档补充说明</h3>
+    <p>本方案文档在功能代码已完成三轮修复后补充创建，用于满足 <code>AGENTS.md</code> 对“复杂缺陷修复 / 跨越多次 review 迭代变更”须有方案记录的要求，并非事后追认跳过流程——后续同类变更仍应遵循“先方案后编码”的顺序。</p>
+  </section>
+
+  <section><h2><span class="num">04</span>测试结果</h2>
+    <p><code>tests/test_scan.py</code> 新增/覆盖以下用例：</p>
+    <ul>
+      <li><code>TestScanDuplicateDetection.test_pdf_scan_marks_existing_book_as_exist</code>：验证元数据解析成功、作者与库内“佚名”不同的已入库 PDF，重新扫描应被标记为 <code>EXIST</code>（覆盖第 1、2 轮修复；断言前会 <code>rollback()</code> 再查询，能捕获“落库时机”问题）。</li>
+      <li><code>TestScanMetadataParseFailure.test_parse_failure_scan_marks_existing_book_as_exist</code>（本轮新增）：<code>get_metadata()</code> 抛异常、库内已存在“佚名”作者同名 PDF 时，重新扫描应被标记为 <code>EXIST</code>，且 <code>row.title</code>/<code>row.author</code> 与兜底 metadata 一致，覆盖第 3 轮修复。</li>
+      <li><code>TestScanPDFTitle</code> 系列既有用例（文件名取标题、多文件互不干扰、解析失败时用文件名等）保持不变，用于回归验证本轮改动未破坏原有行为。</li>
+    </ul>
+    <p><strong>执行状态：待验证。</strong> 当前沙箱环境未安装 <code>pytest</code>，且 <code>docker</code>/<code>python3 -m pytest</code> 等命令在本次自动化流程中被工具权限拦截，无法实际执行 <code>make pytest</code> / <code>make lint-py</code>。修复逻辑与新增测试已通过人工代码走查确认：新增分支复用了既有的标题/作者归一化与查重代码路径，未引入新的控制流分叉；<code>Metadata(title, authors)</code> 构造函数对 <code>tags</code>/<code>publisher</code> 的默认值与既有测试中显式设置的值一致。建议在 CI 或本地 <code>make test</code>/<code>make pytest</code> 环境中确认全部用例通过后再合并。</p>
+  </section>
+
+  <footer>关联：issue #855 · PR #861 · webserver/services/scan.py · tests/test_scan.py</footer>
+</article></body></html>

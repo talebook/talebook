@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARMv7 Python 依赖 Wheel 构建方案</title>
+  <style>
+    :root { color-scheme: light; --paper:#f7f6f2; --ink:#20211f; --muted:#62665f; --line:#d8d7cf; --accent:#245c4f; --accent-bg:#e7f0ec; --warn:#875f1d; --warn-bg:#f5ecd8; --code:#eceae3; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:46px 20px 76px; background:var(--paper); color:var(--ink); font:16px/1.65 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width:960px; margin:auto; }
+    header { padding-bottom:26px; border-bottom:1px solid var(--line); }
+    h1 { margin:.3rem 0 .7rem; font-size:2.05rem; line-height:1.2; }
+    h2 { margin-top:2.6rem; padding-bottom:.45rem; border-bottom:1px solid var(--line); font-size:1.3rem; }
+    p, li { max-width:82ch; }
+    code, .meta, th, .status { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    code { padding:1px 5px; background:var(--code); border-radius:3px; font-size:.9em; }
+    .eyebrow { color:var(--accent); font-size:.78rem; letter-spacing:.12em; }
+    .meta { display:flex; flex-wrap:wrap; gap:12px 24px; color:var(--muted); font-size:.82rem; }
+    .status { display:inline-block; padding:2px 9px; color:var(--warn); background:var(--warn-bg); border:1px solid #dfc99f; border-radius:999px; }
+    .summary { margin:30px 0; padding:18px 22px; background:var(--accent-bg); border-left:4px solid var(--accent); }
+    table { width:100%; border-collapse:collapse; margin:18px 0; font-size:.93rem; }
+    th, td { padding:11px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
+    th { color:var(--muted); font-size:.82rem; }
+    figure { margin:24px 0; border:1px solid var(--line); background:#fff; overflow:auto; }
+    svg { display:block; width:100%; min-width:720px; height:auto; }
+    figcaption { padding:10px 14px; color:var(--muted); background:#efeee9; font-size:.82rem; }
+    .risk { padding:15px 18px; background:var(--warn-bg); border:1px solid #dfc99f; }
+    footer { margin-top:50px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:.85rem; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">TALEBOOK · DOCKER DESIGN</div>
+    <h1>ARMv7 Python 依赖 Wheel 构建</h1>
+    <div class="meta">
+      <span>创建日期：2026-07-18</span>
+      <span>所属模块：docker</span>
+      <span>状态：<b class="status">ACTIVE</b></span>
+      <span>需求来源：PR #872 及其他开放 PR 的 CI 故障</span>
+    </div>
+  </header>
+
+  <div class="summary">
+    在 Talebook 应用镜像中增加一次性 Python wheel 构建阶段，为缺少 ARMv7 预编译包的 <code>psutil</code> 与 <code>cffi</code> 构建 wheel；最终 <code>server</code> 先离线安装这两个构建产物，再按原路径安装其余生产依赖。<code>production</code> 与 <code>test</code> 均不携带 GCC、Python headers 或其他编译工具。
+  </div>
+
+  <section>
+    <h2>原始诉求与故障证据</h2>
+    <p>用户要求解决 PR #872 红灯，并把最新 <code>master</code> 合入其他开放 PR。同步后，三个互不相关分支的 <code>linux/arm/v7</code> 应用镜像均在相同位置失败。日志显示 <code>psutil</code> 与 <code>cffi</code> 没有可用 ARMv7 wheel，<code>pip</code> 回退源码编译后找不到 <code>arm-linux-gnueabihf-gcc</code>。</p>
+    <table>
+      <thead><tr><th>依赖</th><th>来源</th><th>ARMv7 行为</th></tr></thead>
+      <tbody>
+        <tr><td><code>psutil</code></td><td>Talebook 直接依赖；转换服务用于识别正在运行的转换进程</td><td>只取得源码包，需要本机编译扩展</td></tr>
+        <tr><td><code>cffi</code></td><td><code>social-auth-core → cryptography → cffi</code></td><td>只取得源码包，需要本机编译扩展</td></tr>
+        <tr><td><code>bcrypt</code></td><td>Talebook 直接依赖；密码哈希与迁移</td><td>已有 ARMv7 wheel，不是本次故障来源</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>目标、边界与决策</h2>
+    <ul>
+      <li>继续发布 <code>amd64</code>、<code>arm64</code> 与 <code>arm/v7</code> 的 SPA/SSR 应用镜像。</li>
+      <li>编译工具只存在于不可发布的中间阶段，生产镜像继续保持 slim 边界。</li>
+      <li>应用依赖的构建责任留在 Talebook 仓库；<code>talebook-base</code> 只维护通用 Calibre 运行环境。</li>
+      <li>生产和测试阶段使用同一组 <code>psutil</code>、<code>cffi</code> wheel，避免再次回退源码编译。</li>
+      <li>不删除 <code>psutil</code>、社交登录或密码哈希能力，不改变业务行为。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>方案</h2>
+    <figure>
+      <svg viewBox="0 0 920 330" role="img" xmlns="http://www.w3.org/2000/svg">
+        <title>Python wheel 构建与生产安装流程</title>
+        <desc>相同 slim 基础镜像分出 wheel 构建阶段和 server 阶段，wheel 构建阶段安装工具链并输出 wheel，server 只复制 wheel 并离线安装，之后再分出生产和测试阶段。</desc>
+        <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#68716c"/></marker></defs>
+        <rect width="920" height="330" fill="#fff"/>
+        <g font-family="system-ui, PingFang SC, sans-serif" font-size="14" text-anchor="middle">
+          <rect x="30" y="112" width="180" height="104" rx="10" fill="#e7f0ec" stroke="#568577"/>
+          <text x="120" y="148" fill="#245c4f" font-weight="700">slim-v8.5.0</text><text x="120" y="176" fill="#48524e">Calibre + Python</text><text x="120" y="198" fill="#48524e">仅运行依赖</text>
+          <rect x="310" y="28" width="220" height="112" rx="10" fill="#f5ecd8" stroke="#a77c32"/>
+          <text x="420" y="63" fill="#875f1d" font-weight="700">python-wheel-build</text><text x="420" y="91" fill="#48524e">临时安装 build-essential</text><text x="420" y="113" fill="#48524e">输出 /opt/wheels</text>
+          <rect x="310" y="190" width="220" height="112" rx="10" fill="#eef1f4" stroke="#778594"/>
+          <text x="420" y="225" fill="#34485a" font-weight="700">server</text><text x="420" y="253" fill="#48524e">先离线安装缺失 wheel</text><text x="420" y="275" fill="#48524e">其余依赖按原路径安装</text>
+          <rect x="650" y="112" width="220" height="104" rx="10" fill="#edf4ee" stroke="#63876a"/>
+          <text x="760" y="148" fill="#365f3d" font-weight="700">production / test</text><text x="760" y="176" fill="#48524e">继承 server 运行环境</text><text x="760" y="198" fill="#48524e">测试工具仍只在 test</text>
+        </g>
+        <g fill="none" stroke="#68716c" stroke-width="2" marker-end="url(#arrow)"><path d="M210 142 C255 142 260 84 305 84"/><path d="M210 188 C255 188 260 246 305 246"/><path d="M420 140 V185"/><path d="M530 246 C595 246 590 164 645 164"/></g>
+        <text x="445" y="167" font-family="system-ui, PingFang SC, sans-serif" font-size="12" fill="#62665f">wheel only</text>
+      </svg>
+      <figcaption>编译工具不会成为任何发布 target 的祖先层；发布镜像只得到构建产物。</figcaption>
+    </figure>
+    <table>
+      <thead><tr><th>文件</th><th>计划改动</th></tr></thead>
+      <tbody>
+        <tr><td><code>Dockerfile</code></td><td>抽取公共基础阶段；新增 wheel builder；仅在 ARMv7 安装工具链并构建 <code>psutil/cffi</code>；server 通过只读挂载先离线安装这两个 wheel。</td></tr>
+        <tr><td><code>tests/test_docker_stages.py</code></td><td>固定 builder 工具链、wheel 交付方式和最终阶段不包含工具链的边界。</td></tr>
+        <tr><td>本方案</td><td>记录根因、实现、真实测试与多架构 CI 结果。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>风险、回滚与验收</h2>
+    <div class="risk"><strong>主要风险：</strong>ARMv7 首次构建 <code>psutil/cffi</code> 会增加约两分钟；BuildKit 缓存应让相同 Dockerfile 与架构复用结果。wheel builder 和 server 必须基于同一基础镜像，防止 Python ABI 或系统库不一致。其余未固定版本依赖仍沿用原有在线解析行为，不在本次扩大锁定范围。</div>
+    <p>若多架构验证失败，可回滚 Dockerfile 与结构测试；不需要回滚基础镜像，也不会修改业务数据。验收以三个架构的 SPA/SSR 构建成功、生产镜像导入 <code>psutil</code> 与 <code>cffi</code> 成功、最终镜像缺少 GCC 为准。</p>
+  </section>
+
+  <section>
+    <h2>测试结果</h2>
+    <table>
+      <thead><tr><th>命令或验证</th><th>当前状态</th></tr></thead>
+      <tbody>
+        <tr><td><code>python -m pytest tests/test_docker_stages.py tests/test_makefile.py -q</code></td><td>通过，12 passed；新增用例在实现前 2 项失败，实现后全部通过。</td></tr>
+        <tr><td><code>make test</code></td><td>通过，621 passed、1 skipped、32 warnings；使用本机 arm64 Docker 完成测试镜像构建和全量后端测试。</td></tr>
+        <tr><td><code>make lint-py-fix</code> / <code>make lint-py</code></td><td>通过；96 个后端文件无需格式调整，ruff 无错误。</td></tr>
+        <tr><td><code>cd app &amp;&amp; npm run lint</code></td><td>通过，0 errors、196 个既有 warnings；本次不修改前端。</td></tr>
+        <tr><td><code>make check-design</code></td><td>通过，24 份方案文档均满足路径、状态、HTML 结构和单文件资源约束。</td></tr>
+        <tr><td><code>docker buildx build --platform linux/arm/v7 --target server</code></td><td>通过；<code>psutil</code> 与 <code>cffi</code> wheel 安装完成，越过原 CI 失败点。</td></tr>
+        <tr><td>ARMv7 完整 <code>production-spa</code> 本地构建</td><td>未完成：Python/server 层已命中成功缓存；既有前端 <code>npm ci</code> 在本机 Docker/QEMU 下连续 40 分 48 秒满 CPU 且无输出，人工终止。风险限定在既有 ARMv7 前端原生构建性能，改由 GitHub Actions 三架构 workflow 做替代验证。</td></tr>
+        <tr><td>GitHub Actions 多架构 SPA/SSR 构建</td><td>通过，run <code>29630098853</code>：amd64 1m58s、arm64 4m22s、arm/v7 7m20s；三架构 SPA、SSR、digest 上传及 multi-arch manifest 合并全部成功。</td></tr>
+        <tr><td>ARMv7 server 运行检查</td><td>通过；<code>cryptography 49.0.0</code>、<code>psutil 7.2.2</code> 可导入，<code>gcc</code>、<code>g++</code>、<code>build-essential</code> 与 Python headers 均不在最终层。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>本方案延续 <code>design/docker/20260716-docker-production-slim.active.html</code> 的生产瘦身边界，不修改独立 <code>talebook-base</code> 仓库。</footer>
+</main>
+</body>
+</html>

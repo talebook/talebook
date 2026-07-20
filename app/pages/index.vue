@@ -19,12 +19,14 @@
                 <v-card
                     :to="book.href"
                     class="ma-1"
+                    style="position: relative;"
                 >
                     <v-img
                         :src="book.img"
                         :aspect-ratio="11/15"
                         cover
                     />
+                    <BookReadBadge :read-state="book.state?.read_state" />
                 </v-card>
             </v-col>
             <!-- 空状态提示 -->
@@ -103,6 +105,7 @@ import { computed, onMounted } from 'vue';
 import { useAsyncData, useNuxtApp, useRoute } from 'nuxt/app';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
+import BookReadBadge from '@/components/BookReadBadge.vue';
 
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();

@@ -15,12 +15,14 @@
                         <v-col
                             cols="3"
                             class="col-book-img"
+                            style="position: relative;"
                         >
                             <v-img
                                 :src="book.img"
                                 :aspect-ratio="11/15"
                                 cover
                             />
+                            <BookReadBadge :read-state="book.state?.read_state" />
                         </v-col>
                         <v-col
                             cols="9"
@@ -32,6 +34,21 @@
                             >
                                 <div class="book-title">
                                     {{ book.title }}
+                                    <v-chip
+                                        v-if="book.state?.read_state === 2"
+                                        size="x-small"
+                                        color="primary"
+                                        variant="tonal"
+                                        class="read-chip"
+                                    >
+                                        <v-icon
+                                            start
+                                            size="12"
+                                        >
+                                            mdi-check
+                                        </v-icon>
+                                        {{ $t('readingState.done') }}
+                                    </v-chip>
                                 </div>
                                 <slot
                                     name="introduce"
@@ -84,6 +101,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import BookReadBadge from '@/components/BookReadBadge.vue';
 
 const props = defineProps({
     books: {
@@ -117,6 +135,10 @@ const render_books = computed(() => {
     text-overflow: clip;
     text-align: left;
     font-weight: bold;
+}
+.read-chip {
+    margin-left: 6px;
+    vertical-align: middle;
 }
 .book-comments {
     overflow: hidden;
