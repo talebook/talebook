@@ -115,7 +115,8 @@ class TestDemoMode(TestApp):
             self.assertEqual(rsp["err"], "demo.read_only")
 
             rsp = self.json("/api/index")
-            self.assertEqual(rsp["err"], "ok")
+            self.assertEqual(rsp["random_books_count"], len(rsp["random_books"]))
+            self.assertEqual(rsp["new_books_count"], len(rsp["new_books"]))
 
             rsp = self.json("/api/user/info")
             self.assertTrue(rsp["sys"]["demo_mode"])
