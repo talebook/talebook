@@ -160,7 +160,7 @@
 
         <v-dialog
             v-model="generationDialog"
-            max-width="720"
+            :max-width="generation.mode === 'advanced' ? 860 : 720"
         >
             <v-card class="generation-dialog">
                 <v-card-title>{{ t('audiobook.generateTitle') }}</v-card-title>
@@ -181,13 +181,57 @@
                         </v-btn>
                     </v-btn-toggle>
                     <v-alert
+                        v-if="generation.mode === 'quick'"
                         type="info"
                         variant="tonal"
                         density="compact"
                         class="mb-5"
                     >
-                        {{ generation.mode === 'advanced' ? t('audiobook.advancedModeHint') : t('audiobook.quickModeHint') }}
+                        {{ t('audiobook.quickModeHint') }}
                     </v-alert>
+                    <section
+                        v-else
+                        class="advanced-entry"
+                        data-testid="advanced-mode-panel"
+                    >
+                        <p class="advanced-kicker">
+                            {{ t('audiobook.advancedFirstStep') }}
+                        </p>
+                        <h3>{{ t('audiobook.advancedEntryTitle') }}</h3>
+                        <p class="advanced-description">
+                            {{ t('audiobook.advancedEntryDescription') }}
+                        </p>
+                        <ol class="advanced-steps">
+                            <li class="advanced-step current">
+                                <div class="step-topline">
+                                    <span class="step-number">01</span>
+                                    <span class="step-state">{{ t('audiobook.currentStep') }}</span>
+                                </div>
+                                <v-icon icon="mdi-book-search-outline" />
+                                <strong>{{ t('audiobook.advancedStepInspect') }}</strong>
+                            </li>
+                            <li class="advanced-step">
+                                <div class="step-topline">
+                                    <span class="step-number">02</span>
+                                </div>
+                                <v-icon icon="mdi-account-voice" />
+                                <strong>{{ t('audiobook.advancedStepCast') }}</strong>
+                            </li>
+                            <li class="advanced-step">
+                                <div class="step-topline">
+                                    <span class="step-number">03</span>
+                                </div>
+                                <v-icon icon="mdi-script-text-outline" />
+                                <strong>{{ t('audiobook.advancedStepEdit') }}</strong>
+                            </li>
+                        </ol>
+                    </section>
+                    <p
+                        v-if="generation.mode === 'advanced'"
+                        class="advanced-settings-label"
+                    >
+                        {{ t('audiobook.inspectionSettings') }}
+                    </p>
                     <v-row>
                         <v-col
                             cols="12"
@@ -236,10 +280,11 @@
                         color="primary"
                         variant="flat"
                         :loading="submitting"
+                        :prepend-icon="generation.mode === 'advanced' ? 'mdi-book-search-outline' : 'mdi-progress-wrench'"
                         data-testid="submit-generation"
                         @click="submitGeneration"
                     >
-                        {{ t('audiobook.startGeneration') }}
+                        {{ generation.mode === 'advanced' ? t('audiobook.startInspection') : t('audiobook.startGeneration') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -350,8 +395,29 @@ useHead({ title: () => detail.value?.book?.title || t('audiobook.libraryTitle') 
 .chapter-active { background: rgba(217,154,43,.1); }
 .chapter-number { margin-right: 18px; color: #ad7418; font: 700 1.25rem Georgia, serif; }
 .generation-dialog { border-top: 5px solid #d99a2b; }
+.advanced-entry { position: relative; overflow: hidden; margin-bottom: 22px; padding: 24px; color: #fffaf0; background: radial-gradient(circle at 92% 8%, rgba(241,185,87,.2), transparent 34%), linear-gradient(135deg, #132131, #263b48 58%, #42301f); border-radius: 20px; }
+.advanced-kicker { margin-bottom: 6px; color: #f1b957; font-size: .72rem; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+.advanced-entry h3 { font: 700 clamp(1.55rem, 3vw, 2.2rem)/1.1 Georgia, 'Noto Serif SC', serif; }
+.advanced-description { max-width: 680px; margin-top: 10px; color: rgba(255,255,255,.7); }
+.advanced-steps { margin-top: 22px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; list-style: none; }
+.advanced-step { min-height: 118px; padding: 14px; display: grid; align-content: space-between; gap: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 14px; }
+.advanced-step.current { background: rgba(241,185,87,.11); border-color: rgba(241,185,87,.72); }
+.step-topline { display: flex; align-items: center; justify-content: space-between; }
+.step-number { color: #f1b957; font: 700 .72rem ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
+.step-state { padding: 3px 7px; color: #171f27; background: #f1b957; border-radius: 99px; font-size: .66rem; font-weight: 800; }
+.advanced-step > .v-icon { color: rgba(255,255,255,.66); }
+.advanced-step strong { font-size: .88rem; line-height: 1.45; }
+.advanced-settings-label { margin: 0 0 10px 2px; color: rgb(var(--v-theme-on-surface-variant)); font-size: .76rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 @media (max-width: 700px) {
     .detail-hero { align-items: start; flex-direction: column; }
     .hero-cover { width: 125px !important; }
+    .advanced-entry { padding: 18px; border-radius: 16px; }
+    .advanced-entry h3 { font-size: 1.45rem; }
+    .advanced-description { margin-top: 8px; font-size: .86rem; }
+    .advanced-steps { margin-top: 16px; grid-template-columns: 1fr; gap: 7px; }
+    .advanced-step { min-height: 0; padding: 10px 12px; grid-template-columns: 58px 28px 1fr; align-items: center; align-content: center; gap: 8px; }
+    .step-topline { justify-content: flex-start; gap: 5px; }
+    .step-state { padding: 2px 5px; font-size: .58rem; }
+    .advanced-step strong { font-size: .82rem; }
 }
 </style>

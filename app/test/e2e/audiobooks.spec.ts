@@ -54,6 +54,9 @@ test.describe('Audiobook production and playback', () => {
         await page.goto('/audiobooks/1');
         await page.getByTestId('generate-audiobook').click();
         await page.getByRole('button', { name: '高级模式' }).click();
+        await expect(page.getByTestId('advanced-mode-panel')).toContainText('先识别，再进入配音工作台');
+        await expect(page.getByTestId('advanced-mode-panel')).toContainText('调整角色音色与语速');
+        await expect(page.getByTestId('submit-generation')).toHaveText('开始识别角色与对白');
         await page.getByTestId('submit-generation').click();
 
         await expect(page.getByText('等待脚本确认')).toBeVisible({ timeout: 10_000 });
