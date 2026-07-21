@@ -24,6 +24,20 @@ Here we focus on the API account application addresses for common social platfor
  - [QQ Connect Login Website](https://connect.qq.com/)
  - [Github]() To be supplemented
 
+### Configure Single-account Demo Mode
+
+A public demo site can enable single-account read-only mode in `/data/books/settings/auto.py`. Create the demo account first, then add the following settings and restart Talebook:
+
+```python
+settings = {
+    # Keep the other existing settings in this file.
+    "DEMO_MODE": True,
+    "DEMO_USERNAME": "demo",
+}
+```
+
+Once enabled, only the configured account can sign in. Its existing role still controls which pages are visible, while the server rejects registration, upload, edit, delete, push, administration settings, and WebDAV writes. Login IPs, access times, reading history, and access counters are not stored. Demo mode cannot be disabled in the administration UI; set `DEMO_MODE` to `False` manually and restart the service.
+
 ### Logo (Applicable to v3.5.9 and later versions)
 
 The favicon and QR code logo in the navigation menu are placed in the data directory ```/data/books/logo/```, which can be directly overwritten with new images.

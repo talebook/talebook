@@ -45,6 +45,19 @@ def setUpModule():
     user.admin = True
     session.commit()
 
+    other = session.query(Reader).filter(Reader.username == "other_dav").first()
+    if not other:
+        other = Reader()
+        other.username = "other_dav"
+        other.name = "Other DAV"
+        other.email = "other_dav@talebook.local"
+        other.permission = ""
+        other.create_time = datetime.now()
+        other.set_secure_password("other_dav")
+        session.add(other)
+    other.active = True
+    session.commit()
+
 
 class TestWebDav(TestApp):
     def _auth_header(self, username, password):
@@ -91,6 +104,55 @@ class TestWebDav(TestApp):
         )
         # 207 Multi-Status is the WebDAV success code for PROPFIND.
         self.assertEqual(rsp.code, 207)
+
+    def test_demo_mode_allows_only_configured_account(self):
+        from webserver import loader
+
+        conf = loader.get_settings()
+        original_mode = conf.get("DEMO_MODE")
+        original_username = conf.get("DEMO_USERNAME")
+        conf["DEMO_MODE"] = True
+        conf["DEMO_USERNAME"] = "admin"
+        try:
+            allowed = self.fetch(
+                "/books/",
+                method="PROPFIND",
+                headers={"Authorization": self._auth_header("admin", "admin")},
+                allow_nonstandard_methods=True,
+            )
+            self.assertEqual(allowed.code, 207)
+
+            denied = self.fetch(
+                "/books/",
+                method="PROPFIND",
+                headers={"Authorization": self._auth_header("other_dav", "other_dav")},
+                allow_nonstandard_methods=True,
+            )
+            self.assertEqual(denied.code, 401)
+        finally:
+            conf["DEMO_MODE"] = original_mode
+            conf["DEMO_USERNAME"] = original_username
+
+    def test_demo_mode_rejects_webdav_writes(self):
+        from webserver import loader
+
+        conf = loader.get_settings()
+        original_mode = conf.get("DEMO_MODE")
+        original_username = conf.get("DEMO_USERNAME")
+        conf["DEMO_MODE"] = True
+        conf["DEMO_USERNAME"] = "admin"
+        try:
+            rsp = self.fetch(
+                "/books/reader/demo.txt",
+                method="PUT",
+                body=b"demo",
+                headers={"Authorization": self._auth_header("admin", "admin")},
+            )
+            self.assertEqual(rsp.code, 403)
+            self.assertEqual(rsp.body, b"Demo mode is read-only")
+        finally:
+            conf["DEMO_MODE"] = original_mode
+            conf["DEMO_USERNAME"] = original_username
 
     def test_admin_has_no_invisible_private_books(self):
         """WebDAV 管理员应能看到其他用户的私藏书。"""

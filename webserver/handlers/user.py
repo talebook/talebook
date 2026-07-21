@@ -9,7 +9,7 @@ import re
 import tornado.escape
 from tornado import web
 
-from webserver import loader, utils
+from webserver import demo_mode, loader, utils
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Device, Message, Reader
@@ -114,6 +114,8 @@ class Done(BaseHandler):
 
     def get(self):
         user = self.update_userinfo()
+        if not demo_mode.can_login(CONF, user):
+            raise web.HTTPError(403, reason=_("演示模式仅允许指定账号登录"))
         if not user.can_login():
             raise web.HTTPError(403, reason=_("无权登录"))
         self.login_user(user)
@@ -274,6 +276,8 @@ class SignIn(BaseHandler):
         user = self.session.query(Reader).filter(Reader.username == username).first()
         if not user:
             return {"err": "params.no_user", "msg": _("无此用户")}
+        if not demo_mode.can_login(CONF, user):
+            return {"err": "demo.account_only", "msg": _("演示模式仅允许指定账号登录")}
         if user.get_secure_password(password) != user.password:
             return {"err": "params.invalid", "msg": _("用户名或密码错误")}
         if not user.can_login():
@@ -281,7 +285,7 @@ class SignIn(BaseHandler):
         logging.debug("PERM = %s", user.permission)
 
         # 检查并迁移密码从 SHA256 到 bcrypt
-        if user.migrate_password(password):
+        if not demo_mode.is_demo_mode(CONF) and user.migrate_password(password):
             user.save()
             logging.info("User (id=%d, username=%s) has been migrated from SHA256 to bcrypt", user.id, user.username)
 
@@ -423,7 +427,7 @@ class UserInfo(BaseHandler):
             "active": count_hot_users,
             "version": VERSION,
             "title": CONF["site_title"],
-            "socials": CONF["SOCIALS"],
+            "socials": [] if demo_mode.is_demo_mode(CONF) else CONF["SOCIALS"],
             "friends": CONF["FRIENDS"],
             "footer": CONF["FOOTER"],
             "footer_extra_html": CONF["FOOTER_EXTRA_HTML"],
@@ -432,7 +436,7 @@ class UserInfo(BaseHandler):
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
             "FEEDBACK_URL": CONF["FEEDBACK_URL"],
             "allow": {
-                "register": CONF["ALLOW_REGISTER"],
+                "register": CONF["ALLOW_REGISTER"] and not demo_mode.is_demo_mode(CONF),
                 "download": CONF["ALLOW_GUEST_DOWNLOAD"],
                 "push": CONF["ALLOW_GUEST_PUSH"],
                 "read": CONF["ALLOW_GUEST_READ"],
@@ -443,6 +447,7 @@ class UserInfo(BaseHandler):
                 "chunk_threshold": utils.parse_size_safe(CONF.get("UPLOAD_CHUNK_THRESHOLD", "8MB"), "8MB"),
                 "chunk_size": utils.parse_size_safe(CONF.get("UPLOAD_CHUNK_SIZE", "4MB"), "4MB"),
             },
+            "demo_mode": demo_mode.is_demo_mode(CONF),
         }
 
     def get_user_info(self, detail):

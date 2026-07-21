@@ -6,7 +6,7 @@ import datetime
 
 import tornado.escape
 
-from webserver import loader
+from webserver import demo_mode, loader
 from webserver.handlers.base import ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import BookSourceModel, OnlineBookMeta
@@ -113,7 +113,7 @@ class NetworkSearchStatus(NetworkBaseHandler):
         # 任务完成后给「有结果」的源权重 +1（只结算一次），下次“近期可用”排前面
         if status["finished"]:
             hit_ids = service.pop_weight_updates(task_id)
-            if hit_ids:
+            if hit_ids and not demo_mode.is_demo_mode(CONF):
                 self.session.query(BookSourceModel).filter(BookSourceModel.id.in_(hit_ids)).update(
                     {BookSourceModel.weight: BookSourceModel.weight + 1}, synchronize_session=False
                 )

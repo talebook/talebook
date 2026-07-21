@@ -26,6 +26,20 @@ NAS用户，可以参阅网友们写的指南：
  - [QQ互联登录网址](https://connect.qq.com/)
  - [Github]() 待补充
 
+### 配置单账号演示模式
+
+公开演示站可以在 `/data/books/settings/auto.py` 中开启单账号只读模式。请先创建演示账号，再加入以下配置并重启 Talebook：
+
+```python
+settings = {
+    # 保留文件中已有的其他配置
+    "DEMO_MODE": True,
+    "DEMO_USERNAME": "demo",
+}
+```
+
+开启后只有指定账号可以登录；该账号仍按原有角色展示页面，但注册、上传、编辑、删除、推送、后台配置和 WebDAV 写入等操作会由服务端拒绝。登录 IP、访问时间、阅读历史和访问计数不会写入。演示模式不能在管理后台关闭；需要手动将 `DEMO_MODE` 改为 `False` 并重启服务。
+
 ### Logo (适用于v3.5.9及后续版本)
 
 favicon和导航菜单中的二维码logo，放置在数据目录 ```/data/books/logo/```中，可直接使用新图片覆盖掉。
@@ -83,4 +97,3 @@ docker run -d --name talebook -p 80:80 -v /data/calibre:/data -v /data/logo:/var
 ### 阅读器的页面卡住了，不加载书籍，怎么办？
 
  这是因为浏览器的广告拦截插件屏蔽了一些JS，导致页面加载异常。请关闭相关插件后再重试，例如 uBlock Origin
-

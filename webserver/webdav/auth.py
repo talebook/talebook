@@ -1,6 +1,11 @@
 # -*- coding: UTF-8 -*-
 import logging
 
+from webserver import demo_mode, loader
+
+
+CONF = loader.get_settings()
+
 
 class WebDavDomainController:
     """
@@ -52,6 +57,10 @@ class WebDavDomainController:
                 logging.warning(f"WebDAV auth failed: user '{username}' cannot login")
                 return False
 
+            if not demo_mode.can_login(CONF, user):
+                logging.warning(f"WebDAV auth failed: user '{username}' is not the configured demo account")
+                return False
+
             if not user.can_save() or not user.is_active():
                 logging.warning(f"WebDAV auth failed: user '{username}' lacks download permission or is inactive")
                 return False
@@ -89,7 +98,7 @@ class WebDavDomainController:
         try:
             username = user_name.strip().lower()
             user = session.query(Reader).filter(Reader.username == username).first()
-            return user is not None
+            return user is not None and demo_mode.can_login(CONF, user)
         except Exception:
             return False
         finally:
