@@ -205,7 +205,7 @@
     "themes": "主题管理",
     "systemLogs": "系统日志",
     "myShelf": "我的书架",
-    "audiobooks": "有声书",
+    "audiobooks": "有声书 Beta",
     "readBooks": "已读书目"
   },
   "network": {
@@ -1065,6 +1065,7 @@
   },
   "audiobook": {
     "title": "有声书",
+    "beta": "Beta",
     "privateLibrary": "PRIVATE AUDIO LIBRARY",
     "libraryTitle": "把书架，变成声音。",
     "libraryDescription": "多角色演绎、逐章播放、跨设备续听，也可以把整座 Talebook 书库关注为私人播客。",

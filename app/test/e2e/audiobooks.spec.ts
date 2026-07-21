@@ -12,6 +12,18 @@ test.describe('Audiobook production and playback', () => {
         expect(response.ok()).toBeTruthy();
     });
 
+    test('marks audiobook navigation and pages as Beta', async ({ page }) => {
+        await page.goto('/audiobooks');
+        await expect(page.getByRole('link', { name: '有声书 Beta' })).toBeVisible();
+        await expect(page.getByTestId('audiobook-beta')).toHaveText('Beta');
+
+        await page.goto('/audiobooks/1');
+        await expect(page.getByTestId('audiobook-beta')).toHaveText('Beta');
+
+        await page.goto('/audiobooks/jobs');
+        await expect(page.getByTestId('audiobook-beta')).toHaveText('Beta');
+    });
+
     test('generates, publishes, plays, and restores a chapter', async ({ page }) => {
         await page.goto('/book/1');
         await page.getByTestId('open-audiobook').click();

@@ -37,7 +37,17 @@
                     <p class="eyebrow">
                         {{ t('audiobook.audioEdition') }}
                     </p>
-                    <h1>{{ detail.book.title }}</h1>
+                    <div class="title-row">
+                        <h1>{{ detail.book.title }}</h1>
+                        <v-chip
+                            color="amber-lighten-2"
+                            variant="outlined"
+                            size="small"
+                            data-testid="audiobook-beta"
+                        >
+                            {{ t('audiobook.beta') }}
+                        </v-chip>
+                    </div>
                     <p>{{ (detail.book.authors || []).join(' / ') }}</p>
                     <div class="metadata">
                         <span v-if="publishedEdition">{{ t('audiobook.chapterCount', { count: publishedEdition.chapter_count }) }}</span>
@@ -323,6 +333,7 @@ useHead({ title: () => detail.value?.book?.title || t('audiobook.libraryTitle') 
 .detail-hero { min-height: 330px; padding: clamp(24px, 5vw, 54px); display: flex; align-items: center; gap: clamp(28px, 6vw, 72px); color: #fff; background: radial-gradient(circle at 15% 15%, rgba(241,179,73,.2), transparent 30%), linear-gradient(130deg, #101b2b, #253c4e 62%, #46321f); border-radius: 28px; box-shadow: 0 24px 55px rgba(20,31,43,.2); }
 .hero-cover { flex: 0 0 auto; border-radius: 8px 20px 20px 8px; box-shadow: 0 24px 38px rgba(0,0,0,.38); }
 .hero-copy h1 { max-width: 670px; font: 700 clamp(2.2rem, 5vw, 4.6rem)/1 Georgia, 'Noto Serif SC', serif; letter-spacing: -.04em; }
+.title-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 14px; }
 .hero-copy > p:not(.eyebrow) { margin-top: 12px; color: rgba(255,255,255,.7); }
 .eyebrow { color: #f1b957; font-size: .75rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .eyebrow.dark { color: #9d6a13; }

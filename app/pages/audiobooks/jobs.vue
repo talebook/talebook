@@ -5,7 +5,17 @@
                 <p class="eyebrow">
                     {{ t('audiobook.productionDesk') }}
                 </p>
-                <h1>{{ t('audiobook.jobs') }}</h1>
+                <div class="title-row">
+                    <h1>{{ t('audiobook.jobs') }}</h1>
+                    <v-chip
+                        color="amber-darken-3"
+                        variant="tonal"
+                        size="small"
+                        data-testid="audiobook-beta"
+                    >
+                        {{ t('audiobook.beta') }}
+                    </v-chip>
+                </div>
                 <p>{{ t('audiobook.jobsDescription') }}</p>
             </div>
             <v-btn
@@ -490,6 +500,7 @@ useHead({ title: () => t('audiobook.jobs') });
 .jobs-page { max-width: 1160px; margin: 0 auto; padding: 24px 0 120px; }
 .jobs-header { margin-bottom: 24px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
 .jobs-header h1 { font: 700 clamp(2.2rem, 5vw, 4rem) Georgia, 'Noto Serif SC', serif; }
+.title-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 14px; }
 .jobs-header p:not(.eyebrow) { color: rgb(var(--v-theme-on-surface-variant)); }
 .eyebrow { color: #9d6a13; font-size: .75rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .filter-row { margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; }

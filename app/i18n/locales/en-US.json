@@ -200,7 +200,7 @@
     "themes": "Themes",
     "systemLogs": "System Logs",
     "myShelf": "My Shelf",
-    "audiobooks": "Audiobooks",
+    "audiobooks": "Audiobooks Beta",
     "readBooks": "Read Books"
   },
   "network": {
@@ -1049,6 +1049,7 @@
   },
   "audiobook": {
     "title": "Audiobook",
+    "beta": "Beta",
     "privateLibrary": "PRIVATE AUDIO LIBRARY",
     "libraryTitle": "Turn your shelves into sound.",
     "libraryDescription": "Multi-character performances, chapter playback, cross-device progress, and a private podcast for your entire Talebook library.",

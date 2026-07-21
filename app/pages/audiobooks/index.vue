@@ -5,7 +5,17 @@
                 <p class="eyebrow">
                     {{ t('audiobook.privateLibrary') }}
                 </p>
-                <h1>{{ t('audiobook.libraryTitle') }}</h1>
+                <div class="title-row">
+                    <h1>{{ t('audiobook.libraryTitle') }}</h1>
+                    <v-chip
+                        color="amber-lighten-2"
+                        variant="outlined"
+                        size="small"
+                        data-testid="audiobook-beta"
+                    >
+                        {{ t('audiobook.beta') }}
+                    </v-chip>
+                </div>
                 <p class="hero-copy">
                     {{ t('audiobook.libraryDescription') }}
                 </p>
@@ -280,6 +290,7 @@ useHead({ title: () => t('audiobook.libraryTitle') });
 .library-hero { position: relative; overflow: hidden; min-height: 250px; margin: -16px -16px 34px; padding: 48px clamp(24px, 6vw, 80px); display: flex; align-items: end; justify-content: space-between; gap: 32px; color: #fffaf0; background: radial-gradient(circle at 80% 20%, rgba(245, 183, 73, .24), transparent 32%), linear-gradient(125deg, #111d2c 0%, #1b3144 58%, #39291d 100%); border-radius: 0 0 34px 34px; }
 .library-hero::after { content: '◖'; position: absolute; right: 5%; top: -70px; color: rgba(255,255,255,.04); font: 340px Georgia, serif; transform: rotate(-12deg); }
 .library-hero h1 { max-width: 760px; font: 700 clamp(2.2rem, 5vw, 4.7rem)/.98 Georgia, 'Noto Serif SC', serif; letter-spacing: -.04em; }
+.title-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 14px; }
 .eyebrow { margin-bottom: 9px; color: #f4bd5d; font-size: .75rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .eyebrow.dark { color: #9d6a13; }
 .hero-copy { max-width: 650px; margin-top: 18px; color: rgba(255,255,255,.72); }
