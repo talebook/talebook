@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Talebook 前端镜像构建去重</title>
+  <style>
+    :root { color-scheme: light; --paper:#f6f5f1; --ink:#20231f; --muted:#60675f; --line:#d6d9d2; --accent:#245c4f; --soft:#e7f0ec; --code:#ecebe5; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:42px 20px 72px; background:var(--paper); color:var(--ink); font:16px/1.65 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width:920px; margin:auto; }
+    header { padding-bottom:24px; border-bottom:1px solid var(--line); }
+    h1 { margin:.3rem 0 .7rem; font-size:2rem; line-height:1.2; }
+    h2 { margin-top:2.2rem; padding-bottom:.35rem; border-bottom:1px solid var(--line); font-size:1.25rem; }
+    p, li { max-width:84ch; }
+    .eyebrow, .meta, code, th, .status { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .eyebrow { color:var(--accent); font-size:.78rem; letter-spacing:.12em; }
+    .meta { display:flex; flex-wrap:wrap; gap:10px 24px; color:var(--muted); font-size:.84rem; }
+    .status { padding:2px 9px; color:var(--accent); background:var(--soft); border:1px solid #9bc1b5; border-radius:999px; }
+    .summary { margin:26px 0; padding:17px 20px; background:var(--soft); border-left:4px solid var(--accent); }
+    code { padding:1px 5px; background:var(--code); border-radius:3px; font-size:.9em; }
+    pre { padding:16px 18px; overflow:auto; background:var(--code); border:1px solid var(--line); }
+    table { width:100%; border-collapse:collapse; margin:18px 0; font-size:.94rem; }
+    th, td { padding:10px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
+    th { color:var(--muted); font-size:.82rem; }
+    svg { width:100%; height:auto; margin:14px 0; background:#fff; border:1px solid var(--line); }
+    footer { margin-top:44px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:.85rem; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">TALEBOOK · DOCKER DESIGN</div>
+    <h1>Talebook 前端镜像构建去重</h1>
+    <div class="meta">
+      <span>创建日期：2026-07-21</span>
+      <span>所属模块：docker</span>
+      <span>状态：<b class="status">ACTIVE</b></span>
+      <span>需求来源：GitHub Issue #888「优化构建速度」</span>
+    </div>
+  </header>
+
+  <div class="summary">将单个、串行生成 SPA 与 SSR 的前端构建阶段拆成共享依赖层和两个独立构建分支：SPA 目标只生成 SPA，SSR 目标并行生成 SSR 与其兼容所需的 SPA 静态目录，同时保持已有 Docker target 与镜像内容语义。</div>
+
+  <section>
+    <h2>原始诉求与现状</h2>
+    <p>维护者要求执行 Issue #888“优化构建速度”。当前目标提交中的 Dockerfile 只有一个 <code>builder</code> 阶段：先运行 <code>npm run build</code> 生成 SSR，再运行 <code>npm run build-spa</code> 生成 SPA。任何引用该阶段的目标都必须完成两次构建。CI 分别请求 <code>production-spa</code> 和 <code>production-ssr</code>，且使用独立缓存作用域，因此每个平台的冷路径共执行四次 Nuxt 构建。</p>
+    <p>GitHub Issue 页面因当前公共网络连接重置无法补取正文；本方案只处理仓库内能够直接证明的重复工作，不推断或修改其他构建策略。</p>
+  </section>
+
+  <section>
+    <h2>grill 决策与边界</h2>
+    <table>
+      <thead><tr><th>问题</th><th>决策</th><th>理由</th></tr></thead>
+      <tbody>
+        <tr><td>优化哪条链路</td><td>Docker 前端生产构建图</td><td>重复的 SPA/SSR 命令在 Dockerfile 中可直接复现和静态验证。</td></tr>
+        <tr><td>是否修改 CI</td><td>否</td><td>任务明确禁止修改 <code>.github/workflows/</code>；现有 target 调用保持兼容。</td></tr>
+        <tr><td>是否改变产物</td><td>否</td><td>SSR 镜像继续包含既有 <code>dist/</code> 兼容目录；启动脚本和后端静态路径仍引用该目录。默认 logo、配置与运行时符号链接也保持不变。</td></tr>
+        <tr><td>如何验证收益</td><td>构建图回归测试</td><td>任务禁止访问 Docker socket，无法在本次 workflow 内安全执行真实镜像构建或计时。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>方案</h2>
+    <svg viewBox="0 0 900 290" role="img" aria-label="前端 Docker 构建图">
+      <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#245c4f"/></marker></defs>
+      <g fill="#e7f0ec" stroke="#245c4f" stroke-width="2">
+        <rect x="330" y="24" width="240" height="52" rx="7"/><rect x="90" y="119" width="250" height="58" rx="7"/><rect x="560" y="119" width="250" height="58" rx="7"/><rect x="90" y="218" width="250" height="48" rx="7"/><rect x="560" y="218" width="250" height="48" rx="7"/>
+      </g>
+      <g fill="#20231f" font-family="system-ui" font-size="16" text-anchor="middle">
+        <text x="450" y="56">frontend-deps · npm ci</text><text x="215" y="145">builder-spa</text><text x="215" y="166">npm run build-spa</text><text x="685" y="145">builder-ssr</text><text x="685" y="166">npm run build</text><text x="215" y="248">production / production-spa</text><text x="685" y="248">production-ssr</text>
+      </g>
+      <g stroke="#245c4f" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M390 76 L250 118"/><path d="M510 76 L650 118"/><path d="M215 177 L215 216"/><path d="M685 177 L685 216"/><path d="M340 148 C455 148 445 242 558 242"/></g>
+    </svg>
+    <p><code>frontend-deps</code> 只复制 lockfile 并执行 <code>npm ci</code>。<code>builder-spa</code> 与 <code>builder-ssr</code> 分别复制源码并只生成自身产物。后端和数据预构建逻辑放入不含前端产物的 <code>production-common</code>；SPA 与 SSR 目标从该公共阶段分叉，再复制对应产物和默认 logo。</p>
+    <p><code>production</code> 继续表示 SPA，<code>production-spa</code> 继续作为其别名。<code>production-ssr</code> 从 SSR 分支复制 <code>.output</code>，并从 SPA 分支只复制既有的 <code>dist/</code> 兼容目录；两个独立分支可由 BuildKit 并行执行。Makefile 与 workflow 的 target 名称无需改变。理论冷路径由每个平台四次 Nuxt 构建降至三次，并消除 SSR 目标内两次构建的串行依赖；实际耗时收益由合并后的 Actions 运行确认。</p>
+  </section>
+
+  <section>
+    <h2>测试结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td><code>python3 -c 'ns = __import__("runpy").run_path("tests/test_docker_stages.py"); tests = [fn for name, fn in ns.items() if name.startswith("test_")]; [fn() for fn in tests]; print(f"{len(tests)} passed")'</code></td><td>通过：8 项 Docker 阶段结构断言全部通过，覆盖共享依赖层、分离构建分支、生产 target 依赖及 SSR <code>dist/</code> 兼容目录。</td></tr>
+        <tr><td><code>pytest -q tests/test_docker_stages.py</code></td><td>未执行到测试：环境没有 <code>pytest</code>；尝试通过 <code>python3 -m venv venv &amp;&amp; venv/bin/python -m pip install -r requirements-test.txt</code> 安装时，公共包源代理连接被重置。风险由上方直接加载并执行同一测试文件全部断言的替代验证覆盖。</td></tr>
+        <tr><td><code>make check-design</code></td><td>通过：43 份方案文档通过路径、状态、HTML 结构与单文件资源约束检查。</td></tr>
+        <tr><td><code>git diff --check</code></td><td>通过：补丁无空白错误。</td></tr>
+        <tr><td>真实 Docker SPA/SSR 构建与计时</td><td>未执行：任务禁止使用 Docker 等 Unix socket；远端 Actions 需确认镜像构建结果及实际耗时收益。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>影响范围：<code>Dockerfile</code>、Docker 构建图结构测试；不涉及应用 API、数据、权限、前端页面或 workflow 文件。</footer>
+</main>
+</body>
+</html>

@@ -74,6 +74,47 @@ def test_python_wheels_are_built_outside_the_server_stage():
     assert "libffi-dev" not in server
 
 
+def test_frontend_builds_are_isolated_by_delivery_target():
+    frontend_deps = docker_stage("frontend-deps")
+    spa_builder = docker_stage("builder-spa")
+    ssr_builder = docker_stage("builder-ssr")
+    production_common = docker_stage("production-common")
+    production = docker_stage("production")
+    production_ssr = docker_stage("production-ssr")
+    production_spa = docker_stage("production-spa")
+
+    assert frontend_deps.startswith("FROM node:20-alpine AS frontend-deps")
+    assert "npm ci" in frontend_deps
+    assert "npm run build" not in frontend_deps
+
+    assert spa_builder.startswith("FROM frontend-deps AS builder-spa")
+    assert "npm run build-spa" in spa_builder
+    assert "npm run build\n" not in spa_builder
+    assert "/app-static/" in spa_builder
+    assert "/app-ssr/" not in spa_builder
+
+    assert ssr_builder.startswith("FROM frontend-deps AS builder-ssr")
+    assert "npm run build\n" in ssr_builder
+    assert "npm run build-spa" not in ssr_builder
+    assert "/app-ssr/" in ssr_builder
+    assert "/app-static/" not in ssr_builder
+
+    assert production_common.startswith("FROM server AS production-common")
+    assert "builder-spa" not in production_common
+    assert "builder-ssr" not in production_common
+
+    assert production.startswith("FROM production-common AS production")
+    assert "COPY --from=builder-spa" in production
+    assert "builder-ssr" not in production
+
+    assert production_ssr.startswith("FROM production-common AS production-ssr")
+    assert "COPY --from=builder-ssr" in production_ssr
+    assert "COPY --from=builder-spa /app-static/dist/ /var/www/talebook/app/dist/" in production_ssr
+    assert "COPY --from=builder-spa /app-static/ /var/www/talebook/app/" not in production_ssr
+
+    assert production_spa.startswith("FROM production AS production-spa")
+
+
 def test_base_image_source_and_publisher_are_externalized():
     assert not (ROOT / "Dockerfile.base").exists()
     assert not (ROOT / ".github" / "workflows" / "build-base.yml").exists()

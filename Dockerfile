@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 # ----------------------------------------
-# 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
-FROM node:20-alpine AS builder
+# 第一阶段，拉取 node 基础镜像并安装依赖
+FROM node:20-alpine AS frontend-deps
 ARG BUILD_COUNTRY=""
 ARG TARGETARCH
 
@@ -14,16 +14,23 @@ RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
 COPY app/package.json app/package-lock.json* ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 
-# spa build mode will clear ssr build data, run it first
+
+# ----------------------------------------
+# SPA 与 SSR 分别按目标构建，避免每个生产目标都执行两次 Nuxt 构建。
+FROM frontend-deps AS builder-spa
 COPY app/ /build/
-RUN mkdir -p /app-ssr/ /app-static/
-RUN npm run build
-RUN ls -al
-RUN cp -r .output package* /app-ssr/
 RUN npm run build-spa
 RUN rm -rf dist && cp -r .output/public dist
 RUN if [ ! -f dist/index.html ]; then cp dist/200.html dist/index.html; fi
+RUN mkdir -p /app-static/
 RUN cp -r dist package* /app-static/
+
+
+FROM frontend-deps AS builder-ssr
+COPY app/ /build/
+RUN npm run build
+RUN mkdir -p /app-ssr/
+RUN cp -r .output package* /app-ssr/
 
 
 # ----------------------------------------
@@ -122,8 +129,8 @@ CMD ["pytest", "/var/www/talebook/tests"]
 
 
 # ----------------------------------------
-# 生产环境
-FROM server AS production
+# 生产环境公共层
+FROM server AS production-common
 ARG GIT_VERSION=""
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -164,8 +171,6 @@ COPY conf/nginx/ssl.* /data/books/ssl/
 COPY conf/nginx/talebook.conf /etc/nginx/conf.d/
 COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/
 COPY docker/status_page.html /var/www/talebook/status/status_page.html
-COPY --from=builder /app-static/ /var/www/talebook/app/
-COPY --from=builder /app-static/dist/logo/ /data/books/logo/
 
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     cd /var/www/talebook/ && \
@@ -177,9 +182,6 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     python3 server.py --syncdb  && \
     python3 server.py --update-config  && \
     rm -f webserver/*.pyc && \
-    rm -rf app/src && \
-    rm -rf app/dist/logo && \
-    ln -s /data/books/logo app/dist/logo && \
     mkdir -p /prebuilt/ && \
     mv /data/* /prebuilt/ && \
     chmod +x /var/www/talebook/docker/start.sh && \
@@ -194,8 +196,20 @@ CMD ["/var/www/talebook/docker/start.sh"]
 
 
 # ----------------------------------------
+# 生产环境（SPA 版，同时保留 production target 的兼容性）
+FROM production-common AS production
+
+COPY --from=builder-spa /app-static/ /var/www/talebook/app/
+COPY --from=builder-spa /app-static/dist/logo/ /prebuilt/books/logo/
+
+RUN rm -rf /var/www/talebook/app/src && \
+    rm -rf /var/www/talebook/app/dist/logo && \
+    ln -s /data/books/logo /var/www/talebook/app/dist/logo
+
+
+# ----------------------------------------
 # 生产环境（server side render版)
-FROM production AS production-ssr
+FROM production-common AS production-ssr
 
 USER root
 RUN mkdir -p /var/lib/apt/lists/partial && \
@@ -220,7 +234,10 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
 # copy ssr config
 COPY conf/nginx/server-side-render.conf /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/server-side-render.conf /etc/supervisor/conf.d/talebook.conf
-COPY --from=builder /app-ssr/ /var/www/talebook/app/
+COPY --from=builder-ssr /app-ssr/ /var/www/talebook/app/
+# SSR 镜像原本继承 SPA 的 dist 兼容目录；保留该内容，同时让两个前端分支并行构建。
+COPY --from=builder-spa /app-static/dist/ /var/www/talebook/app/dist/
+COPY --from=builder-spa /app-static/dist/logo/ /prebuilt/books/logo/
 
 # fix: symlink logo dir so user can override /data/books/logo/link.png
 RUN rm -rf /var/www/talebook/app/.output/public/logo && \
