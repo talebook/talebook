@@ -413,14 +413,16 @@
                         :prepend-icon="item.icon"
                     >
                         <template
-                            v-if="item.count"
+                            v-if="item.badge || item.count"
                             #append
                         >
                             <v-chip
-                                size="small"
-                                variant="outlined"
+                                :size="item.badge ? 'x-small' : 'small'"
+                                :color="item.badge ? 'amber-darken-3' : undefined"
+                                :variant="item.badge ? 'tonal' : 'outlined'"
+                                :data-testid="item.badge ? 'audiobook-nav-beta' : undefined"
                             >
-                                {{ item.count }}
+                                {{ item.badge || item.count }}
                             </v-chip>
                         </template>
                     </v-list-item>
@@ -478,7 +480,7 @@ const items = computed(() => {
     var library_links = [
         { icon: 'mdi-book', href: '/library', text: $t('navigation.localLibrary') },
         { icon: 'mdi-cloud-search', href: '/network', text: $t('navigation.networkLibrary') },
-        { icon: 'mdi-book-music', href: '/audiobooks', text: $t('navigation.audiobooks') },
+        { icon: 'mdi-book-music', href: '/audiobooks', text: $t('navigation.audiobooks'), badge: $t('audiobook.beta') },
     ];
     var shelf_links = store.user.is_login
         ? [{ icon: 'mdi-bookshelf', href: '/user/shelf', text: $t('navigation.myShelf') }]

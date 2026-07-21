@@ -261,14 +261,16 @@
                         :prepend-icon="isMinimal ? undefined : item.icon"
                     >
                         <template
-                            v-if="item.count"
+                            v-if="item.badge || item.count"
                             #append
                         >
                             <v-chip
                                 size="x-small"
-                                variant="outlined"
+                                :color="item.badge ? 'amber-darken-3' : undefined"
+                                :variant="item.badge ? 'tonal' : 'outlined'"
+                                :data-testid="item.badge ? 'audiobook-nav-beta' : undefined"
                             >
-                                {{ item.count }}
+                                {{ item.badge || item.count }}
                             </v-chip>
                         </template>
                     </v-list-item>
@@ -338,6 +340,7 @@ const navItems = computed(() => {
         { key: 'home', icon: 'mdi-home', href: '/', text: t('navigation.home') },
         { key: 'library', icon: 'mdi-book', href: '/library', text: t('navigation.localLibrary') },
         { key: 'network', icon: 'mdi-cloud-search', href: '/network', text: t('navigation.networkLibrary') },
+        { key: 'audiobooks', icon: 'mdi-book-music', href: '/audiobooks', text: t('navigation.audiobooks'), badge: t('audiobook.beta') },
     ];
     if (store.user.is_admin) {
         items.push({

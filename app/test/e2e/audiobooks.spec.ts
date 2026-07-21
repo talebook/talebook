@@ -14,7 +14,9 @@ test.describe('Audiobook production and playback', () => {
 
     test('marks audiobook navigation and pages as Beta', async ({ page }) => {
         await page.goto('/audiobooks');
-        await expect(page.getByRole('link', { name: '有声书 Beta' })).toBeVisible();
+        const audiobookNav = page.locator('nav a[href="/audiobooks"]');
+        await expect(audiobookNav.locator('.v-list-item-title')).toHaveText('有声书');
+        await expect(audiobookNav.getByTestId('audiobook-nav-beta')).toHaveText('Beta');
         await expect(page.getByTestId('audiobook-beta')).toHaveText('Beta');
 
         await page.goto('/audiobooks/1');
