@@ -28,7 +28,7 @@
         display_url: "",
         book_id: {{book.id}},
         audiobook_edition_id: {% if audiobook_edition_id %}{{audiobook_edition_id}}{% else %}null{% endif %},
-        audiobook_manifest_url: {% if audiobook_edition_id %}"{{RES}}/api/audiobooks/{{audiobook_edition_id}}/manifest"{% else %}""{% endif %},
+        audiobook_manifest_url: {% if audiobook_edition_id %}"{{RES}}/api/audio/{{audiobook_edition_id}}"{% else %}""{% endif %},
       })
     }
 

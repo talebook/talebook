@@ -91,8 +91,8 @@ def _chapter_dict(chapter):
         "title": chapter.title,
         "duration_ms": chapter.duration_ms,
         "size_bytes": chapter.size_bytes,
-        "audio_url": f"/api/audiobooks/{chapter.edition_id}/chapters/{chapter.number}/audio",
-        "timeline_url": f"/api/audiobooks/{chapter.edition_id}/chapters/{chapter.number}/timeline",
+        "audio_url": f"/media/audio/{chapter.edition_id}/chapter/{chapter.number}.mp3",
+        "timeline_url": f"/api/audio/{chapter.edition_id}/chapter/{chapter.number}/timeline",
     }
 
 
@@ -469,7 +469,7 @@ class AudiobookEditionAction(BaseHandler):
         return {"err": "ok", "edition": _edition_dict(edition)}
 
 
-class AudiobookManifest(BaseHandler):
+class AudiobookManifest(AudiobookEditionAction):
     @js
     def get(self, edition_id):
         edition = self.session.get(AudiobookEdition, int(edition_id))
@@ -859,7 +859,7 @@ class PodcastFeed(PodcastBaseHandler):
                 .all()
             )
             for chapter in chapters:
-                audio_url = f"{self.site_url}/podcast/v1/{quote(token)}/audio/{edition.id}/{chapter.number}.mp3"
+                audio_url = f"{self.site_url}/podcast/v1/{quote(token)}/audio/{edition.id}/chapter/{chapter.number}.mp3"
                 pubdate = chapter.first_published_at or edition.published_at or edition.create_time or utcnow()
                 if pubdate.tzinfo is None:
                     pubdate = pubdate.replace(tzinfo=datetime.timezone.utc)
@@ -878,7 +878,7 @@ class PodcastFeed(PodcastBaseHandler):
                             f"<itunes:episode>{chapter.number}</itunes:episode>",
                             "<itunes:episodeType>full</itunes:episodeType>",
                             f"<itunes:duration>{duration_text}</itunes:duration>",
-                            f'<itunes:image href="{escape(self.site_url + "/podcast/v1/" + quote(token) + "/covers/" + str(edition.book_id) + ".jpg")}" />',
+                            f'<itunes:image href="{escape(self.site_url + "/podcast/v1/" + quote(token) + "/cover/" + str(edition.book_id) + ".jpg")}" />',
                             "</item>",
                         )
                     )
@@ -1036,9 +1036,7 @@ class AudiobookVoices(BaseHandler):
         for voice in catalog.get("voices", []):
             preview_path = voice.pop("preview_path", None)
             if preview_path:
-                voice["preview_url"] = (
-                    f"/audiobook-voice-previews/{quote(str(voice['engine']))}/{quote(str(voice['voice_id']))}.mp3"
-                )
+                voice["preview_url"] = f"/media/audio-voice/{quote(str(voice['engine']))}/{quote(str(voice['voice_id']))}.mp3"
         return {"err": "ok", "catalog": catalog}
 
 
@@ -1111,31 +1109,30 @@ class AudiobookAdminStats(BaseHandler):
 
 def routes():
     return [
-        (r"/api/audiobooks/home", AudiobookHome),
-        (r"/api/audiobooks", AudiobookList),
-        (r"/api/audiobooks/([0-9]+)", AudiobookDetail),
-        (r"/api/books/([0-9]+)/audiobook-jobs", AudiobookJobCreate),
-        (r"/api/audiobook-jobs", AudiobookJobs),
-        (r"/api/audiobook-jobs/([0-9]+)", AudiobookJobAction),
-        (r"/api/audiobook-jobs/([0-9]+)/workspace", AudiobookWorkspace),
-        (r"/api/audiobook-jobs/([0-9]+)/confirm", AudiobookConfirm),
-        (r"/api/audiobook-editions/([0-9]+)", AudiobookEditionAction),
-        (r"/api/audiobooks/([0-9]+)/manifest", AudiobookManifest),
-        (r"/api/audiobooks/([0-9]+)/chapters/([0-9]+)/timeline", AudiobookTimeline),
-        (r"/api/audiobooks/([0-9]+)/chapters/([0-9]+)/audio", AudiobookAudio),
-        (r"/api/audiobooks/([0-9]+)/sessions", PlaybackSessionCreate),
-        (r"/api/audiobook-sessions/([a-f0-9]+)", PlaybackSessionUpdate),
-        (r"/api/audiobook-sessions/([a-f0-9]+)/close", PlaybackSessionUpdate),
-        (r"/api/audiobooks/([0-9]+)/bookmarks", AudiobookBookmarks),
+        (r"/api/audios/home", AudiobookHome),
+        (r"/api/audios", AudiobookList),
+        (r"/api/book/([0-9]+)/audios", AudiobookDetail),
+        (r"/api/book/([0-9]+)/audio-jobs", AudiobookJobCreate),
+        (r"/api/audio-jobs", AudiobookJobs),
+        (r"/api/audio-job/([0-9]+)", AudiobookJobAction),
+        (r"/api/audio-job/([0-9]+)/workspace", AudiobookWorkspace),
+        (r"/api/audio-job/([0-9]+)/confirm", AudiobookConfirm),
+        (r"/api/audio/([0-9]+)", AudiobookManifest),
+        (r"/api/audio/([0-9]+)/chapter/([0-9]+)/timeline", AudiobookTimeline),
+        (r"/media/audio/([0-9]+)/chapter/([0-9]+)\.mp3", AudiobookAudio),
+        (r"/api/audio/([0-9]+)/sessions", PlaybackSessionCreate),
+        (r"/api/audio-session/([a-f0-9]+)", PlaybackSessionUpdate),
+        (r"/api/audio-session/([a-f0-9]+)/close", PlaybackSessionUpdate),
+        (r"/api/audio/([0-9]+)/bookmarks", AudiobookBookmarks),
         (r"/api/me/podcast-subscription", PodcastSubscriptionAPI),
         (r"/podcast/v1/([^/]+)/feed\.xml", PodcastFeed),
-        (r"/podcast/v1/([^/]+)/covers/([0-9]+)\.jpg", PodcastCover),
-        (r"/podcast/v1/([^/]+)/audio/([0-9]+)/([0-9]+)\.mp3", PodcastAudio),
-        (r"/api/audiobook-voices", AudiobookVoices),
+        (r"/podcast/v1/([^/]+)/cover/([0-9]+)\.jpg", PodcastCover),
+        (r"/podcast/v1/([^/]+)/audio/([0-9]+)/chapter/([0-9]+)\.mp3", PodcastAudio),
+        (r"/api/audio-voices", AudiobookVoices),
         # Qwen voice IDs may contain spaces. The handler resolves the decoded ID
         # against Voicebook's catalog before serving the catalog-owned MP3 path.
-        (r"/audiobook-voice-previews/([a-z0-9]+)/([^/]+)\.mp3", AudiobookVoicePreview),
-        (r"/api/audiobook-stats/me", AudiobookMyStats),
-        (r"/api/admin/audiobook-stats", AudiobookAdminStats),
-        (r"/api/admin/podcast-audit", PodcastAudit),
+        (r"/media/audio-voice/([a-z0-9]+)/([^/]+)\.mp3", AudiobookVoicePreview),
+        (r"/api/audio-stats/me", AudiobookMyStats),
+        (r"/api/admin/audio-stats", AudiobookAdminStats),
+        (r"/api/admin/podcast-audits", PodcastAudit),
     ]

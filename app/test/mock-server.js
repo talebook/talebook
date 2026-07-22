@@ -160,8 +160,8 @@ const audiobookChapters = [
     title: '第一章 雾中的来客',
     duration_ms: 4200,
     size_bytes: 8444,
-    audio_url: '/api/audiobooks/1/chapters/1/audio',
-    timeline_url: '/api/audiobooks/1/chapters/1/timeline',
+    audio_url: '/media/audio/1/chapter/1.mp3',
+    timeline_url: '/api/audio/1/chapter/1/timeline',
   },
   {
     id: 102,
@@ -170,8 +170,8 @@ const audiobookChapters = [
     title: '第二章 灯塔来信',
     duration_ms: 4600,
     size_bytes: 9244,
-    audio_url: '/api/audiobooks/1/chapters/2/audio',
-    timeline_url: '/api/audiobooks/1/chapters/2/timeline',
+    audio_url: '/media/audio/1/chapter/2.mp3',
+    timeline_url: '/api/audio/1/chapter/2/timeline',
   },
 ];
 
@@ -222,7 +222,7 @@ const makeSilentWav = () => {
 
 const silentWav = makeSilentWav();
 
-router.get('/api/audiobooks/home', eventHandler(() => {
+router.get('/api/audios/home', eventHandler(() => {
   if (!audiobookPublished) {
     return { err: 'ok', enabled: true, continue_listening: [], recent: [], completed: [] };
   }
@@ -236,13 +236,13 @@ router.get('/api/audiobooks/home', eventHandler(() => {
   };
 }));
 
-router.get('/api/audiobooks/:bookId', eventHandler(() => ({
+router.get('/api/book/:bookId/audios', eventHandler(() => ({
   err: 'ok',
   book: audiobookBook(),
   editions: audiobookPublished ? [audiobookEdition()] : [],
 })));
 
-router.post('/api/books/:bookId/audiobook-jobs', eventHandler(async (event) => {
+router.post('/api/book/:bookId/audio-jobs', eventHandler(async (event) => {
   const body = await readBody(event);
   const duplicate = audiobookJobs.find(item => ['queued', 'inspecting', 'awaiting_review', 'generating', 'finalizing'].includes(item.status));
   if (duplicate) return { err: 'ok', job: duplicate, deduplicated: true };
@@ -267,7 +267,7 @@ router.post('/api/books/:bookId/audiobook-jobs', eventHandler(async (event) => {
   return { err: 'ok', job, deduplicated: false };
 }));
 
-router.get('/api/audiobook-jobs', eventHandler(() => {
+router.get('/api/audio-jobs', eventHandler(() => {
   if (audiobookJobs.length) {
     audiobookJobPolls += 1;
     const job = audiobookJobs[0];
@@ -289,7 +289,7 @@ router.get('/api/audiobook-jobs', eventHandler(() => {
   return { err: 'ok', jobs: audiobookJobs };
 }));
 
-router.patch('/api/audiobook-jobs/:jobId', eventHandler(async (event) => {
+router.patch('/api/audio-job/:jobId', eventHandler(async (event) => {
   const body = await readBody(event);
   const job = audiobookJobs[0];
   if (!job) return { err: 'not_found' };
@@ -316,8 +316,8 @@ const workspacePayload = () => ({
   ],
 });
 
-router.get('/api/audiobook-jobs/:jobId/workspace', eventHandler(() => ({ err: 'ok', workspace: workspacePayload(), job: audiobookJobs[0] })));
-router.patch('/api/audiobook-jobs/:jobId/workspace', eventHandler(async (event) => {
+router.get('/api/audio-job/:jobId/workspace', eventHandler(() => ({ err: 'ok', workspace: workspacePayload(), job: audiobookJobs[0] })));
+router.patch('/api/audio-job/:jobId/workspace', eventHandler(async (event) => {
   const body = await readBody(event);
   if (body?.kind === 'chapter' && String(body.text || '').includes('[未知角色]')) {
     return { err: 'script.invalid', msg: '章节脚本校验失败', errors: [{ line: 1, message: '未定义角色：未知角色' }] };
@@ -329,7 +329,7 @@ router.patch('/api/audiobook-jobs/:jobId/workspace', eventHandler(async (event) 
   }
   return { err: 'ok', workspace };
 }));
-router.post('/api/audiobook-jobs/:jobId/confirm', eventHandler(() => {
+router.post('/api/audio-job/:jobId/confirm', eventHandler(() => {
   const job = audiobookJobs[0];
   job.status = 'queued';
   job.phase = 'QUEUED';
@@ -338,12 +338,12 @@ router.post('/api/audiobook-jobs/:jobId/confirm', eventHandler(() => {
   return { err: 'ok', job };
 }));
 
-router.get('/api/audiobooks/:editionId/manifest', eventHandler(() => ({
+router.get('/api/audio/:editionId', eventHandler(() => ({
   err: 'ok',
   manifest: audiobookEdition(),
   progress: audiobookProgress,
 })));
-router.get('/api/audiobooks/:editionId/chapters/:number/timeline', eventHandler((event) => {
+router.get('/api/audio/:editionId/chapter/:number/timeline', eventHandler((event) => {
   const number = Number(getRouterParam(event, 'number'));
   return {
     err: 'ok',
@@ -356,8 +356,8 @@ router.get('/api/audiobooks/:editionId/chapters/:number/timeline', eventHandler(
     },
   };
 }));
-router.post('/api/audiobooks/:editionId/sessions', eventHandler(() => ({ err: 'ok', session_id: 'abcdef123456' })));
-router.patch('/api/audiobook-sessions/:sessionId', eventHandler(async (event) => {
+router.post('/api/audio/:editionId/sessions', eventHandler(() => ({ err: 'ok', session_id: 'abcdef123456' })));
+router.patch('/api/audio-session/:sessionId', eventHandler(async (event) => {
   const body = await readBody(event);
   audiobookProgress = {
     chapter_id: body.chapter_id,
@@ -370,7 +370,7 @@ router.patch('/api/audiobook-sessions/:sessionId', eventHandler(async (event) =>
   return { err: 'ok', version: audiobookProgress.version };
 }));
 
-router.get('/api/audiobook-voices', eventHandler(() => ({
+router.get('/api/audio-voices', eventHandler(() => ({
   err: 'ok',
   catalog: {
     scene_definitions: [{ id: 'narration', name: '旁白', text: '夜色渐深，灯火亮了起来。' }],
@@ -394,7 +394,7 @@ router.delete('/api/me/podcast-subscription', eventHandler(() => {
   return { err: 'ok' };
 }));
 
-router.get('/api/audiobooks/:editionId/chapters/:number/audio', eventHandler((event) => {
+router.get('/media/audio/:editionId/chapter/:number.mp3', eventHandler((event) => {
   const range = event.node.req.headers.range;
   const headers = { 'Content-Type': 'audio/wav', 'Accept-Ranges': 'bytes' };
   if (!range) return new Response(silentWav, { status: 200, headers: { ...headers, 'Content-Length': String(silentWav.length) } });

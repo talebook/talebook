@@ -139,7 +139,7 @@
                         <v-btn
                             variant="text"
                             size="small"
-                            :to="`/audiobooks/${player.book.id}`"
+                            :to="`/audio/${player.edition?.id}`"
                         >
                             {{ t('audiobook.openBook') }}
                         </v-btn>

@@ -106,6 +106,28 @@ class AudiobookFixture:
 
 
 class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
+    def test_audio_collection_and_resource_paths_use_consistent_nouns(self):
+        edition_id = self.seed_published_edition()
+
+        home = self.json("/api/audios/home")
+        self.assertEqual(home["err"], "ok")
+        collection = self.json("/api/audios")
+        self.assertEqual(collection["total"], 1)
+        book_audios = self.json(f"/api/book/{test_main.BID_EPUB}/audios")
+        self.assertEqual(book_audios["editions"][0]["id"], edition_id)
+        audio = self.json(f"/api/audio/{edition_id}")
+        self.assertEqual(audio["manifest"]["id"], edition_id)
+        published = self.json(
+            f"/api/audio/{edition_id}",
+            method="PATCH",
+            body=json.dumps({"action": "publish"}),
+        )
+        self.assertEqual(published["edition"]["status"], "published")
+
+        self.assertEqual(self.fetch("/api/audiobooks").code, 404)
+        self.assertEqual(self.fetch(f"/api/audiobooks/{edition_id}/manifest").code, 404)
+        self.assertEqual(self.fetch(f"/api/audiobook-editions/{edition_id}").code, 404)
+
     def test_reader_page_injects_published_audiobook(self):
         edition_id = self.seed_published_edition()
         response = self.fetch(f"/read/{test_main.BID_EPUB}")
@@ -113,7 +135,7 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         page = response.body.decode("utf-8")
         self.assertIn(f"book_id: {test_main.BID_EPUB}", page)
         self.assertIn(f"audiobook_edition_id: {edition_id}", page)
-        self.assertIn(f'"/api/audiobooks/{edition_id}/manifest"', page)
+        self.assertIn(f'"/api/audio/{edition_id}"', page)
 
     def test_voice_preview_accepts_qwen_voice_id_with_spaces(self):
         preview = AudiobookStorage().root / "qwen-preview.mp3"
@@ -129,7 +151,7 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         }
         result = mock.Mock(stdout=json.dumps(catalog))
         with mock.patch("webserver.handlers.audiobook.subprocess.run", return_value=result):
-            response = self.fetch("/audiobook-voice-previews/qwen3tts/Eldric%20Sage.mp3")
+            response = self.fetch("/media/audio-voice/qwen3tts/Eldric%20Sage.mp3")
         self.assertEqual(response.code, 200)
         self.assertEqual(response.headers["Content-Type"], "audio/mpeg")
         self.assertEqual(response.body, preview.read_bytes())
@@ -137,7 +159,7 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
     def test_create_deduplicate_cancel_and_retry_job(self):
         body = json.dumps({"mode": "quick", "engine": "edgetts", "speed": "x1.0"})
         created = self.json(
-            f"/api/books/{test_main.BID_EPUB}/audiobook-jobs",
+            f"/api/book/{test_main.BID_EPUB}/audio-jobs",
             method="POST",
             body=body,
         )
@@ -146,7 +168,7 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         job_id = created["job"]["id"]
 
         duplicate = self.json(
-            f"/api/books/{test_main.BID_EPUB}/audiobook-jobs",
+            f"/api/book/{test_main.BID_EPUB}/audio-jobs",
             method="POST",
             body=body,
         )
@@ -154,13 +176,13 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         self.assertEqual(duplicate["job"]["id"], job_id)
 
         cancelled = self.json(
-            f"/api/audiobook-jobs/{job_id}",
+            f"/api/audio-job/{job_id}",
             method="PATCH",
             body=json.dumps({"action": "cancel"}),
         )
         self.assertEqual(cancelled["job"]["status"], "cancelled")
         retried = self.json(
-            f"/api/audiobook-jobs/{job_id}",
+            f"/api/audio-job/{job_id}",
             method="PATCH",
             body=json.dumps({"action": "retry"}),
         )
@@ -217,10 +239,10 @@ description: 高级模式测试
         session.add(job)
         session.commit()
 
-        workspace = self.json(f"/api/audiobook-jobs/{job.id}/workspace")
+        workspace = self.json(f"/api/audio-job/{job.id}/workspace")
         revision = workspace["workspace"]["revision"]
         invalid = self.json(
-            f"/api/audiobook-jobs/{job.id}/workspace",
+            f"/api/audio-job/{job.id}/workspace",
             method="PATCH",
             body=json.dumps(
                 {
@@ -235,7 +257,7 @@ description: 高级模式测试
         self.assertEqual(invalid["errors"][0]["line"], 1)
 
         updated = self.json(
-            f"/api/audiobook-jobs/{job.id}/workspace",
+            f"/api/audio-job/{job.id}/workspace",
             method="PATCH",
             body=json.dumps(
                 {
@@ -248,7 +270,7 @@ description: 高级模式测试
         )
         self.assertEqual(updated["err"], "ok")
         stale = self.json(
-            f"/api/audiobook-jobs/{job.id}/workspace",
+            f"/api/audio-job/{job.id}/workspace",
             method="PATCH",
             body=json.dumps(
                 {
@@ -262,7 +284,7 @@ description: 高级模式测试
         self.assertEqual(stale["err"], "script.invalid")
         self.assertIn("刷新", stale["msg"])
 
-        confirmed = self.json(f"/api/audiobook-jobs/{job.id}/confirm", method="POST", body="{}")
+        confirmed = self.json(f"/api/audio-job/{job.id}/confirm", method="POST", body="{}")
         self.assertEqual(confirmed["job"]["status"], "queued")
         self.assertTrue(confirmed["job"]["data"]["confirmed"])
 
@@ -283,12 +305,12 @@ description: 高级模式测试
         reading.set_progress({"href": "before.xhtml", "fraction": 0.42})
         session.commit()
 
-        manifest = self.json(f"/api/audiobooks/{edition.id}/manifest")
+        manifest = self.json(f"/api/audio/{edition.id}")
         self.assertEqual(len(manifest["manifest"]["chapters"]), 2)
-        timeline = self.json(f"/api/audiobooks/{edition.id}/chapters/1/timeline")
+        timeline = self.json(f"/api/audio/{edition.id}/chapter/1/timeline")
         self.assertEqual(timeline["timeline"]["segments"][0]["locator"]["css_selector"], "#p-1")
 
-        audio_url = f"/api/audiobooks/{edition.id}/chapters/1/audio"
+        audio_url = f"/media/audio/{edition.id}/chapter/1.mp3"
         full = self.fetch(audio_url)
         self.assertEqual(full.code, 200)
         ranged = self.fetch(audio_url, headers={"Range": "bytes=3-9"})
@@ -302,13 +324,13 @@ description: 高级模式测试
         self.assertEqual(invalid.code, 416)
 
         created = self.json(
-            f"/api/audiobooks/{edition.id}/sessions",
+            f"/api/audio/{edition.id}/sessions",
             method="POST",
             body=json.dumps({"source": "web", "device_id": "e2e-browser"}),
         )
         session_id = created["session_id"]
         progress = self.json(
-            f"/api/audiobook-sessions/{session_id}",
+            f"/api/audio-session/{session_id}",
             method="PATCH",
             body=json.dumps(
                 {
@@ -322,7 +344,7 @@ description: 高级模式测试
         )
         self.assertEqual(progress["version"], 1)
         conflict = self.json(
-            f"/api/audiobook-sessions/{session_id}",
+            f"/api/audio-session/{session_id}",
             method="PATCH",
             body=json.dumps(
                 {
@@ -367,10 +389,10 @@ description: 高级模式测试
         self.assertTrue(audio_log.ip)
         self.assertEqual(audio_log.range_start, 0)
         self.assertEqual(audio_log.range_end, 7)
-        audit = self.json("/api/admin/podcast-audit")
+        audit = self.json("/api/admin/podcast-audits")
         self.assertTrue(any(row["ip"] == audio_log.ip for row in audit["logs"]))
         protected = self.json(
-            "/api/admin/podcast-audit",
+            "/api/admin/podcast-audits",
             method="PATCH",
             body=json.dumps({"ids": [audio_log.id], "protected": True}),
         )

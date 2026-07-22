@@ -506,7 +506,7 @@
                             color="amber-darken-2"
                             variant="elevated"
                             class="mx-2"
-                            :to="'/audiobooks/' + book.id"
+                            :to="'/book/' + book.id + '/audios'"
                             data-testid="open-audiobook"
                         >
                             <v-icon start>

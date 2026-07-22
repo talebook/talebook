@@ -21,7 +21,7 @@
             <v-btn
                 prepend-icon="mdi-book-music"
                 variant="outlined"
-                to="/audiobooks"
+                to="/audios"
             >
                 {{ t('audiobook.openLibrary') }}
             </v-btn>
@@ -132,7 +132,7 @@
                         v-if="job.status === 'completed'"
                         color="primary"
                         variant="text"
-                        :to="`/audiobooks/${job.book_id}`"
+                        :to="`/audio/${job.edition_id}`"
                     >
                         {{ t('audiobook.viewAudiobook') }}
                     </v-btn>
@@ -365,7 +365,7 @@ let previewAudio: HTMLAudioElement | null = null;
 store.setNavbar(true);
 
 const { data, pending, error, refresh } = await useAsyncData('audiobook-jobs', async () => {
-    const response = await $backend('/audiobook-jobs');
+    const response = await $backend('/audio-jobs');
     if (response.err !== 'ok') throw new Error(response.msg || t('audiobook.loadFailed'));
     return response;
 }, { default: () => ({ jobs: [] }) });
@@ -379,14 +379,14 @@ const voiceOptions = computed(() => voices.value.map(item => ({
 })));
 
 watch(() => data.value?.jobs, (jobs) => {
-    const selected = String(route.query.job || '');
+    const selected = String(route.params.jid || '');
     if (selected && jobs?.some((job: any) => String(job.id) === selected && job.status === 'awaiting_review') && !workspaceDialog.value) {
         void openWorkspace(jobs.find((job: any) => String(job.id) === selected));
     }
 }, { immediate: true });
 
 onMounted(async () => {
-    const response = await $backend('/audiobook-voices');
+    const response = await $backend('/audio-voices');
     voices.value = response.catalog?.voices || [];
     pollTimer = setInterval(() => refresh(), 1500);
 });
@@ -396,7 +396,7 @@ onBeforeUnmount(() => {
 });
 
 async function openWorkspace(job: any) {
-    const response = await $backend(`/audiobook-jobs/${job.id}/workspace`);
+    const response = await $backend(`/audio-job/${job.id}/workspace`);
     if (response.err !== 'ok') return $alert('error', response.msg);
     workspaceJob.value = job;
     workspace.value = response.workspace;
@@ -413,7 +413,7 @@ function selectChapter(item: any) {
 async function saveCharacters() {
     saving.value = true;
     try {
-        const response = await $backend(`/audiobook-jobs/${workspaceJob.value.id}/workspace`, {
+        const response = await $backend(`/audio-job/${workspaceJob.value.id}/workspace`, {
             method: 'PATCH',
             body: JSON.stringify({ kind: 'characters', characters: workspace.value.characters, revision: workspace.value.revision }),
         });
@@ -428,7 +428,7 @@ async function saveChapter() {
     saving.value = true;
     scriptErrors.value = [];
     try {
-        const response = await $backend(`/audiobook-jobs/${workspaceJob.value.id}/workspace`, {
+        const response = await $backend(`/audio-job/${workspaceJob.value.id}/workspace`, {
             method: 'PATCH',
             body: JSON.stringify({
                 kind: 'chapter',
@@ -452,7 +452,7 @@ async function saveChapter() {
 async function confirmWorkspace() {
     confirming.value = true;
     try {
-        const response = await $backend(`/audiobook-jobs/${workspaceJob.value.id}/confirm`, { method: 'POST', body: '{}' });
+        const response = await $backend(`/audio-job/${workspaceJob.value.id}/confirm`, { method: 'POST', body: '{}' });
         if (response.err === 'ok') {
             workspaceDialog.value = false;
             await refresh();
@@ -463,7 +463,7 @@ async function confirmWorkspace() {
 }
 
 async function jobAction(job: any, action: string) {
-    const response = await $backend(`/audiobook-jobs/${job.id}`, {
+    const response = await $backend(`/audio-job/${job.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ action }),
     });

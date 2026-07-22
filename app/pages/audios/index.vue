@@ -33,7 +33,7 @@
                     v-if="store.user.is_admin"
                     variant="outlined"
                     prepend-icon="mdi-progress-wrench"
-                    to="/audiobooks/jobs"
+                    to="/audio-jobs"
                 >
                     {{ t('audiobook.jobs') }}
                 </v-btn>
@@ -75,7 +75,7 @@
                         v-for="item in home.continue_listening"
                         :key="item.edition.id"
                         class="continue-card"
-                        :to="`/audiobooks/${item.id}`"
+                        :to="`/audio/${item.edition.id}`"
                     >
                         <v-img
                             :src="item.img"
@@ -124,7 +124,7 @@
                         v-for="item in filteredBooks"
                         :key="item.edition.id"
                         class="book-card"
-                        :to="`/audiobooks/${item.id}`"
+                        :to="`/audio/${item.edition.id}`"
                     >
                         <div class="cover-wrap">
                             <v-img
@@ -228,7 +228,7 @@ const feedUrl = ref('');
 store.setNavbar(true);
 
 const { data: home, pending, error } = await useAsyncData('audiobook-home', async () => {
-    const response = await $backend('/audiobooks/home');
+    const response = await $backend('/audios/home');
     if (response.err !== 'ok') throw new Error(response.msg || t('audiobook.loadFailed'));
     return response;
 }, { default: () => ({ continue_listening: [], recent: [], completed: [] }) });

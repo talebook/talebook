@@ -81,7 +81,7 @@ export const useAudiobookStore = defineStore('audiobook', () => {
     if (!force && now - lastSavedAt < 10_000) return
     const { $backend } = useNuxtApp()
     const delta = Math.max(0, Math.min(60_000, positionMs.value - lastReportedMs))
-    const response = await $backend(`/audiobook-sessions/${sessionId.value}`, {
+    const response = await $backend(`/audio-session/${sessionId.value}`, {
       method: 'PATCH',
       body: JSON.stringify({
         chapter_id: chapter.value.id,
@@ -136,7 +136,7 @@ export const useAudiobookStore = defineStore('audiobook', () => {
   async function ensureSession() {
     if (sessionId.value || !edition.value) return
     const { $backend } = useNuxtApp()
-    const response = await $backend(`/audiobooks/${edition.value.id}/sessions`, {
+    const response = await $backend(`/audio/${edition.value.id}/sessions`, {
       method: 'POST',
       body: JSON.stringify({ source: 'web', device_id: 'talebook-web' }),
     })
@@ -145,7 +145,7 @@ export const useAudiobookStore = defineStore('audiobook', () => {
 
   async function loadTimeline(target: AudiobookChapter) {
     const { $backend } = useNuxtApp()
-    const response = await $backend(`/audiobooks/${edition.value?.id}/chapters/${target.number}/timeline`)
+    const response = await $backend(`/audio/${edition.value?.id}/chapter/${target.number}/timeline`)
     timeline.value = response.err === 'ok' ? (response.timeline?.segments || []) : []
   }
 
@@ -196,7 +196,7 @@ export const useAudiobookStore = defineStore('audiobook', () => {
     try {
       const saved = JSON.parse(raw) as PersistedPlayer
       const { $backend } = useNuxtApp()
-      const response = await $backend(`/audiobooks/${saved.editionId}/manifest`)
+      const response = await $backend(`/audio/${saved.editionId}`)
       if (response.err !== 'ok') {
         localStorage.removeItem(STORAGE_KEY)
         return

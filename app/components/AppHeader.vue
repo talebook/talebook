@@ -480,7 +480,7 @@ const items = computed(() => {
     var library_links = [
         { icon: 'mdi-book', href: '/library', text: $t('navigation.localLibrary') },
         { icon: 'mdi-cloud-search', href: '/network', text: $t('navigation.networkLibrary') },
-        { icon: 'mdi-book-music', href: '/audiobooks', text: $t('navigation.audiobooks'), badge: $t('audiobook.beta') },
+        { icon: 'mdi-book-music', href: '/audios', text: $t('navigation.audiobooks'), badge: $t('audiobook.beta') },
     ];
     var shelf_links = store.user.is_login
         ? [{ icon: 'mdi-bookshelf', href: '/user/shelf', text: $t('navigation.myShelf') }]

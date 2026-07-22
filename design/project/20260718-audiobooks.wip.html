@@ -729,8 +729,8 @@
 
         <h3>9.1 路由与 Token</h3>
         <pre><code>GET/HEAD /podcast/v1/{token}/feed.xml
-GET/HEAD /podcast/v1/{token}/covers/{book_id}.jpg
-GET/HEAD /podcast/v1/{token}/audio/{edition_id}/{chapter_id}.mp3</code></pre>
+GET/HEAD /podcast/v1/{token}/cover/{book_id}.jpg
+GET/HEAD /podcast/v1/{token}/audio/{audio_id}/chapter/{chapter_number}.mp3</code></pre>
         <ul>
           <li>Token 至少 128 bit 随机熵，仅以哈希入库。持有 URL 即拥有该用户当前可访问音频的下载能力；UI 必须明确提醒并支持撤销/重置。</li>
           <li>每次请求重新校验 Token、用户状态、书籍查看权限、已发布版本和个人隐藏列表；Feed 中不出现候选版本。</li>
@@ -807,17 +807,22 @@ GET/HEAD /podcast/v1/{token}/audio/{edition_id}/{chapter_id}.mp3</code></pre>
       <section id="delivery">
         <h2>12. API、实施顺序、发布与回滚</h2>
         <h3>12.1 主要 API</h3>
+        <div class="callout"><strong>路径命名不变量：</strong>集合使用复数，具体资源使用单数。馆藏页和集合接口使用 <code>/audios</code>，具体音频使用 <code>/audio/{audio_id}</code>；任务集合使用 <code>/audio-jobs</code>，具体任务使用 <code>/audio-job/{job_id}</code>。原书继续沿用 Talebook 既有的 <code>/book/{book_id}</code>。本功能的新路径中禁止使用 <code>audiobooks</code>。</div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>域</th><th>端点</th><th>用途</th></tr></thead>
             <tbody>
-              <tr><td>馆藏</td><td>GET /api/audiobooks/home<br>GET /api/audiobooks<br>GET /api/audiobooks/{book_id}</td><td>个性化分区、分页筛选、详情与版本。</td></tr>
-              <tr><td>任务</td><td>POST /api/books/{book_id}/audiobook-jobs<br>GET /api/audiobook-jobs<br>PATCH /api/audiobook-jobs/{id}</td><td>创建、查询、取消、重试、优先级。</td></tr>
-              <tr><td>审查</td><td>GET/PATCH /api/audiobook-jobs/{id}/characters<br>GET/PATCH /api/audiobook-jobs/{id}/chapters/{number}<br>POST /api/audiobook-jobs/{id}/confirm</td><td>角色结构化编辑、单章 TXT、确认生成。</td></tr>
-              <tr><td>播放</td><td>GET /api/audiobooks/{edition_id}/manifest<br>GET /api/audiobooks/{edition_id}/chapters/{id}/timeline<br>GET/HEAD /audiobooks/{edition_id}/chapters/{id}.mp3</td><td>清单、按章时间轴、受保护 Range 音频。</td></tr>
-              <tr><td>进度</td><td>POST /api/audiobooks/{edition_id}/sessions<br>PATCH /api/audiobook-sessions/{id}<br>POST /api/audiobook-sessions/{id}/close</td><td>第一方会话、进度和真实收听统计。</td></tr>
-              <tr><td>Podcast</td><td>POST/DELETE /api/me/podcast-subscription<br>GET /podcast/v1/{token}/feed.xml</td><td>签发/撤销站点 Feed 与 RSS 输出。</td></tr>
-              <tr><td>统计</td><td>GET /api/audiobook-stats/me<br>GET /api/admin/audiobook-stats<br>GET /api/books/{id}/audiobook-stats</td><td>个人、管理员和匿名书籍汇总。</td></tr>
+              <tr><td>页面</td><td>/audios<br>/audio/{audio_id}<br>/book/{book_id}/audios<br>/audio-jobs<br>/audio-job/{job_id}</td><td>馆藏集合、具体音频、一本书的音频集合、任务集合和具体任务。</td></tr>
+              <tr><td>馆藏</td><td>GET /api/audios/home<br>GET /api/audios<br>GET /api/book/{book_id}/audios</td><td>个性化分区、集合查询和一本书的音频集合。</td></tr>
+              <tr><td>音频资源</td><td>GET /api/audio/{audio_id}<br>PATCH /api/audio/{audio_id}</td><td>读取具体音频清单；发布、回滚或删除候选版本。</td></tr>
+              <tr><td>任务</td><td>POST /api/book/{book_id}/audio-jobs<br>GET /api/audio-jobs<br>PATCH /api/audio-job/{job_id}</td><td>创建、查询、取消、重试、优先级。</td></tr>
+              <tr><td>审查</td><td>GET/PATCH /api/audio-job/{job_id}/workspace<br>POST /api/audio-job/{job_id}/confirm</td><td>角色结构化编辑、单章 TXT、确认生成。</td></tr>
+              <tr><td>播放</td><td>GET /api/audio/{audio_id}/chapter/{chapter_number}/timeline<br>GET/HEAD /media/audio/{audio_id}/chapter/{chapter_number}.mp3</td><td>按章时间轴与受保护 Range 音频。</td></tr>
+              <tr><td>进度</td><td>POST /api/audio/{audio_id}/sessions<br>PATCH /api/audio-session/{session_id}<br>POST /api/audio-session/{session_id}/close</td><td>第一方会话、进度和真实收听统计。</td></tr>
+              <tr><td>书签</td><td>GET/POST /api/audio/{audio_id}/bookmarks</td><td>读取或创建当前用户在具体音频中的书签。</td></tr>
+              <tr><td>Podcast</td><td>GET/POST/PATCH/DELETE /api/me/podcast-subscription<br>GET/HEAD /podcast/v1/{token}/feed.xml<br>GET/HEAD /podcast/v1/{token}/cover/{book_id}.jpg<br>GET/HEAD /podcast/v1/{token}/audio/{audio_id}/chapter/{chapter_number}.mp3</td><td>管理私人订阅、RSS、封面和分章音频。</td></tr>
+              <tr><td>音色</td><td>GET /api/audio-voices<br>GET/HEAD /media/audio-voice/{engine}/{voice_id}.mp3</td><td>音色目录与预生成试听。</td></tr>
+              <tr><td>统计与审计</td><td>GET /api/audio-stats/me<br>GET /api/admin/audio-stats<br>GET/PATCH /api/admin/podcast-audits</td><td>个人/管理员收听统计，以及含 IP 的 Podcast 访问审计。</td></tr>
             </tbody>
           </table>
         </div>
@@ -842,11 +847,11 @@ GET/HEAD /podcast/v1/{token}/audio/{edition_id}/{chapter_id}.mp3</code></pre>
         <h3>12.4 实际验证结果</h3>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>范围</th><th>2026-07-19 实际结果</th><th>结论</th></tr></thead>
+            <thead><tr><th>范围</th><th>实际结果</th><th>结论</th></tr></thead>
             <tbody>
               <tr><td>Voicebook</td><td>全量单元测试 39/39；compileall 通过；0.4.0 wheel 构建通过并包含 8 个 Edge 音色的十场景 MP3 与目录信息。</td><td><span class="badge green">通过</span></td></tr>
-              <tr><td>Talebook 后端</td><td>Docker 真实环境全量 pytest：627 passed、1 skipped；新增有声书定向测试 7/7；Ruff lint/format 通过。</td><td><span class="badge green">通过</span></td></tr>
-              <tr><td>Talebook Web</td><td>Nuxt 构建通过；Playwright 全量 E2E 34/34，覆盖任务、高级编辑、章节播放器、Podcast 与统计主要路径。</td><td><span class="badge green">通过</span></td></tr>
+              <tr><td>Talebook 后端</td><td>Docker 真实环境全量 pytest：627 passed、1 skipped；2026-07-22 URL 规范化后有声书定向测试 8/8，覆盖新集合/资源路径和旧路径 404；Ruff lint/format 通过。</td><td><span class="badge green">通过</span></td></tr>
+              <tr><td>Talebook Web</td><td>Nuxt 构建通过；此前 Playwright 全量 E2E 34/34；2026-07-22 URL 规范化后有声书 Chromium E2E 3/3，覆盖入口、制作/发布/播放/恢复和高级模式。</td><td><span class="badge green">通过</span></td></tr>
               <tr><td>Candle Reader</td><td>构建通过；Playwright 全量 E2E 37/37，覆盖 timeline 高亮、自动翻页、手动脱离、回到朗读位置和“从这里听”。</td><td><span class="badge green">通过</span></td></tr>
               <tr><td>真实长音频</td><td>3 部公版小说 × 完整前两章，共 6 个 MP3、160.3 分钟、73.4 MiB；24 kHz / 单声道 / 64 kbps，Pages 报告与 MP3 均返回 HTTP 200。</td><td><span class="badge green">通过</span></td></tr>
               <tr><td>Qwen 预览资产</td><td>真实短文本冒烟返回 HTTP 500 / <code>Arrearage</code>；49 × 10 未生成，未伪造成功。</td><td><span class="badge">阻塞</span></td></tr>
@@ -856,7 +861,7 @@ GET/HEAD /podcast/v1/{token}/audio/{edition_id}/{chapter_id}.mp3</code></pre>
             </tbody>
           </table>
         </div>
-        <div class="callout"><strong>E2E 门禁已实现：</strong>Talebook 与 Candle Reader 均运行全量 Chromium E2E，而不是只提交测试文件；三仓构建和后端全量回归也均已实际执行。</div>
+        <div class="callout"><strong>真实服务复核：</strong>2026-07-22 在 Docker dev 服务验证 <code>/audios</code> 返回 200、<code>/api/audios/home</code> 返回 200，旧 <code>/api/audiobooks/home</code> 返回 404。E2E 门禁已实现：Talebook 与 Candle Reader 均运行全量 Chromium E2E，而不是只提交测试文件；三仓构建和后端全量回归也均已实际执行。</div>
         <div class="callout warning"><strong>镜像体积风险：</strong>为了跨架构提供转换与 ffprobe 校验，当前使用 Debian 完整 ffmpeg 包；本机测试镜像从 555,042,310 字节增至 1,020,822,276 字节，约增加 466 MB。功能与构建已验证，但后续可单独评估带校验和的多架构静态二进制以缩小镜像，不能为减体积牺牲可复现性。</div>
 
         <h3>12.5 三部小说完整两章试听</h3>

@@ -3,7 +3,7 @@
         <v-btn
             variant="text"
             prepend-icon="mdi-arrow-left"
-            to="/audiobooks"
+            to="/audios"
             class="mb-4"
         >
             {{ t('audiobook.backToLibrary') }}
@@ -77,7 +77,7 @@
                         <v-btn
                             v-if="store.user.is_admin"
                             variant="text"
-                            to="/audiobooks/jobs"
+                            to="/audio-jobs"
                             prepend-icon="mdi-progress-wrench"
                         >
                             {{ t('audiobook.jobs') }}
@@ -317,7 +317,7 @@ const engines = computed(() => [
 store.setNavbar(true);
 
 const { data: detail, pending, error, refresh } = await useAsyncData(`audiobook-detail-${bookId}`, async () => {
-    const response = await $backend(`/audiobooks/${bookId}`);
+    const response = await $backend(`/book/${bookId}/audios`);
     if (response.err !== 'ok') throw new Error(response.msg || t('audiobook.loadFailed'));
     return response;
 });
@@ -344,14 +344,14 @@ async function playChapter(chapter: any) {
 async function submitGeneration() {
     submitting.value = true;
     try {
-        const response = await $backend(`/books/${bookId}/audiobook-jobs`, {
+        const response = await $backend(`/book/${bookId}/audio-jobs`, {
             method: 'POST',
             body: JSON.stringify(generation),
         });
         if (response.err === 'ok') {
             generationDialog.value = false;
             $alert('success', response.deduplicated ? t('audiobook.jobAlreadyQueued') : t('audiobook.jobCreated'));
-            await router.push(`/audiobooks/jobs?job=${response.job.id}`);
+            await router.push(`/audio-job/${response.job.id}`);
         } else {
             $alert('error', response.msg);
         }
