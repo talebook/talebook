@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>生产公共层 Nuxt 环境文件修复</title>
+  <style>
+    :root { color-scheme: light; --paper:#f7f6f2; --ink:#20231f; --muted:#626861; --line:#d6dad3; --accent:#265d50; --soft:#e8f1ed; --code:#ecebe6; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:40px 20px 72px; background:var(--paper); color:var(--ink); font:16px/1.65 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width:900px; margin:auto; }
+    header { padding-bottom:22px; border-bottom:1px solid var(--line); }
+    h1 { margin:.25rem 0 .65rem; font-size:2rem; line-height:1.2; }
+    h2 { margin-top:2rem; padding-bottom:.3rem; border-bottom:1px solid var(--line); font-size:1.2rem; }
+    p, li { max-width:84ch; }
+    .eyebrow, .meta, code, th, .status { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .eyebrow { color:var(--accent); font-size:.78rem; letter-spacing:.11em; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px 22px; color:var(--muted); font-size:.84rem; }
+    .status { padding:2px 9px; color:var(--accent); background:var(--soft); border:1px solid #9bc1b5; border-radius:999px; }
+    .summary { margin:24px 0; padding:16px 19px; background:var(--soft); border-left:4px solid var(--accent); }
+    code { padding:1px 5px; background:var(--code); border-radius:3px; font-size:.9em; }
+    table { width:100%; border-collapse:collapse; margin:16px 0; font-size:.94rem; }
+    th, td { padding:10px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line); }
+    th { color:var(--muted); font-size:.82rem; }
+    footer { margin-top:40px; padding-top:15px; border-top:1px solid var(--line); color:var(--muted); font-size:.85rem; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">TALEBOOK · DOCKER DESIGN</div>
+    <h1>生产公共层 Nuxt 环境文件修复</h1>
+    <div class="meta">
+      <span>创建日期：2026-07-22</span>
+      <span>所属模块：docker</span>
+      <span>状态：<b class="status">ACTIVE</b></span>
+      <span>需求来源：Pull Request #889 维护者评论</span>
+    </div>
+  </header>
+
+  <div class="summary">修复前端构建分支拆分后，生产公共层执行 <code>server.py --update-config</code> 时因 <code>app/</code> 尚不存在而失败的问题，同时保持 SPA、SSR 构建分支和最终镜像内容不变。</div>
+
+  <section>
+    <h2>原始诉求与问题定位</h2>
+    <p>维护者提供的生产镜像日志显示，<code>production-common</code> 阶段调用 <code>python3 server.py --update-config</code> 时，<code>SettingsSaverLogic.update_nuxtjs_env()</code> 无法打开 <code>/var/www/talebook/app/.env</code>，并抛出 <code>FileNotFoundError</code>。</p>
+    <p>此前前端产物在该命令之前复制到 <code>app/</code>。PR #889 为使 SPA 与 SSR 构建分支可并行，将前端复制移到 <code>production-common</code> 的后继阶段，因而公共层首次失去创建 <code>app/</code> 目录的隐式前置条件。</p>
+  </section>
+
+  <section>
+    <h2>目标与边界</h2>
+    <ul>
+      <li>确保公共层运行 <code>--update-config</code> 前，Nuxt 环境文件的父目录已存在且可写。</li>
+      <li>不改变 <code>nuxt_env_path</code>、后端配置写入行为、前端产物结构或生产 target 继承关系。</li>
+      <li>不修改 workflow，不使用 Docker socket；真实镜像构建由远端 Actions 在提交后验证。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>grill 决策</h2>
+    <table>
+      <thead><tr><th>问题</th><th>决策</th><th>理由</th></tr></thead>
+      <tbody>
+        <tr><td>在哪里恢复前置条件</td><td>在 <code>production-common</code> 的目录准备步骤中显式创建 <code>/var/www/talebook/app</code></td><td>两个生产分支都依赖该公共层，且配置命令就在此层执行。</td></tr>
+        <tr><td>是否提前复制前端文件</td><td>否</td><td>会重新引入 SPA 与 SSR 分支耦合，抵消 PR #889 的构建优化。</td></tr>
+        <tr><td>是否让 Python 自动创建父目录</td><td>否</td><td>缺陷来自 Docker 阶段前置条件变化；修改通用运行时代码会扩大行为范围。</td></tr>
+        <tr><td>如何防止回归</td><td>扩展 Docker 构建图测试，校验目录创建发生在 <code>--update-config</code> 之前</td><td>无需 Docker socket即可覆盖本次失败所需的顺序约束。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>实现与测试结果</h2>
+    <p>在公共层已有的 <code>mkdir</code> 链中增加 <code>mkdir -p /var/www/talebook/app</code>。测试从 <code>production-common</code> 阶段提取文本，断言目录创建命令和 <code>python3 server.py --update-config</code> 均存在，并验证前者位于后者之前。</p>
+    <table>
+      <thead><tr><th>验证项</th><th>当前状态</th></tr></thead>
+      <tbody>
+        <tr><td><code>python3 -c 'ns = __import__("runpy").run_path("tests/test_docker_stages.py"); tests = [fn for name, fn in ns.items() if name.startswith("test_")]; [fn() for fn in tests]; print(f"{len(tests)} passed")'</code></td><td>通过：9 项 Docker 阶段结构测试全部通过，包含新增的 Nuxt 环境文件父目录顺序断言。</td></tr>
+        <tr><td><code>pytest -q tests/test_docker_stages.py</code></td><td>未执行：runner 未安装 <code>pytest</code>，命令返回 127；已使用上方直接加载同一测试文件并执行全部测试函数的方式替代验证。</td></tr>
+        <tr><td><code>make check-design</code></td><td>通过：44 份方案文档通过路径、状态、HTML 结构与单文件资源约束检查。</td></tr>
+        <tr><td><code>git diff --check</code></td><td>通过：补丁无空白错误。</td></tr>
+        <tr><td>真实 Docker 生产镜像构建</td><td>不在本地执行：任务禁止使用 Docker 等 Unix socket；由远端 Actions 验证。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>影响范围：<code>Dockerfile</code>、<code>tests/test_docker_stages.py</code>；不涉及 API、数据结构、权限、前端页面或 workflow。</footer>
+</main>
+</body>
+</html>

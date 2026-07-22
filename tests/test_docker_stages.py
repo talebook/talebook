@@ -115,6 +115,16 @@ def test_frontend_builds_are_isolated_by_delivery_target():
     assert production_spa.startswith("FROM production AS production-spa")
 
 
+def test_production_common_prepares_nuxt_env_parent_before_config_update():
+    production_common = docker_stage("production-common")
+    create_app_dir = "mkdir -p /var/www/talebook/app"
+    update_config = "python3 server.py --update-config"
+
+    assert create_app_dir in production_common
+    assert update_config in production_common
+    assert production_common.index(create_app_dir) < production_common.index(update_config)
+
+
 def test_base_image_source_and_publisher_are_externalized():
     assert not (ROOT / "Dockerfile.base").exists()
     assert not (ROOT / ".github" / "workflows" / "build-base.yml").exists()

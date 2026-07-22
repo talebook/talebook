@@ -161,6 +161,7 @@ RUN mkdir -p /data/log/nginx/ && \
     mkdir -p /data/books/logo && \
     mkdir -p /data/books/ssl && \
     mkdir -p /var/www/talebook/ && \
+    mkdir -p /var/www/talebook/app && \
     mkdir -p /var/www/talebook/status && \
     chmod a+w -R /data/log /data/books /var/www
 
