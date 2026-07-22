@@ -252,7 +252,7 @@
         <h1>Talebook 有声书、Voicebook 转换与 Candle Reader 音文同步方案</h1>
         <p class="lede">把现有 EPUB/TXT 书籍转为可管理、可续播、可跨页面播放的多角色章节 MP3；在阅读器中按句段同步高亮，并通过每用户一个站点级私人 Podcast RSS 向 Apple Podcasts 等客户端分发。</p>
         <dl class="meta">
-          <div><dt>状态</dt><dd><span class="status">WIP · 外部验收阻塞</span></dd></div>
+          <div><dt>状态</dt><dd><span class="status">ACTIVE · Beta</span></dd></div>
           <div><dt>产品阶段</dt><dd><span class="status">Beta</span></dd></div>
           <div><dt>创建日期</dt><dd>2026-07-18</dd></div>
           <div><dt>主仓库</dt><dd>talebook</dd></div>
@@ -296,7 +296,7 @@
             <p>每用户一个私人 RSS；每书一个 Season、每章一个 Episode。第一方精确统计与外部 HTTP 传输估算严格分开。</p>
           </article>
         </div>
-        <div class="callout warning"><strong>当前结论：</strong>有声书功能以 <strong>Beta</strong> 对用户开放；导航保留“有声书”正文，并在右侧显示独立的小型 Beta 标签，书架、详情和制作任务页显示 Beta 徽标。三仓实现、自动化测试、EdgeTTS 真实长音频和 GitHub Pages 播放已完成；本文仍保持 WIP，因为 Qwen3TTS 云服务返回 <code>Arrearage</code>，49 个 Qwen 音色的十场景资产无法真实生成，Apple Podcasts 真机订阅也仍需外部验收。不得把这两项伪报为通过。</div>
+        <div class="callout warning"><strong>当前结论：</strong>有声书功能以 <strong>Beta</strong> 对用户开放；导航保留“有声书”正文，并在右侧显示独立的小型 Beta 标签，书架、详情和制作任务页显示 Beta 徽标。三仓实现、自动化测试、EdgeTTS 真实长音频和 GitHub Pages 播放已完成，本文记录的实现方案已验证并转为 ACTIVE。Qwen3TTS 云服务仍返回 <code>Arrearage</code>，49 个 Qwen 音色的十场景资产未能真实生成；Apple Podcasts 真机订阅也尚未外部验收。这两项继续明确记录为 Beta 后续事项，不伪报为通过。</div>
       </section>
 
       <section id="scope">
@@ -857,7 +857,7 @@ GET/HEAD /podcast/v1/{token}/audio/{audio_id}/chapter/{chapter_number}.mp3</code
               <tr><td>Qwen 预览资产</td><td>真实短文本冒烟返回 HTTP 500 / <code>Arrearage</code>；49 × 10 未生成，未伪造成功。</td><td><span class="badge">阻塞</span></td></tr>
               <tr><td>Apple Podcasts</td><td>RSS、Range、稳定 GUID、权限与审计由后端自动化测试覆盖；iPhone/Mac “添加 URL 关注播客”尚未真机执行。</td><td><span class="badge">待外部验收</span></td></tr>
               <tr><td>集成镜像</td><td>测试镜像真实构建通过；容器内报告 Voicebook 0.4.0、ffmpeg/ffprobe 7.1.5、8 个 Edge 十场景资产；同一最终镜像全量后端 627 passed、1 skipped。</td><td><span class="badge green">通过</span></td></tr>
-              <tr><td>发布链</td><td>Voicebook PR #2、Candle Reader PR #17 已创建；Talebook 已固定 Voicebook 0.4.0 的不可变提交，Candle dist 必须在 PR 合并发布后同步。</td><td><span class="badge">部分待合并</span></td></tr>
+              <tr><td>发布链</td><td>Voicebook PR #2 与 Candle Reader PR #17 均已合并；Talebook 已固定 Voicebook 0.4.0 的不可变提交，并集成 Candle Reader 同步播放实现。</td><td><span class="badge green">通过</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -872,8 +872,8 @@ GET/HEAD /podcast/v1/{token}/audio/{audio_id}/chapter/{chapter_number}.mp3</code
           <article class="card"><h4>《红楼梦》</h4><p>曹雪芹 · 50.60 分钟</p><ul><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/hongloumeng/0001-第一回-甄士隱夢幻識通靈-賈雨村風塵懷閨秀.mp3">▶ 第一回</a></li><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/hongloumeng/0002-第二回-賈夫人仙逝揚州城-冷子興演說榮國府.mp3">▶ 第二回</a></li><li><a href="https://talebook.github.io/voicebook/design/resources/voicebook-tool/evaluation-20260716/hongloumeng/book.script">查看 book.script</a></li></ul></article>
         </div>
 
-        <h3>12.6 剩余发布门</h3>
-        <p>先合并 <a href="https://github.com/talebook/voicebook/pull/2">Voicebook PR #2</a> 与 <a href="https://github.com/talebook/candle-reader/pull/17">Candle Reader PR #17</a>；Voicebook 0.4.0 当前以不可变提交固定，Candle Reader 发布后还需同步 dist。随后需要恢复 Qwen 账户可用性以补齐 49 × 10 真实资产，并由用户在 Apple Podcasts 真机完成 URL 订阅验收；在这些偏差被解决或明确接受前，本文保持 WIP。</p>
+        <h3>12.6 ACTIVE 状态与 Beta 后续事项</h3>
+        <p><a href="https://github.com/talebook/voicebook/pull/2">Voicebook PR #2</a> 与 <a href="https://github.com/talebook/candle-reader/pull/17">Candle Reader PR #17</a> 已合并；本方案约定的实现、自动化测试、真实 EdgeTTS 音频和 Talebook 集成链路已完成验证，因此本文转为 ACTIVE，作为当前有效的 Beta 设计。恢复 Qwen 账户可用性并补齐 49 × 10 真实资产、在 Apple Podcasts 真机执行 URL 订阅，仍是明确未完成的外部事项；它们不计为已通过，也不阻断默认 EdgeTTS 与已自动化验证的 Podcast 标准接口。如后续改变这些接口或发布边界，应另建 WIP 方案，不直接实质修改本文。</p>
       </section>
     </main>
   </body>
