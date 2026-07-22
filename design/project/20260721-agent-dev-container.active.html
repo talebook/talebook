@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude 与 Codex 统一开发容器</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      color: #18202a;
+      background: #edf2f7;
+      line-height: 1.65;
+    }
+    * { box-sizing: border-box; }
+    body { max-width: 1120px; margin: 0 auto; padding: 32px 20px 72px; }
+    header, section {
+      background: #fff;
+      border: 1px solid #d8e1eb;
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 18px;
+      box-shadow: 0 7px 24px rgba(27, 45, 65, .055);
+    }
+    header { border-top: 5px solid #375f8c; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 4vw, 2.7rem); line-height: 1.2; }
+    h2 { margin: 0 0 14px; font-size: 1.35rem; }
+    h3 { margin: 22px 0 8px; font-size: 1.05rem; }
+    p, ul, ol { margin-top: 8px; }
+    code {
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: #edf2f7;
+      overflow-wrap: anywhere;
+    }
+    .subtitle { color: #536477; margin: 0 0 20px; }
+    .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+    .meta div { background: #edf4fb; border-radius: 9px; padding: 11px 13px; }
+    .status { color: #8b5600; font-weight: 750; }
+    .callout {
+      border-left: 4px solid #3f78ae;
+      background: #edf6ff;
+      padding: 12px 15px;
+      border-radius: 7px;
+    }
+    .warn { border-left-color: #b16b1b; background: #fff6e9; }
+    .ok { border-left-color: #28835a; background: #edf9f3; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 700px; }
+    th, td { border: 1px solid #d8e1eb; padding: 10px; text-align: left; vertical-align: top; }
+    th { background: #edf4fb; color: #274765; }
+    figure { margin: 18px 0 8px; }
+    svg { width: 100%; height: auto; border: 1px solid #d8e1eb; border-radius: 11px; background: #f9fbfd; }
+    figcaption { margin-top: 8px; color: #607184; font-size: .92rem; }
+    .pending { color: #8b5600; font-weight: 750; }
+    .passed { color: #16723a; font-weight: 750; }
+    .small { color: #607184; font-size: .92rem; }
+    @media (max-width: 720px) {
+      body { padding: 18px 12px 48px; }
+      header, section { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Claude 与 Codex 统一开发容器</h1>
+    <p class="subtitle">维护统一的 <code>dev</code> 镜像，让两套 agent 在同一个可构建、可测试的 Docker job container 中工作</p>
+    <div class="meta">
+      <div><strong>创建日期</strong><br>2026-07-21</div>
+      <div><strong>所属模块</strong><br>project</div>
+      <div><strong>状态</strong><br><span class="status">ACTIVE</span></div>
+      <div><strong>需求来源</strong><br>维护者要求统一 Claude/Codex 开发与测试环境</div>
+      <div><strong>工作分支</strong><br><code>feat/20260721-agent-dev-container</code></div>
+      <div><strong>影响范围</strong><br>Dockerfile、Actions、tests</div>
+      <div><strong>官方调研</strong><br><code>document/claude-code-action-environment-research.md</code></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. 原始诉求与已确认决策</h2>
+    <p>完整优化 <code>.github/workflows/claude.yml</code> 与 <code>.github/workflows/codex.yml</code>，使用仓库 <code>Dockerfile</code> 构建具备开发能力的镜像，让 Claude 与 Codex 的实际运行进程都位于该容器中，并保证容器能够完成前后端开发、lint、构建与测试。修改完成后必须使用本地 GitHub Actions 执行验证，全部通过后才允许提交和创建 Pull Request。</p>
+    <div class="callout ok">
+      <strong>已确认：</strong>沿用 <code>ci.yml</code> 的 job container 模式；只维护浮动标签 <code>talebook/talebook:dev</code>，不发布 commit SHA 标签。只有 <code>master</code> push 可以覆盖该镜像。实际文件名是 <code>claude.yml</code>，原始诉求中的 <code>claude.yaml</code> 视为同一文件。
+    </div>
+    <p>本次只改交互式 Claude workflow，不改变独立的 <code>claude-code-review.yml</code>。后者是 PR 自动审查入口，不属于原始诉求点名的两份 workflow；若未来也要迁移，应在本方案生效后另开变更，避免同时改变三条机器人链路。</p>
+  </section>
+
+  <section>
+    <h2>2. 当前问题</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>位置</th><th>当前行为</th><th>问题</th></tr></thead>
+        <tbody>
+          <tr><td><code>ci.yml</code></td><td>后端 job 使用 <code>talebook/talebook-base:latest</code></td><td>已证明 job container 能解决 Calibre/Python 系统依赖，但该 base 不含前端与 agent 工具。</td></tr>
+          <tr><td><code>Dockerfile dev</code></td><td>提供应用开发运行环境并安装 Node 与 app 依赖</td><td>仍缺 git、jq、pytest、ruff、bubblewrap、Codex CLI 等业务与 agent 工具；无法直接承担 Actions agent job。</td></tr>
+          <tr><td><code>claude.yml</code></td><td>运行于裸 <code>ubuntu-latest</code>，允许命令范围主要覆盖后端</td><td>业务环境与仓库 CI 不一致，不能稳定执行前端 lint/build/test；Claude Action 自身的运行时由 Action 管理，不等同于项目依赖。</td></tr>
+          <tr><td><code>codex.yml</code></td><td>运行时安装 Python 工具、Codex、bubblewrap、AppArmor 配置</td><td>每次重复安装，步骤长且依赖宿主状态；与本地开发镜像、常规 CI 环境产生漂移。</td></tr>
+          <tr><td>本地验收</td><td>单元测试和 actionlint 能检查静态契约</td><td>缺少用 <code>act</code> 真正在 job container 中执行完整工具链与项目命令的验收入口。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. Anthropic 与 GitHub 官方调研结论</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>官方证据</th><th>结论</th><th>对本方案的影响</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><a href="https://github.com/anthropics/claude-code-action/blob/main/action.yml">claude-code-action/action.yml</a></td>
+            <td><code>@v1</code> 是 composite action；默认在调用 job 中安装固定 Bun、安装 Action 自身依赖并启动 Claude。所有内部 run step 使用 bash。</td>
+            <td>使用 job container 后，Action 和它启动的 Claude 都在该容器中运行；dev 镜像必须有 bash、curl、CA 证书等基础能力，但无需替 Action 固定 Claude 版本。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/anthropics/claude-code-action/blob/main/docs/configuration.md#custom-tools">官方 Custom Tools 文档</a></td>
+            <td>业务命令不会被 Action 自动准备，也默认不能随意执行；仓库应先提供可执行环境，再用 <code>--allowedTools</code> 精确授权 npm、测试等命令。</td>
+            <td>Talebook 的 Python、Calibre、Node、lint/test 工具放进 dev 镜像；<code>claude.yml</code> 只负责授权已有命令。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/anthropics/claude-code-action/blob/main/action.yml#L1391-L1404">官方 custom executable inputs</a></td>
+            <td><code>path_to_claude_code_executable</code> 与 <code>path_to_bun_executable</code> 会跳过自动安装；官方警告旧版或不兼容版本可能失败，并说明通常只用于调试或特殊环境。</td>
+            <td>本方案不设置这两个输入，不把它们误作业务依赖机制；跟随 <code>@v1</code> 自己选择兼容运行时。</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/anthropics/claude-code-action/blob/main/.github/workflows/test-custom-executables.yml">官方 custom executables 测试</a></td>
+            <td>若确需自定义路径，官方测试会先显式安装并验证 Bun/Claude，再把两个绝对路径同时传给 Action。</td>
+            <td>证明自定义路径是完整替换机制，不适合只在镜像里随意预装一个 Claude CLI；当前没有采用它的必要。</td>
+          </tr>
+          <tr>
+            <td><a href="https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/run-jobs-in-a-container">GitHub job container 文档</a></td>
+            <td><code>jobs.&lt;job_id&gt;.container</code> 会让没有另行指定容器的 job steps 在目标容器中执行；容器内 run step 默认 shell 是 sh，可由 workflow 改成 bash。</td>
+            <td>这是让 composite Claude Action 使用 Talebook 业务环境的官方 GitHub 机制，与当前 <code>ci.yml</code> 一致。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <strong>仓库搜索结果：</strong>Anthropic 官方仓库没有提供 <code>container:</code> 或 <code>setup-python</code> 的现成示例，也没有“安装业务依赖”的 Action input。官方示例只通过 <code>--allowedTools</code> 开放 npm/bun 等命令，隐含前提是这些命令已存在于 runner。故 Talebook 应采用 GitHub 官方 job container 负责业务环境，同时保留 Claude Action 的默认运行时管理。
+    </div>
+  </section>
+
+  <section>
+    <h2>4. 目标与非目标</h2>
+    <h3>目标</h3>
+    <ul>
+      <li>同一个 <code>dev</code> target 提供 Calibre、Python 生产/测试依赖、Node/npm、常用开发命令、Codex CLI，以及 Claude Action 自动安装自身运行时所需的基础系统能力。</li>
+      <li><code>build.yml</code> 对 PR 构建该 target，只在 <code>master</code> push 时发布 <code>talebook/talebook:dev</code>。</li>
+      <li><code>claude.yml</code> 与 <code>codex.yml</code> 使用 <code>jobs.&lt;job&gt;.container.image</code> 消费同一个固定名称的开发镜像。</li>
+      <li>目标代码 checkout 仍可指向 issue/PR 的目标 SHA；提示模板与 workflow 资源继续来自不可变 workflow SHA，容器环境使用 master 最新成功发布的 dev 镜像。</li>
+      <li>Claude job 在 checkout 后按当前分支执行 <code>make init</code> 与 <code>npm ci</code>；镜像负责系统与语言基线，lockfile 同步负责目标分支依赖准确性。</li>
+      <li>本地使用 Docker 构建同名镜像，并通过 <code>act</code> 在该容器中真实执行工具检查、后端测试、前端 lint 与构建。</li>
+    </ul>
+    <h3>非目标</h3>
+    <ul>
+      <li>不改变 Claude/Codex 的触发语法、维护者授权规则、评论格式、Codex 发布门禁与 fast-forward push 规则。</li>
+      <li>不替换生产镜像，不把测试/agent 工具带入 production stages。</li>
+      <li>不让 agent 获得 Docker socket、宿主文件系统或特权容器权限。</li>
+      <li>不在 PR 阶段向 Docker Hub 推送镜像；PR 只验证 dev target 可构建。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>5. 总体方案</h2>
+    <figure>
+      <svg viewBox="0 0 1040 470" role="img" aria-labelledby="arch-title arch-desc">
+        <title id="arch-title">开发镜像构建与消费架构</title>
+        <desc id="arch-desc">Dockerfile dev target 经 build workflow 构建并发布 dev 标签，Claude、Codex 和本地 act 使用同一镜像。</desc>
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#456f9d"/></marker>
+        </defs>
+        <g fill="#edf4fb" stroke="#456f9d" stroke-width="2">
+          <rect x="50" y="55" width="250" height="105" rx="12"/>
+          <rect x="395" y="55" width="250" height="105" rx="12"/>
+          <rect x="740" y="55" width="250" height="105" rx="12"/>
+        </g>
+        <g fill="#edf9f3" stroke="#28835a" stroke-width="2">
+          <rect x="95" y="280" width="230" height="110" rx="12"/>
+          <rect x="405" y="280" width="230" height="110" rx="12"/>
+          <rect x="715" y="280" width="230" height="110" rx="12"/>
+        </g>
+        <g fill="#18202a" text-anchor="middle" font-size="16">
+          <text x="175" y="88" font-weight="700">Dockerfile · dev</text>
+          <text x="175" y="116">后端 + 前端 + 测试</text>
+          <text x="175" y="140">业务工具 + Codex + bwrap</text>
+          <text x="520" y="88" font-weight="700">build.yml</text>
+          <text x="520" y="116">PR：只构建</text>
+          <text x="520" y="140">push：构建并发布</text>
+          <text x="865" y="88" font-weight="700">Docker Hub</text>
+          <text x="865" y="116">talebook/talebook</text>
+          <text x="865" y="140">talebook/talebook:dev</text>
+          <text x="210" y="315" font-weight="700">claude.yml</text>
+          <text x="210" y="344">Claude Action 调用</text>
+          <text x="210" y="368">Action 在镜像内运行</text>
+          <text x="520" y="315" font-weight="700">codex.yml</text>
+          <text x="520" y="344">直接调用镜像内 codex</text>
+          <text x="520" y="368">保留发布门禁</text>
+          <text x="830" y="315" font-weight="700">本地 act smoke</text>
+          <text x="830" y="344">同一镜像与 workflow</text>
+          <text x="830" y="368">真实运行开发/测试</text>
+        </g>
+        <g stroke="#456f9d" stroke-width="2.5" fill="none" marker-end="url(#arrow)">
+          <path d="M300 108H385"/><path d="M645 108H730"/>
+          <path d="M865 160V220H210V270"/><path d="M865 160V220H520V270"/><path d="M865 160V220H830V270"/>
+        </g>
+      </svg>
+      <figcaption>图 1：单一 Dockerfile 产出、master 维护一个 dev 标签、三条消费链路共享同一开发环境。</figcaption>
+    </figure>
+
+    <h3>4.1 Dockerfile</h3>
+    <ul>
+      <li><code>dev</code> 从 <code>test</code> stage 继承，使 pytest、ruff 等测试依赖天然存在；production 仍从 <code>server</code> 分叉，不受影响。</li>
+      <li>显式安装 git、jq、Node.js 20、bubblewrap、uidmap 等 Actions 与 agent 需要的用户态工具。</li>
+      <li>固定安装 Codex CLI <code>0.144.6</code>，版本由 Docker build arg 声明并在构建日志中验证；不预装 Claude/Bun，由 <code>claude-code-action@v1</code> 在 job container 内按其官方默认流程管理兼容版本。</li>
+      <li>保留现有应用开发能力、Nuxt 源码和 npm 依赖。镜像内的依赖服务于其自带应用副本，不能替代 Actions workspace 对当前 checkout 执行 lockfile 同步。</li>
+    </ul>
+
+    <h3>4.2 build.yml 与镜像生命周期</h3>
+    <ul>
+      <li>PR 的 linux/amd64 构建矩阵额外构建 <code>dev</code> target，不推送。</li>
+      <li>只有 <code>refs/heads/master</code> 的受信任 push 在 linux/amd64 构建并推送 <code>talebook/talebook:dev</code>；dev、claude、codex 等其他分支不得覆盖它。</li>
+      <li>镜像写入构建 commit 的 OCI revision label，并在构建日志中记录 digest，保留“当前 dev 来自哪个提交”的排查证据；标签本身按维护者决定保持浮动。</li>
+      <li>Claude/Codex 固定使用 <code>talebook/talebook:dev</code>，目标 PR 无法选择其他运行镜像。镜像拉取失败时 job 在 agent 启动前失败关闭，不回退到 base 或裸 runner。</li>
+    </ul>
+
+    <h3>4.3 Claude workflow</h3>
+    <ul>
+      <li>增加 <code>talebook/talebook:dev</code> job container，并把 run shell 统一为 bash。</li>
+      <li>checkout 后先探测 Calibre、Python、Node、make、pytest、ruff 等业务工具，再执行 <code>make init</code> 与 <code>npm --prefix app ci</code>；任何一步失败都不启动 Claude。</li>
+      <li>不设置 <code>path_to_claude_code_executable</code> 或 <code>path_to_bun_executable</code>；Action 的 composite steps 会在 dev 容器里完成自身运行时准备，避免与浮动 <code>@v1</code> 产生兼容性错配。</li>
+      <li>允许的开发命令覆盖仓库既有 Makefile、Python/ruff/pytest、npm/npx/node，继续依赖 Action 自身的权限控制，不额外开放宿主资源。</li>
+    </ul>
+
+    <h3>4.4 Codex workflow</h3>
+    <ul>
+      <li>增加同一个 <code>talebook/talebook:dev</code> job container，删除 setup-python、pip 安装、npm 全局安装与宿主 AppArmor 改写。</li>
+      <li>保留启动前的工具版本与 <code>codex sandbox -- /bin/true</code> 自检；开发镜像缺工具或 sandbox 无法创建时直接失败。</li>
+      <li>预检通过后执行 <code>make init</code> 与 <code>npm --prefix app ci</code>，使当前 checkout 的 lockfile 依赖在恢复模型凭据前就绪；不依赖镜像中其他路径的 <code>node_modules</code>。</li>
+      <li>容器仅增加 user namespace 所需的 <code>seccomp=unconfined</code>；本机已验证默认容器创建 user namespace 失败，加入该选项后成功。不得使用 <code>--privileged</code>、Docker socket 或 <code>danger-full-access</code>。</li>
+      <li>保留现有自定义 <code>codex-employee</code> 权限、凭据环境剥离、受信任 prompt/progress reporter、结构化结果门禁和受控发布流程。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. 信任边界与失败策略</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>风险</th><th>控制</th><th>失败行为</th></tr></thead>
+        <tbody>
+          <tr><td>浮动 dev 标签改变内容</td><td>接受维护者指定的单一 dev 标签；仅 master 可发布，并记录 OCI revision 与 digest</td><td>拉取失败时 job 不启动；工具自检不通过时 agent 不运行</td></tr>
+          <tr><td>PR 修改 Dockerfile 注入工具</td><td>PR 只构建不推送；agent 固定使用 master 最近成功发布的 dev</td><td>未信任镜像不会被 agent workflow 消费</td></tr>
+          <tr><td>Codex 越出工作区</td><td>外层 job container + 内层 Codex workspace 权限 + bwrap</td><td>bwrap 自检失败则不运行 Codex</td></tr>
+          <tr><td>secret 泄漏给子命令</td><td>延续 Codex shell environment 排除规则；Claude 继续由官方 Action 管理 token</td><td>认证缺失或格式错误时快速失败</td></tr>
+          <tr><td>目标分支依赖变更</td><td>镜像提供编译器/运行时；Claude 与 Codex job 都在模型凭据可用前按当前 checkout 的 lockfile 同步依赖</td><td>依赖安装失败时不启动 agent</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>7. 本地 GitHub Actions 验收</h2>
+    <p>新增一个只负责环境验收的 workflow，生产 agent workflow 与本地 smoke workflow 共享相同的镜像表达式。它不接收 agent 凭据、不发布代码，适合 <code>act</code> 真实执行。</p>
+    <ol>
+      <li>本地构建 <code>talebook/talebook:dev</code>，覆盖本机同名测试镜像但不推送。</li>
+      <li>用 <code>act workflow_dispatch</code> 启动 smoke workflow，禁止拉取同名远端镜像，确保使用刚构建的本地镜像。</li>
+      <li>容器内验证 bash、curl、git、jq、Node/npm、Python/pip、make、ruff、pytest、Codex、bubblewrap；Claude/Bun 由 Action 自己安装，不作为业务镜像预装工具断言。</li>
+      <li>容器内先执行与 Claude job 相同的 <code>make init</code> 和前端 <code>npm ci</code>，再运行设计检查、Python lint、完整后端 pytest、前端 lint 与 Nuxt build。</li>
+      <li>使用 actionlint 和 workflow 契约测试覆盖 <code>claude.yml</code>、<code>codex.yml</code>、<code>build.yml</code> 及 smoke workflow。</li>
+    </ol>
+    <div class="callout warn">
+      <strong>边界：</strong>本地验收不调用真实 Claude/OpenAI API，不向 GitHub 写评论或推送分支，避免消耗凭据和制造外部副作用。两套真实 agent workflow 的认证/API 阶段由精确契约测试覆盖；共同的容器、工具和项目开发测试由 <code>act</code> 实际运行覆盖。
+    </div>
+  </section>
+
+  <section>
+    <h2>8. 测试计划与结果</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>验证项</th><th>计划命令或证据</th><th>当前结果</th></tr></thead>
+        <tbody>
+          <tr><td>Dockerfile / Workflow 契约</td><td><code>python3 -m pytest -q tests/test_agent_workflows.py tests/test_codex_workflow.py tests/test_docker_stages.py</code></td><td class="passed">通过：36 passed，1 skipped</td></tr>
+          <tr><td>Claude 官方契约</td><td>检查不使用 custom executable inputs，且 checkout、环境探测、lockfile 同步均位于 Claude Action 之前</td><td class="passed">通过；官方 Action runtime 与业务依赖职责已分离</td></tr>
+          <tr><td>Actions 静态检查</td><td><code>actionlint v1.7.12</code> 检查四份修改/新增 workflow</td><td class="passed">通过：无诊断</td></tr>
+          <tr><td>开发镜像构建</td><td><code>make build-dev</code></td><td class="passed">通过：本地 arm64 镜像 <code>sha256:fbf5a21625fa…</code></td></tr>
+          <tr><td>容器工具与 sandbox</td><td>版本检查及 <code>codex sandbox -- /bin/true</code></td><td class="passed">通过：Calibre 8.5.0、Node 20.20.2、Codex 0.144.6、pytest、ruff、git、jq、bubblewrap 均可用</td></tr>
+          <tr><td>本地 GitHub Actions</td><td><code>go run github.com/nektos/act@v0.2.89 workflow_dispatch -W .github/workflows/agent-dev-smoke.yml --pull=false --container-architecture linux/arm64</code></td><td class="passed">通过：本地 dev 镜像完整 job succeeded，未传模型凭据</td></tr>
+          <tr><td>后端</td><td><code>make lint-py-fix</code>；smoke 中执行 <code>make lint-py</code> 与 <code>make pytest</code></td><td class="passed">通过：96 files unchanged；完整 pytest 通过</td></tr>
+          <tr><td>前端</td><td>smoke 中执行 <code>npm --prefix app ci</code>、lint、Nuxt build</td><td class="passed">通过；构建完成</td></tr>
+          <tr><td>完整 Docker 测试</td><td><code>make test</code></td><td class="passed">通过：646 passed，2 skipped，32 warnings</td></tr>
+          <tr><td>设计门禁</td><td><code>make check-design</code>，激活后确认无 WIP</td><td class="passed">通过：43 design document(s) passed</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>9. 发布、回滚与实施顺序</h2>
+    <ol>
+      <li>先以测试驱动更新契约，再修改 Dockerfile、build workflow 与两套 agent workflow。</li>
+      <li>完成本地 Docker + act + 项目测试；失败时保持 WIP，不提交、不创建 PR。</li>
+      <li>验证全部通过后回写本页真实命令、结果与限制，将文件改为 <code>.active.html</code>。</li>
+      <li>提交功能分支、推送并创建 PR；PR 构建验证 dev target，但不发布镜像。</li>
+      <li>合并到 master 后，build workflow 覆盖发布 <code>talebook/talebook:dev</code>；发布完成前，新 workflow 可能暂时消费旧 dev 并在工具自检处失败，禁止静默回退。</li>
+    </ol>
+    <p>回滚时从最后一个已知正常的 master 提交重新构建并覆盖 <code>talebook/talebook:dev</code>，或回退相关 master 提交后让 build workflow 重新发布。不得从未信任分支手工覆盖 dev；回滚完成后重新运行工具自检与本地 smoke。</p>
+  </section>
+
+  <section>
+    <h2>10. 审查门</h2>
+    <p class="status">本方案已完成实现与项目验证，状态为 ACTIVE；最终提交与 Pull Request 仍以本地 act 全绿为门禁。</p>
+    <p class="small">验证期间发现既有异步扫描测试以队列为空误判任务完成；已改为按数据库状态轮询并显式刷新 session。隔离测试、完整 Docker 测试和 act 全套后端测试均验证该修正。</p>
+  </section>
+</body>
+</html>

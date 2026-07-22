@@ -48,8 +48,13 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    container:
+      image: talebook/talebook:dev
+      options: --user root --security-opt seccomp=unconfined
+    defaults:
+      run:
+        shell: bash
     env:
-      CODEX_VERSION: "0.144.4"
       CODEX_MODEL: ${{ vars.CODEX_MODEL || 'gpt-5.6-sol' }}
       CODEX_REASONING_EFFORT: ${{ vars.CODEX_REASONING_EFFORT || 'high' }}
     steps:
@@ -80,14 +85,12 @@ jobs:
             const codexHome = `${runnerTemp}/codex-home`;
             const codexPromptTemplate = `${runnerTemp}/codex-comment-response.md`;
             const codexProgressReporter = `${runnerTemp}/codex-progress-reporter.py`;
-            const codexTestRequirements = `${runnerTemp}/codex-requirements-test.txt`;
             const codexRequestJson = `${runnerTemp}/codex-request.json`;
             const workflowSha = process.env.WORKFLOW_SHA;
 
             core.exportVariable("CODEX_HOME", codexHome);
             core.exportVariable("CODEX_PROMPT_TEMPLATE", codexPromptTemplate);
             core.exportVariable("CODEX_PROGRESS_REPORTER", codexProgressReporter);
-            core.exportVariable("CODEX_TEST_REQUIREMENTS", codexTestRequirements);
             core.exportVariable("CODEX_REQUEST_JSON", codexRequestJson);
 
             let body = "";
@@ -367,21 +370,6 @@ jobs:
                   Buffer.from(progressReporterResult.data.content, "base64"),
                   { mode: 0o600 },
                 );
-
-                const testRequirementsResult = await github.rest.repos.getContent({
-                  owner,
-                  repo,
-                  path: "requirements-test.txt",
-                  ref: workflowSha,
-                });
-                if (Array.isArray(testRequirementsResult.data) || !testRequirementsResult.data.content) {
-                  throw new Error("Trusted Codex test requirements are missing from the workflow commit.");
-                }
-                fs.writeFileSync(
-                  codexTestRequirements,
-                  Buffer.from(testRequirementsResult.data.content, "base64"),
-                  { mode: 0o600 },
-                );
               } catch (error) {
                 if (progressCommentId) {
                   try {
@@ -441,76 +429,33 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Setup Python for Codex validation
-        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install Codex test tools
+      - name: Verify development environment and sandbox
         if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
         run: |
           set -euo pipefail
-          python3 -m pip install --disable-pip-version-check -r "$CODEX_TEST_REQUIREMENTS"
-          ruff --version
+
+          ebook-convert --version
+          python3 --version
+          node --version
+          npm --version
+          make --version
           python3 -m pytest --version
+          ruff --version
+          codex --version
+          bwrap --version
 
-      - name: Install Codex CLI
-        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
-        run: npm install -g "@openai/codex@${CODEX_VERSION}"
+          if codex sandbox -- /bin/true 2>/dev/null; then
+            echo "✅ Codex sandbox test passed"
+          else
+            echo "::error::Codex sandbox self-test failed"
+            exit 1
+          fi
 
-      - name: Setup bubblewrap and AppArmor for sandbox
+      - name: Synchronize project dependencies
         if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
         run: |
-          set -euo pipefail
-          
-          echo "::group::Installing bubblewrap and dependencies"
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap uidmap apparmor-profiles apparmor-utils
-          echo "::endgroup::"
-          
-          echo "::group::Configuring AppArmor for bubblewrap"
-          # Install and load the bwrap AppArmor profile
-          PROFILE_SRC="/usr/share/apparmor/extra-profiles/bwrap-userns-restrict"
-          PROFILE_DST="/etc/apparmor.d/bwrap-userns-restrict"
-          
-          if [ ! -f "$PROFILE_SRC" ]; then
-            echo "::error::Required AppArmor profile source is missing: $PROFILE_SRC"
-            exit 1
-          fi
-          sudo install -m 0644 "$PROFILE_SRC" "$PROFILE_DST"
-          sudo apparmor_parser -r "$PROFILE_DST"
-          echo "✅ AppArmor profile loaded successfully"
-          
-          # Enable userns restrictions with bwrap exception
-          sudo tee /etc/sysctl.d/99-codex-apparmor-hardening.conf >/dev/null <<'EOF'
-          kernel.apparmor_restrict_unprivileged_userns=1
-          kernel.apparmor_restrict_unprivileged_unconfined=1
-          EOF
-          
-          sudo sysctl --system >/dev/null
-          echo "::endgroup::"
-          
-          echo "::group::Verifying installation"
-          # Verify bubblewrap is installed
-          bwrap --version
-          
-          # Test bubblewrap sandbox creation
-          if bwrap --ro-bind / / /bin/true 2>/dev/null; then
-            echo "✅ bubblewrap sandbox test passed"
-          else
-            echo "::error::Bubblewrap sandbox self-test failed"
-            exit 1
-          fi
-          
-          # Check AppArmor status
-          if sudo aa-status | grep -qE '(^|[[:space:]])bwrap($|[[:space:]])'; then
-            echo "✅ AppArmor profile is active for bwrap"
-          else
-            echo "::error::AppArmor profile is not active for bubblewrap"
-            exit 1
-          fi
-          echo "::endgroup::"
+          make init
+          npm --prefix app ci
 
       - name: Restore Codex ChatGPT auth
         if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'

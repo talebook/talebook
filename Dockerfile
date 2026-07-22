@@ -237,22 +237,39 @@ FROM production AS production-spa
 # 开发环境（前端使用 npm run dev，可将本地 app/ 目录挂载进来实时开发）
 # 构建：docker build --target dev -t talebook/talebook:dev .
 # 使用：docker-compose -f dev.yml up
-FROM server AS dev
+FROM test AS dev
 ARG BUILD_COUNTRY=""
 ARG GIT_VERSION=""
 ARG TARGETARCH
 ARG TARGETVARIANT
+ARG CODEX_VERSION="0.144.6"
 
 USER root
 
-# Install Node.js 20
+# Install the common development and agent toolchain.
 RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+        bubblewrap \
+        ca-certificates \
+        curl \
+        git \
+        jq \
+        uidmap && \
     if [ "$TARGETARCH" = "amd64" ] || [ "$TARGETARCH" = "arm64" ]; then \
         curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
         apt-get install -y nodejs; \
     fi && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g "@openai/codex@${CODEX_VERSION}" && \
+    node --version && \
+    npm --version && \
+    codex --version && \
+    python3 -m pytest --version && \
+    ruff --version && \
+    bwrap --version
 
 ENV TZ=Asia/Shanghai
 ENV LANG=C.UTF-8

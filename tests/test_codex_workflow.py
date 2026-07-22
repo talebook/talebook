@@ -119,28 +119,47 @@ def test_employee_job_is_bounded_and_serialized_per_request_target():
     }
 
 
-def test_codex_runtime_installs_declared_test_tools_before_agent_execution():
+def test_codex_runs_in_the_dev_container_without_runtime_install_steps():
+    job = codex_job()
     steps = codex_job()["steps"]
     checkout = workflow_step(name="Checkout repository")
-    setup_python = workflow_step(name="Setup Python for Codex validation")
-    install_tools = workflow_step(name="Install Codex test tools")
+    verify = workflow_step(name="Verify development environment and sandbox")
+    synchronize = workflow_step(name="Synchronize project dependencies")
+    restore_auth = workflow_step(name="Restore Codex ChatGPT auth")
     run_codex = workflow_step(name="Run Codex")
-    context_script = workflow_step(step_id="context")["with"]["script"]
 
-    assert "const codexTestRequirements = `${runnerTemp}/codex-requirements-test.txt`;" in context_script
-    assert 'core.exportVariable("CODEX_TEST_REQUIREMENTS", codexTestRequirements);' in context_script
-    assert 'path: "requirements-test.txt"' in context_script
-    assert "ref: workflowSha" in context_script
-
-    assert setup_python["uses"] == "actions/setup-python@v5"
-    assert setup_python["with"] == {"python-version": "3.13"}
-
-    install_script = install_tools["run"]
-    assert 'python3 -m pip install --disable-pip-version-check -r "$CODEX_TEST_REQUIREMENTS"' in install_script
-    assert "-r requirements-test.txt" not in install_script
-    assert "ruff --version" in install_script
-    assert "python3 -m pytest --version" in install_script
-    assert steps.index(checkout) < steps.index(setup_python) < steps.index(install_tools) < steps.index(run_codex)
+    assert job["container"] == {
+        "image": "talebook/talebook:dev",
+        "options": "--user root --security-opt seccomp=unconfined",
+    }
+    assert job["defaults"] == {"run": {"shell": "bash"}}
+    assert "CODEX_VERSION" not in job["env"]
+    assert all(
+        probe in verify["run"]
+        for probe in (
+            "ebook-convert --version",
+            "python3 --version",
+            "node --version",
+            "npm --version",
+            "make --version",
+            "python3 -m pytest --version",
+            "ruff --version",
+            "codex --version",
+            "bwrap --version",
+        )
+    )
+    assert all(
+        name not in [step.get("name") for step in steps]
+        for name in (
+            "Setup Python for Codex validation",
+            "Install Codex test tools",
+            "Install Codex CLI",
+            "Setup bubblewrap and AppArmor for sandbox",
+        )
+    )
+    assert synchronize["run"] == "make init\nnpm --prefix app ci\n"
+    assert steps.index(checkout) < steps.index(verify) < steps.index(synchronize) < steps.index(restore_auth)
+    assert steps.index(restore_auth) < steps.index(run_codex)
 
 
 def test_only_repository_writers_can_trigger_the_employee():
@@ -190,15 +209,16 @@ def test_agent_has_public_network_but_cannot_read_host_credentials():
 
 
 def test_sandbox_setup_fails_closed_before_codex_runs():
-    setup_script = workflow_step(name="Setup bubblewrap and AppArmor for sandbox")["run"]
+    setup_script = workflow_step(name="Verify development environment and sandbox")["run"]
     step_names = [step.get("name") for step in codex_job()["steps"]]
 
     assert "continuing" not in setup_script
-    assert "::error::Required AppArmor profile source is missing" in setup_script
-    assert "::error::Bubblewrap sandbox self-test failed" in setup_script
-    assert "::error::AppArmor profile is not active for bubblewrap" in setup_script
-    assert setup_script.count("exit 1") >= 3
-    assert step_names.index("Setup bubblewrap and AppArmor for sandbox") < step_names.index("Run Codex")
+    assert "::error::Codex sandbox self-test failed" in setup_script
+    assert "codex sandbox -- /bin/true" in setup_script
+    assert "exit 1" in setup_script
+    assert "sudo" not in setup_script
+    assert "AppArmor" not in setup_script
+    assert step_names.index("Verify development environment and sandbox") < step_names.index("Run Codex")
 
 
 def test_trusted_assets_follow_the_immutable_workflow_version_and_acknowledge_first():
@@ -209,8 +229,8 @@ def test_trusted_assets_follow_the_immutable_workflow_version_and_acknowledge_fi
     assert "const workflowSha = process.env.WORKFLOW_SHA;" in script
     assert 'path: ".github/codex/prompts/comment-response.md"' in script
     assert 'path: ".github/codex/scripts/codex_progress_reporter.py"' in script
-    assert 'path: "requirements-test.txt"' in script
-    assert script.count("ref: workflowSha") == 3
+    assert 'path: "requirements-test.txt"' not in script
+    assert script.count("ref: workflowSha") == 2
     assert "ref: defaultBranch" not in script
     assert script.index("reactions.createForIssueComment") < script.index("issues.createComment")
     assert script.index("issues.createComment") < script.index('path: ".github/codex/prompts/comment-response.md"')

@@ -1,0 +1,54 @@
+name: Agent development image smoke test
+
+"on":
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Exercise development and test toolchain
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: talebook/talebook:dev
+      options: --user root --security-opt seccomp=unconfined
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify development environment and sandbox
+        run: |
+          set -euo pipefail
+          ebook-convert --version
+          python3 --version
+          node --version
+          npm --version
+          make --version
+          git --version
+          jq --version
+          python3 -m pytest --version
+          ruff --version
+          codex --version
+          bwrap --version
+          if ! codex sandbox -- /bin/true 2>/dev/null; then
+            echo "::error::Codex sandbox self-test failed"
+            exit 1
+          fi
+
+      - name: Synchronize project dependencies
+        run: |
+          make init
+          npm --prefix app ci
+
+      - name: Run development checks
+        run: |
+          make lint-py
+          make pytest
+          npm --prefix app run lint
+          npm --prefix app run build
+          make check-design

@@ -66,15 +66,16 @@ class TestScan(TestWithUserLogin):
         self.assertEqual(d["err"], "ok")
         self.assertEqual(n + 1, threading.active_count())
 
-        # wait job done
-        time.sleep(2)
-        q = ScanService().get_queue("do_scan")
-        n = q.qsize()
-        while n:
-            n = q.qsize()
+        # qsize() becomes zero as soon as the worker takes the task, before the
+        # scan transaction is committed. Wait for the observable database state.
+        deadline = time.monotonic() + 10
+        while True:
+            self.session.expire_all()
+            row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
+            if row.status != ScanFile.NEW or time.monotonic() >= deadline:
+                break
             time.sleep(0.1)
 
-        row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
         self.assertEqual(row.status, ScanFile.READY)
         # self.assertEqual(row.status, ScanFile.DROP)
 
