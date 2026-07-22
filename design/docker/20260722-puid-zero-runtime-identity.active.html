@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PUID 0 容器运行身份修复方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #eef3f7;
+      --panel: #ffffff;
+      --ink: #162534;
+      --muted: #607183;
+      --line: #b8c7d5;
+      --blue: #164e87;
+      --blue-soft: #dceaf6;
+      --amber: #9a5b08;
+      --amber-soft: #fff0cf;
+      --red: #a13b36;
+      --green: #26705a;
+      --code: #e3ebf2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 44px 20px 72px;
+      background:
+        linear-gradient(90deg, transparent 31px, rgba(22,78,135,.08) 32px, transparent 33px) 0 0 / 64px 64px,
+        var(--paper);
+      color: var(--ink);
+      font: 16px/1.68 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    main { max-width: 1040px; margin: auto; }
+    header {
+      position: relative;
+      padding: 30px 34px 34px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 8px 8px 0 #cad8e4;
+    }
+    header::before {
+      content: "/etc/passwd";
+      position: absolute;
+      top: -14px;
+      right: 28px;
+      padding: 4px 12px;
+      background: var(--blue);
+      color: white;
+      font: 700 .76rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .08em;
+    }
+    h1, h2 { font-family: Charter, "Bitstream Charter", Georgia, "Songti SC", serif; }
+    h1 { max-width: 720px; margin: .25rem 0 .8rem; font-size: clamp(2.1rem, 5vw, 3.8rem); line-height: 1.04; letter-spacing: -.035em; }
+    h2 { margin: 3.2rem 0 1rem; font-size: 1.55rem; line-height: 1.25; }
+    h3 { margin: 1.9rem 0 .65rem; font-size: 1rem; }
+    p, li { max-width: 82ch; }
+    .eyebrow, .meta, code, th, .status, .identity-row { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .eyebrow { color: var(--blue); font-size: .76rem; font-weight: 800; letter-spacing: .14em; }
+    .meta { display: flex; flex-wrap: wrap; gap: 9px 22px; color: var(--muted); font-size: .8rem; }
+    .status { padding: 2px 8px; border: 1px solid #d7b36d; background: var(--amber-soft); color: var(--amber); }
+    .lead { margin: 26px 0 0; max-width: 760px; font-size: 1.08rem; }
+    code { padding: 2px 5px; background: var(--code); color: #173b5e; font-size: .9em; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0 28px; background: rgba(255,255,255,.72); }
+    th, td { padding: 12px 13px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #dbe6ef; color: #385068; font-size: .78rem; letter-spacing: .04em; }
+    .identity-ledger {
+      margin: 28px 0;
+      overflow: hidden;
+      border: 1px solid #8da5ba;
+      background: var(--panel);
+      box-shadow: 5px 5px 0 #c6d5e1;
+    }
+    .ledger-title { padding: 9px 15px; background: var(--ink); color: white; font: 700 .78rem/1.4 ui-monospace, monospace; letter-spacing: .08em; }
+    .identity-row { display: grid; grid-template-columns: 1fr 46px 1.15fr 46px 1fr; align-items: center; padding: 22px 20px; border-top: 1px solid var(--line); font-size: .9rem; }
+    .identity-row:first-of-type { border-top: 0; }
+    .identity-row strong { display: block; margin-bottom: 4px; font-family: system-ui, sans-serif; font-size: .8rem; color: var(--muted); }
+    .arrow { color: var(--blue); text-align: center; font-size: 1.35rem; }
+    .bad { color: var(--red); text-decoration: line-through; text-decoration-thickness: 2px; }
+    .good { color: var(--green); font-weight: 800; }
+    .callout { padding: 17px 20px; border-left: 5px solid var(--amber); background: var(--amber-soft); }
+    .tests td:last-child { width: 31%; }
+    footer { margin-top: 48px; padding-top: 18px; border-top: 2px solid var(--ink); color: var(--muted); font-size: .84rem; }
+    @media (max-width: 720px) {
+      body { padding: 26px 12px 52px; }
+      header { padding: 25px 20px 28px; box-shadow: 5px 5px 0 #cad8e4; }
+      .identity-row { grid-template-columns: 1fr; gap: 8px; }
+      .arrow { transform: rotate(90deg); }
+      th, td { padding: 9px 8px; font-size: .83rem; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">TALEBOOK · CONTAINER IDENTITY NOTE</div>
+    <h1>让 UID 0 只有一个名字</h1>
+    <div class="meta">
+      <span>创建日期：2026-07-22</span>
+      <span>所属模块：docker</span>
+      <span>状态：<b class="status">ACTIVE</b></span>
+      <span>需求来源：GitHub Issue #761</span>
+    </div>
+    <p class="lead">保留 <code>PUID=0</code> / <code>PGID=0</code> 的兼容能力，但不再把 <code>talebook</code> 账户强行改成与 <code>root</code> 重复的数值身份。运行时按 UID 与 GID 分别复用已有 root 身份或映射 talebook 身份。</p>
+  </header>
+
+  <section>
+    <h2>原始诉求与结论</h2>
+    <p>维护者要求检查“容器内使用 PUID=0 导致的刮削错误”是否存在，并在确认后给出完整 PR。当前生产和开发启动脚本都会执行 <code>usermod -o -u "${PUID}" talebook</code> 与 <code>groupmod -o -g "${PGID}" talebook</code>。当值为 0 时，系统同时存在 <code>root</code> 与 <code>talebook</code> 两个同 UID/GID 条目；Calibre 及其子进程按数值反查账户时，身份名称和主目录不再唯一。</p>
+    <div class="callout"><strong>结论：</strong>问题存在。修复重点不是增加刮削重试，而是消除启动阶段制造的重复系统身份。</div>
+  </section>
+
+  <section>
+    <h2>身份解析规则</h2>
+    <div class="identity-ledger" role="img" aria-label="旧身份映射与新身份映射对比">
+      <div class="ledger-title">RUNTIME IDENTITY LEDGER</div>
+      <div class="identity-row">
+        <div><strong>旧逻辑 · 输入</strong>PUID=0 / PGID=0</div><div class="arrow">→</div>
+        <div class="bad"><strong>修改系统账户</strong>talebook:x:0:0</div><div class="arrow">→</div>
+        <div><strong>结果</strong>root 与 talebook 重号</div>
+      </div>
+      <div class="identity-row">
+        <div><strong>新逻辑 · 输入</strong>PUID=0 / PGID=0</div><div class="arrow">→</div>
+        <div class="good"><strong>复用现有账户</strong>root:root</div><div class="arrow">→</div>
+        <div><strong>结果</strong>唯一、可反查</div>
+      </div>
+      <div class="identity-row">
+        <div><strong>新逻辑 · 输入</strong>PUID=1000 / PGID=100</div><div class="arrow">→</div>
+        <div class="good"><strong>保持既有能力</strong>talebook:talebook</div><div class="arrow">→</div>
+        <div><strong>结果</strong>映射宿主权限</div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>PUID</th><th>PGID</th><th>运行用户</th><th>运行组</th><th>账户修改</th></tr></thead>
+      <tbody>
+        <tr><td><code>0</code></td><td><code>0</code></td><td><code>root</code></td><td><code>root</code></td><td>不修改 talebook 用户或组</td></tr>
+        <tr><td><code>0</code></td><td>非 0</td><td><code>root</code></td><td><code>talebook</code></td><td>只映射 talebook 组</td></tr>
+        <tr><td>非 0</td><td><code>0</code></td><td><code>talebook</code></td><td><code>root</code></td><td>只映射 talebook 用户，并设置其主组为 root</td></tr>
+        <tr><td>非 0</td><td>非 0</td><td><code>talebook</code></td><td><code>talebook</code></td><td>保持现有 UID/GID 映射行为</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>实现范围</h2>
+    <table>
+      <thead><tr><th>文件</th><th>计划变更</th></tr></thead>
+      <tbody>
+        <tr><td><code>docker/setup-user.sh</code></td><td>集中解析 PUID/PGID；0 复用 root，非 0 映射 talebook；导出统一运行身份并更新 nginx worker 身份。</td></tr>
+        <tr><td><code>docker/start.sh</code> / <code>docker/start-dev.sh</code></td><td>复用身份脚本，权限修复使用已解析的运行身份。</td></tr>
+        <tr><td><code>conf/supervisor/*.conf</code></td><td><code>gosu</code> 从固定 <code>talebook:talebook</code> 改为读取启动脚本导出的身份。</td></tr>
+        <tr><td><code>webserver/self_check.py</code></td><td>自检、数据库同步和迁移使用相同身份，避免启动阶段与 Tornado 身份不一致。</td></tr>
+        <tr><td><code>tests/</code></td><td>覆盖四种 0/非 0 组合、非法输入、Supervisor 配置与 self-check 运行身份。</td></tr>
+      </tbody>
+    </table>
+    <h3>非目标</h3>
+    <ul>
+      <li>不修改元数据抓取逻辑、数据源协议、数据库结构或前端交互。</li>
+      <li>不对既有书库执行额外迁移；权限标记变化时仍由启动自检按当前身份修复 <code>/data/books</code>。</li>
+      <li>不移除 PUID/PGID 兼容配置，也不要求使用 root 的 NAS 用户改部署文件。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>风险、兼容与回滚</h2>
+    <ul>
+      <li><strong>兼容：</strong>非 0 的常见配置保持原行为；0 仍获得对应 root 用户或组权限，只是不再创建重复账户记录。</li>
+      <li><strong>一致性：</strong>nginx、启动自检、Tornado 与 SSR/dev Node 进程使用同一解析结果。</li>
+      <li><strong>安全：</strong>使用 0 仍意味着以 root 权限运行，这是用户显式配置；默认镜像继续使用 1000，不扩大默认权限。</li>
+      <li><strong>回滚：</strong>恢复启动脚本内的直接 usermod/groupmod 和 Supervisor 固定用户即可；无数据格式变化。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>测试结果</h2>
+    <table class="tests">
+      <thead><tr><th>实际命令或验证</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td><code>TMPDIR="$PWD/.test-tmp" python3 tests/test_docker_user_setup.py -v</code></td><td>通过，7 项；覆盖四种 UID/GID 组合、非法输入、入口复用和 Supervisor 身份。</td></tr>
+        <tr><td><code>PYTHONPATH="$PWD" TMPDIR="$PWD/.test-tmp" python3 tests/test_self_check.py -v</code></td><td>通过，12 项；包含 root:root 身份传入 syncdb 的断言。</td></tr>
+        <tr><td>使用 <code>runpy</code> 逐项执行 <code>tests/test_docker_stages.py</code> 内测试函数</td><td>通过，10 项 Docker 阶段静态检查。</td></tr>
+        <tr><td><code>sh -n docker/setup-user.sh docker/start.sh docker/start-dev.sh</code></td><td>通过，三个 POSIX shell 脚本语法有效。</td></tr>
+        <tr><td><code>python3 -m compileall -q webserver/self_check.py tests/test_self_check.py tests/test_docker_user_setup.py tests/test_docker_stages.py</code></td><td>通过，修改的 Python 文件均可编译。</td></tr>
+        <tr><td><code>git diff --check</code></td><td>通过，无空白错误。</td></tr>
+        <tr><td><code>make lint-py-fix</code> / <code>make lint-py</code></td><td>环境未执行：宿主机没有 <code>ruff</code>，命令在工具启动前退出 127；已用编译、行宽检查和目标测试替代。</td></tr>
+        <tr><td><code>make pytest</code></td><td>环境未执行：宿主机没有 <code>pytest</code>，公共网络代理也无法下载测试依赖；目标 unittest 共 19 项已通过。</td></tr>
+        <tr><td><code>make test</code></td><td>未执行：任务约束禁止访问 Docker 或其他 Unix socket。</td></tr>
+        <tr><td><code>make check-design</code></td><td>通过，46 份方案文档满足路径、状态、HTML 结构与单文件资源约束，仓库中不存在 WIP 方案。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>本方案已完成实现与目标验证；不涉及数据结构迁移，回滚仅需恢复容器启动身份解析。</footer>
+</main>
+</body>
+</html>

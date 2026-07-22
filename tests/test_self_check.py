@@ -92,10 +92,12 @@ class TestSelfCheckSteps(unittest.TestCase):
 
     @mock.patch("webserver.self_check.run")
     def test_check_syncdb(self, m_run):
-        m_run.return_value = True
-        self.assertEqual(self_check.check_syncdb(), (True, None))
-        m_run.return_value = False
-        self.assertEqual(self_check.check_syncdb(), (False, "syncdb_failed"))
+        with mock.patch.dict(os.environ, {"TALEBOOK_RUN_IDENTITY": "root:root"}):
+            m_run.return_value = True
+            self.assertEqual(self_check.check_syncdb(), (True, None))
+            self.assertEqual(m_run.call_args.args[0][:2], ["gosu", "root:root"])
+            m_run.return_value = False
+            self.assertEqual(self_check.check_syncdb(), (False, "syncdb_failed"))
 
     @mock.patch("webserver.self_check.run")
     def test_check_migrate(self, m_run):

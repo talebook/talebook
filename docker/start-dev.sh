@@ -1,10 +1,9 @@
 #!/bin/sh
 
-PUID=${PUID:-0}
-PGID=${PGID:-0}
-
-groupmod -o -g "${PGID}" talebook
-usermod -o -u "${PUID}" talebook
+DOCKER_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if ! . "$DOCKER_DIR/setup-user.sh"; then
+  exit 1
+fi
 
 # 使用预设的书库和配置
 if [ ! -d "/data/books" ]; then
@@ -44,12 +43,12 @@ touch $permission_file
 permission=`cat $permission_file`
 if [ "x$permission" != "x$PUID:$PGID" ]; then
     echo "updating '/data/' permission to $PUID:$PGID"
-    chown -R talebook:talebook /data
+    chown -R "$TALEBOOK_RUN_IDENTITY" /data
     echo "$PUID:$PGID" > $permission_file
 fi
 
 # 设置系统文件的权限
-chown -R talebook:talebook \
+chown -R "$TALEBOOK_RUN_IDENTITY" \
   /data/log/ \
   /var/lib/nginx \
   /root/.config/calibre \
@@ -63,7 +62,7 @@ chown -R talebook:talebook \
 APP_DIR=/var/www/talebook/app
 if [ -f "${APP_DIR}/package.json" ] && [ ! -d "${APP_DIR}/node_modules" ]; then
   echo "====== Installing npm dependencies ======"
-  cd "${APP_DIR}" && gosu talebook:talebook npm install
+  cd "${APP_DIR}" && gosu "$TALEBOOK_RUN_IDENTITY" npm install
 fi
 
 # 检测权限
@@ -84,16 +83,16 @@ nginx -t || exit 1
 
 echo
 echo "====== Sync DB Scheme ===="
-gosu talebook:talebook /var/www/talebook/server.py --syncdb
+gosu "$TALEBOOK_RUN_IDENTITY" /var/www/talebook/server.py --syncdb
 
 echo
 echo "====== Migrate Database Schema ===="
 echo "Checking for missing columns and adding them..."
-gosu talebook:talebook python3 /var/www/talebook/webserver/migrate_db.py
+gosu "$TALEBOOK_RUN_IDENTITY" python3 /var/www/talebook/webserver/migrate_db.py
 
 echo
 echo "====== Update Server Config ===="
-gosu talebook:talebook /var/www/talebook/server.py --update-config
+gosu "$TALEBOOK_RUN_IDENTITY" /var/www/talebook/server.py --update-config
 
 echo
 echo "====== Start Server ===="

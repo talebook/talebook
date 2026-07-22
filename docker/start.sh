@@ -1,10 +1,9 @@
 #!/bin/sh
 
-PUID=${PUID:-0}
-PGID=${PGID:-0}
-
-groupmod -o -g "${PGID}" talebook
-usermod -o -u "${PUID}" talebook
+DOCKER_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if ! . "$DOCKER_DIR/setup-user.sh"; then
+  exit 1
+fi
 
 # 使用预设的书库和配置
 if [ ! -d "/data/books" ]; then
@@ -40,7 +39,7 @@ mkdir -p /root/.npm
 
 # 设置系统文件的权限（数量较少，且 nginx/诊断页在自检完成前就需要可用，必须先于 supervisord 启动前就绪）
 mkdir -p /data/log/nginx /var/www/talebook/status
-chown -R talebook:talebook \
+chown -R "$TALEBOOK_RUN_IDENTITY" \
   /data/log/ \
   /var/lib/nginx \
   /root/.config/calibre \
@@ -62,4 +61,3 @@ export PYTHONDONTWRITEBYTECODE=1
 echo
 echo "====== Start Server ===="
 exec /usr/bin/supervisord --nodaemon -u root -c /etc/supervisor/supervisord.conf
-

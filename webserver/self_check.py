@@ -28,6 +28,10 @@ RUN_USER = os.environ.get("TALEBOOK_RUN_USER", "talebook")
 SCHEMA_VERSION = 1
 
 
+def run_identity():
+    return os.environ.get("TALEBOOK_RUN_IDENTITY", "%s:%s" % (RUN_USER, RUN_USER))
+
+
 def _status_path():
     return os.path.join(STATUS_DIR, "status.json")
 
@@ -73,14 +77,14 @@ def check_permission():
 
     if previous != current:
         books_dir = os.path.join(DATA_DIR, "books")
-        if not run(["chown", "-R", "%s:%s" % (RUN_USER, RUN_USER), books_dir]):
+        if not run(["chown", "-R", run_identity(), books_dir]):
             return False, "permission_denied"
         with open(permission_file, "w") as f:
             f.write(current)
 
     test_file = os.path.join(DATA_DIR, "books", "library", "test_writeable.txt")
     write_test = "date > '{0}' && rm -f '{0}'".format(test_file)
-    if not run(["gosu", "%s:%s" % (RUN_USER, RUN_USER), "sh", "-c", write_test]):
+    if not run(["gosu", run_identity(), "sh", "-c", write_test]):
         return False, "permission_denied"
 
     return True, None
@@ -91,17 +95,17 @@ def check_nginx_config():
 
 
 def check_syncdb():
-    cmd = ["gosu", "%s:%s" % (RUN_USER, RUN_USER), os.path.join(SERVER_DIR, "server.py"), "--syncdb"]
+    cmd = ["gosu", run_identity(), os.path.join(SERVER_DIR, "server.py"), "--syncdb"]
     return (True, None) if run(cmd) else (False, "syncdb_failed")
 
 
 def check_migrate():
-    cmd = ["gosu", "%s:%s" % (RUN_USER, RUN_USER), "python3", os.path.join(SERVER_DIR, "webserver", "migrate_db.py")]
+    cmd = ["gosu", run_identity(), "python3", os.path.join(SERVER_DIR, "webserver", "migrate_db.py")]
     return (True, None) if run(cmd) else (False, "migrate_failed")
 
 
 def check_update_config():
-    cmd = ["gosu", "%s:%s" % (RUN_USER, RUN_USER), os.path.join(SERVER_DIR, "server.py"), "--update-config"]
+    cmd = ["gosu", run_identity(), os.path.join(SERVER_DIR, "server.py"), "--update-config"]
     return (True, None) if run(cmd) else (False, "update_config_failed")
 
 
