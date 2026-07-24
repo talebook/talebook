@@ -245,7 +245,7 @@ class AudiobookDetail(BaseHandler):
                 .all()
             )
             edition_values.append(_edition_dict(edition, chapters))
-        return {"err": "ok", "book": utils.BookFormatter(self, book).format(), "editions": edition_values}
+        return {"err": "ok", "book": utils.BookFormatter(self, book).format(with_files=True), "editions": edition_values}
 
 
 class AudiobookJobCreate(BaseHandler):

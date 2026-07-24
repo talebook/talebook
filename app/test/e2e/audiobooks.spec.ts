@@ -24,6 +24,8 @@ test.describe('Audiobook production and playback', () => {
 
         await page.goto('/audio-jobs');
         await expect(page.getByTestId('audiobook-beta')).toHaveText('Beta');
+        await expect(page.getByTestId('audio-job-empty-state')).toBeVisible();
+        await expect(page.getByTestId('open-library-to-create-job')).toHaveAttribute('href', '/library');
     });
 
     test('generates, publishes, plays, and restores a chapter', async ({ page }) => {

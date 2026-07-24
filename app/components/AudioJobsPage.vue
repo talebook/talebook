@@ -159,7 +159,21 @@
             v-if="!pending && !filteredJobs.length"
             icon="mdi-progress-clock"
             :title="t('audiobook.noJobs')"
-        />
+            :text="t('audiobook.noJobsDescription')"
+            data-testid="audio-job-empty-state"
+        >
+            <template #actions>
+                <v-btn
+                    color="primary"
+                    variant="flat"
+                    prepend-icon="mdi-library-shelves"
+                    to="/library"
+                    data-testid="open-library-to-create-job"
+                >
+                    {{ t('audiobook.openLibraryToCreateJob') }}
+                </v-btn>
+            </template>
+        </v-empty-state>
 
         <v-dialog
             v-model="workspaceDialog"

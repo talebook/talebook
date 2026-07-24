@@ -35,7 +35,7 @@
                     prepend-icon="mdi-progress-wrench"
                     to="/audio-jobs"
                 >
-                    {{ t('audiobook.jobs') }}
+                    {{ t('audiobook.viewJobs') }}
                 </v-btn>
             </div>
         </section>

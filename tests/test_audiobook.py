@@ -115,6 +115,7 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         self.assertEqual(collection["total"], 1)
         book_audios = self.json(f"/api/book/{test_main.BID_EPUB}/audios")
         self.assertEqual(book_audios["editions"][0]["id"], edition_id)
+        self.assertIn("EPUB", {item["format"] for item in book_audios["book"]["files"]})
         audio = self.json(f"/api/audio/{edition_id}")
         self.assertEqual(audio["manifest"]["id"], edition_id)
         published = self.json(

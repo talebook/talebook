@@ -80,7 +80,7 @@
                             to="/audio-jobs"
                             prepend-icon="mdi-progress-wrench"
                         >
-                            {{ t('audiobook.jobs') }}
+                            {{ t('audiobook.viewJobs') }}
                         </v-btn>
                     </div>
                 </div>
@@ -355,6 +355,9 @@ async function submitGeneration() {
         } else {
             $alert('error', response.msg);
         }
+    } catch (error) {
+        const message = error instanceof Error && error.message ? error.message : t('audiobook.createJobFailed');
+        $alert('error', message);
     } finally {
         submitting.value = false;
     }
