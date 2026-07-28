@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Talebook 产品调研与未来半年路线建议</title>
+    <style>
+      :root {
+        --paper: #f7f7f5;
+        --paper-edge: #efefea;
+        --ink: #1a1a1a;
+        --ink-soft: #4a4a4a;
+        --ink-faint: #7a7a7a;
+        --rule: #d8d8d2;
+        --rule-soft: #e8e8e2;
+        --accent: #6f9bb8;
+        --accent-strong: #497894;
+        --accent-soft: #d9e6f0;
+        --accent-faint: #eef4f8;
+        --warn: #b88a4a;
+        --warn-soft: #f5ecdc;
+        --danger: #a05050;
+        --olive: #6b7560;
+        --olive-soft: #ecede5;
+        --code-bg: #ececea;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html { scroll-behavior: smooth; }
+      body {
+        font-family:
+          ui-serif, "Charter", "Iowan Old Style", "Source Serif Pro", Georgia,
+          "Songti SC", "Source Han Serif SC", "Noto Serif CJK SC", serif;
+        background: var(--paper);
+        color: var(--ink);
+        line-height: 1.66;
+        -webkit-font-smoothing: antialiased;
+        padding: 64px 24px 96px;
+      }
+
+      .doc { max-width: 1080px; margin: 0 auto; }
+      .doc-narrow { max-width: 840px; }
+      .doc-header {
+        border-bottom: 1px solid var(--rule);
+        padding-bottom: 28px;
+        margin-bottom: 48px;
+      }
+      .doc-eyebrow,
+      .doc-meta,
+      .tldr-label,
+      .num,
+      th,
+      figcaption,
+      .kicker,
+      .metric-label,
+      .tag,
+      .toc,
+      .pill,
+      .small {
+        font-family:
+          ui-monospace, "SF Mono", Menlo,
+          "PingFang SC", "Hiragino Sans GB", monospace;
+      }
+      .doc-eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        margin-bottom: 14px;
+      }
+      .mascot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background: var(--accent);
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+      .doc-title {
+        font-size: clamp(28px, 4vw, 48px);
+        font-weight: 650;
+        letter-spacing: 0;
+        line-height: 1.16;
+        max-width: 920px;
+      }
+      .doc-subtitle {
+        font-size: 17px;
+        color: var(--ink-soft);
+        margin-top: 14px;
+        max-width: 760px;
+        font-style: italic;
+      }
+      .doc-meta {
+        font-size: 11px;
+        color: var(--ink-faint);
+        margin-top: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+      }
+      .tldr {
+        background: var(--accent-faint);
+        border-left: 2px solid var(--accent);
+        padding: 22px 24px;
+        margin: 0 0 42px;
+        font-size: 15px;
+      }
+      .tldr-label {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent-strong);
+        margin-bottom: 8px;
+        font-weight: 700;
+      }
+      section { margin-bottom: 64px; }
+      h2 {
+        font-size: 24px;
+        font-weight: 650;
+        letter-spacing: 0;
+        margin-bottom: 18px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--rule);
+      }
+      h2 .num {
+        font-size: 12px;
+        color: var(--ink-faint);
+        font-weight: 500;
+        margin-right: 14px;
+        letter-spacing: 0.05em;
+      }
+      h3 {
+        font-size: 17px;
+        font-weight: 650;
+        margin: 28px 0 10px;
+      }
+      h4 {
+        font-size: 14px;
+        font-weight: 650;
+        margin: 22px 0 8px;
+      }
+      p { margin-bottom: 14px; }
+      a {
+        color: var(--accent-strong);
+        text-decoration: none;
+        border-bottom: 1px solid var(--accent-soft);
+      }
+      a:hover { border-bottom-color: var(--accent-strong); }
+      code {
+        font-family:
+          ui-monospace, "SF Mono", Menlo,
+          "PingFang SC", "Hiragino Sans GB", monospace;
+        font-size: 13px;
+        background: var(--code-bg);
+        padding: 1px 5px;
+        border-radius: 2px;
+      }
+      ul, ol { margin: 8px 0 16px 22px; }
+      li { margin-bottom: 7px; }
+      strong { font-weight: 650; }
+      .grid {
+        display: grid;
+        gap: 16px;
+        margin: 20px 0 22px;
+      }
+      .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .card {
+        border: 1px solid var(--rule);
+        background: #fff;
+        padding: 18px;
+      }
+      .card.accent { background: var(--accent-faint); border-color: var(--accent-soft); }
+      .card.warn { background: var(--warn-soft); border-color: #e6d4a8; }
+      .card.olive { background: var(--olive-soft); border-color: #d7dcc8; }
+      .kicker {
+        color: var(--ink-faint);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 7px;
+        font-weight: 700;
+      }
+      .card-title {
+        font-size: 18px;
+        font-weight: 650;
+        margin-bottom: 6px;
+      }
+      .card-body {
+        color: var(--ink-soft);
+        font-size: 13.5px;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin: 24px 0 26px;
+      }
+      .metric {
+        border-top: 2px solid var(--accent);
+        background: #fff;
+        padding: 14px 14px 16px;
+      }
+      .metric:nth-child(2) { border-top-color: var(--warn); }
+      .metric:nth-child(3) { border-top-color: var(--olive); }
+      .metric:nth-child(4) { border-top-color: var(--danger); }
+      .metric-value {
+        font-size: 30px;
+        line-height: 1.1;
+        font-weight: 650;
+      }
+      .metric-label {
+        margin-top: 5px;
+        color: var(--ink-faint);
+        font-size: 10.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .metric-note {
+        color: var(--ink-soft);
+        font-size: 12.5px;
+        margin-top: 8px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0 18px;
+        font-size: 13.5px;
+        background: #fff;
+      }
+      th, td {
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--rule-soft);
+        vertical-align: top;
+      }
+      th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--ink-faint);
+        border-bottom: 1px solid var(--rule);
+      }
+      tbody tr:hover { background: rgba(0,0,0,0.018); }
+      .numcell {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+        white-space: nowrap;
+      }
+      .verdict { color: var(--accent-strong); font-weight: 650; }
+      .risk { color: var(--danger); font-weight: 650; }
+      .tag {
+        display: inline-block;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border: 1px solid var(--rule);
+        background: var(--paper-edge);
+        color: var(--ink-soft);
+        padding: 2px 6px;
+        margin: 0 4px 5px 0;
+      }
+      .heat {
+        min-width: 56px;
+        text-align: center;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      .heat.high { background: #d9e6f0; color: #315d73; }
+      .heat.mid { background: #f5ecdc; color: #7a6420; }
+      .heat.low { background: #f3f3ef; color: var(--ink-faint); }
+      figure {
+        margin: 28px 0 32px;
+        border: 1px solid var(--rule);
+        background: #fff;
+      }
+      figure svg,
+      figure img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      figcaption {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        padding: 10px 16px;
+        border-top: 1px solid var(--rule-soft);
+        background: var(--paper-edge);
+      }
+      figcaption .fig-num {
+        color: var(--accent-strong);
+        margin-right: 10px;
+        font-weight: 700;
+      }
+      .shot-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 20px;
+      }
+      .shot {
+        border: 1px solid var(--rule);
+        background: #fff;
+        overflow: hidden;
+      }
+      .shot img {
+        width: 100%;
+        display: block;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        object-position: top center;
+        background: #fff;
+      }
+      .shot-title {
+        padding: 10px 12px 0;
+        font-weight: 650;
+        font-size: 14px;
+      }
+      .shot-note {
+        padding: 4px 12px 12px;
+        color: var(--ink-soft);
+        font-size: 12.5px;
+      }
+      .callout {
+        border: 1px solid var(--rule);
+        background: #fff;
+        padding: 17px 19px;
+        margin: 16px 0 20px;
+      }
+      .callout.warn {
+        border-color: #e6d4a8;
+        background: var(--warn-soft);
+      }
+      .callout.cite {
+        border-left: 2px solid var(--accent);
+        border-top: none;
+        border-right: none;
+        border-bottom: none;
+        background: var(--accent-faint);
+        padding-left: 22px;
+        font-style: italic;
+      }
+      .callout-label {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        margin-bottom: 8px;
+        font-weight: 700;
+      }
+      .callout.warn .callout-label { color: var(--warn); }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 18px 0;
+        align-items: center;
+      }
+      .filter {
+        max-width: 280px;
+        border: 1px solid var(--rule);
+        background: #fff;
+        color: var(--ink);
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+      .pill {
+        border: 1px solid var(--rule);
+        background: #fff;
+        color: var(--ink-soft);
+        cursor: pointer;
+        padding: 7px 10px;
+        font-size: 10.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .pill.active {
+        border-color: var(--accent);
+        background: var(--accent-faint);
+        color: var(--accent-strong);
+      }
+      .toc {
+        position: fixed;
+        left: 20px;
+        top: 64px;
+        width: 190px;
+        font-size: 11px;
+        line-height: 1.75;
+      }
+      .toc a {
+        display: block;
+        color: var(--ink-faint);
+        border: none;
+        padding: 2px 0;
+      }
+      .toc a.active {
+        color: var(--accent-strong);
+        font-weight: 700;
+      }
+      .small { font-size: 11px; color: var(--ink-faint); }
+      footer {
+        margin-top: 80px;
+        padding-top: 24px;
+        border-top: 1px solid var(--rule);
+        font-size: 12px;
+        color: var(--ink-faint);
+      }
+      footer h4 {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-family: ui-monospace, Menlo, monospace;
+        margin-bottom: 10px;
+        color: var(--ink-soft);
+      }
+      footer ul { list-style: none; margin-left: 0; }
+      footer li { margin-bottom: 4px; overflow-wrap: anywhere; }
+      @media (max-width: 1240px) {
+        .toc { display: none; }
+      }
+      @media (max-width: 860px) {
+        body { padding: 32px 16px 64px; }
+        .metrics,
+        .grid.cols-2,
+        .grid.cols-3,
+        .grid.cols-4,
+        .shot-grid { grid-template-columns: 1fr; }
+        table { display: block; overflow-x: auto; white-space: nowrap; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="toc" id="toc"></nav>
+    <article class="doc">
+      <header class="doc-header">
+        <div class="doc-eyebrow"><span class="mascot"></span>Talebook · Product Research</div>
+        <h1 class="doc-title">Talebook 产品调研与未来半年路线建议</h1>
+        <p class="doc-subtitle">从自托管书库、商业阅读平台与 AI 阅读工具中提炼机会，给出可执行的半年产品组合。</p>
+        <div class="doc-meta">
+          <span>STATUS · RESEARCH REPORT</span>
+          <span>DATE · 2026-07-28</span>
+          <span>SCOPE · Open Source / Commercial / AI Reading</span>
+          <span>BRANCH · product-research-html-2026h2</span>
+        </div>
+      </header>
+
+      <div class="tldr doc-narrow">
+        <div class="tldr-label">TL;DR</div>
+        Talebook 不应直接复制 Kindle、微信读书或 Audible，也不需要重写 Calibre。未来半年最务实的方向是升级为“中文私有阅读中枢”：把入库、元数据、权限、阅读进度、批注、AI 知识提取和多端同步串起来。推荐投入配比为 50% 基础阅读体验、35% AI 阅读、10% 听书/TTS 验证、5% 开放生态。
+      </div>
+
+      <section id="executive">
+        <h2><span class="num">01</span>执行摘要</h2>
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-value">5.6k</div>
+            <div class="metric-label">Talebook GitHub stars</div>
+            <div class="metric-note">中文自托管书库已有可观基础盘。</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">50%</div>
+            <div class="metric-label">Recommended focus</div>
+            <div class="metric-note">优先补书架、批注、同步、导入质量。</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">35%</div>
+            <div class="metric-label">AI reading</div>
+            <div class="metric-note">AI 必须和全文索引、引用、笔记绑定。</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">6 mo</div>
+            <div class="metric-label">Roadmap horizon</div>
+            <div class="metric-note">半年内做出可传播的大版本。</div>
+          </div>
+        </div>
+
+        <div class="grid cols-3">
+          <div class="card accent">
+            <div class="kicker">Mainline</div>
+            <div class="card-title">私人书库基础体验</div>
+            <div class="card-body">书架、继续阅读、进度同步、批注、OPDS/KOReader/Kobo/Moke。先让用户真的持续读书。</div>
+          </div>
+          <div class="card warn">
+            <div class="kicker">Differentiation</div>
+            <div class="card-title">AI 知识阅读</div>
+            <div class="card-body">从现有 AI 元数据扩展到带来源引用的摘要、问答、划线解释和知识库导出。</div>
+          </div>
+          <div class="card olive">
+            <div class="kicker">Validation</div>
+            <div class="card-title">听书/TTS MVP</div>
+            <div class="card-body">只验证章节级 TTS、收听进度和有声书导入。中心音频分享平台暂缓。</div>
+          </div>
+        </div>
+
+        <figure>
+          <svg viewBox="0 0 900 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, monospace" font-size="12">
+            <rect width="900" height="320" fill="#fff"/>
+            <text x="40" y="38" fill="#1a1a1a" font-size="16" font-weight="700">未来半年投入组合</text>
+            <text x="40" y="60" fill="#7a7a7a" font-size="11">Recommendation split by engineering/product effort</text>
+
+            <g transform="translate(70 96)">
+              <rect x="0" y="0" width="720" height="54" fill="#f3f3ef" stroke="#d8d8d2"/>
+              <rect x="0" y="0" width="360" height="54" fill="#d9e6f0"/>
+              <rect x="360" y="0" width="252" height="54" fill="#f5ecdc"/>
+              <rect x="612" y="0" width="72" height="54" fill="#ecede5"/>
+              <rect x="684" y="0" width="36" height="54" fill="#eadada"/>
+              <text x="180" y="32" text-anchor="middle" fill="#315d73" font-weight="700">基础体验 50%</text>
+              <text x="486" y="32" text-anchor="middle" fill="#7a6420" font-weight="700">AI 35%</text>
+              <text x="648" y="32" text-anchor="middle" fill="#5a5a3a" font-weight="700">TTS 10%</text>
+              <text x="702" y="32" text-anchor="middle" fill="#8a3a3a" font-weight="700">API 5%</text>
+            </g>
+
+            <g transform="translate(70 200)">
+              <circle cx="0" cy="0" r="6" fill="#6f9bb8"/><text x="14" y="4" fill="#4a4a4a">A: 书架/同步/批注/导入</text>
+              <circle cx="230" cy="0" r="6" fill="#b88a4a"/><text x="244" y="4" fill="#4a4a4a">B: 带引用 AI 阅读</text>
+              <circle cx="430" cy="0" r="6" fill="#6b7560"/><text x="444" y="4" fill="#4a4a4a">C: TTS MVP</text>
+              <circle cx="580" cy="0" r="6" fill="#a05050"/><text x="594" y="4" fill="#4a4a4a">D: API/插件</text>
+            </g>
+          </svg>
+          <figcaption><span class="fig-num">FIG 1</span>推荐投入配比：先补底座，再做 AI 差异化，听书只做小步验证。</figcaption>
+        </figure>
+      </section>
+
+      <section id="screenshots">
+        <h2><span class="num">02</span>产品截图观察</h2>
+        <p class="doc-narrow">截图不是为了复刻 UI，而是观察竞品把价值放在什么位置：书库首页、阅读器、批注、TTS、音频库、跨端能力。Talebook 需要从“管理文件”转向“完成阅读闭环”。</p>
+        <div class="shot-grid">
+          <div class="shot">
+            <img src="assets/product-research/talebook.png" alt="Talebook screenshot" />
+            <div class="shot-title">Talebook</div>
+            <div class="shot-note">中文自托管书库、Calibre 底座、Web 阅读和网络书源是现有差异。</div>
+          </div>
+          <div class="shot">
+            <img src="assets/product-research/kavita.gif" alt="Kavita screenshot" />
+            <div class="shot-title">Kavita</div>
+            <div class="shot-note">阅读服务器更强调集合、阅读列表、内置阅读器、主题和元数据。</div>
+          </div>
+          <div class="shot">
+            <img src="assets/product-research/audiobookshelf.png" alt="Audiobookshelf screenshot" />
+            <div class="shot-title">Audiobookshelf</div>
+            <div class="shot-note">有声书不是“上传音频”而是播放、章节、进度、移动端和元数据。</div>
+          </div>
+          <div class="shot">
+            <img src="assets/product-research/koodo.png" alt="Koodo Reader screenshot" />
+            <div class="shot-title">Koodo Reader</div>
+            <div class="shot-note">阅读器端已经把云盘同步、AI、导出到知识库做成卖点。</div>
+          </div>
+          <div class="shot">
+            <img src="assets/product-research/readest-annotations.png" alt="Readest annotations screenshot" />
+            <div class="shot-title">Readest annotations</div>
+            <div class="shot-note">批注、高亮、笔记是从“打开书”到“沉淀知识”的关键环节。</div>
+          </div>
+          <div class="shot">
+            <img src="assets/product-research/readest-tts.png" alt="Readest TTS screenshot" />
+            <div class="shot-title">Readest TTS</div>
+            <div class="shot-note">TTS 应嵌入阅读器体验，而不是作为孤立的音频导出按钮。</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="opensource">
+        <h2><span class="num">03</span>开源竞品格局</h2>
+        <p class="doc-narrow">自托管阅读项目的竞争重心正在从“能管理/下载书”转向“能同步阅读状态、批注和设备”。OPDS 仍是基础，但 KOReader/Kobo 同步、REST API、批注模型和全文搜索已经成为新一代项目的标配倾向。</p>
+
+        <div class="toolbar">
+          <input class="filter" id="oss-filter" type="text" placeholder="筛选开源产品..." />
+          <button class="pill active" data-family="all">全部</button>
+          <button class="pill" data-family="server">服务器</button>
+          <button class="pill" data-family="reader">阅读器</button>
+          <button class="pill" data-family="audio">有声书</button>
+        </div>
+        <table id="oss-table">
+          <thead>
+            <tr>
+              <th>产品</th>
+              <th>Stars</th>
+              <th>定位</th>
+              <th>关键启发</th>
+              <th>Family</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-family="server"><td><strong>Calibre-Web</strong></td><td class="numcell">17.8k</td><td>Calibre 书库 Web 管理</td><td>书架、Kobo Sync、Magic Link、LDAP/OAuth 是直接参考项。</td><td><span class="tag">server</span></td></tr>
+            <tr data-family="server"><td><strong>Kavita</strong></td><td class="numcell">11.3k</td><td>自托管阅读服务器</td><td>集合、Want to Read、批注、Kavita+ 订阅展示了完整产品化路径。</td><td><span class="tag">server</span></td></tr>
+            <tr data-family="server"><td><strong>Komga</strong></td><td class="numcell">6.5k</td><td>漫画/杂志/eBook 媒体服务器</td><td>REST API、OPDS v1/v2、Kobo Sync、KOReader Sync 是设备生态重点。</td><td><span class="tag">server</span></td></tr>
+            <tr data-family="audio"><td><strong>Audiobookshelf</strong></td><td class="numcell">13.7k</td><td>自托管有声书/播客服务器</td><td>音频体验需要章节、进度、移动端、元数据、转码和备份。</td><td><span class="tag">audio</span></td></tr>
+            <tr data-family="reader"><td><strong>Koodo Reader</strong></td><td class="numcell">27.7k</td><td>跨平台电子书阅读器</td><td>AI、网盘/WebDAV、KOReader 同步和知识库导出已成为阅读器卖点。</td><td><span class="tag">reader</span></td></tr>
+            <tr data-family="reader"><td><strong>Readest</strong></td><td class="numcell">22.8k</td><td>现代跨平台阅读器</td><td>Talebook 的 Moke 已借力 Readest，应优先打通后端同步。</td><td><span class="tag">reader</span></td></tr>
+            <tr data-family="reader"><td><strong>KOReader</strong></td><td class="numcell">28.1k</td><td>电纸书阅读器</td><td>电纸书用户强依赖 OPDS 和同步，适配价值高。</td><td><span class="tag">reader</span></td></tr>
+            <tr data-family="server"><td><strong>BookOrbit</strong></td><td class="numcell">1.8k</td><td>新兴自托管阅读平台</td><td>三方进度/批注同步与 Readwise/Hardcover 同步说明趋势已转向阅读数据中枢。</td><td><span class="tag">server</span></td></tr>
+            <tr data-family="server"><td><strong>Stump</strong></td><td class="numcell">2.6k</td><td>数字书服务器</td><td>小团队新项目也把批注、OIDC、Kobo/KOReader 同步作为核心能力。</td><td><span class="tag">server</span></td></tr>
+          </tbody>
+        </table>
+
+        <figure>
+          <svg viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, monospace" font-size="12">
+            <rect width="900" height="420" fill="#fff"/>
+            <text x="40" y="38" fill="#1a1a1a" font-size="16" font-weight="700">开源项目 GitHub stars 对比</text>
+            <text x="40" y="60" fill="#7a7a7a" font-size="11">As of 2026-07-28; approximate values from GitHub API/pages</text>
+            <line x1="170" y1="350" x2="830" y2="350" stroke="#7a7a7a"/>
+            <line x1="170" y1="86" x2="170" y2="350" stroke="#7a7a7a"/>
+            <g stroke="#e8e8e2" stroke-dasharray="2 4">
+              <line x1="170" y1="284" x2="830" y2="284"/>
+              <line x1="170" y1="218" x2="830" y2="218"/>
+              <line x1="170" y1="152" x2="830" y2="152"/>
+              <line x1="170" y1="86" x2="830" y2="86"/>
+            </g>
+            <g fill="#7a7a7a" font-size="10" text-anchor="end">
+              <text x="160" y="354">0</text><text x="160" y="288">7k</text><text x="160" y="222">14k</text><text x="160" y="156">21k</text><text x="160" y="90">28k</text>
+            </g>
+            <g>
+              <rect x="192" y="297" width="38" height="53" fill="#d9e6f0" stroke="#6f9bb8"/><text x="211" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 211 372)">Talebook</text>
+              <rect x="252" y="182" width="38" height="168" fill="#d9e6f0" stroke="#6f9bb8"/><text x="271" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 271 372)">Calibre-Web</text>
+              <rect x="312" y="243" width="38" height="107" fill="#d9e6f0" stroke="#6f9bb8"/><text x="331" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 331 372)">Kavita</text>
+              <rect x="372" y="289" width="38" height="61" fill="#d9e6f0" stroke="#6f9bb8"/><text x="391" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 391 372)">Komga</text>
+              <rect x="432" y="220" width="38" height="130" fill="#f5ecdc" stroke="#b88a4a"/><text x="451" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 451 372)">AudioShelf</text>
+              <rect x="492" y="88" width="38" height="262" fill="#ecede5" stroke="#6b7560"/><text x="511" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 511 372)">Koodo</text>
+              <rect x="552" y="133" width="38" height="217" fill="#ecede5" stroke="#6b7560"/><text x="571" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 571 372)">Readest</text>
+              <rect x="612" y="84" width="38" height="266" fill="#ecede5" stroke="#6b7560"/><text x="631" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 631 372)">KOReader</text>
+              <rect x="672" y="333" width="38" height="17" fill="#d9e6f0" stroke="#6f9bb8"/><text x="691" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 691 372)">BookOrbit</text>
+              <rect x="732" y="325" width="38" height="25" fill="#d9e6f0" stroke="#6f9bb8"/><text x="751" y="372" text-anchor="middle" fill="#4a4a4a" transform="rotate(35 751 372)">Stump</text>
+            </g>
+            <g transform="translate(680 42)" font-size="10">
+              <rect x="0" y="0" width="14" height="10" fill="#d9e6f0" stroke="#6f9bb8"/><text x="22" y="9" fill="#7a7a7a">Server</text>
+              <rect x="0" y="18" width="14" height="10" fill="#ecede5" stroke="#6b7560"/><text x="22" y="27" fill="#7a7a7a">Reader</text>
+              <rect x="0" y="36" width="14" height="10" fill="#f5ecdc" stroke="#b88a4a"/><text x="22" y="45" fill="#7a7a7a">Audio</text>
+            </g>
+          </svg>
+          <figcaption><span class="fig-num">FIG 2</span>开源项目规模：阅读器类项目 stars 高，说明跨端体验和阅读能力更容易形成传播。</figcaption>
+        </figure>
+      </section>
+
+      <section id="commercial">
+        <h2><span class="num">04</span>商业付费产品信号</h2>
+        <p class="doc-narrow">商业产品卖的不是“文件管理”，而是持续阅读的省心体验：跨设备进度、书签高亮、内容发现、离线、TTS、家庭共享、读书目标和可导出笔记。Talebook 的机会在于用自托管和中文生态切入同一个需求。</p>
+        <table>
+          <thead>
+            <tr>
+              <th>产品</th>
+              <th>模式</th>
+              <th>强项</th>
+              <th>给 Talebook 的信号</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>BookFusion</strong></td><td class="numcell">$0 / $1.99+ / $4.99+ / $9.99+</td><td>DRM-free 书库上传、跨端进度/高亮/书签、Calibre 导入、Send to Kindle、家庭分享、TTS。</td><td class="verdict">最像 Talebook 的商业参照，证明私有书库用户愿意为同步和存储付费。</td></tr>
+            <tr><td><strong>Readwise Reader</strong></td><td class="numcell">$9.99/年付月均; $12.99/月付</td><td>文章、PDF、EPUB、RSS、newsletter、YouTube 统一阅读，高亮复习，导出 Notion/Obsidian。</td><td class="verdict">阅读数据和知识流转本身可以成为付费价值。</td></tr>
+            <tr><td><strong>Audible</strong></td><td class="numcell">$8.99 / $14.95</td><td>有声书内容、移动播放、离线、播客、点数购买。</td><td>不要做内容平台；应做个人内容/TTS 的私有听书体验。</td></tr>
+            <tr><td><strong>微信读书</strong></td><td>无限卡/内容购买</td><td>中文内容、阅读统计、划线想法、书评、社交、AI Skill。</td><td class="verdict">AI 读取个人书架、笔记和统计是中文市场明确信号。</td></tr>
+            <tr><td><strong>得到</strong></td><td>课程/听书/电子书/AI 会员</td><td>听书、电子书全局播放、AI 学习助手、笔记同步。</td><td>知识型用户需要“读/听/问/记”一体化。</td></tr>
+            <tr><td><strong>Apple Books</strong></td><td>系统生态 + 内容销售</td><td>阅读目标、成就、推荐、家庭共享、跨设备。</td><td>读书目标和统计可作为留存增强，但不应喧宾夺主。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="ai">
+        <h2><span class="num">05</span>AI 阅读与知识管理趋势</h2>
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="kicker">NotebookLM pattern</div>
+            <div class="card-title">源文档约束 + 引用</div>
+            <div class="card-body">Gemini Notebook 强调基于上传来源回答，并提供引用；音频概览、思维导图、学习指南、报告等是源材料的多种输出形态。</div>
+          </div>
+          <div class="card">
+            <div class="kicker">Readwise pattern</div>
+            <div class="card-title">阅读库成为 AI 上下文</div>
+            <div class="card-body">Readwise Reader/Ghostreader 把文档问答、自动摘要、自动标签、导出、API/MCP 串起来，说明“我的阅读库”是长期资产。</div>
+          </div>
+          <div class="card">
+            <div class="kicker">WeRead pattern</div>
+            <div class="card-title">AI 连接阅读数据</div>
+            <div class="card-body">微信读书 Skill 支持查书架、阅读统计、笔记划线、书籍搜索、详情和推荐。Talebook 可做私有版 API/Skill。</div>
+          </div>
+          <div class="card">
+            <div class="kicker">Open-source acceptance</div>
+            <div class="card-title">BYOK 和可关闭是前提</div>
+            <div class="card-body">自托管用户更关心隐私、成本和可控性。AI 应默认只发送片段、保留审计、支持用户自带 Key。</div>
+          </div>
+        </div>
+
+        <figure>
+          <svg viewBox="0 0 900 390" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, monospace" font-size="12">
+            <rect width="900" height="390" fill="#fff"/>
+            <text x="40" y="38" fill="#1a1a1a" font-size="16" font-weight="700">AI 阅读架构建议</text>
+            <defs>
+              <marker id="arr1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#6f9bb8"/>
+              </marker>
+            </defs>
+            <g>
+              <rect x="50" y="112" width="160" height="88" fill="#eef4f8" stroke="#6f9bb8" stroke-width="1.4"/>
+              <text x="64" y="136" fill="#497894" font-weight="700">SOURCE</text>
+              <text x="64" y="160" fill="#4a4a4a">EPUB / TXT / PDF</text>
+              <text x="64" y="182" fill="#7a7a7a">Calibre files</text>
+
+              <rect x="270" y="112" width="160" height="88" fill="#fff" stroke="#6f9bb8" stroke-width="1.4"/>
+              <text x="284" y="136" fill="#497894" font-weight="700">INDEX</text>
+              <text x="284" y="160" fill="#4a4a4a">extract + chunk</text>
+              <text x="284" y="182" fill="#7a7a7a">FTS / embeddings</text>
+
+              <rect x="490" y="112" width="160" height="88" fill="#f5ecdc" stroke="#b88a4a" stroke-width="1.4"/>
+              <text x="504" y="136" fill="#7a6420" font-weight="700">LLM</text>
+              <text x="504" y="160" fill="#4a4a4a">BYOK providers</text>
+              <text x="504" y="182" fill="#7a7a7a">only send chunks</text>
+
+              <rect x="710" y="112" width="140" height="88" fill="#ecede5" stroke="#6b7560" stroke-width="1.4"/>
+              <text x="724" y="136" fill="#5a5a3a" font-weight="700">OUTPUT</text>
+              <text x="724" y="160" fill="#4a4a4a">answer + cites</text>
+              <text x="724" y="182" fill="#7a7a7a">notes / export</text>
+            </g>
+            <g fill="none" stroke="#6f9bb8" stroke-width="1.4">
+              <path d="M 210 156 L 268 156" marker-end="url(#arr1)"/>
+              <path d="M 430 156 L 488 156" marker-end="url(#arr1)"/>
+              <path d="M 650 156 L 708 156" marker-end="url(#arr1)"/>
+            </g>
+            <g transform="translate(110 260)">
+              <rect x="0" y="0" width="680" height="70" fill="#f7f7f5" stroke="#d8d8d2"/>
+              <text x="18" y="26" fill="#1a1a1a" font-weight="700">Trust gate</text>
+              <text x="18" y="50" fill="#4a4a4a">答案必须附章节/位置/片段引用；没有来源就不回答；管理员可关闭 AI 或限制每日调用。</text>
+            </g>
+          </svg>
+          <figcaption><span class="fig-num">FIG 3</span>AI 不是孤立聊天框，而是全文索引、授权、引用和导出工作流。</figcaption>
+        </figure>
+      </section>
+
+      <section id="capability">
+        <h2><span class="num">06</span>Talebook 能力缺口矩阵</h2>
+        <p class="doc-narrow">下表把 Talebook 放到竞品能力坐标中。结论很直接：中文元数据和 Calibre 兼容是优势；书架/批注、全文搜索、设备同步和 AI 阅读是最值得补的缺口。</p>
+        <table>
+          <thead>
+            <tr>
+              <th>能力</th>
+              <th>Talebook</th>
+              <th>开源竞品成熟度</th>
+              <th>商业产品成熟度</th>
+              <th>半年优先级</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Calibre 兼容</strong></td><td class="heat high">强</td><td class="heat high">强</td><td class="heat low">弱</td><td class="verdict">保持优势</td></tr>
+            <tr><td><strong>中文元数据/书源</strong></td><td class="heat high">强</td><td class="heat low">弱</td><td class="heat high">强</td><td class="verdict">继续强化</td></tr>
+            <tr><td><strong>书架/智能集合</strong></td><td class="heat mid">中</td><td class="heat high">强</td><td class="heat high">强</td><td class="verdict">P0</td></tr>
+            <tr><td><strong>批注/高亮/笔记</strong></td><td class="heat low">弱</td><td class="heat high">强</td><td class="heat high">强</td><td class="verdict">P0</td></tr>
+            <tr><td><strong>KOReader/Kobo 同步</strong></td><td class="heat low">弱</td><td class="heat high">强</td><td class="heat mid">中</td><td class="verdict">P1</td></tr>
+            <tr><td><strong>AI 摘要/问答</strong></td><td class="heat low">弱</td><td class="heat mid">中</td><td class="heat high">强</td><td class="verdict">P1</td></tr>
+            <tr><td><strong>知识库导出</strong></td><td class="heat low">弱</td><td class="heat high">强</td><td class="heat high">强</td><td class="verdict">P1</td></tr>
+            <tr><td><strong>有声书/TTS</strong></td><td class="heat low">弱</td><td class="heat high">强</td><td class="heat high">强</td><td class="verdict">P2 验证</td></tr>
+            <tr><td><strong>公开音频分享</strong></td><td class="heat low">无</td><td class="heat low">弱</td><td class="heat mid">中</td><td class="risk">暂缓</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="options">
+        <h2><span class="num">07</span>四套发展方案</h2>
+        <div class="grid cols-4">
+          <div class="card accent">
+            <div class="kicker">Option A</div>
+            <div class="card-title">私人书库基础体验</div>
+            <div class="card-body">书架、阅读状态、批注、OPDS、Moke、KOReader/Kobo、导入和备份。风险低，直接提升现有用户满意度。</div>
+          </div>
+          <div class="card warn">
+            <div class="kicker">Option B</div>
+            <div class="card-title">AI 知识阅读中枢</div>
+            <div class="card-body">全文索引、摘要、带引用问答、划线解释、卡片、知识库导出、私有阅读 API/MCP。</div>
+          </div>
+          <div class="card olive">
+            <div class="kicker">Option C</div>
+            <div class="card-title">听书与 TTS 验证</div>
+            <div class="card-body">章节级 TTS、有声书导入、Web 播放器、倍速、睡眠定时、收听进度。中心分享暂缓。</div>
+          </div>
+          <div class="card">
+            <div class="kicker">Option D</div>
+            <div class="card-title">开放生态与商业化</div>
+            <div class="card-body">REST API、插件规范、诊断、托管/云增强/优先支持。长期重要，但不宜压过 A/B。</div>
+          </div>
+        </div>
+
+        <figure>
+          <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, monospace" font-size="12">
+            <rect width="900" height="360" fill="#fff"/>
+            <text x="40" y="38" fill="#1a1a1a" font-size="16" font-weight="700">方案评分</text>
+            <text x="40" y="60" fill="#7a7a7a" font-size="11">Higher is better; score reflects fit for next six months</text>
+            <g transform="translate(180 88)">
+              <line x1="0" y1="220" x2="640" y2="220" stroke="#7a7a7a"/>
+              <g stroke="#e8e8e2" stroke-dasharray="2 4">
+                <line x1="0" y1="176" x2="640" y2="176"/>
+                <line x1="0" y1="132" x2="640" y2="132"/>
+                <line x1="0" y1="88" x2="640" y2="88"/>
+                <line x1="0" y1="44" x2="640" y2="44"/>
+              </g>
+              <g fill="#4a4a4a">
+                <text x="-18" y="224" text-anchor="end">0</text>
+                <text x="-18" y="180" text-anchor="end">2</text>
+                <text x="-18" y="136" text-anchor="end">4</text>
+                <text x="-18" y="92" text-anchor="end">6</text>
+                <text x="-18" y="48" text-anchor="end">8</text>
+              </g>
+              <g>
+                <rect x="38" y="44" width="70" height="176" fill="#d9e6f0" stroke="#6f9bb8"/>
+                <text x="73" y="34" text-anchor="middle" fill="#315d73" font-weight="700">8.0</text>
+                <text x="73" y="246" text-anchor="middle" fill="#4a4a4a">A</text>
+
+                <rect x="198" y="66" width="70" height="154" fill="#f5ecdc" stroke="#b88a4a"/>
+                <text x="233" y="56" text-anchor="middle" fill="#7a6420" font-weight="700">7.0</text>
+                <text x="233" y="246" text-anchor="middle" fill="#4a4a4a">B</text>
+
+                <rect x="358" y="132" width="70" height="88" fill="#ecede5" stroke="#6b7560"/>
+                <text x="393" y="122" text-anchor="middle" fill="#5a5a3a" font-weight="700">4.0</text>
+                <text x="393" y="246" text-anchor="middle" fill="#4a4a4a">C</text>
+
+                <rect x="518" y="110" width="70" height="110" fill="#f3f3ef" stroke="#7a7a7a"/>
+                <text x="553" y="100" text-anchor="middle" fill="#4a4a4a" font-weight="700">5.0</text>
+                <text x="553" y="246" text-anchor="middle" fill="#4a4a4a">D</text>
+              </g>
+            </g>
+          </svg>
+          <figcaption><span class="fig-num">FIG 4</span>半年可行性评分：A 是主线，B 是差异化副主线，C 小步验证，D 随主线沉淀。</figcaption>
+        </figure>
+      </section>
+
+      <section id="roadmap">
+        <h2><span class="num">08</span>六个月路线图</h2>
+        <figure>
+          <svg viewBox="0 0 980 430" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, monospace" font-size="12">
+            <rect width="980" height="430" fill="#fff"/>
+            <text x="42" y="38" fill="#1a1a1a" font-size="16" font-weight="700">2026 H2 产品路线</text>
+            <g fill="#7a7a7a" font-size="11">
+              <text x="220" y="72">M1</text><text x="340" y="72">M2</text><text x="460" y="72">M3</text><text x="580" y="72">M4</text><text x="700" y="72">M5</text><text x="820" y="72">M6</text>
+            </g>
+            <g stroke="#e8e8e2">
+              <line x1="210" y1="88" x2="210" y2="372"/><line x1="330" y1="88" x2="330" y2="372"/>
+              <line x1="450" y1="88" x2="450" y2="372"/><line x1="570" y1="88" x2="570" y2="372"/>
+              <line x1="690" y1="88" x2="690" y2="372"/><line x1="810" y1="88" x2="810" y2="372"/>
+              <line x1="930" y1="88" x2="930" y2="372"/>
+            </g>
+            <g fill="#4a4a4a" font-weight="700">
+              <text x="42" y="122">数据模型</text>
+              <text x="42" y="172">书架/索引</text>
+              <text x="42" y="222">AI 阅读</text>
+              <text x="42" y="272">设备同步</text>
+              <text x="42" y="322">TTS 验证</text>
+              <text x="42" y="372">发布增长</text>
+            </g>
+            <g>
+              <rect x="210" y="104" width="120" height="30" fill="#d9e6f0" stroke="#6f9bb8"/><text x="270" y="124" text-anchor="middle" fill="#315d73">state / annotation</text>
+              <rect x="330" y="154" width="240" height="30" fill="#d9e6f0" stroke="#6f9bb8"/><text x="450" y="174" text-anchor="middle" fill="#315d73">shelf + continue + FTS</text>
+              <rect x="450" y="204" width="240" height="30" fill="#f5ecdc" stroke="#b88a4a"/><text x="570" y="224" text-anchor="middle" fill="#7a6420">summary + cited Q&A</text>
+              <rect x="570" y="254" width="240" height="30" fill="#d9e6f0" stroke="#6f9bb8"/><text x="690" y="274" text-anchor="middle" fill="#315d73">Moke / OPDS / KOReader</text>
+              <rect x="690" y="304" width="120" height="30" fill="#ecede5" stroke="#6b7560"/><text x="750" y="324" text-anchor="middle" fill="#5a5a3a">TTS MVP</text>
+              <rect x="810" y="354" width="120" height="30" fill="#f3f3ef" stroke="#7a7a7a"/><text x="870" y="374" text-anchor="middle" fill="#4a4a4a">major release</text>
+            </g>
+          </svg>
+          <figcaption><span class="fig-num">FIG 5</span>路线图：先定义数据模型，再做书架/索引，之后 AI、设备同步和 TTS 验证并行收敛。</figcaption>
+        </figure>
+
+        <table>
+          <thead>
+            <tr><th>月份</th><th>重点</th><th>交付物</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="numcell">M1</td><td>阅读状态、批注、设备、LLM Provider 设计</td><td>数据模型、API 草案、冲突策略、AI provider 抽象</td></tr>
+            <tr><td class="numcell">M2</td><td>书架/智能集合、继续阅读、EPUB/TXT 全文索引</td><td>基础阅读闭环可用</td></tr>
+            <tr><td class="numcell">M3</td><td>Web/Moke 批注同步、AI 摘要、单书问答</td><td>带来源引用的 AI 阅读 MVP</td></tr>
+            <tr><td class="numcell">M4</td><td>KOReader/Kobo Sync、Magic Link、Moke 离线同步</td><td>跨设备连续阅读可感知</td></tr>
+            <tr><td class="numcell">M5</td><td>知识库导出、私有阅读 API/Skill、TTS MVP</td><td>知识流转和听书实验可试用</td></tr>
+            <tr><td class="numcell">M6</td><td>稳定性、诊断、文档、路线图、商业化实验</td><td>可公开传播的半年大版本</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="risks">
+        <h2><span class="num">09</span>风险与对策</h2>
+        <div class="grid cols-2">
+          <div class="callout warn">
+            <div class="callout-label">Copyright</div>
+            公开书库、书源抓取和中心音频分享都有版权风险。建议默认强调个人使用，半年内不做中心音频分享，不提供公开书库发现。
+          </div>
+          <div class="callout warn">
+            <div class="callout-label">AI trust</div>
+            AI 回答必须带章节、位置和片段引用；没有来源就明确无法回答。摘要、问答、卡片都要可回跳原文。
+          </div>
+          <div class="callout">
+            <div class="callout-label">Privacy</div>
+            默认 BYOK、可关闭、只发送检索片段，保留请求审计和每日限额。管理员应能限制哪些用户可以使用 AI。
+          </div>
+          <div class="callout">
+            <div class="callout-label">Data model</div>
+            不要把用户批注、AI 结果、TTS 派生资产硬塞进 Calibre DB。Calibre 继续负责书籍元数据，Talebook DB 管用户态数据。
+          </div>
+        </div>
+      </section>
+
+      <section id="next">
+        <h2><span class="num">10</span>建议立即启动的 Milestones</h2>
+        <ol class="doc-narrow">
+          <li><strong>Reading Core.</strong> 统一阅读状态模型、书架/智能集合、继续阅读、Web/Moke 进度同步、批注/书签基础 API。</li>
+          <li><strong>Search & AI Reading.</strong> EPUB/TXT 全文索引、单书摘要、带引用问答、划线解释/翻译、Markdown/Obsidian 导出。</li>
+          <li><strong>Device Sync.</strong> OPDS v2/认证增强、Magic Link、KOReader/Kobo progress sync MVP、Moke 离线同步。</li>
+          <li><strong>Listening MVP.</strong> TTS provider 抽象、章节级 TTS 队列、Web 播放器、收听进度、M4B/MP3 导入。</li>
+          <li><strong>Ecosystem Preview.</strong> OpenAPI 文档、Provider 插件模板、私有阅读 API/MCP/Skill 原型、安装诊断。</li>
+        </ol>
+      </section>
+
+      <footer>
+        <h4>Source Report</h4>
+        <ul>
+          <li>Markdown source · <a href="./product-research-2026H2.zh_CN.md">product-research-2026H2.zh_CN.md</a></li>
+        </ul>
+        <h4>References</h4>
+        <ul>
+          <li>Talebook · <a href="https://github.com/talebook/talebook">https://github.com/talebook/talebook</a></li>
+          <li>Talebook release v26.07.13 · <a href="https://github.com/talebook/talebook/releases/tag/v26.07.13">https://github.com/talebook/talebook/releases/tag/v26.07.13</a></li>
+          <li>Calibre-Web · <a href="https://github.com/janeczku/calibre-web">https://github.com/janeczku/calibre-web</a></li>
+          <li>Kavita and Kavita+ · <a href="https://www.kavitareader.com/">https://www.kavitareader.com/</a></li>
+          <li>Komga · <a href="https://github.com/gotson/komga">https://github.com/gotson/komga</a></li>
+          <li>Audiobookshelf · <a href="https://github.com/advplyr/audiobookshelf">https://github.com/advplyr/audiobookshelf</a></li>
+          <li>Koodo Reader · <a href="https://github.com/koodo-reader/koodo-reader">https://github.com/koodo-reader/koodo-reader</a></li>
+          <li>Readest · <a href="https://github.com/readest/readest">https://github.com/readest/readest</a></li>
+          <li>KOReader · <a href="https://github.com/koreader/koreader">https://github.com/koreader/koreader</a></li>
+          <li>BookFusion pricing · <a href="https://www.bookfusion.com/reading/pricing">https://www.bookfusion.com/reading/pricing</a></li>
+          <li>Readwise Reader and Ghostreader · <a href="https://readwise.io/read">https://readwise.io/read</a></li>
+          <li>Gemini Notebook help · <a href="https://support.google.com/gemininotebook/answer/16164461">https://support.google.com/gemininotebook/answer/16164461</a></li>
+          <li>微信读书 Skill · <a href="https://weread.qq.com/r/weread-skills">https://weread.qq.com/r/weread-skills</a></li>
+        </ul>
+      </footer>
+    </article>
+
+    <script>
+      (function () {
+        const toc = document.getElementById("toc");
+        const sections = Array.from(document.querySelectorAll("section[id]"));
+        sections.forEach((section) => {
+          const h = section.querySelector("h2");
+          const a = document.createElement("a");
+          a.href = "#" + section.id;
+          a.textContent = h.textContent.replace(/^\s*\d+\s*/, "").trim();
+          toc.appendChild(a);
+        });
+        const links = Array.from(toc.querySelectorAll("a"));
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                links.forEach((link) => {
+                  link.classList.toggle("active", link.getAttribute("href") === "#" + entry.target.id);
+                });
+              }
+            });
+          },
+          { rootMargin: "-35% 0px -55% 0px" }
+        );
+        sections.forEach((section) => observer.observe(section));
+
+        const filter = document.getElementById("oss-filter");
+        const rows = Array.from(document.querySelectorAll("#oss-table tbody tr"));
+        const pills = Array.from(document.querySelectorAll(".pill[data-family]"));
+        let activeFamily = "all";
+
+        function applyFilter() {
+          const q = (filter.value || "").toLowerCase();
+          rows.forEach((row) => {
+            const matchesText = row.innerText.toLowerCase().includes(q);
+            const matchesFamily = activeFamily === "all" || row.dataset.family === activeFamily;
+            row.style.display = matchesText && matchesFamily ? "" : "none";
+          });
+        }
+
+        filter.addEventListener("input", applyFilter);
+        pills.forEach((pill) => {
+          pill.addEventListener("click", () => {
+            activeFamily = pill.dataset.family;
+            pills.forEach((p) => p.classList.toggle("active", p === pill));
+            applyFilter();
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
