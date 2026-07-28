@@ -123,6 +123,7 @@ def test_codex_runs_in_the_dev_container_without_runtime_install_steps():
     job = codex_job()
     steps = codex_job()["steps"]
     checkout = workflow_step(name="Checkout repository")
+    prepare = workflow_step(name="Prepare Codex runtime and repository")
     verify = workflow_step(name="Verify development environment and sandbox")
     synchronize = workflow_step(name="Synchronize project dependencies")
     restore_auth = workflow_step(name="Restore Codex ChatGPT auth")
@@ -158,8 +159,29 @@ def test_codex_runs_in_the_dev_container_without_runtime_install_steps():
         )
     )
     assert synchronize["run"] == "make init\nnpm --prefix app ci\n"
-    assert steps.index(checkout) < steps.index(verify) < steps.index(synchronize) < steps.index(restore_auth)
+    assert steps.index(checkout) < steps.index(prepare) < steps.index(verify) < steps.index(synchronize) < steps.index(restore_auth)
     assert steps.index(restore_auth) < steps.index(run_codex)
+
+
+def test_codex_runtime_home_and_repository_trust_are_prepared_before_verification():
+    prepare = workflow_step(name="Prepare Codex runtime and repository")
+    verify = workflow_step(name="Verify development environment and sandbox")
+
+    assert prepare["if"] == (
+        "steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'"
+    )
+    assert prepare["run"] == (
+        'set -euo pipefail\n'
+        'mkdir -p "$CODEX_HOME"\n'
+        'chmod 700 "$CODEX_HOME"\n'
+        'git config --global --add safe.directory "$GITHUB_WORKSPACE"\n'
+        'git config --global --get-all safe.directory | grep -Fqx "$GITHUB_WORKSPACE"\n'
+        "git status --short\n"
+    )
+    assert "safe.directory '*'" not in prepare["run"]
+    assert 'safe.directory "*"' not in prepare["run"]
+    assert "if codex sandbox -- /bin/true; then" in verify["run"]
+    assert "codex sandbox -- /bin/true 2>/dev/null" not in verify["run"]
 
 
 def test_only_repository_writers_can_trigger_the_employee():

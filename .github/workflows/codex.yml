@@ -429,6 +429,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Prepare Codex runtime and repository
+        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$CODEX_HOME"
+          chmod 700 "$CODEX_HOME"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --get-all safe.directory | grep -Fqx "$GITHUB_WORKSPACE"
+          git status --short
+
       - name: Verify development environment and sandbox
         if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
         run: |
@@ -443,7 +453,7 @@ jobs:
           codex --version
           bwrap --version
 
-          if codex sandbox -- /bin/true 2>/dev/null; then
+          if codex sandbox -- /bin/true; then
             echo "✅ Codex sandbox test passed"
           else
             echo "::error::Codex sandbox self-test failed"
