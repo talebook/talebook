@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BookCards 固定高度修复方案 · ACTIVE</title>
+  <style>
+    :root {
+      --ink: #0b1320;
+      --blueprint: #0f2740;
+      --paper: #eef3f5;
+      --panel: #ffffff;
+      --cyan: #28c5d9;
+      --orange: #ff9d3b;
+      --line: #b8c9d2;
+      --muted: #526675;
+      --danger: #c54b44;
+      --danger-soft: #fff0ed;
+      --pending: #9a5b0b;
+      --pending-soft: #fff4df;
+      --sans: "Avenir Next", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--paper); color: var(--ink); font-family: var(--sans); }
+    body { margin: 0; line-height: 1.7; }
+    main { width: min(1080px, calc(100% - 32px)); margin: 28px auto 72px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 6vw, 58px);
+      border: 1px solid #254968;
+      border-radius: 18px;
+      background:
+        linear-gradient(rgba(40, 197, 217, .08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(40, 197, 217, .08) 1px, transparent 1px),
+        var(--blueprint);
+      background-size: 24px 24px;
+      color: #f7fbfd;
+    }
+    header::after {
+      position: absolute;
+      right: -74px;
+      bottom: -96px;
+      width: 260px;
+      height: 260px;
+      border: 28px solid rgba(40, 197, 217, .18);
+      border-radius: 50%;
+      content: "";
+    }
+    .eyebrow, .label, th, code, .pill, figcaption { font-family: var(--mono); }
+    .eyebrow { margin: 0 0 10px; color: #7ce5ef; font-size: 12px; font-weight: 800; letter-spacing: .14em; }
+    h1 { max-width: 800px; margin: 0; font-size: clamp(32px, 6vw, 58px); line-height: 1.08; letter-spacing: -.035em; }
+    .lede { max-width: 770px; margin: 20px 0 0; color: #d2e4ec; font-size: 18px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 28px; }
+    .pill { padding: 6px 11px; border: 1px solid rgba(255, 255, 255, .3); border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pill.status { border-color: #ffc779; background: #78460c; color: #fff4df; }
+    section { margin-top: 22px; padding: clamp(22px, 4vw, 36px); border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+    h2 { margin: 0 0 16px; font-size: 24px; line-height: 1.25; }
+    h3 { margin: 20px 0 8px; font-size: 17px; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0; padding-left: 22px; }
+    li + li { margin-top: 6px; }
+    code { padding: 2px 5px; border-radius: 4px; background: #e4edf1; color: #0a5970; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 11px 9px; border-bottom: 1px solid #d7e1e6; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 12px; }
+    .callout { padding: 16px 18px; border-left: 5px solid var(--cyan); border-radius: 9px; background: #e9f9fb; }
+    .problem { border-left-color: var(--danger); background: var(--danger-soft); }
+    .pending { border-left-color: var(--orange); background: var(--pending-soft); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+    .mini { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #f8fbfc; }
+    .mini h3 { margin-top: 0; }
+    .label { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    figure { margin: 24px 0 4px; border: 1px solid var(--line); border-radius: 12px; background: #f8fbfc; overflow: hidden; }
+    figure svg { display: block; width: 100%; height: auto; }
+    figcaption { padding: 10px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+    .state-pending { color: var(--pending); font-weight: 800; }
+    .state-pass { color: #08756d; font-weight: 800; }
+    footer { margin-top: 18px; color: var(--muted); text-align: center; font: 12px/1.6 var(--mono); }
+    @media (max-width: 760px) {
+      main { width: min(100% - 20px, 1080px); margin-top: 10px; }
+      header, section { border-radius: 12px; }
+      .grid { grid-template-columns: 1fr; }
+      table { display: block; width: 100%; overflow-x: auto; }
+      thead, tbody { display: table; width: 680px; table-layout: fixed; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">TALEBOOK / APP / LAYOUT REPAIR</p>
+      <h1>BookCards 固定高度修复</h1>
+      <p class="lede">把由简介长度撑开的书籍列表卡片收回统一的 150px 规格，让首页与所有复用 BookCards 的列表重新形成稳定、可扫读的书架节奏。</p>
+      <div class="meta">
+        <span class="pill status">ACTIVE · 已完成验证</span>
+        <span class="pill">创建日期 2026-07-30</span>
+        <span class="pill">所属模块 app</span>
+        <span class="pill">分支 fix/20260730-book-card-fixed-height</span>
+        <span class="pill">需求来源 用户截图反馈</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>01. 原始诉求与问题取证</h2>
+      <div class="callout problem">原始诉求：“开个 git wt 处理这个样式问题：book card 高度异常，应该是固定高度的卡片形式，解决，并让我本地体验。”用户进一步确认：修复应用到所有使用 <code>BookCards</code> 的列表，但不包含 <code>BookCards_Small</code>；验收须导入 Docker 默认书籍并用真实封面截图。实现验收中用户追加反馈“封面下面有一个空白”，因此同一修复补充了封面贴齐卡片底边的约束。</div>
+      <p>截图中的短简介卡片约为 150px 高；长简介卡片会增长到约 220px，导致同一三列网格出现明显的高低错位。当前 <code>app/components/BookCards.vue</code> 只对标题和简介设置行数截断，外层 <code>v-card</code> 没有高度与溢出边界，富文本简介仍能参与行高计算并撑大卡片。</p>
+      <table>
+        <thead><tr><th>观察</th><th>现有行为</th><th>结论</th></tr></thead>
+        <tbody>
+          <tr><td>短简介或“暂无简介”</td><td>卡片高度接近封面自然高度，约 150px</td><td>以 150px 作为既有视觉基线，不重新设计卡片比例</td></tr>
+          <tr><td>长简介</td><td>外层卡片随内容增长，三列网格失去基线</td><td>必须约束卡片本身，而不是只依赖文本截断</td></tr>
+          <tr><td>组件复用</td><td>首页、书库、分类、最近、热门、私有书籍和网络书籍搜索结果共用 <code>BookCards</code></td><td>修复应落在共享组件，页面不分别覆写</td></tr>
+          <tr><td>相似组件</td><td><code>BookCards_Small</code> 仅用于详情弹窗，并带独立操作区</td><td>按用户决定明确排除，避免改变操作区布局</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>02. 目标与边界</h2>
+      <div class="grid">
+        <article class="mini">
+          <p class="label">必须达成</p>
+          <h3>固定规格，内容不再撑高</h3>
+          <ul>
+            <li>每个 <code>BookCards</code> 卡片外框固定为 150px 高。</li>
+            <li>标题继续单行截断，简介最多展示三行；超出内容隐藏。</li>
+            <li>短简介、长简介、无简介、有“已读”标签和连载状态标签时高度一致。</li>
+            <li>存在封面时，封面区域贴齐卡片底边，不在图片下方留下空白条。</li>
+            <li>桌面和移动视口均无溢出、重叠或横向滚动。</li>
+          </ul>
+        </article>
+        <article class="mini">
+          <p class="label">明确不做</p>
+          <h3>不扩大视觉改版范围</h3>
+          <ul>
+            <li>不修改 <code>BookCards_Small</code>、首页纯封面推荐卡或空状态卡片。</li>
+            <li>不修改 API、书籍数据、简介内容或国际化文案。</li>
+            <li>不改变三列响应式栅格、封面宽高比、主题颜色和阴影。</li>
+            <li>不新增高度配置项；当前规格作为共享组件内部契约。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>03. 视觉规格</h2>
+      <figure>
+        <svg viewBox="0 0 920 400" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>BookCards 高度修复前后对比</title>
+          <desc>修复前卡片分别为 150 和 220 像素高；修复后短简介和长简介卡片都固定为 150 像素，长简介在三行后截断。</desc>
+          <rect width="920" height="400" fill="#f8fbfc"/>
+          <g font-family="Avenir Next, PingFang SC, sans-serif">
+            <text x="42" y="42" fill="#526675" font-size="12" font-weight="700" letter-spacing="2">BEFORE · CONTENT-DRIVEN</text>
+            <rect x="42" y="68" width="250" height="150" rx="8" fill="#fff" stroke="#b8c9d2"/>
+            <rect x="42" y="68" width="82" height="150" rx="8" fill="#b7c8ce"/>
+            <text x="144" y="108" fill="#0b1320" font-size="18" font-weight="700">短简介</text>
+            <text x="144" y="140" fill="#526675" font-size="13">暂无简介</text>
+            <rect x="324" y="68" width="250" height="220" rx="8" fill="#fff" stroke="#c54b44" stroke-width="2"/>
+            <rect x="324" y="68" width="82" height="150" rx="8" fill="#b7c8ce"/>
+            <text x="426" y="108" fill="#0b1320" font-size="18" font-weight="700">长简介</text>
+            <text x="426" y="140" fill="#526675" font-size="13">第一行简介内容</text>
+            <text x="426" y="164" fill="#526675" font-size="13">第二行简介内容</text>
+            <text x="426" y="188" fill="#526675" font-size="13">第三行简介内容</text>
+            <text x="426" y="212" fill="#c54b44" font-size="13">额外内容继续撑高…</text>
+            <line x1="604" y1="68" x2="604" y2="288" stroke="#c54b44" stroke-width="2"/>
+            <line x1="594" y1="68" x2="614" y2="68" stroke="#c54b44" stroke-width="2"/>
+            <line x1="594" y1="288" x2="614" y2="288" stroke="#c54b44" stroke-width="2"/>
+            <text x="622" y="184" fill="#c54b44" font-family="ui-monospace, monospace" font-size="13">≈220px</text>
+
+            <text x="42" y="342" fill="#0a7282" font-size="12" font-weight="700" letter-spacing="2">AFTER · FIXED SHELF UNIT</text>
+            <rect x="324" y="318" width="250" height="60" rx="8" fill="#0f2740"/>
+            <rect x="324" y="318" width="82" height="60" rx="8" fill="#28c5d9"/>
+            <text x="426" y="344" fill="#f7fbfd" font-size="16" font-weight="700">所有内容形态</text>
+            <text x="426" y="365" fill="#bfeaf0" font-size="12">固定 150px · 超出隐藏</text>
+            <line x1="604" y1="318" x2="604" y2="378" stroke="#ff9d3b" stroke-width="2"/>
+            <line x1="594" y1="318" x2="614" y2="318" stroke="#ff9d3b" stroke-width="2"/>
+            <line x1="594" y1="378" x2="614" y2="378" stroke="#ff9d3b" stroke-width="2"/>
+            <text x="622" y="353" fill="#9a5b0b" font-family="ui-monospace, monospace" font-size="13">150px</text>
+          </g>
+        </svg>
+        <figcaption>FIG 1 · 高度契约：卡片外框负责 150px 固定边界，文本截断负责在边界内保留可扫读信息。</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>04. 实现方案</h2>
+      <div class="callout">在 <code>BookCards.vue</code> 的书籍 <code>v-card</code> 上增加组件专用类，并由 scoped CSS 设置 <code>height: 150px</code> 与 <code>overflow: hidden</code>。内部行吸收 Vuetify 栅格的 12px 负 gutter，封面列与图片占满可用高度，因此图片从卡片顶边连续覆盖到底边；标题、简介和可选状态标签维持现有内容层级。这样每个调用页面自动获得同一规格，不需要页面级样式。</div>
+      <table>
+        <thead><tr><th>文件</th><th>计划变更</th><th>回归保护</th></tr></thead>
+        <tbody>
+          <tr><td><code>app/components/BookCards.vue</code></td><td>给书籍卡片和封面增加明确类名；固定 150px 高并隐藏超出区域；让内部布局与封面受该高度约束</td><td>不使用全局 <code>.v-card</code> 选择器，避免影响空状态、导航卡和其他组件；封面底边纳入浏览器几何断言</td></tr>
+          <tr><td><code>app/test/components/BookCards.nuxt.spec.ts</code></td><td>补充短简介、长简介、无简介样本，断言每张书籍卡都挂载固定高度专用类</td><td>保护共享组件契约及现有链接、已读标签行为</td></tr>
+          <tr><td><code>app/test/e2e/home.spec.ts</code></td><td>读取首页“新书推荐”中的多张卡片边界，断言高度均为 150px，并断言封面底边等于卡片底边</td><td>用真实浏览器布局弥补 happy-dom 不计算 CSS 尺寸的限制</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>05. 验收结果</h2>
+      <div class="callout"><strong>测试结果：通过。</strong> 自动化测试、Docker 真实数据、真实封面、桌面与移动视口、浅色与深色主题均完成验证。所有受测卡片计算高度为 150px，封面底边差值为 0px。</div>
+      <table>
+        <thead><tr><th>层级</th><th>实际结果</th><th>命令 / 页面</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td>组件测试</td><td>1 个文件、5 条用例通过；覆盖短、长、空简介、链接与已读状态</td><td><code>cd app &amp;&amp; npx vitest run test/components/BookCards.nuxt.spec.ts</code></td><td class="state-pass">通过</td></tr>
+          <tr><td>E2E</td><td>6 条主页用例通过；卡片统一 150px，封面保持 11:15 比例并贴齐底边，四周阴影、原有内容与已读状态正常</td><td><code>MOCK_API_URL=http://127.0.0.1:18180 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 npx playwright test test/e2e/home.spec.ts --project=chromium</code></td><td class="state-pass">通过</td></tr>
+          <tr><td>真实渲染</td><td>1568×943 桌面与 390×844 移动视口：首页 12 张、书库 21 张卡片均为 150px；封面底边差值 0px；浅色与深色无横向滚动</td><td>Chrome DevTools MCP，访问 <code>/</code> 与 <code>/library</code></td><td class="state-pass">通过</td></tr>
+          <tr><td>Docker 数据</td><td>默认目录 10 本书中 3 本已存在、7 本新增；重启容器刷新索引后书库共 21 本，7 个新增标题全部可见且真实封面已截图</td><td><code>docker exec talebook-talebook-1 calibredb add --library-path=/data/books/library/ -r /var/www/talebook/docker/book/</code></td><td class="state-pass">通过</td></tr>
+          <tr><td>前端检查</td><td>production build 通过；eslint 退出码 0，无错误，保留 194 条本次范围外的既有 warning</td><td><code>cd app &amp;&amp; npm run lint</code>；<code>cd app &amp;&amp; API_URL=http://127.0.0.1:8080 npm run build</code></td><td class="state-pass">通过</td></tr>
+          <tr><td>工程门禁</td><td>方案路径、ACTIVE 状态、单文件资源与补丁空白检查通过</td><td><code>make check-design</code>；<code>git diff --check</code></td><td class="state-pass">通过</td></tr>
+        </tbody>
+      </table>
+      <p>截图产物：<code>document/screenshots/book-card-fixed-height/home.png</code> 与 <code>document/screenshots/book-card-fixed-height/library.png</code>。开发态 <code>nuxt dev</code> 因 worktree 复用依赖目录触发 <code>EMFILE</code> 文件监听上限而退出；遵守项目约束未启用 Chokidar polling，改用通过构建的 production preview 做实际体验与 Chrome 验收。</p>
+    </section>
+
+    <section>
+      <h2>06. 风险、兼容性与回滚</h2>
+      <div class="grid">
+        <article class="mini">
+          <h3>风险控制</h3>
+          <ul>
+            <li>固定高度可能在窄屏裁掉状态标签：移动视口必须实际验收标题、简介和标签组合。</li>
+            <li>富文本简介可能包含异常块级元素：外层卡片溢出边界作为最终保护。</li>
+            <li>主题可能覆写 Vuetify 卡片样式：浅色与深色分别检查计算高度。</li>
+          </ul>
+        </article>
+        <article class="mini">
+          <h3>兼容与回滚</h3>
+          <p>不涉及 API、数据、权限、迁移或配置，发布沿用现有前端构建流程。若出现不可接受的裁切，可整体回退组件样式与对应测试；无需后端操作。</p>
+          <p><span class="label">完成条件</span><br>目标测试、lint、build、设计门禁和 Chrome 实际渲染全部通过，且用户可通过本地地址体验后，方案才转为 ACTIVE。</p>
+        </article>
+      </div>
+    </section>
+
+    <footer>Talebook · app · 20260730-book-card-fixed-height · ACTIVE</footer>
+  </main>
+</body>
+</html>

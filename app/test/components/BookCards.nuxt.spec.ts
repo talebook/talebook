@@ -83,6 +83,36 @@ describe('BookCards.vue', () => {
         expect(vCards[0].props('to')).toBe('/book/1');
     });
 
+    it('identifies every standard book card regardless of introduction length', () => {
+        const books = [
+            { id: 1, title: 'Short introduction', img: 'img1.jpg', comments: 'short' },
+            {
+                id: 2,
+                title: 'Long introduction',
+                img: 'img2.jpg',
+                comments: 'A deliberately long introduction that must never make the standard book card taller than its siblings.'
+            },
+            { id: 3, title: 'No introduction', img: 'img3.jpg' },
+        ];
+        const wrapper = mount(BookCards, {
+            global: {
+                plugins: [vuetify],
+                mocks: {
+                    $t: (key: string) => key,
+                },
+            },
+            props: {
+                books
+            }
+        });
+
+        const fixedHeightCards = wrapper.findAll('[data-testid="book-card"]');
+        expect(fixedHeightCards).toHaveLength(books.length);
+        expect(fixedHeightCards.map(card => card.text())).toEqual(
+            expect.arrayContaining(['Short introduction short', 'No introduction messages.clickToView'])
+        );
+    });
+
     it('marks read-done books with a badge and chip, leaves others untouched (User Experience: Read Status Badge)', () => {
         const books = [
             { id: 1, title: 'Book 1', img: 'img1.jpg', comments: 'comment 1', state: { read_state: 2 } },

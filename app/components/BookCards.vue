@@ -10,7 +10,11 @@
                 md="4"
                 class="book-list-card"
             >
-                <v-card :to="book.href">
+                <v-card
+                    :to="book.href"
+                    class="book-card-shell"
+                    data-testid="book-card"
+                >
                     <v-row>
                         <v-col
                             cols="3"
@@ -20,7 +24,9 @@
                             <v-img
                                 :src="book.img"
                                 :aspect-ratio="11/15"
-                                cover
+                                class="book-cover"
+                                data-testid="book-cover"
+                                contain
                             />
                             <BookReadBadge :read-state="book.state?.read_state" />
                         </v-col>
@@ -157,6 +163,16 @@ const render_books = computed(() => {
 .book-list-card .v-row {
     margin-bottom: 0px;
 }
+.book-card-shell {
+    height: 150px;
+    overflow: hidden;
+    box-shadow: 0 0 6px rgb(0 0 0 / 24%);
+}
+.book-card-shell > .v-row {
+    height: 100%;
+    margin: 0;
+    flex-wrap: nowrap;
+}
 .page-title {
     font-weight: bold;
     text-align: left;
@@ -166,10 +182,22 @@ const render_books = computed(() => {
     margin-bottom: 20px;
 }
 .col-book-img {
-    padding: 12px 0 0 12px;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: none;
+    height: 100%;
+    padding: 0;
+    aspect-ratio: 11 / 15;
+}
+.book-cover {
+    height: 100%;
 }
 .col-book-info {
-    margin-left: -4px;
-    padding: 8px 0;
+    flex: 1 1 0;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    margin-left: 0;
+    padding: 0;
 }
 </style>
