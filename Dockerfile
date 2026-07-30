@@ -64,15 +64,13 @@ RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
     dpkg --add-architecture armhf || true; \
     fi
 
-# Create the runtime user and let an unprivileged Nginx bind the existing 80/443 interface.
+# Install the Talebook-owned main config, then let an unprivileged Nginx bind 80/443.
+COPY conf/nginx/nginx.conf /etc/nginx/nginx.conf
 RUN if ! id -u talebook > /dev/null 2>&1; then \
     useradd -u 911 -U -d /var/www/talebook -s /bin/false talebook && \
     usermod -G users talebook && \
     groupmod -g 911 talebook; \
 fi && \
-    sed -i '/^user[[:space:]]/d' /etc/nginx/nginx.conf && \
-    sed -i 's#^pid /run/nginx.pid;#pid /run/talebook/nginx.pid;#' /etc/nginx/nginx.conf && \
-    grep -Fxq 'pid /run/talebook/nginx.pid;' /etc/nginx/nginx.conf && \
     setcap cap_net_bind_service=+ep /usr/sbin/nginx && \
     getcap /usr/sbin/nginx | grep -Fq 'cap_net_bind_service=ep'
 

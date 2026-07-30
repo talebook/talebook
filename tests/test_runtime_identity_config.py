@@ -24,8 +24,16 @@ def test_all_supervisor_variants_run_nginx_as_talebook():
 def test_dockerfile_grants_only_nginx_low_port_capability_and_moves_pid():
     dockerfile = read("Dockerfile")
     assert "setcap cap_net_bind_service=+ep /usr/sbin/nginx" in dockerfile
-    assert "pid /run/talebook/nginx.pid;" in dockerfile
-    assert "sed -i '/^user[[:space:]]/d' /etc/nginx/nginx.conf" in dockerfile
+    assert "COPY conf/nginx/nginx.conf /etc/nginx/nginx.conf" in dockerfile
+    assert "sed -i '/^user[[:space:]]/d' /etc/nginx/nginx.conf" not in dockerfile
+    assert "sed -i 's#^pid /run/nginx.pid;" not in dockerfile
+
+    nginx_config = read("conf/nginx/nginx.conf")
+    assert "pid /run/talebook/nginx.pid;" in nginx_config
+    assert not any(line.strip().startswith("user ") for line in nginx_config.splitlines())
+    assert "include /etc/nginx/modules-enabled/*.conf;" in nginx_config
+    assert "include /etc/nginx/conf.d/*.conf;" in nginx_config
+    assert "include /etc/nginx/sites-enabled/*;" in nginx_config
 
 
 def test_start_scripts_prepare_nginx_runtime_directories():
