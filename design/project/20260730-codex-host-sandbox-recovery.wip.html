@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Actions 宿主沙箱恢复方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #0b172a;
+      --muted: #526173;
+      --paper: #f4f7f8;
+      --panel: #ffffff;
+      --line: #c9d5dc;
+      --incident: #b4234d;
+      --incident-soft: #fff0f3;
+      --recovery: #007f83;
+      --recovery-soft: #e7f7f6;
+      --pending: #9a6700;
+      --pending-soft: #fff7db;
+      --terminal: #10263a;
+      --terminal-ink: #d9f3ef;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 24px 72px;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, transparent 0 23px, rgba(11, 23, 42, .045) 24px, transparent 25px) 0 0 / 48px 48px,
+        var(--paper);
+      font: 17px/1.68 Charter, "Noto Serif SC", "Songti SC", serif;
+    }
+    h1, h2, h3, .meta, th, .label {
+      font-family: "Arial Narrow", "Avenir Next Condensed", "PingFang SC", sans-serif;
+    }
+    h1 {
+      max-width: 840px;
+      margin: 0;
+      font-size: clamp(42px, 7vw, 78px);
+      font-stretch: condensed;
+      line-height: .98;
+      letter-spacing: -.025em;
+    }
+    h2 {
+      margin: 48px 0 18px;
+      font-size: clamp(26px, 4vw, 38px);
+      line-height: 1.08;
+    }
+    h3 { margin: 0 0 9px; font-size: 20px; }
+    p { margin: 11px 0; }
+    code {
+      padding: 2px 6px;
+      border: 1px solid #d9e1e5;
+      border-radius: 4px;
+      background: #edf2f4;
+      font: .9em/1.5 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      overflow-wrap: anywhere;
+    }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 42px 42px 36px 56px;
+      color: #fff;
+      background: var(--terminal);
+      border-radius: 5px 18px 18px 5px;
+      box-shadow: 0 18px 52px rgba(16, 38, 58, .18);
+    }
+    header::before {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 10px;
+      content: "";
+      background: var(--incident);
+    }
+    header::after {
+      position: absolute;
+      right: -54px;
+      bottom: -56px;
+      width: 260px;
+      height: 260px;
+      content: "EINVAL";
+      color: rgba(217, 243, 239, .055);
+      font: 900 58px/260px "SFMono-Regular", Consolas, monospace;
+      text-align: center;
+      border: 2px solid rgba(217, 243, 239, .07);
+      border-radius: 50%;
+      transform: rotate(-12deg);
+    }
+    .eyebrow {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 13px;
+      color: #78d9d3;
+      font: 700 13px/1.2 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .13em;
+    }
+    .thesis {
+      position: relative;
+      z-index: 1;
+      max-width: 830px;
+      margin-top: 21px;
+      color: #d7e5ec;
+      font-size: 19px;
+    }
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      margin-top: 29px;
+      background: rgba(255, 255, 255, .16);
+      border: 1px solid rgba(255, 255, 255, .16);
+    }
+    .meta div {
+      min-height: 72px;
+      padding: 12px 13px;
+      background: rgba(7, 26, 42, .92);
+    }
+    .meta span { display: block; color: #9fb7c5; font-size: 12px; letter-spacing: .08em; }
+    .meta strong { display: block; margin-top: 4px; color: #fff; font-size: 15px; line-height: 1.32; }
+    .meta .status { color: #ffd479; }
+    .section-no {
+      display: inline-block;
+      min-width: 42px;
+      margin-right: 9px;
+      color: var(--recovery);
+      font: 800 .48em/1 "SFMono-Regular", Consolas, monospace;
+      vertical-align: .35em;
+    }
+    .lead {
+      padding: 19px 22px;
+      background: var(--panel);
+      border-left: 5px solid var(--recovery);
+      box-shadow: 0 8px 24px rgba(16, 38, 58, .07);
+    }
+    .trace {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(8, minmax(70px, 1fr));
+      gap: 0;
+      margin: 28px 0 16px;
+      padding: 32px 18px 19px;
+      overflow-x: auto;
+      background: var(--terminal);
+      border-radius: 12px;
+    }
+    .trace::before {
+      position: absolute;
+      top: 53px;
+      right: 56px;
+      left: 56px;
+      height: 2px;
+      content: "";
+      background: #45677b;
+    }
+    .step {
+      position: relative;
+      z-index: 1;
+      min-width: 84px;
+      color: #9db4c2;
+      font: 12px/1.38 "SFMono-Regular", Consolas, monospace;
+      text-align: center;
+    }
+    .step::before {
+      display: block;
+      width: 18px;
+      height: 18px;
+      margin: 12px auto 11px;
+      content: "";
+      background: #67c6b0;
+      border: 4px solid var(--terminal);
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px #67c6b0;
+    }
+    .step strong { display: block; color: #e5f1f5; font-weight: 700; }
+    .step.failed { color: #ffb3c3; }
+    .step.failed::before {
+      background: var(--incident);
+      box-shadow: 0 0 0 2px #ff7896, 0 0 22px rgba(255, 90, 126, .68);
+    }
+    .step.skipped::before { background: #536b79; box-shadow: 0 0 0 2px #536b79; }
+    .step.skipped strong { color: #8198a5; }
+    .evidence-grid, .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .evidence, .decision {
+      padding: 19px 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .evidence .label, .decision .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .1em;
+    }
+    .evidence.incident { background: var(--incident-soft); border-color: #e7a6b6; }
+    .evidence.incident .label { color: var(--incident); }
+    .terminal {
+      margin-top: 15px;
+      padding: 18px 20px;
+      overflow-x: auto;
+      color: var(--terminal-ink);
+      background: #07131e;
+      border-radius: 8px;
+      font: 14px/1.6 "SFMono-Regular", Consolas, monospace;
+      white-space: pre-wrap;
+    }
+    .architecture {
+      display: grid;
+      grid-template-columns: 1fr 58px 1.1fr 58px 1fr;
+      align-items: stretch;
+      gap: 11px;
+      margin: 21px 0;
+    }
+    .node {
+      display: grid;
+      place-content: center;
+      min-height: 132px;
+      padding: 18px;
+      text-align: center;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .node strong { display: block; margin-bottom: 6px; font: 800 20px/1.2 "Arial Narrow", sans-serif; }
+    .node.recovery { background: var(--recovery-soft); border-color: #7dc8c6; }
+    .arrow {
+      display: grid;
+      place-content: center;
+      color: var(--recovery);
+      font: 900 28px/1 monospace;
+    }
+    .split-note {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      margin: 16px 0;
+      background: var(--line);
+      border: 1px solid var(--line);
+    }
+    .split-note div { padding: 17px 19px; background: var(--panel); }
+    .split-note .keep strong { color: var(--recovery); }
+    .split-note .replace strong { color: var(--incident); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      box-shadow: 0 8px 24px rgba(16, 38, 58, .055);
+    }
+    th, td {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: #fff;
+      background: #23445b;
+      font-size: 14px;
+      letter-spacing: .025em;
+    }
+    tr:nth-child(even) td { background: #f7fafb; }
+    ul, ol { padding-left: 24px; }
+    li { margin: 8px 0; }
+    .callout {
+      padding: 17px 20px;
+      background: var(--recovery-soft);
+      border: 1px solid #88cfcc;
+      border-left: 5px solid var(--recovery);
+    }
+    .callout.pending {
+      background: var(--pending-soft);
+      border-color: #e3c45f;
+      border-left-color: var(--pending);
+    }
+    .status-chip {
+      display: inline-block;
+      padding: 2px 8px;
+      color: #6c4900;
+      background: #ffe59a;
+      border-radius: 999px;
+      font: 800 12px/1.7 "Arial Narrow", sans-serif;
+      letter-spacing: .06em;
+    }
+    footer {
+      margin-top: 52px;
+      padding-top: 17px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 14px;
+    }
+    @media (max-width: 850px) {
+      .meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .meta div:last-child { grid-column: 1 / -1; }
+      .architecture { grid-template-columns: 1fr; }
+      .arrow { min-height: 32px; transform: rotate(90deg); }
+    }
+    @media (max-width: 680px) {
+      body { padding: 14px 12px 48px; font-size: 16px; }
+      header { padding: 30px 20px 26px 30px; }
+      .meta, .evidence-grid, .decision-grid, .split-note { grid-template-columns: 1fr; }
+      .meta div:last-child { grid-column: auto; }
+      .trace { grid-template-columns: repeat(8, 86px); }
+      table { display: block; overflow-x: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">INCIDENT 30518957369 / JOB 90794917477</div>
+    <h1>Codex Actions 宿主沙箱恢复方案</h1>
+    <p class="thesis">把 Codex 的 Linux sandbox 从不兼容的 Docker-in-Docker 安全边界中移回 GitHub hosted runner；保留当前数字员工权限、fail-closed、评论与受控发布契约，并新增 hosted runner 回归探针。</p>
+    <div class="meta">
+      <div><span>创建日期</span><strong>2026-07-30</strong></div>
+      <div><span>所属模块</span><strong>project</strong></div>
+      <div><span>状态</span><strong class="status">WIP</strong></div>
+      <div><span>工作分支</span><strong>fix/20260730-codex-actions-run-30518957369</strong></div>
+      <div><span>需求来源</span><strong>修复 Codex run 30518957369 并提交 PR</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2><span class="section-no">01</span>原始诉求与验收目标</h2>
+      <div class="lead">
+        <p><strong>原始诉求：</strong>解决 GitHub Actions run <code>30518957369</code>、job <code>90794917477</code> 的 Codex 执行失败问题，完成验证并提交 Pull Request。</p>
+        <p><strong>最终验收：</strong>修复后的 workflow 在 GitHub hosted runner 上通过真实 Codex sandbox 自检；原有请求鉴权、模型凭据隔离、workspace 权限、评论、结构化结果、提交与 fast-forward 发布门禁保持不变；PR 给出真实测试、风险和方案链接。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="section-no">02</span>失败轨迹与权威证据</h2>
+      <div class="trace" aria-label="失败 job 的步骤轨迹">
+        <div class="step"><strong>01</strong>job setup</div>
+        <div class="step"><strong>02</strong>container init</div>
+        <div class="step"><strong>03</strong>app token</div>
+        <div class="step"><strong>04</strong>request context</div>
+        <div class="step"><strong>06</strong>checkout</div>
+        <div class="step"><strong>07</strong>runtime prepare</div>
+        <div class="step failed"><strong>08</strong>sandbox verify</div>
+        <div class="step skipped"><strong>09+</strong>Codex skipped</div>
+      </div>
+      <div class="evidence-grid">
+        <article class="evidence incident">
+          <div class="label">GITHUB JOB LOG</div>
+          <h3>第 8 步是首个真实失败点</h3>
+          <p>容器初始化、短期 App token、请求上下文、checkout 与 <code>safe.directory</code> 准备均成功。依赖同步和 Codex 执行因 sandbox 自检失败而跳过；末尾 fail-closed 失败是预期连带结果。</p>
+        </article>
+        <article class="evidence">
+          <div class="label">SAME-IMAGE REPRODUCTION</div>
+          <h3>工具存在，内层 seccomp 安装失败</h3>
+          <p>使用相同镜像 digest、root 用户和 <code>seccomp=unconfined</code> 外层参数复现退出码 <code>101</code>；Calibre、Python、Node、npm、pytest、ruff、Codex 与 bubblewrap 的版本探测全部成功。</p>
+        </article>
+      </div>
+      <div class="terminal">codex-cli 0.144.6
+bubblewrap 0.11.0
+
+thread 'main' panicked at linux-sandbox/src/linux_run_main.rs:
+error applying Linux sandbox restrictions:
+Sandbox(SeccompInstall(Seccomp(Os {
+  code: 22,
+  kind: InvalidInput,
+  message: "Invalid argument"
+})))</div>
+      <p class="callout"><strong>结论：</strong>失败来自 Codex 的内层 bubblewrap/seccomp sandbox 与 GitHub job container 的嵌套不兼容，不是 GitHub App secret、checkout、项目依赖或 Git safe directory 问题。</p>
+    </section>
+
+    <section>
+      <h2><span class="section-no">03</span>设计决策：拆分 Agent 运行边界</h2>
+      <div class="architecture" aria-label="修复后的 Agent workflow 运行边界">
+        <div class="node">
+          <strong>Claude workflow</strong>
+          继续使用<br><code>talebook:dev</code><br>job container
+        </div>
+        <div class="arrow">→</div>
+        <div class="node recovery">
+          <strong>Codex workflow</strong>
+          GitHub hosted runner<br>显式安装固定运行时<br>原生 bubblewrap/AppArmor
+        </div>
+        <div class="arrow">→</div>
+        <div class="node">
+          <strong>Codex 内层权限</strong>
+          workspace-only 文件<br>公共网络代理<br>凭据环境隔离
+        </div>
+      </div>
+      <div class="split-note">
+        <div class="keep"><strong>保持不变</strong><br>Claude 的 dev container；Codex 触发器、维护者二次鉴权、短期 token、prompt、进度评论、结构化结果、受控提交与发布门禁。</div>
+        <div class="replace"><strong>替换边界</strong><br>仅移除 Codex job 的 dev container；恢复 GitHub hosted runner 上显式 Node、Python、Codex、测试工具、bubblewrap 与 AppArmor 准备。</div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>候选方案</th><th>判断</th><th>原因</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Codex 回到 hosted runner</td><td><strong>采用</strong></td><td>历史真实 runs 已证明该边界可以完成 sandbox 与完整发布链；不降低内层权限。</td></tr>
+          <tr><td>job container 增加 privileged / SYS_ADMIN</td><td>拒绝</td><td>扩大容器攻击面，且 <code>EINVAL</code> 不是单纯缺少 capability 的证据。</td></tr>
+          <tr><td>跳过 sandbox 或 fail-open</td><td>拒绝</td><td>会让模型进程失去 workspace-only、网络和凭据隔离，不满足现有安全契约。</td></tr>
+          <tr><td>固定旧 <code>:dev</code> digest</td><td>拒绝</td><td>宿主 Actions 上没有证据表明旧 digest 能解决嵌套架构问题，并会冻结开发工具链。</td></tr>
+          <tr><td>强制 legacy Landlock</td><td>拒绝</td><td>已复现同样的 seccomp 安装失败，且当前细粒度文件规则不能用语义更弱的回退替代。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2><span class="section-no">04</span>实现方案</h2>
+      <table>
+        <thead>
+          <tr><th>位置</th><th>计划改动</th><th>约束</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.github/workflows/codex.yml</code></td>
+            <td>移除 Codex job 的 <code>container</code> 与容器专用 shell 默认值；增加固定 Node 24、Python 3.13、Codex 0.144.6 和测试依赖准备；恢复 bubblewrap/AppArmor 安装、profile 加载与 fail-closed 自检。</td>
+            <td>Codex 版本不因迁移改变；不使用 privileged；不写入宽泛 <code>safe.directory "*"</code>。</td>
+          </tr>
+          <tr>
+            <td>受信任测试依赖</td>
+            <td>由上下文步骤按不可变 <code>github.workflow_sha</code> 读取 <code>requirements-test.txt</code> 到 runner 临时目录，再供安装步骤使用。</td>
+            <td>不得从可能被请求目标修改的 checkout 读取 bootstrap 依赖。</td>
+          </tr>
+          <tr>
+            <td>项目依赖</td>
+            <td>保留 <code>make init</code> 与 <code>npm --prefix app ci</code>，确保 agent 面对目标分支的 Python 与前端 lockfile，而不是浮动镜像快照。</td>
+            <td>在恢复模型凭据前完成工具链与 sandbox 验证。</td>
+          </tr>
+          <tr>
+            <td>PR hosted smoke</td>
+            <td>为真实 <code>codex.yml</code> 增加仅在该 workflow 变更的 Pull Request 上运行的 sandbox smoke job；无模型 secret，仅验证 hosted runner bootstrap 与 <code>codex sandbox -- /bin/true</code>。</td>
+            <td>主 Codex job 在 <code>pull_request</code> 事件保持跳过；smoke job 不评论、不调用模型、不发布代码。</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_codex_workflow.py</code></td>
+            <td>把 dev-container 契约改为 hosted-runner 契约，覆盖固定版本、步骤顺序、受信任依赖、smoke 触发范围和 sandbox fail-closed。</td>
+            <td>测试验证行为契约，不复制整个 YAML。</td>
+          </tr>
+          <tr>
+            <td>方案生命周期</td>
+            <td>验证完成后将本方案转为 ACTIVE，并把 <code>20260722-agent-workflows-dev-container.active.html</code> 转为 SUPERSEDED，注明 Claude 仍在容器、Codex 由本方案替代。</td>
+            <td>待合并内容不得保留任何 <code>.wip.html</code>。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2><span class="section-no">05</span>安全、兼容与回滚</h2>
+      <div class="decision-grid">
+        <article class="decision">
+          <div class="label">SECURITY</div>
+          <h3>安全强度不降级</h3>
+          <p>外层从 Docker job container 改为 GitHub 临时 VM，但真正约束模型命令的 Codex permission profile、bubblewrap、seccomp、AppArmor、网络代理和环境变量过滤均保留。sandbox 自检仍在恢复模型凭据之前 fail-closed。</p>
+        </article>
+        <article class="decision">
+          <div class="label">COMPATIBILITY</div>
+          <h3>Claude 与生产镜像不受影响</h3>
+          <p>不修改 <code>claude.yml</code>、Dockerfile、build workflow、生产镜像或应用 API。Codex 仍使用 Node 24、Python 3.13 与 Codex 0.144.6。</p>
+        </article>
+        <article class="decision">
+          <div class="label">PERFORMANCE</div>
+          <h3>接受一次性 bootstrap 时间</h3>
+          <p>每次请求需安装固定 Codex 与测试依赖，启动时间高于复用 dev image；换取 hosted runner 原生 sandbox 能力。25 分钟 job 与 20 分钟模型时限保持不变，测试记录实际耗时。</p>
+        </article>
+        <article class="decision">
+          <div class="label">ROLLBACK</div>
+          <h3>以提交回退为单位</h3>
+          <p>若 hosted smoke 或真实运行出现新问题，回退本 PR 可恢复当前配置；但当前容器方案已被真实失败证伪，回退后 Codex workflow 应视为不可用，不能宣称恢复服务。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="section-no">06</span>验证计划与当前结果</h2>
+      <p class="callout pending"><span class="status-chip">待 hosted 验证</span> 本地实现与项目测试已经完成；GitHub hosted runner 的真实 sandbox smoke 是剩余合并阻断项。通过后再将本方案转为 ACTIVE。</p>
+      <table>
+        <thead>
+          <tr><th>验证层</th><th>实际命令或证据</th><th>当前状态</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>TDD 红灯</td><td>先修改 hosted-runner、可信依赖和 smoke 契约测试，再对旧 workflow 运行定向测试。</td><td>符合预期：5 failed，23 passed。</td></tr>
+          <tr><td>定向测试</td><td><code>python3 -m pytest -q tests/test_codex_workflow.py tests/test_agent_workflows.py</code>；扩展执行另含 design 与项目指引测试。</td><td>30 passed；扩展集合 54 passed。</td></tr>
+          <tr><td>Actions 静态检查</td><td><code>go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -config-file .github/actionlint.yaml .github/workflows/codex.yml</code></td><td>通过。</td></tr>
+          <tr><td>真实 act：主 job</td><td><code>act issue_comment -W .github/workflows/codex.yml -j codex ...</code>，使用假 GitHub App 凭据且不读取生产 secret。</td><td>真实 runner 与 token action 已启动；按预期在解析假私钥时停止，属于外部 GitHub App 边界。</td></tr>
+          <tr><td>真实 act：smoke job</td><td><code>act pull_request -W .github/workflows/codex.yml -j codex-sandbox-smoke ...</code></td><td>Node 24、Codex 0.144.6 和 apt 安装成功；act 外层 Docker 未挂载宿主 AppArmor 文件系统，profile 加载按 fail-closed 停止。由 hosted smoke 继续验收。</td></tr>
+          <tr><td>GitHub hosted smoke</td><td>PR 上新 job 必须成功，日志需证明固定 Codex 版本、bubblewrap/AppArmor 和 <code>codex sandbox -- /bin/true</code> 通过。</td><td>待执行；合并阻断项</td></tr>
+          <tr><td>项目检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make test</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>格式、lint、diff 通过；Docker 全量测试 682 passed、2 skipped。宿主缺少 Calibre 等测试依赖，故 <code>make pytest</code> 无法启动；WIP 状态下 design 检查仅命中预期合并门禁。</td></tr>
+          <tr><td>PR 交付</td><td>正文包含背景、关键改动、实际验证、风险、兼容性，以及 ACTIVE 方案的 commit-SHA 固定 GitHub 与 RawGitHack 链接。</td><td>待执行</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    本方案取代旧方案中“Codex 运行在 dev job container”的核心决定；Claude 的 dev container 决定继续有效，并在本方案激活时一并成为新的当前依据。
+  </footer>
+</body>
+</html>

@@ -27,6 +27,10 @@ def codex_job():
     return workflow_data()["jobs"]["codex"]
 
 
+def sandbox_smoke_job():
+    return workflow_data()["jobs"]["codex-sandbox-smoke"]
+
+
 def workflow_step(*, step_id=None, name=None):
     for step in codex_job()["steps"]:
         if step_id is not None and step.get("id") == step_id:
@@ -119,26 +123,40 @@ def test_employee_job_is_bounded_and_serialized_per_request_target():
     }
 
 
-def test_codex_runs_in_the_dev_container_without_runtime_install_steps():
+def test_codex_runs_on_the_hosted_runner_with_pinned_runtime_installation():
     job = codex_job()
     steps = codex_job()["steps"]
     checkout = workflow_step(name="Checkout repository")
     prepare = workflow_step(name="Prepare Codex runtime and repository")
-    verify = workflow_step(name="Verify development environment and sandbox")
+    setup_node = workflow_step(name="Setup Node for Codex runtime")
+    setup_python = workflow_step(name="Setup Python for Codex validation")
+    install_tools = workflow_step(name="Install Codex CLI and test tools")
+    setup_sandbox = workflow_step(name="Setup bubblewrap and AppArmor for sandbox")
     synchronize = workflow_step(name="Synchronize project dependencies")
     restore_auth = workflow_step(name="Restore Codex ChatGPT auth")
     run_codex = workflow_step(name="Run Codex")
 
-    assert job["container"] == {
-        "image": "talebook/talebook:dev",
-        "options": "--user root --security-opt seccomp=unconfined",
+    assert job["runs-on"] == "ubuntu-latest"
+    assert "container" not in job
+    assert "defaults" not in job
+    assert workflow_data()["env"]["CODEX_VERSION"] == "0.144.6"
+    assert setup_node == {
+        "name": "Setup Node for Codex runtime",
+        "if": "steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'",
+        "uses": "actions/setup-node@v4",
+        "with": {"node-version": "24"},
     }
-    assert job["defaults"] == {"run": {"shell": "bash"}}
-    assert "CODEX_VERSION" not in job["env"]
+    assert setup_python == {
+        "name": "Setup Python for Codex validation",
+        "if": "steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'",
+        "uses": "actions/setup-python@v5",
+        "with": {"python-version": "3.13"},
+    }
     assert all(
-        probe in verify["run"]
+        probe in install_tools["run"]
         for probe in (
-            "ebook-convert --version",
+            'npm install -g "@openai/codex@${CODEX_VERSION}"',
+            'python3 -m pip install --disable-pip-version-check -r "$CODEX_TEST_REQUIREMENTS"',
             "python3 --version",
             "node --version",
             "npm --version",
@@ -146,32 +164,34 @@ def test_codex_runs_in_the_dev_container_without_runtime_install_steps():
             "python3 -m pytest --version",
             "ruff --version",
             "codex --version",
-            "bwrap --version",
         )
     )
-    assert all(
-        name not in [step.get("name") for step in steps]
-        for name in (
-            "Setup Python for Codex validation",
-            "Install Codex test tools",
-            "Install Codex CLI",
-            "Setup bubblewrap and AppArmor for sandbox",
-        )
+    assert "ebook-convert --version" not in install_tools["run"]
+    assert (
+        "sudo apt-get install -y --no-install-recommends bubblewrap uidmap apparmor-profiles apparmor-utils"
+        in setup_sandbox["run"]
     )
     assert synchronize["run"] == "make init\nnpm --prefix app ci\n"
-    assert steps.index(checkout) < steps.index(prepare) < steps.index(verify) < steps.index(synchronize) < steps.index(restore_auth)
+    assert (
+        steps.index(checkout)
+        < steps.index(prepare)
+        < steps.index(setup_node)
+        < steps.index(setup_python)
+        < steps.index(install_tools)
+        < steps.index(setup_sandbox)
+        < steps.index(synchronize)
+        < steps.index(restore_auth)
+    )
     assert steps.index(restore_auth) < steps.index(run_codex)
 
 
-def test_codex_runtime_home_and_repository_trust_are_prepared_before_verification():
+def test_codex_runtime_home_and_repository_trust_are_prepared_before_installation():
     prepare = workflow_step(name="Prepare Codex runtime and repository")
-    verify = workflow_step(name="Verify development environment and sandbox")
+    install_tools = workflow_step(name="Install Codex CLI and test tools")
 
-    assert prepare["if"] == (
-        "steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'"
-    )
+    assert prepare["if"] == ("steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'")
     assert prepare["run"] == (
-        'set -euo pipefail\n'
+        "set -euo pipefail\n"
         'mkdir -p "$CODEX_HOME"\n'
         'chmod 700 "$CODEX_HOME"\n'
         'git config --global --add safe.directory "$GITHUB_WORKSPACE"\n'
@@ -180,8 +200,7 @@ def test_codex_runtime_home_and_repository_trust_are_prepared_before_verificatio
     )
     assert "safe.directory '*'" not in prepare["run"]
     assert 'safe.directory "*"' not in prepare["run"]
-    assert "if codex sandbox -- /bin/true; then" in verify["run"]
-    assert "codex sandbox -- /bin/true 2>/dev/null" not in verify["run"]
+    assert 'npm install -g "@openai/codex@${CODEX_VERSION}"' in install_tools["run"]
 
 
 def test_only_repository_writers_can_trigger_the_employee():
@@ -231,16 +250,41 @@ def test_agent_has_public_network_but_cannot_read_host_credentials():
 
 
 def test_sandbox_setup_fails_closed_before_codex_runs():
-    setup_script = workflow_step(name="Verify development environment and sandbox")["run"]
+    setup_script = workflow_step(name="Setup bubblewrap and AppArmor for sandbox")["run"]
     step_names = [step.get("name") for step in codex_job()["steps"]]
 
     assert "continuing" not in setup_script
+    assert "::error::Required AppArmor profile source is missing" in setup_script
+    assert "::error::Bubblewrap sandbox self-test failed" in setup_script
+    assert "::error::AppArmor profile is not active for bubblewrap" in setup_script
     assert "::error::Codex sandbox self-test failed" in setup_script
     assert "codex sandbox -- /bin/true" in setup_script
-    assert "exit 1" in setup_script
-    assert "sudo" not in setup_script
-    assert "AppArmor" not in setup_script
-    assert step_names.index("Verify development environment and sandbox") < step_names.index("Run Codex")
+    assert "codex sandbox -- /bin/true 2>/dev/null" not in setup_script
+    assert setup_script.count("exit 1") >= 4
+    assert step_names.index("Setup bubblewrap and AppArmor for sandbox") < step_names.index("Run Codex")
+
+
+def test_pull_requests_run_a_secretless_hosted_runner_sandbox_smoke_job():
+    triggers = workflow_data()[True]
+    smoke = sandbox_smoke_job()
+    smoke_steps = smoke["steps"]
+    main_sandbox_script = workflow_step(name="Setup bubblewrap and AppArmor for sandbox")["run"]
+    smoke_sandbox = next(step for step in smoke_steps if step.get("name") == "Setup bubblewrap and AppArmor for sandbox")
+
+    assert triggers["pull_request"] == {"paths": [".github/workflows/codex.yml"]}
+    assert smoke["name"] == "Verify Codex sandbox on hosted runner"
+    assert smoke["if"] == "github.event_name == 'pull_request'"
+    assert smoke["runs-on"] == "ubuntu-latest"
+    assert smoke["timeout-minutes"] == 10
+    assert smoke["env"]["CODEX_HOME"] == "${{ github.workspace }}/.codex-smoke-home"
+    assert all("secrets." not in str(step) for step in smoke_steps)
+    assert smoke_steps[0] == {
+        "name": "Setup Node for Codex runtime",
+        "uses": "actions/setup-node@v4",
+        "with": {"node-version": "24"},
+    }
+    assert 'npm install -g "@openai/codex@${CODEX_VERSION}"' in smoke_steps[1]["run"]
+    assert smoke_sandbox["run"] == main_sandbox_script
 
 
 def test_trusted_assets_follow_the_immutable_workflow_version_and_acknowledge_first():
@@ -251,8 +295,8 @@ def test_trusted_assets_follow_the_immutable_workflow_version_and_acknowledge_fi
     assert "const workflowSha = process.env.WORKFLOW_SHA;" in script
     assert 'path: ".github/codex/prompts/comment-response.md"' in script
     assert 'path: ".github/codex/scripts/codex_progress_reporter.py"' in script
-    assert 'path: "requirements-test.txt"' not in script
-    assert script.count("ref: workflowSha") == 2
+    assert 'path: "requirements-test.txt"' in script
+    assert script.count("ref: workflowSha") == 3
     assert "ref: defaultBranch" not in script
     assert script.index("reactions.createForIssueComment") < script.index("issues.createComment")
     assert script.index("issues.createComment") < script.index('path: ".github/codex/prompts/comment-response.md"')
@@ -261,6 +305,8 @@ def test_trusted_assets_follow_the_immutable_workflow_version_and_acknowledge_fi
     assert "const codexPromptTemplate = `${runnerTemp}/codex-comment-response.md`;" in script
     assert 'core.exportVariable("CODEX_PROMPT_TEMPLATE", codexPromptTemplate)' in script
     assert 'core.exportVariable("CODEX_PROGRESS_REPORTER", codexProgressReporter)' in script
+    assert "const codexTestRequirements = `${runnerTemp}/codex-requirements-test.txt`;" in script
+    assert 'core.exportVariable("CODEX_TEST_REQUIREMENTS", codexTestRequirements)' in script
     assert 'cat "$CODEX_PROMPT_TEMPLATE"' in workflow_step(name="Build Codex prompt")["run"]
     assert "python3 .github/codex/scripts/codex_progress_reporter.py" not in workflow_text()
 
