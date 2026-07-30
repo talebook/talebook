@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>书籍详情页离场请求修复方案</title>
+  <style>
+    :root {
+      --ink: #17324d;
+      --muted: #607387;
+      --paper: #eef3f8;
+      --card: #ffffff;
+      --line: #c8d4df;
+      --navy: #102a43;
+      --teal: #087f75;
+      --teal-soft: #d8f3ef;
+      --red: #b43c32;
+      --red-soft: #fbe9e7;
+      --amber: #9a6700;
+      --amber-soft: #fff3cd;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { color: var(--ink); background: var(--paper); font-family: var(--sans); }
+    body { margin: 0; line-height: 1.68; }
+    main { width: min(1080px, calc(100% - 32px)); margin: 28px auto 64px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 6vw, 62px);
+      color: #f5fbff;
+      background: var(--navy);
+      border-radius: 26px;
+    }
+    header::after {
+      content: "/book/1 → /recent";
+      position: absolute;
+      right: -12px;
+      bottom: -16px;
+      color: rgba(216, 243, 239, .09);
+      font: 800 clamp(34px, 8vw, 88px)/1 var(--mono);
+      letter-spacing: -.08em;
+      white-space: nowrap;
+    }
+    .eyebrow, .label { font: 700 12px/1.4 var(--mono); letter-spacing: .11em; text-transform: uppercase; }
+    .eyebrow { margin: 0 0 12px; color: #7fe2d8; }
+    h1 { position: relative; z-index: 1; max-width: 760px; margin: 0; font-size: clamp(32px, 6vw, 60px); line-height: 1.08; letter-spacing: -.04em; }
+    .lede { position: relative; z-index: 1; max-width: 720px; margin: 20px 0 0; color: #d6e3ed; font-size: 18px; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+    .pill { padding: 6px 11px; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; font: 700 12px/1.3 var(--mono); }
+    .pill.status { color: #5e3b00; background: #ffd875; border-color: #ffd875; }
+    section { margin-top: 22px; padding: clamp(22px, 4vw, 36px); background: var(--card); border: 1px solid var(--line); border-radius: 20px; }
+    h2 { margin: 0 0 16px; font-size: 25px; line-height: 1.25; letter-spacing: -.02em; }
+    h3 { margin: 0 0 8px; font-size: 17px; }
+    p { margin: 9px 0; }
+    ul, ol { margin: 9px 0; padding-left: 22px; }
+    li + li { margin-top: 6px; }
+    code { padding: 2px 5px; color: #173d5d; background: #e6eef5; border-radius: 5px; font: 13px/1.5 var(--mono); }
+    .callout { padding: 16px 18px; background: var(--red-soft); border-left: 5px solid var(--red); border-radius: 10px; }
+    .verified { padding: 14px 16px; color: #075f58; background: var(--teal-soft); border-left: 5px solid var(--teal); border-radius: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+    .mini { padding: 18px; background: #f8fafc; border: 1px solid var(--line); border-radius: 14px; }
+    .mini .label { color: var(--muted); }
+    .trace { overflow-x: auto; padding: 18px; background: #f8fafc; border: 1px solid var(--line); border-radius: 15px; }
+    .trace svg { display: block; width: 100%; min-width: 760px; height: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 11px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font: 700 12px/1.4 var(--mono); }
+    .good { color: var(--teal); font-weight: 700; }
+    .bad { color: var(--red); font-weight: 700; }
+    footer { margin-top: 18px; color: var(--muted); text-align: center; font: 12px/1.5 var(--mono); }
+    @media (max-width: 720px) {
+      main { width: min(100% - 20px, 1080px); margin-top: 10px; }
+      header, section { border-radius: 15px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">DESIGN / APP / ROUTE LIFECYCLE</p>
+      <h1>书籍详情页离场请求修复</h1>
+      <p class="lede">当用户从详情页进入“最近”列表时，让详情数据加载随详情路由一起结束，不再把已经消失的书籍参数拼成后端请求。</p>
+      <div class="meta">
+        <span class="pill status">ACTIVE · 已验证</span>
+        <span class="pill">创建日期 2026-07-30</span>
+        <span class="pill">模块 app</span>
+        <span class="pill">需求来源 用户缺陷反馈</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>01. 原始诉求与可观察症状</h2>
+      <div class="callout">
+        用户从书籍详情页点击 navbar 的“最近”后，列表页会弹出 404；网络请求显示前端访问了
+        <code>http://127.0.0.1:8080/api/book/undefined</code>。
+      </div>
+      <table>
+        <thead><tr><th>操作</th><th>预期</th><th>当前异常</th></tr></thead>
+        <tbody>
+          <tr><td>打开 <code>/book/{bid}</code></td><td>请求当前书籍详情</td><td>详情正常加载</td></tr>
+          <tr><td>点击 navbar 的 <code>/recent</code></td><td>仅加载最近书籍列表</td><td>详情组件离场时又请求 <code>/book/undefined</code></td></tr>
+          <tr><td>进入列表页</td><td>无错误弹窗</td><td>无效详情请求触发 404 弹窗</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>02. 目标、边界与已确认决策</h2>
+      <div class="grid">
+        <article class="mini">
+          <p class="label">必须达成</p>
+          <h3>详情请求只属于有效详情路由</h3>
+          <ul>
+            <li>详情页首次打开仍请求正确的书籍 ID。</li>
+            <li>详情页离场时不请求 <code>/book/undefined</code>。</li>
+            <li>从详情页进入 Recent 后，列表正常展示且没有相关错误弹窗。</li>
+          </ul>
+        </article>
+        <article class="mini">
+          <p class="label">明确不做</p>
+          <h3>不扩大到全局容错</h3>
+          <ul>
+            <li>不在全局 <code>backend()</code> 静默过滤包含 <code>undefined</code> 的 URL。</li>
+            <li>不修改 Recent API、后端路由或错误提示策略。</li>
+            <li>不借机重构详情页其他数据与交互。</li>
+          </ul>
+        </article>
+      </div>
+      <p>用户已确认采用局部生命周期修复。该选择保留全局 API 层对调用错误的可见性，避免掩盖其他无效参数来源。</p>
+    </section>
+
+    <section>
+      <h2>03. 根因假设与验证顺序</h2>
+      <table>
+        <thead><tr><th>优先级</th><th>可证伪假设</th><th>预测</th></tr></thead>
+        <tbody>
+          <tr><td>H1</td><td>详情页的响应式 <code>useAsyncData</code> key 依赖全局路由参数；离场时参数先清空、组件后卸载，触发一次重取</td><td>捕获客户端导航网络请求时，会在 <code>/recent</code> 期间观察到一次 <code>/api/book/undefined</code></td></tr>
+          <tr><td>H2</td><td>navbar 自身拼出了错误详情 URL</td><td>检查链接属性会出现书籍详情地址，而不是 <code>/recent</code></td></tr>
+          <tr><td>H3</td><td>Recent 列表数据包含缺失 ID 的书籍卡片并在加载时自动打开</td><td>直接打开 <code>/recent</code> 也会发出相同无效请求</td></tr>
+        </tbody>
+      </table>
+      <p><strong>验证结论：</strong>H1 成立。本地 Nuxt 实现会监听响应式 key 并在 key 变化时初始化新数据项；修复前回归用例连续两次均捕获到一次无效请求。navbar 的实际链接为 <code>/recent</code>，且直接 Recent 加载不会触发详情请求，H2 与 H3 被排除。</p>
+    </section>
+
+    <section>
+      <h2>04. 请求航迹与修复点</h2>
+      <div class="trace">
+        <svg viewBox="0 0 940 290" role="img" aria-labelledby="trace-title trace-desc">
+          <title id="trace-title">详情页离场请求时序</title>
+          <desc id="trace-desc">现状会在路由参数清空后重取 undefined；修复后数据加载绑定稳定书籍 ID，离场只加载最近列表。</desc>
+          <defs>
+            <marker id="ok-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 8 4 0 8Z" fill="#087f75"/></marker>
+            <marker id="bad-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 8 4 0 8Z" fill="#b43c32"/></marker>
+          </defs>
+          <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#17324d">
+            <rect x="24" y="20" width="160" height="46" rx="10" fill="#fff" stroke="#c8d4df"/><text x="104" y="48" text-anchor="middle">详情组件</text>
+            <rect x="220" y="20" width="160" height="46" rx="10" fill="#fff" stroke="#c8d4df"/><text x="300" y="48" text-anchor="middle">Vue Router</text>
+            <rect x="416" y="20" width="160" height="46" rx="10" fill="#fff" stroke="#c8d4df"/><text x="496" y="48" text-anchor="middle">useAsyncData</text>
+            <rect x="612" y="20" width="140" height="46" rx="10" fill="#fff" stroke="#c8d4df"/><text x="682" y="48" text-anchor="middle">API</text>
+            <rect x="788" y="20" width="128" height="46" rx="10" fill="#fff" stroke="#c8d4df"/><text x="852" y="48" text-anchor="middle">Recent</text>
+            <g stroke="#c8d4df" stroke-dasharray="4 5"><path d="M104 66v204"/><path d="M300 66v204"/><path d="M496 66v204"/><path d="M682 66v204"/><path d="M852 66v204"/></g>
+            <path d="M104 100h568" stroke="#087f75" stroke-width="2" marker-end="url(#ok-arrow)"/><text x="388" y="93" text-anchor="middle">GET /api/book/1</text>
+            <path d="M104 137h186" stroke="#087f75" stroke-width="2" marker-end="url(#ok-arrow)"/><text x="197" y="130" text-anchor="middle">点击 /recent</text>
+            <path d="M300 174h186" stroke="#b43c32" stroke-width="2" marker-end="url(#bad-arrow)"/><text x="393" y="167" text-anchor="middle">bid → undefined</text>
+            <path d="M496 211h176" stroke="#b43c32" stroke-width="2" marker-end="url(#bad-arrow)"/><text x="584" y="204" text-anchor="middle">现状：错误重取</text>
+            <path d="M300 248h542" stroke="#087f75" stroke-width="3" marker-end="url(#ok-arrow)"/><text x="571" y="241" text-anchor="middle">修复：离场不重取，仅进入 Recent</text>
+          </g>
+        </svg>
+      </div>
+      <ol>
+        <li>详情数据 key 使用进入该详情组件时确定的有效书籍 ID，不把离场后的空路由参数作为新数据源。</li>
+        <li>保留详情路由之间切换书籍时的正确刷新能力；若实现需要响应路由变化，则只接受有效 ID。</li>
+        <li>回归测试在真实导航链路捕获所有请求，直接断言无 <code>/api/book/undefined</code>。</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>05. 实现影响与风险</h2>
+      <table>
+        <thead><tr><th>位置</th><th>计划变更</th><th>兼容性与风险控制</th></tr></thead>
+        <tbody>
+          <tr><td><code>app/pages/book/[bid]/index.vue</code></td><td>限制详情数据源只对有效书籍 ID 发起请求，避免离场重取</td><td>不改变模板、接口形状或服务端契约；验证客户端切换书籍仍刷新</td></tr>
+          <tr><td><code>app/test/e2e/book-detail.spec.ts</code></td><td>新增“详情页点击 Recent”网络回归用例</td><td>直接覆盖用户操作与精确异常 URL</td></tr>
+        </tbody>
+      </table>
+      <p><strong>回滚：</strong>改动仅在详情页数据加载逻辑和测试，可整体回退；无数据库、配置或迁移步骤。</p>
+    </section>
+
+    <section>
+      <h2>06. 验收计划与结果</h2>
+      <div class="verified"><strong>当前状态：已完成。</strong>目标网络回归、有效书籍切换、实际浏览器导航、lint 与工程门禁均已验证。</div>
+      <table>
+        <thead><tr><th>层级</th><th>验证内容</th><th>实际命令 / 页面</th><th>实际结果</th></tr></thead>
+        <tbody>
+          <tr><td>E2E 红灯</td><td>证明用例能捕获用户描述的精确症状</td><td><code>MOCK_API_URL=http://127.0.0.1:18180 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 npx playwright test test/e2e/book-detail.spec.ts --project=chromium -g "does not request an undefined book" --repeat-each=2</code></td><td><span class="bad">修复前按预期失败</span>：2 failed；每次均捕获一个 <code>/api/book/undefined</code></td></tr>
+          <tr><td>E2E 绿灯</td><td>详情页点击 Recent 后无无效书籍请求，列表正常展示</td><td>同一命令，修复后再次执行</td><td><span class="good">通过</span>：2 passed，7.6 秒</td></tr>
+          <tr><td>有效路由切换</td><td>确认局部修复没有破坏 <code>/book/1</code> 到 <code>/book/2</code> 的详情刷新与阅读状态隔离</td><td><code>npx playwright test test/e2e/shelf.spec.ts --project=chromium -g "restores reading state after reload and keeps books independent"</code></td><td><span class="good">通过</span>：1 passed，4.7 秒</td></tr>
+          <tr><td>组合回归</td><td>书籍详情与 Recent / Hot 列表</td><td><code>npx playwright test test/e2e/book-detail.spec.ts test/e2e/library.spec.ts --project=chromium</code></td><td>9 passed，1 failed；失败项为既有“EPUB 与 TXT 同时存在时显示两个阅读入口”，实际稳定只有一个入口。该断言与本次路由离场数据键无关，单独重复 3 次结果相同；目标用例与列表用例均通过</td></tr>
+          <tr><td>浏览器验收</td><td>实际渲染、导航、网络请求与错误弹窗</td><td>Chrome DevTools MCP，隔离 headless Chrome，<code>1440 × 1000</code>，浅色主题：<code>/book/1</code> → navbar <code>/recent</code></td><td><span class="good">通过</span>：进入 <code>/recent</code>，标题“新书推荐”；<code>/api/recent</code> 1 次，<code>/api/book/undefined</code> 0 次，可见弹窗 0 个；截图 <code>/tmp/talebook-book-detail-recent.png</code></td></tr>
+          <tr><td>前端检查</td><td>ESLint</td><td><code>npm run lint</code></td><td><span class="good">通过</span>：0 errors；194 条仓库既有 warnings</td></tr>
+          <tr><td>设计门禁</td><td>路径、状态、HTML 与单文件约束</td><td><code>make check-design</code></td><td><span class="good">通过</span></td></tr>
+          <tr><td>补丁完整性</td><td>空白错误与意外生成文件</td><td><code>git diff --check</code>；<code>git status --short</code></td><td><span class="good">通过</span>：仅包含详情页、目标 E2E、本方案文件及 PR 验收截图</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>Talebook · app · 20260730-book-detail-navigation-request · ACTIVE</footer>
+  </main>
+</body>
+</html>
