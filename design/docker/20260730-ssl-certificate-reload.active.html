@@ -476,7 +476,7 @@
             <tr><td>后端全量</td><td>全部 Python 回归与格式检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make pytest</code></td><td><span class="test-status pass">696 passed</span><br><small>2 skipped，22 个既有依赖或代码弃用告警；无失败。</small></td></tr>
             <tr><td>镜像构建</td><td>production 与 production-ssr 均可构建，Nginx capability 保留</td><td><code>docker build --target production</code>；<code>docker build --target production-ssr</code></td><td><span class="test-status pass">通过</span></td></tr>
             <tr><td>容器身份</td><td>默认 PUID 1000 下长期进程非 root，80/443 可监听，诊断页可用</td><td><code>docker run</code> + <code>docker exec ps/getcap</code> + HTTP/HTTPS 探测；分别运行静态与 SSR 镜像</td><td><span class="test-status pass">通过</span><br><small>Supervisor 为 root；Nginx master/worker、Tornado 与 SSR Node 为 talebook；capability 为 <code>cap_net_bind_service=ep</code>。</small></td></tr>
-            <tr><td>Chrome E2E</td><td>管理员上传成功、线上指纹立即切换、重启后保持</td><td><code>CHOKIDAR_USEPOLLING=true API_URL=http://127.0.0.1:18180 npx nuxt dev --port 3000 --host 127.0.0.1</code> + Chrome DevTools MCP</td><td><span class="test-status pass">通过</span><br><small>POST 返回 <code>err: ok</code>；线上与磁盘均切换为测试证书二，重启后 SHA-256 指纹不变。</small></td></tr>
+            <tr><td>Chrome E2E</td><td>管理员上传成功、线上指纹立即切换、重启后保持</td><td><code>API_URL=http://127.0.0.1:18180 npx nuxt dev --port 3000 --host 127.0.0.1</code> + Chrome DevTools MCP</td><td><span class="test-status pass">通过</span><br><small>POST 返回 <code>err: ok</code>；线上与磁盘均切换为测试证书二，重启后 SHA-256 指纹不变。</small></td></tr>
             <tr><td>失败路径</td><td>非法配对不触碰正式证书；保存、配置检查、reload 与恢复失败均有确定行为</td><td>Chrome 上传不匹配证书与私钥；单测注入写入、<code>nginx -t</code>、reload 和 rollback 失败</td><td><span class="test-status pass">通过</span><br><small>浏览器显示“证书与私钥不匹配”，磁盘和线上指纹保持；进程级 reload 注入采用可重复单测替代破坏性容器注入。</small></td></tr>
             <tr><td>兼容性</td><td>显式 PUID 0 仍可启动并热更新证书，同时输出安全提示</td><td>独立容器运行；检查日志、进程、<code>nginx -t</code>，并以兼容身份调用同一证书安装服务</td><td><span class="test-status pass">通过</span></td></tr>
             <tr><td>文件与重启</td><td>证书模式 0644、私钥模式 0600；重启后加载上传证书</td><td><code>stat</code> + TLS 证书主题与 SHA-256 指纹比较</td><td><span class="test-status pass">通过</span></td></tr>
@@ -488,7 +488,7 @@
       <ul>
         <li>默认 PUID 1000、SSR 与显式 PUID 0 三类运行方式均到达 <code>ready</code>，证书热更新不再要求整套应用以 root 运行。</li>
         <li>Chrome 实际验证了管理员设置页的匹配证书成功路径与错误配对路径；成功请求后的在线证书与磁盘证书指纹一致。</li>
-        <li>本机 Nuxt 常规文件监听触发 <code>EMFILE</code>，改用 Chokidar polling 后完成验收；这只影响本地测试启动方式，不影响镜像运行。</li>
+        <li>本机 Nuxt 常规文件监听曾触发 <code>EMFILE</code>；该现象不影响已取得的 Chrome 请求、在线指纹与重启持久化证据，后续开发服务必须按仓库规范使用原生文件事件。</li>
         <li>浏览器仍显示既有 Vuetify i18n 缺失 key 告警；Nginx 仍提示既有 <code>listen ... http2</code> 弃用告警。二者均不影响本次 SSL 流程，且本次不扩大范围处理。</li>
       </ul>
     </section>
