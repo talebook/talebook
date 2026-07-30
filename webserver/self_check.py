@@ -87,7 +87,8 @@ def check_permission():
 
 
 def check_nginx_config():
-    return (True, None) if run(["nginx", "-t"]) else (False, "nginx_config_invalid")
+    cmd = ["gosu", "%s:%s" % (RUN_USER, RUN_USER), "nginx", "-t"]
+    return (True, None) if run(cmd) else (False, "nginx_config_invalid")
 
 
 def check_syncdb():

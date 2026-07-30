@@ -6,6 +6,10 @@ PGID=${PGID:-0}
 groupmod -o -g "${PGID}" talebook
 usermod -o -u "${PUID}" talebook
 
+if [ "${PUID}" = "0" ]; then
+  echo "WARNING: PUID=0 runs Talebook application processes as root; this is supported for compatibility but is not required for SSL upload."
+fi
+
 # 使用预设的书库和配置
 if [ ! -d "/data/books" ]; then
   cp -rf /prebuilt/books /data/
@@ -36,7 +40,7 @@ find . \( -path ./library -o -name '*.pyc' \) -prune -o -type f -print | while r
 done
 
 
-mkdir -p /root/.npm
+mkdir -p /root/.npm /run/talebook /data/books/ssl
 
 # 设置PUID/GUID权限
 permission_file=/data/.permission
@@ -50,14 +54,24 @@ fi
 
 # 设置系统文件的权限
 chown -R talebook:talebook \
+  /run/talebook \
+  /data/books/ssl \
   /data/log/ \
   /var/lib/nginx \
+  /var/log/nginx \
   /root/.config/calibre \
   /root/.npm \
   /var/www/talebook/webserver \
   /var/www/talebook/server.py \
   /usr/lib/calibre \
   /usr/share/calibre
+
+if [ -f /data/books/ssl/ssl.crt ]; then
+  chmod 0644 /data/books/ssl/ssl.crt
+fi
+if [ -f /data/books/ssl/ssl.key ]; then
+  chmod 0600 /data/books/ssl/ssl.key
+fi
 
 # 若挂载了外部 app/ 目录导致 node_modules 缺失，自动安装依赖
 APP_DIR=/var/www/talebook/app
@@ -80,7 +94,7 @@ fi
 export PYTHONDONTWRITEBYTECODE=1
 echo
 echo "====== Check config ===="
-nginx -t || exit 1
+gosu talebook:talebook nginx -t || exit 1
 
 echo
 echo "====== Sync DB Scheme ===="

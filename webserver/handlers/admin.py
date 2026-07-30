@@ -7,9 +7,6 @@ import hashlib
 import logging
 import os
 import re
-import ssl
-import subprocess
-import tempfile
 import traceback
 import uuid
 
@@ -26,6 +23,14 @@ from webserver.services.autofill import AutoFillService
 from webserver.services.batch_convert import BatchConvertService
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
+from webserver.services.ssl_certificate import (
+    CertificateRollbackError,
+    CertificateSaveError,
+    CertificateValidationError,
+    NginxConfigError,
+    NginxReloadError,
+    SSLCertificateManager,
+)
 from webserver.services.update_checker import UpdateChecker
 
 
@@ -740,109 +745,37 @@ class AdminInstall(BaseHandler):
 
 
 class SSLHandlerLogic:
-    def check_ssl_chain(self, crt_body, key_body):
-        """return None if ok, else Err"""
-        import os
-
-        crt_fd = None
-        key_fd = None
-        crt_path = None
-        key_path = None
-        try:
-            crt_fd, crt_path = tempfile.mkstemp(suffix=".crt")
-            try:
-                key_fd, key_path = tempfile.mkstemp(suffix=".key")
-                with os.fdopen(crt_fd, "wb") as crt_file:
-                    crt_file.write(crt_body)
-                crt_fd = None  # fdopen 关闭后设为 None
-                with os.fdopen(key_fd, "wb") as key_file:
-                    key_file.write(key_body)
-                key_fd = None  # fdopen 关闭后设为 None
-                return self.check_ssl_chain_files(crt_path, key_path)
-            except:
-                # 如果 key_fd 创建失败，确保关闭 crt_fd
-                if crt_fd is not None:
-                    try:
-                        os.close(crt_fd)
-                    except OSError:
-                        pass
-                raise
-        finally:
-            # 确保关闭未关闭的文件描述符
-            if crt_fd is not None:
-                try:
-                    os.close(crt_fd)
-                except OSError:
-                    pass
-            if key_fd is not None:
-                try:
-                    os.close(key_fd)
-                except OSError:
-                    pass
-            if crt_path and os.path.exists(crt_path):
-                try:
-                    os.unlink(crt_path)
-                except OSError:
-                    pass
-            if key_path and os.path.exists(key_path):
-                try:
-                    os.unlink(key_path)
-                except OSError:
-                    pass
-
-    def check_ssl_chain_files(self, crt_file, key_file):
-        ctx = ssl.SSLContext()
-        try:
-            ctx.load_cert_chain(crt_file, key_file)
-        except ssl.SSLError as err:
-            return err
-        return None
-
-    def save_files(self, crt_body, key_body):
-        with open(CONF["ssl_crt_file"], "w+b") as f:
-            f.write(crt_body)
-
-        with open(CONF["ssl_key_file"], "w+b") as f:
-            f.write(key_body)
-
-    def nginx_check(self):
-        return subprocess.run(["nginx", "-t"], check=True)
-
-    def nginx_reload(self):
-        return subprocess.run(["service", "nginx", "reload"], check=True)
+    def __init__(self, manager=None):
+        self.manager = manager or SSLCertificateManager(CONF["ssl_crt_file"], CONF["ssl_key_file"])
 
     def run(self, ssl_crt, ssl_key):
-        err = self.check_ssl_chain(ssl_crt, ssl_key)
-        if err is not None:
-            return {"err": "params.ssl_error", "msg": _("证书或密钥校验失败: %s" % err)}
-
         try:
-            self.save_files(ssl_crt, ssl_key)
-        except Exception as err:
-            import traceback
-
-            logging.error(traceback.format_exc())
+            self.manager.install(ssl_crt, ssl_key)
+        except CertificateValidationError as err:
+            return {"err": "params.ssl_error", "msg": _("证书或密钥校验失败: %s" % err)}
+        except CertificateSaveError as err:
+            logging.exception("failed to save SSL certificate")
             return {
                 "err": "internal.ssl_save_error",
                 "msg": _("证书存储失败: %s" % err),
             }
-
-        # testing nginx config
-        try:
-            self.nginx_check()
-        except subprocess.CalledProcessError as err:
+        except NginxConfigError as err:
+            logging.exception("nginx rejected uploaded SSL certificate")
             return {
                 "err": "internal.nginx_test_error",
                 "msg": _("NGINX配置异常: %s") % err,
             }
-
-        # reload nginx config
-        try:
-            self.nginx_reload()
-        except subprocess.CalledProcessError as err:
+        except NginxReloadError as err:
+            logging.exception("nginx failed to reload uploaded SSL certificate")
             return {
                 "err": "internal.nginx_reload_error",
                 "msg": _("NGINX重新加载配置异常: %s") % err,
+            }
+        except CertificateRollbackError as err:
+            logging.exception("failed to rollback uploaded SSL certificate")
+            return {
+                "err": "internal.ssl_rollback_error",
+                "msg": _("证书更新失败且无法恢复旧证书: %s") % err,
             }
 
         return {"err": "ok"}
