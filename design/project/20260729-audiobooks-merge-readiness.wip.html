@@ -226,7 +226,7 @@
             <tr><td>Podcast/Nginx</td><td>增加专用 <code>/podcast/v1/</code> 代理 location，关闭普通 access log，保留应用层脱敏审计；补稳定站点 UUID、Feed GUID、Channel image、gzip/缓存语义。</td><td>Nginx 配置静态测试与容器请求；RSS/XML、HEAD/304、Range/416、权限变化和普通日志无 Token。</td></tr>
             <tr><td>调度器</td><td>运行进程由 watchdog 周期续租并观察 cancel deadline；优雅取消超时 TERM，再超时 KILL。持久化 last seq，重复/倒序事件直接忽略。</td><td>静默子进程不被重领、重复事件不重复计数、TERM/KILL 顺序、重启恢复、1–3 workers CAS。</td></tr>
             <tr><td>容量与清理</td><td>领取任务前检查可用空间；周期清理成功缓存和失败临时文件；配置默认沿用现有方案。Feed/Range 采用轻量令牌桶，管理员可冻结订阅。</td><td>低磁盘拒绝、过期文件清理、受保护/发布资源保留、限速和冻结返回明确状态。</td></tr>
-            <tr><td>生成与版本</td><td>快速模式提供并真实传递 engine、chapters、speed、quality、主角音；Edition action 明确 publish、rollback、delete，partial 默认不可发布。</td><td>命令参数测试；候选发布/回滚保持 GUID、旧版本变 historical；错误状态 UI。</td></tr>
+            <tr><td>生成与版本</td><td>Voicebook CLI 仅直接接收 engine、chapters；Talebook 在 inspect 后把 speed 与主角音写入角色表再生成。当前上游没有质量参数，因此只接受真实存在的 standard，界面不展示伪质量档位。Edition action 明确 publish、rollback、delete，partial 默认不可发布。</td><td>CLI 与角色表落盘测试；非 standard 质量被拒绝；候选发布/回滚保持 GUID、旧版本变 historical；错误状态 UI。</td></tr>
             <tr><td>权限与健康</td><td>公开读取端点保留原书可见性校验，并在规范中记录公共 API 例外；写端点使用认证。详情响应返回可生成能力与 Voicebook health，前端不自行猜管理员/所有者规则。</td><td>游客/私有书/所有者/管理员矩阵，CLI 不可用和功能关闭状态。</td></tr>
             <tr><td>前端结构</td><td>保持 Composition API；把播放状态改为聚焦的 Pinia 模块并同步架构说明，复杂请求与版本动作集中到 store/composable，避免页面继续膨胀。</td><td>组件测试、页面 E2E、明暗主题、桌面/移动、空状态、失败态和候选版本操作。</td></tr>
           </tbody>

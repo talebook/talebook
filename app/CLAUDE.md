@@ -36,12 +36,16 @@ URL 路由在 `nuxt.config.ts` 的 `routeRules` 中将 `/api/**`、`/get/**`、`
 
 ### 全局状态
 
-只有一个 Pinia store：`stores/main.ts`（`useMainStore`），包含：
+Pinia 按领域拆分 store。`stores/main.ts`（`useMainStore`）承载站点级状态，包括：
 - `user` — 当前登录用户信息（`is_login`、`is_admin`、`nickname` 等）
 - `sys` — 站点配置（`socials`、`allow`、`footer` 等），由登录接口一并返回
 - `alert` — 全局通知弹窗状态
-- `theme` — 明/暗主题，通过 cookie 持久化
 - `loading` / `nav` — 页面加载状态和导航栏显示状态
+
+独立领域状态放在对应 store：
+
+- `stores/theme.ts` — 明/暗主题及 cookie 持久化。
+- `stores/audiobook.ts` — 有声书播放器、播放队列与本地恢复状态。
 
 ### 国际化
 

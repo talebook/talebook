@@ -74,4 +74,22 @@ test.describe('Audiobook production and playback', () => {
         await page.getByTestId('confirm-workspace').click();
         await expect(page.getByText('已完成', { exact: true })).toBeVisible({ timeout: 10_000 });
     });
+
+    test('shows real casting controls and manages candidate history', async ({ page, request }) => {
+        const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+        await request.post(`${mockApi}/_test/reset`, {
+            data: { installed: true, audiobookVersions: true },
+        });
+        await page.goto('/book/1/audios');
+
+        await expect(page.getByTestId('edition-management')).toContainText('候选与历史版本');
+        await expect(page.getByTestId('publish-edition-2')).toBeVisible();
+        await expect(page.getByTestId('rollback-edition-3')).toBeVisible();
+        await page.getByTestId('publish-edition-2').click();
+        await expect(page.getByTestId('publish-edition-2')).toHaveCount(0);
+
+        await page.getByTestId('generate-audiobook').click();
+        await expect(page.getByLabel('男主角音色（可选）')).toBeVisible();
+        await expect(page.getByLabel('女主角音色（可选）')).toBeVisible();
+    });
 });

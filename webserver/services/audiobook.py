@@ -7,8 +7,10 @@ import hashlib
 import json
 import logging
 import os
+import queue
 import re
 import shlex
+import shutil
 import subprocess
 import threading
 import time
@@ -34,6 +36,13 @@ def utcnow():
 def stable_json_hash(value):
     data = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(data).hexdigest()
+
+
+def stable_site_uuid():
+    """Return a non-secret, stable identity scoped to this Talebook instance."""
+
+    secret = str(CONF.get("cookie_secret", "talebook"))
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"talebook-instance:{secret}"))
 
 
 class AudiobookStorage:
@@ -205,7 +214,7 @@ class VoicebookProcess:
             return {"ok": False, "reason": str(exc)}
         return {"ok": result.returncode == 0, "version": result.stdout.strip(), "reason": result.stderr.strip()}
 
-    def run(self, job, arguments, on_event):
+    def run(self, job, arguments, on_event, on_control=None):
         job_dir = self.storage.job_dir(job.id)
         job_dir.mkdir(parents=True, exist_ok=True)
         cancel_file = job_dir / "cancel"
@@ -214,14 +223,58 @@ class VoicebookProcess:
         command = self.command + arguments + ["--progress-format", "jsonl", "--cancel-file", str(cancel_file)]
         with log_file.open("a", encoding="utf-8") as errors, events_file.open("a", encoding="utf-8") as events:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=errors, text=True, bufsize=1)
-            for line in process.stdout:
-                events.write(line)
-                events.flush()
+            output = queue.Queue()
+            finished = object()
+
+            def read_output():
                 try:
-                    on_event(json.loads(line))
-                except (ValueError, TypeError):
-                    logging.warning("invalid voicebook event: %s", line[:300])
+                    for line in process.stdout:
+                        output.put(line)
+                finally:
+                    output.put(finished)
+
+            reader = threading.Thread(target=read_output, name=f"voicebook-output-{job.id}", daemon=True)
+            reader.start()
+            heartbeat = max(0.05, float(CONF.get("AUDIOBOOK_HEARTBEAT_SECONDS", 3)))
+            term_after = max(0.0, float(CONF.get("AUDIOBOOK_CANCEL_TERM_SECONDS", 15)))
+            kill_after = max(0.0, float(CONF.get("AUDIOBOOK_CANCEL_KILL_SECONDS", 5)))
+            cancel_seen_at = None
+            term_sent_at = None
+            lease_lost = False
+            output_finished = False
+            while process.poll() is None or not output_finished:
+                try:
+                    line = output.get(timeout=heartbeat)
+                except queue.Empty:
+                    line = None
+                if line is finished:
+                    output_finished = True
+                elif line:
+                    events.write(line)
+                    events.flush()
+                    try:
+                        on_event(json.loads(line))
+                    except (ValueError, TypeError):
+                        logging.warning("invalid voicebook event: %s", line[:300])
+
+                control = on_control() if on_control else {}
+                now = time.monotonic()
+                if control.get("lease_owned") is False:
+                    lease_lost = True
+                    if process.poll() is None:
+                        process.terminate()
+                if control.get("cancel_requested"):
+                    cancel_seen_at = cancel_seen_at or now
+                    if process.poll() is None and now - cancel_seen_at >= term_after and term_sent_at is None:
+                        process.terminate()
+                        term_sent_at = now
+                    if process.poll() is None and term_sent_at is not None and now - term_sent_at >= kill_after:
+                        process.kill()
             status = process.wait()
+        if lease_lost:
+            raise RuntimeError("有声书任务租约已丢失，已停止重复进程")
+        if cancel_seen_at is not None:
+            return 3
         if status not in (0, 3):
             raise RuntimeError(f"voicebook-tool 退出码 {status}")
         return status
@@ -245,6 +298,7 @@ class AudiobookScheduler:
         self.storage = AudiobookStorage()
         self.storage.ensure()
         self.worker_id = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
+        self._last_maintenance = 0.0
         self.started = True
         if not CONF.get("AUDIOBOOK_ENABLED", True) or not CONF.get("AUDIOBOOK_RUNNER_ENABLED", True):
             return
@@ -281,11 +335,16 @@ class AudiobookScheduler:
                         AudiobookJob.status: "queued",
                         AudiobookJob.phase: "QUEUED",
                         AudiobookJob.lease_owner: "",
+                        AudiobookJob.last_event_seq: -1,
                     },
                     synchronize_session=False,
                 )
             )
             session.commit()
+            self._run_maintenance()
+            if not self._has_capacity():
+                logging.warning("audiobook scheduler paused: free disk space is below AUDIOBOOK_MIN_FREE_GB")
+                return False
             job = (
                 session.query(AudiobookJob)
                 .filter(AudiobookJob.status == "queued")
@@ -305,7 +364,8 @@ class AudiobookScheduler:
                         AudiobookJob.status: status,
                         AudiobookJob.phase: phase,
                         AudiobookJob.lease_owner: self.worker_id,
-                        AudiobookJob.lease_until: now + datetime.timedelta(seconds=30),
+                        AudiobookJob.lease_until: now
+                        + datetime.timedelta(seconds=max(5, int(CONF.get("AUDIOBOOK_LEASE_SECONDS", 30)))),
                         AudiobookJob.started_at: job.started_at or now,
                         AudiobookJob.update_time: now,
                         AudiobookJob.attempts: AudiobookJob.attempts + 1,
@@ -320,6 +380,108 @@ class AudiobookScheduler:
             session.close()
         self._process(job_id)
         return True
+
+    def _has_capacity(self):
+        minimum = max(0.0, float(CONF.get("AUDIOBOOK_MIN_FREE_GB", 5))) * 1024**3
+        return shutil.disk_usage(self.storage.root).free >= minimum
+
+    def _run_maintenance(self):
+        interval = max(60, int(CONF.get("AUDIOBOOK_MAINTENANCE_SECONDS", 3600)))
+        now = time.monotonic()
+        if now - self._last_maintenance < interval:
+            return
+        self._last_maintenance = now
+        wall_clock = time.time()
+        cache_cutoff = wall_clock - max(1, int(CONF.get("AUDIOBOOK_CACHE_DAYS", 30))) * 86400
+        for path in (self.storage.root / "cache").rglob("*"):
+            if path.is_file() and path.stat().st_mtime < cache_cutoff:
+                path.unlink(missing_ok=True)
+
+        failed_cutoff = utcnow() - datetime.timedelta(days=max(1, int(CONF.get("AUDIOBOOK_FAILED_TEMP_DAYS", 7))))
+        session = self.session_maker()
+        try:
+            jobs = (
+                session.query(AudiobookJob)
+                .filter(
+                    AudiobookJob.status.in_(("failed", "cancelled")),
+                    AudiobookJob.update_time < failed_cutoff,
+                )
+                .all()
+            )
+            for job in jobs:
+                directory = self.storage.job_dir(job.id)
+                if not directory.is_dir():
+                    continue
+                for path in directory.iterdir():
+                    if path.name not in {"events.jsonl", "stderr.log"}:
+                        if path.is_dir():
+                            shutil.rmtree(path)
+                        else:
+                            path.unlink(missing_ok=True)
+        finally:
+            session.close()
+
+    def _control(self, job_id):
+        session = self.session_maker()
+        try:
+            job = (
+                session.query(AudiobookJob)
+                .filter(
+                    AudiobookJob.id == int(job_id),
+                    AudiobookJob.lease_owner == self.worker_id,
+                    AudiobookJob.status.in_(("inspecting", "generating", "finalizing")),
+                )
+                .first()
+            )
+            if not job:
+                return {"lease_owned": False, "cancel_requested": False}
+            job.lease_until = utcnow() + datetime.timedelta(seconds=max(5, int(CONF.get("AUDIOBOOK_LEASE_SECONDS", 30))))
+            job.update_time = utcnow()
+            state = {
+                "lease_owned": True,
+                "cancel_requested": bool(job.cancel_requested),
+                "cancel_requested_at": job.cancel_requested_at,
+            }
+            session.commit()
+            return state
+        finally:
+            session.close()
+
+    @staticmethod
+    def _configured_voice(config, role, engine):
+        values = config.get("protagonist_voices") or {}
+        if not isinstance(values, dict):
+            return ""
+        candidate = (
+            values.get(role.get("name"))
+            or values.get(role.get("gender"))
+            or values.get({"男": "male", "女": "female"}.get(role.get("gender"), ""))
+            or values.get("default")
+        )
+        if isinstance(candidate, dict):
+            candidate = candidate.get(engine)
+        return str(candidate or "").strip()
+
+    def _apply_generation_defaults(self, script, job, edition):
+        workspace = read_script_workspace(script)
+        roles = workspace["characters"]
+        speed = str((job.config or {}).get("speed", "x1.0"))
+        for role in roles:
+            role["speed"] = speed
+            if role.get("position") != "主角":
+                continue
+            voice = self._configured_voice(job.config or {}, role, edition.engine)
+            if not voice:
+                continue
+            overrides = {}
+            for token in re.split(r"[;；]", role.get("voice_overrides", "")):
+                if "=" in token:
+                    key, value = (part.strip() for part in token.split("=", 1))
+                    if key and value:
+                        overrides[key] = value
+            overrides[edition.engine] = voice
+            role["voice_overrides"] = "; ".join(f"{key}={value}" for key, value in overrides.items())
+        save_script_roles(script, roles, workspace["revision"])
 
     def _source_path(self, job, job_dir):
         formats = {str(item).upper() for item in (self.book_db.new_api.formats(job.book_id) or [])}
@@ -351,11 +513,14 @@ class AudiobookScheduler:
             def on_event(event):
                 self._consume_event(job_id, event)
 
+            def on_control():
+                return self._control(job_id)
+
             if not job.data.get("inspected"):
                 args = ["inspect", str(source), "-o", str(script)]
                 if job.chapter_selection:
                     args.extend(("--chapters", job.chapter_selection))
-                status = process.run(job, args, on_event)
+                status = process.run(job, args, on_event, on_control)
                 if status == 3:
                     self._finish_cancelled(job_id)
                     return
@@ -364,6 +529,7 @@ class AudiobookScheduler:
                 edition = session.get(AudiobookEdition, job.edition_id)
                 job.data = {**job.data, "inspected": True}
                 edition.script_path = self.storage.relative(script)
+                self._apply_generation_defaults(script, job, edition)
                 job.update_time = utcnow()
                 if job.mode == "advanced":
                     job.status = "awaiting_review"
@@ -376,7 +542,7 @@ class AudiobookScheduler:
             job.phase = "GENERATING"
             session.commit()
             args = ["generate", str(script), "-o", str(edition_dir), "--engine", edition.engine, "--resume"]
-            status = process.run(job, args, on_event)
+            status = process.run(job, args, on_event, on_control)
             if status == 3:
                 self._finish_cancelled(job_id)
                 return
@@ -390,6 +556,8 @@ class AudiobookScheduler:
                 job.phase = "FAILED"
                 job.error_code = type(exc).__name__
                 job.error_message = str(exc)[:4000]
+                job.lease_owner = ""
+                job.lease_until = None
                 job.finished_at = utcnow()
                 job.update_time = utcnow()
                 session.commit()
@@ -402,6 +570,14 @@ class AudiobookScheduler:
             job = session.get(AudiobookJob, job_id)
             if not job:
                 return
+            try:
+                sequence = int(event.get("seq"))
+            except (TypeError, ValueError):
+                sequence = None
+            if sequence is not None and sequence <= int(job.last_event_seq if job.last_event_seq is not None else -1):
+                return
+            if sequence is not None:
+                job.last_event_seq = sequence
             name = event.get("event")
             if name == "phase_started":
                 job.phase = str(event.get("job_phase", job.phase))
@@ -414,7 +590,9 @@ class AudiobookScheduler:
             elif name == "segment_completed":
                 data["completed_segments"] = int(data.get("completed_segments", 0)) + 1
             job.data = data
-            job.lease_until = utcnow() + datetime.timedelta(seconds=30)
+            if "progress" in event:
+                job.progress = max(0.0, min(1.0, float(event["progress"])))
+            job.lease_until = utcnow() + datetime.timedelta(seconds=max(5, int(CONF.get("AUDIOBOOK_LEASE_SECONDS", 30))))
             job.update_time = utcnow()
             session.commit()
         finally:
@@ -426,6 +604,8 @@ class AudiobookScheduler:
             job = session.get(AudiobookJob, job_id)
             job.status = "cancelled"
             job.phase = "CANCELLED"
+            job.lease_owner = ""
+            job.lease_until = None
             job.finished_at = utcnow()
             job.update_time = utcnow()
             session.commit()
@@ -456,7 +636,7 @@ class AudiobookScheduler:
                     duration_ms=int(record.get("duration_ms", 0)),
                     size_bytes=int(record.get("size_bytes", 0)),
                     content_hash=str(record.get("sha256", "")),
-                    episode_guid=stable_json_hash([job.book_id, record.get("source_key")]),
+                    episode_guid=stable_json_hash([stable_site_uuid(), job.book_id, record.get("source_key")]),
                 )
                 session.add(chapter)
             edition.manifest_path = self.storage.relative(manifest_path)
@@ -479,6 +659,8 @@ class AudiobookScheduler:
             job.status = "completed"
             job.phase = "COMPLETED"
             job.progress = 1.0
+            job.lease_owner = ""
+            job.lease_until = None
             job.finished_at = utcnow()
             job.update_time = utcnow()
             session.commit()
@@ -488,6 +670,7 @@ class AudiobookScheduler:
 
 def request_cancel(storage, job):
     job.cancel_requested = True
+    job.cancel_requested_at = job.cancel_requested_at or utcnow()
     job.update_time = utcnow()
     directory = storage.job_dir(job.id)
     directory.mkdir(parents=True, exist_ok=True)
@@ -498,9 +681,13 @@ def reset_for_retry(storage, job):
     cancel = storage.job_dir(job.id) / "cancel"
     cancel.unlink(missing_ok=True)
     job.cancel_requested = False
+    job.cancel_requested_at = None
     job.status = "queued"
     job.phase = "QUEUED"
     job.error_code = ""
     job.error_message = ""
+    job.last_event_seq = -1
+    job.lease_owner = ""
+    job.lease_until = None
     job.finished_at = None
     job.update_time = utcnow()

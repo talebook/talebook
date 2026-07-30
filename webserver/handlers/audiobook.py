@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 import datetime
+import gzip
 import hashlib
 import ipaddress
 import json
@@ -9,7 +10,10 @@ import re
 import secrets
 import shutil
 import subprocess
+import threading
+import time
 import uuid
+from collections import defaultdict, deque
 from email.utils import format_datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -46,11 +50,14 @@ from webserver.services.audiobook import (
     save_script_chapter,
     save_script_roles,
     stable_json_hash,
+    stable_site_uuid,
     utcnow,
 )
 
 
 CONF = loader.get_settings()
+_PODCAST_RATE_LOCK = threading.Lock()
+_PODCAST_RATE_EVENTS = defaultdict(deque)
 
 
 def _json_body(handler):
@@ -144,6 +151,40 @@ def _can_subscription_view(session, reader, book_id):
         return True
     item = session.get(Item, int(book_id))
     return not item or item.scope != "private" or (reader and item.collector_id == reader.id)
+
+
+def _generation_capability(handler, book):
+    enabled = bool(CONF.get("AUDIOBOOK_ENABLED", True))
+    formats = {str(value).upper() for value in book.get("available_formats", [])}
+    compatible = bool(formats.intersection({"EPUB", "TXT"}))
+    owner_allowed = bool(
+        handler.current_user
+        and CONF.get("AUDIOBOOK_OWNER_GENERATE", False)
+        and handler.is_book_owner(int(book["id"]), handler.user_id())
+    )
+    permitted = handler.is_admin() or owner_allowed
+    if not enabled:
+        reason = "disabled"
+    elif not compatible:
+        reason = "format.not_supported"
+    elif not handler.current_user:
+        reason = "login.required"
+    elif not permitted:
+        reason = "permission"
+    else:
+        reason = ""
+    health = VoicebookProcess(AudiobookStorage()).health() if permitted and enabled and compatible else None
+    return {
+        "enabled": enabled,
+        "compatible": compatible,
+        "permitted": permitted,
+        "can_generate": enabled and compatible and permitted,
+        "can_manage": handler.is_admin(),
+        "reason": reason,
+        "health": health,
+        "engines": ["edgetts", "qwen3tts"],
+        "quality_options": ["standard"],
+    }
 
 
 class AudiobookHome(BaseHandler):
@@ -245,7 +286,12 @@ class AudiobookDetail(BaseHandler):
                 .all()
             )
             edition_values.append(_edition_dict(edition, chapters))
-        return {"err": "ok", "book": utils.BookFormatter(self, book).format(with_files=True), "editions": edition_values}
+        return {
+            "err": "ok",
+            "book": utils.BookFormatter(self, book).format(with_files=True),
+            "editions": edition_values,
+            "generation": _generation_capability(self, book),
+        }
 
 
 class AudiobookJobCreate(BaseHandler):
@@ -271,12 +317,27 @@ class AudiobookJobCreate(BaseHandler):
         engine = body.get("engine", "edgetts")
         if mode not in {"quick", "advanced"} or engine not in {"edgetts", "qwen3tts"}:
             return {"err": "params.invalid", "msg": _("生成模式或引擎无效")}
+        speed = str(body.get("speed", "x1.0"))
+        try:
+            speed_value = float(speed.removeprefix("x"))
+        except ValueError:
+            speed_value = 0
+        if not speed.startswith("x") or not 0.75 <= speed_value <= 1.5:
+            return {"err": "params.invalid", "msg": _("默认语速必须在 x0.75 到 x1.5 之间")}
+        quality = str(body.get("quality", "standard"))
+        if quality != "standard":
+            return {"err": "params.invalid", "msg": _("当前 Voicebook 版本仅支持标准音质")}
+        protagonist_voices = body.get("protagonist_voices", {})
+        if not isinstance(protagonist_voices, dict) or len(protagonist_voices) > 100:
+            return {"err": "params.invalid", "msg": _("主角音色设置无效")}
+        if any(len(str(key)) > 200 or len(str(value)) > 500 for key, value in protagonist_voices.items()):
+            return {"err": "params.invalid", "msg": _("主角音色设置无效")}
         chapters = str(body.get("chapters", "")).strip()
         config = {
             "engine": engine,
-            "speed": str(body.get("speed", "x1.0")),
-            "quality": body.get("quality", "standard"),
-            "protagonist_voices": body.get("protagonist_voices", {}),
+            "speed": speed,
+            "quality": quality,
+            "protagonist_voices": protagonist_voices,
         }
         config_hash = stable_json_hash({"book_id": int(book_id), "mode": mode, "chapters": chapters, **config})
         duplicate = (
@@ -439,16 +500,26 @@ class AudiobookEditionAction(BaseHandler):
             return {"err": "not_found", "msg": _("有声版本不存在")}
         body = _json_body(self)
         action = body.get("action")
-        if action == "publish":
+        if action in {"publish", "rollback"}:
+            if action == "rollback" and edition.status != "historical":
+                return {"err": "state.invalid", "msg": _("只有历史版本可以回滚")}
+            if action == "publish" and edition.status not in {"ready", "partial", "historical", "published"}:
+                return {"err": "state.invalid", "msg": _("当前版本尚未完成，不能发布")}
+            if edition.status == "partial" and not bool(body.get("allow_partial", False)):
+                return {"err": "partial.confirmation_required", "msg": _("部分章节版本默认不可发布，请明确确认")}
             old = (
                 self.session.query(AudiobookEdition)
-                .filter(AudiobookEdition.book_id == edition.book_id, AudiobookEdition.status == "published")
+                .filter(
+                    AudiobookEdition.book_id == edition.book_id,
+                    AudiobookEdition.status == "published",
+                    AudiobookEdition.id != edition.id,
+                )
                 .all()
             )
             for item in old:
                 item.status = "historical"
             edition.status = "published"
-            edition.published_at = utcnow()
+            edition.published_at = edition.published_at or utcnow()
             chapters = self.session.query(AudiobookChapter).filter(AudiobookChapter.edition_id == edition.id).all()
             for chapter in chapters:
                 chapter.first_published_at = chapter.first_published_at or utcnow()
@@ -711,7 +782,17 @@ class PodcastSubscriptionAPI(BaseHandler):
             .filter(PodcastSubscription.reader_id == self.user_id(), PodcastSubscription.active.is_(True))
             .first()
         )
-        return {"err": "ok", "subscription": {"active": True, "token_hint": row.token_hint} if row else None}
+        return {
+            "err": "ok",
+            "subscription": {
+                "active": True,
+                "token_hint": row.token_hint,
+                "frozen": bool(row.frozen_at),
+                "frozen_reason": row.frozen_reason or "",
+            }
+            if row
+            else None,
+        }
 
     @js
     @auth
@@ -781,11 +862,36 @@ def _subscription(handler, token):
     )
     if not row:
         raise tornado.web.HTTPError(404)
+    freeze_seconds = max(1, int(CONF.get("PODCAST_RATE_LIMIT_FREEZE_SECONDS", 300)))
+    if row.frozen_at:
+        if row.frozen_at + datetime.timedelta(seconds=freeze_seconds) > utcnow():
+            raise tornado.web.HTTPError(429, reason="Podcast subscription temporarily frozen")
+        row.frozen_at = None
+        row.frozen_reason = ""
     reader = handler.session.get(Reader, row.reader_id)
     if not reader or not reader.is_active():
         raise tornado.web.HTTPError(404)
+    _enforce_podcast_rate_limit(handler, row)
     row.last_access_at = utcnow()
     return row, reader
+
+
+def _enforce_podcast_rate_limit(handler, subscription):
+    limit = max(1, int(CONF.get("PODCAST_RATE_LIMIT_REQUESTS", 120)))
+    window = max(1, int(CONF.get("PODCAST_RATE_LIMIT_WINDOW_SECONDS", 60)))
+    key = (subscription.id, _source_ip(handler))
+    now = time.monotonic()
+    with _PODCAST_RATE_LOCK:
+        events = _PODCAST_RATE_EVENTS[key]
+        while events and events[0] <= now - window:
+            events.popleft()
+        events.append(now)
+        exceeded = len(events) > limit
+    if exceeded:
+        subscription.frozen_at = utcnow()
+        subscription.frozen_reason = "rate_limit"
+        handler.session.commit()
+        raise tornado.web.HTTPError(429, reason="Podcast request rate exceeded")
 
 
 def _audit(
@@ -885,12 +991,17 @@ class PodcastFeed(PodcastBaseHandler):
                 )
         title = f"{CONF.get('site_title', 'Talebook')} · 私人有声书"
         build_date = max(feed_dates, default=datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc))
+        feed_guid = stable_site_uuid()
+        channel_image = f"{self.site_url}/podcast/v1/{quote(token)}/cover/site.jpg"
         body = (
             '<?xml version="1.0" encoding="UTF-8"?>'
-            '<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">'
+            '<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" '
+            'xmlns:podcast="https://podcastindex.org/namespace/1.0">'
             f"<channel><title>{escape(title)}</title><link>{escape(self.site_url)}</link>"
             "<description>你的 Talebook 私人有声书馆藏</description><language>zh-cn</language>"
             "<itunes:type>serial</itunes:type><itunes:block>Yes</itunes:block>"
+            f"<podcast:guid>{escape(feed_guid)}</podcast:guid>"
+            f'<itunes:image href="{escape(channel_image)}" />'
             f"<lastBuildDate>{format_datetime(build_date)}</lastBuildDate>{''.join(items)}</channel></rss>"
         ).encode("utf-8")
         etag = '"' + hashlib.sha256(body).hexdigest() + '"'
@@ -904,11 +1015,16 @@ class PodcastFeed(PodcastBaseHandler):
             self.finish()
             _audit(self, subscription, kind="feed", status=304)
             return
-        self.set_header("Content-Length", str(len(body)))
+        payload = body
+        if "gzip" in self.request.headers.get("Accept-Encoding", "").lower():
+            payload = gzip.compress(body, mtime=0)
+            self.set_header("Content-Encoding", "gzip")
+            self.set_header("Vary", "Accept-Encoding")
+        self.set_header("Content-Length", str(len(payload)))
         if self.request.method != "HEAD":
-            self.write(body)
+            self.write(payload)
         self.finish()
-        _audit(self, subscription, kind="feed", status=200, size=len(body))
+        _audit(self, subscription, kind="feed", status=200, size=len(payload))
 
     head = get
 
@@ -928,6 +1044,21 @@ class PodcastCover(PodcastBaseHandler):
             self.write(cover)
         self.finish()
         _audit(self, subscription, kind="cover", status=200, book_id=int(book_id), size=len(cover))
+
+    head = get
+
+
+class PodcastSiteCover(PodcastBaseHandler):
+    def get(self, token):
+        subscription, _reader = _subscription(self, token)
+        cover = self.default_cover
+        self.set_header("Content-Type", "image/jpeg")
+        self.set_header("Content-Length", str(len(cover)))
+        self.set_header("Cache-Control", "private, max-age=86400")
+        if self.request.method != "HEAD":
+            self.write(cover)
+        self.finish()
+        _audit(self, subscription, kind="site_cover", status=200, size=len(cover))
 
     head = get
 
@@ -1002,6 +1133,26 @@ class PodcastAudit(BaseHandler):
     def patch(self):
         try:
             body = _json_body(self)
+            if body.get("action") in {"freeze", "unfreeze"}:
+                subscription = self.session.get(PodcastSubscription, int(body.get("subscription_id", 0)))
+                if not subscription:
+                    return {"err": "not_found", "msg": _("Podcast 订阅不存在")}
+                if body["action"] == "freeze":
+                    subscription.frozen_at = utcnow()
+                    subscription.frozen_reason = str(body.get("reason", "manual"))[:500]
+                else:
+                    subscription.frozen_at = None
+                    subscription.frozen_reason = ""
+                    with _PODCAST_RATE_LOCK:
+                        for key in [key for key in _PODCAST_RATE_EVENTS if key[0] == subscription.id]:
+                            _PODCAST_RATE_EVENTS.pop(key, None)
+                self.session.commit()
+                return {
+                    "err": "ok",
+                    "subscription_id": subscription.id,
+                    "frozen": bool(subscription.frozen_at),
+                    "frozen_reason": subscription.frozen_reason or "",
+                }
             ids = {int(value) for value in body.get("ids", [])}
         except (TypeError, ValueError):
             return {"err": "params.invalid", "msg": _("审计记录参数无效")}
@@ -1126,6 +1277,7 @@ def routes():
         (r"/api/audio/([0-9]+)/bookmarks", AudiobookBookmarks),
         (r"/api/me/podcast-subscription", PodcastSubscriptionAPI),
         (r"/podcast/v1/([^/]+)/feed\.xml", PodcastFeed),
+        (r"/podcast/v1/([^/]+)/cover/site\.jpg", PodcastSiteCover),
         (r"/podcast/v1/([^/]+)/cover/([0-9]+)\.jpg", PodcastCover),
         (r"/podcast/v1/([^/]+)/audio/([0-9]+)/chapter/([0-9]+)\.mp3", PodcastAudio),
         (r"/api/audio-voices", AudiobookVoices),

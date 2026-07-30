@@ -702,7 +702,9 @@ class AudiobookJob(Base, SQLAlchemyMixin):
     progress = Column(Float, default=0.0)
     lease_owner = Column(String(128), default="")
     lease_until = Column(DateTime)
+    last_event_seq = Column(BigInteger, default=-1, nullable=False)
     cancel_requested = Column(Boolean, default=False)
+    cancel_requested_at = Column(DateTime)
     attempts = Column(Integer, default=0)
     error_code = Column(String(128), default="")
     error_message = Column(Text, default="")
@@ -773,6 +775,8 @@ class PodcastSubscription(Base, SQLAlchemyMixin):
     create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
     last_access_at = Column(DateTime)
     revoked_at = Column(DateTime)
+    frozen_at = Column(DateTime)
+    frozen_reason = Column(String(500), default="")
 
 
 class PodcastAccessLog(Base, SQLAlchemyMixin):

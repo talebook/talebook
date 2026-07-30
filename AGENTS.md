@@ -118,7 +118,7 @@ cd app && npm run lint   # 前端：eslint 必须通过
 ### 代码风格
 
 - Python 行宽上限 120 字符（见 `pyproject.toml` black 配置）。
-- 后端新增接口统一使用 `@js` + `@auth` 装饰器，返回 `{"err": "ok", ...}`，禁止直接抛出 HTTP 异常。
+- 后端新增 JSON 接口默认使用 `@js` + `@auth` 装饰器，返回 `{"err": "ok", ...}`，禁止直接抛出 HTTP 异常。与公开阅读能力绑定的只读 JSON 可以不加 `@auth`，但必须逐资源调用 `can_view_book()` 或等价权限校验，并补游客、私有资源和所有者测试。媒体流、Podcast、OPDS 等非 JSON 协议可以使用标准 HTTP 状态码，但不得绕过资源权限。
 - 前端 API 调用统一使用 `plugins/talebook.js` 的 `backend()` 函数，禁止直接使用 `fetch`。
 - 前端 i18n 文案（`app/i18n/locales/*.json` ）中**禁止出现字面量 `@` 和 `<`**：vue-i18n 把 `@`（如 `@js:`）当链接消息语法（报 `Invalid linked format`）、把 `<`（如 `<js>`）当 HTML（报 `Detected HTML`），任一出现都会让**整个 locale 编译失败**——页面所有文案显示为原始 key、dev server 返回 500，而 `JSON.parse` 与 eslint 均不报错（只有 dev server 日志里有 `[unplugin-vue-i18n]` 错误）。文案应改写绕开这两个符号，必须保留时用字面插值 `{'@'}`。新增 key 后 HMR 常不热更，需重启 `nuxt dev`。
 

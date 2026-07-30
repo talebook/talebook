@@ -86,6 +86,87 @@
                 </div>
             </section>
 
+            <v-alert
+                v-if="detail.generation?.permitted && detail.generation?.health && !detail.generation.health.ok"
+                type="warning"
+                variant="tonal"
+                class="mt-5"
+                data-testid="voicebook-health-warning"
+            >
+                {{ t('audiobook.voicebookUnavailable') }}
+                <span v-if="detail.generation.health.reason">：{{ detail.generation.health.reason }}</span>
+            </v-alert>
+
+            <section
+                v-if="detail.generation?.can_manage && managedEditions.length"
+                class="edition-management"
+                data-testid="edition-management"
+            >
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow dark">
+                            {{ t('audiobook.editionManagementEyebrow') }}
+                        </p>
+                        <h2>{{ t('audiobook.editionManagement') }}</h2>
+                    </div>
+                </div>
+                <v-list
+                    class="edition-list"
+                    lines="two"
+                >
+                    <v-list-item
+                        v-for="edition in managedEditions"
+                        :key="edition.id"
+                    >
+                        <template #prepend>
+                            <v-chip
+                                :color="edition.status === 'ready' ? 'success' : edition.status === 'partial' ? 'warning' : 'default'"
+                                size="small"
+                                variant="tonal"
+                            >
+                                {{ editionStatusLabel(edition.status) }}
+                            </v-chip>
+                        </template>
+                        <v-list-item-title>
+                            {{ engineLabel(edition.engine) }} · {{ t('audiobook.chapterCount', { count: edition.chapter_count }) }}
+                        </v-list-item-title>
+                        <v-list-item-subtitle>{{ edition.created_at }}</v-list-item-subtitle>
+                        <template #append>
+                            <div class="edition-actions">
+                                <v-btn
+                                    v-if="['ready', 'partial'].includes(edition.status)"
+                                    size="small"
+                                    variant="tonal"
+                                    color="primary"
+                                    :data-testid="`publish-edition-${edition.id}`"
+                                    @click="changeEdition(edition, 'publish')"
+                                >
+                                    {{ t('audiobook.publishEdition') }}
+                                </v-btn>
+                                <v-btn
+                                    v-if="edition.status === 'historical'"
+                                    size="small"
+                                    variant="tonal"
+                                    :data-testid="`rollback-edition-${edition.id}`"
+                                    @click="changeEdition(edition, 'rollback')"
+                                >
+                                    {{ t('audiobook.rollbackEdition') }}
+                                </v-btn>
+                                <v-btn
+                                    size="small"
+                                    variant="text"
+                                    color="error"
+                                    :aria-label="t('audiobook.deleteEdition')"
+                                    @click="changeEdition(edition, 'delete')"
+                                >
+                                    {{ t('audiobook.deleteEdition') }}
+                                </v-btn>
+                            </div>
+                        </template>
+                    </v-list-item>
+                </v-list>
+            </section>
+
             <section
                 v-if="publishedEdition"
                 class="chapter-section"
@@ -266,6 +347,38 @@
                                 variant="outlined"
                             />
                         </v-col>
+                        <v-col
+                            cols="12"
+                            sm="6"
+                        >
+                            <v-combobox
+                                v-model="generation.protagonist_voices.male"
+                                :items="voiceItems"
+                                item-title="title"
+                                item-value="value"
+                                :label="t('audiobook.maleProtagonistVoice')"
+                                :hint="t('audiobook.protagonistVoiceHint')"
+                                persistent-hint
+                                clearable
+                                variant="outlined"
+                            />
+                        </v-col>
+                        <v-col
+                            cols="12"
+                            sm="6"
+                        >
+                            <v-combobox
+                                v-model="generation.protagonist_voices.female"
+                                :items="voiceItems"
+                                item-title="title"
+                                item-value="value"
+                                :label="t('audiobook.femaleProtagonistVoice')"
+                                :hint="t('audiobook.protagonistVoiceHint')"
+                                persistent-hint
+                                clearable
+                                variant="outlined"
+                            />
+                        </v-col>
                     </v-row>
                 </v-card-text>
                 <v-card-actions>
@@ -308,7 +421,15 @@ const bookId = Number(route.params.bid);
 const generationDialog = ref(false);
 const submitting = ref(false);
 const selectedEditionId = ref<number | null>(null);
-const generation = reactive({ mode: 'quick', engine: 'edgetts', speed: 'x1.0', chapters: '' });
+const voiceCatalog = ref<any[]>([]);
+const generation = reactive({
+    mode: 'quick',
+    engine: 'edgetts',
+    speed: 'x1.0',
+    quality: 'standard',
+    chapters: '',
+    protagonist_voices: { male: '', female: '' },
+});
 const speeds = ['x0.75', 'x0.9', 'x1.0', 'x1.1', 'x1.25', 'x1.5'];
 const engines = computed(() => [
     { title: t('audiobook.edgeTts'), value: 'edgetts' },
@@ -324,13 +445,22 @@ const { data: detail, pending, error, refresh } = await useAsyncData(`audiobook-
 
 const publishedEditions = computed(() => (detail.value?.editions || []).filter((item: any) => item.status === 'published'));
 const publishedEdition = computed(() => publishedEditions.value.find((item: any) => item.id === selectedEditionId.value) || publishedEditions.value[0] || null);
-const compatible = computed(() => (detail.value?.book?.files || []).some((item: any) => ['epub', 'txt'].includes(String(item.format).toLowerCase())));
-const canGenerate = computed(() => store.user.is_admin && compatible.value);
+const managedEditions = computed(() => (detail.value?.editions || []).filter((item: any) => item.status !== 'published'));
+const canGenerate = computed(() => Boolean(detail.value?.generation?.can_generate));
+const voiceItems = computed(() => voiceCatalog.value
+    .filter(item => item.engine === generation.engine)
+    .map(item => ({ title: item.name || item.voice_id, value: item.voice_id })));
 const resumeLabel = computed(() => player.book?.id === bookId ? t('audiobook.continueListening') : t('audiobook.startListening'));
 
 watch(publishedEditions, (items) => {
     if (!selectedEditionId.value && items.length) selectedEditionId.value = items[0].id;
 }, { immediate: true });
+
+watch(generationDialog, async (open) => {
+    if (!open || voiceCatalog.value.length) return;
+    const response = await $backend('/audio-voices');
+    if (response.err === 'ok') voiceCatalog.value = response.catalog?.voices || [];
+});
 
 async function playChapter(chapter: any) {
     if (!publishedEdition.value || !detail.value?.book) return;
@@ -363,6 +493,25 @@ async function submitGeneration() {
     }
 }
 
+async function changeEdition(edition: any, action: 'publish' | 'rollback' | 'delete') {
+    let allowPartial = false;
+    if (edition.status === 'partial' && action === 'publish') {
+        if (!globalThis.confirm(t('audiobook.confirmPartialPublish'))) return;
+        allowPartial = true;
+    }
+    if (action === 'delete' && !globalThis.confirm(t('audiobook.confirmEditionDelete'))) return;
+    const response = await $backend(`/audio/${edition.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action, allow_partial: allowPartial }),
+    });
+    if (response.err !== 'ok') {
+        $alert('error', response.msg);
+        return;
+    }
+    $alert('success', t(`audiobook.editionAction_${action}`));
+    await refresh();
+}
+
 function formatDuration(ms: number) {
     const minutes = Math.max(1, Math.round((ms || 0) / 60000));
     if (minutes < 60) return t('audiobook.minutes', { count: minutes });
@@ -371,6 +520,10 @@ function formatDuration(ms: number) {
 
 function engineLabel(engine: string) {
     return engine === 'qwen3tts' ? t('audiobook.qwenTts') : t('audiobook.edgeTts');
+}
+
+function editionStatusLabel(status: string) {
+    return t(`audiobook.editionStatus_${status}`);
 }
 
 useHead({ title: () => detail.value?.book?.title || t('audiobook.libraryTitle') });
@@ -388,6 +541,11 @@ useHead({ title: () => detail.value?.book?.title || t('audiobook.libraryTitle') 
 .metadata { margin: 22px 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .metadata span { padding: 5px 10px; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.14); border-radius: 99px; font-size: .76rem; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.edition-management { margin-top: 42px; }
+.edition-list { overflow: hidden; border: 1px solid rgba(var(--v-border-color), .13); border-radius: 20px; }
+.edition-list :deep(.v-list-item) { min-height: 78px; border-bottom: 1px solid rgba(var(--v-border-color), .08); }
+.edition-list :deep(.v-list-item:last-child) { border-bottom: 0; }
+.edition-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .chapter-section { margin-top: 48px; }
 .section-heading { margin-bottom: 18px; display: flex; justify-content: space-between; align-items: end; }
 .section-heading h2 { font: 700 2rem Georgia, 'Noto Serif SC', serif; }
@@ -414,6 +572,8 @@ useHead({ title: () => detail.value?.book?.title || t('audiobook.libraryTitle') 
 @media (max-width: 700px) {
     .detail-hero { align-items: start; flex-direction: column; }
     .hero-cover { width: 125px !important; }
+    .edition-list :deep(.v-list-item__append) { margin-inline-start: 8px; }
+    .edition-actions { max-width: 112px; }
     .advanced-entry { padding: 18px; border-radius: 16px; }
     .advanced-entry h3 { font-size: 1.45rem; }
     .advanced-description { margin-top: 8px; font-size: .86rem; }

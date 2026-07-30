@@ -7,7 +7,8 @@ from unittest import mock
 
 from tests import test_main
 from webserver import main, models
-from webserver.services.audiobook import AudiobookScheduler, AudiobookStorage, stable_json_hash
+from webserver.handlers import audiobook as audiobook_handlers
+from webserver.services.audiobook import AudiobookScheduler, AudiobookStorage, stable_json_hash, stable_site_uuid
 
 
 def setUpModule():
@@ -116,6 +117,9 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         book_audios = self.json(f"/api/book/{test_main.BID_EPUB}/audios")
         self.assertEqual(book_audios["editions"][0]["id"], edition_id)
         self.assertIn("EPUB", {item["format"] for item in book_audios["book"]["files"]})
+        self.assertTrue(book_audios["generation"]["can_generate"])
+        self.assertTrue(book_audios["generation"]["can_manage"])
+        self.assertEqual(book_audios["generation"]["quality_options"], ["standard"])
         audio = self.json(f"/api/audio/{edition_id}")
         self.assertEqual(audio["manifest"]["id"], edition_id)
         published = self.json(
@@ -188,6 +192,68 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
             body=json.dumps({"action": "retry"}),
         )
         self.assertEqual(retried["job"]["status"], "queued")
+
+        invalid_quality = self.json(
+            f"/api/book/{test_main.BID_EPUB}/audio-jobs",
+            method="POST",
+            body=json.dumps({"mode": "quick", "engine": "edgetts", "quality": "high"}),
+        )
+        self.assertEqual(invalid_quality["err"], "params.invalid")
+        self.assertIn("标准音质", invalid_quality["msg"])
+
+    def test_candidate_publish_partial_confirmation_and_historical_rollback(self):
+        published_id = self.seed_published_edition()
+        session = test_main.get_db()
+        now = datetime.datetime.now()
+        candidate = models.AudiobookEdition(
+            book_id=test_main.BID_EPUB,
+            status="ready",
+            engine="edgetts",
+            config={},
+            created_by=1,
+            create_time=now,
+            update_time=now,
+            chapter_count=1,
+            completed_count=1,
+        )
+        partial = models.AudiobookEdition(
+            book_id=test_main.BID_EPUB,
+            status="partial",
+            engine="edgetts",
+            config={},
+            created_by=1,
+            create_time=now,
+            update_time=now,
+            chapter_count=1,
+            completed_count=1,
+        )
+        session.add_all((candidate, partial))
+        session.commit()
+
+        rejected = self.json(
+            f"/api/audio/{partial.id}",
+            method="PATCH",
+            body=json.dumps({"action": "publish"}),
+        )
+        self.assertEqual(rejected["err"], "partial.confirmation_required")
+
+        activated = self.json(
+            f"/api/audio/{candidate.id}",
+            method="PATCH",
+            body=json.dumps({"action": "publish"}),
+        )
+        self.assertEqual(activated["edition"]["status"], "published")
+        session.expire_all()
+        self.assertEqual(session.get(models.AudiobookEdition, published_id).status, "historical")
+
+        rolled_back = self.json(
+            f"/api/audio/{published_id}",
+            method="PATCH",
+            body=json.dumps({"action": "rollback"}),
+        )
+        self.assertEqual(rolled_back["edition"]["status"], "published")
+        session.expire_all()
+        self.assertEqual(session.get(models.AudiobookEdition, candidate.id).status, "historical")
 
     def test_advanced_workspace_validation_revision_and_confirm(self):
         session = test_main.get_db()
@@ -371,6 +437,14 @@ description: 高级模式测试
         root = ET.fromstring(feed.body)
         items = root.findall("./channel/item")
         self.assertEqual(len(items), 2)
+        podcast_ns = {
+            "podcast": "https://podcastindex.org/namespace/1.0",
+            "itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
+        }
+        self.assertEqual(root.find("./channel/podcast:guid", podcast_ns).text, stable_site_uuid())
+        channel_image = root.find("./channel/itunes:image", podcast_ns)
+        cover_path = urllib.parse.urlsplit(channel_image.attrib["href"]).path
+        self.assertEqual(self.fetch(cover_path).code, 200)
         enclosure = items[0].find("enclosure")
         audio_path = urllib.parse.urlsplit(enclosure.attrib["url"]).path
 
@@ -412,6 +486,32 @@ description: 高级模式测试
         )
         self.assertEqual(hidden["hidden_book_ids"], [test_main.BID_EPUB])
         self.assertEqual(len(ET.fromstring(self.fetch(hidden_feed).body).findall("./channel/item")), 0)
+
+    def test_podcast_rate_limit_freezes_and_admin_can_unfreeze(self):
+        self.seed_published_edition()
+        created = self.json("/api/me/podcast-subscription", method="POST", body="{}")
+        feed_path = urllib.parse.urlsplit(created["feed_url"]).path
+        session = test_main.get_db()
+        subscription = session.query(models.PodcastSubscription).filter(models.PodcastSubscription.active.is_(True)).first()
+        audiobook_handlers._PODCAST_RATE_EVENTS.clear()
+        with mock.patch.dict(
+            "webserver.handlers.audiobook.CONF",
+            {
+                "PODCAST_RATE_LIMIT_REQUESTS": 2,
+                "PODCAST_RATE_LIMIT_WINDOW_SECONDS": 60,
+                "PODCAST_RATE_LIMIT_FREEZE_SECONDS": 300,
+            },
+        ):
+            self.assertEqual(self.fetch(feed_path).code, 200)
+            self.assertEqual(self.fetch(feed_path).code, 200)
+            self.assertEqual(self.fetch(feed_path).code, 429)
+            unfrozen = self.json(
+                "/api/admin/podcast-audits",
+                method="PATCH",
+                body=json.dumps({"action": "unfreeze", "subscription_id": subscription.id}),
+            )
+            self.assertFalse(unfrozen["frozen"])
+        audiobook_handlers._PODCAST_RATE_EVENTS.clear()
 
     def test_expired_lease_is_reclaimed_once(self):
         session = test_main.get_db()

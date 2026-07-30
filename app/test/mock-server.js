@@ -23,6 +23,7 @@ let audiobookPublished = false;
 let audiobookJobs = [];
 let audiobookJobPolls = 0;
 let audiobookProgress = null;
+let audiobookManagedEditions = [];
 let podcastTokenHint = '';
 
 const builtinThemes = [
@@ -137,6 +138,24 @@ router.post('/_test/reset', eventHandler(async (event) => {
   audiobookJobs = [];
   audiobookJobPolls = 0;
   audiobookProgress = null;
+  audiobookManagedEditions = body?.audiobookVersions
+    ? [
+        {
+          ...audiobookEdition(),
+          id: 2,
+          status: 'ready',
+          created_at: '2026-07-19T10:00:00',
+          published_at: null,
+        },
+        {
+          ...audiobookEdition(),
+          id: 3,
+          status: 'historical',
+          created_at: '2026-07-17T10:00:00',
+        },
+      ]
+    : [];
+  if (body?.audiobookVersions) audiobookPublished = true;
   podcastTokenHint = '';
   return { status: 'ok' };
 }));
@@ -241,7 +260,18 @@ router.get('/api/audios/home', eventHandler(() => {
 router.get('/api/book/:bookId/audios', eventHandler(() => ({
   err: 'ok',
   book: audiobookBook(),
-  editions: audiobookPublished ? [audiobookEdition()] : [],
+  editions: [...(audiobookPublished ? [audiobookEdition()] : []), ...audiobookManagedEditions],
+  generation: {
+    enabled: true,
+    compatible: true,
+    permitted: true,
+    can_generate: true,
+    can_manage: true,
+    reason: '',
+    health: { ok: true, version: 'voicebook-tool 0.4.0', reason: '' },
+    engines: ['edgetts', 'qwen3tts'],
+    quality_options: ['standard'],
+  },
 })));
 
 router.post('/api/book/:bookId/audio-jobs', eventHandler(async (event) => {
@@ -345,6 +375,14 @@ router.get('/api/audio/:editionId', eventHandler(() => ({
   manifest: audiobookEdition(),
   progress: audiobookProgress,
 })));
+router.patch('/api/audio/:editionId', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (!['publish', 'rollback', 'delete'].includes(body?.action)) return { err: 'params.invalid' };
+  const editionId = Number(getRouterParam(event, 'editionId'));
+  const edition = audiobookManagedEditions.find(item => item.id === editionId);
+  audiobookManagedEditions = audiobookManagedEditions.filter(item => item.id !== editionId);
+  return { err: 'ok', edition: edition ? { ...edition, status: body.action === 'delete' ? 'deleted' : 'published' } : audiobookEdition() };
+}));
 router.get('/api/audio/:editionId/chapter/:number/timeline', eventHandler((event) => {
   const number = Number(getRouterParam(event, 'number'));
   return {
