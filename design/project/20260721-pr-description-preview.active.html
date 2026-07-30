@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pull Request 描述与方案预览规范</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #1d2733; background: #f6f8fb; }
+    body { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+    header, section { background: #fff; border: 1px solid #d9e1ea; border-radius: 12px; margin-bottom: 18px; padding: 22px; }
+    h1, h2 { margin-top: 0; }
+    .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .meta div { background: #eef5ff; border-radius: 8px; padding: 10px 12px; }
+    code { background: #eef1f4; border-radius: 4px; padding: 2px 5px; overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #d9e1ea; padding: 9px; text-align: left; vertical-align: top; }
+    th { background: #eef5ff; }
+    .pending { color: #8a5a00; font-weight: 700; }
+    .url { display: block; margin: 8px 0; overflow-wrap: anywhere; }
+    svg { width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Pull Request 描述与方案预览规范</h1>
+    <div class="meta">
+      <div><strong>创建日期</strong><br>2026-07-21</div>
+      <div><strong>所属模块</strong><br>project</div>
+      <div><strong>状态</strong><br>ACTIVE</div>
+      <div><strong>需求来源</strong><br>维护者要求完善 PR 正文、截图与 RawGitHack 预览</div>
+    </div>
+  </header>
+
+  <section>
+    <h2>原始诉求</h2>
+    <p>更新仓库级研发约束：提交 PR 时正文必须完整；条件允许时附带截图；引用单文件 HTML 方案时，除 GitHub 固定 commit 文件链接外，还要提供可直接渲染的 RawGitHack 预览链接。</p>
+  </section>
+
+  <section>
+    <h2>目标与规则</h2>
+    <ul>
+      <li>PR 正文至少说明背景或目标、关键改动、实际验证结果、风险或兼容性，以及方案路径或豁免原因。</li>
+      <li>涉及界面、布局、交互或其他可视结果时必须附截图；其他改动在截图能帮助评审时优先附带。</li>
+      <li>引用 ACTIVE HTML 方案时同时提供 GitHub blob 链接和 RawGitHack 预览链接。</li>
+      <li>两个链接都使用已推送的完整 commit SHA，避免分支移动后评审内容漂移。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>固定链接转换</h2>
+    <svg viewBox="0 0 900 190" role="img" aria-label="GitHub 方案链接转换为 RawGitHack 预览链接">
+      <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#3b73af"/></marker></defs>
+      <rect x="25" y="45" width="350" height="100" rx="12" fill="#eef5ff" stroke="#3b73af" stroke-width="2"/>
+      <rect x="525" y="45" width="350" height="100" rx="12" fill="#eefaf4" stroke="#37845c" stroke-width="2"/>
+      <line x1="385" y1="95" x2="515" y2="95" stroke="#3b73af" stroke-width="3" marker-end="url(#arrow)"/>
+      <g text-anchor="middle" fill="#1d2733"><text x="200" y="78" font-size="17" font-weight="700">GitHub blob 固定链接</text><text x="200" y="107" font-size="15">/blob/&lt;commit-sha&gt;/&lt;path&gt;</text><text x="700" y="78" font-size="17" font-weight="700">RawGitHack 在线预览</text><text x="700" y="107" font-size="15">/&lt;commit-sha&gt;/&lt;path&gt;</text></g>
+    </svg>
+    <p><strong>转换公式：</strong></p>
+    <code class="url">https://github.com/&lt;owner&gt;/&lt;repo&gt;/blob/&lt;commit-sha&gt;/&lt;path&gt;</code>
+    <code class="url">https://raw.githack.com/&lt;owner&gt;/&lt;repo&gt;/&lt;commit-sha&gt;/&lt;path&gt;</code>
+    <p><strong>维护者提供的示例：</strong></p>
+    <code class="url">https://github.com/talebook/talebook/blob/18113f147aefa0ad79e8c7efd93f1c882610b3ed/design/webserver/20260721-booksource-large-json-import.active.html</code>
+    <code class="url">https://raw.githack.com/talebook/talebook/18113f147aefa0ad79e8c7efd93f1c882610b3ed/design/webserver/20260721-booksource-large-json-import.active.html</code>
+  </section>
+
+  <section>
+    <h2>测试计划与结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>预期</th><th>实际结果</th></tr></thead>
+      <tbody>
+        <tr><td>研发规范契约测试</td><td><code>python3 -m pytest -q tests/test_project_instructions.py</code></td><td>通过；修复前因缺少 PR 提交规范失败，写入规则后 <code>1 passed</code>。</td></tr>
+        <tr><td>完整 Docker 测试</td><td><code>make test</code></td><td>通过，<code>636 passed, 2 skipped</code>，包含新增研发规范契约。</td></tr>
+        <tr><td>Python lint / format</td><td><code>ruff check tests/test_project_instructions.py --no-cache</code>；<code>ruff format --check tests/test_project_instructions.py</code></td><td>通过，文件格式无需调整。</td></tr>
+        <tr><td>设计文档门禁</td><td><code>make check-design</code></td><td>通过，32 份方案文档均满足路径、状态、HTML 与单文件资源约束。</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

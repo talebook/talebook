@@ -28,8 +28,18 @@ jobs:
       options: --user root
 
     steps:
+      - name: Install git (required for submodule checkout in container)
+        run: |
+          if ! command -v git >/dev/null 2>&1 || [ "$(git --version | awk '{print $3}' | cut -d. -f1,2)" \< "2.18" ]; then
+            apt-get update
+            apt-get install -y --no-install-recommends git ca-certificates
+            rm -rf /var/lib/apt/lists/*
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Inspect environment
         run: |

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex 测试工具运行环境</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #17202a; background: #f4f7fb; }
+    body { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+    header, section { background: white; border: 1px solid #dce4ee; border-radius: 12px; padding: 22px; margin-bottom: 18px; }
+    h1, h2 { margin-top: 0; }
+    .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .meta div { background: #edf4ff; border-radius: 8px; padding: 10px 12px; }
+    code { background: #eef1f5; border-radius: 4px; padding: 2px 5px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #dce4ee; padding: 9px; text-align: left; vertical-align: top; }
+    th { background: #edf4ff; }
+    .pending { color: #8a5a00; font-weight: 700; }
+    svg { width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Codex 测试工具运行环境</h1>
+    <div class="meta">
+      <div><strong>创建日期</strong><br>2026-07-21</div>
+      <div><strong>所属模块</strong><br>project / GitHub Actions</div>
+      <div><strong>状态</strong><br>ACTIVE</div>
+      <div><strong>需求来源</strong><br>维护者指出 Codex runner 未安装 ruff 与 pytest</div>
+    </div>
+  </header>
+
+  <section>
+    <h2>原始诉求与问题</h2>
+    <p>Codex 在 <code>.github/workflows/codex.yml</code> 的 runner 中执行维护任务时，会把需要运行的 ruff 或 pytest 验证记录为“未执行”，原因是 runner 没有安装对应命令。当前 workflow 只安装 Codex CLI 和 sandbox 组件，没有准备仓库声明的 Python 测试工具。</p>
+  </section>
+
+  <section>
+    <h2>目标与边界</h2>
+    <ul>
+      <li>Codex 启动前，runner 必须能执行 <code>ruff</code> 和 <code>python3 -m pytest</code>。</li>
+      <li>工具版本继续由 <code>requirements-test.txt</code> 管理，不在 workflow 中重复维护版本。</li>
+      <li>依赖清单必须来自不可变的 <code>github.workflow_sha</code>，不得安装 PR head 可修改的清单。</li>
+      <li>安装发生在可信 workflow 步骤中，不扩大 Codex sandbox 权限，不暴露凭据。</li>
+      <li>本次不改变常规 <code>ci.yml</code>、生产镜像或 Docker 测试阶段。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>方案</h2>
+    <svg viewBox="0 0 900 190" role="img" aria-label="Codex runner 测试工具准备流程">
+      <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#4577b4"/></marker></defs>
+      <g fill="#edf4ff" stroke="#4577b4" stroke-width="2">
+        <rect x="25" y="50" width="180" height="85" rx="10"/><rect x="260" y="50" width="180" height="85" rx="10"/>
+        <rect x="495" y="50" width="180" height="85" rx="10"/><rect x="730" y="50" width="145" height="85" rx="10"/>
+      </g>
+      <g fill="#17202a" text-anchor="middle" font-size="16">
+        <text x="115" y="78">读取受信任清单</text><text x="115" y="102">workflow SHA</text><text x="115" y="122">requirements-test</text>
+        <text x="350" y="84">Checkout</text><text x="350" y="108">目标提交</text>
+        <text x="585" y="78">setup-python 3.13</text><text x="585" y="102">安装受信任清单</text><text x="585" y="122">验证 ruff / pytest</text>
+        <text x="802" y="84">Run Codex</text><text x="802" y="108">受限 sandbox</text>
+      </g>
+      <g stroke="#4577b4" stroke-width="2" marker-end="url(#arrow)"><line x1="205" y1="92" x2="250" y2="92"/><line x1="440" y1="92" x2="485" y2="92"/><line x1="675" y1="92" x2="720" y2="92"/></g>
+    </svg>
+    <p>上下文解析步骤从不可变的 <code>github.workflow_sha</code> 读取受信任 <code>requirements-test.txt</code>，保存到 runner 临时目录；不得直接安装 PR head 中的依赖清单。checkout 后新增 Python 环境准备与测试工具安装步骤，安装临时目录中的受信任清单，随后运行版本命令快速失败，从而把依赖准备错误暴露在 Codex 启动前。</p>
+  </section>
+
+  <section>
+    <h2>测试计划与结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>预期</th><th>实际结果</th></tr></thead>
+      <tbody>
+        <tr><td>workflow 契约回归</td><td>从 <code>github.workflow_sha</code> 获取受信任清单，安装步骤不读取 PR head 清单，并位于 checkout 与 Run Codex 之间</td><td>通过；测试在修复前因缺少步骤失败，加入受信任清单约束后再次得到 2 项失败，实现后 <code>2 passed</code>。</td></tr>
+        <tr><td>相关 pytest</td><td><code>python3 -m pytest -q tests/test_codex_workflow.py tests/test_codex_progress_reporter.py tests/test_check_design_docs.py tests/test_project_instructions.py</code></td><td>通过，<code>52 passed</code>。</td></tr>
+        <tr><td>完整 Docker 测试</td><td><code>make test</code></td><td>通过，Python 3.13 / Calibre 环境中 <code>636 passed, 2 skipped</code>；包含新增 workflow 与研发规范测试。</td></tr>
+        <tr><td>工具可执行性</td><td><code>docker run --rm talebook/test sh -c 'ruff --version &amp;&amp; python3 -m pytest --version'</code></td><td>通过，输出 <code>ruff 0.15.22</code> 与 <code>pytest 7.4.4</code>。</td></tr>
+        <tr><td>Python lint / format</td><td><code>ruff check tests/test_codex_workflow.py tests/test_project_instructions.py --no-cache</code>；<code>ruff format --check</code></td><td>通过，2 个文件无 lint 或格式问题；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 也通过。</td></tr>
+        <tr><td>workflow 静态检查</td><td><code>go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -config-file .github/actionlint.yaml .github/workflows/codex.yml</code></td><td>通过，无输出。</td></tr>
+        <tr><td>宿主组合测试说明</td><td>曾把 <code>tests/test_docker_stages.py</code> 加入宿主 Python 3.9 组合测试</td><td>收集阶段因 Python 3.9 无标准库 <code>tomllib</code> 中止；同一文件随后已在 Python 3.13 的 <code>make test</code> 中通过，不构成相关失败。</td></tr>
+        <tr><td>设计门禁</td><td><code>make check-design</code></td><td>通过，32 份方案文档均满足路径、状态、HTML 与单文件资源约束。</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

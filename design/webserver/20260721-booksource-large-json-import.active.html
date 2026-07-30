@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>修复大体积书源 JSON 导入失败 · ACTIVE</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { max-width: 920px; margin: 0 auto; padding: 24px; font: 15px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; color: #1f2328; background: #fff; }
+  h1 { margin-bottom: 4px; font-size: 28px; }
+  h2 { margin-top: 30px; padding-bottom: 6px; border-bottom: 1px solid #d0d7de; font-size: 20px; }
+  h3 { font-size: 16px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #57606a; }
+  .status { padding: 2px 10px; border-radius: 999px; color: #1a7f37; background: #dafbe1; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 8px 10px; border: 1px solid #d0d7de; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  code { padding: 1px 5px; border-radius: 4px; background: #f6f8fa; }
+  pre { overflow-x: auto; padding: 14px; border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa; }
+  @media (prefers-color-scheme: dark) {
+    body { color: #e6edf3; background: #0d1117; }
+    h2, th, td, pre { border-color: #30363d; }
+    th, code, pre { background: #161b22; }
+    .meta { color: #8b949e; }
+  }
+</style>
+</head>
+<body>
+<h1>修复大体积书源 JSON 导入失败</h1>
+<div class="meta">
+  <span class="status">ACTIVE</span>
+  <span>创建日期：2026-07-21</span>
+  <span>所属模块：webserver</span>
+  <span>需求来源：GitHub Issue #878</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<blockquote>
+  <p>Issue 标题：“导入书源 JSON文件过大”；维护者请求：“处理这个 BUG”。</p>
+</blockquote>
+<p>需要修复较大书源 JSON 无法通过管理端导入的问题，并避免破坏电子书分片上传已有的大小约束。</p>
+
+<h2>2. 现状与根因</h2>
+<p>书源粘贴导入会把完整 JSON 作为一次 <code>POST /api/admin/booksource/import</code> 请求发送。开启分片上传后，<code>webserver.main.get_upload_size()</code> 仅使用 <code>UPLOAD_CHUNK_SIZE</code>（默认 4MB）初始化 Tornado 的全局 <code>max_buffer_size</code>。书源导入不属于电子书分片上传，因此超过 4MB 的请求会在到达书源 Handler 前被 HTTP 层拒绝。</p>
+<pre>书源 JSON（例如 5MB）
+        │ 单次 POST
+        ▼
+Tornado max_buffer_size（当前默认 4MB） ──拒绝──▶ 书源导入 Handler 未执行
+        │
+        └─修复后粗粒度上限默认 100MB──▶ JSON 解析与书源导入</pre>
+
+<h3>grill 澄清结果</h3>
+<table>
+  <tr><th>决策点</th><th>结论</th><th>理由</th></tr>
+  <tr><td>修复层级</td><td>恢复 HTTP 传输层容量，不改书源 API</td><td>请求尚未进入 Handler，根因在全局请求缓冲上限</td></tr>
+  <tr><td>上限算法</td><td>取 <code>MAX_UPLOAD_SIZE</code> 与 <code>UPLOAD_CHUNK_SIZE</code> 的较大值</td><td>全局值应容纳所有合法单请求；不能因开启电子书分片而压低其他接口容量</td></tr>
+  <tr><td>电子书上传约束</td><td>保持现有 Handler 级分片大小和合并后总大小校验</td><td><code>max_buffer_size</code> 是传输层粗粒度保护，不替代业务限制</td></tr>
+  <tr><td>配置与兼容性</td><td>不新增配置，不改变 API 和数据结构</td><td>沿用管理员已有的大小配置即可消除回归</td></tr>
+  <tr><td>前端改动</td><td>无</td><td>前端已经能提交 JSON，失败发生在后端接收阶段</td></tr>
+</table>
+
+<h2>3. 目标与非目标</h2>
+<ul>
+  <li>开启分片上传且分片大小小于最大上传大小时，大于单分片、小于最大上传上限的书源 JSON 可以到达后端接口。</li>
+  <li>单分片配置大于最大上传配置时，合法的大分片仍可被 Tornado 接收。</li>
+  <li>不改变书源解析、去重、后台检测和数据库写入逻辑。</li>
+  <li>不引入书源专用分片协议，也不放宽电子书上传的业务级大小校验。</li>
+</ul>
+
+<h2>4. 实现方案</h2>
+<p>修改 <code>webserver/main.py</code> 的 <code>get_upload_size()</code>：安全解析 <code>MAX_UPLOAD_SIZE</code> 和 <code>UPLOAD_CHUNK_SIZE</code>，无论分片开关状态均返回两者较大值。这样 Tornado 能容纳当前配置允许的最大合法单请求，而具体上传接口继续执行自身限制。</p>
+<p>修改 <code>tests/test_main.py</code> 的回归测试，覆盖默认问题组合（最大上传 100MB、分片 4MB）和反向组合（最大上传 100MB、分片 200MB）。</p>
+
+<h2>5. 影响范围与风险</h2>
+<table>
+  <tr><th>范围</th><th>影响</th></tr>
+  <tr><td><code>webserver/main.py</code></td><td>Tornado 启动时的全局单请求缓冲上限恢复为两个合法请求规模的较大值</td></tr>
+  <tr><td><code>tests/test_main.py</code></td><td>锁定全局上限不能低于任一相关配置</td></tr>
+  <tr><td>API / 数据库 / 前端</td><td>无变化</td></tr>
+</table>
+<p>风险是全局 HTTP 层可接收比单分片更大的请求；该值仍受管理员配置的 <code>MAX_UPLOAD_SIZE</code> / <code>UPLOAD_CHUNK_SIZE</code> 约束，电子书上传 Handler 的细粒度限制保持不变。</p>
+
+<h2>6. 测试结果</h2>
+<p><strong>状态：已完成替代验证；标准测试工具受 runner 环境限制未能执行。</strong></p>
+<table>
+  <tr><th>验证项</th><th>实际命令 / 方式</th><th>结果</th></tr>
+  <tr><td>目标回归测试</td><td><code>pytest tests/test_main.py::TestGetUploadSize -v</code></td><td>未执行：runner 未安装 <code>pytest</code>，命令返回 127</td></tr>
+  <tr><td>源码级行为验证</td><td>通过 Python AST 从 <code>webserver/main.py</code> 加载实际 <code>get_upload_size()</code>，分别验证 100MB/4MB 与 100MB/200MB 组合</td><td>通过：分别返回 100MB 与 200MB</td></tr>
+  <tr><td>Python 语法检查</td><td><code>python3 -m py_compile webserver/main.py tests/test_main.py</code></td><td>通过</td></tr>
+  <tr><td>差异检查</td><td><code>git diff --check</code></td><td>通过</td></tr>
+  <tr><td>Python 自动格式化</td><td><code>make lint-py-fix</code></td><td>未执行：runner 未安装 <code>ruff</code>；尝试从公共包源安装时连接被重置</td></tr>
+  <tr><td>Python lint</td><td><code>make lint-py</code></td><td>未执行：runner 未安装 <code>ruff</code></td></tr>
+  <tr><td>后端全量测试</td><td><code>make pytest</code></td><td>未执行：runner 未安装 <code>pytest</code> 与项目运行依赖</td></tr>
+  <tr><td>方案校验</td><td><code>make check-design</code></td><td>通过：31 份方案文档通过检查</td></tr>
+</table>
+<p>未执行标准测试的风险：未在本 runner 内启动完整 Tornado/Calibre 测试环境。替代验证直接执行了本次修改的实际函数体并覆盖两个边界方向；改动仅涉及纯配置值解析和 <code>max()</code> 选择，且新增的仓库回归用例将在具备依赖的 CI 环境中执行。</p>
+</body>
+</html>

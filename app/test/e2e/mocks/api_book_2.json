@@ -1,6 +1,15 @@
 {
   "err": "ok",
   "kindle_sender": "",
+  "conversion_options": [
+    {
+      "source_format": "txt",
+      "target_format": "epub",
+      "converter": "txt2epub",
+      "available": true,
+      "reason": null
+    }
+  ],
   "book": {
     "id": 2,
     "title": "漫漫自由路",

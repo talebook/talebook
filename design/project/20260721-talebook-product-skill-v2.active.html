@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talebook 产品 Skill V2 · ACTIVE</title>
+  <style>
+    :root{--ink:#182b34;--muted:#61727a;--line:#d8e1e5;--paper:#fbfcfd;--accent:#176b78;--soft:#e9f4f5;--warn:#fff3ce}
+    *{box-sizing:border-box}body{margin:0;background:#edf2f4;color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC",sans-serif}
+    main{width:min(1080px,calc(100% - 32px));margin:32px auto;padding:40px;background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:0 16px 45px #182b3412}
+    h1{margin:0 0 8px;font-size:32px;line-height:1.2}h2{margin:36px 0 12px;padding-top:16px;border-top:1px solid var(--line);font-size:21px}h3{font-size:17px}
+    p,ul,ol{margin:8px 0 14px}.eyebrow{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.12em}.summary{color:var(--muted);font-size:17px}
+    .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.meta span{padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:13px}.status{background:var(--warn)!important;font-weight:700}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:#fff}.card strong{display:block;color:var(--accent)}
+    table{width:100%;border-collapse:collapse;margin:12px 0 20px;background:#fff}th,td{padding:10px 12px;border:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--soft)}
+    code{padding:2px 5px;border-radius:5px;background:var(--soft)}figure{margin:18px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff}figcaption{margin-top:8px;color:var(--muted);font-size:13px}
+    @media(max-width:720px){main{padding:24px}.grid{grid-template-columns:1fr}h1{font-size:26px}}
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">TALEBOOK · PROJECT DESIGN</div>
+  <h1>Talebook 产品策划 Skill V2</h1>
+  <p class="summary">收窄触发、按需加载、确定性取证，并把 UX 评审与真实页面证据对齐。</p>
+  <div class="meta"><span class="status">状态 · ACTIVE</span><span>创建日期 · 2026-07-21</span><span>所属模块 · project</span><span>需求来源 · 当前对话</span><span>替代 · 20260721-talebook-product-skill.superseded.html</span></div>
+
+  <h2>1. 原始诉求</h2>
+  <p>用户确认继续优化现有 <code>talebook-product</code> Skill。优化范围来自上一轮审查：降低纯编码任务误触发，拆分行业调研与交互设计资料，为 Git/GitHub 证据采集增加可重复脚本，把稳定产品上下文与日期快照分离，补充 Talebook 指标库、中文默认提示和正负场景验证。</p>
+
+  <h2>2. 目标与非目标</h2>
+  <div class="grid">
+    <div class="card"><strong>触发准确</strong>只在产品判断、行业/竞品研究和 UI/UX 设计任务中隐式触发。</div>
+    <div class="card"><strong>上下文经济</strong>产品、竞品、UX、指标和历史快照按任务分别加载。</div>
+    <div class="card"><strong>证据稳定</strong>用只读脚本统一采集 Git 与 gh 结果，并保留部分失败信息。</div>
+    <div class="card"><strong>可验证</strong>验证结构、脚本、正向场景、负向场景和输出契约。</div>
+  </div>
+  <p><strong>非目标：</strong>不改业务代码，不自动发布或操作 GitHub，不把 Skill 拆成多个会互相竞争触发的独立 Skill，不承诺外部网络始终可用。</p>
+
+  <h2>3. 方案</h2>
+  <figure>
+    <svg viewBox="0 0 920 230" width="100%" role="img" aria-labelledby="flow-title flow-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="flow-title">V2 按需加载结构</title><desc id="flow-desc">核心工作流根据任务分别加载产品上下文、竞品研究、交互设计、指标和历史快照，证据脚本为所有路径提供只读输入。</desc>
+      <defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1l7 4-7 4" fill="none" stroke="#61727a" stroke-width="1.5"/></marker></defs>
+      <g font-family="system-ui,PingFang SC,sans-serif" font-size="13">
+        <rect x="30" y="76" width="150" height="78" rx="12" fill="#e9f4f5" stroke="#80b7bf"/><text x="105" y="107" text-anchor="middle">SKILL 核心路由</text><text x="105" y="131" text-anchor="middle" fill="#61727a" font-size="11">触发边界 + 证据原则</text>
+        <rect x="250" y="20" width="160" height="58" rx="10" fill="#edf3fb" stroke="#94afd0"/><text x="330" y="54" text-anchor="middle">产品稳定上下文</text>
+        <rect x="250" y="90" width="160" height="58" rx="10" fill="#fff4d6" stroke="#d8bd68"/><text x="330" y="124" text-anchor="middle">竞品研究</text>
+        <rect x="250" y="160" width="160" height="58" rx="10" fill="#f2ecf8" stroke="#ad91c6"/><text x="330" y="194" text-anchor="middle">UX 设计与审查</text>
+        <rect x="485" y="55" width="160" height="58" rx="10" fill="#f7f0e8" stroke="#c9a67d"/><text x="565" y="89" text-anchor="middle">产品指标</text>
+        <rect x="485" y="128" width="160" height="58" rx="10" fill="#eef5eb" stroke="#98b88c"/><text x="565" y="162" text-anchor="middle">日期快照</text>
+        <rect x="720" y="76" width="170" height="78" rx="12" fill="#fff" stroke="#8aa0a8"/><text x="805" y="107" text-anchor="middle">只读证据脚本</text><text x="805" y="131" text-anchor="middle" fill="#61727a" font-size="11">Git 必选 · gh 可降级</text>
+        <g fill="none" stroke="#61727a" marker-end="url(#a)"><path d="M180 112L248 50"/><path d="M180 115H248"/><path d="M180 119L248 189"/><path d="M410 84L483 84"/><path d="M410 151L483 157"/><path d="M645 121H718"/></g>
+      </g>
+    </svg>
+    <figcaption>核心 Skill 只负责路由和共同原则；任务专属细节一层引用直达，避免无关上下文加载。</figcaption>
+  </figure>
+
+  <h3>3.1 触发边界</h3>
+  <p>frontmatter description 明确正向触发：产品分析、Issue 聚类、路线图、竞品研究、PRD、信息架构、用户流程、UI/UX 评审。明确负向边界：纯编码、Bug 诊断、CI、代码审查、部署运维和不涉及产品取舍的 API 实现不隐式触发。</p>
+
+  <h3>3.2 引用拆分</h3>
+  <table><thead><tr><th>资源</th><th>用途</th><th>加载条件</th></tr></thead><tbody>
+    <tr><td><code>product-context.md</code></td><td>稳定定位、角色、闭环、约束和机会原则</td><td>所有产品任务</td></tr>
+    <tr><td><code>competitor-research.md</code></td><td>竞品分组、信源、维度和结论格式</td><td>行业或竞品任务</td></tr>
+    <tr><td><code>ux-design.md</code></td><td>页面观察、任务流、状态、可访问性和验收规格</td><td>UI/UX 任务</td></tr>
+    <tr><td><code>product-metrics.md</code></td><td>Talebook 指标候选和选择规则</td><td>路线图、PRD、实验和复盘</td></tr>
+    <tr><td><code>snapshot-20260721.md</code></td><td>V1 分析时点的动态证据与假设</td><td>需要历史基线时</td></tr>
+  </tbody></table>
+
+  <h3>3.3 证据脚本</h3>
+  <p>新增 <code>scripts/collect_evidence.py</code>，只调用只读的 <code>git</code> 与 <code>gh</code> 子命令；输出 JSON，记录命令状态、标准输出、错误和采集时间。GitHub 查询失败时保留错误但继续输出本地证据，不创建、修改或评论远端对象。</p>
+
+  <h3>3.4 UX 页面证据</h3>
+  <p>评审现有页面时，只要环境可启动，就必须检查真实渲染页面；记录路由、主题、视口、角色和关键状态。仅做未来概念设计且没有可运行页面时，可以使用流程与线框，但必须明确哪些结论未经真实页面验证。</p>
+
+  <h2>4. 验证计划</h2>
+  <ul>
+    <li>运行 Skill Creator <code>quick_validate.py</code>。</li>
+    <li>运行证据脚本的 JSON 输出、限制日志数量和 gh 失败降级场景。</li>
+    <li>检查所有引用均存在、保持一层深度且旧合并引用已删除。</li>
+    <li>正向场景：版本路线图、跨端竞品研究、批量导入 UX 规格。</li>
+    <li>负向场景：修复 WebDAV 401、处理 CI 失败、代码审查不应隐式触发。</li>
+    <li>校验中文 <code>openai.yaml</code>、UTF-8、尾随空白和方案文档。</li>
+  </ul>
+
+  <h2>5. 风险与回滚</h2>
+  <table><thead><tr><th>风险</th><th>控制</th></tr></thead><tbody>
+    <tr><td>description 收窄后漏触发</td><td>保留明确的产品、调研与 UX 同义词，并支持用户显式调用。</td></tr>
+    <tr><td>脚本输出过大</td><td>限制日志、Issue、PR、Release 和远端分支数量；允许参数调整。</td></tr>
+    <tr><td>gh 配置或网络不可用</td><td>将 gh 作为可降级证据，保留错误而不中断 Git 采集。</td></tr>
+    <tr><td>引用拆分增加导航成本</td><td>所有资源从 SKILL.md 一层直达，并写明精确加载条件。</td></tr>
+  </tbody></table>
+  <p>回滚时恢复 V1 Skill 文件和 <code>research-and-ux.md</code>，并将本方案标为 SUPERSEDED。</p>
+
+  <h2>6. 测试结果</h2>
+  <p><strong>验证通过，方案转为 ACTIVE。</strong></p>
+  <table><thead><tr><th>验证项</th><th>方法</th><th>结果</th></tr></thead><tbody>
+    <tr><td>Skill 结构</td><td><code>python -X utf8 .../quick_validate.py .agents/skills/talebook-product</code></td><td>通过，输出 <code>Skill is valid!</code>。</td></tr>
+    <tr><td>本地证据采集</td><td><code>collect_evidence.py --no-github</code></td><td>通过；Git 根目录、状态、标签、提交、Issue 关联提交、远端 refs 和最新标签差异均输出有效 JSON。</td></tr>
+    <tr><td>GitHub 降级</td><td>限制为 1 条记录、5 秒超时运行四类 gh 查询</td><td>通过；本机 gh 配置不可读导致 4 项查询失败，脚本保留错误且在 Git 成功时整体返回成功。</td></tr>
+    <tr><td>参数边界</td><td><code>--log-limit 0</code></td><td>通过；拒绝越界参数并返回 argparse 错误。</td></tr>
+    <tr><td>只读性</td><td>检查实际报告中的全部命令</td><td>通过；未发现 push、commit、create、comment、close、edit、delete 或 merge 等变更命令。</td></tr>
+    <tr><td>正向场景</td><td>路线图、竞品研究、UX 规格内容契约检查</td><td>通过；机会树与指标、三类竞品结论、真实页面证据和未验证假设均有明确路径。</td></tr>
+    <tr><td>负向场景</td><td>检查 frontmatter 中纯编码、Bug、CI、代码审查、部署运维和 API 实现边界</td><td>通过。</td></tr>
+    <tr><td>按需加载</td><td>检查全部一层引用与旧合并引用</td><td>通过；5 个任务引用均存在，旧 <code>research-and-ux.md</code> 已删除。</td></tr>
+    <tr><td>展示元数据</td><td>重新生成并读取 <code>agents/openai.yaml</code></td><td>通过；默认提示已改为中文并显式包含 <code>$talebook-product</code>。</td></tr>
+    <tr><td>编码与格式</td><td>UTF-8 读取、尾随空白检查</td><td>通过。</td></tr>
+    <tr><td>仓库规定入口</td><td><code>make check-design</code></td><td>环境未提供 <code>python3</code> 命令，Make 无法启动检查脚本；改用当前 Python 运行同一脚本。</td></tr>
+    <tr><td>WIP 门禁</td><td><code>python -X utf8 scripts/check_design_docs.py</code></td><td>WIP 阶段正确拒绝合并；转 ACTIVE 后再次运行通过。</td></tr>
+  </tbody></table>
+  <p><strong>未执行：</strong>没有运行前后端业务测试或浏览器验收，因为本次只修改 Skill、只读辅助脚本和内部方案，不改变产品运行时与页面。没有进行独立新上下文的子代理前向测试；当前任务未获得子代理授权，实际隐式触发仍存在模型相关风险，后续可由用户显式授权后补测。</p>
+</main></body></html>

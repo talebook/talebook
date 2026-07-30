@@ -1,0 +1,223 @@
+{
+  "schema_version": 2,
+  "generated_on": "2026-07-23",
+  "artifact_policy": "Download URLs may change over time; source_sha256 pins the retrieved source artifact and sha256 pins the committed final-format artifact.",
+  "jurisdiction_notice": "Public-domain status can differ by jurisdiction. The records below retain the source edition's rights notices and identify the basis used for this preset collection.",
+  "chinese_conversion": {
+    "tool": "opencc-python-reimplemented",
+    "version": "0.1.7",
+    "configuration": "t2s",
+    "scope": "UTF-8 XML, OPF, NCX, SVG, HTML and XHTML text resources only",
+    "navigation": "Rebuilt from the source edition's chapter headings; the Project Gutenberg license entry remains linked."
+  },
+  "format_conversion": {
+    "tool": "calibre ebook-convert",
+    "version": "8.5.0",
+    "runtime": "talebook/talebook:dev",
+    "source_format": "EPUB",
+    "metadata_limit": "Calibre imports the converted TXT and PDF titles, but reports their authors as Unknown and their languages as empty. The TXT's visible metadata header and this manifest retain those fields."
+  },
+  "books": [
+    {
+      "filename": "hong-lou-meng.epub",
+      "format": "EPUB",
+      "title": "红楼梦",
+      "author": "曹雪芹",
+      "language": "zh-CN",
+      "source": "Project Gutenberg",
+      "source_page": "https://www.gutenberg.org/ebooks/24264",
+      "download_url": "https://www.gutenberg.org/ebooks/24264.epub3.images",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "cca1a10b5302d42378eac8e601497983cc545e845d98f261a0348e72538b3b4f",
+      "sha256": "3ec0e02f008a6cb49b30e888ffda77ebdea90edba6cd4505e51c8d02fb2f4ec8",
+      "chapter_count": 120,
+      "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
+      "transformations": [
+        "Traditional Chinese to Simplified Chinese with OpenCC t2s",
+        "Normalized title, author and language metadata",
+        "Rebuilt EPUB navigation from 120 source chapter headings"
+      ]
+    },
+    {
+      "filename": "xi-you-ji.epub",
+      "format": "EPUB",
+      "title": "西游记",
+      "author": "吴承恩",
+      "language": "zh-CN",
+      "source": "Project Gutenberg",
+      "source_page": "https://www.gutenberg.org/ebooks/23962",
+      "download_url": "https://www.gutenberg.org/ebooks/23962.epub3.images",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "b229817ffc91e7cea1c092cd576bf1bb0bc8a43f20d6429ee4d3ca5da8095371",
+      "sha256": "07efe08564be8151c64fff55a34487b6588bc42f43686dc930af6d067cfc1e59",
+      "chapter_count": 100,
+      "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
+      "transformations": [
+        "Traditional Chinese to Simplified Chinese with OpenCC t2s",
+        "Normalized title, author and language metadata",
+        "Rebuilt EPUB navigation from 100 source chapter headings"
+      ]
+    },
+    {
+      "filename": "san-guo-zhi-yan-yi.epub",
+      "format": "EPUB",
+      "title": "三国志演义",
+      "author": "罗贯中",
+      "language": "zh-CN",
+      "source": "Project Gutenberg",
+      "source_page": "https://www.gutenberg.org/ebooks/23950",
+      "download_url": "https://www.gutenberg.org/ebooks/23950.epub3.images",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "e6f7ac2b2f2888067c3680900afb371f3f2c415cdcaa44a9fe9bfbc87397f592",
+      "sha256": "0c1779300cdac9524cc634c738a0451db2b012951d61532ee8f6951d5d959cb3",
+      "chapter_count": 120,
+      "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
+      "transformations": [
+        "Traditional Chinese to Simplified Chinese with OpenCC t2s",
+        "Normalized title, author and language metadata",
+        "Rebuilt EPUB navigation from 120 source chapter headings"
+      ]
+    },
+    {
+      "filename": "shui-hu-zhuan.epub",
+      "format": "EPUB",
+      "title": "水浒传",
+      "author": "施耐庵",
+      "language": "zh-CN",
+      "source": "Project Gutenberg",
+      "source_page": "https://www.gutenberg.org/ebooks/23863",
+      "download_url": "https://www.gutenberg.org/ebooks/23863.epub3.images",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "30dfc12741580629cc0b32af58175294d3d7acb4823a3e382a790ca73501e100",
+      "sha256": "9aa508bc95a5509c48da26e15686ca9aba5e7216b172bf6c81a9080b7654380e",
+      "chapter_count": 70,
+      "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
+      "transformations": [
+        "Traditional Chinese to Simplified Chinese with OpenCC t2s",
+        "Normalized title, author and language metadata",
+        "Rebuilt EPUB navigation from 70 source chapter headings"
+      ]
+    },
+    {
+      "filename": "dao-de-jing.epub",
+      "format": "EPUB",
+      "title": "道德经",
+      "author": "老子",
+      "language": "zh-CN",
+      "source": "Project Gutenberg",
+      "source_page": "https://www.gutenberg.org/ebooks/7337",
+      "download_url": "https://www.gutenberg.org/ebooks/7337.epub3.images",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "da417e611524b2795bfebb36035f7bc706147492d7b99f5c36c859cc950ddf4b",
+      "sha256": "b4241ab2d3f9f1d29660493c60d65abc1feabeff5e47b808ab29da7ecd0887c3",
+      "chapter_count": 81,
+      "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
+      "transformations": [
+        "Traditional Chinese to Simplified Chinese with OpenCC t2s",
+        "Normalized title, author and language metadata",
+        "Rebuilt EPUB navigation from 81 source chapter headings"
+      ]
+    },
+    {
+      "filename": "pride-and-prejudice.mobi",
+      "format": "MOBI",
+      "title": "Pride and Prejudice",
+      "author": "Jane Austen",
+      "language": "en-GB",
+      "source": "Standard Ebooks",
+      "source_page": "https://standardebooks.org/ebooks/jane-austen/pride-and-prejudice",
+      "download_url": "https://standardebooks.org/ebooks/jane-austen/pride-and-prejudice/downloads/jane-austen_pride-and-prejudice.epub?source=download",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "377c8b79622702c406de068d1ca4f6d2a8a675f46f801c2fe4013e1af17e6ee9",
+      "sha256": "f29f0f67b3a983481c01d7f10f6e97e0f2a752bd077f82ce383a908bdf2fec4e",
+      "rights": "Text is public domain in the USA; Standard Ebooks production is dedicated to the public domain under CC0 1.0.",
+      "transformations": [
+        "Converted from the pinned source EPUB to MOBI with Calibre 8.5.0",
+        "Command: ebook-convert source.epub output.mobi"
+      ]
+    },
+    {
+      "filename": "alices-adventures-in-wonderland.pdf",
+      "format": "PDF",
+      "title": "Alice’s Adventures in Wonderland",
+      "author": "Lewis Carroll",
+      "language": "en-GB",
+      "source": "Standard Ebooks",
+      "source_page": "https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel",
+      "download_url": "https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel/downloads/lewis-carroll_alices-adventures-in-wonderland_john-tenniel.epub?source=download",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "ee036cd4da21ea84aa9f17cbdd75a476e1f69ee5f51136ef5469e85b008fe17d",
+      "sha256": "967270f907c5a687cf651ad63b7ba8665c6b1d57ba7e723f7b8888da489843ea",
+      "page_count": 102,
+      "calibre_import": {
+        "title": "Alice’s Adventures in Wonderland",
+        "author": "Unknown",
+        "language": null
+      },
+      "rights": "Text and illustrations are public domain in the USA; Standard Ebooks production is dedicated to the public domain under CC0 1.0.",
+      "transformations": [
+        "Converted from the pinned source EPUB to an A4 illustrated PDF with Calibre 8.5.0",
+        "Command: ebook-convert source.epub output.pdf --paper-size a4 --title \"Alice’s Adventures in Wonderland\" --authors \"Lewis Carroll\" --language en-GB"
+      ]
+    },
+    {
+      "filename": "frankenstein.txt",
+      "format": "TXT",
+      "title": "Frankenstein",
+      "author": "Mary Shelley",
+      "language": "en-GB",
+      "source": "Standard Ebooks",
+      "source_page": "https://standardebooks.org/ebooks/mary-shelley/frankenstein",
+      "download_url": "https://standardebooks.org/ebooks/mary-shelley/frankenstein/downloads/mary-shelley_frankenstein.epub?source=download",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "9ef7e1a6138d8bf64e6c529e6c981a169a70f7455455598aba031da482ec6c8f",
+      "sha256": "67ad6b4e703df2bd268f9cfe5a259b2f4b634de8008c6d6673a1152f38af6677",
+      "line_count": 2087,
+      "calibre_import": {
+        "title": "Frankenstein",
+        "author": "Unknown",
+        "language": null
+      },
+      "rights": "Text is public domain in the USA; Standard Ebooks production is dedicated to the public domain under CC0 1.0.",
+      "transformations": [
+        "Converted from the pinned source EPUB to UTF-8 plain text with a visible metadata header using Calibre 8.5.0",
+        "Command: ebook-convert source.epub output.txt --txt-output-formatting plain --newline unix --insert-metadata --title Frankenstein --authors \"Mary Shelley\" --language en-GB",
+        "Normalized non-semantic indentation whitespace and trailing blank lines for a Git-stable text artifact"
+      ]
+    },
+    {
+      "filename": "the-picture-of-dorian-gray.azw3",
+      "format": "AZW3",
+      "title": "The Picture of Dorian Gray",
+      "author": "Oscar Wilde",
+      "language": "en-GB",
+      "source": "Standard Ebooks",
+      "source_page": "https://standardebooks.org/ebooks/oscar-wilde/the-picture-of-dorian-gray",
+      "download_url": "https://standardebooks.org/ebooks/oscar-wilde/the-picture-of-dorian-gray/downloads/oscar-wilde_the-picture-of-dorian-gray.epub?source=download",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "cbc33e9dcaaa8b3aa8afc4062739b481ab810c224fd2157312925cabad633402",
+      "sha256": "946a18565b058a59e3aecad47884e5919d582b38b7b875303562ace5085a5929",
+      "rights": "Text is public domain in the USA; Standard Ebooks production is dedicated to the public domain under CC0 1.0.",
+      "transformations": [
+        "Converted from the pinned source EPUB to AZW3 with Calibre 8.5.0",
+        "Command: ebook-convert source.epub output.azw3"
+      ]
+    },
+    {
+      "filename": "the-adventures-of-sherlock-holmes.epub",
+      "format": "EPUB",
+      "title": "The Adventures of Sherlock Holmes",
+      "author": "Arthur Conan Doyle",
+      "language": "en-GB",
+      "source": "Standard Ebooks",
+      "source_page": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-adventures-of-sherlock-holmes",
+      "download_url": "https://standardebooks.org/ebooks/arthur-conan-doyle/the-adventures-of-sherlock-holmes/downloads/arthur-conan-doyle_the-adventures-of-sherlock-holmes.epub?source=download",
+      "retrieved_on": "2026-07-23",
+      "source_sha256": "31f9992031b2409d19dc6ba4396426cd4ca1cea5601ab1b6884af15b1d52abbd",
+      "sha256": "31f9992031b2409d19dc6ba4396426cd4ca1cea5601ab1b6884af15b1d52abbd",
+      "minimum_navigation_entries": 12,
+      "rights": "Text and illustrations are public domain in the USA; Standard Ebooks production is dedicated to the public domain under CC0 1.0.",
+      "transformations": []
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talebook 产品策划与体验设计 Skill · SUPERSEDED</title>
+  <style>
+    :root { color-scheme: light; --ink:#18322b; --muted:#65746f; --line:#d8e2de; --paper:#fbfdfc; --accent:#1b7658; --soft:#eaf5f0; --warn:#fff4d6; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:#eef3f0; color:var(--ink); font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC",sans-serif; }
+    main { width:min(1080px,calc(100% - 32px)); margin:32px auto; padding:40px; background:var(--paper); border:1px solid var(--line); border-radius:18px; box-shadow:0 16px 45px #18322b12; }
+    h1 { margin:0 0 8px; font-size:32px; line-height:1.2; }
+    h2 { margin:38px 0 12px; padding-top:18px; border-top:1px solid var(--line); font-size:21px; }
+    h3 { margin:24px 0 8px; font-size:17px; }
+    p, ul, ol { margin:8px 0 14px; }
+    code { padding:2px 5px; border-radius:5px; background:var(--soft); }
+    .eyebrow { color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.12em; }
+    .summary { color:var(--muted); font-size:17px; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+    .meta span { padding:5px 10px; border:1px solid var(--line); border-radius:999px; background:#fff; font-size:13px; }
+    .status { color:#795a00; background:var(--warn)!important; border-color:#ead38f!important; font-weight:700; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .card { padding:16px 18px; border:1px solid var(--line); border-radius:12px; background:#fff; }
+    .card strong { display:block; margin-bottom:4px; color:var(--accent); }
+    table { width:100%; border-collapse:collapse; margin:12px 0 20px; background:#fff; }
+    th, td { padding:10px 12px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:var(--soft); }
+    figure { margin:18px 0; padding:14px; border:1px solid var(--line); border-radius:12px; background:#fff; }
+    figcaption { margin-top:8px; color:var(--muted); font-size:13px; }
+    .pending { color:#795a00; font-weight:700; }
+    @media (max-width:720px) { main{padding:24px} .grid{grid-template-columns:1fr} h1{font-size:26px} }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">TALEBOOK · PROJECT DESIGN</div>
+  <h1>Talebook 产品策划与体验设计 Skill</h1>
+  <p class="summary">把仓库事实、GitHub 用户信号、行业对标和 UI/交互验收串成一个 Talebook 专用工作流。</p>
+  <div class="meta">
+    <span class="status">状态 · SUPERSEDED</span><span>创建日期 · 2026-07-21</span><span>所属模块 · project</span><span>需求来源 · 当前对话</span>
+  </div>
+  <p><strong>替代说明：</strong>本方案已由 <code>design/project/20260721-talebook-product-skill-v2.active.html</code> 替代。V2 收窄隐式触发边界、拆分竞品与 UX 引用、加入只读证据脚本、产品指标和日期快照；本文件仅保留历史决策记录。</p>
+
+  <h2>1. 原始诉求</h2>
+  <p>先利用 <code>gh</code> 与 <code>git</code> 分析 Talebook，再制作适合本项目的 <code>SKILL.md</code>。背景目标覆盖产品策划、行业调研和 UI/交互设计，不采用脱离现有产品与工程边界的通用模板。</p>
+
+  <h2>2. 目标与非目标</h2>
+  <div class="grid">
+    <div class="card"><strong>目标</strong>从 Git 历史、Issue/PR/Release、现有方案和代码结构建立证据链。</div>
+    <div class="card"><strong>目标</strong>支持机会识别、竞品研究、优先级判断、交互规格和路线图输出。</div>
+    <div class="card"><strong>目标</strong>把自托管、NAS、多用户、跨端阅读和运维成本作为 Talebook 的固有约束。</div>
+    <div class="card"><strong>非目标</strong>不默认做商业市场规模测算，不替代实现阶段的仓库方案、测试和浏览器验收。</div>
+  </div>
+
+  <h2>3. 分析结论</h2>
+  <table>
+    <thead><tr><th>维度</th><th>仓库证据</th><th>对 Skill 的要求</th></tr></thead>
+    <tbody>
+      <tr><td>产品定位</td><td>README 将产品定义为基于 Calibre 的个人图书管理系统，强调在线阅读、简单部署、私人模式和多用户。</td><td>优先服务自托管管理员、个人读者和家庭/小圈子共享，不照搬公有内容平台指标。</td></tr>
+      <tr><td>核心闭环</td><td>近一年集中演进导入/扫描、元数据补全、发现与筛选、在线阅读、阅读状态/进度、推送、OPDS、WebDAV。</td><td>研究和方案必须落入“部署维护 → 入库整理 → 发现组织 → 阅读同步 → 分享推送”闭环。</td></tr>
+      <tr><td>产品阶段</td><td>自 v25.06.26 至当前分支约 494 个文件变化；前端迁至 Nuxt 4/Vue 3/Vuetify 3，后端持续扩展服务与安全边界。</td><td>重点从堆叠能力转向一致性、可发现性、错误恢复、跨端连续性和维护成本。</td></tr>
+      <tr><td>用户信号</td><td>Git 历史关联上传重复、导入恢复、PDF/TXT 阅读、翻页、书架、空状态、导航点击、阅读进度等 Issue。</td><td>不得只按 Issue 数量排序，要聚类到用户任务并验证影响范围。</td></tr>
+      <tr><td>工程约束</td><td>现有 AGENTS.md 要求重大改动先方案、配套测试；前端改动还需实际浏览器渲染验收。</td><td>Skill 的产品产物必须包含边界、状态、异常、权限、响应式与可验收标准。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. 方案</h2>
+  <figure>
+    <svg viewBox="0 0 920 190" width="100%" role="img" aria-labelledby="flow-title flow-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="flow-title">Skill 工作流</title><desc id="flow-desc">从证据采集到机会定义、取舍和交互规格，再进入实现门禁。</desc>
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M1 1l7 4-7 4" fill="none" stroke="#65746f" stroke-width="1.5"/></marker></defs>
+      <g font-family="system-ui,PingFang SC,sans-serif" font-size="14">
+        <g fill="#eaf5f0" stroke="#80b59f"><rect x="20" y="50" width="165" height="80" rx="12"/><text x="102" y="82" text-anchor="middle" fill="#18322b">证据采集</text><text x="102" y="106" text-anchor="middle" fill="#65746f" font-size="12">Git / gh / 代码 / 方案</text></g>
+        <g fill="#edf3fb" stroke="#91acd0"><rect x="255" y="50" width="165" height="80" rx="12"/><text x="337" y="82" text-anchor="middle" fill="#18322b">机会定义</text><text x="337" y="106" text-anchor="middle" fill="#65746f" font-size="12">用户 · 任务 · 痛点 · 信心</text></g>
+        <g fill="#fff4d6" stroke="#d8bd68"><rect x="490" y="50" width="165" height="80" rx="12"/><text x="572" y="82" text-anchor="middle" fill="#18322b">优先级取舍</text><text x="572" y="106" text-anchor="middle" fill="#65746f" font-size="12">价值 · 维护 · 风险 · 可逆性</text></g>
+        <g fill="#f2ecf8" stroke="#ad91c6"><rect x="725" y="50" width="175" height="80" rx="12"/><text x="812" y="82" text-anchor="middle" fill="#18322b">交互与验收</text><text x="812" y="106" text-anchor="middle" fill="#65746f" font-size="12">流程 · 状态 · 权限 · 测试</text></g>
+        <g fill="none" stroke="#65746f" stroke-width="1.5" marker-end="url(#arrow)"><path d="M185 90h68"/><path d="M420 90h68"/><path d="M655 90h68"/></g>
+      </g>
+    </svg>
+    <figcaption>四阶段主流程；若用户要求实现，再进入仓库既有的 WIP 方案、编码、测试和浏览器验收流程。</figcaption>
+  </figure>
+  <p>Skill 放在 <code>.agents/skills/talebook-product/</code>，包含：</p>
+  <ul>
+    <li><code>SKILL.md</code>：触发说明、工作流、证据规则、决策框架、产物规范和实现门禁。</li>
+    <li><code>references/product-context.md</code>：带日期的产品定位、角色、闭环、现有能力、约束与机会假设。</li>
+    <li><code>references/research-and-ux.md</code>：竞品分组、研究维度、交互检查表和产物模板。</li>
+    <li><code>agents/openai.yaml</code>：Codex UI 展示信息与默认调用提示。</li>
+  </ul>
+
+  <h2>5. 设计决策与边界</h2>
+  <ol>
+    <li>优先使用仓库本地证据；需要最新 Issue、PR、Release 或竞品信息时再调用 <code>gh</code> 或浏览器，并标注检索日期。</li>
+    <li>把 Issue 当作线索，不把单个请求直接等同于路线图项；先聚类用户任务，再评估受益范围和维护成本。</li>
+    <li>竞品分为 Calibre 生态、自托管阅读服务器、漫画/有声等邻近品类和跨端客户端，不做单一功能清单竞赛。</li>
+    <li>交互方案必须覆盖加载、空白、失败、权限不足、长任务进度、移动端、深色主题和中英文。</li>
+    <li>涉及违法公开传播、绕过付费/反爬或高风险远程执行的方向，明确排除或提高安全门槛。</li>
+  </ol>
+
+  <h2>6. 风险</h2>
+  <table>
+    <thead><tr><th>风险</th><th>控制</th></tr></thead>
+    <tbody>
+      <tr><td>产品快照过期</td><td>引用资料标注日期，并要求在路线图或行业研究任务中刷新 GitHub 与 Release 证据。</td></tr>
+      <tr><td>Skill 过宽导致误触发</td><td>description 限定 Talebook 的产品策划、竞品/行业研究和 UI/UX 任务。</td></tr>
+      <tr><td>只产出漂亮文档而不可实现</td><td>强制映射现有页面/API/权限/状态，并给出可验收标准与不做事项。</td></tr>
+      <tr><td>GitHub 数据不完整</td><td>记录 CLI 失败，允许用 Git 历史、Release 页面和仓库文件交叉验证，降低证据置信度。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>7. 测试结果</h2>
+  <p><strong>验证通过，方案转为 ACTIVE。</strong></p>
+  <table>
+    <thead><tr><th>验证项</th><th>命令或方法</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>Skill 结构</td><td><code>python -X utf8 .../quick_validate.py .agents/skills/talebook-product</code></td><td>通过，输出 <code>Skill is valid!</code>。</td></tr>
+      <tr><td>展示元数据编码</td><td>以 UTF-8 读取并核对 <code>agents/openai.yaml</code></td><td>通过；名称、简介和带 <code>$talebook-product</code> 的默认提示一致。</td></tr>
+      <tr><td>路线图场景走查</td><td>检查证据采集、Issue 聚类、机会树、优先级和“现在 / 接下来 / 以后 / 不做”路径</td><td>通过。</td></tr>
+      <tr><td>批量导入交互场景走查</td><td>检查主/失败流程、异步进度、部分成功、重试、响应式、主题、i18n 与验收条件</td><td>通过。</td></tr>
+      <tr><td>方案校验</td><td><code>make check-design</code></td><td>环境未提供 <code>python3</code> 命令，Make 入口无法执行；改用其实际脚本做等价验证。</td></tr>
+      <tr><td>方案等价校验</td><td><code>python -X utf8 scripts/check_design_docs.py</code></td><td>WIP 阶段正确触发合并门禁；转 ACTIVE 后再次执行并通过。</td></tr>
+      <tr><td>差异格式</td><td><code>git diff --check</code></td><td>通过。</td></tr>
+    </tbody>
+  </table>
+  <p>未运行前后端单元测试和浏览器验收：本次只新增项目级 Skill 与内部方案，不修改业务代码、前端交互或运行时行为。GitHub CLI 的仓库、Issue、PR、Release 查询均连续收到 HTTP 502；分析已改用本地 Git 历史、远端 refs、README、ACTIVE 方案与 GitHub Release/官方竞品页面交叉验证，Skill 中也明确了相同降级策略。</p>
+</main>
+</body>
+</html>

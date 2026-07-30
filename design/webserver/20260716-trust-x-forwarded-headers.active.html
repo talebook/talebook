@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>site_url 信任反向代理头 · ACTIVE</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; color: #1f2328; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 20px; margin-top: 32px; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; }
+  code { background: #f6f8fa; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #57606a; font-size: 14px; margin: 8px 0 16px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  .active { background: #dafbe1; color: #1a7f37; }
+  .todo { color: #8250df; font-weight: 600; }
+  .warn { background: #fff8c5; padding: 8px 12px; border-left: 3px solid #d4a72c; margin: 12px 0; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<h1>site_url 信任反向代理头</h1>
+<div class="meta">
+  <span><span class="badge active">ACTIVE</span> 待实现</span>
+  <span>创建日期：2026-07-16</span>
+  <span>所属模块：webserver</span>
+  <span>需求来源：Issue #498（"希望能够增加设置外网 ip+port 的功能"）</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<blockquote>
+希望能够增加设置外网 ip+port 的功能，以便在发送激活邮件等操作时，正确地发送外网地址。
+</blockquote>
+<p>当前 <code>self.site_url = self.request.protocol + "://" + host</code>（<code>webserver/handlers/base.py:194</code>）直接采用请求的 <code>Host</code> 头。Nginx / Caddy / Traefik 反向代理后，Tornado 看到的协议是 HTTP、host 是容器端口，发出去的激活邮件链接就会指向 <code>http://192.168.x.x:8080/...</code>，用户在公网无法点击。</p>
+
+<h2>2. 目标</h2>
+<ul>
+  <li>按业界惯例：仅当请求来自可信代理（由 <code>TRUSTED_PROXIES</code> 配置）时，信任 <code>X-Forwarded-Proto</code> 和 <code>X-Forwarded-Host</code>。</li>
+  <li>支持显式覆盖：新增 <code>SITE_URL</code> 配置，优先级最高（避免误用反代头）。</li>
+  <li>不改任何业务调用方——继续用 <code>self.site_url</code>。</li>
+</ul>
+
+<h2>3. 配置项</h2>
+<table>
+<thead><tr><th>键</th><th>类型</th><th>默认</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>SITE_URL</code></td><td>str</td><td>空</td><td>显式覆盖，例如 <code>https://books.example.com</code>。留空则按反代头或请求头推断。</td></tr>
+<tr><td><code>TRUSTED_PROXIES</code></td><td>list[str]</td><td><code>["127.0.0.1", "::1"]</code></td><td>可信代理 IP / CIDR。仅这些 IP 来的请求才会被允许覆盖。</td></tr>
+</tbody>
+</table>
+<p>两个键加入 <code>webserver/handlers/admin.py</code> 的 KEYS 白名单，写入 <code>/data/books/settings/auto.py</code>。</p>
+
+<h2>4. 解析逻辑</h2>
+<p>修改 <code>webserver/handlers/base.py:192-194</code> 的 <code>site_url</code> 计算：</p>
+<pre>def _compute_site_url(self):
+    explicit = CONF.get("SITE_URL", "").strip()
+    if explicit:
+        return explicit.rstrip("/")
+
+    remote = self.request.remote_ip or ""
+    trusted = any(_cidr_match(remote, cidr) for cidr in CONF.get("TRUSTED_PROXIES", []))
+    if trusted:
+        proto = self.request.headers.get("X-Forwarded-Proto", self.request.protocol).split(",")[0].strip()
+        host = self.request.headers.get("X-Forwarded-Host", self.request.host).split(",")[0].strip()
+        return f"{proto}://{host}"
+
+    return f"{self.request.protocol}://{self.request.host}"</pre>
+<p><code>_cidr_match</code> 用 <code>ipaddress.ip_network</code> 实现一次，支持单 IP 和 <code>10.0.0.0/8</code>。</p>
+
+<h2>5. 影响范围</h2>
+<table>
+<thead><tr><th>调用点</th><th>当前</th><th>修复后</th></tr></thead>
+<tbody>
+<tr><td><code>webserver/handlers/user.py:178</code> 激活邮件链接</td><td>错的协议 / 内网 host</td><td>正确公网地址</td></tr>
+<tr><td><code>webserver/handlers/book.py:1680</code> 推送 Kindle 邮件</td><td>同上</td><td>同上</td></tr>
+<tr><td><code>webserver/handlers/book.py:1691, 1854</code> 转换推送</td><td>同上</td><td>同上</td></tr>
+</tbody>
+</table>
+
+<h2>6. 边界</h2>
+<ul>
+  <li><code>X-Forwarded-*</code> 取逗号分隔的第一个值（最接近客户端的反代）。</li>
+  <li>反代链超过一层时（如 CDN + 自建 Nginx），仅信任直接相邻的那层；CDN 头部由配置决定。</li>
+  <li>不记录 / 不告警 site_url 被改写；调试时通过日志打印 <code>remote_ip</code> + 解析结果即可。</li>
+</ul>
+
+<h2>7. 测试计划（待验证）</h2>
+<table>
+<thead><tr><th>层级</th><th>用例</th></tr></thead>
+<tbody>
+<tr><td>单元</td><td><code>tests/test_base.py</code>：四种组合（SITE_URL 优先 / 可信代理 + 有头 / 可信代理 + 无头 / 不可信代理）</td></tr>
+<tr><td>CIDR</td><td>单 IP、<code>/24</code>、IPv6、IPv4-mapped IPv6</td></tr>
+<tr><td>端到端</td><td>用 mock 起一个请求，<code>X-Forwarded-Proto: https</code> + <code>X-Forwarded-Host: books.example.com</code>，断言激活邮件链接正确</td></tr>
+</tbody>
+</table>
+<p class="todo">实现完成后回写实际跑通的命令和结果。</p>
+
+<h2>8. 风险</h2>
+<div class="warn">
+  误把 <code>TRUSTED_PROXIES</code> 设为 <code>0.0.0.0/0</code> 会让任意客户端伪造 <code>X-Forwarded-*</code>。需要在 README / 安装引导里强调该选项的信任模型。
+</div>

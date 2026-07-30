@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>阅读笔记 / 高亮后端同步设计 · ACTIVE</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; color: #1f2328; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 20px; margin-top: 32px; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; }
+  h3 { font-size: 16px; margin-top: 20px; }
+  code { background: #f6f8fa; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #57606a; font-size: 14px; margin: 8px 0 16px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  .active { background: #dafbe1; color: #1a7f37; }
+  .todo { color: #8250df; font-weight: 600; }
+  .warn { background: #fff8c5; padding: 8px 12px; border-left: 3px solid #d4a72c; margin: 12px 0; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<h1>阅读笔记 / 高亮后端同步设计</h1>
+<div class="meta">
+  <span><span class="badge active">ACTIVE</span> 待实现</span>
+  <span>创建日期：2026-07-16</span>
+  <span>所属模块：webserver（主） + candle-reader（外部仓库）</span>
+  <span>需求来源：Issue #181（"能否支持笔记功能"）</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<blockquote>
+希望支持笔记功能。
+</blockquote>
+<p>candle-reader 已支持高亮和本地笔记，但当前只在浏览器 localStorage 中保存。同一用户换设备或清缓存即丢失，也无法跨端同步。需要 Talebook 后端提供持久化和多端同步接口。</p>
+
+<h2>2. 目标</h2>
+<ul>
+  <li>Talebook 后端提供"高亮 + 笔记"的 CRUD 接口，存储在服务端。</li>
+  <li>candle-reader 通过新接口读写，跨设备登录后能同步。</li>
+  <li>支持同一本书同一位置的幂等更新（按 client_id 去重）。</li>
+  <li>后端不做冲突合并：按更新时间后写覆盖（v1 简单优先）。</li>
+</ul>
+
+<h2>3. 数据模型</h2>
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>id</td><td>INTEGER PK</td><td>主键</td></tr>
+<tr><td>reader_id</td><td>INTEGER FK→readers.id</td><td>所属用户</td></tr>
+<tr><td>book_id</td><td>INTEGER</td><td>Calibre 书籍 id</td></tr>
+<tr><td>client_id</td><td>VARCHAR(64)</td><td>阅读器生成的 UUID，幂等键</td></tr>
+<tr><td>kind</td><td>VARCHAR(16)</td><td><code>highlight</code> / <code>note</code> / <code>bookmark</code></td></tr>
+<tr><td>cfi</td><td>VARCHAR(255)</td><td>EPUB CFI（PDF 用页码字符串）</td></tr>
+<tr><td>text</td><td>TEXT NULL</td><td>高亮文本 / 笔记内容</td></tr>
+<tr><td>color</td><td>VARCHAR(16) NULL</td><td>前端颜色标识，如 <code>#ffff00</code></td></tr>
+<tr><td>chapter</td><td>VARCHAR(255) NULL</td><td>章节名（前端展示用）</td></tr>
+<tr><td>created_at</td><td>DATETIME</td><td>本地首次创建</td></tr>
+<tr><td>updated_at</td><td>DATETIME</td><td>最近修改</td></tr>
+</tbody>
+</table>
+<p>唯一约束：<code>(reader_id, book_id, client_id)</code>。便于阅读器幂等 upsert。</p>
+<p>新表随启动自动迁移（<code>compare_and_migrate</code> 已支持）。</p>
+
+<h2>4. API</h2>
+<table>
+<thead><tr><th>方法</th><th>路径</th><th>权限</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/book/&lt;id&gt;/annotations</code></td><td>登录 + 书籍可读</td><td>列出当前用户在该书的所有笔记 / 高亮，按 <code>cfi</code> 排序</td></tr>
+<tr><td>POST</td><td><code>/api/book/&lt;id&gt;/annotations</code></td><td>登录</td><td>upsert：按 <code>client_id</code> 存在则更新，否则插入</td></tr>
+<tr><td>PUT</td><td><code>/api/book/&lt;id&gt;/annotations/&lt;ann_id&gt;</code></td><td>owner</td><td>更新（仅 text / color / chapter）</td></tr>
+<tr><td>DELETE</td><td><code>/api/book/&lt;id&gt;/annotations/&lt;ann_id&gt;</code></td><td>owner</td><td>删除</td></tr>
+</tbody>
+</table>
+<p>所有接口沿用 <code>@js</code> + <code>@auth</code> 装饰器；权限校验参考现有 <code>BookReadingProgress</code>（<code>webserver/handlers/book.py</code>）。</p>
+
+<h2>5. candle-reader 侧改动（外部仓库）</h2>
+<p>本设计只覆盖 Talebook 端。candle-reader 侧需要：</p>
+<ol>
+  <li>新增一个 <code>TalebookAnnotationSync</code> provider，把 localStorage 的笔记在打开时同步到后端、关闭前批量 upsert。</li>
+  <li>登录后从 <code>GET /api/book/&lt;id&gt;/annotations</code> 拉取本地没 <code>client_id</code> 的旧条目，补写 <code>client_id</code> 后再 upsert。</li>
+  <li>删除操作同步调用 <code>DELETE</code>。</li>
+</ol>
+<div class="warn">
+  candle-reader 改造不在本仓库范围，需在 candle-reader 仓库单独提 PR。本设计只锁定后端接口契约，确保双方独立推进也能对齐。
+</div>
+
+<h2>6. 边界</h2>
+<ul>
+  <li>不支持实时协作（多人同时编辑同一笔记）。v1 用 last-write-wins。</li>
+  <li>不支持 PDF 笔记的位置信息精确匹配，只存页码字符串供前端跳转。</li>
+  <li>不导出 / 不导入 EPUB 注释（避免与 EPUB spec 复杂对齐）。</li>
+  <li>不暴露给他人；管理员也不可见其他用户笔记。</li>
+</ul>
+
+<h2>7. 测试计划（待验证）</h2>
+<table>
+<thead><tr><th>层级</th><th>用例</th></tr></thead>
+<tbody>
+<tr><td>模型</td><td><code>tests/test_models.py</code> 新增：唯一约束、级联删除随 reader 注销</td></tr>
+<tr><td>API</td><td><code>tests/test_annotations.py</code>（新建）：权限、upsert 幂等、列表排序、删除</td></tr>
+<tr><td>前端</td><td>本仓库无前端消费方；阅读器端测试在 candle-reader 仓库</td></tr>
+</tbody>
+</table>
+<p class="todo">实现完成后回写实际跑通的命令和结果。</p>

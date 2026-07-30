@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多设备批量推送 UI 设计 · ACTIVE</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; color: #1f2328; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 20px; margin-top: 32px; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; }
+  code { background: #f6f8fa; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #57606a; font-size: 14px; margin: 8px 0 16px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  .active { background: #dafbe1; color: #1a7f37; }
+  .todo { color: #8250df; font-weight: 600; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<h1>多设备批量推送 UI 设计</h1>
+<div class="meta">
+  <span><span class="badge active">ACTIVE</span> 待实现</span>
+  <span>创建日期：2026-07-16</span>
+  <span>所属模块：app</span>
+  <span>需求来源：Issue #293（"发送到 kindle 能否多个邮箱"）</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<blockquote>
+发送到 kindle 能否多个邮箱？
+</blockquote>
+<p>后端 <code>UserDevices</code>（<code>webserver/handlers/user.py:540</code>）已支持每个用户维护多台设备（多个 Kindle 邮箱、多个 IP:PORT 自定义设备）。但书籍详情页的"推送到设备"对话框仍是单选下拉（<code>app/pages/book/[bid]/index.vue:1305</code>），一次只能推一本到一台设备。</p>
+
+<h2>2. 目标</h2>
+<ul>
+  <li>详情页推送到设备对话框改为多选 checkbox，可同时勾选多个目标。</li>
+  <li>后端 <code>BookSendToDevice</code> 改为循环处理（已有循环雏形，需确认）。</li>
+  <li>一次请求内并行推送，单个失败不影响其他设备；UI 给出每个设备的结果。</li>
+</ul>
+
+<h2>3. 后端改动（最小）</h2>
+<p><code>webserver/handlers/book.py</code> 的 <code>BookSendToDevice.post</code>：</p>
+<ul>
+  <li>请求体改为 <code>{device_type: [name1, name2, ...]}</code> 或 <code>{devices: [...]}</code>（多对象数组）。</li>
+  <li>handler 内 <code>for device in devices</code> 循环，沿用现有 <code>_send_to_other_device</code> / 邮件分支。</li>
+  <li>单设备失败捕获异常，记录 <code>device_name -&gt; error</code>，最终返回 <code>{"err": "ok", "results": [{"name": ..., "ok": true}, ...]}</code>。</li>
+  <li>不引入异步队列：单本 ≤ 5 台设备的推送在几秒内完成；用户已有推送历史可查（<code>push_history</code>）。</li>
+</ul>
+
+<h2>4. 前端改动</h2>
+<table>
+<thead><tr><th>位置</th><th>改动</th></tr></thead>
+<tbody>
+<tr><td><code>app/pages/book/[bid]/index.vue</code></td><td>推送对话框改用 <code>v-list</code> + 多个 <code>v-checkbox</code>，列出 <code>userDevices</code></td></tr>
+<tr><td>推送按钮文案</td><td>"推送到 2 台设备"（动态显示数量）</td></tr>
+<tr><td>请求体组装</td><td>把勾选设备构造成数组提交</td></tr>
+<tr><td>结果展示</td><td>成功 / 部分失败分别 toast，失败项单独列在 dialog 底部</td></tr>
+</tbody>
+</table>
+
+<h2>5. 边界</h2>
+<ul>
+  <li>用户没勾选任何设备时禁用按钮。</li>
+  <li>Kindle 邮箱和自定义设备类型不同，参数体字段也不同（<code>mailbox</code> vs <code>device_url</code>），但都在同一循环内处理。</li>
+  <li>不批量推送到"邮件"——那是 <code>/api/book/&lt;id&gt;/mailto</code> 单独接口，不在本改动范围。</li>
+</ul>
+
+<h2>6. 测试计划（待验证）</h2>
+<table>
+<thead><tr><th>层级</th><th>用例</th></tr></thead>
+<tbody>
+<tr><td>API</td><td><code>tests/test_book.py::TestBookSendToDevice</code> 新增：多设备成功、部分失败、空数组</td></tr>
+<tr><td>组件</td><td><code>app/test/components/SendToDeviceDialog.spec.ts</code>：多选切换、按钮态、结果展示</td></tr>
+<tr><td>E2E</td><td><code>app/test/e2e/book-send-to-device.spec.ts</code>：mock 设备列表 → 勾选 2 台 → 确认 → 断言 2 次调用</td></tr>
+</tbody>
+</table>
+<p class="todo">实现完成后回写实际跑通结果。</p>

@@ -17,6 +17,7 @@ let saveStatusPolls = 0;
 let booksourceCheckRunning = false;
 let booksourceCheckPolls = 0;
 let shelfBookIds = new Set();
+let readingStateByBookId = new Map();
 let activeThemeName = '';
 let audiobookPublished = false;
 let audiobookJobs = [];
@@ -130,6 +131,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   booksourceCheckRunning = false;
   booksourceCheckPolls = 0;
   shelfBookIds = new Set();
+  readingStateByBookId = new Map();
   activeThemeName = '';
   audiobookPublished = false;
   audiobookJobs = [];
@@ -570,6 +572,11 @@ router.post('/api/book/:id/delete', eventHandler(() => ({
   msg: 'Book deleted'
 })));
 
+router.post('/api/book/:id/convert', eventHandler(() => ({
+  err: 'ok',
+  msg: 'Conversion started'
+})));
+
 router.post('/api/book/:id/edit', eventHandler(() => ({
   err: 'ok',
   msg: 'Book updated'
@@ -681,19 +688,22 @@ const getShelfBooks = () => {
   const books = readJson('books.json') || [];
   return books
     .filter(book => shelfBookIds.has(Number(book.id)))
-    .map(book => ({
-      ...book,
-      state: {
-        favorite: 0,
-        favorite_date: null,
-        wants: 1,
-        wants_date: '2023-01-01T00:00:00',
-        read_state: 0,
-        read_date: null,
-        online_read: 0,
-        download: 0,
-      },
-    }));
+    .map((book) => {
+      const reading = readingStateByBookId.get(Number(book.id));
+      return {
+        ...book,
+        state: {
+          favorite: 0,
+          favorite_date: null,
+          wants: 1,
+          wants_date: '2023-01-01T00:00:00',
+          read_state: reading?.readState || 0,
+          read_date: reading?.readDate || null,
+          online_read: 0,
+          download: 0,
+        },
+      };
+    });
 };
 
 router.get('/api/shelf', eventHandler(() => {
@@ -719,12 +729,13 @@ router.post('/api/book/:id/shelf', eventHandler(async (event) => {
 
 router.get('/api/book/:id/readstate', eventHandler((event) => {
   const id = Number(getRouterParam(event, 'id'));
+  const reading = readingStateByBookId.get(id);
   return {
     err: 'ok',
     favorite: false,
     wants: shelfBookIds.has(id),
-    read_state: 0,
-    read_date: null,
+    read_state: reading?.readState || 0,
+    read_date: reading?.readDate || null,
     favorite_date: null,
     wants_date: shelfBookIds.has(id) ? '2023-01-01T00:00:00' : null,
     online_read: 0,
@@ -732,10 +743,22 @@ router.get('/api/book/:id/readstate', eventHandler((event) => {
   };
 }));
 
-router.post('/api/book/:id/readstate', eventHandler(() => ({
-  err: 'ok',
-  msg: 'Reading state updated',
-})));
+router.post('/api/book/:id/readstate', eventHandler(async (event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  const body = await readBody(event);
+  const readState = Number(body?.read_state || 0);
+  if (![0, 1, 2].includes(readState)) {
+    return { err: 'params.invalid', msg: 'Invalid reading state' };
+  }
+  readingStateByBookId.set(id, {
+    readState,
+    readDate: new Date().toISOString(),
+  });
+  return {
+    err: 'ok',
+    msg: 'Reading state updated',
+  };
+}));
 
 router.get('/api/user/devices', eventHandler(() => ({
   err: 'ok',

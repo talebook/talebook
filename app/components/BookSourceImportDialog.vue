@@ -34,6 +34,23 @@
                         />
                     </v-window-item>
                     <v-window-item value="json">
+                        <div class="d-flex justify-end mb-2">
+                            <v-btn
+                                variant="outlined"
+                                size="small"
+                                prepend-icon="mdi-file-upload-outline"
+                                @click="triggerFileSelect"
+                            >
+                                {{ $t('booksource.loadFromFile') }}
+                            </v-btn>
+                            <input
+                                ref="fileInput"
+                                type="file"
+                                accept=".json,application/json"
+                                class="d-none"
+                                @change="onFileSelected"
+                            >
+                        </div>
                         <v-textarea
                             v-model="jsonText"
                             :placeholder="$t('booksource.jsonPlaceholder')"
@@ -84,9 +101,30 @@ const tab = ref('url');
 const jsonText = ref('');
 const url = ref(DEFAULT_BOOKSOURCE_URL);
 const loading = ref(false);
+const fileInput = ref(null);
 
 const open = () => {
     dialog.value = true;
+};
+
+const triggerFileSelect = () => {
+    fileInput.value?.click();
+};
+
+// 读取本地 JSON 文件内容并填入文本框，交由既有的粘贴 JSON 流程校验与提交
+const onFileSelected = (event) => {
+    const { $alert } = useNuxtApp();
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        jsonText.value = String(reader.result || '');
+    };
+    reader.onerror = () => {
+        if ($alert) $alert('error', t('booksource.fileReadError'));
+    };
+    reader.readAsText(file);
 };
 
 const doImport = async () => {
@@ -146,5 +184,5 @@ const doImport = async () => {
     }
 };
 
-defineExpose({ open, doImport, tab, jsonText, url });
+defineExpose({ open, doImport, tab, jsonText, url, fileInput, onFileSelected, triggerFileSelect });
 </script>

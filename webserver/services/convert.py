@@ -6,8 +6,10 @@ import os
 import subprocess
 import time
 import traceback
+from pathlib import Path
 
 import psutil
+from txt2epub_next import Txt2Epub
 
 from webserver import loader, utils
 from webserver.i18n import _
@@ -18,11 +20,49 @@ from webserver.services.mail import MailService
 
 EBOOK_CONVERT_CMD = "ebook-convert"
 DEFAULT_CONVERT_TIMEOUT = 3000
+# Each target exposes one preferred source. This keeps the conversion dialog
+# actionable when a book holds multiple input formats for the same target.
+CONVERSION_TARGETS = (
+    ("epub", ("azw3", "mobi", "pdf", "txt", "azw")),
+    ("azw3", ("epub",)),
+    ("pdf", ("epub", "azw3", "mobi", "azw")),
+)
 
 CONF = loader.get_settings()
 
 
+def get_txt2epub_converter():
+    """Return the TXT-to-EPUB converter installed from PyPI."""
+    return Txt2Epub
+
+
 class ConvertService(AsyncService):
+    @staticmethod
+    def get_conversion_options(book):
+        """Describe supported conversion routes for the current book formats."""
+        options = []
+        for target_format, source_formats in CONVERSION_TARGETS:
+            reason = None
+            source_format = next(
+                (fmt for fmt in source_formats if book.get(f"fmt_{fmt}")),
+                source_formats[0],
+            )
+            converter = "txt2epub" if source_format == "txt" and target_format == "epub" else "ebook-convert"
+            if book.get(f"fmt_{target_format}"):
+                reason = "target_exists"
+            elif not book.get(f"fmt_{source_format}"):
+                reason = "source_missing"
+            options.append(
+                {
+                    "source_format": source_format,
+                    "target_format": target_format,
+                    "converter": converter,
+                    "available": reason is None,
+                    "reason": reason,
+                }
+            )
+        return options
+
     def get_path_of_fmt(self, book, fmt):
         """for mock test"""
         from calibre.utils.filenames import ascii_filename
@@ -49,8 +89,33 @@ class ConvertService(AsyncService):
                 pass
         return found
 
-    def do_ebook_convert(self, old_path, new_path, log_path):
+    def do_txt_to_epub(self, old_path, new_path, book=None):
+        """Create an EPUB from a TXT source with the PyPI txt2epub-next library."""
+        book = book or {}
+        authors = book.get("authors") or []
+        author = ", ".join(authors) if isinstance(authors, (list, tuple)) else str(authors)
+        return bool(
+            get_txt2epub_converter().create_epub(
+                input_file=Path(old_path),
+                output_file=Path(new_path),
+                book_title=book.get("title"),
+                book_author=author or None,
+                overwrite=True,
+            )
+        )
+
+    def do_ebook_convert(self, old_path, new_path, log_path, book=None):
         """convert book, and block, and wait"""
+        if old_path.lower().endswith(".txt") and new_path.lower().endswith(".epub"):
+            try:
+                ok = self.do_txt_to_epub(old_path, new_path, book)
+            except Exception:
+                logging.exception("txt2epub failed: %s => %s", old_path, new_path)
+                ok = False
+            with open(log_path, "w") as log:
+                log.write("txt2epub finish: %s\n" % new_path if ok else "txt2epub conversion failed\n")
+            return ok
+
         args = [EBOOK_CONVERT_CMD, old_path, new_path]
         args += [
             "--book-producer",
@@ -139,7 +204,7 @@ class ConvertService(AsyncService):
             title = title[0:19] + "..."
         service_item = f"[{book['id']}]{title}"
         task = BackgroundService().add_task(BackgroundTask.SERVICE_TYPE_CONVERT, service_item, book_id=book["id"])
-        ok = ConvertService().do_ebook_convert(fpath, new_path, progress_file)
+        ok = ConvertService().do_ebook_convert(fpath, new_path, progress_file, book=book)
         if task:
             BackgroundService().complete_task(task.id)
         if not ok:

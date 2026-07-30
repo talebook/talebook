@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PR #882 有声书合并就绪修复方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f4f7fa;
+      --surface: #ffffff;
+      --ink: #15243a;
+      --muted: #617086;
+      --line: #cbd5e1;
+      --navy: #173f68;
+      --blue: #246b9e;
+      --amber: #c77d16;
+      --red: #b33a3a;
+      --green: #257052;
+      --violet: #6b5b95;
+      --shadow: 0 18px 50px rgba(21, 36, 58, .09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(23, 63, 104, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 63, 104, .045) 1px, transparent 1px),
+        var(--paper);
+      background-size: 28px 28px;
+      font: 16px/1.7 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+    }
+    a { color: var(--blue); }
+    code {
+      padding: .08em .36em;
+      border: 1px solid #dbe3ea;
+      border-radius: 5px;
+      background: #eef3f7;
+      font: .88em/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .masthead {
+      position: relative;
+      overflow: hidden;
+      padding: 70px 24px 58px;
+      color: white;
+      background: var(--navy);
+    }
+    .masthead::after {
+      position: absolute;
+      right: -100px;
+      bottom: -210px;
+      width: 520px;
+      height: 520px;
+      border: 70px solid rgba(255, 255, 255, .055);
+      border-radius: 50%;
+      content: "";
+    }
+    .masthead-inner, main { width: min(1140px, calc(100% - 40px)); margin: 0 auto; }
+    .eyebrow {
+      margin: 0 0 14px;
+      color: #b9d9ef;
+      font: 700 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 880px;
+      margin: 0;
+      font: 760 clamp(2.3rem, 5.8vw, 5.3rem)/1.03 ui-rounded, "Arial Rounded MT Bold", "PingFang SC", sans-serif;
+      letter-spacing: -.045em;
+    }
+    .lede { max-width: 760px; margin: 24px 0 0; color: #d8e8f4; font-size: 1.1rem; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      margin-top: 38px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .16);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .16);
+    }
+    .meta > div { padding: 14px 16px; background: rgba(12, 42, 72, .88); }
+    .meta dt { color: #9fc8e4; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+    .meta dd { margin: 5px 0 0; font-weight: 700; }
+    .status { color: #1a2d21; background: #a8d8bd; padding: 3px 9px; border-radius: 999px; font-size: .78rem; }
+    main { padding: 48px 0 90px; }
+    section {
+      margin: 0 0 28px;
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: var(--shadow);
+    }
+    h2 { margin: 0 0 20px; color: var(--navy); font: 760 1.65rem/1.2 ui-rounded, "Arial Rounded MT Bold", sans-serif; }
+    h3 { margin: 24px 0 9px; color: #294662; font-size: 1rem; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0; padding-left: 1.35rem; }
+    li + li { margin-top: 7px; }
+    .callout {
+      margin-top: 20px;
+      padding: 16px 18px;
+      border-left: 4px solid var(--amber);
+      border-radius: 0 10px 10px 0;
+      background: #fff7e8;
+    }
+    .callout.danger { border-color: var(--red); background: #fff0f0; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fbfdff; }
+    .card h3 { margin-top: 0; }
+    .gate-rail { display: grid; gap: 0; margin-top: 22px; }
+    .gate {
+      display: grid;
+      grid-template-columns: 82px 28px minmax(0, 1fr);
+      min-height: 106px;
+    }
+    .gate-id {
+      padding-top: 5px;
+      color: var(--muted);
+      font: 700 .78rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .rail { position: relative; }
+    .rail::before {
+      position: absolute;
+      top: 16px;
+      bottom: -16px;
+      left: 12px;
+      width: 2px;
+      background: var(--line);
+      content: "";
+    }
+    .gate:last-child .rail::before { display: none; }
+    .dot {
+      position: absolute;
+      top: 5px;
+      left: 4px;
+      width: 18px;
+      height: 18px;
+      border: 4px solid white;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 1px var(--red);
+    }
+    .gate:nth-child(4) .dot, .gate:nth-child(5) .dot { background: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
+    .gate-copy { padding: 0 0 24px 12px; }
+    .gate-copy strong { display: block; color: var(--navy); font-size: 1.05rem; }
+    .gate-copy p { margin: 5px 0 0; color: var(--muted); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    th, td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--navy); background: #edf4f9; font-size: .8rem; letter-spacing: .04em; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .74rem; font-weight: 700; white-space: nowrap; }
+    .tag.block { color: #792727; background: #f8d8d8; }
+    .tag.beta { color: #76500d; background: #f8e5bb; }
+    .tag.done { color: #1c5d43; background: #d7eee2; }
+    .diagram {
+      margin-top: 18px;
+      padding: 20px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #f8fbfd;
+    }
+    .diagram svg { display: block; min-width: 760px; }
+    .small { color: var(--muted); font-size: .88rem; }
+    @media (max-width: 820px) {
+      .meta { grid-template-columns: 1fr 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      section { padding: 22px; }
+      .gate { grid-template-columns: 58px 26px minmax(0, 1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-inner">
+      <p class="eyebrow">Merge control record · PR #882</p>
+      <h1>有声书合并就绪修复方案</h1>
+      <p class="lede">把“能演示的 Beta”收敛为“生产路径真实可用、故障可恢复、发布证据可信”的版本；先消除功能和文档之间的落差，再允许转 Ready。</p>
+      <dl class="meta">
+        <div><dt>状态</dt><dd><span class="status">WIP</span></dd></div>
+        <div><dt>创建日期</dt><dd>2026-07-29</dd></div>
+        <div><dt>所属模块</dt><dd>project</dd></div>
+        <div><dt>需求来源</dt><dd>继续处理 PR #882</dd></div>
+        <div><dt>影响范围</dt><dd>app / webserver / nginx / tests / design</dd></div>
+      </dl>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. 原始诉求与完成定义</h2>
+      <p>将最新 <code>master</code> 合入 <code>feat/20260718-audiobooks</code>，解决合并审计发现的生产链路、任务可靠性、核心功能、测试与文档问题，最终启动本地 mock API 和 Nuxt dev server，提供可访问地址供体验。</p>
+      <div class="callout danger"><strong>完成不是“冲突消失”。</strong>完成要求 Candle Reader 音文同步 bundle 已进入 Talebook、Podcast 能穿过 Nginx 且 Token 不进入普通日志、任务具备可靠心跳/取消/幂等、生成和版本操作与 UI 一致，并有自动化与真实浏览器证据。</div>
+      <h3>本轮采用的发布边界</h3>
+      <ul>
+        <li>Qwen 云账户欠费与 49 × 10 预览资产、Apple Podcasts iPhone/Mac 真机订阅属于外部 Beta 验收项；本轮必须显示明确状态并禁止伪报通过，但不以虚构素材或模拟真机替代。</li>
+        <li>默认 EdgeTTS、Podcast 标准接口、Candle Reader 同步、任务恢复和安全链路是代码内合并门禁，必须实际完成。</li>
+        <li>若用户要求 Qwen 素材或 Apple 真机成为本轮硬门禁，需要提供可用云账户或真机协作，方案将保持 WIP。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. 当前门禁轨道</h2>
+      <div class="gate-rail" aria-label="合并门禁顺序">
+        <div class="gate"><div class="gate-id">GATE 01</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>基线与冲突</strong><p>快进到 PR 最新 head，合入最新 master，保留 EPUB 优先阅读与 audiobook 注入，并补交叉回归。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 02</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>生产分发</strong><p>发布 Candle Reader 新版本并同步 dist；补 Podcast 独立 Nginx location、Token 脱敏与真实代理测试。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 03</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>可靠调度</strong><p>独立租约心跳、JSONL seq 幂等、取消 TERM/KILL、恢复和清理策略必须能被测试证明。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 04</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>产品闭环</strong><p>生成参数真实传递、候选发布/回滚、所有者权限、Voicebook 健康状态和容量限制形成可用 UI。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 05</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>证据与交付</strong><p>全量检查、Docker/Nginx 集成、Chrome 实渲、截图、ACTIVE 方案和 PR 正文使用同一份事实。</p></div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. 实现方案</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>工作流</th><th>设计决策</th><th>新增验证</th></tr></thead>
+          <tbody>
+            <tr><td>合并 master</td><td>合并而非改写已发布历史；阅读入口抽出统一渲染函数，先 EPUB、再 PDF/TXT/转换格式，同时注入当前发布 Edition。</td><td>EPUB、TXT、MOBI/AZW3 和有/无已发布音频组合测试；Shelf E2E 使用最新 mock URL 约定。</td></tr>
+            <tr><td>Candle Reader</td><td>以已合并的 Candle Reader main 构建新 tag/release，通过仓库既有 release + dispatch 流程同步不可变 dist；Talebook 不手抄 bundle。</td><td>校验 version 文件、bundle 包含 audiobook 入口；阅读器 E2E 覆盖高亮、换章和“从这里听”。</td></tr>
+            <tr><td>Podcast/Nginx</td><td>增加专用 <code>/podcast/v1/</code> 代理 location，关闭普通 access log，保留应用层脱敏审计；补稳定站点 UUID、Feed GUID、Channel image、gzip/缓存语义。</td><td>Nginx 配置静态测试与容器请求；RSS/XML、HEAD/304、Range/416、权限变化和普通日志无 Token。</td></tr>
+            <tr><td>调度器</td><td>运行进程由 watchdog 周期续租并观察 cancel deadline；优雅取消超时 TERM，再超时 KILL。持久化 last seq，重复/倒序事件直接忽略。</td><td>静默子进程不被重领、重复事件不重复计数、TERM/KILL 顺序、重启恢复、1–3 workers CAS。</td></tr>
+            <tr><td>容量与清理</td><td>领取任务前检查可用空间；周期清理成功缓存和失败临时文件；配置默认沿用现有方案。Feed/Range 采用轻量令牌桶，管理员可冻结订阅。</td><td>低磁盘拒绝、过期文件清理、受保护/发布资源保留、限速和冻结返回明确状态。</td></tr>
+            <tr><td>生成与版本</td><td>快速模式提供并真实传递 engine、chapters、speed、quality、主角音；Edition action 明确 publish、rollback、delete，partial 默认不可发布。</td><td>命令参数测试；候选发布/回滚保持 GUID、旧版本变 historical；错误状态 UI。</td></tr>
+            <tr><td>权限与健康</td><td>公开读取端点保留原书可见性校验，并在规范中记录公共 API 例外；写端点使用认证。详情响应返回可生成能力与 Voicebook health，前端不自行猜管理员/所有者规则。</td><td>游客/私有书/所有者/管理员矩阵，CLI 不可用和功能关闭状态。</td></tr>
+            <tr><td>前端结构</td><td>保持 Composition API；把播放状态改为聚焦的 Pinia 模块并同步架构说明，复杂请求与版本动作集中到 store/composable，避免页面继续膨胀。</td><td>组件测试、页面 E2E、明暗主题、桌面/移动、空状态、失败态和候选版本操作。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. 关键时序</h2>
+      <div class="diagram">
+        <svg viewBox="0 0 940 390" width="100%" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>有声书任务租约、事件与取消时序</title>
+          <desc>调度器领取任务，watchdog 独立续租，Voicebook 输出带序号事件，并在取消超时后依次 TERM 和 KILL。</desc>
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="context-stroke" stroke-width="1.5"/></marker>
+          </defs>
+          <g font-family="ui-sans-serif, sans-serif" font-size="13" fill="#15243a">
+            <text x="90" y="28" text-anchor="middle" font-weight="700">Scheduler</text><text x="345" y="28" text-anchor="middle" font-weight="700">Watchdog</text><text x="600" y="28" text-anchor="middle" font-weight="700">Voicebook</text><text x="850" y="28" text-anchor="middle" font-weight="700">Database</text>
+            <g stroke="#9aabba" stroke-dasharray="4 5"><path d="M90 42V360"/><path d="M345 42V360"/><path d="M600 42V360"/><path d="M850 42V360"/></g>
+            <g stroke="#246b9e" marker-end="url(#arrow)"><path d="M90 75H840"/><path d="M840 118H355"/><path d="M600 164H840"/><path d="M345 207H840"/></g>
+            <text x="460" y="67">CAS 领取 + 30s 租约</text><text x="580" y="110">启动独立续租/取消观察</text><text x="720" y="156">seq=N 事件</text><text x="570" y="199">固定周期续租，不依赖事件</text>
+            <g stroke="#c77d16" marker-end="url(#arrow)"><path d="M840 250H355"/><path d="M345 286H590"/></g>
+            <text x="580" y="242">cancel_requested + deadline</text><text x="470" y="278">取消文件 → 超时 TERM</text>
+            <g stroke="#b33a3a" marker-end="url(#arrow)"><path d="M345 326H590"/></g><text x="470" y="318">仍未退出 → KILL</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <h2>5. 兼容、发布与回滚</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>兼容策略</h3>
+          <ul>
+            <li>数据库只新增字段/索引，启动迁移可重复执行；旧 Edition 和 Job 有安全默认值。</li>
+            <li>公开音频继续跟随原书可见性；现有客户端路径保持不变。</li>
+            <li>旧 Candle bundle 在新版本发布前不覆盖；版本文件和 cache-busting 同步提交。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>回滚策略</h3>
+          <ul>
+            <li>总开关关闭新任务但保留已发布播放；停止 worker 后释放/过期租约。</li>
+            <li>Candle Reader 可回退上一 release，Talebook 静态资源与版本号一起回退。</li>
+            <li>Podcast GUID 与 enclosure 版本稳定；回滚 Edition 不删除历史媒体。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>6. 测试结果</h2>
+      <p><span class="tag beta">待验证</span> 进入实现前，本节只记录计划，不宣称历史结果。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>范围</th><th>计划命令/页面</th><th>当前状态</th></tr></thead>
+          <tbody>
+            <tr><td>后端格式与功能</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make pytest</code>；定向调度器、Podcast、权限和格式测试。</td><td><span class="tag beta">待验证</span></td></tr>
+            <tr><td>前端</td><td><code>cd app &amp;&amp; npm run lint</code>、<code>npm run build</code>、Vitest 与完整 Chromium E2E。</td><td><span class="tag beta">待验证</span></td></tr>
+            <tr><td>生产代理</td><td>Nginx 配置检查；经 Nginx 请求 Feed、Range、304，并检查普通 access log 不含 Token。</td><td><span class="tag beta">待验证</span></td></tr>
+            <tr><td>跨仓与镜像</td><td>Candle Reader build/E2E/release/dist 校验；Talebook Docker 测试与生产镜像构建。</td><td><span class="tag beta">待验证</span></td></tr>
+            <tr><td>浏览器</td><td><code>/audios</code>、单书有声版、任务列表/工作台、候选发布回滚、Candle 同步；明暗主题和移动/桌面关键状态。</td><td><span class="tag beta">待验证</span></td></tr>
+            <tr><td>方案</td><td><code>make check-design</code>；新方案 ACTIVE 后再把旧主方案转 SUPERSEDED，清除所有 WIP。</td><td><span class="tag beta">待验证</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small">最终交付还需更新 PR 正文：完整 SHA 的 GitHub/RawGitHack 方案链接、实际命令与结果、风险/兼容性、界面截图及外部未验证项。</p>
+    </section>
+  </main>
+</body>
+</html>

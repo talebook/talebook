@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Workflows 使用 Dev Container</title>
+  <style>
+    :root { color-scheme: light; --ink: #17212b; --muted: #5b6875; --line: #d8e0e7; --panel: #f6f8fa; --accent: #0969da; --success: #1a7f37; }
+    * { box-sizing: border-box; }
+    body { max-width: 980px; margin: 0 auto; padding: 36px 24px 64px; color: var(--ink); background: #fff; font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    header { padding: 26px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(135deg, #f6f8fa, #eef5ff); }
+    h1, h2 { line-height: 1.25; }
+    h1 { margin: 0 0 18px; font-size: 30px; }
+    h2 { margin-top: 34px; font-size: 21px; }
+    .meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .meta div { padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,.82); }
+    .status { color: var(--success); font-weight: 700; }
+    code { padding: 2px 5px; border-radius: 4px; background: var(--panel); overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: center; margin: 18px 0; }
+    .flow div { padding: 14px; border: 1px solid var(--line); border-radius: 9px; text-align: center; }
+    .arrow { color: var(--accent); font-size: 24px; }
+    .note { padding: 12px 14px; border-left: 4px solid var(--accent); background: #eef6ff; }
+    @media (max-width: 700px) { .meta { grid-template-columns: 1fr; } .flow { grid-template-columns: 1fr; } .arrow { transform: rotate(90deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Agent Workflows 使用 Dev Container</h1>
+    <div class="meta">
+      <div><strong>创建日期</strong><br>2026-07-22</div>
+      <div><strong>所属模块</strong><br>project</div>
+      <div><strong>状态</strong><br><span class="status">ACTIVE</span></div>
+      <div><strong>需求来源</strong><br>维护者要求镜像发布后再拆分第二个 PR</div>
+      <div><strong>工作分支</strong><br><code>feat/20260722-agent-workflows-dev-container</code></div>
+      <div><strong>前置方案</strong><br><code>20260722-dev-container-foundation.active.html</code></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. 原始诉求与前置门禁</h2>
+    <p>第一阶段先发布只维护浮动标签的 <code>talebook/talebook:dev</code>，镜像可用后再提交第二个 PR，让交互式 Claude 与 Codex workflow 使用统一业务环境。临时验证用途的 <code>agent-dev-smoke.yml</code> 不属于线上长期能力，不得保留。</p>
+    <table>
+      <thead><tr><th>门禁</th><th>实际结果</th></tr></thead>
+      <tbody>
+        <tr><td>第一阶段合并</td><td>PR #893 合并提交为 <code>723894495f091cc0d85f80cf3aac51712b54a790</code>。</td></tr>
+        <tr><td>master 发布</td><td>GitHub Actions run <code>29908807145</code> 全部成功，amd64 development image 步骤通过。</td></tr>
+        <tr><td>Docker Hub</td><td><code>talebook/talebook:dev</code> manifest 为 <code>sha256:e74a201b25abf9a50f8a6ee3b9c5e7e556f6703f8ed92ad1a1f98f455415ab6c</code>，OCI revision 与合并提交一致；远端配置历史包含 <code>setup_24.x</code>。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>2. 目标与边界</h2>
+    <table>
+      <thead><tr><th>范围</th><th>本次处理</th><th>本次不处理</th></tr></thead>
+      <tbody>
+        <tr><td>Claude</td><td><code>claude.yml</code> 使用 dev job container，启动 Action 前探测工具并同步当前 checkout 依赖。</td><td>不修改独立的 <code>claude-code-review.yml</code>，不预装或固定 Claude/Bun。</td></tr>
+        <tr><td>Codex</td><td><code>codex.yml</code> 使用同一 dev container，复用镜像内 Codex、pytest、ruff、bubblewrap，并保留 sandbox fail-closed 自检。</td><td>不改变触发、权限、prompt、结构化结果、发布门禁与 App 身份。</td></tr>
+        <tr><td>镜像</td><td>固定消费 master 维护的 <code>talebook/talebook:dev</code>。</td><td>不再修改 Dockerfile 或 build workflow，不引入 SHA 标签。</td></tr>
+        <tr><td>验证资产</td><td>保留 workflow 契约测试与 actionlint。</td><td>不新增长期 smoke workflow，不提交临时 act 文件。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. 官方行为与方案</h2>
+    <p><code>anthropics/claude-code-action@v1</code> 是 composite action，默认自行准备 Bun 和 Claude Code，但不会安装 Talebook 的 Calibre、Python、Node 或项目依赖。GitHub job container 会让普通 run step 与 composite action step 在指定容器中执行，因此 dev 镜像负责业务环境，Claude Action 继续负责自身运行时。</p>
+    <div class="flow" aria-label="agent workflow 环境流程">
+      <div>Docker Hub<br><strong>talebook:dev</strong></div><span class="arrow">→</span>
+      <div>GitHub job container<br><strong>工具探测与依赖同步</strong></div><span class="arrow">→</span>
+      <div>Claude / Codex<br><strong>现有权限与发布门禁</strong></div>
+    </div>
+    <ul>
+      <li>两个 job 都设置 <code>defaults.run.shell: bash</code> 和 root 用户，避免 composite/run shell 与工作区权限差异。</li>
+      <li>Claude 不设置 <code>path_to_claude_code_executable</code> 或 <code>path_to_bun_executable</code>；allowed tools 扩展到仓库实际使用的 make、npm、Node、Python、pytest 与 ruff。</li>
+      <li>Codex 容器增加 <code>--security-opt seccomp=unconfined</code> 以允许镜像内 bubblewrap 创建 user namespace，但不使用 privileged 或 Docker socket。</li>
+      <li>Codex 删除 runner 侧 setup-python、pip、npm 全局安装与 AppArmor 改写；在恢复模型凭据前验证环境、sandbox 并同步依赖。</li>
+      <li>两个 job 对当前 checkout 继续执行 <code>make init</code> 与 <code>npm --prefix app ci</code>，避免镜像构建时的依赖替代目标分支 lockfile。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>4. 测试缝与 TDD 顺序</h2>
+    <p class="note">公开测试缝是 workflow job contract：容器、shell、工具探测、依赖同步顺序以及 agent 启动前的失败关闭行为。测试不依赖 Action 内部实现。</p>
+    <ol>
+      <li>先新增 Claude job contract 测试，在裸 runner 配置上确认红灯；最小迁移 Claude 后转绿。</li>
+      <li>再把 Codex 现有运行时安装契约改写为 dev container 契约，确认红灯；最小迁移 Codex 后转绿。</li>
+      <li>运行相关 pytest、ruff、actionlint、设计检查和完整 Docker 测试。</li>
+      <li>用本地已构建的 dev 镜像做等价容器命令验证；不保留临时 smoke workflow。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>5. 风险与回滚</h2>
+    <ul>
+      <li>浮动标签漂移：仅 master 可发布，job 启动时打印工具版本；镜像缺工具则在 agent 获取凭据前失败。</li>
+      <li>Claude composite action 兼容：使用 Debian/glibc、bash、curl 与 CA 基线，并保留 Action 默认 Bun/Claude 管理。</li>
+      <li>Codex sandbox：只放宽容器 seccomp，内层 permission profile 与凭据隔离不变；sandbox 自检失败直接退出。</li>
+      <li>回滚：移除两个 job 的 container/defaults 与同步步骤，恢复 Codex runner 安装步骤；镜像本身继续可供开发使用。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. 测试结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>实际命令</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td>TDD 红灯</td><td>分别先运行新增的 Claude contract 和改写后的 Codex container contract</td><td>均按预期因 workflow 尚无 dev container 或验证步骤而失败；完成最小实现后转绿。</td></tr>
+        <tr><td>Claude/Codex 契约</td><td><code>python3.12 -m pytest -q tests/test_agent_workflows.py tests/test_codex_workflow.py</code></td><td>通过，<strong>27 passed</strong>。</td></tr>
+        <tr><td>关联说明与方案契约</td><td><code>python3.12 -m pytest -q tests/test_agent_workflows.py tests/test_codex_workflow.py tests/test_check_design_docs.py tests/test_project_instructions.py</code></td><td>通过，<strong>50 passed</strong>。</td></tr>
+        <tr><td>Python 静态检查</td><td><code>make lint-py-fix &amp;&amp; make lint-py</code>；对两个 workflow 测试执行 <code>ruff check --no-cache</code> 与 <code>ruff format --check</code></td><td>通过；后端 96 个文件无需调整，两个测试文件已格式化。</td></tr>
+        <tr><td>Actions 静态检查</td><td><code>go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -config-file .github/actionlint.yaml .github/workflows/claude.yml .github/workflows/codex.yml</code></td><td>通过。沙箱内首次因内部 Go proxy DNS 失败，允许联网后同一命令退出码为 0。</td></tr>
+        <tr><td>本地 dev 镜像等价 job</td><td><code>go run github.com/nektos/act@v0.2.89 workflow_dispatch -W /private/tmp/talebook-agent-workflows-dev-container-smoke.yml --pull=false --container-architecture linux/arm64</code></td><td>通过。使用本地已构建镜像，不拉取远端镜像；确认 Calibre 8.5.0、Python 3.13.5、Node 24.18.0、npm 11.16.0、Codex 0.144.6、ruff 0.15.22、bubblewrap 0.11.0，sandbox、依赖同步、27 个契约测试、Python lint、前端 lint 与 Nuxt build 全部成功。临时 workflow 已删除，仓库中未保留 smoke workflow。</td></tr>
+        <tr><td>完整回归</td><td><code>make test</code></td><td>通过，<strong>647 passed、2 skipped</strong>，共 33 条既有 warning。</td></tr>
+        <tr><td>方案检查</td><td><code>make check-design</code></td><td>通过，<strong>46 design documents passed</strong>。</td></tr>
+      </tbody>
+    </table>
+    <p class="note">非阻塞告警：<code>npm ci</code> 报告当前 lockfile 有 39 个漏洞，Nuxt 构建提示 caniuse-lite 数据较旧；二者来自现有依赖状态，不由本次 workflow 配置变更引入。</p>
+  </section>
+</body>
+</html>

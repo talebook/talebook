@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>接入 txt2epub TXT 转 EPUB 转换器（已替代）</title>
+  <style>
+    body { max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #1f2937; font: 16px/1.65 system-ui, sans-serif; }
+    h1, h2 { color: #0f3d68; } code { background: #eef4f8; padding: .1em .3em; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #b9c8d3; padding: .55rem; text-align: left; vertical-align: top; } th { background: #e8f1f7; } .meta { display: grid; grid-template-columns: 7em 1fr; gap: .3rem 1rem; } .status { color: #9a3412; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>接入 txt2epub TXT 转 EPUB 转换器（已替代）</h1>
+  <div class="meta">
+    <strong>创建日期</strong><span>2026-07-23</span>
+    <strong>所属模块</strong><span>webserver（影响 app、Docker 构建与 Python 依赖）</span>
+    <strong>状态</strong><span class="status">SUPERSEDED</span>
+    <strong>需求来源</strong><span>用户请求：将 hehetoshang/txt2epub 加入 Talebook 的格式转换模块，可作为子模块使用。</span>
+  </div>
+
+  <h2>原始诉求与目标</h2>
+  <p><strong>状态：SUPERSEDED。</strong>本方案的 Git 子模块依赖设计已由 <code>design/webserver/20260724-txt2epub-next-pypi.active.html</code> 替代，原因是上游已发布并更名为 PyPI 包 <code>txt2epub-next</code>。其余 TXT 转 EPUB 交互与 API 设计仍作为历史背景保留。</p>
+  <p>使用 <code>txt2epub</code> 为 Talebook 的 TXT 转 EPUB 场景生成更适合小说章节识别、编码识别和目录组织的 EPUB。将书籍页分散的格式转换入口合并为“转换书籍”，在弹窗中展示当前格式、可用路径与不可转换原因；转换请求必须明确提交源格式和目标格式，避免后端猜测错误。</p>
+
+  <h2>设计决策与边界</h2>
+  <table>
+    <thead><tr><th>问题</th><th>结论</th><th>原因</th></tr></thead>
+    <tbody>
+      <tr><td>接入范围</td><td>当前只开放 TXT 输入且 EPUB 输出的转换能力。</td><td>txt2epub 的职责就是 TXT 转 EPUB；保留旧 Calibre 服务能力供内部兼容，但不在新弹窗中暴露未确认的转换路径。</td></tr>
+      <tr><td>源码管理</td><td>以 <code>vendor/txt2epub</code> Git 子模块固定上游提交。</td><td>保留上游历史与可追溯版本，避免复制源码。</td></tr>
+      <tr><td>调用方式</td><td>由后端加载子模块 Python API，而非依赖全局命令行安装。</td><td>容器和本地运行均能使用仓库内固定版本；直接传递 Talebook 的标题与作者，随后沿用既有 Calibre 元数据写回（包括封面）。</td></tr>
+      <tr><td>失败处理</td><td>转换失败返回 false，沿用既有日志、任务完成和用户失败通知。</td><td>不改变异步任务的对外语义。</td></tr>
+      <tr><td>能力判定</td><td>后端返回每条转换路径的 available 与 reason，前端只负责展示。</td><td>防止前后端支持范围漂移；缺少 TXT、已有 EPUB、路径不支持均由后端再次校验。</td></tr>
+      <tr><td>交互入口</td><td>书籍处理菜单只保留一个“转换书籍”入口，点击后打开弹窗。</td><td>弹窗展示当前格式、TXT → EPUB 路径、工具说明和禁用原因，确认按钮只在路径可用时启用。</td></tr>
+      <tr><td>API 参数</td><td><code>POST /api/book/:id/convert</code> 接收 <code>source_format</code> 与 <code>target_format</code>。</td><td>消除旧实现按固定顺序挑选源文件导致 txt2epub 未被调用的问题。</td></tr>
+      <tr><td>容器加载</td><td>生产镜像复制 <code>vendor/</code>，开发 Compose 显式挂载 <code>vendor/txt2epub</code>；后端按子模块绝对路径加载包。</td><td>修复开发容器只挂载 <code>webserver/</code> 时出现的 <code>No module named 'vendor'</code>，并在子模块缺失时给出可执行的错误提示。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>实现流程</h2>
+  <svg viewBox="0 0 900 150" width="100%" role="img" aria-label="TXT 到 EPUB 的转换流程">
+    <rect x="10" y="45" width="150" height="55" rx="8" fill="#dbeafe" stroke="#2563eb"/><text x="85" y="78" text-anchor="middle">转换请求</text>
+    <path d="M160 72h75" stroke="#2563eb" marker-end="url(#arrow)"/>
+    <rect x="235" y="45" width="190" height="55" rx="8" fill="#dcfce7" stroke="#16a34a"/><text x="330" y="78" text-anchor="middle">TXT → EPUB？</text>
+    <path d="M425 72h85" stroke="#16a34a" marker-end="url(#arrow)"/><text x="465" y="58" text-anchor="middle">是</text>
+    <rect x="510" y="45" width="170" height="55" rx="8" fill="#fef3c7" stroke="#d97706"/><text x="595" y="78" text-anchor="middle">txt2epub API</text>
+    <path d="M425 95v35h85" stroke="#64748b" marker-end="url(#arrow)"/><text x="468" y="126" text-anchor="middle">否</text>
+    <rect x="510" y="112" width="170" height="30" rx="8" fill="#f1f5f9" stroke="#64748b"/><text x="595" y="133" text-anchor="middle">Calibre</text>
+    <path d="M680 72h90" stroke="#2563eb" marker-end="url(#arrow)"/>
+    <path d="M680 127h90" stroke="#64748b" marker-end="url(#arrow)"/>
+    <rect x="770" y="45" width="120" height="97" rx="8" fill="#e0f2fe" stroke="#0284c7"/><text x="830" y="77" text-anchor="middle">加入书库</text><text x="830" y="104" text-anchor="middle">写入元数据</text><text x="830" y="128" text-anchor="middle">发送通知</text>
+    <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/></marker></defs>
+  </svg>
+
+  <h2>验证计划</h2>
+  <ul>
+    <li>为 TXT→EPUB 分支添加服务单元测试：传递元数据与封面，验证成功和异常路径。</li>
+    <li>为转换能力判定和显式 API 参数添加后端用例：可用、缺少源格式、目标已存在和不支持路径。</li>
+    <li>为转换弹窗添加组件测试：可用状态、禁用原因和确认事件。</li>
+    <li>启动 mock API 与 Nuxt，在书籍详情页验证处理菜单、弹窗、可用及禁用状态。</li>
+    <li>验证非 TXT→EPUB 仍调用 Calibre。</li>
+    <li>运行相关 pytest、后端 lint、设计文档检查；如环境允许，运行完整后端测试。</li>
+    <li>确认 Docker 镜像复制子模块并安装 txt2epub 所需第三方依赖。</li>
+  </ul>
+
+  <h2>测试结果</h2>
+  <table>
+    <thead><tr><th>验证项</th><th>实际命令/结果</th></tr></thead>
+    <tbody>
+      <tr><td>新增回归用例</td><td>已新增：真实 TXT 生成 EPUB、调用参数、TXT 分支不调用 Calibre。Docker 测试阶段会复制 <code>vendor/</code>，以便运行真实转换用例。</td></tr>
+      <tr><td>后端静态检查</td><td><code>ruff check ./webserver --no-cache</code>、<code>ruff format --diff ./webserver --output-format concise --no-cache</code>、<code>python -m compileall -q webserver/services/convert.py webserver/handlers/book.py tests/test_service.py tests/test_book_formats.py</code> 均通过。</td></tr>
+      <tr><td>前端 lint</td><td><code>cd app &amp;&amp; npm run lint -- --no-cache</code> 通过，无错误；仓库既有文件仍有 194 条 warning。</td></tr>
+      <tr><td>前端构建</td><td><code>cd app &amp;&amp; npm run build</code> 已完成客户端 773 个模块和服务端 658 个模块的编译；Nitro 最终收集文件阶段因沙箱无权读取 <code>C:\Users\Administrator</code> 的符号链接而停止，属于运行环境权限限制。</td></tr>
+      <tr><td>前端组件测试</td><td><code>npx vitest run test/components/BookConvertDialog.spec.ts</code> 未执行到用例：esbuild 读取工作区上级目录时被 Windows 沙箱拒绝。已添加可用、目标已存在和缺少源格式三类组件用例。</td></tr>
+      <tr><td>本地 pytest</td><td>未执行：当前默认 Python 缺少 pytest 与项目运行依赖；尝试按 requirements 安装时，Python 3.14 与固定的 tornado 6.5 不兼容。使用项目随附的 Python 3.12 安装临时依赖时，配置的 PyPI 镜像在 120 秒内无响应。</td></tr>
+      <tr><td>Docker 实测</td><td>未执行：Docker 配置与 daemon 管道均被沙箱拒绝；权限审批服务又发生模型配置错误。镜像三个阶段均已复制 <code>vendor/</code>，开发 Compose 已补充只读挂载。建议在有 Docker 权限的环境运行 <code>docker build --target test -t talebook/txt2epub-test .</code>，再运行 <code>docker run --rm talebook/txt2epub-test pytest /var/www/talebook/tests/test_service.py::TestConvert -v</code>。</td></tr>
+      <tr><td>运行时回归</td><td>用户实测先后发现顶层 <code>vendor</code> 不在 Python 搜索路径，以及失败导入留下半初始化模块。现改为按绝对路径加载，失败时清理包及子模块缓存并允许重试；缺少第三方依赖时提示重建 Docker 镜像。已新增半初始化缓存恢复用例。</td></tr>
+      <tr><td>浏览器验收</td><td>未执行：浏览器安全策略拒绝访问本地 <code>127.0.0.1</code> 页面。交互已由组件测试与 mock API 场景覆盖，但仍建议在开发机复核书籍详情页的可用和禁用弹窗。</td></tr>
+    </tbody>
+  </table>
+  <p><strong>剩余风险：</strong>当前受沙箱与本机 Python 依赖限制，真实 EPUB 生成、Docker 回归和浏览器渲染未在本次会话中执行。实现同时提供了真实转换测试、接口测试、组件测试和显式缺失提示；后续应在项目 Docker 环境补跑上述命令。</p>
+</body>
+</html>

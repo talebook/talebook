@@ -48,8 +48,13 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    container:
+      image: talebook/talebook:dev
+      options: --user root --security-opt seccomp=unconfined
+    defaults:
+      run:
+        shell: bash
     env:
-      CODEX_VERSION: "0.144.4"
       CODEX_MODEL: ${{ vars.CODEX_MODEL || 'gpt-5.6-sol' }}
       CODEX_REASONING_EFFORT: ${{ vars.CODEX_REASONING_EFFORT || 'high' }}
     steps:
@@ -424,62 +429,42 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install Codex CLI
-        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
-        run: npm install -g "@openai/codex@${CODEX_VERSION}"
-
-      - name: Setup bubblewrap and AppArmor for sandbox
+      - name: Prepare Codex runtime and repository
         if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
         run: |
           set -euo pipefail
-          
-          echo "::group::Installing bubblewrap and dependencies"
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap uidmap apparmor-profiles apparmor-utils
-          echo "::endgroup::"
-          
-          echo "::group::Configuring AppArmor for bubblewrap"
-          # Install and load the bwrap AppArmor profile
-          PROFILE_SRC="/usr/share/apparmor/extra-profiles/bwrap-userns-restrict"
-          PROFILE_DST="/etc/apparmor.d/bwrap-userns-restrict"
-          
-          if [ ! -f "$PROFILE_SRC" ]; then
-            echo "::error::Required AppArmor profile source is missing: $PROFILE_SRC"
-            exit 1
-          fi
-          sudo install -m 0644 "$PROFILE_SRC" "$PROFILE_DST"
-          sudo apparmor_parser -r "$PROFILE_DST"
-          echo "✅ AppArmor profile loaded successfully"
-          
-          # Enable userns restrictions with bwrap exception
-          sudo tee /etc/sysctl.d/99-codex-apparmor-hardening.conf >/dev/null <<'EOF'
-          kernel.apparmor_restrict_unprivileged_userns=1
-          kernel.apparmor_restrict_unprivileged_unconfined=1
-          EOF
-          
-          sudo sysctl --system >/dev/null
-          echo "::endgroup::"
-          
-          echo "::group::Verifying installation"
-          # Verify bubblewrap is installed
+          mkdir -p "$CODEX_HOME"
+          chmod 700 "$CODEX_HOME"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --get-all safe.directory | grep -Fqx "$GITHUB_WORKSPACE"
+          git status --short
+
+      - name: Verify development environment and sandbox
+        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
+        run: |
+          set -euo pipefail
+          ebook-convert --version
+          python3 --version
+          node --version
+          npm --version
+          make --version
+          python3 -m pytest --version
+          ruff --version
+          codex --version
           bwrap --version
-          
-          # Test bubblewrap sandbox creation
-          if bwrap --ro-bind / / /bin/true 2>/dev/null; then
-            echo "✅ bubblewrap sandbox test passed"
+
+          if codex sandbox -- /bin/true; then
+            echo "✅ Codex sandbox test passed"
           else
-            echo "::error::Bubblewrap sandbox self-test failed"
+            echo "::error::Codex sandbox self-test failed"
             exit 1
           fi
-          
-          # Check AppArmor status
-          if sudo aa-status | grep -qE '(^|[[:space:]])bwrap($|[[:space:]])'; then
-            echo "✅ AppArmor profile is active for bwrap"
-          else
-            echo "::error::AppArmor profile is not active for bubblewrap"
-            exit 1
-          fi
-          echo "::endgroup::"
+
+      - name: Synchronize project dependencies
+        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
+        run: |
+          make init
+          npm --prefix app ci
 
       - name: Restore Codex ChatGPT auth
         if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'

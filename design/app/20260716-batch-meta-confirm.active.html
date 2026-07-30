@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>批量更新元数据确认页设计 · ACTIVE</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; color: #1f2328; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 20px; margin-top: 32px; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; }
+  code { background: #f6f8fa; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #57606a; font-size: 14px; margin: 8px 0 16px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  .active { background: #dafbe1; color: #1a7f37; }
+  .todo { color: #8250df; font-weight: 600; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<h1>批量更新元数据确认页设计</h1>
+<div class="meta">
+  <span><span class="badge active">ACTIVE</span> 待实现</span>
+  <span>创建日期：2026-07-16</span>
+  <span>所属模块：app</span>
+  <span>需求来源：features.md #67（"批量更新元数据（需要有个表格确认页？）"）</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<blockquote>
+批量更新元数据（需要有个表格确认页）。
+</blockquote>
+<p>当前 <code>AutoFillService.auto_fill_all</code> 一旦触发就会按数据源直接覆盖（<code>replace_metadata=True</code>），管理员无机会逐本预览差异。一旦豆瓣 API 返回错误元数据，整批书籍都会被污染。需要在前端加一道"预览 → 确认"的闸门。</p>
+
+<h2>2. 目标</h2>
+<ul>
+  <li>管理员在 <code>/admin/books</code> 勾选多本书 → 点"批量更新元数据"→ 弹出确认页（不是直接执行）。</li>
+  <li>确认页显示每本书的新旧字段对比，管理员可逐本勾选"应用 / 跳过"。</li>
+  <li>可选择"仅更新空字段"或"全量覆盖"。</li>
+  <li>提交后异步执行，进度轮询。</li>
+</ul>
+
+<h2>3. 后端最小改动</h2>
+<p>现有 <code>/api/admin/book/fill</code>（<code>webserver/handlers/admin.py</code>）直接执行。本设计在它之前加一个"预览"接口：</p>
+<table>
+<thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/api/admin/book/fill/preview</code></td><td>接受 book_id 列表，返回每本的新旧元数据 diff（不落库）</td></tr>
+<tr><td>POST</td><td><code>/api/admin/book/fill</code></td><td>现有接口保持不变；新增可选参数 <code>preview_id</code>（引用某次预览结果），按勾选项执行</td></tr>
+</tbody>
+</table>
+<p>预览接口复用现有 <code>AutoFillService.plugin_search_best_book_info</code>，不调用 <code>smart_update</code>；只计算 diff 返回。</p>
+
+<h2>4. 前端确认页</h2>
+<table>
+<thead><tr><th>位置</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><code>app/pages/admin/books.vue</code></td><td>多选后按钮文案改为"批量更新元数据（预览）"</td></tr>
+<tr><td><code>app/components/BatchMetaConfirmDialog.vue</code>（新建）</td><td>表格：书名 / 作者 / 出版社 / 简介 / 标签 / 封面（缩略图），每行一对新旧值，高亮差异</td></tr>
+<tr><td>字段控制</td><td>每列顶部 checkbox："更新该字段"，默认全勾</td></tr>
+<tr><td>顶部策略切换</td><td>"仅更新空字段"（推荐）/ "全量覆盖"（管理员自负责）</td></tr>
+<tr><td>提交</td><td>调 <code>/api/admin/book/fill</code>，传入勾选项 + 策略；进度用现有轮询接口</td></tr>
+</tbody>
+</table>
+
+<h2>5. diff 展示</h2>
+<p>对每个字段，返回 <code>{old: ..., new: ...}</code>；前端用 Vuetify 表格展示：</p>
+<ul>
+  <li>相同字段：灰底 + 折叠按钮展开对比。</li>
+  <li>不同字段：黄底标记，未勾选则提交时跳过。</li>
+</ul>
+
+<h2>6. 边界</h2>
+<ul>
+  <li>预览请求可能耗时（每本都要调外部 API）。一次预览最多 50 本，超出分批。</li>
+  <li>单本预览失败时该行标红，仍可继续其他书籍。</li>
+  <li>预览结果不持久化（纯内存）；关闭 dialog 即失效。</li>
+</ul>
+
+<h2>7. 测试计划（待验证）</h2>
+<table>
+<thead><tr><th>层级</th><th>用例</th></tr></thead>
+<tbody>
+<tr><td>API</td><td><code>tests/test_admin.py</code> 新增：preview 不落库、fill 接受勾选参数、空数组返回 400</td></tr>
+<tr><td>组件</td><td><code>app/test/components/BatchMetaConfirmDialog.spec.ts</code>：diff 高亮、字段全选 / 全不选、策略切换</td></tr>
+<tr><td>E2E</td><td><code>app/test/e2e/admin-batch-meta.spec.ts</code>：勾选 2 本 → 预览 → 取消 1 本 → 确认 → 仅 1 本被更新</td></tr>
+</tbody>
+</table>
+<p class="todo">实现完成后回写实际跑通结果。</p>

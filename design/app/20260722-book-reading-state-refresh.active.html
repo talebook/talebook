@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>书籍阅读状态刷新一致性修复方案</title>
+  <style>
+    :root {
+      --ink: #173b57;
+      --muted: #587083;
+      --paper: #edf5f7;
+      --card: #ffffff;
+      --line: #bfd4dc;
+      --teal: #168c82;
+      --teal-soft: #d7f2ec;
+      --rust: #c65f3e;
+      --rust-soft: #f9e8e2;
+      --gold: #c28a24;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--paper); color: var(--ink); font-family: var(--sans); }
+    body { margin: 0; line-height: 1.68; }
+    main { width: min(1120px, calc(100% - 32px)); margin: 32px auto 72px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 6vw, 64px);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: var(--ink);
+      color: #f7fbfc;
+    }
+    header::after {
+      content: "SYNC";
+      position: absolute;
+      right: -10px;
+      bottom: -48px;
+      color: rgba(215, 242, 236, .08);
+      font: 800 clamp(96px, 20vw, 220px)/1 var(--mono);
+      letter-spacing: -.08em;
+    }
+    .eyebrow { margin: 0 0 10px; color: #8fe0d3; font: 700 13px/1.4 var(--mono); letter-spacing: .12em; }
+    h1 { position: relative; z-index: 1; max-width: 780px; margin: 0; font-size: clamp(32px, 6vw, 64px); line-height: 1.08; letter-spacing: -.035em; }
+    .lede { position: relative; z-index: 1; max-width: 720px; margin: 22px 0 0; color: #d8e6eb; font-size: 18px; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 30px; }
+    .pill { padding: 6px 11px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; font: 700 12px/1.3 var(--mono); }
+    .pill.status { border-color: #ffbd89; background: #c65f3e; color: #fff; }
+    section { margin-top: 24px; padding: clamp(22px, 4vw, 38px); border: 1px solid var(--line); border-radius: 22px; background: var(--card); }
+    h2 { margin: 0 0 18px; font-size: 25px; line-height: 1.25; letter-spacing: -.02em; }
+    h3 { margin: 24px 0 10px; font-size: 17px; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0; padding-left: 22px; }
+    li + li { margin-top: 7px; }
+    code { padding: 2px 5px; border-radius: 5px; background: #e5eff2; color: #19445f; font: 13px/1.5 var(--mono); }
+    .callout { padding: 16px 18px; border-left: 5px solid var(--rust); border-radius: 10px; background: var(--rust-soft); }
+    .success { border-left-color: var(--teal); background: var(--teal-soft); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .mini { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #f8fbfc; }
+    .mini h3 { margin-top: 0; }
+    .label { color: var(--muted); font: 700 11px/1.4 var(--mono); letter-spacing: .11em; text-transform: uppercase; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font: 700 12px/1.4 var(--mono); }
+    .ledger { display: grid; grid-template-columns: 1fr 92px 1fr; align-items: stretch; margin-top: 18px; }
+    .ledger article { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: #f8fbfc; }
+    .ledger .merge { display: grid; place-items: center; color: var(--teal); }
+    .ledger svg { width: 72px; height: 72px; }
+    .ledger strong { display: block; margin: 8px 0; font-size: 20px; }
+    .sequence { overflow-x: auto; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: #f8fbfc; }
+    .sequence svg { display: block; width: 100%; min-width: 760px; height: auto; }
+    .tag { display: inline-block; margin: 2px 3px 2px 0; padding: 3px 7px; border-radius: 6px; background: var(--teal-soft); color: #126a63; font: 700 12px/1.3 var(--mono); }
+    .pending { color: var(--gold); font-weight: 700; }
+    footer { margin-top: 20px; color: var(--muted); text-align: center; font: 12px/1.6 var(--mono); }
+    @media (max-width: 760px) {
+      main { width: min(100% - 20px, 1120px); margin-top: 10px; }
+      header, section { border-radius: 16px; }
+      .grid { grid-template-columns: 1fr; }
+      .ledger { grid-template-columns: 1fr; gap: 10px; }
+      .ledger .merge { transform: rotate(90deg); }
+    }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">DESIGN / APP / STATE RECONCILIATION</p>
+      <h1>书籍阅读状态刷新一致性修复</h1>
+      <p class="lede">让“加入书架”和“阅读状态”在首次打开、硬刷新、切换书籍及登录态变化后，始终以服务端已持久化状态为准。</p>
+      <div class="meta">
+        <span class="pill status">ACTIVE · 已验证</span>
+        <span class="pill">创建日期 2026-07-22</span>
+        <span class="pill">模块 app</span>
+        <span class="pill">分支 fix/20260722-book-reading-state-refresh</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>01. 原始诉求与现场证据</h2>
+      <div class="callout">
+        用户提供的视频显示：登录后在书籍详情页执行“加入书架”或“设为在读”，当前页面会即时变化；刷新页面后，按钮却退回默认状态，造成操作未保存的错觉。
+      </div>
+      <p><span class="label">需求来源</span><br>用户于 2026-07-22 提供的本地录屏及随后确认的修复边界。</p>
+      <table>
+        <thead><tr><th>检查项</th><th>结果</th><th>结论</th></tr></thead>
+        <tbody>
+          <tr><td>本地浏览器基线复现</td><td>操作后显示“移除书架”；硬刷新后重新显示“加入书架”</td><td>问题稳定存在于 UI 初始化阶段</td></tr>
+          <tr><td><code>GET /api/book/{id}/readstate</code></td><td>刷新后仍返回 <code>wants: true</code></td><td>服务端已经持久化，不能通过重复写入修复</td></tr>
+          <tr><td>页面状态监听</td><td>仅监听书籍 ID 变化，且没有 <code>immediate</code></td><td>首次挂载时 ID 已就绪，监听器可能永不触发</td></tr>
+          <tr><td>登录态监听</td><td>登录变化只刷新设备列表</td><td>阅读状态不会随登录/退出同步或清空</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>02. 目标与边界</h2>
+      <div class="grid">
+        <article class="mini">
+          <p class="label">必须达成</p>
+          <h3>服务端真值驱动 UI</h3>
+          <ul>
+            <li>首次进入及硬刷新时拉取当前书籍状态。</li>
+            <li>书籍路由切换、登录成功时重新同步。</li>
+            <li>退出登录或没有有效书籍时清空用户态，避免串号。</li>
+            <li>快速切换时丢弃过期响应，避免旧书状态覆盖新书。</li>
+          </ul>
+        </article>
+        <article class="mini">
+          <p class="label">明确不做</p>
+          <h3>保持现有业务契约</h3>
+          <ul>
+            <li>不修改后端 API、数据库或权限模型。</li>
+            <li>不改变“加入/移除书架”“在读/读完”的按钮语义。</li>
+            <li>不新增本地持久化或乐观状态队列。</li>
+            <li>不借此重构整页数据加载架构。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>03. 状态账本：默认值与服务端真值合流</h2>
+      <div class="ledger">
+        <article>
+          <p class="label">UI 安全默认值</p>
+          <strong>未加入 · 未标记</strong>
+          <p>仅用于未登录、书籍无效或请求尚未完成时，不能覆盖已经返回的服务端状态。</p>
+          <span class="tag">isInShelf = false</span>
+          <span class="tag">readingState = 0</span>
+        </article>
+        <div class="merge" aria-label="合流到服务端真值">
+          <svg viewBox="0 0 72 72" role="img" aria-hidden="true">
+            <circle cx="36" cy="36" r="31" fill="#d7f2ec" stroke="#168c82" stroke-width="2"/>
+            <path d="M18 27h24l-6-6m18 24H30l6 6" fill="none" stroke="#168c82" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <article>
+          <p class="label">API 权威状态</p>
+          <strong>按书籍、按用户恢复</strong>
+          <p><code>/readstate</code> 返回后更新书架、阅读状态和最近阅读时间，并根据 <code>read_date</code> 推导已阅读天数；页面展示以该响应为准。</p>
+          <span class="tag">wants</span>
+          <span class="tag">read_state</span>
+          <span class="tag">read_date</span>
+          <span class="tag">derived read days</span>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>04. 同步流程</h2>
+      <div class="sequence">
+        <svg viewBox="0 0 980 285" role="img" aria-labelledby="sequence-title sequence-desc">
+          <title id="sequence-title">书籍阅读状态同步时序</title>
+          <desc id="sequence-desc">页面触发立即监听，先重置，再请求服务端，并校验请求对应的书籍后更新界面。</desc>
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#168c82"/></marker>
+            <marker id="bad-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#c65f3e"/></marker>
+          </defs>
+          <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#173b57">
+            <rect x="22" y="24" width="150" height="48" rx="11" fill="#fff" stroke="#bfd4dc"/><text x="97" y="53" text-anchor="middle">页面 / 登录态</text>
+            <rect x="215" y="24" width="180" height="48" rx="11" fill="#d7f2ec" stroke="#168c82"/><text x="305" y="53" text-anchor="middle">immediate watcher</text>
+            <rect x="438" y="24" width="150" height="48" rx="11" fill="#fff" stroke="#bfd4dc"/><text x="513" y="53" text-anchor="middle">本地状态</text>
+            <rect x="631" y="24" width="150" height="48" rx="11" fill="#fff" stroke="#bfd4dc"/><text x="706" y="53" text-anchor="middle">readstate API</text>
+            <rect x="824" y="24" width="134" height="48" rx="11" fill="#fff" stroke="#bfd4dc"/><text x="891" y="53" text-anchor="middle">详情页 UI</text>
+            <g stroke="#bfd4dc" stroke-dasharray="4 5"><path d="M97 72v185"/><path d="M305 72v185"/><path d="M513 72v185"/><path d="M706 72v185"/><path d="M891 72v185"/></g>
+            <path d="M97 103h198" stroke="#168c82" stroke-width="2" marker-end="url(#arrow)"/><text x="196" y="96" text-anchor="middle">首次 / 换书 / 登录变化</text>
+            <path d="M305 137h198" stroke="#168c82" stroke-width="2" marker-end="url(#arrow)"/><text x="404" y="130" text-anchor="middle">先清空旧用户态</text>
+            <path d="M305 173h391" stroke="#168c82" stroke-width="2" marker-end="url(#arrow)"/><text x="500" y="166" text-anchor="middle">已登录且 bookId 有效：GET</text>
+            <path d="M706 207H315" stroke="#168c82" stroke-width="2" marker-end="url(#arrow)"/><text x="510" y="200" text-anchor="middle">返回状态 + 请求对应 bookId</text>
+            <path d="M305 241h576" stroke="#168c82" stroke-width="2" marker-end="url(#arrow)"/><text x="593" y="234" text-anchor="middle">身份仍一致才提交到 UI</text>
+            <path d="M97 272h784" stroke="#c65f3e" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#bad-arrow)"/><text x="489" y="266" text-anchor="middle" fill="#c65f3e">旧流程：首次不触发 watcher → 永久显示默认值</text>
+          </g>
+        </svg>
+      </div>
+      <ol>
+        <li>使用同一个响应式监听器观察当前路由书籍 ID 与登录状态，并启用 <code>immediate: true</code>。</li>
+        <li>每次触发先恢复安全默认值；未登录或书籍无效时到此结束。</li>
+        <li>已登录时请求当前书籍的 <code>/readstate</code>，成功后填充所有相关字段。</li>
+        <li>提交响应前再次核对当前书籍 ID 和登录状态；不匹配说明响应已经过期，直接丢弃。</li>
+        <li>保留按钮操作成功后的即时反馈，下一次同步再由服务端确认最终状态。</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>05. 实现影响</h2>
+      <table>
+        <thead><tr><th>位置</th><th>计划变更</th><th>兼容性</th></tr></thead>
+        <tbody>
+          <tr><td><code>app/pages/book/[bid]/index.vue</code></td><td>将路由书籍 ID 改为响应式数据源，统一登录态同步，并修正动态 key 的缓存行为</td><td>不改变模板、API 参数或服务端契约</td></tr>
+          <tr><td><code>app/composables/useBookReadingState.js</code></td><td>封装立即同步、退出重置、过期响应保护，并从 <code>read_date</code> 计算阅读天数</td><td>只复用页面现有状态与 API</td></tr>
+          <tr><td><code>app/test/mock-server.js</code></td><td>让 mock 的阅读状态像书架状态一样在测试进程内持久化</td><td>仅测试环境，重置接口同时清空</td></tr>
+          <tr><td><code>app/test/e2e/shelf.spec.ts</code> 与 composable 单测</td><td>补充硬刷新、客户端路由换书、登录态切换和旧响应竞态验收</td><td>复用现有 mock、Vitest 与 Chromium 工程</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>06. 验收矩阵</h2>
+      <table>
+        <thead><tr><th>层级</th><th>验证内容</th><th>实际命令 / 页面</th><th>实际结果</th></tr></thead>
+        <tbody>
+          <tr><td>单元测试</td><td>登录/退出重置、重新登录恢复、旧响应丢弃、阅读天数推导</td><td><code>npx vitest run test/composables/useBookReadingState.spec.ts</code></td><td><strong>通过</strong>：3 passed，2.79 秒</td></tr>
+          <tr><td>E2E</td><td>书架硬刷新、阅读状态与天数硬刷新、客户端路由换书隔离</td><td><code>MOCK_API_URL=http://127.0.0.1:18183 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3005 npx playwright test test/e2e/shelf.spec.ts --project=chromium</code></td><td><strong>通过</strong>：改用公开浏览器 History API 触发 SPA 换书，3 passed，3.3 秒</td></tr>
+          <tr><td>交互验收</td><td>刷新恢复、登录态切换和跨书籍状态</td><td>Chrome DevTools MCP，浅色主题，<code>1440 × 1000</code>：<code>/book/1</code>、<code>/book/2</code></td><td><strong>通过</strong>：刷新后显示“移除书架 / 标记读完 / 在读”；退出时隐藏并清空用户操作区，再登录恢复；第二本书保持未读</td></tr>
+          <tr><td>真实后端复验</td><td>排除 mock 行为差异，确认书架与在读状态均由真实服务持久化并在刷新后恢复</td><td>Chrome DevTools MCP：Docker Talebook dev 后端 <code>127.0.0.1:8080</code> + production preview <code>127.0.0.1:3004/book/13</code>；使用安装流程创建的 <code>admin / demodemo</code> 登录</td><td><strong>通过</strong>：加入书架后清缓存刷新仍显示“移除书架”，验收后恢复未加入；点击“设为在读”后显示“标记读完 / 在读 / 已阅读不足一天”，清缓存刷新后三项仍完整恢复</td></tr>
+          <tr><td>网络证据</td><td>页面确实以服务端真值恢复</td><td>Chrome DevTools Network：<code>GET /api/book/1/readstate</code></td><td><strong>通过</strong>：HTTP 200，返回 <code>wants: true</code>、<code>read_state: 1</code>，页面状态一致</td></tr>
+          <tr><td>前端检查</td><td>目标回归、lint 与 production build</td><td><code>npm run lint</code>；<code>npm run build</code></td><td><strong>通过</strong>：lint 0 error（196 条仓库既有 warning）；Nuxt client、SSR 与 Nitro 构建成功</td></tr>
+          <tr><td>后端回归</td><td>完整 Python 测试与格式检查</td><td><code>make lint-py</code>；在 <code>talebook/talebook-base:latest</code> 中执行 <code>make init &amp;&amp; make pytest</code></td><td><strong>通过</strong>：ruff 全通过；646 passed，2 skipped，31 warnings，80.01 秒</td></tr>
+          <tr><td>工程门禁</td><td>设计文档与补丁完整性</td><td><code>make check-design</code>；<code>git diff --check</code></td><td><strong>通过</strong></td></tr>
+        </tbody>
+      </table>
+      <p class="callout success">本方案已完成实现和验证。Chrome DevTools 验收截图保留为提交过程证据，PR 正文提供本 ACTIVE 方案的 GitHub 与 RawGitHack 固定提交预览链接。</p>
+      <h3>验收环境说明</h3>
+      <p>自动化浏览器覆盖使用的 mock 未实现 <code>/api/book/txt/init</code> 与 <code>/api/user/devices</code>，因此这两个既有请求返回 404，并触发现有错误弹窗；同时开发模式存在详情页 SSR hydration warning。它们在本次改动前已存在，不涉及 <code>/readstate</code>。后续已在真实 Docker dev 后端完成独立复验，真实验收不使用 mock；因原生 Nuxt watcher 在当前 worktree 触发 <code>EMFILE</code>，且工程约束禁止 polling，前端使用同一源码的 production preview。</p>
+    </section>
+
+    <section>
+      <h2>07. 风险、监控与回滚</h2>
+      <div class="grid">
+        <article class="mini">
+          <h3>主要风险</h3>
+          <ul>
+            <li>SSR 与客户端监听造成重复请求：以实际网络记录确认，必要时保持幂等并限制触发源。</li>
+            <li>快速切书响应乱序：用请求对应的书籍 ID 与当前身份做提交前校验。</li>
+            <li>退出后残留上一用户信息：同步入口统一先重置四个用户相关字段。</li>
+          </ul>
+        </article>
+        <article class="mini">
+          <h3>回滚策略</h3>
+          <p>改动集中在详情页同步逻辑及测试 mock。若线上出现回归，可整体回退该提交；由于没有 API、数据库或数据迁移变更，不需要额外回滚步骤。</p>
+          <p><span class="label">可观察信号</span><br>详情页 <code>/readstate</code> 请求次数、响应错误提示、刷新前后按钮和阅读状态一致性。</p>
+        </article>
+      </div>
+    </section>
+
+    <footer>Talebook · app · 20260722-book-reading-state-refresh · ACTIVE</footer>
+  </main>
+</body>
+</html>

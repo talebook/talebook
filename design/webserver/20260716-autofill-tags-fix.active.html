@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自动更新图书标签修复 · ACTIVE</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; color: #1f2328; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 20px; margin-top: 32px; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; }
+  h3 { font-size: 16px; margin-top: 20px; }
+  code { background: #f6f8fa; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #57606a; font-size: 14px; margin: 8px 0 16px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  .active { background: #dafbe1; color: #1a7f37; }
+  .todo { color: #8250df; font-weight: 600; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<h1>自动更新图书标签修复</h1>
+<div class="meta">
+  <span><span class="badge active">ACTIVE</span> 待实现</span>
+  <span>创建日期：2026-07-16</span>
+  <span>所属模块：webserver</span>
+  <span>需求来源：Issue #522（"希望自动更新图书信息可以自动更新图书标签"）</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<blockquote>
+希望【图书管理-自动更新图书信息】功能可以自动更新图书标签。
+</blockquote>
+<p>管理员后台的批量自动填充任务（<code>AutoFillService.auto_fill_all</code>）以及单本刷新（<code>/api/book/&lt;id&gt;/refer</code>）执行后，用户期望标签会像封面 / 简介一样被一并更新。实际行为存在两处断裂：</p>
+<ol>
+  <li>豆瓣 V2 插件返回的元数据完全没写 <code>mi.tags</code>。</li>
+  <li><code>autofill.py</code> 定义了 <code>guess_tags()</code>，但 <code>do_fill_metadata()</code> 走完 <code>smart_update</code> 后从未调用它。</li>
+</ol>
+
+<h2>2. 目标</h2>
+<ul>
+  <li>任何开启了"自动更新元数据"的数据源（含豆瓣 V2、AI 等）刷新成功后，标签字段都被写入。</li>
+  <li>保留：豆瓣 V1 已经会写标签，不要回归。</li>
+  <li>不动：标签的手动编辑、导入时从 EPUB 本身抓取的逻辑。</li>
+</ul>
+
+<h2>3. 现状定位</h2>
+<table>
+<thead><tr><th>位置</th><th>现状</th></tr></thead>
+<tbody>
+<tr><td><code>webserver/services/autofill.py:96-128</code> <code>do_fill_metadata</code></td><td>L125 调 <code>mi.smart_update(refer_mi, replace_metadata=True)</code> 后立即落库，<strong>未调用</strong> <code>guess_tags</code>。</td></tr>
+<tr><td><code>webserver/services/autofill.py:135</code> <code>guess_tags</code></td><td>定义完整，按 <code>BOOK_NAV</code> 字符串匹配书名 / 简介 / 作者，最多 8 个。</td></tr>
+<tr><td><code>webserver/plugins/meta/douban_v2/api.py:234</code> <code>build_metadata</code></td><td>完全没提取 <code>tags</code> 字段。豆瓣 V1 在 L205 写 <code>mi.tags = [t["name"] for t in book["tags"]][:8]</code>。</td></tr>
+<tr><td><code>webserver/handlers/book.py:218</code> <code>BookRefer.post</code></td><td>手动刷新走的是 <code>smart_update</code>，所以豆瓣 V1 刷新能带标签、V2 不能。</td></tr>
+</tbody>
+</table>
+
+<h2>4. 方案</h2>
+<h3>4.1 豆瓣 V2 提取标签</h3>
+<p>在 <code>build_metadata</code> 中按 V1 的语义补上：</p>
+<pre>tags = [{"name": t.get("name")} for t in item.get("tags", []) if t.get("name")]
+if tags:
+    mi.tags = [t["name"] for t in tags][:8]
+    mi.tag_sort = mi.tags</pre>
+<p>若 V2 接口实际不返回 tags，调用点退化为空列表（保持现状即可，不报错）。</p>
+
+<h3>4.2 复活 <code>guess_tags</code></h3>
+<p>在 <code>do_fill_metadata</code> 中 <code>smart_update</code> 之后、落库之前插入：</p>
+<pre>if not mi.tags:
+    guessed = self.guess_tags(refer_mi)
+    if guessed:
+        mi.tags = guessed</pre>
+<p><code>guess_tags</code> 仅在标签为空时触发，避免覆盖已经存在的真实标签。</p>
+
+<h2>5. 边界</h2>
+<ul>
+  <li><code>smart_update(replace_metadata=True)</code> 默认会用 refer 的 tags 覆盖原有标签；若 refer 无 tags（如 AI、Calibre、NeoDB），会清空原标签。因此新加的 <code>guess_tags</code> 兜底必须放在 <code>smart_update</code> 之后。</li>
+  <li>已存在的真实标签（如用户手动加的）由 <code>smart_update</code> 保留；本次不调整该语义。</li>
+</ul>
+
+<h2>6. 测试计划（待验证）</h2>
+<table>
+<thead><tr><th>位置</th><th>用例</th></tr></thead>
+<tbody>
+<tr><td><code>tests/test_douban_v2.py</code></td><td>新增：构造含 tags 字段的详情响应，断言 <code>mi.tags</code> 被填充且 ≤ 8</td></tr>
+<tr><td><code>tests/test_douban_v2.py</code></td><td>新增：tags 为空时不写 <code>mi.tags</code></td></tr>
+<tr><td><code>tests/test_autofill.py</code></td><td>新增：refer_mi 无 tags 时 <code>guess_tags</code> 被调用并写入 <code>mi.tags</code></td></tr>
+<tr><td><code>tests/test_autofill.py</code></td><td>新增：refer_mi 有 tags 时 <code>guess_tags</code> 不被调用，原标签保留</td></tr>
+<tr><td><code>tests/test_book_refer.py</code></td><td>回归：用豆瓣 V2 手动刷新后，<code>book.tags</code> 出现在 <code>GET /api/book/&lt;id&gt;</code> 响应中</td></tr>
+</tbody>
+</table>
+<p class="todo">实现完成后需跑通以上用例并回写结果。</p>

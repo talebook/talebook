@@ -133,6 +133,20 @@ jobs:
           cache-from: type=gha,scope=ssr-${{ steps.pname.outputs.name }}
           cache-to: type=gha,scope=ssr-${{ steps.pname.outputs.name }},mode=max
 
+      - name: Build development image
+        if: matrix.platform == 'linux/amd64' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/master')
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: dev
+          platforms: linux/amd64
+          provenance: false
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=dev-linux-amd64
+          cache-to: type=gha,scope=dev-linux-amd64,mode=max
+
       - name: Export digests
         if: github.event_name != 'pull_request'
         run: |

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>搜索自动补全设计 · ACTIVE</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; color: #1f2328; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 20px; margin-top: 32px; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; }
+  code { background: #f6f8fa; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #57606a; font-size: 14px; margin: 8px 0 16px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  .active { background: #dafbe1; color: #1a7f37; }
+  .todo { color: #8250df; font-weight: 600; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<h1>搜索自动补全设计</h1>
+<div class="meta">
+  <span><span class="badge active">ACTIVE</span> 待实现</span>
+  <span>创建日期：2026-07-16</span>
+  <span>所属模块：webserver（主） + app</span>
+  <span>需求来源：features.md #38（"搜索时自动补全（模糊匹配书籍）"）</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<blockquote>
+搜索时自动补全（模糊匹配书籍）。
+</blockquote>
+<p>目前首页 / 详情页 / 网络书库等位置的搜索框仅在提交后跳转到 <code>/search?q=...</code> 才显示结果，输入过程中无任何提示。需要一个轻量级的"输入即提示"接口供前端自动补全组件使用。</p>
+
+<h2>2. 目标</h2>
+<ul>
+  <li>新增 <code>GET /api/search/suggest?q=&limit=</code> 接口，返回按相关性排序的书名 + 作者建议列表。</li>
+  <li>前端搜索框接入 Vuetify <code>v-autocomplete</code>（已安装），复用现有 <code>$backend</code>。</li>
+  <li>建议查询耗时 ≤ 200ms（万级书库用 Calibre 索引，足够）。</li>
+  <li>不影响现有 <code>/api/search</code> 列表接口。</li>
+</ul>
+
+<h2>3. 接口</h2>
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>q</td><td>str (query param)</td><td>用户输入，最少 2 个字符</td></tr>
+<tr><td>limit</td><td>int (default 8, max 20)</td><td>返回条数</td></tr>
+<tr><td>scope</td><td>str (optional)</td><td>仅搜索当前用户的可见范围（公开 / 私有）</td></tr>
+</tbody>
+</table>
+<p>响应：</p>
+<pre>{
+  "err": "ok",
+  "items": [
+    {"id": 123, "title": "三体", "authors": "刘慈欣"},
+    ...
+  ]
+}</pre>
+<p>复用现有 <code>SearchBook</code> 的 Calibre 查询（<code>self.db.search_getting_ids</code> + <code>simple_search</code>），限制返回字段为 id / title / authors，命中关键词优先。</p>
+
+<h2>4. 前端</h2>
+<ul>
+  <li><code>app/components/SearchBox.vue</code>（新建）：把现有 <code>appbar</code> 搜索框抽出来，用 <code>v-autocomplete</code>，绑定 <code>/api/search/suggest</code>。</li>
+  <li>回车仍跳到 <code>/search?q=</code>，保证行为一致；选中提示项直接跳 <code>/book/&lt;id&gt;</code>。</li>
+  <li>i18n：复用 <code>search.placeholder</code>。</li>
+</ul>
+
+<h2>5. 边界</h2>
+<ul>
+  <li>不支持拼音 / 模糊匹配首字母；Calibre 自带的 LIKE 足够覆盖中文。</li>
+  <li>不存储用户搜索历史（隐私）。</li>
+  <li>不缓存建议结果（输入变化快，缓存命中率低，浪费内存）。</li>
+  <li>登录前也可使用；scope 默认按当前会话 cookie 解析。</li>
+</ul>
+
+<h2>6. 测试计划（待验证）</h2>
+<table>
+<thead><tr><th>层级</th><th>用例</th></tr></thead>
+<tbody>
+<tr><td>API</td><td><code>tests/test_search.py</code> 新增：q 太短、空、limit 边界、命中排序、权限过滤</td></tr>
+<tr><td>组件</td><td><code>app/test/components/SearchBox.spec.ts</code>：输入触发、键盘导航、回车跳转</td></tr>
+<tr><td>E2E</td><td><code>app/test/e2e/search.spec.ts</code>：从首页输入"三体"看到建议并点击进入详情</td></tr>
+</tbody>
+</table>
+<p class="todo">实现完成后回写实际跑通结果。</p>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>书籍写接口所有权校验修复 · ACTIVE</title>
+<style>
+  body { max-width: 960px; margin: 0 auto; padding: 24px; color: #24292f; font: 15px/1.7 sans-serif; }
+  h1, h2 { line-height: 1.3; }
+  h2 { margin-top: 30px; border-bottom: 1px solid #d0d7de; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  .status { padding: 2px 10px; border-radius: 12px; color: #1a7f37; background: #dafbe1; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 7px 10px; border: 1px solid #d0d7de; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  code { padding: 1px 4px; border-radius: 4px; background: #f6f8fa; }
+  .limited { color: #9a6700; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>书籍写接口所有权校验修复</h1>
+<div class="meta">
+  <span class="status">ACTIVE</span>
+  <span>创建日期：2026-07-19</span>
+  <span>所属模块：webserver</span>
+  <span>需求来源：PR #871 维护者评审请求</span>
+</div>
+
+<h2>原始诉求</h2>
+<blockquote>评审并修复发现的问题，推送到当前分支里。</blockquote>
+<p>PR 修复了 <code>BookEdit</code>、<code>BookDelete</code>、<code>BookSetScope</code>、<code>BookDeleteFormat</code> 和 <code>BookSeparate</code> 的所有权校验绕过，并为 <code>BookSetScope</code> 新建的 <code>Item</code> 设置 <code>collector_id</code>。评审发现该安全修复缺少测试与方案记录，无法证明所有入口均已封堵，也无法防止后续回归。</p>
+
+<h2>目标与边界决策</h2>
+<ul>
+  <li>五个写接口必须使用 <code>self.user_id()</code> 校验当前登录用户，而不是使用书籍响应中的收藏者 ID 自证所有权。</li>
+  <li>管理员仍可绕过所有权限制；<code>can_edit</code> 与 <code>can_delete</code> 权限位的既有语义不变。</li>
+  <li>保持现有路由、请求体和错误响应不变，越权请求继续返回 <code>{"err": "permission"}</code>。</li>
+  <li>当管理员为没有 <code>Item</code> 的书籍切换范围时，新记录的 <code>collector_id</code> 必须是当前操作者，不能依赖模型默认值。</li>
+  <li>不扩展到本 PR 未修改的只读接口或管理员批量接口。</li>
+</ul>
+
+<h2>授权流程</h2>
+<svg viewBox="0 0 840 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="书籍写接口授权流程">
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#57606a"/></marker></defs>
+  <g fill="#f6f8fa" stroke="#57606a"><rect x="10" y="45" width="145" height="52" rx="6"/><rect x="225" y="45" width="150" height="52" rx="6"/><rect x="445" y="15" width="165" height="52" rx="6"/><rect x="445" y="90" width="165" height="52" rx="6"/><rect x="680" y="45" width="145" height="52" rx="6"/></g>
+  <g font-size="14" text-anchor="middle" fill="#24292f"><text x="82" y="76">已登录写请求</text><text x="300" y="76">权限位允许？</text><text x="527" y="46">管理员</text><text x="527" y="121">当前用户是 owner</text><text x="752" y="76">执行写操作</text></g>
+  <g stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"><path d="M155 71 H225"/><path d="M375 65 L445 44"/><path d="M375 78 L445 112"/><path d="M610 41 L680 62"/><path d="M610 116 L680 83"/></g>
+</svg>
+
+<h2>实现与测试方案</h2>
+<table>
+<thead><tr><th>验证项</th><th>测试方法</th><th>预期</th></tr></thead>
+<tbody>
+<tr><td>编辑整本书</td><td>用户 2 操作用户 1 的公开书籍</td><td><code>BookEdit</code> 返回 <code>permission</code></td></tr>
+<tr><td>删除整本书</td><td>同上，并 mock Calibre 删除</td><td>返回 <code>permission</code>，删除函数未调用</td></tr>
+<tr><td>切换公开范围</td><td>同上，随后查询 <code>Item</code></td><td>返回 <code>permission</code>，scope 不变</td></tr>
+<tr><td>删除单个格式</td><td>同上，并 mock 格式删除</td><td>返回 <code>permission</code>，删除函数未调用</td></tr>
+<tr><td>分离单个格式</td><td>同上</td><td>在文件复制和导入前返回 <code>permission</code></td></tr>
+<tr><td>新建范围记录</td><td>临时删除 <code>Item</code>，由管理员 30 操作</td><td>新记录 <code>collector_id == 30</code></td></tr>
+</tbody>
+</table>
+
+<h2>测试结果</h2>
+<table>
+<thead><tr><th>命令</th><th>结果</th><th>证据或限制</th></tr></thead>
+<tbody>
+<tr><td><code>python3 -m py_compile webserver/handlers/book.py tests/test_book_write_permissions.py</code></td><td>通过</td><td>业务代码与新增测试均可完成 Python 语法编译。</td></tr>
+<tr><td>内联 Python AST 检查五个目标 handler</td><td>通过</td><td>五个类均存在 <code>is_book_owner</code> 调用，且第二个参数均为 <code>self.user_id()</code>。</td></tr>
+<tr><td><code>git diff --check</code></td><td>通过</td><td>未发现空白错误。</td></tr>
+<tr><td><code>make lint-py-fix</code>、<code>make lint-py</code></td><td>未执行</td><td>runner 未安装 <code>ruff</code>；尝试安装时公开包源代理连接失败。未对代码做自动格式化，已用行宽和语法检查替代。</td></tr>
+<tr><td><code>pytest tests/test_book_write_permissions.py -v</code>、<code>make pytest</code></td><td>未执行</td><td>runner 未安装 <code>pytest</code>、Calibre、Tornado 和 SQLAlchemy，命令在测试收集前终止。新增用例需由标准 <code>talebook/talebook-base</code> CI 环境执行。</td></tr>
+</tbody>
+</table>
+<p class="limited">残余风险：本地未完成运行时回归验证；发布 workflow 应依赖仓库标准 CI 执行新增六项用例及完整后端测试。</p>
+</body>
+</html>

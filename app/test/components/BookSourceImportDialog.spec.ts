@@ -34,6 +34,9 @@ type DialogVm = {
     tab: string;
     jsonText: string;
     url: string;
+    fileInput: HTMLInputElement | null;
+    onFileSelected: (event: Event) => void;
+    triggerFileSelect: () => void;
 };
 
 function mountDialog() {
@@ -93,6 +96,71 @@ describe('BookSourceImportDialog.vue', () => {
         await vm.doImport();
         expect(backendMock).not.toHaveBeenCalled();
         expect(alertMock).toHaveBeenCalledWith('error', 'booksource.urlRequired');
+        wrapper.unmount();
+    });
+
+    it('renders a button to load a local JSON file on the json tab', async () => {
+        const wrapper = mountDialog();
+        const vm = wrapper.vm as unknown as DialogVm;
+        vm.tab = 'json';
+        vm.open();
+        await wrapper.vm.$nextTick();
+        expect(document.body.textContent).toContain('booksource.loadFromFile');
+        wrapper.unmount();
+    });
+
+    it('loads the content of a selected local file into the json textarea', async () => {
+        const wrapper = mountDialog();
+        const vm = wrapper.vm as unknown as DialogVm;
+        vm.tab = 'json';
+        await wrapper.vm.$nextTick();
+
+        const content = '[{"bookSourceName":"test"}]';
+        const file = new File([content], 'source.json', { type: 'application/json' });
+        const input = { files: [file], value: 'source.json' };
+        vm.onFileSelected({ target: input } as unknown as Event);
+
+        await vi.waitFor(() => expect(vm.jsonText).toBe(content));
+        expect(input.value).toBe('');
+        wrapper.unmount();
+    });
+
+    it('shows an alert when the selected file fails to read', async () => {
+        const wrapper = mountDialog();
+        const vm = wrapper.vm as unknown as DialogVm;
+        vm.tab = 'json';
+        await wrapper.vm.$nextTick();
+
+        const OriginalFileReader = globalThis.FileReader;
+        class FailingFileReader {
+            onload: (() => void) | null = null;
+            onerror: (() => void) | null = null;
+            readAsText() {
+                setTimeout(() => this.onerror && this.onerror(), 0);
+            }
+        }
+        // @ts-expect-error stub the reader to exercise the error path
+        globalThis.FileReader = FailingFileReader;
+
+        const file = new File(['irrelevant'], 'source.json', { type: 'application/json' });
+        vm.onFileSelected({ target: { files: [file], value: 'source.json' } } as unknown as Event);
+
+        await vi.waitFor(() => expect(alertMock).toHaveBeenCalledWith('error', 'booksource.fileReadError'));
+        globalThis.FileReader = OriginalFileReader;
+        wrapper.unmount();
+    });
+
+    it('does nothing when the file input change fires without a selected file', async () => {
+        const wrapper = mountDialog();
+        const vm = wrapper.vm as unknown as DialogVm;
+        vm.tab = 'json';
+        vm.jsonText = 'unchanged';
+        await wrapper.vm.$nextTick();
+
+        vm.onFileSelected({ target: { files: [], value: '' } } as unknown as Event);
+        await wrapper.vm.$nextTick();
+
+        expect(vm.jsonText).toBe('unchanged');
         wrapper.unmount();
     });
 });

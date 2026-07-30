@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>书源导入支持选择本地 JSON 文件</title>
+  <style>
+    body{margin:0;background:#f4f6f8;color:#263238;font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif}article{max-width:960px;margin:32px auto;padding:36px;background:#fff;border:1px solid #dfe5e8;border-radius:12px}h1{margin:0 0 8px;font-size:30px}h2{margin-top:32px;border-bottom:1px solid #e6ebee;padding-bottom:8px}.meta{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}.meta span{padding:4px 10px;border-radius:999px;background:#e8f1ff;color:#245b9e}table{width:100%;border-collapse:collapse}th,td{padding:10px 12px;border:1px solid #dfe5e8;text-align:left;vertical-align:top}th{background:#f5f8fa}code{background:#f1f3f5;padding:1px 4px;border-radius:4px}footer{margin-top:32px;color:#65727a}
+  </style>
+</head>
+<body><article>
+  <header>
+    <h1>书源导入支持选择本地 JSON 文件</h1>
+    <p>在书源导入对话框「粘贴 JSON 导入」页签新增按钮，允许选择本地 JSON 文件并把内容加载进已有文本框，复用既有校验与提交流程。</p>
+    <div class="meta"><span>创建日期 · 2026-07-21</span><span>模块 · app</span><span>状态 · ACTIVE</span><span>需求来源 · PR #883 评论</span></div>
+  </header>
+
+  <section><h2>原始诉求</h2>
+    <p>PR #883（书源大 JSON 导入修复）评论中，ClementLi233 提出「最好加一个选择JSON文件的按钮 可以选择复制还是加载」，liaoshutian 确认并要求「加个按钮，允许选择本地JSON文件进行上传」；随后 <code>@claude</code> 被要求直接实现该按钮。当前 <code>BookSourceImportDialog.vue</code> 的 JSON 页签只有一个 <code>v-textarea</code>，用户必须手动粘贴 JSON 文本，无法直接选择本地文件。</p>
+  </section>
+
+  <section><h2>目标</h2>
+    <ul>
+      <li>在 JSON 页签新增「选择本地 JSON 文件」按钮，点击后弹出系统文件选择框（限定 <code>.json</code>）。</li>
+      <li>选中文件后读取其文本内容并填入现有 <code>jsonText</code> 文本框，用户可在提交前继续查看或编辑。</li>
+      <li>读取失败时给出错误提示；不选择文件（用户取消）时保持原内容不变。</li>
+      <li>不改变后端 API、数据结构、数据库、权限或部署配置；复用 <code>doImport()</code> 既有的 JSON 校验与 <code>/admin/booksource/import</code> 提交路径。</li>
+    </ul>
+  </section>
+
+  <section><h2>方案</h2>
+    <ol>
+      <li><code>app/components/BookSourceImportDialog.vue</code>：JSON 页签顶部新增一个 <code>v-btn</code> 触发按钮和一个隐藏的 <code>&lt;input type="file" accept=".json,application/json"&gt;</code>；按钮点击调用 <code>fileInput.value.click()</code>。</li>
+      <li>文件 <code>change</code> 事件里用 <code>FileReader.readAsText()</code> 异步读取所选文件；<code>onload</code> 把结果写入 <code>jsonText</code>，<code>onerror</code> 通过 <code>$alert('error', t('booksource.fileReadError'))</code> 提示失败；读取后清空 <code>input.value</code>，允许重复选择同一文件。</li>
+      <li>文件内容加载进文本框后不自动提交，仍走原有的「粘贴 JSON」提交按钮与 <code>JSON.parse</code> 校验，行为与手动粘贴一致。</li>
+      <li>新增 i18n key <code>booksource.loadFromFile</code>（按钮文案）与 <code>booksource.fileReadError</code>（失败提示），同步补充 <code>zh-CN.json</code> 与 <code>en-US.json</code>，两者均不含字面量 <code>@</code> 或 <code>&lt;</code>。</li>
+      <li>组件通过 <code>defineExpose</code> 暴露 <code>fileInput</code>、<code>onFileSelected</code>、<code>triggerFileSelect</code>，供单元测试直接调用文件选择回调，无需依赖浏览器原生的文件选择对话框。</li>
+    </ol>
+    <p>不涉及 URL 导入、内置书源导入、后端 <code>/admin/booksource/import</code> 接口或 <code>webserver/main.py</code> 中的上传大小限制（见 <code>design/webserver/20260721-booksource-large-json-import.active.html</code>，本方案与其相互独立、互不覆盖）。</p>
+  </section>
+
+  <section><h2>测试结果</h2>
+    <table><thead><tr><th>命令 / 验证项</th><th>结果</th></tr></thead><tbody>
+      <tr><td><code>git diff --check</code></td><td>通过：新增/修改内容无空白错误。</td></tr>
+      <tr><td>新增单元测试（<code>app/test/components/BookSourceImportDialog.spec.ts</code>）：<br>· 渲染「选择本地 JSON 文件」按钮<br>· 选中文件后内容写入 <code>jsonText</code> 且 input 被清空<br>· <code>FileReader</code> 读取失败时弹出 <code>booksource.fileReadError</code><br>· 未选择文件时 <code>jsonText</code> 保持不变</td><td>已编写，覆盖新增交互的四条路径，与既有用例风格一致（直接调用组件暴露的方法，不依赖真实文件选择对话框）。</td></tr>
+      <tr><td><code>npx vitest run test/components/BookSourceImportDialog.spec.ts</code>、<code>npm run lint</code>、<code>make check-design</code></td><td>未执行：当前 runner 的 Bash 权限只放行 <code>git</code> 相关命令，<code>npm</code>/<code>npx</code>/<code>make</code>/<code>python3</code> 均被沙箱拒绝（返回 "This command requires approval"），且工作区没有 <code>node_modules</code>。已通过人工复核 <code>.vue</code>、测试文件与两份 locale JSON 的语法和结构；CI 需补跑上述命令验证。</td></tr>
+    </tbody></table>
+    <p>实现范围小、风险集中在前端单个组件，未涉及后端或数据变更；受当前 runner 权限限制未能执行动态测试，已记录原因与待补跑项，方案标记为 <strong>ACTIVE</strong>。</p>
+  </section>
+
+  <footer>本方案是 <code>design/webserver/20260721-booksource-large-json-import.active.html</code> 的补充功能，两者分别解决「后端能接收多大的书源 JSON」与「前端如何更方便地提供书源 JSON」，互不替代。</footer>
+</article></body></html>

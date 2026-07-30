@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>书单（BookList）功能设计 · ACTIVE</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; color: #1f2328; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 20px; margin-top: 32px; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; }
+  h3 { font-size: 16px; margin-top: 20px; }
+  code { background: #f6f8fa; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #57606a; font-size: 14px; margin: 8px 0 16px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+  .wip { background: #fff8c5; color: #7d4e00; }
+  .active { background: #dafbe1; color: #1a7f37; }
+  .todo { color: #8250df; font-weight: 600; }
+  .warn { background: #fff8c5; padding: 8px 12px; border-left: 3px solid #d4a72c; margin: 12px 0; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<h1>书单（BookList）功能设计</h1>
+<div class="meta">
+  <span><span class="badge active">ACTIVE</span> 待实现</span>
+  <span>创建日期：2026-07-16</span>
+  <span>所属模块：webserver（主） + app</span>
+  <span>需求来源：Issue #509</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<blockquote>
+对收藏的图书开列阅读清单，列阅读计划，或者特别开列管理。可以对现有藏书选择加入某个特别命名的阅读书单、列表。
+</blockquote>
+
+<h2>2. 目标</h2>
+<ul>
+  <li>用户可创建多个命名的书单（私有 / 公开）。</li>
+  <li>书单可加入 / 移除任意本地藏书，顺序保留，时间记录。</li>
+  <li>书籍详情页和搜索结果页支持"加入书单"。</li>
+  <li>用户主页新增"我的书单"入口。</li>
+  <li>不与现有"书架 = 待读"语义冲突：书单是分组，书架是单状态字段。</li>
+</ul>
+
+<h2>3. 数据模型</h2>
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td colspan="3"><code>book_lists</code></td></tr>
+<tr><td>id</td><td>INTEGER PK</td><td>主键</td></tr>
+<tr><td>owner_id</td><td>INTEGER FK→readers.id</td><td>创建者</td></tr>
+<tr><td>name</td><td>VARCHAR(64)</td><td>书单名（owner 内唯一）</td></tr>
+<tr><td>description</td><td>TEXT NULL</td><td>可选说明</td></tr>
+<tr><td>is_public</td><td>BOOLEAN</td><td>是否对其他登录用户可见</td></tr>
+<tr><td>created_at</td><td>DATETIME</td><td>创建时间</td></tr>
+<tr><td>updated_at</td><td>DATETIME</td><td>修改时间</td></tr>
+<tr><td colspan="3"><code>book_list_items</code>（复合主键 list_id + book_id）</td></tr>
+<tr><td>list_id</td><td>INTEGER FK→book_lists.id</td><td>书单</td></tr>
+<tr><td>book_id</td><td>INTEGER</td><td>Calibre book id</td></tr>
+<tr><td>added_by</td><td>INTEGER FK→readers.id</td><td>加入者（owner 或公开书单协作者）</td></tr>
+<tr><td>added_at</td><td>DATETIME</td><td>加入时间，决定排序</td></tr>
+<tr><td>note</td><td>TEXT NULL</td><td>用户自定义备注（如"第 3 本必读"）</td></tr>
+</tbody>
+</table>
+<p>新表随启动自动迁移（<code>compare_and_migrate</code> 已支持新增表）。</p>
+
+<h2>4. API</h2>
+<table>
+<thead><tr><th>方法</th><th>路径</th><th>权限</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/lists</code></td><td>登录</td><td>当前用户的书单 + 已加入的公开书单</td></tr>
+<tr><td>POST</td><td><code>/api/lists</code></td><td>登录</td><td>创建书单（name, description?, is_public）</td></tr>
+<tr><td>PUT</td><td><code>/api/lists/&lt;id&gt;</code></td><td>owner</td><td>改名、改可见性</td></tr>
+<tr><td>DELETE</td><td><code>/api/lists/&lt;id&gt;</code></td><td>owner</td><td>删除书单（含 items 级联删除）</td></tr>
+<tr><td>GET</td><td><code>/api/lists/&lt;id&gt;</code></td><td>owner 或公开</td><td>书单详情 + 书籍列表</td></tr>
+<tr><td>POST</td><td><code>/api/lists/&lt;id&gt;/items</code></td><td>owner</td><td>加入书籍（body: book_id, note?）</td></tr>
+<tr><td>DELETE</td><td><code>/api/lists/&lt;id&gt;/items/&lt;book_id&gt;</code></td><td>owner</td><td>移出书籍</td></tr>
+<tr><td>GET</td><td><code>/api/book/&lt;id&gt;/lists</code></td><td>登录</td><td>当前书在哪些书单里（含公开）</td></tr>
+</tbody>
+</table>
+<p>所有接口沿用 <code>@js</code> + <code>@auth</code> 装饰器，权限校验在 handler 内做，参考 <code>webserver/handlers/book.py:2176</code> shelf 的写法。</p>
+
+<h2>5. 前端</h2>
+<table>
+<thead><tr><th>页面 / 组件</th><th>行为</th></tr></thead>
+<tbody>
+<tr><td><code>app/pages/user/lists.vue</code></td><td>我的书单列表 + 创建按钮</td></tr>
+<tr><td><code>app/pages/user/lists/[id].vue</code></td><td>书单详情（书籍网格 + 备注编辑 + 删除）</td></tr>
+<tr><td><code>app/pages/user/detail.vue</code></td><td>侧栏加"我的书单"入口</td></tr>
+<tr><td><code>app/pages/book/[bid]/index.vue</code></td><td>菜单加"加入书单"按钮（弹窗多选 checkbox）</td></tr>
+<tr><td><code>app/components/AddToListDialog.vue</code></td><td>复用组件，传入 <code>book_id</code>，从 <code>/api/lists</code> 拉取 + 多选</td></tr>
+</tbody>
+</table>
+
+<h2>6. 边界与不做的事</h2>
+<ul>
+  <li>不支持书单嵌套 / 排序拖拽（首版够用，再加）。</li>
+  <li>公开书单仅允许查看，不允许其他用户编辑。</li>
+  <li>不存储书单封面（用首本书的封面）。</li>
+  <li>不与"书架（wants）"字段互通——避免与现有语义混淆。</li>
+</ul>
+
+<h2>7. 测试计划（待验证）</h2>
+<table>
+<thead><tr><th>层级</th><th>用例</th></tr></thead>
+<tbody>
+<tr><td>模型</td><td><code>tests/test_models.py</code> 新增：创建书单、唯一约束（owner+name）、级联删除 items</td></tr>
+<tr><td>API</td><td><code>tests/test_book_list.py</code>（新建）：未登录、权限越权、公开只读、加入/移除、列表分页</td></tr>
+<tr><td>前端</td><td><code>app/test/e2e/book-list.spec.ts</code>：创建 → 加入 → 详情可见 → 移除 → 删除</td></tr>
+<tr><td>组件</td><td><code>app/test/components/AddToListDialog.spec.ts</code>：多选行为、空态、错误提示</td></tr>
+</tbody>
+</table>
+<p class="todo">实现完成后需在 CI 跑通以上用例，并回写真实结果。</p>
+
+<h2>8. 风险</h2>
+<div class="warn">
+  <code>book_id</code> 是 Calibre 整数 id，重命名 / 迁移不会变；删除书籍时由 Calibre DB 决定是否级联。本设计不在应用层强约束孤儿 item，按 lazy 删除兜底（<code>GET /api/lists/&lt;id&gt;</code> 渲染时静默跳过找不到的书）。
+</div>

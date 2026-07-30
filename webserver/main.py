@@ -351,16 +351,14 @@ def _enqueue_pending_booksource_checks(scoped_session):
 
 
 def get_upload_size():
-    # Tornado 的 max_buffer_size 决定单个 HTTP 请求能接收的 body 上限（即单分片大小）。
-    # 分片关闭时单文件即单请求，上限取 MAX_UPLOAD_SIZE；分片开启时单请求上限取
-    # UPLOAD_CHUNK_SIZE（单分片大小），而 MAX_UPLOAD_SIZE 此时作为分片合并后的
-    # 总文件上限（在 book.py 中校验），二者职责不同，此处只负责单请求层。
+    # Tornado 的 max_buffer_size 是所有接口共用的传输层上限，必须容纳最大的合法单请求。
+    # 电子书分片大小和合并后的总文件大小仍由 book.py 在业务层分别校验；这里取两项配置
+    # 的较大值，也避免开启分片后把书源 JSON 等非分片请求误限为单分片大小。
     from webserver.utils import parse_size_safe
 
-    chunk_enabled = CONF.get("UPLOAD_CHUNK_ENABLED", True)
-    if chunk_enabled:
-        return parse_size_safe(CONF.get("UPLOAD_CHUNK_SIZE", "4MB"), "4MB")
-    return parse_size_safe(CONF.get("MAX_UPLOAD_SIZE", "100MB"), "100MB")
+    upload_size = parse_size_safe(CONF.get("MAX_UPLOAD_SIZE", "100MB"), "100MB")
+    chunk_size = parse_size_safe(CONF.get("UPLOAD_CHUNK_SIZE", "4MB"), "4MB")
+    return max(upload_size, chunk_size)
 
 
 def setup_logging():

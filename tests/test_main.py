@@ -653,6 +653,21 @@ class TestBook(TestWithUserLogin):
             self.assertEqual(rsp.code, 200)
             self.assertNotIn("waitReady", rsp.body.decode("utf-8"))
 
+    def test_read_prefers_epub_when_other_formats_exist(self):
+        book = {
+            "id": BID_EPUB,
+            "title": "EPUB First",
+            "fmt_epub": testdir + "/cases/old.epub",
+            "fmt_pdf": testdir + "/cases/old.pdf",
+            "fmt_txt": testdir + "/cases/book.txt",
+        }
+        with mock.patch("webserver.handlers.base.BaseHandler.get_book_or_404", return_value=book):
+            rsp = self.fetch("/read/%s" % BID_EPUB, follow_redirects=False)
+
+        self.assertEqual(rsp.code, 200)
+        self.assertNotIn("Location", rsp.headers)
+        self.assertNotIn("waitReady", rsp.body.decode("utf-8"))
+
     def test_edit(self):
         body = {
             "id": 5,
@@ -1157,26 +1172,27 @@ def setUpModule():
 
 
 class TestGetUploadSize(unittest.TestCase):
-    """Tornado max_buffer_size 是单请求（单分片）上限：
-    分片关闭时取 MAX_UPLOAD_SIZE（整体即单请求），开启时取 UPLOAD_CHUNK_SIZE"""
+    """Tornado max_buffer_size 应覆盖所有接口最大的合法单请求。"""
 
-    def test_chunk_disabled_uses_max_upload_size(self):
+    def test_uses_max_upload_size_when_larger_than_chunk(self):
         from webserver import main
         from webserver.handlers.book import CONF
 
-        with mock.patch.dict(CONF, {"UPLOAD_CHUNK_ENABLED": False, "MAX_UPLOAD_SIZE": "100MB"}):
-            self.assertEqual(main.get_upload_size(), 100 * 1024 * 1024)
-
-    def test_chunk_enabled_uses_chunk_size(self):
-        from webserver import main
-        from webserver.handlers.book import CONF
-
-        # 分片开启时单请求上限取单分片大小，MAX_UPLOAD_SIZE 此时作为总文件上限
         with mock.patch.dict(
             CONF,
-            {"UPLOAD_CHUNK_ENABLED": True, "MAX_UPLOAD_SIZE": "100MB", "UPLOAD_CHUNK_SIZE": "50MB"},
+            {"UPLOAD_CHUNK_ENABLED": True, "MAX_UPLOAD_SIZE": "100MB", "UPLOAD_CHUNK_SIZE": "4MB"},
         ):
-            self.assertEqual(main.get_upload_size(), 50 * 1024 * 1024)
+            self.assertEqual(main.get_upload_size(), 100 * 1024 * 1024)
+
+    def test_uses_chunk_size_when_larger_than_max_upload(self):
+        from webserver import main
+        from webserver.handlers.book import CONF
+
+        with mock.patch.dict(
+            CONF,
+            {"UPLOAD_CHUNK_ENABLED": True, "MAX_UPLOAD_SIZE": "100MB", "UPLOAD_CHUNK_SIZE": "200MB"},
+        ):
+            self.assertEqual(main.get_upload_size(), 200 * 1024 * 1024)
 
 
 if __name__ == "__main__":
