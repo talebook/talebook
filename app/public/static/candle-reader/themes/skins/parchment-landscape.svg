@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7efd9"/><stop offset="0.5" stop-color="#f1e6c8"/><stop offset="1" stop-color="#e7d4a6"/>
+    </linearGradient>
+    <radialGradient id="st" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#bd9c5e" stop-opacity="0.3"/><stop offset="1" stop-color="#bd9c5e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#g)"/>
+  <ellipse cx="140" cy="120" rx="260" ry="160" fill="url(#st)"/>
+  <ellipse cx="1160" cy="640" rx="280" ry="180" fill="url(#st)"/>
+  <g stroke="#a9853f" stroke-width="1.2" opacity="0.13">
+    <line x1="0" y1="120" x2="1280" y2="114"/><line x1="0" y1="270" x2="1280" y2="276"/><line x1="0" y1="430" x2="1280" y2="424"/><line x1="0" y1="590" x2="1280" y2="596"/>
+  </g>
+  <g stroke="#6b4a1d" stroke-width="7" stroke-linecap="round" opacity="0.1" fill="none">
+    <path d="M120 90 q16 90 -6 200"/><path d="M170 120 q-12 100 6 200"/>
+  </g>
+  <g opacity="0.76"><rect x="1170" y="60" width="62" height="62" rx="6" fill="none" stroke="#b5352b" stroke-width="4"/>
+    <text x="1201" y="89" font-size="24" text-anchor="middle" fill="#b5352b" font-family="serif">藏</text>
+    <text x="1201" y="114" font-size="24" text-anchor="middle" fill="#b5352b" font-family="serif">书</text></g>
+</svg>

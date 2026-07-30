@@ -11,13 +11,6 @@
   background-color: #D3E3D3;
 }
 
-/* 棕色模式 */
-.brown {
-  color: #663300;
-  background-color: #f5deb3;
-}
-
-
 /* 夜晚模式 */
 .grey,
 .grey * {
@@ -32,84 +25,41 @@
   background-color: #000;
 }
 
-/* 评论图标样式 */
+/* 评论图标：聊天气泡作 background，评论数作为内容居中显示在气泡内（沿用 3bc8c3d 之前的历史实现） */
 .comment-icon {
-  position: absolute;
-  right: -20px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 1170 1024" xmlns="http://www.w3.org/2000/svg" width="200" height="200"><path fill="%23999999" d="M841.134446 1024a36.790489 36.790489 0 0 1-17.590681-4.46167L490.052242 837.487579h-110.627465C173.74912 837.487579 0 656.095108 0 441.45954V373.035081A376.681947 376.681947 0 0 1 379.424777 0.01024h411.424457A376.681947 376.681947 0 0 1 1170.274012 373.035081v68.278174a369.367735 369.367735 0 0 1-292.568503 363.955218V987.428937a36.571063 36.571063 0 0 1-36.571063 36.571063zM379.424777 72.823226A303.539822 303.539822 0 0 0 73.142126 373.035081v68.278174c0 172.139993 143.13914 323.141911 306.282651 323.141912h119.989657a36.900202 36.900202 0 0 1 17.590682 4.46167L804.563383 926.099265v-150.233927a36.571063 36.571063 0 0 1 30.28084-35.839641C994.184344 712.26826 1097.131886 595.058004 1097.131886 441.45954V373.035081a303.539822 303.539822 0 0 0-306.282652-300.358139h-411.424457z"></path></svg>') no-repeat center center;
+  background-size: contain;
+  position: relative;
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  text-align: center;
+  font-size: 16px;
+  vertical-align: middle;
+  margin-left: 2px;
   cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-  z-index: 10;
 }
 
-.comment-icon:hover {
-  opacity: 1;
-}
-
-.comment-icon svg {
-  width: 16px;
-  height: 16px;
-  margin-right: 2px;
-}
-
+/* 评论数：绝对居中叠在气泡体内（不受段落 text-align:justify 影响；底部留出气泡尾巴） */
 .comment-count {
-  font-size: 12px;
-  font-weight: bold;
-  background-color: #ff4444;
-  color: white;
-  border-radius: 50%;
-  width: 16px;
-  height: 16px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 18%;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 60%;
+  color: #999999;
 }
 
-/* 热评样式 */
-.hot-comment svg {
+/* 热评：数字标红 */
+.hot-comment .comment-count {
   color: #ff4444;
 }
 
-.hot-comment .comment-count {
-  background-color: #ff4444;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-/* 不同主题下的评论图标颜色 */
-.white .comment-icon svg {
-  color: #666666;
-}
-
-.eyecare .comment-icon svg {
-  color: #666666;
-}
-
-.brown .comment-icon svg {
-  color: #996633;
-}
-
-.grey .comment-icon svg,
-.dark .comment-icon svg {
-  color: #aaaaaa;
-}
-
+/* 深色主题下评论数用白色保证对比 */
 .grey .comment-count,
 .dark .comment-count {
   color: #ffffff !important;
@@ -143,13 +93,6 @@
 .eyecare #status-bar-bottom {
   background-color: rgba(211, 227, 211, 0.9);
   color: #142614;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.brown #status-bar-top,
-.brown #status-bar-bottom {
-  background-color: rgba(245, 222, 179, 0.9);
-  color: #663300;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 

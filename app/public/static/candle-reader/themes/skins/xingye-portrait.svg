@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 780">
+  <defs>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a2340"/><stop offset="0.5" stop-color="#141d38"/><stop offset="1" stop-color="#0c1124"/>
+    </linearGradient>
+    <radialGradient id="m" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#f3f6ff"/><stop offset="0.7" stop-color="#cdd6ef"/><stop offset="1" stop-color="#aab6dc" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="360" height="780" fill="url(#s)"/>
+  <circle cx="296" cy="110" r="42" fill="url(#m)"/><circle cx="296" cy="110" r="26" fill="#fbfdff" opacity="0.95"/>
+  <!-- 繁星：密布上中部，下部渐少 -->
+  <g fill="#eef2ff">
+    <circle cx="30" cy="40" r="1.8" opacity="0.85"/><circle cx="70" cy="70" r="1" opacity="0.55"/><circle cx="110" cy="36" r="1.4" opacity="0.75"/>
+    <circle cx="150" cy="64" r="1" opacity="0.5"/><circle cx="186" cy="34" r="1.6" opacity="0.85"/><circle cx="50" cy="120" r="1.2" opacity="0.6"/>
+    <circle cx="96" cy="100" r="0.9" opacity="0.5"/><circle cx="140" cy="128" r="1.3" opacity="0.7"/><circle cx="200" cy="96" r="1" opacity="0.55"/>
+    <circle cx="236" cy="60" r="1.1" opacity="0.6"/><circle cx="24" cy="170" r="1.5" opacity="0.7"/><circle cx="78" cy="190" r="1" opacity="0.5"/>
+    <circle cx="130" cy="178" r="1.2" opacity="0.6"/><circle cx="180" cy="200" r="0.9" opacity="0.45"/><circle cx="240" cy="170" r="1.3" opacity="0.6"/>
+    <circle cx="320" cy="210" r="1.1" opacity="0.55"/><circle cx="40" cy="250" r="1.2" opacity="0.55"/><circle cx="110" cy="270" r="0.9" opacity="0.45"/>
+    <circle cx="190" cy="280" r="1.2" opacity="0.55"/><circle cx="280" cy="260" r="1" opacity="0.5"/><circle cx="150" cy="330" r="1.1" opacity="0.5"/>
+    <circle cx="70" cy="360" r="1" opacity="0.45"/><circle cx="300" cy="350" r="1.1" opacity="0.45"/><circle cx="30" cy="430" r="1" opacity="0.4"/>
+    <circle cx="210" cy="420" r="0.9" opacity="0.4"/><circle cx="120" cy="470" r="1" opacity="0.4"/>
+  </g>
+  <!-- 远山剪影 -->
+  <path d="M0 690 L80 630 L170 675 L270 615 L360 660 L360 780 L0 780 Z" fill="#070b1a"/>
+</svg>
