@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 140">
+  <defs>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#39332a"/><stop offset="1" stop-color="#1c1814"/></linearGradient>
+    <radialGradient id="sun" cx="0.82" cy="0.2" r="0.3"><stop offset="0" stop-color="#caa05a" stop-opacity="0.45"/><stop offset="1" stop-color="#caa05a" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="280" height="140" fill="url(#s)"/><rect width="280" height="140" fill="url(#sun)"/>
+  <circle cx="230" cy="28" r="12" fill="#c89a52" opacity="0.6"/>
+  <!-- 层峦：远山稍亮、近山更暗，拉出层次 -->
+  <path d="M0 86 L50 64 L100 82 L150 60 L210 80 L280 66 L280 140 L0 140 Z" fill="#4a4236" opacity="0.7"/>
+  <path d="M0 104 L60 86 L130 104 L200 84 L280 100 L280 140 L0 140 Z" fill="#2c271f"/>
+  <path d="M0 122 L70 108 L150 122 L230 106 L280 118 L280 140 L0 140 Z" fill="#15110c"/>
+</svg>

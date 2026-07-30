@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 780">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7efd9"/><stop offset="0.5" stop-color="#f1e6c8"/><stop offset="1" stop-color="#e9d7ab"/>
+    </linearGradient>
+    <radialGradient id="st" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#bd9c5e" stop-opacity="0.3"/><stop offset="1" stop-color="#bd9c5e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="360" height="780" fill="url(#g)"/>
+  <ellipse cx="60" cy="90" rx="130" ry="100" fill="url(#st)"/>
+  <ellipse cx="320" cy="700" rx="150" ry="120" fill="url(#st)"/>
+  <g stroke="#a9853f" stroke-width="1" opacity="0.15">
+    <line x1="0" y1="110" x2="360" y2="106"/><line x1="0" y1="250" x2="360" y2="256"/><line x1="0" y1="400" x2="360" y2="394"/>
+    <line x1="0" y1="540" x2="360" y2="546"/><line x1="0" y1="680" x2="360" y2="674"/>
+  </g>
+  <!-- 竖排淡墨笔意（上方）-->
+  <g stroke="#6b4a1d" stroke-width="6" stroke-linecap="round" opacity="0.12" fill="none">
+    <path d="M70 70 q14 70 -4 150"/><path d="M110 90 q-10 80 4 150"/>
+  </g>
+  <!-- 朱红印章（右下）-->
+  <g opacity="0.78"><rect x="284" y="690" width="56" height="56" rx="5" fill="none" stroke="#b5352b" stroke-width="3.5"/>
+    <text x="312" y="717" font-size="22" text-anchor="middle" fill="#b5352b" font-family="serif">藏</text>
+    <text x="312" y="740" font-size="22" text-anchor="middle" fill="#b5352b" font-family="serif">书</text></g>
+</svg>

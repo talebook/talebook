@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 780">
+  <defs>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#39332a"/><stop offset="0.5" stop-color="#2a2620"/><stop offset="1" stop-color="#1a1712"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.8" cy="0.13" r="0.26">
+      <stop offset="0" stop-color="#caa05a" stop-opacity="0.42"/><stop offset="1" stop-color="#caa05a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="360" height="780" fill="url(#s)"/>
+  <rect width="360" height="780" fill="url(#sun)"/>
+  <!-- 小而暗的残阳，移到右上角 -->
+  <circle cx="296" cy="96" r="22" fill="#c89a52" opacity="0.55"/>
+  <!-- 三重层峦，自上而下渐暗，拉出层次让山可见 -->
+  <path d="M0 520 L60 470 L130 510 L210 455 L290 500 L360 465 L360 780 L0 780 Z" fill="#4a4236" opacity="0.75"/>
+  <path d="M0 600 L80 550 L170 595 L260 540 L360 585 L360 780 L0 780 Z" fill="#2c271f"/>
+  <path d="M0 672 L90 622 L190 665 L290 612 L360 650 L360 780 L0 780 Z" fill="#130f0b"/>
+  <!-- 枯树剪影 -->
+  <g stroke="#0a0805" stroke-width="4" stroke-linecap="round" fill="none">
+    <path d="M62 672 L58 568"/><path d="M58 600 L36 575 M58 586 L82 560 M58 620 L42 606"/>
+  </g>
+</svg>
