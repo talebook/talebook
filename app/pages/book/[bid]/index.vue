@@ -1018,7 +1018,17 @@ const store = useMainStore();
 const { $backend, $backend_stream, $alert } = useNuxtApp();
 const { t } = useI18n();
 
-const bookid = computed(() => route.params.bid);
+const routeBookId = computed(() => {
+    return typeof route.params.bid === 'string' && route.params.bid
+        ? route.params.bid
+        : null;
+});
+const bookid = ref(routeBookId.value);
+watch(routeBookId, (newBookId) => {
+    if (newBookId) {
+        bookid.value = newBookId;
+    }
+});
 const book = ref({
     id: 0,
     title: '',

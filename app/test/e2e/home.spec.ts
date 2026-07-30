@@ -9,12 +9,12 @@ const __dirname = path.dirname(__filename);
 
 const mockDir = path.join(__dirname, 'mocks');
 const apiIndex = JSON.parse(fs.readFileSync(path.join(mockDir, 'api_index.json'), 'utf-8'));
-const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+const mockApiUrl = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
 
 test.describe('Homepage', () => {
     test.beforeEach(async ({ request }) => {
     // Reset mock server to installed state
-        const response = await request.post(`${mockApi}/_test/reset`, {
+        const response = await request.post(`${mockApiUrl}/_test/reset`, {
             data: { installed: true }
         });
         expect(response.ok()).toBeTruthy();
@@ -48,6 +48,55 @@ test.describe('Homepage', () => {
             // Recent books use BookCards component, which likely displays titles.
             await expect(page.getByText(firstNewBook.title).first()).toBeVisible();
         }
+    });
+
+    test('keeps every recent book card at the fixed shelf height', async ({ page }) => {
+        await page.goto('/');
+
+        const cards = page.getByTestId('book-card');
+        await expect(cards).toHaveCount(apiIndex.new_books.length);
+        await expect(cards.first()).toBeVisible();
+
+        const heights = await cards.evaluateAll(elements =>
+            elements.map(element => Math.round(element.getBoundingClientRect().height))
+        );
+        expect([...new Set(heights)]).toEqual([150]);
+    });
+
+    test('keeps each cover at its original ratio through the bottom edge of its card', async ({ page }) => {
+        await page.goto('/');
+
+        const cardWithCover = page.getByTestId('book-card').filter({
+            has: page.getByTestId('book-cover'),
+        }).first();
+        await expect(cardWithCover).toBeVisible();
+
+        const cardBox = await cardWithCover.boundingBox();
+        const coverBox = await cardWithCover.getByTestId('book-cover').boundingBox();
+
+        expect(cardBox).not.toBeNull();
+        expect(coverBox).not.toBeNull();
+        expect(Math.round(coverBox!.y + coverBox!.height)).toBe(
+            Math.round(cardBox!.y + cardBox!.height)
+        );
+        expect(coverBox!.width / coverBox!.height).toBeCloseTo(11 / 15, 2);
+        await expect(cardWithCover.getByTestId('book-cover').locator('img')).toHaveCSS(
+            'object-fit',
+            'contain'
+        );
+    });
+
+    test('uses an ambient shadow that is visible above each card', async ({ page }) => {
+        await page.goto('/');
+
+        const cards = page.getByTestId('book-card');
+        await expect(cards.first()).toBeVisible();
+
+        const shadows = await cards.evaluateAll(elements =>
+            elements.map(element => getComputedStyle(element).boxShadow)
+        );
+        expect(shadows).not.toContain('none');
+        expect(shadows.every(shadow => /0px 0px 6px/.test(shadow))).toBe(true);
     });
 
     test('shows the read badge on books marked as finished', async ({ page }) => {

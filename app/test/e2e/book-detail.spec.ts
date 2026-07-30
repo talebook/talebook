@@ -11,6 +11,7 @@ const mockDir = path.join(__dirname, 'mocks');
 const books = JSON.parse(fs.readFileSync(path.join(mockDir, 'books.json'), 'utf-8'));
 const bookId = books[0].id;
 const apiBook = JSON.parse(fs.readFileSync(path.join(mockDir, `api_book_${bookId}.json`), 'utf-8'));
+const apiRecent = JSON.parse(fs.readFileSync(path.join(mockDir, 'api_recent.json'), 'utf-8'));
 const mockApiUrl = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
 
 test.describe('Book Detail Page', () => {
@@ -46,6 +47,24 @@ test.describe('Book Detail Page', () => {
     
         // Check download button (dialog trigger)
         await expect(page.getByText('下载').first()).toBeVisible();
+    });
+
+    test('does not request an undefined book when navigating to Recent', async ({ page }) => {
+        const undefinedBookRequests: string[] = [];
+        page.on('request', (request) => {
+            if (new URL(request.url()).pathname === '/api/book/undefined') {
+                undefinedBookRequests.push(request.url());
+            }
+        });
+
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByText(apiBook.book.title).first()).toBeVisible({ timeout: 15_000 });
+
+        await page.locator('nav').getByRole('link', { name: '最近' }).click();
+
+        await expect(page).toHaveURL('/recent');
+        await expect(page.getByRole('heading', { name: apiRecent.title })).toBeVisible();
+        expect(undefinedBookRequests).toEqual([]);
     });
 
     test('opens the unified conversion dialog for a TXT book', async ({ page }) => {
