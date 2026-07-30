@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SSL 证书非 root 热更新与失败回滚方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #16253a;
+      --ink-soft: #526378;
+      --steel: #315f78;
+      --steel-deep: #1e4057;
+      --ice: #e8f1f4;
+      --mist: #f4f7f8;
+      --paper: #ffffff;
+      --line: #b8c7ce;
+      --amber: #a6531b;
+      --amber-soft: #fff0dd;
+      --green: #17634f;
+      --green-soft: #e1f2ec;
+      --red: #943c36;
+      --root: #6f485d;
+      --talebook: #2a6a67;
+      --shadow: 0 18px 52px rgba(26, 58, 75, .10);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.68;
+      color: var(--ink);
+      background: var(--mist);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, rgba(49, 95, 120, .055) 1px, transparent 1px),
+        linear-gradient(rgba(49, 95, 120, .055) 1px, transparent 1px),
+        var(--mist);
+      background-size: 24px 24px;
+    }
+    main { width: min(1160px, calc(100% - 32px)); margin: 0 auto; padding: 30px 0 72px; }
+    header, section { background: rgba(255, 255, 255, .97); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    header { position: relative; overflow: hidden; padding: 44px 46px 38px; border-top: 9px solid var(--steel-deep); }
+    header::after {
+      content: "TLS / PID / HUP";
+      position: absolute;
+      right: 30px;
+      top: 25px;
+      color: rgba(49, 95, 120, .15);
+      font: 900 clamp(1rem, 3vw, 2.4rem)/1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .08em;
+    }
+    .eyebrow, .label, .chip, .rail-title, .state, .test-status {
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .eyebrow { margin: 0 0 10px; color: var(--steel); font-size: .76rem; font-weight: 850; }
+    h1 {
+      max-width: 850px;
+      margin: 0;
+      font-family: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif;
+      font-size: clamp(2.15rem, 5.5vw, 4.8rem);
+      line-height: 1.02;
+      letter-spacing: -.055em;
+    }
+    .lede { max-width: 820px; margin: 22px 0 0; color: var(--ink-soft); font-size: 1.08rem; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 1px;
+      margin-top: 32px;
+      border: 1px solid var(--line);
+      background: var(--line);
+    }
+    .meta div { min-height: 88px; padding: 13px 14px; background: var(--paper); }
+    .meta strong {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--ink-soft);
+      font: 750 .67rem/1.3 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .status {
+      display: inline-block;
+      padding: 2px 9px;
+      border: 1px solid var(--amber);
+      background: var(--amber-soft);
+      color: var(--amber);
+      font: 850 .76rem/1.5 ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+    .status.active {
+      border-color: var(--green);
+      background: var(--green-soft);
+      color: var(--green);
+    }
+    nav { display: flex; gap: 8px; margin: 17px 0; overflow-x: auto; }
+    nav a {
+      flex: none;
+      padding: 7px 11px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--ink);
+      font: 750 .77rem/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      text-decoration: none;
+    }
+    nav a:hover, nav a:focus-visible { border-color: var(--steel); outline: 3px solid rgba(49, 95, 120, .16); }
+    section { margin-top: 18px; padding: 34px 38px 38px; }
+    .section-head {
+      display: grid;
+      grid-template-columns: 146px 1fr;
+      gap: 20px;
+      align-items: start;
+      margin-bottom: 22px;
+    }
+    .label { padding-top: 6px; border-top: 4px solid var(--steel); color: var(--steel); font-size: .72rem; font-weight: 850; }
+    h2 {
+      margin: 0;
+      font-family: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif;
+      font-size: clamp(1.55rem, 3.5vw, 2.35rem);
+      line-height: 1.15;
+      letter-spacing: -.03em;
+    }
+    h3 { margin: 25px 0 8px; font-size: 1.02rem; }
+    p, ul, ol, figure { margin-top: 10px; }
+    li + li { margin-top: 5px; }
+    code {
+      padding: 2px 5px;
+      background: var(--ice);
+      color: var(--steel-deep);
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+    a { color: #175c82; text-underline-offset: 3px; }
+    .request {
+      display: grid;
+      grid-template-columns: 132px 1fr;
+      gap: 18px;
+      margin: 18px 0;
+      padding: 18px 20px;
+      border-left: 7px solid var(--amber);
+      background: var(--amber-soft);
+    }
+    .request strong { color: var(--amber); font: 850 .73rem/1.4 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .07em; text-transform: uppercase; }
+    .request p { margin: 0; }
+    .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; }
+    .facts article { padding: 16px; border: 1px solid var(--line); background: var(--mist); }
+    .facts b { display: block; margin-bottom: 6px; color: var(--steel-deep); font-size: 1rem; }
+    .facts span { color: var(--ink-soft); font-size: .9rem; }
+    .decision {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 18px;
+      margin-top: 20px;
+      padding: 18px 20px;
+      border: 1px solid #91bbb0;
+      background: var(--green-soft);
+    }
+    .decision strong { color: var(--green); font: 850 .76rem/1.4 ui-monospace, "SFMono-Regular", Consolas, monospace; text-transform: uppercase; }
+    .decision p { margin: 0; }
+    .rails {
+      display: grid;
+      grid-template-columns: 180px 1fr 1fr;
+      gap: 1px;
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      background: var(--line);
+    }
+    .rails > div { min-height: 86px; padding: 15px 17px; background: var(--paper); }
+    .rails .head { min-height: auto; background: var(--ink); color: white; }
+    .rail-title { font-size: .73rem; font-weight: 850; }
+    .rails .role { background: #eff4f6; font-weight: 800; }
+    .rails .root-lane { border-left: 7px solid var(--root); }
+    .rails .talebook-lane { border-left: 7px solid var(--talebook); }
+    .rails small { display: block; margin-top: 5px; color: var(--ink-soft); }
+    .cap {
+      display: inline-block;
+      margin-top: 7px;
+      padding: 2px 7px;
+      border: 1px solid var(--steel);
+      color: var(--steel);
+      font: 800 .68rem/1.4 ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+    .path-strip {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 14px;
+      align-items: center;
+      margin-top: 20px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: var(--mist);
+      text-align: center;
+    }
+    .path-strip .arrow { color: var(--amber); font: 900 1.6rem/1 ui-monospace, monospace; }
+    .path-strip b { display: block; margin-bottom: 5px; color: var(--ink-soft); font-size: .76rem; }
+    .matrix { overflow-x: auto; border: 1px solid var(--line); }
+    table { width: 100%; min-width: 800px; border-collapse: collapse; font-size: .91rem; }
+    th, td { padding: 11px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--ink); color: white; font: 750 .73rem/1.35 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .04em; }
+    tbody tr:nth-child(even) { background: #f2f6f7; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .recommended { color: var(--green); font-weight: 850; }
+    .rejected { color: var(--red); font-weight: 780; }
+    .state-machine {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 22px;
+      margin: 24px 0 0;
+    }
+    .state-machine article {
+      position: relative;
+      min-height: 150px;
+      padding: 17px;
+      border: 1px solid var(--line);
+      border-top: 7px solid var(--steel);
+      background: var(--paper);
+    }
+    .state-machine article:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      top: 51px;
+      right: -19px;
+      z-index: 2;
+      color: var(--amber);
+      font: 900 1.4rem/1 ui-monospace, monospace;
+    }
+    .state { color: var(--steel); font-size: .68rem; font-weight: 850; }
+    .state-machine h3 { margin: 8px 0 5px; }
+    .state-machine p { margin: 0; color: var(--ink-soft); font-size: .86rem; }
+    .rollback {
+      margin-top: 18px;
+      padding: 17px 20px;
+      border: 1px solid #d9a477;
+      border-left: 7px solid var(--amber);
+      background: var(--amber-soft);
+    }
+    .rollback b { color: var(--amber); }
+    .contract-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .contract-grid article { padding: 17px 18px; border: 1px solid var(--line); background: var(--mist); }
+    .contract-grid h3 { margin-top: 0; }
+    .contract-grid ul { margin-bottom: 0; padding-left: 20px; }
+    .test-status {
+      display: inline-block;
+      min-width: 92px;
+      padding: 3px 8px;
+      border: 1px solid currentColor;
+      color: var(--amber);
+      font-size: .68rem;
+      font-weight: 850;
+      text-align: center;
+    }
+    .test-status.pass { color: var(--green); }
+    .evidence { color: var(--steel); }
+    .risk-list { display: grid; gap: 8px; padding: 0; list-style: none; }
+    .risk-list li {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 16px;
+      padding: 13px 15px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+    }
+    .risk-list b { color: var(--amber); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: .78rem; text-transform: uppercase; }
+    footer { padding: 23px 0 0; color: var(--ink-soft); text-align: center; font-size: .81rem; }
+    @media (max-width: 920px) {
+      .meta { grid-template-columns: repeat(2, 1fr); }
+      .facts { grid-template-columns: 1fr; }
+      .state-machine { grid-template-columns: repeat(2, 1fr); }
+      .state-machine article::after { display: none; }
+    }
+    @media (max-width: 660px) {
+      main { width: min(100% - 18px, 1160px); padding-top: 9px; }
+      header, section { padding: 26px 20px; }
+      header::after { display: none; }
+      .meta, .section-head, .request, .decision, .contract-grid, .path-strip, .state-machine { grid-template-columns: 1fr; }
+      .rails { grid-template-columns: 115px 1fr; }
+      .rails .head:first-child { display: none; }
+      .rails .head:nth-child(3) { display: none; }
+      .rails .role { grid-column: 1; }
+      .rails .root-lane, .rails .talebook-lane { grid-column: 2; }
+      .rails .root-lane + .talebook-lane { border-top: 1px dashed var(--line); }
+      .path-strip .arrow { transform: rotate(90deg); }
+      .risk-list li { grid-template-columns: 1fr; gap: 4px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Container runtime · TLS certificate transaction</p>
+      <h1>证书能热更新，应用不必全程 root</h1>
+      <p class="lede">保留 Talebook 面向 NAS 与 Docker 用户的内置 SSL 上传能力；将监听低端口所需的权限精确授予 Nginx，并把证书写入、配置检查、热加载和失败恢复收敛为一次可验证的事务。</p>
+      <div class="meta">
+        <div><strong>创建日期</strong>2026-07-30</div>
+        <div><strong>所属模块</strong>docker（主要）</div>
+        <div><strong>状态</strong><span class="status active">ACTIVE</span></div>
+        <div><strong>需求来源</strong><a href="https://github.com/talebook/talebook/issues/761">Issue #761</a> 后续核查</div>
+        <div><strong>影响范围</strong>Docker / Supervisor / Nginx / webserver / tests</div>
+      </div>
+    </header>
+
+    <nav aria-label="方案目录">
+      <a href="#request">原始诉求</a>
+      <a href="#evidence">现状证据</a>
+      <a href="#identity">运行身份</a>
+      <a href="#transaction">证书事务</a>
+      <a href="#compatibility">兼容边界</a>
+      <a href="#tests">验证结果</a>
+    </nav>
+
+    <section id="request">
+      <div class="section-head"><div class="label">Request &amp; scope</div><h2>修复功能，不绕开功能</h2></div>
+      <div class="request">
+        <strong>原始诉求</strong>
+        <p>继续处理 Issue #761 的运行身份问题；不能因为权限实现复杂就废弃 SSL 上传。需要确认 slim runtime 下的真实行为，并给出比整套身份重构更直接、可完整验证的方案。</p>
+      </div>
+      <h3>目标</h3>
+      <ul>
+        <li>默认 <code>PUID=1000</code>、<code>PGID=1000</code> 时，管理员上传合法证书后立即完成 Nginx 热加载。</li>
+        <li>Nginx master、worker 与 Tornado 均以动态映射后的 <code>talebook</code> 身份运行；只有 Supervisor 与一次性 bootstrap 保留 root。</li>
+        <li>Nginx 继续监听容器内 80/443，Docker 对外端口和现有证书路径保持不变。</li>
+        <li>配置检查或热加载失败时恢复旧证书，不能出现“接口报错但新证书留在磁盘、重启后意外生效”。</li>
+        <li>实现同时覆盖静态生产镜像与 SSR 生产镜像，并通过真实 Docker 与 Chrome 操作验收。</li>
+      </ul>
+      <h3>非目标</h3>
+      <ul>
+        <li>不移除 SSL 上传，不要求用户改用 Caddy、Traefik 或宿主机反向代理。</li>
+        <li>不改变 <code>/data/books/ssl/ssl.crt</code> 与 <code>/data/books/ssl/ssl.key</code>。</li>
+        <li>本次不禁止 <code>PUID=0</code>；它保留为显式兼容配置，但不再是 SSL 上传的必要条件。</li>
+        <li>不处理 Calibre Google/Amazon 元数据插件未注册问题；该问题由 Issue #907 独立跟踪。</li>
+      </ul>
+    </section>
+
+    <section id="evidence">
+      <div class="section-head"><div class="label">Observed on master</div><h2>当前故障发生在 reload 权限，不在 Chromium</h2></div>
+      <div class="facts">
+        <article><b>默认身份稳定失败</b><span>Chrome 上传请求进入 Tornado 后，<code>nginx -t</code> 因无法访问 root 所有的 <code>/run/nginx.pid</code> 返回权限错误。</span></article>
+        <article><b>写盘先于检查</b><span>接口虽然返回失败，新证书却已覆盖存量文件；当前 Nginx 仍使用旧证书，下一次容器重启会加载“失败”的新证书。</span></article>
+        <article><b><code>PUID=0</code> 能成功</b><span>所有进程均变为 root 后，检查与 reload 成功，证明证书功能本身可用，但该方式扩大了整个应用的权限。</span></article>
+      </div>
+      <div class="decision">
+        <strong>已确认结论</strong>
+        <p>slim 基础镜像不包含 Qt/Chromium，已消除旧版 Calibre 触发 Chromium root sandbox 的路径；但这不会修复 Nginx PID 文件与信号权限。两类问题必须分开处理。</p>
+      </div>
+      <h3>当前调用顺序</h3>
+      <p><code>SSLHandlerLogic.run()</code> 先写正式证书，再执行 <code>nginx -t</code> 和 <code>service nginx reload</code>。Handler 既承担 HTTP 行为，也承担文件事务与进程控制，失败恢复没有形成明确接口。</p>
+    </section>
+
+    <section id="identity">
+      <div class="section-head"><div class="label">Privilege rail</div><h2>root 只做初始化，长期进程统一为 talebook</h2></div>
+      <div class="rails" role="img" aria-label="容器进程运行身份分配">
+        <div class="head rail-title">进程</div>
+        <div class="head rail-title">root 轨道</div>
+        <div class="head rail-title">talebook 轨道</div>
+
+        <div class="role">supervisord</div>
+        <div class="root-lane"><b>保留</b><small>PID 1，拉起并监督不同身份的子进程。</small></div>
+        <div class="talebook-lane"><small>不迁移，避免扩大本次编排改动。</small></div>
+
+        <div class="role">bootstrap</div>
+        <div class="root-lane"><b>保留后退出</b><small>修复挂载卷权限、迁移数据库、写入启动状态。</small></div>
+        <div class="talebook-lane"><small>其中业务命令继续通过 gosu 以 talebook 执行。</small></div>
+
+        <div class="role">nginx</div>
+        <div class="root-lane"><small>不再以 root master 常驻。</small></div>
+        <div class="talebook-lane"><b>master + worker</b><small>Supervisor 通过 <code>user=talebook</code> 启动。</small><span class="cap">CAP_NET_BIND_SERVICE</span></div>
+
+        <div class="role">tornado / node</div>
+        <div class="root-lane"><small>不使用 root。</small></div>
+        <div class="talebook-lane"><b>保持</b><small>继续使用映射后的 PUID/PGID。</small></div>
+      </div>
+
+      <div class="path-strip">
+        <div><b>旧 PID 文件</b><code>/run/nginx.pid</code><br><small>父目录仅 root 可创建文件</small></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div><b>新 PID 文件</b><code>/run/talebook/nginx.pid</code><br><small>运行目录由 start.sh 创建并授权</small></div>
+      </div>
+
+      <h3>实现约束</h3>
+      <ul>
+        <li>镜像构建时只给 <code>/usr/sbin/nginx</code> 添加 <code>cap_net_bind_service=+ep</code>，不把能力授予 Python、Node 或整个容器。</li>
+        <li><code>docker/start.sh</code> 在动态修改 talebook UID/GID 后创建并授权 <code>/run/talebook</code>、<code>/data/books/ssl</code>、Nginx 日志与临时目录。</li>
+        <li>Nginx 主配置中的 PID 路径改为 <code>/run/talebook/nginx.pid</code>；证书路径与站点配置保持不变。</li>
+        <li>Supervisor 的静态生产与 SSR 配置都使用 <code>user=talebook</code> 启动 Nginx；dev 配置同步，避免开发与生产身份模型分叉。</li>
+        <li>启动自检以 talebook 身份运行 <code>nginx -t</code>，验证真实运行权限，不接受 root 检查造成的假阳性。</li>
+      </ul>
+    </section>
+
+    <section id="alternatives">
+      <div class="section-head"><div class="label">Decision record</div><h2>候选方案与取舍</h2></div>
+      <div class="matrix">
+        <table>
+          <thead><tr><th>方案</th><th>优点</th><th>代价</th><th>结论</th></tr></thead>
+          <tbody>
+            <tr><td>容器内改用 8080/8443</td><td>完全不需要低端口能力</td><td>破坏现有 80/443 映射、Compose 和用户部署习惯</td><td class="rejected">不采用</td></tr>
+            <tr><td>保留 root Nginx，增加 sudo/helper</td><td>站点配置改动较少</td><td>新增特权接口、授权规则和维护面；实现比问题本身更绕</td><td class="rejected">不采用</td></tr>
+            <tr><td>只把 <code>/run/nginx.pid</code> chown</td><td>表面改动最小</td><td>Nginx 退出会删除 PID 文件，非 root 无权在 <code>/run</code> 重建；也不能向 root master 发信号</td><td class="rejected">无效</td></tr>
+            <tr><td>外置 TLS，删除内置上传</td><td>应用不负责证书</td><td>违背 NAS/Docker 一体化诉求，属于功能退化</td><td class="rejected">不采用</td></tr>
+            <tr><td>talebook Nginx + 单项 capability</td><td>保留端口兼容；Tornado 可直接 reload；权限范围清晰</td><td>需要管理 Nginx PID、日志和临时目录的属主</td><td class="recommended">采用</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="transaction">
+      <div class="section-head"><div class="label">Certificate state</div><h2>一次上传只有“完整生效”或“恢复旧值”</h2></div>
+      <p>新增内部深模块 <code>SSLCertificateManager</code>，对 Handler 只暴露一个安装接口。临时文件、备份、权限、Nginx 检查、热加载与失败恢复都留在模块实现内部；HTTP Handler 不再知道操作顺序。</p>
+
+      <div class="state-machine" role="img" aria-label="SSL 证书安装事务状态机">
+        <article><div class="state">01 · validate</div><h3>校验上传</h3><p>在 SSL 目录创建临时文件，校验证书链与私钥匹配；失败不触碰正式文件。</p></article>
+        <article><div class="state">02 · prepare</div><h3>锁定与备份</h3><p>获取更新锁，保存旧证书和私钥，候选文件落盘并设置确定权限。</p></article>
+        <article><div class="state">03 · install</div><h3>原子替换</h3><p>用同目录 <code>os.replace</code> 分别替换正式文件，避免单个文件出现半写状态。</p></article>
+        <article><div class="state">04 · verify</div><h3>检查配置</h3><p>以 talebook 运行 <code>nginx -t</code>；错误时立即恢复旧文件。</p></article>
+        <article><div class="state">05 · activate</div><h3>热加载</h3><p>执行 <code>nginx -s reload</code>；成功后删除备份并返回 <code>err: ok</code>。</p></article>
+      </div>
+
+      <div class="rollback">
+        <b>统一回滚规则：</b>配置检查或 reload 任一步失败，使用同目录临时文件与 <code>os.replace</code> 恢复旧证书，再检查旧配置；reload 已被请求但失败时，再尝试恢复旧配置的 reload。若恢复本身失败，返回独立的 rollback 错误并完整记录服务端日志，不能伪装成普通 reload 失败。
+      </div>
+
+      <h3>文件契约</h3>
+      <ul>
+        <li>正式路径仍为 <code>/data/books/ssl/ssl.crt</code> 与 <code>/data/books/ssl/ssl.key</code>。</li>
+        <li>证书权限固定为 <code>0644</code>，私钥固定为 <code>0600</code>，属主为动态映射后的 talebook。</li>
+        <li>临时文件与备份必须位于同一目录，确保 <code>os.replace</code> 不跨文件系统。</li>
+        <li>成功、失败与异常退出都清理临时文件；锁只保护一次安装事务，不暴露给 Handler。</li>
+        <li>reload 使用 <code>nginx -s reload</code>，不再依赖 Debian init 脚本 <code>service nginx reload</code>。</li>
+      </ul>
+    </section>
+
+    <section id="compatibility">
+      <div class="section-head"><div class="label">Compatibility &amp; risk</div><h2>外部接口保持，内部权限收窄</h2></div>
+      <div class="contract-grid">
+        <article>
+          <h3>保持不变</h3>
+          <ul>
+            <li>管理员 SSL 上传接口及前端交互。</li>
+            <li>容器内 80/443 与 Docker 端口映射。</li>
+            <li>正式证书、私钥和数据卷路径。</li>
+            <li>PUID/PGID 的动态 UID/GID 映射。</li>
+            <li>静态诊断页和 bootstrap 启动自检。</li>
+          </ul>
+        </article>
+        <article>
+          <h3>明确变化</h3>
+          <ul>
+            <li>Nginx master 从 root 改为 talebook。</li>
+            <li>PID 文件移入 talebook 可管理的运行目录。</li>
+            <li>Nginx 二进制获得唯一的低端口绑定能力。</li>
+            <li>上传失败不再保留候选证书。</li>
+            <li><code>PUID=0</code> 仍可用，但不再作为 SSL workaround。</li>
+          </ul>
+        </article>
+      </div>
+      <ul class="risk-list">
+        <li><b>能力保留</b><span>构建后使用 <code>getcap /usr/sbin/nginx</code> 验证文件能力；实际以 PUID 1000 监听 80/443，防止多阶段 COPY 或打包过程丢失扩展属性。</span></li>
+        <li><b>启动顺序</b><span>SSL、日志、PID 与 Nginx 临时目录必须在 Supervisor 启动前完成授权，否则非 root Nginx 无法提供诊断页。</span></li>
+        <li><b>SSR 一致性</b><span>SSR 镜像继承 production 后覆盖 Supervisor 配置，必须同步 Nginx 用户配置；Node 运行身份不变化。</span></li>
+        <li><b>显式 root</b><span><code>PUID=0</code> 会把名为 talebook 的账户映射到 UID 0。本次为兼容保留，并在容器日志中输出安全提示；是否禁止需另立方案。</span></li>
+      </ul>
+      <h3>发布与回滚</h3>
+      <p>不涉及库表、数据迁移或证书路径迁移。镜像回滚到旧版本后仍能读取同一组正式证书。若新镜像无法启动，可直接回滚镜像标签；数据卷不需要执行逆向转换。</p>
+    </section>
+
+    <section id="tests">
+      <div class="section-head"><div class="label">Verification results</div><h2>故障已复现，默认身份与兼容模式均完成验证</h2></div>
+      <div class="matrix">
+        <table>
+          <thead><tr><th>层级</th><th>验证项</th><th>实际命令或操作</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td>诊断证据</td><td>master 默认 PUID 上传失败且写盘残留</td><td>生产镜像 + Nuxt dev server + Chrome 上传 + TLS 指纹比较</td><td><span class="test-status evidence">已复现</span></td></tr>
+            <tr><td>定向单测</td><td>证书事务、异常映射、Nginx 自检身份、三套 Supervisor 配置与启动脚本契约</td><td><code>pytest tests/test_ssl_crt.py tests/test_self_check.py tests/test_runtime_identity_config.py -q</code></td><td><span class="test-status pass">31 passed</span></td></tr>
+            <tr><td>后端全量</td><td>全部 Python 回归与格式检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make pytest</code></td><td><span class="test-status pass">696 passed</span><br><small>2 skipped，22 个既有依赖或代码弃用告警；无失败。</small></td></tr>
+            <tr><td>镜像构建</td><td>production 与 production-ssr 均可构建，Nginx capability 保留</td><td><code>docker build --target production</code>；<code>docker build --target production-ssr</code></td><td><span class="test-status pass">通过</span></td></tr>
+            <tr><td>容器身份</td><td>默认 PUID 1000 下长期进程非 root，80/443 可监听，诊断页可用</td><td><code>docker run</code> + <code>docker exec ps/getcap</code> + HTTP/HTTPS 探测；分别运行静态与 SSR 镜像</td><td><span class="test-status pass">通过</span><br><small>Supervisor 为 root；Nginx master/worker、Tornado 与 SSR Node 为 talebook；capability 为 <code>cap_net_bind_service=ep</code>。</small></td></tr>
+            <tr><td>Chrome E2E</td><td>管理员上传成功、线上指纹立即切换、重启后保持</td><td><code>CHOKIDAR_USEPOLLING=true API_URL=http://127.0.0.1:18180 npx nuxt dev --port 3000 --host 127.0.0.1</code> + Chrome DevTools MCP</td><td><span class="test-status pass">通过</span><br><small>POST 返回 <code>err: ok</code>；线上与磁盘均切换为测试证书二，重启后 SHA-256 指纹不变。</small></td></tr>
+            <tr><td>失败路径</td><td>非法配对不触碰正式证书；保存、配置检查、reload 与恢复失败均有确定行为</td><td>Chrome 上传不匹配证书与私钥；单测注入写入、<code>nginx -t</code>、reload 和 rollback 失败</td><td><span class="test-status pass">通过</span><br><small>浏览器显示“证书与私钥不匹配”，磁盘和线上指纹保持；进程级 reload 注入采用可重复单测替代破坏性容器注入。</small></td></tr>
+            <tr><td>兼容性</td><td>显式 PUID 0 仍可启动并热更新证书，同时输出安全提示</td><td>独立容器运行；检查日志、进程、<code>nginx -t</code>，并以兼容身份调用同一证书安装服务</td><td><span class="test-status pass">通过</span></td></tr>
+            <tr><td>文件与重启</td><td>证书模式 0644、私钥模式 0600；重启后加载上传证书</td><td><code>stat</code> + TLS 证书主题与 SHA-256 指纹比较</td><td><span class="test-status pass">通过</span></td></tr>
+            <tr><td>方案检查</td><td>路径、状态、HTML 与离线资源约束</td><td><code>make check-design</code></td><td><span class="test-status pass">通过</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>验收结论与已知告警</h3>
+      <ul>
+        <li>默认 PUID 1000、SSR 与显式 PUID 0 三类运行方式均到达 <code>ready</code>，证书热更新不再要求整套应用以 root 运行。</li>
+        <li>Chrome 实际验证了管理员设置页的匹配证书成功路径与错误配对路径；成功请求后的在线证书与磁盘证书指纹一致。</li>
+        <li>本机 Nuxt 常规文件监听触发 <code>EMFILE</code>，改用 Chokidar polling 后完成验收；这只影响本地测试启动方式，不影响镜像运行。</li>
+        <li>浏览器仍显示既有 Vuetify i18n 缺失 key 告警；Nginx 仍提示既有 <code>listen ... http2</code> 弃用告警。二者均不影响本次 SSL 流程，且本次不扩大范围处理。</li>
+      </ul>
+    </section>
+
+    <footer>Talebook internal design · SSL certificate reload · ACTIVE</footer>
+  </main>
+</body>
+</html>
