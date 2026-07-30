@@ -324,13 +324,18 @@
     <div class="meta">
       <div><span>创建日期</span><strong>2026-07-30</strong></div>
       <div><span>所属模块</span><strong>project</strong></div>
-      <div><span>状态</span><strong class="status">ACTIVE</strong></div>
+      <div><span>状态</span><strong class="status">SUPERSEDED</strong></div>
       <div><span>工作分支</span><strong>fix/20260730-codex-actions-run-30518957369</strong></div>
       <div><span>需求来源</span><strong>修复 Codex run 30518957369 并提交 PR</strong></div>
     </div>
   </header>
 
   <main>
+    <section>
+      <h2><span class="section-no">00</span>替代说明</h2>
+      <p class="callout"><strong>本方案已被替代：</strong>用户明确要求 Codex 必须直接处于 <code>talebook/talebook:dev</code> 完整项目环境；后续证据也确认可以用非 root job container 阻断 GitHub runner 强制挂载的 Docker socket。因此本方案由 <code>20260730-codex-dev-container-outer-sandbox.active.html</code> 替代，不再以裸 hosted runner 作为 Codex 运行边界。</p>
+    </section>
+
     <section>
       <h2><span class="section-no">01</span>原始诉求与验收目标</h2>
       <div class="lead">

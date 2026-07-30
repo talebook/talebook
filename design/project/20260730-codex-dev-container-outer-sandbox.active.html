@@ -349,7 +349,7 @@
     <div class="meta">
       <div><span>创建日期</span><strong>2026-07-30</strong></div>
       <div><span>所属模块</span><strong>project</strong></div>
-      <div><span>状态</span><strong class="status">WIP</strong></div>
+      <div><span>状态</span><strong class="status">ACTIVE</strong></div>
       <div><span>工作分支</span><strong>fix/20260730-codex-actions-run-30518957369</strong></div>
       <div><span>需求来源</span><strong>用户纠正：Codex 必须保留完整 dev image 环境</strong></div>
     </div>
@@ -550,8 +550,8 @@ project runtime:
           </tr>
           <tr>
             <td>方案生命周期</td>
-            <td>验证通过后激活本方案，并把 <code>20260730-codex-host-sandbox-recovery.active.html</code> 转为 SUPERSEDED。</td>
-            <td>旧的 <code>20260722-agent-workflows-dev-container.superseded.html</code> 保留历史状态；不重新激活旧决策。</td>
+            <td>本方案已在真实 hosted smoke 通过后激活，并把 <code>20260730-codex-host-sandbox-recovery.active.html</code> 转为 SUPERSEDED。</td>
+            <td>旧的 <code>20260722-agent-workflows-dev-container.superseded.html</code> 保留历史状态；没有重新激活旧决策。</td>
           </tr>
         </tbody>
       </table>
@@ -559,7 +559,7 @@ project runtime:
 
     <section>
       <h2><span class="section-code">TEST</span>验证计划</h2>
-      <p class="callout pending"><strong>状态：修订方案已获用户批准，正在实现并等待 hosted runner。</strong>非 root 候选已证明可以同时保留完整 dev image 与阻断 socket；真实 GitHub job container 结果仍是激活阻断项。</p>
+      <p class="callout"><strong>验证完成：</strong>修订方案已获用户批准，本地 exact-image 与 GitHub hosted runner 均证明非 root job container 可以同时保留完整 dev image、阻断 Docker socket 并运行全量 pytest。run <code>30541122659</code>、job <code>90865878990</code> 是本方案激活的运行时证据。</p>
       <table>
         <thead>
           <tr><th>验证层</th><th>计划命令或证据</th><th>当前状态</th></tr>
@@ -571,9 +571,9 @@ project runtime:
           <tr><td>非 root 候选 smoke</td><td>同一 dev image、UID/GID 1001、<code>/data</code> tmpfs、同一外层安全参数并模拟 runner socket 挂载。</td><td>通过：Calibre、Codex、依赖同步可用，socket 连接返回 <code>EACCES</code>；候选代码快照 <strong>697 passed、1 skipped、18 warnings in 49.01s</strong>。</td></tr>
           <tr><td>本地 exact-image smoke</td><td>修订实现后，同一 dev image、同一 container options 下验证工具链、安全状态、依赖同步、danger-full-access 与当前分支全量 pytest。</td><td>通过：UID/GID <code>1001:1001</code>、无附加组、socket 连接返回 <code>EACCES</code>、Calibre/Codex/依赖同步可用；<strong>683 passed、1 skipped、30 warnings in 80.38s</strong>。</td></tr>
           <tr><td>本地 Actions 编排</td><td><code>act pull_request -j codex-sandbox-smoke</code></td><td>确认 job 以 UID 1001 启动；随后因 Docker Desktop 不允许 act 对 macOS bind mount 执行 <code>chown</code>，在创建 <code>CODEX_HOME</code> 前停止。该本地平台限制不冒充 hosted 结果。</td></tr>
-          <tr><td>GitHub hosted container smoke</td><td>PR job 必须在真实 hosted runner 的 dev job container 内通过非 root、零 capabilities、默认 seccomp、Docker socket 不可写且连接被拒、Calibre import 和全量 pytest。</td><td>待执行；合并阻断项</td></tr>
-          <tr><td>项目检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make test</code>、<code>make check-design</code>、<code>git diff --check</code></td><td><code>make lint-py-fix</code>、<code>make lint-py</code> 与 <code>git diff --check</code> 通过；<code>make test</code> 为 <strong>682 passed、2 skipped、33 warnings in 59.88s</strong>，其中 actionlint 用例因测试镜像未安装 Go 工具而按设计跳过；<code>make check-design</code> 当前仅按预期拦截本 WIP。</td></tr>
-          <tr><td>PR 交付</td><td>PR #910 保持 Draft，直到 smoke、项目 CI 和方案生命周期全部完成；正文更新真实风险与最终 SHA 固定方案链接。</td><td>Draft</td></tr>
+          <tr><td>GitHub hosted container smoke</td><td>GitHub Actions run <code>30541122659</code>、job <code>90865878990</code>；真实 hosted runner 的 dev job container。</td><td>通过：runner 使用预期 Docker create options，socket 为 <code>root:118</code> 且连接返回 <code>EACCES (13)</code>；Calibre 8.5.0、Codex external-sandbox 自检、依赖同步成功；merge ref 全量测试 <strong>698 passed、1 skipped、21 warnings in 46.65s</strong>。</td></tr>
+          <tr><td>项目检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make test</code>、<code>make check-design</code>、<code>git diff --check</code></td><td><code>make lint-py-fix</code>、<code>make lint-py</code> 与 <code>git diff --check</code> 通过；<code>make test</code> 为 <strong>682 passed、2 skipped、33 warnings in 59.88s</strong>，其中 actionlint 用例因测试镜像未安装 Go 工具而按设计跳过；激活后 <code>make check-design</code> 为 <strong>63 design documents passed</strong>。</td></tr>
+          <tr><td>PR 交付</td><td>PR #910 在 WIP 验证阶段保持 Draft；激活提交推送后更新最终 SHA 固定方案链接并转为 Ready。</td><td>hosted smoke 已通过；进入激活收尾。</td></tr>
         </tbody>
       </table>
     </section>
@@ -582,7 +582,7 @@ project runtime:
       <h2><span class="section-code">ROLL</span>发布与回滚</h2>
       <ul>
         <li>本 PR 不修改 Dockerfile、dev image 发布逻辑、Claude workflow、应用 API 或生产镜像。</li>
-        <li>如果 hosted container smoke 发现 GitHub job container 不接受非 root 或 <code>/data</code> tmpfs 参数，方案保持 WIP；不得回退到 root、privileged 或裸 runner。</li>
+        <li>hosted container smoke 已确认 GitHub job container 接受非 root 与 <code>/data</code> tmpfs 参数；未来若该契约回归，应 fail-closed，不得回退到 root、privileged 或裸 runner。</li>
         <li>如果 danger-full-access 在真实主请求中出现行为差异，回退本 PR 会恢复当前已知失败状态；Codex workflow 应临时视为不可用。</li>
         <li>后续若 Codex 官方支持在非特权 job container 内工作的 sandbox backend，应创建新 WIP 恢复内层 workspace/network 强隔离。</li>
       </ul>
