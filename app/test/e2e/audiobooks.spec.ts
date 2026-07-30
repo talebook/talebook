@@ -92,4 +92,15 @@ test.describe('Audiobook production and playback', () => {
         await expect(page.getByLabel('男主角音色（可选）')).toBeVisible();
         await expect(page.getByLabel('女主角音色（可选）')).toBeVisible();
     });
+
+    test('blocks generation and explains when disk capacity is insufficient', async ({ page, request }) => {
+        const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+        await request.post(`${mockApi}/_test/reset`, {
+            data: { installed: true, audiobookCapacityOk: false },
+        });
+        await page.goto('/book/1/audios');
+
+        await expect(page.getByTestId('audiobook-capacity-warning')).toContainText('新的生成任务已暂停');
+        await expect(page.getByTestId('generate-audiobook')).toHaveCount(0);
+    });
 });

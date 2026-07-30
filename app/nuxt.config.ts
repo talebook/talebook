@@ -5,6 +5,9 @@ import { join, resolve } from 'node:path'
 export default defineNuxtConfig({
     compatibilityDate: '2024-04-03',
     devtools: { enabled: true },
+    ignore: [
+        '**/node_modules/**',
+    ],
     modules: [
         'vuetify-nuxt-module',
         '@pinia/nuxt',

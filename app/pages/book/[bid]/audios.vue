@@ -96,6 +96,15 @@
                 {{ t('audiobook.voicebookUnavailable') }}
                 <span v-if="detail.generation.health.reason">：{{ detail.generation.health.reason }}</span>
             </v-alert>
+            <v-alert
+                v-if="detail.generation?.permitted && detail.generation?.capacity && !detail.generation.capacity.ok"
+                type="warning"
+                variant="tonal"
+                class="mt-5"
+                data-testid="audiobook-capacity-warning"
+            >
+                {{ t('audiobook.capacityUnavailable') }}
+            </v-alert>
 
             <section
                 v-if="detail.generation?.can_manage && managedEditions.length"

@@ -242,6 +242,8 @@ class VoicebookProcess:
             term_sent_at = None
             lease_lost = False
             output_finished = False
+            control = {}
+            last_control_at = 0.0
             while process.poll() is None or not output_finished:
                 try:
                     line = output.get(timeout=heartbeat)
@@ -257,8 +259,10 @@ class VoicebookProcess:
                     except (ValueError, TypeError):
                         logging.warning("invalid voicebook event: %s", line[:300])
 
-                control = on_control() if on_control else {}
                 now = time.monotonic()
+                if on_control and now - last_control_at >= heartbeat:
+                    control = on_control() or {}
+                    last_control_at = now
                 if control.get("lease_owned") is False:
                     lease_lost = True
                     if process.poll() is None:
@@ -342,9 +346,6 @@ class AudiobookScheduler:
             )
             session.commit()
             self._run_maintenance()
-            if not self._has_capacity():
-                logging.warning("audiobook scheduler paused: free disk space is below AUDIOBOOK_MIN_FREE_GB")
-                return False
             job = (
                 session.query(AudiobookJob)
                 .filter(AudiobookJob.status == "queued")
@@ -352,6 +353,9 @@ class AudiobookScheduler:
                 .first()
             )
             if not job:
+                return False
+            if not self._has_capacity():
+                logging.warning("audiobook scheduler paused: free disk space is below AUDIOBOOK_MIN_FREE_GB")
                 return False
             job_id = job.id
             status = "inspecting" if not job.data.get("inspected") else "generating"

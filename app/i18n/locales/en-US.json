@@ -1127,6 +1127,7 @@
     "femaleProtagonistVoice": "Female lead voice (optional)",
     "protagonistVoiceHint": "Choose a catalog voice or enter a Voicebook voice ID. Leave blank for automatic casting.",
     "voicebookUnavailable": "Voicebook is currently unavailable. Jobs can be saved, but the command environment must be restored before generation.",
+    "capacityUnavailable": "Free disk space is below the configured safety threshold, so new generation jobs are paused.",
     "editionManagementEyebrow": "EDITION CONTROL",
     "editionManagement": "Candidate and historical editions",
     "publishEdition": "Publish",

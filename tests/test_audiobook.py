@@ -201,6 +201,25 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         self.assertEqual(invalid_quality["err"], "params.invalid")
         self.assertIn("标准音质", invalid_quality["msg"])
 
+    def test_low_disk_capacity_blocks_generation_and_job_creation(self):
+        usage = mock.Mock(free=1 * 1024**3)
+        with (
+            mock.patch("webserver.handlers.audiobook.shutil.disk_usage", return_value=usage),
+            mock.patch.dict("webserver.handlers.audiobook.CONF", {"AUDIOBOOK_MIN_FREE_GB": 5}),
+        ):
+            detail = self.json(f"/api/book/{test_main.BID_EPUB}/audios")
+            created = self.json(
+                f"/api/book/{test_main.BID_EPUB}/audio-jobs",
+                method="POST",
+                body=json.dumps({"mode": "quick", "engine": "edgetts"}),
+            )
+
+        self.assertFalse(detail["generation"]["capacity"]["ok"])
+        self.assertFalse(detail["generation"]["can_generate"])
+        self.assertEqual(detail["generation"]["reason"], "disk.low")
+        self.assertEqual(created["err"], "audiobook.disk_low")
+        self.assertEqual(test_main.get_db().query(models.AudiobookJob).count(), 0)
+
     def test_candidate_publish_partial_confirmation_and_historical_rollback(self):
         published_id = self.seed_published_edition()
         session = test_main.get_db()
@@ -434,6 +453,10 @@ description: 高级模式测试
         feed_path = urllib.parse.urlsplit(created["feed_url"]).path
         feed = self.fetch(feed_path)
         self.assertEqual(feed.code, 200)
+        self.assertEqual(feed.headers["Vary"], "Accept-Encoding")
+        cached = self.fetch(feed_path, headers={"If-None-Match": feed.headers["ETag"]})
+        self.assertEqual(cached.code, 304)
+        self.assertEqual(cached.headers["Vary"], "Accept-Encoding")
         root = ET.fromstring(feed.body)
         items = root.findall("./channel/item")
         self.assertEqual(len(items), 2)

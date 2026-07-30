@@ -51,6 +51,36 @@ def test_silent_voicebook_process_keeps_calling_control_callback():
         assert len(controls) >= 3
 
 
+def test_chatty_voicebook_process_throttles_control_callback_to_heartbeat():
+    with tempfile.TemporaryDirectory() as directory:
+        storage = AudiobookStorage(directory)
+        storage.ensure()
+        process = VoicebookProcess(storage)
+        controls = []
+        command = [
+            sys.executable,
+            "-u",
+            "-c",
+            "import time\nfor _ in range(200): print('{}')\ntime.sleep(0.12)",
+        ]
+        with (
+            mock.patch.object(VoicebookProcess, "command", new_callable=mock.PropertyMock, return_value=command),
+            mock.patch.dict(
+                "webserver.services.audiobook.CONF",
+                {"AUDIOBOOK_HEARTBEAT_SECONDS": 0.05},
+            ),
+        ):
+            status = process.run(
+                SimpleNamespace(id=1),
+                ["ignored"],
+                lambda _event: None,
+                lambda: controls.append(True) or {"lease_owned": True, "cancel_requested": False},
+            )
+
+        assert status == 0
+        assert 2 <= len(controls) < 20
+
+
 def test_cancel_escalates_to_term_and_returns_cancelled_status():
     with tempfile.TemporaryDirectory() as directory:
         storage = AudiobookStorage(directory)
@@ -159,6 +189,19 @@ def test_generation_defaults_are_written_to_voicebook_role_table():
         contents = script.read_text(encoding="utf-8")
         assert "旁白 | 旁白 | 人类 | 男 | 中年 | 中国 | 沉稳 | x1.25 |" in contents
         assert "韩立 | 主角 | 人类 | 男 | 青年 | 中国 | 克制 | x1.25 | edgetts=zh-CN-YunxiNeural" in contents
+
+
+def test_scheduler_capacity_gate_uses_configured_free_space_floor():
+    session_maker = _session_maker()
+    with tempfile.TemporaryDirectory() as directory:
+        scheduler = _scheduler(session_maker, AudiobookStorage(directory))
+        scheduler.storage.ensure()
+        usage = SimpleNamespace(total=20 * 1024**3, used=19 * 1024**3, free=1 * 1024**3)
+        with (
+            mock.patch("webserver.services.audiobook.shutil.disk_usage", return_value=usage),
+            mock.patch.dict("webserver.services.audiobook.CONF", {"AUDIOBOOK_MIN_FREE_GB": 5}),
+        ):
+            assert not scheduler._has_capacity()
 
 
 def test_all_nginx_variants_proxy_podcast_without_raw_access_log():

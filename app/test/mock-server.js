@@ -24,6 +24,7 @@ let audiobookJobs = [];
 let audiobookJobPolls = 0;
 let audiobookProgress = null;
 let audiobookManagedEditions = [];
+let audiobookCapacityOk = true;
 let podcastTokenHint = '';
 
 const builtinThemes = [
@@ -156,6 +157,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
       ]
     : [];
   if (body?.audiobookVersions) audiobookPublished = true;
+  audiobookCapacityOk = body?.audiobookCapacityOk !== false;
   podcastTokenHint = '';
   return { status: 'ok' };
 }));
@@ -265,10 +267,11 @@ router.get('/api/book/:bookId/audios', eventHandler(() => ({
     enabled: true,
     compatible: true,
     permitted: true,
-    can_generate: true,
+    can_generate: audiobookCapacityOk,
     can_manage: true,
     reason: '',
     health: { ok: true, version: 'voicebook-tool 0.4.0', reason: '' },
+    capacity: { ok: audiobookCapacityOk, free_bytes: audiobookCapacityOk ? 10737418240 : 1073741824, minimum_bytes: 5368709120 },
     engines: ['edgetts', 'qwen3tts'],
     quality_options: ['standard'],
   },

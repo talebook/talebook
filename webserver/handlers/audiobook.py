@@ -163,6 +163,14 @@ def _generation_capability(handler, book):
         and handler.is_book_owner(int(book["id"]), handler.user_id())
     )
     permitted = handler.is_admin() or owner_allowed
+    storage = AudiobookStorage()
+    try:
+        storage.ensure()
+        free_bytes = shutil.disk_usage(storage.root).free
+    except OSError:
+        free_bytes = 0
+    minimum_bytes = max(0.0, float(CONF.get("AUDIOBOOK_MIN_FREE_GB", 5))) * 1024**3
+    capacity_ok = free_bytes >= minimum_bytes
     if not enabled:
         reason = "disabled"
     elif not compatible:
@@ -171,6 +179,8 @@ def _generation_capability(handler, book):
         reason = "login.required"
     elif not permitted:
         reason = "permission"
+    elif not capacity_ok:
+        reason = "disk.low"
     else:
         reason = ""
     health = VoicebookProcess(AudiobookStorage()).health() if permitted and enabled and compatible else None
@@ -178,10 +188,15 @@ def _generation_capability(handler, book):
         "enabled": enabled,
         "compatible": compatible,
         "permitted": permitted,
-        "can_generate": enabled and compatible and permitted,
+        "can_generate": enabled and compatible and permitted and capacity_ok,
         "can_manage": handler.is_admin(),
         "reason": reason,
         "health": health,
+        "capacity": {
+            "ok": capacity_ok,
+            "free_bytes": free_bytes,
+            "minimum_bytes": int(minimum_bytes),
+        },
         "engines": ["edgetts", "qwen3tts"],
         "quality_options": ["standard"],
     }
@@ -306,6 +321,11 @@ class AudiobookJobCreate(BaseHandler):
         owner_allowed = CONF.get("AUDIOBOOK_OWNER_GENERATE", False) and self.is_book_owner(int(book_id), self.user_id())
         if not self.is_admin() and not owner_allowed:
             return {"err": "permission", "msg": _("只有管理员或获准的书籍所有者可以生成有声书")}
+        storage = AudiobookStorage()
+        storage.ensure()
+        minimum_bytes = max(0.0, float(CONF.get("AUDIOBOOK_MIN_FREE_GB", 5))) * 1024**3
+        if shutil.disk_usage(storage.root).free < minimum_bytes:
+            return {"err": "audiobook.disk_low", "msg": _("可用磁盘空间不足，暂不能创建生成任务")}
         formats = {str(value).upper() for value in book.get("available_formats", [])}
         if not formats.intersection({"EPUB", "TXT"}):
             return {"err": "format.not_supported", "msg": _("生成有声书需要 EPUB 或 TXT 格式")}
@@ -1010,6 +1030,7 @@ class PodcastFeed(PodcastBaseHandler):
         self.set_header("ETag", etag)
         self.set_header("Last-Modified", last_modified)
         self.set_header("Cache-Control", "private, max-age=300")
+        self.set_header("Vary", "Accept-Encoding")
         if self.request.headers.get("If-None-Match") == etag or self.request.headers.get("If-Modified-Since") == last_modified:
             self.set_status(304)
             self.finish()
@@ -1019,7 +1040,6 @@ class PodcastFeed(PodcastBaseHandler):
         if "gzip" in self.request.headers.get("Accept-Encoding", "").lower():
             payload = gzip.compress(body, mtime=0)
             self.set_header("Content-Encoding", "gzip")
-            self.set_header("Vary", "Accept-Encoding")
         self.set_header("Content-Length", str(len(payload)))
         if self.request.method != "HEAD":
             self.write(payload)

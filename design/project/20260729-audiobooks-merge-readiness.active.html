@@ -141,10 +141,9 @@
       height: 18px;
       border: 4px solid white;
       border-radius: 50%;
-      background: var(--red);
-      box-shadow: 0 0 0 1px var(--red);
+      background: var(--green);
+      box-shadow: 0 0 0 1px var(--green);
     }
-    .gate:nth-child(4) .dot, .gate:nth-child(5) .dot { background: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
     .gate-copy { padding: 0 0 24px 12px; }
     .gate-copy strong { display: block; color: var(--navy); font-size: 1.05rem; }
     .gate-copy p { margin: 5px 0 0; color: var(--muted); }
@@ -180,9 +179,9 @@
     <div class="masthead-inner">
       <p class="eyebrow">Merge control record · PR #882</p>
       <h1>有声书合并就绪修复方案</h1>
-      <p class="lede">把“能演示的 Beta”收敛为“生产路径真实可用、故障可恢复、发布证据可信”的版本；先消除功能和文档之间的落差，再允许转 Ready。</p>
+      <p class="lede">“能演示的 Beta”已经收敛为生产路径真实可用、故障可恢复、发布证据可信的版本；代码内合并门禁和 EdgeTTS 功能验收均已完成。</p>
       <dl class="meta">
-        <div><dt>状态</dt><dd><span class="status">WIP</span></dd></div>
+        <div><dt>状态</dt><dd><span class="status">ACTIVE</span></dd></div>
         <div><dt>创建日期</dt><dd>2026-07-29</dd></div>
         <div><dt>所属模块</dt><dd>project</dd></div>
         <div><dt>需求来源</dt><dd>继续处理 PR #882</dd></div>
@@ -195,23 +194,24 @@
     <section>
       <h2>1. 原始诉求与完成定义</h2>
       <p>将最新 <code>master</code> 合入 <code>feat/20260718-audiobooks</code>，解决合并审计发现的生产链路、任务可靠性、核心功能、测试与文档问题，最终启动本地 mock API 和 Nuxt dev server，提供可访问地址供体验。</p>
-      <div class="callout danger"><strong>完成不是“冲突消失”。</strong>完成要求 Candle Reader 音文同步 bundle 已进入 Talebook、Podcast 能穿过 Nginx 且 Token 不进入普通日志、任务具备可靠心跳/取消/幂等、生成和版本操作与 UI 一致，并有自动化与真实浏览器证据。</div>
+      <div class="callout"><strong>完成结论。</strong>Candle Reader v1.1.0 音文同步 bundle 已随最新 master 进入 Talebook；Podcast 代理、Token 脱敏、任务心跳/取消/幂等、生成容量门禁、版本操作和 UI 状态均已有自动化证据，EdgeTTS 已真实生成可播放 MP3。</div>
       <h3>本轮采用的发布边界</h3>
       <ul>
-        <li>Qwen 云账户欠费与 49 × 10 预览资产、Apple Podcasts iPhone/Mac 真机订阅属于外部 Beta 验收项；本轮必须显示明确状态并禁止伪报通过，但不以虚构素材或模拟真机替代。</li>
+        <li>按用户确认，本轮忽略 Qwen3TTS 云账户失败，以 EdgeTTS 完成功能验收；Qwen 预览资产不作为 PR #882 的合并门禁。</li>
+        <li>Apple Podcasts iPhone/Mac 真机订阅属于外部 Beta 验收项，本轮不以模拟真机替代，也不伪报通过。</li>
         <li>默认 EdgeTTS、Podcast 标准接口、Candle Reader 同步、任务恢复和安全链路是代码内合并门禁，必须实际完成。</li>
-        <li>若用户要求 Qwen 素材或 Apple 真机成为本轮硬门禁，需要提供可用云账户或真机协作，方案将保持 WIP。</li>
+        <li>后续若要提升 Qwen 或 Apple 真机状态，需另行提供可用云账户或真机协作，不回退本方案的 ACTIVE 状态。</li>
       </ul>
     </section>
 
     <section>
       <h2>2. 当前门禁轨道</h2>
       <div class="gate-rail" aria-label="合并门禁顺序">
-        <div class="gate"><div class="gate-id">GATE 01</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>基线与冲突</strong><p>快进到 PR 最新 head，合入最新 master，保留 EPUB 优先阅读与 audiobook 注入，并补交叉回归。</p></div></div>
-        <div class="gate"><div class="gate-id">GATE 02</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>生产分发</strong><p>发布 Candle Reader 新版本并同步 dist；补 Podcast 独立 Nginx location、Token 脱敏与真实代理测试。</p></div></div>
-        <div class="gate"><div class="gate-id">GATE 03</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>可靠调度</strong><p>独立租约心跳、JSONL seq 幂等、取消 TERM/KILL、恢复和清理策略必须能被测试证明。</p></div></div>
-        <div class="gate"><div class="gate-id">GATE 04</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>产品闭环</strong><p>生成参数真实传递、候选发布/回滚、所有者权限、Voicebook 健康状态和容量限制形成可用 UI。</p></div></div>
-        <div class="gate"><div class="gate-id">GATE 05</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>证据与交付</strong><p>全量检查、Docker/Nginx 集成、Chrome 实渲、截图、ACTIVE 方案和 PR 正文使用同一份事实。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 01</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>基线与冲突 · 完成</strong><p>最新 master 已通过合并提交 <code>1401818</code> 进入功能分支，EPUB 优先阅读与 audiobook 注入均已保留。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 02</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>生产分发 · 完成</strong><p>Candle Reader v1.1.0 的不可变 dist 已由 master 合入；Podcast 三套 Nginx 配置均使用独立 location 并关闭含 Token 的普通 access log。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 03</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>可靠调度 · 完成</strong><p>独立租约心跳、JSONL seq 幂等、取消 TERM/KILL、恢复、磁盘门禁和清理策略均有后端测试覆盖。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 04</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>产品闭环 · 完成</strong><p>生成参数、候选发布/回滚、所有者权限、Voicebook 健康状态和磁盘容量限制已形成一致的 API 与 UI。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 05</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>证据与交付 · 完成</strong><p>全量 Docker pytest、Nuxt lint/build、Chromium E2E、EdgeTTS 实际生成和多视口实渲已完成；Chrome DevTools MCP 的共享实例冲突单独记录为环境限制。</p></div></div>
       </div>
     </section>
 
@@ -264,7 +264,7 @@
           <ul>
             <li>数据库只新增字段/索引，启动迁移可重复执行；旧 Edition 和 Job 有安全默认值。</li>
             <li>公开音频继续跟随原书可见性；现有客户端路径保持不变。</li>
-            <li>旧 Candle bundle 在新版本发布前不覆盖；版本文件和 cache-busting 同步提交。</li>
+            <li>Candle Reader v1.1.0 bundle 与版本文件随同一次 master 合并进入，避免版本号和 cache-busting 漂移。</li>
           </ul>
         </article>
         <article class="card">
@@ -276,25 +276,27 @@
           </ul>
         </article>
       </div>
+      <div class="callout"><strong>已知边界。</strong>Qwen3TTS 按用户确认从本轮验收中排除；Apple Podcasts 真机订阅未执行。Chrome DevTools MCP 因另一活跃会话占用共享 Chrome profile 无法连接，未终止他人进程；改用真实 Chromium 的 Playwright 自动化与明暗主题、桌面/移动手工实渲作为替代证据。</div>
     </section>
 
     <section>
       <h2>6. 测试结果</h2>
-      <p><span class="tag beta">待验证</span> 进入实现前，本节只记录计划，不宣称历史结果。</p>
+      <p><span class="tag done">验证完成</span> 2026-07-30 在 PR 分支合入 Candle Reader v1.1.0 后重新执行；下表只记录实际运行结果。</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>范围</th><th>计划命令/页面</th><th>当前状态</th></tr></thead>
+          <thead><tr><th>范围</th><th>实际命令/页面与结果</th><th>状态</th></tr></thead>
           <tbody>
-            <tr><td>后端格式与功能</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make pytest</code>；定向调度器、Podcast、权限和格式测试。</td><td><span class="tag beta">待验证</span></td></tr>
-            <tr><td>前端</td><td><code>cd app &amp;&amp; npm run lint</code>、<code>npm run build</code>、Vitest 与完整 Chromium E2E。</td><td><span class="tag beta">待验证</span></td></tr>
-            <tr><td>生产代理</td><td>Nginx 配置检查；经 Nginx 请求 Feed、Range、304，并检查普通 access log 不含 Token。</td><td><span class="tag beta">待验证</span></td></tr>
-            <tr><td>跨仓与镜像</td><td>Candle Reader build/E2E/release/dist 校验；Talebook Docker 测试与生产镜像构建。</td><td><span class="tag beta">待验证</span></td></tr>
-            <tr><td>浏览器</td><td><code>/audios</code>、单书有声版、任务列表/工作台、候选发布回滚、Candle 同步；明暗主题和移动/桌面关键状态。</td><td><span class="tag beta">待验证</span></td></tr>
-            <tr><td>方案</td><td><code>make check-design</code>；新方案 ACTIVE 后再把旧主方案转 SUPERSEDED，清除所有 WIP。</td><td><span class="tag beta">待验证</span></td></tr>
+            <tr><td>后端格式与功能</td><td><code>make lint-py-fix</code> 与 <code>make lint-py</code> 通过；使用 <code>talebook/test</code> 镜像运行完整 <code>pytest -q tests</code>，结果为 699 passed、2 skipped。定向可靠性测试另得 7/7，通过静默任务心跳、高频输出节流、seq 幂等、TERM/KILL、角色表参数、磁盘门禁和三套 Nginx 配置检查。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>前端静态检查</td><td><code>npm run lint -- --no-cache</code> 为 0 errors、194 个既有 warnings；<code>npm run build</code> 完成 Nuxt 生产构建。为 Git worktree 增加 <code>node_modules</code> 忽略后，标准原生文件监听 dev server 可稳定启动，未启用 Chokidar polling。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>浏览器功能</td><td>针对 <code>/audios</code>、<code>/book/1/audios</code> 和制作流程执行 Chromium E2E，覆盖 Beta 标识、生成/发布/播放/恢复、高级审查、候选历史与磁盘不足禁用，结果 5 passed（22.4s）。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>实际渲染</td><td>在 1440 × 1000 明亮/暗色、390 × 844 移动端以及生成对话框状态完成真实 Chromium 渲染检查；无横向溢出、控制台错误或 400+ 请求，截图保存在 <code>document/screenshots/audiobooks-pr-882/</code>。Chrome DevTools MCP 受共享 profile 占用阻塞，使用 Playwright Chromium 替代。</td><td><span class="tag done">替代通过</span></td></tr>
+            <tr><td>EdgeTTS</td><td><code>voicebook-tool 0.4.0</code> 使用 <code>--engine edgetts --chapters 1 --progress-format jsonl --resume</code> 真实生成 2 个片段和章节 MP3；时长 15.386 秒、124006 bytes、manifest 状态 completed，音色为 <code>zh-CN-YunjianNeural</code>。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>Candle Reader / Podcast</td><td>master 提交 <code>cae2333</code> 已包含 Candle Reader v1.1.0，版本文件与 bundle 均可见 audiobook 播放/高亮入口；后端完整测试覆盖阅读页 Edition 注入、Feed XML/HEAD/304/gzip、媒体 Range/416、权限、限速与冻结，Nginx 静态断言覆盖三套配置的专用代理和 access log 关闭。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>方案</td><td><code>make check-design</code> 校验 ACTIVE 路径、HTML 结构与单文件资源约束。本方案是 <code>design/project/20260718-audiobooks.active.html</code> 的合并就绪补充记录，不替代其完整产品设计。</td><td><span class="tag done">通过</span></td></tr>
           </tbody>
         </table>
       </div>
-      <p class="small">最终交付还需更新 PR 正文：完整 SHA 的 GitHub/RawGitHack 方案链接、实际命令与结果、风险/兼容性、界面截图及外部未验证项。</p>
+      <p class="small">PR 正文同步使用推送后完整 SHA 的 GitHub/RawGitHack 方案链接，并保留实际命令、风险/兼容性、界面截图以及 Qwen3TTS 与 Apple 真机的验收边界。</p>
     </section>
   </main>
 </body>
