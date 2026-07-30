@@ -324,7 +324,7 @@
     <div class="meta">
       <div><span>创建日期</span><strong>2026-07-30</strong></div>
       <div><span>所属模块</span><strong>project</strong></div>
-      <div><span>状态</span><strong class="status">WIP</strong></div>
+      <div><span>状态</span><strong class="status">ACTIVE</strong></div>
       <div><span>工作分支</span><strong>fix/20260730-codex-actions-run-30518957369</strong></div>
       <div><span>需求来源</span><strong>修复 Codex run 30518957369 并提交 PR</strong></div>
     </div>
@@ -482,7 +482,7 @@ Sandbox(SeccompInstall(Seccomp(Os {
 
     <section>
       <h2><span class="section-no">06</span>验证计划与当前结果</h2>
-      <p class="callout pending"><span class="status-chip">待 hosted 验证</span> 本地实现与项目测试已经完成；GitHub hosted runner 的真实 sandbox smoke 是剩余合并阻断项。通过后再将本方案转为 ACTIVE。</p>
+      <p class="callout"><strong>验证完成：</strong>本地实现、项目测试与 GitHub hosted runner 的真实 sandbox smoke 均已通过。run <code>30521862495</code>、job <code>90803857382</code> 是本方案激活的运行时证据。</p>
       <table>
         <thead>
           <tr><th>验证层</th><th>实际命令或证据</th><th>当前状态</th></tr>
@@ -493,9 +493,9 @@ Sandbox(SeccompInstall(Seccomp(Os {
           <tr><td>Actions 静态检查</td><td><code>go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -config-file .github/actionlint.yaml .github/workflows/codex.yml</code></td><td>通过。</td></tr>
           <tr><td>真实 act：主 job</td><td><code>act issue_comment -W .github/workflows/codex.yml -j codex ...</code>，使用假 GitHub App 凭据且不读取生产 secret。</td><td>真实 runner 与 token action 已启动；按预期在解析假私钥时停止，属于外部 GitHub App 边界。</td></tr>
           <tr><td>真实 act：smoke job</td><td><code>act pull_request -W .github/workflows/codex.yml -j codex-sandbox-smoke ...</code></td><td>Node 24、Codex 0.144.6 和 apt 安装成功；act 外层 Docker 未挂载宿主 AppArmor 文件系统，profile 加载按 fail-closed 停止。由 hosted smoke 继续验收。</td></tr>
-          <tr><td>GitHub hosted smoke</td><td>PR 上新 job 必须成功，日志需证明固定 Codex 版本、bubblewrap/AppArmor 和 <code>codex sandbox -- /bin/true</code> 通过。</td><td>待执行；合并阻断项</td></tr>
-          <tr><td>项目检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make test</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>格式、lint、diff 通过；Docker 全量测试 682 passed、2 skipped。宿主缺少 Calibre 等测试依赖，故 <code>make pytest</code> 无法启动；WIP 状态下 design 检查仅命中预期合并门禁。</td></tr>
-          <tr><td>PR 交付</td><td>正文包含背景、关键改动、实际验证、风险、兼容性，以及 ACTIVE 方案的 commit-SHA 固定 GitHub 与 RawGitHack 链接。</td><td>待执行</td></tr>
+          <tr><td>GitHub hosted smoke</td><td>GitHub Actions run <code>30521862495</code>、job <code>90803857382</code>，Ubuntu 24.04 hosted runner。</td><td>通过。Node 24.18.0、npm 11.16.0、Codex 0.144.6、bubblewrap 0.9.0；AppArmor profile、bubblewrap 自检与 <code>codex sandbox -- /bin/true</code> 均成功。主 Codex job 在 PR 事件正确跳过。</td></tr>
+          <tr><td>项目检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make test</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>格式、lint、diff 通过；Docker 全量测试 682 passed、2 skipped；方案检查 62 documents passed。宿主缺少 Calibre 等测试依赖，故 <code>make pytest</code> 无法启动。</td></tr>
+          <tr><td>PR 交付</td><td>草稿 PR <code>#910</code> 包含背景、关键改动、实际验证、风险、兼容性与方案路径；激活提交推送后补充 commit-SHA 固定链接。</td><td>PR 已创建；ACTIVE 文档随本次收尾提交交付。</td></tr>
         </tbody>
       </table>
     </section>
