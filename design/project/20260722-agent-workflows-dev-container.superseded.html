@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Agent Workflows 使用 Dev Container</title>
+  <title>Agent Workflows 使用 Dev Container（已被替代）</title>
   <style>
     :root { color-scheme: light; --ink: #17212b; --muted: #5b6875; --line: #d8e0e7; --panel: #f6f8fa; --accent: #0969da; --success: #1a7f37; }
     * { box-sizing: border-box; }
@@ -14,7 +14,7 @@
     h2 { margin-top: 34px; font-size: 21px; }
     .meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
     .meta div { padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,.82); }
-    .status { color: var(--success); font-weight: 700; }
+    .status { color: #b42318; font-weight: 700; }
     code { padding: 2px 5px; border-radius: 4px; background: var(--panel); overflow-wrap: anywhere; }
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 11px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
@@ -32,12 +32,15 @@
     <div class="meta">
       <div><strong>创建日期</strong><br>2026-07-22</div>
       <div><strong>所属模块</strong><br>project</div>
-      <div><strong>状态</strong><br><span class="status">ACTIVE</span></div>
+      <div><strong>状态</strong><br><span class="status">SUPERSEDED</span></div>
       <div><strong>需求来源</strong><br>维护者要求镜像发布后再拆分第二个 PR</div>
       <div><strong>工作分支</strong><br><code>feat/20260722-agent-workflows-dev-container</code></div>
       <div><strong>前置方案</strong><br><code>20260722-dev-container-foundation.active.html</code></div>
+      <div><strong>替代方案</strong><br><code>20260730-codex-host-sandbox-recovery.active.html</code></div>
     </div>
   </header>
+
+  <p class="note"><strong>替代说明（2026-07-30）：</strong>Codex 在 dev job container 内创建内层 bubblewrap/seccomp sandbox 时稳定失败，因此本方案关于 Codex 使用 dev container 的决定已由 <code>20260730-codex-host-sandbox-recovery.active.html</code> 替代。Claude 继续使用 dev container；本页保留为当时设计与验证记录。</p>
 
   <section>
     <h2>1. 原始诉求与前置门禁</h2>

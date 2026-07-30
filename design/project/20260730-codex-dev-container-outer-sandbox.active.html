@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Dev Container 外层沙箱修正方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172536;
+      --muted: #5c6874;
+      --paper: #edf3f6;
+      --panel: #ffffff;
+      --line: #b8c7d1;
+      --container: #155e75;
+      --container-soft: #dff3f7;
+      --runtime: #d97706;
+      --runtime-soft: #fff1d6;
+      --secure: #147d64;
+      --secure-soft: #dff5ec;
+      --broken: #b4233f;
+      --broken-soft: #fff0f3;
+      --pending: #7a5a00;
+      --pending-soft: #fff8d8;
+      --code: #12212e;
+      --code-ink: #d9edf3;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 28px 24px 72px;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(21, 94, 117, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(21, 94, 117, .045) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+      font: 17px/1.65 Georgia, "Songti SC", "Noto Serif CJK SC", serif;
+    }
+    h1, h2, h3, .meta, .eyebrow, th, .tag, .layer-label {
+      font-family: "Arial Narrow", "Avenir Next Condensed", "PingFang SC", sans-serif;
+    }
+    h1 {
+      max-width: 900px;
+      margin: 0;
+      font-size: clamp(40px, 6.7vw, 74px);
+      line-height: .98;
+      letter-spacing: -.025em;
+    }
+    h2 {
+      margin: 52px 0 18px;
+      font-size: clamp(27px, 4vw, 40px);
+      line-height: 1.08;
+    }
+    h3 { margin: 0 0 8px; font-size: 21px; line-height: 1.2; }
+    p { margin: 11px 0; }
+    code {
+      padding: 2px 6px;
+      border: 1px solid #d1dce2;
+      border-radius: 4px;
+      background: #f1f5f7;
+      font: .88em/1.5 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      overflow-wrap: anywhere;
+    }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 42px 46px 38px 58px;
+      color: #fff;
+      background: var(--code);
+      border-left: 11px solid var(--runtime);
+      border-radius: 4px 20px 20px 4px;
+      box-shadow: 0 22px 58px rgba(18, 33, 46, .2);
+    }
+    header::after {
+      position: absolute;
+      right: -78px;
+      bottom: -104px;
+      width: 330px;
+      height: 240px;
+      content: "";
+      border: 18px solid rgba(90, 202, 219, .075);
+      border-radius: 38px;
+      transform: rotate(-9deg);
+    }
+    .eyebrow {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 14px;
+      color: #72d1dd;
+      font: 800 13px/1.2 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .14em;
+    }
+    .thesis {
+      position: relative;
+      z-index: 1;
+      max-width: 880px;
+      margin-top: 22px;
+      color: #d3e3e9;
+      font-size: 19px;
+    }
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      margin-top: 30px;
+      border: 1px solid rgba(255, 255, 255, .17);
+      background: rgba(255, 255, 255, .17);
+    }
+    .meta div {
+      min-height: 76px;
+      padding: 12px 13px;
+      background: rgba(9, 31, 43, .94);
+    }
+    .meta span {
+      display: block;
+      color: #91adba;
+      font-size: 12px;
+      letter-spacing: .08em;
+    }
+    .meta strong {
+      display: block;
+      margin-top: 4px;
+      color: #fff;
+      font-size: 15px;
+      line-height: 1.33;
+    }
+    .meta .status { color: #ffd46f; }
+    .section-code {
+      display: inline-block;
+      min-width: 56px;
+      margin-right: 10px;
+      color: var(--container);
+      font: 800 .45em/1 "SFMono-Regular", Consolas, monospace;
+      vertical-align: .42em;
+    }
+    .lead {
+      padding: 20px 23px;
+      background: var(--panel);
+      border-left: 6px solid var(--runtime);
+      box-shadow: 0 9px 28px rgba(18, 33, 46, .07);
+    }
+    .invariants {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 22px 0;
+    }
+    .invariant {
+      padding: 18px 19px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-top: 5px solid var(--container);
+      border-radius: 8px;
+    }
+    .invariant:nth-child(2) { border-top-color: var(--runtime); }
+    .invariant:nth-child(3) { border-top-color: var(--secure); }
+    .tag {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .09em;
+    }
+    .cutaway {
+      position: relative;
+      margin: 28px 0 18px;
+      padding: 28px;
+      background: #d7e2e8;
+      border: 2px solid #7d96a5;
+      border-radius: 28px 8px 28px 8px;
+      box-shadow: inset 0 0 0 9px rgba(255, 255, 255, .52);
+    }
+    .cutaway::before {
+      position: absolute;
+      top: -13px;
+      left: 34px;
+      padding: 2px 12px;
+      color: #fff;
+      content: "GITHUB HOSTED RUNNER / TEMPORARY VM";
+      background: #526c7a;
+      font: 800 12px/1.7 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .06em;
+      border-radius: 3px;
+    }
+    .outer {
+      padding: 25px;
+      background: var(--container-soft);
+      border: 4px solid var(--container);
+      border-radius: 18px 6px 18px 6px;
+    }
+    .layer-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 16px;
+      color: #0c4b5c;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: .035em;
+    }
+    .layer-label span:last-child {
+      font: 700 12px/1.5 "SFMono-Regular", Consolas, monospace;
+      text-align: right;
+    }
+    .runtime-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 15px;
+    }
+    .runtime-box {
+      min-height: 190px;
+      padding: 21px;
+      background: var(--runtime-soft);
+      border: 2px solid var(--runtime);
+      border-radius: 11px;
+    }
+    .runtime-box strong {
+      display: block;
+      margin-bottom: 10px;
+      color: #824a00;
+      font: 800 24px/1.15 "Arial Narrow", sans-serif;
+    }
+    .toolchain {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .toolchain span {
+      padding: 8px 9px;
+      color: #4b3a21;
+      background: rgba(255, 255, 255, .7);
+      border: 1px solid #dfbd81;
+      font: 13px/1.35 "SFMono-Regular", Consolas, monospace;
+    }
+    .broken-layer {
+      position: relative;
+      min-height: 190px;
+      padding: 21px;
+      overflow: hidden;
+      color: #702033;
+      background:
+        linear-gradient(135deg, transparent 0 47%, rgba(180, 35, 63, .18) 48% 52%, transparent 53%),
+        var(--broken-soft);
+      border: 2px dashed var(--broken);
+      border-radius: 11px;
+    }
+    .broken-layer strong {
+      display: block;
+      margin-bottom: 10px;
+      font: 800 23px/1.15 "Arial Narrow", sans-serif;
+    }
+    .broken-layer::after {
+      position: absolute;
+      right: 18px;
+      bottom: 13px;
+      content: "EINVAL";
+      color: rgba(180, 35, 63, .18);
+      font: 900 42px/1 "SFMono-Regular", Consolas, monospace;
+      transform: rotate(-8deg);
+    }
+    .callout {
+      padding: 17px 20px;
+      background: var(--secure-soft);
+      border: 1px solid #7fcbb5;
+      border-left: 5px solid var(--secure);
+    }
+    .callout.warning {
+      background: var(--broken-soft);
+      border-color: #e5a3b1;
+      border-left-color: var(--broken);
+    }
+    .callout.pending {
+      background: var(--pending-soft);
+      border-color: #ddc15e;
+      border-left-color: var(--pending);
+    }
+    .terminal {
+      margin: 16px 0;
+      padding: 18px 20px;
+      overflow-x: auto;
+      color: var(--code-ink);
+      background: #0c1923;
+      border-radius: 8px;
+      font: 14px/1.62 "SFMono-Regular", Consolas, monospace;
+      white-space: pre-wrap;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      box-shadow: 0 9px 28px rgba(18, 33, 46, .055);
+    }
+    th, td {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: #fff;
+      background: #294d60;
+      font-size: 14px;
+      letter-spacing: .025em;
+    }
+    tr:nth-child(even) td { background: #f6fafb; }
+    .decision-yes { color: var(--secure); font-weight: 800; }
+    .decision-no { color: var(--broken); font-weight: 800; }
+    ul, ol { padding-left: 24px; }
+    li { margin: 8px 0; }
+    footer {
+      margin-top: 54px;
+      padding-top: 18px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 14px;
+    }
+    @media (max-width: 860px) {
+      .meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .meta div:last-child { grid-column: 1 / -1; }
+      .invariants, .runtime-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      body { padding: 14px 12px 48px; font-size: 16px; }
+      header { padding: 30px 20px 26px 29px; }
+      .meta { grid-template-columns: 1fr; }
+      .meta div:last-child { grid-column: auto; }
+      .cutaway { padding: 16px; border-radius: 18px 6px 18px 6px; }
+      .outer { padding: 15px; }
+      .layer-label { display: block; }
+      .layer-label span { display: block; margin-top: 5px; text-align: left !important; }
+      .toolchain { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">CORRECTION / PR #910 / CONTAINER BOUNDARY</div>
+    <h1>Codex Dev Container 外层沙箱修正方案</h1>
+    <p class="thesis">Codex 必须直接处于 Talebook 完整开发镜像中，才能使用真实 Calibre runtime 与全量 pytest。取消已经证伪的嵌套 bwrap，把加固后的 GitHub job container 明确设为唯一执行边界。</p>
+    <div class="meta">
+      <div><span>创建日期</span><strong>2026-07-30</strong></div>
+      <div><span>所属模块</span><strong>project</strong></div>
+      <div><span>状态</span><strong class="status">ACTIVE</strong></div>
+      <div><span>工作分支</span><strong>fix/20260730-codex-actions-run-30518957369</strong></div>
+      <div><span>需求来源</span><strong>用户纠正：Codex 必须保留完整 dev image 环境</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2><span class="section-code">REQ</span>原始诉求与纠正</h2>
+      <div class="lead">
+        <p><strong>原始诉求：</strong>修复 Codex Actions run <code>30518957369</code>、job <code>90794917477</code>，同时保证数字员工可以在项目完整环境中自行运行所有 pytest 功能。</p>
+        <p><strong>用户纠正：</strong>不得移除 <code>image: talebook/talebook:dev</code>。此前 PR #910 把 Codex 移到裸 hosted runner，虽然恢复了内层 sandbox，却失去了 Calibre、插件路径、动态库和镜像内测试依赖，不符合真正验收目标。</p>
+      </div>
+      <div class="invariants">
+        <article class="invariant">
+          <div class="tag">ENVIRONMENT</div>
+          <h3>Dev image 是硬约束</h3>
+          <p>Codex、shell 与 pytest 必须共享 <code>talebook/talebook:dev</code> 的文件系统、Python、Calibre 和 Node 环境。</p>
+        </article>
+        <article class="invariant">
+          <div class="tag">TESTABILITY</div>
+          <h3>全量 pytest 必须可执行</h3>
+          <p>不能用宿主 pip 依赖或外部 <code>make test</code> 冒充 Codex 所在环境；PR hosted smoke 要在同一 job container 内完成全量测试。</p>
+        </article>
+        <article class="invariant">
+          <div class="tag">CONTAINMENT</div>
+          <h3>非 root 阻断 Docker socket</h3>
+          <p>GitHub runner 会强制挂载 Docker socket，因此必须用无附加组的非 root UID、默认 seccomp、零 capabilities 与 <code>no-new-privileges</code> 阻止连接。</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="section-code">EVID</span>已确认事实</h2>
+      <table>
+        <thead>
+          <tr><th>证据</th><th>实际结果</th><th>结论</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>失败 job 与同镜像复现</td>
+            <td>当前 <code>--user root --security-opt seccomp=unconfined</code> 下，<code>codex sandbox -- /bin/true</code> 返回 <code>SeccompInstall(EINVAL)</code>。</td>
+            <td>工具缺失不是根因；nested sandbox 与 job container 不兼容。</td>
+          </tr>
+          <tr>
+            <td>增加 capability</td>
+            <td>分别增加 <code>SYS_ADMIN</code>，以及 <code>SYS_ADMIN + SYS_PTRACE</code>，仍返回同一 <code>EINVAL</code>。</td>
+            <td>不能用 capability 堆叠修复；拒绝继续扩大权限。</td>
+          </tr>
+          <tr>
+            <td>Dev image 完整工具链</td>
+            <td>Calibre 8.5.0、Python 3.13.5、pytest 7.4.4、ruff 0.16.0、Codex 0.144.6 均可用，<code>import calibre</code> 指向 <code>/usr/lib/calibre</code>。</td>
+            <td>该镜像确实承载了不能由裸 runner 等价替换的项目环境。</td>
+          </tr>
+          <tr>
+            <td>GitHub job container 系统挂载</td>
+            <td>官方 <code>actions/runner</code> 源码 <code>src/Runner.Worker/Container/ContainerInfo.cs</code> 对所有 Linux job container 执行 <code>MountVolumes.Add("/var/run/docker.sock", ...)</code>；本地 <code>act</code> 也实际注入该 socket。</td>
+            <td><code>--user root</code> 会让模型进程获得宿主 Docker 控制权；“root 且无 socket”的原方案前提不成立。</td>
+          </tr>
+          <tr>
+            <td>非 root 外层容器候选</td>
+            <td>UID/GID <code>1001:1001</code>、<code>CapEff=0</code>、<code>NoNewPrivs=1</code>、<code>Seccomp=2</code>；socket 为 <code>root:root 0660</code>，连接返回 <code>EACCES (13)</code>。</td>
+            <td>无附加组的非 root 身份配合 <code>no-new-privileges</code>，可把 runner 强制挂载的 socket 变为不可用资源。</td>
+          </tr>
+          <tr>
+            <td>非 root 完整测试候选</td>
+            <td>为 CI 测试数据提供 UID 1001 可写的 <code>/data</code> tmpfs，并设置 <code>USER</code>/<code>LOGNAME</code> 后，Calibre、Codex、依赖同步均可用；候选快照全量测试 <strong>697 passed、1 skipped</strong>。</td>
+            <td>不需要 root 也能保留完整 dev image 功能；<code>/data</code> 仅在一次性 CI job 内存续。</td>
+          </tr>
+          <tr>
+            <td>Codex 无内层 sandbox 模式</td>
+            <td><code>sandbox_mode="danger-full-access"</code> 与 <code>approval_policy="never"</code> 在加固容器内成功执行 <code>/bin/true</code>。</td>
+            <td>可以绕开已证伪的 nested bwrap，同时保留完整镜像环境。</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="terminal">GitHub runner invariant:
+  /var/run/docker.sock: system-mounted
+
+outer container:
+  uid / gid:    1001 / 1001
+  CapEff:      0000000000000000
+  NoNewPrivs:  1
+  Seccomp:     2
+  docker.sock: connect errno 13 (EACCES)
+  /data:       tmpfs, owner 1001:1001
+
+project runtime:
+  ebook-convert 8.5.0
+  pytest 7.4.4
+  final-branch exact smoke: 683 passed, 1 skipped</div>
+    </section>
+
+    <section>
+      <h2><span class="section-code">ARCH</span>运行边界</h2>
+      <div class="cutaway" aria-label="Codex dev container 外层沙箱剖面">
+        <div class="outer">
+          <div class="layer-label">
+            <span>TALEBOOK DEV JOB CONTAINER — 唯一强执行边界</span>
+            <span>non-root 1001:1001 / default seccomp / cap-drop ALL / no-new-privileges</span>
+          </div>
+          <div class="runtime-grid">
+            <div class="runtime-box">
+              <strong>Codex 与项目工具同层运行</strong>
+              <p>模型生成的命令直接看到 Talebook 的真实开发环境，不通过宿主 wrapper 或旁路容器转发。</p>
+              <div class="toolchain">
+                <span>Calibre 8.5.0</span>
+                <span>Python 3.13.5</span>
+                <span>pytest 7.4.4</span>
+                <span>Node 24</span>
+                <span>ruff 0.16.0</span>
+                <span>Codex 0.144.6</span>
+              </div>
+            </div>
+            <div class="broken-layer">
+              <strong>内层 bwrap 不再启动</strong>
+              <p>在 Docker job container 内重复创建 user/PID namespace 并安装 seccomp 已被真实 job 和本地候选参数共同证伪。</p>
+              <p>使用 Codex 明确的 <code>danger-full-access</code> 模式，由外层容器承担隔离。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="callout"><strong>用户已重新确认的修正：</strong>继续以“Codex 直接处于完整项目环境”为优先目标，但把 job 用户从 root 改为 <code>1001:1001</code>，并为测试所需的 <code>/data</code> 提供一次性 tmpfs。原因是 GitHub runner 强制挂载 Docker socket，原先批准的 root 前提会导致宿主失守。</p>
+      <p class="callout warning"><strong>必须公开的剩余风险：</strong>模型命令与 Codex 进程处于同一容器，因此不能再宣称 shell 无法读取容器内其他路径或 Codex 凭据。shell environment policy 继续过滤 token 类环境变量，但它是纵深措施，不替代文件系统 sandbox。</p>
+    </section>
+
+    <section>
+      <h2><span class="section-code">DEC</span>候选方案与决定</h2>
+      <table>
+        <thead>
+          <tr><th>候选</th><th>决定</th><th>依据</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>非 root dev job container + 不可访问的 Docker socket + Codex <code>danger-full-access</code></td>
+            <td class="decision-yes">采用</td>
+            <td>满足完整项目环境；非 root 候选的全量 pytest 已通过，socket 连接被内核权限拒绝；符合 Codex 对“外部 sandbox”模式的定位。</td>
+          </tr>
+          <tr>
+            <td>root dev job container</td>
+            <td class="decision-no">拒绝</td>
+            <td>GitHub runner 强制挂载宿主 Docker socket；root 即使没有 capabilities，仍可通过 Docker API 创建高权限 sibling container 并控制宿主。</td>
+          </tr>
+          <tr>
+            <td>裸 hosted runner + pip 安装测试依赖</td>
+            <td class="decision-no">拒绝</td>
+            <td>没有 Calibre runtime、插件、资源、动态库和镜像路径，不能代表 Talebook 完整环境。</td>
+          </tr>
+          <tr>
+            <td>privileged / 增加全部 capabilities</td>
+            <td class="decision-no">拒绝</td>
+            <td>扩大宿主攻击面；较窄 capability 已证明不能解决 <code>EINVAL</code>。</td>
+          </tr>
+          <tr>
+            <td>宿主 Codex + Docker/SSH 命令转发</td>
+            <td class="decision-no">拒绝</td>
+            <td>Codex 并非直接处于项目环境，命令语义、路径和工具发现需要额外 wrapper，不符合用户硬约束。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2><span class="section-code">IMPL</span>计划实现</h2>
+      <table>
+        <thead>
+          <tr><th>位置</th><th>计划改动</th><th>验收约束</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.github/workflows/codex.yml</code> 主 job</td>
+            <td>恢复 <code>container.image: talebook/talebook:dev</code> 与 bash 默认 shell；options 使用 <code>--user 1001:1001 --cap-drop ALL --security-opt no-new-privileges --tmpfs /data:rw,uid=1001,gid=1001,mode=0755</code>，并设置 <code>USER=codex</code>、<code>LOGNAME=codex</code>。</td>
+            <td>不得出现 <code>privileged</code>、root 用户、<code>SYS_ADMIN</code> 或 <code>seccomp=unconfined</code>；<code>/data</code> 只保存本次 CI 测试数据。</td>
+          </tr>
+          <tr>
+            <td>运行时准备</td>
+            <td>删除 hosted runner 专用的 setup-node、setup-python、pip/npm 全局安装和 AppArmor 改写；恢复镜像工具探测，保留 <code>make init</code> 与 <code>npm --prefix app ci</code>。</td>
+            <td>依赖同步仍在恢复模型凭据之前完成；探测必须包含 Calibre 与 <code>import calibre</code>。同时 fail-closed 校验非 root、零 capabilities、<code>NoNewPrivs=1</code>、<code>Seccomp=2</code>、可写 <code>/data</code> 与 Docker socket 连接返回 <code>EACCES</code>/<code>EPERM</code>。</td>
+          </tr>
+          <tr>
+            <td>Codex 配置</td>
+            <td>明确设置 <code>sandbox_mode = "danger-full-access"</code> 与 <code>approval_policy = "never"</code>；移除不再生效的 permissions profile 与网络强隔离声明；保留 shell environment token 过滤。</td>
+            <td>文案和测试不得继续声称 workspace-only 或网络 allowlist 是强边界。</td>
+          </tr>
+          <tr>
+            <td>Run Codex</td>
+            <td>CLI 显式传入 <code>--sandbox danger-full-access</code>，继续使用 <code>--strict-config</code>、20 分钟 timeout、结构化结果和发布门禁。</td>
+            <td>调用模型前用无凭据命令验证 danger-full-access 路径可执行，失败则 fail-closed。</td>
+          </tr>
+          <tr>
+            <td>PR container smoke</td>
+            <td>把当前 host sandbox smoke 改为使用同一 dev image 和同一 container options；checkout 后验证安全状态、完整工具链、依赖同步与全量 <code>pytest tests</code>。</td>
+            <td>无模型 secret、不评论、不发布；真实 GitHub hosted runner 结果是激活方案的阻断项。</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_codex_workflow.py</code></td>
+            <td>恢复 dev-container 契约并新增非 root 身份、<code>/data</code> tmpfs、socket 不可访问、外层加固、danger-full-access、真实工具链、全量 smoke 与禁止危险选项的断言。</td>
+            <td>针对修订后的安全契约重新执行 TDD 红灯，再修改 workflow。</td>
+          </tr>
+          <tr>
+            <td>方案生命周期</td>
+            <td>本方案已在真实 hosted smoke 通过后激活，并把 <code>20260730-codex-host-sandbox-recovery.active.html</code> 转为 SUPERSEDED。</td>
+            <td>旧的 <code>20260722-agent-workflows-dev-container.superseded.html</code> 保留历史状态；没有重新激活旧决策。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2><span class="section-code">TEST</span>验证计划</h2>
+      <p class="callout"><strong>验证完成：</strong>修订方案已获用户批准，本地 exact-image 与 GitHub hosted runner 均证明非 root job container 可以同时保留完整 dev image、阻断 Docker socket 并运行全量 pytest。run <code>30541122659</code>、job <code>90865878990</code> 是本方案激活的运行时证据。</p>
+      <table>
+        <thead>
+          <tr><th>验证层</th><th>计划命令或证据</th><th>当前状态</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>TDD 红灯</td><td>先改写 dev-container 外层隔离契约，在当前 hosted-runner workflow 上运行定向测试。</td><td>第一轮 dev image 契约为 <strong>7 failed、23 passed</strong>；非 root/socket 修订契约为 <strong>3 failed、27 passed in 4.50s</strong>，失败点对应 root options、缺失身份/socket 自检与 smoke 身份配置。</td></tr>
+          <tr><td>定向契约</td><td><code>python3 -m pytest -q tests/test_codex_workflow.py tests/test_agent_workflows.py</code></td><td>修订实现通过；格式化后重跑为 <strong>30 passed in 7.23s</strong>。</td></tr>
+          <tr><td>Actions 静态检查</td><td>actionlint 1.7.12 检查真实 <code>codex.yml</code>。</td><td>通过；无输出、退出码 0。</td></tr>
+          <tr><td>非 root 候选 smoke</td><td>同一 dev image、UID/GID 1001、<code>/data</code> tmpfs、同一外层安全参数并模拟 runner socket 挂载。</td><td>通过：Calibre、Codex、依赖同步可用，socket 连接返回 <code>EACCES</code>；候选代码快照 <strong>697 passed、1 skipped、18 warnings in 49.01s</strong>。</td></tr>
+          <tr><td>本地 exact-image smoke</td><td>修订实现后，同一 dev image、同一 container options 下验证工具链、安全状态、依赖同步、danger-full-access 与当前分支全量 pytest。</td><td>通过：UID/GID <code>1001:1001</code>、无附加组、socket 连接返回 <code>EACCES</code>、Calibre/Codex/依赖同步可用；<strong>683 passed、1 skipped、30 warnings in 80.38s</strong>。</td></tr>
+          <tr><td>本地 Actions 编排</td><td><code>act pull_request -j codex-sandbox-smoke</code></td><td>确认 job 以 UID 1001 启动；随后因 Docker Desktop 不允许 act 对 macOS bind mount 执行 <code>chown</code>，在创建 <code>CODEX_HOME</code> 前停止。该本地平台限制不冒充 hosted 结果。</td></tr>
+          <tr><td>GitHub hosted container smoke</td><td>GitHub Actions run <code>30541122659</code>、job <code>90865878990</code>；真实 hosted runner 的 dev job container。</td><td>通过：runner 使用预期 Docker create options，socket 为 <code>root:118</code> 且连接返回 <code>EACCES (13)</code>；Calibre 8.5.0、Codex external-sandbox 自检、依赖同步成功；merge ref 全量测试 <strong>698 passed、1 skipped、21 warnings in 46.65s</strong>。</td></tr>
+          <tr><td>项目检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make test</code>、<code>make check-design</code>、<code>git diff --check</code></td><td><code>make lint-py-fix</code>、<code>make lint-py</code> 与 <code>git diff --check</code> 通过；<code>make test</code> 为 <strong>682 passed、2 skipped、33 warnings in 59.88s</strong>，其中 actionlint 用例因测试镜像未安装 Go 工具而按设计跳过；激活后 <code>make check-design</code> 为 <strong>63 design documents passed</strong>。</td></tr>
+          <tr><td>PR 交付</td><td>PR #910 在 WIP 验证阶段保持 Draft；激活提交推送后更新最终 SHA 固定方案链接并转为 Ready。</td><td>hosted smoke 已通过；进入激活收尾。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2><span class="section-code">ROLL</span>发布与回滚</h2>
+      <ul>
+        <li>本 PR 不修改 Dockerfile、dev image 发布逻辑、Claude workflow、应用 API 或生产镜像。</li>
+        <li>hosted container smoke 已确认 GitHub job container 接受非 root 与 <code>/data</code> tmpfs 参数；未来若该契约回归，应 fail-closed，不得回退到 root、privileged 或裸 runner。</li>
+        <li>如果 danger-full-access 在真实主请求中出现行为差异，回退本 PR 会恢复当前已知失败状态；Codex workflow 应临时视为不可用。</li>
+        <li>后续若 Codex 官方支持在非特权 job container 内工作的 sandbox backend，应创建新 WIP 恢复内层 workspace/network 强隔离。</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    本方案纠正 PR #910 第一版错误地移除 dev image 的决定。核心顺序是：先保证 Codex 所在环境真实完整，再用可验证的外层容器参数收敛权限，并诚实记录不再存在的内层隔离能力。
+  </footer>
+</body>
+</html>
