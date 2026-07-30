@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#39332a"/><stop offset="0.5" stop-color="#2a2620"/><stop offset="1" stop-color="#181510"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.85" cy="0.16" r="0.22">
+      <stop offset="0" stop-color="#caa05a" stop-opacity="0.42"/><stop offset="1" stop-color="#caa05a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#s)"/>
+  <rect width="1280" height="720" fill="url(#sun)"/>
+  <!-- 小而暗的残阳，右上角 -->
+  <circle cx="1090" cy="120" r="30" fill="#c89a52" opacity="0.55"/>
+  <!-- 三重层峦渐暗 -->
+  <path d="M0 460 L160 380 L320 440 L520 370 L720 430 L920 375 L1120 425 L1280 390 L1280 720 L0 720 Z" fill="#4a4236" opacity="0.75"/>
+  <path d="M0 545 L200 480 L420 535 L640 470 L880 530 L1100 478 L1280 525 L1280 720 L0 720 Z" fill="#2c271f"/>
+  <path d="M0 620 L220 560 L460 612 L700 552 L940 608 L1160 558 L1280 600 L1280 720 L0 720 Z" fill="#130f0b"/>
+  <g stroke="#0a0805" stroke-width="5" stroke-linecap="round" fill="none">
+    <path d="M150 620 L144 478"/><path d="M144 518 L110 486 M144 500 L182 466 M144 548 L120 528"/>
+  </g>
+</svg>

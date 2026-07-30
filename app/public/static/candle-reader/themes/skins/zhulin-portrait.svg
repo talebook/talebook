@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="780" viewBox="0 0 360 780" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e4efd2"/><stop offset="0.5" stop-color="#dcebc6"/><stop offset="1" stop-color="#cfe2b4"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.82" cy="0.08" r="0.4">
+      <stop offset="0" stop-color="#fbffe9" stop-opacity="0.8"/><stop offset="1" stop-color="#fbffe9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="360" height="780" fill="url(#g)"/>
+  <rect width="360" height="780" fill="url(#sun)"/>
+  <!-- 竹丛：更深的绿、更高的可见度，左右两侧分布 -->
+  <g fill="#6f9a4e" opacity="0.62">
+    <rect x="8" y="0" width="16" height="780" rx="4"/><rect x="36" y="0" width="10" height="780" rx="3"/>
+    <rect x="58" y="0" width="7" height="780" rx="2"/><rect x="94" y="0" width="9" height="780" rx="3"/>
+    <rect x="300" y="0" width="13" height="780" rx="4"/><rect x="326" y="0" width="9" height="780" rx="3"/>
+    <rect x="346" y="0" width="7" height="780" rx="2"/>
+  </g>
+  <g stroke="#4f7a32" stroke-width="3" opacity="0.6">
+    <line x1="6" y1="130" x2="26" y2="130"/><line x1="6" y1="340" x2="26" y2="340"/><line x1="6" y1="560" x2="26" y2="560"/>
+    <line x1="92" y1="230" x2="105" y2="230"/><line x1="92" y1="470" x2="105" y2="470"/>
+    <line x1="298" y1="200" x2="317" y2="200"/><line x1="298" y1="470" x2="317" y2="470"/><line x1="298" y1="680" x2="317" y2="680"/>
+  </g>
+  <g fill="#5f8f3e" opacity="0.6">
+    <path d="M26 70 q46 -20 92 -5 q-46 22 -92 5z"/><path d="M40 112 q42 14 78 52 q-52 2 -78 -52z"/>
+    <path d="M103 60 q42 -16 80 -3 q-42 18 -80 3z"/>
+    <path d="M300 90 q-44 -18 -88 -4 q44 20 88 4z"/><path d="M330 150 q-38 16 -66 54 q46 0 66 -54z"/>
+    <path d="M22 700 q44 -18 86 -4 q-44 20 -86 4z"/><path d="M330 720 q-42 -16 -80 -3 q42 18 80 3z"/>
+    <path d="M94 730 q40 -16 76 -3 q-40 18 -76 3z"/>
+  </g>
+</svg>

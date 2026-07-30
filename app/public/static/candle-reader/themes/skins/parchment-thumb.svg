@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 140">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7efd9"/><stop offset="1" stop-color="#e9d7ab"/>
+    </linearGradient>
+    <radialGradient id="st" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#bd9c5e" stop-opacity="0.35"/><stop offset="1" stop-color="#bd9c5e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="280" height="140" fill="url(#g)"/>
+  <ellipse cx="40" cy="30" rx="70" ry="50" fill="url(#st)"/>
+  <ellipse cx="250" cy="120" rx="80" ry="55" fill="url(#st)"/>
+  <g stroke="#a9853f" stroke-width="1" opacity="0.18"><line x1="0" y1="46" x2="280" y2="44"/><line x1="0" y1="94" x2="280" y2="96"/></g>
+  <g opacity="0.8"><rect x="232" y="16" width="34" height="34" rx="4" fill="none" stroke="#b5352b" stroke-width="2.5"/>
+    <text x="249" y="40" font-size="22" text-anchor="middle" fill="#b5352b" font-family="serif">藏</text></g>
+</svg>
