@@ -14,9 +14,6 @@ on:
 permissions:
   contents: read
 
-env:
-  CODEX_VERSION: "0.144.6"
-
 jobs:
   codex:
     name: Respond to maintainer request
@@ -54,7 +51,15 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    container:
+      image: talebook/talebook:dev
+      options: --user 1001:1001 --cap-drop ALL --security-opt no-new-privileges --tmpfs /data:rw,uid=1001,gid=1001,mode=0755
+    defaults:
+      run:
+        shell: bash
     env:
+      USER: codex
+      LOGNAME: codex
       CODEX_MODEL: ${{ vars.CODEX_MODEL || 'gpt-5.6-sol' }}
       CODEX_REASONING_EFFORT: ${{ vars.CODEX_REASONING_EFFORT || 'high' }}
     steps:
@@ -85,14 +90,12 @@ jobs:
             const codexHome = `${runnerTemp}/codex-home`;
             const codexPromptTemplate = `${runnerTemp}/codex-comment-response.md`;
             const codexProgressReporter = `${runnerTemp}/codex-progress-reporter.py`;
-            const codexTestRequirements = `${runnerTemp}/codex-requirements-test.txt`;
             const codexRequestJson = `${runnerTemp}/codex-request.json`;
             const workflowSha = process.env.WORKFLOW_SHA;
 
             core.exportVariable("CODEX_HOME", codexHome);
             core.exportVariable("CODEX_PROMPT_TEMPLATE", codexPromptTemplate);
             core.exportVariable("CODEX_PROGRESS_REPORTER", codexProgressReporter);
-            core.exportVariable("CODEX_TEST_REQUIREMENTS", codexTestRequirements);
             core.exportVariable("CODEX_REQUEST_JSON", codexRequestJson);
 
             let body = "";
@@ -372,21 +375,6 @@ jobs:
                   Buffer.from(progressReporterResult.data.content, "base64"),
                   { mode: 0o600 },
                 );
-
-                const testRequirementsResult = await github.rest.repos.getContent({
-                  owner,
-                  repo,
-                  path: "requirements-test.txt",
-                  ref: workflowSha,
-                });
-                if (Array.isArray(testRequirementsResult.data) || !testRequirementsResult.data.content) {
-                  throw new Error("Trusted Codex test requirements are missing from the workflow commit.");
-                }
-                fs.writeFileSync(
-                  codexTestRequirements,
-                  Buffer.from(testRequirementsResult.data.content, "base64"),
-                  { mode: 0o600 },
-                );
               } catch (error) {
                 if (progressCommentId) {
                   try {
@@ -456,24 +444,15 @@ jobs:
           git config --global --get-all safe.directory | grep -Fqx "$GITHUB_WORKSPACE"
           git status --short
 
-      - name: Setup Node for Codex runtime
-        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Setup Python for Codex validation
-        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install Codex CLI and test tools
+      - name: Verify development environment and outer sandbox
         if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
         run: |
           set -euo pipefail
-          npm install -g "@openai/codex@${CODEX_VERSION}"
-          python3 -m pip install --disable-pip-version-check -r "$CODEX_TEST_REQUIREMENTS"
+          mkdir -p "$CODEX_HOME"
+          chmod 700 "$CODEX_HOME"
+
+          ebook-convert --version
+          python3 -c "import calibre; print(calibre.__file__)"
           python3 --version
           node --version
           npm --version
@@ -482,59 +461,68 @@ jobs:
           ruff --version
           codex --version
 
-      - name: Setup bubblewrap and AppArmor for sandbox
-        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
-        run: |
-          set -euo pipefail
-          mkdir -p "$CODEX_HOME"
-          chmod 700 "$CODEX_HOME"
-
-          echo "::group::Installing bubblewrap and dependencies"
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends bubblewrap uidmap apparmor-profiles apparmor-utils
-          echo "::endgroup::"
-
-          echo "::group::Configuring AppArmor for bubblewrap"
-          PROFILE_SRC="/usr/share/apparmor/extra-profiles/bwrap-userns-restrict"
-          PROFILE_DST="/etc/apparmor.d/bwrap-userns-restrict"
-
-          if [ ! -f "$PROFILE_SRC" ]; then
-            echo "::error::Required AppArmor profile source is missing: $PROFILE_SRC"
+          if [ "$(id -u)" -eq 0 ]; then
+            echo "::error::The dev container must not run as root"
             exit 1
           fi
-          sudo install -m 0644 "$PROFILE_SRC" "$PROFILE_DST"
-          sudo apparmor_parser -r "$PROFILE_DST"
 
-          sudo tee /etc/sysctl.d/99-codex-apparmor-hardening.conf >/dev/null <<'EOF'
-          kernel.apparmor_restrict_unprivileged_userns=1
-          kernel.apparmor_restrict_unprivileged_unconfined=1
-          EOF
-          sudo sysctl --system >/dev/null
-          echo "::endgroup::"
+          if [ "$(id -u):$(id -g)" != "1001:1001" ]; then
+            echo "::error::The dev container must run only as uid/gid 1001:1001"
+            exit 1
+          fi
 
-          echo "::group::Verifying Codex sandbox"
-          bwrap --version
-          if bwrap --ro-bind / / /bin/true; then
-            echo "✅ bubblewrap sandbox test passed"
+          if [ "$(id -G)" != "1001" ]; then
+            echo "::error::The dev container retained supplementary groups"
+            exit 1
+          fi
+
+          if ! grep -Eq "^CapEff:[[:space:]]*0+$" /proc/1/status; then
+            echo "::error::The dev container retained Linux capabilities"
+            exit 1
+          fi
+
+          if ! grep -Eq "^NoNewPrivs:[[:space:]]*1$" /proc/1/status; then
+            echo "::error::The dev container does not enforce no-new-privileges"
+            exit 1
+          fi
+
+          if ! grep -Eq "^Seccomp:[[:space:]]*2$" /proc/1/status; then
+            echo "::error::The dev container does not use the default seccomp filter"
+            exit 1
+          fi
+
+          if [ ! -w /data ]; then
+            echo "::error::The ephemeral /data filesystem is not writable"
+            exit 1
+          fi
+
+          if [ -S /var/run/docker.sock ]; then
+            stat -c "docker_socket=%A uid=%u gid=%g" /var/run/docker.sock
+            if [ -w /var/run/docker.sock ]; then
+              echo "::error::Docker socket is writable by the Codex user"
+              exit 1
+            fi
+
+            socket_errno="$(python3 -c 'import socket; sock = socket.socket(socket.AF_UNIX); print(sock.connect_ex("/var/run/docker.sock"))')"
+            case "$socket_errno" in
+              "1" | "13")
+                echo "✅ Docker socket connection denied with errno $socket_errno"
+                ;;
+              *)
+                echo "::error::Docker socket connection was not denied; errno=$socket_errno"
+                exit 1
+                ;;
+            esac
           else
-            echo "::error::Bubblewrap sandbox self-test failed"
-            exit 1
+            echo "✅ Docker socket is not mounted"
           fi
 
-          if sudo aa-status | grep -qE '(^|[[:space:]])bwrap($|[[:space:]])'; then
-            echo "✅ AppArmor profile is active for bwrap"
+          if codex sandbox -c "sandbox_mode=\"danger-full-access\"" -c "approval_policy=\"never\"" -- /bin/true; then
+            echo "✅ Codex external-sandbox mode test passed"
           else
-            echo "::error::AppArmor profile is not active for bubblewrap"
+            echo "::error::Codex external-sandbox self-test failed"
             exit 1
           fi
-
-          if codex sandbox -- /bin/true; then
-            echo "✅ Codex sandbox test passed"
-          else
-            echo "::error::Codex sandbox self-test failed"
-            exit 1
-          fi
-          echo "::endgroup::"
 
       - name: Synchronize project dependencies
         if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
@@ -569,39 +557,9 @@ jobs:
           cat > "$CODEX_HOME/config.toml" <<EOF
           cli_auth_credentials_store = "file"
           approval_policy = "never"
-          default_permissions = "codex-employee"
+          sandbox_mode = "danger-full-access"
           model = "$CODEX_MODEL"
           model_reasoning_effort = "$CODEX_REASONING_EFFORT"
-
-          [features]
-          network_proxy = true
-
-          [permissions.codex-employee]
-          description = "Talebook digital employee with workspace-only files and public network access."
-          extends = ":workspace"
-
-          [permissions.codex-employee.filesystem]
-          ":root" = "deny"
-          ":minimal" = "read"
-          ":tmpdir" = "deny"
-          ":slash_tmp" = "deny"
-
-          [permissions.codex-employee.filesystem.":workspace_roots"]
-          "." = "write"
-          ".github/workflows" = "read"
-          ".codex" = "read"
-          ".git" = "read"
-
-          [permissions.codex-employee.network]
-          enabled = true
-          allow_local_binding = true
-
-          [permissions.codex-employee.network.domains]
-          "*" = "allow"
-          "localhost" = "allow"
-          "127.0.0.1" = "allow"
-          "169.254.169.254" = "deny"
-          "metadata.google.internal" = "deny"
 
           [shell_environment_policy]
           inherit = "core"
@@ -644,6 +602,7 @@ jobs:
           set -euo pipefail
           timeout --signal=TERM --kill-after=30s 20m env -u CODEX_PROGRESS_TOKEN codex exec \
             --strict-config \
+            --sandbox danger-full-access \
             --skip-git-repo-check \
             --cd "$GITHUB_WORKSPACE" \
             --output-last-message .codex/tmp/codex-final.md \
@@ -1138,77 +1097,108 @@ jobs:
           fi
 
   codex-sandbox-smoke:
-    name: Verify Codex sandbox on hosted runner
+    name: Verify Codex dev container on hosted runner
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    container:
+      image: talebook/talebook:dev
+      options: --user 1001:1001 --cap-drop ALL --security-opt no-new-privileges --tmpfs /data:rw,uid=1001,gid=1001,mode=0755
+    defaults:
+      run:
+        shell: bash
     env:
       CODEX_HOME: ${{ github.workspace }}/.codex-smoke-home
+      USER: codex
+      LOGNAME: codex
     steps:
-      - name: Setup Node for Codex runtime
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install Codex CLI
+      - name: Verify development environment and outer sandbox
         run: |
           set -euo pipefail
           mkdir -p "$CODEX_HOME"
           chmod 700 "$CODEX_HOME"
-          npm install -g "@openai/codex@${CODEX_VERSION}"
+
+          ebook-convert --version
+          python3 -c "import calibre; print(calibre.__file__)"
+          python3 --version
           node --version
           npm --version
+          make --version
+          python3 -m pytest --version
+          ruff --version
           codex --version
 
-      - name: Setup bubblewrap and AppArmor for sandbox
+          if [ "$(id -u)" -eq 0 ]; then
+            echo "::error::The dev container must not run as root"
+            exit 1
+          fi
+
+          if [ "$(id -u):$(id -g)" != "1001:1001" ]; then
+            echo "::error::The dev container must run only as uid/gid 1001:1001"
+            exit 1
+          fi
+
+          if [ "$(id -G)" != "1001" ]; then
+            echo "::error::The dev container retained supplementary groups"
+            exit 1
+          fi
+
+          if ! grep -Eq "^CapEff:[[:space:]]*0+$" /proc/1/status; then
+            echo "::error::The dev container retained Linux capabilities"
+            exit 1
+          fi
+
+          if ! grep -Eq "^NoNewPrivs:[[:space:]]*1$" /proc/1/status; then
+            echo "::error::The dev container does not enforce no-new-privileges"
+            exit 1
+          fi
+
+          if ! grep -Eq "^Seccomp:[[:space:]]*2$" /proc/1/status; then
+            echo "::error::The dev container does not use the default seccomp filter"
+            exit 1
+          fi
+
+          if [ ! -w /data ]; then
+            echo "::error::The ephemeral /data filesystem is not writable"
+            exit 1
+          fi
+
+          if [ -S /var/run/docker.sock ]; then
+            stat -c "docker_socket=%A uid=%u gid=%g" /var/run/docker.sock
+            if [ -w /var/run/docker.sock ]; then
+              echo "::error::Docker socket is writable by the Codex user"
+              exit 1
+            fi
+
+            socket_errno="$(python3 -c 'import socket; sock = socket.socket(socket.AF_UNIX); print(sock.connect_ex("/var/run/docker.sock"))')"
+            case "$socket_errno" in
+              "1" | "13")
+                echo "✅ Docker socket connection denied with errno $socket_errno"
+                ;;
+              *)
+                echo "::error::Docker socket connection was not denied; errno=$socket_errno"
+                exit 1
+                ;;
+            esac
+          else
+            echo "✅ Docker socket is not mounted"
+          fi
+
+          if codex sandbox -c "sandbox_mode=\"danger-full-access\"" -c "approval_policy=\"never\"" -- /bin/true; then
+            echo "✅ Codex external-sandbox mode test passed"
+          else
+            echo "::error::Codex external-sandbox self-test failed"
+            exit 1
+          fi
+
+      - name: Synchronize project dependencies
         run: |
-          set -euo pipefail
-          mkdir -p "$CODEX_HOME"
-          chmod 700 "$CODEX_HOME"
+          make init
+          npm --prefix app ci
 
-          echo "::group::Installing bubblewrap and dependencies"
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends bubblewrap uidmap apparmor-profiles apparmor-utils
-          echo "::endgroup::"
-
-          echo "::group::Configuring AppArmor for bubblewrap"
-          PROFILE_SRC="/usr/share/apparmor/extra-profiles/bwrap-userns-restrict"
-          PROFILE_DST="/etc/apparmor.d/bwrap-userns-restrict"
-
-          if [ ! -f "$PROFILE_SRC" ]; then
-            echo "::error::Required AppArmor profile source is missing: $PROFILE_SRC"
-            exit 1
-          fi
-          sudo install -m 0644 "$PROFILE_SRC" "$PROFILE_DST"
-          sudo apparmor_parser -r "$PROFILE_DST"
-
-          sudo tee /etc/sysctl.d/99-codex-apparmor-hardening.conf >/dev/null <<'EOF'
-          kernel.apparmor_restrict_unprivileged_userns=1
-          kernel.apparmor_restrict_unprivileged_unconfined=1
-          EOF
-          sudo sysctl --system >/dev/null
-          echo "::endgroup::"
-
-          echo "::group::Verifying Codex sandbox"
-          bwrap --version
-          if bwrap --ro-bind / / /bin/true; then
-            echo "✅ bubblewrap sandbox test passed"
-          else
-            echo "::error::Bubblewrap sandbox self-test failed"
-            exit 1
-          fi
-
-          if sudo aa-status | grep -qE '(^|[[:space:]])bwrap($|[[:space:]])'; then
-            echo "✅ AppArmor profile is active for bwrap"
-          else
-            echo "::error::AppArmor profile is not active for bubblewrap"
-            exit 1
-          fi
-
-          if codex sandbox -- /bin/true; then
-            echo "✅ Codex sandbox test passed"
-          else
-            echo "::error::Codex sandbox self-test failed"
-            exit 1
-          fi
-          echo "::endgroup::"
+      - name: Run full project test suite
+        run: |
+          python3 -m pytest tests
