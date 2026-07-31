@@ -16,6 +16,10 @@ PROGRESS_REPORTER = ROOT / ".github" / "codex" / "scripts" / "codex_progress_rep
 DEV_CONTAINER_OPTIONS = (
     "--user 1001:1001 --cap-drop ALL --security-opt no-new-privileges --tmpfs /data:rw,uid=1001,gid=1001,mode=0755"
 )
+requires_node = pytest.mark.skipif(
+    shutil.which("node") is None,
+    reason="Node.js is required to execute the real actions/github-script response body",
+)
 
 
 def workflow_text():
@@ -805,6 +809,7 @@ def test_initial_progress_comment_reserves_the_plan_progress_boundaries():
     )
 
 
+@requires_node
 def test_final_response_preserves_the_latest_plan_in_the_same_comment(tmp_path):
     progress_body = "\n".join(
         [
@@ -840,6 +845,7 @@ def test_final_response_preserves_the_latest_plan_in_the_same_comment(tmp_path):
     assert "活动汇总" not in update["body"]
 
 
+@requires_node
 def test_final_response_keeps_the_original_comment_when_plan_reading_fails(tmp_path):
     progress_body = "\n".join(
         [
@@ -857,6 +863,7 @@ def test_final_response_keeps_the_original_comment_when_plan_reading_fails(tmp_p
     assert "get comment failed" in trace["error"]
 
 
+@requires_node
 def test_final_response_reserves_comment_space_for_the_complete_plan(tmp_path):
     plan_items = [f"- [x] 步骤 {index} " + ("进" * 230) for index in range(10)]
     progress_body = "\n".join(
@@ -905,6 +912,7 @@ def test_final_response_reserves_comment_space_for_the_complete_plan(tmp_path):
         ),
     ],
 )
+@requires_node
 def test_final_response_keeps_the_original_comment_when_plan_boundaries_are_invalid(tmp_path, progress_body):
     completed, trace = run_response_step(tmp_path, progress_body=progress_body)
 
@@ -913,6 +921,7 @@ def test_final_response_keeps_the_original_comment_when_plan_boundaries_are_inva
     assert "one valid plan boundary pair" in trace["error"]
 
 
+@requires_node
 def test_final_response_does_not_create_a_second_comment_when_the_existing_update_fails(tmp_path):
     progress_body = "\n".join(
         [
@@ -930,6 +939,7 @@ def test_final_response_does_not_create_a_second_comment_when_the_existing_updat
     assert "update comment failed" in trace["error"]
 
 
+@requires_node
 def test_final_response_creates_one_comment_only_when_the_initial_comment_was_never_created(tmp_path):
     completed, trace = run_response_step(tmp_path, progress_body="", progress_comment_id="")
 
@@ -939,6 +949,7 @@ def test_final_response_creates_one_comment_only_when_the_initial_comment_was_ne
     assert trace["calls"][0]["args"]["body"] == "已完成处理，并保留执行计划。"
 
 
+@requires_node
 def test_final_response_omits_an_empty_plan_section(tmp_path):
     progress_body = "\n".join(
         [
