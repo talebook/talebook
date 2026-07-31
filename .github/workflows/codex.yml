@@ -335,6 +335,9 @@ jobs:
                     "- [ ] 执行修改",
                     "- [ ] 验证并发布",
                     "",
+                    "<!-- codex-plan-progress:start -->",
+                    "<!-- codex-plan-progress:end -->",
+                    "",
                     "<sub>该评论会持续更新，任务完成后将替换为最终结果。</sub>",
                   ].join("\n"),
                 });
@@ -937,6 +940,37 @@ jobs:
               .replaceAll("&", "&amp;")
               .replaceAll("<", "&lt;")
               .replaceAll(">", "&gt;");
+            const planProgressStart = "<!-- codex-plan-progress:start -->";
+            const planProgressEnd = "<!-- codex-plan-progress:end -->";
+            const extractPlanProgress = (commentBody) => {
+              const text = String(commentBody || "");
+              const startIndex = text.indexOf(planProgressStart);
+              const endIndex = text.indexOf(planProgressEnd);
+              const hasOneOrderedPair = (
+                startIndex >= 0
+                && endIndex > startIndex
+                && text.indexOf(planProgressStart, startIndex + planProgressStart.length) === -1
+                && text.indexOf(planProgressEnd, endIndex + planProgressEnd.length) === -1
+              );
+              if (!hasOneOrderedPair) {
+                throw new Error("The Codex progress comment does not contain one valid plan boundary pair.");
+              }
+              const planBody = text.slice(startIndex + planProgressStart.length, endIndex).trim();
+              return planBody ? `${planProgressStart}\n${planBody}\n${planProgressEnd}` : "";
+            };
+            const fitFinalBody = (resultBody, planProgress) => {
+              const maxCommentLength = 64000;
+              const truncationNotice = "\n\n……[内容已截断，完整输出请查看 workflow 日志]";
+              const planSuffix = planProgress ? `\n\n${planProgress}` : "";
+              const resultBudget = maxCommentLength - planSuffix.length;
+              if (resultBudget <= truncationNotice.length) {
+                throw new Error("The preserved Codex plan leaves no room for a final result.");
+              }
+              const fittedResult = resultBody.length > resultBudget
+                ? `${resultBody.slice(0, resultBudget - truncationNotice.length)}${truncationNotice}`
+                : resultBody;
+              return `${fittedResult}${planSuffix}`;
+            };
 
             let finalMessage = "";
             if (fs.existsSync(process.env.CODEX_FINAL_MESSAGE)) {
@@ -1020,14 +1054,17 @@ jobs:
               body += `\n恢复补丁：请下载 workflow artifact \`${process.env.CODEX_ARTIFACT_NAME}\`。`;
             }
 
-            if (body.length > 64000) {
-              body = `${body.slice(0, 63500)}\n\n……[内容已截断，完整输出请查看 workflow 日志]`;
-            }
-
             const progressCommentId = Number(process.env.CODEX_PROGRESS_COMMENT_ID);
             let responseUpdated = false;
             if (Number.isSafeInteger(progressCommentId) && progressCommentId > 0) {
               try {
+                const progressComment = await github.rest.issues.getComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: progressCommentId,
+                });
+                const planProgress = extractPlanProgress(progressComment.data.body);
+                body = fitFinalBody(body, planProgress);
                 await github.rest.issues.updateComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -1036,11 +1073,13 @@ jobs:
                 });
                 responseUpdated = true;
               } catch (error) {
-                core.warning(`Could not replace the Codex progress comment: ${error.message}`);
+                core.warning(`Could not preserve and finalize the Codex progress comment: ${error.message}`);
+                throw error;
               }
             }
 
             if (!responseUpdated) {
+              body = fitFinalBody(body, "");
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,

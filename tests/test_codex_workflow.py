@@ -123,6 +123,126 @@ def run_publish_gate(
     return dict(line.split("=", 1) for line in output_file.read_text(encoding="utf-8").splitlines())
 
 
+def run_response_step(
+    tmp_path,
+    *,
+    progress_body,
+    progress_comment_id="456",
+    get_comment_error=False,
+    update_comment_error=False,
+    tests=(),
+):
+    result_file = tmp_path / ".codex-result.json"
+    result_file.write_text(
+        json.dumps(
+            {
+                "delivery": "reply",
+                "feature": "",
+                "commit_message": "",
+                "summary": "已完成处理，并保留执行计划。",
+                "tests": list(tests),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    final_message = tmp_path / "codex-final.md"
+    final_message.write_text("fallback", encoding="utf-8")
+    trace_file = tmp_path / "response-trace.json"
+    response_script = workflow_step(name="Post Codex response")["with"]["script"]
+    harness = (
+        """
+const harnessFs = require("fs");
+const calls = [];
+const github = {
+  rest: {
+    issues: {
+      getComment: async (args) => {
+        calls.push({name: "getComment", args});
+        if (process.env.TEST_GET_COMMENT_ERROR === "true") {
+          throw new Error("get comment failed");
+        }
+        return {data: {body: process.env.TEST_PROGRESS_BODY}};
+      },
+      updateComment: async (args) => {
+        calls.push({name: "updateComment", args});
+        if (process.env.TEST_UPDATE_COMMENT_ERROR === "true") {
+          throw new Error("update comment failed");
+        }
+        return {data: {id: args.comment_id}};
+      },
+      createComment: async (args) => {
+        calls.push({name: "createComment", args});
+        return {data: {id: 789}};
+      },
+    },
+  },
+};
+const context = {
+  serverUrl: "https://github.test",
+  repo: {owner: "talebook", repo: "talebook"},
+};
+const core = {
+  warning: (message) => calls.push({name: "warning", message}),
+};
+const finish = (error) => {
+  harnessFs.writeFileSync(
+    process.env.TEST_TRACE_FILE,
+    JSON.stringify({calls, error: error ? error.message : ""}),
+  );
+};
+(async () => {
+"""
+        + response_script
+        + """
+})().then(
+  () => finish(null),
+  (error) => {
+    finish(error);
+    process.exitCode = 1;
+  },
+);
+"""
+    )
+    env = {
+        **os.environ,
+        "CODEX_FINAL_MESSAGE": str(final_message),
+        "CODEX_RESULT_FILE": str(result_file),
+        "CODEX_RUN_OUTCOME": "success",
+        "CODEX_CONTRACT_VALID": "true",
+        "CODEX_DELIVERY": "reply",
+        "CODEX_GATE_READY": "true",
+        "CODEX_GATE_REASON": "",
+        "CODEX_NO_CHANGES": "true",
+        "CODEX_APP_TOKEN_OUTCOME": "skipped",
+        "CODEX_PUBLISH_OUTCOME": "skipped",
+        "CODEX_PUBLISH_BRANCH": "",
+        "CODEX_COMMIT_SHA": "",
+        "IS_PR": "false",
+        "EXISTING_ISSUE_BRANCH": "",
+        "EXISTING_PR_NUMBER": "",
+        "CREATED_PR_OUTCOME": "skipped",
+        "CREATED_PR_URL": "",
+        "CODEX_HAS_PATCH": "false",
+        "CODEX_ARTIFACT_NAME": "codex-patch-test",
+        "ISSUE_NUMBER": "77",
+        "CODEX_PROGRESS_COMMENT_ID": progress_comment_id,
+        "TEST_PROGRESS_BODY": progress_body,
+        "TEST_GET_COMMENT_ERROR": "true" if get_comment_error else "false",
+        "TEST_UPDATE_COMMENT_ERROR": "true" if update_comment_error else "false",
+        "TEST_TRACE_FILE": str(trace_file),
+    }
+    completed = subprocess.run(
+        ["node", "-e", harness],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return completed, json.loads(trace_file.read_text(encoding="utf-8"))
+
+
 def test_employee_job_is_bounded_and_serialized_per_request_target():
     job = codex_job()
 
@@ -673,6 +793,166 @@ def test_one_progress_comment_is_created_then_updated_throughout_the_run():
     assert "todo_list" in reporter
     assert "UPDATE_INTERVAL_SECONDS = 60" in reporter
     assert "reasoning" not in reporter
+
+
+def test_initial_progress_comment_reserves_the_plan_progress_boundaries():
+    context_script = workflow_step(step_id="context")["with"]["script"]
+
+    assert '"<!-- codex-plan-progress:start -->"' in context_script
+    assert '"<!-- codex-plan-progress:end -->"' in context_script
+    assert context_script.index('"<!-- codex-plan-progress:start -->"') < context_script.index(
+        '"<!-- codex-plan-progress:end -->"'
+    )
+
+
+def test_final_response_preserves_the_latest_plan_in_the_same_comment(tmp_path):
+    progress_body = "\n".join(
+        [
+            "<!-- codex-live-progress -->",
+            "## Codex 正在处理",
+            "",
+            "正在验证结果并准备发布。",
+            "",
+            "<!-- codex-plan-progress:start -->",
+            "",
+            "### 执行计划",
+            "",
+            "- [x] 定位覆盖路径",
+            "- [ ] 🔄 验证最终评论",
+            "<!-- codex-plan-progress:end -->",
+            "",
+            "活动汇总：命令 3 · 文件变更 2 · 网络检索 0",
+        ]
+    )
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body)
+
+    assert completed.returncode == 0, completed.stderr
+    assert [call["name"] for call in trace["calls"]] == ["getComment", "updateComment"]
+    update = trace["calls"][1]["args"]
+    assert update["comment_id"] == 456
+    assert "已完成处理，并保留执行计划。" in update["body"]
+    assert "<!-- codex-plan-progress:start -->" in update["body"]
+    assert "- [x] 定位覆盖路径" in update["body"]
+    assert "- [ ] 🔄 验证最终评论" in update["body"]
+    assert update["body"].index("已完成处理，并保留执行计划。") < update["body"].index("### 执行计划")
+    assert "Codex 正在处理" not in update["body"]
+    assert "活动汇总" not in update["body"]
+
+
+def test_final_response_keeps_the_original_comment_when_plan_reading_fails(tmp_path):
+    progress_body = "\n".join(
+        [
+            "<!-- codex-plan-progress:start -->",
+            "### 执行计划",
+            "- [x] 已执行步骤",
+            "<!-- codex-plan-progress:end -->",
+        ]
+    )
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body, get_comment_error=True)
+
+    assert completed.returncode != 0
+    assert [call["name"] for call in trace["calls"] if call["name"] != "warning"] == ["getComment"]
+    assert "get comment failed" in trace["error"]
+
+
+def test_final_response_reserves_comment_space_for_the_complete_plan(tmp_path):
+    plan_items = [f"- [x] 步骤 {index} " + ("进" * 230) for index in range(10)]
+    progress_body = "\n".join(
+        [
+            "<!-- codex-plan-progress:start -->",
+            "### 执行计划",
+            *plan_items,
+            "<!-- codex-plan-progress:end -->",
+        ]
+    )
+    tests = [
+        {
+            "command": "python3 -m pytest " + ("tests/" * 12000),
+            "result": "passed",
+            "details": "验证通过",
+        }
+    ]
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body, tests=tests)
+
+    assert completed.returncode == 0, completed.stderr
+    update_body = next(call["args"]["body"] for call in trace["calls"] if call["name"] == "updateComment")
+    assert len(update_body) <= 64000
+    assert all(item in update_body for item in plan_items)
+    assert update_body.endswith("<!-- codex-plan-progress:end -->")
+
+
+@pytest.mark.parametrize(
+    "progress_body",
+    [
+        "### 执行计划\n- [x] 缺少边界",
+        "\n".join(
+            [
+                "<!-- codex-plan-progress:start -->",
+                "<!-- codex-plan-progress:start -->",
+                "### 执行计划",
+                "<!-- codex-plan-progress:end -->",
+            ]
+        ),
+        "\n".join(
+            [
+                "<!-- codex-plan-progress:end -->",
+                "### 执行计划",
+                "<!-- codex-plan-progress:start -->",
+            ]
+        ),
+    ],
+)
+def test_final_response_keeps_the_original_comment_when_plan_boundaries_are_invalid(tmp_path, progress_body):
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body)
+
+    assert completed.returncode != 0
+    assert [call["name"] for call in trace["calls"] if call["name"] != "warning"] == ["getComment"]
+    assert "one valid plan boundary pair" in trace["error"]
+
+
+def test_final_response_does_not_create_a_second_comment_when_the_existing_update_fails(tmp_path):
+    progress_body = "\n".join(
+        [
+            "<!-- codex-plan-progress:start -->",
+            "### 执行计划",
+            "- [x] 已执行步骤",
+            "<!-- codex-plan-progress:end -->",
+        ]
+    )
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body, update_comment_error=True)
+
+    assert completed.returncode != 0
+    assert [call["name"] for call in trace["calls"] if call["name"] != "warning"] == ["getComment", "updateComment"]
+    assert "update comment failed" in trace["error"]
+
+
+def test_final_response_creates_one_comment_only_when_the_initial_comment_was_never_created(tmp_path):
+    completed, trace = run_response_step(tmp_path, progress_body="", progress_comment_id="")
+
+    assert completed.returncode == 0, completed.stderr
+    assert [call["name"] for call in trace["calls"]] == ["createComment"]
+    assert trace["calls"][0]["args"]["issue_number"] == 77
+    assert trace["calls"][0]["args"]["body"] == "已完成处理，并保留执行计划。"
+
+
+def test_final_response_omits_an_empty_plan_section(tmp_path):
+    progress_body = "\n".join(
+        [
+            "<!-- codex-live-progress -->",
+            "<!-- codex-plan-progress:start -->",
+            "<!-- codex-plan-progress:end -->",
+        ]
+    )
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body)
+
+    assert completed.returncode == 0, completed.stderr
+    update_body = next(call["args"]["body"] for call in trace["calls"] if call["name"] == "updateComment")
+    assert update_body == "已完成处理，并保留执行计划。"
 
 
 def test_actionlint_config_only_ignores_the_confirmed_v3_metadata_mismatch():
