@@ -588,7 +588,10 @@
         <li>
           GitHub 评论 API 是本地 act 无法安全调用的外部边界。测试通过 mock GitHub API 执行 workflow 中的真实
           JavaScript，覆盖同 ID 读取/更新、计划保留、空计划、无初始评论、标记损坏、读取失败、更新失败和长度预算。
-          PR 创建后继续观察 hosted-runner smoke job；合并后再用真实维护者请求验收评论呈现。
+          PR #914 的 hosted-runner Codex dev-container smoke 已通过；常规 test-server 首轮暴露 Node 缺失后，为 9 个
+          JavaScript 行为用例增加 Node 可用性条件，第二轮 test-server、Codex smoke、test-ui、integration-test、
+          check-design、CodeQL、linux/amd64 镜像构建和 Claude review 全部通过，PR 状态为 CLEAN / MERGEABLE。
+          合并后再用真实维护者请求验收评论呈现。
         </li>
         <li><code>make check-design</code>：通过，67 design document(s) passed。</li>
       </ul>
