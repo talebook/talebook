@@ -13,6 +13,8 @@ import urllib.request
 UPDATE_INTERVAL_SECONDS = 60
 MAX_PLAN_ITEMS = 10
 MAX_PLAN_ITEM_LENGTH = 240
+PLAN_PROGRESS_START = "<!-- codex-plan-progress:start -->"
+PLAN_PROGRESS_END = "<!-- codex-plan-progress:end -->"
 
 
 def sanitize_markdown(value):
@@ -104,6 +106,7 @@ class ProgressState:
             f"- [ ] {'正在验证并准备发布' if self.turn_finished else '验证并发布'}",
         ]
 
+        lines.extend(["", PLAN_PROGRESS_START])
         if self.plan_items:
             lines.extend(["", "### 执行计划", ""])
             highlighted_pending = False
@@ -115,6 +118,7 @@ class ProgressState:
                     prefix = "🔄 "
                     highlighted_pending = True
                 lines.append(f"- [{marker}] {prefix}{sanitize_markdown(entry['text'])}")
+        lines.append(PLAN_PROGRESS_END)
 
         lines.extend(
             [
