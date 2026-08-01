@@ -737,7 +737,8 @@ class TestRefer(TestWithUserLogin):
     @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_isbn")
     @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_title")
     @mock.patch("webserver.plugins.meta.tomato.TomatoNovelApi.get_book")
-    def test_refer(self, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
+    @mock.patch("webserver.plugins.meta.xhsd.XhsdBookApi.get_book")
+    def test_refer(self, m_xhsd, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
         from tests.test_baike import BAIKE_PAGE
         from tests.test_douban import DOUBAN_BOOK, DOUBAN_SEARCH
         from tests.test_youshu import YOUSHU_PAGE
@@ -754,6 +755,7 @@ class TestRefer(TestWithUserLogin):
         m_calibre_isbn.return_value = []
         m_calibre_title.return_value = []
         m_tomato.return_value = None
+        m_xhsd.return_value = None
 
         # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
         # main.CONF["douban_baseurl"] = self.douban_url
