@@ -1060,7 +1060,21 @@ class SearchBook(ListHandler):
 
         title = _("搜索：%(name)s") % {"name": name}
         ids = self.cache.search(name)
+        ids = self.sort_ids_by_title_relevance(ids, name)
         return self.render_book_list([], ids=ids, title=title)
+
+    def sort_ids_by_title_relevance(self, ids, keyword):
+        """calibre 的 cache.search() 返回的是未排序的匹配集合，书名命中和简介、标签等其他字段
+        命中的结果混杂在一起。这里把书名命中的结果排到前面，同一优先级内按 id 从大到小排列。
+        """
+        keyword = (keyword or "").strip().lower()
+
+        def sort_key(book_id):
+            book_title = (self.cache.field_for("title", book_id) or "").lower()
+            title_matched = bool(keyword) and keyword in book_title
+            return (0 if title_matched else 1, -book_id)
+
+        return sorted(ids, key=sort_key)
 
 
 class HotBook(ListHandler):

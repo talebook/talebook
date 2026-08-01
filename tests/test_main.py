@@ -248,6 +248,17 @@ class TestAppWithoutLogin(TestApp):
         d = self.json("/api/search?name=A")
         self.assert_book_list(d, 6)
 
+    def test_search_prioritizes_title_matches(self):
+        # 书籍 3《安徒生童话》标题命中关键字；书籍 5、13 仅标签命中关键字（标题不含关键字）。
+        d = self.json("/api/search?name=" + Q("童话"))
+        self.assertEqual(d["err"], "ok")
+        ids = [book["id"] for book in d["books"]]
+        self.assertIn(3, ids)
+        self.assertIn(5, ids)
+        self.assertIn(13, ids)
+        self.assertLess(ids.index(3), ids.index(5))
+        self.assertLess(ids.index(3), ids.index(13))
+
     def test_hot(self):
         d = self.json("/api/hot")
         self.assert_book_list(d, 0)
