@@ -234,9 +234,7 @@ class TestTalebookSkillCli:
         )
         assert code == CLI.EXIT_GUARD
         assert errors is None
-        rendered = json.dumps(output)
-        assert "db-secret" not in rendered
-        assert "db.example.com" in rendered
+        assert output["arguments"]["url"] == "mysql+pymysql://<redacted>@db.example.com/books"
 
     def test_admin_command_preflights_role(self):
         status = guest_status(user={"is_login": True, "is_admin": True})
