@@ -839,6 +839,26 @@ class TestUserSignUp(TestWithUserLogin):
     def auth(self, s):
         return "Basic " + base64.encodebytes(s.encode("ascii")).decode("ascii")
 
+    def test_signup_username_length_boundary(self):
+        self.mail.reset_mock()
+
+        # 1个字符：低于最小长度2，应被拒绝
+        body = "email=short@gmail.com&nickname=short&username=a&password=unittest"
+        d = self.json("/api/user/sign_up", method="POST", raise_error=True, body=body)
+        self.assertEqual(d["err"], "params.username.invalid")
+
+        # 2个字符：等于最小长度2，应被接受
+        session = get_db()
+        session.query(models.Reader).filter(models.Reader.username == "ab").delete()
+        session.commit()
+        try:
+            body = "email=short2@gmail.com&nickname=short2&username=ab&password=unittest"
+            d = self.json("/api/user/sign_up", method="POST", raise_error=True, body=body)
+            self.assertEqual(d["err"], "ok")
+        finally:
+            session.query(models.Reader).filter(models.Reader.username == "ab").delete()
+            session.commit()
+
 
 class TestWithAdminUser(TestApp):
     @classmethod

@@ -209,7 +209,7 @@ class SignUp(BaseHandler):
 
         if not re.match(Reader.RE_EMAIL, email):
             return {"err": "params.email.invalid", "msg": _("Email无效")}
-        if len(username) < 5 or len(username) > 20 or not re.match(Reader.RE_USERNAME, username):
+        if len(username) < 2 or len(username) > 20 or not re.match(Reader.RE_USERNAME, username):
             return {"err": "params.username.invalid", "msg": _("用户名无效")}
         if len(password) < 8 or len(password) > 20 or not re.match(Reader.RE_PASSWORD, password):
             return {"err": "params.password.invalid", "msg": _("密码无效")}
