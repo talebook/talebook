@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talebook 操作型 Agent Skill · ACTIVE</title>
+  <style>
+    :root {
+      --canvas: #dfe8f0;
+      --paper: #f8fbfd;
+      --ink: #142033;
+      --muted: #5f6e80;
+      --line: #c7d4df;
+      --navy: #172944;
+      --blue: #2d63c8;
+      --teal: #168981;
+      --amber: #c87816;
+      --red: #b83f55;
+      --code: #0e1b2d;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, transparent 31px, #b8c9d7 32px, transparent 33px) 0 0 / 100% 100%,
+        var(--canvas);
+      color: var(--ink);
+      font: 15px/1.68 ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif;
+    }
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 32px auto;
+      background: var(--paper);
+      border: 1px solid #aebfcd;
+      box-shadow: 0 24px 64px #17294424;
+    }
+    header {
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      min-height: 360px;
+      background: var(--navy);
+      color: #f5f8fb;
+    }
+    .spine {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-right: 1px solid #ffffff2b;
+      color: #9fdad5;
+      font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .24em;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+    }
+    .hero { padding: 50px 54px 42px; }
+    .eyebrow {
+      margin: 0 0 18px;
+      color: #9fdad5;
+      font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 { max-width: 760px; margin: 0; font-size: clamp(36px, 6vw, 68px); line-height: 1.02; letter-spacing: -.045em; }
+    .lede { max-width: 720px; margin: 22px 0 0; color: #c9d5e1; font-size: 18px; }
+    .prompt {
+      margin: 34px 0 0;
+      padding: 17px 20px;
+      border: 1px solid #4d6481;
+      background: #0e1b2d;
+      color: #d7e4ef;
+      font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
+    .prompt b { color: #75d4ca; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 18px 54px;
+      border-bottom: 1px solid var(--line);
+      background: #edf3f7;
+    }
+    .meta span { padding: 5px 10px; border: 1px solid #b9c8d4; background: #fff; font-size: 12px; }
+    .meta .status { border-color: #72aaa4; background: #e2f3f0; color: #12665f; font-weight: 800; }
+    article { padding: 18px 54px 56px 132px; }
+    section { position: relative; padding: 27px 0 30px; border-bottom: 1px solid var(--line); }
+    section:last-child { border-bottom: 0; }
+    section::before {
+      content: attr(data-mark);
+      position: absolute;
+      left: -78px;
+      top: 32px;
+      color: var(--blue);
+      font: 800 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .12em;
+    }
+    section::after {
+      content: "";
+      position: absolute;
+      left: -54px;
+      top: 28px;
+      bottom: -1px;
+      width: 1px;
+      background: var(--line);
+    }
+    h2 { margin: 0 0 13px; font-size: 25px; line-height: 1.25; letter-spacing: -.02em; }
+    h3 { margin: 24px 0 8px; font-size: 17px; }
+    p, ul, ol { margin: 8px 0 14px; }
+    code { padding: 2px 5px; background: #e5edf4; color: #18375d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre {
+      margin: 14px 0;
+      padding: 18px 20px;
+      overflow: auto;
+      border-left: 4px solid var(--teal);
+      background: var(--code);
+      color: #d6e2ec;
+      font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; margin: 16px 0; }
+    .card { padding: 16px 18px; border: 1px solid var(--line); background: #fff; }
+    .card strong { display: block; margin-bottom: 4px; color: var(--blue); }
+    table { width: 100%; margin: 14px 0 20px; border-collapse: collapse; background: #fff; }
+    th, td { padding: 10px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #e7eef4; color: #30445d; font-size: 13px; }
+    .flow { margin: 18px 0; padding: 18px; border: 1px solid var(--line); background: #fff; }
+    .legend { color: var(--muted); font-size: 13px; }
+    .pending { color: var(--amber); font-weight: 800; }
+    .danger { color: var(--red); font-weight: 700; }
+    @media (max-width: 760px) {
+      main { width: min(100% - 18px, 1120px); margin: 9px auto; }
+      header { grid-template-columns: 48px 1fr; }
+      .hero { padding: 34px 24px 30px; }
+      .meta { padding: 14px 24px; }
+      article { padding: 12px 24px 40px 72px; }
+      section::before { left: -51px; }
+      section::after { left: -28px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="spine">TALEBOOK · AGENT OPERATOR</div>
+    <div class="hero">
+      <p class="eyebrow">Project design / agent skill</p>
+      <h1>让 Agent 真正操作书库，而不只是解释页面</h1>
+      <p class="lede">以明确命令、权限探测和风险门禁，把自然语言请求连接到 Talebook 现有 API；访客开箱即用，登录用户与管理员按身份逐级解锁。</p>
+      <div class="prompt"><b>$</b> talebook-cli.py --site books.example.com books upload ./三体.epub</div>
+    </div>
+  </header>
+
+  <div class="meta">
+    <span class="status">状态 · ACTIVE</span>
+    <span>创建日期 · 2026-07-31</span>
+    <span>所属模块 · project</span>
+    <span>需求来源 · 当前对话</span>
+  </div>
+
+  <article>
+    <section data-mark="ASK">
+      <h2>原始诉求</h2>
+      <p>在仓库根目录的 <code>skills/talebook/</code> 创建一个 Agent Skill，让用户通过自然语言操作和使用 Talebook，而非指导开发 Talebook。Skill 需要支持公开实例的 guest 访问、可选账号认证、普通用户与管理员操作，以及基于 Docker Compose 启动新实例的参考说明。</p>
+      <p>用户逐项确认：CLI 使用单体 <code>scripts/talebook-cli.py</code>；命令采用按领域组织的多层树；顶层为 <code>me</code>、<code>books</code>、<code>remote</code> 和 <code>admin</code>；管理接口全部位于 <code>admin</code>；不提供 <code>raw</code> 与 <code>deploy</code> 命令。</p>
+    </section>
+
+    <section data-mark="GOAL">
+      <h2>目标与边界</h2>
+      <div class="grid">
+        <div class="card"><strong>自然触发</strong>用户提到操作、管理或部署 Talebook 时自动加载，也支持显式调用 <code>$talebook</code>。</div>
+        <div class="card"><strong>Guest first</strong>仅站点地址必填；用户名和密码成对可选，公开实例无需登录。</div>
+        <div class="card"><strong>明确命令</strong>CLI 只封装已核实接口，不提供任意 HTTP 请求逃生口。</div>
+        <div class="card"><strong>风险可见</strong>破坏性、外发、权限和系统配置操作先预览，再凭 <code>--confirmed</code> 执行。</div>
+      </div>
+      <p><strong>非目标：</strong>不修改 Talebook 业务 API；不实现容器生命周期管理；不保存账号密码；不绕过验证码、访问码或服务端权限；不把部署逻辑塞进 CLI。</p>
+    </section>
+
+    <section data-mark="FLOW">
+      <h2>执行主轴</h2>
+      <div class="flow">
+        <svg viewBox="0 0 920 220" width="100%" role="img" aria-labelledby="flow-title flow-desc" xmlns="http://www.w3.org/2000/svg">
+          <title id="flow-title">Agent 操作 Talebook 的执行流程</title>
+          <desc id="flow-desc">自然语言请求依次经过 Skill 意图路由、身份权限探测、风险门禁、CLI 或浏览器执行，最后核验响应。</desc>
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1l7 4-7 4" fill="none" stroke="#5f6e80" stroke-width="1.5"/></marker>
+          </defs>
+          <g font-family="system-ui,PingFang SC,sans-serif" font-size="13">
+            <rect x="20" y="72" width="140" height="76" rx="4" fill="#edf3f7" stroke="#9eb2c3"/><text x="90" y="103" text-anchor="middle" fill="#142033">自然语言请求</text><text x="90" y="127" text-anchor="middle" fill="#5f6e80" font-size="11">搜索 / 上传 / 管理</text>
+            <rect x="205" y="72" width="140" height="76" rx="4" fill="#e7eefb" stroke="#7895cf"/><text x="275" y="103" text-anchor="middle" fill="#142033">Skill 路由</text><text x="275" y="127" text-anchor="middle" fill="#5f6e80" font-size="11">me / books / remote / admin</text>
+            <rect x="390" y="72" width="140" height="76" rx="4" fill="#e4f3f1" stroke="#70aaa5"/><text x="460" y="103" text-anchor="middle" fill="#142033">身份与权限</text><text x="460" y="127" text-anchor="middle" fill="#5f6e80" font-size="11">guest / user / admin</text>
+            <rect x="575" y="72" width="140" height="76" rx="4" fill="#fff0d9" stroke="#d19b51"/><text x="645" y="103" text-anchor="middle" fill="#142033">风险门禁</text><text x="645" y="127" text-anchor="middle" fill="#5f6e80" font-size="11">预览 / 确认 / 执行</text>
+            <rect x="760" y="35" width="140" height="64" rx="4" fill="#172944" stroke="#172944"/><text x="830" y="64" text-anchor="middle" fill="#f5f8fb">CLI → API</text><text x="830" y="84" text-anchor="middle" fill="#9fdad5" font-size="11">确定性操作</text>
+            <rect x="760" y="121" width="140" height="64" rx="4" fill="#f4e7ec" stroke="#bd8190"/><text x="830" y="150" text-anchor="middle" fill="#142033">浏览器兜底</text><text x="830" y="170" text-anchor="middle" fill="#5f6e80" font-size="11">验证码 / 首次初始化</text>
+            <g fill="none" stroke="#5f6e80" marker-end="url(#arrow)"><path d="M160 110h43"/><path d="M345 110h43"/><path d="M530 110h43"/><path d="M715 101l43-27"/><path d="M715 119l43 26"/></g>
+          </g>
+        </svg>
+      </div>
+      <p class="legend">成功不以“请求已发出”为准，而以 Talebook 返回成功状态、目标资源可重新查询，或浏览器页面显示预期状态为准。</p>
+    </section>
+
+    <section data-mark="CLI">
+      <h2>CLI 与配置设计</h2>
+      <p>CLI 使用 Python 标准库与递归 <code>argparse</code> 子命令，保持单文件可执行。公共参数位于命令树之前：</p>
+      <pre>talebook-cli.py [--site URL] [--user USER] [--password PASSWORD] &lt;service&gt; &lt;command&gt; [options]</pre>
+      <table>
+        <thead><tr><th>参数</th><th>环境变量</th><th>规则</th></tr></thead>
+        <tbody>
+          <tr><td><code>--site</code></td><td><code>TALEBOOK_URL</code></td><td>必填；无 scheme 时补 <code>https://</code>，显式 HTTP(S) 保持不变，移除末尾斜杠。</td></tr>
+          <tr><td><code>--user</code></td><td><code>TALEBOOK_USERNAME</code></td><td>可选；必须与密码同时出现。</td></tr>
+          <tr><td><code>--password</code></td><td><code>TALEBOOK_PASSWORD</code></td><td>可选；环境变量更安全，命令行参数可能暴露于历史或进程列表。</td></tr>
+        </tbody>
+      </table>
+      <p>命令行参数覆盖环境变量。未提供用户名和密码时不发送 Authorization 头，以 guest 身份请求。服务端要求访问码、验证码或第三方登录时，Skill 转入浏览器流程。</p>
+      <pre>me status
+books search | show | list | upload | download | edit | delete
+books favorite set|unset | shelf add|remove | reading state|progress|stats
+books send device|mail
+remote sources list | search start|status | explore list|categories
+remote books show|toc|content|save|save-status | library list
+admin users ... | books ... | imports ... | booksources ...
+admin opds ... | settings ... | trash ... | ssl ... | themes ... | logs ...</pre>
+    </section>
+
+    <section data-mark="FILES">
+      <h2>Skill 信息层级</h2>
+      <table>
+        <thead><tr><th>文件</th><th>职责</th><th>加载条件</th></tr></thead>
+        <tbody>
+          <tr><td><code>SKILL.md</code></td><td>意图路由、身份探测、风险分级、执行与核验步骤。</td><td>每次 Skill 触发。</td></tr>
+          <tr><td><code>scripts/talebook-cli.py</code></td><td>单体多层 CLI、HTTP Basic Auth、上传下载、响应与错误处理。</td><td>需要 API 操作时直接执行；仅在修复脚本时读取源码。</td></tr>
+          <tr><td><code>references/api.md</code></td><td>命令树、接口映射、参数、权限、风险和响应说明。</td><td>选择命令或处理异常响应时。</td></tr>
+          <tr><td><code>references/docker-compose.md</code></td><td>生成 Compose 配置、启动容器和验证地址。</td><td>用户要求部署 Talebook 时。</td></tr>
+          <tr><td><code>agents/openai.yaml</code></td><td>展示名称、短描述和默认提示。</td><td>由宿主读取。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section data-mark="SAFE">
+      <h2>权限与风险门禁</h2>
+      <table>
+        <thead><tr><th>等级</th><th>示例</th><th>行为</th></tr></thead>
+        <tbody>
+          <tr><td>只读</td><td>搜索、详情、列表、状态、日志查看</td><td>直接执行并核验。</td></tr>
+          <tr><td>常规写入</td><td>明确要求的上传、收藏、书架、阅读状态</td><td>直接执行；失败时展示服务端原因。</td></tr>
+          <tr><td>外部副作用</td><td>发送到设备或邮箱</td><td>展示书籍、目标与格式，确认后添加 <code>--confirmed</code>。</td></tr>
+          <tr><td>管理写入</td><td>用户权限、系统设置、书源、主题</td><td>先验证管理员身份，展示变更摘要，再确认。</td></tr>
+          <tr><td class="danger">破坏性</td><td>删除、批量操作、清空回收站、迁移数据库</td><td>展示精确目标、数量与不可逆影响，确认后执行。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section data-mark="TEST">
+      <h2>验证计划与结果</h2>
+      <p><strong>当前状态：核心路径验证通过；全量后端测试受本地依赖限制。</strong></p>
+      <ul>
+        <li><code>quick_validate.py skills/talebook</code>：通过，输出 <code>Skill is valid!</code>。</li>
+        <li><code>.venv/bin/ruff check</code> 与 <code>ruff format --check</code>：CLI 和测试均通过。</li>
+        <li><code>.venv/bin/pytest tests/test_talebook_skill_cli.py -q</code>：18 项通过，耗时 6.51 秒。</li>
+        <li>定向测试使用本地伪 HTTP 服务覆盖 URL 规范化、guest、Basic Auth、参数优先级、身份门禁、风险预览与脱敏、普通及分片上传、下载、远程书库和管理员请求。</li>
+        <li>递归检查解析器得到 84 个叶子命令；顶层仅为 <code>me</code>、<code>books</code>、<code>remote</code>、<code>admin</code>，不存在 <code>raw</code> 或 <code>deploy</code>。</li>
+        <li>完整命令 <code>.venv/bin/pytest tests -q --cov=webserver --cov-report=term-missing</code> 在收集阶段停止：本地环境缺少 <code>PyYAML</code> 与 Calibre，共 10 个模块导入错误，未进入测试执行。此次未修改后端业务代码，相关 CLI 定向测试和静态检查作为替代验证；剩余风险是未在当前宿主环境重跑既有后端全套。</li>
+        <li><code>make check-design</code>：ACTIVE 文件路径、HTML 结构和单文件资源约束通过。</li>
+        <li>本次不改变前端页面，无需启动 Nuxt 或执行浏览器渲染验收。</li>
+      </ul>
+    </section>
+
+    <section data-mark="RISK">
+      <h2>风险与回滚</h2>
+      <table>
+        <thead><tr><th>风险</th><th>控制</th></tr></thead>
+        <tbody>
+          <tr><td>接口随业务代码变化</td><td>接口细节单一来源放在 CLI 与 API 参考，测试覆盖关键请求契约。</td></tr>
+          <tr><td>命令树过大导致维护困难</td><td>保持单体文件但按领域分段；公共传输、认证、输出和门禁只实现一次。</td></tr>
+          <tr><td>密码出现在命令历史</td><td>支持用户要求的参数，同时在帮助与 Skill 中优先推荐环境变量。</td></tr>
+          <tr><td>误执行高风险操作</td><td>CLI 强制 <code>--confirmed</code>，Skill 先向用户展示预览；服务端权限仍为最终边界。</td></tr>
+        </tbody>
+      </table>
+      <p>方案已生效；如需改变核心命令或安全模型，应创建新的 WIP 方案替代。本 Skill 可独立移除，不影响 Talebook 业务 API 与前端。</p>
+    </section>
+  </article>
+</main>
+</body>
+</html>
