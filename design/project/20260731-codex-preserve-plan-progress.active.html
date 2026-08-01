@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex 最终总结保留执行计划进展方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #102a43;
+      --muted: #52677a;
+      --paper: #f4f8fb;
+      --panel: #ffffff;
+      --line: #b8cad8;
+      --rail: #176b87;
+      --rail-soft: #dff2f7;
+      --done: #13795b;
+      --done-soft: #def5e9;
+      --pending: #9a5b13;
+      --pending-soft: #fff0d8;
+      --danger: #a63d40;
+      --danger-soft: #fde8e8;
+      --code: #172b3a;
+      --code-ink: #dbeaf2;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 24px 76px;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(23, 107, 135, .045) 1px, transparent 1px),
+        var(--paper);
+      background-size: 28px 100%;
+      font: 17px/1.68 Georgia, "Songti SC", "STSong", serif;
+    }
+
+    h1, h2, h3, .eyebrow, .meta, .tag, th, .step, .comment-label {
+      font-family: "Avenir Next Condensed", "Arial Narrow", "PingFang SC", sans-serif;
+    }
+    h1 {
+      max-width: 860px;
+      margin: 0;
+      font-size: clamp(39px, 6.3vw, 68px);
+      line-height: 1;
+      letter-spacing: -.025em;
+    }
+    h2 {
+      margin: 52px 0 17px;
+      font-size: clamp(28px, 4vw, 40px);
+      line-height: 1.08;
+    }
+    h3 {
+      margin: 0 0 8px;
+      font-size: 21px;
+      line-height: 1.2;
+    }
+    p { margin: 11px 0; }
+    code {
+      padding: 2px 6px;
+      border: 1px solid #c7d7e1;
+      border-radius: 4px;
+      background: #edf4f7;
+      font: .87em/1.5 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      overflow-wrap: anywhere;
+    }
+
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 42px 48px 38px 58px;
+      color: #fff;
+      background: var(--code);
+      border-left: 12px solid var(--rail);
+      border-radius: 5px 18px 18px 5px;
+      box-shadow: 0 22px 60px rgba(16, 42, 67, .2);
+    }
+    header::after {
+      position: absolute;
+      right: 42px;
+      bottom: -74px;
+      width: 150px;
+      height: 230px;
+      content: "";
+      border: 15px solid rgba(125, 211, 236, .1);
+      border-top-color: rgba(125, 211, 236, .38);
+      border-radius: 80px 80px 0 0;
+      transform: rotate(12deg);
+    }
+    .eyebrow {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 14px;
+      color: #8cd7e8;
+      font: 800 13px/1.2 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .14em;
+    }
+    .thesis {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+      margin-top: 20px;
+      color: #d4e5ed;
+      font-size: 19px;
+    }
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr .8fr .8fr 1.4fr;
+      gap: 1px;
+      margin-top: 28px;
+      border: 1px solid rgba(255, 255, 255, .16);
+      background: rgba(255, 255, 255, .16);
+    }
+    .meta div {
+      min-height: 72px;
+      padding: 11px 13px;
+      background: rgba(9, 31, 44, .94);
+    }
+    .meta span {
+      display: block;
+      color: #8ea9b7;
+      font-size: 12px;
+      letter-spacing: .08em;
+    }
+    .meta strong {
+      display: block;
+      margin-top: 4px;
+      color: #fff;
+      font-size: 15px;
+      line-height: 1.32;
+    }
+    .meta .status { color: #ffd285; }
+
+    .lead {
+      padding: 20px 23px;
+      background: var(--panel);
+      border-left: 6px solid var(--rail);
+      box-shadow: 0 9px 28px rgba(16, 42, 67, .07);
+    }
+    .quote {
+      margin: 20px 0;
+      padding: 19px 23px;
+      background: var(--code);
+      color: var(--code-ink);
+      border-radius: 6px;
+      font-size: 19px;
+    }
+    .quote strong { color: #91d9e8; }
+
+    .invariants {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 24px 0;
+    }
+    .invariant {
+      min-height: 170px;
+      padding: 19px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-top: 5px solid var(--rail);
+      border-radius: 7px;
+    }
+    .invariant:nth-child(2) { border-top-color: var(--done); }
+    .invariant:nth-child(3) { border-top-color: var(--danger); }
+    .tag {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .09em;
+    }
+
+    .ledger {
+      position: relative;
+      margin: 28px 0;
+      padding-left: 64px;
+    }
+    .ledger::before {
+      position: absolute;
+      top: 12px;
+      bottom: 12px;
+      left: 25px;
+      width: 5px;
+      content: "";
+      background: linear-gradient(var(--rail), var(--done));
+      border-radius: 4px;
+    }
+    .ledger-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 175px minmax(0, 1fr);
+      gap: 18px;
+      margin: 0 0 14px;
+      padding: 18px 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      box-shadow: 0 6px 18px rgba(16, 42, 67, .05);
+    }
+    .ledger-row::before {
+      position: absolute;
+      top: 24px;
+      left: -51px;
+      width: 23px;
+      height: 23px;
+      content: "";
+      background: var(--paper);
+      border: 6px solid var(--rail);
+      border-radius: 50%;
+    }
+    .ledger-row:last-child::before { border-color: var(--done); }
+    .step {
+      color: var(--rail);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: .045em;
+    }
+    .ledger-row p { margin: 0; }
+
+    .comment-shell {
+      margin: 26px 0;
+      overflow: hidden;
+      background: var(--panel);
+      border: 1px solid #9fb5c4;
+      border-radius: 9px;
+      box-shadow: 0 16px 38px rgba(16, 42, 67, .1);
+    }
+    .comment-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 11px 17px;
+      color: #fff;
+      background: var(--rail);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .04em;
+    }
+    .comment-body { padding: 22px 25px 25px; }
+    .summary {
+      padding-bottom: 17px;
+      border-bottom: 1px solid var(--line);
+    }
+    .plan {
+      margin-top: 18px;
+      padding: 16px 18px;
+      background: var(--done-soft);
+      border: 1px solid #9dcdb9;
+      border-left: 5px solid var(--done);
+      border-radius: 5px;
+    }
+    .plan ul {
+      margin: 9px 0 0;
+      padding: 0;
+      list-style: none;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 14px;
+    }
+    .plan li + li { margin-top: 7px; }
+
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .decision {
+      padding: 18px 19px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+    }
+    .decision.rejected {
+      background: var(--danger-soft);
+      border-color: #e1acad;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 710px;
+    }
+    th, td {
+      padding: 13px 15px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid #d7e2e9;
+    }
+    th {
+      color: #fff;
+      background: var(--code);
+      font-size: 14px;
+      letter-spacing: .03em;
+    }
+    tr:last-child td { border-bottom: 0; }
+    td:first-child {
+      width: 23%;
+      color: var(--rail);
+      font-weight: 700;
+    }
+
+    .callout {
+      margin: 22px 0;
+      padding: 19px 21px;
+      background: var(--pending-soft);
+      border: 1px solid #e1bd87;
+      border-left: 6px solid var(--pending);
+      border-radius: 6px;
+    }
+    .callout.danger {
+      background: var(--danger-soft);
+      border-color: #dfaaac;
+      border-left-color: var(--danger);
+    }
+    ul, ol { padding-left: 23px; }
+    li + li { margin-top: 7px; }
+
+    footer {
+      margin-top: 50px;
+      padding-top: 17px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 14px;
+    }
+    @media (max-width: 760px) {
+      body { padding: 14px 14px 52px; }
+      header { padding: 31px 24px 28px 30px; }
+      header::after { display: none; }
+      .meta, .invariants, .decision-grid { grid-template-columns: 1fr; }
+      .ledger { padding-left: 45px; }
+      .ledger::before { left: 15px; }
+      .ledger-row { grid-template-columns: 1fr; gap: 4px; }
+      .ledger-row::before { left: -42px; }
+      .comment-label { display: block; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">CODEX COMMENT LEDGER / DESIGN DECISION</div>
+    <h1>总结可以收口，进展不能消失</h1>
+    <p class="thesis">
+      最终回帖继续使用同一条 GitHub 评论，但只替换临时阶段说明；Codex 已经展示过的执行计划及其最后勾选状态必须成为最终结果的一部分。
+    </p>
+    <div class="meta" aria-label="方案元数据">
+      <div><span>创建日期</span><strong>2026-07-31</strong></div>
+      <div><span>所属模块</span><strong>project</strong></div>
+      <div><span>状态</span><strong class="status">ACTIVE</strong></div>
+      <div><span>需求来源</span><strong>维护者在 #910 合并后的继续优化要求</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <h2>原始诉求</h2>
+    <div class="quote">
+      <strong>维护者：</strong>“codex 输出总结时，不要把原来已经执行的 plan 进展覆盖掉。”
+    </div>
+    <p class="lead">
+      当前 workflow 在运行期持续更新一条进度评论，展示 Codex 的计划清单；运行结束时，最终回帖步骤却用结构化
+      <code>summary</code> 重新构造整段评论正文，再对同一评论执行覆盖更新。结果是总结出现了，但用户刚刚看到的执行轨迹消失了。
+    </p>
+
+    <h2>目标与不变量</h2>
+    <div class="invariants">
+      <article class="invariant">
+        <div class="tag">ONE COMMENT</div>
+        <h3>始终单评论</h3>
+        <p>存在实时进度评论时，最终结果只更新该评论；禁止因读取、解析或更新失败而追加第二条回帖。</p>
+      </article>
+      <article class="invariant">
+        <div class="tag">PLAN SURVIVES</div>
+        <h3>保留最后进展</h3>
+        <p>最终正文保留最新执行计划清单，完成项继续勾选，失败或未完成项继续保持未勾选。</p>
+      </article>
+      <article class="invariant">
+        <div class="tag">FAIL CLOSED</div>
+        <h3>不能保真就不覆盖</h3>
+        <p>已有评论但无法可靠取得计划边界时，保留原评论并使 workflow 失败，不用总结冒险覆盖进展。</p>
+      </article>
+    </div>
+
+    <h2>根因</h2>
+    <div class="ledger" aria-label="当前评论生命周期">
+      <article class="ledger-row">
+        <div class="step">01 · ACKNOWLEDGE</div>
+        <p><code>Resolve request context</code> 创建带固定 ID 的初始进度评论。</p>
+      </article>
+      <article class="ledger-row">
+        <div class="step">02 · REPORT</div>
+        <p><code>codex_progress_reporter.py</code> 消费 JSONL 事件，把 todo 清单与勾选状态 PATCH 到该 ID。</p>
+      </article>
+      <article class="ledger-row">
+        <div class="step">03 · REBUILD</div>
+        <p><code>Post Codex response</code> 从空字符串重新构造 <code>body</code>，其中只有总结、验证和发布结果。</p>
+      </article>
+      <article class="ledger-row">
+        <div class="step">04 · OVERWRITE</div>
+        <p>最终 <code>updateComment</code> 将运行期正文整段替换，todo 清单没有任何传递通道，因此必然丢失。</p>
+      </article>
+    </div>
+
+    <h2>目标评论形态</h2>
+    <div class="comment-shell" aria-label="最终 GitHub 评论示意">
+      <div class="comment-label">
+        <span>同一 comment_id</span>
+        <span>FINAL / 不再显示“正在处理”</span>
+      </div>
+      <div class="comment-body">
+        <div class="summary">
+          <h3>Codex 处理结果</h3>
+          <p>这里保留结构化总结、实际验证结果和发布状态。</p>
+        </div>
+        <div class="plan">
+          <h3>执行计划</h3>
+          <ul>
+            <li>☑ 定位评论覆盖路径</li>
+            <li>☑ 实现计划边界保留</li>
+            <li>☐ 完成尚未通过的验证</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <p>
+      最终正文不保留“Codex 正在处理”“正在验证并准备发布”等瞬时文案，也不保留活动计数。计划清单作为结果后的审计轨迹保留。
+    </p>
+
+    <h2>方案</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>环节</th>
+            <th>改动</th>
+            <th>约束</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>初始评论</td>
+            <td>在评论内写入唯一的 plan 起止标记；尚未生成计划时，标记之间为空。</td>
+            <td>标记不依赖可见中文标题，避免文案调整破坏解析。</td>
+          </tr>
+          <tr>
+            <td>实时 reporter</td>
+            <td>每次渲染都保留同一对标记，并把已转义的“执行计划”区块放在标记之间。</td>
+            <td>计划文本继续限制数量和长度，并转义 Markdown、HTML 与提及。</td>
+          </tr>
+          <tr>
+            <td>最终回帖</td>
+            <td>先用 <code>getComment</code> 读取当前评论，校验且提取标记区块，再拼入总结正文并更新同一 ID。</td>
+            <td>只允许恰好一对有序标记；不从 Codex 最终文本重新推断 plan。</td>
+          </tr>
+          <tr>
+            <td>长度控制</td>
+            <td>先为 plan 区块和截断提示预留空间，再截断过长的结果正文，最后追加 plan。</td>
+            <td>GitHub 评论长度受控时，优先保证计划区块完整，不允许从中间截断。</td>
+          </tr>
+          <tr>
+            <td>无初始评论</td>
+            <td>若最初创建评论已失败且没有合法 comment ID，则按既有逻辑创建一条最终评论。</td>
+            <td>此时系统从未留下进度评论，所以仍然只有一条评论。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout danger">
+      <h3>失败策略</h3>
+      <p>
+        如果 comment ID 合法但读取失败、标记缺失/重复/逆序，或者同一评论更新失败，最终回帖步骤直接失败。
+        不修改原评论，不调用创建评论作为兜底。后续 fail-closed 状态步骤继续把本次交付判为失败。
+      </p>
+    </div>
+
+    <h2>关键决策</h2>
+    <div class="decision-grid">
+      <article class="decision">
+        <h3>采用：从 GitHub 当前评论读取</h3>
+        <p>最终步骤拿到的是维护者实际看见的最后状态，避免本地快照与最后一次 PATCH 成败不一致。</p>
+      </article>
+      <article class="decision">
+        <h3>采用：隐藏边界标记</h3>
+        <p>解析稳定边界而不是匹配标题或列表文本；计划内容仍由受信任 reporter 统一转义。</p>
+      </article>
+      <article class="decision rejected">
+        <h3>拒绝：整段旧评论直接追加</h3>
+        <p>会把“正在处理”和“稍后替换”等过时文案冻结在最终结果里，状态语义错误。</p>
+      </article>
+      <article class="decision rejected">
+        <h3>拒绝：失败时另发总结</h3>
+        <p>会产生双评论，违背维护者明确确认的单评论约束，也让哪条评论是最终结果变得含糊。</p>
+      </article>
+    </div>
+
+    <h2>安全、兼容与回滚</h2>
+    <ul>
+      <li><strong>不扩大权限：</strong>继续使用现有 interaction token；只增加对已知 comment ID 的读取，不新增仓库写权限。</li>
+      <li><strong>内容安全：</strong>plan 仍由 reporter 进行 HTML、Markdown 和提及转义；最终步骤只搬运标记内的受控区块。</li>
+      <li><strong>兼容无计划运行：</strong>标记之间为空时正常发布总结，不伪造执行计划。</li>
+      <li><strong>兼容初始 ACK 失败：</strong>没有 comment ID 时允许创建唯一的最终评论；不属于双评论。</li>
+      <li><strong>回滚：</strong>回退 workflow、reporter 和测试提交即可恢复旧行为，不涉及数据、API 或持久化迁移。</li>
+    </ul>
+
+    <h2>影响范围</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>文件</th><th>职责</th><th>预期变化</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.github/workflows/codex.yml</code></td>
+            <td>初始评论与最终回帖</td>
+            <td>写入 plan 标记；读取、提取、组合并单评论 fail-closed 更新。</td>
+          </tr>
+          <tr>
+            <td><code>.github/codex/scripts/codex_progress_reporter.py</code></td>
+            <td>实时计划渲染</td>
+            <td>始终输出稳定标记，计划存在时把可见区块置于标记之间。</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_codex_progress_reporter.py</code></td>
+            <td>reporter 行为测试</td>
+            <td>覆盖空计划、有计划、转义与最终勾选状态的边界标记。</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_codex_workflow.py</code></td>
+            <td>workflow 契约测试</td>
+            <td>覆盖读取提取、同 ID 更新、长度预算以及禁止双评论兜底。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>测试结果</h2>
+    <div class="callout">
+      <h3>状态：实现与本地 workflow 验证通过</h3>
+      <ul>
+        <li>
+          TDD 红灯证据：新增边界测试最初因 <code>PLAN_PROGRESS_START</code> 不存在失败；最终回帖行为测试最初只观察到
+          <code>updateComment</code> 且正文没有 plan；读取失败测试最初错误地创建第二条评论；长度测试最初得到
+          66,029 字符正文，超过 64,000 字符预算。
+        </li>
+        <li>
+          <code>python3 -m pytest tests/test_codex_progress_reporter.py tests/test_codex_workflow.py -q</code>：
+          42 passed。
+        </li>
+        <li>
+          <code>ruff check .github/codex/scripts/codex_progress_reporter.py tests/test_codex_progress_reporter.py tests/test_codex_workflow.py</code>：
+          通过；<code>ruff format --check</code>：3 files already formatted。
+        </li>
+        <li><code>make lint-py-fix</code>：通过，97 files left unchanged。</li>
+        <li><code>make lint-py</code>：通过，97 files already formatted。</li>
+        <li>
+          宿主 <code>make pytest</code> 未进入测试，因为 macOS PATH 没有 <code>pytest</code> 可执行文件；等价的
+          <code>python3 -m pytest tests -v --cov=webserver --cov-report=term-missing</code> 在收集阶段因宿主 Python 3.9
+          缺少 Calibre、QuickJS、<code>txt2epub_next</code> 等完整项目依赖产生 22 个环境错误。该结果未写成通过。
+        </li>
+        <li>
+          使用 <code>act 0.2.82</code>、<code>pull_request</code> 事件、真实
+          <code>.github/workflows/codex.yml</code> 和 <code>codex-sandbox-smoke</code> job；本地镜像
+          <code>talebook/talebook:dev</code>（<code>sha256:8bdf46936f7f…</code>），
+          <code>--pull=false</code>。
+        </li>
+        <li>
+          macOS 默认 act copy/mount 因宿主 UID 501 与容器 UID 1001 的 bind mount 限制在创建
+          <code>.codex-smoke-home</code> 前失败；改用可写临时 staging、<code>--bind</code> 后环境校验全部通过。
+          act 本地未提供 hosted-runner npm cache，首次同步依赖时 npm 误用 <code>/.npm</code>；仅在最终本地命令中增加
+          <code>--env npm_config_cache=/data/npm-cache</code> 后通过，workflow 文件未因此修改。
+        </li>
+        <li>
+          最终 act 命令完整通过：环境校验、<code>make init</code>、<code>npm --prefix app ci</code> 和
+          <code>python3 -m pytest tests</code> 均成功；全量结果 709 passed、1 skipped、20 warnings，job succeeded。
+        </li>
+        <li>
+          GitHub 评论 API 是本地 act 无法安全调用的外部边界。测试通过 mock GitHub API 执行 workflow 中的真实
+          JavaScript，覆盖同 ID 读取/更新、计划保留、空计划、无初始评论、标记损坏、读取失败、更新失败和长度预算。
+          PR #914 的 hosted-runner Codex dev-container smoke 已通过；常规 test-server 首轮暴露 Node 缺失后，为 9 个
+          JavaScript 行为用例增加 Node 可用性条件，第二轮 test-server、Codex smoke、test-ui、integration-test、
+          check-design、CodeQL、linux/amd64 镜像构建和 Claude review 全部通过，PR 状态为 CLEAN / MERGEABLE。
+          合并后再用真实维护者请求验收评论呈现。
+        </li>
+        <li><code>make check-design</code>：通过，67 design document(s) passed。</li>
+      </ul>
+    </div>
+
+    <h2>验收标准</h2>
+    <ul>
+      <li>实时运行期间仍可看到持续更新的阶段和执行计划。</li>
+      <li>最终总结出现后，评论数量不增加，原 comment ID 不变。</li>
+      <li>最终正文不再显示临时阶段文案，但显示最新 plan 清单及原勾选状态。</li>
+      <li>读取或解析已有 plan 失败时，原评论正文不变，workflow 明确失败。</li>
+      <li>无 plan 的纯问答或早期失败不会出现空的“执行计划”标题。</li>
+      <li>超长最终结果的截断不会截断或删除 plan 区块。</li>
+      <li>相关单元测试、全量测试、设计检查和真实 workflow 验证均有实际记录。</li>
+    </ul>
+  </main>
+
+  <footer>
+    本方案记录当前生效的 Codex 单评论总结与执行计划保留规则。核心行为变更需通过新的 WIP 方案替代。
+  </footer>
+</body>
+</html>
