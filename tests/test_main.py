@@ -248,6 +248,17 @@ class TestAppWithoutLogin(TestApp):
         d = self.json("/api/search?name=A")
         self.assert_book_list(d, 6)
 
+    def test_search_prioritizes_title_matches(self):
+        # 书籍 3《安徒生童话》标题命中关键字；书籍 5、13 仅标签命中关键字（标题不含关键字）。
+        d = self.json("/api/search?name=" + Q("童话"))
+        self.assertEqual(d["err"], "ok")
+        ids = [book["id"] for book in d["books"]]
+        self.assertIn(3, ids)
+        self.assertIn(5, ids)
+        self.assertIn(13, ids)
+        self.assertLess(ids.index(3), ids.index(5))
+        self.assertLess(ids.index(3), ids.index(13))
+
     def test_hot(self):
         d = self.json("/api/hot")
         self.assert_book_list(d, 0)
@@ -726,7 +737,8 @@ class TestRefer(TestWithUserLogin):
     @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_isbn")
     @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_title")
     @mock.patch("webserver.plugins.meta.tomato.TomatoNovelApi.get_book")
-    def test_refer(self, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
+    @mock.patch("webserver.plugins.meta.xhsd.XhsdBookApi.get_book")
+    def test_refer(self, m_xhsd, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
         from tests.test_baike import BAIKE_PAGE
         from tests.test_douban import DOUBAN_BOOK, DOUBAN_SEARCH
         from tests.test_youshu import YOUSHU_PAGE
@@ -743,6 +755,7 @@ class TestRefer(TestWithUserLogin):
         m_calibre_isbn.return_value = []
         m_calibre_title.return_value = []
         m_tomato.return_value = None
+        m_xhsd.return_value = None
 
         # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
         # main.CONF["douban_baseurl"] = self.douban_url
