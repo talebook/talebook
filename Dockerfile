@@ -64,13 +64,15 @@ RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
     dpkg --add-architecture armhf || true; \
     fi
 
-# Create a talebook user and change the Nginx startup user if it doesn't exist
+# Install the Talebook-owned main config, then let an unprivileged Nginx bind 80/443.
+COPY conf/nginx/nginx.conf /etc/nginx/nginx.conf
 RUN if ! id -u talebook > /dev/null 2>&1; then \
     useradd -u 911 -U -d /var/www/talebook -s /bin/false talebook && \
     usermod -G users talebook && \
     groupmod -g 911 talebook; \
 fi && \
-    sed -i "s/user www-data;/user talebook;/g" /etc/nginx/nginx.conf
+    setcap cap_net_bind_service=+ep /usr/sbin/nginx && \
+    getcap /usr/sbin/nginx | grep -Fq 'cap_net_bind_service=ep'
 
 
 # ----------------------------------------
@@ -258,6 +260,7 @@ RUN apt-get update -y && \
         curl \
         git \
         jq \
+        unzip \
         uidmap && \
     if [ "$TARGETARCH" = "amd64" ] || [ "$TARGETARCH" = "arm64" ]; then \
         curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
@@ -273,7 +276,8 @@ RUN --mount=type=cache,target=/root/.npm \
     codex --version && \
     python3 -m pytest --version && \
     ruff --version && \
-    bwrap --version
+    bwrap --version && \
+    unzip -v
 
 ENV TZ=Asia/Shanghai
 ENV LANG=C.UTF-8

@@ -11,6 +11,16 @@ from webserver.handlers.base import BaseHandler
 
 CONF = loader.get_settings()
 
+WEBDAV_METHODS = (
+    "COPY",
+    "LOCK",
+    "MKCOL",
+    "MOVE",
+    "PROPFIND",
+    "PROPPATCH",
+    "UNLOCK",
+)
+
 
 class WebDAVHandler(BaseHandler):
     """
@@ -23,10 +33,9 @@ class WebDAVHandler(BaseHandler):
     The WSGI app is lazily initialized on first request and then cached.
     """
 
-    SUPPORTED_METHODS = RequestHandler.SUPPORTED_METHODS + (
-        "PROPFIND",  # query file/directory properties
-        "MKCOL",  # create directory
-    )
+    # Tornado rejects unknown methods before prepare() runs. Register every
+    # core WebDAV method that WsgiDAV handles so sync clients can reach it.
+    SUPPORTED_METHODS = tuple(dict.fromkeys(RequestHandler.SUPPORTED_METHODS + WEBDAV_METHODS))
 
     # Lazily-initialized WSGI container; reset via reset_app() when needed.
     _wsgi_container = None
@@ -102,6 +111,26 @@ class WebDAVHandler(BaseHandler):
 
     def mkcol(self, *args, **kwargs):
         """WebDAV MKCOL method - create directory."""
+        pass
+
+    def copy(self, *args, **kwargs):
+        """WebDAV COPY method - copy a resource."""
+        pass
+
+    def lock(self, *args, **kwargs):
+        """WebDAV LOCK method - create or refresh a resource lock."""
+        pass
+
+    def move(self, *args, **kwargs):
+        """WebDAV MOVE method - move or rename a resource."""
+        pass
+
+    def proppatch(self, *args, **kwargs):
+        """WebDAV PROPPATCH method - update resource properties."""
+        pass
+
+    def unlock(self, *args, **kwargs):
+        """WebDAV UNLOCK method - release a resource lock."""
         pass
 
     def put(self, *args, **kwargs):

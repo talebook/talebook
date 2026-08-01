@@ -102,6 +102,10 @@ def test_dev_stage_is_a_complete_agent_development_environment():
 
     assert dev.startswith("FROM test AS dev")
     assert all(tool in dev for tool in ("git", "jq", "bubblewrap", "uidmap"))
+    assert re.search(
+        r"apt-get install -y --no-install-recommends \\\n(?:\s+\S+ \\\n)*\s+unzip \\\n",
+        dev,
+    )
     assert 'ARG CODEX_VERSION="0.144.6"' in dev
     assert 'npm install -g "@openai/codex@${CODEX_VERSION}"' in dev
     assert all(
@@ -113,6 +117,7 @@ def test_dev_stage_is_a_complete_agent_development_environment():
             "python3 -m pytest --version",
             "ruff --version",
             "bwrap --version",
+            "unzip -v",
         )
     )
 

@@ -3,6 +3,9 @@ name: Codex
 on:
   issue_comment:
     types: [created]
+  pull_request:
+    paths:
+      - .github/workflows/codex.yml
   pull_request_review_comment:
     types: [created]
   pull_request_review:
@@ -50,11 +53,13 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: talebook/talebook:dev
-      options: --user root --security-opt seccomp=unconfined
+      options: --user 1001:1001 --cap-drop ALL --security-opt no-new-privileges --tmpfs /data:rw,uid=1001,gid=1001,mode=0755
     defaults:
       run:
         shell: bash
     env:
+      USER: codex
+      LOGNAME: codex
       CODEX_MODEL: ${{ vars.CODEX_MODEL || 'gpt-5.6-sol' }}
       CODEX_REASONING_EFFORT: ${{ vars.CODEX_REASONING_EFFORT || 'high' }}
     steps:
@@ -330,6 +335,9 @@ jobs:
                     "- [ ] 执行修改",
                     "- [ ] 验证并发布",
                     "",
+                    "<!-- codex-plan-progress:start -->",
+                    "<!-- codex-plan-progress:end -->",
+                    "",
                     "<sub>该评论会持续更新，任务完成后将替换为最终结果。</sub>",
                   ].join("\n"),
                 });
@@ -429,11 +437,25 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify development environment and sandbox
+      - name: Prepare Codex runtime and repository
         if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
         run: |
           set -euo pipefail
+          mkdir -p "$CODEX_HOME"
+          chmod 700 "$CODEX_HOME"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --get-all safe.directory | grep -Fqx "$GITHUB_WORKSPACE"
+          git status --short
+
+      - name: Verify development environment and outer sandbox
+        if: steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$CODEX_HOME"
+          chmod 700 "$CODEX_HOME"
+
           ebook-convert --version
+          python3 -c "import calibre; print(calibre.__file__)"
           python3 --version
           node --version
           npm --version
@@ -441,12 +463,67 @@ jobs:
           python3 -m pytest --version
           ruff --version
           codex --version
-          bwrap --version
 
-          if codex sandbox -- /bin/true 2>/dev/null; then
-            echo "✅ Codex sandbox test passed"
+          if [ "$(id -u)" -eq 0 ]; then
+            echo "::error::The dev container must not run as root"
+            exit 1
+          fi
+
+          if [ "$(id -u):$(id -g)" != "1001:1001" ]; then
+            echo "::error::The dev container must run only as uid/gid 1001:1001"
+            exit 1
+          fi
+
+          if [ "$(id -G)" != "1001" ]; then
+            echo "::error::The dev container retained supplementary groups"
+            exit 1
+          fi
+
+          if ! grep -Eq "^CapEff:[[:space:]]*0+$" /proc/1/status; then
+            echo "::error::The dev container retained Linux capabilities"
+            exit 1
+          fi
+
+          if ! grep -Eq "^NoNewPrivs:[[:space:]]*1$" /proc/1/status; then
+            echo "::error::The dev container does not enforce no-new-privileges"
+            exit 1
+          fi
+
+          if ! grep -Eq "^Seccomp:[[:space:]]*2$" /proc/1/status; then
+            echo "::error::The dev container does not use the default seccomp filter"
+            exit 1
+          fi
+
+          if [ ! -w /data ]; then
+            echo "::error::The ephemeral /data filesystem is not writable"
+            exit 1
+          fi
+
+          if [ -S /var/run/docker.sock ]; then
+            stat -c "docker_socket=%A uid=%u gid=%g" /var/run/docker.sock
+            if [ -w /var/run/docker.sock ]; then
+              echo "::error::Docker socket is writable by the Codex user"
+              exit 1
+            fi
+
+            socket_errno="$(python3 -c 'import socket; sock = socket.socket(socket.AF_UNIX); print(sock.connect_ex("/var/run/docker.sock"))')"
+            case "$socket_errno" in
+              "1" | "13")
+                echo "✅ Docker socket connection denied with errno $socket_errno"
+                ;;
+              *)
+                echo "::error::Docker socket connection was not denied; errno=$socket_errno"
+                exit 1
+                ;;
+            esac
           else
-            echo "::error::Codex sandbox self-test failed"
+            echo "✅ Docker socket is not mounted"
+          fi
+
+          if codex sandbox -c "sandbox_mode=\"danger-full-access\"" -c "approval_policy=\"never\"" -- /bin/true; then
+            echo "✅ Codex external-sandbox mode test passed"
+          else
+            echo "::error::Codex external-sandbox self-test failed"
             exit 1
           fi
 
@@ -483,39 +560,9 @@ jobs:
           cat > "$CODEX_HOME/config.toml" <<EOF
           cli_auth_credentials_store = "file"
           approval_policy = "never"
-          default_permissions = "codex-employee"
+          sandbox_mode = "danger-full-access"
           model = "$CODEX_MODEL"
           model_reasoning_effort = "$CODEX_REASONING_EFFORT"
-
-          [features]
-          network_proxy = true
-
-          [permissions.codex-employee]
-          description = "Talebook digital employee with workspace-only files and public network access."
-          extends = ":workspace"
-
-          [permissions.codex-employee.filesystem]
-          ":root" = "deny"
-          ":minimal" = "read"
-          ":tmpdir" = "deny"
-          ":slash_tmp" = "deny"
-
-          [permissions.codex-employee.filesystem.":workspace_roots"]
-          "." = "write"
-          ".github/workflows" = "read"
-          ".codex" = "read"
-          ".git" = "read"
-
-          [permissions.codex-employee.network]
-          enabled = true
-          allow_local_binding = true
-
-          [permissions.codex-employee.network.domains]
-          "*" = "allow"
-          "localhost" = "allow"
-          "127.0.0.1" = "allow"
-          "169.254.169.254" = "deny"
-          "metadata.google.internal" = "deny"
 
           [shell_environment_policy]
           inherit = "core"
@@ -558,6 +605,7 @@ jobs:
           set -euo pipefail
           timeout --signal=TERM --kill-after=30s 20m env -u CODEX_PROGRESS_TOKEN codex exec \
             --strict-config \
+            --sandbox danger-full-access \
             --skip-git-repo-check \
             --cd "$GITHUB_WORKSPACE" \
             --output-last-message .codex/tmp/codex-final.md \
@@ -892,6 +940,37 @@ jobs:
               .replaceAll("&", "&amp;")
               .replaceAll("<", "&lt;")
               .replaceAll(">", "&gt;");
+            const planProgressStart = "<!-- codex-plan-progress:start -->";
+            const planProgressEnd = "<!-- codex-plan-progress:end -->";
+            const extractPlanProgress = (commentBody) => {
+              const text = String(commentBody || "");
+              const startIndex = text.indexOf(planProgressStart);
+              const endIndex = text.indexOf(planProgressEnd);
+              const hasOneOrderedPair = (
+                startIndex >= 0
+                && endIndex > startIndex
+                && text.indexOf(planProgressStart, startIndex + planProgressStart.length) === -1
+                && text.indexOf(planProgressEnd, endIndex + planProgressEnd.length) === -1
+              );
+              if (!hasOneOrderedPair) {
+                throw new Error("The Codex progress comment does not contain one valid plan boundary pair.");
+              }
+              const planBody = text.slice(startIndex + planProgressStart.length, endIndex).trim();
+              return planBody ? `${planProgressStart}\n${planBody}\n${planProgressEnd}` : "";
+            };
+            const fitFinalBody = (resultBody, planProgress) => {
+              const maxCommentLength = 64000;
+              const truncationNotice = "\n\n……[内容已截断，完整输出请查看 workflow 日志]";
+              const planSuffix = planProgress ? `\n\n${planProgress}` : "";
+              const resultBudget = maxCommentLength - planSuffix.length;
+              if (resultBudget <= truncationNotice.length) {
+                throw new Error("The preserved Codex plan leaves no room for a final result.");
+              }
+              const fittedResult = resultBody.length > resultBudget
+                ? `${resultBody.slice(0, resultBudget - truncationNotice.length)}${truncationNotice}`
+                : resultBody;
+              return `${fittedResult}${planSuffix}`;
+            };
 
             let finalMessage = "";
             if (fs.existsSync(process.env.CODEX_FINAL_MESSAGE)) {
@@ -975,14 +1054,17 @@ jobs:
               body += `\n恢复补丁：请下载 workflow artifact \`${process.env.CODEX_ARTIFACT_NAME}\`。`;
             }
 
-            if (body.length > 64000) {
-              body = `${body.slice(0, 63500)}\n\n……[内容已截断，完整输出请查看 workflow 日志]`;
-            }
-
             const progressCommentId = Number(process.env.CODEX_PROGRESS_COMMENT_ID);
             let responseUpdated = false;
             if (Number.isSafeInteger(progressCommentId) && progressCommentId > 0) {
               try {
+                const progressComment = await github.rest.issues.getComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: progressCommentId,
+                });
+                const planProgress = extractPlanProgress(progressComment.data.body);
+                body = fitFinalBody(body, planProgress);
                 await github.rest.issues.updateComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -991,11 +1073,13 @@ jobs:
                 });
                 responseUpdated = true;
               } catch (error) {
-                core.warning(`Could not replace the Codex progress comment: ${error.message}`);
+                core.warning(`Could not preserve and finalize the Codex progress comment: ${error.message}`);
+                throw error;
               }
             }
 
             if (!responseUpdated) {
+              body = fitFinalBody(body, "");
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -1050,3 +1134,110 @@ jobs:
           if [ "$IS_PR" != "true" ] && [ -z "$EXISTING_PR_NUMBER" ] && [ "$CREATED_PR_OUTCOME" != "success" ]; then
             exit 1
           fi
+
+  codex-sandbox-smoke:
+    name: Verify Codex dev container on hosted runner
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: talebook/talebook:dev
+      options: --user 1001:1001 --cap-drop ALL --security-opt no-new-privileges --tmpfs /data:rw,uid=1001,gid=1001,mode=0755
+    defaults:
+      run:
+        shell: bash
+    env:
+      CODEX_HOME: ${{ github.workspace }}/.codex-smoke-home
+      USER: codex
+      LOGNAME: codex
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify development environment and outer sandbox
+        run: |
+          set -euo pipefail
+          mkdir -p "$CODEX_HOME"
+          chmod 700 "$CODEX_HOME"
+
+          ebook-convert --version
+          python3 -c "import calibre; print(calibre.__file__)"
+          python3 --version
+          node --version
+          npm --version
+          make --version
+          python3 -m pytest --version
+          ruff --version
+          codex --version
+
+          if [ "$(id -u)" -eq 0 ]; then
+            echo "::error::The dev container must not run as root"
+            exit 1
+          fi
+
+          if [ "$(id -u):$(id -g)" != "1001:1001" ]; then
+            echo "::error::The dev container must run only as uid/gid 1001:1001"
+            exit 1
+          fi
+
+          if [ "$(id -G)" != "1001" ]; then
+            echo "::error::The dev container retained supplementary groups"
+            exit 1
+          fi
+
+          if ! grep -Eq "^CapEff:[[:space:]]*0+$" /proc/1/status; then
+            echo "::error::The dev container retained Linux capabilities"
+            exit 1
+          fi
+
+          if ! grep -Eq "^NoNewPrivs:[[:space:]]*1$" /proc/1/status; then
+            echo "::error::The dev container does not enforce no-new-privileges"
+            exit 1
+          fi
+
+          if ! grep -Eq "^Seccomp:[[:space:]]*2$" /proc/1/status; then
+            echo "::error::The dev container does not use the default seccomp filter"
+            exit 1
+          fi
+
+          if [ ! -w /data ]; then
+            echo "::error::The ephemeral /data filesystem is not writable"
+            exit 1
+          fi
+
+          if [ -S /var/run/docker.sock ]; then
+            stat -c "docker_socket=%A uid=%u gid=%g" /var/run/docker.sock
+            if [ -w /var/run/docker.sock ]; then
+              echo "::error::Docker socket is writable by the Codex user"
+              exit 1
+            fi
+
+            socket_errno="$(python3 -c 'import socket; sock = socket.socket(socket.AF_UNIX); print(sock.connect_ex("/var/run/docker.sock"))')"
+            case "$socket_errno" in
+              "1" | "13")
+                echo "✅ Docker socket connection denied with errno $socket_errno"
+                ;;
+              *)
+                echo "::error::Docker socket connection was not denied; errno=$socket_errno"
+                exit 1
+                ;;
+            esac
+          else
+            echo "✅ Docker socket is not mounted"
+          fi
+
+          if codex sandbox -c "sandbox_mode=\"danger-full-access\"" -c "approval_policy=\"never\"" -- /bin/true; then
+            echo "✅ Codex external-sandbox mode test passed"
+          else
+            echo "::error::Codex external-sandbox self-test failed"
+            exit 1
+          fi
+
+      - name: Synchronize project dependencies
+        run: |
+          make init
+          npm --prefix app ci
+
+      - name: Run full project test suite
+        run: |
+          python3 -m pytest tests

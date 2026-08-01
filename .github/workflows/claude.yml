@@ -36,6 +36,12 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Configure Git safe directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --get-all safe.directory | grep -Fqx "$GITHUB_WORKSPACE"
+          git status --short
+
       - name: Verify development environment
         run: |
           ebook-convert --version

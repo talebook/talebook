@@ -58,3 +58,21 @@ def test_claude_action_uses_the_dev_container_and_prepares_current_checkout():
             "Bash(ruff:*)",
         )
     )
+
+
+def test_claude_action_persists_only_the_current_workspace_as_a_safe_directory():
+    claude_job = workflow("claude.yml")["jobs"]["claude"]
+    steps = claude_job["steps"]
+    checkout = workflow_step(claude_job, "Checkout repository")
+    configure_git = workflow_step(claude_job, "Configure Git safe directory")
+    verify = workflow_step(claude_job, "Verify development environment")
+    run_claude = workflow_step(claude_job, "Run Claude Code")
+
+    assert configure_git["run"] == (
+        'git config --global --add safe.directory "$GITHUB_WORKSPACE"\n'
+        'git config --global --get-all safe.directory | grep -Fqx "$GITHUB_WORKSPACE"\n'
+        "git status --short\n"
+    )
+    assert "safe.directory '*'" not in configure_git["run"]
+    assert 'safe.directory "*"' not in configure_git["run"]
+    assert steps.index(checkout) < steps.index(configure_git) < steps.index(verify) < steps.index(run_claude)

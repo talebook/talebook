@@ -86,24 +86,26 @@ make dev     # 挂载 webserver/ 进容器，用于后端开发调试
 ### 前端验收
 
 - 修改前端交互、样式、主题、页面布局或弹窗时，除单元/组件测试外，必须使用 Chrome DevTools MCP 在浏览器中做实际渲染验证，并在回复中说明验证过的页面、主题或关键状态。
-- 前端改动完成后，如果需要 dev server 才能体验，必须启动本地 dev server，并在最终回复中提供可访问地址（例如 `http://127.0.0.1:3000/` ）。
+- 修改界面时允许使用 mock API 完成组件测试、E2E 和快速回归等隔离自测。mock 环境只服务于自动化测试或智能体内部验证，不得作为用户体验环境、实际数据验收或完整功能验证结果。
+- 用户要求本地体验、查看实际效果或提供可访问地址时，必须使用 Docker 运行 Talebook 后端，并让前端连接该真实后端；不得提供由 mock API 驱动的体验地址。体验环境应能使用真实书库、封面、登录、阅读和管理等完整功能。
+- 只要智能体需要手动启动并保留 Nuxt dev server，无论用户是否已明确要求体验，都必须先启动 Docker 后端并确认 `http://127.0.0.1:8080/api/welcome` 可用，再通过 `API_URL=http://127.0.0.1:8080` 启动前端。Docker 后端不可用时必须报告阻塞，不得静默降级到 mock。
+- 自动化测试命令可以管理短生命周期的 mock 与临时页面服务作为上述规则的唯一例外；这些服务不得向用户提供，测试结束后必须停止。
+- 前端改动完成后，如果需要 dev server 才能体验，必须启动符合上述 Docker 后端约束的本地 dev server，并在最终回复中提供可访问地址（例如 `http://127.0.0.1:3000/` ）。
 - 永远禁止设置 `CHOKIDAR_USEPOLLING=true` 启动 Nuxt、Vite 或其他前端开发服务，不允许在交互命令、脚本、Makefile、CI 或文档示例中启用该轮询模式，也不为 Docker、worktree、网络文件系统或热更新故障设置例外。
 - 文件监听或热更新异常时，必须停止 dev server 并报告现象，改用原生文件事件、手动刷新或其他不启用 Chokidar polling 的方案。发现由智能体启动的 dev server 异常占用 CPU 时，应立即停止该进程并检查残留。
-- 前端本地体验默认启动方式：
+- 前端本地体验默认使用两个终端启动：
   ```bash
-  cd app
-  npx nuxt dev --port 3000 --host 127.0.0.1
-  ```
-- 如需使用本仓库 mock API，可用两个终端启动 mock 与 Nuxt：
-  ```bash
-  # 终端 1
-  cd app
-  PORT=18180 node test/mock-server.js
+  # 终端 1：Docker 后端
+  make dev
 
-  # 终端 2
+  # 确认真实后端已经就绪
+  curl --fail --silent http://127.0.0.1:8080/api/welcome
+
+  # 终端 2：连接 Docker 后端的 Nuxt dev server
   cd app
-  API_URL=http://127.0.0.1:18180 npx nuxt dev --port 3000 --host 127.0.0.1
+  API_URL=http://127.0.0.1:8080 npx nuxt dev --port 3000 --host 127.0.0.1
   ```
+- 如需使用本仓库 mock API 自测，应由测试步骤控制 mock 与临时前端进程的生命周期；不得把 mock 进程替代上述 Docker 体验环境。
 
 ### 提交前检查
 
