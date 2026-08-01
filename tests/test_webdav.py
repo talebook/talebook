@@ -105,6 +105,15 @@ class TestWebDav(TestApp):
         # 207 Multi-Status is the WebDAV success code for PROPFIND.
         self.assertEqual(rsp.code, 207)
 
+    def test_core_webdav_methods_are_dispatchable(self):
+        """RFC 4918 sync methods must pass Tornado's method gate."""
+        from webserver.webdav.handler import WEBDAV_METHODS, WebDAVHandler
+
+        for method in WEBDAV_METHODS:
+            with self.subTest(method=method):
+                self.assertIn(method, WebDAVHandler.SUPPORTED_METHODS)
+                self.assertTrue(callable(getattr(WebDAVHandler, method.lower(), None)))
+
     def test_demo_mode_allows_only_configured_account(self):
         from webserver import loader
 
