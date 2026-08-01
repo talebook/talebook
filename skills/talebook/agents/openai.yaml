@@ -1,0 +1,4 @@
+interface:
+  display_name: "Talebook 个人书库"
+  short_description: "检索、整理、阅读并保存 Talebook 书库内容"
+  default_prompt: "Use $talebook to find a book in my library and summarize its metadata."

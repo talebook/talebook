@@ -81,6 +81,8 @@ def js(func):
 def auth(func):
     def do(self, *args, **kwargs):
         if not self.current_user:
+            if hasattr(self, "authentication_error"):
+                return self.authentication_error()
             return {"err": "user.need_login", "msg": _("请先登录")}
         return func(self, *args, **kwargs)
 

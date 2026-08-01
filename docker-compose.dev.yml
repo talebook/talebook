@@ -26,6 +26,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Asia/Shanghai
+      - TALEBOOK_MCP_TOKEN=${TALEBOOK_MCP_TOKEN:-}
     depends_on:
       - douban-rs-api
 

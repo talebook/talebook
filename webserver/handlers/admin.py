@@ -345,6 +345,8 @@ class AdminSettings(BaseHandler):
         ]
         # 添加元数据源配置
         settings_dict = dict(CONF)
+        # MCP Token 只允许通过部署环境或本地配置注入，永不通过管理接口回传。
+        settings_dict.pop("MCP_TOKEN", None)
         settings_dict["META_ALL_SOURCES"] = META_ALL_SOURCES
         if "META_SELECTED_SOURCES" not in settings_dict:
             settings_dict["META_SELECTED_SOURCES"] = DEFAULT_META_SOURCES

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Talebook MCP 与智能体 Skill</title>
+  <style>
+    :root {
+      --paper:#eaf1f5;
+      --card:#f8fbfd;
+      --ink:#132333;
+      --muted:#526777;
+      --rule:#9fb2bf;
+      --blue:#155eef;
+      --blue-deep:#103d8f;
+      --orange:#ef6c35;
+      --green:#187a64;
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body {
+      margin:0;
+      color:var(--ink);
+      background:
+        linear-gradient(90deg,transparent 0 34px,rgba(21,94,239,.13) 34px 35px,transparent 35px),
+        var(--paper);
+      font:16px/1.68 "Segoe UI","Microsoft YaHei",sans-serif;
+    }
+    main { max-width:1100px; margin:0 auto; padding:54px 30px 80px 64px; }
+    .hero { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(240px,.75fr); gap:32px; align-items:end; }
+    .kicker,.label,th,dt { font:700 12px/1.4 Consolas,"SFMono-Regular",monospace; letter-spacing:.09em; text-transform:uppercase; }
+    .kicker { color:var(--blue); }
+    h1 { max-width:780px; margin:10px 0 12px; font:800 clamp(38px,7vw,76px)/.98 "Arial Narrow","Microsoft YaHei",sans-serif; letter-spacing:-.055em; }
+    .lead { max-width:68ch; color:var(--muted); font-size:18px; }
+    .stamp { padding:18px; color:white; background:var(--blue-deep); box-shadow:10px 10px 0 var(--orange); }
+    .stamp strong { display:block; font-size:27px; line-height:1.1; }
+    .meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; margin:42px 0 20px; background:var(--rule); border:1px solid var(--rule); }
+    .meta div { min-width:0; padding:14px 16px; background:var(--card); }
+    dt { color:var(--muted); }
+    dd { margin:5px 0 0; overflow-wrap:anywhere; }
+    section { margin-top:44px; }
+    h2 { margin:0 0 14px; font:750 28px/1.15 "Arial Narrow","Microsoft YaHei",sans-serif; letter-spacing:-.025em; }
+    h3 { margin:24px 0 8px; font-size:18px; }
+    p,li { max-width:82ch; }
+    code { color:var(--blue-deep); font:14px/1.45 Consolas,"SFMono-Regular",monospace; overflow-wrap:anywhere; }
+    .spine {
+      position:relative;
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:18px;
+      margin:26px 0 8px;
+      padding-top:28px;
+    }
+    .spine::before { content:""; position:absolute; top:8px; left:8%; right:8%; height:5px; background:var(--blue); }
+    .node { position:relative; min-height:150px; padding:19px 17px; border:1px solid var(--rule); background:var(--card); }
+    .node::before { content:""; position:absolute; top:-24px; left:calc(50% - 8px); width:16px; height:16px; border:4px solid var(--paper); border-radius:50%; background:var(--orange); }
+    .node strong { display:block; margin-bottom:8px; font-size:18px; }
+    .node.hot { color:white; border-color:var(--blue-deep); background:var(--blue-deep); }
+    .node.hot code { color:#d9e6ff; }
+    table { width:100%; border-collapse:collapse; margin:16px 0 24px; font-size:14px; }
+    th { color:var(--muted); text-align:left; }
+    th,td { padding:11px 10px; border-bottom:1px solid var(--rule); vertical-align:top; }
+    tbody tr:hover { background:rgba(255,255,255,.48); }
+    .callout { border-left:6px solid var(--orange); padding:13px 17px; background:var(--card); }
+    .pending { color:var(--orange); font-weight:750; }
+    .yes { color:var(--green); font-weight:750; }
+    ul { padding-left:22px; }
+    @media (max-width:800px) {
+      main { padding:34px 20px 60px 42px; }
+      .hero { grid-template-columns:1fr; }
+      .meta { grid-template-columns:1fr 1fr; }
+      .spine { grid-template-columns:1fr; padding-top:0; }
+      .spine::before { top:0; bottom:0; left:-17px; right:auto; width:5px; height:auto; }
+      .node::before { top:22px; left:-28px; }
+    }
+    @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+  </style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div>
+      <div class="kicker">Protocol spine / personal library</div>
+      <h1>让智能体读懂<br>你的 Talebook</h1>
+      <p class="lead">在现有 Tornado 与 Calibre 架构内增加标准 MCP 入口，并提供轻量 Skill，让智能体可以检索、整理、阅读和保存书籍，同时不接触用户密码。</p>
+    </div>
+    <aside class="stamp"><span class="label">Design state</span><strong>ACTIVE</strong><span>本地验证完成，集成套件由 CI 复核</span></aside>
+  </header>
+
+  <dl class="meta">
+    <div><dt>创建日期</dt><dd>2026-08-01</dd></div>
+    <div><dt>所属模块</dt><dd>webserver（影响 skills、Docker、document 与测试）</dd></div>
+    <div><dt>状态</dt><dd>ACTIVE</dd></div>
+    <div><dt>需求来源</dt><dd>用户请求：为 Talebook 增加 MCP 与 Skill，并体现网络书库等原生能力。</dd></div>
+  </dl>
+
+  <section>
+    <h2>原始诉求与目标</h2>
+    <p>为 Talebook 提供可由 MCP 客户端直接连接的书库工具，并交付可安装的智能体 Skill。实现需基于 Talebook 当前代码独立设计；外部项目副本与示例仅用于理解用户期望，不作为代码、文案或测试来源。</p>
+    <ul>
+      <li>提供内置 Streamable HTTP 端点 <code>/mcp</code>，覆盖初始化、工具发现与工具调用。</li>
+      <li>使用 <code>Authorization: Bearer &lt;token&gt;</code> 鉴权，不向模型暴露 Talebook 用户名或密码。</li>
+      <li>首期覆盖本地书库管理、阅读状态和网络书库；排除文件上传/下载、邮件和局域网设备推送。</li>
+      <li>协议响应、业务响应与错误结构保持稳定，可由 Skill CLI 和通用 MCP 客户端共同使用。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>系统骨架</h2>
+    <div class="spine" role="img" aria-label="Skill 与 MCP 客户端经 Bearer 鉴权进入 MCP 协议层，再调用 Talebook 服务">
+      <div class="node"><strong>智能体 Skill</strong><code>SKILL.md</code><br><code>talebook_mcp.py</code><p>提供任务路由、确认边界和确定性 CLI。</p></div>
+      <div class="node"><strong>MCP 客户端</strong><code>POST /mcp</code><p>发送 initialize、tools/list 与 tools/call。</p></div>
+      <div class="node hot"><strong>协议与工具注册表</strong><code>webserver/mcp/</code><p>校验 JSON-RPC、协议版本、参数与工具白名单。</p></div>
+      <div class="node"><strong>Talebook 领域能力</strong><code>Calibre DB</code><br><code>ReadingState</code><br><code>BookSourceEngine</code><p>复用现有权限、格式化器和后台任务。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>关键设计决策</h2>
+    <table>
+      <thead><tr><th>主题</th><th>决策</th><th>边界与原因</th></tr></thead>
+      <tbody>
+        <tr><td>协议</td><td>实现无状态 Streamable HTTP JSON-RPC；支持 <code>initialize</code>、<code>notifications/initialized</code>、<code>ping</code>、<code>tools/list</code>、<code>tools/call</code>。</td><td>单次调用返回 JSON，不建立服务器会话；GET 返回 405，不提供 SSE 流。协议版本以当前稳定版 <code>2025-11-25</code> 为首选，并兼容常见旧版初始化。</td></tr>
+        <tr><td>依赖</td><td>协议核心使用项目现有 Python/Tornado 能力实现，不引入第二套 ASGI 服务。</td><td>避免为一个端点同时维护 Tornado 与 Starlette 生命周期；以协议契约测试保证兼容。</td></tr>
+        <tr><td>鉴权</td><td>Token 默认空值即关闭 MCP；运行时优先读取 <code>TALEBOOK_MCP_TOKEN</code>，可回退到本地配置 <code>MCP_TOKEN</code>。使用常量时间比较。</td><td>Token 只授权 <code>/mcp</code> 的固定工具集合，不可用于其他 HTTP API。请求映射到第一个有效管理员，以复用私有书可见性与现有写权限。</td></tr>
+        <tr><td>秘密处理</td><td>管理设置接口不回传 Token，日志不记录 Authorization、Token 或完整工具参数。</td><td>Skill 通过环境变量读取地址和 Token，命令行参数不携带秘密。</td></tr>
+        <tr><td>部署入口</td><td>SPA、SSR 与开发三套 Nginx 配置均精确代理 <code>/mcp</code> 到 Tornado；Compose 显式透传宿主机 Token。</td><td>不使用覆盖范围更大的路径正则；Token 未设置时容器内保持空值并禁用 MCP。</td></tr>
+        <tr><td>业务复用</td><td>MCP 工具服务复用 <code>BookFormatter</code>、Calibre cache、<code>ReadingState</code>、<code>AutoFillService</code>、网络书源引擎与后台任务。</td><td>不从其他项目移植 handler；必要的共享逻辑从 Talebook 现有 handler 中提取为本项目服务。</td></tr>
+        <tr><td>写操作</td><td>编辑、阅读状态、自动补全、元数据写回和网络书保存均保留现有权限与参数约束。</td><td>Skill 对元数据覆盖、自动补全和网络书保存要求先确认目标；上传、下载、邮件、设备推送不进入工具表。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>工具边界</h2>
+    <table>
+      <thead><tr><th>能力组</th><th>首期工具</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>发现与统计</td><td><code>library_overview</code>、<code>search_books</code>、<code>get_book</code>、<code>list_authors</code>、<code>list_categories</code></td><td>统一分页上限；返回适合模型消费的精简书籍结构。</td></tr>
+        <tr><td>个人阅读</td><td><code>reading_overview</code>、<code>list_bookshelf</code>、<code>update_reading_state</code>、<code>get_reading_progress</code>、<code>update_reading_progress</code></td><td>书架支持 favorite、wants、reading、finished；阅读进度沿用 8 KiB 上限。</td></tr>
+        <tr><td>元数据</td><td><code>update_book_metadata</code>、<code>auto_fill_metadata</code>、<code>save_metadata_to_file</code></td><td>仅允许显式字段；批量自动补全限制单次 ID 数量，不提供全库快捷值。</td></tr>
+        <tr><td>网络书库</td><td><code>list_network_sources</code>、<code>search_network_books</code>、<code>get_network_search</code>、<code>get_network_book</code>、<code>get_network_toc</code>、<code>read_network_chapter</code>、<code>save_network_book</code>、<code>get_network_save</code>、<code>list_saved_network_books</code></td><td>保留异步搜索/保存模型；客户端轮询状态，正文响应设置长度上限并提示截断。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong>明确排除：</strong>电子书文件上传和下载、邮件投递、局域网设备推送、删除书籍、删除格式、管理用户、管理书源。这些能力不会隐藏在通用执行工具中。</div>
+  </section>
+
+  <section>
+    <h2>协议与错误契约</h2>
+    <ul>
+      <li>JSON-RPC 协议错误使用标准 <code>error.code</code>：解析错误、无效请求、未知方法、无效参数和内部错误。</li>
+      <li><code>tools/call</code> 的业务错误仍返回 MCP result，并设置 <code>isError: true</code>；文本内容为结构化 JSON，便于通用客户端展示。</li>
+      <li>工具成功结果统一为 <code>{"ok": true, "data": ...}</code>，失败为 <code>{"ok": false, "error": {"code": ..., "message": ...}}</code>，不向客户端返回 traceback。</li>
+      <li>无 Token、Token 错误或功能未启用返回 HTTP 401/503，并附带不含秘密的说明；未知 Origin 不授予浏览器跨域凭据。</li>
+      <li>通知请求不生成 JSON-RPC body，HTTP 返回 202；批量 JSON-RPC 请求不在首期支持。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Skill 交付</h2>
+    <p>在 <code>skills/talebook/</code> 创建独立 Skill。<code>SKILL.md</code> 只保留触发条件、工作流、安全确认和资源导航；完整工具参数放入 <code>references/tools.md</code>；<code>scripts/talebook_mcp.py</code> 使用 Python 标准库调用 MCP，支持 <code>list</code>、<code>call</code> 和连接自检。凭据仅从 <code>TALEBOOK_MCP_URL</code> 与 <code>TALEBOOK_MCP_TOKEN</code> 读取。</p>
+    <p>写操作前，Skill 必须先通过搜索或详情确认唯一 book ID；覆盖元数据、启动自动补全、写回文件、保存网络书时明确向用户复述目标。纯查询操作无需额外确认。</p>
+  </section>
+
+  <section>
+    <h2>测试结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>计划</th><th>当前结果</th></tr></thead>
+      <tbody>
+        <tr><td>协议、部署与 CLI 单元测试</td><td><code>python -m pytest tests/test_mcp_protocol.py tests/test_mcp_deployment.py tests/test_talebook_skill.py -q</code></td><td class="yes">9 passed；覆盖版本协商、通知、工具调用、Nginx/Compose 入口、环境变量和 Bearer 请求。</td></tr>
+        <tr><td>Python 静态检查</td><td>对本次后端、测试与 Skill CLI 执行 <code>ruff check</code> 和 <code>ruff format --check</code>；此前执行 <code>make lint-py-fix</code>。</td><td class="yes">通过；10 个目标文件格式一致，webserver 全量 ruff 检查通过。</td></tr>
+        <tr><td>Skill 结构</td><td><code>quick_validate.py skills/talebook</code></td><td class="yes">Skill is valid。</td></tr>
+        <tr><td>语法与差异</td><td><code>python -m py_compile ...</code> 与 <code>git diff --check</code></td><td class="yes">通过。</td></tr>
+        <tr><td>HTTP/Calibre 集成与全量 pytest</td><td><code>python -m pytest tests/test_mcp.py -v</code>；<code>make test</code></td><td class="pending">本机前者在收集阶段缺少已声明依赖 <code>txt2epub_next</code>，后者在 Windows Make 执行 <code>rm</code> 时失败，均未执行到 MCP 用例。用户决定提交后交由 Linux CI 运行；风险为真实 Tornado/Calibre 工具调用尚待 CI 复核。</td></tr>
+        <tr><td>设计门禁</td><td><code>python scripts/check_design_docs.py</code></td><td class="yes">转为 ACTIVE 后执行并通过。</td></tr>
+      </tbody>
+    </table>
+    <p>实现已完成本地静态、协议、部署和 Skill 验证。完整 HTTP/Calibre 集成测试由推送后的 Linux CI 继续执行；若 CI 出现与本功能相关的失败，不得合并，需修复并创建新方案承载实质设计变化。</p>
+  </section>
+</main>
+</body>
+</html>

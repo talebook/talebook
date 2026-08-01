@@ -112,6 +112,12 @@ settings = {
     'ai_model'          : "gpt-3.5-turbo",
     'ai_use_thinking'   : False,
 
+    # MCP 默认关闭。优先使用 TALEBOOK_MCP_TOKEN 环境变量，或在本地 manual.py 中设置 MCP_TOKEN。
+    'MCP_TOKEN'              : '',
+    'MCP_MAX_BOOKS'          : 20,
+    'MCP_MAX_CONTENT_CHARS'  : 20000,
+    'MCP_MAX_AUTOFILL_BOOKS' : 10,
+
     'avatar_service'    : "https://cravatar.cn",
 
     'BOOK_NAMES_FORMAT': 'en',
