@@ -29,7 +29,6 @@ class MCPHandler(BaseHandler):
         self.set_hosts()
         self.set_i18n()
         self.should_be_installed()
-        self.should_allow_demo_request()
 
     def get_current_user(self):
         expected = configured_mcp_token()
