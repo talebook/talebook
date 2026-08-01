@@ -23,6 +23,7 @@ EXIT_TRANSPORT = 4
 EXIT_API = 5
 SUCCESS_ERRORS = {None, "ok", "free"}
 RISK_CONFIRMATION = {"external", "admin-write", "destructive"}
+TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
 class CliFailure(Exception):
@@ -305,6 +306,62 @@ def require_admin(client: TalebookClient) -> dict[str, Any]:
 
 def api_result(result: dict[str, Any]) -> dict[str, Any]:
     return result
+
+
+def update_notifier_disabled(environ: Mapping[str, str]) -> bool:
+    value = environ.get("TALEBOOK_NO_UPDATE_NOTIFIER", "")
+    return value.strip().lower() in TRUE_ENV_VALUES
+
+
+def update_notice(status: Any) -> dict[str, Any] | None:
+    if not isinstance(status, Mapping) or not status.get("has_update"):
+        return None
+    current_version = str(status.get("current_version") or "未知版本")
+    latest_version = str(status.get("latest_version") or "新版本")
+    notice = {
+        "message": f"Talebook 有新版本 {latest_version}（当前 {current_version}）",
+        "current_version": status.get("current_version"),
+        "latest_version": status.get("latest_version"),
+    }
+    release_url = status.get("latest_release_url")
+    if release_url:
+        notice["release_url"] = release_url
+    return notice
+
+
+def attach_update_notice(
+    client: TalebookClient,
+    result: dict[str, Any],
+    *,
+    command_path: str,
+    environ: Mapping[str, str],
+) -> dict[str, Any]:
+    """Best-effort update notice that never changes the command outcome."""
+    if result.get("err") not in SUCCESS_ERRORS or not client.config.user or update_notifier_disabled(environ):
+        return result
+    try:
+        if command_path == "admin settings check-update":
+            status = result.get("status")
+        else:
+            identity = client.status()
+            user = identity.get("user")
+            if identity.get("err") not in SUCCESS_ERRORS or not isinstance(user, Mapping) or not user.get("is_admin"):
+                return result
+            response = client.json("GET", "/api/admin/update")
+            if response.get("err") not in SUCCESS_ERRORS:
+                return result
+            status = response.get("status")
+        notice = update_notice(status)
+    except CliFailure:
+        return result
+    if notice is None:
+        return result
+    enriched = dict(result)
+    existing = result.get("_notice")
+    notices = dict(existing) if isinstance(existing, Mapping) else {}
+    notices["update"] = notice
+    enriched["_notice"] = notices
+    return enriched
 
 
 # me commands
@@ -1507,6 +1564,7 @@ def main(
         elif args.requires_auth:
             require_auth(client)
         result = api_result(args.handler(client, args))
+        result = attach_update_notice(client, result, command_path=args.command_path, environ=env)
         emit(result, output)
         return EXIT_OK if result.get("err") in SUCCESS_ERRORS else EXIT_API
     except CliFailure as exc:

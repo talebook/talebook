@@ -53,12 +53,23 @@ python scripts/talebook-cli.py [--site URL] [--user USER] [--password PASSWORD] 
 
 核验完成标准：重新查询的状态与用户请求一致；异步任务则明确报告已启动、当前进度入口和尚未完成的部分。
 
-## 5. 部署分支
+## 5. 更新提醒
+
+CLI 成功输出可能包含 `_notice.update`。看到该字段时：
+
+1. 先完成并核验用户当前请求，不要让更新提醒中断任务。
+2. 除非用户正在询问版本或更新，否则只在结果末尾简短说明当前版本、最新版本和发布页；不要原样复制整段 `_notice`。
+3. 不要自动升级实例。用户要求更新时，先确认当前部署方式；Docker Compose 实例读取 [references/docker-compose.md](references/docker-compose.md)，在正确的部署目录中推导更新步骤并获得相应授权。
+4. 脚本需要稳定 JSON 或不希望产生额外检查请求时，在命令前设置 `TALEBOOK_NO_UPDATE_NOTIFIER=1`。
+
+管理员可用 `admin settings check-update` 读取服务端缓存，或在用户明确要求实时检查时添加 `--refresh`。普通命令的提醒只读缓存，不会主动访问 GitHub。
+
+## 6. 部署分支
 
 用户要求部署新实例时，不调用 CLI。读取 [references/docker-compose.md](references/docker-compose.md)，收集部署目录、端口和数据目录，生成 Compose 配置并执行文档中的启动与可访问性验证。首次初始化转到浏览器完成。
 
 部署完成标准：`docker compose up -d` 成功，Talebook HTTP 入口可访问，并向用户提供明确地址和持久化数据目录。
 
-## 6. 交付结果
+## 7. 交付结果
 
 报告实际执行的命令、目标站点、身份、Talebook 响应和核验结果。隐藏密码与 Authorization；下载或日志文件报告本地路径，不把二进制内容写入对话。

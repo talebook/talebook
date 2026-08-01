@@ -30,8 +30,11 @@ python scripts/talebook-cli.py \
 | `--user` | `TALEBOOK_USERNAME` | 与密码成对可选；两者均省略时为 guest。 |
 | `--password` | `TALEBOOK_PASSWORD` | 与用户名成对可选；优先使用环境变量，避免 shell 历史和进程列表泄露。 |
 | `--timeout` | 无 | 单次 HTTP 超时，默认 30 秒。 |
+| 无 | `TALEBOOK_NO_UPDATE_NOTIFIER` | 设置为 `1`、`true`、`yes` 或 `on` 时关闭更新提醒与对应的额外请求。 |
 
 CLI 使用 HTTP Basic Auth，不持久化 Cookie。JSON 写入 stdout，错误 JSON 写入 stderr；下载内容只写文件。
+
+使用管理员凭据执行成功后，CLI 会尽力读取 `GET /api/admin/update` 的服务端缓存。存在新版本时，原成功 JSON 会附加 `_notice.update`，其中包含提示文案、当前版本、最新版本和可用的发布页。提醒检查失败不改变原命令结果；guest、普通用户和业务失败响应不附加提醒。Agent 应先完成当前任务，再简短报告提醒，不得据此自动升级实例。
 
 退出码：
 

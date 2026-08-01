@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talebook Agent Skill 更新提醒方案</title>
+  <style>
+    :root {
+      --paper: #f4f0e6;
+      --ink: #152238;
+      --muted: #657080;
+      --line: #c9c1b1;
+      --blue: #1646a0;
+      --amber: #f2ad2e;
+      --white: #fffdf7;
+      --red: #aa322b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(21,34,56,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(21,34,56,.045) 1px, transparent 1px),
+        var(--paper);
+      background-size: 24px 24px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.62;
+    }
+    main { width: min(1120px, calc(100% - 32px)); margin: 24px auto 72px; }
+    .masthead {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      min-height: 430px;
+      border: 2px solid var(--ink);
+      background: var(--white);
+      box-shadow: 10px 10px 0 var(--ink);
+    }
+    .hero { padding: clamp(28px, 5vw, 64px); position: relative; overflow: hidden; }
+    .eyebrow, .label, th, .signal small {
+      font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    h1 { max-width: 760px; margin: 22px 0 20px; font-size: clamp(42px, 7vw, 82px); line-height: .94; letter-spacing: -.055em; }
+    .lede { max-width: 680px; font-size: 19px; color: #33415a; }
+    .stamp { display: inline-block; margin-top: 34px; padding: 8px 12px; color: var(--red); border: 2px solid var(--red); font-weight: 800; transform: rotate(-2deg); }
+    .signal {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 26px;
+      color: white;
+      background: var(--blue);
+      border-left: 2px solid var(--ink);
+    }
+    .signal-mark { width: 100%; height: auto; }
+    .signal strong { display: block; margin-top: 12px; color: var(--amber); font-size: 29px; line-height: 1; }
+    .signal dl { margin: 24px 0 0; }
+    .signal dt { color: #b9c7e9; font-size: 12px; }
+    .signal dd { margin: 2px 0 14px; font: 700 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    section { margin-top: 56px; }
+    h2 { margin: 0 0 20px; font-size: clamp(28px, 4vw, 44px); line-height: 1; letter-spacing: -.035em; }
+    h3 { margin: 0 0 8px; font-size: 20px; }
+    p { margin: 0 0 14px; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    code { padding: .12em .35em; background: #e5dfd1; font-size: .92em; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card { padding: 22px; border-top: 5px solid var(--blue); background: var(--white); box-shadow: 0 0 0 1px var(--line); }
+    .number { display: block; margin-bottom: 26px; color: var(--amber); font: 800 34px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .flow { padding: 28px; border: 2px solid var(--ink); background: var(--ink); color: white; overflow-x: auto; }
+    .flow svg { display: block; min-width: 850px; width: 100%; height: auto; }
+    .contract { display: grid; grid-template-columns: .8fr 1.2fr; gap: 20px; align-items: start; }
+    pre { margin: 0; padding: 22px; overflow: auto; color: #eaf1ff; background: #111d31; border-left: 8px solid var(--amber); font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; background: var(--white); }
+    th, td { padding: 14px; text-align: left; vertical-align: top; border: 1px solid var(--line); }
+    th { color: white; background: var(--blue); }
+    .yes { color: #12643d; font-weight: 800; }
+    .no { color: var(--red); font-weight: 800; }
+    .tests { counter-reset: test; display: grid; gap: 10px; }
+    .test { display: grid; grid-template-columns: 42px 1fr 116px; gap: 14px; align-items: center; padding: 14px; background: var(--white); border: 1px solid var(--line); }
+    .test::before { counter-increment: test; content: counter(test, decimal-leading-zero); color: var(--blue); font: 800 18px/1 ui-monospace, monospace; }
+    .pending { padding: 5px 8px; text-align: center; color: #75530d; background: #f8e7ba; font: 700 11px/1.2 ui-monospace, monospace; }
+    .passed { padding: 5px 8px; text-align: center; color: #0e6040; background: #d8efdf; font: 700 11px/1.2 ui-monospace, monospace; }
+    footer { margin-top: 60px; padding-top: 18px; color: var(--muted); border-top: 1px solid var(--line); font-size: 13px; }
+    @media (max-width: 780px) {
+      .masthead, .contract { grid-template-columns: 1fr; }
+      .signal { border-left: 0; border-top: 2px solid var(--ink); }
+      .grid { grid-template-columns: 1fr; }
+      .test { grid-template-columns: 34px 1fr; }
+      .pending, .passed { grid-column: 2; justify-self: start; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="masthead">
+      <div class="hero">
+        <span class="eyebrow">Project / Agent Operations / Release Signal</span>
+        <h1>更新抵达时，轻声提醒。</h1>
+        <p class="lede">让 Talebook CLI 在完成用户当前任务后，以结构化 notice 告知管理员实例存在新版本；提醒是附加信息，不改变命令成败，也不擅自升级实例。</p>
+        <span class="stamp">ACTIVE · 已验证</span>
+      </div>
+      <aside class="signal">
+        <div>
+          <small>release signal</small>
+          <strong>_notice.update</strong>
+        </div>
+        <svg class="signal-mark" viewBox="0 0 260 160" role="img" aria-label="更新信号示意图">
+          <circle cx="130" cy="78" r="18" fill="#f2ad2e"/>
+          <path d="M91 40a54 54 0 0 0 0 76M169 40a54 54 0 0 1 0 76" fill="none" stroke="#fff" stroke-width="8"/>
+          <path d="M64 16a88 88 0 0 0 0 124M196 16a88 88 0 0 1 0 124" fill="none" stroke="#8ca7e5" stroke-width="6"/>
+          <path d="M130 96v45" stroke="#f2ad2e" stroke-width="8"/>
+          <path d="M100 143h60" stroke="#f2ad2e" stroke-width="8"/>
+        </svg>
+        <dl>
+          <dt>创建日期</dt><dd>2026-08-01</dd>
+          <dt>所属模块</dt><dd>project / skills/talebook</dd>
+          <dt>需求来源</dt><dd>用户：参考 lark-cli 增加 update 提醒</dd>
+          <dt>前置方案</dt><dd>20260731-talebook-agent-skill.active.html</dd>
+        </dl>
+      </aside>
+    </header>
+
+    <section>
+      <span class="label">01 / Original request</span>
+      <h2>原始诉求与边界</h2>
+      <p>用户要求参考 lark-cli Skill 的做法，为 Talebook Agent Skill 增加更新提醒。这里的“更新”解释为 Talebook 服务实例版本更新，而非自动更新本地 CLI 文件。</p>
+      <div class="grid">
+        <article class="card"><span class="number">01</span><h3>结构化提醒</h3><p>成功结果存在新版本时，追加 <code>_notice.update</code>，便于 Agent 识别而不破坏原接口字段。</p></article>
+        <article class="card"><span class="number">02</span><h3>安静失败</h3><p>检查权限不足、网络错误或旧版服务不支持接口时，原命令结果照常返回。</p></article>
+        <article class="card"><span class="number">03</span><h3>不自动升级</h3><p>提醒只报告版本和发布页。升级依赖部署方式，Agent 必须先完成当前任务，再按用户意图处理。</p></article>
+      </div>
+    </section>
+
+    <section>
+      <span class="label">02 / Runtime flow</span>
+      <h2>运行流程</h2>
+      <div class="flow">
+        <svg viewBox="0 0 1040 230" role="img" aria-label="CLI 更新提醒流程图">
+          <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0l10 5-10 5z" fill="#f2ad2e"/></marker></defs>
+          <g fill="#f9fbff" stroke="#8ca7e5" stroke-width="2">
+            <rect x="20" y="65" width="170" height="90" rx="2"/><rect x="255" y="65" width="180" height="90" rx="2"/><rect x="500" y="20" width="210" height="90" rx="2"/><rect x="500" y="135" width="210" height="75" rx="2"/><rect x="785" y="65" width="230" height="90" rx="2"/>
+          </g>
+          <g fill="#152238" font-family="ui-monospace, monospace" text-anchor="middle">
+            <text x="105" y="102" font-size="15" font-weight="700">执行目标命令</text><text x="105" y="127" font-size="12">保留原始结果</text>
+            <text x="345" y="102" font-size="15" font-weight="700">是否可检查？</text><text x="345" y="127" font-size="12">有凭据 · 未禁用</text>
+            <text x="605" y="55" font-size="15" font-weight="700">管理员缓存状态</text><text x="605" y="80" font-size="12">GET /api/admin/update</text>
+            <text x="605" y="166" font-size="15" font-weight="700">跳过提醒</text><text x="605" y="189" font-size="12">guest / non-admin / error</text>
+            <text x="900" y="97" font-size="15" font-weight="700">合并 JSON</text><text x="900" y="123" font-size="12">_notice.update</text>
+          </g>
+          <g fill="none" stroke="#f2ad2e" stroke-width="3" marker-end="url(#arrow)"><path d="M190 110h65"/><path d="M435 95l65-25"/><path d="M435 125l65 45"/><path d="M710 70l75 34"/></g>
+          <g fill="#f2ad2e" font-family="ui-monospace, monospace" font-size="11"><text x="460" y="68">YES</text><text x="458" y="158">NO</text><text x="744" y="76">has_update</text></g>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <span class="label">03 / Output contract</span>
+      <h2>输出契约</h2>
+      <div class="contract">
+        <div>
+          <p>仅在目标命令成功且服务报告 <code>has_update: true</code> 时附加 notice。版本字段来自现有管理接口；发布地址保持服务返回值。</p>
+          <p>设置 <code>TALEBOOK_NO_UPDATE_NOTIFIER=1</code> 可禁用额外请求并获得稳定 JSON，适合脚本或严格机器读取。</p>
+        </div>
+        <pre>{
+  "err": "ok",
+  "books": [],
+  "_notice": {
+    "update": {
+      "message": "Talebook 有新版本 v26.08.1（当前 v26.07.13）",
+      "current_version": "v26.07.13",
+      "latest_version": "v26.08.1",
+      "release_url": "https://github.com/talebook/talebook/releases/tag/v26.08.1"
+    }
+  }
+}</pre>
+      </div>
+    </section>
+
+    <section>
+      <span class="label">04 / Decisions</span>
+      <h2>关键决策</h2>
+      <table>
+        <thead><tr><th>问题</th><th>决策</th><th>理由</th></tr></thead>
+        <tbody>
+          <tr><td>检查来源</td><td>读取 <code>GET /api/admin/update</code></td><td>复用服务端周期检查的缓存，不让每条 CLI 命令触发 GitHub 联网。</td></tr>
+          <tr><td>检查对象</td><td>仅提供凭据的管理员</td><td>接口本身是管理接口；guest 和普通用户不应因提醒产生权限噪声。</td></tr>
+          <tr><td>错误语义</td><td>best-effort，全部静默跳过</td><td>更新提醒是旁路能力，不得把一次成功操作改判为失败。</td></tr>
+          <tr><td>Agent 行为</td><td>先完成任务，再简短提示</td><td>与 lark-cli 的 notice 使用习惯一致，避免提醒喧宾夺主。</td></tr>
+          <tr><td>自动升级</td><td class="no">不执行</td><td>Talebook 可通过 Docker Compose 或其他方式部署，CLI 无法安全推断部署目录和更新动作。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <span class="label">05 / Verification</span>
+      <h2>测试计划与结果</h2>
+      <div class="tests">
+        <div class="test"><span><code>python3 -m pytest -q tests/test_talebook_skill_cli.py</code>：管理员有更新时附加 notice；共 22 项通过。</span><span class="passed">PASS · 22</span></div>
+        <div class="test"><span>同组测试验证无更新、guest、普通用户和 <code>TALEBOOK_NO_UPDATE_NOTIFIER=1</code> 均不输出 notice。</span><span class="passed">PASS</span></div>
+        <div class="test"><span>同组测试模拟更新接口 HTTP 503，目标命令仍以原 JSON 和退出码 0 完成。</span><span class="passed">PASS</span></div>
+        <div class="test"><span><code>quick_validate.py skills/talebook</code>、<code>py_compile</code>、目标文件 Ruff check / format check 全部通过。</span><span class="passed">PASS</span></div>
+        <div class="test"><span><code>make lint-py-fix</code> 未改动 97 个后端文件；<code>make lint-py</code> 通过。首次定向测试受沙箱禁止 loopback 影响，授权本地临时服务后重跑通过。</span><span class="passed">PASS</span></div>
+        <div class="test"><span>真实实例 <code>demo.talebook.org</code> 的 <code>admin settings check-update</code> 返回成功；当前与最新版本均为 26.07.13，按设计不附加 notice。</span><span class="passed">PASS</span></div>
+        <div class="test"><span>完整后端套件未重跑：本次只修改 Skill CLI 与其定向测试，且此前本地全量收集受 PyYAML 与 Calibre 依赖缺失阻塞。</span><span class="pending">环境受限</span></div>
+      </div>
+    </section>
+
+    <footer>Talebook Agent Skill · Update Notice · ACTIVE since 2026-08-01.</footer>
+  </main>
+</body>
+</html>

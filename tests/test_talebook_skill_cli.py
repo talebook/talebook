@@ -184,10 +184,12 @@ class TestTalebookSkillCli:
     def test_basic_auth_header_is_sent_when_credentials_are_present(self):
         status = guest_status(user={"is_login": True, "is_admin": False})
         with fake_server(status=status) as (server, site):
-            code, _, _ = run_cli(["--site", site, "--user", "alice", "--password", "secret", "me", "status"])
+            code, output, _ = run_cli(["--site", site, "--user", "alice", "--password", "secret", "me", "status"])
         assert code == 0
         token = base64.b64encode(b"alice:secret").decode("ascii")
         assert server.records[0]["headers"]["Authorization"] == "Basic " + token
+        assert "_notice" not in output
+        assert [record["path"] for record in server.records] == ["/api/user/info"]
 
     def test_search_encodes_query(self):
         routes = {("GET", "/api/search"): {"err": "ok", "books": []}}
@@ -243,7 +245,87 @@ class TestTalebookSkillCli:
             code, output, _ = run_cli(["--site", site, "--user", "admin", "--password", "secret", "admin", "users", "list"])
         assert code == 0
         assert output["users"]["total"] == 0
-        assert [record["path"] for record in server.records] == ["/api/user/info", "/api/admin/users"]
+        assert [record["path"] for record in server.records] == [
+            "/api/user/info",
+            "/api/admin/users",
+            "/api/admin/update",
+        ]
+
+    def test_admin_receives_update_notice_after_successful_command(self):
+        status = guest_status(user={"is_login": True, "is_admin": True})
+        routes = {
+            ("GET", "/api/search"): {"err": "ok", "books": []},
+            (
+                "GET",
+                "/api/admin/update",
+            ): {
+                "err": "ok",
+                "status": {
+                    "has_update": True,
+                    "current_version": "v26.07.13",
+                    "latest_version": "v26.08.1",
+                    "latest_release_url": "https://example.com/releases/v26.08.1",
+                },
+            },
+        }
+        with fake_server(status=status, routes=routes) as (server, site):
+            code, output, errors = run_cli(
+                ["--site", site, "--user", "admin", "--password", "secret", "books", "search", "--name", "三体"]
+            )
+        assert code == 0
+        assert errors is None
+        assert output["books"] == []
+        assert output["_notice"]["update"] == {
+            "message": "Talebook 有新版本 v26.08.1（当前 v26.07.13）",
+            "current_version": "v26.07.13",
+            "latest_version": "v26.08.1",
+            "release_url": "https://example.com/releases/v26.08.1",
+        }
+        assert [record["path"] for record in server.records] == [
+            "/api/search",
+            "/api/user/info",
+            "/api/admin/update",
+        ]
+
+    def test_update_notice_can_be_disabled_for_stable_json(self):
+        status = guest_status(user={"is_login": True, "is_admin": True})
+        routes = {("GET", "/api/search"): {"err": "ok", "books": []}}
+        with fake_server(status=status, routes=routes) as (server, site):
+            code, output, errors = run_cli(
+                ["--site", site, "--user", "admin", "--password", "secret", "books", "search", "--name", "三体"],
+                environ={"TALEBOOK_NO_UPDATE_NOTIFIER": "1"},
+            )
+        assert code == 0
+        assert errors is None
+        assert "_notice" not in output
+        assert [record["path"] for record in server.records] == ["/api/search"]
+
+    def test_update_check_failure_does_not_change_command_result(self):
+        status = guest_status(user={"is_login": True, "is_admin": True})
+        routes = {
+            ("GET", "/api/search"): {"err": "ok", "books": []},
+            ("GET", "/api/admin/update"): (
+                503,
+                {"Content-Type": "application/json; charset=utf-8"},
+                {"err": "update.unavailable", "msg": "temporary failure"},
+            ),
+        }
+        with fake_server(status=status, routes=routes) as (_, site):
+            code, output, errors = run_cli(
+                ["--site", site, "--user", "admin", "--password", "secret", "books", "search", "--name", "三体"]
+            )
+        assert code == 0
+        assert errors is None
+        assert output == {"err": "ok", "books": []}
+
+    def test_guest_does_not_check_for_updates(self):
+        routes = {("GET", "/api/search"): {"err": "ok", "books": []}}
+        with fake_server(routes=routes) as (server, site):
+            code, output, errors = run_cli(["--site", site, "books", "search", "--name", "三体"])
+        assert code == 0
+        assert errors is None
+        assert "_notice" not in output
+        assert [record["path"] for record in server.records] == ["/api/search"]
 
     def test_admin_command_stops_for_non_admin(self):
         status = guest_status(user={"is_login": True, "is_admin": False})
