@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>演示模式：自动开户与伪管理员面板</title>
+  <style>
+    :root { color-scheme: light; --ink:#1c2333; --muted:#606d82; --line:#dde3ee; --paper:#fff; --bg:#f5f6fa; --accent:#7a3ff0; --soft:#f1eaff; --ok:#187a5c; --warn:#9a6700; --bad:#b42318; --fake:#0f7490; --fakesoft:#e6f5f9; }
+    * { box-sizing: border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1060px,calc(100% - 32px)); margin:32px auto 72px; }
+    header,section { margin-bottom:20px; padding:26px 30px; border:1px solid var(--line); border-radius:14px; background:var(--paper); }
+    header { border-top:5px solid var(--accent); }
+    h1 { margin:0 0 10px; font-size:29px; line-height:1.25; }
+    h2 { margin:0 0 14px; font-size:20px; }
+    h3 { margin:18px 0 8px; font-size:16px; }
+    p,ul,ol { margin:8px 0; }
+    code { padding:2px 5px; border-radius:5px; background:#eef1f5; font-size:0.92em; }
+    .lead { color:var(--muted); font-size:16px; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+    .tag { padding:4px 10px; border-radius:999px; color:var(--muted); background:#eef1f5; font-size:13px; }
+    .tag.status { color:var(--warn); background:#fff4d6; font-weight:700; }
+    .callout { margin:14px 0; padding:13px 16px; border-left:4px solid var(--accent); background:var(--soft); }
+    .callout.fake { border-left-color:var(--fake); background:var(--fakesoft); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .card { padding:16px; border:1px solid var(--line); border-radius:10px; }
+    table { width:100%; border-collapse:collapse; margin:12px 0; }
+    th,td { padding:10px 12px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f7f8fa; }
+    .yes { color:var(--ok); font-weight:700; }
+    .no { color:var(--bad); font-weight:700; }
+    .fakebadge { display:inline-block; padding:2px 8px; border-radius:999px; background:var(--fakesoft); color:var(--fake); font-weight:700; font-size:12.5px; }
+    .flow { display:grid; grid-template-columns:1fr 34px 1fr 34px 1fr 34px 1fr; align-items:center; gap:6px; margin-top:16px; }
+    .node { min-height:104px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fafbfc; font-size:13.5px; }
+    .arrow { color:var(--accent); text-align:center; font-size:22px; }
+    footer { color:var(--muted); text-align:center; font-size:13px; }
+    .rel { display:flex; gap:14px; align-items:stretch; margin-top:14px; }
+    .rel .box { flex:1; padding:14px; border:1px dashed var(--line); border-radius:10px; }
+    .rel .box.old { background:#fafbfc; }
+    .rel .box.new { background:var(--soft); border-style:solid; border-color:var(--accent); }
+    .rel .link { align-self:center; color:var(--accent); font-size:22px; }
+    @media (max-width:820px) { main{width:min(100% - 20px,1060px);margin-top:10px} header,section{padding:20px} .grid,.flow{grid-template-columns:1fr} .arrow{transform:rotate(90deg)} .rel{flex-direction:column} .rel .link{transform:rotate(90deg)} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>演示模式：自动开户与伪管理员面板</h1>
+    <p class="lead">在已上线的单账号只读演示模式基础上，去掉“部署者需手工预建 demo 账号”的门槛，并让 demo 账号能够体验管理员设置面板——但看到的是出厂默认参数、点击保存也不会真正改变任何运行配置。</p>
+    <div class="meta">
+      <span class="tag status">状态：ACTIVE</span>
+      <span class="tag">创建日期：2026-08-01</span>
+      <span class="tag">所属模块：webserver</span>
+      <span class="tag">影响范围：登录鉴权、用户数据模型、管理员设置接口、演示模式策略</span>
+      <span class="tag">需求来源：PR #887 评论 @hehetoshang（2026-08-01）</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>原始诉求</h2>
+    <p>PR #887（Issue #886 的实现）评论区中，<code>@hehetoshang</code> 提出：</p>
+    <div class="callout">“我希望打开演示模式时自动创建一个名为 demo 的用户，然后密码是 demodemo，然后 demo 用户可以查看管理员面板，但是内部内容为虚假体验版，可以进入演示管理员面板，内部的内容为 settings.py 设置的默认参数，并且点击保存按钮是不会真的去保存的。”</div>
+    <p>拆解为三个可验证的行为点：① 演示模式生效时不再要求部署者预先创建账号；② 配置的 demo 账号能进入“管理员设置”页面；③ 该页面显示的是 <code>webserver/settings.py</code> 里的出厂默认值而非真实运行配置，且提交保存请求返回成功但不写入任何配置。</p>
+  </section>
+
+  <section>
+    <h2>与既有方案的关系</h2>
+    <p>本方案建立在已生效的 <code>design/webserver/20260721-single-account-demo-mode.active.html</code>（单账号只读演示模式）之上，复用其“单账号判定 / 只读写保护”基础设施，但直接推翻了该方案里的两条“非目标”：</p>
+    <div class="rel">
+      <div class="box old">
+        <h3>20260721 方案的非目标（现状）</h3>
+        <ul>
+          <li>不自动创建、重置或定期清理演示账号。</li>
+          <li>不修改现有角色和权限位，也不把演示账号强制改为管理员。</li>
+        </ul>
+      </div>
+      <div class="link">→</div>
+      <div class="box new">
+        <h3>本方案的目标（新增）</h3>
+        <ul>
+          <li>演示模式下，demo 账号首次登录即自动开户，密码固定为 <code>demodemo</code>。</li>
+          <li>demo 账号<strong>不</strong>获得数据库里的真实 <code>admin</code> 权限位；“能看到管理员面板”是仅针对设置页面的伪造视图，不解锁其余管理接口。</li>
+        </ul>
+      </div>
+    </div>
+    <p>其余部分（写请求统一拒绝、WebDAV 只读、不记录访问痕迹等）不变，本方案不重复描述，只覆盖新增的开户与伪管理员面板行为。旧方案已随本方案生效改为状态 <code>SUPERSEDED</code>（<code>design/webserver/20260721-single-account-demo-mode.superseded.html</code>），并在其中注明由本方案取代上述两条非目标，原因见上表；旧方案其余设计仍然有效，由本方案继续复用，不再重复维护。</p>
+  </section>
+
+  <section>
+    <h2>目标与非目标</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>目标</h3>
+        <ul>
+          <li>演示模式开启后，任何人以配置的 <code>DEMO_USERNAME</code>、密码 <code>demodemo</code> 登录时，若账号不存在则自动创建（非管理员、可登录、无自定义权限位）。</li>
+          <li>已存在同名账号时不覆盖、不重置密码，自动开户逻辑幂等。</li>
+          <li>demo 账号可以看到“管理员设置”页面，但读取到的是 <code>settings.py</code> 里的默认参数，不泄露真实部署的密钥、数据库地址、当前站点标题等运行配置。</li>
+          <li>demo 账号提交“保存设置”会收到成功响应（模拟真实保存的交互反馈），但后端不写入 <code>CONF</code>、不落盘 <code>auto.py</code>。</li>
+          <li>用户信息接口对 demo 账号展示 <code>is_admin: true</code>，使前端既有的管理员入口自然可见，不需要新增前端代码。</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>非目标</h3>
+        <ul>
+          <li>不把 demo 账号的数据库 <code>admin</code> 字段设为真，因此其余 <code>@is_admin</code> 管理接口（用户管理、书籍批量删除、书源管理等）仍然拒绝 demo 账号，返回既有的权限错误。</li>
+          <li>不为管理员设置页面之外的其它页面单独构造“虚假数据”，管理员面板的其它子页面在本方案后仍不可用，留作后续按需扩展。</li>
+          <li>不在管理后台提供“开启/关闭演示模式”的开关，仍只能通过配置文件控制。</li>
+          <li>不改变 20260721 方案里关于只读写保护、WebDAV、社交登录禁用等既有行为。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>行为矩阵</h2>
+    <table>
+      <thead><tr><th>场景</th><th>本方案前</th><th>本方案后</th></tr></thead>
+      <tbody>
+        <tr><td>demo 账号不存在，以 <code>DEMO_USERNAME</code> + <code>demodemo</code> 登录</td><td class="no">params.no_user（需部署者预建）</td><td class="yes">自动创建后登录成功</td></tr>
+        <tr><td>demo 账号已存在，密码错误</td><td>密码校验失败</td><td>行为不变：密码校验失败</td></tr>
+        <tr><td><code>GET /api/user/info</code> 返回的 <code>is_admin</code></td><td class="no">跟随数据库 <code>admin</code> 字段（通常为 false）</td><td class="yes"><span class="fakebadge">伪造</span> demo 账号恒为 true</td></tr>
+        <tr><td><code>GET /api/admin/settings</code></td><td class="no">非管理员被拒绝（permission）</td><td class="yes"><span class="fakebadge">伪造</span> 返回 settings.py 默认参数</td></tr>
+        <tr><td><code>POST /api/admin/settings</code></td><td class="no">先被演示模式只读策略拒绝（demo.read_only）</td><td class="yes"><span class="fakebadge">伪造</span> 校验通过后返回 ok，不写入 CONF/auto.py</td></tr>
+        <tr><td>其它 <code>@is_admin</code> 接口（用户管理、书籍删除等）</td><td class="no">拒绝（permission.not_admin）</td><td class="no">行为不变：仍然拒绝</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>方案</h2>
+    <h3>1. 自动开户：登录时按需创建，而非启动时创建</h3>
+    <p>新增 <code>webserver/demo_mode.ensure_demo_account(conf, session)</code>：仅在演示模式开启且配置了 <code>DEMO_USERNAME</code> 时生效；先按用户名查询，存在则直接返回，不存在才创建一条 <code>admin=False</code>、<code>active=True</code>、无自定义权限位（权限位留空即按既有 <code>has_permission</code> 语义默认放行）的账号，密码固定为常量 <code>DEMO_DEFAULT_PASSWORD = "demodemo"</code>（走既有 <code>bcrypt</code> 哈希，不明文存储）。</p>
+    <p>调用点选在 <code>SignIn.post()</code>：当按用户名查不到账号、且演示模式开启、且用户名等于配置的 <code>DEMO_USERNAME</code> 时才触发开户，随后复用既有密码校验、<code>can_login()</code> 等流程，不改变原有登录判定顺序。选择“登录时按需创建”而非“服务启动时创建”，是因为后者依赖 <code>main.py</code> 里数据库表已就绪的时序，且在测试、多进程部署等场景下不易保证只执行一次；登录时创建复用了同一条查询-写入路径，天然幂等，也不需要改动启动流程。</p>
+
+    <h3>2. 伪管理员视图：只在“设置页”内特判，不动真实权限位</h3>
+    <p><code>AdminSettings</code> 新增 <code>is_demo_fake_admin()</code>：演示模式开启且当前登录账号是配置的 demo 账号时为真。<code>GET</code> 在该条件下返回 <code>webserver/settings.py</code> 里的原始 <code>settings</code> 字典（出厂默认值）而不是合并了 <code>auto.py</code>/<code>manual.py</code> 覆盖的运行时 <code>CONF</code>，避免把真实部署的站点标题、AI Key、数据库连接串等展示给公开演示访客。<code>POST</code> 在该条件下只做 JSON 解码（保证接口不报 500），直接返回 <code>{"err": "ok", "rsp": data}</code>，不经过原有的字段白名单过滤、<code>SettingsSaverLogic.save_extra_settings()</code>、写 <code>auto.py</code> 等真实保存路径。</p>
+    <p>该特判只加在 <code>AdminSettings</code> 一个 handler 里，不修改 <code>BaseHandler.is_admin()</code> 或全局 <code>@is_admin</code> 装饰器，因此其它管理接口对 demo 账号的判定完全不受影响，继续依据数据库里真实的 <code>admin</code> 字段拒绝。</p>
+
+    <h3>3. 演示模式只读策略的例外：放行“假保存”这一条 POST 路径</h3>
+    <p><code>demo_mode.request_is_allowed()</code> 新增 <code>DEMO_FAKE_SAVE_PATHS = {"/api/admin/settings"}</code>：仅对该固定路径的 <code>POST</code> 放行，使请求能进入 handler 触发上面的“假保存”分支，而不是在 <code>BaseHandler.prepare()</code> 阶段就被通用只读策略拦成 <code>demo.read_only</code>。放行只发生在路由层面，实际是否允许执行、返回什么内容仍完全由 <code>AdminSettings.post()</code> 内的 <code>is_demo_fake_admin()</code> 判断决定；非 demo 账号即便命中这条路径，也会落回原有 <code>self.admin_user</code> 校验。</p>
+
+    <h3>4. 前端零改动：复用已有管理员入口与设置页</h3>
+    <p><code>UserInfo.get_user_info()</code> 对 demo 账号返回 <code>is_admin: true</code>（叠加原有 <code>user.is_admin()</code> 结果，即 <code>user.is_admin() or is_demo_fake_admin</code>）。前端现有的“管理员”导航入口和设置页组件均按此字段显示，无需新增或修改任何 <code>.vue</code> 文件；设置页调用的 <code>GET/POST /api/admin/settings</code> 接口行为已在后端伪造，页面看到的即是默认参数与“保存成功”的提示。</p>
+
+    <div class="flow" aria-label="demo 账号进入伪管理员设置面板的请求路径">
+      <div class="node"><strong>登录</strong><br>demo 账号不存在时自动开户，存在则正常校验密码</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>/api/user/info</strong><br>demo 账号 is_admin 恒为 true，驱动前端显示入口</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>GET 设置</strong><br>AdminSettings 识别 demo 账号，返回 settings.py 默认值</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>POST 保存</strong><br>放行请求 → 校验 JSON → 返回 ok，不写 CONF/auto.py</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>安全边界与风险</h2>
+    <ul>
+      <li><strong>不产生真实管理员权限：</strong>数据库里 demo 账号的 <code>admin</code> 字段始终为 <code>False</code>，其它所有 <code>@is_admin</code> 保护的接口（用户管理、批量删数据、书源管理、SSL 证书、日志下载等）不受本方案影响，继续拒绝 demo 账号——这是本方案刻意收窄的范围，避免“伪管理员”被误用为真实提权入口。</li>
+      <li><strong>不泄露真实配置：</strong>设置页对 demo 账号只读出 <code>settings.py</code> 里写死的出厂默认值，不合并 <code>auto.py</code>/<code>manual.py</code> 覆盖，真实部署的第三方密钥、数据库连接串、真实站点标题等不会经此接口泄露。</li>
+      <li><strong>固定密码是已知风险，但已被既有只读策略兜底：</strong><code>demodemo</code> 是公开可预期的密码，任何人都能登录 demo 账号；这本身符合“公开演示账号”的定位，且登录后仍受 20260721 方案里全局的只读写保护约束，不能执行真实的业务写操作。</li>
+      <li><strong>幂等开户避免竞态覆盖：</strong>开户逻辑先查后建，若账号已被部署者手工创建（例如自定义了更强的密码），不会被自动流程覆盖或重置密码。</li>
+      <li><strong>放行面收窄到单一路径：</strong>只读策略的例外只加了 <code>/api/admin/settings</code> 一条，不是放开整个 <code>/api/admin/*</code> 前缀，降低误放行到破坏性接口（如批量删除、迁移数据库）的风险。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>测试计划与验收标准</h2>
+    <table>
+      <thead><tr><th>层级</th><th>计划验证</th><th>实际结果</th></tr></thead>
+      <tbody>
+        <tr><td>策略单测</td><td><code>demo_mode.request_is_allowed()</code> 对 <code>/api/admin/settings</code> 的例外、<code>ensure_demo_account()</code> 的创建/幂等/关闭态 no-op。</td><td class="yes">通过：<code>tests/test_demo_mode_policy.py</code> 新增 3 项全部通过。</td></tr>
+        <tr><td>自动开户集成测试</td><td>未预建账号时，密码错误返回校验失败但账号已创建；正确密码（<code>demodemo</code>）登录成功；创建的账号 <code>admin=False</code>。</td><td class="yes">通过：<code>test_demo_account_is_auto_created_on_first_login</code>。</td></tr>
+        <tr><td>伪管理员面板集成测试</td><td>demo 账号 <code>/api/user/info</code> 的 <code>is_admin</code> 为 true；<code>GET /api/admin/settings</code> 返回值与 <code>settings.py</code> 默认值一致；<code>POST</code> 返回 ok 但不改变运行时 <code>CONF</code>。</td><td class="yes">通过：<code>test_demo_account_sees_fake_admin_settings_and_cannot_persist</code>。</td></tr>
+        <tr><td>回归</td><td>既有演示模式、管理员设置、用户注册等测试不受影响。</td><td class="yes">通过：<code>pytest -q tests/</code> 全量 724 passed, 1 skipped。</td></tr>
+        <tr><td>质量门禁</td><td><code>make lint-py</code>、<code>make check-design</code>。</td><td class="yes">均通过。</td></tr>
+      </tbody>
+    </table>
+    <h3>实际执行记录</h3>
+    <ul>
+      <li><code>python3 -m pytest -q tests/test_demo_mode.py tests/test_demo_mode_policy.py</code> — <strong>passed</strong>（12 项全部通过）。</li>
+      <li><code>python3 -m pytest -q tests/test_admin.py tests/test_main.py</code> — <strong>passed</strong>（128 passed, 1 skipped）。</li>
+      <li><code>python3 -m pytest -q tests/</code> — <strong>passed</strong>（724 passed, 1 skipped）。</li>
+      <li><code>make lint-py-fix &amp;&amp; make lint-py</code> — <strong>passed</strong>（ruff 检查与格式化均通过，无告警）。</li>
+      <li><code>python3 scripts/check_design_docs.py</code> — <strong>passed</strong>（含本文档在内全部方案通过）。</li>
+      <li>前端验收：本方案未修改任何 <code>.vue</code>/前端文件，管理员设置页复用既有组件与既有 <code>/api/admin/settings</code> 接口约定，因此按仓库前端验收规范不要求 Chrome DevTools 实际渲染验证；页面级视觉效果建议在后续如需调整前端交互时再单独验证。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>决策记录</h2>
+    <ol>
+      <li>2026-08-01：明确“自动开户”的触发时机选在登录请求内按需创建，而不是服务启动阶段，理由是避免依赖启动时序、天然幂等、且不需要改动 <code>main.py</code> 的会话生命周期。</li>
+      <li>2026-08-01：明确“伪管理员”的范围仅限管理员设置页面，不把 demo 账号数据库 <code>admin</code> 字段置真，避免放大到其它管理接口造成真实数据风险；用户请求里的“管理员面板”按上下文（“内部内容为 settings.py 默认参数”“点击保存不会真的保存”）理解为设置页面，而非整个后台。</li>
+      <li>2026-08-01：只读策略的放行范围收窄到 <code>/api/admin/settings</code> 单一路径，而不是整个 <code>/api/admin/*</code> 前缀，降低误放行破坏性接口的风险。</li>
+      <li>2026-08-01：固定密码 <code>demodemo</code> 直接采用需求原文给出的值；开户逻辑先查后建，已存在账号不会被自动流程覆盖密码。</li>
+    </ol>
+  </section>
+
+  <footer>Talebook 内部开发方案 · ACTIVE · PR #887 / Issue #886</footer>
+</main>
+</body>
+</html>

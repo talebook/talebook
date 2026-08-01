@@ -274,6 +274,8 @@ class SignIn(BaseHandler):
         if not username or not password:
             return {"err": "params.invalid", "msg": _("用户名或密码错误")}
         user = self.session.query(Reader).filter(Reader.username == username).first()
+        if not user and demo_mode.is_demo_mode(CONF) and username == demo_mode.demo_username(CONF):
+            user = demo_mode.ensure_demo_account(CONF, self.session)
         if not user:
             return {"err": "params.no_user", "msg": _("无此用户")}
         if not demo_mode.can_login(CONF, user):
@@ -465,10 +467,13 @@ class UserInfo(BaseHandler):
         if not user:
             return d
 
+        # 演示模式下，配置的 demo 账号即使数据库中不是真实管理员，也展示“管理员面板”
+        # 入口，用于呈现只读的伪造管理员体验；handler 层单独保证不会暴露真实数据或写入。
+        is_demo_fake_admin = demo_mode.is_demo_mode(CONF) and demo_mode.is_demo_user(CONF, user)
         d.update(
             {
                 "is_login": True,
-                "is_admin": user.is_admin(),
+                "is_admin": user.is_admin() or is_demo_fake_admin,
                 "is_active": user.is_active(),
                 "nickname": user.name or "",
                 "username": user.username,

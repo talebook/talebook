@@ -42,13 +42,18 @@
     <h1>单账号演示模式方案</h1>
     <p class="lead">为公开演示站提供一个可浏览完整功能、但不能改变业务数据的共享账号，并在服务端固定单账号边界。</p>
     <div class="meta">
-      <span class="tag status">状态：ACTIVE</span>
+      <span class="tag status">状态：SUPERSEDED</span>
       <span class="tag">创建日期：2026-07-21</span>
       <span class="tag">所属模块：webserver</span>
       <span class="tag">影响范围：认证、HTTP API、WebDAV、运行配置、用户文档</span>
       <span class="tag">需求来源：GitHub Issue #886</span>
     </div>
   </header>
+
+  <section>
+    <h2>替代说明</h2>
+    <div class="callout"><strong>已被替代：</strong>本方案被 <code>design/webserver/20260801-demo-mode-auto-account-fake-admin.active.html</code> 部分取代。该新方案推翻了本方案“不自动创建演示账号”“不把演示账号强制改为管理员（伪造视图）”两条非目标，改为演示模式下自动开户并提供伪管理员设置面板；本方案其余关于单账号只读写保护、WebDAV、社交登录禁用等设计仍然有效，未被替代，继续由新方案复用。本文档以下内容保留作为历史记录，不再代表当前完整行为，请以新方案为准。</div>
+  </section>
 
   <section>
     <h2>原始诉求与解释边界</h2>
@@ -170,7 +175,7 @@
     </ol>
   </section>
 
-  <footer>Talebook 内部开发方案 · ACTIVE · GitHub Issue #886</footer>
+  <footer>Talebook 内部开发方案 · SUPERSEDED · 被 20260801-demo-mode-auto-account-fake-admin 部分取代 · GitHub Issue #886</footer>
 </main>
 </body>
 </html>

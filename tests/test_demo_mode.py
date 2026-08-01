@@ -4,12 +4,14 @@
 import base64
 import contextlib
 import datetime
+import json
 import urllib.parse
 from unittest import mock
 
 from tests.test_main import BaseHandler, TestApp, get_db
 from tests.test_main import setUpModule as init
-from webserver import loader, models
+from webserver import demo_mode, loader, models
+from webserver.settings import settings as DEFAULT_SETTINGS
 
 
 def setUpModule():
@@ -142,3 +144,50 @@ class TestDemoMode(TestApp):
         item = session.query(models.Item).filter(models.Item.book_id == 1).first()
         self.assertEqual(dict(user.extra), original_extra)
         self.assertEqual(item.count_download, original_count)
+
+    def test_demo_account_is_auto_created_on_first_login(self):
+        session = get_db()
+        session.query(models.Reader).filter(models.Reader.username == "issue886_autocreate").delete(
+            synchronize_session=False
+        )
+        session.commit()
+        try:
+            with enabled_demo_mode(username="issue886_autocreate"):
+                body = urllib.parse.urlencode({"username": "issue886_autocreate", "password": "wrong-password"})
+                rsp = self.json("/api/user/sign_in", method="POST", body=body)
+                self.assertEqual(rsp["err"], "params.invalid")
+
+                body = urllib.parse.urlencode(
+                    {"username": "issue886_autocreate", "password": demo_mode.DEMO_DEFAULT_PASSWORD}
+                )
+                rsp = self.json("/api/user/sign_in", method="POST", body=body)
+                self.assertEqual(rsp["err"], "ok")
+
+            created = get_db().query(models.Reader).filter(models.Reader.username == "issue886_autocreate").first()
+            self.assertIsNotNone(created)
+            self.assertFalse(created.admin)
+        finally:
+            session = get_db()
+            session.query(models.Reader).filter(models.Reader.username == "issue886_autocreate").delete(
+                synchronize_session=False
+            )
+            session.commit()
+
+    def test_demo_account_sees_fake_admin_settings_and_cannot_persist(self):
+        user = get_db().query(models.Reader).filter(models.Reader.username == "issue886_demo").first()
+        self.assertFalse(user.admin)
+        original_site_title = loader.get_settings()["site_title"]
+
+        with enabled_demo_mode(), mock.patch.object(BaseHandler, "user_id", return_value=user.id):
+            info = self.json("/api/user/info")
+            self.assertTrue(info["user"]["is_admin"])
+
+            rsp = self.json("/api/admin/settings")
+            self.assertEqual(rsp["err"], "ok")
+            self.assertEqual(rsp["settings"]["site_title"], DEFAULT_SETTINGS["site_title"])
+
+            body = json.dumps({"site_title": "被演示账号篡改的标题"})
+            rsp = self.json("/api/admin/settings", method="POST", body=body)
+            self.assertEqual(rsp["err"], "ok")
+
+        self.assertEqual(loader.get_settings()["site_title"], original_site_title)

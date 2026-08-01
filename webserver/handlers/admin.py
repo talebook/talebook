@@ -13,7 +13,7 @@ import uuid
 import tornado
 from tornado.options import options as tornado_options
 
-from webserver import loader, utils
+from webserver import demo_mode, loader, utils
 from webserver.base.trash_manager import TrashManager
 from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
@@ -32,6 +32,7 @@ from webserver.services.ssl_certificate import (
     SSLCertificateManager,
 )
 from webserver.services.update_checker import UpdateChecker
+from webserver.settings import settings as DEFAULT_SETTINGS
 
 
 CONF = loader.get_settings()
@@ -314,10 +315,16 @@ GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
 
 
 class AdminSettings(BaseHandler):
+    def is_demo_fake_admin(self):
+        # demo 账号在演示模式下允许“查看”管理员面板，但看到的是 settings.py 的默认
+        # 参数而非真实运行配置，且不要求数据库中的 admin 标记，避免真正解锁其它
+        # 管理接口（如用户管理、批量删除书籍）。
+        return demo_mode.is_demo_mode(CONF) and demo_mode.is_demo_user(CONF, self.current_user)
+
     @js
     @auth
     def get(self):
-        if not self.admin_user:
+        if not self.admin_user and not self.is_demo_fake_admin():
             return {"err": "permission", "msg": _("无权访问此接口")}
 
         sns = [
@@ -343,8 +350,10 @@ class AdminSettings(BaseHandler):
                 "link": "https://developers.weixin.qq.com/doc/offiaccount/OA_Web_Apps/Wechat_webpage_authorization.html",
             },
         ]
+        # 演示账号看到的是 settings.py 里的出厂默认值，不暴露真实部署配置（密钥、
+        # 数据库地址等）；真实管理员仍看到当前生效的运行配置。
+        settings_dict = dict(DEFAULT_SETTINGS) if self.is_demo_fake_admin() else dict(CONF)
         # 添加元数据源配置
-        settings_dict = dict(CONF)
         settings_dict["META_ALL_SOURCES"] = META_ALL_SOURCES
         if "META_SELECTED_SOURCES" not in settings_dict:
             settings_dict["META_SELECTED_SOURCES"] = DEFAULT_META_SOURCES
@@ -354,6 +363,15 @@ class AdminSettings(BaseHandler):
     @js
     @auth
     def post(self):
+        if self.is_demo_fake_admin():
+            # 演示模式下的“保存”只做参数校验，不写入 CONF、不落盘，
+            # 让访客可以感受保存流程但不会影响真实运行配置。
+            data = tornado.escape.json_decode(self.request.body)
+            return {
+                "err": "ok",
+                "rsp": data,
+                "msg": _("演示模式下设置不会真正保存"),
+            }
         if not self.admin_user:
             return {"err": "permission", "msg": _("无权访问此接口")}
         data = tornado.escape.json_decode(self.request.body)
