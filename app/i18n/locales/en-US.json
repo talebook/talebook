@@ -939,11 +939,15 @@
       },
       "label": {
         "lines": "Show last N lines",
-        "file": "Log file"
+        "file": "Log file",
+        "showInfo": "Info",
+        "showWarning": "Warning",
+        "showError": "Error"
       },
       "message": {
         "noLogs": "No log content available",
-        "loadError": "Failed to load logs"
+        "loadError": "Failed to load logs",
+        "allFiltered": "No log lines match the current filter"
       }
     }
   },

@@ -959,11 +959,15 @@
       },
       "label": {
         "lines": "显示最近行数",
-        "file": "日志文件"
+        "file": "日志文件",
+        "showInfo": "信息",
+        "showWarning": "警告",
+        "showError": "错误"
       },
       "message": {
         "noLogs": "暂无日志内容",
-        "loadError": "加载日志失败"
+        "loadError": "加载日志失败",
+        "allFiltered": "当前筛选条件下暂无日志内容"
       }
     }
   },

@@ -225,6 +225,22 @@ router.post('/api/admin/testmail', eventHandler(() => ({
   msg: 'Test email sent'
 })));
 
+router.get('/api/admin/log', eventHandler((event) => {
+  const query = getQuery(event);
+  const lines = Number(query.lines) || 500;
+  const allLines = [
+    '[I 260101 12:00:00 admin:1] mock info line',
+    '[W 260101 12:00:01 admin:2] mock warning line',
+    '[E 260101 12:00:02 admin:3] mock error line'
+  ];
+  return {
+    err: 'ok',
+    lines: allLines.slice(0, lines),
+    total: allLines.length,
+    file: '/data/log/talebook.log'
+  };
+}));
+
 router.get('/api/admin/trash/size', eventHandler(() => ({
   err: 'ok',
   sizes: { trash: 0, upload: 0 },
