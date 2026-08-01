@@ -37,15 +37,16 @@ class TestDemoMode(TestApp):
     def setUpClass(cls):
         session = get_db()
         session.query(models.Reader).filter(
-            models.Reader.username.in_(["issue886_demo", "issue886_other"])
+            models.Reader.username.in_(["issue886_demo", "issue886_other", "issue886_admin"])
         ).delete(synchronize_session=False)
         now = datetime.datetime(2020, 1, 2, 3, 4, 5)
-        for username in ("issue886_demo", "issue886_other"):
+        for username in ("issue886_demo", "issue886_other", "issue886_admin"):
             user = models.Reader(
                 username=username,
                 name=username,
                 email="%s@example.com" % username,
                 active=True,
+                admin=(username == "issue886_admin"),
                 permission="",
                 create_time=now,
                 update_time=now,
@@ -60,7 +61,7 @@ class TestDemoMode(TestApp):
     def tearDownClass(cls):
         session = get_db()
         session.query(models.Reader).filter(
-            models.Reader.username.in_(["issue886_demo", "issue886_other"])
+            models.Reader.username.in_(["issue886_demo", "issue886_other", "issue886_admin"])
         ).delete(synchronize_session=False)
         session.commit()
 
@@ -191,3 +192,69 @@ class TestDemoMode(TestApp):
             self.assertEqual(rsp["err"], "ok")
 
         self.assertEqual(loader.get_settings()["site_title"], original_site_title)
+
+    def test_real_admin_can_sign_in_when_demo_mode_enabled(self):
+        with enabled_demo_mode():
+            body = urllib.parse.urlencode({"username": "issue886_admin", "password": "demo-password"})
+            rsp = self.json("/api/user/sign_in", method="POST", body=body)
+            self.assertEqual(rsp["err"], "ok")
+
+            denied = urllib.parse.urlencode({"username": "issue886_other", "password": "demo-password"})
+            rsp = self.json("/api/user/sign_in", method="POST", body=denied)
+            self.assertEqual(rsp["err"], "demo.account_only")
+
+    def test_real_admin_session_persists_instead_of_being_logged_out(self):
+        admin = get_db().query(models.Reader).filter(models.Reader.username == "issue886_admin").first()
+        with enabled_demo_mode(), mock.patch.object(BaseHandler, "user_id", return_value=admin.id):
+            rsp = self.json("/api/user/info")
+            self.assertTrue(rsp["user"]["is_login"])
+            self.assertEqual(rsp["user"]["username"], "issue886_admin")
+            self.assertTrue(rsp["user"]["is_admin"])
+
+    def test_real_admin_login_updates_ip_and_access_time(self):
+        session = get_db()
+        admin = session.query(models.Reader).filter(models.Reader.username == "issue886_admin").first()
+        before_access_time = admin.access_time
+
+        with enabled_demo_mode():
+            body = urllib.parse.urlencode({"username": "issue886_admin", "password": "demo-password"})
+            rsp = self.json("/api/user/sign_in", method="POST", body=body)
+            self.assertEqual(rsp["err"], "ok")
+
+        after = get_db().query(models.Reader).filter(models.Reader.username == "issue886_admin").first()
+        self.assertNotEqual(after.access_time, before_access_time)
+        self.assertTrue(after.extra.get("login_ip"))
+
+    def test_real_admin_writes_are_allowed_and_demo_account_stays_read_only(self):
+        session = get_db()
+        admin = session.query(models.Reader).filter(models.Reader.username == "issue886_admin").first()
+        demo_user = session.query(models.Reader).filter(models.Reader.username == "issue886_demo").first()
+        original_site_title = loader.get_settings()["site_title"]
+
+        try:
+            with enabled_demo_mode(), mock.patch.object(BaseHandler, "user_id", return_value=admin.id):
+                with mock.patch("webserver.loader.SettingsLoader.set_store_path", return_value="/tmp/"):
+                    body = json.dumps({"site_title": "由真实管理员在演示模式下维护"})
+                    rsp = self.json("/api/admin/settings", method="POST", body=body)
+                self.assertEqual(rsp["err"], "ok")
+                self.assertEqual(loader.get_settings()["site_title"], "由真实管理员在演示模式下维护")
+
+            with enabled_demo_mode(), mock.patch.object(BaseHandler, "user_id", return_value=demo_user.id):
+                body = json.dumps({"site_title": "被演示账号篡改的标题"})
+                rsp = self.json("/api/admin/settings", method="POST", body=body)
+                self.assertEqual(rsp["err"], "ok")
+                # demo 账号的“假保存”不应影响真实管理员刚刚写入的配置
+                self.assertEqual(loader.get_settings()["site_title"], "由真实管理员在演示模式下维护")
+        finally:
+            loader.get_settings()["site_title"] = original_site_title
+
+    def test_real_admin_webdav_writes_still_rejected(self):
+        with enabled_demo_mode():
+            rsp = self.fetch(
+                "/books/some-file.txt",
+                method="PUT",
+                headers={"Authorization": self._auth_header("issue886_admin")},
+                body=b"data",
+            )
+            self.assertEqual(rsp.code, 403)
+            self.assertEqual(rsp.body, b"Demo mode is read-only")

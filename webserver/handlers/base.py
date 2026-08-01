@@ -182,7 +182,7 @@ class BaseHandler(web.RequestHandler):
         raise web.Finish()
 
     def should_allow_demo_request(self):
-        if not demo_mode.request_is_allowed(CONF, self.request.method, self.request.path):
+        if not demo_mode.request_is_allowed(CONF, self.request.method, self.request.path, self.current_user):
             self.send_error_of_demo_read_only()
 
     def send_error_of_not_invited(self):
@@ -263,7 +263,7 @@ class BaseHandler(web.RequestHandler):
             user_id = int(user_id)
         user = self.session.get(Reader, user_id) if user_id else None
 
-        if demo_mode.is_demo_mode(CONF) and not demo_mode.is_demo_user(CONF, user):
+        if not demo_mode.can_login(CONF, user):
             return None
 
         admin_id = self.get_secure_cookie("admin_id")
@@ -284,14 +284,14 @@ class BaseHandler(web.RequestHandler):
         logging.info("LOGIN: %s - %d - %s" % (self.request.remote_ip, user.id, user.username))
         self.set_secure_cookie("user_id", str(user.id))
         self.set_secure_cookie("lt", str(int(time.time())))
-        if demo_mode.is_demo_mode(CONF):
+        if demo_mode.is_demo_restricted(CONF, user):
             return
         user.access_time = datetime.datetime.now()
         user.extra["login_ip"] = self.request.remote_ip
         user.save()
 
     def add_msg(self, status, msg):
-        if demo_mode.is_demo_mode(CONF):
+        if demo_mode.is_demo_restricted(CONF, self.current_user):
             return
         m = Message(self.user_id(), status, msg)
         if m.reader_id:
@@ -299,7 +299,7 @@ class BaseHandler(web.RequestHandler):
             self.session.commit()
 
     def pop_messages(self):
-        if demo_mode.is_demo_mode(CONF):
+        if demo_mode.is_demo_restricted(CONF, self.current_user):
             return []
         if not self.current_user:
             return []
@@ -310,7 +310,7 @@ class BaseHandler(web.RequestHandler):
         return messages
 
     def user_history(self, action, book):
-        if demo_mode.is_demo_mode(CONF):
+        if demo_mode.is_demo_restricted(CONF, self.current_user):
             return
         if not self.user_id():
             return
@@ -596,7 +596,7 @@ class BaseHandler(web.RequestHandler):
         return formatted_books
 
     def count_increase(self, book_id, **kwargs):
-        if demo_mode.is_demo_mode(CONF):
+        if demo_mode.is_demo_restricted(CONF, self.current_user):
             return
         try:
             item = self.session.query(Item).filter(Item.book_id == book_id).one()

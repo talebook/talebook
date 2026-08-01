@@ -287,7 +287,7 @@ class SignIn(BaseHandler):
         logging.debug("PERM = %s", user.permission)
 
         # 检查并迁移密码从 SHA256 到 bcrypt
-        if not demo_mode.is_demo_mode(CONF) and user.migrate_password(password):
+        if not demo_mode.is_demo_restricted(CONF, user) and user.migrate_password(password):
             user.save()
             logging.info("User (id=%d, username=%s) has been migrated from SHA256 to bcrypt", user.id, user.username)
 

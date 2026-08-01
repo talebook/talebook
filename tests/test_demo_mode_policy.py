@@ -14,6 +14,37 @@ class TestDemoModePolicy(unittest.TestCase):
         self.assertTrue(demo_mode.request_is_allowed(conf, "POST", "/api/admin/settings"))
         self.assertTrue(demo_mode.can_login(conf, SimpleNamespace(username="another-user")))
 
+    def test_can_login_allows_real_admin_account(self):
+        conf = {"DEMO_MODE": True, "DEMO_USERNAME": "issue886_demo"}
+        admin = SimpleNamespace(username="issue886_admin", is_admin=lambda: True)
+        other = SimpleNamespace(username="issue886_other", is_admin=lambda: False)
+        self.assertTrue(demo_mode.can_login(conf, admin))
+        self.assertFalse(demo_mode.can_login(conf, other))
+
+    def test_is_demo_restricted_exempts_only_real_admin(self):
+        conf_off = {"DEMO_MODE": False, "DEMO_USERNAME": "issue886_demo"}
+        conf_on = {"DEMO_MODE": True, "DEMO_USERNAME": "issue886_demo"}
+        admin = SimpleNamespace(username="issue886_admin", is_admin=lambda: True)
+        demo_user = SimpleNamespace(username="issue886_demo", is_admin=lambda: False)
+        other = SimpleNamespace(username="issue886_other", is_admin=lambda: False)
+
+        self.assertFalse(demo_mode.is_demo_restricted(conf_off, other))
+        self.assertFalse(demo_mode.is_demo_restricted(conf_on, admin))
+        self.assertTrue(demo_mode.is_demo_restricted(conf_on, demo_user))
+        self.assertTrue(demo_mode.is_demo_restricted(conf_on, other))
+        self.assertTrue(demo_mode.is_demo_restricted(conf_on, None))
+
+    def test_request_is_allowed_bypasses_read_only_for_real_admin(self):
+        conf = {"DEMO_MODE": True, "DEMO_USERNAME": "issue886_demo"}
+        admin = SimpleNamespace(username="issue886_admin", is_admin=lambda: True)
+        other = SimpleNamespace(username="issue886_other", is_admin=lambda: False)
+
+        self.assertTrue(demo_mode.request_is_allowed(conf, "POST", "/api/admin/users", admin))
+        self.assertTrue(demo_mode.request_is_allowed(conf, "DELETE", "/api/book/1", admin))
+        # 非管理员仍然只放行既有的只读方法与白名单路径
+        self.assertFalse(demo_mode.request_is_allowed(conf, "POST", "/api/admin/users", other))
+        self.assertFalse(demo_mode.request_is_allowed(conf, "POST", "/api/admin/users"))
+
     def test_configured_username_is_normalized(self):
         conf = {"DEMO_MODE": True, "DEMO_USERNAME": " Issue886_Demo "}
         self.assertTrue(demo_mode.is_demo_user(conf, SimpleNamespace(username="issue886_demo")))

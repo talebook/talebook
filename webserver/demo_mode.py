@@ -43,12 +43,29 @@ def is_demo_user(conf, user):
     return bool(username) and username == demo_username(conf)
 
 
+def is_real_admin(user):
+    """是否为数据库中标记为 admin=True 的真实管理员账号（区别于 demo 账号的伪管理员展示）。"""
+    return bool(user is not None and getattr(user, "is_admin", lambda: False)())
+
+
 def can_login(conf, user):
-    return not is_demo_mode(conf) or is_demo_user(conf, user)
+    return not is_demo_mode(conf) or is_demo_user(conf, user) or is_real_admin(user)
 
 
-def request_is_allowed(conf, method, path):
+def is_demo_restricted(conf, user):
+    """该用户在当前请求中是否需要遵守演示模式的只读/伪造限制。
+
+    真实管理员账号用于日常维护公开演示站（上传、编辑、后台设置等），登录后不受
+    只读限制，也会正常记录副作用（登录 IP、消息、阅读历史等）；只有配置的
+    DEMO_USERNAME 及匿名访客才被当作演示只读访客。
+    """
     if not is_demo_mode(conf):
+        return False
+    return not is_real_admin(user)
+
+
+def request_is_allowed(conf, method, path, user=None):
+    if not is_demo_restricted(conf, user):
         return True
 
     method = str(method or "").upper()
