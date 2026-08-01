@@ -49,6 +49,25 @@ test.describe('Admin Pages', () => {
         await expect(page.getByText('扫描书籍')).toBeVisible();
     });
 
+    test('Users table "detail" column keeps a reasonable width (regression for #917)', async ({ page }) => {
+        // 回归保护：详情列没有空格可换行的中文文案，若表格列宽未固定，
+        // 该列会被压缩到单字宽度，内容逐字换行纵向堆叠，撑爆整行高度。
+        await page.setViewportSize({ width: 1280, height: 800 });
+        const usersPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/users'));
+        await page.goto('/admin/users');
+        await usersPromise;
+        await expect(page.locator('.loading-page')).toBeHidden();
+
+        const detailCell = page.locator('tbody tr').first().locator('td').filter({ hasText: '阅读了' });
+        await expect(detailCell).toBeVisible();
+        const box = await detailCell.boundingBox();
+        expect(box.width).toBeGreaterThan(100);
+
+        // 行高也应保持在合理范围内，而不是被压垮的单字列撑到几百像素
+        const rowBox = await page.locator('tbody tr').first().boundingBox();
+        expect(rowBox.height).toBeLessThan(200);
+    });
+
     test('Settings page interactions', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 1024 });
         await page.goto('/admin/settings');

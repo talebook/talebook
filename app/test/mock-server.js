@@ -262,7 +262,13 @@ app.use('/api/admin/users', eventHandler((event) => {
             is_active: true,
             access_time: '2023-01-01 12:00:00',
             create_time: '2023-01-01 12:00:00',
-            extra: { login_ip: '127.0.0.1' },
+            extra: {
+              login_ip: '127.0.0.1',
+              visit_history: Array(10).fill('mock-book-id'),
+              read_history: Array(1).fill('mock-book-id'),
+              download_history: Array(3).fill('mock-book-id'),
+              upload_history: Array(24).fill('mock-book-id')
+            },
             can_login: true,
             can_upload: true,
             can_read: true

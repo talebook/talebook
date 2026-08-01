@@ -563,16 +563,16 @@ const guestPermissionList = computed(() => [
 ]);
 
 const headers = computed(() => [
-    { title: 'ID', key: 'id', sortable: true },
-    { title: t('admin.users.label.username'), key: 'username', sortable: true },
-    { title: t('admin.users.label.nickname'), key: 'name', sortable: false },
-    { title: 'Email', key: 'email', sortable: true },
-    { title: t('admin.users.label.registrationPlatform'), key: 'provider', sortable: false },
-    { title: t('admin.users.label.registrationTime'), key: 'create_time', sortable: true },
-    { title: t('admin.users.label.loginTime'), key: 'access_time', sortable: true },
-    { title: t('admin.users.label.loginIp'), key: 'login_ip', sortable: false },
-    { title: t('admin.users.label.detail'), key: 'detail', sortable: false },
-    { title: t('admin.users.label.action'), key: 'actions', sortable: false },
+    { title: 'ID', key: 'id', sortable: true, width: 70, nowrap: true },
+    { title: t('admin.users.label.username'), key: 'username', sortable: true, width: 120, nowrap: true },
+    { title: t('admin.users.label.nickname'), key: 'name', sortable: false, width: 100, nowrap: true },
+    { title: 'Email', key: 'email', sortable: true, width: 180, nowrap: true },
+    { title: t('admin.users.label.registrationPlatform'), key: 'provider', sortable: false, width: 100, nowrap: true },
+    { title: t('admin.users.label.registrationTime'), key: 'create_time', sortable: true, width: 175, nowrap: true },
+    { title: t('admin.users.label.loginTime'), key: 'access_time', sortable: true, width: 175, nowrap: true },
+    { title: t('admin.users.label.loginIp'), key: 'login_ip', sortable: false, width: 130, nowrap: true },
+    { title: t('admin.users.label.detail'), key: 'detail', sortable: false, width: 260 },
+    { title: t('admin.users.label.action'), key: 'actions', sortable: false, width: 110, nowrap: true },
 ]);
 
 const permissions = computed(() => [
@@ -817,5 +817,15 @@ useHead(() => ({
 
 :deep(.v-data-table-footer__items-per-page .v-field) {
     min-width: 100px;
+}
+
+/*
+ * 强制表格使用固定列宽布局。
+ * 默认的 table-layout: auto 会按内容自动分配列宽，而“详情”列内容不含空格，
+ * 浏览器可在任意字符间换行，导致该列在空间不足时被压缩到单字宽度，
+ * 其余内容被迫逐字换行、纵向堆叠。固定列宽后改为在 .v-table__wrapper 上出现横向滚动条。
+ */
+:deep(.v-table__wrapper > table) {
+    table-layout: fixed;
 }
 </style>
