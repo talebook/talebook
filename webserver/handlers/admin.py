@@ -89,6 +89,7 @@ class AdminUsers(BaseHandler):
                 "avatar": user.avatar,
                 "is_active": user.is_active(),
                 "is_admin": user.is_admin(),
+                "is_demo": demo_mode.is_demo_user(CONF, user),
                 "extra": dict(user.extra),
                 "provider": user.social_auth[0].provider
                 if hasattr(user, "social_auth") and user.social_auth.count()

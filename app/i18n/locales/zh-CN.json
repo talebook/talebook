@@ -912,7 +912,8 @@
         "permissionEdit": "编辑",
         "permissionDelete": "删除",
         "permissionPush": "推送",
-        "permissionRead": "阅读"
+        "permissionRead": "阅读",
+        "demoAccountLocked": "演示模式下该账号操作已锁定"
       },
       "placeholder": {
         "username": "请输入用户名，小写字母开头",

@@ -882,7 +882,8 @@
         "permissionEdit": "Edit",
         "permissionDelete": "Delete",
         "permissionPush": "Push",
-        "permissionRead": "Read"
+        "permissionRead": "Read",
+        "demoAccountLocked": "Actions are locked for this account in demo mode"
       },
       "placeholder": {
         "username": "Please enter username, starting with lowercase letters",

@@ -15,7 +15,7 @@ import urllib
 import tornado.escape
 from tornado import web
 
-from webserver import loader, utils
+from webserver import demo_mode, loader, utils
 from webserver.constants import (
     CALIBRE_ERROR_FLAG,
     META_SELECTED_SOURCES,
@@ -932,18 +932,22 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
 
     def prepare(self):
         BaseHandler.prepare(self)
-        if not CONF["ALLOW_GUEST_DOWNLOAD"] and not self.current_user:
-            if self.is_opds:
-                return self.send_error_of_not_invited()
-            else:
-                return self.redirect("/login")
+        # 演示模式下，未登录访客与演示账号的下载权限统一遵循“访客权限”配置，
+        # 忽略演示账号自身的权限位（该账号默认拥有完整权限，用于伪装管理员体验）。
+        guest_like = not self.current_user or demo_mode.is_demo_restricted(CONF, self.current_user)
+        if guest_like:
+            if not CONF["ALLOW_GUEST_DOWNLOAD"]:
+                if self.is_opds:
+                    return self.send_error_of_not_invited()
+                else:
+                    return self.redirect("/login")
+            return
 
-        if self.current_user:
-            if self.current_user.can_save():
-                if not self.current_user.is_active():
-                    raise web.HTTPError(403, reason=_("无权操作，请先登录注册邮箱激活账号。"))
-            else:
-                raise web.HTTPError(403, reason=_("无权操作"))
+        if self.current_user.can_save():
+            if not self.current_user.is_active():
+                raise web.HTTPError(403, reason=_("无权操作，请先登录注册邮箱激活账号。"))
+        else:
+            raise web.HTTPError(403, reason=_("无权操作"))
 
     def parse_url_path(self, url_path: str) -> str:
         filename = url_path.split("/")[-1]
@@ -1499,15 +1503,17 @@ class BookRead(BaseHandler):
         )
 
     def get(self, id):
-        if not CONF["ALLOW_GUEST_READ"] and not self.current_user:
-            return self.redirect("/login")
-
-        if self.current_user:
-            if self.current_user.can_read():
-                if not self.current_user.is_active():
-                    raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
-            else:
-                raise web.HTTPError(403, reason=_("无权在线阅读"))
+        # 演示模式下，未登录访客与演示账号的在线阅读权限统一遵循“访客权限”配置，
+        # 忽略演示账号自身的权限位（该账号默认拥有完整权限，用于伪装管理员体验）。
+        guest_like = not self.current_user or demo_mode.is_demo_restricted(CONF, self.current_user)
+        if guest_like:
+            if not CONF["ALLOW_GUEST_READ"]:
+                return self.redirect("/login")
+        elif self.current_user.can_read():
+            if not self.current_user.is_active():
+                raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
+        else:
+            raise web.HTTPError(403, reason=_("无权在线阅读"))
 
         book = self.get_book_or_404(id)
         book_id = book["id"]
@@ -1519,10 +1525,10 @@ class BookRead(BaseHandler):
 
         if "fmt_pdf" in book:
             # PDF类书籍需要检查下载权限。
-            if not CONF["ALLOW_GUEST_DOWNLOAD"] and not self.current_user:
-                return self.redirect("/login")
-
-            if self.current_user and not self.current_user.can_save():
+            if guest_like:
+                if not CONF["ALLOW_GUEST_DOWNLOAD"]:
+                    return self.redirect("/login")
+            elif not self.current_user.can_save():
                 raise web.HTTPError(403, reason=_("无权在线阅读PDF类书籍"))
 
             pdf_url = urllib.parse.quote_plus(self.api_url + "/api/book/%(id)d.PDF" % book)

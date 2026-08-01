@@ -352,7 +352,13 @@
                 <span v-if="item.extra.upload_history"> {{ t('admin.users.label.uploaded') }}{{ item.extra.upload_history.length }}{{ t('admin.users.label.books') }} </span>
             </template>
             <template #item.actions="{ item }">
-                <v-menu>
+                <span
+                    v-if="store.sys.demo_mode && item.is_demo"
+                    class="text-medium-emphasis text-body-2"
+                >
+                    {{ t('admin.users.label.demoAccountLocked') }}
+                </span>
+                <v-menu v-else>
                     <template #activator="{ props }">
                         <v-btn
                             color="primary"

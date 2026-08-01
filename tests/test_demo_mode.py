@@ -248,6 +248,58 @@ class TestDemoMode(TestApp):
         finally:
             loader.get_settings()["site_title"] = original_site_title
 
+    def test_admin_users_list_marks_demo_account(self):
+        session = get_db()
+        admin = session.query(models.Reader).filter(models.Reader.username == "issue886_admin").first()
+        with enabled_demo_mode(), mock.patch.object(BaseHandler, "user_id", return_value=admin.id):
+            rsp = self.json("/api/admin/users?num=0")
+            self.assertEqual(rsp["err"], "ok")
+            flags = {
+                item["username"]: item["is_demo"]
+                for item in rsp["users"]["items"]
+                if item["username"] in ("issue886_demo", "issue886_admin", "issue886_other")
+            }
+        self.assertTrue(flags["issue886_demo"])
+        self.assertFalse(flags["issue886_admin"])
+        self.assertFalse(flags["issue886_other"])
+
+    def test_reading_follows_guest_permission_setting_for_anonymous_and_demo_account(self):
+        session = get_db()
+        demo_user = session.query(models.Reader).filter(models.Reader.username == "issue886_demo").first()
+        conf = loader.get_settings()
+        original_allow_read = conf.get("ALLOW_GUEST_READ")
+        try:
+            conf["ALLOW_GUEST_READ"] = False
+            with enabled_demo_mode():
+                # 匿名访客：访客权限关闭时应被拒绝
+                rsp = self.fetch("/read/1", follow_redirects=False)
+                self.assertEqual(rsp.code, 302)
+
+                # 演示账号：忽略自身默认拥有的 can_read() 权限位，同样遵循访客权限关闭
+                with mock.patch.object(BaseHandler, "user_id", return_value=demo_user.id):
+                    rsp = self.fetch("/read/1", follow_redirects=False)
+                    self.assertEqual(rsp.code, 302)
+
+            conf["ALLOW_GUEST_READ"] = True
+            with enabled_demo_mode(), mock.patch.object(BaseHandler, "user_id", return_value=demo_user.id):
+                rsp = self.fetch("/read/1", follow_redirects=False)
+                self.assertIn(rsp.code, (200, 302))
+        finally:
+            conf["ALLOW_GUEST_READ"] = original_allow_read
+
+    def test_real_admin_reading_ignores_guest_permission_setting(self):
+        session = get_db()
+        admin = session.query(models.Reader).filter(models.Reader.username == "issue886_admin").first()
+        conf = loader.get_settings()
+        original_allow_read = conf.get("ALLOW_GUEST_READ")
+        try:
+            conf["ALLOW_GUEST_READ"] = False
+            with enabled_demo_mode(), mock.patch.object(BaseHandler, "user_id", return_value=admin.id):
+                rsp = self.fetch("/read/1", follow_redirects=False)
+                self.assertIn(rsp.code, (200, 302))
+        finally:
+            conf["ALLOW_GUEST_READ"] = original_allow_read
+
     def test_real_admin_webdav_writes_still_rejected(self):
         with enabled_demo_mode():
             rsp = self.fetch(
