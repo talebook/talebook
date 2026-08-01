@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>前端体验必须连接 Docker 后端 · ACTIVE</title>
+  <style>
+    :root {
+      --slate: #12212f;
+      --slate-2: #20364a;
+      --paper: #f4f7fb;
+      --card: #ffffff;
+      --line: #c8d4e3;
+      --muted: #5c6d7e;
+      --docker: #1769e0;
+      --docker-soft: #e9f1ff;
+      --mock: #f08a4b;
+      --mock-soft: #fff2e8;
+      --success: #16845b;
+      --display: Georgia, "Songti SC", serif;
+      --body: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--paper); color: var(--slate); font-family: var(--body); }
+    body { margin: 0; line-height: 1.65; }
+    main { width: min(1040px, calc(100% - 28px)); margin: 24px auto 64px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(30px, 6vw, 64px);
+      border-radius: 22px;
+      background: var(--slate);
+      color: white;
+    }
+    header::after {
+      position: absolute;
+      right: -72px;
+      bottom: -86px;
+      width: 270px;
+      height: 270px;
+      border: 34px solid rgba(23, 105, 224, .65);
+      border-radius: 50%;
+      content: "";
+    }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #9fc4ff;
+      font: 700 12px/1.4 var(--mono);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1 {
+      position: relative;
+      z-index: 1;
+      max-width: 780px;
+      margin: 0;
+      font: 700 clamp(34px, 6vw, 62px)/1.08 var(--display);
+      letter-spacing: -.035em;
+    }
+    .lede {
+      position: relative;
+      z-index: 1;
+      max-width: 720px;
+      margin: 18px 0 0;
+      color: #d8e6f4;
+      font-size: 18px;
+    }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+    .pill {
+      padding: 6px 10px;
+      border: 1px solid rgba(255, 255, 255, .28);
+      border-radius: 999px;
+      font: 700 12px/1.3 var(--mono);
+    }
+    .pill.status { border-color: #ffd0b2; background: var(--mock); color: #32170a; }
+    section {
+      margin-top: 20px;
+      padding: clamp(22px, 4vw, 36px);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+    }
+    h2 { margin: 0 0 14px; font-size: 24px; line-height: 1.25; }
+    h3 { margin: 0 0 8px; font-size: 17px; }
+    p { margin: 9px 0; }
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #e8eef5;
+      color: #164d88;
+      font: 13px/1.55 var(--mono);
+    }
+    .request {
+      padding: 17px 19px;
+      border-left: 5px solid var(--docker);
+      border-radius: 9px;
+      background: var(--docker-soft);
+      font-size: 17px;
+    }
+    .switchboard { display: grid; gap: 16px; margin-top: 20px; }
+    .lane {
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr) auto;
+      align-items: center;
+      min-height: 118px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+    .lane-label {
+      align-self: stretch;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      font: 800 14px/1.4 var(--mono);
+      letter-spacing: .08em;
+      text-align: center;
+    }
+    .lane.mock .lane-label { background: var(--mock-soft); color: #9b4817; }
+    .lane.real .lane-label { background: var(--docker-soft); color: #1458b9; }
+    .track {
+      position: relative;
+      padding: 22px 26px;
+    }
+    .track::before {
+      position: absolute;
+      top: 50%;
+      right: 10px;
+      left: 10px;
+      height: 4px;
+      border-radius: 4px;
+      background: var(--line);
+      content: "";
+    }
+    .stops {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .stop {
+      max-width: 150px;
+      padding: 7px 10px;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      font: 700 12px/1.4 var(--mono);
+      text-align: center;
+    }
+    .lane.mock .stop { border-color: var(--mock); }
+    .lane.real .stop { border-color: var(--docker); }
+    .destination {
+      margin-right: 18px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font: 800 12px/1.4 var(--mono);
+      white-space: nowrap;
+    }
+    .mock .destination { background: var(--mock-soft); color: #8e3f13; }
+    .real .destination { background: var(--docker); color: white; }
+    .rule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .rule {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #f9fbfd;
+    }
+    .rule strong { color: var(--success); }
+    pre {
+      overflow-x: auto;
+      margin: 14px 0 0;
+      padding: 17px;
+      border-radius: 12px;
+      background: var(--slate-2);
+      color: #eef6ff;
+      font: 13px/1.7 var(--mono);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font: 700 12px/1.4 var(--mono); }
+    .pending { color: #9a5a00; font-weight: 800; }
+    footer { margin-top: 16px; color: var(--muted); text-align: center; font: 12px/1.5 var(--mono); }
+    @media (max-width: 720px) {
+      main { margin-top: 10px; }
+      .rule-grid { grid-template-columns: 1fr; }
+      .lane { grid-template-columns: 1fr; }
+      .lane-label { min-height: 58px; }
+      .destination { margin: 0 18px 18px; text-align: center; }
+      .stops { flex-direction: column; align-items: stretch; }
+      .stop { max-width: none; }
+      .track::before { top: 10px; bottom: 10px; left: 50%; width: 4px; height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Project guardrail / frontend runtime</p>
+      <h1>体验环境必须走真实后端</h1>
+      <p class="lede">mock 可以帮助快速发现界面回归，但只有 Docker 后端能覆盖书籍、封面、登录、阅读与管理等完整链路。</p>
+      <div class="meta">
+        <span class="pill status">ACTIVE · 已生效</span>
+        <span class="pill">创建日期 2026-07-31</span>
+        <span class="pill">模块 project</span>
+        <span class="pill">需求来源 用户现场指令</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>原始诉求</h2>
+      <div class="request">“修改界面是可以用 mock 自测，但是用户要求体验，或者启动 dev server 时，必须是基于 Docker 运行后端服务，提供完整全套功能。”</div>
+      <p>当前规范同时给出了 Docker 与 mock 两种前端启动方法，却没有把“内部自测”和“交付体验”明确分开，容易把只有固定响应的 mock 页面误当成真实产品体验。</p>
+    </section>
+
+    <section>
+      <h2>两条轨道，不共享终点</h2>
+      <div class="switchboard" aria-label="mock 自测与 Docker 体验的运行边界">
+        <div class="lane mock">
+          <div class="lane-label">MOCK<br>测试轨</div>
+          <div class="track">
+            <div class="stops">
+              <span class="stop">组件测试</span>
+              <span class="stop">隔离 E2E</span>
+              <span class="stop">快速回归</span>
+            </div>
+          </div>
+          <div class="destination">仅限自测</div>
+        </div>
+        <div class="lane real">
+          <div class="lane-label">DOCKER<br>体验轨</div>
+          <div class="track">
+            <div class="stops">
+              <span class="stop">真实书库</span>
+              <span class="stop">完整接口</span>
+              <span class="stop">浏览器验收</span>
+            </div>
+          </div>
+          <div class="destination">可交付用户</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>规则落地</h2>
+      <div class="rule-grid">
+        <article class="rule">
+          <h3>允许：mock 隔离自测</h3>
+          <p>界面开发可用 mock 完成组件测试、自动化 E2E 和快速回归。测试服务只对测试过程负责，不得作为体验地址或真实数据验收依据。</p>
+        </article>
+        <article class="rule">
+          <h3>强制：Docker 完整体验</h3>
+          <p><strong>用户要求体验，或智能体手动启动并保留 dev server 时</strong>，必须先启动 Docker 后端并确认健康，再让 Nuxt 连接 <code>127.0.0.1:8080</code>。</p>
+        </article>
+        <article class="rule">
+          <h3>例外边界</h3>
+          <p>自动化测试可以管理短生命周期的 mock 与临时页面服务；它们不得对用户暴露，测试结束后应停止。手动长期运行的 Nuxt 服务不属于此例外。</p>
+        </article>
+        <article class="rule">
+          <h3>禁止静默降级</h3>
+          <p>Docker 后端无法启动或健康检查失败时，应报告阻塞和已检查项，不得改用 mock 后端向用户声称“可体验”或“已完成真实验收”。</p>
+        </article>
+      </div>
+      <pre><span># 终端 1：Docker 后端</span>
+make dev
+
+<span># 确认真实后端就绪</span>
+curl --fail --silent http://127.0.0.1:8080/api/welcome
+
+<span># 终端 2：Nuxt 连接 Docker 后端</span>
+cd app
+API_URL=http://127.0.0.1:8080 npx nuxt dev --port 3000 --host 127.0.0.1</pre>
+    </section>
+
+    <section>
+      <h2>影响范围与兼容性</h2>
+      <p>仅修改根目录 <code>AGENTS.md</code> 的前端验收规范，不改变应用代码、Docker Compose、API、测试数据或部署行为。现有 mock 测试能力继续保留，但用途被收窄为隔离自测。</p>
+    </section>
+
+    <section>
+      <h2>测试结果</h2>
+      <table>
+        <thead>
+          <tr><th>验证项</th><th>计划命令 / 方法</th><th>状态</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>规范同时包含 mock 自测边界、Docker 强制条件和禁止降级</td>
+            <td><code>rg -n "mock|Docker|dev server|API_URL" AGENTS.md</code> 并人工核对</td>
+            <td><strong>通过</strong>：规则位于“前端验收”，同时明确允许范围、强制条件、唯一例外和禁止降级</td>
+          </tr>
+          <tr>
+            <td>启动命令与仓库实际配置一致</td>
+            <td>核对 <code>Makefile</code>、<code>docker-compose.dev.yml</code> 与 <code>app/nuxt.config.ts</code></td>
+            <td><strong>通过</strong>：<code>make dev</code> 使用开发 Compose，映射后端至 8080；Nuxt 读取 <code>API_URL</code> 配置代理</td>
+          </tr>
+          <tr>
+            <td>补丁无空白错误</td>
+            <td><code>git diff --check</code></td>
+            <td><strong>通过</strong>：无空白错误</td>
+          </tr>
+          <tr>
+            <td>方案路径、状态与单文件约束</td>
+            <td><code>make check-design</code></td>
+            <td><strong>通过</strong>：转为 ACTIVE 后复跑，全部设计文档通过</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>风险与回滚</h2>
+      <p>主要成本是本地体验前需要准备 Docker 镜像和真实数据，但这正是“完整全套功能”可信度的必要条件。若未来需要改变边界，应新建工程治理 WIP 方案说明替代规则；ACTIVE 文档不直接弱化或删除。</p>
+    </section>
+
+    <footer>Talebook · project · 20260731-docker-backed-frontend-experience · ACTIVE</footer>
+  </main>
+</body>
+</html>

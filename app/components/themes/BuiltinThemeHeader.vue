@@ -418,7 +418,7 @@ function doSearch() {
     if (isLightGray.value && searchCategory.value !== 'all') {
         keyword = `${searchCategory.value}:${keyword.replace(/^(title:|author:|isbn:|tag:)/i, '').trim()}`;
     }
-    router.push({ path: '/search', query: { keyword } });
+    router.push({ path: '/search', query: { name: keyword } });
 }
 
 let injectedStyle = null;

@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>公版双语预置书库替换方案（已替代）</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #102a43;
+      --ink-soft: #486581;
+      --paper: #f7f9fc;
+      --card: #ffffff;
+      --line: #bcccdc;
+      --blue: #1167b1;
+      --blue-pale: #e8f1f8;
+      --seal: #b83232;
+      --seal-pale: #fff1f0;
+      --verified: #147d64;
+      --pending: #9c5d00;
+      --shadow: 0 18px 50px rgba(16, 42, 67, .08);
+      font-family: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif;
+      line-height: 1.7;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: linear-gradient(90deg, var(--ink) 0 16px, transparent 16px); }
+    main { width: min(1160px, calc(100% - 36px)); margin: 0 auto; padding: 36px 0 72px; }
+    header, section { background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    header { position: relative; overflow: hidden; padding: 42px 48px 38px 118px; border-top: 7px solid var(--seal); }
+    header::before {
+      content: "馆藏替换";
+      position: absolute;
+      inset: 0 auto 0 0;
+      display: grid;
+      width: 82px;
+      place-items: center;
+      background: var(--ink);
+      color: #fff;
+      font: 700 15px/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .32em;
+      writing-mode: vertical-rl;
+    }
+    .eyebrow, .utility {
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+    .eyebrow { margin: 0 0 9px; color: var(--seal); font-size: .78rem; font-weight: 800; }
+    h1 { max-width: 760px; margin: 0; font-size: clamp(2.2rem, 6vw, 4.7rem); line-height: .98; letter-spacing: -.055em; }
+    .lede { max-width: 760px; margin: 24px 0 0; color: var(--ink-soft); font-size: 1.08rem; }
+    .meta { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 1px; margin-top: 32px; border: 1px solid var(--line); background: var(--line); }
+    .meta div { min-height: 94px; padding: 13px 15px; background: #fff; }
+    .meta strong { display: block; margin-bottom: 7px; color: var(--ink-soft); font: 700 .69rem/1.3 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .09em; text-transform: uppercase; }
+    .status { display: inline-block; padding: 2px 9px; border: 1px solid var(--seal); color: var(--seal); font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-weight: 800; }
+    nav { display: flex; gap: 8px; margin: 18px 0; overflow-x: auto; }
+    nav a { flex: none; padding: 7px 11px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: 700 .78rem/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; text-decoration: none; }
+    nav a:hover, nav a:focus-visible { border-color: var(--blue); outline: 3px solid rgba(17, 103, 177, .16); }
+    section { margin-top: 18px; padding: 34px 38px 38px; }
+    .section-head { display: grid; grid-template-columns: 80px 1fr; gap: 18px; align-items: start; margin-bottom: 22px; }
+    .section-index { padding-top: 5px; border-top: 3px solid var(--blue); color: var(--blue); font: 800 .85rem/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    h2 { margin: 0; font-size: clamp(1.45rem, 3vw, 2.15rem); line-height: 1.16; letter-spacing: -.025em; }
+    h3 { margin: 24px 0 9px; font-size: 1.06rem; }
+    p, ul, ol, figure { margin-top: 10px; }
+    code { padding: 2px 5px; background: var(--blue-pale); color: #0b4f85; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; overflow-wrap: anywhere; }
+    .decision { display: grid; grid-template-columns: 7px 1fr; gap: 15px; margin: 18px 0; padding: 17px 18px; background: var(--seal-pale); }
+    .decision::before { content: ""; background: var(--seal); }
+    .decision p { margin: 0; }
+    .shelves { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .shelf { position: relative; padding: 20px 20px 18px 52px; border: 1px solid var(--line); background: linear-gradient(145deg, #fff, #f4f8fb); }
+    .shelf::before { position: absolute; top: 0; bottom: 0; left: 0; display: grid; width: 34px; place-items: center; background: var(--ink); color: #fff; font: 800 .72rem/1 ui-monospace, "SFMono-Regular", Consolas, monospace; writing-mode: vertical-rl; letter-spacing: .18em; }
+    .shelf.zh::before { content: "中文 · ZH-CN"; }
+    .shelf.en::before { content: "ENGLISH · EN"; }
+    .shelf ol { margin-bottom: 0; padding-left: 1.4em; }
+    .shelf li { padding: 4px 0; border-bottom: 1px dotted var(--line); }
+    .shelf li:last-child { border-bottom: 0; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+    table { width: 100%; min-width: 780px; border-collapse: collapse; font-size: .94rem; }
+    th, td { padding: 11px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--ink); color: #fff; font: 750 .76rem/1.4 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .04em; }
+    tbody tr:nth-child(even) { background: #f4f8fb; }
+    tbody tr:last-child td { border-bottom: 0; }
+    a { color: #0b5c99; text-underline-offset: 3px; }
+    .flow { margin: 22px 0 0; }
+    svg { display: block; width: 100%; height: auto; background: #f8fbfd; border: 1px solid var(--line); }
+    figcaption { margin-top: 8px; color: var(--ink-soft); font-size: .88rem; }
+    .contract { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+    .contract article { padding: 18px; background: #fff; }
+    .contract h3 { margin-top: 0; }
+    .contract .utility { color: var(--blue); font-size: .72rem; font-weight: 800; }
+    .pending { color: var(--pending); font-weight: 800; }
+    .pass { color: var(--verified); font-weight: 800; }
+    footer { padding: 22px 0 0; color: var(--ink-soft); text-align: center; font-size: .82rem; }
+    @media (max-width: 820px) {
+      header { padding: 32px 24px 30px 82px; }
+      header::before { width: 58px; }
+      .meta { grid-template-columns: 1fr 1fr; }
+      .shelves, .contract { grid-template-columns: 1fr; }
+      section { padding: 28px 22px 31px; }
+    }
+    @media (max-width: 520px) {
+      body { background: var(--paper); }
+      main { width: min(100% - 20px, 1160px); padding-top: 10px; }
+      header { padding: 82px 20px 26px; }
+      header::before { inset: 0 0 auto; width: auto; height: 58px; writing-mode: horizontal-tb; letter-spacing: .28em; }
+      .meta { grid-template-columns: 1fr; }
+      .section-head { grid-template-columns: 50px 1fr; gap: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Docker preset collection / 2026-07-23</p>
+      <h1>公版双语<br>预置书库</h1>
+      <p class="lede">把当前 13 个演示格式样本替换为 10 本可追溯、可完整阅读的中英文公版 EPUB，让新安装的第一屏展示真实馆藏，同时把版权来源和转换过程纳入测试契约。</p>
+      <div class="meta">
+        <div><strong>创建日期</strong>2026-07-23</div>
+        <div><strong>所属模块</strong>docker</div>
+        <div><strong>状态</strong><span class="status">SUPERSEDED</span></div>
+        <div><strong>需求来源</strong>用户对话确认</div>
+        <div><strong>影响范围</strong><code>docker/book/</code>、Docker 预构建书库、tests</div>
+      </div>
+    </header>
+
+    <section>
+      <div class="section-head"><div class="section-index">替代说明</div><h2>本方案已由混合格式方案替代</h2></div>
+      <div class="decision"><p>替代方案：<code>design/docker/20260723-mixed-format-preset-library.active.html</code>。替代原因：本方案把 10 本书统一为 EPUB，破坏了原预置书库对 MOBI、AZW3、TXT、PDF 的格式覆盖与回归测试用途。新方案保留同一书目集合，并恢复 6 EPUB、1 MOBI、1 AZW3、1 TXT、1 PDF 的格式矩阵。</p></div>
+    </section>
+
+    <nav aria-label="方案目录">
+      <a href="#request">01 原始诉求</a>
+      <a href="#catalog">02 目标馆藏</a>
+      <a href="#source">03 来源</a>
+      <a href="#pipeline">04 流程</a>
+      <a href="#contract">05 契约</a>
+      <a href="#tests">06 测试</a>
+    </nav>
+
+    <section id="request">
+      <div class="section-head"><div class="section-index">01 / 06</div><h2>原始诉求与边界</h2></div>
+      <p><strong>原始诉求：</strong>“把 talebook 里内置集成的书籍换成 10 本公版中文+英文数据。”</p>
+      <div class="decision"><p><strong>Grill 后的共同决策：</strong>总数为 10 本，中文和英文各 5 本；全部使用完整 EPUB；中文为简体；替换仓库 <code>docker/book/</code> 内现有 13 个文件，不迁移或删除已有用户 <code>/data</code> 书库。</p></div>
+      <ul>
+        <li>影响全新 Docker 构建生成的预置 Calibre 书库，以及首次初始化的新数据卷。</li>
+        <li>不改变 <code>docker/start.sh</code> 对既有书库的保护语义，不通过书名猜测并清理用户数据。</li>
+        <li>不保留 MOBI、AZW3、TXT、PDF 等演示格式；格式兼容能力由独立测试覆盖。</li>
+      </ul>
+    </section>
+
+    <section id="catalog">
+      <div class="section-head"><div class="section-index">02 / 06</div><h2>目标馆藏：五本中文，五本英文</h2></div>
+      <div class="shelves">
+        <article class="shelf zh">
+          <h3>四大名著 + 道德经</h3>
+          <ol>
+            <li>《红楼梦》— 曹雪芹</li>
+            <li>《西游记》— 吴承恩</li>
+            <li>《三国志演义》— 罗贯中</li>
+            <li>《水浒传》— 施耐庵</li>
+            <li>《道德经》— 老子</li>
+          </ol>
+        </article>
+        <article class="shelf en">
+          <h3>Five English classics</h3>
+          <ol>
+            <li><i>Pride and Prejudice</i> — Jane Austen</li>
+            <li><i>Alice’s Adventures in Wonderland</i> — Lewis Carroll</li>
+            <li><i>Frankenstein</i> — Mary Shelley</li>
+            <li><i>The Picture of Dorian Gray</i> — Oscar Wilde</li>
+            <li><i>The Adventures of Sherlock Holmes</i> — Arthur Conan Doyle</li>
+          </ol>
+        </article>
+      </div>
+      <p>中文 EPUB 的标题和作者元数据使用简体中文，语言标记统一为 <code>zh-CN</code>；英文标题、作者与正文保持来源版本，语言标记为 <code>en</code>。</p>
+    </section>
+
+    <section id="source">
+      <div class="section-head"><div class="section-index">03 / 06</div><h2>来源、版权与转换记录</h2></div>
+      <p>中文原文优先采用 Project Gutenberg 的 EPUB3，英文采用 Standard Ebooks 的兼容 EPUB。两者的来源说明页保留在成品中；仓库另存机器可读清单，记录下载地址、来源标识、转换和最终 SHA-256。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>书名</th><th>来源</th><th>来源标识</th><th>处理</th></tr></thead>
+          <tbody>
+            <tr><td>红楼梦</td><td>Project Gutenberg</td><td><a href="https://www.gutenberg.org/ebooks/24264">eBook 24264</a></td><td>繁体转简体；规范标题、作者、语言</td></tr>
+            <tr><td>西游记</td><td>Project Gutenberg</td><td><a href="https://www.gutenberg.org/ebooks/23962">eBook 23962</a></td><td>繁体转简体；规范标题、作者、语言</td></tr>
+            <tr><td>三国志演义</td><td>Project Gutenberg</td><td><a href="https://www.gutenberg.org/ebooks/23950">eBook 23950</a></td><td>繁体转简体；规范标题、作者、语言</td></tr>
+            <tr><td>水浒传</td><td>Project Gutenberg</td><td><a href="https://www.gutenberg.org/ebooks/23863">eBook 23863</a></td><td>繁体转简体；规范标题、作者、语言</td></tr>
+            <tr><td>道德经</td><td>Project Gutenberg</td><td><a href="https://www.gutenberg.org/ebooks/7337">eBook 7337</a></td><td>繁体转简体；规范标题、作者、语言</td></tr>
+            <tr><td>Pride and Prejudice</td><td>Standard Ebooks</td><td>jane-austen/pride-and-prejudice</td><td>保留兼容 EPUB、封面与来源说明</td></tr>
+            <tr><td>Alice’s Adventures in Wonderland</td><td>Standard Ebooks</td><td>lewis-carroll/alices-adventures-in-wonderland</td><td>保留兼容 EPUB、插图与来源说明</td></tr>
+            <tr><td>Frankenstein</td><td>Standard Ebooks</td><td>mary-shelley/frankenstein</td><td>保留兼容 EPUB、封面与来源说明</td></tr>
+            <tr><td>The Picture of Dorian Gray</td><td>Standard Ebooks</td><td>oscar-wilde/the-picture-of-dorian-gray</td><td>保留兼容 EPUB、封面与来源说明</td></tr>
+            <tr><td>The Adventures of Sherlock Holmes</td><td>Standard Ebooks</td><td>arthur-conan-doyle/the-adventures-of-sherlock-holmes</td><td>保留兼容 EPUB、插图与来源说明</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>版权判断以来源页面的公版声明及作品作者年代为依据。Project Gutenberg 商标与使用说明不移除；Standard Ebooks 的制版来源说明不移除。清单明确声明不同司法辖区可能存在差异，不把“可下载”替代为无条件的全球版权结论。</p>
+    </section>
+
+    <section id="pipeline">
+      <div class="section-head"><div class="section-index">04 / 06</div><h2>馆藏流转：下载、转换、验证、预构建</h2></div>
+      <figure class="flow">
+        <svg viewBox="0 0 1040 330" role="img" aria-labelledby="flow-title flow-desc">
+          <title id="flow-title">公版 EPUB 进入 Talebook 预置书库的流程</title>
+          <desc id="flow-desc">五本中文书从 Project Gutenberg 下载并转换为简体，五本英文书从 Standard Ebooks 下载，统一校验后进入 docker/book，并由 Dockerfile 导入 Calibre 预置书库。</desc>
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0 0L0 6L9 3z" fill="#1167b1"/></marker>
+          </defs>
+          <g fill="#fff" stroke="#bcccdc" stroke-width="2">
+            <rect x="28" y="45" width="205" height="92"/>
+            <rect x="28" y="193" width="205" height="92"/>
+            <rect x="298" y="45" width="205" height="92"/>
+            <rect x="298" y="193" width="205" height="92"/>
+            <rect x="568" y="119" width="205" height="92"/>
+            <rect x="838" y="119" width="174" height="92"/>
+          </g>
+          <rect x="28" y="45" width="9" height="92" fill="#b83232"/>
+          <rect x="28" y="193" width="9" height="92" fill="#102a43"/>
+          <g fill="#102a43" font-family="system-ui, sans-serif" font-size="15">
+            <text x="52" y="75" font-weight="700">Project Gutenberg</text><text x="52" y="101">5 × 中文 EPUB3</text><text x="52" y="122">公版原文 + 来源说明</text>
+            <text x="52" y="223" font-weight="700">Standard Ebooks</text><text x="52" y="249">5 × English EPUB</text><text x="52" y="270">封面 / 插图 / 来源说明</text>
+            <text x="322" y="75" font-weight="700">中文规范化</text><text x="322" y="101">OpenCC t2s</text><text x="322" y="122">标题、作者、zh-CN</text>
+            <text x="322" y="223" font-weight="700">英文保真</text><text x="322" y="249">正文与制版不改写</text><text x="322" y="270">规范稳定文件名</text>
+            <text x="592" y="149" font-weight="700">结构与来源契约</text><text x="592" y="175">manifest + SHA-256</text><text x="592" y="196">EPUB / metadata / cover</text>
+            <text x="862" y="149" font-weight="700">docker/book</text><text x="862" y="175">恰好 10 本</text><text x="862" y="196">calibredb add -r</text>
+          </g>
+          <g fill="none" stroke="#1167b1" stroke-width="2.5" marker-end="url(#arrow)">
+            <path d="M233 91H286"/><path d="M233 239H286"/>
+            <path d="M503 91H532Q545 91 545 106V150Q545 165 558 165"/>
+            <path d="M503 239H532Q545 239 545 224V180Q545 165 558 165"/>
+            <path d="M773 165H826"/>
+          </g>
+        </svg>
+        <figcaption>图 1：内容分支只在中文侧执行简繁转换，两个分支在入库前共享结构、元数据与来源校验。</figcaption>
+      </figure>
+      <ol>
+        <li>先在临时目录下载固定来源版本，验证响应内容为 EPUB ZIP，而不是错误页。</li>
+        <li>对中文 EPUB 内的 XHTML、OPF、NCX 与导航 XML 执行繁体转简体；不转换图片和其他二进制文件。</li>
+        <li>显式写入约定标题、作者与语言；保留来源标识、版权页、封面及插图。</li>
+        <li>重新打包时让 <code>mimetype</code> 成为首个未压缩条目，保持 EPUB 规范。</li>
+        <li>删除现有 13 个样本，再放入 10 个稳定命名的 EPUB 和一份非书籍来源清单。</li>
+      </ol>
+    </section>
+
+    <section id="contract">
+      <div class="section-head"><div class="section-index">05 / 06</div><h2>仓库契约与失败边界</h2></div>
+      <div class="contract">
+        <article><div class="utility">Collection</div><h3>数量与格式</h3><p><code>docker/book/*.epub</code> 恰好 10 个，不再出现 MOBI、AZW3、TXT、PDF；每个文件都能作为 ZIP 完整读取。</p></article>
+        <article><div class="utility">Metadata</div><h3>可识别馆藏</h3><p>书名、作者、语言与清单一致；每本有非空正文、可导航章节及封面声明，Calibre 不依赖文件名猜测元数据。</p></article>
+        <article><div class="utility">Upgrade safety</div><h3>不触碰用户数据</h3><p>不修改启动脚本的首次初始化条件。镜像升级不扫描、不替换、不删除已有 <code>/data/books/library</code> 内容。</p></article>
+      </div>
+      <h3>失败与回退</h3>
+      <ul>
+        <li>任一下载来源、结构、元数据、章节或封面验证失败时，不将方案转为 ACTIVE。</li>
+        <li>转换若破坏 EPUB，可回退到下载的原始来源文件重新生成；来源 URL 与哈希提供追溯证据。</li>
+        <li>如完整 Docker 预构建受本地架构或网络限制，必须记录未执行原因，并至少通过不依赖 Calibre 的静态契约测试。</li>
+      </ul>
+    </section>
+
+    <section id="tests">
+      <div class="section-head"><div class="section-index">06 / 06</div><h2>测试计划与当前结果</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>验证项</th><th>计划命令 / 证据</th><th>当前结果</th></tr></thead>
+          <tbody>
+            <tr><td>馆藏契约</td><td><code>python3 -m pytest -q tests/test_preset_books.py</code></td><td class="pass">通过：22 passed；数量、格式、ZIP、mimetype、OPF、元数据、封面、正文与章节均符合契约</td></tr>
+            <tr><td>来源清单</td><td>测试逐项比对文件名、来源 URL、处理记录及 SHA-256</td><td class="pass">通过：10 本来源页、下载地址、原始与成品 SHA-256、转换说明全部可审计</td></tr>
+            <tr><td>Calibre 实际导入</td><td>在 <code>talebook/talebook:dev</code> 中执行 <code>calibredb add /books/*.epub</code> 并列出书目</td><td class="pass">通过：Added book ids 1–10；书库恰好 10 本，中文识别为 zho、英文识别为 eng，格式全部为 EPUB</td></tr>
+            <tr><td>后端回归</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>；开发镜像内执行 <code>make pytest</code></td><td class="pass">通过：格式化与 lint 无错误；全量测试 670 passed、1 skipped、33 warnings，用时 40.21s</td></tr>
+            <tr><td>方案校验</td><td><code>make check-design</code></td><td class="pass">通过：ACTIVE 路径、HTML 结构与单文件资源约束均满足</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>该轮实现时，与改动相关的测试全部通过并转为 ACTIVE；现已被混合格式方案替代。该轮预置目录约 17 MiB，主要体积来自保留原版插图的英文 EPUB。</p>
+    </section>
+
+    <footer>Talebook · Docker 预置馆藏方案 · 离线单文件</footer>
+  </main>
+</body>
+</html>

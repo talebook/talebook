@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Action Git 安全目录持久化方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172032;
+      --muted: #596275;
+      --line: #cbd4e2;
+      --paper: #f5f7fb;
+      --navy: #142a4a;
+      --blue: #1769aa;
+      --cyan: #0b8793;
+      --orange: #b45309;
+      --red: #b42318;
+      --green: #18794e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 36px 24px 72px;
+      color: var(--ink);
+      background: #fff;
+      font: 16px/1.68 "IBM Plex Sans", "Noto Sans SC", "PingFang SC", sans-serif;
+    }
+    h1, h2, h3 {
+      font-family: "Avenir Next Condensed", "Arial Narrow", "Noto Sans SC", sans-serif;
+      line-height: 1.14;
+      letter-spacing: .018em;
+    }
+    h1 { max-width: 820px; margin: 0; font-size: clamp(38px, 6vw, 68px); font-weight: 850; }
+    h2 { margin: 42px 0 17px; font-size: 27px; font-weight: 800; }
+    h3 { margin: 0 0 9px; font-size: 20px; }
+    p { margin: 10px 0; }
+    a { color: var(--blue); }
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eaf0f7;
+      font: .91em/1.45 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 35px;
+      color: #fff;
+      background: var(--navy);
+      border-radius: 15px;
+    }
+    header::after {
+      content: "HOME ≠ HOME";
+      position: absolute;
+      right: -10px;
+      bottom: -8px;
+      color: rgba(255,255,255,.07);
+      font: 900 58px/1 "JetBrains Mono", monospace;
+      transform: rotate(-3deg);
+    }
+    .eyebrow {
+      margin-bottom: 12px;
+      color: #7bd8e4;
+      font: 750 13px/1.2 "JetBrains Mono", monospace;
+      letter-spacing: .14em;
+    }
+    .thesis { position: relative; z-index: 1; max-width: 850px; margin: 19px 0 0; font-size: 19px; }
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 20px;
+      margin-top: 25px;
+      color: #d9e7fb;
+    }
+    .meta strong { color: #fff; }
+    .status { color: #ffd37b; }
+    .evidence {
+      margin-top: 20px;
+      padding: 15px 17px;
+      border-left: 4px solid var(--red);
+      background: #fff1f0;
+    }
+    .home-trace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr);
+      gap: 15px;
+      align-items: stretch;
+      margin: 22px 0;
+    }
+    .home-card {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--paper);
+    }
+    .home-card.temp { border-color: #efc48a; background: #fff8eb; }
+    .home-card.persist { border-color: #8bc9b0; background: #effaf4; }
+    .home-card .label {
+      display: block;
+      margin-bottom: 8px;
+      font: 750 12px/1.2 "JetBrains Mono", monospace;
+      letter-spacing: .08em;
+    }
+    .temp .label { color: var(--orange); }
+    .persist .label { color: var(--green); }
+    .handoff {
+      display: grid;
+      place-items: center;
+      color: var(--red);
+      font: 900 24px/1 "JetBrains Mono", monospace;
+      text-align: center;
+    }
+    .handoff small { display: block; margin-top: 7px; font-size: 10px; letter-spacing: .04em; }
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 13px;
+    }
+    .decision {
+      padding: 18px;
+      border-top: 4px solid var(--cyan);
+      background: var(--paper);
+    }
+    .decision.reject { border-top-color: var(--line); color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 13px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #e9f0f8; }
+    ul, ol { padding-left: 23px; }
+    li { margin: 7px 0; }
+    .contract {
+      padding: 18px;
+      border: 1px solid #8bc9b0;
+      border-radius: 11px;
+      background: #effaf4;
+    }
+    .warning {
+      padding: 14px 16px;
+      border-left: 4px solid var(--orange);
+      background: #fff8e8;
+    }
+    pre {
+      overflow-x: auto;
+      padding: 16px;
+      border-radius: 10px;
+      color: #edf6ff;
+      background: #12243e;
+      font: 13px/1.55 "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+    }
+    @media (max-width: 760px) {
+      body { padding: 18px 13px 48px; }
+      header { padding: 25px 20px; }
+      header::after { font-size: 40px; }
+      .home-trace, .decision-grid { grid-template-columns: 1fr; }
+      .handoff { min-height: 42px; transform: rotate(90deg); }
+      .handoff small { display: none; }
+      table { display: block; overflow-x: auto; }
+      th, td { min-width: 145px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">INCIDENT FOLLOW-UP / GIT TRUST BOUNDARY</div>
+    <h1>让 Git 的信任配置活过 Action 之间的 HOME 切换</h1>
+    <p class="thesis">问题不在 checkout 是否配置过安全目录，而在配置写进了谁的 HOME。修复必须让 Claude Action 后续执行的 Git 进程看到同一个精确工作区信任项。</p>
+    <div class="meta">
+      <span><strong>创建日期</strong> 2026-07-24</span>
+      <span><strong>所属模块</strong> project</span>
+      <span><strong>状态</strong> <span class="status">ACTIVE</span></span>
+      <span><strong>影响范围</strong> GitHub Actions、workflow 契约测试</span>
+      <span><strong>需求来源</strong> Claude issue_comment 真实运行失败</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. 原始诉求与已确认事实</h2>
+    <p>用户反馈合并 PR #904 后 Claude 仍执行失败，并明确要求本地完成完整测试。权威证据来自
+      <a href="https://github.com/talebook/talebook/actions/runs/30064264584/job/89392016289">run 30064264584 / job 89392016289</a> 。
+    </p>
+    <div class="evidence">
+      <strong>日志结论：</strong> <code>unzip</code>、Bun 1.3.14、140 个 Action 依赖、OIDC token 与 GitHub App token 均成功；失败点已经推进到 Claude Action 创建分支时执行 <code>git fetch origin master --depth=1</code>。
+      Git 返回 <code>detected dubious ownership in repository at '/__w/talebook/talebook'</code>。
+    </div>
+  </section>
+
+  <section>
+    <h2>2. 根因：配置存在，但生命周期错误</h2>
+    <div class="home-trace" aria-label="checkout 与 Claude Action 使用不同 HOME 的配置生命周期">
+      <div class="home-card temp">
+        <span class="label">CHECKOUT / TEMPORARY HOME</span>
+        <h3>安全目录写入一次性配置</h3>
+        <p><code>actions/checkout@v4</code> 临时覆盖 HOME，将 <code>safe.directory</code> 写入 runner 临时目录，以便 checkout 自己完成 Git 操作。</p>
+      </div>
+      <div class="handoff">→<small>HOME RESET</small></div>
+      <div class="home-card persist">
+        <span class="label">CLAUDE / PERSISTENT HOME</span>
+        <h3>后续 Git 看不到信任项</h3>
+        <p>Claude Action 恢复 job container 的持久 HOME <code>/github/home</code>，随后 <code>git fetch</code> 使用另一份全局配置，触发所有权保护。</p>
+      </div>
+    </div>
+    <p class="warning"><strong>安全边界：</strong>不得使用 <code>safe.directory '*'</code> 绕过 Git 所有权保护；只允许信任 GitHub 提供的当前 <code>GITHUB_WORKSPACE</code> 精确路径。</p>
+  </section>
+
+  <section>
+    <h2>3. 决策与范围</h2>
+    <div class="decision-grid">
+      <article class="decision">
+        <h3>采用：workflow 显式持久化</h3>
+        <p>checkout 后、任何项目命令和 Claude Action 前，新增独立步骤，把当前工作区加入持久 HOME 的全局 Git 配置并立即验证。</p>
+      </article>
+      <article class="decision reject">
+        <h3>不采用：信任所有目录</h3>
+        <p>通配符能让错误消失，但扩大容器内所有仓库的信任范围，掩盖未来挂载或所有权异常。</p>
+      </article>
+      <article class="decision reject">
+        <h3>本次不耦合：运行身份重构</h3>
+        <p>root/non-root、PUID/PGID 与 TLS 权限属于另一套运行身份设计；本修复只解决 Action 间 Git 配置生命周期。</p>
+      </article>
+    </div>
+    <h3 style="margin-top: 24px;">计划步骤</h3>
+    <pre>git config --global --add safe.directory "$GITHUB_WORKSPACE"
+git config --global --get-all safe.directory | grep -Fqx "$GITHUB_WORKSPACE"
+git status --short</pre>
+    <ul>
+      <li>新增步骤位于 <code>Checkout repository</code> 之后、<code>Verify development environment</code> 之前。</li>
+      <li><code>git status</code> 是行为探针：如果当前 HOME 中没有精确信任项，步骤在进入依赖安装和模型调用前直接失败。</li>
+      <li>不修改 dev 镜像、不改变 job 的 root 运行方式、不扩大 GitHub permissions、不接触 OAuth secret。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>4. 测试契约</h2>
+    <div class="contract">
+      <strong>完整本地测试定义：</strong>静态契约只能证明 YAML 形状；本轮必须同时证明所有权故障可复现、精确配置可消除故障、真实 workflow 可在 act 中越过新增步骤，并完成仓库全量回归。
+    </div>
+    <table>
+      <thead><tr><th>层级</th><th>计划验证</th><th>通过标准</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>TDD 契约</td>
+          <td>扩展 <code>tests/test_agent_workflows.py</code>，先确认缺少配置步骤时红灯，再加入 workflow 实现。</td>
+          <td>锁定精确路径、禁止通配符、锁定 checkout 与 Claude Action 之间的执行顺序。</td>
+        </tr>
+        <tr>
+          <td>容器故障复现</td>
+          <td>在本地 dev 容器中创建由另一 UID 持有的 Git 仓库，先捕获 <code>dubious ownership</code>，再执行与 workflow 相同的三条命令。</td>
+          <td>配置前稳定失败；只信任该仓库后 <code>git status</code> 成功；全局配置中不存在 <code>*</code>。</td>
+        </tr>
+        <tr>
+          <td>真实 workflow</td>
+          <td>用匹配 <code>issue_comment</code> 的事件 JSON 执行 <code>act -W .github/workflows/claude.yml -j claude</code>，使用本地 dev 镜像且禁止强制拉取。</td>
+          <td>真实 checkout、新增 Git 配置、环境探测、依赖同步、Bun bootstrap 与 Action 依赖安装全部通过；本地无法提供的 OIDC 边界如实记录。</td>
+        </tr>
+        <tr>
+          <td>仓库回归</td>
+          <td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make test</code>、<code>make check-design</code>、<code>git diff --check</code>。</td>
+          <td>与本次改动相关的检查无失败；实际数量和环境限制回写本方案。</td>
+        </tr>
+        <tr>
+          <td>线上闭环</td>
+          <td>新 PR CI 全绿后，在真实 issue_comment 触发 Claude workflow。</td>
+          <td>越过分支创建与 <code>git fetch</code>，不再出现 dubious ownership；若出现下一条独立错误，按新证据处理，不把它混称为本修复失败。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>5. 兼容性、风险与回滚</h2>
+    <ul>
+      <li><strong>兼容性：</strong>配置使用 GitHub 标准环境变量，不写死 runner 路径或操作系统临时目录。</li>
+      <li><strong>安全：</strong>信任范围仅为本次 job 的工作区；不使用通配符，不改变 token 或仓库权限。</li>
+      <li><strong>重复执行：</strong><code>--add</code> 可能留下重复的同值条目，但 job container 一次性销毁，不跨 run 累积；验证读取所有值并匹配精确路径。</li>
+      <li><strong>外部边界：</strong>本地 act 无法等价提供 GitHub OIDC 和真实回帖/推送能力，因此线上 issue_comment 是最终闭环，不以本地 dummy token 冒充。</li>
+      <li><strong>回滚：</strong>删除新增 Git 配置步骤即可恢复原流程；不涉及镜像回滚或数据迁移。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. 测试结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>状态</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td>真实失败日志审计</td><td>已完成</td><td>确认前序 unzip/OIDC 均成功，唯一直接失败为 Git dubious ownership。</td></tr>
+        <tr><td>TDD 红灯与绿灯</td><td>通过</td><td><code>python3.12 -m pytest -q tests/test_agent_workflows.py</code>：实现前因缺少配置步骤得到 <code>1 failed, 1 passed</code>；实现后 <code>2 passed</code>。联合项目规范定向测试 <code>4 passed</code>。</td></tr>
+        <tr><td>dev 镜像构建</td><td>通过</td><td><code>make build-dev</code> 成功，本地镜像摘要 <code>sha256:d24e2fef3591cb682dd0fb8a9272c018b5224a7e50c4ea6f1aeb4d852c24c20b</code>。</td></tr>
+        <tr><td>异主仓库容器复现</td><td>通过</td><td>在一次性 dev 容器中创建 UID 1001 持有的 Git 仓库：checkout 临时 HOME 已配置信任时，Claude 持久 HOME 仍稳定报 <code>dubious ownership</code>；执行本方案三条命令后 <code>git status</code> 成功，且不存在通配符信任。</td></tr>
+        <tr><td>真实 act workflow</td><td>通过本地边界</td><td><code>act 0.2.82</code> 使用真实 <code>claude.yml</code> 与 <code>issue_comment</code> 事件运行。直接从 Git worktree 执行时，act 复制的 <code>.git</code> 指针指向容器外宿主元数据，属于 act/worktree 限制；改用一次性标准 clone 后，checkout、Git 安全目录、<code>git status</code>、环境探测、依赖同步、Bun 1.3.14 解压及 140 个 Action 依赖全部成功，最终仅停在 act 不提供的 <code>ACTIONS_ID_TOKEN_REQUEST_URL</code> OIDC 边界。事件文件和 clone 已删除。</td></tr>
+        <tr><td>静态检查</td><td>通过</td><td><code>make lint-py-fix</code>：96 个文件无需修改；<code>make lint-py</code> 通过；<code>npm ci &amp;&amp; npm run lint</code> 为 0 error、196 条既有 warning。</td></tr>
+        <tr><td>全量回归</td><td>通过</td><td>宿主直接 <code>make pytest</code> 因 PATH 没有 <code>pytest</code> 命令未启动；在 workflow 使用的 dev 容器中执行同一 <code>make pytest</code> target 得到 <code>669 passed, 1 skipped, 34 warnings</code>。仓库标准 <code>make test</code> 得到 <code>668 passed, 2 skipped, 33 warnings</code>。</td></tr>
+        <tr><td>方案与补丁检查</td><td>通过</td><td><code>make check-design</code>：54 份方案文档通过；<code>git diff --check</code>：补丁无空白错误。</td></tr>
+        <tr><td>真实 GitHub Actions 闭环</td><td>待 PR 合并</td><td>本地无法提供 GitHub OIDC、真实分支创建与回帖边界；PR 合并后使用真实 <code>issue_comment</code> 验收，要求越过 <code>git fetch</code> 且不再出现 dubious ownership。</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

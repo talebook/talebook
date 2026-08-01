@@ -87,8 +87,12 @@ class TestSelfCheckSteps(unittest.TestCase):
     def test_check_nginx_config(self, m_run):
         m_run.return_value = True
         self.assertEqual(self_check.check_nginx_config(), (True, None))
+        m_run.assert_called_once_with(["gosu", "talebook:talebook", "nginx", "-t"])
+
+        m_run.reset_mock()
         m_run.return_value = False
         self.assertEqual(self_check.check_nginx_config(), (False, "nginx_config_invalid"))
+        m_run.assert_called_once_with(["gosu", "talebook:talebook", "nginx", "-t"])
 
     @mock.patch("webserver.self_check.run")
     def test_check_syncdb(self, m_run):

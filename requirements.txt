@@ -9,6 +9,9 @@ lxml
 jsonpath-ng
 quickjs
 
+# Published TXT-to-EPUB converter
+txt2epub-next==1.0.0
+
 # build-in support for MYSQL
 pymysql
 bcrypt

@@ -64,18 +64,21 @@ RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
     dpkg --add-architecture armhf || true; \
     fi
 
-# Create a talebook user and change the Nginx startup user if it doesn't exist
+# Install the Talebook-owned main config, then let an unprivileged Nginx bind 80/443.
+COPY conf/nginx/nginx.conf /etc/nginx/nginx.conf
 RUN if ! id -u talebook > /dev/null 2>&1; then \
     useradd -u 911 -U -d /var/www/talebook -s /bin/false talebook && \
     usermod -G users talebook && \
     groupmod -g 911 talebook; \
 fi && \
-    sed -i "s/user www-data;/user talebook;/g" /etc/nginx/nginx.conf
+    setcap cap_net_bind_service=+ep /usr/sbin/nginx && \
+    getcap /usr/sbin/nginx | grep -Fq 'cap_net_bind_service=ep'
 
 
 # ----------------------------------------
 # Python wheel 构建阶段
-# ARMv7 上 psutil、cffi 等依赖没有可用的预编译 wheel；工具链只保留在本阶段。
+# ARMv7 上 psutil、cffi、pillow 等依赖没有可用的预编译 wheel；
+# 工具链只保留在本阶段。
 FROM application-base AS python-wheel-build
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -86,6 +89,14 @@ RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
         apt-get install -y --no-install-recommends \
             build-essential \
             libffi-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libtiff-dev \
+            libfreetype-dev \
+            liblcms2-dev \
+            libwebp-dev \
+            libopenjp2-7-dev \
+            zlib1g-dev \
             python3-dev \
             python3-wheel; \
     fi && \
@@ -93,7 +104,8 @@ RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
 
 COPY requirements.txt /tmp/
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python3 -m pip wheel --wheel-dir /opt/wheels psutil "cffi>=2.0.0"
+    python3 -m pip wheel --wheel-dir /opt/wheels \
+        psutil "cffi>=2.0.0" "pillow>=10.4.0"
 
 
 # ----------------------------------------
@@ -107,7 +119,7 @@ RUN --mount=from=python-wheel-build,source=/opt/wheels,target=/tmp/talebook-whee
     python3 -m pip install \
         --no-index \
         --find-links=/tmp/talebook-wheels \
-        psutil cffi && \
+        psutil cffi "pillow>=10.4.0" && \
     python3 -m pip install -r /tmp/requirements.txt
 
 
@@ -228,31 +240,44 @@ RUN rm -rf /var/www/talebook/app/.output/public/logo && \
 
 
 # ----------------------------------------
-# 生产环境（spa版，作为默认 docker build 结果）
-FROM production AS production-spa
-# no more actions
-
-
-# ----------------------------------------
 # 开发环境（前端使用 npm run dev，可将本地 app/ 目录挂载进来实时开发）
 # 构建：docker build --target dev -t talebook/talebook:dev .
 # 使用：docker-compose -f dev.yml up
-FROM server AS dev
+FROM test AS dev
 ARG BUILD_COUNTRY=""
 ARG GIT_VERSION=""
 ARG TARGETARCH
 ARG TARGETVARIANT
+ARG CODEX_VERSION="0.144.6"
 
 USER root
 
-# Install Node.js 20
+# Install the common development and agent toolchain.
 RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+        bubblewrap \
+        ca-certificates \
+        curl \
+        git \
+        jq \
+        unzip \
+        uidmap && \
     if [ "$TARGETARCH" = "amd64" ] || [ "$TARGETARCH" = "arm64" ]; then \
-        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+        curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
         apt-get install -y nodejs; \
     fi && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g "@openai/codex@${CODEX_VERSION}" && \
+    node --version && \
+    npm --version && \
+    codex --version && \
+    python3 -m pytest --version && \
+    ruff --version && \
+    bwrap --version && \
+    unzip -v
 
 ENV TZ=Asia/Shanghai
 ENV LANG=C.UTF-8
@@ -310,3 +335,9 @@ EXPOSE 80 443
 VOLUME ["/data"]
 
 CMD ["/var/www/talebook/docker/start-dev.sh"]
+
+
+# ----------------------------------------
+# 生产环境（spa版，作为默认 docker build 结果）
+FROM production AS production-spa
+# no more actions

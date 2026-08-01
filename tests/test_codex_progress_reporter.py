@@ -15,6 +15,37 @@ def load_reporter():
     return module
 
 
+def test_plan_progress_has_stable_boundaries_before_and_after_plan_generation():
+    reporter = load_reporter()
+    state = reporter.ProgressState()
+
+    empty_body = state.render()
+    assert reporter.PLAN_PROGRESS_START in empty_body
+    assert reporter.PLAN_PROGRESS_END in empty_body
+    assert empty_body.index(reporter.PLAN_PROGRESS_START) < empty_body.index(reporter.PLAN_PROGRESS_END)
+    assert "### 执行计划" not in empty_body
+
+    state.consume(
+        {
+            "type": "item.updated",
+            "item": {
+                "id": "plan-1",
+                "type": "todo_list",
+                "items": [
+                    {"text": "Inspect behavior", "completed": True},
+                    {"text": "Preserve progress", "completed": False},
+                ],
+            },
+        }
+    )
+    plan_body = state.render()
+    plan_section = plan_body.split(reporter.PLAN_PROGRESS_START, 1)[1].split(reporter.PLAN_PROGRESS_END, 1)[0]
+
+    assert plan_section.count("### 执行计划") == 1
+    assert "- [x] Inspect behavior" in plan_section
+    assert "- [ ] 🔄 Preserve progress" in plan_section
+
+
 def test_plan_is_rendered_without_markdown_injection_or_mentions():
     reporter = load_reporter()
     state = reporter.ProgressState()

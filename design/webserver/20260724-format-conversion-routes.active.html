@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>书籍格式转换路线恢复</title>
+  <style>
+    :root { --ink:#14231f; --paper:#f5f6ee; --leaf:#245847; --jade:#0d8270; --amber:#d77c2c; --mist:#d9e5dc; --line:#9caf9f; --muted:#52665e; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--paper); font:16px/1.65 "Noto Sans SC","Microsoft YaHei",sans-serif; }
+    main { width:min(100%,1000px); margin:auto; padding:44px 26px 70px; } .mast { display:grid; grid-template-columns:auto 1fr; gap:18px; align-items:start; padding-bottom:25px; border-bottom:2px solid var(--leaf); }
+    .mark { display:grid; place-items:center; width:58px; height:58px; color:#fff; background:var(--leaf); font:700 27px/1 Georgia,serif; clip-path:polygon(50% 0,100% 28%,82% 100%,18% 100%,0 28%); }
+    .eyebrow,dt,th,.label { font:700 12px/1.25 ui-monospace,Consolas,monospace; letter-spacing:.08em; text-transform:uppercase; } .eyebrow { color:var(--jade); }
+    h1 { margin:5px 0 0; font:700 clamp(31px,5vw,53px)/1.08 Georgia,"Noto Serif SC",serif; letter-spacing:-.035em; } h2 { margin:0 0 14px; font:700 25px/1.2 Georgia,"Noto Serif SC",serif; }
+    .meta { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:27px 0; background:var(--line); } .meta div { min-width:0; padding:13px; background:#fcfdf9; } dt { color:var(--muted); } dd { margin:4px 0 0; overflow-wrap:anywhere; }
+    section { margin-top:40px; } p,li { max-width:78ch; } code { padding:.1em .3em; border-radius:3px; background:#e6ede6; color:#154c3c; font:13px/1.5 ui-monospace,Consolas,monospace; overflow-wrap:anywhere; }
+    .matrix { display:grid; grid-template-columns:1fr 62px 1fr; align-items:center; gap:9px; max-width:720px; margin:22px 0; } .node { min-height:70px; display:grid; place-items:center; padding:11px; border:1px solid var(--line); border-radius:10px; background:#fff; text-align:center; font-weight:700; } .node.output { border-color:var(--jade); background:#e4f2ec; } .arrow { color:var(--amber); text-align:center; font:700 31px/1 Georgia,serif; }
+    table { width:100%; border-collapse:collapse; font-size:14px; } th { color:var(--muted); text-align:left; } th,td { padding:11px 9px; border-bottom:1px solid var(--line); vertical-align:top; } .flag { display:inline-block; padding:3px 8px; border-radius:999px; color:#78400d; background:#ffe1b7; font-size:12px; font-weight:700; }
+    .empty { display:flex; gap:13px; align-items:center; max-width:720px; padding:17px; border-left:5px solid var(--jade); background:var(--mist); } .empty b { display:block; } .empty span { color:var(--muted); font-size:14px; }
+    @media (max-width:680px) { main { padding:30px 17px 50px; } .meta { grid-template-columns:1fr 1fr; } .matrix { grid-template-columns:1fr; } .arrow { transform:rotate(90deg); } table { font-size:13px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header class="mast"><div class="mark">⇄</div><div><div class="eyebrow">Conversion matrix / regression repair</div><h1>书籍格式转换路线恢复</h1></div></header>
+  <dl class="meta"><div><dt>创建日期</dt><dd>2026-07-24</dd></div><div><dt>所属模块</dt><dd>webserver（影响 app）</dd></div><div><dt>状态</dt><dd><span class="flag">ACTIVE</span></dd></div><div><dt>需求来源</dt><dd>用户反馈：EPUB 转 AZW3 等能力消失，且不可用路线不应显示。</dd></div></dl>
+
+  <section><h2>原始诉求与目标</h2><p>恢复 EPUB 到 AZW3、PDF 的转换能力。转换弹窗只显示当前书籍可立即执行的路线；来源缺失或目标格式已经存在的路线均不显示。全部路线均不可执行时，弹窗只显示明确的“没有可转换的格式”提示。</p></section>
+
+  <section><h2>设计决策</h2><p>本次以“用户当前能做什么”为唯一展示依据，而不是暴露后端完整的能力清单。弹窗保留书籍格式标签，让空状态仍能解释为什么没有动作可选。视觉上使用书脊绿与琥珀箭头：绿色表达可执行的终点，箭头只用于真实的转换方向，不增加装饰性图表。</p>
+    <div class="matrix" role="img" aria-label="TXT、EPUB、Kindle 格式到 EPUB、AZW3 和 PDF 的转换路线"><div class="node">TXT</div><div class="arrow">→</div><div class="node output">EPUB</div><div class="node">EPUB</div><div class="arrow">→</div><div class="node output">AZW3 / PDF</div><div class="node">AZW3 / MOBI / AZW</div><div class="arrow">→</div><div class="node output">EPUB / PDF</div></div>
+    <table><thead><tr><th>路线</th><th>执行器</th><th>显示条件</th></tr></thead><tbody>
+      <tr><td>TXT → EPUB</td><td><code>txt2epub-next</code></td><td>存在 TXT，且没有 EPUB。</td></tr>
+      <tr><td>EPUB → AZW3</td><td><code>ebook-convert</code></td><td>存在 EPUB，且没有 AZW3。</td></tr>
+      <tr><td>EPUB / AZW3 / MOBI / AZW → PDF</td><td><code>ebook-convert</code></td><td>按优先级选择已有源格式，且没有 PDF；每本书只显示一条 PDF 路线。</td></tr>
+      <tr><td>AZW3 / MOBI / AZW → EPUB</td><td><code>ebook-convert</code></td><td>当不存在 EPUB 时，按优先级选择一个已有 Kindle 源格式。</td></tr>
+    </tbody></table>
+  </section>
+
+  <section><h2>流程与边界</h2><p>后端集中生成完整路线并在其上标记可用性，保留 API 的诊断语义。前端只把 <code>available: true</code> 的项目交给选择器渲染；没有项目时不渲染单选列表，改为显示空状态。接口仍会对提交的来源、目标组合做白名单校验，不能通过伪造参数绕过路线限制。</p>
+    <div class="empty"><div aria-hidden="true">ⓘ</div><div><b>没有可转换的格式</b><span>当前书籍的可支持目标格式都已存在，或缺少可用源文件。</span></div></div>
+  </section>
+
+  <section><h2>测试结果</h2><table><thead><tr><th>验证项</th><th>结果</th></tr></thead><tbody>
+    <tr><td>后端转换矩阵与优先级</td><td>新增服务层和 HTTP 回归用例，覆盖 EPUB→AZW3、EPUB→PDF 与目标格式的单一优先来源。<code>python -c "from webserver.services.convert import ConvertService; ..."</code> 冒烟验证得到 EPUB→AZW3、EPUB→PDF 两条可用路线。完整 pytest 无法运行：当前 Windows Python 环境缺少 <code>calibre</code>，用例在服务启动前失败；风险由服务冒烟和 HTTP 用例代码审查部分缓解。</td></tr>
+    <tr><td>前端对话框</td><td><code>cd app &amp;&amp; npx vitest run test/components/BookConvertDialog.spec.ts</code> 通过（2/2）。浏览器在 <code>http://127.0.0.1:3001/book/1</code> 实测仅显示 EPUB→AZW3、EPUB→PDF；<code>/book/3</code> 实测无路线卡片并显示空状态提示。新增 Playwright 页面用例；<code>npx playwright test test/e2e/book-detail.spec.ts --grep "conversion"</code> 在 64 秒后超时且未输出结果，未计为通过，风险是本机 Playwright 运行环境未完成自动页面回归。</td></tr>
+    <tr><td>质量检查</td><td><code>make lint-py-fix</code> 通过；<code>cd app &amp;&amp; npm run lint</code> 返回 0（仓库已有 194 条 warning，无 error）；<code>git diff --check</code> 通过。方案转为 ACTIVE 后执行 <code>make check-design</code>。</td></tr>
+  </tbody></table></section>
+</main>
+</body>
+</html>

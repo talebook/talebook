@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dev Container 升级 Node 24</title>
+  <style>
+    :root { color-scheme: light; --ink: #17212b; --muted: #5b6875; --line: #d8e0e7; --panel: #f6f8fa; --accent: #0969da; --ok: #1a7f37; }
+    * { box-sizing: border-box; }
+    body { max-width: 960px; margin: 0 auto; padding: 36px 24px 64px; color: var(--ink); background: #fff; font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    header { padding: 26px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(135deg, #f6f8fa, #eef5ff); }
+    h1, h2 { line-height: 1.25; }
+    h1 { margin: 0 0 18px; font-size: 30px; }
+    h2 { margin-top: 34px; font-size: 21px; }
+    .meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .meta div { padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,.8); }
+    .status { color: var(--ok); font-weight: 700; }
+    code { padding: 2px 5px; border-radius: 4px; background: var(--panel); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: center; margin: 18px 0; }
+    .flow div { padding: 14px; border: 1px solid var(--line); border-radius: 9px; text-align: center; }
+    .arrow { color: var(--accent); font-size: 24px; }
+    @media (max-width: 700px) { .meta { grid-template-columns: 1fr; } .flow { grid-template-columns: 1fr; } .arrow { transform: rotate(90deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dev Container 升级 Node 24</h1>
+    <div class="meta">
+      <div><strong>创建日期</strong><br>2026-07-22</div>
+      <div><strong>所属模块</strong><br>project</div>
+      <div><strong>状态</strong><br><span class="status">ACTIVE</span></div>
+      <div><strong>需求来源</strong><br>维护者确认 dev 先升级，其他环境后续单独 PR</div>
+      <div><strong>关联方案</strong><br><code>20260722-dev-container-foundation.active.html</code></div>
+      <div><strong>目标 PR</strong><br>#893</div>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. 原始诉求与结论</h2>
+    <p>将当前 PR 中新增的 Docker <code>dev</code> stage 从 Node 20 升级到 Node 24。Docker 前端 builder、<code>production-ssr</code> 和 <code>ci.yml</code> 暂不修改，后续通过独立 PR 全面升级。</p>
+    <p>Node 20 虽能运行当前 Codex 和 Claude Action，但已经停止维护；新建的开发镜像直接采用当前 Active LTS Node 24，避免发布即携带 EOL 运行时，并将支持周期延长到 2028 年 4 月。</p>
+    <p>本方案仅替代关联基础方案中 dev stage 采用 Node 20 的决定；基础方案的镜像结构、发布策略和其余验证结论继续有效。</p>
+  </section>
+
+  <section>
+    <h2>2. Node 22 与 Node 24 选型</h2>
+    <table>
+      <thead><tr><th>评估维度</th><th>Node 22</th><th>Node 24</th><th>结论</th></tr></thead>
+      <tbody>
+        <tr><td>Node 官方阶段</td><td>Maintenance LTS，计划 2027 年 4 月 EOL</td><td>Active LTS，计划 2028 年 4 月 EOL</td><td>Node 24 多一年维护窗口。</td></tr>
+        <tr><td>Nuxt 4.3</td><td>满足 22.12 以上要求</td><td>满足要求，并符合 Nuxt 推荐 Active LTS 的方向</td><td>Node 24 更适合新建环境。</td></tr>
+        <tr><td>Codex 0.144.6</td><td>声明兼容，实测可安装运行</td><td>声明兼容，实测可安装运行</td><td>两者均可；最终镜像保留 <code>codex --version</code> 发布探针。</td></tr>
+        <tr><td>Claude Code Action v1</td><td colspan="2">Action 主入口使用 Bun 并安装原生 Claude CLI，不依赖 dev 镜像预装 Node。</td><td>Node 选型主要由业务工具链决定。</td></tr>
+        <tr><td>npm 风险</td><td>npm 10 路径较保守</td><td>npm 11 曾有平台可选依赖安装风险</td><td>用 Codex 启动、前端安装与构建实测控制风险。</td></tr>
+      </tbody>
+    </table>
+    <p>以上结论依据 Node.js 发布周期、Nuxt 4 安装要求、Codex 包元数据及 Claude Code Action v1 官方仓库实现，并通过 Node 22 与 Node 24 一次性容器交叉验证。</p>
+
+    <h2>3. 范围与边界</h2>
+    <table>
+      <thead><tr><th>范围</th><th>本次处理</th><th>本次不处理</th></tr></thead>
+      <tbody>
+        <tr><td>Dockerfile</td><td>仅把 <code>dev</code> stage 的 NodeSource 安装入口改为 <code>setup_24.x</code>。</td><td>不修改 <code>node:20-alpine</code> builder，也不修改 <code>production-ssr</code> 中的 Node 20。</td></tr>
+        <tr><td>Agent 工具</td><td>保留 Codex 0.144.6，并用 Node 24 重新安装、执行版本探测。</td><td>不预装 Claude Code；<code>claude-code-action@v1</code> 仍由 action 自行安装 Bun 和原生 Claude CLI。</td></tr>
+        <tr><td>CI</td><td>PR 的 dev target 构建继续作为发布门禁。</td><td>不修改 <code>ci.yml</code> 的 <code>node:20-alpine</code>。</td></tr>
+        <tr><td>默认镜像</td><td><code>production-spa</code> 继续保持为 Dockerfile 最后 stage。</td><td>不改变默认生产构建结果。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. 实施与测试策略</h2>
+    <div class="flow" aria-label="红绿验证流程">
+      <div>契约测试要求<br><strong>dev = Node 24</strong></div><span class="arrow">→</span>
+      <div>旧实现触发红灯<br><strong>setup_20.x</strong></div><span class="arrow">→</span>
+      <div>最小修改转绿<br><strong>setup_24.x</strong></div>
+    </div>
+    <ol>
+      <li>公共测试缝为 Docker <code>dev</code> stage 暴露的 Node 主版本；测试只检查 dev stage，不约束其他 stage。</li>
+      <li>先让契约测试要求 <code>setup_24.x</code> 且拒绝 <code>setup_20.x</code>，确认在旧实现上失败。</li>
+      <li>仅修改 dev stage 的 NodeSource 安装入口，然后运行契约测试。</li>
+      <li>构建 dev 镜像，验证 Node 24、npm、Codex、pytest、ruff 和 bubblewrap 版本探测，并执行前端依赖安装或构建入口。</li>
+      <li>复验未指定 target 的默认构建契约仍为 <code>production-spa</code>。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>5. 风险与回滚</h2>
+    <ul>
+      <li>风险：Node 24 自带 npm 11，平台可选依赖解析或 Nuxt 工具链行为可能与 Node 20 不同；通过 Codex 启动探针、镜像构建和前端命令验证。</li>
+      <li>风险：误改其他 stage 会扩大生产影响；契约与 diff 评审限定只出现 dev 安装入口变更。</li>
+      <li>回滚：将 dev stage 安装入口恢复为 <code>setup_20.x</code>，重新发布浮动 <code>:dev</code>。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. 测试结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>实际命令或结果</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>红灯</td><td><code>python3.12 -m pytest -q tests/test_docker_stages.py -k node_24_active_lts</code>；旧实现缺少 <code>setup_24.x</code>，按预期 1 项失败。</td><td>通过</td></tr>
+        <tr><td>绿灯</td><td>仅修改 dev stage 后重跑同一命令，1 项通过，9 项取消选择。</td><td>通过</td></tr>
+        <tr><td>完整静态契约</td><td><code>python3.12 -m pytest -q tests/test_docker_stages.py tests/test_dev_container_workflow.py</code>；11 项通过。</td><td>通过</td></tr>
+        <tr><td>dev 镜像</td><td><code>make build-dev</code>；生成 <code>sha256:03c54bbbbd109bef750f4fa843d8282869e18f4e8f208cc44f277952231172c0</code>。</td><td>通过</td></tr>
+        <tr><td>最终镜像运行时</td><td>Node 24.18.0、npm 11.16.0、Codex 0.144.6、pytest 7.4.4、ruff 0.15.22、bubblewrap 0.11.0；<code>codex sandbox -- /bin/true</code> 成功。</td><td>通过</td></tr>
+        <tr><td>真实前端命令</td><td>最终 dev 镜像内执行 <code>npm run lint -- --quiet</code> 和 <code>npm run build</code>；Nuxt 4.3.0 client、server、Nitro 均构建完成。</td><td>通过</td></tr>
+        <tr><td>全量 Docker 测试</td><td><code>make test</code>；首次为 645 项通过、2 项跳过，后台扫描时序用例 1 项失败；该用例单独复跑通过，完整套件再跑为 646 项通过、2 项跳过。</td><td>通过</td></tr>
+        <tr><td>宿主全量测试</td><td><code>make pytest</code> 因宿主 PATH 无 <code>pytest</code> 未启动；改用 <code>python3.12 -m pytest</code> 后因宿主缺少业务依赖而在收集阶段停止，已由标准 Docker 测试路径完成覆盖。</td><td>环境限制，由 Docker 替代</td></tr>
+        <tr><td>Python lint</td><td><code>make lint-py</code>；ruff 检查通过，96 个文件格式不变。</td><td>通过</td></tr>
+        <tr><td>方案检查</td><td><code>make check-design</code>；45 份方案文档通过。</td><td>通过</td></tr>
+      </tbody>
+    </table>
+    <p>非阻断警告：前端构建提示 Browserslist 数据已过期；<code>npm ci</code> 报告当前锁文件依赖的 38 个 audit 项。这些警告未由 Node 主版本切换引入，本方案不扩展处理范围。</p>
+  </section>
+</body>
+</html>

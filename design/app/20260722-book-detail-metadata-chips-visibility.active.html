@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>书籍详情元数据标签可见性修复方案 · ACTIVE</title>
+  <style>
+    :root {
+      --ink: #17263a;
+      --muted: #5e6d7f;
+      --paper: #eef2f6;
+      --card: #ffffff;
+      --line: #c9d4df;
+      --blue: #1c6bc5;
+      --blue-soft: #deedff;
+      --red: #b83d45;
+      --red-soft: #fde8e9;
+      --green: #18765a;
+      --green-soft: #ddf4e9;
+      --amber: #a16207;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --sans: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--paper); color: var(--ink); font-family: var(--sans); }
+    body { margin: 0; line-height: 1.68; }
+    main { width: min(1080px, calc(100% - 32px)); margin: 32px auto 72px; }
+    header, section { border: 1px solid var(--line); background: var(--card); }
+    header { padding: clamp(28px, 6vw, 58px); border-radius: 24px; background: var(--ink); color: white; }
+    .eyebrow { margin: 0 0 10px; color: #9bc8ff; font: 700 13px/1.4 var(--mono); letter-spacing: .12em; }
+    h1 { max-width: 800px; margin: 0; font-size: clamp(32px, 6vw, 58px); line-height: 1.08; letter-spacing: -.035em; }
+    .lede { max-width: 760px; margin: 20px 0 0; color: #d7e2ee; font-size: 18px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 28px; }
+    .pill { padding: 6px 11px; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; font: 700 12px/1.3 var(--mono); }
+    .pill.status { border-color: #ffb2b6; background: var(--red); }
+    section { margin-top: 22px; padding: clamp(22px, 4vw, 36px); border-radius: 20px; }
+    h2 { margin: 0 0 16px; font-size: 24px; line-height: 1.25; }
+    h3 { margin: 22px 0 8px; font-size: 17px; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0; padding-left: 22px; }
+    li + li { margin-top: 6px; }
+    code { padding: 2px 5px; border-radius: 5px; background: #e8eef4; color: #194e83; font: 13px/1.5 var(--mono); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 11px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font: 700 12px/1.4 var(--mono); }
+    .callout { padding: 16px 18px; border-left: 5px solid var(--red); border-radius: 10px; background: var(--red-soft); }
+    .decision { border-left-color: var(--blue); background: var(--blue-soft); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+    .mini { padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: #f8fafc; }
+    .mini h3 { margin-top: 0; }
+    .label { color: var(--muted); font: 700 11px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .flow { display: grid; grid-template-columns: 1fr 54px 1fr 54px 1fr; align-items: center; gap: 8px; }
+    .node { min-height: 138px; padding: 16px; border: 1px solid var(--line); border-radius: 13px; background: #f8fafc; }
+    .node.bad { border-color: #e2a4a8; background: var(--red-soft); }
+    .node.good { border-color: #92cbb8; background: var(--green-soft); }
+    .arrow { color: var(--blue); text-align: center; font: 800 28px/1 var(--mono); }
+    .pending { color: var(--amber); font-weight: 700; }
+    .passed { color: var(--green); font-weight: 700; }
+    footer { margin-top: 18px; color: var(--muted); text-align: center; font: 12px/1.6 var(--mono); }
+    @media (max-width: 760px) {
+      main { width: min(100% - 20px, 1080px); margin-top: 10px; }
+      header, section { border-radius: 15px; }
+      .grid { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">DESIGN / APP / VISUAL REGRESSION</p>
+      <h1>书籍详情元数据标签可见性修复</h1>
+      <p class="lede">修正默认浅色主题下作者、出版社、系列、ISBN 与普通标签已经渲染却不可见的问题，并用真实渲染回归覆盖所有内置主题的明暗模式。</p>
+      <div class="meta">
+        <span class="pill status">ACTIVE · 已完成验证</span>
+        <span class="pill">创建日期 2026-07-22</span>
+        <span class="pill">模块 app</span>
+        <span class="pill">分支 fix/20260722-book-reading-state-refresh</span>
+        <span class="pill">需求来源 用户截图反馈</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>01. 原始诉求与缺陷表现</h2>
+      <div class="callout">用户提供默认主题与水墨主题的书籍详情对比截图，并指出前端标签没有显示。默认主题中标签区域只看得到“公共书籍”；水墨主题中作者、出版社、普通标签及“公共书籍”均正常可见。</div>
+      <p>经确认，DOM 与接口数据都存在，缺陷属于颜色规则冲突造成的视觉不可见，不是后端漏字段，也不是 Vue 条件渲染失败。</p>
+      <table>
+        <thead><tr><th>现场</th><th>观察</th><th>判断</th></tr></thead>
+        <tbody>
+          <tr><td>默认浅色主题</td><td>作者、出版社、普通标签不可见；绿色“公共书籍”可见</td><td><code>tonal</code> 标签受错误文字色影响，<code>flat</code> 状态标签仍有实体背景</td></tr>
+          <tr><td>水墨主题</td><td>同一组元数据标签全部可见</td><td>内置主题覆盖层重新指定 tonal 配色，暂时掩盖页面级错误规则</td></tr>
+          <tr><td>接口与模板</td><td><code>authors</code>、<code>publisher</code>、<code>tags</code> 均有值且对应 Chip 已渲染</td><td>无需修改 API、字段或模板数据流</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>02. 根因链路</h2>
+      <div class="flow" aria-label="从历史样式到视觉缺陷的因果链">
+        <article class="node">
+          <p class="label">历史前提</p>
+          <h3>Flat Chip</h3>
+          <p>早期元数据 Chip 使用深色 <code>flat</code> 背景，因此页面添加了强制白字规则。</p>
+        </article>
+        <div class="arrow" aria-hidden="true">→</div>
+        <article class="node bad">
+          <p class="label">2026-07-09 变更</p>
+          <h3>Tonal + 遗留白字</h3>
+          <p><code>9feaea00</code> 将元数据改为 <code>primary + tonal</code>，但 <code>color: white !important</code> 没有同步移除。</p>
+        </article>
+        <div class="arrow" aria-hidden="true">→</div>
+        <article class="node good">
+          <p class="label">计划修复</p>
+          <h3>交还 Vuetify / 主题</h3>
+          <p>移除页面级强制文字色，让默认主题和内置主题分别按各自 primary tonal 调色板生成前景与背景。</p>
+        </article>
+      </div>
+      <p>直接冲突位于 <code>app/pages/book/[bid]/index.vue</code> 的 scoped CSS：<code>.tag-chips :deep(.v-chip) { color: white !important; }</code>。该规则最初服务于深色 <code>flat</code> Chip；变体改成 <code>tonal</code> 后已不再成立。</p>
+    </section>
+
+    <section>
+      <h2>03. 目标与边界</h2>
+      <div class="grid">
+        <article class="mini">
+          <p class="label">必须达成</p>
+          <h3>所有主题中清晰、完整、可用</h3>
+          <ul>
+            <li>默认主题以及五个内置主题的浅色、深色模式均可清楚辨认元数据 Chip。</li>
+            <li>作者、出版社、系列、ISBN、普通标签全部覆盖；有链接的 Chip 保持可点击。</li>
+            <li>公有、私有状态继续保留 teal / orange 语义色。</li>
+            <li>缺少可选元数据时继续遵循现有条件渲染，不制造空标签。</li>
+          </ul>
+        </article>
+        <article class="mini">
+          <p class="label">明确不做</p>
+          <h3>不扩张数据与主题契约</h3>
+          <ul>
+            <li>不修改后端 API、数据库、权限或 Calibre 元数据。</li>
+            <li>不改变 Chip 的文案、顺序、跳转地址、尺寸或间距。</li>
+            <li>不为单个主题硬编码新的颜色。</li>
+            <li>不重构整页样式或内置主题系统。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>04. 实现方案</h2>
+      <div class="callout decision">删除详情页对所有元数据 Chip 的强制白字覆盖；保留现有 <code>color="primary"</code> 与 <code>variant="tonal"</code>，由 Vuetify 默认主题或当前内置主题的调色板决定文字与底色。出版社 Chip 改为仅在字段就绪后挂载，避免初始空值生成的 <code>/publisher/</code> 链接被组件缓存。状态 Chip 仍由自身的 <code>flat</code> 变体和 teal / orange 颜色控制。</div>
+      <table>
+        <thead><tr><th>位置</th><th>计划变更</th><th>理由</th></tr></thead>
+        <tbody>
+          <tr><td><code>app/pages/book/[bid]/index.vue</code></td><td>移除 <code>.tag-chips :deep(.v-chip)</code> 的白色文字强制规则；出版社 Chip 增加字段存在条件</td><td>恢复 Vuetify tonal 的前景/背景配对，并确保异步数据返回后以真实出版社生成链接</td></tr>
+          <tr><td><code>app/test/e2e/book-detail.spec.ts</code></td><td>精确定位元数据 Chip，断言作者、出版社、普通标签可见且链接正确；默认浅色主题下验证 tonal 前景色不再被强制为白色</td><td>普通 <code>toBeVisible</code> 无法识别白底白字，需要加入计算样式回归</td></tr>
+          <tr><td>本方案文档</td><td>测试完成后回写命令、主题矩阵、截图路径与实际结果，并改为 <code>.active.html</code></td><td>保存缺陷证据和可复核验收记录</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>05. 验收矩阵</h2>
+      <table>
+        <thead><tr><th>层级</th><th>验证内容</th><th>计划命令 / 页面</th><th>当前状态</th></tr></thead>
+        <tbody>
+          <tr><td>E2E 回归</td><td>作者、出版社、系列、普通标签可见，链接正确，默认浅色 tonal 前景未被强制为白色</td><td><code>npx playwright test test/e2e/book-detail.spec.ts --project=chromium</code></td><td class="passed">通过 · 2 passed</td></tr>
+          <tr><td>真实渲染</td><td>默认主题 + light-gray / minimal / graphite / brass / warm-red，共六种主题的浅色与深色模式</td><td>Chrome DevTools MCP，真实 dev 后端与 production preview 访问 <code>/book/13</code>；逐项检查作者、出版社、ISBN、普通标签与状态 Chip</td><td class="passed">通过 · 公有状态 12 / 12 组合；默认浅色另验私有状态</td></tr>
+          <tr><td>交互</td><td>作者、出版社、普通标签 Chip 跳转地址仍正确</td><td>Chrome DevTools MCP 检查真实渲染链接</td><td class="passed">通过</td></tr>
+          <tr><td>前端检查</td><td>目标测试、全量 lint 与 production build</td><td><code>cd app &amp;&amp; npm run lint</code>；<code>cd app &amp;&amp; npm run build</code></td><td class="passed">通过 · lint 0 errors；build 成功</td></tr>
+          <tr><td>工程门禁</td><td>方案、HTML 单文件资源与补丁完整性</td><td><code>make check-design</code>；<code>git diff --check</code></td><td class="passed">通过</td></tr>
+        </tbody>
+      </table>
+      <p>真实验收使用 Docker 中的 Talebook dev 后端（13 本书）与当前前端 production preview。先将安装状态切为未安装，经安装页创建 <code>admin / demodemo</code> 并完成真实登录，再由主题管理页面逐个激活主题。样本“北风”实际包含作者、出版社、ISBN、普通标签与公有状态；五个内置主题的明暗模式均记录到非透明、可辨认的计算前景色与背景色。随后在默认浅色主题将书籍切为私有，确认“私有书籍” Chip 可见且计算样式为黑字橙底，再恢复为公有；最终恢复默认浅色主题。样本没有系列字段，系列由 E2E fixture 单独覆盖。</p>
+      <p>检查中没有与本次改动相关的失败项；eslint 保留仓库既有 warning，但错误数为 0。原生 Nuxt dev watcher 曾因工作区文件数量触发 <code>EMFILE</code>，按工程约束未启用 Chokidar polling，改用同一构建产物的 production preview 完成真实浏览器验收。</p>
+    </section>
+
+    <section>
+      <h2>06. 风险与回滚</h2>
+      <div class="grid">
+        <article class="mini">
+          <h3>风险控制</h3>
+          <ul>
+            <li>移除强制白字可能影响状态 Chip：通过公有与私有两种状态分别验收。</li>
+            <li>单纯 DOM 可见不代表视觉可见：E2E 同时检查默认浅色的计算样式，浏览器检查全部主题矩阵。</li>
+            <li>内置主题覆盖可能隐藏新冲突：浅色和深色必须分别实际渲染。</li>
+          </ul>
+        </article>
+        <article class="mini">
+          <h3>回滚策略</h3>
+          <p>改动限定为一条页面级 CSS 与测试。如果产生主题回归，可整体回退修复提交；不涉及数据、API 或迁移，不需要额外回滚步骤。</p>
+          <p><span class="label">完成条件</span><br>十二种“主题 × 明暗模式”组合均通过，目标 E2E、lint、build 与设计门禁通过后，方案方可转为 ACTIVE。</p>
+        </article>
+      </div>
+    </section>
+
+    <footer>Talebook · app · 20260722-book-detail-metadata-chips-visibility · ACTIVE</footer>
+  </main>
+</body>
+</html>

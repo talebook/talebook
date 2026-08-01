@@ -21,6 +21,7 @@ dependencies = [
     "tornado==6.5",
     "psutil>=7.0.0",
     "requests-toolbelt>=1.0.0",
+    "txt2epub-next==1.0.0",
 ]
 
 [project.optional-dependencies]

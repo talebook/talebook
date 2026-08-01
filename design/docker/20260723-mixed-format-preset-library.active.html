@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>混合格式公版预置书库修正方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --navy: #14213d;
+      --blue: #315e8a;
+      --cyan: #dceff4;
+      --paper: #f4f7f9;
+      --white: #ffffff;
+      --line: #a9bac6;
+      --amber: #b76616;
+      --amber-pale: #fff3dd;
+      --green: #176b56;
+      --muted: #526675;
+      --shadow: 0 16px 45px rgba(20, 33, 61, .09);
+      font-family: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif;
+      line-height: 1.65;
+      color: var(--navy);
+      background: var(--paper);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: linear-gradient(180deg, var(--cyan) 0 260px, var(--paper) 260px); }
+    main { width: min(1180px, calc(100% - 34px)); margin: 0 auto; padding: 32px 0 70px; }
+    header, section { background: var(--white); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    header { position: relative; padding: 38px 42px 34px; overflow: hidden; }
+    header::after {
+      content: "6 / 1 / 1 / 1 / 1";
+      position: absolute;
+      right: -24px;
+      top: 35px;
+      padding: 7px 38px;
+      transform: rotate(9deg);
+      background: var(--amber);
+      color: #fff;
+      font: 800 .76rem/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .16em;
+    }
+    .kicker, .label, .format-tag, .step-no {
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .kicker { margin: 0 0 8px; color: var(--amber); font-size: .78rem; font-weight: 800; }
+    h1 { max-width: 860px; margin: 0; font-size: clamp(2.1rem, 5.5vw, 4.65rem); line-height: 1; letter-spacing: -.055em; }
+    .lede { max-width: 800px; margin: 22px 0 0; color: var(--muted); font-size: 1.07rem; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 1px;
+      margin-top: 30px;
+      border: 1px solid var(--line);
+      background: var(--line);
+    }
+    .meta div { min-height: 88px; padding: 12px 14px; background: #fff; }
+    .meta strong { display: block; margin-bottom: 6px; color: var(--muted); font: 700 .68rem/1.3 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
+    .status { display: inline-block; padding: 2px 9px; border: 1px solid var(--green); color: var(--green); font: 800 .8rem/1.5 ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    nav { display: flex; gap: 8px; margin: 17px 0; overflow-x: auto; }
+    nav a { flex: none; padding: 7px 11px; border: 1px solid var(--line); background: #fff; color: var(--navy); font: 700 .78rem/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; text-decoration: none; }
+    nav a:hover, nav a:focus-visible { border-color: var(--blue); outline: 3px solid rgba(49, 94, 138, .16); }
+    section { margin-top: 18px; padding: 32px 36px 36px; }
+    .section-head { display: grid; grid-template-columns: 132px 1fr; gap: 18px; align-items: start; margin-bottom: 21px; }
+    .label { padding-top: 5px; border-top: 3px solid var(--blue); color: var(--blue); font-size: .76rem; font-weight: 800; }
+    h2 { margin: 0; font-size: clamp(1.45rem, 3vw, 2.1rem); line-height: 1.16; letter-spacing: -.025em; }
+    h3 { margin: 24px 0 8px; font-size: 1.05rem; }
+    p, ul, ol, figure { margin-top: 10px; }
+    code { padding: 2px 5px; background: var(--cyan); color: #17496a; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; overflow-wrap: anywhere; }
+    .correction { display: grid; grid-template-columns: 110px 1fr; gap: 18px; margin: 18px 0; padding: 18px; background: var(--amber-pale); border-left: 7px solid var(--amber); }
+    .correction strong { color: var(--amber); font: 800 .76rem/1.4 ui-monospace, "SFMono-Regular", Consolas, monospace; text-transform: uppercase; letter-spacing: .08em; }
+    .correction p { margin: 0; }
+    .matrix { overflow-x: auto; border: 1px solid var(--line); }
+    table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: .93rem; }
+    th, td { padding: 11px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--navy); color: #fff; font: 750 .75rem/1.35 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .04em; }
+    tbody tr:nth-child(even) { background: #f2f7f9; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .format-tag { display: inline-block; min-width: 58px; padding: 2px 7px; border: 1px solid currentColor; color: var(--blue); font-size: .7rem; font-weight: 800; text-align: center; }
+    .format-tag.alt { color: var(--amber); }
+    .bench { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 21px 0 0; }
+    .bench article { min-height: 150px; padding: 16px; border-top: 8px solid var(--blue); background: #edf4f7; }
+    .bench article:first-child { grid-column: span 1; border-top-color: var(--navy); }
+    .bench article:not(:first-child) { border-top-color: var(--amber); }
+    .bench b { display: block; font: 900 1.55rem/1 ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    .bench span { display: block; margin-top: 9px; color: var(--muted); font-size: .88rem; }
+    .flow { margin-top: 22px; }
+    svg { display: block; width: 100%; height: auto; background: #f8fbfc; border: 1px solid var(--line); }
+    figcaption { margin-top: 8px; color: var(--muted); font-size: .87rem; }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; border: 1px solid var(--line); background: var(--line); }
+    .steps article { padding: 18px; background: #fff; }
+    .step-no { color: var(--amber); font-size: .72rem; font-weight: 800; }
+    .steps h3 { margin-top: 8px; }
+    .pending { color: var(--amber); font-weight: 800; }
+    .pass { color: var(--green); font-weight: 800; }
+    a { color: #205d87; text-underline-offset: 3px; }
+    footer { padding: 22px 0 0; color: var(--muted); text-align: center; font-size: .82rem; }
+    @media (max-width: 900px) {
+      .meta { grid-template-columns: repeat(2, 1fr); }
+      .bench { grid-template-columns: repeat(2, 1fr); }
+      .steps { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      body { background: var(--paper); }
+      main { width: min(100% - 20px, 1180px); padding-top: 10px; }
+      header, section { padding: 26px 20px; }
+      header::after { display: none; }
+      .meta, .bench, .steps { grid-template-columns: 1fr; }
+      .section-head, .correction { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="kicker">Preset library · format coverage correction</p>
+      <h1>十本书，也是一套格式测试台</h1>
+      <p class="lede">保留 10 本完整中英文公版书，同时恢复内置馆藏对 EPUB、MOBI、AZW3、TXT、PDF 的覆盖，让新安装演示数据继续承担真实格式回归职责。</p>
+      <div class="meta">
+        <div><strong>创建日期</strong>2026-07-23</div>
+        <div><strong>所属模块</strong>docker</div>
+        <div><strong>状态</strong><span class="status">ACTIVE</span></div>
+        <div><strong>需求来源</strong>PR #900 用户反馈</div>
+        <div><strong>替代方案</strong><code>20260723-public-domain-preset-library.superseded.html</code></div>
+      </div>
+    </header>
+
+    <nav aria-label="方案目录">
+      <a href="#request">原始诉求</a>
+      <a href="#matrix">格式矩阵</a>
+      <a href="#pipeline">转换链路</a>
+      <a href="#contract">测试契约</a>
+      <a href="#rollout">生效流程</a>
+      <a href="#tests">验证结果</a>
+    </nav>
+
+    <section id="request">
+      <div class="section-head"><div class="label">Problem correction</div><h2>原始诉求与修正目标</h2></div>
+      <div class="correction">
+        <strong>用户原话</strong>
+        <p>“格式不能统一用 epub，因为要测试对于所有格式的支持情况，你看原本的书库也是使用了不同的格式。”</p>
+      </div>
+      <p>上一版方案把 13 个演示样本替换成 10 本完整 EPUB，满足了公版、完整内容和中英文馆藏目标，却删除了原目录对 MOBI、AZW3、TXT、PDF 的覆盖。本方案承认该行为回归，并恢复原内置书库所覆盖的五类格式。</p>
+      <h3>目标</h3>
+      <ul>
+        <li>仍然只提交用户确认的 10 本书，中文 5 本、英文 5 本，内容完整且来源可审计。</li>
+        <li>最终书籍文件分布固定为 6 EPUB、1 MOBI、1 AZW3、1 TXT、1 PDF。</li>
+        <li>每个非 EPUB 工件由清单中固定 SHA-256 的完整来源 EPUB 转换生成，不额外提交源文件副本。</li>
+        <li>不修改 Docker 首次初始化逻辑，不迁移、不替换、不删除用户已有 <code>/data/books/library</code>。</li>
+      </ul>
+      <h3>非目标</h3>
+      <ul>
+        <li>不新增原书库没有覆盖的 AZW 样本；Talebook 的 AZW 支持仍由现有单元测试覆盖。</li>
+        <li>不要求 TXT 保留封面和富文本排版；TXT 验证重点是完整正文、编码和 Calibre 导入。</li>
+        <li>不改动前端阅读器的格式能力，也不承诺五种格式都能在浏览器内直接阅读。</li>
+      </ul>
+    </section>
+
+    <section id="matrix">
+      <div class="section-head"><div class="label">Format matrix</div><h2>十本书的最终格式分配</h2></div>
+      <div class="bench" aria-label="格式数量摘要">
+        <article><b>6</b><span>EPUB：五本中文与 Sherlock Holmes</span></article>
+        <article><b>1</b><span>MOBI：Pride and Prejudice</span></article>
+        <article><b>1</b><span>AZW3：The Picture of Dorian Gray</span></article>
+        <article><b>1</b><span>TXT：Frankenstein</span></article>
+        <article><b>1</b><span>PDF：Alice’s Adventures in Wonderland</span></article>
+      </div>
+      <div class="matrix">
+        <table>
+          <thead><tr><th>语言</th><th>书名</th><th>最终文件</th><th>格式职责</th></tr></thead>
+          <tbody>
+            <tr><td>简体中文</td><td>红楼梦</td><td><code>hong-lou-meng.epub</code></td><td><span class="format-tag">EPUB</span> 120 回导航、中文元数据</td></tr>
+            <tr><td>简体中文</td><td>西游记</td><td><code>xi-you-ji.epub</code></td><td><span class="format-tag">EPUB</span> 100 回导航、中文元数据</td></tr>
+            <tr><td>简体中文</td><td>三国志演义</td><td><code>san-guo-zhi-yan-yi.epub</code></td><td><span class="format-tag">EPUB</span> 120 回导航、中文元数据</td></tr>
+            <tr><td>简体中文</td><td>水浒传</td><td><code>shui-hu-zhuan.epub</code></td><td><span class="format-tag">EPUB</span> 70 回导航、中文元数据</td></tr>
+            <tr><td>简体中文</td><td>道德经</td><td><code>dao-de-jing.epub</code></td><td><span class="format-tag">EPUB</span> 81 章导航、中文元数据</td></tr>
+            <tr><td>English</td><td>The Adventures of Sherlock Holmes</td><td><code>the-adventures-of-sherlock-holmes.epub</code></td><td><span class="format-tag">EPUB</span> 英文 EPUB 与插图</td></tr>
+            <tr><td>English</td><td>Pride and Prejudice</td><td><code>pride-and-prejudice.mobi</code></td><td><span class="format-tag alt">MOBI</span> PalmDB / Kindle 旧格式</td></tr>
+            <tr><td>English</td><td>The Picture of Dorian Gray</td><td><code>the-picture-of-dorian-gray.azw3</code></td><td><span class="format-tag alt">AZW3</span> Kindle Format 8</td></tr>
+            <tr><td>English</td><td>Frankenstein</td><td><code>frankenstein.txt</code></td><td><span class="format-tag alt">TXT</span> UTF-8 纯文本与标题头</td></tr>
+            <tr><td>English</td><td>Alice’s Adventures in Wonderland</td><td><code>alices-adventures-in-wonderland.pdf</code></td><td><span class="format-tag alt">PDF</span> 固定版式与插图</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="pipeline">
+      <div class="section-head"><div class="label">Conversion pipeline</div><h2>来源固定，按格式分流</h2></div>
+      <figure class="flow">
+        <svg viewBox="0 0 1040 260" role="img" aria-labelledby="flow-title flow-desc">
+          <title id="flow-title">混合格式书籍生成链路</title>
+          <desc id="flow-desc">固定来源 EPUB 经哈希校验后，中文进入简体与导航处理，英文按最终格式进入 Calibre 转换，最后共同执行清单和导入验证。</desc>
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0 0L10 5L0 10Z" fill="#315e8a"/>
+            </marker>
+          </defs>
+          <g fill="#fff" stroke="#315e8a" stroke-width="2">
+            <rect x="34" y="82" width="180" height="92"/>
+            <rect x="298" y="24" width="190" height="80"/>
+            <rect x="298" y="154" width="190" height="80"/>
+            <rect x="574" y="24" width="190" height="80"/>
+            <rect x="574" y="154" width="190" height="80"/>
+            <rect x="840" y="82" width="166" height="92"/>
+          </g>
+          <g fill="none" stroke="#315e8a" stroke-width="2" marker-end="url(#arrow)">
+            <path d="M214 128H260V64H298"/>
+            <path d="M214 128H260V194H298"/>
+            <path d="M488 64H574"/>
+            <path d="M488 194H574"/>
+            <path d="M764 64H802V128H840"/>
+            <path d="M764 194H802V128H840"/>
+          </g>
+          <g fill="#14213d" font-family="ui-monospace, monospace" text-anchor="middle">
+            <text x="124" y="116" font-size="16" font-weight="800">SOURCE EPUB</text><text x="124" y="143" font-size="13">URL + SHA-256</text>
+            <text x="393" y="58" font-size="15" font-weight="800">ZH-CN PIPE</text><text x="393" y="82" font-size="12">OpenCC + navigation</text>
+            <text x="393" y="188" font-size="15" font-weight="800">EN PIPE</text><text x="393" y="212" font-size="12">source edition retained</text>
+            <text x="669" y="58" font-size="15" font-weight="800">6 × EPUB</text><text x="669" y="82" font-size="12">spec + chapter checks</text>
+            <text x="669" y="188" font-size="15" font-weight="800">4 × CONVERT</text><text x="669" y="212" font-size="12">MOBI / AZW3 / TXT / PDF</text>
+            <text x="923" y="116" font-size="15" font-weight="800">AUDIT + IMPORT</text><text x="923" y="143" font-size="12">manifest · Calibre</text>
+          </g>
+        </svg>
+        <figcaption>所有分支都从已记录原始 SHA-256 的完整 EPUB 出发；转换工具与最终 SHA-256 写入同一份来源清单。</figcaption>
+      </figure>
+      <h3>转换约束</h3>
+      <ul>
+        <li>使用项目开发镜像中与生产环境一致的 Calibre <code>ebook-convert</code>，记录实际 Calibre 版本与完整参数。</li>
+        <li>MOBI 与 AZW3 保留标题、作者、语言、封面和目录；TXT 输出 UTF-8，并在正文顶部保留书名、作者和来源声明；PDF 保留插图与可见标题。</li>
+        <li>Calibre 8.5.0 导入 TXT 与 PDF 时能识别标题，但其通用解析器不会从这两个转换工件读取作者和语言，书目中显示 Unknown / 空语言；作者与语言仍由可见 TXT 头、来源清单和专项测试保证。这是格式能力边界，不伪造为完整嵌入元数据。</li>
+        <li>清单中的 <code>source_sha256</code> 指向转换前 EPUB，<code>sha256</code> 指向提交的最终格式工件。</li>
+      </ul>
+    </section>
+
+    <section id="contract">
+      <div class="section-head"><div class="label">Test contract</div><h2>格式存在还不够，必须能被真实导入</h2></div>
+      <div class="steps">
+        <article><div class="step-no">01 / Inventory</div><h3>数量与分布</h3><p>目录恰好 10 本，后缀计数严格等于 6/1/1/1/1，另有唯一非书籍文件 <code>sources.json</code>。</p></article>
+        <article><div class="step-no">02 / Signature</div><h3>文件签名</h3><p>EPUB 验证 ZIP 与 mimetype；MOBI/AZW3 验证 PalmDB/BOOKMOBI；PDF 验证 PDF 头；TXT 验证 UTF-8 和非空正文。</p></article>
+        <article><div class="step-no">03 / Content</div><h3>内容与审计</h3><p>逐书比对 SHA-256、标题、作者、正文体积、代表性文本、来源与权利声明；EPUB 继续验证封面和导航。</p></article>
+        <article><div class="step-no">04 / Import</div><h3>Calibre 导入</h3><p>在开发镜像中新建空书库并导入全部格式，断言恰好得到 10 条书目及预期标题和格式；EPUB、MOBI、AZW3 另核对作者与语言。</p></article>
+      </div>
+      <h3>失败边界</h3>
+      <ul>
+        <li>转换导致正文缺失、富元数据格式的元数据丢失、格式识别错误或 Calibre 无法导入时，不转为 ACTIVE。已记录的 TXT/PDF 作者与语言解析限制不视为失败。</li>
+        <li>新方案验证通过前，旧 ACTIVE 方案保持不变；新方案生效后，旧方案只改名为 SUPERSEDED，并在其顶部注明替代方案与原因。</li>
+        <li>本次只更新 PR #900，不改写已推送提交；新增提交后，PR 正文中的方案链接必须换成最新完整 commit SHA。</li>
+      </ul>
+    </section>
+
+    <section id="rollout">
+      <div class="section-head"><div class="label">Activation sequence</div><h2>从纠偏到生效的顺序</h2></div>
+      <ol>
+        <li>创建本 WIP，先锁定书目—格式矩阵、转换与测试规则。</li>
+        <li>在临时目录转换 4 本英文 EPUB，验证元数据、正文和文件签名后替换仓库工件。</li>
+        <li>更新 <code>sources.json</code> 与馆藏契约测试，并执行真实 Calibre 多格式导入。</li>
+        <li>完成 lint、全量后端测试和设计门禁，将本方案转为 ACTIVE；随后将旧 ACTIVE 改名为 SUPERSEDED。</li>
+        <li>提交并推送增量修正，更新 PR #900 的固定 SHA 方案链接和测试结果。</li>
+      </ol>
+    </section>
+
+    <section id="tests">
+      <div class="section-head"><div class="label">Verification record</div><h2>测试计划与实际结果</h2></div>
+      <div class="matrix">
+        <table>
+          <thead><tr><th>验证项</th><th>命令 / 证据</th><th>当前结果</th></tr></thead>
+          <tbody>
+            <tr><td>格式转换</td><td>Calibre 8.5.0 <code>ebook-convert</code> 生成 MOBI、AZW3、UTF-8 TXT、102 页 A4 PDF</td><td class="pass">通过：四种工件签名和体积正确；PDF 保留 88 个图片对象；TXT 保留完整 24 章、可见作者与 CC0 声明</td></tr>
+            <tr><td>馆藏契约</td><td><code>python3 -m pytest -q tests/test_preset_books.py</code></td><td class="pass">通过：19 passed in 0.29s；分布、签名、哈希、正文、EPUB 结构与权利声明符合契约</td></tr>
+            <tr><td>Calibre 多格式导入</td><td>开发镜像执行 Dockerfile 同款 <code>calibredb add --library-path=/library -r /books</code></td><td class="pass">通过：Added book ids 1–10；恰好 10 本，格式为 6 EPUB、1 MOBI、1 AZW3、1 TXT、1 PDF；解析结果符合已记录元数据边界</td></tr>
+            <tr><td>后端回归</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、开发镜像内 <code>make pytest</code></td><td class="pass">通过：ruff 与格式检查无错误；全量测试 667 passed、1 skipped、34 warnings，用时 66.36s</td></tr>
+            <tr><td>方案校验</td><td><code>make check-design</code></td><td class="pass">通过：ACTIVE / SUPERSEDED 路径、HTML 结构与单文件资源约束满足要求</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>第一次全量运行出现既有异步用例 <code>TestScan.test_scan_background</code> 的线程时序波动：666 passed、1 failed、1 skipped；该用例单独复跑为 1 passed，随后第二次完整运行全部通过。未修改或规避该用例。</p>
+    </section>
+
+    <footer>Talebook · Docker 混合格式预置馆藏修正方案 · 离线单文件</footer>
+  </main>
+</body>
+</html>

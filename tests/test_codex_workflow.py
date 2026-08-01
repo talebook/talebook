@@ -13,6 +13,13 @@ WORKFLOW = ROOT / ".github" / "workflows" / "codex.yml"
 ACTIONLINT_CONFIG = ROOT / ".github" / "actionlint.yaml"
 PROMPT = ROOT / ".github" / "codex" / "prompts" / "comment-response.md"
 PROGRESS_REPORTER = ROOT / ".github" / "codex" / "scripts" / "codex_progress_reporter.py"
+DEV_CONTAINER_OPTIONS = (
+    "--user 1001:1001 --cap-drop ALL --security-opt no-new-privileges --tmpfs /data:rw,uid=1001,gid=1001,mode=0755"
+)
+requires_node = pytest.mark.skipif(
+    shutil.which("node") is None,
+    reason="Node.js is required to execute the real actions/github-script response body",
+)
 
 
 def workflow_text():
@@ -27,6 +34,10 @@ def codex_job():
     return workflow_data()["jobs"]["codex"]
 
 
+def sandbox_smoke_job():
+    return workflow_data()["jobs"]["codex-sandbox-smoke"]
+
+
 def workflow_step(*, step_id=None, name=None):
     for step in codex_job()["steps"]:
         if step_id is not None and step.get("id") == step_id:
@@ -34,6 +45,13 @@ def workflow_step(*, step_id=None, name=None):
         if name is not None and step.get("name") == name:
             return step
     raise AssertionError(f"workflow step not found: id={step_id!r}, name={name!r}")
+
+
+def smoke_workflow_step(*, name):
+    for step in sandbox_smoke_job()["steps"]:
+        if step.get("name") == name:
+            return step
+    raise AssertionError(f"smoke workflow step not found: name={name!r}")
 
 
 def prompt_text():
@@ -109,6 +127,126 @@ def run_publish_gate(
     return dict(line.split("=", 1) for line in output_file.read_text(encoding="utf-8").splitlines())
 
 
+def run_response_step(
+    tmp_path,
+    *,
+    progress_body,
+    progress_comment_id="456",
+    get_comment_error=False,
+    update_comment_error=False,
+    tests=(),
+):
+    result_file = tmp_path / ".codex-result.json"
+    result_file.write_text(
+        json.dumps(
+            {
+                "delivery": "reply",
+                "feature": "",
+                "commit_message": "",
+                "summary": "已完成处理，并保留执行计划。",
+                "tests": list(tests),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    final_message = tmp_path / "codex-final.md"
+    final_message.write_text("fallback", encoding="utf-8")
+    trace_file = tmp_path / "response-trace.json"
+    response_script = workflow_step(name="Post Codex response")["with"]["script"]
+    harness = (
+        """
+const harnessFs = require("fs");
+const calls = [];
+const github = {
+  rest: {
+    issues: {
+      getComment: async (args) => {
+        calls.push({name: "getComment", args});
+        if (process.env.TEST_GET_COMMENT_ERROR === "true") {
+          throw new Error("get comment failed");
+        }
+        return {data: {body: process.env.TEST_PROGRESS_BODY}};
+      },
+      updateComment: async (args) => {
+        calls.push({name: "updateComment", args});
+        if (process.env.TEST_UPDATE_COMMENT_ERROR === "true") {
+          throw new Error("update comment failed");
+        }
+        return {data: {id: args.comment_id}};
+      },
+      createComment: async (args) => {
+        calls.push({name: "createComment", args});
+        return {data: {id: 789}};
+      },
+    },
+  },
+};
+const context = {
+  serverUrl: "https://github.test",
+  repo: {owner: "talebook", repo: "talebook"},
+};
+const core = {
+  warning: (message) => calls.push({name: "warning", message}),
+};
+const finish = (error) => {
+  harnessFs.writeFileSync(
+    process.env.TEST_TRACE_FILE,
+    JSON.stringify({calls, error: error ? error.message : ""}),
+  );
+};
+(async () => {
+"""
+        + response_script
+        + """
+})().then(
+  () => finish(null),
+  (error) => {
+    finish(error);
+    process.exitCode = 1;
+  },
+);
+"""
+    )
+    env = {
+        **os.environ,
+        "CODEX_FINAL_MESSAGE": str(final_message),
+        "CODEX_RESULT_FILE": str(result_file),
+        "CODEX_RUN_OUTCOME": "success",
+        "CODEX_CONTRACT_VALID": "true",
+        "CODEX_DELIVERY": "reply",
+        "CODEX_GATE_READY": "true",
+        "CODEX_GATE_REASON": "",
+        "CODEX_NO_CHANGES": "true",
+        "CODEX_APP_TOKEN_OUTCOME": "skipped",
+        "CODEX_PUBLISH_OUTCOME": "skipped",
+        "CODEX_PUBLISH_BRANCH": "",
+        "CODEX_COMMIT_SHA": "",
+        "IS_PR": "false",
+        "EXISTING_ISSUE_BRANCH": "",
+        "EXISTING_PR_NUMBER": "",
+        "CREATED_PR_OUTCOME": "skipped",
+        "CREATED_PR_URL": "",
+        "CODEX_HAS_PATCH": "false",
+        "CODEX_ARTIFACT_NAME": "codex-patch-test",
+        "ISSUE_NUMBER": "77",
+        "CODEX_PROGRESS_COMMENT_ID": progress_comment_id,
+        "TEST_PROGRESS_BODY": progress_body,
+        "TEST_GET_COMMENT_ERROR": "true" if get_comment_error else "false",
+        "TEST_UPDATE_COMMENT_ERROR": "true" if update_comment_error else "false",
+        "TEST_TRACE_FILE": str(trace_file),
+    }
+    completed = subprocess.run(
+        ["node", "-e", harness],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return completed, json.loads(trace_file.read_text(encoding="utf-8"))
+
+
 def test_employee_job_is_bounded_and_serialized_per_request_target():
     job = codex_job()
 
@@ -119,28 +257,80 @@ def test_employee_job_is_bounded_and_serialized_per_request_target():
     }
 
 
-def test_codex_runtime_installs_declared_test_tools_before_agent_execution():
+def test_codex_runs_in_the_hardened_dev_container_without_runtime_install_steps():
+    job = codex_job()
     steps = codex_job()["steps"]
     checkout = workflow_step(name="Checkout repository")
-    setup_python = workflow_step(name="Setup Python for Codex validation")
-    install_tools = workflow_step(name="Install Codex test tools")
+    prepare = workflow_step(name="Prepare Codex runtime and repository")
+    verify = workflow_step(name="Verify development environment and outer sandbox")
+    synchronize = workflow_step(name="Synchronize project dependencies")
+    restore_auth = workflow_step(name="Restore Codex ChatGPT auth")
     run_codex = workflow_step(name="Run Codex")
-    context_script = workflow_step(step_id="context")["with"]["script"]
 
-    assert "const codexTestRequirements = `${runnerTemp}/codex-requirements-test.txt`;" in context_script
-    assert 'core.exportVariable("CODEX_TEST_REQUIREMENTS", codexTestRequirements);' in context_script
-    assert 'path: "requirements-test.txt"' in context_script
-    assert "ref: workflowSha" in context_script
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["container"] == {
+        "image": "talebook/talebook:dev",
+        "options": DEV_CONTAINER_OPTIONS,
+    }
+    assert job["defaults"] == {"run": {"shell": "bash"}}
+    assert "env" not in workflow_data()
+    assert job["env"]["USER"] == "codex"
+    assert job["env"]["LOGNAME"] == "codex"
+    assert all(
+        unsafe not in job["container"]["options"]
+        for unsafe in ("--user root", "privileged", "SYS_ADMIN", "SYS_PTRACE", "seccomp=unconfined", "/var/run/docker.sock")
+    )
+    assert all(
+        probe in verify["run"]
+        for probe in (
+            "ebook-convert --version",
+            'python3 -c "import calibre; print(calibre.__file__)"',
+            "python3 --version",
+            "node --version",
+            "npm --version",
+            "make --version",
+            "python3 -m pytest --version",
+            "ruff --version",
+            "codex --version",
+        )
+    )
+    assert all(
+        name not in [step.get("name") for step in steps]
+        for name in (
+            "Setup Node for Codex runtime",
+            "Setup Python for Codex validation",
+            "Install Codex CLI and test tools",
+            "Setup bubblewrap and AppArmor for sandbox",
+        )
+    )
+    assert synchronize["run"] == "make init\nnpm --prefix app ci\n"
+    assert (
+        steps.index(checkout)
+        < steps.index(prepare)
+        < steps.index(verify)
+        < steps.index(synchronize)
+        < steps.index(restore_auth)
+    )
+    assert steps.index(restore_auth) < steps.index(run_codex)
 
-    assert setup_python["uses"] == "actions/setup-python@v5"
-    assert setup_python["with"] == {"python-version": "3.13"}
 
-    install_script = install_tools["run"]
-    assert 'python3 -m pip install --disable-pip-version-check -r "$CODEX_TEST_REQUIREMENTS"' in install_script
-    assert "-r requirements-test.txt" not in install_script
-    assert "ruff --version" in install_script
-    assert "python3 -m pytest --version" in install_script
-    assert steps.index(checkout) < steps.index(setup_python) < steps.index(install_tools) < steps.index(run_codex)
+def test_codex_runtime_home_and_repository_trust_are_prepared_before_verification():
+    prepare = workflow_step(name="Prepare Codex runtime and repository")
+    verify = workflow_step(name="Verify development environment and outer sandbox")
+
+    assert prepare["if"] == ("steps.context.outputs.authorized == 'true' && steps.context.outputs.supported_target == 'true'")
+    assert prepare["run"] == (
+        "set -euo pipefail\n"
+        'mkdir -p "$CODEX_HOME"\n'
+        'chmod 700 "$CODEX_HOME"\n'
+        'git config --global --add safe.directory "$GITHUB_WORKSPACE"\n'
+        'git config --global --get-all safe.directory | grep -Fqx "$GITHUB_WORKSPACE"\n'
+        "git status --short\n"
+    )
+    assert "safe.directory '*'" not in prepare["run"]
+    assert 'safe.directory "*"' not in prepare["run"]
+    assert 'sandbox_mode=\\"danger-full-access\\"' in verify["run"]
+    assert 'approval_policy=\\"never\\"' in verify["run"]
 
 
 def test_only_repository_writers_can_trigger_the_employee():
@@ -157,48 +347,91 @@ def test_only_repository_writers_can_trigger_the_employee():
     assert '["admin", "maintain", "write"].includes(permission)' in context_script
 
 
-def test_agent_has_public_network_but_cannot_read_host_credentials():
+def test_outer_container_mode_filters_shell_tokens_without_claiming_inner_isolation():
     restore_script = workflow_step(name="Restore Codex ChatGPT auth")["run"]
+    run_script = workflow_step(step_id="run_codex")["run"]
 
     required_fragments = (
-        'default_permissions = "codex-employee"',
-        'extends = ":workspace"',
-        '":root" = "deny"',
-        '":minimal" = "read"',
-        '":tmpdir" = "deny"',
-        '":slash_tmp" = "deny"',
-        '[permissions.codex-employee.filesystem.":workspace_roots"]',
-        '"." = "write"',
-        '".github/workflows" = "read"',
-        "[permissions.codex-employee.network.domains]",
-        "network_proxy = true",
-        "allow_local_binding = true",
-        '"*" = "allow"',
-        '"localhost" = "allow"',
-        '"127.0.0.1" = "allow"',
-        '"169.254.169.254" = "deny"',
-        '"metadata.google.internal" = "deny"',
+        'sandbox_mode = "danger-full-access"',
+        'approval_policy = "never"',
+        "[shell_environment_policy]",
+        'inherit = "core"',
+        "ignore_default_excludes = false",
         'TMPDIR = "$GITHUB_WORKSPACE/.codex-runtime"',
         "'.codex/tmp/'",
         '"GITHUB_TOKEN"',
         '"CODEX_AUTH_JSON"',
     )
     assert all(fragment in restore_script for fragment in required_fragments)
-    assert "allow_local_binding = false" not in restore_script
+    assert "default_permissions" not in restore_script
+    assert "[permissions." not in restore_script
+    assert "network_proxy" not in restore_script
+    assert "[permissions.codex-employee.network" not in restore_script
+    assert "--sandbox danger-full-access" in run_script
     assert "--sandbox workspace-write" not in workflow_text()
     assert 'sandbox_mode = "workspace-write"' not in restore_script
 
 
-def test_sandbox_setup_fails_closed_before_codex_runs():
-    setup_script = workflow_step(name="Setup bubblewrap and AppArmor for sandbox")["run"]
+def test_outer_container_verification_fails_closed_before_codex_runs():
+    verify_script = workflow_step(name="Verify development environment and outer sandbox")["run"]
     step_names = [step.get("name") for step in codex_job()["steps"]]
 
-    assert "continuing" not in setup_script
-    assert "::error::Required AppArmor profile source is missing" in setup_script
-    assert "::error::Bubblewrap sandbox self-test failed" in setup_script
-    assert "::error::AppArmor profile is not active for bubblewrap" in setup_script
-    assert setup_script.count("exit 1") >= 3
-    assert step_names.index("Setup bubblewrap and AppArmor for sandbox") < step_names.index("Run Codex")
+    assert "continuing" not in verify_script
+    assert "::error::The dev container must not run as root" in verify_script
+    assert "::error::The dev container must run only as uid/gid 1001:1001" in verify_script
+    assert "::error::The dev container retained supplementary groups" in verify_script
+    assert "::error::The dev container retained Linux capabilities" in verify_script
+    assert "::error::The dev container does not enforce no-new-privileges" in verify_script
+    assert "::error::The dev container does not use the default seccomp filter" in verify_script
+    assert "::error::The ephemeral /data filesystem is not writable" in verify_script
+    assert "::error::Docker socket is writable by the Codex user" in verify_script
+    assert "::error::Docker socket connection was not denied" in verify_script
+    assert "::error::Codex external-sandbox self-test failed" in verify_script
+    assert 'codex sandbox -c "sandbox_mode=\\"danger-full-access\\""' in verify_script
+    assert '[ "$(id -u)" -eq 0 ]' in verify_script
+    assert '[ "$(id -u):$(id -g)" != "1001:1001" ]' in verify_script
+    assert '[ "$(id -G)" != "1001" ]' in verify_script
+    assert 'grep -Eq "^CapEff:[[:space:]]*0+$" /proc/1/status' in verify_script
+    assert 'grep -Eq "^NoNewPrivs:[[:space:]]*1$" /proc/1/status' in verify_script
+    assert 'grep -Eq "^Seccomp:[[:space:]]*2$" /proc/1/status' in verify_script
+    assert "[ ! -w /data ]" in verify_script
+    assert 'stat -c "docker_socket=%A uid=%u gid=%g" /var/run/docker.sock' in verify_script
+    assert "socket.socket(socket.AF_UNIX)" in verify_script
+    assert 'connect_ex("/var/run/docker.sock")' in verify_script
+    assert '"1" | "13"' in verify_script
+    assert "sudo" not in verify_script
+    assert "bwrap" not in verify_script
+    assert "AppArmor" not in verify_script
+    assert step_names.index("Verify development environment and outer sandbox") < step_names.index("Run Codex")
+
+
+def test_pull_requests_run_a_secretless_full_dev_container_smoke_job():
+    triggers = workflow_data()[True]
+    smoke = sandbox_smoke_job()
+    smoke_steps = smoke["steps"]
+    main_verify_script = workflow_step(name="Verify development environment and outer sandbox")["run"]
+    smoke_verify = smoke_workflow_step(name="Verify development environment and outer sandbox")
+    full_tests = smoke_workflow_step(name="Run full project test suite")
+
+    assert triggers["pull_request"] == {"paths": [".github/workflows/codex.yml"]}
+    assert smoke["name"] == "Verify Codex dev container on hosted runner"
+    assert smoke["if"] == "github.event_name == 'pull_request'"
+    assert smoke["runs-on"] == "ubuntu-latest"
+    assert smoke["timeout-minutes"] == 10
+    assert smoke["container"] == codex_job()["container"]
+    assert smoke["defaults"] == {"run": {"shell": "bash"}}
+    assert smoke["env"]["CODEX_HOME"] == "${{ github.workspace }}/.codex-smoke-home"
+    assert smoke["env"]["USER"] == "codex"
+    assert smoke["env"]["LOGNAME"] == "codex"
+    assert all("secrets." not in str(step) for step in smoke_steps)
+    assert smoke_steps[0] == {
+        "name": "Checkout repository",
+        "uses": "actions/checkout@v4",
+    }
+    assert smoke_verify["run"] == main_verify_script
+    assert smoke_workflow_step(name="Synchronize project dependencies")["run"] == "make init\nnpm --prefix app ci\n"
+    assert full_tests["run"] == "python3 -m pytest tests\n"
+    assert smoke_steps.index(smoke_verify) < smoke_steps.index(full_tests)
 
 
 def test_trusted_assets_follow_the_immutable_workflow_version_and_acknowledge_first():
@@ -209,8 +442,8 @@ def test_trusted_assets_follow_the_immutable_workflow_version_and_acknowledge_fi
     assert "const workflowSha = process.env.WORKFLOW_SHA;" in script
     assert 'path: ".github/codex/prompts/comment-response.md"' in script
     assert 'path: ".github/codex/scripts/codex_progress_reporter.py"' in script
-    assert 'path: "requirements-test.txt"' in script
-    assert script.count("ref: workflowSha") == 3
+    assert 'path: "requirements-test.txt"' not in script
+    assert script.count("ref: workflowSha") == 2
     assert "ref: defaultBranch" not in script
     assert script.index("reactions.createForIssueComment") < script.index("issues.createComment")
     assert script.index("issues.createComment") < script.index('path: ".github/codex/prompts/comment-response.md"')
@@ -219,6 +452,8 @@ def test_trusted_assets_follow_the_immutable_workflow_version_and_acknowledge_fi
     assert "const codexPromptTemplate = `${runnerTemp}/codex-comment-response.md`;" in script
     assert 'core.exportVariable("CODEX_PROMPT_TEMPLATE", codexPromptTemplate)' in script
     assert 'core.exportVariable("CODEX_PROGRESS_REPORTER", codexProgressReporter)' in script
+    assert "codexTestRequirements" not in script
+    assert "CODEX_TEST_REQUIREMENTS" not in script
     assert 'cat "$CODEX_PROMPT_TEMPLATE"' in workflow_step(name="Build Codex prompt")["run"]
     assert "python3 .github/codex/scripts/codex_progress_reporter.py" not in workflow_text()
 
@@ -261,6 +496,7 @@ def test_agent_contract_distinguishes_conversational_replies_from_code_publicati
     prompt = prompt_text()
 
     assert "timeout --signal=TERM --kill-after=30s 20m env -u CODEX_PROGRESS_TOKEN codex exec" in run_step["run"]
+    assert "--sandbox danger-full-access" in run_step["run"]
     assert "--json" in run_step["run"]
     assert "tee .codex/tmp/codex-events.jsonl" in run_step["run"]
     assert run_step["env"]["CODEX_PROGRESS_TOKEN"] == "${{ steps.interaction_token.outputs.token }}"
@@ -561,6 +797,173 @@ def test_one_progress_comment_is_created_then_updated_throughout_the_run():
     assert "todo_list" in reporter
     assert "UPDATE_INTERVAL_SECONDS = 60" in reporter
     assert "reasoning" not in reporter
+
+
+def test_initial_progress_comment_reserves_the_plan_progress_boundaries():
+    context_script = workflow_step(step_id="context")["with"]["script"]
+
+    assert '"<!-- codex-plan-progress:start -->"' in context_script
+    assert '"<!-- codex-plan-progress:end -->"' in context_script
+    assert context_script.index('"<!-- codex-plan-progress:start -->"') < context_script.index(
+        '"<!-- codex-plan-progress:end -->"'
+    )
+
+
+@requires_node
+def test_final_response_preserves_the_latest_plan_in_the_same_comment(tmp_path):
+    progress_body = "\n".join(
+        [
+            "<!-- codex-live-progress -->",
+            "## Codex 正在处理",
+            "",
+            "正在验证结果并准备发布。",
+            "",
+            "<!-- codex-plan-progress:start -->",
+            "",
+            "### 执行计划",
+            "",
+            "- [x] 定位覆盖路径",
+            "- [ ] 🔄 验证最终评论",
+            "<!-- codex-plan-progress:end -->",
+            "",
+            "活动汇总：命令 3 · 文件变更 2 · 网络检索 0",
+        ]
+    )
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body)
+
+    assert completed.returncode == 0, completed.stderr
+    assert [call["name"] for call in trace["calls"]] == ["getComment", "updateComment"]
+    update = trace["calls"][1]["args"]
+    assert update["comment_id"] == 456
+    assert "已完成处理，并保留执行计划。" in update["body"]
+    assert "<!-- codex-plan-progress:start -->" in update["body"]
+    assert "- [x] 定位覆盖路径" in update["body"]
+    assert "- [ ] 🔄 验证最终评论" in update["body"]
+    assert update["body"].index("已完成处理，并保留执行计划。") < update["body"].index("### 执行计划")
+    assert "Codex 正在处理" not in update["body"]
+    assert "活动汇总" not in update["body"]
+
+
+@requires_node
+def test_final_response_keeps_the_original_comment_when_plan_reading_fails(tmp_path):
+    progress_body = "\n".join(
+        [
+            "<!-- codex-plan-progress:start -->",
+            "### 执行计划",
+            "- [x] 已执行步骤",
+            "<!-- codex-plan-progress:end -->",
+        ]
+    )
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body, get_comment_error=True)
+
+    assert completed.returncode != 0
+    assert [call["name"] for call in trace["calls"] if call["name"] != "warning"] == ["getComment"]
+    assert "get comment failed" in trace["error"]
+
+
+@requires_node
+def test_final_response_reserves_comment_space_for_the_complete_plan(tmp_path):
+    plan_items = [f"- [x] 步骤 {index} " + ("进" * 230) for index in range(10)]
+    progress_body = "\n".join(
+        [
+            "<!-- codex-plan-progress:start -->",
+            "### 执行计划",
+            *plan_items,
+            "<!-- codex-plan-progress:end -->",
+        ]
+    )
+    tests = [
+        {
+            "command": "python3 -m pytest " + ("tests/" * 12000),
+            "result": "passed",
+            "details": "验证通过",
+        }
+    ]
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body, tests=tests)
+
+    assert completed.returncode == 0, completed.stderr
+    update_body = next(call["args"]["body"] for call in trace["calls"] if call["name"] == "updateComment")
+    assert len(update_body) <= 64000
+    assert all(item in update_body for item in plan_items)
+    assert update_body.endswith("<!-- codex-plan-progress:end -->")
+
+
+@pytest.mark.parametrize(
+    "progress_body",
+    [
+        "### 执行计划\n- [x] 缺少边界",
+        "\n".join(
+            [
+                "<!-- codex-plan-progress:start -->",
+                "<!-- codex-plan-progress:start -->",
+                "### 执行计划",
+                "<!-- codex-plan-progress:end -->",
+            ]
+        ),
+        "\n".join(
+            [
+                "<!-- codex-plan-progress:end -->",
+                "### 执行计划",
+                "<!-- codex-plan-progress:start -->",
+            ]
+        ),
+    ],
+)
+@requires_node
+def test_final_response_keeps_the_original_comment_when_plan_boundaries_are_invalid(tmp_path, progress_body):
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body)
+
+    assert completed.returncode != 0
+    assert [call["name"] for call in trace["calls"] if call["name"] != "warning"] == ["getComment"]
+    assert "one valid plan boundary pair" in trace["error"]
+
+
+@requires_node
+def test_final_response_does_not_create_a_second_comment_when_the_existing_update_fails(tmp_path):
+    progress_body = "\n".join(
+        [
+            "<!-- codex-plan-progress:start -->",
+            "### 执行计划",
+            "- [x] 已执行步骤",
+            "<!-- codex-plan-progress:end -->",
+        ]
+    )
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body, update_comment_error=True)
+
+    assert completed.returncode != 0
+    assert [call["name"] for call in trace["calls"] if call["name"] != "warning"] == ["getComment", "updateComment"]
+    assert "update comment failed" in trace["error"]
+
+
+@requires_node
+def test_final_response_creates_one_comment_only_when_the_initial_comment_was_never_created(tmp_path):
+    completed, trace = run_response_step(tmp_path, progress_body="", progress_comment_id="")
+
+    assert completed.returncode == 0, completed.stderr
+    assert [call["name"] for call in trace["calls"]] == ["createComment"]
+    assert trace["calls"][0]["args"]["issue_number"] == 77
+    assert trace["calls"][0]["args"]["body"] == "已完成处理，并保留执行计划。"
+
+
+@requires_node
+def test_final_response_omits_an_empty_plan_section(tmp_path):
+    progress_body = "\n".join(
+        [
+            "<!-- codex-live-progress -->",
+            "<!-- codex-plan-progress:start -->",
+            "<!-- codex-plan-progress:end -->",
+        ]
+    )
+
+    completed, trace = run_response_step(tmp_path, progress_body=progress_body)
+
+    assert completed.returncode == 0, completed.stderr
+    update_body = next(call["args"]["body"] for call in trace["calls"] if call["name"] == "updateComment")
+    assert update_body == "已完成处理，并保留执行计划。"
 
 
 def test_actionlint_config_only_ignores_the_confirmed_v3_metadata_mismatch():

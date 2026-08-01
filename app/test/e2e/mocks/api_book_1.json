@@ -1,6 +1,29 @@
 {
   "err": "ok",
   "kindle_sender": "",
+  "conversion_options": [
+    {
+      "source_format": "txt",
+      "target_format": "epub",
+      "converter": "txt2epub",
+      "available": false,
+      "reason": "target_exists"
+    },
+    {
+      "source_format": "epub",
+      "target_format": "azw3",
+      "converter": "ebook-convert",
+      "available": true,
+      "reason": null
+    },
+    {
+      "source_format": "epub",
+      "target_format": "pdf",
+      "converter": "ebook-convert",
+      "available": true,
+      "reason": null
+    }
+  ],
   "book": {
     "id": 1,
     "title": "百年孤独",
@@ -34,13 +57,19 @@
     "count_visit": 0,
     "count_download": 0,
     "available_formats": [
-      "epub"
+      "epub",
+      "txt"
     ],
     "files": [
       {
         "format": "epub",
         "size": 440912,
         "href": "/api/book/1.epub"
+      },
+      {
+        "format": "txt",
+        "size": 120000,
+        "href": "/api/book/1.txt"
       }
     ],
     "is_public": true,

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dev Container 分阶段交付方案</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #17212b; background: #eef2f6; line-height: 1.65; }
+    * { box-sizing: border-box; }
+    body { max-width: 1080px; margin: 0 auto; padding: 28px 18px 64px; }
+    header, section { margin-bottom: 18px; padding: 22px; border: 1px solid #d4dde7; border-radius: 12px; background: #fff; }
+    header { border-top: 5px solid #23774f; }
+    h1 { margin: 0 0 8px; line-height: 1.2; }
+    h2 { margin: 0 0 12px; font-size: 1.3rem; }
+    p, ul, ol { margin-top: 8px; }
+    code { padding: 2px 5px; border-radius: 4px; background: #edf2f7; overflow-wrap: anywhere; }
+    .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 9px; margin-top: 18px; }
+    .meta div { padding: 10px 12px; border-radius: 8px; background: #f3f6f9; }
+    .status, .passed { color: #176a42; font-weight: 700; }
+    .callout { padding: 12px 14px; border-left: 4px solid #386d9e; border-radius: 6px; background: #edf6ff; }
+    .warn { border-left-color: #a96a17; background: #fff6e9; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; min-width: 700px; border-collapse: collapse; }
+    th, td { padding: 10px; border: 1px solid #d4dde7; text-align: left; vertical-align: top; }
+    th { background: #edf3f8; }
+    svg { width: 100%; height: auto; border: 1px solid #d4dde7; border-radius: 10px; background: #fbfcfd; }
+    figcaption { color: #5b6c7d; font-size: .92rem; }
+    @media (max-width: 680px) { body { padding: 14px 10px 40px; } header, section { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dev Container 分阶段交付方案</h1>
+    <p>先发布并验证开发镜像，再迁移 Claude/Codex 消费端，避免镜像尚未就绪时同时启用消费者。</p>
+    <div class="meta">
+      <div><strong>创建日期</strong><br>2026-07-22</div>
+      <div><strong>所属模块</strong><br>project</div>
+      <div><strong>状态</strong><br><span class="status">ACTIVE</span></div>
+      <div><strong>需求来源</strong><br>维护者要求拆分 PR</div>
+      <div><strong>当前 PR 范围</strong><br>仅 dev container 基础设施</div>
+      <div><strong>影响范围</strong><br>Dockerfile、build workflow、tests</div>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. 原始诉求与最新决策</h2>
+    <p>总体目标仍是让 Claude 与 Codex 最终运行在 Talebook 的统一开发镜像中，并能够完成后端和前端开发测试。但交付必须拆分：第一个 PR 只建立、发布并验证 <code>talebook/talebook:dev</code>；镜像上线后，后续 PR 才修改 <code>claude.yml</code> 与 <code>codex.yml</code>。</p>
+    <div class="callout warn"><strong>明确决策：</strong><code>agent-dev-smoke.yml</code> 不是线上长期使用的 workflow，不得提交到仓库。需要的本地 GitHub Actions 验收使用 <code>/private/tmp</code> 下的一次性 workflow，测试完成后不进入 git。</div>
+  </section>
+
+  <section>
+    <h2>2. 为什么拆分</h2>
+    <p>若同一个合并同时发布镜像并让 Claude/Codex 立即引用 <code>:dev</code>，消费者可能在 master 的镜像构建完成前触发，从而拉取旧镜像或因标签不存在而失败。拆分后的发布顺序把镜像可用性变成第二个 PR 的明确前置条件。</p>
+    <figure>
+      <svg viewBox="0 0 980 280" role="img" aria-labelledby="flow-title flow-desc">
+        <title id="flow-title">Dev Container 分阶段发布流程</title>
+        <desc id="flow-desc">第一个 PR 构建并发布 dev 镜像，验证成功后，第二个 PR 再迁移 Claude 与 Codex。</desc>
+        <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L0 6L9 3z" fill="#3d6f9f"/></marker></defs>
+        <g fill="#edf5fc" stroke="#3d6f9f" stroke-width="2">
+          <rect x="35" y="75" width="250" height="120" rx="11"/>
+          <rect x="365" y="75" width="250" height="120" rx="11"/>
+          <rect x="695" y="75" width="250" height="120" rx="11"/>
+        </g>
+        <g fill="#17212b" text-anchor="middle" font-size="16">
+          <text x="160" y="108" font-weight="700">PR 1：镜像基础</text><text x="160" y="138">构建 Dockerfile dev</text><text x="160" y="166">master 发布 :dev</text>
+          <text x="490" y="108" font-weight="700">上线门禁</text><text x="490" y="138">镜像构建成功</text><text x="490" y="166">Hosted Runner 验证</text>
+          <text x="820" y="108" font-weight="700">PR 2：消费者</text><text x="820" y="138">迁移 Claude/Codex</text><text x="820" y="166">复用已发布 :dev</text>
+        </g>
+        <g fill="none" stroke="#3d6f9f" stroke-width="2.5" marker-end="url(#arrow)"><path d="M285 135H353"/><path d="M615 135H683"/></g>
+      </svg>
+      <figcaption>图 1：当前只实施左侧 PR 1；右侧消费者迁移不进入本次 diff。</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>3. 当前 PR 的边界</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>类别</th><th>包含</th><th>不包含</th></tr></thead>
+        <tbody>
+          <tr><td>镜像</td><td><code>dev</code> 从测试 stage 继承；包含 Calibre、Python 测试依赖、Node 20、git、jq、Codex CLI、bubblewrap/uidmap；<code>production-spa</code> 保持为 Dockerfile 最后一个 stage，未指定 target 时仍默认构建 SPA 生产镜像。</td><td>不改变 production stages，不预装 Claude/Bun。</td></tr>
+          <tr><td>发布</td><td>PR 仅构建 linux/amd64 dev target；只有 master push 发布浮动 <code>talebook/talebook:dev</code>。</td><td>不发布 commit SHA 标签；其他分支不得覆盖 <code>:dev</code>。</td></tr>
+          <tr><td>消费者</td><td>无。</td><td>不修改 <code>claude.yml</code>、<code>codex.yml</code> 或 Claude review workflow。</td></tr>
+          <tr><td>验收入口</td><td>Docker 构建、静态 workflow 测试，以及位于 <code>/private/tmp</code> 的临时 act workflow。</td><td>仓库中不新增任何 smoke workflow。</td></tr>
+          <tr><td>旁支修复</td><td>无。</td><td>异步 scan 测试竞态另开独立 PR，不混入镜像基础 PR。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>4. 实现方案</h2>
+    <ol>
+      <li>调整 <code>Dockerfile</code>：让 <code>dev</code> 继承 <code>test</code>，安装 agent 与开发工具，并在构建时执行版本探测；<code>production-spa</code> 必须位于文件末尾，维持默认生产构建语义。</li>
+      <li>调整 <code>.github/workflows/build.yml</code>：复用现有 build job，在 PR 中只验证构建，在 master push 中发布唯一的 <code>:dev</code> 标签，并写入 OCI revision。</li>
+      <li>添加 Docker stage 与 build workflow 契约测试，锁定继承关系、工具、发布条件和标签策略。</li>
+      <li>本地构建同名镜像后，动态生成临时 workflow 并用 <code>act -W /private/tmp/...</code> 验证 job container 能执行工具探测和开发测试；临时文件不复制进仓库。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>5. 发布、失败与回滚</h2>
+    <ul>
+      <li>PR 构建失败时不能合并，因此不会影响 Docker Hub 上已有标签。</li>
+      <li>master 发布失败时，后续消费者 PR 保持阻塞，不修改 Claude/Codex workflow。</li>
+      <li><code>:dev</code> 是维护者确认的浮动标签；OCI revision 与构建日志用于追溯实际来源。</li>
+      <li>如新镜像不可用，在消费者尚未迁移时不会影响 agent；修复 Dockerfile 后重新由 master 发布即可。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>6. 测试计划</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>验证项</th><th>计划命令/证据</th><th>当前结果</th></tr></thead>
+        <tbody>
+          <tr><td>镜像构建</td><td><code>make build-dev</code></td><td class="passed">通过；rebase 到最新 master 后复验生成 <code>sha256:f6b87e6e08518b196c5bd062bada1c85a06bb497d0b0afa0d971fcb74997405c</code></td></tr>
+          <tr><td>容器工具链</td><td>在镜像内探测 Calibre、Python、Node、npm、pytest、ruff、Codex、bwrap，并执行 <code>codex sandbox -- /bin/true</code></td><td class="passed">通过；Calibre 8.5.0、Python 3.13.5、Node 20.20.2、Codex 0.144.6，sandbox 成功</td></tr>
+          <tr><td>静态契约</td><td><code>python3.12 -m pytest -q tests/test_docker_stages.py tests/test_dev_container_workflow.py</code>；固定版本 <code>actionlint</code> 检查 build 与临时 workflow</td><td class="passed">通过；10 passed，其中包含 Dockerfile 最后 stage 回归检查；actionlint 无错误输出</td></tr>
+          <tr><td>默认生产构建</td><td><code>docker build --build-arg BUILD_COUNTRY=CN -t talebook/default-spa-check:pr893 -f Dockerfile .</code>，并检查镜像 CMD</td><td class="passed">通过；生成 <code>sha256:10bc886206f7c092d7aeac15c2636555cd827cd72db217f500f4183426bbd3e3</code>，CMD 为 <code>/var/www/talebook/docker/start.sh</code>，未落入 dev stage</td></tr>
+          <tr><td>本地 Actions</td><td><code>go run github.com/nektos/act@v0.2.89 workflow_dispatch -W /private/tmp/talebook-dev-container-smoke.yml --pull=false --container-architecture linux/arm64</code></td><td class="passed">通过；Job succeeded。临时 workflow 未进入工作区或 git</td></tr>
+          <tr><td>仓库检查</td><td><code>make lint-py-fix</code>；act 内执行 <code>make lint-py</code> 与 <code>make pytest</code>；另执行 <code>make test</code></td><td class="passed">通过；格式 96 files unchanged；act 后端 645 passed、1 skipped；make test 644 passed、2 skipped</td></tr>
+          <tr><td>前端能力</td><td>临时 act job 内执行 npm lint/build</td><td class="passed">通过；lint 为 0 errors、196 个存量 warnings；Nuxt 4.3.0 build 完成</td></tr>
+          <tr><td>方案校验</td><td><code>make check-design</code></td><td class="passed">通过；最新 master 基线上 44 份方案文档全部通过</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>实现与开发测试均已通过，方案转为 ACTIVE。真实 Docker Hub 发布只能在该 PR 合并到 master 后发生，将作为消费者 PR 的前置验收，不在本 PR 中伪报通过。</p>
+  </section>
+</body>
+</html>

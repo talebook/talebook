@@ -12,7 +12,6 @@ from tests.test_main import (
     BID_MOBI,
     BID_PDF,
     BID_TXT,
-    TestWithAdminUser,
     TestWithUserLogin,
     get_db,
     setUpModule as init,
@@ -202,26 +201,48 @@ class TestBookConvert(TestWithUserLogin):
                 self.assertEqual(d["err"], "user.no_permission")
 
     def test_convert_no_supported_formats(self):
-        """Book with no supported ebook formats should be rejected."""
+        """Book without the TXT source should be rejected."""
         mock_book = {
             "id": BID_EPUB,
             "title": "Test",
         }
         with mock.patch.object(BaseHandler, "get_book", return_value=mock_book):
-            d = self.json(f"/api/book/{BID_EPUB}/convert", method="POST", body="")
-            self.assertEqual(d["err"], "params.book.invalid")
+            d = self.json(
+                f"/api/book/{BID_EPUB}/convert",
+                method="POST",
+                body="source_format=txt&target_format=epub",
+            )
+            self.assertEqual(d["err"], "params.convert.source_missing")
 
-    def test_convert_already_has_epub_and_azw3(self):
-        """Book with both EPUB and AZW3 should be rejected."""
+    def test_convert_already_has_target_format(self):
+        """Book with both TXT and EPUB should not overwrite the EPUB."""
+        mock_book = {
+            "id": BID_EPUB,
+            "title": "Test",
+            "fmt_txt": "/tmp/test.txt",
+            "fmt_epub": "/tmp/test.epub",
+        }
+        with mock.patch.object(BaseHandler, "get_book", return_value=mock_book):
+            d = self.json(
+                f"/api/book/{BID_EPUB}/convert",
+                method="POST",
+                body="source_format=txt&target_format=epub",
+            )
+            self.assertEqual(d["err"], "params.convert.target_exists")
+
+    def test_convert_rejects_unsupported_route(self):
         mock_book = {
             "id": BID_EPUB,
             "title": "Test",
             "fmt_epub": "/tmp/test.epub",
-            "fmt_azw3": "/tmp/test.azw3",
         }
         with mock.patch.object(BaseHandler, "get_book", return_value=mock_book):
-            d = self.json(f"/api/book/{BID_EPUB}/convert", method="POST", body="")
-            self.assertEqual(d["err"], "params.book.invalid")
+            d = self.json(
+                f"/api/book/{BID_EPUB}/convert",
+                method="POST",
+                body="source_format=epub&target_format=txt",
+            )
+            self.assertEqual(d["err"], "params.convert.unsupported")
 
     def test_convert_success(self):
         """Book with only TXT format should be convertible."""
@@ -239,9 +260,49 @@ class TestBookConvert(TestWithUserLogin):
                     "webserver.services.convert.ConvertService.convert_and_save",
                     return_value=None,
                 ) as mock_convert:
-                    d = self.json(f"/api/book/{BID_TXT}/convert", method="POST", body="")
+                    d = self.json(
+                        f"/api/book/{BID_TXT}/convert",
+                        method="POST",
+                        body="source_format=txt&target_format=epub",
+                    )
                     self.assertEqual(d["err"], "ok")
-                    mock_convert.assert_called_once()
+                    mock_convert.assert_called_once_with(1, mock_book, "/tmp/test.txt", "epub")
+
+    def test_convert_epub_to_azw3(self):
+        mock_book = {
+            "id": BID_EPUB,
+            "title": "Test",
+            "fmt_epub": "/tmp/test.epub",
+        }
+        with mock.patch.object(BaseHandler, "get_book", return_value=mock_book):
+            with mock.patch("webserver.services.convert.ConvertService.is_book_converting", return_value=False):
+                with mock.patch("webserver.services.convert.ConvertService.convert_and_save") as mock_convert:
+                    d = self.json(
+                        f"/api/book/{BID_EPUB}/convert",
+                        method="POST",
+                        body="source_format=epub&target_format=azw3",
+                    )
+
+        self.assertEqual(d["err"], "ok")
+        mock_convert.assert_called_once_with(1, mock_book, "/tmp/test.epub", "azw3")
+
+    def test_convert_epub_to_pdf(self):
+        mock_book = {
+            "id": BID_EPUB,
+            "title": "Test",
+            "fmt_epub": "/tmp/test.epub",
+        }
+        with mock.patch.object(BaseHandler, "get_book", return_value=mock_book):
+            with mock.patch("webserver.services.convert.ConvertService.is_book_converting", return_value=False):
+                with mock.patch("webserver.services.convert.ConvertService.convert_and_save") as mock_convert:
+                    d = self.json(
+                        f"/api/book/{BID_EPUB}/convert",
+                        method="POST",
+                        body="source_format=epub&target_format=pdf",
+                    )
+
+        self.assertEqual(d["err"], "ok")
+        mock_convert.assert_called_once_with(1, mock_book, "/tmp/test.epub", "pdf")
 
 
 class TestBookToPDF(TestWithUserLogin):

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>在线阅读 EPUB 优先机制</title>
+  <style>
+    body { max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #1f2937; font: 16px/1.65 system-ui, sans-serif; }
+    h1, h2 { color: #0f3d68; }
+    code { background: #eef4f8; padding: .1em .3em; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #b9c8d3; padding: .55rem; text-align: left; vertical-align: top; }
+    th { background: #e8f1f7; }
+    .meta { display: grid; grid-template-columns: 7em 1fr; gap: .3rem 1rem; }
+    .status { color: #9a3412; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>在线阅读 EPUB 优先机制</h1>
+  <div class="meta">
+    <strong>创建日期</strong><span>2026-07-23</span>
+    <strong>所属模块</strong><span>webserver（影响 app 与 tests）</span>
+    <strong>状态</strong><span class="status">WIP</span>
+    <strong>需求来源</strong><span>用户要求整个书籍机制在存在 EPUB 时优先使用 EPUB 方式打开。</span>
+  </div>
+
+  <h2>原始诉求与目标</h2>
+  <p>同一本书可能同时保存 EPUB、PDF、TXT 或 Kindle 格式。所有在线阅读入口应得到一致结果：只要 EPUB 存在，就打开 EPUB 阅读器；没有 EPUB 时才按既有能力回退，避免前端根据 TXT 存在与否绕过统一规则。</p>
+
+  <h2>边界澄清</h2>
+  <table>
+    <thead><tr><th>决策</th><th>结论</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>适用操作</td><td>在线打开与阅读。</td><td>下载、发送设备、删除格式、拆分格式仍允许用户明确选择，不强制改成 EPUB。</td></tr>
+      <tr><td>统一入口</td><td>前端所有阅读按钮均指向 <code>/read/:id</code>。</td><td>格式优先级只由后端维护，避免多个前端入口产生不同结果。</td></tr>
+      <tr><td>旧 TXT 地址</td><td><code>/book/:id/readtxt</code> 在 EPUB 存在时转到统一阅读入口。</td><td>兼容历史书签，同时防止旧地址绕过 EPUB 优先规则；纯 TXT 仍留在原阅读器。</td></tr>
+      <tr><td>格式顺序</td><td>EPUB → PDF → TXT → MOBI/AZW/AZW3 转 EPUB。</td><td>保留 PDF 权限检查、TXT 专用阅读器以及其他格式的异步转换行为。</td></tr>
+      <tr><td>EPUB 与其他格式并存</td><td>直接渲染 EPUB，不触发 PDF/TXT 跳转，也不启动转换。</td><td>这是本次需求的核心可观察行为。</td></tr>
+      <tr><td>历史与统计</td><td>保持一次打开记录一次阅读历史与下载计数。</td><td>仅调整格式选择，不改变统计语义。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>统一决策流程</h2>
+  <svg viewBox="0 0 900 145" width="100%" role="img" aria-label="在线阅读格式优先级">
+    <rect x="10" y="45" width="130" height="52" rx="8" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="75" y="76" text-anchor="middle">阅读入口</text>
+    <path d="M140 71h65" stroke="#2563eb"/>
+    <rect x="205" y="20" width="140" height="52" rx="8" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="275" y="51" text-anchor="middle">有 EPUB</text>
+    <path d="M345 46h70" stroke="#16a34a"/>
+    <rect x="415" y="20" width="170" height="52" rx="8" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="500" y="51" text-anchor="middle">EPUB 阅读器</text>
+    <path d="M205 96h70" stroke="#64748b"/>
+    <rect x="275" y="88" width="310" height="42" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="430" y="114" text-anchor="middle">PDF → TXT → 其他格式转 EPUB</text>
+  </svg>
+
+  <h2>验证计划</h2>
+  <ul>
+    <li>后端增加 EPUB 与 PDF/TXT 并存时仍返回 EPUB 阅读页的回归用例。</li>
+    <li>保留单一 PDF、单一 TXT 和 Kindle 格式的现有回退测试。</li>
+    <li>前端增加多格式书籍的阅读链接用例，断言所有入口均使用 <code>/read/:id</code>。</li>
+    <li>运行后端 lint、Python 编译、前端 lint、相关测试和设计文档检查。</li>
+    <li>启动 mock API 与 Nuxt，实际验证多格式书籍详情页的主按钮和在线阅读卡片。</li>
+  </ul>
+
+  <h2>测试结果</h2>
+  <p>待验证。</p>
+</body>
+</html>

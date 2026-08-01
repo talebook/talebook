@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dev 镜像补齐 Claude Action 解压依赖</title>
+  <style>
+    :root { color-scheme: light; --ink: #17212b; --muted: #596675; --line: #d8e0e7; --panel: #f6f8fa; --accent: #0969da; --warn: #9a6700; --danger: #cf222e; --success: #1a7f37; }
+    * { box-sizing: border-box; }
+    body { max-width: 1020px; margin: 0 auto; padding: 36px 24px 64px; color: var(--ink); background: #fff; font: 16px/1.65 "IBM Plex Sans", "Noto Sans SC", "PingFang SC", sans-serif; }
+    header { padding: 26px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(135deg, #f6f8fa, #eef5ff); }
+    h1, h2 { font-family: "Avenir Next Condensed", "Arial Narrow", "Noto Sans SC", sans-serif; line-height: 1.15; letter-spacing: .025em; }
+    h1 { margin: 0 0 18px; font-size: 32px; font-weight: 800; }
+    h2 { margin-top: 34px; font-size: 22px; font-weight: 750; }
+    .meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .meta div { padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,.82); }
+    .status { color: var(--success); font-weight: 700; }
+    code { padding: 2px 5px; border-radius: 4px; background: var(--panel); font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace; font-size: .92em; overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; gap: 9px; align-items: center; margin: 18px 0; }
+    .flow div { min-height: 86px; padding: 13px; border: 1px solid var(--line); border-radius: 9px; display: grid; place-items: center; text-align: center; }
+    .arrow { color: var(--accent); font-size: 23px; }
+    .note { padding: 12px 14px; border-left: 4px solid var(--accent); background: #eef6ff; }
+    .warning { padding: 12px 14px; border-left: 4px solid var(--danger); background: #fff1f0; }
+    @media (max-width: 760px) { .meta { grid-template-columns: 1fr; } .flow { grid-template-columns: 1fr; } .arrow { transform: rotate(90deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dev 镜像补齐 Claude Action 解压依赖</h1>
+    <div class="meta">
+      <div><strong>创建日期</strong><br>2026-07-23</div>
+      <div><strong>所属模块</strong><br>docker</div>
+      <div><strong>状态</strong><br><span class="status">ACTIVE</span></div>
+      <div><strong>需求来源</strong><br>PR #898 合并后的真实 <code>@claude</code> 运行失败</div>
+      <div><strong>工作分支</strong><br><code>fix/20260723-dev-image-unzip</code></div>
+      <div><strong>影响范围</strong><br>Docker development stage 与镜像契约测试</div>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. 原始诉求与事实</h2>
+    <p>继续保留 <code>talebook/talebook:dev</code> 作为 Claude 与 Codex 的统一业务环境，修复 Claude Action 在 job container 内无法安装 Bun 的问题。用户要求本地验收必须加载真实 <code>.github/workflows/claude.yml</code> 并模拟 <code>@claude</code>，不能再用只执行工具探测和项目检查的替代 smoke 冒充 Action 验收。</p>
+    <table>
+      <thead><tr><th>证据</th><th>结论</th></tr></thead>
+      <tbody>
+        <tr><td>线上 run <code>29974489717</code></td><td>checkout、环境探测和依赖同步成功；Claude Action 内部 <code>setup-bun</code> 下载 Bun 后报 <code>Unable to locate executable file: unzip</code>。</td></tr>
+        <tr><td>本地真实 workflow 复现</td><td><code>act v0.2.82</code> 加载仓库 <code>.github/workflows/claude.yml</code> ，使用 <code>issue_comment</code> 事件与 dummy OAuth token，稳定复现同一 <code>unzip</code> 错误；临时事件文件已删除。</td></tr>
+        <tr><td>旧测试缺口</td><td>旧临时 act workflow 没有执行 Claude Action；YAML contract 只检查步骤顺序和参数；PR 上的 Claude review 是另一份运行在宿主 <code>ubuntu-latest</code> 的 workflow。</td></tr>
+      </tbody>
+    </table>
+    <p class="warning"><strong>纠偏：</strong>旧方案所称“等价 job”只等价到业务环境和项目命令，不等价到第三方 composite action 的 bootstrap 边界。本方案把真实 Action bootstrap 纳入验收。</p>
+  </section>
+
+  <section>
+    <h2>2. 目标与明确边界</h2>
+    <table>
+      <thead><tr><th>包含</th><th>不包含</th></tr></thead>
+      <tbody>
+        <tr><td>development stage 安装 <code>unzip</code>，并在镜像构建阶段执行版本探测。</td><td>不修改 production、builder 或 test stage，不调整 Node 24、Codex 版本及发布标签。</td></tr>
+        <tr><td>扩展 Dockerfile 契约测试，保证 <code>unzip</code> 安装与探测不会回退。</td><td>不修改 <code>.github/workflows/claude.yml</code> 、<code>.github/workflows/codex.yml</code> 或 Claude review workflow。</td></tr>
+        <tr><td>用本地已构建镜像运行真实 <code>.github/workflows/claude.yml</code> ，确认 <code>Install Bun</code> 成功。</td><td>不把临时事件 JSON 或 smoke workflow 提交到仓库，不向本地 act 提供真实 OAuth token。</td></tr>
+        <tr><td>合并发布后，以真实 <code>@claude</code> 成功作为启动 Codex 修复 PR 的发布门禁。</td><td>本 PR 不处理 GitHub Ubuntu 的 Codex AppArmor/user namespace 问题。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. 方案与验收链路</h2>
+    <div class="flow" aria-label="Claude Action bootstrap 验收流程">
+      <div>TDD contract<br><strong>要求 unzip</strong></div><span class="arrow">→</span>
+      <div>构建 dev 镜像<br><strong>unzip -v</strong></div><span class="arrow">→</span>
+      <div>本地真实 Claude workflow<br><strong>Install Bun 成功</strong></div><span class="arrow">→</span>
+      <div>master 发布后<br><strong>真实 @claude</strong></div>
+    </div>
+    <ol>
+      <li>先给 <code>test_dev_stage_is_a_complete_agent_development_environment</code> 增加 <code>unzip</code> 安装和版本探测断言，在当前 Dockerfile 上确认红灯。</li>
+      <li>最小修改 dev stage：在已有 apt 清单加入 <code>unzip</code>，并在工具链验证 RUN 中加入 <code>unzip -v</code>。</li>
+      <li>构建本地 dev target，并直接验证 <code>unzip</code>。</li>
+      <li>创建一次性 <code>/private/tmp</code> 事件 JSON，使用 dummy token 运行仓库真实 <code>.github/workflows/claude.yml</code> ；验收点是 Action 内部 <code>Install Bun</code> 成功并进入后续步骤。因 dummy token 导致的后续鉴权失败不视为 bootstrap 失败。</li>
+      <li>删除临时事件文件，确认仓库中不存在 smoke workflow。</li>
+    </ol>
+    <p class="note">本地 act 可以验证真实 composite action、Bun 下载和解压链路，但不能等价证明 GitHub OIDC、仓库 API 回帖和真实模型调用；这些能力由发布后的真实 <code>@claude</code> 验收。</p>
+  </section>
+
+  <section>
+    <h2>4. 发布、风险与回滚</h2>
+    <ul>
+      <li>发布仍由 master 的 build workflow 覆盖浮动 <code>talebook/talebook:dev</code>，不增加 SHA 标签。</li>
+      <li>风险仅为 dev 镜像增加一个 Debian 工具包及少量体积；production 镜像不继承 dev stage。</li>
+      <li>若 Bun bootstrap 仍失败，保持方案 WIP，依据真实 Action 下一条错误补充缺失依赖，不提前扩大到 Claude/Bun 预装。</li>
+      <li>回滚为移除 dev stage 的 <code>unzip</code> 安装和探测；不会影响生产镜像。</li>
+      <li>发布后真实 <code>@claude</code> 未成功前，不启动 Codex sandbox 修复 PR。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>5. Codex 新失败证据的隔离结论</h2>
+    <p>run <code>30006177093</code> 使用新下载的 dev 镜像，Docker 已收到 <code>--security-opt seccomp=unconfined</code>；所有工具探测成功，但 <code>codex sandbox -- /bin/true</code> 返回非零。当前 workflow 使用 <code>2&gt;/dev/null</code> 丢弃了原始错误，因此只能定位到 sandbox 初始化失败，不能从现有日志证明具体 AppArmor/user namespace 分支。</p>
+    <p>后续独立 Codex 方案必须先取消 stderr 屏蔽并记录宿主策略诊断，再决定是否增加 AppArmor container option 或调整 runner 架构。本 PR 不携带该改动。</p>
+  </section>
+
+  <section>
+    <h2>6. 测试结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>实际命令或证据</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td>TDD 红灯</td><td><code>python3.12 -m pytest -q tests/test_docker_stages.py</code></td><td>通过：实现前得到预期的 <code>1 failed, 9 passed</code>，唯一失败是 dev stage 缺少 <code>unzip</code>。</td></tr>
+        <tr><td>TDD 绿灯</td><td><code>python3.12 -m pytest -q tests/test_docker_stages.py</code></td><td>通过：实现后 <code>10 passed</code>。</td></tr>
+        <tr><td>dev 镜像构建</td><td><code>make build-dev</code></td><td>通过：构建 <code>linux/arm64</code> 本地镜像 <code>sha256:231bf83ae3fcfcbd02b32624d230d740daa3576be4d1371f137bcb27f36de9ea</code>；构建期 <code>unzip -v</code> 输出版本 <code>6.00</code>。</td></tr>
+        <tr><td>镜像工具</td><td>一次性 <code>talebook/talebook:dev</code> 容器执行 <code>unzip -v</code>、Node、Codex、pytest、ruff 与 bubblewrap 探测</td><td>通过：<code>/usr/bin/unzip</code> 可执行，既有工具探测均成功。</td></tr>
+        <tr><td>真实 Claude bootstrap</td><td><code>act v0.2.82 issue_comment</code> 加载仓库真实 <code>.github/workflows/claude.yml</code> ，使用 dummy OAuth token</td><td>目标通过：真实 <code>setup-bun</code> 调用 <code>/usr/bin/unzip</code> ，Bun <code>1.3.14</code> 安装成功，140 个 Action 依赖安装成功并进入主逻辑；随后因本地 act 不提供 <code>ACTIONS_ID_TOKEN_REQUEST_URL</code> 在 OIDC 边界失败，符合计划限制。一次性事件 JSON 已删除。</td></tr>
+        <tr><td>Python 检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code></td><td>通过：96 个后端 Python 文件无需格式调整，ruff 检查通过。</td></tr>
+        <tr><td>全量后端测试</td><td><code>make test</code></td><td>通过：Docker 中 <code>667 passed, 2 skipped, 33 warnings</code>。</td></tr>
+        <tr><td>方案与补丁检查</td><td><code>make check-design</code>、<code>git diff --check</code></td><td>通过：53 份方案文档通过路径、状态、HTML 结构和单文件资源检查；补丁无空白错误。</td></tr>
+        <tr><td>发布后验收</td><td>Docker Hub revision 对齐合并提交，真实 <code>@claude</code> run 成功</td><td>未执行：必须等待本 PR 合并并由 master 发布 dev 镜像；仍作为后续 Codex sandbox 修复 PR 的启动门禁。</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

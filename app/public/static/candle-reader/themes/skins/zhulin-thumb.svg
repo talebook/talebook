@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 140">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef5e4"/><stop offset="1" stop-color="#dbe9c8"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.85" cy="0.1" r="0.5">
+      <stop offset="0" stop-color="#fbffe9" stop-opacity="0.85"/><stop offset="1" stop-color="#fbffe9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="280" height="140" fill="url(#g)"/>
+  <rect width="280" height="140" fill="url(#sun)"/>
+  <g fill="#8bb06a" opacity="0.5">
+    <rect x="14" y="0" width="9" height="140" rx="3"/><rect x="34" y="0" width="6" height="140" rx="2"/>
+    <rect x="92" y="0" width="7" height="140" rx="2"/><rect x="210" y="0" width="8" height="140" rx="3"/>
+    <rect x="252" y="0" width="6" height="140" rx="2"/>
+  </g>
+  <g stroke="#6f9a4e" stroke-width="2" opacity="0.42">
+    <line x1="12" y1="46" x2="25" y2="46"/><line x1="12" y1="96" x2="25" y2="96"/>
+    <line x1="90" y1="70" x2="101" y2="70"/><line x1="208" y1="58" x2="220" y2="58"/>
+  </g>
+  <g fill="#7aa552" opacity="0.5">
+    <path d="M40 34 q34 -16 68 -4 q-34 18 -68 4z"/><path d="M99 64 q30 12 56 44 q-40 0 -56 -44z"/>
+    <path d="M218 40 q30 -14 58 -3 q-30 16 -58 3z"/><path d="M30 112 q30 -14 60 -3 q-30 16 -60 3z"/>
+  </g>
+</svg>

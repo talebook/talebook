@@ -6,6 +6,10 @@ PGID=${PGID:-0}
 groupmod -o -g "${PGID}" talebook
 usermod -o -u "${PUID}" talebook
 
+if [ "${PUID}" = "0" ]; then
+  echo "WARNING: PUID=0 runs Talebook application processes as root; this is supported for compatibility but is not required for SSL upload."
+fi
+
 # 使用预设的书库和配置
 if [ ! -d "/data/books" ]; then
   cp -rf /prebuilt/books /data/
@@ -36,13 +40,16 @@ find . \( -path ./library -o -name '*.pyc' \) -prune -o -type f -print | while r
 done
 
 
-mkdir -p /root/.npm
+mkdir -p /root/.npm /run/talebook /data/books/ssl
 
 # 设置系统文件的权限（数量较少，且 nginx/诊断页在自检完成前就需要可用，必须先于 supervisord 启动前就绪）
 mkdir -p /data/log/nginx /var/www/talebook/status
 chown -R talebook:talebook \
+  /run/talebook \
+  /data/books/ssl \
   /data/log/ \
   /var/lib/nginx \
+  /var/log/nginx \
   /root/.config/calibre \
   /root/.npm \
   /var/www/talebook/app/.env \
@@ -53,6 +60,13 @@ chown -R talebook:talebook \
   /usr/lib/calibre \
   /usr/share/calibre
 
+if [ -f /data/books/ssl/ssl.crt ]; then
+  chmod 0644 /data/books/ssl/ssl.crt
+fi
+if [ -f /data/books/ssl/ssl.key ]; then
+  chmod 0600 /data/books/ssl/ssl.key
+fi
+
 # /data/books 的权限校验、nginx 配置检查、数据库初始化/迁移/配置写入这些"可能失败"的
 # 步骤，交给 supervisor 的 bootstrap program（webserver/self_check.py）在 nginx 启动
 # 之后逐项自检并写入 status.json；任一步失败都不会导致容器整体重启，nginx 与诊断页
@@ -62,4 +76,3 @@ export PYTHONDONTWRITEBYTECODE=1
 echo
 echo "====== Start Server ===="
 exec /usr/bin/supervisord --nodaemon -u root -c /etc/supervisor/supervisord.conf
-

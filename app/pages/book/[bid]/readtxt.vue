@@ -296,7 +296,7 @@ onMounted(() => {
             mainStore.login(rsp);
         }
     });
-    init();
+    openPreferredReader();
 });
 
 onUnmounted(() => {
@@ -351,6 +351,20 @@ const init = () => {
         }).finally(() => {
             loading.value = false;
         });
+};
+
+const openPreferredReader = async () => {
+    try {
+        const rsp = await $backend(`/book/${bookid}`);
+        const formats = rsp.book?.files?.map(file => String(file.format).toLowerCase()) || [];
+        if (rsp.err === 'ok' && formats.includes('epub')) {
+            window.location.replace(`/read/${bookid}`);
+            return;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+    init();
 };
 
 const getNovelContent = (i) => {

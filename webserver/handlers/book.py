@@ -30,7 +30,6 @@ from webserver.constants import (
     META_SOURCE_QIMAO,
     META_SOURCE_TOMATO,
     META_SOURCE_XHSD,
-    SUPPORTED_EBOOK_FORMATS,
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
@@ -40,7 +39,7 @@ from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
 from webserver.services.autofill import AutoFillService
-from webserver.services.convert import ConvertService
+from webserver.services.convert import CONVERSION_TARGETS, ConvertService
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
 
@@ -121,6 +120,7 @@ class BookDetail(BaseHandler):
             "err": "ok",
             "kindle_sender": CONF["smtp_username"],
             "book": book_info,
+            "conversion_options": ConvertService.get_conversion_options(book),
         }
 
 
@@ -136,33 +136,41 @@ class BookConverter(BaseHandler):
         if not self.is_admin() and not self.is_book_owner(book_id, self.user_id()):
             return {"err": "user.no_permission", "msg": _("无权限")}
 
-        fmts = []
-        paths = []
-        for fmt in SUPPORTED_EBOOK_FORMATS:
-            book_path = book.get("fmt_%s" % fmt, None)
-            if book_path:
-                fmts.append(fmt)
-                paths.append(book_path)
+        source_format = self.get_argument("source_format", "").strip().lower()
+        target_format = self.get_argument("target_format", "").strip().lower()
+        # Validate the requested (source, target) is a supported conversion route.
+        # `get_conversion_options` only returns one option per target (with a
+        # fallback source), so looking up the user-supplied pair there would
+        # falsely report `unsupported` whenever the book lacks every source
+        # format for that target. Build the option against CONVERSION_TARGETS
+        # directly so we can distinguish "route doesn't exist" from "book
+        # doesn't carry the source".
+        valid_sources_for_target = next(
+            (sources for target, sources in CONVERSION_TARGETS if target == target_format),
+            None,
+        )
+        if not valid_sources_for_target or source_format not in valid_sources_for_target:
+            return {
+                "err": "params.convert.unsupported",
+                "msg": _("不支持从 %s 转换为 %s") % (source_format.upper() or "?", target_format.upper() or "?"),
+            }
+        if book.get(f"fmt_{target_format}"):
+            return {
+                "err": "params.convert.target_exists",
+                "msg": _("本书已有 %s 格式，无需重复转换") % target_format.upper(),
+            }
+        if not book.get(f"fmt_{source_format}"):
+            return {
+                "err": "params.convert.source_missing",
+                "msg": _("本书没有 %s 格式") % source_format.upper(),
+            }
 
-        if not fmts:
-            return {"err": "params.book.invalid", "msg": _("本书没有支持的电子书格式")}
-
-        if ("epub" in fmts) and ("azw3" in fmts):
-            return {"err": "params.book.invalid", "msg": _("本书已有EPUB及Kindle版本, 不需要转换")}
-
-        if fmts[0] == "epub":
-            fmt = "azw3"
-        elif fmts[0] == "pdf":
-            fmt = "epub"
-        else:
-            fmt = "epub"
-
-        fpath = paths[0]
+        fpath = book[f"fmt_{source_format}"]
 
         service = ConvertService()
         if service.is_book_converting(book):
             return {"err": "params.book.converting", "msg": _("本书正在转换中，请稍后再试")}
-        service.convert_and_save(self.user_id(), book, fpath, fmt)
+        service.convert_and_save(self.user_id(), book, fpath, target_format)
         return {"err": "ok", "content": "%s" % _("转换成功，请稍后刷新页面查看")}
 
 
@@ -1479,6 +1487,17 @@ class BookUploadComplete(BookUploadBase):
 
 
 class BookRead(BaseHandler):
+    def render_epub(self, book, is_ready):
+        return self.html_page(
+            "book/" + CONF["EPUB_VIEWER"],
+            {
+                "book": book,
+                "epub_dir": "/get/extract/%s" % book["id"],
+                "is_ready": is_ready,
+                "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
+            },
+        )
+
     def get(self, id):
         if not CONF["ALLOW_GUEST_READ"] and not self.current_user:
             return self.redirect("/login")
@@ -1494,6 +1513,9 @@ class BookRead(BaseHandler):
         book_id = book["id"]
         self.user_history("read_history", book)
         self.count_increase(book_id, count_download=1)
+
+        if book.get("fmt_epub"):
+            return self.render_epub(book, is_ready=True)
 
         if "fmt_pdf" in book:
             # PDF类书籍需要检查下载权限。
@@ -1513,25 +1535,13 @@ class BookRead(BaseHandler):
             return self.redirect(txt_reader_url)
 
         # 其他格式，转换为EPUB进行在线阅读
-        for fmt in ["epub", "mobi", "azw", "azw3", "txt"]:
+        for fmt in ["mobi", "azw", "azw3"]:
             fpath = book.get("fmt_%s" % fmt, None)
             if not fpath:
                 continue
 
-            if fmt != "epub":
-                ConvertService().convert_and_save(self.user_id(), book, fpath, "epub")
-
-            # epub_dir is for javascript
-            epub_dir = "/get/extract/%s" % book["id"]
-            return self.html_page(
-                "book/" + CONF["EPUB_VIEWER"],
-                {
-                    "book": book,
-                    "epub_dir": epub_dir,
-                    "is_ready": (fmt == "epub"),
-                    "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
-                },
-            )
+            ConvertService().convert_and_save(self.user_id(), book, fpath, "epub")
+            return self.render_epub(book, is_ready=False)
         raise web.HTTPError(404, reason=_("抱歉，在线阅读器暂不支持该格式的书籍"))
 
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Talebook 产品策划"
+  short_description: "为 Talebook 提供基于证据的产品策划、竞品研究与交互设计"
+  default_prompt: "使用 $talebook-product 基于仓库证据分析 Talebook，并输出有优先级和验收标准的产品方案。"

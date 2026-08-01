@@ -650,6 +650,21 @@ class TestBook(TestWithUserLogin):
             self.assertEqual(rsp.code, 200)
             self.assertNotIn("waitReady", rsp.body.decode("utf-8"))
 
+    def test_read_prefers_epub_when_other_formats_exist(self):
+        book = {
+            "id": BID_EPUB,
+            "title": "EPUB First",
+            "fmt_epub": testdir + "/cases/old.epub",
+            "fmt_pdf": testdir + "/cases/old.pdf",
+            "fmt_txt": testdir + "/cases/book.txt",
+        }
+        with mock.patch("webserver.handlers.base.BaseHandler.get_book_or_404", return_value=book):
+            rsp = self.fetch("/read/%s" % BID_EPUB, follow_redirects=False)
+
+        self.assertEqual(rsp.code, 200)
+        self.assertNotIn("Location", rsp.headers)
+        self.assertNotIn("waitReady", rsp.body.decode("utf-8"))
+
     def test_edit(self):
         body = {
             "id": 5,

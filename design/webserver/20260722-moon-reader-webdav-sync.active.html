@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>静读天下 WebDAV 同步兼容修复方案</title>
+  <style>
+    :root {
+      --ink: #172338;
+      --muted: #5d6b7c;
+      --paper: #f2f6f9;
+      --panel: #ffffff;
+      --line: #c8d4df;
+      --blue: #176b87;
+      --cyan: #00a6a6;
+      --red: #b23a48;
+      --green: #257a5a;
+      --code: #0c2430;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(23, 107, 135, .055) 1px, transparent 1px) 0 0 / 32px 32px,
+        linear-gradient(rgba(23, 107, 135, .055) 1px, transparent 1px) 0 0 / 32px 32px,
+        var(--paper);
+      font-family: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.7;
+    }
+    main { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 48px 0 72px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(30px, 6vw, 70px);
+      color: white;
+      background: var(--code);
+      border-radius: 4px 4px 28px 4px;
+      box-shadow: 0 24px 70px rgba(12, 36, 48, .18);
+    }
+    header::after {
+      content: "MOVE";
+      position: absolute;
+      right: -18px;
+      bottom: -48px;
+      color: rgba(255, 255, 255, .055);
+      font: 900 clamp(92px, 20vw, 230px)/1 "Courier New", monospace;
+      letter-spacing: -.1em;
+    }
+    .eyebrow, .utility { font: 700 12px/1.4 "Courier New", monospace; letter-spacing: .14em; text-transform: uppercase; }
+    .eyebrow { color: #79e2df; }
+    h1 { position: relative; z-index: 1; max-width: 780px; margin: 18px 0 22px; font-size: clamp(36px, 6vw, 72px); line-height: 1.06; letter-spacing: -.045em; }
+    .lead { position: relative; z-index: 1; max-width: 700px; margin: 0; color: #c9dae0; font-size: 18px; }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .meta span { padding: 7px 11px; border: 1px solid rgba(121, 226, 223, .35); background: rgba(121, 226, 223, .08); font-size: 13px; }
+    section { margin-top: 52px; }
+    h2 { margin: 0 0 18px; font-size: clamp(25px, 3.4vw, 38px); letter-spacing: -.025em; line-height: 1.2; }
+    h3 { margin: 0 0 8px; font-size: 17px; }
+    p { margin: 0 0 12px; }
+    code { padding: .1em .35em; color: #075d72; background: #e1f1f3; font-family: "Courier New", monospace; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 18px; }
+    .card { padding: 24px; background: rgba(255, 255, 255, .94); border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 8px 24px rgba(37, 61, 79, .06); }
+    .card p:last-child { margin-bottom: 0; }
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    .utility { display: block; margin-bottom: 12px; color: var(--blue); }
+    .trace { display: grid; grid-template-columns: 1fr 54px 1fr; align-items: stretch; margin-top: 24px; }
+    .trace-panel { min-width: 0; padding: 24px; color: #dcebf0; background: var(--code); }
+    .trace-panel:first-child { border-radius: 4px 0 0 4px; }
+    .trace-panel:last-child { border-radius: 0 4px 4px 0; }
+    .trace-arrow { display: grid; place-items: center; color: white; background: var(--blue); font: 800 24px/1 "Courier New", monospace; }
+    .request { margin: 10px 0; padding: 12px 0; border-top: 1px solid #294855; border-bottom: 1px solid #294855; font: 700 clamp(18px, 3vw, 30px)/1.2 "Courier New", monospace; color: #79e2df; overflow-wrap: anywhere; }
+    .bad { color: #ff9ba7; }
+    .good { color: #83e0bc; }
+    .method-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .method-strip b { padding: 8px 10px; color: white; background: var(--blue); font: 700 13px/1 "Courier New", monospace; }
+    .method-strip b.new { background: var(--green); }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); }
+    th, td { padding: 14px 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { color: var(--blue); background: #e7f0f4; font-size: 13px; letter-spacing: .05em; }
+    tr:last-child td { border-bottom: 0; }
+    ul { margin: 8px 0 0; padding-left: 20px; }
+    li + li { margin-top: 5px; }
+    .status { display: inline-flex; gap: 8px; align-items: center; color: var(--red); font-weight: 800; }
+    .status::before { content: ""; width: 9px; height: 9px; background: currentColor; border-radius: 50%; box-shadow: 0 0 0 5px rgba(178, 58, 72, .12); }
+    .test-list { margin: 0; padding: 0; list-style: none; }
+    .test-list li { display: grid; grid-template-columns: 112px 1fr; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .test-list li:last-child { border-bottom: 0; }
+    .test-list strong { color: var(--muted); font: 700 12px/1.6 "Courier New", monospace; }
+    footer { margin-top: 52px; padding-top: 18px; color: var(--muted); border-top: 1px solid var(--line); font-size: 13px; }
+    @media (max-width: 760px) {
+      main { width: min(100% - 22px, 1120px); padding-top: 12px; }
+      header { border-radius: 3px 3px 20px 3px; }
+      .span-4, .span-6, .span-8 { grid-column: span 12; }
+      .trace { grid-template-columns: 1fr; }
+      .trace-arrow { min-height: 42px; transform: none; }
+      .trace-arrow::before { content: "↓"; }
+      .trace-arrow { font-size: 0; }
+      .trace-arrow::before { font-size: 22px; }
+      .trace-panel:first-child, .trace-panel:last-child { border-radius: 3px; }
+      .test-list li { grid-template-columns: 1fr; gap: 2px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Issue #890 · WebDAV protocol bridge</div>
+      <h1>让同步请求穿过 405 闸门</h1>
+      <p class="lead">静读天下能连接、能浏览，却在进入写入同步流程后报错。修复聚焦于 Tornado 与 WsgiDAV 之间缺失的方法转发。</p>
+      <div class="meta">
+        <span>创建日期：2026-07-22</span>
+        <span>所属模块：webserver</span>
+        <span>状态：ACTIVE</span>
+        <span>需求来源：GitHub Issue #890</span>
+      </div>
+    </header>
+
+    <section aria-labelledby="request-title">
+      <span class="utility">Request / 原始诉求</span>
+      <h2 id="request-title">寻找原因，修复静读天下 WebDAV 同步报错</h2>
+      <div class="grid">
+        <article class="card span-8">
+          <h3>维护者请求</h3>
+          <p>针对“静读天下 WEBDAV 同步报错”定位原因、完成修复，并提供完整 PR 内容。</p>
+          <p>当前 GitHub Actions 上下文仅提供 Issue 标题与维护者评论；公开页面因运行环境网络连接被重置，无法读取原始附件。因此以服务端协议路径和实现证据界定问题。</p>
+        </article>
+        <article class="card span-4">
+          <h3>交付目标</h3>
+          <ul>
+            <li>静读天下的核心同步方法不再返回 Tornado 405。</li>
+            <li>请求继续交由 WsgiDAV 处理。</li>
+            <li>不扩大书库写权限。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="cause-title">
+      <span class="utility">Diagnosis / 根因</span>
+      <h2 id="cause-title">请求在进入 WebDAV 引擎之前就被拒绝</h2>
+      <p><code>WebDAVHandler.prepare()</code> 本可把全部请求交给 WsgiDAV，但 Tornado 会先检查 <code>SUPPORTED_METHODS</code>。现有桥接层仅补入 <code>PROPFIND</code> 与 <code>MKCOL</code>，同步阶段常见的 <code>MOVE</code> 等方法因此直接得到 405。</p>
+      <div class="trace" role="img" aria-label="修复前后 WebDAV MOVE 请求处理流程对比">
+        <div class="trace-panel">
+          <span class="utility bad">Before · bridge rejected</span>
+          <div class="request">MOVE /books/reader/…</div>
+          <p>Tornado 方法检查</p>
+          <p class="bad"><strong>405 Method Not Allowed</strong></p>
+        </div>
+        <div class="trace-arrow">→</div>
+        <div class="trace-panel">
+          <span class="utility good">After · engine decides</span>
+          <div class="request">MOVE /books/reader/…</div>
+          <p>Tornado 桥接 → WsgiDAV</p>
+          <p class="good"><strong>按 WebDAV 语义完成或返回协议错误</strong></p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="solution-title">
+      <span class="utility">Design / 修复方案</span>
+      <h2 id="solution-title">补齐核心方法，只修桥，不改资源权限</h2>
+      <div class="grid">
+        <article class="card span-6">
+          <h3>方法集合集中声明</h3>
+          <p>在 <code>webserver/webdav/handler.py</code> 定义 RFC 4918 核心方法集合，并与 Tornado 原生方法去重合并，避免分散维护。</p>
+          <div class="method-strip" aria-label="WebDAV 方法列表">
+            <b>PROPFIND</b><b>MKCOL</b><b class="new">COPY</b><b class="new">LOCK</b><b class="new">MOVE</b><b class="new">PROPPATCH</b><b class="new">UNLOCK</b>
+          </div>
+        </article>
+        <article class="card span-6">
+          <h3>分派入口完整对应</h3>
+          <p>为新增方法提供 Tornado 小写处理入口。实际请求仍在 <code>prepare()</code> 中统一委托给 WsgiDAV，入口本身不重复实现协议逻辑。</p>
+          <p>回归测试同时验证白名单和入口一一对应，防止仅添加方法名却在分派阶段失败。</p>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="boundary-title">
+      <span class="utility">Boundaries / 边界决策</span>
+      <h2 id="boundary-title">兼容性变化与不变项</h2>
+      <table>
+        <thead><tr><th>主题</th><th>决策</th><th>理由</th></tr></thead>
+        <tbody>
+          <tr><td>认证</td><td>不变，继续使用站点账号 Basic Auth</td><td>问题发生于认证后的 HTTP 方法门禁。</td></tr>
+          <tr><td>书库目录</td><td>保持只读</td><td>新增转发不改变 <code>VirtualCollection</code> 和 <code>WebDavResource</code> 的 403 策略。</td></tr>
+          <tr><td>reader 同步目录</td><td>保持按用户隔离、可写</td><td>继续由现有 <code>FilesystemProvider</code> 判断操作是否合法。</td></tr>
+          <tr><td>未知扩展方法</td><td>不做通配放行</td><td>只允许 WsgiDAV 支持的核心方法，保留 Tornado 对意外方法的防护。</td></tr>
+          <tr><td>前端与配置</td><td>不修改</td><td>无需改变用户地址、配置项或界面。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="tests-title">
+      <span class="utility">Verification / 验证</span>
+      <h2 id="tests-title">实际验证结果</h2>
+      <div class="grid">
+        <article class="card span-8">
+          <ul class="test-list">
+            <li><strong>PASSED</strong><span><code>python3 -m compileall -q webserver/webdav/handler.py tests/test_webdav.py</code>：实现与回归测试通过语法编译。</span></li>
+            <li><strong>PASSED</strong><span>独立 AST 契约检查：确认 7 个 RFC 4918 方法及对应的小写分派入口完整存在。</span></li>
+            <li><strong>PASSED</strong><span><code>git diff --check</code>：未发现空白错误。</span></li>
+            <li><strong>NOT RUN</strong><span><code>make lint-py-fix</code>、<code>make lint-py</code>：runner 未安装 <code>ruff</code>，命令以 127 退出；外网代理连接重置，无法补装。</span></li>
+            <li><strong>NOT RUN</strong><span><code>make pytest</code>、<code>pytest tests/test_webdav.py -v</code>：runner 未安装 <code>pytest</code>，命令以 127 退出；已用语法编译与 AST 契约检查替代。</span></li>
+            <li><strong>PASSED</strong><span><code>make check-design</code>：46 份方案文档通过路径、HTML 结构与单文件资源约束检查。</span></li>
+          </ul>
+        </article>
+        <aside class="card span-4">
+          <span class="status" style="color: var(--green);">替代验证通过</span>
+          <p style="margin-top: 14px;">核心协议契约已静态验证。剩余风险是当前 runner 无法执行完整依赖测试；具备项目测试环境时仍应运行定向 pytest 与 lint。</p>
+        </aside>
+      </div>
+    </section>
+
+    <footer>Talebook 内部方案 · ACTIVE · 静读天下 WebDAV 同步方法桥接兼容修复。</footer>
+  </main>
+</body>
+</html>

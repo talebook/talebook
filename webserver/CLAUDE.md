@@ -99,12 +99,14 @@ queue.put((args, kwargs))
 ```python
 from tests.test_main import TestWithUserLogin, setUpModule as init
 
+
 def setUpModule():
     init()  # 必须调用，初始化 Tornado app 和 mock
 
+
 class TestMyFeature(TestWithUserLogin):
     def test_normal_case(self):
-        d = self.json("/api/my/endpoint")   # 发 GET 并解析 JSON
+        d = self.json("/api/my/endpoint")  # 发 GET 并解析 JSON
         self.assertEqual(d["err"], "ok")
 
     def test_post_case(self):

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内置定制主题搜索参数修复 · ACTIVE</title>
+<style>
+  body { max-width: 920px; margin: 0 auto; padding: 24px; color: #24292f; background: #fff; font: 15px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; }
+  h1 { margin-bottom: 4px; font-size: 26px; }
+  h2 { margin-top: 30px; padding-bottom: 6px; border-bottom: 1px solid #d0d7de; font-size: 20px; }
+  h3 { margin-top: 20px; font-size: 16px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 8px 0 18px; color: #57606a; }
+  .status { padding: 2px 10px; border-radius: 999px; color: #1a7f37; background: #dafbe1; font-weight: 700; }
+  code { padding: 1px 5px; border-radius: 4px; background: #f6f8fa; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 8px 10px; border: 1px solid #d0d7de; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .flow { margin: 12px 0; padding: 14px; border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa; overflow-x: auto; }
+  .limited { color: #9a6700; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>内置定制主题搜索参数修复</h1>
+<div class="meta">
+  <span class="status">ACTIVE</span>
+  <span>创建日期：2026-07-21</span>
+  <span>所属模块：app</span>
+  <span>需求来源：GitHub Issue #879</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<blockquote>默认主题下的搜索可以搜索到书库中已有的书，而其他定制主题的搜索结果均为空白；修复该缺陷并提交 PR。</blockquote>
+
+<h2>2. 根因</h2>
+<p>默认主题的 <code>AppHeader.vue</code> 跳转到 <code>/search?name=...</code>。五个内置定制主题复用 <code>BuiltinThemeHeader.vue</code>，该组件跳转到 <code>/search?keyword=...</code>。搜索页会把完整地址交给后端，而后端 <code>SearchBook</code> 只读取 <code>name</code> 参数，因此定制主题请求被识别为缺少关键字，无法返回书库结果。</p>
+
+<h2>3. 逐项澄清结果</h2>
+<table>
+  <tr><th>决策点</th><th>结论</th><th>依据</th></tr>
+  <tr><td>接口契约</td><td>统一使用现有 <code>name</code> 参数</td><td>默认主题、后端处理器及现有 E2E 均以 <code>name</code> 为准</td></tr>
+  <tr><td>修改范围</td><td>只修改内置主题共用头部</td><td>五个异常主题都复用该组件；后端行为正确，无需扩大兼容面</td></tr>
+  <tr><td>浅灰主题分类搜索</td><td>保留 <code>title:</code>、<code>author:</code>、<code>isbn:</code>、<code>tag:</code> 前缀</td><td>前缀属于传入 Calibre 搜索引擎的查询内容，与 URL 参数名无冲突</td></tr>
+  <tr><td>空白输入</td><td>保持不跳转</td><td>现有交互已有防护，本缺陷不涉及变更</td></tr>
+  <tr><td>视觉表现</td><td>不改布局与样式</td><td>问题仅由路由参数不一致导致</td></tr>
+</table>
+
+<h2>4. 目标与方案</h2>
+<ul>
+  <li>所有内置定制主题从桌面和移动搜索入口提交后，都生成 <code>/search?name=...</code>。</li>
+  <li>浅灰主题选择字段分类时，仍把字段前缀编码在 <code>name</code> 的值中。</li>
+  <li>新增组件测试，直接验证普通主题与带分类的浅灰主题搜索路由，防止参数名再次漂移。</li>
+</ul>
+<div class="flow"><code>五个内置主题 → BuiltinThemeHeader.doSearch → /search?name=查询内容 → BookList → /api/search → SearchBook(name) → 书库结果</code></div>
+
+<h2>5. 影响范围</h2>
+<ul>
+  <li><code>app/components/themes/BuiltinThemeHeader.vue</code>：修正搜索跳转参数。</li>
+  <li><code>app/test/components/BuiltinThemeHeader.spec.ts</code>：新增搜索路由回归测试。</li>
+  <li>后端、API、数据库、配置、权限和部署均不变。</li>
+</ul>
+
+<h2>6. 测试计划与结果</h2>
+<p><strong>状态：代码级验证通过；依赖网络与浏览器工具受限项已记录。</strong></p>
+<table>
+  <tr><th>验证项</th><th>命令 / 方式</th><th>结果</th></tr>
+  <tr><td>搜索路由契约</td><td><code>node -e "const fs=require('node:fs');const s=fs.readFileSync('app/components/themes/BuiltinThemeHeader.vue','utf8');if(!s.includes(&quot;query: { name: keyword }&quot;)||s.includes(&quot;query: { keyword }&quot;))process.exit(1);console.log('内置主题搜索路由契约检查通过')"</code></td><td>通过：新参数存在，旧参数不存在</td></tr>
+  <tr><td>补丁格式</td><td><code>git diff --check</code></td><td>通过，无空白错误</td></tr>
+  <tr><td>组件测试</td><td><code>cd app &amp;&amp; npx vitest run test/components/BuiltinThemeHeader.spec.ts</code></td><td class="limited">未执行：runner 没有本地依赖；<code>npm ci --no-audit --no-fund</code> 多次下载 <code>@parcel/watcher-wasm</code> 时均被公共网络重置（ECONNRESET）。测试文件已覆盖普通主题、浅灰分类和空输入</td></tr>
+  <tr><td>前端 lint</td><td><code>cd app &amp;&amp; npm run lint</code></td><td class="limited">未执行：同上，eslint 未安装成功。替代执行 <code>git diff --check</code> 并人工复核修改</td></tr>
+  <tr><td>搜索 E2E 与浏览器验收</td><td>mock API + Nuxt dev server；Chrome DevTools MCP</td><td class="limited">未执行：Nuxt/Playwright 依赖未安装，且当前工具集没有 Chrome DevTools MCP。风险限于未完成实际渲染回归；本次不改模板、样式或输入交互，组件测试已随代码交付</td></tr>
+  <tr><td>方案门禁</td><td><code>make check-design</code></td><td>通过：35 份方案文档检查通过</td></tr>
+</table>
+</body>
+</html>
