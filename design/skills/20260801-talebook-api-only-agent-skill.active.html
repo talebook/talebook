@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Talebook API-only Agent Skill 收敛方案</title>
+  <style>
+    :root{--ink:#172033;--muted:#667085;--paper:#f6f9fa;--panel:#fff;--line:#d6e0e4;--api:#087e8b;--api-soft:#dff4f3;--mcp:#6941c6;--drop:#b42318;--keep:#166534;--warn:#b54708}
+    *{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--paper);font:16px/1.68 "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}.shell{width:min(1080px,calc(100% - 34px));margin:auto}
+    header{padding:48px 0 34px;border-bottom:1px solid var(--line);background:#fff}.meta{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:5px 9px;border:1px solid var(--line);border-radius:999px;font:700 12px Consolas,monospace}.wip{color:var(--warn);background:#fff3df;border-color:#ecb870}
+    h1{max-width:900px;margin:30px 0 14px;font:760 clamp(38px,7vw,76px)/.98 Georgia,"Songti SC",serif;letter-spacing:-.045em}.lead{max-width:760px;color:var(--muted);font-size:19px}
+    .rail{height:116px;margin-top:34px}.rail svg{width:100%;height:100%}.rail text{font:700 12px Consolas,monospace;letter-spacing:.08em}
+    main{padding:30px 0 74px}section{padding:30px 0;border-bottom:1px solid var(--line)}h2{margin:0 0 16px;font:720 32px/1.12 Georgia,"Songti SC",serif}h3{margin:0 0 8px;font-size:17px}p{margin:0 0 12px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{padding:22px;border:1px solid var(--line);border-radius:15px;background:var(--panel)}
+    .manifest{display:grid;grid-template-columns:120px 1fr 1.2fr;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}.manifest>*{padding:13px 15px;border-bottom:1px solid var(--line)}.manifest .head{font:700 12px Consolas,monospace;color:var(--muted);background:#edf2f4}.keep{color:var(--keep);font-weight:750}.drop{color:var(--drop);font-weight:750}.learn{color:var(--api);font-weight:750}
+    code{padding:2px 5px;border-radius:5px;background:#eaf0f2;font:13px Consolas,monospace}pre{overflow:auto;padding:18px;border-radius:12px;color:#efffff;background:#172f35;font:13px/1.6 Consolas,monospace}ul,ol{padding-left:21px}.pending{color:var(--warn);font-weight:700}.pass{color:var(--keep);font-weight:700}
+    @media(max-width:720px){.grid{grid-template-columns:1fr}.manifest{grid-template-columns:1fr}.manifest .head{display:none}.rail{height:90px}}
+  </style>
+</head>
+<body>
+  <header><div class="shell">
+    <div class="meta"><span class="chip wip" style="color:#166534;background:#e7f8ed;border-color:#83c79d">ACTIVE</span><span class="chip">2026-08-01</span><span class="chip">MODULE · skills</span><span class="chip">SOURCE · 用户决策</span></div>
+    <h1>拆掉协议层，<br>留下好习惯。</h1>
+    <p class="lead">Talebook Agent 最终只交付兼容原有 HTTP API 的 Skill。删除 MCP 的服务端和部署负担，同时把它在工作流表达、目标确认和异步任务处理上的优点迁入 API 版。</p>
+    <div class="rail" aria-label="MCP 轨道终止，有用工作流并入 API 轨道"><svg viewBox="0 0 1040 116" role="img">
+      <path d="M20 34 H360" stroke="#6941c6" stroke-width="12" stroke-linecap="round"/><path d="M360 34 C460 34 470 82 590 82 H1020" fill="none" stroke="#087e8b" stroke-width="12" stroke-linecap="round"/>
+      <path d="M20 82 H1020" stroke="#087e8b" stroke-width="12" stroke-linecap="round"/><line x1="350" y1="18" x2="382" y2="50" stroke="#b42318" stroke-width="5"/><line x1="382" y1="18" x2="350" y2="50" stroke="#b42318" stroke-width="5"/>
+      <text x="20" y="18" fill="#6941c6">MCP · REMOVE</text><text x="20" y="112" fill="#087e8b">ORIGINAL API · KEEP AND LEARN</text>
+    </svg></div>
+  </div></header>
+  <main class="shell">
+    <section><h2>原始诉求</h2><p>用户重新评估后决定只保留 API 版本，删除 MCP 版本；同时要求检查 MCP 实现中可学习的部分，并将其加入 API Skill。</p></section>
+    <section><h2>决策边界</h2><div class="grid">
+      <article class="card"><h3>删除</h3><ul><li><code>/mcp</code> Handler、协议和工具服务。</li><li>Bearer Token 设置、Nginx/Compose MCP 接入。</li><li><code>talebook-mcp</code> Skill、仓库 MCP 文档与专属测试。</li></ul></article>
+      <article class="card"><h3>保留并加强</h3><ul><li><code>talebook</code> 的完整命令树和原 API 兼容性。</li><li>Guest/Basic Auth、同源重定向、风险确认和凭据脱敏。</li><li>新增从 MCP 提炼的多步工作流参考与回归测试。</li></ul></article>
+    </div></section>
+    <section><h2>提炼清单</h2><div class="manifest">
+      <div class="head">处理</div><div class="head">MCP 中的内容</div><div class="head">API-only 落点</div>
+      <div class="drop">删除</div><div>JSON-RPC、协议版本协商、工具发现、Bearer Token</div><div>不进入 API Skill；避免服务端维护面。</div>
+      <div class="learn">学习</div><div>搜索后取详情，写操作前解析唯一 ID</div><div><code>references/workflows.md</code> 规定 search → show → mutate → verify。</div>
+      <div class="learn">学习</div><div>列表元数据按完整值覆盖</div><div>增删作者、标签前先读取当前值，本地合并后提交。</div>
+      <div class="learn">学习</div><div>异步搜索/保存任务的轮询纪律</div><div>仅在用户要求等待时轮询；运行中不视为失败。</div>
+      <div class="learn">学习</div><div>结构化结果和错误恢复</div><div>摘要展示，保留 book/task/source ID；写失败不自动重试。</div>
+      <div class="keep">已有</div><div>只读与变更的安全边界</div><div>继续使用 CLI 风险等级、明确确认和服务端最终权限。</div>
+    </div></section>
+    <section><h2>目标结构</h2><pre>skills/talebook/
+├── SKILL.md
+├── agents/openai.yaml
+├── references/
+│   ├── api.md
+│   ├── docker-compose.md
+│   └── workflows.md      # 从 MCP 提炼
+└── scripts/talebook-cli.py
+
+# 不存在
+skills/talebook-mcp/
+webserver/handlers/mcp.py
+webserver/mcp/
+document/mcp.md</pre></section>
+    <section><h2>测试结果</h2><ul>
+      <li><span class="pass">通过 · 22</span>：<code>python -m pytest tests/test_talebook_skill.py tests/test_talebook_skill_cli.py -q</code> 返回 22 passed，覆盖 Skill 自包含、MCP 运行时缺席、工作流纪律及 API CLI 请求与门禁。</li>
+      <li><span class="pass">通过</span>：设置 <code>PYTHONUTF8=1</code> 后执行 skill-creator 的 <code>quick_validate.py skills/talebook</code>，输出 <code>Skill is valid!</code>。</li>
+      <li><span class="pass">通过 · 721</span>：使用仓库 Docker test 镜像在 Calibre/Linux 环境执行 <code>pytest --log-file=unittest.log --log-level=INFO tests -q</code>，结果为 721 passed、11 skipped、20 warnings。</li>
+      <li><span class="pass">通过</span>：Skill 脚本与相关测试的 Ruff 检查、格式检查、<code>git diff --check</code> 和 <code>python scripts/check_design_docs.py</code> 均通过。</li>
+    </ul></section>
+  </main>
+</body>
+</html>

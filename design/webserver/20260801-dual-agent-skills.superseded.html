@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talebook 双轨 Agent Skills 合并方案</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #5d6678;
+      --paper: #f7f9fc;
+      --panel: #ffffff;
+      --line: #dce3ee;
+      --api: #087e8b;
+      --api-soft: #dff4f3;
+      --mcp: #6941c6;
+      --mcp-soft: #eee8ff;
+      --warn: #b54708;
+      --warn-soft: #fff1df;
+      --ok: #166534;
+      --radius: 18px;
+      --shadow: 0 18px 55px rgba(29, 44, 75, .09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, transparent 49.8%, rgba(105,65,198,.045) 50%, transparent 50.2%),
+        var(--paper);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.65;
+    }
+    a { color: inherit; }
+    .shell { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
+    header { padding: 48px 0 34px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.76); }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 34px; }
+    .chip { padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font: 600 12px/1.2 Consolas, monospace; letter-spacing: .04em; }
+    .chip.status { border-color: #f0b06a; background: var(--warn-soft); color: var(--warn); }
+    h1 { max-width: 900px; margin: 0; font: 760 clamp(38px, 7vw, 78px)/.98 Georgia, "Songti SC", serif; letter-spacing: -.045em; }
+    .lede { max-width: 760px; margin: 24px 0 0; color: var(--muted); font-size: 19px; }
+    .rails { position: relative; height: 180px; margin: 42px 0 0; overflow: hidden; }
+    .rails svg { width: 100%; height: 100%; }
+    .rail-label { font: 700 13px Consolas, monospace; letter-spacing: .08em; }
+    main { padding: 34px 0 88px; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 34px; }
+    nav a { padding: 7px 11px; text-decoration: none; border-bottom: 2px solid var(--line); font-size: 13px; font-weight: 700; }
+    section { padding: 34px 0; border-top: 1px solid var(--line); }
+    section:first-of-type { border-top: 0; }
+    .eyebrow { color: var(--muted); font: 700 12px/1 Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; }
+    h2 { margin: 8px 0 20px; font: 720 clamp(28px, 4vw, 42px)/1.08 Georgia, "Songti SC", serif; letter-spacing: -.025em; }
+    h3 { margin: 0 0 10px; font-size: 17px; }
+    p { margin: 0 0 14px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .card { padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }
+    .card.api { border-top: 5px solid var(--api); }
+    .card.mcp { border-top: 5px solid var(--mcp); }
+    .card.warn { background: var(--warn-soft); border-color: #f3c892; box-shadow: none; }
+    .badge { display: inline-block; margin-bottom: 14px; padding: 5px 9px; border-radius: 6px; font: 700 12px Consolas, monospace; }
+    .api .badge { color: var(--api); background: var(--api-soft); }
+    .mcp .badge { color: var(--mcp); background: var(--mcp-soft); }
+    ul, ol { margin: 10px 0 0; padding-left: 22px; }
+    li + li { margin-top: 6px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); }
+    th, td { padding: 13px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); background: #f1f4f9; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    code { padding: 2px 5px; border-radius: 5px; background: #edf1f7; font: 13px/1.4 Consolas, monospace; }
+    pre { overflow: auto; margin: 14px 0 0; padding: 18px; border-radius: 12px; color: #eaf2ff; background: #172033; font: 13px/1.6 Consolas, monospace; }
+    .flow { display: grid; grid-template-columns: 1fr 72px 1.1fr 72px 1fr; align-items: center; gap: 8px; }
+    .node { min-height: 118px; padding: 18px; display: grid; place-content: center; text-align: center; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    .arrow { text-align: center; color: var(--muted); font: 700 22px Consolas, monospace; }
+    .status-list { display: grid; gap: 10px; }
+    .status-row { display: grid; grid-template-columns: 130px 1fr; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .pending { color: var(--warn); font-weight: 700; }
+    .pass { color: var(--ok); font-weight: 700; }
+    footer { padding: 24px 0 50px; color: var(--muted); border-top: 1px solid var(--line); font-size: 13px; }
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 24px, 1160px); }
+      header { padding-top: 26px; }
+      .grid { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); }
+      .rails { height: 130px; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+      .status-row { grid-template-columns: 1fr; gap: 4px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <div class="meta">
+        <span class="chip status">SUPERSEDED</span>
+        <span class="chip">2026-08-01</span>
+        <span class="chip">MODULE · webserver</span>
+        <span class="chip">SOURCE · PR #916 + PR #923</span>
+      </div>
+      <h1>同一座书库，<br>两条 Agent 接入轨道。</h1>
+      <p class="lede">把兼容现有 Talebook API 的广覆盖能力，与内置 MCP 的结构化协议和最小权限边界合并到当前分支；两种 Skill 独立发布、共享安全原则、互不伪装成对方。</p>
+      <p class="lede" style="color:#b42318"><strong>替代说明：</strong>用户最终决定删除 MCP 版本。本方案已由 <code>design/skills/20260801-talebook-api-only-agent-skill.active.html</code> 替代。</p>
+      <div class="rails" aria-label="API 与 MCP 两条接入路径汇入同一 Talebook 书库">
+        <svg viewBox="0 0 1100 180" role="img">
+          <path d="M20 52 C350 52, 430 86, 650 90 S900 90,1080 90" fill="none" stroke="#087e8b" stroke-width="13" stroke-linecap="round"/>
+          <path d="M20 138 C350 138, 430 94, 650 90 S900 90,1080 90" fill="none" stroke="#6941c6" stroke-width="13" stroke-linecap="round"/>
+          <circle cx="650" cy="90" r="20" fill="#fff" stroke="#172033" stroke-width="6"/>
+          <text x="22" y="32" fill="#087e8b" class="rail-label">ORIGINAL API · COMPATIBLE</text>
+          <text x="22" y="170" fill="#6941c6" class="rail-label">/MCP · STRUCTURED</text>
+          <text x="850" y="68" fill="#172033" class="rail-label">TALEBOOK LIBRARY</text>
+        </svg>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <nav aria-label="文档目录">
+      <a href="#request">原始诉求</a><a href="#decision">核心决策</a><a href="#architecture">架构</a><a href="#security">安全</a><a href="#files">文件</a><a href="#tests">测试</a>
+    </nav>
+
+    <section id="request">
+      <div class="eyebrow">Request</div>
+      <h2>原始诉求与目标</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>原始诉求</h3>
+          <p>在当前分支中合并 PR #916 与 PR #923 的优点，形成优势互补的实现；提供两版 Skill，一版兼容地直接使用原有 API，另一版使用新加入的 <code>/mcp</code>。</p>
+        </article>
+        <article class="card">
+          <h3>成功标准</h3>
+          <ul>
+            <li>两个 Skill 有独立名称、配置、脚本和参考文档。</li>
+            <li>API 版不要求升级服务端；MCP 版默认关闭且可显式启用。</li>
+            <li>危险操作、凭据、重定向和外部内容均有明确边界。</li>
+            <li>协议、部署、CLI 与关键业务能力均有自动化测试。</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="decision">
+      <div class="eyebrow">Decision record</div>
+      <h2>两个 Skill，不做隐式自动降级</h2>
+      <div class="grid">
+        <article class="card api">
+          <span class="badge">talebook-api</span>
+          <h3>原有 API 兼容版</h3>
+          <ul>
+            <li>使用 Guest 或 HTTP Basic Auth。</li>
+            <li>覆盖查询、上传下载、阅读状态、网络书源及管理员命令。</li>
+            <li>管理写入、删除、外发操作必须显式确认。</li>
+            <li>限制跨域重定向，预览和错误输出中脱敏凭据。</li>
+          </ul>
+        </article>
+        <article class="card mcp">
+          <span class="badge">talebook-mcp</span>
+          <h3>内置 MCP 版</h3>
+          <ul>
+            <li>使用独立 Bearer Token，仅授权固定工具白名单。</li>
+            <li>覆盖检索、阅读状态、元数据和网络书库核心流程。</li>
+            <li>不暴露删除、用户、系统设置、邮件或任意原始请求。</li>
+            <li>提供协议发现和结构化结果，适配标准 MCP 客户端。</li>
+          </ul>
+        </article>
+      </div>
+      <div class="card warn" style="margin-top:18px">
+        <h3>边界决策</h3>
+        <p>不让一个 Skill 在运行时悄悄切换传输方式。调用者应显式选择兼容版或 MCP 版，从名称、配置和权限上都能判断当前使用哪条通道。MCP Token 仍映射到一个启用的管理员身份，因此 MCP 工具集保持最小化，并在文档中明确 Token 的部署级权限性质。</p>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <div class="eyebrow">Architecture</div>
+      <h2>共享书库，不共享认证语义</h2>
+      <div class="flow" role="img" aria-label="Agent 经过独立 Skill 和传输层访问 Talebook 服务">
+        <div class="node"><strong>Agent / MCP Client</strong><small>显式选择能力包</small></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>talebook-api</strong><small>Basic Auth · 原有 API</small><hr style="width:70%;border:0;border-top:1px solid #dce3ee"><strong>talebook-mcp</strong><small>Bearer Token · JSON-RPC</small></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>Talebook</strong><small>Calibre + Reader DB + 网络书源</small></div>
+      </div>
+      <table style="margin-top:22px">
+        <thead><tr><th>能力</th><th>API Skill</th><th>MCP Skill</th></tr></thead>
+        <tbody>
+          <tr><td>兼容旧实例</td><td>是，只依赖现有接口</td><td>否，需要包含 <code>/mcp</code> 的新版本</td></tr>
+          <tr><td>书库检索与详情</td><td>支持</td><td>支持，结构化工具</td></tr>
+          <tr><td>上传、下载、推送</td><td>支持并受确认门禁约束</td><td>首期不支持</td></tr>
+          <tr><td>管理员管理</td><td>支持并先校验管理员身份</td><td>不暴露</td></tr>
+          <tr><td>网络书库</td><td>使用现有 API</td><td>使用 MCP 异步工具</td></tr>
+          <tr><td>认证</td><td>Guest / Basic Auth</td><td>部署级 Bearer Token</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="security">
+      <div class="eyebrow">Security gates</div>
+      <h2>凭据不混用，危险能力不扩散</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>API 版门禁</h3>
+          <ol>
+            <li>解析站点并拒绝内嵌凭据、非 HTTP(S) scheme。</li>
+            <li>Basic Auth 只发送给同源地址，跨源重定向拒绝。</li>
+            <li>管理员命令调用前验证当前用户身份。</li>
+            <li>写入、删除、外发先输出脱敏预览；只有显式确认后执行。</li>
+          </ol>
+        </article>
+        <article class="card">
+          <h3>MCP 版门禁</h3>
+          <ol>
+            <li>未配置 Token 时端点返回禁用状态。</li>
+            <li>固定时间比较 Bearer Token，不在管理设置接口回传。</li>
+            <li>拒绝跨源浏览器请求，只允许固定工具集合。</li>
+            <li>控制分页、批量数、阅读正文长度与进度载荷大小。</li>
+          </ol>
+        </article>
+      </div>
+    </section>
+
+    <section id="files">
+      <div class="eyebrow">Repository shape</div>
+      <h2>预期文件结构</h2>
+      <pre>skills/
+├── talebook-api/
+│   ├── SKILL.md
+│   ├── agents/openai.yaml
+│   ├── references/{api,docker-compose}.md
+│   └── scripts/talebook-cli.py
+└── talebook-mcp/
+    ├── SKILL.md
+    ├── agents/openai.yaml
+    ├── references/tools.md
+    └── scripts/talebook_mcp.py
+
+webserver/
+├── handlers/mcp.py
+└── mcp/{protocol,service}.py
+
+document/mcp.md
+tests/test_talebook_api_skill_cli.py
+tests/test_talebook_mcp_skill.py
+tests/test_mcp_{protocol,deployment}.py</pre>
+      <p style="margin-top:16px">部署层同步修改三套 Nginx 配置以及生产、开发 Docker Compose，将精确路径 <code>/mcp</code> 代理到后端，并传递 <code>TALEBOOK_MCP_TOKEN</code>。</p>
+    </section>
+
+    <section id="tests">
+      <div class="eyebrow">Verification</div>
+      <h2>测试结果</h2>
+      <div class="status-list">
+        <div class="status-row"><span class="pass">通过 · 30</span><span><code>python -m pytest tests/test_talebook_api_skill_cli.py tests/test_talebook_mcp_skill.py tests/test_talebook_skills.py tests/test_mcp_protocol.py tests/test_mcp_deployment.py -q</code>：30 passed，覆盖 API 配置/鉴权/上传下载/门禁、MCP 协议与客户端、部署配置及双 Skill 边界。</span></div>
+        <div class="status-row"><span class="pass">通过 · 737</span><span>使用仓库 Docker test target 构建 <code>talebook/dual-agent-skills-test</code>，随后在容器内执行 <code>pytest --log-file=unittest.log --log-level=INFO tests -q</code>：737 passed、11 skipped、21 warnings，真实 Tornado/Calibre MCP HTTP 集成测试包含在内。</span></div>
+        <div class="status-row"><span class="pass">通过</span><span><code>make lint-py-fix</code> 与 <code>make lint-py</code>：webserver 全量 Ruff 检查和格式检查通过；对两个 Skill 脚本及相关测试执行 <code>ruff check</code>、<code>ruff format --check</code> 通过。</span></div>
+        <div class="status-row"><span class="pass">通过</span><span>设置 <code>PYTHONUTF8=1</code> 后分别执行 skill-creator 的 <code>quick_validate.py skills/talebook-api</code> 与 <code>quick_validate.py skills/talebook-mcp</code>，均输出 <code>Skill is valid!</code>。</span></div>
+        <div class="status-row"><span class="pass">通过</span><span><code>git diff --check</code> 与 <code>python scripts/check_design_docs.py</code> 通过。方案文件、状态、单文件资源和 WIP 合并门禁满足要求。</span></div>
+        <div class="status-row"><span class="pending">环境说明</span><span>宿主机补装 <code>txt2epub-next==1.0.0</code> 后，直接运行 <code>tests/test_mcp.py</code> 仍因 Windows Python 不包含 Calibre 模块而无法启动；已由上述 Docker 全量测试完成等价且更完整的替代验证。</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="shell">Talebook internal design · SUPERSEDED · 后续以 API-only 方案为准。</div></footer>
+</body>
+</html>

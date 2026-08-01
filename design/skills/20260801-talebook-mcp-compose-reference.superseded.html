@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talebook MCP Skill 部署参考补充方案</title>
+  <style>
+    :root{--ink:#182033;--muted:#667085;--paper:#f6f7fb;--panel:#fff;--line:#d9ddea;--mcp:#6941c6;--soft:#eee9ff;--warn:#b54708;--ok:#166534}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.68 "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+    .shell{width:min(1020px,calc(100% - 32px));margin:auto}header{padding:48px 0 36px;background:linear-gradient(135deg,#fff 0 58%,var(--soft) 58%);border-bottom:1px solid var(--line)}
+    .meta{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:5px 9px;border:1px solid var(--line);border-radius:999px;background:#fff;font:700 12px Consolas,monospace}.wip{color:var(--warn);border-color:#edb774;background:#fff4e5}
+    h1{max-width:800px;margin:28px 0 14px;font:750 clamp(36px,6vw,68px)/1.02 Georgia,"Songti SC",serif;letter-spacing:-.04em}.lead{max-width:720px;color:var(--muted);font-size:19px}
+    main{padding:34px 0 72px}section{padding:30px 0;border-bottom:1px solid var(--line)}h2{margin:0 0 16px;font:720 31px/1.15 Georgia,"Songti SC",serif}h3{margin:0 0 8px;font-size:17px}p{margin:0 0 12px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{padding:22px;border:1px solid var(--line);border-radius:15px;background:var(--panel)}
+    .manifest{display:grid;grid-template-columns:210px 1fr;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}.manifest div{padding:14px 18px;border-bottom:1px solid var(--line)}.manifest div:nth-child(odd){font:700 13px Consolas,monospace;color:var(--mcp);background:var(--soft)}
+    code{padding:2px 5px;border-radius:5px;background:#edf0f6;font:13px Consolas,monospace}pre{overflow:auto;padding:18px;border-radius:12px;background:#182033;color:#eef2ff;font:13px/1.6 Consolas,monospace}
+    ul{padding-left:21px}.pending{color:var(--warn);font-weight:700}.pass{color:var(--ok);font-weight:700}@media(max-width:680px){.grid{grid-template-columns:1fr}.manifest{grid-template-columns:1fr}.manifest div:nth-child(odd){border-bottom:0}header{background:#fff}}
+  </style>
+</head>
+<body>
+  <header><div class="shell">
+    <div class="meta"><span class="chip wip">SUPERSEDED</span><span class="chip">2026-08-01</span><span class="chip">MODULE · skills</span><span class="chip">SOURCE · 用户复核</span></div>
+    <h1>让 MCP Skill 带齐自己的部署行李。</h1>
+    <p class="lead">修复双轨合并中的资源不对称：API Skill 已携带 Docker Compose 参考，而 MCP Skill 只在仓库文档中说明部署。单独安装 Skill 时，后者因此不自包含。</p>
+    <p class="lead" style="color:#b42318"><strong>替代说明：</strong>用户随后决定删除 MCP 版本。本方案已由 <code>design/skills/20260801-talebook-api-only-agent-skill.active.html</code> 替代，所描述资源不再交付。</p>
+  </div></header>
+  <main class="shell">
+    <section><h2>原始诉求</h2><p>用户指出 MCP 版本缺少 <code>docker-compose.md</code>，与“合并两个 PR 的优点、优势互补”的目标不一致。要求 MCP Skill 也随包提供部署参考。</p></section>
+    <section><h2>目标与边界</h2><div class="grid">
+      <article class="card"><h3>目标</h3><ul><li>新增 <code>skills/talebook-mcp/references/docker-compose.md</code>。</li><li>从 MCP Skill 主流程直接导航到部署参考。</li><li>覆盖随机 Token、Compose、启动、HTTP/MCP 验证和轮换。</li></ul></article>
+      <article class="card"><h3>不改变</h3><ul><li>不修改 MCP 协议、工具表或权限模型。</li><li>不复制完整仓库文档，只保留 Agent 执行部署所需步骤。</li><li>不让 MCP Skill 自动回退到原有 API。</li></ul></article>
+    </div></section>
+    <section><h2>Skill 打包清单</h2><div class="manifest">
+      <div>SKILL.md</div><div>连接、业务工作流、安全确认，以及部署请求的资源导航。</div>
+      <div>references/tools.md</div><div>MCP 工具选择、参数和异步任务说明。</div>
+      <div>references/docker-compose.md</div><div>新增：生成 Token、Compose 配置、启动、健康检查、客户端自检与 Token 轮换。</div>
+      <div>scripts/talebook_mcp.py</div><div>使用环境变量执行 MCP 初始化、工具发现和调用。</div>
+    </div></section>
+    <section><h2>部署闭环</h2><pre>生成随机 Token
+  → 写入仅限本机的 .env
+  → docker compose up -d
+  → 检查 /api/welcome
+  → 配置 TALEBOOK_MCP_URL 与 Token
+  → talebook_mcp.py check</pre><p>参考文档必须说明 Token 与管理员身份的关系、默认关闭行为、不得提交密钥，以及变更 Token 后重建容器。</p></section>
+    <section><h2>测试结果</h2><ul>
+      <li><span class="pass">通过</span>：新增自包含测试验证 MCP Skill 引用的部署文件存在，且包含 Compose Token 变量、随机生成、启动、自检和不交付明文要求。</li>
+      <li><span class="pass">通过</span>：设置 <code>PYTHONUTF8=1</code> 后，两份 Skill 分别通过 skill-creator 的 <code>quick_validate.py</code>。</li>
+      <li><span class="pass">通过 · 9</span>：<code>python -m pytest tests/test_talebook_skills.py tests/test_mcp_deployment.py tests/test_talebook_mcp_skill.py -q</code> 返回 9 passed。</li>
+      <li><span class="pass">通过</span>：相关测试文件的 Ruff 检查、格式检查、<code>git diff --check</code> 与 <code>python scripts/check_design_docs.py</code> 均通过。</li>
+    </ul></section>
+  </main>
+</body>
+</html>
