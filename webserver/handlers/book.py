@@ -33,7 +33,7 @@ from webserver.constants import (
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
-from webserver.models import Item, ReadingState
+from webserver.models import AudiobookEdition, Item, ReadingState
 from webserver.plugins.meta import baike, biquge, calibre, douban, douban_v2, neodb, qimao, tomato, xhsd, youshu
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
@@ -1501,7 +1501,7 @@ class BookUploadComplete(BookUploadBase):
 
 
 class BookRead(BaseHandler):
-    def render_epub(self, book, is_ready):
+    def render_epub(self, book, is_ready, audiobook_edition=None):
         return self.html_page(
             "book/" + CONF["EPUB_VIEWER"],
             {
@@ -1509,6 +1509,7 @@ class BookRead(BaseHandler):
                 "epub_dir": "/get/extract/%s" % book["id"],
                 "is_ready": is_ready,
                 "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
+                "audiobook_edition_id": audiobook_edition.id if audiobook_edition else None,
             },
         )
 
@@ -1525,11 +1526,17 @@ class BookRead(BaseHandler):
 
         book = self.get_book_or_404(id)
         book_id = book["id"]
+        audiobook_edition = (
+            self.session.query(AudiobookEdition)
+            .filter(AudiobookEdition.book_id == book_id, AudiobookEdition.status == "published")
+            .order_by(AudiobookEdition.published_at.desc(), AudiobookEdition.id.desc())
+            .first()
+        )
         self.user_history("read_history", book)
         self.count_increase(book_id, count_download=1)
 
         if book.get("fmt_epub"):
-            return self.render_epub(book, is_ready=True)
+            return self.render_epub(book, is_ready=True, audiobook_edition=audiobook_edition)
 
         if "fmt_pdf" in book:
             # PDF类书籍需要检查下载权限。
@@ -1555,7 +1562,7 @@ class BookRead(BaseHandler):
                 continue
 
             ConvertService().convert_and_save(self.user_id(), book, fpath, "epub")
-            return self.render_epub(book, is_ready=False)
+            return self.render_epub(book, is_ready=False, audiobook_edition=audiobook_edition)
         raise web.HTTPError(404, reason=_("抱歉，在线阅读器暂不支持该格式的书籍"))
 
 

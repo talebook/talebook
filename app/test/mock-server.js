@@ -19,6 +19,13 @@ let booksourceCheckPolls = 0;
 let shelfBookIds = new Set();
 let readingStateByBookId = new Map();
 let activeThemeName = '';
+let audiobookPublished = false;
+let audiobookJobs = [];
+let audiobookJobPolls = 0;
+let audiobookProgress = null;
+let audiobookManagedEditions = [];
+let audiobookCapacityOk = true;
+let podcastTokenHint = '';
 
 const builtinThemes = [
   {
@@ -128,6 +135,30 @@ router.post('/_test/reset', eventHandler(async (event) => {
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
   activeThemeName = '';
+  audiobookPublished = false;
+  audiobookJobs = [];
+  audiobookJobPolls = 0;
+  audiobookProgress = null;
+  audiobookManagedEditions = body?.audiobookVersions
+    ? [
+        {
+          ...audiobookEdition(),
+          id: 2,
+          status: 'ready',
+          created_at: '2026-07-19T10:00:00',
+          published_at: null,
+        },
+        {
+          ...audiobookEdition(),
+          id: 3,
+          status: 'historical',
+          created_at: '2026-07-17T10:00:00',
+        },
+      ]
+    : [];
+  if (body?.audiobookVersions) audiobookPublished = true;
+  audiobookCapacityOk = body?.audiobookCapacityOk !== false;
+  podcastTokenHint = '';
   return { status: 'ok' };
 }));
 
@@ -143,6 +174,367 @@ const readJson = (filename) => {
   }
   return null;
 };
+
+const audiobookChapters = [
+  {
+    id: 101,
+    number: 1,
+    source_key: 'Text/chapter-1.xhtml',
+    title: '第一章 雾中的来客',
+    duration_ms: 4200,
+    size_bytes: 8444,
+    audio_url: '/media/audio/1/chapter/1.mp3',
+    timeline_url: '/api/audio/1/chapter/1/timeline',
+  },
+  {
+    id: 102,
+    number: 2,
+    source_key: 'Text/chapter-2.xhtml',
+    title: '第二章 灯塔来信',
+    duration_ms: 4600,
+    size_bytes: 9244,
+    audio_url: '/media/audio/1/chapter/2.mp3',
+    timeline_url: '/api/audio/1/chapter/2/timeline',
+  },
+];
+
+const audiobookEdition = () => ({
+  id: 1,
+  book_id: 1,
+  status: 'published',
+  engine: 'edgetts',
+  config: { speed: 'x1.0' },
+  chapter_count: 2,
+  completed_count: 2,
+  duration_ms: 8800,
+  size_bytes: 17688,
+  created_at: '2026-07-18T10:00:00',
+  published_at: '2026-07-18T10:03:00',
+  chapters: audiobookChapters,
+});
+
+const audiobookBook = () => {
+  const data = readJson('api_book_1.json');
+  return data?.book || {
+    id: 1,
+    title: '百年孤独',
+    authors: ['加西亚·马尔克斯'],
+    files: [{ format: 'EPUB' }],
+    img: '/get/cover/1',
+  };
+};
+
+const audiobookJobPlan = (job) => {
+  const completed = job.status === 'completed';
+  const generating = job.status === 'generating' || job.status === 'finalizing';
+  const chapters = [
+    {
+      number: 1,
+      title: '第一章 雾中的来客',
+      status: completed ? 'completed' : (generating ? 'generating' : 'pending'),
+      total_segments: 2,
+      completed_segments: completed ? 2 : (generating ? 1 : 0),
+      cache_hits: completed ? 1 : 0,
+      resumed: false,
+      duration_ms: completed ? 4600 : 0,
+      size_bytes: completed ? 9216 : 0,
+    },
+    {
+      number: 2,
+      title: '第二章 灯塔来信',
+      status: completed ? 'completed' : 'pending',
+      total_segments: 1,
+      completed_segments: completed ? 1 : 0,
+      cache_hits: 0,
+      resumed: completed,
+      duration_ms: completed ? 4200 : 0,
+      size_bytes: completed ? 8472 : 0,
+    },
+  ];
+  const chaptersCompleted = completed ? 2 : 0;
+  const segmentsCompleted = completed ? 3 : (generating ? 1 : 0);
+  const reviewStatus = job.mode === 'quick' ? 'skipped' : (job.data.confirmed ? 'done' : (job.status === 'awaiting_review' ? 'current' : 'pending'));
+  const phaseStatus = (key) => {
+    if (key === 'queue') return job.status === 'queued' ? 'current' : 'done';
+    if (key === 'inspect') return job.status === 'queued' ? 'pending' : 'done';
+    if (key === 'review') return reviewStatus;
+    if (key === 'generate') return completed ? 'done' : (generating ? 'current' : 'pending');
+    if (key === 'finalize') return completed ? 'done' : (job.status === 'finalizing' ? 'current' : 'pending');
+    return completed ? 'done' : 'pending';
+  };
+  const phases = ['queue', 'inspect', 'review', 'generate', 'finalize', 'complete'].map(key => ({
+    key,
+    status: phaseStatus(key),
+    started_at: key === 'queue' || phaseStatus(key) !== 'pending' ? '2026-07-18T10:00:00' : null,
+    completed_at: ['done', 'skipped'].includes(phaseStatus(key)) ? '2026-07-18T10:03:00' : null,
+    summary: key === 'queue'
+      ? { attempts: 1 }
+      : key === 'inspect'
+        ? { chapters_total: 2 }
+        : key === 'review'
+          ? { mode: job.mode }
+          : key === 'generate'
+            ? { chapters_total: 2, chapters_completed: chaptersCompleted, segments_total: 3, segments_completed: segmentsCompleted, cache_hits: completed ? 1 : 0 }
+            : { chapters_completed: chaptersCompleted },
+  }));
+  return {
+    version: 1,
+    detailed: true,
+    overall_percent: Math.round(job.progress * 100),
+    phases,
+    summary: {
+      chapters_total: 2,
+      chapters_completed: chaptersCompleted,
+      segments_total: 3,
+      segments_completed: segmentsCompleted,
+      cache_hits: completed ? 1 : 0,
+      attempts: 1,
+    },
+    chapters,
+  };
+};
+
+const audiobookJobPayload = (job) => {
+  const book = audiobookBook();
+  return {
+    ...job,
+    book: {
+      id: book.id,
+      title: book.title,
+      author: book.author || (book.authors || []).join(', '),
+      img: book.img,
+      thumb: book.thumb || book.img,
+    },
+    plan: audiobookJobPlan(job),
+  };
+};
+
+const makeSilentWav = () => {
+  const sampleRate = 8000;
+  const samples = sampleRate * 5;
+  const bytes = Buffer.alloc(44 + samples * 2);
+  bytes.write('RIFF', 0);
+  bytes.writeUInt32LE(bytes.length - 8, 4);
+  bytes.write('WAVEfmt ', 8);
+  bytes.writeUInt32LE(16, 16);
+  bytes.writeUInt16LE(1, 20);
+  bytes.writeUInt16LE(1, 22);
+  bytes.writeUInt32LE(sampleRate, 24);
+  bytes.writeUInt32LE(sampleRate * 2, 28);
+  bytes.writeUInt16LE(2, 32);
+  bytes.writeUInt16LE(16, 34);
+  bytes.write('data', 36);
+  bytes.writeUInt32LE(samples * 2, 40);
+  return bytes;
+};
+
+const silentWav = makeSilentWav();
+
+router.get('/api/audios/home', eventHandler(() => {
+  if (!audiobookPublished) {
+    return { err: 'ok', enabled: true, continue_listening: [], recent: [], completed: [] };
+  }
+  const book = { ...audiobookBook(), edition: audiobookEdition(), listening_progress: audiobookProgress };
+  return {
+    err: 'ok',
+    enabled: true,
+    continue_listening: audiobookProgress ? [book] : [],
+    recent: [book],
+    completed: [],
+  };
+}));
+
+router.get('/api/book/:bookId/audios', eventHandler(() => ({
+  err: 'ok',
+  book: audiobookBook(),
+  editions: [...(audiobookPublished ? [audiobookEdition()] : []), ...audiobookManagedEditions],
+  generation: {
+    enabled: true,
+    compatible: true,
+    permitted: true,
+    can_generate: audiobookCapacityOk,
+    can_manage: true,
+    reason: '',
+    health: { ok: true, version: 'voicebook-tool 0.4.0', reason: '' },
+    capacity: { ok: audiobookCapacityOk, free_bytes: audiobookCapacityOk ? 10737418240 : 1073741824, minimum_bytes: 5368709120 },
+    engines: ['edgetts', 'qwen3tts'],
+    quality_options: ['standard'],
+  },
+})));
+
+router.post('/api/book/:bookId/audio-jobs', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const duplicate = audiobookJobs.find(item => ['queued', 'inspecting', 'awaiting_review', 'generating', 'finalizing'].includes(item.status));
+  if (duplicate) return { err: 'ok', job: duplicate, deduplicated: true };
+  const job = {
+    id: 1,
+    book_id: Number(getRouterParam(event, 'bookId')),
+    edition_id: 1,
+    creator_id: 1,
+    mode: body?.mode || 'quick',
+    status: 'queued',
+    phase: 'QUEUED',
+    priority: 0,
+    config: { engine: body?.engine || 'edgetts', speed: body?.speed || 'x1.0' },
+    chapter_selection: body?.chapters || '',
+    progress: 0,
+    data: {},
+    created_at: '2026-07-18T10:00:00',
+    updated_at: '2026-07-18T10:00:00',
+  };
+  audiobookJobs = [job];
+  audiobookJobPolls = 0;
+  return { err: 'ok', job, deduplicated: false };
+}));
+
+router.get('/api/audio-jobs', eventHandler(() => {
+  if (audiobookJobs.length) {
+    audiobookJobPolls += 1;
+    const job = audiobookJobs[0];
+    if (job.mode === 'advanced' && audiobookJobPolls >= 2 && !job.data.confirmed) {
+      job.status = 'awaiting_review';
+      job.phase = 'AWAITING_REVIEW';
+      job.progress = 0.2;
+    } else if ((job.mode === 'quick' || job.data.confirmed) && audiobookJobPolls >= 2) {
+      job.status = 'completed';
+      job.phase = 'COMPLETED';
+      job.progress = 1;
+      audiobookPublished = true;
+    } else if (job.status === 'queued') {
+      job.status = 'generating';
+      job.phase = 'GENERATING';
+      job.progress = 0.35;
+    }
+  }
+  return { err: 'ok', jobs: audiobookJobs.map(audiobookJobPayload) };
+}));
+
+router.patch('/api/audio-job/:jobId', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const job = audiobookJobs[0];
+  if (!job) return { err: 'not_found' };
+  if (body?.action === 'cancel') {
+    job.status = 'cancelled';
+    job.phase = 'CANCELLED';
+  } else if (body?.action === 'retry') {
+    job.status = 'queued';
+    job.phase = 'QUEUED';
+    audiobookJobPolls = 0;
+  }
+  return { err: 'ok', job };
+}));
+
+const workspacePayload = () => ({
+  revision: `mock-${audiobookJobPolls}`,
+  characters: [
+    { name: '旁白', position: '旁白', type: '人类', gender: '男', age: '中年', region: '中国', description: '沉稳', speed: 'x1.0', voice_overrides: '' },
+    { name: '林夏', position: '女主角', type: '人类', gender: '女', age: '青年', region: '城市', description: '清亮', speed: 'x1.0', voice_overrides: '' },
+  ],
+  chapters: [
+    { number: 1, title: '第一章 雾中的来客', volume: '', lines: ['[旁白] 海雾漫过码头。', '[林夏] 那封信终于来了。'] },
+    { number: 2, title: '第二章 灯塔来信', volume: '', lines: ['[旁白] 灯塔在远处亮起。'] },
+  ],
+});
+
+router.get('/api/audio-job/:jobId/workspace', eventHandler(() => ({ err: 'ok', workspace: workspacePayload(), job: audiobookJobs[0] })));
+router.patch('/api/audio-job/:jobId/workspace', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body?.kind === 'chapter' && String(body.text || '').includes('[未知角色]')) {
+    return { err: 'script.invalid', msg: '章节脚本校验失败', errors: [{ line: 1, message: '未定义角色：未知角色' }] };
+  }
+  const workspace = workspacePayload();
+  if (body?.kind === 'chapter') {
+    const chapter = workspace.chapters.find(item => item.number === Number(body.chapter_number));
+    chapter.lines = String(body.text || '').split('\n').filter(Boolean);
+  }
+  return { err: 'ok', workspace };
+}));
+router.post('/api/audio-job/:jobId/confirm', eventHandler(() => {
+  const job = audiobookJobs[0];
+  job.status = 'queued';
+  job.phase = 'QUEUED';
+  job.data = { ...job.data, confirmed: true };
+  audiobookJobPolls = 0;
+  return { err: 'ok', job };
+}));
+
+router.get('/api/audio/:editionId', eventHandler(() => ({
+  err: 'ok',
+  manifest: audiobookEdition(),
+  progress: audiobookProgress,
+})));
+router.patch('/api/audio/:editionId', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (!['publish', 'rollback', 'delete'].includes(body?.action)) return { err: 'params.invalid' };
+  const editionId = Number(getRouterParam(event, 'editionId'));
+  const edition = audiobookManagedEditions.find(item => item.id === editionId);
+  audiobookManagedEditions = audiobookManagedEditions.filter(item => item.id !== editionId);
+  return { err: 'ok', edition: edition ? { ...edition, status: body.action === 'delete' ? 'deleted' : 'published' } : audiobookEdition() };
+}));
+router.get('/api/audio/:editionId/chapter/:number/timeline', eventHandler((event) => {
+  const number = Number(getRouterParam(event, 'number'));
+  return {
+    err: 'ok',
+    timeline: {
+      chapter_number: number,
+      segments: [
+        { id: `c${number}-s1`, start_ms: 0, end_ms: 2100, text: '海雾漫过码头，灯塔在远处明灭。', locator: { href: `Text/chapter-${number}.xhtml`, css_selector: '#p-1' } },
+        { id: `c${number}-s2`, start_ms: 2100, end_ms: 4200, text: '那封等待多年的信，终于到了。', locator: { href: `Text/chapter-${number}.xhtml`, css_selector: '#p-2' } },
+      ],
+    },
+  };
+}));
+router.post('/api/audio/:editionId/sessions', eventHandler(() => ({ err: 'ok', session_id: 'abcdef123456' })));
+router.patch('/api/audio-session/:sessionId', eventHandler(async (event) => {
+  const body = await readBody(event);
+  audiobookProgress = {
+    chapter_id: body.chapter_id,
+    position_ms: body.position_ms,
+    segment_id: body.segment_id,
+    listened_ms: body.listened_delta_ms,
+    finished: body.completed,
+    version: Number(body.version || 0) + 1,
+  };
+  return { err: 'ok', version: audiobookProgress.version };
+}));
+
+router.get('/api/audio-voices', eventHandler(() => ({
+  err: 'ok',
+  catalog: {
+    scene_definitions: [{ id: 'narration', name: '旁白', text: '夜色渐深，灯火亮了起来。' }],
+    voices: [
+      { engine: 'edgetts', voice_id: 'zh-CN-YunxiNeural', name: '云希', gender: 'male', preview_available: false },
+      { engine: 'edgetts', voice_id: 'zh-CN-XiaoxiaoNeural', name: '晓晓', gender: 'female', preview_available: false },
+    ],
+  },
+})));
+
+router.get('/api/me/podcast-subscription', eventHandler(() => ({
+  err: 'ok',
+  subscription: podcastTokenHint ? { active: true, token_hint: podcastTokenHint } : null,
+})));
+router.post('/api/me/podcast-subscription', eventHandler(() => {
+  podcastTokenHint = 'e2e123';
+  return { err: 'ok', feed_url: 'http://127.0.0.1:8080/podcast/v1/mock-token/feed.xml', token_hint: podcastTokenHint };
+}));
+router.delete('/api/me/podcast-subscription', eventHandler(() => {
+  podcastTokenHint = '';
+  return { err: 'ok' };
+}));
+
+router.get('/media/audio/:editionId/chapter/:number.mp3', eventHandler((event) => {
+  const range = event.node.req.headers.range;
+  const headers = { 'Content-Type': 'audio/wav', 'Accept-Ranges': 'bytes' };
+  if (!range) return new Response(silentWav, { status: 200, headers: { ...headers, 'Content-Length': String(silentWav.length) } });
+  const match = /^bytes=(\d+)-(\d*)$/.exec(range);
+  const start = match ? Number(match[1]) : 0;
+  const end = match && match[2] ? Math.min(Number(match[2]), silentWav.length - 1) : silentWav.length - 1;
+  const body = silentWav.subarray(start, end + 1);
+  return new Response(body, {
+    status: 206,
+    headers: { ...headers, 'Content-Length': String(body.length), 'Content-Range': `bytes ${start}-${end}/${silentWav.length}` },
+  });
+}));
 
 router.get('/api/user/info', eventHandler(() => ({
   err: 'ok',
@@ -174,11 +566,19 @@ router.get('/api/user/messages', eventHandler(() => ({
   messages: []
 })));
 
-router.get('/get/cover/:id', eventHandler((event) => {
-  // Return a 1x1 pixel transparent gif or just 200 OK
-  // Or maybe redirect to a placeholder
-  return new Response('fake-image', { headers: { 'Content-Type': 'image/jpeg' } });
-}));
+const mockBookCover = `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="240" viewBox="0 0 180 240">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#23384a"/><stop offset="1" stop-color="#bd752e"/></linearGradient></defs>
+  <rect width="180" height="240" rx="10" fill="url(#g)"/><path d="M22 28h136M22 210h136" stroke="#f7e8cd" stroke-width="2" opacity=".7"/>
+  <text x="90" y="116" text-anchor="middle" fill="#fff9ef" font-family="serif" font-size="27">百年孤独</text><text x="90" y="148" text-anchor="middle" fill="#f7e8cd" font-family="sans-serif" font-size="12">TALEBOOK</text>
+</svg>`;
+
+router.get('/get/cover/:id', eventHandler(() => (
+  new Response(mockBookCover, { headers: { 'Content-Type': 'image/svg+xml' } })
+)));
+
+router.get('/get/thumb_60x80/:id', eventHandler(() => (
+  new Response(mockBookCover, { headers: { 'Content-Type': 'image/svg+xml' } })
+)));
 
 router.get('/api/index', eventHandler(() => {
   console.log('[Mock] GET /api/index, isInstalled:', isInstalled);
@@ -515,6 +915,20 @@ router.post('/api/book/:id/readstate', eventHandler(async (event) => {
     msg: 'Reading state updated',
   };
 }));
+
+router.get('/api/user/devices', eventHandler(() => ({
+  err: 'ok',
+  devices: [],
+  device_types: [],
+})));
+
+// The book detail page probes TXT parsing state for every format. Keep the
+// mock response successful so that this background probe does not open the
+// application's global error dialog during unrelated browser flows.
+router.get('/api/book/txt/init', eventHandler(() => ({
+  err: 'ok',
+  msg: '未解析',
+})));
 
 // Book Detail
 router.get('/api/book/:id', eventHandler((event) => {

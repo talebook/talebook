@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+
 test.describe('Admin Settings (GitHub-style layout)', () => {
     test.beforeEach(async ({ request }) => {
         // 保证已安装并以管理员身份登录（mock 默认）
-        await request.post('http://127.0.0.1:8080/_test/reset', {
+        await request.post(`${mockApi}/_test/reset`, {
             data: { installed: true }
         });
     });

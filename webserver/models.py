@@ -10,7 +10,7 @@ import time
 
 import bcrypt
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import declarative_base, object_session, relationship
 
@@ -644,6 +644,177 @@ class OnlineBookMeta(Base, SQLAlchemyMixin):
             "status_manual": bool(self.status_manual),
             "last_chapter": self.last_chapter or "",
         }
+
+
+class AudiobookEdition(Base, SQLAlchemyMixin):
+    __tablename__ = "audiobook_editions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    status = Column(String(32), default="draft", nullable=False, index=True)
+    engine = Column(String(32), default="edgetts", nullable=False)
+    config = Column(MutableDict.as_mutable(JSONType), default={})
+    source_fingerprint = Column(String(64), default="")
+    script_path = Column(String(1024), default="")
+    manifest_path = Column(String(1024), default="")
+    chapter_count = Column(Integer, default=0)
+    completed_count = Column(Integer, default=0)
+    duration_ms = Column(BigInteger, default=0)
+    size_bytes = Column(BigInteger, default=0)
+    created_by = Column(Integer, ForeignKey("readers.id"), nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    published_at = Column(DateTime)
+
+
+class AudiobookChapter(Base, SQLAlchemyMixin):
+    __tablename__ = "audiobook_chapters"
+    __table_args__ = (UniqueConstraint("edition_id", "number", name="uq_audiobook_chapter_number"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    edition_id = Column(Integer, ForeignKey("audiobook_editions.id"), nullable=False, index=True)
+    source_key = Column(String(1024), default="")
+    number = Column(Integer, nullable=False)
+    title = Column(String(512), default="")
+    audio_path = Column(String(1024), default="")
+    timeline_path = Column(String(1024), default="")
+    duration_ms = Column(BigInteger, default=0)
+    size_bytes = Column(BigInteger, default=0)
+    content_hash = Column(String(64), default="")
+    episode_guid = Column(String(128), default="")
+    first_published_at = Column(DateTime)
+
+
+class AudiobookJob(Base, SQLAlchemyMixin):
+    __tablename__ = "audiobook_jobs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    edition_id = Column(Integer, ForeignKey("audiobook_editions.id"), nullable=False, index=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    mode = Column(String(24), default="quick", nullable=False)
+    status = Column(String(32), default="queued", nullable=False, index=True)
+    phase = Column(String(32), default="QUEUED")
+    priority = Column(Integer, default=0, nullable=False)
+    config = Column(MutableDict.as_mutable(JSONType), default={})
+    chapter_selection = Column(String(1024), default="")
+    config_hash = Column(String(64), default="", index=True)
+    progress = Column(Float, default=0.0)
+    lease_owner = Column(String(128), default="")
+    lease_until = Column(DateTime)
+    last_event_seq = Column(BigInteger, default=-1, nullable=False)
+    cancel_requested = Column(Boolean, default=False)
+    cancel_requested_at = Column(DateTime)
+    attempts = Column(Integer, default=0)
+    error_code = Column(String(128), default="")
+    error_message = Column(Text, default="")
+    log_path = Column(String(1024), default="")
+    data = Column(MutableDict.as_mutable(JSONType), default={})
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime)
+
+
+class AudiobookProgress(Base, SQLAlchemyMixin):
+    __tablename__ = "audiobook_progress"
+    __table_args__ = (UniqueConstraint("reader_id", "edition_id", name="uq_audiobook_progress_reader_edition"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    edition_id = Column(Integer, ForeignKey("audiobook_editions.id"), nullable=False, index=True)
+    chapter_id = Column(Integer, ForeignKey("audiobook_chapters.id"))
+    position_ms = Column(BigInteger, default=0)
+    segment_id = Column(String(64), default="")
+    listened_ms = Column(BigInteger, default=0)
+    is_finished = Column(Boolean, default=False)
+    version = Column(Integer, default=1)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+
+class AudiobookBookmark(Base, SQLAlchemyMixin):
+    __tablename__ = "audiobook_bookmarks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    edition_id = Column(Integer, ForeignKey("audiobook_editions.id"), nullable=False, index=True)
+    chapter_id = Column(Integer, ForeignKey("audiobook_chapters.id"), nullable=False)
+    position_ms = Column(BigInteger, default=0)
+    segment_id = Column(String(64), default="")
+    note = Column(String(1000), default="")
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+
+class AudiobookPlaybackSession(Base, SQLAlchemyMixin):
+    __tablename__ = "audiobook_playback_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uuid = Column(String(64), unique=True, nullable=False, index=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    edition_id = Column(Integer, ForeignKey("audiobook_editions.id"), nullable=False, index=True)
+    source = Column(String(32), default="web")
+    device_id = Column(String(128), default="")
+    ip = Column(String(128), default="")
+    user_agent = Column(String(1000), default="")
+    started_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    ended_at = Column(DateTime)
+    current_ms = Column(BigInteger, default=0)
+    listened_ms = Column(BigInteger, default=0)
+    completed = Column(Boolean, default=False)
+
+
+class PodcastSubscription(Base, SQLAlchemyMixin):
+    __tablename__ = "podcast_subscriptions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    token_hint = Column(String(16), default="")
+    active = Column(Boolean, default=True, nullable=False)
+    hidden_books = Column(MutableDict.as_mutable(JSONType), default={})
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    last_access_at = Column(DateTime)
+    revoked_at = Column(DateTime)
+    frozen_at = Column(DateTime)
+    frozen_reason = Column(String(500), default="")
+
+
+class PodcastAccessLog(Base, SQLAlchemyMixin):
+    __tablename__ = "podcast_access_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    subscription_id = Column(Integer, ForeignKey("podcast_subscriptions.id"), nullable=False, index=True)
+    book_id = Column(Integer, index=True)
+    edition_id = Column(Integer)
+    chapter_id = Column(Integer)
+    kind = Column(String(32), nullable=False)
+    method = Column(String(12), default="GET")
+    status = Column(Integer, default=200)
+    range_start = Column(BigInteger)
+    range_end = Column(BigInteger)
+    bytes_sent = Column(BigInteger, default=0)
+    ip = Column(String(128), default="")
+    user_agent = Column(String(1000), default="")
+    protected = Column(Boolean, default=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False, index=True)
+
+
+class AudiobookDailyStat(Base, SQLAlchemyMixin):
+    __tablename__ = "audiobook_daily_stats"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False, index=True)
+    scope = Column(String(32), nullable=False)
+    reader_id = Column(Integer)
+    book_id = Column(Integer)
+    chapter_id = Column(Integer)
+    source = Column(String(32), nullable=False)
+    listened_ms = Column(BigInteger, default=0)
+    sessions = Column(Integer, default=0)
+    starts = Column(Integer, default=0)
+    completes = Column(Integer, default=0)
+    requests = Column(Integer, default=0)
+    bytes_sent = Column(BigInteger, default=0)
 
 
 class InstalledTheme(Base, SQLAlchemyMixin):

@@ -5,6 +5,9 @@ import { join, resolve } from 'node:path'
 export default defineNuxtConfig({
     compatibilityDate: '2024-04-03',
     devtools: { enabled: true },
+    ignore: [
+        '**/node_modules/**',
+    ],
     modules: [
         'vuetify-nuxt-module',
         '@pinia/nuxt',
@@ -46,6 +49,7 @@ export default defineNuxtConfig({
         '/get/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/get/**' },
         '/read/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/read/**' },
         '/books/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/books/**' },
+        '/media/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/media/**' },
         '/static/themes/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/static/themes/**' },
     },
     app: {

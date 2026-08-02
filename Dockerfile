@@ -57,6 +57,10 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
         pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/; \
     fi
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
 # 针对 ARM32 架构的特殊处理
 RUN if [ "$TARGETARCH" = "arm" ] && [ "$TARGETVARIANT" = "v7" ]; then \
     echo "Building for ARM32 (ARMv7) architecture"; \

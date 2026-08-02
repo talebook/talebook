@@ -512,6 +512,20 @@
 
                         <v-btn
                             v-if="book.id > 0"
+                            color="amber-darken-2"
+                            variant="elevated"
+                            class="mx-2"
+                            :to="'/book/' + book.id + '/audios'"
+                            data-testid="open-audiobook"
+                        >
+                            <v-icon start>
+                                mdi-book-music
+                            </v-icon>
+                            {{ t('audiobook.title') }}
+                        </v-btn>
+
+                        <v-btn
+                            v-if="book.id > 0"
                             color="primary"
                             variant="elevated"
                             class="mx-2"

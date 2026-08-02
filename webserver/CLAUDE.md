@@ -34,6 +34,11 @@ class MyHandler(BaseHandler):
         return {"err": "ok", "data": {...}}
 ```
 
+默认规则有两个受约束的例外：
+
+- 与公开阅读能力绑定的只读 JSON 可以不加 `@auth`，但必须对每一本书调用 `can_view_book()` 或等价校验，并覆盖游客、私有书和所有者测试。
+- 媒体 Range、Podcast、OPDS 等非 JSON 协议可以使用标准 HTTP 状态码；Token 只能用于目标协议，日志必须脱敏，仍需校验原书可见性。
+
 ### 配置系统
 
 `loader.py` 提供单例 `CONF = loader.get_settings()`，所有模块在文件顶部导入它。配置按以下顺序叠加（后者覆盖前者）：

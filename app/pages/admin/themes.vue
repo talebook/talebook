@@ -18,6 +18,7 @@
                             :color="theme.active ? 'primary' : undefined"
                             :variant="theme.active ? 'tonal' : 'outlined'"
                             :class="['theme-card', { 'theme-card--active': theme.active }]"
+                            :data-theme-name="theme.name"
                         >
                             <div class="theme-card-head">
                                 <v-icon
