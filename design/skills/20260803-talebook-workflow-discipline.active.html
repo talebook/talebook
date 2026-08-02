@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talebook Agent Skill 多步工作流合并方案</title>
+  <style>
+    :root {
+      --board: #dfeaec;
+      --panel: #f8fbfb;
+      --ink: #102a35;
+      --muted: #58717a;
+      --line: #9bb0b6;
+      --route: #087c9b;
+      --merge: #6741d9;
+      --signal: #f26b38;
+      --safe: #16855b;
+      --white: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--board);
+      font: 15px/1.65 ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    main { width: min(1160px, calc(100% - 28px)); margin: 22px auto 70px; }
+    header {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      min-height: 430px;
+      background: var(--panel);
+      border: 2px solid var(--ink);
+      box-shadow: 9px 9px 0 #748c93;
+    }
+    .hero { padding: clamp(30px, 6vw, 70px); }
+    .eyebrow, .tag, th, .route-label {
+      font: 800 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 720px;
+      margin: 24px 0 22px;
+      font: 850 clamp(43px, 7vw, 82px)/.9 "Arial Narrow", "Aptos Narrow", sans-serif;
+      letter-spacing: -.045em;
+      text-transform: uppercase;
+    }
+    .lead { max-width: 670px; margin: 0; color: #35515b; font-size: 19px; }
+    .status { display: inline-block; margin-top: 34px; padding: 8px 12px; border: 2px solid var(--signal); color: #a43c17; font-weight: 850; }
+    .switchboard { padding: 28px 22px; color: white; background: var(--ink); border-left: 2px solid var(--ink); }
+    .switchboard svg { width: 100%; height: auto; margin: 30px 0; }
+    .switchboard dl { display: grid; grid-template-columns: 92px 1fr; gap: 9px 12px; margin: 0; }
+    .switchboard dt { color: #9db8c1; font-size: 12px; }
+    .switchboard dd { margin: 0; font: 700 12px/1.4 ui-monospace, monospace; }
+    section { margin-top: 56px; }
+    h2 { margin: 7px 0 20px; font: 800 clamp(28px, 4vw, 46px)/1 "Arial Narrow", "Aptos Narrow", sans-serif; letter-spacing: -.025em; }
+    h3 { margin: 0 0 8px; font-size: 18px; }
+    p { margin: 0 0 13px; }
+    code { padding: .12em .34em; background: #d5e2e5; font: .92em ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .decision {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .decision article { padding: 24px; }
+    .decision article + article { border-left: 1px solid var(--line); }
+    .decision .keep { border-top: 7px solid var(--safe); }
+    .decision .drop { border-top: 7px solid var(--signal); }
+    .flow { overflow-x: auto; padding: 28px; color: white; background: #173943; border: 1px solid var(--ink); }
+    .flow svg { display: block; min-width: 920px; width: 100%; height: auto; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card { min-height: 190px; padding: 20px; background: var(--panel); border: 1px solid var(--line); }
+    .card b { display: block; margin-bottom: 24px; color: var(--route); font: 850 28px/1 ui-monospace, monospace; }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); }
+    th, td { padding: 13px 14px; text-align: left; vertical-align: top; border: 1px solid var(--line); }
+    th { color: white; background: var(--ink); }
+    .tests { display: grid; gap: 9px; }
+    .test { display: grid; grid-template-columns: 22px 1fr 110px; gap: 12px; align-items: center; padding: 13px 15px; background: var(--panel); border: 1px solid var(--line); }
+    .lamp { width: 13px; height: 13px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 4px #f26b3828; }
+    .pending { justify-self: end; color: #9b3d1b; font: 800 11px/1 ui-monospace, monospace; }
+    .passed { justify-self: end; color: var(--safe); font: 800 11px/1 ui-monospace, monospace; }
+    footer { margin-top: 56px; padding-top: 16px; color: var(--muted); border-top: 1px solid var(--line); font-size: 12px; }
+    @media (max-width: 800px) {
+      header, .decision { grid-template-columns: 1fr; }
+      .switchboard { border-left: 0; border-top: 2px solid var(--ink); }
+      .decision article + article { border-left: 0; border-top: 1px solid var(--line); }
+      .cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="hero">
+        <span class="eyebrow">Agent route control / PR #924 integration</span>
+        <h1>先锁定目标，<br>再放行操作。</h1>
+        <p class="lead">把 PR #924 提炼的多步工作流纪律并入当前 Talebook Skill，同时保留现有 update notice、命令树和部署参考。</p>
+        <span class="status">ACTIVE · ROUTE CLEARED</span>
+      </div>
+      <aside class="switchboard">
+        <span class="route-label">interlocking board</span>
+        <svg viewBox="0 0 340 220" role="img" aria-label="当前分支与 PR 924 工作流能力汇合示意图">
+          <path d="M15 55h110c45 0 45 110 95 110h105" fill="none" stroke="#6741d9" stroke-width="12" stroke-linecap="round"/>
+          <path d="M15 165h310" fill="none" stroke="#087c9b" stroke-width="12" stroke-linecap="round"/>
+          <circle cx="220" cy="165" r="18" fill="#102a35" stroke="#f26b38" stroke-width="7"/>
+          <circle cx="15" cy="55" r="8" fill="#6741d9"/><circle cx="15" cy="165" r="8" fill="#087c9b"/><circle cx="325" cy="165" r="8" fill="#16855b"/>
+          <g fill="#fff" font-family="ui-monospace, monospace" font-size="11" font-weight="700"><text x="15" y="33">PR 924 · WORKFLOW</text><text x="15" y="198">CURRENT · UPDATE NOTICE</text><text x="230" y="143">MERGE</text></g>
+        </svg>
+        <dl>
+          <dt>创建日期</dt><dd>2026-08-03</dd>
+          <dt>所属模块</dt><dd>skills / talebook</dd>
+          <dt>状态</dt><dd>ACTIVE</dd>
+          <dt>需求来源</dt><dd>用户要求合并 PR #924 能力</dd>
+          <dt>上游提交</dt><dd>2cb04c65c2fb56356cbb5ffcf5b2b320748da531</dd>
+        </dl>
+      </aside>
+    </header>
+
+    <section>
+      <span class="eyebrow">Scope decision</span>
+      <h2>合并能力，不覆盖现状</h2>
+      <div class="decision">
+        <article class="keep"><h3>并入当前 Skill</h3><p>新增多步工作流参考；要求先解析唯一 ID，列表字段先读后合并，异步任务按需轮询，写失败不自动重试，结果保留后续需要的 ID。</p></article>
+        <article class="drop"><h3>不直接 cherry-pick</h3><p>PR #924 的整包提交基于 master 创建，会移除当前分支的更新提醒，并带入本分支没有经历过的 MCP 方案历史。只重放有效增量，避免伪造历史和功能倒退。</p></article>
+      </div>
+    </section>
+
+    <section>
+      <span class="eyebrow">Execution route</span>
+      <h2>多步操作的联锁顺序</h2>
+      <div class="flow">
+        <svg viewBox="0 0 1040 210" role="img" aria-label="Talebook 多步操作流程">
+          <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0l10 5-10 5z" fill="#f26b38"/></marker></defs>
+          <g fill="#f8fbfb" stroke="#8bb0ba" stroke-width="2"><rect x="20" y="62" width="155" height="86"/><rect x="230" y="62" width="155" height="86"/><rect x="440" y="62" width="155" height="86"/><rect x="650" y="62" width="155" height="86"/><rect x="860" y="62" width="155" height="86"/></g>
+          <g fill="#102a35" text-anchor="middle" font-family="ui-monospace, monospace"><text x="97" y="96" font-size="14" font-weight="800">探测身份</text><text x="97" y="122" font-size="11">me status</text><text x="307" y="96" font-size="14" font-weight="800">解析目标</text><text x="307" y="122" font-size="11">search → show</text><text x="517" y="96" font-size="14" font-weight="800">预览影响</text><text x="517" y="122" font-size="11">唯一 ID · 当前值</text><text x="727" y="96" font-size="14" font-weight="800">执行一次</text><text x="727" y="122" font-size="11">写失败不重试</text><text x="937" y="96" font-size="14" font-weight="800">重新核验</text><text x="937" y="122" font-size="11">状态 · task ID</text></g>
+          <g fill="none" stroke="#f26b38" stroke-width="3" marker-end="url(#arrow)"><path d="M175 105h55"/><path d="M385 105h55"/><path d="M595 105h55"/><path d="M805 105h55"/></g>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <span class="eyebrow">Imported disciplines</span>
+      <h2>五条需要留下的规则</h2>
+      <div class="cards">
+        <article class="card"><b>01</b><h3>唯一目标</h3><p>从搜索、详情或管理列表解析真实 ID；结果不唯一时让用户选择，不按顺序或旧会话猜测。</p></article>
+        <article class="card"><b>02</b><h3>先读后合并</h3><p>作者、标签等完整列表字段先读取当前值，在本地应用增删，再提交完整预期值。</p></article>
+        <article class="card"><b>03</b><h3>有限轮询</h3><p>只有用户要求等待时才查询异步状态；运行中且无变化是正常状态，不无限轮询。</p></article>
+        <article class="card"><b>04</b><h3>写入不重试</h3><p>失败后先报告错误和潜在副作用，重新读取状态；不把写入当作网络只读请求自动重放。</p></article>
+        <article class="card"><b>05</b><h3>保留接力棒</h3><p>摘要展示有用字段，并保留后续操作所需的 book、source、task 等 ID，不倾倒完整 JSON。</p></article>
+      </div>
+    </section>
+
+    <section>
+      <span class="eyebrow">File map</span>
+      <h2>落点与兼容性</h2>
+      <table>
+        <thead><tr><th>文件</th><th>变化</th><th>兼容策略</th></tr></thead>
+        <tbody>
+          <tr><td><code>skills/talebook/references/workflows.md</code></td><td>新增本地书籍、元数据、网络书库、管理员和失败处理流程。</td><td>只描述命令编排，不增加 API 或协议依赖。</td></tr>
+          <tr><td><code>skills/talebook/SKILL.md</code></td><td>路由多步任务到工作流参考，强化 ID、重试和交付规则。</td><td>保留 update notice 与部署章节。</td></tr>
+          <tr><td><code>skills/talebook/agents/openai.yaml</code></td><td>收紧短描述。</td><td>Skill 名称和默认提示不变。</td></tr>
+          <tr><td><code>tests/test_talebook_skill.py</code></td><td>新增目录自包含、工作流纪律和无 MCP 协议依赖测试。</td><td>与现有 CLI 测试并行，不替换更新提醒用例。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <span class="eyebrow">Verification board</span>
+      <h2>测试计划与结果</h2>
+      <div class="tests">
+        <div class="test"><span class="lamp"></span><span><code>python3 -m pytest -q tests/test_talebook_skill.py tests/test_talebook_skill_cli.py</code>：26 项通过。</span><span class="passed">PASS · 26</span></div>
+        <div class="test"><span class="lamp"></span><span>skill-creator quick validation 输出 <code>Skill is valid!</code>；Python compile、目标文件 Ruff check 与 format check 均通过。</span><span class="passed">PASS</span></div>
+        <div class="test"><span class="lamp"></span><span><code>make lint-py-fix</code> 未改动 97 个后端文件；<code>make lint-py</code> 通过。</span><span class="passed">PASS</span></div>
+        <div class="test"><span class="lamp"></span><span>原有 update notice、guest、普通用户、禁用开关和检查异常用例全部包含在 26 项回归中并通过。</span><span class="passed">NO REGRESSION</span></div>
+        <div class="test"><span class="lamp"></span><span>未在本地重复运行 Docker 全量后端测试：本次不修改后端业务代码；推送后由现有 PR 的 test-server、test-ui 与 integration-test CI 覆盖。</span><span class="pending">由 CI 验证</span></div>
+      </div>
+    </section>
+
+    <footer>Talebook Agent Skill · Workflow interlocking · ACTIVE since 2026-08-03.</footer>
+  </main>
+</body>
+</html>

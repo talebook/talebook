@@ -1,6 +1,6 @@
 ---
 name: talebook
-description: 操作 Talebook 实例。用户要求搜索、浏览、上传、下载、收藏、管理阅读状态或设备、使用远程书库、执行管理员操作时使用；用户要求通过 Docker Compose 部署 Talebook 时也使用。
+description: 通过 Talebook 原有 HTTP API 操作自托管实例。用户要求搜索、浏览、上传、下载、收藏、管理阅读状态与设备、使用远程书库、执行管理员操作，或通过 Docker Compose 部署 Talebook 时使用。
 ---
 
 # Talebook 操作助手
@@ -11,7 +11,7 @@ description: 操作 Talebook 实例。用户要求搜索、浏览、上传、下
 
 1. 获取 Talebook 站点地址。优先使用用户本次提供的地址，其次使用 `TALEBOOK_URL`。地址没有 scheme 时按 HTTPS 处理。
 2. 若用户提供账号，使用成对的 `TALEBOOK_USERNAME` 与 `TALEBOOK_PASSWORD`；两者均缺失时保持 guest。优先通过环境变量传递密码，避免命令历史和进程列表暴露凭据。
-3. API 操作前读取 [references/api.md](references/api.md)，选择已有命令并确认参数、权限和风险级别。
+3. API 操作前读取 [references/api.md](references/api.md)，选择已有命令并确认参数、权限和风险级别。多步书库、元数据、远程书源或管理员任务还要读取 [references/workflows.md](references/workflows.md)。
 4. 首次连接或需要身份信息时执行：
 
    ```bash
@@ -26,6 +26,7 @@ description: 操作 Talebook 实例。用户要求搜索、浏览、上传、下
 - 用户明确要求的上传、收藏、书架和阅读状态属于常规写入，可直接执行。
 - 发送到邮箱或设备、管理员写入、删除和批量操作先展示目标、数量和影响，得到用户确认后才添加 `--confirmed`。
 - CLI 报告需要确认时，原样展示预览；不要代替用户确认。
+- 写入前先通过搜索和详情解析唯一书籍 ID，或通过列表解析唯一用户、书源与任务标识；不要猜测 ID。
 - 服务器权限是最终边界。CLI 的身份检查通过不代表可以绕过 Talebook 返回的权限错误。
 
 门禁完成标准：只读或常规写入已获用户原始请求授权；其他操作已有本次会话中的明确确认，且命令目标与预览一致。
@@ -44,6 +45,7 @@ python scripts/talebook-cli.py [--site URL] [--user USER] [--password PASSWORD] 
 - `not_invited`、`captcha.invalid`、第三方登录或首次初始化：切换浏览器完成交互，再重新运行 `me status`。
 - 连接、TLS 或超时错误：检查地址、scheme、端口和实例状态；保留 HTTPS 校验。
 - Talebook 业务错误：展示服务端 `err` 与 `msg`，不要把失败包装成成功。
+- 写操作失败时不要自动重试；先报告服务端错误并重新确认目标与当前状态。
 
 执行完成标准：CLI 返回零退出码，或浏览器中的目标操作显示成功；异步任务已取得任务标识或可查询状态。
 
@@ -72,4 +74,4 @@ CLI 成功输出可能包含 `_notice.update`。看到该字段时：
 
 ## 7. 交付结果
 
-报告实际执行的命令、目标站点、身份、Talebook 响应和核验结果。隐藏密码与 Authorization；下载或日志文件报告本地路径，不把二进制内容写入对话。
+报告实际执行的命令、目标站点、身份、Talebook 响应和核验结果。摘要展示有用字段并保留后续操作需要的 book、task、source 等 ID，不倾倒整段原始 JSON。隐藏密码与 Authorization；下载或日志文件报告本地路径，不把二进制内容写入对话。
