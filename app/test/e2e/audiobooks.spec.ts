@@ -26,6 +26,42 @@ test.describe('Audiobook production and playback', () => {
         await expect(page.getByTestId('audiobook-beta')).toHaveText('Beta');
         await expect(page.getByTestId('audio-job-empty-state')).toBeVisible();
         await expect(page.getByTestId('open-library-to-create-job')).toHaveAttribute('href', '/library');
+
+        await page.getByText('管理', { exact: true }).click();
+        await expect(page.getByRole('link', { name: '有声书任务' })).toHaveAttribute('href', '/audio-jobs');
+    });
+
+    test('shows the real book and expands every generation step', async ({ page, request }) => {
+        const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+        const created = await request.post(`${mockApi}/api/book/1/audio-jobs`, {
+            data: { mode: 'quick', engine: 'edgetts', speed: 'x1.0' },
+        });
+        expect(created.ok()).toBeTruthy();
+
+        await page.goto('/audio-jobs');
+        const card = page.locator('[data-job-id="1"]');
+        const bookLink = card.getByRole('link', { name: '打开《百年孤独》的有声书页面' });
+        await expect(bookLink).toHaveAttribute('href', '/book/1/audios');
+        await expect(bookLink).toContainText('加西亚·马尔克斯');
+        await expect(bookLink.locator('img')).toHaveAttribute('src', /thumb_60x80\/1\.jpg/);
+        await expect(card).toContainText(/整体进度|生成音频中/);
+
+        await page.getByTestId('job-plan-toggle-1').click();
+        const plan = page.getByTestId('job-plan-1');
+        await expect(plan).toBeVisible();
+        await expect(plan).toContainText('检查书籍与脚本');
+        await expect(plan).toContainText('审查角色与对白');
+        await expect(plan).toContainText('逐章生成音频');
+        await expect(plan).toContainText('整理与校验产物');
+        await expect(plan).toContainText('完成有声版本');
+        await expect(plan).toContainText('第一章 雾中的来客');
+        await expect(plan).toContainText('第二章 灯塔来信');
+        await expect(plan).toContainText('分段');
+
+        await page.setViewportSize({ width: 390, height: 844 });
+        await expect(plan).toBeVisible();
+        await expect(plan.getByText('第一章 雾中的来客')).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
     });
 
     test('generates, publishes, plays, and restores a chapter', async ({ page }) => {

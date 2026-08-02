@@ -9,7 +9,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from webserver import models
-from webserver.services.audiobook import AudiobookScheduler, AudiobookStorage, VoicebookProcess
+from webserver.services.audiobook import (
+    AudiobookScheduler,
+    AudiobookStorage,
+    VoicebookProcess,
+    audiobook_job_plan,
+    create_audiobook_job_plan,
+)
 
 
 def _session_maker():
@@ -133,22 +139,46 @@ def test_event_sequence_is_idempotent_and_renews_lease():
             config_hash="seq-test",
             lease_owner="test-worker",
             lease_until=now,
-            data={},
+            data={"plan": create_audiobook_job_plan("quick", now)},
             create_time=now,
             update_time=now,
         )
         session.add(job)
         session.commit()
 
-        scheduler._consume_event(job.id, {"seq": 10, "event": "segment_completed", "progress": 0.4})
-        scheduler._consume_event(job.id, {"seq": 10, "event": "segment_completed", "progress": 0.4})
-        scheduler._consume_event(job.id, {"seq": 9, "event": "segment_completed", "progress": 0.3})
+        scheduler._consume_event(
+            job.id,
+            {
+                "seq": 10,
+                "event": "chapter_started",
+                "chapter_number": 1,
+                "title": "第一章",
+                "total_segments": 2,
+            },
+        )
+        scheduler._consume_event(
+            job.id,
+            {
+                "seq": 11,
+                "event": "segment_completed",
+                "chapter_number": 1,
+                "segment_index": 0,
+                "cache_hit": True,
+                "fingerprint": "must-not-be-public",
+            },
+        )
+        scheduler._consume_event(job.id, {"seq": 11, "event": "segment_completed", "chapter_number": 1})
+        scheduler._consume_event(job.id, {"seq": 9, "event": "segment_completed", "chapter_number": 1})
 
         session.expire_all()
         updated = session.get(models.AudiobookJob, job.id)
-        assert updated.last_event_seq == 10
+        assert updated.last_event_seq == 11
         assert updated.data["completed_segments"] == 1
-        assert updated.progress == 0.4
+        assert updated.data["plan"]["chapters"][0]["completed_segments"] == 1
+        assert updated.data["plan"]["chapters"][0]["cache_hits"] == 1
+        assert "fingerprint" not in updated.data["last_event"]
+        assert updated.progress == 0.575
+        assert audiobook_job_plan(updated)["overall_percent"] == 58
         assert updated.lease_until > now
         session.close()
 

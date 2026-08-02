@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有声书任务书籍信息与生成计划进度方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #edf1f4;
+      --paper: #fbfcfd;
+      --ink: #18232f;
+      --muted: #5d6a77;
+      --line: #cbd4dc;
+      --panel: #202d3a;
+      --panel-soft: #2d3b48;
+      --route: #ec8b32;
+      --route-soft: #fff0df;
+      --blue: #28708f;
+      --green: #247158;
+      --red: #a94040;
+      --pending: #8b5c18;
+      --shadow: 0 18px 45px rgba(24, 35, 47, .09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    code {
+      padding: .1em .38em;
+      border: 1px solid #d8e0e7;
+      border-radius: 5px;
+      background: #f0f4f7;
+      font: .88em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .topbar { height: 12px; background: linear-gradient(90deg, var(--panel) 0 72%, var(--route) 72% 100%); }
+    header { padding: 58px 24px 48px; color: #f8fbfd; background: var(--panel); }
+    .wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    .kicker {
+      margin: 0 0 16px;
+      color: #a9bac8;
+      font: 700 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 940px;
+      margin: 0;
+      font: 760 clamp(2.25rem, 5.8vw, 4.85rem)/1.02 "Arial Narrow", "PingFang SC", sans-serif;
+      letter-spacing: -.045em;
+    }
+    .lede { max-width: 820px; margin: 22px 0 0; color: #cad5de; font-size: 1.08rem; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      margin-top: 34px;
+      overflow: hidden;
+      border: 1px solid #43515e;
+      border-radius: 10px;
+      background: #43515e;
+    }
+    .meta div { padding: 13px 15px; background: #263442; }
+    .meta span { display: block; color: #93a6b6; font-size: .72rem; letter-spacing: .08em; }
+    .meta strong { display: block; margin-top: 4px; font-size: .92rem; }
+    .status { display: inline-block; padding: 2px 8px; border-radius: 999px; color: #174b3b; background: #d8eee6; font-size: .76rem; }
+    main { padding: 42px 0 84px; }
+    section { margin-bottom: 22px; padding: 28px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: var(--shadow); }
+    h2 { margin: 0 0 16px; font: 750 1.55rem/1.2 "Arial Narrow", "PingFang SC", sans-serif; }
+    h3 { margin: 0 0 8px; font-size: 1rem; }
+    p { margin: 9px 0; }
+    ul, ol { margin: 10px 0; padding-left: 1.35rem; }
+    li + li { margin-top: 6px; }
+    .quote { margin: 14px 0 0; padding: 16px 18px; border-left: 4px solid var(--route); background: var(--route-soft); font-weight: 650; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: #f7f9fb; }
+    .card p { color: var(--muted); }
+    .job-demo { overflow: hidden; border: 1px solid #bfcbd4; border-radius: 14px; background: #fff; }
+    .job-summary { display: grid; grid-template-columns: 68px minmax(0, 1fr) 150px; gap: 16px; align-items: center; padding: 18px; }
+    .cover { width: 68px; aspect-ratio: 3/4; display: grid; place-items: center; border-radius: 7px; color: #fff; background: linear-gradient(145deg, #253746, #557084); font: 800 .75rem/1.3 ui-monospace, monospace; text-align: center; }
+    .book-title { margin: 0; font: 760 1.25rem/1.2 Georgia, "Songti SC", serif; }
+    .byline, .job-meta { color: var(--muted); font-size: .82rem; }
+    .percent { text-align: right; }
+    .percent strong { display: block; font: 800 2rem/1 ui-monospace, monospace; }
+    .bar { height: 7px; margin-top: 10px; overflow: hidden; border-radius: 99px; background: #e2e8ed; }
+    .bar span { display: block; width: 47%; height: 100%; background: var(--route); }
+    .plan { display: grid; grid-template-columns: 280px minmax(0, 1fr); border-top: 1px solid var(--line); background: #f7f9fb; }
+    .phase-list { padding: 22px; border-right: 1px solid var(--line); }
+    .phase { position: relative; display: grid; grid-template-columns: 22px 1fr; gap: 10px; min-height: 58px; }
+    .phase::before { position: absolute; top: 19px; bottom: -2px; left: 7px; width: 2px; content: ""; background: #c9d2d9; }
+    .phase:last-child::before { display: none; }
+    .dot { z-index: 1; width: 16px; height: 16px; margin-top: 2px; border: 3px solid #f7f9fb; border-radius: 50%; background: #b6c0c8; box-shadow: 0 0 0 1px #b6c0c8; }
+    .phase.done .dot { background: var(--green); box-shadow: 0 0 0 1px var(--green); }
+    .phase.current .dot { background: var(--route); box-shadow: 0 0 0 2px var(--route); }
+    .phase small { display: block; color: var(--muted); }
+    .chapter-panel { padding: 22px; }
+    .summary-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .metric { padding: 5px 9px; border: 1px solid var(--line); border-radius: 7px; background: white; font-size: .8rem; }
+    .chapter { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; padding: 10px 0; border-bottom: 1px solid #dce3e8; }
+    .chapter:last-child { border: 0; }
+    .chapter-no { color: var(--blue); font: 750 .82rem/1.7 ui-monospace, monospace; }
+    .chapter strong { font-size: .9rem; }
+    .chapter small { display: block; color: var(--muted); }
+    .tag { align-self: center; padding: 2px 8px; border-radius: 99px; font-size: .72rem; font-weight: 750; }
+    .tag.done { color: #174b3b; background: #d8eee6; }
+    .tag.live { color: #65410d; background: #f8e4bf; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .91rem; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #31404e; background: #edf2f5; font-size: .78rem; letter-spacing: .04em; }
+    .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; }
+    .node { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: white; font-size: .84rem; }
+    .arrow { color: var(--route); font-weight: 900; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .74rem; font-weight: 750; }
+    .pill.ok { color: #174b3b; background: #d8eee6; }
+    .pill.pending { color: #65410d; background: #f8e4bf; }
+    .pill.no { color: #6e2b2b; background: #f4d8d8; }
+    .small { color: var(--muted); font-size: .88rem; }
+    @media (max-width: 800px) {
+      .meta { grid-template-columns: 1fr 1fr; }
+      .grid, .plan { grid-template-columns: 1fr; }
+      .phase-list { border-right: 0; border-bottom: 1px solid var(--line); }
+      .job-summary { grid-template-columns: 54px 1fr; }
+      .cover { width: 54px; }
+      .percent { grid-column: 1 / -1; text-align: left; }
+      section { padding: 21px; }
+    }
+    @media (max-width: 520px) {
+      .meta { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <div class="topbar"></div>
+  <header>
+    <div class="wrap">
+      <p class="kicker">Production visibility · PR #882</p>
+      <h1>一眼认出是哪本书，<br>展开看清每一步。</h1>
+      <p class="lede">补齐管理员入口，并把只有“书籍编号”的任务卡改为真实书籍摘要；点击任务后展开 Talebook 与 Voicebook 的完整可观测生成计划、章节进度和整体百分比。</p>
+      <div class="meta">
+        <div><span>创建日期</span><strong>2026-08-01</strong></div>
+        <div><span>所属模块</span><strong>app（主）/ webserver</strong></div>
+        <div><span>状态</span><strong><b class="status">ACTIVE</b></strong></div>
+        <div><span>需求来源</span><strong>用户 · PR #882</strong></div>
+        <div><span>影响范围</span><strong>导航 / API / 任务页</strong></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>原始诉求与目标</h2>
+      <div class="quote">“admin 导航列表里增加一个 /audio-jobs 的入口。”</div>
+      <div class="quote">“任务列表里要增加书籍的信息，并且点击后能够展开 plan list，看到整体进度%；生成过程能展示就全展示。”</div>
+      <div class="grid" style="margin-top:16px">
+        <div class="card"><h3>目标</h3><p>管理员能找到任务入口、识别任务对应书籍，并从单张卡片追踪阶段、章节、片段、缓存复用、续跑与错误状态。</p></div>
+        <div class="card"><h3>不在范围内</h3><p>不改变 TTS 合成算法，不新增数据库表，不伪造 Voicebook 没有上报的耗时预估，也不展示逐片段正文或内部 fingerprint。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>交互蓝图</h2>
+      <div class="job-demo" aria-label="可展开任务卡示意">
+        <div class="job-summary">
+          <div class="cover">BOOK<br>COVER</div>
+          <div>
+            <h3 class="book-title">持续买入</h3>
+            <div class="byline">【美】尼克·马吉奥利</div>
+            <div class="job-meta">任务 #12 · 快捷模式 · Edge TTS · x1.0 · 生成中</div>
+          </div>
+          <div class="percent"><strong>47%</strong><span class="small">整体进度</span><div class="bar"><span></span></div></div>
+        </div>
+        <div class="plan">
+          <div class="phase-list">
+            <div class="phase done"><span class="dot"></span><div><strong>任务入队</strong><small>已完成</small></div></div>
+            <div class="phase done"><span class="dot"></span><div><strong>识别书籍</strong><small>31 章 · 18 个角色</small></div></div>
+            <div class="phase done"><span class="dot"></span><div><strong>脚本审核</strong><small>快捷模式自动跳过</small></div></div>
+            <div class="phase current"><span class="dot"></span><div><strong>生成章节音频</strong><small>第 8 / 31 章</small></div></div>
+            <div class="phase"><span class="dot"></span><div><strong>整理产物</strong><small>待执行</small></div></div>
+            <div class="phase"><span class="dot"></span><div><strong>完成</strong><small>待执行</small></div></div>
+          </div>
+          <div class="chapter-panel">
+            <div class="summary-strip">
+              <span class="metric">章节 7 / 31</span><span class="metric">片段 286 / 742</span><span class="metric">缓存命中 42</span><span class="metric">重试 1 次</span>
+            </div>
+            <div class="chapter"><span class="chapter-no">07</span><div><strong>前言</strong><small>64 / 64 片段 · 12:36 · 8.4 MB</small></div><span class="tag done">完成</span></div>
+            <div class="chapter"><span class="chapter-no">08</span><div><strong>第一章 从哪里开始</strong><small>23 / 71 片段 · 当前正在合成</small></div><span class="tag live">进行中</span></div>
+            <div class="chapter"><span class="chapter-no">09</span><div><strong>第二章 储蓄</strong><small>0 / 58 片段</small></div><span class="tag">等待</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="small">任务摘要整行是可聚焦的展开按钮，保留独立的书籍链接和任务操作按钮；同一时间只展开一个任务，轮询刷新不会收起当前任务。</p>
+    </section>
+
+    <section>
+      <h2>真实过程与可展示信息</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>步骤</th><th>真实来源</th><th>展示内容</th><th>无数据时</th></tr></thead>
+          <tbody>
+            <tr><td>任务入队</td><td>Talebook 创建任务</td><td>创建时间、优先级、模式、引擎、语速、章节选择</td><td>始终存在</td></tr>
+            <tr><td>识别书籍</td><td><code>phase_started: INSPECTING</code> 与 inspect 完成事件</td><td>章节数、角色数、开始/完成时间</td><td>执行中显示不定进度，不虚构细分百分比</td></tr>
+            <tr><td>脚本审核</td><td>Talebook <code>AWAITING_REVIEW</code> / confirm</td><td>高级模式等待审核；快捷模式明确标记“自动跳过”</td><td>不隐藏该步骤</td></tr>
+            <tr><td>生成章节</td><td><code>chapter_started</code></td><td>章节编号、标题、片段总数、当前章节</td><td>等待生成</td></tr>
+            <tr><td>生成片段</td><td><code>segment_completed</code></td><td>已完成片段数、缓存命中数、章节百分比</td><td>只展示计数，不展示内部 fingerprint</td></tr>
+            <tr><td>完成章节</td><td><code>chapter_completed</code></td><td>时长、文件大小、片段数、是否整章续跑复用</td><td>等待生成</td></tr>
+            <tr><td>整理产物</td><td>Talebook 导入 manifest 与章节记录</td><td>明确的 FINALIZING 阶段</td><td>执行前显示待处理</td></tr>
+            <tr><td>终态</td><td>completed / cancelled / failed</td><td>完成、取消或失败位置；错误码、错误消息、是否可重试</td><td>始终可判定</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>整体进度算法</h2>
+      <p>整体百分比是“真实里程碑 + 已完成片段”的确定性计算，不是剩余时间预测：</p>
+      <div class="flow" aria-label="整体进度区间">
+        <span class="node">入队 0%</span><span class="arrow">→</span>
+        <span class="node">识别中 5%</span><span class="arrow">→</span>
+        <span class="node">识别完成 15%</span><span class="arrow">→</span>
+        <span class="node">审核完成/跳过 20%</span><span class="arrow">→</span>
+        <span class="node">片段生成 20%–95%</span><span class="arrow">→</span>
+        <span class="node">整理产物 98%</span><span class="arrow">→</span>
+        <span class="node">完成 100%</span>
+      </div>
+      <ul>
+        <li>生成区间按 <code>已完成片段 / 总片段</code> 线性计算；整章续跑复用按该章全部片段完成计入。</li>
+        <li>失败或取消保留停止时的百分比，配合失败阶段展示，不倒退。</li>
+        <li>旧任务缺少章节计划时仍展示阶段和已有 <code>job.progress</code>，明细标记“历史任务无逐章数据”。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>接口与持久化</h2>
+      <div class="grid">
+        <div class="card">
+          <h3><code>GET /api/audio-jobs</code> 增量返回</h3>
+          <ul>
+            <li><code>book</code>：id、title、author、img、thumb。</li>
+            <li><code>plan.overall_percent</code>：0–100 整数。</li>
+            <li><code>plan.phases</code>：步骤、状态、时间、摘要。</li>
+            <li><code>plan.summary</code>：章节/片段/缓存/重试计数。</li>
+            <li><code>plan.chapters</code>：每章标题、状态、片段进度、时长、大小、续跑标记。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>数据策略</h3>
+          <ul>
+            <li>不建表：精简章节计划写入现有 <code>AudiobookJob.data</code> JSON。</li>
+            <li>每次事件采用复制后整体赋值，保证 SQLAlchemy JSON 变更可追踪。</li>
+            <li>任务列表批量读取书籍，避免前端逐任务请求形成 N+1。</li>
+            <li>API 只返回 UI 需要的稳定字段，不暴露脚本正文、路径或指纹。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead><tr><th>兼容性</th><th>处理</th></tr></thead>
+          <tbody>
+            <tr><td>旧任务没有 plan</td><td>服务端从现有 phase/progress/data 生成兼容摘要，前端不报错。</td></tr>
+            <tr><td>书籍已删除</td><td><code>book</code> 为 null，保留“已删除书籍 #ID”回退文案与任务操作。</td></tr>
+            <tr><td>Voicebook 新事件</td><td>保留 last_event，但未知事件不进入公开 plan 契约。</td></tr>
+            <tr><td>重试/断点续跑</td><td>保留已完成章节；重置当前失败状态，累计 attempts、cache_hits、resumed。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>管理员入口</h2>
+      <p>现有“管理”二级导航在“图书管理”之后新增“有声书任务”（英文 <code>Audiobook Jobs</code>），图标 <code>mdi-playlist-music</code>，目标 <code>/audio-jobs</code>。入口继续受 <code>store.user.is_admin</code> 控制，不改变页面的后端权限校验。</p>
+    </section>
+
+    <section>
+      <h2>实现范围与测试计划</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>实现范围</h3>
+          <ul>
+            <li><code>webserver/services/audiobook.py</code>：建立计划、消费完整事件、计算进度、进入 FINALIZING。</li>
+            <li><code>webserver/handlers/audiobook.py</code>：任务列表批量附加书籍摘要和规范化 plan。</li>
+            <li><code>app/components/AppHeader.vue</code>：管理员导航入口。</li>
+            <li><code>app/components/AudioJobsPage.vue</code>：书籍摘要、百分比、单开式展开计划。</li>
+            <li>中英文 i18n、mock API、后端测试与 Playwright E2E 同步更新。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>实际验证结果</h3>
+          <ul>
+            <li><span class="pill ok">718 passed</span> <code>make test</code>，另有 11 个按仓库条件跳过的用例。</li>
+            <li><span class="pill ok">19 passed</span> <code>docker run … talebook/test pytest -q tests/test_audiobook.py tests/test_audiobook_reliability.py</code>。</li>
+            <li><span class="pill ok">6 passed</span> <code>npx playwright test test/e2e/audiobooks.spec.ts --project=chromium</code>，包含 390×844 移动端无横向溢出断言。</li>
+            <li><span class="pill ok">通过</span> <code>make lint-py-fix</code>、<code>make lint-py</code>、<code>npm run lint -- --no-cache</code>；前端为 0 error，仓库存量文件仍有 warning。</li>
+            <li><span class="pill ok">通过</span> Chrome DevTools MCP 验证桌面任务卡、真实书籍摘要、完整展开计划、逐章明细和轮询后展开状态。</li>
+            <li><span class="pill pending">环境限制</span> <code>npx nuxt typecheck</code> 会临时下载未安装的 <code>vue-tsc</code>，内部包源 DNS 不可用；以 ESLint、Nuxt 实际编译和 Playwright 替代验证。</li>
+            <li><span class="pill ok">通过</span> <code>make check-design</code>。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>风险与控制</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>风险</th><th>控制</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td>长篇小说产生大量 DOM</td><td>只有当前任务展开；章节区域使用定高滚动，避免同时渲染多张展开卡。</td><td><span class="pill ok">已控制</span></td></tr>
+            <tr><td>轮询导致展开状态丢失</td><td>仅保存稳定的 job id，不把响应对象作为展开状态。</td><td><span class="pill ok">E2E 通过</span></td></tr>
+            <tr><td>事件重复导致计数膨胀</td><td>继续使用 seq 幂等门禁，并按章节/片段索引更新而非盲目追加。</td><td><span class="pill ok">幂等测试通过</span></td></tr>
+            <tr><td>进度看似精确但不可解释</td><td>界面注明“整体进度”，方案固定权重；不展示 ETA。</td><td><span class="pill ok">已定义</span></td></tr>
+            <tr><td>真实书籍隐私扩散</td><td>仅登录且有权查看任务的用户获得书籍摘要；不增加新的匿名接口。</td><td><span class="pill ok">权限不扩大</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small">回滚：移除导航项和展开 UI，并停止写入新的 plan 字段即可；新增 JSON 字段可被旧代码忽略，无数据库降级操作。</p>
+    </section>
+  </main>
+</body>
+</html>

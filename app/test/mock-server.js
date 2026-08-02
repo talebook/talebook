@@ -224,6 +224,91 @@ const audiobookBook = () => {
   };
 };
 
+const audiobookJobPlan = (job) => {
+  const completed = job.status === 'completed';
+  const generating = job.status === 'generating' || job.status === 'finalizing';
+  const chapters = [
+    {
+      number: 1,
+      title: '第一章 雾中的来客',
+      status: completed ? 'completed' : (generating ? 'generating' : 'pending'),
+      total_segments: 2,
+      completed_segments: completed ? 2 : (generating ? 1 : 0),
+      cache_hits: completed ? 1 : 0,
+      resumed: false,
+      duration_ms: completed ? 4600 : 0,
+      size_bytes: completed ? 9216 : 0,
+    },
+    {
+      number: 2,
+      title: '第二章 灯塔来信',
+      status: completed ? 'completed' : 'pending',
+      total_segments: 1,
+      completed_segments: completed ? 1 : 0,
+      cache_hits: 0,
+      resumed: completed,
+      duration_ms: completed ? 4200 : 0,
+      size_bytes: completed ? 8472 : 0,
+    },
+  ];
+  const chaptersCompleted = completed ? 2 : 0;
+  const segmentsCompleted = completed ? 3 : (generating ? 1 : 0);
+  const reviewStatus = job.mode === 'quick' ? 'skipped' : (job.data.confirmed ? 'done' : (job.status === 'awaiting_review' ? 'current' : 'pending'));
+  const phaseStatus = (key) => {
+    if (key === 'queue') return job.status === 'queued' ? 'current' : 'done';
+    if (key === 'inspect') return job.status === 'queued' ? 'pending' : 'done';
+    if (key === 'review') return reviewStatus;
+    if (key === 'generate') return completed ? 'done' : (generating ? 'current' : 'pending');
+    if (key === 'finalize') return completed ? 'done' : (job.status === 'finalizing' ? 'current' : 'pending');
+    return completed ? 'done' : 'pending';
+  };
+  const phases = ['queue', 'inspect', 'review', 'generate', 'finalize', 'complete'].map(key => ({
+    key,
+    status: phaseStatus(key),
+    started_at: key === 'queue' || phaseStatus(key) !== 'pending' ? '2026-07-18T10:00:00' : null,
+    completed_at: ['done', 'skipped'].includes(phaseStatus(key)) ? '2026-07-18T10:03:00' : null,
+    summary: key === 'queue'
+      ? { attempts: 1 }
+      : key === 'inspect'
+        ? { chapters_total: 2 }
+        : key === 'review'
+          ? { mode: job.mode }
+          : key === 'generate'
+            ? { chapters_total: 2, chapters_completed: chaptersCompleted, segments_total: 3, segments_completed: segmentsCompleted, cache_hits: completed ? 1 : 0 }
+            : { chapters_completed: chaptersCompleted },
+  }));
+  return {
+    version: 1,
+    detailed: true,
+    overall_percent: Math.round(job.progress * 100),
+    phases,
+    summary: {
+      chapters_total: 2,
+      chapters_completed: chaptersCompleted,
+      segments_total: 3,
+      segments_completed: segmentsCompleted,
+      cache_hits: completed ? 1 : 0,
+      attempts: 1,
+    },
+    chapters,
+  };
+};
+
+const audiobookJobPayload = (job) => {
+  const book = audiobookBook();
+  return {
+    ...job,
+    book: {
+      id: book.id,
+      title: book.title,
+      author: book.author || (book.authors || []).join(', '),
+      img: book.img,
+      thumb: book.thumb || book.img,
+    },
+    plan: audiobookJobPlan(job),
+  };
+};
+
 const makeSilentWav = () => {
   const sampleRate = 8000;
   const samples = sampleRate * 5;
@@ -321,7 +406,7 @@ router.get('/api/audio-jobs', eventHandler(() => {
       job.progress = 0.35;
     }
   }
-  return { err: 'ok', jobs: audiobookJobs };
+  return { err: 'ok', jobs: audiobookJobs.map(audiobookJobPayload) };
 }));
 
 router.patch('/api/audio-job/:jobId', eventHandler(async (event) => {
@@ -481,11 +566,19 @@ router.get('/api/user/messages', eventHandler(() => ({
   messages: []
 })));
 
-router.get('/get/cover/:id', eventHandler((event) => {
-  // Return a 1x1 pixel transparent gif or just 200 OK
-  // Or maybe redirect to a placeholder
-  return new Response('fake-image', { headers: { 'Content-Type': 'image/jpeg' } });
-}));
+const mockBookCover = `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="240" viewBox="0 0 180 240">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#23384a"/><stop offset="1" stop-color="#bd752e"/></linearGradient></defs>
+  <rect width="180" height="240" rx="10" fill="url(#g)"/><path d="M22 28h136M22 210h136" stroke="#f7e8cd" stroke-width="2" opacity=".7"/>
+  <text x="90" y="116" text-anchor="middle" fill="#fff9ef" font-family="serif" font-size="27">百年孤独</text><text x="90" y="148" text-anchor="middle" fill="#f7e8cd" font-family="sans-serif" font-size="12">TALEBOOK</text>
+</svg>`;
+
+router.get('/get/cover/:id', eventHandler(() => (
+  new Response(mockBookCover, { headers: { 'Content-Type': 'image/svg+xml' } })
+)));
+
+router.get('/get/thumb_60x80/:id', eventHandler(() => (
+  new Response(mockBookCover, { headers: { 'Content-Type': 'image/svg+xml' } })
+)));
 
 router.get('/api/index', eventHandler(() => {
   console.log('[Mock] GET /api/index, isInstalled:', isInstalled);

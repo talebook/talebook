@@ -44,6 +44,9 @@ from webserver.services.audiobook import (
     AudiobookStorage,
     ScriptValidationError,
     VoicebookProcess,
+    audiobook_job_plan,
+    confirm_audiobook_job_plan,
+    create_audiobook_job_plan,
     read_script_workspace,
     request_cancel,
     reset_for_retry,
@@ -103,8 +106,10 @@ def _chapter_dict(chapter):
     }
 
 
-def _job_dict(job):
-    return {
+def _job_dict(job, book=None, include_book=False):
+    data = dict(job.data or {})
+    data.pop("plan", None)
+    value = {
         "id": job.id,
         "book_id": job.book_id,
         "edition_id": job.edition_id,
@@ -120,10 +125,14 @@ def _job_dict(job):
         "attempts": job.attempts,
         "error_code": job.error_code,
         "error_message": job.error_message,
-        "data": job.data or {},
+        "data": data,
+        "plan": audiobook_job_plan(job),
         "created_at": job.create_time.isoformat() if job.create_time else None,
         "updated_at": job.update_time.isoformat() if job.update_time else None,
     }
+    if include_book:
+        value["book"] = book
+    return value
 
 
 def _source_ip(handler):
@@ -394,7 +403,7 @@ class AudiobookJobCreate(BaseHandler):
             config=config,
             chapter_selection=chapters,
             config_hash=config_hash,
-            data={},
+            data={"plan": create_audiobook_job_plan(mode, now)},
             create_time=now,
             update_time=now,
         )
@@ -415,7 +424,21 @@ class AudiobookJobs(BaseHandler):
         if status:
             query = query.filter(AudiobookJob.status == status)
         jobs = query.order_by(AudiobookJob.create_time.desc()).limit(200).all()
-        return {"err": "ok", "jobs": [_job_dict(job) for job in jobs]}
+        book_ids = {job.book_id for job in jobs}
+        books = {}
+        for source in self.db.get_data_as_dict(ids=list(book_ids)) if book_ids else []:
+            value = utils.SimpleBookFormatter(source, self.cdn_url, self.api_url).format()
+            books[value["id"]] = {
+                "id": value["id"],
+                "title": value["title"],
+                "author": value["author"],
+                "img": value["img"],
+                "thumb": value["thumb"],
+            }
+        return {
+            "err": "ok",
+            "jobs": [_job_dict(job, books.get(job.book_id), include_book=True) for job in jobs],
+        }
 
 
 class AudiobookJobAction(BaseHandler):
@@ -504,7 +527,9 @@ class AudiobookConfirm(BaseHandler):
             return {"err": "state.invalid", "msg": _("任务当前不在审查阶段")}
         job.status = "queued"
         job.phase = "QUEUED"
+        job.last_event_seq = -1
         job.data = {**(job.data or {}), "confirmed": True}
+        confirm_audiobook_job_plan(job)
         job.update_time = utcnow()
         self.session.commit()
         AudiobookScheduler().wake()

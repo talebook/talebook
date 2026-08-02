@@ -27,6 +27,7 @@ ACTIVE_JOB_STATUSES = {"queued", "inspecting", "awaiting_review", "generating", 
 ROLE_COLUMNS = 9
 CHAPTER_HEADING = re.compile(r"^##\s+章节\s+(\d+)\s*\|\s*(.*?)(?:\s+#\s*(.+))?$")
 SCRIPT_LINE = re.compile(r"^\[([^\]]+)\]\s+(.+)$")
+PLAN_PHASE_KEYS = ("queue", "inspect", "review", "generate", "finalize", "complete")
 
 
 def utcnow():
@@ -125,6 +126,204 @@ def _script_sections(path):
 def read_script_workspace(path):
     _, roles, chapters, revision = _script_sections(path)
     return {"characters": roles, "chapters": chapters, "revision": revision}
+
+
+def create_audiobook_job_plan(mode, created_at=None):
+    """Create the compact, persisted plan used to resume and explain a job."""
+
+    timestamp = (created_at or utcnow()).isoformat()
+    return {
+        "version": 1,
+        "chapters": [],
+        "phases": {"queue": {"started_at": timestamp}},
+        "last_active_phase": "queue",
+        "review_status": "pending" if mode == "advanced" else "not_started",
+    }
+
+
+def _copy_job_plan(data, mode):
+    stored = (data or {}).get("plan") or {}
+    plan = dict(stored)
+    plan["chapters"] = [dict(chapter) for chapter in stored.get("chapters", [])]
+    plan["phases"] = {key: dict(value) for key, value in stored.get("phases", {}).items()}
+    plan.setdefault("review_status", "pending" if mode == "advanced" else "not_started")
+    return plan
+
+
+def _mark_plan_phase(plan, key, state, timestamp=None):
+    timestamp = timestamp or utcnow().isoformat()
+    phases = plan.setdefault("phases", {})
+    phase = dict(phases.get(key) or {})
+    if state == "started":
+        phase.setdefault("started_at", timestamp)
+        plan["last_active_phase"] = key
+    elif state == "completed":
+        phase.setdefault("started_at", timestamp)
+        phase["completed_at"] = timestamp
+    phases[key] = phase
+
+
+def _mark_current_chapter_terminal(data, plan, status):
+    try:
+        number = int(data.get("current_chapter"))
+    except (TypeError, ValueError):
+        return
+    chapter = next((item for item in plan.get("chapters", []) if int(item.get("number", 0)) == number), None)
+    if chapter and chapter.get("status") != "completed":
+        chapter["status"] = status
+
+
+def initialize_audiobook_job_plan(job, workspace):
+    """Persist chapter metadata after inspection without retaining script text."""
+
+    data = dict(job.data or {})
+    plan = _copy_job_plan(data, job.mode)
+    plan.setdefault("version", 1)
+    existing = {int(item.get("number", 0)): item for item in plan.get("chapters", [])}
+    chapters = []
+    for source in workspace.get("chapters", []):
+        number = int(source.get("number", 0))
+        chapter = dict(existing.get(number) or {})
+        chapter.update(
+            {
+                "number": number,
+                "title": str(source.get("title", "")),
+                "status": chapter.get("status", "pending"),
+                "total_segments": len(source.get("lines") or []),
+                "completed_segments": int(chapter.get("completed_segments", 0)),
+                "cache_hits": int(chapter.get("cache_hits", 0)),
+                "resumed": bool(chapter.get("resumed", False)),
+                "duration_ms": int(chapter.get("duration_ms", 0)),
+                "size_bytes": int(chapter.get("size_bytes", 0)),
+            }
+        )
+        chapters.append(chapter)
+    plan["chapters"] = chapters
+    timestamp = utcnow().isoformat()
+    _mark_plan_phase(plan, "inspect", "completed", timestamp)
+    if job.mode == "quick":
+        plan["review_status"] = "skipped"
+        _mark_plan_phase(plan, "review", "completed", timestamp)
+    else:
+        plan["review_status"] = "pending"
+        _mark_plan_phase(plan, "review", "started", timestamp)
+    data["plan"] = plan
+    job.data = data
+    return plan
+
+
+def confirm_audiobook_job_plan(job):
+    data = dict(job.data or {})
+    plan = _copy_job_plan(data, job.mode)
+    plan.setdefault("version", 1)
+    plan["review_status"] = "completed"
+    _mark_plan_phase(plan, "review", "completed")
+    data["plan"] = plan
+    job.data = data
+    job.progress = max(float(job.progress or 0), 0.20)
+
+
+def _terminal_phase_status(job, key, plan):
+    if job.status not in {"failed", "cancelled"}:
+        return None
+    active = plan.get("last_active_phase") or "queue"
+    if active == key:
+        return job.status
+    return None
+
+
+def audiobook_job_plan(job):
+    """Build a stable, public plan for new jobs and a useful fallback for old jobs."""
+
+    data = job.data or {}
+    stored = data.get("plan") or {}
+    plan = _copy_job_plan(data, job.mode)
+    chapters = sorted(plan.get("chapters", []), key=lambda item: int(item.get("number", 0)))
+    chapters_total = len(chapters)
+    chapters_completed = sum(1 for item in chapters if item.get("status") == "completed")
+    segments_total = sum(max(0, int(item.get("total_segments", 0))) for item in chapters)
+    segments_completed = sum(
+        min(max(0, int(item.get("completed_segments", 0))), max(0, int(item.get("total_segments", 0)))) for item in chapters
+    )
+    cache_hits = sum(max(0, int(item.get("cache_hits", 0))) for item in chapters)
+
+    derived_progress = 0.0
+    if job.status == "inspecting":
+        derived_progress = 0.05
+    elif data.get("inspected"):
+        derived_progress = 0.15
+    if plan.get("review_status") in {"completed", "skipped"}:
+        derived_progress = max(derived_progress, 0.20)
+    if segments_total:
+        derived_progress = max(derived_progress, 0.20 + 0.75 * segments_completed / segments_total)
+    if job.status == "finalizing":
+        derived_progress = max(derived_progress, 0.98)
+    if job.status == "completed":
+        derived_progress = 1.0
+    overall_percent = int(max(float(job.progress or 0), derived_progress) * 100 + 0.5000001)
+    overall_percent = max(0, min(100, overall_percent))
+
+    phase_times = plan.get("phases", {})
+    phase_statuses = {
+        "queue": "current" if job.status == "queued" else "done",
+        "inspect": "current" if job.status == "inspecting" else ("done" if data.get("inspected") else "pending"),
+        "review": "current" if job.status == "awaiting_review" else "pending",
+        "generate": "current"
+        if job.status == "generating"
+        else ("done" if job.status in {"finalizing", "completed"} else "pending"),
+        "finalize": "current" if job.status == "finalizing" else ("done" if job.status == "completed" else "pending"),
+        "complete": "done" if job.status == "completed" else "pending",
+    }
+    if plan.get("review_status") == "skipped":
+        phase_statuses["review"] = "skipped"
+    elif plan.get("review_status") == "completed" or data.get("confirmed"):
+        phase_statuses["review"] = "done"
+    for key in PLAN_PHASE_KEYS:
+        terminal = _terminal_phase_status(job, key, plan)
+        if terminal:
+            phase_statuses[key] = terminal
+
+    summaries = {
+        "queue": {"attempts": int(job.attempts or 0)},
+        "inspect": {"chapters_total": chapters_total},
+        "review": {"mode": job.mode},
+        "generate": {
+            "chapters_total": chapters_total,
+            "chapters_completed": chapters_completed,
+            "segments_total": segments_total,
+            "segments_completed": segments_completed,
+            "cache_hits": cache_hits,
+        },
+        "finalize": {"chapters_completed": chapters_completed},
+        "complete": {"chapters_completed": chapters_completed},
+    }
+    phases = []
+    for key in PLAN_PHASE_KEYS:
+        timing = phase_times.get(key) or {}
+        phases.append(
+            {
+                "key": key,
+                "status": phase_statuses[key],
+                "started_at": timing.get("started_at"),
+                "completed_at": timing.get("completed_at"),
+                "summary": summaries[key],
+            }
+        )
+    return {
+        "version": int(stored.get("version", 0)),
+        "detailed": bool(stored.get("version")),
+        "overall_percent": overall_percent,
+        "phases": phases,
+        "summary": {
+            "chapters_total": chapters_total,
+            "chapters_completed": chapters_completed,
+            "segments_total": segments_total,
+            "segments_completed": segments_completed,
+            "cache_hits": cache_hits,
+            "attempts": int(job.attempts or 0),
+        },
+        "chapters": chapters,
+    }
 
 
 def save_script_roles(path, roles, revision):
@@ -534,28 +733,64 @@ class AudiobookScheduler:
                 job.data = {**job.data, "inspected": True}
                 edition.script_path = self.storage.relative(script)
                 self._apply_generation_defaults(script, job, edition)
+                workspace = read_script_workspace(script)
+                initialize_audiobook_job_plan(job, workspace)
+                job.progress = max(float(job.progress or 0), 0.15)
                 job.update_time = utcnow()
                 if job.mode == "advanced":
                     job.status = "awaiting_review"
                     job.phase = "AWAITING_REVIEW"
                     session.commit()
                     return
+                job.progress = max(float(job.progress or 0), 0.20)
                 session.commit()
 
             job.status = "generating"
             job.phase = "GENERATING"
+            job.last_event_seq = -1
+            data = dict(job.data or {})
+            plan = _copy_job_plan(data, job.mode)
+            _mark_plan_phase(plan, "generate", "started")
+            data["plan"] = plan
+            job.data = data
+            job.progress = max(float(job.progress or 0), 0.20)
             session.commit()
             args = ["generate", str(script), "-o", str(edition_dir), "--engine", edition.engine, "--resume"]
             status = process.run(job, args, on_event, on_control)
             if status == 3:
                 self._finish_cancelled(job_id)
                 return
+            session.expire_all()
+            job = session.get(AudiobookJob, job_id)
+            data = dict(job.data or {})
+            plan = _copy_job_plan(data, job.mode)
+            timestamp = utcnow().isoformat()
+            _mark_plan_phase(plan, "generate", "completed", timestamp)
+            _mark_plan_phase(plan, "finalize", "started", timestamp)
+            data["plan"] = plan
+            job.data = data
+            job.status = "finalizing"
+            job.phase = "FINALIZING"
+            job.progress = max(float(job.progress or 0), 0.98)
+            job.update_time = utcnow()
+            session.commit()
             self._finalize(job_id)
         except Exception as exc:
             logging.exception("audiobook job %s failed", job_id)
             session.rollback()
             job = session.get(AudiobookJob, job_id)
             if job:
+                data = dict(job.data or {})
+                plan = _copy_job_plan(data, job.mode)
+                plan["last_active_phase"] = {
+                    "INSPECTING": "inspect",
+                    "AWAITING_REVIEW": "review",
+                    "GENERATING": "generate",
+                    "FINALIZING": "finalize",
+                }.get(job.phase, plan.get("last_active_phase", "queue"))
+                _mark_current_chapter_terminal(data, plan, "failed")
+                data["plan"] = plan
+                job.data = data
                 job.status = "failed"
                 job.phase = "FAILED"
                 job.error_code = type(exc).__name__
@@ -583,19 +818,107 @@ class AudiobookScheduler:
             if sequence is not None:
                 job.last_event_seq = sequence
             name = event.get("event")
+            timestamp = str(event.get("at") or utcnow().isoformat())
+            data = dict(job.data or {})
+            plan = _copy_job_plan(data, job.mode)
             if name == "phase_started":
                 job.phase = str(event.get("job_phase", job.phase))
-            data = dict(job.data or {})
-            data["last_event"] = event
+                phase_key = {"INSPECTING": "inspect", "GENERATING": "generate"}.get(job.phase)
+                if phase_key:
+                    _mark_plan_phase(plan, "queue", "completed", timestamp)
+                    _mark_plan_phase(plan, phase_key, "started", timestamp)
+                    job.progress = max(float(job.progress or 0), 0.05 if phase_key == "inspect" else 0.20)
+            public_event_keys = {
+                "seq",
+                "event",
+                "at",
+                "job_phase",
+                "chapter_number",
+                "title",
+                "total_segments",
+                "segment_index",
+                "cache_hit",
+                "duration_ms",
+                "size_bytes",
+                "resumed",
+                "code",
+                "message",
+                "retryable",
+            }
+            data["last_event"] = {key: value for key, value in event.items() if key in public_event_keys}
+            chapters = plan.setdefault("chapters", [])
+
+            def chapter_record():
+                try:
+                    number = int(event.get("chapter_number"))
+                except (TypeError, ValueError):
+                    return None
+                chapter = next((item for item in chapters if int(item.get("number", 0)) == number), None)
+                if chapter is None:
+                    chapter = {
+                        "number": number,
+                        "title": str(event.get("title", "")),
+                        "status": "pending",
+                        "total_segments": 0,
+                        "completed_segments": 0,
+                        "cache_hits": 0,
+                        "resumed": False,
+                        "duration_ms": 0,
+                        "size_bytes": 0,
+                    }
+                    chapters.append(chapter)
+                return chapter
+
             if name == "chapter_started":
                 data["current_chapter"] = event.get("chapter_number")
                 data["chapter_segments"] = event.get("total_segments", 0)
                 data["completed_segments"] = 0
+                chapter = chapter_record()
+                if chapter is not None:
+                    chapter["title"] = str(event.get("title") or chapter.get("title", ""))
+                    chapter["status"] = "generating"
+                    chapter["total_segments"] = max(0, int(event.get("total_segments", 0)))
+                    chapter["completed_segments"] = 0
+                    chapter["cache_hits"] = 0
+                    chapter["started_at"] = timestamp
             elif name == "segment_completed":
                 data["completed_segments"] = int(data.get("completed_segments", 0)) + 1
+                chapter = chapter_record()
+                if chapter is not None:
+                    total = max(0, int(chapter.get("total_segments", 0)))
+                    completed = int(chapter.get("completed_segments", 0)) + 1
+                    chapter["completed_segments"] = min(completed, total) if total else completed
+                    if event.get("cache_hit"):
+                        chapter["cache_hits"] = int(chapter.get("cache_hits", 0)) + 1
+            elif name == "chapter_completed":
+                chapter = chapter_record()
+                if chapter is not None:
+                    total = max(
+                        int(chapter.get("total_segments", 0)),
+                        int(event.get("segment_count", 0) or 0),
+                    )
+                    chapter.update(
+                        {
+                            "status": "completed",
+                            "total_segments": total,
+                            "completed_segments": total,
+                            "resumed": bool(event.get("resumed", False)),
+                            "duration_ms": max(0, int(event.get("duration_ms", 0) or 0)),
+                            "size_bytes": max(0, int(event.get("size_bytes", 0) or 0)),
+                            "completed_at": timestamp,
+                        }
+                    )
+            elif name == "completed" and job.status == "generating":
+                _mark_plan_phase(plan, "generate", "completed", timestamp)
+                job.progress = max(float(job.progress or 0), 0.95)
+            data["plan"] = plan
             job.data = data
+            summary = audiobook_job_plan(job)["summary"]
+            if summary["segments_total"]:
+                progress = 0.20 + 0.75 * summary["segments_completed"] / summary["segments_total"]
+                job.progress = max(float(job.progress or 0), min(0.95, progress))
             if "progress" in event:
-                job.progress = max(0.0, min(1.0, float(event["progress"])))
+                job.progress = max(float(job.progress or 0), max(0.0, min(1.0, float(event["progress"]))))
             job.lease_until = utcnow() + datetime.timedelta(seconds=max(5, int(CONF.get("AUDIOBOOK_LEASE_SECONDS", 30))))
             job.update_time = utcnow()
             session.commit()
@@ -606,6 +929,12 @@ class AudiobookScheduler:
         session = self.session_maker()
         try:
             job = session.get(AudiobookJob, job_id)
+            data = dict(job.data or {})
+            plan = _copy_job_plan(data, job.mode)
+            plan["last_active_phase"] = plan.get("last_active_phase", "queue")
+            _mark_current_chapter_terminal(data, plan, "cancelled")
+            data["plan"] = plan
+            job.data = data
             job.status = "cancelled"
             job.phase = "CANCELLED"
             job.lease_owner = ""
@@ -660,6 +989,13 @@ class AudiobookScheduler:
             else:
                 edition.status = "ready" if complete else "partial"
             edition.update_time = utcnow()
+            data = dict(job.data or {})
+            plan = _copy_job_plan(data, job.mode)
+            timestamp = utcnow().isoformat()
+            _mark_plan_phase(plan, "finalize", "completed", timestamp)
+            _mark_plan_phase(plan, "complete", "completed", timestamp)
+            data["plan"] = plan
+            job.data = data
             job.status = "completed"
             job.phase = "COMPLETED"
             job.progress = 1.0
@@ -688,6 +1024,11 @@ def reset_for_retry(storage, job):
     job.cancel_requested_at = None
     job.status = "queued"
     job.phase = "QUEUED"
+    data = dict(job.data or {})
+    plan = _copy_job_plan(data, job.mode)
+    _mark_plan_phase(plan, "queue", "started")
+    data["plan"] = plan
+    job.data = data
     job.error_code = ""
     job.error_message = ""
     job.last_event_seq = -1

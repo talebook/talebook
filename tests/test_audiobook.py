@@ -201,6 +201,29 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         self.assertEqual(invalid_quality["err"], "params.invalid")
         self.assertIn("标准音质", invalid_quality["msg"])
 
+    def test_job_list_includes_real_book_and_expandable_plan(self):
+        created = self.json(
+            f"/api/book/{test_main.BID_EPUB}/audio-jobs",
+            method="POST",
+            body=json.dumps({"mode": "quick", "engine": "edgetts", "speed": "x1.0"}),
+        )
+
+        response = self.json("/api/audio-jobs")
+        self.assertEqual(response["err"], "ok")
+        job = next(item for item in response["jobs"] if item["id"] == created["job"]["id"])
+        self.assertEqual(job["book"]["id"], test_main.BID_EPUB)
+        self.assertTrue(job["book"]["title"])
+        self.assertTrue(job["book"]["author"])
+        self.assertIn(f"/get/thumb_60x80/{test_main.BID_EPUB}.jpg", job["book"]["thumb"])
+        self.assertTrue(job["plan"]["detailed"])
+        self.assertEqual(job["plan"]["overall_percent"], 0)
+        self.assertEqual(
+            [phase["key"] for phase in job["plan"]["phases"]],
+            ["queue", "inspect", "review", "generate", "finalize", "complete"],
+        )
+        self.assertEqual(job["plan"]["phases"][0]["status"], "current")
+        self.assertNotIn("plan", job["data"])
+
     def test_low_disk_capacity_blocks_generation_and_job_creation(self):
         usage = mock.Mock(free=1 * 1024**3)
         with (

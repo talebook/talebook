@@ -96,27 +96,164 @@
                         <time>{{ formatDate(job.updated_at || job.created_at) }}</time>
                     </div>
                     <div class="job-body">
-                        <div>
-                            <h2>{{ t('audiobook.bookJobTitle', { id: job.book_id }) }}</h2>
-                            <p>{{ modeLabel(job.mode) }} · {{ engineLabel(job.config?.engine) }} · {{ job.config?.speed || 'x1.0' }}</p>
-                            <p
-                                v-if="job.error_message"
-                                class="job-error"
+                        <NuxtLink
+                            v-if="job.book"
+                            class="job-book"
+                            :to="`/book/${job.book_id}/audios`"
+                            :aria-label="t('audiobook.openBookJob', { title: job.book.title })"
+                        >
+                            <img
+                                :src="job.book.thumb || job.book.img"
+                                :alt="job.book.title"
                             >
-                                {{ job.error_message }}
-                            </p>
+                            <span>
+                                <strong>{{ job.book.title }}</strong>
+                                <small>{{ job.book.author }}</small>
+                                <small>#{{ job.book_id }}</small>
+                            </span>
+                        </NuxtLink>
+                        <div
+                            v-else
+                            class="job-book deleted-book"
+                        >
+                            <span class="deleted-cover"><v-icon icon="mdi-book-remove-outline" /></span>
+                            <span>
+                                <strong>{{ t('audiobook.deletedBook', { id: job.book_id }) }}</strong>
+                                <small>{{ t('audiobook.deletedBookHint') }}</small>
+                            </span>
                         </div>
-                        <div class="phase-block">
-                            <span>{{ phaseLabel(job.phase) }}</span>
+                        <button
+                            type="button"
+                            class="job-plan-toggle"
+                            :aria-expanded="expandedJobId === job.id"
+                            :aria-controls="`job-plan-${job.id}`"
+                            :data-testid="`job-plan-toggle-${job.id}`"
+                            @click="toggleJob(job.id)"
+                        >
+                            <span class="job-config">{{ modeLabel(job.mode) }} · {{ engineLabel(job.config?.engine) }} · {{ job.config?.speed || 'x1.0' }}</span>
+                            <span class="phase-heading">
+                                <span>{{ phaseLabel(job.phase) }}</span>
+                                <strong>{{ overallPercent(job) }}%</strong>
+                            </span>
                             <v-progress-linear
-                                :model-value="job.progress * 100"
-                                :indeterminate="activeStatuses.includes(job.status) && !job.progress"
+                                :model-value="overallPercent(job)"
                                 color="amber-darken-2"
                                 rounded
                             />
-                        </div>
+                            <span class="expand-label">
+                                {{ expandedJobId === job.id ? t('audiobook.collapsePlan') : t('audiobook.expandPlan') }}
+                                <v-icon :icon="expandedJobId === job.id ? 'mdi-chevron-up' : 'mdi-chevron-down'" />
+                            </span>
+                        </button>
                     </div>
+                    <p
+                        v-if="job.error_message"
+                        class="job-error"
+                    >
+                        {{ job.error_message }}
+                    </p>
                 </v-card-text>
+                <v-expand-transition>
+                    <section
+                        v-if="expandedJobId === job.id"
+                        :id="`job-plan-${job.id}`"
+                        class="job-plan"
+                        :data-testid="`job-plan-${job.id}`"
+                    >
+                        <div class="plan-heading">
+                            <div>
+                                <p class="eyebrow">
+                                    {{ t('audiobook.generationPlan') }}
+                                </p>
+                                <h3>{{ t('audiobook.overallProgress', { percent: overallPercent(job) }) }}</h3>
+                            </div>
+                            <span>{{ t('audiobook.progressMethodHint') }}</span>
+                        </div>
+                        <div class="plan-metrics">
+                            <div>
+                                <strong>{{ job.plan?.summary?.chapters_completed || 0 }}/{{ job.plan?.summary?.chapters_total || 0 }}</strong>
+                                <span>{{ t('audiobook.metricChapters') }}</span>
+                            </div>
+                            <div>
+                                <strong>{{ job.plan?.summary?.segments_completed || 0 }}/{{ job.plan?.summary?.segments_total || 0 }}</strong>
+                                <span>{{ t('audiobook.metricSegments') }}</span>
+                            </div>
+                            <div>
+                                <strong>{{ job.plan?.summary?.cache_hits || 0 }}</strong>
+                                <span>{{ t('audiobook.metricCacheHits') }}</span>
+                            </div>
+                            <div>
+                                <strong>{{ job.plan?.summary?.attempts || 0 }}</strong>
+                                <span>{{ t('audiobook.metricAttempts') }}</span>
+                            </div>
+                        </div>
+                        <v-alert
+                            v-if="!job.plan?.detailed"
+                            type="info"
+                            variant="tonal"
+                            density="compact"
+                            class="legacy-plan-alert"
+                        >
+                            {{ t('audiobook.legacyPlanUnavailable') }}
+                        </v-alert>
+                        <ol class="phase-list">
+                            <li
+                                v-for="phase in job.plan?.phases || []"
+                                :key="phase.key"
+                                :class="`phase-${phase.status}`"
+                            >
+                                <span class="phase-icon"><v-icon :icon="phaseIcon(phase.status)" /></span>
+                                <div>
+                                    <div class="phase-title-row">
+                                        <strong>{{ planPhaseLabel(phase.key) }}</strong>
+                                        <v-chip
+                                            size="x-small"
+                                            :color="phaseStatusColor(phase.status)"
+                                            variant="tonal"
+                                        >
+                                            {{ planStatusLabel(phase.status) }}
+                                        </v-chip>
+                                    </div>
+                                    <p>{{ planPhaseSummary(phase) }}</p>
+                                    <time v-if="phase.completed_at || phase.started_at">
+                                        {{ formatDate(phase.completed_at || phase.started_at) }}
+                                    </time>
+                                </div>
+                            </li>
+                        </ol>
+                        <div
+                            v-if="job.plan?.chapters?.length"
+                            class="chapter-progress"
+                        >
+                            <div class="chapter-progress-heading">
+                                <h4>{{ t('audiobook.chapterProgress') }}</h4>
+                                <span>{{ t('audiobook.chapterProgressCount', { count: job.plan.chapters.length }) }}</span>
+                            </div>
+                            <div class="chapter-progress-list">
+                                <article
+                                    v-for="chapter in job.plan.chapters"
+                                    :key="chapter.number"
+                                    class="chapter-progress-row"
+                                >
+                                    <span class="chapter-number">{{ String(chapter.number).padStart(2, '0') }}</span>
+                                    <div>
+                                        <strong>{{ chapter.title || t('audiobook.untitledChapter', { number: chapter.number }) }}</strong>
+                                        <span>
+                                            {{ chapterStatusLabel(chapter.status) }} ·
+                                            {{ t('audiobook.segmentProgress', { completed: chapter.completed_segments || 0, total: chapter.total_segments || 0 }) }}
+                                        </span>
+                                    </div>
+                                    <div class="chapter-facts">
+                                        <span v-if="chapter.cache_hits">{{ t('audiobook.chapterCacheHits', { count: chapter.cache_hits }) }}</span>
+                                        <span v-if="chapter.resumed">{{ t('audiobook.chapterResumed') }}</span>
+                                        <span v-if="chapter.duration_ms">{{ formatDuration(chapter.duration_ms) }}</span>
+                                        <span v-if="chapter.size_bytes">{{ formatBytes(chapter.size_bytes) }}</span>
+                                    </div>
+                                </article>
+                            </div>
+                        </div>
+                    </section>
+                </v-expand-transition>
                 <v-card-actions>
                     <v-btn
                         v-if="job.status === 'awaiting_review'"
@@ -124,7 +261,7 @@
                         variant="flat"
                         prepend-icon="mdi-script-text-edit"
                         data-testid="edit-workspace"
-                        @click="openWorkspace(job)"
+                        @click.stop="openWorkspace(job)"
                     >
                         {{ t('audiobook.editScript') }}
                     </v-btn>
@@ -140,7 +277,7 @@
                         v-if="activeStatuses.includes(job.status)"
                         color="error"
                         variant="text"
-                        @click="jobAction(job, 'cancel')"
+                        @click.stop="jobAction(job, 'cancel')"
                     >
                         {{ t('common.cancel') }}
                     </v-btn>
@@ -148,7 +285,7 @@
                         v-if="['failed', 'cancelled'].includes(job.status)"
                         color="primary"
                         variant="text"
-                        @click="jobAction(job, 'retry')"
+                        @click.stop="jobAction(job, 'retry')"
                     >
                         {{ t('common.retry') }}
                     </v-btn>
@@ -357,11 +494,71 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 
+interface JobBook {
+    id: number;
+    title: string;
+    author: string;
+    img: string;
+    thumb: string;
+}
+
+interface JobPhase {
+    key: string;
+    status: string;
+    started_at?: string | null;
+    completed_at?: string | null;
+    summary: Record<string, string | number>;
+}
+
+interface JobChapter {
+    number: number;
+    title: string;
+    status: string;
+    total_segments: number;
+    completed_segments: number;
+    cache_hits: number;
+    resumed: boolean;
+    duration_ms: number;
+    size_bytes: number;
+}
+
+interface JobPlan {
+    detailed: boolean;
+    overall_percent: number;
+    phases: JobPhase[];
+    summary: {
+        chapters_total: number;
+        chapters_completed: number;
+        segments_total: number;
+        segments_completed: number;
+        cache_hits: number;
+        attempts: number;
+    };
+    chapters: JobChapter[];
+}
+
+interface AudiobookJob {
+    id: number;
+    book_id: number;
+    edition_id: number;
+    mode: string;
+    status: string;
+    phase: string;
+    progress: number;
+    config: { engine?: string; speed?: string };
+    book: JobBook | null;
+    plan: JobPlan;
+    error_message?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
 const { t, locale } = useI18n();
 const route = useRoute();
 const { $backend, $alert } = useNuxtApp();
 const store = useMainStore();
 const statusFilter = ref('');
+const expandedJobId = ref<number | null>(null);
 const workspaceDialog = ref(false);
 const workspaceTab = ref('characters');
 const workspaceJob = ref<any>(null);
@@ -378,14 +575,14 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 let previewAudio: HTMLAudioElement | null = null;
 store.setNavbar(true);
 
-const { data, pending, error, refresh } = await useAsyncData('audiobook-jobs', async () => {
+const { data, pending, error, refresh } = await useAsyncData<{ jobs: AudiobookJob[] }>('audiobook-jobs', async () => {
     const response = await $backend('/audio-jobs');
     if (response.err !== 'ok') throw new Error(response.msg || t('audiobook.loadFailed'));
     return response;
 }, { default: () => ({ jobs: [] }) });
 
 const filteredJobs = computed(() => statusFilter.value
-    ? (data.value?.jobs || []).filter((job: any) => job.status === statusFilter.value)
+    ? (data.value?.jobs || []).filter(job => job.status === statusFilter.value)
     : (data.value?.jobs || []));
 const voiceOptions = computed(() => voices.value.map(item => ({
     label: `${item.name} · ${item.gender === 'male' ? t('audiobook.male') : t('audiobook.female')} · ${item.engine}`,
@@ -498,6 +695,64 @@ function previewVoice(voice: any) {
     void previewAudio.play();
 }
 
+function toggleJob(jobId: number) {
+    expandedJobId.value = expandedJobId.value === jobId ? null : jobId;
+}
+
+function overallPercent(job: AudiobookJob) {
+    const value = job.plan?.overall_percent ?? Math.round(Number(job.progress || 0) * 100);
+    return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function phaseIcon(status: string) {
+    return ({
+        done: 'mdi-check',
+        current: 'mdi-progress-clock',
+        skipped: 'mdi-skip-next',
+        failed: 'mdi-alert',
+        cancelled: 'mdi-close',
+    } as Record<string, string>)[status] || 'mdi-circle-small';
+}
+
+function phaseStatusColor(status: string) {
+    return ({ done: 'success', current: 'warning', skipped: 'blue-grey', failed: 'error', cancelled: 'grey' } as Record<string, string>)[status] || 'grey';
+}
+
+function planPhaseLabel(key: string) { return t(`audiobook.planPhase_${key}`); }
+function planStatusLabel(status: string) { return t(`audiobook.planStatus_${status}`); }
+
+function planPhaseSummary(phase: JobPhase) {
+    const summary = phase.summary || {};
+    if (phase.key === 'queue') return t('audiobook.planSummaryQueue', { attempts: summary.attempts || 0 });
+    if (phase.key === 'inspect') return summary.chapters_total
+        ? t('audiobook.planSummaryInspectDone', { chapters: summary.chapters_total })
+        : t('audiobook.planSummaryInspect');
+    if (phase.key === 'review') return phase.status === 'skipped'
+        ? t('audiobook.planSummaryReviewSkipped')
+        : t('audiobook.planSummaryReview');
+    if (phase.key === 'generate') return t('audiobook.planSummaryGenerate', {
+        chaptersCompleted: summary.chapters_completed || 0,
+        chaptersTotal: summary.chapters_total || 0,
+        segmentsCompleted: summary.segments_completed || 0,
+        segmentsTotal: summary.segments_total || 0,
+    });
+    if (phase.key === 'finalize') return t('audiobook.planSummaryFinalize');
+    return t('audiobook.planSummaryComplete', { chapters: summary.chapters_completed || 0 });
+}
+
+function chapterStatusLabel(status: string) { return t(`audiobook.chapterStatus_${status || 'pending'}`); }
+
+function formatDuration(milliseconds: number) {
+    const seconds = Math.max(0, Math.round(milliseconds / 1000));
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function formatBytes(bytes: number) {
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function statusColor(status: string) {
     return ({ completed: 'success', failed: 'error', cancelled: 'grey', awaiting_review: 'warning' } as Record<string, string>)[status] || 'info';
 }
@@ -515,33 +770,76 @@ useHead({ title: () => t('audiobook.jobs') });
 .jobs-header { margin-bottom: 24px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
 .jobs-header h1 { font: 700 clamp(2.2rem, 5vw, 4rem) Georgia, 'Noto Serif SC', serif; }
 .title-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 14px; }
-.jobs-header p:not(.eyebrow) { color: rgb(var(--v-theme-on-surface-variant)); }
+.jobs-header p:not(.eyebrow) { color: rgba(var(--v-theme-on-surface), .64); }
 .eyebrow { color: #9d6a13; font-size: .75rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .filter-row { margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; }
 .job-list { display: grid; gap: 14px; }
 .job-card { position: relative; overflow: hidden; border: 1px solid rgba(var(--v-border-color), .13); border-radius: 18px; }
 .job-status-rail { position: absolute; top: 0; bottom: 0; left: 0; width: 5px; background: #7292a7; }
 .rail-completed { background: #3f9b6c; }.rail-failed { background: #c94848; }.rail-awaiting_review { background: #d99a2b; }
-.job-topline { display: flex; justify-content: space-between; color: rgb(var(--v-theme-on-surface-variant)); font-size: .76rem; }
+.job-topline { display: flex; justify-content: space-between; color: rgba(var(--v-theme-on-surface), .64); font-size: .76rem; }
 .job-topline > div { display: flex; align-items: center; gap: 8px; }
 .job-id { font: 700 .9rem monospace; }
-.job-body { margin-top: 18px; display: grid; grid-template-columns: 1fr minmax(220px, 34%); align-items: end; gap: 30px; }
-.job-body h2 { font: 700 1.3rem Georgia, 'Noto Serif SC', serif; }
-.job-body p { color: rgb(var(--v-theme-on-surface-variant)); font-size: .82rem; }
+.job-body { margin-top: 18px; display: grid; grid-template-columns: minmax(250px, 38%) 1fr; align-items: stretch; gap: 26px; }
+.job-book { min-width: 0; display: flex; align-items: center; gap: 14px; color: inherit; text-decoration: none; border-radius: 12px; }
+.job-book:hover strong { color: #9d6a13; }
+.job-book img, .deleted-cover { width: 58px; height: 76px; flex: 0 0 auto; object-fit: cover; border-radius: 7px; background: rgba(var(--v-theme-on-surface), .06); box-shadow: 0 5px 16px rgba(35, 27, 18, .13); }
+.deleted-cover { display: grid; place-items: center; color: rgba(var(--v-theme-on-surface), .64); box-shadow: none; }
+.job-book > span:last-child { min-width: 0; display: grid; gap: 3px; }
+.job-book strong { overflow: hidden; font: 700 1.18rem Georgia, 'Noto Serif SC', serif; text-overflow: ellipsis; white-space: nowrap; transition: color .18s ease; }
+.job-book small { overflow: hidden; color: rgba(var(--v-theme-on-surface), .64); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+.job-plan-toggle { min-width: 0; padding: 4px 2px; display: grid; align-content: center; gap: 8px; color: inherit; text-align: left; border-radius: 10px; }
+.job-plan-toggle:focus-visible { outline: 3px solid rgba(217,154,43,.42); outline-offset: 4px; }
+.job-config { color: rgba(var(--v-theme-on-surface), .64); font-size: .76rem; }
+.phase-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: .82rem; }
+.phase-heading strong { color: #9d6a13; font: 800 1rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+.expand-label { display: flex; align-items: center; justify-content: flex-end; color: #9d6a13; font-size: .72rem; font-weight: 700; }
 .job-error { color: rgb(var(--v-theme-error)) !important; }
-.phase-block { display: grid; gap: 7px; font-size: .78rem; }
+.job-plan { padding: 28px 28px 32px; background: rgba(157, 106, 19, .035); border-top: 1px solid rgba(var(--v-border-color), .12); border-bottom: 1px solid rgba(var(--v-border-color), .08); }
+.plan-heading { display: flex; align-items: end; justify-content: space-between; gap: 22px; }
+.plan-heading h3 { font: 700 1.55rem Georgia, 'Noto Serif SC', serif; }
+.plan-heading > span { max-width: 420px; color: rgba(var(--v-theme-on-surface), .64); font-size: .75rem; text-align: right; }
+.plan-metrics { margin: 22px 0; display: grid; grid-template-columns: repeat(4, 1fr); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(var(--v-border-color), .12); border-radius: 13px; }
+.plan-metrics > div { min-width: 0; padding: 14px 18px; display: grid; gap: 2px; border-right: 1px solid rgba(var(--v-border-color), .1); }
+.plan-metrics > div:last-child { border-right: 0; }
+.plan-metrics strong { font: 750 1.15rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+.plan-metrics span { color: rgba(var(--v-theme-on-surface), .64); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; }
+.legacy-plan-alert { margin-bottom: 20px; }
+.phase-list { position: relative; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; list-style: none; }
+.phase-list li { min-width: 0; padding: 15px; display: grid; grid-template-columns: 30px 1fr; gap: 10px; background: rgba(var(--v-theme-surface), .72); border: 1px solid rgba(var(--v-border-color), .1); border-radius: 12px; }
+.phase-icon { width: 28px; height: 28px; display: grid; place-items: center; color: rgba(var(--v-theme-on-surface), .64); background: rgba(var(--v-theme-on-surface), .06); border-radius: 50%; }
+.phase-done .phase-icon { color: #26734d; background: rgba(63,155,108,.15); }
+.phase-current { border-color: rgba(217,154,43,.52) !important; box-shadow: inset 3px 0 #d99a2b; }
+.phase-current .phase-icon { color: #9d6a13; background: rgba(217,154,43,.17); }
+.phase-failed .phase-icon { color: rgb(var(--v-theme-error)); background: rgba(var(--v-theme-error), .12); }
+.phase-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.phase-title-row strong { font-size: .86rem; }
+.phase-list p { min-height: 2.5em; margin-top: 5px; color: rgba(var(--v-theme-on-surface), .64); font-size: .72rem; line-height: 1.35; }
+.phase-list time { color: rgba(var(--v-theme-on-surface), .64); font-size: .65rem; }
+.chapter-progress { margin-top: 24px; }
+.chapter-progress-heading { margin-bottom: 10px; display: flex; align-items: baseline; justify-content: space-between; }
+.chapter-progress-heading h4 { font: 700 1.1rem Georgia, 'Noto Serif SC', serif; }
+.chapter-progress-heading span { color: rgba(var(--v-theme-on-surface), .64); font-size: .72rem; }
+.chapter-progress-list { max-height: 360px; overflow: auto; background: rgb(var(--v-theme-surface)); border: 1px solid rgba(var(--v-border-color), .12); border-radius: 13px; }
+.chapter-progress-row { padding: 13px 16px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; border-bottom: 1px solid rgba(var(--v-border-color), .08); }
+.chapter-progress-row:last-child { border-bottom: 0; }
+.chapter-number { color: #9d6a13; font: 750 .8rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+.chapter-progress-row > div:nth-child(2) { min-width: 0; display: grid; gap: 2px; }
+.chapter-progress-row strong { overflow: hidden; font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+.chapter-progress-row > div:nth-child(2) span, .chapter-facts { color: rgba(var(--v-theme-on-surface), .64); font-size: .7rem; }
+.chapter-facts { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 5px 10px; }
 .workspace-card { background: rgb(var(--v-theme-background)); }
 .workspace-window { height: calc(100vh - 112px); overflow: auto; }
 .workspace-pane { max-width: 1320px; margin: 0 auto; padding: 32px; }
 .pane-heading { margin-bottom: 22px; display: flex; justify-content: space-between; align-items: start; gap: 20px; }
 .pane-heading h2 { font: 700 1.8rem Georgia, 'Noto Serif SC', serif; }
-.pane-heading p { color: rgb(var(--v-theme-on-surface-variant)); }
+.pane-heading p { color: rgba(var(--v-theme-on-surface), .64); }
 .character-table-wrap { overflow: auto; background: rgb(var(--v-theme-surface)); border: 1px solid rgba(var(--v-border-color), .13); border-radius: 18px; }
 .character-table { width: 100%; border-collapse: collapse; }
 .character-table th, .character-table td { min-width: 110px; padding: 14px; text-align: left; border-bottom: 1px solid rgba(var(--v-border-color), .09); }
-.character-table th { color: rgb(var(--v-theme-on-surface-variant)); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+.character-table th { color: rgba(var(--v-theme-on-surface), .64); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .character-table td:first-child { min-width: 150px; }
-.character-table small { display: block; color: rgb(var(--v-theme-on-surface-variant)); }
+.character-table small { display: block; color: rgba(var(--v-theme-on-surface), .64); }
 .voice-cell { min-width: 270px; display: flex; align-items: center; }
 .voice-cell :deep(.v-input) { flex: 1; }
 .chapter-pane { display: grid; grid-template-columns: 260px 1fr; gap: 30px; }
@@ -552,6 +850,16 @@ useHead({ title: () => t('audiobook.jobs') });
 .script-editor :deep(textarea) { font: .96rem/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; }
 @media (max-width: 760px) {
     .jobs-header, .job-body { align-items: start; grid-template-columns: 1fr; flex-direction: column; }
+    .job-body { gap: 16px; }
+    .job-book, .job-plan-toggle { width: 100%; }
+    .plan-heading { align-items: start; flex-direction: column; }
+    .plan-heading > span { text-align: left; }
+    .plan-metrics { grid-template-columns: repeat(2, 1fr); }
+    .plan-metrics > div:nth-child(2) { border-right: 0; }
+    .plan-metrics > div:nth-child(-n+2) { border-bottom: 1px solid rgba(var(--v-border-color), .1); }
+    .phase-list { grid-template-columns: 1fr; }
+    .chapter-progress-row { grid-template-columns: 32px minmax(0, 1fr); }
+    .chapter-facts { grid-column: 2; justify-content: flex-start; }
     .chapter-pane { grid-template-columns: 1fr; }
     .chapter-pane aside { max-height: 160px; overflow: auto; }
 }
