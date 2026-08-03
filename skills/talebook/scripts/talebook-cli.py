@@ -14,6 +14,7 @@ import sys
 import tempfile
 import uuid
 from dataclasses import dataclass
+from http import client as http_client
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence, TextIO
 from urllib import error, parse, request
@@ -251,17 +252,52 @@ class TalebookClient:
                 if "text/html" in lowered_type:
                     raise CliFailure("download.login_redirect", "下载被重定向到 HTML 页面，请检查登录与下载权限", EXIT_API)
 
+                expected_bytes = None
+                transfer_encoding = str(headers.get("Transfer-Encoding", "")).lower()
+                content_length = headers.get("Content-Length")
+                if content_length is not None and "chunked" not in transfer_encoding:
+                    try:
+                        expected_bytes = int(content_length)
+                    except (TypeError, ValueError):
+                        raise CliFailure("response.invalid", "Talebook 下载响应的 Content-Length 无效", EXIT_TRANSPORT)
+                    if expected_bytes < 0:
+                        raise CliFailure("response.invalid", "Talebook 下载响应的 Content-Length 无效", EXIT_TRANSPORT)
+
                 output.parent.mkdir(parents=True, exist_ok=True)
                 fd, temporary_name = tempfile.mkstemp(prefix=f".{output.name}.", suffix=".download", dir=output.parent)
                 temporary = Path(temporary_name)
                 written = 0
                 with os.fdopen(fd, "wb") as stream:
                     while True:
-                        chunk = response.read(DOWNLOAD_CHUNK_SIZE)
+                        try:
+                            chunk = response.read(DOWNLOAD_CHUNK_SIZE)
+                        except http_client.IncompleteRead as exc:
+                            partial = exc.partial if isinstance(exc.partial, (bytes, bytearray)) else b""
+                            raise CliFailure(
+                                "download.incomplete",
+                                "Talebook 下载连接提前结束",
+                                EXIT_TRANSPORT,
+                                received_bytes=written + len(partial),
+                            )
+                        except http_client.HTTPException as exc:
+                            raise CliFailure("transport.error", f"Talebook 下载连接异常：{exc}", EXIT_TRANSPORT)
+                        except TimeoutError:
+                            raise CliFailure("transport.timeout", "下载 Talebook 文件超时", EXIT_TRANSPORT)
+                        except OSError as exc:
+                            raise CliFailure("transport.error", f"Talebook 下载连接异常：{exc}", EXIT_TRANSPORT)
                         if not chunk:
                             break
                         stream.write(chunk)
                         written += len(chunk)
+
+            if expected_bytes is not None and written != expected_bytes:
+                raise CliFailure(
+                    "download.incomplete",
+                    "Talebook 下载内容不完整",
+                    EXIT_TRANSPORT,
+                    expected_bytes=expected_bytes,
+                    received_bytes=written,
+                )
 
             if (output.exists() or output.is_symlink()) and not overwrite:
                 raise CliFailure("file.exists", f"目标文件已存在：{output}", EXIT_USAGE)

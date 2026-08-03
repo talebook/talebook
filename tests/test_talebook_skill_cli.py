@@ -1,4 +1,5 @@
 import base64
+import http.client
 import importlib.util
 import io
 import json
@@ -681,6 +682,94 @@ class TestTalebookSkillCli:
         assert result["bytes"] == len(payload)
         assert response.read_sizes
         assert all(size > 0 for size in response.read_sizes)
+
+    def test_download_rejects_identity_response_shorter_than_content_length(self):
+        payload = b"truncated"
+
+        class TruncatedResponse:
+            headers = {"Content-Type": "audio/mpeg", "Content-Length": str(len(payload) + 100)}
+
+            def __init__(self):
+                self.sent = False
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, _size=-1):
+                if self.sent:
+                    return b""
+                self.sent = True
+                return payload
+
+            def geturl(self):
+                return "https://books.example.com/media/audio/9/chapter/1.mp3"
+
+        client = CLI.TalebookClient(CLI.Config("https://books.example.com", None, None, 30))
+        client.opener = SimpleNamespace(open=lambda _request, timeout: TruncatedResponse())
+        with TemporaryDirectory() as directory:
+            output_path = Path(directory) / "chapter.mp3"
+            with pytest.raises(CLI.CliFailure) as raised:
+                client.download("/media/audio/9/chapter/1.mp3", output_path)
+            assert not output_path.exists()
+            assert list(Path(directory).iterdir()) == []
+        assert raised.value.code == "download.incomplete"
+        assert raised.value.exit_code == CLI.EXIT_TRANSPORT
+        assert raised.value.details == {"expected_bytes": len(payload) + 100, "received_bytes": len(payload)}
+
+    def test_chunked_incomplete_read_uses_structured_transport_error(self, monkeypatch):
+        class IncompleteChunkedResponse:
+            headers = {"Content-Type": "audio/mpeg", "Transfer-Encoding": "chunked"}
+
+            def __init__(self):
+                self.reads = 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, _size=-1):
+                self.reads += 1
+                if self.reads == 1:
+                    return b"complete-chunk"
+                raise http.client.IncompleteRead(b"partial", 100)
+
+            def geturl(self):
+                return "https://books.example.com/media/audio/9/chapter/1.mp3"
+
+        client = CLI.TalebookClient(CLI.Config("https://books.example.com", None, None, 30))
+        client._status = guest_status()
+        client.opener = SimpleNamespace(open=lambda _request, timeout: IncompleteChunkedResponse())
+        monkeypatch.setattr(CLI, "TalebookClient", lambda _config: client)
+        with TemporaryDirectory() as directory:
+            output_path = Path(directory) / "chapter.mp3"
+            code, output, errors = run_cli(
+                [
+                    "--site",
+                    "https://books.example.com",
+                    "books",
+                    "download",
+                    "--id",
+                    "7",
+                    "--format",
+                    "mp3",
+                    "--output",
+                    str(output_path),
+                ]
+            )
+            assert not output_path.exists()
+            assert list(Path(directory).iterdir()) == []
+        assert code == CLI.EXIT_TRANSPORT
+        assert output is None
+        assert errors == {
+            "err": "download.incomplete",
+            "msg": "Talebook 下载连接提前结束",
+            "received_bytes": len(b"complete-chunk") + len(b"partial"),
+        }
 
     def test_audios_list_encodes_optional_keyword(self):
         routes = {("GET", "/api/audios"): {"err": "ok", "total": 0, "books": []}}

@@ -282,7 +282,7 @@ admin opds ... | settings ... | trash ... | ssl ... | themes ... | logs ...</pre
       <span class="eyebrow">Verification</span>
       <h2>测试结果</h2>
       <div class="tests">
-        <div class="test"><span class="lamp"></span><span><code>python3 -m pytest -q tests/test_talebook_skill.py tests/test_talebook_skill_cli.py</code>：48 项通过，覆盖命令树与方法/路径/请求体矩阵、严格未知路由、认证中止、风险预览、组合写入部分成功、敏感设置脱敏、流式上传下载、更新提醒、跨页书源及 audios 正常与失败路径。</span><span class="passed">PASS · 48</span></div>
+        <div class="test"><span class="lamp"></span><span><code>python3 -m pytest -q tests/test_talebook_skill.py tests/test_talebook_skill_cli.py</code>：50 项通过，覆盖命令树与方法/路径/请求体矩阵、严格未知路由、认证中止、风险预览、组合写入部分成功、敏感设置脱敏、流式上传下载、截断响应完整性校验、更新提醒、跨页书源及 audios 正常与失败路径。</span><span class="passed">PASS · 50</span></div>
         <div class="test"><span class="lamp"></span><span>Python compile、目标文件 <code>ruff check</code>、<code>ruff format --check</code> 与 skill-creator quick validation 均通过。</span><span class="passed">PASS</span></div>
         <div class="test"><span class="lamp"></span><span><code>make lint-py-fix</code> 通过且 100 个后端文件未改变；<code>make lint-py</code> 通过。</span><span class="passed">PASS</span></div>
         <div class="test"><span class="lamp"></span><span><code>git diff --check</code> 与 <code>make check-design</code> 通过；PR 最终仅保留本方案。</span><span class="passed">PASS</span></div>
@@ -300,7 +300,7 @@ admin opds ... | settings ... | trash ... | ssl ... | themes ... | logs ...</pre
           <tr><td data-label="风险">凭据或更新信息泄露</td><td data-label="控制">优先环境变量；预览脱敏；更新提醒只读服务端缓存且不自动升级。</td></tr>
           <tr><td data-label="风险">管理员设置进入 Agent 上下文</td><td data-label="控制">在 CLI stdout 边界递归隐藏密码、secret、token、API key、访问码和 URL 凭据，不依赖 Agent 事后摘要。</td></tr>
           <tr><td data-label="风险">高风险误操作</td><td data-label="控制">CLI 强制确认参数，Skill 先展示目标与影响，服务端权限仍是最终边界。</td></tr>
-          <tr><td data-label="风险">有声书下载耗尽内存或留下半成品</td><td data-label="控制">固定分块流式写入、净化文件名、拒绝覆盖、逐章临时文件、整本临时目录和原子落位。</td></tr>
+          <tr><td data-label="风险">有声书下载耗尽内存、截断或留下半成品</td><td data-label="控制">固定分块流式写入、响应长度与传输完整性校验、净化文件名、拒绝覆盖、逐章临时文件、整本临时目录和原子落位。</td></tr>
         </tbody>
       </table>
       <p>整个 Skill 可以从 <code>skills/talebook/</code> 独立移除，不影响 Talebook 后端数据、API 或前端。核心命令或安全模型以后发生变化时，应直接创建新的替代方案，不在本 ACTIVE 文件中追加过程记录。</p>
