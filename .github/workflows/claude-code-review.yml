@@ -23,15 +23,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
+      # 评审本身用 OIDC 换取的 App token（自带 PR/issues 写权限），与此处无关；
+      # 这里的写权限是给最后一步用内置 GITHUB_TOKEN 打 reaction 用的。
+      pull-requests: write
+      issues: write
       id-token: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          # code-review skill 会读 git blame 与历史提交来判断改动上下文，
+          # 浅克隆会让这部分评审静默失效，因此拉取完整历史。
+          fetch-depth: 0
 
       - name: Run Claude Code Review
         id: claude-review
@@ -41,6 +45,55 @@ jobs:
           allowed_bots: 'codex-talebook[bot]'
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          # 传完整 PR URL，便于 skill 直接交给 gh pr view/diff 使用。
+          # slash command 后追加的正文会被一并送达（命令文件无 $ARGUMENTS 时参数自动追加，已实测）。
+          prompt: |
+            /code-review:code-review https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+
+            补充要求（优先级高于上面命令模板里的收尾格式）：
+            1. 未发现需要处理的问题时，不要发表任何评论，交由工作流打 reaction 标记即可。
+            2. 无论是否发表评论，最后都必须返回结构化结果，字段含义：
+               - reviewed：是否真正执行了评审。因 PR 已关闭、处于草稿状态或此前已评审过而跳过时为 false。
+               - issues_found：是否发表了列出问题的评审评论。
+               - summary：一句话结论。
+          # agent 模式不会注入任何默认工具（--permission-mode/--allowedTools 只在 tag 模式下设置），
+          # 不显式声明工具时 Claude 只能空转，既读不到 diff 也发不出评论。
+          # 下列工具对应 code-review skill 自身 frontmatter 的声明，外加 git 历史与子代理编排。
+          claude_args: |
+            --allowedTools "Read,Glob,Grep,Task,mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh search:*),Bash(git log:*),Bash(git blame:*),Bash(git diff:*),Bash(git show:*)"
+            --json-schema '{"type":"object","properties":{"reviewed":{"type":"boolean"},"issues_found":{"type":"boolean"},"summary":{"type":"string"}},"required":["reviewed","issues_found"]}'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
+
+      # reaction 由工作流按结构化结果判定，不依赖 Claude 自己记得去点：
+      # 输出为空  -> 评审没跑出结果，不打标记（红叉本身就是信号，避免误报“没问题”）
+      # reviewed=false -> 草稿/已关闭/已评审过，跳过
+      # issues_found -> true 打 👀，false 打 👍
+      - name: Mark review outcome on PR
+        if: steps.claude-review.outputs.structured_output != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OUTCOME: ${{ steps.claude-review.outputs.structured_output }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          reviewed=$(jq -r '.reviewed // false' <<<"$OUTCOME")
+          issues_found=$(jq -r '.issues_found // false' <<<"$OUTCOME")
+          echo "reviewed=$reviewed issues_found=$issues_found"
+
+          if [ "$reviewed" != "true" ]; then
+            echo "评审被跳过（草稿、已关闭或此前已评审），不打标记。"
+            exit 0
+          fi
+
+          if [ "$issues_found" = "true" ]; then
+            content="eyes"
+          else
+            content="+1"
+          fi
+
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/reactions" \
+            -f "content=${content}"
+          echo "已标记 reaction: ${content}"
