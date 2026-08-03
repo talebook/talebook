@@ -544,7 +544,7 @@
     "pageTitle": "私人图书馆"
   },
   "validation": {
-    "usernameLength": "用户名长度必须在5-20个字符之间",
+    "usernameLength": "用户名长度必须在2-20个字符之间",
     "usernameFormat": "用户名必须以小写字母开头，只能包含小写字母、数字和下划线",
     "passwordLength": "密码长度必须在8-20个字符之间",
     "passwordFormat": "密码包含非法字符",
@@ -914,7 +914,8 @@
         "permissionEdit": "编辑",
         "permissionDelete": "删除",
         "permissionPush": "推送",
-        "permissionRead": "阅读"
+        "permissionRead": "阅读",
+        "demoAccountLocked": "演示模式下该账号操作已锁定"
       },
       "placeholder": {
         "username": "请输入用户名，小写字母开头",
@@ -926,7 +927,7 @@
       "message": {
         "required": "此项为必填项",
         "invalidEmail": "邮箱格式不正确",
-        "invalidUsername": "用户名必须以小写字母开头，只能包含字母、数字和下划线，长度在5-20个字符之间",
+        "invalidUsername": "用户名必须以小写字母开头，只能包含字母、数字和下划线，长度在2-20个字符之间",
         "invalidPassword": "密码长度必须在8-20个字符之间",
         "invalidNickname": "昵称长度至少为2个字符",
         "guestPermissionSaved": "访客权限设置保存成功！",
@@ -983,7 +984,7 @@
     "accessCode": "访问码",
     "codeRule": "访问码不能为空",
     "completeSetup": "完成设置",
-    "userRule": "6 ~ 20 characters",
+    "userRule": "2 ~ 20 characters",
     "passRule": "8 ~ 20 characters",
     "emailRule": "邮箱格式不正确",
     "apiServiceNormal": "API服务正常",
