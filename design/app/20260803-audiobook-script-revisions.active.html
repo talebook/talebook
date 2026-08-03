@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有声书剧本质量、修订版本与单章返工方案</title>
+  <style>
+    :root {
+      --ink: #172536;
+      --muted: #607083;
+      --paper: #eef3f6;
+      --sheet: #ffffff;
+      --line: #c8d3dc;
+      --navy: #183b56;
+      --cyan: #2b8190;
+      --copper: #b56f39;
+      --green: #38785d;
+      --red: #a54545;
+      --code: #e8eef2;
+      --shadow: 0 18px 48px rgba(31, 55, 72, .11);
+    }
+    * { box-sizing: border-box; }
+    html { color-scheme: light; background: var(--paper); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, transparent 0 31px, rgba(24, 59, 86, .06) 31px 32px, transparent 32px),
+        var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.68;
+    }
+    main { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 96px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 6vw, 68px);
+      color: #f4f8fa;
+      background: var(--navy);
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+    }
+    header::after {
+      content: "";
+      position: absolute;
+      inset: auto -8% -64% 42%;
+      height: 250px;
+      border: 18px solid rgba(73, 173, 183, .18);
+      border-radius: 50%;
+      transform: rotate(-8deg);
+    }
+    .kicker, .section-index {
+      margin: 0 0 12px;
+      color: #75c4cc;
+      font: 800 .72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3, h4 { margin: 0; line-height: 1.18; }
+    h1 { max-width: 880px; font: 760 clamp(2.05rem, 5vw, 4.2rem)/1.08 Georgia, "Noto Serif SC", serif; }
+    header > p:not(.kicker) { position: relative; z-index: 1; max-width: 820px; margin: 24px 0 0; color: rgba(244, 248, 250, .76); font-size: 1.02rem; }
+    .meta { position: relative; z-index: 1; margin-top: 34px; display: flex; flex-wrap: wrap; gap: 9px; }
+    .meta span, .pill { padding: 5px 10px; display: inline-flex; align-items: center; border-radius: 999px; font-size: .73rem; font-weight: 750; }
+    .meta span { color: #e8f3f5; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.15); }
+    .meta .active { color: #173c2d; background: #8ed0ab; border-color: #8ed0ab; }
+    section { margin-top: 28px; padding: clamp(24px, 4vw, 42px); background: var(--sheet); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(31, 55, 72, .055); }
+    section:first-of-type { border-top: 5px solid var(--cyan); }
+    h2 { margin-bottom: 20px; font: 740 clamp(1.55rem, 3vw, 2.25rem)/1.18 Georgia, "Noto Serif SC", serif; }
+    h3 { margin: 24px 0 10px; font-size: 1.05rem; }
+    p { margin: 8px 0; }
+    ul, ol { margin: 10px 0; padding-left: 1.35rem; }
+    li + li { margin-top: 7px; }
+    code { padding: 2px 6px; color: #21485e; background: var(--code); border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; }
+    pre { overflow: auto; padding: 16px; color: #e5eef2; background: #172536; border-radius: 4px; }
+    pre code { padding: 0; color: inherit; background: transparent; }
+    .quote { margin: 10px 0; padding: 14px 18px; color: #314b60; background: #eef7f8; border-left: 4px solid var(--cyan); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .card { min-width: 0; padding: 18px; background: #f7f9fa; border: 1px solid var(--line); border-radius: 4px; }
+    .card h3 { margin-top: 0; }
+    .metric { display: flex; align-items: baseline; gap: 10px; }
+    .metric strong { color: var(--copper); font: 800 2.15rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .metric span { color: var(--muted); font-size: .78rem; }
+    .table-wrap { overflow-x: auto; margin-top: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { padding: 12px 13px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { color: #f3f7f9; background: var(--navy); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    .flow { margin-top: 18px; padding: 18px; background: #f7f9fa; border: 1px solid var(--line); }
+    .flow svg { width: 100%; height: auto; display: block; }
+    .legend { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill.pending { color: #77501e; background: #fde8c6; }
+    .pill.ok { color: #245c46; background: #dceee5; }
+    .pill.risk { color: #853838; background: #f6dddd; }
+    .decision { border-left: 5px solid var(--copper); }
+    .test-list li { padding-left: 4px; }
+    .test-list strong { color: var(--copper); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .small { color: var(--muted); font-size: .82rem; }
+    @media (max-width: 760px) {
+      main { width: min(100% - 24px, 1180px); padding-top: 12px; }
+      header, section { padding: 22px 18px; }
+      .grid { grid-template-columns: 1fr; }
+      th, td { min-width: 150px; }
+      .flow { padding: 8px; overflow-x: auto; }
+      .flow svg { min-width: 720px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="kicker">Audiobook revision protocol / 2026-08-03</p>
+    <h1>有声书剧本质量、修订版本与单章返工方案</h1>
+    <p>让“识别 → 审查 → 生成 → 发布”从一次性流水线变成可检查、可修订、可局部返工、可回滚的版本链；同时在生成前解决伪章节、CSS 误读和超长文本切片。</p>
+    <div class="meta">
+      <span class="active">ACTIVE · 已验证</span>
+      <span>创建日期：2026-08-03</span>
+      <span>所属模块：app（主）</span>
+      <span>影响范围：webserver / tests / voicebook 集成契约</span>
+      <span>需求来源：PR 882 合并后真实体验反馈</span>
+    </div>
+  </header>
+
+  <section>
+    <p class="section-index">01 / 原始诉求与证据</p>
+    <h2>不是“换个标题”，而是修正生产母带</h2>
+    <div class="quote">“百年孤独出现了很多 index_split_000 这种非正常章节。”</div>
+    <div class="quote">“通常一句为一个切片，如果一句太短，就多句联合，大概五十字。”</div>
+    <div class="quote">“芳华的 titlepage 章节，念了一堆 CSS，非正文。”</div>
+    <div class="quote">“转换后应该可以看到并编辑剧本，然后以高级模式手动触发重新生成该章节。”</div>
+    <div class="quote">“剧本可以创建版本，成功生成好音频后才替换，旧版本保留备份；可设定保留几个备份，并提供清理按钮。”</div>
+    <div class="grid">
+      <article class="card">
+        <div class="metric"><strong>9 / 25</strong><span>《百年孤独》真实产物中的 index_split 章节</span></div>
+        <p class="small">第 18–20 章正文可以从首段识别，但当前直接显示 EPUB 文件名。</p>
+      </article>
+      <article class="card">
+        <div class="metric"><strong>193 / 361</strong><span>《芳华》/《百年孤独》当前平均单段字符数</span></div>
+        <p class="small">两本书分别存在 425、507 个超过 200 字的剧本行。</p>
+      </article>
+      <article class="card">
+        <div class="metric"><strong>2</strong><span>《芳华》titlepage 中被当正文朗读的 CSS 行</span></div>
+        <p class="small">该章没有有效正文，应从剧本及最终章节列表中移除。</p>
+      </article>
+      <article class="card">
+        <div class="metric"><strong>0</strong><span>完成任务当前可用的剧本编辑入口</span></div>
+        <p class="small">脚本文件已持久化，但接口把读取和修改都绑定在 awaiting_review。</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="decision">
+    <p class="section-index">02 / 已确认决策</p>
+    <h2>版本先生成，发布后切换</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>决策</th><th>约束</th><th>结果</th></tr></thead>
+        <tbody>
+          <tr><td>修订不覆盖当前发布版</td><td>编辑时复制剧本形成候选版本；生成完成前线上仍指向旧版。</td><td>试听、Podcast 与阅读器不会读到半成品。</td></tr>
+          <tr><td>发布采用原子切换</td><td>候选版完整可用后，由管理员明确点击“替换当前版本”。</td><td>候选版变为 published，旧版变为 historical。</td></tr>
+          <tr><td>历史备份默认保留 3 个</td><td>全站管理员配置；仅显式点击清理按钮时执行。</td><td>最近 N 个 historical 保留，当前发布版、候选版、运行中任务不删除。</td></tr>
+          <tr><td>局部与整本返工分流</td><td>只改对白可重生成当前章；删章、重排、重命名等结构变化必须整本生成。</td><td>避免把旧 manifest 与新章节结构错误拼接。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="section-index">03 / 剧本规范化</p>
+    <h2>先把输入整理成可审查的剧本</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>章节标题恢复</h3>
+        <p>对 <code>index_split_000</code>、UUID、纯文件名等技术标题，从首个有效正文段提取“第十八章”等自然标题；无法识别时显示“第 N 章”，不把内部文件名暴露给用户。</p>
+      </article>
+      <article class="card">
+        <h3>非正文剔除</h3>
+        <p>过滤明确的 CSS/style 内容；若 <code>titlepage</code>、cover 等技术章节清理后没有可朗读正文，则整章移除。普通正文中谈论 CSS 的句子不会因关键词命中而删除。</p>
+      </article>
+      <article class="card">
+        <h3>约 50 字切片</h3>
+        <p>先按句末标点切句；同角色、同定位范围内的短句合并到约 50 字。目标 50 字、软下限 28 字、硬上限 80 字；超长单句优先在逗号、分号处分开。</p>
+      </article>
+      <article class="card">
+        <h3>定位信息同步</h3>
+        <p>拆分或合并后同步更新 locator 的字符范围、文本哈希、出现序号和章节编号，保证 candle-reader 的音文高亮仍能定位。</p>
+      </article>
+    </div>
+    <h3>规范化时机与幂等性</h3>
+    <ul>
+      <li>新任务：Voicebook <code>inspect</code> 产出后、进入人工审查或生成前执行。</li>
+      <li>旧任务：从已完成版本创建修订版时执行一次，使历史坏剧本可以进入新工作台修复。</li>
+      <li>脚本记录规范化版本；同一版本重复执行不得继续拆分、改名或漂移 locator。</li>
+      <li>输出规范化报告：删掉的章节/行、改名章节、拆分前后段数、是否发生结构变化。</li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="section-index">04 / 版本与返工流程</p>
+    <h2>一条线上母版，一条可编辑修订线</h2>
+    <div class="flow" aria-label="有声书版本修订状态图">
+      <svg viewBox="0 0 1050 370" role="img" aria-labelledby="flow-title flow-desc">
+        <title id="flow-title">有声书版本修订与发布替换流程</title>
+        <desc id="flow-desc">线上版本复制为修订版，编辑后按当前章或整本生成，通过校验后成为候选版，管理员发布后原子替换，旧版本成为历史备份。</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#607083"/></marker>
+        </defs>
+        <rect x="30" y="38" width="205" height="96" rx="7" fill="#183b56"/>
+        <text x="52" y="72" fill="#75c4cc" font-size="12" font-weight="700">CURRENT</text>
+        <text x="52" y="101" fill="#fff" font-size="19" font-weight="700">当前发布版 V3</text>
+        <text x="52" y="121" fill="#cbdbe4" font-size="12">持续供播放器与 Podcast 使用</text>
+        <path d="M235 86H325" stroke="#607083" stroke-width="2" marker-end="url(#arrow)"/>
+        <rect x="325" y="38" width="210" height="96" rx="7" fill="#e8f2f3" stroke="#2b8190" stroke-width="2"/>
+        <text x="347" y="72" fill="#2b8190" font-size="12" font-weight="700">FORK</text>
+        <text x="347" y="101" fill="#172536" font-size="19" font-weight="700">剧本修订版 V4</text>
+        <text x="347" y="121" fill="#607083" font-size="12">复制剧本、定位文件和基线清单</text>
+        <path d="M535 86H625" stroke="#607083" stroke-width="2" marker-end="url(#arrow)"/>
+        <rect x="625" y="20" width="195" height="66" rx="7" fill="#fff" stroke="#b56f39" stroke-width="2"/>
+        <text x="647" y="48" fill="#172536" font-size="16" font-weight="700">只重生成当前章</text>
+        <text x="647" y="69" fill="#607083" font-size="12">仅对白变化</text>
+        <rect x="625" y="104" width="195" height="66" rx="7" fill="#fff" stroke="#b56f39" stroke-width="2"/>
+        <text x="647" y="132" fill="#172536" font-size="16" font-weight="700">整本重新生成</text>
+        <text x="647" y="153" fill="#607083" font-size="12">结构变化或管理员主动选择</text>
+        <path d="M820 53H895V205" fill="none" stroke="#607083" stroke-width="2" marker-end="url(#arrow)"/>
+        <path d="M820 137H895V205" fill="none" stroke="#607083" stroke-width="2" marker-end="url(#arrow)"/>
+        <rect x="805" y="205" width="210" height="82" rx="7" fill="#dceee5" stroke="#38785d" stroke-width="2"/>
+        <text x="827" y="238" fill="#38785d" font-size="12" font-weight="700">READY</text>
+        <text x="827" y="266" fill="#172536" font-size="19" font-weight="700">完整候选版 V4</text>
+        <path d="M805 246H600" stroke="#607083" stroke-width="2" marker-end="url(#arrow)"/>
+        <rect x="390" y="205" width="210" height="82" rx="7" fill="#fff4e7" stroke="#b56f39" stroke-width="2"/>
+        <text x="412" y="238" fill="#b56f39" font-size="12" font-weight="700">PUBLISH</text>
+        <text x="412" y="266" fill="#172536" font-size="19" font-weight="700">替换当前版本</text>
+        <path d="M390 246H235" stroke="#607083" stroke-width="2" marker-end="url(#arrow)"/>
+        <rect x="30" y="205" width="205" height="82" rx="7" fill="#f4f6f7" stroke="#607083" stroke-width="2"/>
+        <text x="52" y="238" fill="#607083" font-size="12" font-weight="700">HISTORICAL</text>
+        <text x="52" y="266" fill="#172536" font-size="19" font-weight="700">历史备份 V3</text>
+        <path d="M132 287V333H438" fill="none" stroke="#607083" stroke-width="2" marker-end="url(#arrow)"/>
+        <rect x="438" y="308" width="300" height="48" rx="7" fill="#f7f9fa" stroke="#c8d3dc"/>
+        <text x="458" y="338" fill="#172536" font-size="14" font-weight="700">显式清理：仅删除超出保留数的最旧备份</text>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <p class="section-index">05 / 数据与接口</p>
+    <h2>复用 Edition 作为剧本版本，不新增数据库列</h2>
+    <p>每个 <code>AudiobookEdition</code> 已有独立 <code>script_path</code>、配置、章节清单与状态，直接作为剧本/音频版本。版本关系写入现有 JSON 配置，避免为已部署数据库新增迁移风险。</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>数据</th><th>写入位置</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>revision_of_edition_id</code></td><td>候选 Edition.config</td><td>指向复制来源，显示版本链并合并未修改章节。</td></tr>
+          <tr><td><code>revision_number</code></td><td>候选 Edition.config</td><td>稳定显示 V1/V2/V3，不依赖数据库 id。</td></tr>
+          <tr><td><code>normalization</code></td><td>Job.data</td><td>记录规则版本、变更章节、结构变化与统计。</td></tr>
+          <tr><td><code>AUDIOBOOK_BACKUP_RETENTION</code></td><td>系统设置</td><td>全站备份保留数，默认 3，允许 0–20。</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>接口增量</h3>
+    <pre><code>GET  /api/audio-job/:job_id/workspace
+     completed / ready / historical 可读；只有 awaiting_review 修订任务可写
+
+POST /api/audio/:edition_id/revisions
+     复制版本并返回 advanced + awaiting_review 修订任务
+
+POST /api/audio-job/:job_id/confirm
+     { "scope": "chapter", "chapter_number": 18 }
+     或 { "scope": "book" }
+
+DELETE /api/book/:book_id/audio-backups
+     按 AUDIOBOOK_BACKUP_RETENTION 删除最旧 historical 版本</code></pre>
+    <p class="small">所有新增接口继续使用 <code>@js</code> 与 <code>@auth</code>/<code>@is_admin</code>；前端继续统一通过 <code>backend()</code> 调用。</p>
+  </section>
+
+  <section>
+    <p class="section-index">06 / 单章合并与发布安全</p>
+    <h2>局部生成也必须得到完整候选版</h2>
+    <ol>
+      <li>创建修订版时复制基线 script、locator、manifest、未修改章节音频与 timeline。</li>
+      <li>编辑当前章后只让 Voicebook 生成该章；保留 segment cache，未改片段可命中缓存。</li>
+      <li>Talebook 将新章记录替换进基线 manifest，重新计算全书时长、大小、哈希与章节数。</li>
+      <li>校验每章音频、timeline、source key 和章节编号完整后，候选版进入 <code>ready</code>。</li>
+      <li>发布动作在同一事务中切换状态；失败时旧版仍为 <code>published</code>。</li>
+    </ol>
+    <div class="grid">
+      <article class="card">
+        <h3>必须整本生成</h3>
+        <p>移除 titlepage、章节重编号、source key 集合变化、脚本规范化首次应用导致多章变化，或用户主动选择整本。</p>
+      </article>
+      <article class="card">
+        <h3>允许单章生成</h3>
+        <p>章节结构与角色表未变，且文本修改只发生在当前章；未修改章节直接复制并校验。角色或音色调整影响跨章配音，必须整本生成。</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <p class="section-index">07 / 前端体验</p>
+    <h2>任务页是工作台，书籍页是版本管理台</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>位置</th><th>新增体验</th><th>关键状态</th></tr></thead>
+        <tbody>
+          <tr><td>任务列表</td><td>完成任务显示“查看剧本”；等待审查显示“编辑剧本”。</td><td>只读工作台不展示保存/生成按钮。</td></tr>
+          <tr><td>剧本工作台</td><td>展示规范化报告、版本来源、每章字数/片段数；提供“保存”“重生成本章”“整本重新生成”。</td><td>结构变化时禁用单章按钮并解释原因。</td></tr>
+          <tr><td>书籍有声版</td><td>已发布版显示“创建修订版”；ready 候选显示“替换当前版本”；历史版支持回滚。</td><td>创建修订版后直接进入剧本工作台。</td></tr>
+          <tr><td>备份管理</td><td>显示“历史备份 X / 保留 N”，提供带二次确认的“清理旧备份”。</td><td>预览将删除版本、释放空间和不可恢复提示。</td></tr>
+          <tr><td>系统设置</td><td>有声书设置中增加“历史备份保留数”，默认 3。</td><td>限制 0–20；保存后不自动清理。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="section-index">08 / 清理、兼容与回滚</p>
+    <h2>清理可预期，旧数据可进入新流程</h2>
+    <ul>
+      <li>清理只选择当前书最旧且超出保留数的 <code>historical</code>；逐个删除章节、进度、书签、播放会话、终态任务及版本目录。</li>
+      <li>当前发布版、ready/partial/draft 候选版、存在活动任务的版本始终排除。</li>
+      <li>旧完成任务若 script 仍存在，可以只读查看并创建修订版；script 缺失时明确提示无法修订，不伪造剧本。</li>
+      <li>旧剧本创建修订版时应用规范化；旧已发布音频不原地修改，因此升级本身不改变正在播放的内容。</li>
+      <li>回滚代码时，新增 JSON 字段可被旧代码忽略；已创建候选仍是普通 edition，历史发布版仍可回滚。</li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="section-index">09 / 测试结果</p>
+    <h2>测试结果：自动化与真实样本均通过</h2>
+    <div class="legend">
+      <span class="pill ok">后端全量通过</span>
+      <span class="pill ok">前端 E2E 通过</span>
+      <span class="pill ok">真实样本通过</span>
+    </div>
+    <ul class="test-list">
+      <li><strong>后端全量：</strong>在 <code>talebook/test</code> 容器执行 <code>pytest -q tests</code>，结果 727 passed、11 skipped；另执行有声书与设置定向用例，结果 25 passed。</li>
+      <li><strong>后端格式与 lint：</strong>在测试容器执行 <code>make lint-py-fix &amp;&amp; make lint-py</code>，101 个 Python 文件检查通过，无 lint 错误。</li>
+      <li><strong>前端 lint：</strong>执行 <code>cd app &amp;&amp; npm run lint -- --no-fix</code>，0 errors；194 个 warning 均为仓库既有规则告警。</li>
+      <li><strong>前端 E2E：</strong>执行 <code>PLAYWRIGHT_BASE_URL=http://127.0.0.1:3004 MOCK_API_URL=http://127.0.0.1:18184 npx playwright test test/e2e/audiobooks.spec.ts test/e2e/settings.spec.ts</code>，13 passed。覆盖完成任务查看剧本、修订创建、单章生成、成功后替换、备份清理及设置项。</li>
+      <li><strong>真实样本 ·《芳华》：</strong>在真实产物副本上从 17 章规范为 16 章；最大切片由 905 字降至 80 字，平均 35.8 字；移除 titlepage 与 2 条 CSS，UUID 技术标题恢复为“第1章”。</li>
+      <li><strong>真实样本 ·《百年孤独》：</strong>从 25 章规范为 24 章；最大切片由 4321 字降至 80 字，平均 40.9 字；清除全部 index_split/titlepage 标题，9 个技术标题恢复为自然章节名或安全标题。</li>
+      <li><strong>浏览器渲染：</strong>Chrome DevTools MCP 实际检查 <code>/book/1/audios</code> 的版本管理与 <code>/audio-job/1</code> 的 1440×900 修订工作台；500×780 Chromium 复查无横向溢出，规范化提示无裁切。页面无 console error 与失败请求，仅观察到仓库既有的 Vuetify locale 缺省 warning。</li>
+      <li><strong>方案门禁：</strong>执行 <code>make check-design</code>，ACTIVE 路径、HTML 结构与单文件资源约束通过。</li>
+    </ul>
+    <p class="small">本轮按需求使用 EdgeTTS 完成功能验收；已知的 qwen3tts 环境失败不纳入本次阻塞项。升级不原地修改已发布音频，需由管理员创建修订版并在生成成功后显式替换。</p>
+  </section>
+</main>
+</body>
+</html>

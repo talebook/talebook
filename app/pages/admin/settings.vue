@@ -917,6 +917,20 @@ const cards = computed(() => [
         ],
     },
     {
+        key: 'audiobookSettings',
+        title: t('admin.settings.section.audiobookSettings'),
+        subtitle: t('admin.settings.message.audiobookSettingsInfo'),
+        fields: [
+            {
+                icon: 'mdi-backup-restore',
+                key: 'AUDIOBOOK_BACKUP_RETENTION',
+                label: t('admin.settings.label.audiobookBackupRetention'),
+                type: 'select',
+                items: [0, 1, 2, 3, 5, 10, 20].map(value => ({ text: String(value), value })),
+            },
+        ],
+    },
+    {
         key: 'webdavSettings',
         title: t('admin.settings.section.webdavSettings'),
         fields: [
@@ -1031,7 +1045,7 @@ const cards = computed(() => [
 const navGroupDefs = [
     { key: 'site', titleKey: 'admin.settings.group.site', keys: ['basicInfo', 'bookCategories', 'friendshipLinks'] },
     { key: 'access', titleKey: 'admin.settings.group.access', keys: ['userSettings', 'socialLogin', 'captchaSettings'] },
-    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'deviceManagement', 'bookInfoSources', 'opdsSettings', 'webdavSettings'] },
+    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'deviceManagement', 'bookInfoSources', 'audiobookSettings', 'opdsSettings', 'webdavSettings'] },
     { key: 'system', titleKey: 'admin.settings.group.system', keys: ['advancedSettings', 'databaseManagement', 'sslManagement', 'trashManagement', 'updateCheck'] },
 ];
 

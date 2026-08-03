@@ -85,6 +85,29 @@ class TestAdminSettingsSecurity(TestWithAdminUser):
             conf["UPLOAD_CHUNK_THRESHOLD"] = prev_threshold
             conf["UPLOAD_CHUNK_SIZE"] = prev_size
 
+    def test_settings_update_validates_audiobook_backup_retention(self):
+        """有声书备份数只能保存 0 到 20 的整数。"""
+        conf = loader.get_settings()
+        previous = conf.get("AUDIOBOOK_BACKUP_RETENTION", 3)
+        try:
+            with mock.patch("webserver.loader.SettingsLoader.set_store_path", return_value="/tmp/"):
+                accepted = self.json(
+                    "/api/admin/settings",
+                    method="POST",
+                    body=json.dumps({"AUDIOBOOK_BACKUP_RETENTION": 5}),
+                )
+                rejected = self.json(
+                    "/api/admin/settings",
+                    method="POST",
+                    body=json.dumps({"AUDIOBOOK_BACKUP_RETENTION": 21}),
+                )
+
+            self.assertEqual(accepted["err"], "ok")
+            self.assertEqual(accepted["rsp"]["AUDIOBOOK_BACKUP_RETENTION"], 5)
+            self.assertEqual(rejected["err"], "params.audiobook_backup_retention")
+        finally:
+            conf["AUDIOBOOK_BACKUP_RETENTION"] = previous
+
     def test_settings_update_rejects_invalid_chunk_size(self):
         """分片阈值/分片大小配置格式不合法时必须被拒绝，不能污染现有配置"""
         conf = loader.get_settings()

@@ -17,6 +17,7 @@ pymysql
 bcrypt
 psutil
 requests-toolbelt
+PyYAML>=6.0.2
 
 # Voicebook host protocol v2 and packaged EdgeTTS preview assets.
 # Pin the immutable commit so production generation cannot drift between builds.

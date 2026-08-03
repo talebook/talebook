@@ -274,6 +274,16 @@
                         {{ t('audiobook.viewAudiobook') }}
                     </v-btn>
                     <v-btn
+                        v-if="job.script_available && job.status !== 'awaiting_review'"
+                        color="primary"
+                        variant="text"
+                        prepend-icon="mdi-script-text-outline"
+                        :data-testid="`view-script-${job.id}`"
+                        @click.stop="openWorkspace(job)"
+                    >
+                        {{ t('audiobook.viewScript') }}
+                    </v-btn>
+                    <v-btn
                         v-if="activeStatuses.includes(job.status)"
                         color="error"
                         variant="text"
@@ -321,24 +331,69 @@
                 v-if="workspace"
                 class="workspace-card"
             >
-                <v-toolbar color="blue-grey-darken-4">
+                <v-toolbar
+                    class="workspace-toolbar"
+                    color="blue-grey-darken-4"
+                >
                     <v-btn
                         icon="mdi-close"
                         :aria-label="t('common.close')"
                         @click="workspaceDialog = false"
                     />
-                    <v-toolbar-title>{{ t('audiobook.advancedWorkspace') }}</v-toolbar-title>
+                    <v-toolbar-title>
+                        {{ t('audiobook.advancedWorkspace') }}
+                        <small v-if="workspaceJob?.config?.revision_number">v{{ workspaceJob.config.revision_number }}</small>
+                    </v-toolbar-title>
                     <v-spacer />
                     <v-btn
+                        v-if="workspace.editable && !workspace.revision_info?.source_edition_id"
                         color="amber-lighten-2"
                         variant="flat"
                         :loading="confirming"
                         data-testid="confirm-workspace"
-                        @click="confirmWorkspace"
+                        @click="confirmWorkspace('book')"
                     >
                         {{ t('audiobook.confirmAndGenerate') }}
                     </v-btn>
+                    <template v-if="workspace.editable && workspace.revision_info?.source_edition_id">
+                        <v-btn
+                            class="revision-action"
+                            color="amber-lighten-2"
+                            variant="text"
+                            prepend-icon="mdi-file-refresh-outline"
+                            :loading="confirming"
+                            :disabled="!selectedChapter"
+                            data-testid="regenerate-current-chapter"
+                            @click="confirmWorkspace('chapter')"
+                        >
+                            {{ t('audiobook.regenerateChapter') }}
+                        </v-btn>
+                        <v-btn
+                            class="revision-action"
+                            color="amber-lighten-2"
+                            variant="flat"
+                            prepend-icon="mdi-book-refresh-outline"
+                            :loading="confirming"
+                            data-testid="regenerate-full-book"
+                            @click="confirmWorkspace('book')"
+                        >
+                            {{ t('audiobook.regenerateBook') }}
+                        </v-btn>
+                    </template>
                 </v-toolbar>
+                <v-alert
+                    v-if="workspace.normalization?.removed_style_lines || workspace.normalization?.removed_chapters?.length || workspace.normalization?.renamed_chapters?.length"
+                    type="info"
+                    variant="tonal"
+                    class="normalization-alert"
+                    data-testid="script-normalization-report"
+                >
+                    {{ t('audiobook.normalizationSummary', {
+                        styles: workspace.normalization.removed_style_lines || 0,
+                        removed: workspace.normalization.removed_chapters?.length || 0,
+                        renamed: workspace.normalization.renamed_chapters?.length || 0,
+                    }) }}
+                </v-alert>
                 <v-tabs
                     v-model="workspaceTab"
                     color="amber-darken-2"
@@ -363,6 +418,7 @@
                                     <p>{{ t('audiobook.characterCastingHint') }}</p>
                                 </div>
                                 <v-btn
+                                    v-if="workspace.editable"
                                     color="primary"
                                     variant="flat"
                                     :loading="saving"
@@ -395,6 +451,7 @@
                                             <td>
                                                 <v-select
                                                     v-model="role.speed"
+                                                    :disabled="!workspace.editable"
                                                     :items="speedOptions"
                                                     density="compact"
                                                     variant="outlined"
@@ -405,6 +462,7 @@
                                                 <div class="voice-cell">
                                                     <v-select
                                                         v-model="role.voice_overrides"
+                                                        :disabled="!workspace.editable"
                                                         :items="voiceOptions"
                                                         item-title="label"
                                                         item-value="value"
@@ -451,6 +509,7 @@
                                         <p>{{ t('audiobook.chapterEditorHint') }}</p>
                                     </div>
                                     <v-btn
+                                        v-if="workspace.editable"
                                         color="primary"
                                         variant="flat"
                                         :loading="saving"
@@ -462,6 +521,7 @@
                                 </div>
                                 <v-textarea
                                     v-model="chapterText"
+                                    :readonly="!workspace.editable"
                                     class="script-editor"
                                     variant="outlined"
                                     rows="22"
@@ -548,6 +608,7 @@ interface AudiobookJob {
     config: { engine?: string; speed?: string };
     book: JobBook | null;
     plan: JobPlan;
+    script_available?: boolean;
     error_message?: string;
     created_at?: string;
     updated_at?: string;
@@ -609,7 +670,7 @@ onBeforeUnmount(() => {
 async function openWorkspace(job: any) {
     const response = await $backend(`/audio-job/${job.id}/workspace`);
     if (response.err !== 'ok') return $alert('error', response.msg);
-    workspaceJob.value = job;
+    workspaceJob.value = response.job || job;
     workspace.value = response.workspace;
     workspaceDialog.value = true;
     selectChapter(workspace.value.chapters[0]);
@@ -651,19 +712,25 @@ async function saveChapter() {
         if (response.err === 'ok') {
             workspace.value = response.workspace;
             selectChapter(workspace.value.chapters.find((item: any) => item.number === selectedChapter.value.number));
+            return true;
         } else {
             scriptErrors.value = response.errors || [];
             $alert('error', response.msg);
+            return false;
         }
     } finally {
         saving.value = false;
     }
 }
 
-async function confirmWorkspace() {
+async function confirmWorkspace(scope: 'book' | 'chapter') {
+    if (scope === 'chapter' && !await saveChapter()) return;
     confirming.value = true;
     try {
-        const response = await $backend(`/audio-job/${workspaceJob.value.id}/confirm`, { method: 'POST', body: '{}' });
+        const response = await $backend(`/audio-job/${workspaceJob.value.id}/confirm`, {
+            method: 'POST',
+            body: JSON.stringify({ scope, chapter_number: selectedChapter.value?.number }),
+        });
         if (response.err === 'ok') {
             workspaceDialog.value = false;
             await refresh();
@@ -829,6 +896,9 @@ useHead({ title: () => t('audiobook.jobs') });
 .chapter-progress-row > div:nth-child(2) span, .chapter-facts { color: rgba(var(--v-theme-on-surface), .64); font-size: .7rem; }
 .chapter-facts { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 5px 10px; }
 .workspace-card { background: rgb(var(--v-theme-background)); }
+.workspace-card :deep(.v-toolbar-title small) { margin-left: 8px; color: #f1b957; font: 700 .72rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+.normalization-alert { height: auto !important; min-height: 72px; margin: 12px 24px 0; }
+.normalization-alert :deep(.v-alert__content) { overflow: visible; line-height: 1.5; white-space: normal; }
 .workspace-window { height: calc(100vh - 112px); overflow: auto; }
 .workspace-pane { max-width: 1320px; margin: 0 auto; padding: 32px; }
 .pane-heading { margin-bottom: 22px; display: flex; justify-content: space-between; align-items: start; gap: 20px; }
@@ -862,5 +932,10 @@ useHead({ title: () => t('audiobook.jobs') });
     .chapter-facts { grid-column: 2; justify-content: flex-start; }
     .chapter-pane { grid-template-columns: 1fr; }
     .chapter-pane aside { max-height: 160px; overflow: auto; }
+    .workspace-toolbar .revision-action :deep(.v-btn__content) { font-size: 0; }
+    .workspace-toolbar .revision-action :deep(.v-icon) { margin: 0; font-size: 1.35rem; }
+}
+@media (max-width: 960px) {
+    .workspace-toolbar :deep(.v-toolbar-title) { display: none; }
 }
 </style>
