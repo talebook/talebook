@@ -6,7 +6,7 @@ import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('vue-i18n', () => ({
+vi.mock('#i18n', () => ({
     useI18n: () => ({
         locale: { value: 'zh-CN' },
         locales: { value: [{ code: 'zh-CN', name: '简体中文' }] },
@@ -55,8 +55,11 @@ global.ResizeObserver = require('resize-observer-polyfill');
 import BuiltinThemeHeader from '@/components/themes/BuiltinThemeHeader.vue';
 
 function mountHeader(variant: 'light-gray' | 'minimal' | 'graphite' | 'brass' | 'warm-red') {
-    return mount(BuiltinThemeHeader, {
-        props: { variant },
+    return mount({
+        components: { BuiltinThemeHeader },
+        data: () => ({ variant }),
+        template: '<v-app><BuiltinThemeHeader :variant="variant" /></v-app>',
+    }, {
         global: { plugins: [vuetify] },
     });
 }
@@ -81,7 +84,7 @@ describe('BuiltinThemeHeader.vue search', () => {
 
     it('keeps the light-gray field prefix inside the name query value', async () => {
         const wrapper = mountHeader('light-gray');
-        const header = wrapper.vm as unknown as {
+        const header = wrapper.findComponent(BuiltinThemeHeader).vm as unknown as {
             search: string;
             searchCategory: string;
             doSearch: () => void;

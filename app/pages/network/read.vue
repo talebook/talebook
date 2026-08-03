@@ -113,7 +113,10 @@ import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 
-definePageMeta({ layout: 'blank' });
+definePageMeta({
+    layout: 'blank',
+    themeRuntime: false,
+});
 
 const { t } = useI18n();
 const route = useRoute();

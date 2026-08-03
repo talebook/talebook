@@ -11,6 +11,7 @@ const MOCK_DIR = path.join(__dirname, 'e2e/mocks');
 
 // State
 let isInstalled = true;
+let isLoggedIn = true;
 let demoMode = false;
 let users = [];
 let saveStarted = false;
@@ -127,6 +128,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   } else {
     isInstalled = true;
   }
+  isLoggedIn = body?.loggedIn !== false;
   demoMode = !!(body && body.demoMode);
   console.log('[Mock] isInstalled set to:', isInstalled);
   users = [];
@@ -136,7 +138,9 @@ router.post('/_test/reset', eventHandler(async (event) => {
   booksourceCheckPolls = 0;
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
-  activeThemeName = '';
+  activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
+    ? body.activeTheme
+    : '';
   audiobookPublished = false;
   audiobookJobs = [];
   audiobookJobPolls = 0;
@@ -555,12 +559,22 @@ router.get('/api/user/info', eventHandler(() => ({
     demo_mode: demoMode
   },
   user: {
-    is_login: true,
-    is_admin: true,
-    nickname: 'Admin',
+    is_login: isLoggedIn,
+    is_admin: isLoggedIn,
+    nickname: isLoggedIn ? 'Admin' : '',
     avatar: '',
-    kindle_email: 'test@kindle.com'
+    kindle_email: isLoggedIn ? 'test@kindle.com' : ''
   }
+})));
+
+router.get('/api/user/sign_out', eventHandler(() => {
+  isLoggedIn = false;
+  return { err: 'ok', msg: '你已成功退出登录。' };
+}));
+
+router.get('/api/captcha/config', eventHandler(() => ({
+  err: 'ok',
+  config: { enabled: false, scenes: {} },
 })));
 
 router.get('/api/user/messages', eventHandler(() => ({

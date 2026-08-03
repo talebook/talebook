@@ -103,7 +103,7 @@
                 >
                     <v-toolbar
                         dark
-                        color="red"
+                        color="error"
                     >
                         <v-toolbar-title>{{ t('auth.resetPassword') }}</v-toolbar-title>
                     </v-toolbar>
@@ -137,7 +137,7 @@
                                 <v-btn
                                     rounded
                                     dark
-                                    color="red"
+                                    color="error"
                                     type="submit"
                                     :loading="loading"
                                 >
@@ -453,4 +453,3 @@ useHead(() => ({
     min-height: calc(100vh - 120px);
 }
 </style>
-

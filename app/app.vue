@@ -1,8 +1,14 @@
 <template>
-    <NuxtLayout>
-        <NuxtPage />
-    </NuxtLayout>
+    <ThemeRuntimeProvider>
+        <NuxtLayout>
+            <NuxtPage />
+        </NuxtLayout>
+    </ThemeRuntimeProvider>
 </template>
+
+<script setup>
+import ThemeRuntimeProvider from '@/components/ThemeRuntimeProvider.vue';
+</script>
 
 <style>
 /* 全局样式：为所有卡片标题添加顶部空隙 */
@@ -13,6 +19,6 @@
 /* 公告内容链接样式 */
 .press-content a,
 a.press-content {
-  color: #1976d2 !important;
+  color: rgb(var(--v-theme-primary)) !important;
 }
 </style>

@@ -40,4 +40,13 @@ describe('theme store', () => {
 
         expect(store.activeTheme).toBeNull();
     });
+
+    it('rehydrates the cached theme after the client store already exists', () => {
+        const store = useThemeStore();
+        window.localStorage.setItem(activeThemeCacheKey, JSON.stringify(cachedTheme));
+
+        store.hydrateCachedTheme();
+
+        expect(store.activeTheme).toEqual(cachedTheme);
+    });
 });
