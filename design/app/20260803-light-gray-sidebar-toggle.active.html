@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>浅灰主题侧栏切换修复方案</title>
+  <style>
+    :root {
+      --fog: #eef0f1;
+      --paper: #fbfcfc;
+      --ink: #20252a;
+      --muted: #667078;
+      --line: #cbd1d5;
+      --slate: #505961;
+      --signal: #b64b38;
+      --success: #2f6c55;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--fog); color: var(--ink); font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif; }
+    body { margin: 0; }
+    a { color: inherit; }
+    code { padding: .12em .35em; background: #e5e8ea; border-radius: 3px; font: 500 .9em/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .shell { width: min(1120px, calc(100% - 32px)); margin: 24px auto 56px; }
+    .hero { position: relative; overflow: hidden; min-height: 360px; padding: clamp(28px, 6vw, 72px); color: #f7f8f8; background: var(--ink); }
+    .hero::after { position: absolute; inset: 0 0 0 auto; width: 64px; content: ""; background: var(--signal); }
+    .eyebrow, .label { font: 800 .72rem/1.2 "Arial Narrow", "Noto Sans SC", sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { max-width: 760px; margin: 24px 0 18px; font: 800 clamp(2.6rem, 7vw, 5.7rem)/.92 "Arial Narrow", "Noto Sans SC", sans-serif; letter-spacing: -.045em; }
+    .hero p { max-width: 650px; margin: 0; color: #cbd1d5; font-size: 1.02rem; line-height: 1.8; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 34px; }
+    .meta span { padding: 7px 10px; border: 1px solid #586169; font-size: .78rem; }
+    .meta .status { color: #fff; background: var(--signal); border-color: var(--signal); font-weight: 800; }
+    main { display: grid; gap: 18px; margin-top: 18px; }
+    section { padding: clamp(24px, 5vw, 48px); background: var(--paper); border: 1px solid var(--line); }
+    h2 { margin: 8px 0 22px; font: 800 clamp(1.5rem, 3vw, 2.2rem)/1.1 "Arial Narrow", "Noto Sans SC", sans-serif; letter-spacing: -.02em; }
+    h3 { margin: 0 0 8px; font-size: 1rem; }
+    p, li, td, th { line-height: 1.75; }
+    .lead { max-width: 780px; color: var(--muted); }
+    .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 26px; background: var(--line); border: 1px solid var(--line); }
+    .fact { min-height: 130px; padding: 20px; background: var(--paper); }
+    .fact strong { display: block; margin: 10px 0 6px; font: 800 1.15rem/1.2 "Arial Narrow", "Noto Sans SC", sans-serif; }
+    .fact small { color: var(--muted); line-height: 1.6; }
+    .gate { display: grid; grid-template-columns: 240px 64px minmax(0, 1fr); min-height: 240px; margin: 26px 0; border: 1px solid var(--line); }
+    .gate > div { display: grid; align-content: center; padding: 24px; }
+    .gate .open { color: #e8ebed; background: var(--slate); }
+    .gate .remnant { padding: 8px; color: #fff; background: var(--signal); writing-mode: vertical-rl; text-align: center; font-weight: 800; letter-spacing: .08em; }
+    .gate .closed { background: #fff; }
+    .gate strong { display: block; margin-bottom: 8px; font-size: 1.4rem; }
+    .decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .decision { padding: 20px; border-left: 5px solid var(--slate); background: #f1f3f4; }
+    .decision.no { border-left-color: var(--signal); }
+    .decision p { margin: 0; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 13px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { font: 800 .75rem/1.2 "Arial Narrow", "Noto Sans SC", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+    .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 24px; }
+    .flow div { position: relative; min-height: 120px; padding: 18px; color: #fff; background: var(--slate); }
+    .flow div:last-child { background: var(--success); }
+    .flow span { display: block; margin-bottom: 18px; color: #d8dde0; font: 800 .7rem/1 ui-monospace, monospace; }
+    .checklist { display: grid; gap: 8px; padding: 0; list-style: none; }
+    .checklist li { padding: 12px 14px 12px 44px; background: #f1f3f4; position: relative; }
+    .checklist li::before { position: absolute; left: 15px; content: "○"; color: var(--signal); font-weight: 900; }
+    .note { margin-top: 20px; padding: 16px 18px; color: #fff; background: var(--ink); }
+    .note strong { color: #f3a18f; }
+    footer { padding: 24px 0; color: var(--muted); font-size: .78rem; }
+    :focus-visible { outline: 3px solid var(--signal); outline-offset: 3px; }
+    @media (max-width: 760px) {
+      .hero::after { width: 16px; }
+      .facts, .decision-grid, .flow { grid-template-columns: 1fr; }
+      .gate { grid-template-columns: 1fr 28px; }
+      .gate .closed { grid-column: 1 / -1; min-height: 130px; }
+      table, tbody, tr, th, td { display: block; }
+      th { display: none; }
+      td { padding-left: 0; }
+      td::before { display: block; color: var(--muted); font: 800 .68rem/1.2 ui-monospace, monospace; content: attr(data-label); }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <div class="eyebrow">Issue #928 · Interaction repair</div>
+      <h1>把残留的 64px<br>彻底收回去</h1>
+      <p>浅灰主题把“关闭侧栏”误实现为 rail 模式，并用头像代替菜单符号。本方案移除这组主题特例，让按钮含义、抽屉状态与其余内置主题重新一致。</p>
+      <div class="meta">
+        <span class="status">ACTIVE · 已验证</span>
+        <span>创建日期 2026-08-03</span>
+        <span>所属模块 app</span>
+        <span>需求来源 GitHub Issue #928</span>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <div class="label">原始诉求 / Evidence</div>
+        <h2>用户报告的两个现象来自同一处主题分支</h2>
+        <p class="lead">Issue 描述：仅浅灰主题中，顶部左侧按钮图标显示异常；点击后侧栏只能收回一半。截图显示标题栏左侧为放大的头像轮廓，页面左缘仍保留窄抽屉及被截断的导航内容。</p>
+        <div class="facts">
+          <div class="fact"><span class="eyebrow">SYMPTOM A</span><strong>按钮语义错误</strong><small>导航开关展示用户头像，而不是各主题通用的菜单图标。</small></div>
+          <div class="fact"><span class="eyebrow">SYMPTOM B</span><strong>侧栏没有关闭</strong><small>点击只将 240px 抽屉切为 64px rail，主内容仍被布局占位。</small></div>
+          <div class="fact"><span class="eyebrow">CAUSE</span><strong>浅灰专属分支</strong><small><code>isLightGray</code> 同时控制头像、rail 属性和 <code>miniVariant</code> 状态。</small></div>
+        </div>
+        <div class="gate" role="img" aria-label="当前 240 像素抽屉切换为 64 像素残留，目标是完全关闭抽屉">
+          <div class="open"><strong>240px · 展开</strong><span>完整导航内容</span></div>
+          <div class="remnant">64px 残留</div>
+          <div class="closed"><strong>目标 · 0px</strong><span>关闭后释放全部主内容空间；再次点击恢复 240px。</span></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="label">Grill / Boundary decisions</div>
+        <h2>逐项澄清后的范围</h2>
+        <div class="decision-grid">
+          <article class="decision"><h3>统一导航开关</h3><p>浅灰主题改用 <code>mdi-menu</code>，与其他四套内置主题保持一致；按钮继续负责打开和关闭抽屉。</p></article>
+          <article class="decision"><h3>完整切换抽屉</h3><p>桌面和移动端均只切换 <code>sidebar</code> 布尔状态，不保留 rail 中间态。</p></article>
+          <article class="decision no"><h3>不调整主题视觉体系</h3><p>保留浅灰明暗配色、抽屉宽度、搜索分类、导航项目与页面卡片样式。</p></article>
+          <article class="decision no"><h3>不引入状态持久化</h3><p>本次不把开关状态写入 cookie 或 localStorage，沿用组件挂载时按断点初始化的行为。</p></article>
+        </div>
+      </section>
+
+      <section>
+        <div class="label">Implementation / State contract</div>
+        <h2>删除特例，让现有状态模型重新成为单一事实源</h2>
+        <table>
+          <thead><tr><th>关注点</th><th>当前</th><th>调整后</th></tr></thead>
+          <tbody>
+            <tr><td data-label="关注点">按钮内容</td><td data-label="当前">浅灰展示头像，其他主题展示 <code>mdi-menu</code></td><td data-label="调整后">所有内置主题展示 <code>mdi-menu</code></td></tr>
+            <tr><td data-label="关注点">点击行为</td><td data-label="当前">浅灰在打开时切换 <code>miniVariant</code></td><td data-label="调整后">统一执行 <code>sidebar = !sidebar</code></td></tr>
+            <tr><td data-label="关注点">抽屉属性</td><td data-label="当前">浅灰绑定 <code>rail</code> 与 64px rail 宽度</td><td data-label="调整后">移除 rail 绑定和配套隐藏样式</td></tr>
+            <tr><td data-label="关注点">兼容范围</td><td data-label="当前">桌面浅灰行为独有</td><td data-label="调整后">五套主题交互一致；移动断点初始化不变</td></tr>
+          </tbody>
+        </table>
+        <div class="flow" role="img" aria-label="导航按钮点击后的状态流程">
+          <div><span>01 · INPUT</span><strong>点击菜单按钮</strong></div>
+          <div><span>02 · STATE</span><strong>反转 sidebar</strong></div>
+          <div><span>03 · VUETIFY</span><strong>更新抽屉布局</strong></div>
+          <div><span>04 · RESULT</span><strong>0px 或 240px</strong></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="label">Verification / Completed</div>
+        <h2>测试结果与发布门禁</h2>
+        <table>
+          <thead><tr><th>命令或验证</th><th>结果</th><th>证据</th></tr></thead>
+          <tbody>
+            <tr><td data-label="命令或验证"><code>npx vitest run test/components/BuiltinThemeHeader.spec.ts</code></td><td data-label="结果">通过</td><td data-label="证据">1 个文件、4 个用例通过；覆盖菜单图标、完整关闭、重新打开及既有搜索行为。</td></tr>
+            <tr><td data-label="命令或验证"><code>npm run lint</code></td><td data-label="结果">通过</td><td data-label="证据">退出码 0、无 error；报告 193 个仓库既有 warning，本次文件未新增错误。</td></tr>
+            <tr><td data-label="命令或验证"><code>npx playwright test test/e2e/light-gray-sidebar.spec.ts --project=chromium</code></td><td data-label="结果">通过</td><td data-label="证据">短生命周期 mock 与 Nuxt 服务下 1/1 通过；实测 240px → 0px → 240px，且始终没有 rail 类。</td></tr>
+            <tr><td data-label="命令或验证"><code>npx nuxt prepare &amp;&amp; npx vitest run test/components/</code></td><td data-label="结果">环境失败</td><td data-label="证据">26 个已执行断言通过，其中本次相关 4/4 通过；4 个既有 suite 在收集阶段缺少 <code>#build/i18n-options.mjs</code>，与本次文件和断言无关。</td></tr>
+            <tr><td data-label="命令或验证">截图人工核对</td><td data-label="结果">通过</td><td data-label="证据">Chromium 关闭态截图显示菜单图标正常、抽屉无残留、主内容回到视口左缘；再次打开由 E2E 状态与宽度断言确认。</td></tr>
+          </tbody>
+        </table>
+        <div class="note"><strong>环境限制：</strong> 当前 runner 未提供 Chrome DevTools MCP，且任务明确禁止 Docker，因此无法按常规路径连接真实后端做 DevTools 验收。本次使用仓库允许的短生命周期 mock + Nuxt + Playwright Chromium 完成实际渲染替代验证；runner 缺少系统浏览器库时，将依赖解包到 <code>/tmp</code> 后运行，未修改系统或仓库依赖。</div>
+      </section>
+    </main>
+    <footer>Talebook 内部开发方案 · 单文件离线 HTML · 2026-08-03</footer>
+  </div>
+</body>
+</html>
