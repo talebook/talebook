@@ -284,9 +284,9 @@ admin opds ... | settings ... | trash ... | ssl ... | themes ... | logs ...</pre
       <div class="tests">
         <div class="test"><span class="lamp"></span><span><code>python3 -m pytest -q tests/test_talebook_skill.py tests/test_talebook_skill_cli.py</code>：48 项通过，覆盖命令树与方法/路径/请求体矩阵、严格未知路由、认证中止、风险预览、组合写入部分成功、敏感设置脱敏、流式上传下载、更新提醒、跨页书源及 audios 正常与失败路径。</span><span class="passed">PASS · 48</span></div>
         <div class="test"><span class="lamp"></span><span>Python compile、目标文件 <code>ruff check</code>、<code>ruff format --check</code> 与 skill-creator quick validation 均通过。</span><span class="passed">PASS</span></div>
-        <div class="test"><span class="lamp"></span><span><code>make lint-py-fix</code> 通过且 97 个后端文件未改变；<code>make lint-py</code> 通过。</span><span class="passed">PASS</span></div>
+        <div class="test"><span class="lamp"></span><span><code>make lint-py-fix</code> 通过且 100 个后端文件未改变；<code>make lint-py</code> 通过。</span><span class="passed">PASS</span></div>
         <div class="test"><span class="lamp"></span><span><code>git diff --check</code> 与 <code>make check-design</code> 通过；PR 最终仅保留本方案。</span><span class="passed">PASS</span></div>
-        <div class="test"><span class="lamp warn"></span><span><code>make pytest</code> 未进入测试：PATH 中没有 pytest 可执行文件。等价命令收集到 246 项后，因宿主 Python 3.9 及缺少 Calibre、txt2epub-next、quickjs、tomllib 出现 22 个导入错误。本次不修改后端，定向测试作为替代验证；完整后端回归由具备项目依赖的 CI 复验。</span><span class="limited">环境受限</span></div>
+        <div class="test"><span class="lamp warn"></span><span><code>make pytest</code> 未进入测试：PATH 中没有 pytest 可执行文件。等价收集命令识别到 269 项后，因宿主 Python 3.9 及缺少 Calibre、txt2epub-next、quickjs、tomllib 出现 25 个导入错误。本次不修改后端，定向测试作为替代验证；完整后端回归由具备项目依赖的 CI 复验。</span><span class="limited">环境受限</span></div>
       </div>
     </section>
 
