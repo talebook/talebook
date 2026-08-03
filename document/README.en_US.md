@@ -38,7 +38,7 @@ settings = {
 
 Once enabled, only the configured account can sign in. Its existing role still controls which pages are visible, while the server rejects registration, upload, edit, delete, push, administration settings, and WebDAV writes. Login IPs, access times, reading history, and access counters are not stored. Demo mode cannot be disabled in the administration UI; set `DEMO_MODE` to `False` manually and restart the service.
 
-There is no need to pre-create the demo account: it is created automatically the first time someone signs in with `DEMO_USERNAME` (default `demo`) and password `demodemo`. The demo account can open the "Admin Settings" page, but the content shown is the factory defaults from `webserver/settings.py`, not the site's real configuration; clicking save reports success but writes nothing, so it only demonstrates the interaction flow.
+There is no need to pre-create the demo account: it is created automatically the first time someone signs in with `DEMO_USERNAME` (default `demo`) and password `talebook`. The demo account can open the "Admin Settings" page, but the content shown is the factory defaults from `webserver/settings.py`, not the site's real configuration; clicking save reports success but writes nothing, so it only demonstrates the interaction flow.
 
 ### Logo (Applicable to v3.5.9 and later versions)
 

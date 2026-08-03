@@ -20,7 +20,7 @@ READ_ONLY_METHODS = {"GET", "HEAD", "OPTIONS", "PROPFIND"}
 
 # demo 账号首次以配置的用户名登录时，若账号不存在则自动创建时使用的固定密码。
 # 仅用于公开演示站的“伪管理员”体验，不代表真实部署的密码策略。
-DEMO_DEFAULT_PASSWORD = "demodemo"
+DEMO_DEFAULT_PASSWORD = "talebook"
 
 # 演示模式下允许“假保存”的管理接口：请求会通过校验并返回成功，但不会写入任何配置。
 DEMO_FAKE_SAVE_PATHS = {
