@@ -8,7 +8,10 @@ import base64
 import json
 import mimetypes
 import os
+import re
+import shutil
 import sys
+import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +27,8 @@ EXIT_API = 5
 SUCCESS_ERRORS = {None, "ok", "free"}
 RISK_CONFIRMATION = {"external", "admin-write", "destructive"}
 TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024
+MAX_DOWNLOAD_ERROR_BYTES = 4 * 1024 * 1024
 
 
 class CliFailure(Exception):
@@ -203,24 +208,83 @@ class TalebookClient:
         return result
 
     def download(self, path: str, output: Path, *, overwrite: bool = False) -> dict[str, Any]:
-        if output.exists() and not overwrite:
+        if (output.exists() or output.is_symlink()) and not overwrite:
             raise CliFailure("file.exists", f"目标文件已存在：{output}", EXIT_USAGE)
-        content, headers, final_url = self._open("GET", path)
-        parsed = parse_json_bytes(content)
-        if parsed is not None and parsed.get("err") not in SUCCESS_ERRORS:
-            return parsed
-        content_type = headers.get("Content-Type", "")
-        if "text/html" in content_type.lower():
-            raise CliFailure("download.login_redirect", "下载被重定向到 HTML 页面，请检查登录与下载权限", EXIT_API)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(content)
-        return {
-            "err": "ok",
-            "path": str(output.resolve()),
-            "bytes": len(content),
-            "content_type": content_type,
-            "source": final_url,
-        }
+        req = request.Request(self._url(path), headers=self._headers(), method="GET")
+        try:
+            response = self.opener.open(req, timeout=self.config.timeout)
+        except error.HTTPError as exc:
+            content = exc.read(MAX_DOWNLOAD_ERROR_BYTES + 1)
+            if len(content) > MAX_DOWNLOAD_ERROR_BYTES:
+                raise CliFailure("response.too_large", "Talebook 下载错误响应过大", EXIT_API, status=exc.code)
+            parsed = parse_json_bytes(content)
+            if parsed is not None:
+                raise CliFailure(
+                    str(parsed.get("err") or "http.error"),
+                    str(parsed.get("msg") or f"Talebook 返回 HTTP {exc.code}"),
+                    EXIT_API,
+                    status=exc.code,
+                )
+            raise CliFailure("http.error", f"Talebook 返回 HTTP {exc.code}: {exc.reason}", EXIT_TRANSPORT, status=exc.code)
+        except error.URLError as exc:
+            raise CliFailure("transport.error", f"无法连接 Talebook：{exc.reason}", EXIT_TRANSPORT)
+        except TimeoutError:
+            raise CliFailure("transport.timeout", "连接 Talebook 超时", EXIT_TRANSPORT)
+
+        temporary = None
+        try:
+            with response:
+                headers = response.headers
+                final_url = response.geturl()
+                content_type = headers.get("Content-Type", "")
+                lowered_type = content_type.lower()
+                if "application/json" in lowered_type or "+json" in lowered_type:
+                    content = response.read(MAX_DOWNLOAD_ERROR_BYTES + 1)
+                    if len(content) > MAX_DOWNLOAD_ERROR_BYTES:
+                        raise CliFailure("response.too_large", "Talebook 下载响应过大且不是文件", EXIT_API)
+                    parsed = parse_json_bytes(content)
+                    if parsed is None:
+                        raise CliFailure("response.not_json", "Talebook 返回了无效的 JSON 下载响应", EXIT_API)
+                    if parsed.get("err") not in SUCCESS_ERRORS:
+                        return parsed
+                    raise CliFailure("download.not_binary", "Talebook 下载接口返回了 JSON 而不是文件", EXIT_API)
+                if "text/html" in lowered_type:
+                    raise CliFailure("download.login_redirect", "下载被重定向到 HTML 页面，请检查登录与下载权限", EXIT_API)
+
+                output.parent.mkdir(parents=True, exist_ok=True)
+                fd, temporary_name = tempfile.mkstemp(prefix=f".{output.name}.", suffix=".download", dir=output.parent)
+                temporary = Path(temporary_name)
+                written = 0
+                with os.fdopen(fd, "wb") as stream:
+                    while True:
+                        chunk = response.read(DOWNLOAD_CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        stream.write(chunk)
+                        written += len(chunk)
+
+            if (output.exists() or output.is_symlink()) and not overwrite:
+                raise CliFailure("file.exists", f"目标文件已存在：{output}", EXIT_USAGE)
+            if overwrite:
+                os.replace(temporary, output)
+            else:
+                temporary.rename(output)
+            temporary = None
+            return {
+                "err": "ok",
+                "path": str(output.resolve()),
+                "bytes": written,
+                "content_type": content_type,
+                "source": final_url,
+            }
+        except TimeoutError:
+            raise CliFailure("transport.timeout", "下载 Talebook 文件超时", EXIT_TRANSPORT)
+        finally:
+            if temporary is not None:
+                try:
+                    temporary.unlink()
+                except OSError:
+                    pass
 
     def status(self, *, refresh: bool = False) -> dict[str, Any]:
         if refresh or self._status is None:
@@ -291,7 +355,11 @@ def csv_values(value: str) -> list[str]:
 def require_auth(client: TalebookClient) -> dict[str, Any]:
     status = client.status()
     if status.get("err") not in SUCCESS_ERRORS:
-        return status
+        raise CliFailure(
+            str(status.get("err") or "auth.preflight"),
+            str(status.get("msg") or "读取 Talebook 身份失败"),
+            EXIT_API,
+        )
     if not status.get("user", {}).get("is_login"):
         raise CliFailure("auth.required", "该命令需要登录用户；请提供 --user 与 --password", EXIT_GUARD)
     return status
@@ -515,18 +583,30 @@ def cmd_books_download(client: TalebookClient, args: argparse.Namespace) -> dict
 def cmd_books_edit(client: TalebookClient, args: argparse.Namespace) -> dict[str, Any]:
     require_auth(client)
     changes = key_values(args.set)
+    cover = Path(args.cover) if args.cover else None
+    if cover is not None and not cover.is_file():
+        raise CliFailure("file.not_found", f"找不到封面文件：{cover}", EXIT_USAGE)
+    cover_content = cover.read_bytes() if cover is not None else None
+    if not changes and cover is None:
+        raise CliFailure("params.empty", "请通过 --set 或 --cover 提供修改内容", EXIT_USAGE)
+
     responses: list[dict[str, Any]] = []
     if changes:
-        responses.append(client.json("POST", f"/api/book/{args.id}/edit", json_body=changes))
-    if args.cover:
-        cover = Path(args.cover)
-        if not cover.is_file():
-            raise CliFailure("file.not_found", f"找不到封面文件：{cover}", EXIT_USAGE)
-        responses.append(
-            client.json("POST", f"/api/book/{args.id}/edit", multipart=({}, "cover", cover.name, cover.read_bytes()))
-        )
-    if not responses:
-        raise CliFailure("params.empty", "请通过 --set 或 --cover 提供修改内容", EXIT_USAGE)
+        result = client.json("POST", f"/api/book/{args.id}/edit", json_body=changes)
+        if result.get("err") not in SUCCESS_ERRORS:
+            return result
+        responses.append(result)
+    if cover is not None:
+        result = client.json("POST", f"/api/book/{args.id}/edit", multipart=({}, "cover", cover.name, cover_content))
+        if result.get("err") not in SUCCESS_ERRORS:
+            if responses:
+                partial = dict(result)
+                partial["err"] = result.get("err") or "api.error"
+                partial["msg"] = result.get("msg") or "封面修改失败"
+                partial.update({"partial": True, "completed": ["metadata"], "failed": "cover"})
+                return partial
+            return result
+        responses.append(result)
     return responses[-1] if len(responses) == 1 else {"err": "ok", "results": responses}
 
 
@@ -583,6 +663,123 @@ def cmd_books_send_device(client: TalebookClient, args: argparse.Namespace) -> d
 
 def cmd_books_send_mail(client: TalebookClient, args: argparse.Namespace) -> dict[str, Any]:
     return client.json("POST", f"/api/book/{args.id}/mailto", json_body={"email": args.email})
+
+
+# audiobook commands
+
+
+def cmd_audios_list(client: TalebookClient, args: argparse.Namespace) -> dict[str, Any]:
+    query = {"keyword": args.keyword} if args.keyword else None
+    return client.json("GET", "/api/audios", query=query)
+
+
+def _published_audio(client: TalebookClient, book_id: int) -> dict[str, Any]:
+    detail = client.json("GET", f"/api/book/{book_id}/audios")
+    if detail.get("err") not in SUCCESS_ERRORS:
+        return detail
+    book = detail.get("book")
+    editions = detail.get("editions")
+    if not isinstance(book, dict) or not isinstance(editions, list):
+        raise CliFailure("response.invalid", "Talebook 返回的有声书详情格式无效", EXIT_API)
+    published = [item for item in editions if isinstance(item, dict) and item.get("status") == "published"]
+    if not published:
+        return {"err": "audio.not_found", "msg": "该书没有已发布的有声版本", "book_id": book_id}
+    try:
+        edition_id = int(published[0]["id"])
+    except (KeyError, TypeError, ValueError):
+        raise CliFailure("response.invalid", "Talebook 返回的有声版本 ID 无效", EXIT_API)
+    response = client.json("GET", f"/api/audio/{edition_id}")
+    if response.get("err") not in SUCCESS_ERRORS:
+        return response
+    manifest = response.get("manifest")
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("chapters"), list):
+        raise CliFailure("response.invalid", "Talebook 返回的有声书清单格式无效", EXIT_API)
+    try:
+        chapters = sorted(manifest["chapters"], key=lambda item: int(item["number"]))
+    except (KeyError, TypeError, ValueError):
+        raise CliFailure("response.invalid", "Talebook 返回的有声书章节编号无效", EXIT_API)
+    audio = dict(manifest)
+    audio["chapters"] = chapters
+    return {"err": "ok", "book": book, "audio": audio}
+
+
+def cmd_audios_show(client: TalebookClient, args: argparse.Namespace) -> dict[str, Any]:
+    return _published_audio(client, args.book_id)
+
+
+_UNSAFE_AUDIO_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def audio_chapter_filename(number: int, title: Any, width: int) -> str:
+    safe_title = _UNSAFE_AUDIO_FILENAME.sub("_", str(title or ""))
+    safe_title = re.sub(r"\s+", " ", safe_title).strip(" .")
+    while len(safe_title.encode("utf-8")) > 160:
+        safe_title = safe_title[:-1]
+    safe_title = safe_title or f"chapter-{number:0{width}d}"
+    return f"{number:0{width}d}-{safe_title}.mp3"
+
+
+def cmd_audios_download(client: TalebookClient, args: argparse.Namespace) -> dict[str, Any]:
+    output = Path(args.output).expanduser()
+    if output.exists() or output.is_symlink():
+        raise CliFailure("file.exists", f"目标目录已存在：{output}", EXIT_USAGE)
+    resolved = _published_audio(client, args.book_id)
+    if resolved.get("err") not in SUCCESS_ERRORS:
+        return resolved
+    audio = resolved["audio"]
+    chapters = audio["chapters"]
+    if not chapters:
+        return {"err": "audio.empty", "msg": "已发布的有声版本没有可下载章节", "book_id": args.book_id}
+    try:
+        chapter_numbers = [int(chapter["number"]) for chapter in chapters]
+        edition_id = int(audio["id"])
+    except (KeyError, TypeError, ValueError):
+        raise CliFailure("response.invalid", "Talebook 返回的有声书清单格式无效", EXIT_API)
+    width = max(3, len(str(max(chapter_numbers))))
+    filenames = [
+        audio_chapter_filename(chapter_numbers[index], chapter.get("title"), width) for index, chapter in enumerate(chapters)
+    ]
+    if len(filenames) != len(set(filenames)):
+        raise CliFailure("response.invalid", "Talebook 返回了重复的有声书章节", EXIT_API)
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.download-", dir=output.parent))
+    downloaded: list[dict[str, Any]] = []
+    moved = False
+    try:
+        for index, chapter in enumerate(chapters):
+            number = chapter_numbers[index]
+            filename = filenames[index]
+            target = temporary / filename
+            result = client.download(f"/media/audio/{edition_id}/chapter/{number}.mp3", target)
+            if result.get("err") not in SUCCESS_ERRORS:
+                return result
+            downloaded.append(
+                {
+                    "number": number,
+                    "title": chapter.get("title") or "",
+                    "filename": filename,
+                    "bytes": result["bytes"],
+                }
+            )
+        temporary.rename(output)
+        moved = True
+    finally:
+        if not moved:
+            shutil.rmtree(temporary, ignore_errors=True)
+
+    absolute_output = output.resolve()
+    for chapter in downloaded:
+        chapter["path"] = str(absolute_output / chapter.pop("filename"))
+    return {
+        "err": "ok",
+        "book_id": args.book_id,
+        "edition_id": edition_id,
+        "path": str(absolute_output),
+        "chapter_count": len(downloaded),
+        "bytes": sum(chapter["bytes"] for chapter in downloaded),
+        "chapters": downloaded,
+    }
 
 
 # remote commands
@@ -775,13 +972,26 @@ def cmd_admin_booksources_list(client: TalebookClient, args: argparse.Namespace)
 
 
 def cmd_admin_booksources_show(client: TalebookClient, args: argparse.Namespace) -> dict[str, Any]:
-    result = client.json("GET", "/api/admin/booksource/list", query={"page": 1, "size": 200})
-    if result.get("err") not in SUCCESS_ERRORS:
-        return result
-    item = next((item for item in result.get("items", []) if item.get("id") == args.id), None)
-    if item is None:
-        return {"err": "params.not_found", "msg": "未找到该书源"}
-    return {"err": "ok", "item": item}
+    size = 200
+    for page in range(1, 1001):
+        result = client.json("GET", "/api/admin/booksource/list", query={"page": page, "size": size})
+        if result.get("err") not in SUCCESS_ERRORS:
+            return result
+        items = result.get("items")
+        if not isinstance(items, list):
+            raise CliFailure("response.invalid", "Talebook 返回的书源列表格式无效", EXIT_API)
+        item = next((item for item in items if isinstance(item, dict) and item.get("id") == args.id), None)
+        if item is not None:
+            return {"err": "ok", "item": item}
+        count = result.get("count")
+        if isinstance(count, int):
+            if page * size >= count:
+                break
+        elif len(items) < size:
+            break
+    else:
+        raise CliFailure("response.invalid", "Talebook 书源分页数量异常", EXIT_API)
+    return {"err": "params.not_found", "msg": "未找到该书源"}
 
 
 def cmd_admin_booksources_create(client: TalebookClient, args: argparse.Namespace) -> dict[str, Any]:
@@ -887,7 +1097,13 @@ def cmd_admin_opds_import(client: TalebookClient, args: argparse.Namespace) -> d
 
 
 def cmd_admin_settings_show(client: TalebookClient, args: argparse.Namespace) -> dict[str, Any]:
-    return client.json("GET", "/api/admin/settings")
+    result = client.json("GET", "/api/admin/settings")
+    if result.get("err") not in SUCCESS_ERRORS:
+        return result
+    sanitized = dict(result)
+    if "settings" in sanitized:
+        sanitized["settings"] = redact_sensitive_value(sanitized["settings"])
+    return sanitized
 
 
 def cmd_admin_settings_update(client: TalebookClient, args: argparse.Namespace) -> dict[str, Any]:
@@ -1142,6 +1358,22 @@ def build_parser() -> argparse.ArgumentParser:
     mail = leaf(send_cmds, "mail", cmd_books_send_mail, help_text="发送到邮箱", path="books send mail", risk="external")
     add_id(mail)
     mail.add_argument("--email", required=True)
+
+    audios = services.add_parser("audios", help="已发布有声书")
+    audio_cmds = subs(audios, "audios_cmd")
+    audio_list = leaf(audio_cmds, "list", cmd_audios_list, help_text="列出有声书", path="audios list")
+    audio_list.add_argument("--keyword", help="按书名或作者过滤")
+    audio_show = leaf(audio_cmds, "show", cmd_audios_show, help_text="查看有声书详情", path="audios show")
+    audio_show.add_argument("--book-id", type=int, required=True)
+    audio_download = leaf(
+        audio_cmds,
+        "download",
+        cmd_audios_download,
+        help_text="下载整本有声书",
+        path="audios download",
+    )
+    audio_download.add_argument("--book-id", type=int, required=True)
+    audio_download.add_argument("--output", required=True, help="不存在的本地输出目录")
 
     remote = services.add_parser("remote", help="远程书库与网络书源")
     remote_cmds = subs(remote, "remote_cmd")
@@ -1489,6 +1721,26 @@ def add_admin_misc(admin_cmds: Any) -> None:
     download.add_argument("--overwrite", action="store_true")
 
 
+_SENSITIVE_NAME_PARTS = ("password", "passwd", "secret", "token", "api_key", "apikey", "invite_code")
+
+
+def is_sensitive_name(name: str) -> bool:
+    normalized = name.strip().lower()
+    return normalized == "key" or normalized.endswith("_key") or any(part in normalized for part in _SENSITIVE_NAME_PARTS)
+
+
+def redact_sensitive_value(value: Any, *, field_name: str = "") -> Any:
+    if field_name and is_sensitive_name(field_name):
+        return value if value is None or value == "" else "<redacted>"
+    if isinstance(value, Mapping):
+        return {str(key): redact_sensitive_value(item, field_name=str(key)) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [redact_sensitive_value(item) for item in value]
+    if isinstance(value, str):
+        return redact_url(value)
+    return value
+
+
 def sanitized_arguments(args: argparse.Namespace) -> dict[str, Any]:
     hidden = {"handler", "password", "current_password", "new_password", "smtp_password"}
     result: dict[str, Any] = {}
@@ -1499,7 +1751,7 @@ def sanitized_arguments(args: argparse.Namespace) -> dict[str, Any]:
             continue
         if isinstance(value, list):
             result[key] = [redact_assignment(item) if isinstance(item, str) else item for item in value]
-        elif key == "url" and isinstance(value, str):
+        elif key.lower().endswith("url") and isinstance(value, str):
             result[key] = redact_url(value)
         else:
             result[key] = value
@@ -1508,7 +1760,7 @@ def sanitized_arguments(args: argparse.Namespace) -> dict[str, Any]:
 
 def redact_assignment(value: str) -> str:
     key, separator, _ = value.partition("=")
-    if separator and any(secret in key.lower() for secret in ("password", "secret", "token", "key")):
+    if separator and is_sensitive_name(key):
         return key + "=<redacted>"
     return value
 
@@ -1518,14 +1770,23 @@ def redact_url(value: str) -> str:
         parts = parse.urlsplit(value)
     except ValueError:
         return value
-    if parts.username is None and parts.password is None:
+    query = parse.parse_qsl(parts.query, keep_blank_values=True)
+    redacted_query = [(key, "<redacted>" if item and is_sensitive_name(key) else item) for key, item in query]
+    query_changed = redacted_query != query
+    if parts.username is None and parts.password is None and not query_changed:
         return value
-    hostname = parts.hostname or ""
-    try:
-        port = f":{parts.port}" if parts.port is not None else ""
-    except ValueError:
-        port = ""
-    return parse.urlunsplit((parts.scheme, f"<redacted>@{hostname}{port}", parts.path, parts.query, parts.fragment))
+    netloc = parts.netloc
+    if parts.username is not None or parts.password is not None:
+        hostname = parts.hostname or ""
+        if ":" in hostname and not hostname.startswith("["):
+            hostname = f"[{hostname}]"
+        try:
+            port = f":{parts.port}" if parts.port is not None else ""
+        except ValueError:
+            port = ""
+        netloc = f"<redacted>@{hostname}{port}"
+    rendered_query = parse.urlencode(redacted_query, doseq=True) if query_changed else parts.query
+    return parse.urlunsplit((parts.scheme, netloc, parts.path, rendered_query, parts.fragment))
 
 
 def emit(payload: Mapping[str, Any], stream: TextIO) -> None:

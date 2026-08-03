@@ -53,3 +53,17 @@ def test_workflow_reference_preserves_mcp_lessons_without_protocol_dependency():
     assert "写操作失败时不要自动重试" in workflows
     assert "预览与执行之间目标发生变化时" in workflows
     assert "JSON-RPC" not in workflows
+
+
+def test_audios_commands_are_documented_with_a_narrow_scope():
+    skill = read("skills/talebook/SKILL.md")
+    api = read("skills/talebook/references/api.md")
+    workflows = read("skills/talebook/references/workflows.md")
+
+    assert "已发布有声书" in skill
+    assert "`audios list`" in api
+    assert "`audios show`" in api
+    assert "`audios download`" in api
+    assert "生成任务" in api
+    assert "audios show --book-id" in workflows
+    assert "audios download --book-id --output" in workflows

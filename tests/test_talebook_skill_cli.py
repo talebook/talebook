@@ -11,6 +11,8 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from urllib import parse
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CLI_PATH = ROOT / "skills" / "talebook" / "scripts" / "talebook-cli.py"
@@ -69,7 +71,11 @@ class RecordingHandler(BaseHTTPRequestHandler):
         elif responder is not None:
             response = responder
         else:
-            response = {"err": "ok"}
+            response = (
+                500,
+                {"Content-Type": "application/json; charset=utf-8"},
+                {"err": "test.route_missing", "msg": f"unregistered route: {self.command} {parsed.path}"},
+            )
         status = 200
         headers = {"Content-Type": "application/json; charset=utf-8"}
         if isinstance(response, tuple):
@@ -199,6 +205,17 @@ class TestTalebookSkillCli:
         assert output["err"] == "ok"
         assert server.records[0]["query"] == {"name": ["三体"], "start": ["30"]}
 
+    def test_fake_server_rejects_unregistered_routes(self):
+        with fake_server() as (_, site):
+            code, output, errors = run_cli(["--site", site, "books", "show", "--id", "404"])
+        assert code == CLI.EXIT_API
+        assert output is None
+        assert errors == {
+            "err": "test.route_missing",
+            "msg": "unregistered route: GET /api/book/404",
+            "status": 500,
+        }
+
     def test_destructive_command_previews_without_connecting_and_redacts_password(self):
         code, output, errors = run_cli(
             [
@@ -235,6 +252,58 @@ class TestTalebookSkillCli:
         assert code == CLI.EXIT_GUARD
         assert errors is None
         assert output["arguments"]["url"] == "mysql+pymysql://<redacted>@db.example.com/books"
+
+    def test_admin_settings_show_redacts_secrets_before_stdout(self):
+        status = guest_status(user={"is_login": True, "is_admin": True})
+        routes = {
+            (
+                "GET",
+                "/api/admin/settings",
+            ): {
+                "err": "ok",
+                "settings": {
+                    "site_title": "My Library",
+                    "smtp_password": "mail-secret",
+                    "cookie_secret": "cookie-secret",
+                    "SOCIAL_AUTH_GITHUB_KEY": "oauth-key",
+                    "SOCIAL_AUTH_GITHUB_SECRET": "oauth-secret",
+                    "ai_api_key": "ai-secret",
+                    "INVITE_CODE": "invite-secret",
+                    "user_database": "mysql+pymysql://alice:db-secret@db.example.com/books",
+                    "nested": {"access_token": "nested-secret", "visible": "yes"},
+                },
+            }
+        }
+        with fake_server(status=status, routes=routes) as (_, site):
+            code, output, errors = run_cli(
+                ["--site", site, "--user", "admin", "--password", "secret", "admin", "settings", "show"],
+                environ={"TALEBOOK_NO_UPDATE_NOTIFIER": "1"},
+            )
+        assert code == 0
+        assert errors is None
+        assert output["settings"] == {
+            "site_title": "My Library",
+            "smtp_password": "<redacted>",
+            "cookie_secret": "<redacted>",
+            "SOCIAL_AUTH_GITHUB_KEY": "<redacted>",
+            "SOCIAL_AUTH_GITHUB_SECRET": "<redacted>",
+            "ai_api_key": "<redacted>",
+            "INVITE_CODE": "<redacted>",
+            "user_database": "mysql+pymysql://<redacted>@db.example.com/books",
+            "nested": {"access_token": "<redacted>", "visible": "yes"},
+        }
+
+    def test_auth_preflight_business_error_stops_before_protected_endpoint(self):
+        status = {"err": "not_installed", "msg": "instance is not initialized"}
+        routes = {("GET", "/api/network/sources"): {"err": "ok", "items": []}}
+        with fake_server(status=status, routes=routes) as (server, site):
+            code, output, errors = run_cli(
+                ["--site", site, "--user", "reader", "--password", "secret", "remote", "sources", "list"]
+            )
+        assert code == CLI.EXIT_API
+        assert output is None
+        assert errors == {"err": "not_installed", "msg": "instance is not initialized"}
+        assert [record["path"] for record in server.records] == ["/api/user/info"]
 
     def test_admin_command_preflights_role(self):
         status = guest_status(user={"is_login": True, "is_admin": True})
@@ -402,6 +471,165 @@ class TestTalebookSkillCli:
         assert paths.count("/api/book/upload/chunk") == 3
         assert paths[-1] == "/api/book/upload/complete"
 
+    def test_books_edit_validates_cover_before_mutating_metadata(self):
+        status = guest_status(user={"is_login": True, "is_admin": False})
+        routes = {("POST", "/api/book/42/edit"): {"err": "ok"}}
+        with TemporaryDirectory() as directory:
+            missing_cover = Path(directory) / "missing.jpg"
+            with fake_server(status=status, routes=routes) as (server, site):
+                code, output, errors = run_cli(
+                    [
+                        "--site",
+                        site,
+                        "--user",
+                        "reader",
+                        "--password",
+                        "secret",
+                        "books",
+                        "edit",
+                        "--id",
+                        "42",
+                        "--set",
+                        "title=新标题",
+                        "--cover",
+                        str(missing_cover),
+                    ]
+                )
+        assert code == CLI.EXIT_USAGE
+        assert output is None
+        assert errors["err"] == "file.not_found"
+        assert [record["path"] for record in server.records] == ["/api/user/info"]
+
+    def test_books_edit_propagates_each_business_error_without_false_success(self):
+        status = guest_status(user={"is_login": True, "is_admin": False})
+        responses = iter(
+            [
+                {"err": "metadata.rejected", "msg": "metadata rejected"},
+                {"err": "ok"},
+            ]
+        )
+
+        def edit_response(_record):
+            return next(responses)
+
+        routes = {("POST", "/api/book/42/edit"): edit_response}
+        with TemporaryDirectory() as directory:
+            cover = Path(directory) / "cover.jpg"
+            cover.write_bytes(b"jpeg")
+            with fake_server(status=status, routes=routes) as (server, site):
+                code, output, errors = run_cli(
+                    [
+                        "--site",
+                        site,
+                        "--user",
+                        "reader",
+                        "--password",
+                        "secret",
+                        "books",
+                        "edit",
+                        "--id",
+                        "42",
+                        "--set",
+                        "title=新标题",
+                        "--cover",
+                        str(cover),
+                    ]
+                )
+        assert code == CLI.EXIT_API
+        assert errors is None
+        assert output == {"err": "metadata.rejected", "msg": "metadata rejected"}
+        assert [record["path"] for record in server.records] == ["/api/user/info", "/api/book/42/edit"]
+
+    def test_books_edit_reports_partial_success_when_cover_update_fails(self):
+        status = guest_status(user={"is_login": True, "is_admin": False})
+        responses = iter(
+            [
+                {"err": "ok"},
+                {"err": "cover.rejected", "msg": "cover rejected", "retry_after": 30},
+            ]
+        )
+        routes = {("POST", "/api/book/42/edit"): lambda _record: next(responses)}
+        with TemporaryDirectory() as directory:
+            cover = Path(directory) / "cover.jpg"
+            cover.write_bytes(b"jpeg")
+            with fake_server(status=status, routes=routes) as (server, site):
+                code, output, errors = run_cli(
+                    [
+                        "--site",
+                        site,
+                        "--user",
+                        "reader",
+                        "--password",
+                        "secret",
+                        "books",
+                        "edit",
+                        "--id",
+                        "42",
+                        "--set",
+                        "title=新标题",
+                        "--cover",
+                        str(cover),
+                    ]
+                )
+        assert code == CLI.EXIT_API
+        assert errors is None
+        assert output == {
+            "err": "cover.rejected",
+            "msg": "cover rejected",
+            "partial": True,
+            "completed": ["metadata"],
+            "failed": "cover",
+            "retry_after": 30,
+        }
+        assert [record["path"] for record in server.records] == [
+            "/api/user/info",
+            "/api/book/42/edit",
+            "/api/book/42/edit",
+        ]
+
+    def test_books_edit_reads_cover_before_mutating_metadata(self):
+        status = guest_status(user={"is_login": True, "is_admin": False})
+        with TemporaryDirectory() as directory:
+            cover = Path(directory) / "cover.jpg"
+            cover.write_bytes(b"jpeg")
+            calls = 0
+
+            def edit_response(_record):
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    cover.unlink()
+                return {"err": "ok"}
+
+            routes = {("POST", "/api/book/42/edit"): edit_response}
+            with fake_server(status=status, routes=routes) as (server, site):
+                code, output, errors = run_cli(
+                    [
+                        "--site",
+                        site,
+                        "--user",
+                        "reader",
+                        "--password",
+                        "secret",
+                        "books",
+                        "edit",
+                        "--id",
+                        "42",
+                        "--set",
+                        "title=新标题",
+                        "--cover",
+                        str(cover),
+                    ]
+                )
+        assert code == 0
+        assert errors is None
+        assert output["err"] == "ok"
+        assert [record["path"] for record in server.records] == [
+            "/api/user/info",
+            "/api/book/42/edit",
+            "/api/book/42/edit",
+        ]
+
     def test_download_writes_binary_file(self):
         routes = {("GET", "/api/book/7.epub"): (200, {"Content-Type": "application/octet-stream"}, b"ebook-content")}
         with TemporaryDirectory() as directory:
@@ -415,6 +643,309 @@ class TestTalebookSkillCli:
         assert errors is None
         assert output["bytes"] == len(b"ebook-content")
 
+    def test_download_streams_binary_response_without_unbounded_read(self):
+        payload = b"audio" * 500_000
+
+        class StreamingResponse:
+            headers = {"Content-Type": "audio/mpeg"}
+
+            def __init__(self):
+                self.offset = 0
+                self.read_sizes = []
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, size=-1):
+                self.read_sizes.append(size)
+                if size < 0:
+                    raise AssertionError("binary downloads must not use an unbounded read")
+                chunk = payload[self.offset : self.offset + size]
+                self.offset += len(chunk)
+                return chunk
+
+            def geturl(self):
+                return "https://books.example.com/media/audio/9/chapter/1.mp3"
+
+        response = StreamingResponse()
+        client = CLI.TalebookClient(CLI.Config("https://books.example.com", None, None, 30))
+        client.opener = SimpleNamespace(open=lambda _request, timeout: response)
+        with TemporaryDirectory() as directory:
+            output_path = Path(directory) / "chapter.mp3"
+            result = client.download("/media/audio/9/chapter/1.mp3", output_path)
+            assert output_path.read_bytes() == payload
+        assert result["err"] == "ok"
+        assert result["bytes"] == len(payload)
+        assert response.read_sizes
+        assert all(size > 0 for size in response.read_sizes)
+
+    def test_audios_list_encodes_optional_keyword(self):
+        routes = {("GET", "/api/audios"): {"err": "ok", "total": 0, "books": []}}
+        with fake_server(routes=routes) as (server, site):
+            code, output, errors = run_cli(["--site", site, "audios", "list", "--keyword", "三体"])
+        assert code == 0
+        assert errors is None
+        assert output == {"err": "ok", "total": 0, "books": []}
+        assert server.records[0]["query"] == {"keyword": ["三体"]}
+
+    def test_audios_show_resolves_the_published_edition_and_sorts_chapters(self):
+        routes = {
+            (
+                "GET",
+                "/api/book/42/audios",
+            ): {
+                "err": "ok",
+                "book": {"id": 42, "title": "三体", "author": "刘慈欣"},
+                "editions": [
+                    {"id": 11, "status": "candidate"},
+                    {"id": 9, "status": "published"},
+                ],
+                "generation": {"can_generate": True},
+            },
+            (
+                "GET",
+                "/api/audio/9",
+            ): {
+                "err": "ok",
+                "manifest": {
+                    "id": 9,
+                    "book_id": 42,
+                    "status": "published",
+                    "chapters": [
+                        {"number": 2, "title": "宇宙闪烁", "size_bytes": 4},
+                        {"number": 1, "title": "科学边界", "size_bytes": 3},
+                    ],
+                },
+                "progress": {"position_ms": 800},
+            },
+        }
+        with fake_server(routes=routes) as (server, site):
+            code, output, errors = run_cli(["--site", site, "audios", "show", "--book-id", "42"])
+        assert code == 0
+        assert errors is None
+        assert output["book"] == {"id": 42, "title": "三体", "author": "刘慈欣"}
+        assert [chapter["number"] for chapter in output["audio"]["chapters"]] == [1, 2]
+        assert "generation" not in output
+        assert "progress" not in output
+        assert [record["path"] for record in server.records] == ["/api/book/42/audios", "/api/audio/9"]
+
+    def test_audios_download_writes_ordered_sanitized_chapter_files(self):
+        routes = {
+            (
+                "GET",
+                "/api/book/42/audios",
+            ): {
+                "err": "ok",
+                "book": {"id": 42, "title": "三体"},
+                "editions": [{"id": 9, "status": "published"}],
+            },
+            (
+                "GET",
+                "/api/audio/9",
+            ): {
+                "err": "ok",
+                "manifest": {
+                    "id": 9,
+                    "book_id": 42,
+                    "chapters": [
+                        {"number": 2, "title": "  "},
+                        {"number": 1, "title": "开篇/序: 星?"},
+                    ],
+                },
+            },
+            ("GET", "/media/audio/9/chapter/1.mp3"): (200, {"Content-Type": "audio/mpeg"}, b"one"),
+            ("GET", "/media/audio/9/chapter/2.mp3"): (200, {"Content-Type": "audio/mpeg"}, b"two-two"),
+        }
+        with TemporaryDirectory() as directory:
+            output_dir = Path(directory) / "三体有声书"
+            with fake_server(routes=routes) as (server, site):
+                code, output, errors = run_cli(
+                    ["--site", site, "audios", "download", "--book-id", "42", "--output", str(output_dir)]
+                )
+            files = sorted(path.name for path in output_dir.iterdir())
+            assert files == ["001-开篇_序_ 星_.mp3", "002-chapter-002.mp3"]
+            assert (output_dir / files[0]).read_bytes() == b"one"
+            assert (output_dir / files[1]).read_bytes() == b"two-two"
+            assert output["path"] == str(output_dir.resolve())
+            assert [Path(item["path"]).name for item in output["chapters"]] == files
+        assert code == 0
+        assert errors is None
+        assert output["edition_id"] == 9
+        assert output["chapter_count"] == 2
+        assert output["bytes"] == 10
+        assert [record["path"] for record in server.records] == [
+            "/api/book/42/audios",
+            "/api/audio/9",
+            "/media/audio/9/chapter/1.mp3",
+            "/media/audio/9/chapter/2.mp3",
+        ]
+
+    def test_audios_download_rejects_an_existing_output_without_connecting(self):
+        with TemporaryDirectory() as directory:
+            output_dir = Path(directory) / "existing"
+            output_dir.mkdir()
+            with fake_server() as (server, site):
+                code, output, errors = run_cli(
+                    ["--site", site, "audios", "download", "--book-id", "42", "--output", str(output_dir)]
+                )
+        assert code == CLI.EXIT_USAGE
+        assert output is None
+        assert errors["err"] == "file.exists"
+        assert server.records == []
+
+    def test_audios_show_preserves_server_permission_failure(self):
+        routes = {("GET", "/api/book/42/audios"): {"err": "not_found", "msg": "书籍不存在或不可见"}}
+        with fake_server(routes=routes) as (server, site):
+            code, output, errors = run_cli(["--site", site, "audios", "show", "--book-id", "42"])
+        assert code == CLI.EXIT_API
+        assert errors is None
+        assert output == {"err": "not_found", "msg": "书籍不存在或不可见"}
+        assert [record["path"] for record in server.records] == ["/api/book/42/audios"]
+
+    def test_audios_download_cleans_temporary_directory_after_chapter_failure(self):
+        routes = {
+            (
+                "GET",
+                "/api/book/42/audios",
+            ): {
+                "err": "ok",
+                "book": {"id": 42, "title": "三体"},
+                "editions": [{"id": 9, "status": "published"}],
+            },
+            (
+                "GET",
+                "/api/audio/9",
+            ): {
+                "err": "ok",
+                "manifest": {
+                    "id": 9,
+                    "book_id": 42,
+                    "chapters": [
+                        {"number": 1, "title": "第一章"},
+                        {"number": 2, "title": "第二章"},
+                    ],
+                },
+            },
+            ("GET", "/media/audio/9/chapter/1.mp3"): (200, {"Content-Type": "audio/mpeg"}, b"one"),
+            (
+                "GET",
+                "/media/audio/9/chapter/2.mp3",
+            ): (503, {"Content-Type": "application/json"}, {"err": "audio.unavailable", "msg": "暂不可用"}),
+        }
+        with TemporaryDirectory() as directory:
+            output_dir = Path(directory) / "三体有声书"
+            with fake_server(routes=routes) as (_, site):
+                code, output, errors = run_cli(
+                    ["--site", site, "audios", "download", "--book-id", "42", "--output", str(output_dir)]
+                )
+            assert not output_dir.exists()
+            assert list(Path(directory).iterdir()) == []
+        assert code == CLI.EXIT_API
+        assert output is None
+        assert errors["err"] == "audio.unavailable"
+
+    def test_booksources_show_paginates_until_the_requested_id(self):
+        status = guest_status(user={"is_login": True, "is_admin": True})
+
+        def list_sources(record):
+            page = int(record["query"]["page"][0])
+            if page == 1:
+                return {"err": "ok", "items": [{"id": item} for item in range(1, 201)], "count": 201}
+            return {"err": "ok", "items": [{"id": 201, "name": "last source"}], "count": 201}
+
+        routes = {("GET", "/api/admin/booksource/list"): list_sources}
+        with fake_server(status=status, routes=routes) as (server, site):
+            code, output, errors = run_cli(
+                [
+                    "--site",
+                    site,
+                    "--user",
+                    "admin",
+                    "--password",
+                    "secret",
+                    "admin",
+                    "booksources",
+                    "show",
+                    "--id",
+                    "201",
+                ],
+                environ={"TALEBOOK_NO_UPDATE_NOTIFIER": "1"},
+            )
+        assert code == 0
+        assert errors is None
+        assert output == {"err": "ok", "item": {"id": 201, "name": "last source"}}
+        assert [record["query"]["page"] for record in server.records if record["path"].endswith("/list")] == [
+            ["1"],
+            ["2"],
+        ]
+
+    @pytest.mark.parametrize(
+        ("argv", "method", "path", "expected_query", "expected_json"),
+        [
+            (
+                ["books", "favorite", "set", "--id", "7"],
+                "POST",
+                "/api/book/7/favorite",
+                {},
+                {"favorite": True},
+            ),
+            (
+                ["books", "reading", "state", "--id", "7", "--value", "finished"],
+                "POST",
+                "/api/book/7/readstate",
+                {},
+                {"read_state": 2},
+            ),
+            (
+                ["remote", "search", "status", "--task-id", "task-1"],
+                "GET",
+                "/api/network/search/status",
+                {"task_id": ["task-1"]},
+                None,
+            ),
+            (
+                ["admin", "users", "list"],
+                "GET",
+                "/api/admin/users",
+                {"page": ["1"], "num": ["20"], "sort": ["access_time"], "desc": ["true"]},
+                None,
+            ),
+            (
+                ["admin", "imports", "scan", "status"],
+                "GET",
+                "/api/admin/scan/status",
+                {},
+                None,
+            ),
+            (
+                ["admin", "themes", "active"],
+                "GET",
+                "/api/themes/active",
+                {},
+                None,
+            ),
+        ],
+    )
+    def test_command_contract_matrix(self, argv, method, path, expected_query, expected_json):
+        status = guest_status(user={"is_login": True, "is_admin": True})
+        routes = {(method, path): {"err": "ok"}}
+        with fake_server(status=status, routes=routes) as (server, site):
+            code, output, errors = run_cli(
+                ["--site", site, "--user", "admin", "--password", "secret", *argv],
+                environ={"TALEBOOK_NO_UPDATE_NOTIFIER": "1"},
+            )
+        assert code == 0
+        assert errors is None
+        assert output == {"err": "ok"}
+        record = next(record for record in server.records if record["path"] == path)
+        assert record["method"] == method
+        assert record["query"] == expected_query
+        body = json.loads(record["body"]) if record["body"] else None
+        assert body == expected_json
+
     def test_api_error_uses_nonzero_exit_code(self):
         routes = {("GET", "/api/search"): {"err": "params.invalid", "msg": "bad search"}}
         with fake_server(routes=routes) as (_, site):
@@ -427,6 +958,11 @@ class TestTalebookSkillCli:
         parser = CLI.build_parser()
         args = parser.parse_args(["--site", "books.example.com", "admin", "opds", "sources", "list"])
         assert args.command_path == "admin opds sources list"
+        audio_args = parser.parse_args(
+            ["--site", "books.example.com", "audios", "download", "--book-id", "42", "--output", "./audio"]
+        )
+        assert audio_args.command_path == "audios download"
         root_help = parser.format_help()
+        assert "audios" in root_help
         assert "raw" not in root_help
         assert "deploy" not in root_help

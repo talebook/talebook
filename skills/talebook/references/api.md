@@ -8,6 +8,7 @@
 - [风险等级](#风险等级)
 - [me](#me)
 - [books](#books)
+- [audios](#audios)
 - [remote](#remote)
 - [admin](#admin)
 - [错误处理](#错误处理)
@@ -32,7 +33,7 @@ python scripts/talebook-cli.py \
 | `--timeout` | 无 | 单次 HTTP 超时，默认 30 秒。 |
 | 无 | `TALEBOOK_NO_UPDATE_NOTIFIER` | 设置为 `1`、`true`、`yes` 或 `on` 时关闭更新提醒与对应的额外请求。 |
 
-CLI 使用 HTTP Basic Auth，不持久化 Cookie。JSON 写入 stdout，错误 JSON 写入 stderr；下载内容只写文件。
+CLI 使用 HTTP Basic Auth，不持久化 Cookie。JSON 写入 stdout，错误 JSON 写入 stderr；下载内容以固定大小分块写入同目录临时文件，成功后才移动到目标路径，不把完整文件缓存在内存。
 
 使用管理员凭据执行成功后，CLI 会尽力读取 `GET /api/admin/update` 的服务端缓存。存在新版本时，原成功 JSON 会附加 `_notice.update`，其中包含提示文案、当前版本、最新版本和可用的发布页。提醒检查失败不改变原命令结果；guest、普通用户和业务失败响应不附加提醒。Agent 应先完成当前任务，再简短报告提醒，不得据此自动升级实例。
 
@@ -92,7 +93,7 @@ CLI 使用 HTTP Basic Auth，不持久化 Cookie。JSON 写入 stdout，错误 J
 | `books show` | `GET /api/book/{id}` | 返回格式、权限和阅读状态。 |
 | `books upload` | `POST /api/book/upload*` | 根据 `me status` 的服务端阈值自动选择普通或分片上传；服务端决定 guest 是否可上传。 |
 | `books download` | `GET /api/book/{id}.{format}` | 先检查 guest 下载权限；拒绝把登录 HTML 当成电子书；默认不覆盖本地文件。 |
-| `books edit` | `POST /api/book/{id}/edit` | 需要登录及书籍编辑权限；`--set KEY=VALUE` 修改元数据，`--cover` 上传封面。 |
+| `books edit` | `POST /api/book/{id}/edit` | 需要登录及书籍编辑权限；`--set KEY=VALUE` 修改元数据，`--cover` 上传封面。组合执行会先验证全部本地输入；后续步骤失败时返回 `partial: true` 及已完成步骤，不伪装成整体成功。 |
 | `books delete` | `POST /api/book/{id}/delete` | 需要登录、所有权或管理员权限以及删除确认。 |
 
 ### 个人书库状态
@@ -113,6 +114,20 @@ CLI 使用 HTTP Basic Auth，不持久化 Cookie。JSON 写入 stdout，错误 J
 | `books send mail` | `POST /api/book/{id}/mailto` | Talebook 自动选择可发送格式。需要确认。 |
 
 Talebook 可以由管理员开放 guest 推送，因此外发命令不强制本地登录预检；服务端仍会按实际设置判定。
+
+## audios
+
+本组命令只使用已发布有声书的稳定消费接口，不包含生成任务、脚本工作区、发布回滚、播放会话、Podcast、音色、统计或审计。
+
+| 命令 | 接口 | 说明 |
+|---|---|---|
+| `audios list` | `GET /api/audios` | 列出当前身份可见的已发布有声书；`--keyword` 按书名或作者过滤。 |
+| `audios show` | `GET /api/book/{book_id}/audios`、`GET /api/audio/{edition_id}` | 使用 `--book-id` 解析当前 published edition，返回书籍信息和按章节号排序的 manifest；不输出生成能力字段。 |
+| `audios download` | 上述详情接口、`GET /media/audio/{edition_id}/chapter/{number}.mp3` | 使用 `--book-id` 把全部章节下载到 `--output` 指定的新目录。 |
+
+`audios download` 将章节命名为 `001-章节标题.mp3`。文件名会替换路径分隔符、控制字符和常见跨平台保留字符；空标题使用章节号回退。输出目录已存在时命令在下载音频前失败，不提供覆盖参数。每章使用流式临时文件写入；整本先进入同级临时目录，全部章节成功后才把目录移动到目标路径，任一章节失败会清理临时内容。
+
+列表、详情、manifest 和音频流均由服务端逐书校验查看权限。guest 可以下载公开且允许查看的有声书；private book 或不可见版本保持服务端的拒绝结果。成功输出包含 book ID、edition ID、绝对目录、章节数量、总字节数和逐章路径。
 
 ## remote
 
@@ -166,7 +181,7 @@ Talebook 可以由管理员开放 guest 推送，因此外发命令不强制本�
 
 命令前缀为 `admin booksources`：
 
-- `list`、`show`：查询摘要；当前后端没有独立详情 GET，`show` 从列表中按 ID 选择摘要。
+- `list`、`show`：查询摘要；当前后端没有独立详情 GET，`show` 按服务端总数逐页查找 ID，不受单页 200 条上限影响。
 - `create --file`、`update`：使用 Legado 书源 JSON。
 - `delete --ids`：删除一个或多个书源。
 - `import --url|--file`、`seed`、`toggle`：导入、加载内置源或批量启停。
@@ -187,7 +202,7 @@ Talebook 可以由管理员开放 guest 推送，因此外发命令不强制本�
 
 | 命令 | 接口 | 风险 |
 |---|---|---|
-| `admin settings show` | `GET /api/admin/settings` | 只读；响应可能包含敏感配置，报告时脱敏。 |
+| `admin settings show` | `GET /api/admin/settings` | 只读；CLI 在写入 stdout 前递归隐藏密码、secret、token、API key、访问码和 URL 凭据，普通配置保持可读。 |
 | `admin settings update` | `POST /api/admin/settings` | 使用重复 `--set KEY=VALUE` 或 JSON 文件；管理写入。 |
 | `admin settings test-mail` | `POST /api/admin/testmail` | 向 SMTP 账号发送测试邮件，需要确认。 |
 | `admin settings test-db` | `POST /api/admin/testdb` | 测试数据库连接，需要确认。 |
@@ -201,6 +216,7 @@ Talebook 可以由管理员开放 guest 推送，因此外发命令不强制本�
 ## 错误处理
 
 - `not_installed`：实例已启动但尚未初始化；打开站点根地址，在浏览器完成安装。
+- 身份预检返回任何非成功业务错误时，CLI 立即停止，不继续请求受保护接口。
 - `not_invited`：实例开启访问码；使用浏览器输入访问码。Basic Auth 登录用户会由服务端自动标记已访问。
 - `captcha.invalid`：CLI 不处理验证码，切换浏览器。
 - `user.need_login`、`auth.required`：提供登录凭据后重试。
