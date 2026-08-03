@@ -1,9 +1,9 @@
 export const builtinThemeNames = ['light-gray', 'minimal', 'graphite', 'brass', 'warm-red'] as const;
 
 export type BuiltinThemeName = typeof builtinThemeNames[number];
-type BuiltinThemeMode = 'light' | 'dark';
+export type BuiltinThemeMode = 'light' | 'dark';
 
-interface OverlayThemePalette {
+export interface BuiltinThemePalette {
     background: string
     text: string
     title: string
@@ -36,7 +36,7 @@ const sansFont = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystem
 const serifFont = 'Georgia, "Songti SC", "Noto Serif SC", serif';
 const minimalFont = 'Verdana, Geneva, sans-serif';
 
-const overlayThemePalettes: Record<BuiltinThemeName, Record<BuiltinThemeMode, OverlayThemePalette>> = {
+const overlayThemePalettes: Record<BuiltinThemeName, Record<BuiltinThemeMode, BuiltinThemePalette>> = {
     'light-gray': {
         dark: {
             background: '#1b1d20',
@@ -317,7 +317,7 @@ function overlaySelector(themeName: BuiltinThemeName, mode: BuiltinThemeMode, su
     return `body.tb-current-builtin-theme-${themeName}.tb-current-builtin-theme-mode-${mode} .v-overlay-container${suffix}`;
 }
 
-function buildModeOverlayCss(themeName: BuiltinThemeName, mode: BuiltinThemeMode, palette: OverlayThemePalette) {
+function buildModeOverlayCss(themeName: BuiltinThemeName, mode: BuiltinThemeMode, palette: BuiltinThemePalette) {
     const base = overlaySelector(themeName, mode);
     const titleFontFamily = palette.titleFontFamily || palette.fontFamily;
     // cardPadding 是 CSS 简写（如 "12px 18px 18px"），取水平内边距让弹窗标题/正文/操作栏左右对齐
@@ -401,7 +401,7 @@ function buildModeOverlayCss(themeName: BuiltinThemeName, mode: BuiltinThemeMode
         }
         ${base} .v-overlay__content .v-btn.v-btn--variant-text,
         ${base} .v-overlay__content .text-primary,
-        ${base} .v-overlay__content a {
+        ${base} .v-overlay__content a:not(.v-btn) {
             color: ${palette.primaryTextColor} !important;
         }
         ${base} .v-overlay__content .v-avatar.bg-primary {
@@ -470,4 +470,8 @@ export function buildBuiltinThemeOverlayCss(themeName: BuiltinThemeName) {
         ${buildModeOverlayCss(themeName, 'dark', palettes.dark)}
         ${buildModeOverlayCss(themeName, 'light', palettes.light)}
     `;
+}
+
+export function getBuiltinThemePalette(themeName: BuiltinThemeName, mode: BuiltinThemeMode) {
+    return overlayThemePalettes[themeName][mode];
 }

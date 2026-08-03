@@ -1,8 +1,7 @@
 <template>
-    <v-app>
+    <v-app :theme="store.theme">
         <Loading />
-        <v-main>
-            
+        <v-main v-show="themeRuntimeReady">
             <slot />
 
             <v-dialog
@@ -51,18 +50,18 @@
 
 <script setup>
 import { useMainStore } from '@/stores/main';
+import { useThemeRuntime } from '@/composables/useThemeRuntime';
 import { useDisplay } from 'vuetify';
 
 const store = useMainStore();
 const display = useDisplay();
 const router = useRouter();
+const { ready: themeRuntimeReady } = useThemeRuntime();
 
 useHead({
     title: computed(() => store.site_title),
     titleTemplate: computed(() => store.site_title_template),
 });
 
-onMounted(() => {
-    store.setLoading(false);
-});
+watch(themeRuntimeReady, value => store.setLoading(!value), { immediate: true });
 </script>

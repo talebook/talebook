@@ -85,7 +85,7 @@
                                     dark
                                     large
                                     rounded
-                                    color="red"
+                                    color="primary"
                                     type="submit"
                                     :loading="loading"
                                 >
@@ -336,4 +336,3 @@ useHead(() => ({
     min-height: calc(100vh - 120px);
 }
 </style>
-

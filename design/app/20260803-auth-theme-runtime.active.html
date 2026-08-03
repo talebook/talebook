@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>认证页面主题运行时系统化修复 · ACTIVE</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #111820;
+      --ink-soft: #33424f;
+      --paper: #f7f8f5;
+      --sheet: #ffffff;
+      --rule: #cdd5d2;
+      --rule-strong: #8fa19f;
+      --blueprint: #2f5b78;
+      --blueprint-soft: #e6eef2;
+      --danger: #a33e36;
+      --danger-soft: #f4e8e6;
+      --verified: #2b6c5b;
+      --verified-soft: #e2eee9;
+      --pending: #99651f;
+      --pending-soft: #f5ecdc;
+      --rail: 64px;
+      --content: 1120px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+      background: var(--ink);
+      color: var(--ink);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--ink); }
+    a { color: inherit; }
+
+    .page {
+      width: min(calc(100% - 28px), calc(var(--content) + var(--rail)));
+      margin: 0 auto;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: var(--rail) minmax(0, 1fr);
+      background: var(--paper);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 24px 80px rgba(0,0,0,.28);
+    }
+
+    .spectrum {
+      position: relative;
+      background: var(--ink);
+      border-right: 1px solid rgba(255,255,255,.12);
+    }
+    .spectrum__label {
+      position: sticky;
+      top: 22px;
+      margin: 22px auto;
+      writing-mode: vertical-rl;
+      color: rgba(255,255,255,.66);
+      font: 700 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .2em;
+    }
+    .spectrum__colors {
+      position: absolute;
+      inset: auto 0 0;
+      display: grid;
+      grid-template-rows: repeat(6, 38px);
+    }
+    .spectrum__colors i:nth-child(1) { background: #1976d2; }
+    .spectrum__colors i:nth-child(2) { background: #555c64; }
+    .spectrum__colors i:nth-child(3) { background: #ff6600; }
+    .spectrum__colors i:nth-child(4) { background: #3f6da3; }
+    .spectrum__colors i:nth-child(5) { background: #a9773a; }
+    .spectrum__colors i:nth-child(6) { background: #8f3a34; }
+
+    main { min-width: 0; }
+    .hero {
+      padding: 58px clamp(24px, 5vw, 72px) 42px;
+      background:
+        linear-gradient(90deg, rgba(47,91,120,.08) 1px, transparent 1px) 0 0 / 48px 48px,
+        linear-gradient(rgba(47,91,120,.08) 1px, transparent 1px) 0 0 / 48px 48px,
+        var(--sheet);
+      border-bottom: 1px solid var(--rule-strong);
+    }
+    .eyebrow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      align-items: center;
+      margin-bottom: 26px;
+      color: var(--blueprint);
+      font: 700 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .state {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 10px;
+      border: 1px solid var(--pending);
+      background: var(--pending-soft);
+      color: #72460e;
+      letter-spacing: .12em;
+    }
+    .state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pending); }
+    .state--active::before { background: var(--verified); }
+    h1 {
+      max-width: 820px;
+      margin: 0;
+      font-family: "Songti SC", "Noto Serif SC", Georgia, serif;
+      font-size: clamp(36px, 6vw, 72px);
+      font-weight: 700;
+      line-height: .98;
+      letter-spacing: -.045em;
+    }
+    .hero__lead {
+      max-width: 760px;
+      margin: 28px 0 0;
+      color: var(--ink-soft);
+      font-size: clamp(17px, 2vw, 21px);
+      line-height: 1.7;
+    }
+    .hero__thesis {
+      margin: 36px 0 0;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 16px;
+      align-items: stretch;
+      max-width: 900px;
+    }
+    .hero__thesis strong {
+      display: grid;
+      place-items: center;
+      width: 72px;
+      background: var(--danger);
+      color: white;
+      font: 700 11px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .12em;
+      text-align: center;
+    }
+    .hero__thesis p {
+      margin: 0;
+      padding: 17px 20px;
+      border: 1px solid var(--danger);
+      background: var(--danger-soft);
+      color: #652a25;
+      font-weight: 650;
+      line-height: 1.65;
+    }
+
+    .content { padding: 18px clamp(18px, 4vw, 54px) 76px; }
+    section { scroll-margin-top: 20px; padding: 46px 0 8px; border-bottom: 1px solid var(--rule); }
+    section:last-child { border-bottom: 0; }
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 24px;
+    }
+    .section-kicker {
+      margin: 0 0 6px;
+      color: var(--blueprint);
+      font: 700 11px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h2 { margin: 0; font-size: clamp(25px, 3vw, 36px); line-height: 1.12; letter-spacing: -.025em; }
+    h3 { margin: 0 0 10px; font-size: 18px; line-height: 1.3; }
+    p, li { line-height: 1.72; }
+    p { margin: 0 0 14px; }
+    ul, ol { margin: 0; padding-left: 1.25em; }
+    li + li { margin-top: 8px; }
+    code {
+      font: 600 .9em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #234a65;
+      background: var(--blueprint-soft);
+      padding: .1em .36em;
+      border-radius: 2px;
+      overflow-wrap: anywhere;
+    }
+
+    .meta-grid, .decision-grid, .risk-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .card {
+      background: var(--sheet);
+      border: 1px solid var(--rule);
+      padding: 20px;
+      min-width: 0;
+    }
+    .card--accent { border-top: 4px solid var(--blueprint); }
+    .card--danger { border-top: 4px solid var(--danger); }
+    .card--verified { border-top: 4px solid var(--verified); }
+    .label {
+      display: block;
+      margin-bottom: 8px;
+      color: #62717a;
+      font: 700 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .trace {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border: 1px solid var(--rule-strong);
+      background: var(--sheet);
+    }
+    .trace article { position: relative; padding: 22px 18px; min-height: 150px; }
+    .trace article + article { border-left: 1px solid var(--rule); }
+    .trace article + article::before {
+      content: "→";
+      position: absolute;
+      left: -14px;
+      top: 20px;
+      display: grid;
+      place-items: center;
+      width: 27px;
+      height: 27px;
+      border: 1px solid var(--rule-strong);
+      border-radius: 50%;
+      background: var(--paper);
+      color: var(--blueprint);
+      font-weight: 800;
+    }
+    .trace b { display: block; margin-bottom: 8px; font-size: 14px; }
+    .trace p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+
+    .diagram {
+      padding: 20px;
+      background: var(--ink);
+      border: 1px solid var(--ink);
+      overflow-x: auto;
+    }
+    .diagram svg { display: block; width: 100%; min-width: 760px; height: auto; }
+
+    .palette-table, .matrix, .test-table, .files {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--sheet);
+      font-size: 14px;
+    }
+    th, td { padding: 13px 14px; border: 1px solid var(--rule); text-align: left; vertical-align: top; }
+    th { background: #edf1ef; color: #35454f; font: 750 11px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .07em; }
+    .swatch { display: inline-block; width: 14px; height: 14px; margin-right: 7px; vertical-align: -2px; border: 1px solid rgba(17,24,32,.22); }
+    .yes { color: var(--verified); font-weight: 750; }
+    .no { color: #6d7780; }
+    .pending { color: var(--pending); font-weight: 750; }
+
+    .callout {
+      padding: 18px 20px;
+      border-left: 5px solid var(--blueprint);
+      background: var(--blueprint-soft);
+      color: #24465b;
+    }
+    .callout--risk { border-left-color: var(--danger); background: var(--danger-soft); color: #652a25; }
+    .callout--ok { border-left-color: var(--verified); background: var(--verified-soft); color: #194d40; }
+    .callout p:last-child { margin-bottom: 0; }
+
+    .footer-mark {
+      margin-top: 54px;
+      padding-top: 18px;
+      border-top: 3px double var(--rule-strong);
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      color: #61717a;
+      font: 600 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    @media (max-width: 820px) {
+      :root { --rail: 22px; }
+      .page { width: 100%; }
+      .spectrum__label { display: none; }
+      .spectrum__colors { grid-template-rows: repeat(6, 28px); }
+      .hero { padding-top: 38px; }
+      .meta-grid, .decision-grid, .risk-grid { grid-template-columns: 1fr; }
+      .trace { grid-template-columns: 1fr; }
+      .trace article { min-height: 0; }
+      .trace article + article { border-left: 0; border-top: 1px solid var(--rule); }
+      .trace article + article::before { left: 18px; top: -14px; transform: rotate(90deg); }
+      .section-head { grid-template-columns: 1fr; }
+      .table-wrap { overflow-x: auto; }
+      table { min-width: 720px; }
+      .footer-mark { flex-direction: column; }
+    }
+
+    @media print {
+      :root { background: white; }
+      body { background: white; }
+      .page { width: 100%; box-shadow: none; }
+      .spectrum__label { position: static; }
+      section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <aside class="spectrum" aria-label="主题色谱索引">
+      <div class="spectrum__label">TALEBOOK · THEME RUNTIME · 2026</div>
+      <div class="spectrum__colors" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </aside>
+
+    <main>
+      <header class="hero">
+        <div class="eyebrow">
+          <span class="state state--active">ACTIVE · 已验证</span>
+          <span>创建日期 2026-08-03</span>
+          <span>所属模块 app</span>
+          <span>影响范围 Nuxt 布局 / 主题运行时 / 认证页 / E2E</span>
+        </div>
+        <h1>认证页面主题运行时<br>系统化修复</h1>
+        <p class="hero__lead">把主题从“页头附带的 CSS”提升为应用级能力，使登录、退出、注册、欢迎、安装与激活成功页在没有 Header 时仍获得完整且一致的主题语义。</p>
+        <div class="hero__thesis">
+          <strong>ROOT<br>CAUSE</strong>
+          <p>主题的全局样式、Body 标记与清理动作当前由 <code>BuiltinThemeHeader</code> 挂载；页面一旦隐藏或卸载 Header，主题运行时也随之消失。修复的核心不是补颜色，而是重新划分所有权。</p>
+        </div>
+      </header>
+
+      <div class="content">
+        <section id="request">
+          <div class="section-head">
+            <div><p class="section-kicker">01 / Intent</p><h2>原始诉求与已确认边界</h2></div>
+          </div>
+          <div class="meta-grid">
+            <article class="card card--danger">
+              <span class="label">需求来源</span>
+              <h3>用户截图与连续反馈</h3>
+              <p>暖红主题下，登录页工具栏仍为默认蓝色；退出页完全回退到默认蓝色和蓝灰色。用户要求新开 worktree 分支进行系统性修改优化，避免继续逐页遗漏。</p>
+            </article>
+            <article class="card card--accent">
+              <span class="label">目标体验</span>
+              <h3>一套主题，一致生效</h3>
+              <p>内置皮肤接管全站 <code>primary</code> 语义；认证页保留现有结构与主题身份；Header 是否存在不再影响主题；主题加载失败时整套回退默认。</p>
+            </article>
+          </div>
+          <div class="callout" style="margin-top:16px">
+            <p><strong>已完成 grill：</strong>运行时覆盖默认布局与认证用途的 blank 布局；阅读器明确退出内置皮肤运行时。重点验收登录、退出、注册、欢迎、安装、激活成功；不重做五套认证页面结构。</p>
+          </div>
+        </section>
+
+        <section id="facts">
+          <div class="section-head">
+            <div><p class="section-kicker">02 / Evidence</p><h2>现状证据与失效链路</h2></div>
+          </div>
+          <div class="trace" aria-label="当前失效链路">
+            <article><b>① 激活皮肤</b><p><code>themeStore.activeTheme</code> 得到内置主题，布局选择对应 Header / Footer。</p></article>
+            <article><b>② Header 挂载</b><p>Header 的 <code>onMounted</code> 注入页面 CSS，并在 Body 写入主题名和明暗模式类。</p></article>
+            <article><b>③ 页面隐藏导航</b><p><code>logout</code> 等页面执行 <code>setNavbar(false)</code>，布局不再渲染 Header。</p></article>
+            <article><b>④ 主题被清空</b><p>Header 卸载时移除 Body 类与 Style；页面重新暴露 Vuetify 默认蓝色。</p></article>
+          </div>
+          <div class="table-wrap" style="margin-top:18px">
+            <table>
+              <thead><tr><th>实测页面</th><th>主题标记</th><th>Vuetify primary</th><th>可见结果</th></tr></thead>
+              <tbody>
+                <tr><td>暖红 · 登录</td><td>存在暖红 Body 类与 Style</td><td><code>25,118,210</code>（默认蓝）</td><td>背景/按钮暖红，工具栏蓝色，形成混搭</td></tr>
+                <tr><td>暖红 · 退出</td><td>Body 类与 Style 均不存在</td><td><code>25,118,210</code>（默认蓝）</td><td>页面整体退回默认主题</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="architecture">
+          <div class="section-head">
+            <div><p class="section-kicker">03 / Ownership</p><h2>目标架构：应用级 Provider 原子提交</h2></div>
+          </div>
+          <div class="diagram" role="img" aria-label="主题运行时目标架构图">
+            <svg viewBox="0 0 980 430" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9fb8c7"/></marker>
+                <style>
+                  .box{fill:#17222c;stroke:#5e8197;stroke-width:1.5}.hot{fill:#243b49;stroke:#75a2bc;stroke-width:2}.cold{fill:#20262b;stroke:#66747d;stroke-width:1.5}.t{fill:#edf5f7;font:700 16px system-ui,sans-serif}.s{fill:#b7c9d1;font:13px system-ui,sans-serif}.m{fill:#9fb8c7;font:700 11px ui-monospace,monospace;letter-spacing:1px}.line{stroke:#9fb8c7;stroke-width:1.6;fill:none;marker-end:url(#arrow)}
+                </style>
+              </defs>
+              <rect class="hot" x="330" y="24" width="320" height="86" rx="4"/>
+              <text class="m" x="350" y="50">APP-LEVEL OWNER</text><text class="t" x="350" y="76">ThemeRuntimeProvider</text><text class="s" x="350" y="98">解析 · 暂存 · 原子提交 · 回退</text>
+
+              <rect class="box" x="30" y="165" width="250" height="96" rx="4"/>
+              <text class="m" x="50" y="191">INPUT</text><text class="t" x="50" y="218">Theme Store</text><text class="s" x="50" y="242">缓存主题 / 服务端主题 / 明暗模式</text>
+
+              <rect class="box" x="365" y="165" width="250" height="96" rx="4"/>
+              <text class="m" x="385" y="191">PURE CONTRACT</text><text class="t" x="385" y="218">Builtin Theme Descriptor</text><text class="s" x="385" y="242">组件 + 语义调色板 + 页面 CSS</text>
+
+              <rect class="box" x="700" y="165" width="250" height="96" rx="4"/>
+              <text class="m" x="720" y="191">ROUTE POLICY</text><text class="t" x="720" y="218">Page Meta</text><text class="s" x="720" y="242">阅读器显式 opt-out</text>
+
+              <rect class="cold" x="92" y="325" width="240" height="78" rx="4"/>
+              <text class="t" x="112" y="355">Default Layout</text><text class="s" x="112" y="380">消费 Header / Footer / ready</text>
+              <rect class="cold" x="370" y="325" width="240" height="78" rx="4"/>
+              <text class="t" x="390" y="355">Blank Layout</text><text class="s" x="390" y="380">认证页消费 palette / ready</text>
+              <rect class="cold" x="648" y="325" width="240" height="78" rx="4"/>
+              <text class="t" x="668" y="355">DOM Runtime</text><text class="s" x="668" y="380">Body 类 / Style / Vuetify tokens</text>
+
+              <path class="line" d="M280 213 H365"/><path class="line" d="M700 213 H615"/>
+              <path class="line" d="M490 165 V111"/>
+              <path class="line" d="M410 110 C360 190 260 260 212 325"/>
+              <path class="line" d="M490 110 V325"/>
+              <path class="line" d="M570 110 C620 190 720 260 768 325"/>
+            </svg>
+          </div>
+          <div class="decision-grid" style="margin-top:16px">
+            <article class="card"><span class="label">职责上移</span><h3>Provider 始终存在</h3><p>在 <code>app.vue</code> 层包裹布局。主题解析与 DOM 副作用不再属于 Header，因此 <code>store.nav</code> 只控制导航可见性。</p></article>
+            <article class="card"><span class="label">两阶段提交</span><h3>先暂存，后切换</h3><p>先解析 Header、Footer、页面 CSS 和语义调色板；全部成功后一次提交。任一必需资源失败则清除皮肤并整套回退默认。</p></article>
+            <article class="card"><span class="label">显式依赖</span><h3>布局只消费公开状态</h3><p>通过 Symbol key 的 provide/inject 暴露 <code>ready</code>、有效主题和动态组件，避免布局复制主题加载逻辑。</p></article>
+            <article class="card"><span class="label">副作用边界</span><h3>DOM 操作集中且可清理</h3><p>Body 类和 Style 的创建/更新/清理集中在 Provider；纯调色板与 CSS 构建函数可独立测试，SSR 阶段不访问 DOM。</p></article>
+          </div>
+        </section>
+
+        <section id="tokens">
+          <div class="section-head">
+            <div><p class="section-kicker">04 / Semantic contract</p><h2>皮肤强调色接管 Vuetify primary</h2></div>
+          </div>
+          <p>现有 overlay 调色板已包含每套主题的 primary、前景、表面、正文、边框和状态色。本次把它提升为公开的内置主题语义契约，并据此生成 Vuetify CSS variables；认证页继续使用 <code>color="primary"</code>，不再识别具体皮肤名。</p>
+          <div class="table-wrap">
+            <table class="palette-table">
+              <thead><tr><th>主题</th><th>浅色 primary / on-primary</th><th>深色 primary / on-primary</th><th>运行时策略</th></tr></thead>
+              <tbody>
+                <tr><td>默认</td><td><span class="swatch" style="background:#1976d2"></span>#1976D2 / white</td><td><span class="swatch" style="background:#1976d2"></span>#1976D2 / white</td><td>无内置皮肤时不注入覆盖</td></tr>
+                <tr><td>浅灰</td><td><span class="swatch" style="background:#555c64"></span>#555C64 / white</td><td><span class="swatch" style="background:#747b84"></span>#747B84 / white</td><td>中性灰接管 primary</td></tr>
+                <tr><td>极简</td><td><span class="swatch" style="background:#ff6600"></span>#FF6600 / black</td><td><span class="swatch" style="background:#d35400"></span>#D35400 / near-black</td><td>保留零圆角与高密度</td></tr>
+                <tr><td>石墨</td><td><span class="swatch" style="background:#3f6da3"></span>#3F6DA3 / white</td><td><span class="swatch" style="background:#6f9dd6"></span>#6F9DD6 / near-black</td><td>冷蓝强调色全站一致</td></tr>
+                <tr><td>黄铜</td><td><span class="swatch" style="background:#a9773a"></span>#A9773A / white</td><td><span class="swatch" style="background:#c99a5b"></span>#C99A5B / dark-brown</td><td>保留黄铜与纸张质感</td></tr>
+                <tr><td>暖红</td><td><span class="swatch" style="background:#8f3a34"></span>#8F3A34 / warm-white</td><td><span class="swatch" style="background:#b5524a"></span>#B5524A / warm-black</td><td>消除认证页默认蓝色</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout callout--ok" style="margin-top:16px"><p><strong>语义不变量：</strong>成功、错误、警告仍使用各自状态色；页面主行动、链接、工具栏、选中态和弹窗 primary 使用当前皮肤强调色。默认主题继续使用现有蓝色。</p></div>
+        </section>
+
+        <section id="flow">
+          <div class="section-head">
+            <div><p class="section-kicker">05 / State flow</p><h2>缓存优先、服务端校准、失败原子回退</h2></div>
+          </div>
+          <div class="trace">
+            <article><b>① Hydrate</b><p>客户端显式读取 <code>talebook.activeTheme</code>，避免 SSR Pinia 状态覆盖本地缓存。</p></article>
+            <article><b>② Apply cached</b><p>有缓存时立即解析并应用；布局 ready 后展示页面，不等待网络。</p></article>
+            <article><b>③ Reconcile</b><p>后台请求 <code>/themes/active</code>；结果不同则执行新一轮原子切换。</p></article>
+            <article><b>④ First visit</b><p>无缓存时维持 Loading，直到接口确认主题或默认状态，再展示页面。</p></article>
+          </div>
+          <div class="risk-grid" style="margin-top:16px">
+            <article class="card card--verified"><span class="label">接口失败</span><h3>保留已缓存主题</h3><p>延续现有静默失败策略，站点继续可用；不因临时网络错误清空用户已见主题。</p></article>
+            <article class="card card--danger"><span class="label">组件或样式失败</span><h3>整套回退默认</h3><p>默认 Header、Footer、默认蓝色和无主题 Body 类一次性生效；记录 console warning，不阻断页面。</p></article>
+          </div>
+        </section>
+
+        <section id="routes">
+          <div class="section-head">
+            <div><p class="section-kicker">06 / Route policy</p><h2>认证 blank 布局纳入，阅读器显式退出</h2></div>
+          </div>
+          <div class="table-wrap">
+            <table class="matrix">
+              <thead><tr><th>页面/类别</th><th>布局</th><th>主题运行时</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr><td>登录、注册</td><td>default</td><td class="yes">启用</td><td>保留站点导航，卡片使用语义色</td></tr>
+                <tr><td>退出、激活成功</td><td>default + nav=false</td><td class="yes">启用</td><td>验证运行时不依赖 Header</td></tr>
+                <tr><td>欢迎、安装</td><td>blank</td><td class="yes">启用</td><td>blank 布局默认继承应用主题</td></tr>
+                <tr><td>本地 TXT 阅读、网络阅读</td><td>blank</td><td class="no">显式退出</td><td>页面 meta 标记关闭内置皮肤，保留独立阅读配色</td></tr>
+                <tr><td>其他 default 页面</td><td>default</td><td class="yes">启用</td><td>自动获得全站 primary 语义，不逐页列白名单</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="changes">
+          <div class="section-head">
+            <div><p class="section-kicker">07 / Change map</p><h2>预计实现落点</h2></div>
+          </div>
+          <div class="table-wrap">
+            <table class="files">
+              <thead><tr><th>位置</th><th>计划改动</th><th>约束</th></tr></thead>
+              <tbody>
+                <tr><td><code>app/app.vue</code></td><td>挂载应用级 ThemeRuntimeProvider；全局链接色改用 Vuetify primary variable</td><td>Provider 在所有 layout 之上且只创建一次</td></tr>
+                <tr><td><code>app/components/ThemeRuntimeProvider.vue</code></td><td>主题解析、原子提交、DOM 样式生命周期、route opt-out、ready 状态</td><td>浏览器 API 仅在客户端生命周期访问</td></tr>
+                <tr><td><code>app/composables/useThemeRuntime.ts</code></td><td>以 Symbol key 暴露只读运行时状态</td><td>无隐藏 DOM 副作用</td></tr>
+                <tr><td><code>app/utils/builtin-theme-*.ts</code></td><td>抽离页面 CSS；公开语义 palette；构建 Vuetify token CSS 与 Body descriptor</td><td>纯函数可测试，保留 overlay 现有契约</td></tr>
+                <tr><td><code>app/components/themes/BuiltinThemeHeader.vue</code></td><td>删除全局 Style/Body 类注入与清理，只保留 Header 自身交互</td><td>Header 卸载不得改变主题</td></tr>
+                <tr><td><code>app/layouts/default.vue</code>、<code>blank.vue</code></td><td>消费 runtime ready；default 消费动态 Header/Footer；Loading 与首次无缓存策略对齐</td><td>无缓存接口确认前不展示页面</td></tr>
+                <tr><td>认证页与阅读页</td><td>清理蓝灰/红色主行动等非语义硬编码；阅读页增加主题运行时 opt-out meta</td><td>不改变表单、路由与业务逻辑</td></tr>
+                <tr><td><code>app/test/</code></td><td>新增纯契约测试、Provider 行为测试与认证页 E2E 主题矩阵；mock 支持访客/退出状态</td><td>断言计算样式，不依赖私有实现或大快照</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="tests">
+          <div class="section-head">
+            <div><p class="section-kicker">08 / Verification</p><h2>测试计划与完成门槛</h2></div>
+            <span class="state state--active">验证完成</span>
+          </div>
+          <div class="table-wrap">
+            <table class="test-table">
+              <thead><tr><th>层级</th><th>公开 seam / 场景</th><th>实际命令或工具</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>纯契约 + Provider</td><td>10 组内置皮肤/模式映射；DOM 替换/清理；无 Header；缓存优先；失败整套回退；阅读路由 opt-out</td><td><code>npx vitest run test/components/BuiltinThemeHeader.spec.ts test/components/ThemeRuntimeProvider.spec.ts test/utils/builtin-theme-runtime.spec.ts test/stores/theme.spec.ts</code></td><td class="yes">22 / 22 通过</td></tr>
+                <tr><td>E2E 完整矩阵</td><td>5 个内置主题 × light/dark；登录直接访问、刷新与退出无导航状态均断言计算色</td><td><code>PLAYWRIGHT_BASE_URL=http://127.0.0.1:3010 npx playwright test test/e2e/auth-themes.spec.ts</code></td><td class="yes">10 组矩阵通过</td></tr>
+                <tr><td>E2E 代表页</td><td>注册→登录页内跳转；欢迎、安装、激活成功无 Header 页面；阅读器 opt-out</td><td>同一 Playwright 文件，短生命周期本地 Nuxt + API 拦截</td><td class="yes">共 13 / 13 通过</td></tr>
+                <tr><td>浏览器验收</td><td>暖红 light：登录、退出、注册、390×844 移动端；石墨 dark：登录；检查 Body 类、单一 Style、背景、工具栏、按钮与横向溢出</td><td>Chrome DevTools MCP；暖红主色 <code>rgb(143, 58, 52)</code>，石墨暗色主色 <code>rgb(111, 157, 214)</code></td><td class="yes">计算样式与截图通过，控制台无错误</td></tr>
+                <tr><td>工程检查</td><td>ESLint、Nuxt 类型、production build、设计门禁</td><td><code>npm run lint</code>；<code>npx nuxt typecheck</code>；<code>npm run build</code>；<code>make check-design</code></td><td class="yes">0 error；类型/build 通过；74 份方案通过门禁</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout callout--ok" style="margin-top:16px">
+            <p><strong>验证结论：</strong>主题运行时已与 Header 生命周期解耦，五套内置主题的明暗矩阵、认证页无导航状态、代表性 blank 页面和阅读器隔离均通过自动化或浏览器计算样式验证。</p>
+          </div>
+          <div class="callout callout--risk" style="margin-top:12px">
+            <p><strong>验证边界：</strong>本次没有提供或保留用户体验地址，因此未启动真实 Docker 书库做完整业务流验收；接口契约未改，主题相关真实渲染使用短生命周期 Nuxt 与页面级 API 拦截完成。ESLint 仍报告仓库既有的 193 条 warning，但为 0 error；build 仅有 Browserslist 数据陈旧和 chunk 大小提示。</p>
+          </div>
+        </section>
+
+        <section id="risks">
+          <div class="section-head">
+            <div><p class="section-kicker">09 / Safety</p><h2>兼容性、风险与回滚</h2></div>
+          </div>
+          <div class="risk-grid">
+            <article class="card"><span class="label">第三方主题</span><h3>保持现有 API 契约</h3><p>继续支持 API 返回的 Header/Footer 模块；本次语义 palette 只覆盖五个内置主题，不引入上传格式或后端变化。外部组件加载失败按原子策略回退。</p></article>
+            <article class="card"><span class="label">CSS 优先级</span><h3>Body 作用域高于 Vuetify 默认值</h3><p>生成 token CSS 时限定主题名与模式，避免污染默认主题；移除 Header 内旧注入后检查不存在重复 Style 与残留 Body 类。</p></article>
+            <article class="card"><span class="label">路由切换</span><h3>阅读器进出必须清洁</h3><p>进入 opt-out 页面时清除内置主题 DOM 状态，离开后从有效主题重新应用；防止阅读器和站点主题互相泄漏。</p></article>
+            <article class="card"><span class="label">回滚</span><h3>前端提交可整体撤回</h3><p>不改数据库、接口或持久化 key。若上线异常，可整体回退本次前端提交，恢复 Header 承载的旧运行时；用户缓存仍兼容。</p></article>
+          </div>
+        </section>
+
+        <section id="acceptance">
+          <div class="section-head">
+            <div><p class="section-kicker">10 / Done</p><h2>验收标准</h2></div>
+          </div>
+          <ol>
+            <li>暖红主题登录页工具栏、主按钮、链接和背景不再出现默认蓝色；退出页在 <code>nav=false</code> 时仍保持暖红主题。</li>
+            <li>五个内置主题的 light/dark primary 都与本方案色谱一致，默认主题仍为 <code>#1976D2</code>。</li>
+            <li>主题 Body 类与注入 Style 的存在只取决于有效主题和路由策略，不取决于 Header 是否渲染。</li>
+            <li>登录、退出、注册、欢迎、安装、激活成功在直接访问和导航后均无主题混搭；阅读器保持独立配色。</li>
+            <li>有缓存时快速应用；无缓存时 Loading 等待服务端确认；组件/样式失败整套回退默认。</li>
+            <li>自动化、真实浏览器计算样式验收、lint、typecheck、build 与设计门禁均已记录；与本次改动相关的检查无失败。</li>
+          </ol>
+        </section>
+
+        <div class="footer-mark">
+          <span>BRANCH · fix/20260801-auth-theme-runtime</span>
+          <span>DOCUMENT · design/app/20260803-auth-theme-runtime.active.html</span>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
