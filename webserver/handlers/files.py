@@ -9,7 +9,7 @@ import zipfile
 
 from tornado import web
 
-from webserver import constants, loader
+from webserver import constants, demo_mode, loader
 from webserver.handlers.base import BaseHandler
 from webserver.i18n import _
 from webserver.services.convert import ConvertService
@@ -157,15 +157,17 @@ class ProgressHandler(BaseHandler):
 
 class EpubReader(BaseHandler):
     def get(self, bid, path):
-        if not CONF["ALLOW_GUEST_READ"] and not self.current_user:
-            return self.redirect("/login")
-
-        if self.current_user:
-            if self.current_user.can_read():
-                if not self.current_user.is_active():
-                    raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
-            else:
-                raise web.HTTPError(403, reason=_("无权在线阅读"))
+        # 演示模式下，未登录访客与演示账号的在线阅读权限统一遵循“访客权限”配置，
+        # 忽略演示账号自身的权限位（该账号默认拥有完整权限，用于伪装管理员体验）。
+        guest_like = not self.current_user or demo_mode.is_demo_restricted(CONF, self.current_user)
+        if guest_like:
+            if not CONF["ALLOW_GUEST_READ"]:
+                return self.redirect("/login")
+        elif self.current_user.can_read():
+            if not self.current_user.is_active():
+                raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
+        else:
+            raise web.HTTPError(403, reason=_("无权在线阅读"))
 
         book = self.get_book_or_404(bid)
         fpath = book.get("fmt_epub", None)

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>演示模式：单账号只读体验、自动开户与真实管理员维护</title>
+  <style>
+    :root { color-scheme: light; --ink:#172033; --muted:#5b6a80; --line:#dce3ec; --paper:#fff; --bg:#f4f6f9; --accent:#2457c5; --soft:#eaf0ff; --ok:#187a5c; --warn:#9a6700; --bad:#b42318; --fake:#7a3ff0; --fakesoft:#f1eaff; }
+    * { box-sizing: border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1080px,calc(100% - 32px)); margin:32px auto 72px; }
+    header,section { margin-bottom:20px; padding:26px 30px; border:1px solid var(--line); border-radius:14px; background:var(--paper); }
+    header { border-top:5px solid var(--accent); }
+    h1 { margin:0 0 10px; font-size:28px; line-height:1.28; }
+    h2 { margin:0 0 14px; font-size:20px; }
+    h3 { margin:20px 0 8px; font-size:16px; }
+    p,ul,ol { margin:8px 0; }
+    code { padding:2px 5px; border-radius:5px; background:#eef1f5; font-size:0.92em; }
+    .lead { color:var(--muted); font-size:16px; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+    .tag { padding:4px 10px; border-radius:999px; color:var(--muted); background:#eef1f5; font-size:13px; }
+    .tag.status { color:var(--ok); background:#e3f5ec; font-weight:700; }
+    .callout { margin:14px 0; padding:13px 16px; border-left:4px solid var(--accent); background:var(--soft); }
+    .callout.fake { border-left-color:var(--fake); background:var(--fakesoft); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .card { padding:16px; border:1px solid var(--line); border-radius:10px; }
+    table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; }
+    th,td { padding:9px 11px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f7f8fa; }
+    .yes { color:var(--ok); font-weight:700; }
+    .no { color:var(--bad); font-weight:700; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:var(--fakesoft); color:var(--fake); font-weight:700; font-size:12.5px; }
+    .toc { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .toc a { padding:5px 11px; border-radius:8px; background:#f1f3f7; color:var(--accent); text-decoration:none; font-size:13px; }
+    .flow { display:grid; grid-template-columns:1fr 30px 1fr 30px 1fr 30px 1fr; align-items:center; gap:6px; margin-top:16px; }
+    .node { min-height:100px; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fafbfc; font-size:13.5px; }
+    .arrow { color:var(--accent); text-align:center; font-size:22px; }
+    footer { color:var(--muted); text-align:center; font-size:13px; }
+    .mock-table { width:100%; border-collapse:collapse; margin:14px 0; font-size:13.5px; box-shadow:0 1px 2px rgba(23,32,51,0.06); }
+    .mock-table th,.mock-table td { border:1px solid var(--line); padding:10px 12px; }
+    .mock-table th { background:#f7f8fa; text-align:left; font-weight:600; }
+    .mock-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; font-size:13px; }
+    .mock-locked { display:inline-flex; align-items:center; gap:6px; color:var(--muted); font-size:13px; }
+    .mock-locked .dot { width:7px; height:7px; border-radius:50%; background:var(--fake); flex:none; }
+    .row-demo { background:var(--fakesoft); }
+    .caption { margin-top:8px; color:var(--muted); font-size:13px; }
+    @media (max-width:820px) { main{width:min(100% - 20px,1080px);margin-top:10px} header,section{padding:20px} .grid,.flow{grid-template-columns:1fr} .arrow{transform:rotate(90deg)} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>演示模式：单账号只读体验、自动开户与真实管理员维护</h1>
+    <p class="lead">为公开演示站提供一个可浏览完整功能、但不能改变业务数据的共享账号：演示模式开启后仅配置的 demo 账号（及数据库中真实的管理员账号）可登录，demo 账号首次登录自动开户并进入“伪管理员设置面板”体验交互流程，未登录访客与 demo 账号的阅读/下载权限统一对齐后台“访客权限”设置，真实管理员账号则不受任何限制、可持续维护演示站。</p>
+    <div class="meta">
+      <span class="tag status">状态：ACTIVE</span>
+      <span class="tag">创建日期：2026-07-21</span>
+      <span class="tag">最近更新：2026-08-03</span>
+      <span class="tag">所属模块：webserver</span>
+      <span class="tag">影响范围：认证、HTTP API、WebDAV、AdminSettings、AdminUsers、阅读/下载权限、社交登录、用户文档</span>
+      <span class="tag">需求来源：GitHub Issue #886；PR #887 评论 @hehetoshang（2026-07-21 ～ 2026-08-01）、@liaoshutian（2026-08-03）</span>
+    </div>
+    <div class="toc">
+      <a href="#req">原始诉求</a>
+      <a href="#goals">目标与非目标</a>
+      <a href="#matrix">行为矩阵</a>
+      <a href="#design">方案</a>
+      <a href="#risk">安全边界与风险</a>
+      <a href="#test">测试与验收</a>
+      <a href="#log">决策记录</a>
+    </div>
+  </header>
+
+  <section id="req">
+    <h2>原始诉求</h2>
+    <p>GitHub Issue #886 标题为“添加演示模式（单个 demo 账号）”，要求为公开演示站提供只读体验。实现进入 PR #887 后，维护者在评论区分批补充了具体诉求，最终共同构成本方案：</p>
+    <div class="callout">“我希望打开演示模式时自动创建一个名为 demo 的用户……demo 用户可以查看管理员面板，但是内部内容为虚假体验版……点击保存按钮是不会真的去保存的。”（2026-08-01）</div>
+    <div class="callout">“那我要怎么维护 demo？给我管理员账号允许登录”（2026-08-01）</div>
+    <div class="callout">“我希望演示模式时，在用户管理中，演示用户的操作按钮直接被隐藏……然后演示模式的未登录与演示用户的权限要遵循访客权限设置的”（2026-08-01）</div>
+    <div class="callout">“这个 PR 更新：默认密码设置为 talebook，方案文档合并为 1 份，不要保留中间临时方案”（2026-08-03）</div>
+    <p>拆解为六个可验证的行为点：① 演示模式只允许配置的 demo 账号与数据库中真实管理员登录，其余账号一律拒绝；② demo 账号不产生登录 IP、访问时间、阅读历史、访问计数等副作用；③ demo 账号首次登录按需自动开户，默认密码为 <code>talebook</code>，已存在同名账号不覆盖；④ demo 账号可进入“管理员设置”页面看到 <code>settings.py</code> 出厂默认值，点击保存返回成功但不真实写入；⑤ 真实管理员账号在演示模式下不受只读限制，可正常维护站点；⑥ 未登录访客与 demo 账号的阅读/下载权限统一遵循后台“访客权限”设置，用户管理页对 demo 账号隐藏操作入口。</p>
+  </section>
+
+  <section id="goals">
+    <h2>目标与非目标</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>目标</h3>
+        <ul>
+          <li>新增配置 <code>DEMO_MODE</code>（默认 <code>False</code>）与 <code>DEMO_USERNAME</code>（默认 <code>demo</code>）；关闭时不改变任何现有行为。</li>
+          <li>演示模式开启后，仅配置的 demo 账号与数据库中 <code>admin=True</code> 的真实管理员账号可登录（网页密码、HTTP Basic、WebDAV 认证均适用）；其余账号与已登录的旧会话一律视为未登录。</li>
+          <li>demo 账号的业务写请求、会产生副作用的 GET（如 <code>/api/admin/users/owner</code>、<code>/api/active/*</code>）、WebDAV 写方法与社交登录/绑定统一拒绝；真实管理员账号不受此限制。</li>
+          <li>demo 账号不记录登录 IP、访问时间、阅读历史、书籍访问计数、站内消息与书源搜索权重等副作用数据；真实管理员账号正常记录。</li>
+          <li>demo 账号不存在时首次登录按需自动创建（非管理员、可登录、密码固定为 <code>talebook</code>），已存在同名账号不覆盖资料或重置密码。</li>
+          <li>demo 账号数据库 <code>admin</code> 字段仍为 <code>False</code>，但 <code>/api/user/info</code> 向前端展示管理员入口；<code>GET /api/admin/settings</code> 只返回 <code>settings.py</code> 出厂默认值，<code>POST</code> 校验通过后返回成功但不写入 <code>CONF</code>/<code>auto.py</code>；其余管理接口仍按真实权限拒绝 demo 账号。</li>
+          <li>未登录访客与 demo 账号的在线阅读、EPUB 分页读取、下载统一遵循 <code>ALLOW_GUEST_READ</code>/<code>ALLOW_GUEST_DOWNLOAD</code>，忽略 demo 账号自身默认拥有的权限位；真实管理员不受影响。</li>
+          <li><code>GET /api/admin/users</code> 为每个用户新增 <code>is_demo</code> 字段；用户管理页在演示模式开启且该行是 demo 账号时，以锁定提示替换操作菜单。</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>非目标</h3>
+        <ul>
+          <li>不在管理后台提供“开启/关闭演示模式”的开关，仍只能通过配置文件修改并重启生效，避免 demo 账号通过伪设置页改变安全边界。</li>
+          <li>不为管理员设置页面之外的其它管理子页面构造虚假数据，其余 <code>@is_admin</code> 接口对 demo 账号继续拒绝。</li>
+          <li>不放开 WebDAV 写操作：<code>WebDAVHandler.prepare()</code> 的只读检查发生在完整解析请求者身份之前，真实管理员如需上传/整理文件需改走网页后台，不通过 WebDAV 同步。</li>
+          <li>不放开社交账号登录：演示模式下 <code>/auth/login</code>、<code>/auth/complete</code>、<code>/auth/disconnect</code> 对所有账号统一拒绝，管理员需用户名密码登录。</li>
+          <li>不扩大推送、上传的只读白名单：两者是 POST 请求，已被统一只读策略拒绝，不重复处理。</li>
+          <li>不新增独立的“演示模式访客权限”配置项，复用既有 <code>ALLOW_GUEST_*</code> 四项配置。</li>
+          <li>不新增“管理员专用密码”，真实管理员账号本就由部署者预先创建并维护，与 demo 账号的密码策略无关。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="matrix">
+    <h2>行为矩阵</h2>
+    <table>
+      <thead><tr><th>场景</th><th>演示模式关闭</th><th>演示模式开启</th></tr></thead>
+      <tbody>
+        <tr><td>配置的 demo 账号登录（首次，不存在时）</td><td>—</td><td class="yes">自动创建（密码 <code>talebook</code>）后登录成功，不记录 IP/时间</td></tr>
+        <tr><td>数据库 <code>admin=True</code> 的真实管理员登录</td><td>按既有权限判断</td><td class="yes">正常登录、会话保持，读写权限与关闭时一致</td></tr>
+        <tr><td>其它非管理员账号登录 / 已登录旧会话</td><td>按既有权限判断</td><td class="no">拒绝 / 视为未登录（<code>demo.account_only</code>）</td></tr>
+        <tr><td>demo 账号注册、上传、编辑、删除、推送、WebDAV 写方法</td><td>按既有权限判断</td><td class="no">统一拒绝（<code>demo.read_only</code> / 403）</td></tr>
+        <tr><td>demo 账号 <code>GET /api/admin/settings</code></td><td>非管理员被拒绝</td><td class="badge">伪造：返回 settings.py 默认参数</td></tr>
+        <tr><td>demo 账号 <code>POST /api/admin/settings</code></td><td>非管理员被拒绝</td><td class="badge">伪造：校验通过返回 ok，不写入 CONF/auto.py</td></tr>
+        <tr><td>demo 账号其它 <code>@is_admin</code> 接口（用户管理、批量删除等）</td><td>非管理员被拒绝</td><td class="no">拒绝：行为不变</td></tr>
+        <tr><td>真实管理员 <code>POST /api/admin/settings</code> 等写接口</td><td>按既有权限执行</td><td class="yes">按既有权限正常执行，真实写入</td></tr>
+        <tr><td><code>ALLOW_GUEST_READ=False</code> 时，匿名或 demo 账号访问 <code>/read/&lt;id&gt;</code></td><td>按既有权限判断</td><td class="no">重定向登录，与匿名访客一致</td></tr>
+        <tr><td><code>ALLOW_GUEST_READ=False</code> 时，真实管理员访问 <code>/read/&lt;id&gt;</code></td><td>按自身权限位</td><td>按自身权限位，不受访客权限设置约束</td></tr>
+        <tr><td><code>GET /api/admin/users</code> 返回的 demo 账号条目</td><td>无 <code>is_demo</code> 字段</td><td class="yes"><code>is_demo: true</code>，其余账号为 <code>false</code></td></tr>
+        <tr><td>用户管理页，demo 账号所在行的操作按钮</td><td>显示</td><td class="yes">替换为锁定提示文字</td></tr>
+        <tr><td>社交账号登录 / 绑定</td><td>按既有配置</td><td class="no">统一拒绝（403）</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="design">
+    <h2>方案</h2>
+
+    <h3>1. 配置与账号判定（<code>webserver/demo_mode.py</code>）</h3>
+    <p>新增 <code>DEMO_MODE = False</code>、<code>DEMO_USERNAME = "demo"</code> 两项默认配置。用户名比较统一去除首尾空白并转小写。核心判定函数：</p>
+    <ul>
+      <li><code>is_demo_user(conf, user)</code> — 是否为配置的演示账号。</li>
+      <li><code>is_real_admin(user)</code> — 是否为数据库 <code>admin=True</code> 的真实管理员，与 <code>is_demo_user</code> 相互独立。</li>
+      <li><code>can_login(conf, user)</code> — <code>not is_demo_mode(conf) or is_demo_user(conf, user) or is_real_admin(user)</code>，统一驱动网页登录、HTTP Basic Auth、WebDAV 认证与社交回调四处调用点。</li>
+      <li><code>is_demo_restricted(conf, user)</code> — 演示模式开启且用户不是真实管理员时为真；取代分散各处的 <code>is_demo_mode(CONF)</code> 布尔检查，是“该请求是否套用只读/伪造限制”的唯一入口。</li>
+    </ul>
+
+    <h3>2. 会话与只读写保护（<code>webserver/handlers/base.py</code>）</h3>
+    <p><code>get_current_user()</code> 复用 <code>can_login()</code>：不允许登录的账号也不允许维持已登录状态，因此旧管理员会话不会被强制清空，普通账号会话则被清空。<code>request_is_allowed(conf, method, path, user)</code> 在 <code>is_demo_restricted()</code> 为假（真实管理员）时直接放行任意方法与路径；为真时仅放行 <code>GET/HEAD/OPTIONS/PROPFIND</code>、登录/验证码/首页等会话建立路径（<code>DEMO_SESSION_PATHS</code>），以及 <code>/api/admin/settings</code> 这一条“假保存”路径（<code>DEMO_FAKE_SAVE_PATHS</code>），并显式拒绝 <code>DEMO_BLOCKED_GET_PATHS</code> 与 <code>/api/active/*</code>。<code>BaseHandler.prepare()</code> 在公共入口调用该判定，其它继承 <code>BaseHandler</code> 的业务接口默认受保护，不依赖各 handler 单独实现。</p>
+    <p>登录 IP/时间记录（<code>login_user</code>）、站内消息写入/弹出（<code>add_msg</code>/<code>pop_messages</code>）、阅读历史（<code>user_history</code>）、图书访问计数（<code>count_increase</code>）与密码格式迁移，判定条件统一改为 <code>is_demo_restricted(CONF, user)</code>：真实管理员正常记录/迁移，demo 账号与匿名访客继续跳过。<code>webserver/handlers/network_library.py</code> 中的书源搜索权重更新同样按此判定。</p>
+
+    <h3>3. 自动开户（<code>demo_mode.ensure_demo_account()</code>）</h3>
+    <p>演示模式开启且配置了 <code>DEMO_USERNAME</code> 时，登录请求（<code>SignIn.post()</code>）里若按用户名查不到 demo 账号则自动创建：<code>admin=False</code>、<code>active=True</code>、无自定义权限位，密码为常量 <code>DEMO_DEFAULT_PASSWORD = "talebook"</code>（走既有 bcrypt 哈希，不明文存储）。先查后建保证幂等，已存在的同名账号（含部署者手工创建、设置了更强密码的账号）不会被覆盖或重置密码。选择“登录时按需创建”而非“服务启动时创建”，避免依赖启动时序，也不需要改动 <code>main.py</code> 的会话生命周期。</p>
+
+    <h3>4. 伪管理员设置面板（<code>webserver/handlers/admin.py</code> 的 <code>AdminSettings</code>）</h3>
+    <p>新增 <code>is_demo_fake_admin()</code>：演示模式开启且当前账号是配置的 demo 账号时为真。<code>GET</code> 在该条件下返回 <code>webserver/settings.py</code> 里的原始 <code>settings</code> 字典（出厂默认值），不合并 <code>auto.py</code>/<code>manual.py</code> 覆盖的运行时 <code>CONF</code>，避免向公开演示访客泄露真实站点标题、密钥、数据库连接串等。<code>POST</code> 只做 JSON 解码校验后直接返回 <code>{"err": "ok", ...}</code>，不经过字段白名单过滤、<code>SettingsSaverLogic.save_extra_settings()</code>、写 <code>auto.py</code> 等真实保存路径。该特判只加在 <code>AdminSettings</code> 一个 handler 里，不修改 <code>BaseHandler.is_admin()</code> 或全局 <code>@is_admin</code> 装饰器，其它管理接口继续依据数据库真实 <code>admin</code> 字段拒绝 demo 账号。<code>UserInfo.get_user_info()</code> 对 demo 账号返回 <code>is_admin: true</code>（叠加 <code>user.is_admin() or is_demo_fake_admin</code>），复用前端既有管理员导航入口与设置页组件，无需新增或修改 <code>.vue</code> 文件。</p>
+
+    <h3>5. 真实管理员登录维护</h3>
+    <p>放行条件严格锚定数据库既有的 <code>Reader.admin</code> 字段，不新增角色或“演示管理员”白名单。第 1、2 节中 <code>can_login()</code>/<code>get_current_user()</code>/<code>request_is_allowed()</code> 的改造统一覆盖该场景后，<code>webserver/handlers/admin.py</code> 中的 <code>@is_admin</code> 装饰器与 <code>self.admin_user</code> 判断无需任何改动，即可对真实管理员“开箱即用”：用户管理、批量删除、书源管理等所有既有管理接口在演示模式下对真实管理员正常工作。<code>AdminSettings.is_demo_fake_admin()</code> 只判断“是否为配置的 demo 账号”，真实管理员始终为假，因此继续走真实保存路径，与伪管理员面板逻辑互不干扰。WebDAV 写操作是唯一未放开的例外（见“非目标”），管理员改用网页后台维护书库。</p>
+
+    <h3>6. 访客权限对齐（<code>webserver/handlers/book.py</code>、<code>webserver/handlers/files.py</code>）</h3>
+    <p>在线阅读（<code>BookRead.get</code>，含 PDF 分支）、EPUB 分页读取（<code>EpubReader.get</code>）、书籍下载（<code>BookDownload.prepare</code>）三处权限判断前统一计算：</p>
+    <pre>guest_like = not self.current_user or demo_mode.is_demo_restricted(CONF, self.current_user)</pre>
+    <p>为真时只检查对应的 <code>ALLOW_GUEST_READ</code>/<code>ALLOW_GUEST_DOWNLOAD</code>，不再检查账号自身的 <code>is_active()</code>/<code>can_read()</code>/<code>can_save()</code>——demo 账号自动创建时未设置权限位，按 <code>has_permission()</code> 默认语义等同拥有全部权限，若不做此对齐会绕开后台的访客权限收紧。真实管理员场景下 <code>guest_like</code> 恒为假，继续按自身权限位判断，不受影响。推送、上传接口维持现状：两者是 POST 请求，已被第 2 节的只读策略统一拦截为 <code>demo.read_only</code>，重复判断是死代码。</p>
+
+    <h3>7. 用户管理页锁定（<code>webserver/handlers/admin.py</code> 的 <code>AdminUsers</code>、<code>app/pages/admin/users.vue</code>）</h3>
+    <p><code>AdminUsers.get()</code> 为每个用户新增 <code>"is_demo": demo_mode.is_demo_user(CONF, user)</code>，只回答“这是不是配置的演示账号”，是否需要锁定展示由前端结合已有的 <code>sys.demo_mode</code> 一并判断。<code>admin/users.vue</code> 的“操作”单元格在 <code>sys.demo_mode &amp;&amp; item.is_demo</code> 为真时，将下拉菜单替换为锁定提示文字（i18n key <code>admin.users.label.demoAccountLocked</code>），信息层级遵循“状态优先于操作”，用浅紫底色与次要文本色弱化区分，不使用红色/警告色——这不是错误状态，而是演示站点的正常边界。演示模式关闭或该行不是演示账号时，操作按钮保持原有下拉菜单。</p>
+    <table class="mock-table">
+      <thead><tr><th>用户名</th><th>邮箱</th><th>登录时间</th><th style="width:220px">操作</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>alice_admin</td><td>alice@example.com</td><td>2026-08-01 10:02</td>
+          <td><span class="mock-btn">操作 ▾</span></td>
+        </tr>
+        <tr class="row-demo">
+          <td>demo</td><td>demo@talebook.demo</td><td>2026-08-01 09:58</td>
+          <td><span class="mock-locked"><span class="dot"></span>演示模式下该账号操作已锁定</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="caption">用户管理页的锁定是展示层面的引导，不是权限边界：真正阻止修改 demo 账号的仍是第 2 节的后端只读策略；隐藏按钮只是避免管理员误以为点击会生效。</p>
+
+    <div class="flow" aria-label="演示模式下不同账号的请求处理路径">
+      <div class="node"><strong>登录</strong><br>demo 账号按需开户；真实管理员正常校验；其余账号拒绝</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>会话判定</strong><br><code>get_current_user()</code> 对真实管理员不清空会话</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>请求放行</strong><br>只读白名单 / 假保存路径 / 真实管理员任意放行</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>业务层</strong><br>伪管理员面板、访客权限对齐、用户管理页锁定</div>
+    </div>
+  </section>
+
+  <section id="risk">
+    <h2>安全边界与风险</h2>
+    <ul>
+      <li><strong>后端是最终边界：</strong>策略统一放在 <code>BaseHandler.prepare()</code> 公共入口与 WebDAV 独立 <code>prepare()</code>，前端隐藏按钮、直接 HTTP 调用或脚本均不能绕过；用户管理页的锁定提示只是体验优化。</li>
+      <li><strong>不产生真实管理员权限：</strong>demo 账号数据库 <code>admin</code> 字段始终为 <code>False</code>，除 <code>AdminSettings</code> 一处伪造视图外，其余所有 <code>@is_admin</code> 接口继续拒绝 demo 账号，避免“伪管理员”被误用为真实提权入口。</li>
+      <li><strong>不泄露真实配置：</strong>设置页对 demo 账号只读出 <code>settings.py</code> 出厂默认值，不合并 <code>auto.py</code>/<code>manual.py</code> 覆盖，真实密钥、数据库连接串、站点标题不经此接口泄露。</li>
+      <li><strong>固定密码是已知且刻意接受的风险：</strong><code>talebook</code> 是公开可预期的密码，任何人都能登录 demo 账号——这符合“公开演示账号”定位，且登录后仍受全局只读写保护约束，不能执行真实业务写操作；若同名账号已由部署者手工创建，自动开户逻辑不会重置其密码。</li>
+      <li><strong>真实管理员密码是整站写权限的唯一门槛：</strong>演示模式开启后与关闭时一致，本方案不降低也不提高这一固有风险，需部署者自行妥善保管。</li>
+      <li><strong>放行面收窄到必要路径：</strong>只读策略对 demo 账号的例外只加了 <code>/api/admin/settings</code> 一条 POST 路径，不是放开整个 <code>/api/admin/*</code> 前缀，降低误放行到破坏性接口（批量删除、迁移数据库等）的风险。</li>
+      <li><strong>访客权限判定不影响真实管理员：</strong><code>guest_like</code> 表达式在真实管理员场景下恒为假，不会出现“管理员因访客权限关闭而读不了书”的回归。</li>
+      <li><strong>演示模式只能通过配置文件关闭：</strong>不在管理后台提供开关，避免 demo 账号通过伪设置页或其它途径意外关闭只读保护。</li>
+    </ul>
+  </section>
+
+  <section id="test">
+    <h2>测试计划与验收标准</h2>
+    <table>
+      <thead><tr><th>层级</th><th>计划验证</th><th>实际结果</th></tr></thead>
+      <tbody>
+        <tr><td>策略单测</td><td><code>can_login()</code>/<code>is_demo_restricted()</code>/<code>request_is_allowed()</code> 对 demo 账号、真实管理员、普通账号三类判定；<code>ensure_demo_account()</code> 创建/幂等/关闭态 no-op。</td><td class="yes">通过：<code>tests/test_demo_mode_policy.py</code> 全部通过。</td></tr>
+        <tr><td>登录与会话集成</td><td>demo 账号自动开户并登录成功；真实管理员登录成功且会话不被清空；普通账号被拒绝。</td><td class="yes">通过：<code>tests/test_demo_mode.py</code> 相关用例全部通过。</td></tr>
+        <tr><td>只读写保护</td><td>demo 账号业务写请求、危险 GET、WebDAV 写方法、社交登录统一拒绝；真实管理员写请求正常执行。</td><td class="yes">通过：<code>tests/test_demo_mode.py</code>、<code>tests/test_webdav.py</code>、<code>webserver/social_routes.py</code> 相关用例全部通过。</td></tr>
+        <tr><td>伪管理员面板</td><td>demo 账号 <code>is_admin</code> 为 true；<code>GET /api/admin/settings</code> 返回 settings.py 默认值；<code>POST</code> 返回 ok 但不改变运行时 CONF。</td><td class="yes">通过。</td></tr>
+        <tr><td>访客权限对齐</td><td><code>ALLOW_GUEST_READ=False</code> 时匿名与 demo 账号被拒绝、真实管理员不受影响；恢复后均可访问。</td><td class="yes">通过。</td></tr>
+        <tr><td>用户列表与前端锁定</td><td><code>GET /api/admin/users</code> 的 demo 账号条目 <code>is_demo=true</code>；用户管理页演示模式开启时该行操作按钮隐藏、显示锁定提示，关闭后恢复。</td><td class="yes">通过：<code>test/e2e/admin-users-demo-mode.spec.ts</code>（1 passed）；回归 <code>test/e2e/admin.spec.ts</code>（3 passed）。</td></tr>
+        <tr><td>用户名最小长度调整</td><td>注册、邀请注册、安装向导、管理员创建用户的最小长度由 5 改为 2，1 字符被拒绝、2 字符被接受。</td><td class="yes">通过：<code>tests/test_main.py::TestUserSignUp::test_signup_username_length_boundary</code> 等。</td></tr>
+        <tr><td>全量回归</td><td>后端全量测试套件、lint、方案文档检查。</td><td class="yes">通过：<code>python3 -m pytest -q tests/</code> 738 passed, 1 skipped；<code>make lint-py-fix &amp;&amp; make lint-py</code> 通过；<code>python3 scripts/check_design_docs.py</code> 通过。</td></tr>
+        <tr><td>前端 lint</td><td><code>cd app &amp;&amp; npm run lint</code>。</td><td class="yes">通过：0 error，194 个既有 warning 与本次改动无关。</td></tr>
+      </tbody>
+    </table>
+    <h3>实际执行记录</h3>
+    <ul>
+      <li><code>python3 -m pytest -q tests/</code> — <strong>passed</strong>（738 passed, 1 skipped）。</li>
+      <li><code>make lint-py-fix &amp;&amp; make lint-py</code> — <strong>passed</strong>。</li>
+      <li><code>cd app &amp;&amp; npm run lint</code> — <strong>passed</strong>（0 error；194 个既有 warning 与本次改动无关）。</li>
+      <li><code>python3 scripts/check_design_docs.py</code> — <strong>passed</strong>。</li>
+      <li><code>npx playwright test test/e2e/admin-users-demo-mode.spec.ts</code> — <strong>passed</strong>（1 passed）。</li>
+      <li><code>npx playwright test test/e2e/admin.spec.ts</code> — <strong>passed</strong>（3 passed）。</li>
+      <li>PR 最新提交在 GitHub Actions 中 <code>check-design</code>、<code>test-server</code>、<code>test-ui</code>、<code>integration-test</code>、CodeQL 与 Docker 多架构构建均通过（详见 PR #887 描述）。</li>
+      <li>未完全通过但已确认与本方案无关：<code>npx vitest run test/components/</code> 中 <code>BuiltinThemeHeader.spec.ts</code> 因既有 Vuetify layout 注入夹具问题失败；全量 <code>npx playwright test</code> 另有 9 项既有失败（<code>admin-themes</code>、<code>book-detail</code>、<code>sidebar</code>、<code>webdav-readme</code>），两次独立运行结果一致，改动前后复现一致，判断为改动前已存在的问题。</li>
+      <li>前端交互验收：当前执行环境未提供 Chrome DevTools MCP，因此未附真实浏览器人工验收截图；用户管理页改动已通过 Playwright + mock API 的隔离渲染验证，未作为真实后端完整体验验收，建议后续有 Chrome DevTools MCP 的环境中补充人工验收。</li>
+      <li>本次默认密码由 <code>demodemo</code> 调整为 <code>talebook</code> 后，已同步更新 <code>webserver/demo_mode.py</code> 的 <code>DEMO_DEFAULT_PASSWORD</code> 常量、<code>document/README.zh_CN.md</code>、<code>document/README.en_US.md</code> 的示例密码，并确认 <code>tests/test_demo_mode.py</code>、<code>tests/test_demo_mode_policy.py</code> 均引用该常量而非硬编码字符串，测试无需改动即随之更新。</li>
+    </ul>
+  </section>
+
+  <section id="log">
+    <h2>决策记录</h2>
+    <ol>
+      <li>2026-07-21：请求只明确“演示模式”和“单个 demo 账号”，选择默认关闭、配置指定账号的兼容方案；写保护放在公共请求入口，并为 WebDAV 独立入口补充策略，不依赖前端隐藏按钮。</li>
+      <li>2026-08-01：新增“自动开户”，触发时机选在登录请求内按需创建而非服务启动阶段，天然幂等、不改动启动流程；“伪管理员”范围仅限管理员设置页面，不把 demo 账号数据库 <code>admin</code> 字段置真，避免放大到其它管理接口。</li>
+      <li>2026-08-01：新增“真实管理员登录维护”，放行条件选择数据库既有 <code>admin=True</code> 字段而非新增独立配置项；会话保持判定复用 <code>can_login()</code>，理由是“能登录”与“能维持登录”语义应当一致；WebDAV 写操作明确列为非目标，因其只读检查在完整身份解析之前，按账号类型放行需要提前完成 Basic Auth 校验，改动面和风险明显更高。</li>
+      <li>2026-08-01：新增“访客权限对齐与用户管理页锁定”，<code>is_demo</code> 判定放在后端而非前端做用户名字符串比较，避免前端硬编码 <code>DEMO_USERNAME</code>；用户管理页锁定态使用文字说明而非置灰按钮，避免置灰按钮仍引诱点击造成困惑；推送/上传接口不重复添加 <code>guest_like</code> 判断，避免死代码。</li>
+      <li>2026-08-01：用户名最小长度由 5 调整为 2，仅同步已有校验常量与文案，未引入新接口、数据结构或权限模型，随本方案一并记录、不单独建档。</li>
+      <li>2026-08-03：应维护者要求，demo 账号默认密码由需求原文给出的 <code>demodemo</code> 改为 <code>talebook</code>，降低与常见弱密码字典的重合度；同时将此前分 4 份提交的演示模式方案（<code>20260721-single-account-demo-mode</code>、<code>20260801-demo-mode-auto-account-fake-admin</code>、<code>20260801-demo-mode-real-admin-login</code>、<code>20260801-demo-mode-guest-permission-and-ui-lock</code>）合并为本文档一份最终方案，不再保留合并前的中间方案文件——这些文件均为本 PR 内新增、尚未随 PR 合并进入 <code>master</code>，合并前的迭代过程已通过 Git 提交历史留痕，不依赖设计文档承担历史记录职责。</li>
+    </ol>
+  </section>
+
+  <footer>Talebook 内部开发方案 · ACTIVE · GitHub Issue #886 / PR #887</footer>
+</main>
+</body>
+</html>

@@ -5,7 +5,7 @@ import threading
 from tornado.web import RequestHandler
 from tornado.wsgi import WSGIContainer
 
-from webserver import loader
+from webserver import demo_mode, loader
 from webserver.handlers.base import BaseHandler
 
 
@@ -65,6 +65,12 @@ class WebDAVHandler(BaseHandler):
 
     def prepare(self):
         """Called before any HTTP method handler."""
+        if demo_mode.is_demo_mode(CONF) and self.request.method not in demo_mode.READ_ONLY_METHODS:
+            self.set_status(403)
+            self.finish("Demo mode is read-only")
+            self._finished = True
+            return
+
         # Handle collection URL without trailing slash - redirect to add slash.
         request_path = self.request.path
         if request_path == "/books" or (
