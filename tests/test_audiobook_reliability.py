@@ -243,6 +243,7 @@ def test_script_normalization_drops_css_recovers_title_and_rewrites_locators():
         script = root / "book.script"
         locators = root / "book.script.locators.json"
         long_text = "第 十 八 章 " + "雨停了。村民推开窗户，看见河面升起薄雾。" * 5
+        css_prose = "本章介绍 CSS 的排版用途，body { color: red; } 只是书中引用的示例，不应作为样式残留删除。"
         script.write_text(
             f"""---
 格式: voicebook-script
@@ -265,6 +266,7 @@ def test_script_normalization_drops_css_recovers_title_and_rewrites_locators():
 ## 章节 0002 | index_split_000
 
 [旁白] {long_text}
+[旁白] {css_prose}
 """,
             encoding="utf-8",
         )
@@ -297,6 +299,9 @@ def test_script_normalization_drops_css_recovers_title_and_rewrites_locators():
         report = normalize_voicebook_script(script)
         workspace = read_script_workspace(script)
         locator_payload = json.loads(locators.read_text(encoding="utf-8"))
+        normalized_script = script.read_bytes()
+        normalized_locators = locators.read_bytes()
+        second_report = normalize_voicebook_script(script)
 
         assert report["removed_style_lines"] == 2
         assert report["removed_chapters"] == [{"number": 1, "title": "titlepage"}]
@@ -304,9 +309,14 @@ def test_script_normalization_drops_css_recovers_title_and_rewrites_locators():
         assert report["structural_changed"]
         assert [(chapter["number"], chapter["title"]) for chapter in workspace["chapters"]] == [(1, "第十八章")]
         assert all(len(line.split("] ", 1)[1]) <= 80 for line in workspace["chapters"][0]["lines"])
+        assert any("本章介绍 CSS" in line for line in workspace["chapters"][0]["lines"])
         assert "## 章节 0001 | index_split_000" not in script.read_text(encoding="utf-8")
         assert all(item["chapter_number"] == 1 for item in locator_payload["segments"])
         assert locator_payload["segments"][0]["locator"]["start_char"] > 0
+        assert second_report["removed_style_lines"] == 0
+        assert not second_report["structural_changed"]
+        assert script.read_bytes() == normalized_script
+        assert locators.read_bytes() == normalized_locators
 
 
 def test_single_chapter_revision_manifest_preserves_unselected_chapters():
