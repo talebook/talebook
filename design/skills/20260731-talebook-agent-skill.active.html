@@ -168,7 +168,7 @@
       <div class="scope">
         <article class="in">
           <h3>纳入</h3>
-          <p>自包含 <code>skills/talebook/</code>；单体 Python CLI；guest 与 Basic Auth；查询、常规写入、管理员操作和部署参考；风险预览；敏感设置输出脱敏；流式原子下载；更新提醒；已发布有声书消费接口。</p>
+          <p>自包含 <code>skills/talebook/</code> ；单体 Python CLI；guest 与 Basic Auth；查询、常规写入、管理员操作和部署参考；风险预览；敏感设置输出脱敏；流式原子下载；更新提醒；已发布有声书消费接口。</p>
         </article>
         <article class="out">
           <h3>不纳入</h3>
@@ -282,7 +282,7 @@ admin opds ... | settings ... | trash ... | ssl ... | themes ... | logs ...</pre
       <span class="eyebrow">Verification</span>
       <h2>测试结果</h2>
       <div class="tests">
-        <div class="test"><span class="lamp"></span><span><code>python3 -m pytest -q tests/test_talebook_skill.py tests/test_talebook_skill_cli.py</code>：50 项通过，覆盖命令树与方法/路径/请求体矩阵、严格未知路由、认证中止、风险预览、组合写入部分成功、敏感设置脱敏、流式上传下载、截断响应完整性校验、更新提醒、跨页书源及 audios 正常与失败路径。</span><span class="passed">PASS · 50</span></div>
+        <div class="test"><span class="lamp"></span><span><code>python3 -m pytest -q tests/test_talebook_skill.py tests/test_talebook_skill_cli.py</code> ：51 项通过，覆盖命令树与方法/路径/请求体矩阵、严格未知路由、认证中止、风险预览、组合写入部分成功、敏感设置与 URL 凭据脱敏、流式上传下载、截断响应完整性校验、更新提醒、跨页书源及 audios 正常与失败路径。</span><span class="passed">PASS · 51</span></div>
         <div class="test"><span class="lamp"></span><span>Python compile、目标文件 <code>ruff check</code>、<code>ruff format --check</code> 与 skill-creator quick validation 均通过。</span><span class="passed">PASS</span></div>
         <div class="test"><span class="lamp"></span><span><code>make lint-py-fix</code> 通过且 100 个后端文件未改变；<code>make lint-py</code> 通过。</span><span class="passed">PASS</span></div>
         <div class="test"><span class="lamp"></span><span><code>git diff --check</code> 与 <code>make check-design</code> 通过；PR 最终仅保留本方案。</span><span class="passed">PASS</span></div>

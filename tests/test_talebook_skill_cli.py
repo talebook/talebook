@@ -254,6 +254,23 @@ class TestTalebookSkillCli:
         assert errors is None
         assert output["arguments"]["url"] == "mysql+pymysql://<redacted>@db.example.com/books"
 
+    def test_confirmation_preview_redacts_credentials_embedded_in_set_assignment(self):
+        code, output, errors = run_cli(
+            [
+                "--site",
+                "books.example.com",
+                "admin",
+                "settings",
+                "update",
+                "--set",
+                "user_database=mysql+pymysql://alice:db-secret@db.example.com/books",
+            ]
+        )
+        assert code == CLI.EXIT_GUARD
+        assert errors is None
+        assert output["arguments"]["set"] == ["user_database=mysql+pymysql://<redacted>@db.example.com/books"]
+        assert "db-secret" not in json.dumps(output)
+
     def test_admin_settings_show_redacts_secrets_before_stdout(self):
         status = guest_status(user={"is_login": True, "is_admin": True})
         routes = {

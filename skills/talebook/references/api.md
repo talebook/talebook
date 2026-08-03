@@ -1,6 +1,6 @@
 # Talebook CLI 与 API 参考
 
-本参考用于把用户意图路由到 `scripts/talebook-cli.py`。CLI 的 `--help` 是参数名称的最终依据；这里记录命令语义、Talebook 接口、权限与风险。
+本参考用于把用户意图路由到 `scripts/talebook-cli.py` 。CLI 的 `--help` 是参数名称的最终依据；这里记录命令语义、Talebook 接口、权限与风险。
 
 ## 目录
 
@@ -27,7 +27,7 @@ python scripts/talebook-cli.py \
 
 | 参数 | 环境变量 | 规则 |
 |---|---|---|
-| `--site` | `TALEBOOK_URL` | 必填；没有 scheme 时补 `https://`；允许显式 HTTP；移除末尾斜杠。 |
+| `--site` | `TALEBOOK_URL` | 必填；没有 scheme 时补 `https://` ；允许显式 HTTP；移除末尾斜杠。 |
 | `--user` | `TALEBOOK_USERNAME` | 与密码成对可选；两者均省略时为 guest。 |
 | `--password` | `TALEBOOK_PASSWORD` | 与用户名成对可选；优先使用环境变量，避免 shell 历史和进程列表泄露。 |
 | `--timeout` | 无 | 单次 HTTP 超时，默认 30 秒。 |
@@ -63,7 +63,7 @@ CLI 使用 HTTP Basic Auth，不持久化 Cookie。JSON 写入 stdout，错误 J
 
 ### `me status`
 
-调用 `GET /api/user/info`。guest 也可使用。返回：
+调用 `GET /api/user/info` 。guest 也可使用。返回：
 
 - 站点标题、版本和书籍统计；
 - 当前用户是否登录、是否管理员；
@@ -74,11 +74,11 @@ CLI 使用 HTTP Basic Auth，不持久化 Cookie。JSON 写入 stdout，错误 J
 
 ### `me update`
 
-调用 `POST /api/user/update`，需要登录。支持昵称、Kindle 邮箱和密码修改。修改密码时同时提供当前密码与新密码；Talebook 服务端要求新密码满足自己的长度与格式规则。
+调用 `POST /api/user/update` ，需要登录。支持昵称、Kindle 邮箱和密码修改。修改密码时同时提供当前密码与新密码；Talebook 服务端要求新密码满足自己的长度与格式规则。
 
 ### `me devices list|add|delete`
 
-调用 `GET/POST /api/user/devices`，需要登录。服务端使用“整表替换”写入个人设备，设备没有独立 ID，因此 CLI 的删除参数是设备名称。添加同名设备会替换旧值。
+调用 `GET/POST /api/user/devices` ，需要登录。服务端使用“整表替换”写入个人设备，设备没有独立 ID，因此 CLI 的删除参数是设备名称。添加同名设备会替换旧值。
 
 设备字段：`name`、`type`、`ip`、`port`、`schema`、`mailbox`。Kindle 使用邮箱；其他设备使用 HTTP(S) 地址。删除需要确认。
 
@@ -122,7 +122,7 @@ Talebook 可以由管理员开放 guest 推送，因此外发命令不强制本�
 | 命令 | 接口 | 说明 |
 |---|---|---|
 | `audios list` | `GET /api/audios` | 列出当前身份可见的已发布有声书；`--keyword` 按书名或作者过滤。 |
-| `audios show` | `GET /api/book/{book_id}/audios`、`GET /api/audio/{edition_id}` | 使用 `--book-id` 解析当前 published edition，返回书籍信息和按章节号排序的 manifest；不输出生成能力字段。 |
+| `audios show` | `GET /api/book/{book_id}/audios` 、`GET /api/audio/{edition_id}` | 使用 `--book-id` 解析当前 published edition，返回书籍信息和按章节号排序的 manifest；不输出生成能力字段。 |
 | `audios download` | 上述详情接口、`GET /media/audio/{edition_id}/chapter/{number}.mp3` | 使用 `--book-id` 把全部章节下载到 `--output` 指定的新目录。 |
 
 `audios download` 将章节命名为 `001-章节标题.mp3`。文件名会替换路径分隔符、控制字符和常见跨平台保留字符；空标题使用章节号回退。输出目录已存在时命令在下载音频前失败，不提供覆盖参数。每章使用流式临时文件写入；整本先进入同级临时目录，全部章节成功后才把目录移动到目标路径，任一章节失败会清理临时内容。
@@ -132,7 +132,7 @@ Talebook 可以由管理员开放 guest 推送，因此外发命令不强制本�
 ## remote
 
 “remote”对应 Talebook 页面中的网络书库与 Legado 书源。整组命令都需要登录；网络书源接口使用
-`/api/network/*`，已保存书籍列表使用 `/api/library/online`。
+`/api/network/*` ，已保存书籍列表使用 `/api/library/online` 。
 
 | 命令 | 接口 | 说明 |
 |---|---|---|
@@ -173,8 +173,8 @@ Talebook 可以由管理员开放 guest 推送，因此外发命令不强制本�
 | 命令 | 接口 | 风险 |
 |---|---|---|
 | `admin imports list` | `GET /api/admin/scan/list` | 只读。 |
-| `admin imports scan start|status` | `/api/admin/scan/run`、`/status` | 启动扫描需确认。 |
-| `admin imports run start|status` | `/api/admin/import/run`、`/status` | 启动入库需确认；`--delete-after` 会删除导入源文件。 |
+| `admin imports scan start|status` | `/api/admin/scan/run` 、`/status` | 启动扫描需确认。 |
+| `admin imports run start|status` | `/api/admin/import/run` 、`/status` | 启动入库需确认；`--delete-after` 会删除导入源文件。 |
 | `admin imports delete` | `POST /api/admin/scan/delete` | 删除扫描记录，需确认。 |
 
 ### 网络书源

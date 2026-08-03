@@ -1795,10 +1795,12 @@ def sanitized_arguments(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def redact_assignment(value: str) -> str:
-    key, separator, _ = value.partition("=")
-    if separator and is_sensitive_name(key):
+    key, separator, rest = value.partition("=")
+    if not separator:
+        return value
+    if is_sensitive_name(key):
         return key + "=<redacted>"
-    return value
+    return key + "=" + redact_url(rest)
 
 
 def redact_url(value: str) -> str:
