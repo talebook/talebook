@@ -15,7 +15,7 @@ from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import func as sql_func
 from tornado import web
 
-from webserver import loader, utils
+from webserver import demo_mode, loader, utils
 from webserver.i18n import _, set_language
 
 # import social_tornado.handlers
@@ -168,9 +168,22 @@ class BaseHandler(web.RequestHandler):
             return False
         if user.get_secure_password(password) != str(user.password):
             return False
+        if not demo_mode.can_login(CONF, user):
+            return False
+        if demo_mode.is_demo_mode(CONF) and not user.can_login():
+            return False
         self.mark_invited()
         self.login_user(user)
         return True
+
+    def send_error_of_demo_read_only(self):
+        self.write({"err": "demo.read_only", "msg": _("演示模式为只读，无法执行此操作")})
+        self.set_status(200)
+        raise web.Finish()
+
+    def should_allow_demo_request(self):
+        if not demo_mode.request_is_allowed(CONF, self.request.method, self.request.path, self.current_user):
+            self.send_error_of_demo_read_only()
 
     def send_error_of_not_invited(self):
         self.write({"err": "not_invited"})
@@ -207,6 +220,7 @@ class BaseHandler(web.RequestHandler):
         self.set_i18n()
         self.process_auth_header()
         self.should_be_installed()
+        self.should_allow_demo_request()
         self.should_be_invited()
 
     def set_i18n(self):
@@ -249,6 +263,9 @@ class BaseHandler(web.RequestHandler):
             user_id = int(user_id)
         user = self.session.get(Reader, user_id) if user_id else None
 
+        if not demo_mode.can_login(CONF, user):
+            return None
+
         admin_id = self.get_secure_cookie("admin_id")
         if admin_id:
             self.admin_user = self.session.get(Reader, int(admin_id))
@@ -267,17 +284,23 @@ class BaseHandler(web.RequestHandler):
         logging.info("LOGIN: %s - %d - %s" % (self.request.remote_ip, user.id, user.username))
         self.set_secure_cookie("user_id", str(user.id))
         self.set_secure_cookie("lt", str(int(time.time())))
+        if demo_mode.is_demo_restricted(CONF, user):
+            return
         user.access_time = datetime.datetime.now()
         user.extra["login_ip"] = self.request.remote_ip
         user.save()
 
     def add_msg(self, status, msg):
+        if demo_mode.is_demo_restricted(CONF, self.current_user):
+            return
         m = Message(self.user_id(), status, msg)
         if m.reader_id:
             self.session.add(m)
             self.session.commit()
 
     def pop_messages(self):
+        if demo_mode.is_demo_restricted(CONF, self.current_user):
+            return []
         if not self.current_user:
             return []
         messages = self.current_user.messages
@@ -287,6 +310,8 @@ class BaseHandler(web.RequestHandler):
         return messages
 
     def user_history(self, action, book):
+        if demo_mode.is_demo_restricted(CONF, self.current_user):
+            return
         if not self.user_id():
             return
         extra = self.current_user.extra
@@ -571,6 +596,8 @@ class BaseHandler(web.RequestHandler):
         return formatted_books
 
     def count_increase(self, book_id, **kwargs):
+        if demo_mode.is_demo_restricted(CONF, self.current_user):
+            return
         try:
             item = self.session.query(Item).filter(Item.book_id == book_id).one()
         except:

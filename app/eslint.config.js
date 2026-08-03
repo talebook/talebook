@@ -1,4 +1,5 @@
 import pluginVue from 'eslint-plugin-vue';
+import tsParser from '@typescript-eslint/parser';
 import globals from 'globals';
 
 export default [
@@ -51,6 +52,13 @@ export default [
   // Vue 文件规则（4格缩进）
   {
     files: ['**/*.vue'],
+    languageOptions: {
+      parserOptions: {
+        parser: tsParser,
+        ecmaVersion: 2021,
+        sourceType: 'module'
+      }
+    },
     rules: {
       'indent': ['error', 4, { 'SwitchCase': 1 }]
     }

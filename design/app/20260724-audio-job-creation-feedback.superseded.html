@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>制作任务入口无响应修复方案</title>
+  <style>
+    body { max-width: 960px; margin: 32px auto; padding: 0 20px; color: #172033; font: 16px/1.65 system-ui, sans-serif; }
+    header, section { margin-bottom: 28px; } h1 { margin-bottom: 6px; } .meta { color: #586174; }
+    .status { display: inline-block; padding: 2px 10px; border-radius: 12px; color: #146c43; background: #dff6e8; }
+    table { width: 100%; border-collapse: collapse; } th, td { padding: 9px; border: 1px solid #d8dee9; text-align: left; vertical-align: top; }
+    th { background: #f4f7fb; } code { background: #f1f4f8; padding: 1px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>制作任务入口无响应修复方案</h1>
+    <p class="meta">创建日期：2026-07-24 ｜ 所属模块：app ｜ 状态：SUPERSEDED ｜ 替代方案：<code>design/app/20260724-audiobook-generate-action.wip.html</code> 。原因：后续定位确认详情接口缺少文件格式字段，导致生成按钮被隐藏；该方案仅覆盖入口反馈，已不再完整。</p>
+  </header>
+  <section>
+    <h2>结论</h2>
+    <p>问题不在数据库表或音色接口。原“制作任务”入口只跳转到任务队列页；该页为角色配音工作台预加载音色目录，因此 <code>/api/audio-voices</code> 的 200 是预期行为，且不会创建任务。真正的创建动作只能在具体书籍的有声版页面确认后执行 <code>POST /api/book/{id}/audio-jobs</code>。此外，提交函数未捕获请求抛出的异常，服务异常时会静默结束。</p>
+  </section>
+  <section>
+    <h2>方案</h2>
+    <table>
+      <tr><th>入口语义</th><td>把跳转到队列的按钮文案改为“查看制作任务”，避免误解为立即创建任务。</td></tr>
+      <tr><th>空列表引导</th><td>队列为空时说明从书籍有声版页面创建，并提供“前往书库选择书籍”操作。</td></tr>
+      <tr><th>异常反馈</th><td>单书创建任务请求增加异常捕获：无论是 HTTP 非 200、网络错误还是非 JSON 响应，均显示错误提示并结束加载状态。</td></tr>
+      <tr><th>回归保护</th><td>端到端用例断言空任务页与书库引导链接，已有生成流程继续覆盖成功创建与跳转。</td></tr>
+    </table>
+  </section>
+  <section>
+    <h2>测试结果</h2>
+    <table>
+      <tr><th>项目</th><th>实际结果</th></tr>
+      <tr><td>语言文件 JSON 解析</td><td>通过：中英文语言文件均可解析。</td></tr>
+      <tr><td><code>cd app &amp;&amp; npm run build</code></td><td>通过：Nuxt 生产构建成功。</td></tr>
+      <tr><td><code>cd app &amp;&amp; npm run lint</code></td><td>通过（0 error）。仓库既有 196 条 warning 未在本次修改中处理。</td></tr>
+      <tr><td><code>cd app &amp;&amp; npx playwright test test/e2e/audiobooks.spec.ts --list</code></td><td>通过：3 个用例被发现，包含新空列表引导断言。未完整执行：当前本地页面要求访问密码，未配置可登录的 mock 绑定 Nuxt 服务；生产构建与浏览器路由检查作为替代验证。</td></tr>
+      <tr><td>浏览器实际验证</td><td>本地浏览器直接打开 <code>/audio-jobs</code> 无控制台错误，按未登录规则跳转至访问密码页。当前会话没有密码，故无法验证登录后的任务列表视觉状态；已由构建与 E2E 用例覆盖页面装配。</td></tr>
+      <tr><td>本地路由冒烟</td><td><code>http://127.0.0.1:9000/audio-jobs</code> 返回 200。</td></tr>
+    </table>
+  </section>
+</body>
+</html>

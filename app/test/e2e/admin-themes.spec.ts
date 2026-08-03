@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+
 test.describe('Admin Themes', () => {
     test.beforeEach(async ({ request }) => {
-        await request.post('http://127.0.0.1:8080/_test/reset', {
+        await request.post(`${mockApi}/_test/reset`, {
             data: { installed: true }
         });
     });
@@ -10,8 +12,7 @@ test.describe('Admin Themes', () => {
     test('activating a theme updates the card without refetching the list', async ({ page }) => {
         await page.goto('/admin/themes');
 
-        // 内置主题卡片（mock 无 display_name，卡片标题回退显示 name）
-        const card = page.locator('.theme-card', { hasText: 'graphite' });
+        const card = page.locator('.theme-card[data-theme-name="graphite"]');
         await expect(card).toBeVisible();
         await expect(card.getByRole('button', { name: '激活', exact: true })).toBeVisible();
 
@@ -30,7 +31,7 @@ test.describe('Admin Themes', () => {
         await card.getByRole('button', { name: '激活', exact: true }).click();
 
         // 卡片本地翻转为已激活状态
-        await expect(card.getByText('已激活')).toBeVisible();
+        await expect(card.getByRole('button', { name: '已激活', exact: true })).toBeDisabled();
 
         // 关键断言：激活后没有再次拉取主题列表，避免撞上重启窗口
         await page.waitForTimeout(500);

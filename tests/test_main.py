@@ -71,9 +71,12 @@ def setup_server():
     main.CONF["user_database"] = "sqlite:///%s/library/users.db" % testdir
     main.CONF["ALLOW_REGISTER"] = True
     main.CONF["BOOKSOURCE_RESUME_PENDING_CHECK_ON_START"] = False  # 测试不触发启动时的后台书源体检
+    main.CONF["AUDIOBOOK_PATH"] = testdir + "/library/audiobooks"
+    main.CONF["AUDIOBOOK_RUNNER_ENABLED"] = False
     # main.CONF["db_engine_args"] = {"echo": True}
     if _app is None:
         _app = main.make_app()
+        models.Base.metadata.create_all(_app.settings["SessionMaker"].kw["bind"])
 
 
 def setup_mock_user():
@@ -247,6 +250,17 @@ class TestAppWithoutLogin(TestApp):
 
         d = self.json("/api/search?name=A")
         self.assert_book_list(d, 6)
+
+    def test_search_prioritizes_title_matches(self):
+        # 书籍 3《安徒生童话》标题命中关键字；书籍 5、13 仅标签命中关键字（标题不含关键字）。
+        d = self.json("/api/search?name=" + Q("童话"))
+        self.assertEqual(d["err"], "ok")
+        ids = [book["id"] for book in d["books"]]
+        self.assertIn(3, ids)
+        self.assertIn(5, ids)
+        self.assertIn(13, ids)
+        self.assertLess(ids.index(3), ids.index(5))
+        self.assertLess(ids.index(3), ids.index(13))
 
     def test_hot(self):
         d = self.json("/api/hot")
@@ -726,7 +740,8 @@ class TestRefer(TestWithUserLogin):
     @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_isbn")
     @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_title")
     @mock.patch("webserver.plugins.meta.tomato.TomatoNovelApi.get_book")
-    def test_refer(self, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
+    @mock.patch("webserver.plugins.meta.xhsd.XhsdBookApi.get_book")
+    def test_refer(self, m_xhsd, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
         from tests.test_baike import BAIKE_PAGE
         from tests.test_douban import DOUBAN_BOOK, DOUBAN_SEARCH
         from tests.test_youshu import YOUSHU_PAGE
@@ -743,6 +758,7 @@ class TestRefer(TestWithUserLogin):
         m_calibre_isbn.return_value = []
         m_calibre_title.return_value = []
         m_tomato.return_value = None
+        m_xhsd.return_value = None
 
         # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
         # main.CONF["douban_baseurl"] = self.douban_url
@@ -838,6 +854,26 @@ class TestUserSignUp(TestWithUserLogin):
 
     def auth(self, s):
         return "Basic " + base64.encodebytes(s.encode("ascii")).decode("ascii")
+
+    def test_signup_username_length_boundary(self):
+        self.mail.reset_mock()
+
+        # 1个字符：低于最小长度2，应被拒绝
+        body = "email=short@gmail.com&nickname=short&username=a&password=unittest"
+        d = self.json("/api/user/sign_up", method="POST", raise_error=True, body=body)
+        self.assertEqual(d["err"], "params.username.invalid")
+
+        # 2个字符：等于最小长度2，应被接受
+        session = get_db()
+        session.query(models.Reader).filter(models.Reader.username == "ab").delete()
+        session.commit()
+        try:
+            body = "email=short2@gmail.com&nickname=short2&username=ab&password=unittest"
+            d = self.json("/api/user/sign_up", method="POST", raise_error=True, body=body)
+            self.assertEqual(d["err"], "ok")
+        finally:
+            session.query(models.Reader).filter(models.Reader.username == "ab").delete()
+            session.commit()
 
 
 class TestWithAdminUser(TestApp):
@@ -1161,10 +1197,11 @@ class TestBookDetailScope(TestApp):
 
 def setUpModule():
     os.environ["ASYNC_TEST_TIMEOUT"] = "60"
-    setup_server()
-    setup_mock_user()
-    setup_mock_sendmail()
-    setup_mock_service()
+    if _app is None:
+        setup_server()
+        setup_mock_user()
+        setup_mock_sendmail()
+        setup_mock_service()
 
 
 class TestGetUploadSize(unittest.TestCase):

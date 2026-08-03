@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+
 test.describe('Network Library', () => {
     test.beforeEach(async ({ request }) => {
-        await request.post('http://127.0.0.1:8080/_test/reset', {
+        await request.post(`${mockApi}/_test/reset`, {
             data: { installed: true },
         });
     });

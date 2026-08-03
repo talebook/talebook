@@ -15,7 +15,7 @@ import urllib
 import tornado.escape
 from tornado import web
 
-from webserver import loader, utils
+from webserver import demo_mode, loader, utils
 from webserver.constants import (
     CALIBRE_ERROR_FLAG,
     META_SELECTED_SOURCES,
@@ -33,7 +33,7 @@ from webserver.constants import (
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
-from webserver.models import Item, ReadingState
+from webserver.models import AudiobookEdition, Item, ReadingState
 from webserver.plugins.meta import baike, biquge, calibre, douban, douban_v2, neodb, qimao, tomato, xhsd, youshu
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
@@ -932,18 +932,22 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
 
     def prepare(self):
         BaseHandler.prepare(self)
-        if not CONF["ALLOW_GUEST_DOWNLOAD"] and not self.current_user:
-            if self.is_opds:
-                return self.send_error_of_not_invited()
-            else:
-                return self.redirect("/login")
+        # 演示模式下，未登录访客与演示账号的下载权限统一遵循“访客权限”配置，
+        # 忽略演示账号自身的权限位（该账号默认拥有完整权限，用于伪装管理员体验）。
+        guest_like = not self.current_user or demo_mode.is_demo_restricted(CONF, self.current_user)
+        if guest_like:
+            if not CONF["ALLOW_GUEST_DOWNLOAD"]:
+                if self.is_opds:
+                    return self.send_error_of_not_invited()
+                else:
+                    return self.redirect("/login")
+            return
 
-        if self.current_user:
-            if self.current_user.can_save():
-                if not self.current_user.is_active():
-                    raise web.HTTPError(403, reason=_("无权操作，请先登录注册邮箱激活账号。"))
-            else:
-                raise web.HTTPError(403, reason=_("无权操作"))
+        if self.current_user.can_save():
+            if not self.current_user.is_active():
+                raise web.HTTPError(403, reason=_("无权操作，请先登录注册邮箱激活账号。"))
+        else:
+            raise web.HTTPError(403, reason=_("无权操作"))
 
     def parse_url_path(self, url_path: str) -> str:
         filename = url_path.split("/")[-1]
@@ -1060,7 +1064,21 @@ class SearchBook(ListHandler):
 
         title = _("搜索：%(name)s") % {"name": name}
         ids = self.cache.search(name)
+        ids = self.sort_ids_by_title_relevance(ids, name)
         return self.render_book_list([], ids=ids, title=title)
+
+    def sort_ids_by_title_relevance(self, ids, keyword):
+        """calibre 的 cache.search() 返回的是未排序的匹配集合，书名命中和简介、标签等其他字段
+        命中的结果混杂在一起。这里把书名命中的结果排到前面，同一优先级内按 id 从大到小排列。
+        """
+        keyword = (keyword or "").strip().lower()
+
+        def sort_key(book_id):
+            book_title = (self.cache.field_for("title", book_id) or "").lower()
+            title_matched = bool(keyword) and keyword in book_title
+            return (0 if title_matched else 1, -book_id)
+
+        return sorted(ids, key=sort_key)
 
 
 class HotBook(ListHandler):
@@ -1487,7 +1505,7 @@ class BookUploadComplete(BookUploadBase):
 
 
 class BookRead(BaseHandler):
-    def render_epub(self, book, is_ready):
+    def render_epub(self, book, is_ready, audiobook_edition=None):
         return self.html_page(
             "book/" + CONF["EPUB_VIEWER"],
             {
@@ -1495,34 +1513,43 @@ class BookRead(BaseHandler):
                 "epub_dir": "/get/extract/%s" % book["id"],
                 "is_ready": is_ready,
                 "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
+                "audiobook_edition_id": audiobook_edition.id if audiobook_edition else None,
             },
         )
 
     def get(self, id):
-        if not CONF["ALLOW_GUEST_READ"] and not self.current_user:
-            return self.redirect("/login")
-
-        if self.current_user:
-            if self.current_user.can_read():
-                if not self.current_user.is_active():
-                    raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
-            else:
-                raise web.HTTPError(403, reason=_("无权在线阅读"))
+        # 演示模式下，未登录访客与演示账号的在线阅读权限统一遵循“访客权限”配置，
+        # 忽略演示账号自身的权限位（该账号默认拥有完整权限，用于伪装管理员体验）。
+        guest_like = not self.current_user or demo_mode.is_demo_restricted(CONF, self.current_user)
+        if guest_like:
+            if not CONF["ALLOW_GUEST_READ"]:
+                return self.redirect("/login")
+        elif self.current_user.can_read():
+            if not self.current_user.is_active():
+                raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
+        else:
+            raise web.HTTPError(403, reason=_("无权在线阅读"))
 
         book = self.get_book_or_404(id)
         book_id = book["id"]
+        audiobook_edition = (
+            self.session.query(AudiobookEdition)
+            .filter(AudiobookEdition.book_id == book_id, AudiobookEdition.status == "published")
+            .order_by(AudiobookEdition.published_at.desc(), AudiobookEdition.id.desc())
+            .first()
+        )
         self.user_history("read_history", book)
         self.count_increase(book_id, count_download=1)
 
         if book.get("fmt_epub"):
-            return self.render_epub(book, is_ready=True)
+            return self.render_epub(book, is_ready=True, audiobook_edition=audiobook_edition)
 
         if "fmt_pdf" in book:
             # PDF类书籍需要检查下载权限。
-            if not CONF["ALLOW_GUEST_DOWNLOAD"] and not self.current_user:
-                return self.redirect("/login")
-
-            if self.current_user and not self.current_user.can_save():
+            if guest_like:
+                if not CONF["ALLOW_GUEST_DOWNLOAD"]:
+                    return self.redirect("/login")
+            elif not self.current_user.can_save():
                 raise web.HTTPError(403, reason=_("无权在线阅读PDF类书籍"))
 
             pdf_url = urllib.parse.quote_plus(self.api_url + "/api/book/%(id)d.PDF" % book)
@@ -1541,7 +1568,7 @@ class BookRead(BaseHandler):
                 continue
 
             ConvertService().convert_and_save(self.user_id(), book, fpath, "epub")
-            return self.render_epub(book, is_ready=False)
+            return self.render_epub(book, is_ready=False, audiobook_edition=audiobook_edition)
         raise web.HTTPError(404, reason=_("抱歉，在线阅读器暂不支持该格式的书籍"))
 
 

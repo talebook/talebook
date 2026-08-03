@@ -248,7 +248,7 @@ const buildUserDatabaseUrl = () => {
 };
 
 const rules = {
-    user: v => ( v && 20 >= v.length && v.length >= 5) || $t('install.userRule'),
+    user: v => ( v && 20 >= v.length && v.length >= 2) || $t('install.userRule'),
     pass: v => ( v && 20 >= v.length && v.length >= 8) || $t('install.passRule'),
     code: v => (invite.value && v && v.trim()) || $t('install.codeRule'),
     email: function (email) {

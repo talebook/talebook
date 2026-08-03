@@ -85,7 +85,7 @@
                                     dark
                                     large
                                     rounded
-                                    color="red"
+                                    color="primary"
                                     type="submit"
                                     :loading="loading"
                                 >
@@ -185,7 +185,7 @@ const RE_EMAIL = /^[^@]+@[^@]+\.[^@]+$/;
 
 const rules = {
     user: v => {
-        if (!v || v.length < 5 || v.length > 20) return t('validation.usernameLength');
+        if (!v || v.length < 2 || v.length > 20) return t('validation.usernameLength');
         if (!RE_USERNAME.test(v)) return t('validation.usernameFormat');
         return true;
     },
@@ -336,4 +336,3 @@ useHead(() => ({
     min-height: calc(100vh - 120px);
 }
 </style>
-

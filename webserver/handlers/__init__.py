@@ -6,7 +6,7 @@ import logging
 def routes():
     from webserver.webdav import handler as webdav
 
-    from . import admin, book, booksource_admin, captcha, files, meta, network_library, opds, scan, theme, user
+    from . import admin, audiobook, book, booksource_admin, captcha, files, meta, network_library, opds, scan, theme, user
 
     routes = []
     routes += admin.routes()
@@ -17,6 +17,7 @@ def routes():
     routes += meta.routes()
     routes += booksource_admin.routes()
     routes += network_library.routes()
+    routes += audiobook.routes()
     captcha_routes = captcha.routes()
     routes += captcha_routes
     logging.info("CAPTCHA routes registered: %s", [r[0] for r in captcha_routes])

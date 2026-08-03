@@ -263,7 +263,8 @@ function toggleTheme() {
 }
 
 definePageMeta({
-    layout: 'blank'
+    layout: 'blank',
+    themeRuntime: false,
 });
 
 const route = useRoute();

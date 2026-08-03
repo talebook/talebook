@@ -63,12 +63,33 @@ class TestAutoFillKeepCover(TestWithUserLogin):
         self.assertEqual(mi.cover_data, ("jpg", b"wrong-cover"))
 
     @mock.patch.object(AutoFillService, "plugin_search_best_book_info")
-    def test_skips_update_when_no_cover_found_and_option_disabled(self, mock_search):
+    def test_updates_other_metadata_when_no_cover_found_and_option_disabled(self, mock_search):
+        # 无法获取封面时，不应放弃其余元数据（作者、简介等）的更新
         mi = self._make_mi("原书名", has_cover=False, cover_data=None)
         refer_mi = self._make_mi("错误的书名", has_cover=False, cover_data=None)
+        refer_mi.comments = "新简介"
+        refer_mi.authors = ["新作者"]
         mock_search.return_value = refer_mi
 
         with mock.patch.dict("webserver.services.autofill.CONF", {"auto_fill_keep_cover": False}):
             ok = self.service.do_fill_metadata(1, mi)
 
-        self.assertFalse(ok)
+        self.assertTrue(ok)
+        self.assertEqual(mi.comments, "新简介")
+        self.assertEqual(mi.authors, ["新作者"])
+        self.assertFalse(mi.has_cover and mi.cover_data and mi.cover_data[1])
+
+    @mock.patch.object(AutoFillService, "plugin_search_best_book_info")
+    def test_keeps_existing_cover_when_no_cover_found(self, mock_search):
+        # 书籍原本已有封面，抓取结果没有封面时，不应清空原有封面
+        mi = self._make_mi("原书名", has_cover=True, cover_data=("jpg", b"old-cover"))
+        refer_mi = self._make_mi("错误的书名", has_cover=False, cover_data=None)
+        refer_mi.comments = "新简介"
+        mock_search.return_value = refer_mi
+
+        with mock.patch.dict("webserver.services.autofill.CONF", {"auto_fill_keep_cover": False}):
+            ok = self.service.do_fill_metadata(1, mi)
+
+        self.assertTrue(ok)
+        self.assertEqual(mi.comments, "新简介")
+        self.assertEqual(mi.cover_data, ("jpg", b"old-cover"))

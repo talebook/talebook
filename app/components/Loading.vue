@@ -7,7 +7,7 @@
         <v-progress-circular
             indeterminate
             size="128"
-            color="deep-orange lighten-2"
+            color="primary"
         />
     </div>
 </template>
@@ -25,7 +25,7 @@ const store = useMainStore();
     right: 0;
     bottom: 0;
     z-index: 1;
-    background: white;
+    background: rgb(var(--v-theme-background));
     text-align: center;
     padding-top: 200px;
     font-size: 30px;

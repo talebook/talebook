@@ -110,11 +110,13 @@ class AutoFillService(AsyncService):
         keep_cover = CONF.get("auto_fill_keep_cover", False) and mi.has_cover
         refer_has_cover = bool(refer_mi.cover_data and refer_mi.cover_data[1])
 
-        if not keep_cover and not refer_has_cover:
-            logging.info(_("忽略更新书籍 id=%d : 无法获取封面"), book_id)
-            return False
+        if not refer_has_cover and not keep_cover:
+            # 未获取到封面时不应放弃其余元数据的更新，仅跳过封面字段
+            logging.warning(_("更新书籍 id=%d 的信息时无法获取封面，其余元数据将照常更新"), book_id)
 
-        if keep_cover:
+        if keep_cover or not refer_has_cover:
+            # smart_update(replace_metadata=True) 会无条件覆盖 cover_data，因此这里必须显式回填原封面，
+            # 否则封面会被清空为空值
             refer_mi.cover_data = mi.cover_data
 
         # 保留书名不修改（万一出 BUG，还能抢救一下）

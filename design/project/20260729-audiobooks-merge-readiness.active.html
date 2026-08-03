@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PR #882 有声书合并就绪修复方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f4f7fa;
+      --surface: #ffffff;
+      --ink: #15243a;
+      --muted: #617086;
+      --line: #cbd5e1;
+      --navy: #173f68;
+      --blue: #246b9e;
+      --amber: #c77d16;
+      --red: #b33a3a;
+      --green: #257052;
+      --violet: #6b5b95;
+      --shadow: 0 18px 50px rgba(21, 36, 58, .09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(23, 63, 104, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 63, 104, .045) 1px, transparent 1px),
+        var(--paper);
+      background-size: 28px 28px;
+      font: 16px/1.7 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+    }
+    a { color: var(--blue); }
+    code {
+      padding: .08em .36em;
+      border: 1px solid #dbe3ea;
+      border-radius: 5px;
+      background: #eef3f7;
+      font: .88em/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .masthead {
+      position: relative;
+      overflow: hidden;
+      padding: 70px 24px 58px;
+      color: white;
+      background: var(--navy);
+    }
+    .masthead::after {
+      position: absolute;
+      right: -100px;
+      bottom: -210px;
+      width: 520px;
+      height: 520px;
+      border: 70px solid rgba(255, 255, 255, .055);
+      border-radius: 50%;
+      content: "";
+    }
+    .masthead-inner, main { width: min(1140px, calc(100% - 40px)); margin: 0 auto; }
+    .eyebrow {
+      margin: 0 0 14px;
+      color: #b9d9ef;
+      font: 700 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 880px;
+      margin: 0;
+      font: 760 clamp(2.3rem, 5.8vw, 5.3rem)/1.03 ui-rounded, "Arial Rounded MT Bold", "PingFang SC", sans-serif;
+      letter-spacing: -.045em;
+    }
+    .lede { max-width: 760px; margin: 24px 0 0; color: #d8e8f4; font-size: 1.1rem; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      margin-top: 38px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .16);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .16);
+    }
+    .meta > div { padding: 14px 16px; background: rgba(12, 42, 72, .88); }
+    .meta dt { color: #9fc8e4; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+    .meta dd { margin: 5px 0 0; font-weight: 700; }
+    .status { color: #1a2d21; background: #a8d8bd; padding: 3px 9px; border-radius: 999px; font-size: .78rem; }
+    main { padding: 48px 0 90px; }
+    section {
+      margin: 0 0 28px;
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: var(--shadow);
+    }
+    h2 { margin: 0 0 20px; color: var(--navy); font: 760 1.65rem/1.2 ui-rounded, "Arial Rounded MT Bold", sans-serif; }
+    h3 { margin: 24px 0 9px; color: #294662; font-size: 1rem; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 10px 0; padding-left: 1.35rem; }
+    li + li { margin-top: 7px; }
+    .callout {
+      margin-top: 20px;
+      padding: 16px 18px;
+      border-left: 4px solid var(--amber);
+      border-radius: 0 10px 10px 0;
+      background: #fff7e8;
+    }
+    .callout.danger { border-color: var(--red); background: #fff0f0; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fbfdff; }
+    .card h3 { margin-top: 0; }
+    .gate-rail { display: grid; gap: 0; margin-top: 22px; }
+    .gate {
+      display: grid;
+      grid-template-columns: 82px 28px minmax(0, 1fr);
+      min-height: 106px;
+    }
+    .gate-id {
+      padding-top: 5px;
+      color: var(--muted);
+      font: 700 .78rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .rail { position: relative; }
+    .rail::before {
+      position: absolute;
+      top: 16px;
+      bottom: -16px;
+      left: 12px;
+      width: 2px;
+      background: var(--line);
+      content: "";
+    }
+    .gate:last-child .rail::before { display: none; }
+    .dot {
+      position: absolute;
+      top: 5px;
+      left: 4px;
+      width: 18px;
+      height: 18px;
+      border: 4px solid white;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 1px var(--green);
+    }
+    .gate-copy { padding: 0 0 24px 12px; }
+    .gate-copy strong { display: block; color: var(--navy); font-size: 1.05rem; }
+    .gate-copy p { margin: 5px 0 0; color: var(--muted); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    th, td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--navy); background: #edf4f9; font-size: .8rem; letter-spacing: .04em; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .74rem; font-weight: 700; white-space: nowrap; }
+    .tag.block { color: #792727; background: #f8d8d8; }
+    .tag.beta { color: #76500d; background: #f8e5bb; }
+    .tag.done { color: #1c5d43; background: #d7eee2; }
+    .diagram {
+      margin-top: 18px;
+      padding: 20px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #f8fbfd;
+    }
+    .diagram svg { display: block; min-width: 760px; }
+    .small { color: var(--muted); font-size: .88rem; }
+    @media (max-width: 820px) {
+      .meta { grid-template-columns: 1fr 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      section { padding: 22px; }
+      .gate { grid-template-columns: 58px 26px minmax(0, 1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-inner">
+      <p class="eyebrow">Merge control record · PR #882</p>
+      <h1>有声书合并就绪修复方案</h1>
+      <p class="lede">“能演示的 Beta”已经收敛为生产路径真实可用、故障可恢复、发布证据可信的版本；代码内合并门禁和 EdgeTTS 功能验收均已完成。</p>
+      <dl class="meta">
+        <div><dt>状态</dt><dd><span class="status">ACTIVE</span></dd></div>
+        <div><dt>创建日期</dt><dd>2026-07-29</dd></div>
+        <div><dt>所属模块</dt><dd>project</dd></div>
+        <div><dt>需求来源</dt><dd>继续处理 PR #882</dd></div>
+        <div><dt>影响范围</dt><dd>app / webserver / nginx / tests / design</dd></div>
+      </dl>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. 原始诉求与完成定义</h2>
+      <p>将最新 <code>master</code> 合入 <code>feat/20260718-audiobooks</code>，解决合并审计发现的生产链路、任务可靠性、核心功能、测试与文档问题，最终启动本地 mock API 和 Nuxt dev server，提供可访问地址供体验。</p>
+      <div class="callout"><strong>完成结论。</strong>Candle Reader v1.1.0 音文同步 bundle 已随最新 master 进入 Talebook；Podcast 代理、Token 脱敏、任务心跳/取消/幂等、生成容量门禁、版本操作和 UI 状态均已有自动化证据，EdgeTTS 已真实生成可播放 MP3。</div>
+      <h3>本轮采用的发布边界</h3>
+      <ul>
+        <li>按用户确认，本轮忽略 Qwen3TTS 云账户失败，以 EdgeTTS 完成功能验收；Qwen 预览资产不作为 PR #882 的合并门禁。</li>
+        <li>Apple Podcasts iPhone/Mac 真机订阅属于外部 Beta 验收项，本轮不以模拟真机替代，也不伪报通过。</li>
+        <li>默认 EdgeTTS、Podcast 标准接口、Candle Reader 同步、任务恢复和安全链路是代码内合并门禁，必须实际完成。</li>
+        <li>后续若要提升 Qwen 或 Apple 真机状态，需另行提供可用云账户或真机协作，不回退本方案的 ACTIVE 状态。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. 当前门禁轨道</h2>
+      <div class="gate-rail" aria-label="合并门禁顺序">
+        <div class="gate"><div class="gate-id">GATE 01</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>基线与冲突 · 完成</strong><p>最新 master 已通过合并提交 <code>1401818</code> 进入功能分支，EPUB 优先阅读与 audiobook 注入均已保留。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 02</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>生产分发 · 完成</strong><p>Candle Reader v1.1.0 的不可变 dist 已由 master 合入；Podcast 三套 Nginx 配置均使用独立 location 并关闭含 Token 的普通 access log。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 03</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>可靠调度 · 完成</strong><p>独立租约心跳、JSONL seq 幂等、取消 TERM/KILL、恢复、磁盘门禁和清理策略均有后端测试覆盖。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 04</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>产品闭环 · 完成</strong><p>生成参数、候选发布/回滚、所有者权限、Voicebook 健康状态和磁盘容量限制已形成一致的 API 与 UI。</p></div></div>
+        <div class="gate"><div class="gate-id">GATE 05</div><div class="rail"><span class="dot"></span></div><div class="gate-copy"><strong>证据与交付 · 完成</strong><p>全量 Docker pytest、Nuxt lint/build、Chromium E2E、EdgeTTS 实际生成和多视口实渲已完成；Chrome DevTools MCP 的共享实例冲突单独记录为环境限制。</p></div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. 实现方案</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>工作流</th><th>设计决策</th><th>新增验证</th></tr></thead>
+          <tbody>
+            <tr><td>合并 master</td><td>合并而非改写已发布历史；阅读入口抽出统一渲染函数，先 EPUB、再 PDF/TXT/转换格式，同时注入当前发布 Edition。</td><td>EPUB、TXT、MOBI/AZW3 和有/无已发布音频组合测试；Shelf E2E 使用最新 mock URL 约定。</td></tr>
+            <tr><td>Candle Reader</td><td>以已合并的 Candle Reader main 构建新 tag/release，通过仓库既有 release + dispatch 流程同步不可变 dist；Talebook 不手抄 bundle。</td><td>校验 version 文件、bundle 包含 audiobook 入口；阅读器 E2E 覆盖高亮、换章和“从这里听”。</td></tr>
+            <tr><td>Podcast/Nginx</td><td>增加专用 <code>/podcast/v1/</code> 代理 location，关闭普通 access log，保留应用层脱敏审计；补稳定站点 UUID、Feed GUID、Channel image、gzip/缓存语义。</td><td>Nginx 配置静态测试与容器请求；RSS/XML、HEAD/304、Range/416、权限变化和普通日志无 Token。</td></tr>
+            <tr><td>调度器</td><td>运行进程由 watchdog 周期续租并观察 cancel deadline；优雅取消超时 TERM，再超时 KILL。持久化 last seq，重复/倒序事件直接忽略。</td><td>静默子进程不被重领、重复事件不重复计数、TERM/KILL 顺序、重启恢复、1–3 workers CAS。</td></tr>
+            <tr><td>容量与清理</td><td>领取任务前检查可用空间；周期清理成功缓存和失败临时文件；配置默认沿用现有方案。Feed/Range 采用轻量令牌桶，管理员可冻结订阅。</td><td>低磁盘拒绝、过期文件清理、受保护/发布资源保留、限速和冻结返回明确状态。</td></tr>
+            <tr><td>生成与版本</td><td>Voicebook CLI 仅直接接收 engine、chapters；Talebook 在 inspect 后把 speed 与主角音写入角色表再生成。当前上游没有质量参数，因此只接受真实存在的 standard，界面不展示伪质量档位。Edition action 明确 publish、rollback、delete，partial 默认不可发布。</td><td>CLI 与角色表落盘测试；非 standard 质量被拒绝；候选发布/回滚保持 GUID、旧版本变 historical；错误状态 UI。</td></tr>
+            <tr><td>权限与健康</td><td>公开读取端点保留原书可见性校验，并在规范中记录公共 API 例外；写端点使用认证。详情响应返回可生成能力与 Voicebook health，前端不自行猜管理员/所有者规则。</td><td>游客/私有书/所有者/管理员矩阵，CLI 不可用和功能关闭状态。</td></tr>
+            <tr><td>前端结构</td><td>保持 Composition API；把播放状态改为聚焦的 Pinia 模块并同步架构说明，复杂请求与版本动作集中到 store/composable，避免页面继续膨胀。</td><td>组件测试、页面 E2E、明暗主题、桌面/移动、空状态、失败态和候选版本操作。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. 关键时序</h2>
+      <div class="diagram">
+        <svg viewBox="0 0 940 390" width="100%" role="img" xmlns="http://www.w3.org/2000/svg">
+          <title>有声书任务租约、事件与取消时序</title>
+          <desc>调度器领取任务，watchdog 独立续租，Voicebook 输出带序号事件，并在取消超时后依次 TERM 和 KILL。</desc>
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="context-stroke" stroke-width="1.5"/></marker>
+          </defs>
+          <g font-family="ui-sans-serif, sans-serif" font-size="13" fill="#15243a">
+            <text x="90" y="28" text-anchor="middle" font-weight="700">Scheduler</text><text x="345" y="28" text-anchor="middle" font-weight="700">Watchdog</text><text x="600" y="28" text-anchor="middle" font-weight="700">Voicebook</text><text x="850" y="28" text-anchor="middle" font-weight="700">Database</text>
+            <g stroke="#9aabba" stroke-dasharray="4 5"><path d="M90 42V360"/><path d="M345 42V360"/><path d="M600 42V360"/><path d="M850 42V360"/></g>
+            <g stroke="#246b9e" marker-end="url(#arrow)"><path d="M90 75H840"/><path d="M840 118H355"/><path d="M600 164H840"/><path d="M345 207H840"/></g>
+            <text x="460" y="67">CAS 领取 + 30s 租约</text><text x="580" y="110">启动独立续租/取消观察</text><text x="720" y="156">seq=N 事件</text><text x="570" y="199">固定周期续租，不依赖事件</text>
+            <g stroke="#c77d16" marker-end="url(#arrow)"><path d="M840 250H355"/><path d="M345 286H590"/></g>
+            <text x="580" y="242">cancel_requested + deadline</text><text x="470" y="278">取消文件 → 超时 TERM</text>
+            <g stroke="#b33a3a" marker-end="url(#arrow)"><path d="M345 326H590"/></g><text x="470" y="318">仍未退出 → KILL</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section>
+      <h2>5. 兼容、发布与回滚</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>兼容策略</h3>
+          <ul>
+            <li>数据库只新增字段/索引，启动迁移可重复执行；旧 Edition 和 Job 有安全默认值。</li>
+            <li>公开音频继续跟随原书可见性；现有客户端路径保持不变。</li>
+            <li>Candle Reader v1.1.0 bundle 与版本文件随同一次 master 合并进入，避免版本号和 cache-busting 漂移。</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>回滚策略</h3>
+          <ul>
+            <li>总开关关闭新任务但保留已发布播放；停止 worker 后释放/过期租约。</li>
+            <li>Candle Reader 可回退上一 release，Talebook 静态资源与版本号一起回退。</li>
+            <li>Podcast GUID 与 enclosure 版本稳定；回滚 Edition 不删除历史媒体。</li>
+          </ul>
+        </article>
+      </div>
+      <div class="callout"><strong>已知边界。</strong>Qwen3TTS 按用户确认从本轮验收中排除；Apple Podcasts 真机订阅未执行。Chrome DevTools MCP 因另一活跃会话占用共享 Chrome profile 无法连接，未终止他人进程；改用真实 Chromium 的 Playwright 自动化与明暗主题、桌面/移动手工实渲作为替代证据。</div>
+    </section>
+
+    <section>
+      <h2>6. 测试结果</h2>
+      <p><span class="tag done">验证完成</span> 2026-07-30 在 PR 分支合入 Candle Reader v1.1.0 后重新执行；下表只记录实际运行结果。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>范围</th><th>实际命令/页面与结果</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td>后端格式与功能</td><td><code>make lint-py-fix</code> 与 <code>make lint-py</code> 通过；使用 <code>talebook/test</code> 镜像运行完整 <code>pytest -q tests</code>，结果为 699 passed、2 skipped。定向可靠性测试另得 7/7，通过静默任务心跳、高频输出节流、seq 幂等、TERM/KILL、角色表参数、磁盘门禁和三套 Nginx 配置检查。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>前端静态检查</td><td><code>npm run lint -- --no-cache</code> 为 0 errors、194 个既有 warnings；<code>npm run build</code> 完成 Nuxt 生产构建。为 Git worktree 增加 <code>node_modules</code> 忽略后，标准原生文件监听 dev server 可稳定启动，未启用 Chokidar polling。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>浏览器功能</td><td>针对 <code>/audios</code>、<code>/book/1/audios</code> 和制作流程执行 Chromium E2E，覆盖 Beta 标识、生成/发布/播放/恢复、高级审查、候选历史与磁盘不足禁用，结果 5 passed（22.4s）。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>实际渲染</td><td>在 1440 × 1000 明亮/暗色、390 × 844 移动端以及生成对话框状态完成真实 Chromium 渲染检查；无横向溢出、控制台错误或 400+ 请求，截图保存在 <code>document/screenshots/audiobooks-pr-882/</code>。Chrome DevTools MCP 受共享 profile 占用阻塞，使用 Playwright Chromium 替代。</td><td><span class="tag done">替代通过</span></td></tr>
+            <tr><td>EdgeTTS</td><td><code>voicebook-tool 0.4.0</code> 使用 <code>--engine edgetts --chapters 1 --progress-format jsonl --resume</code> 真实生成 2 个片段和章节 MP3；时长 15.386 秒、124006 bytes、manifest 状态 completed，音色为 <code>zh-CN-YunjianNeural</code>。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>Candle Reader / Podcast</td><td>master 提交 <code>cae2333</code> 已包含 Candle Reader v1.1.0，版本文件与 bundle 均可见 audiobook 播放/高亮入口；后端完整测试覆盖阅读页 Edition 注入、Feed XML/HEAD/304/gzip、媒体 Range/416、权限、限速与冻结，Nginx 静态断言覆盖三套配置的专用代理和 access log 关闭。</td><td><span class="tag done">通过</span></td></tr>
+            <tr><td>方案</td><td><code>make check-design</code> 校验 ACTIVE 路径、HTML 结构与单文件资源约束。本方案是 <code>design/project/20260718-audiobooks.active.html</code> 的合并就绪补充记录，不替代其完整产品设计。</td><td><span class="tag done">通过</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small">PR 正文同步使用推送后完整 SHA 的 GitHub/RawGitHack 方案链接，并保留实际命令、风险/兼容性、界面截图以及 Qwen3TTS 与 Apple 真机的验收边界。</p>
+    </section>
+  </main>
+</body>
+</html>

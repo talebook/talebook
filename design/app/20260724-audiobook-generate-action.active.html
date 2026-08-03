@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有声书生成按钮缺失修复方案</title>
+  <style>
+    body { max-width: 960px; margin: 32px auto; padding: 0 20px; color: #172033; font: 16px/1.65 system-ui, sans-serif; }
+    header, section { margin-bottom: 28px; } h1 { margin-bottom: 6px; } .meta { color: #586174; }
+    .status { display: inline-block; padding: 2px 10px; border-radius: 12px; color: #146c43; background: #dff6e8; }
+    table { width: 100%; border-collapse: collapse; } th, td { padding: 9px; border: 1px solid #d8dee9; text-align: left; vertical-align: top; }
+    th { background: #f4f7fb; } code { background: #f1f4f8; padding: 1px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>有声书生成按钮缺失修复方案</h1>
+    <p class="meta">创建日期：2026-07-24 ｜ 所属模块：webserver ｜ 状态：<span class="status">ACTIVE</span> ｜ 需求来源：用户反馈未看到“生成有声书”按钮；替代 <code>design/app/20260724-audio-job-creation-feedback.active.html</code> 。</p>
+  </header>
+  <section>
+    <h2>根因与目标</h2>
+    <p>有声书详情接口调用 <code>BookFormatter.format()</code> 时未请求文件字段，响应中的 <code>book.files</code> 因而缺失。前端以该字段判断 EPUB/TXT 兼容性，结果始终隐藏生成按钮。目标是令详情接口返回文件格式信息，使管理员或获准所有者能看到可用书籍的生成入口。</p>
+  </section>
+  <section>
+    <h2>实现</h2>
+    <table>
+      <tr><th>接口</th><td><code>GET /api/book/{id}/audios</code> 改用 <code>BookFormatter.format(with_files=True)</code> 序列化书籍，返回格式、大小与资源链接。</td></tr>
+      <tr><th>前端</th><td>沿用既有 <code>book.files</code> 兼容性判断，不放宽管理员、获准所有者、EPUB/TXT 的权限和格式限制。</td></tr>
+      <tr><th>测试</th><td>后端测试断言详情响应包含 EPUB 文件；前端已有 E2E 创建流程覆盖生成按钮后的实际创建与跳转，补充的任务空列表用例覆盖创建路径引导。</td></tr>
+    </table>
+  </section>
+  <section>
+    <h2>测试结果</h2>
+    <table>
+      <tr><th>项目</th><th>实际结果</th></tr>
+      <tr><td><code>python -m py_compile webserver/handlers/audiobook.py</code></td><td>通过。</td></tr>
+      <tr><td><code>make lint-py</code></td><td>通过：Ruff 检查及格式检查均通过。</td></tr>
+      <tr><td><code>pytest tests/test_audiobook.py -v</code></td><td>未执行成功：全部 8 个用例在初始化前因当前环境缺少 <code>calibre</code> 模块而报错。风险是实际 HTTP 序列化尚需在包含 Calibre 的 CI 或 Docker 环境复验；失败不由本次改动引起。</td></tr>
+      <tr><td>前端验证</td><td>此前已通过 <code>npm run build</code>、<code>npm run lint</code>（0 error）及 E2E 用例发现检查。浏览器本地未登录，任务页按预期跳转访问密码页，无法检查登录后按钮视觉状态。</td></tr>
+      <tr><td>静态检查</td><td><code>git diff --check</code> 通过。</td></tr>
+    </table>
+  </section>
+</body>
+</html>
