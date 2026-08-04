@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>取消 WIP 方案强制使用 frontend-design 的工程规范方案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #142238;
+      --muted: #5d6878;
+      --paper: #f3f6fa;
+      --line: #cbd4df;
+      --blue: #245b9b;
+      --red: #a83c35;
+      --green: #18715a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 32px 22px 64px;
+      color: var(--ink);
+      background: #fff;
+      font: 16px/1.68 "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    h1, h2, h3 {
+      font-family: "Avenir Next Condensed", "Arial Narrow", "Noto Sans SC", sans-serif;
+      line-height: 1.15;
+    }
+    h1 { max-width: 820px; margin: 0; font-size: clamp(38px, 6vw, 66px); }
+    h2 { margin: 40px 0 16px; font-size: 27px; }
+    h3 { margin: 0 0 8px; font-size: 20px; }
+    p { margin: 10px 0; }
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #e9eef5;
+      font: .92em/1.45 "SFMono-Regular", Consolas, monospace;
+    }
+    header {
+      padding: 34px;
+      color: #f7f9fc;
+      background: var(--ink);
+      border-radius: 14px;
+    }
+    .eyebrow {
+      margin-bottom: 14px;
+      color: #8fbef5;
+      font: 750 12px/1.2 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .14em;
+    }
+    .thesis { max-width: 820px; font-size: 19px; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 22px;
+      color: #cbd7e7;
+    }
+    .meta strong { color: #fff; }
+    .status { color: #8fe0c5; }
+    .policy-diff {
+      display: grid;
+      grid-template-columns: 1fr 70px 1fr;
+      gap: 14px;
+      align-items: stretch;
+      margin: 22px 0;
+    }
+    .policy {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--paper);
+    }
+    .policy.before { border-color: #dfa9a4; background: #fff3f1; }
+    .policy.after { border-color: #8fc9b6; background: #eef9f5; }
+    .label {
+      display: block;
+      margin-bottom: 8px;
+      font: 750 12px/1.2 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .08em;
+    }
+    .before .label { color: var(--red); }
+    .after .label { color: var(--green); }
+    .arrow {
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      font: 900 25px/1 "SFMono-Regular", Consolas, monospace;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 11px 13px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #e9eef5; }
+    ul { padding-left: 22px; }
+    li { margin: 7px 0; }
+    .note {
+      padding: 15px 17px;
+      border-left: 4px solid var(--blue);
+      background: #eef5fd;
+    }
+    @media (max-width: 720px) {
+      body { padding: 15px 12px 44px; }
+      header { padding: 24px 19px; }
+      .policy-diff { grid-template-columns: 1fr; }
+      .arrow { min-height: 36px; transform: rotate(90deg); }
+      table { display: block; overflow-x: auto; }
+      th, td { min-width: 145px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">PROJECT GOVERNANCE / DESIGN DOC AUTHORING</div>
+    <h1>让方案质量由内容约束，而不是由单一视觉 skill 决定</h1>
+    <p class="thesis">保留离线单文件、信息完整、图表有解释价值和响应式可读等结果要求；取消创建 WIP 时必须调用 <code>frontend-design</code> 的过程绑定。</p>
+    <div class="meta">
+      <span><strong>创建日期</strong> 2026-07-28</span>
+      <span><strong>所属模块</strong> project</span>
+      <span><strong>状态</strong> <span class="status">ACTIVE</span></span>
+      <span><strong>影响范围</strong> AGENTS.md、项目规范测试</span>
+      <span><strong>需求来源</strong> 用户要求移除强制 frontend-design 规则</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>原始诉求与目标</h2>
+    <p>用户要求从 <code>AGENTS.md</code> 中移除“创建 WIP 方案时必须使用项目的 <code>frontend-design</code> skill”这一要求，并将修改独立提交 PR。</p>
+    <ul>
+      <li>删除对特定 skill 的强制调用与自检绑定。</li>
+      <li>不改变方案适用范围、WIP/ACTIVE 生命周期、单文件 HTML、内容完整性、图表价值、测试回写和合并门禁。</li>
+      <li><code>frontend-design</code> 仍可在任务本身需要视觉设计时按 skill 触发规则使用，只是不再由 WIP 文档类型自动强制。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>规范变化</h2>
+    <div class="policy-diff" aria-label="规范修改前后对比">
+      <article class="policy before">
+        <span class="label">BEFORE / PROCESS-BOUND</span>
+        <h3>每份 WIP 都必须调用同一 skill</h3>
+        <p>文档类型直接决定工具流程，即使方案内容只是后端、CI 或工程治理，也要执行完整视觉设计与自检。</p>
+      </article>
+      <div class="arrow">→</div>
+      <article class="policy after">
+        <span class="label">AFTER / OUTCOME-BOUND</span>
+        <h3>保留质量标准，解除工具绑定</h3>
+        <p>作者继续对信息层级、离线可读、必要图表和响应式布局负责，但可以选择与任务相称的方法。</p>
+      </article>
+    </div>
+    <p class="note"><strong>最小变更：</strong>只删除 <code>AGENTS.md</code> 中两行独立段落，不改写相邻方案质量规则，不修改 skill 文件或检查脚本。</p>
+  </section>
+
+  <section>
+    <h2>验证结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>实际命令</th><th>实际结果</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>规范契约</td>
+          <td>扩展 <code>tests/test_project_instructions.py</code>，并运行定向测试。</td>
+          <td><code>AGENTS.md</code> 不再包含 <code>frontend-design</code> 强制引用；原有单文件、内容、图表、测试回写和生命周期规则仍由断言保护。</td>
+        </tr>
+        <tr>
+          <td>定向测试</td>
+          <td><code>python3.12 -m pytest -q tests/test_project_instructions.py tests/test_check_design_docs.py</code></td>
+          <td>通过：25 passed。</td>
+        </tr>
+        <tr>
+          <td>完整后端测试</td>
+          <td><code>make test</code></td>
+          <td>通过：Docker 测试镜像中 798 passed、11 skipped、20 warnings。</td>
+        </tr>
+        <tr>
+          <td>Python 质量门禁</td>
+          <td><code>make lint-py-fix</code><br><code>make lint-py</code></td>
+          <td>通过：ruff check 无错误，100 个 webserver 文件格式保持不变。</td>
+        </tr>
+        <tr>
+          <td>方案校验</td>
+          <td><code>make check-design</code></td>
+          <td>通过：77 份方案文档的路径、HTML 结构、单文件资源和状态门禁全部通过。</td>
+        </tr>
+        <tr>
+          <td>补丁检查</td>
+          <td><code>git diff --check</code></td>
+          <td>通过：无空白错误。</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>环境说明：</strong>宿主机运行 <code>make pytest</code> 时 PATH 中没有 <code>pytest</code> 可执行文件；直接使用 <code>python3.12 -m pytest</code> 收集完整套件时又缺少 <code>social_sqlalchemy</code>、<code>bs4</code> 等运行依赖。已按仓库标准改用 <code>make test</code> 在完整 Docker 测试镜像中验证全部 809 项用例，结果通过。</p>
+  </section>
+
+  <section>
+    <h2>兼容性、风险与回滚</h2>
+    <ul>
+      <li><strong>兼容性：</strong>不影响现有 ACTIVE/SUPERSEDED 方案，也不改变 <code>make check-design</code>。</li>
+      <li><strong>风险：</strong>未来方案的视觉风格可能更不一致；现有内容与可读性结果规则继续承担质量底线。</li>
+      <li><strong>回滚：</strong>恢复删除的两行即可重新强制该 skill，不涉及代码、数据或部署回滚。</li>
+    </ul>
+  </section>
+</body>
+</html>
