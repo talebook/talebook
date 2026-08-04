@@ -653,12 +653,13 @@ jobs:
             reject "Codex 未生成 .codex-result.json。"
           elif ! jq -e '
             type == "object" and
-            (keys | sort) == ["commit_message", "delivery", "feature", "summary", "tests"] and
+            (keys | sort) == ["commit_message", "delivery", "feature", "pr_body", "summary", "tests"] and
             (.delivery == "reply" or .delivery == "publish") and
             (.feature | type == "string") and
             (.commit_message | type == "string") and
             (.summary | type == "string") and
             (.summary | length >= 1 and length <= 1000) and
+            (.pr_body | type == "string") and
             (.tests | type == "array") and
             ([.tests[] |
               type == "object" and
@@ -669,12 +670,37 @@ jobs:
             ] | all) and
             (if .delivery == "reply" then
               .feature == "" and
-              .commit_message == ""
+              .commit_message == "" and
+              .pr_body == ""
             else
               (.feature | length >= 3 and length <= 48 and test("^[a-z0-9]+(-[a-z0-9]+)*$")) and
               (.commit_message | length >= 1 and length <= 120 and (test("[\\r\\n]") | not)) and
               (.commit_message | test("^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\([a-z0-9._/-]+\\))?!?: .+")) and
-              (.tests | length >= 1)
+              (.tests | length >= 1) and
+              (.pr_body as $body |
+                ($body | length >= 1 and length <= 50000) and
+                ([
+                  "## 背景或目标",
+                  "## 关键改动",
+                  "## 实际验证",
+                  "## 风险与兼容性",
+                  "## 方案",
+                  "## 视觉证据"
+                ] | all(. as $heading | $body | contains($heading))) and
+                ($body | contains("<!-- codex-pr-description:") | not) and
+                (($body | split("{{TEST_RESULTS") | length) == 2) and
+                (([$body | scan("\\{\\{TEST_RESULTS\\}\\}")] | length) == 1) and
+                (($body | split("{{DESIGN_") | length) == 2) and
+                (([$body | scan("\\{\\{DESIGN_LINKS:design/[a-z0-9]+(?:-[a-z0-9]+)*/[0-9]{8}-[a-z0-9]+(?:-[a-z0-9]+)*\\.active\\.html\\}\\}")] | length) as $design_link_count |
+                  ([$body | scan("\\{\\{DESIGN_EXEMPTION\\}\\}")] | length) as $design_exemption_count |
+                  (
+                    ($design_link_count == 1 and $design_exemption_count == 0) or
+                    ($design_link_count == 0 and
+                      $design_exemption_count == 1 and
+                      ($body | test("\\{\\{DESIGN_EXEMPTION\\}\\}[[:space:]]+[^[:space:]#]")))
+                  )
+                )
+              )
             end)
           ' "$RESULT_FILE" >/dev/null; then
             reject "Codex 结果不符合发布契约或 Conventional Commit 规则。"
@@ -683,6 +709,21 @@ jobs:
             delivery="$(jq -r '.delivery' "$RESULT_FILE")"
             feature="$(jq -r '.feature' "$RESULT_FILE")"
             commit_message="$(jq -r '.commit_message' "$RESULT_FILE")"
+          fi
+
+          design_path=""
+          if [ "$contract_valid" = "true" ] && [ "$delivery" = "publish" ]; then
+            design_path="$(jq -r '
+              try (
+                .pr_body
+                | capture("\\{\\{DESIGN_LINKS:(?<path>design/[a-z0-9]+(?:-[a-z0-9]+)*/[0-9]{8}-[a-z0-9]+(?:-[a-z0-9]+)*\\.active\\.html)\\}\\}")
+                | .path
+              ) catch ""
+            ' "$RESULT_FILE")"
+            if [ -n "$design_path" ] && [ ! -f "$design_path" ]; then
+              contract_valid=false
+              reject "方案文档不存在或不是文件：$design_path"
+            fi
           fi
 
           if [ -z "$reason" ] && [ "$delivery" = "publish" ] && jq -e '.tests | any(.result == "failed")' "$RESULT_FILE" >/dev/null; then
@@ -696,6 +737,11 @@ jobs:
 
           if [ -z "$reason" ] && ! git add -A; then
             reject "Git 无法暂存候选改动。"
+          fi
+
+          if [ -z "$reason" ] && [ -n "$design_path" ] && ! git cat-file -e ":$design_path" 2>/dev/null; then
+            contract_valid=false
+            reject "方案文档未包含在待发布提交中：$design_path"
           fi
 
           if [ -z "$reason" ] && [ "$delivery" = "publish" ]; then
@@ -839,18 +885,18 @@ jobs:
           echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - id: create_issue_pr
-        name: Create Draft PR for issue work
+        name: Create or update Draft PR for issue work
         if: |
           steps.publish_gate.outputs.delivery == 'publish' &&
           steps.app_token.outcome == 'success' &&
           steps.context.outputs.is_pr != 'true' &&
-          steps.context.outputs.existing_issue_pr_number == '' &&
           (
             steps.publish.outcome == 'success' ||
             (
               steps.publish_gate.outputs.contract_valid == 'true' &&
               steps.publish_gate.outputs.no_changes == 'true' &&
-              steps.context.outputs.existing_issue_branch != ''
+              steps.context.outputs.existing_issue_branch != '' &&
+              steps.context.outputs.existing_issue_pr_number == ''
             )
           )
         uses: actions/github-script@v7
@@ -859,21 +905,122 @@ jobs:
           ISSUE_TITLE: ${{ steps.context.outputs.issue_title }}
           DEFAULT_BRANCH: ${{ steps.context.outputs.default_branch }}
           PUBLISH_BRANCH: ${{ steps.publish_gate.outputs.publish_branch }}
+          COMMIT_SHA: ${{ steps.publish.outputs.commit_sha || steps.context.outputs.target_sha }}
+          EXISTING_PR_NUMBER: ${{ steps.context.outputs.existing_issue_pr_number }}
+          RESULT_FILE: .codex-result.json
         with:
           github-token: ${{ steps.app_token.outputs.token }}
           script: |
-            const title = `codex: ${process.env.ISSUE_TITLE}`.slice(0, 256);
-            const result = await github.rest.pulls.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              head: process.env.PUBLISH_BRANCH,
-              base: process.env.DEFAULT_BRANCH,
-              body: `Issue #${process.env.ISSUE_NUMBER} 的自动实现。\n\nCloses #${process.env.ISSUE_NUMBER}`,
-              draft: true,
+            const fs = require("fs");
+
+            const escapeHtml = (value) => String(value)
+              .replaceAll("&", "&amp;")
+              .replaceAll("<", "&lt;")
+              .replaceAll(">", "&gt;");
+            const managedStart = "<!-- codex-pr-description:start -->";
+            const managedEnd = "<!-- codex-pr-description:end -->";
+            const mergeManagedBody = (existingBody, managedBody) => {
+              const existing = String(existingBody || "");
+              const startCount = existing.split(managedStart).length - 1;
+              const endCount = existing.split(managedEnd).length - 1;
+              if (startCount === 0 && endCount === 0) {
+                return existing.trim() ? `${existing.trim()}\n\n${managedBody}` : managedBody;
+              }
+              const startIndex = existing.indexOf(managedStart);
+              const endIndex = existing.indexOf(managedEnd);
+              if (startCount !== 1 || endCount !== 1 || endIndex <= startIndex) {
+                throw new Error("The existing PR body does not contain one valid managed description boundary pair.");
+              }
+              const before = existing.slice(0, startIndex).trimEnd();
+              const after = existing.slice(endIndex + managedEnd.length).trimStart();
+              return [before, managedBody, after].filter(Boolean).join("\n\n");
+            };
+
+            const result = JSON.parse(fs.readFileSync(process.env.RESULT_FILE, "utf8"));
+            const commitSha = String(process.env.COMMIT_SHA || "");
+            if (!/^[0-9a-f]{40}$/.test(commitSha)) {
+              throw new Error("The controlled publisher did not provide a full commit SHA for the PR body.");
+            }
+            const issueNumber = Number(process.env.ISSUE_NUMBER);
+            if (!Number.isSafeInteger(issueNumber) || issueNumber <= 0) {
+              throw new Error("The issue number is invalid.");
+            }
+
+            const testLines = result.tests.map((test) => {
+              let line = `- <code>${escapeHtml(test.command)}</code> — <strong>${escapeHtml(test.result)}</strong>`;
+              if (typeof test.details === "string" && test.details.trim()) {
+                line += ` — ${escapeHtml(test.details.trim())}`;
+              }
+              return line;
             });
-            core.setOutput("pull_request_number", String(result.data.number));
-            core.setOutput("pull_request_url", result.data.html_url);
+            let renderedBody = result.pr_body.replace("{{TEST_RESULTS}}", testLines.join("\n"));
+            const designMatch = renderedBody.match(
+              /\{\{DESIGN_LINKS:(design\/[a-z0-9]+(?:-[a-z0-9]+)*\/[0-9]{8}-[a-z0-9]+(?:-[a-z0-9]+)*\.active\.html)\}\}/,
+            );
+            if (designMatch) {
+              const designPath = designMatch[1];
+              const encodedPath = designPath.split("/").map(encodeURIComponent).join("/");
+              const githubUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/blob/${commitSha}/${encodedPath}`;
+              const previewUrl = `https://raw.githack.com/${context.repo.owner}/${context.repo.repo}/${commitSha}/${encodedPath}`;
+              renderedBody = renderedBody.replace(
+                designMatch[0],
+                `- [GitHub 方案文件](${githubUrl})\n- [RawGitHack 在线预览](${previewUrl})`,
+              );
+            } else {
+              renderedBody = renderedBody.replace("{{DESIGN_EXEMPTION}}", "");
+            }
+
+            const managedBody = [
+              managedStart,
+              renderedBody.trim(),
+              `Closes #${process.env.ISSUE_NUMBER}`,
+              managedEnd,
+            ].join("\n\n");
+            if (managedBody.length > 65536) {
+              throw new Error("The rendered PR body exceeds GitHub's maximum issue body length.");
+            }
+
+            const existingPrNumber = process.env.EXISTING_PR_NUMBER
+              ? Number(process.env.EXISTING_PR_NUMBER)
+              : 0;
+            let pullRequest;
+            let action;
+            if (existingPrNumber) {
+              if (!Number.isSafeInteger(existingPrNumber) || existingPrNumber <= 0) {
+                throw new Error("The existing PR number is invalid.");
+              }
+              const existingPr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: existingPrNumber,
+              });
+              const body = mergeManagedBody(existingPr.data.body, managedBody);
+              if (body.length > 65536) {
+                throw new Error("The merged PR body exceeds GitHub's maximum issue body length.");
+              }
+              pullRequest = await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: existingPrNumber,
+                body,
+              });
+              action = "updated";
+            } else {
+              const title = `codex: ${process.env.ISSUE_TITLE}`.slice(0, 256);
+              pullRequest = await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                head: process.env.PUBLISH_BRANCH,
+                base: process.env.DEFAULT_BRANCH,
+                body: managedBody,
+                draft: true,
+              });
+              action = "created";
+            }
+            core.setOutput("pull_request_number", String(pullRequest.data.number));
+            core.setOutput("pull_request_url", pullRequest.data.html_url);
+            core.setOutput("pull_request_action", action);
 
       - id: diff
         name: Capture Codex patch
@@ -927,6 +1074,7 @@ jobs:
           EXISTING_PR_NUMBER: ${{ steps.context.outputs.existing_issue_pr_number }}
           CREATED_PR_OUTCOME: ${{ steps.create_issue_pr.outcome }}
           CREATED_PR_URL: ${{ steps.create_issue_pr.outputs.pull_request_url }}
+          ISSUE_PR_ACTION: ${{ steps.create_issue_pr.outputs.pull_request_action }}
           CODEX_HAS_PATCH: ${{ steps.diff.outputs.has_patch }}
           CODEX_ARTIFACT_NAME: codex-patch-${{ github.run_id }}
           ISSUE_NUMBER: ${{ steps.context.outputs.issue_number }}
@@ -1022,12 +1170,12 @@ jobs:
 
               if (process.env.IS_PR !== "true") {
                 if (process.env.CREATED_PR_URL) {
-                  body += ` 已创建 Draft PR：${process.env.CREATED_PR_URL}`;
-                } else if (process.env.EXISTING_PR_NUMBER) {
-                  const prUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/pull/${process.env.EXISTING_PR_NUMBER}`;
-                  body += ` 已更新现有 Draft PR：${prUrl}`;
+                  const verb = process.env.ISSUE_PR_ACTION === "updated" ? "已更新" : "已创建";
+                  body += ` ${verb} Draft PR：${process.env.CREATED_PR_URL}`;
                 } else if (process.env.CREATED_PR_OUTCOME !== "success") {
-                  body += " 分支已推送，但 Draft PR 创建失败；请查看 workflow 日志。";
+                  body += process.env.EXISTING_PR_NUMBER
+                    ? " 提交已推送，但 Draft PR 正文更新失败；请查看 workflow 日志。"
+                    : " 分支已推送，但 Draft PR 创建失败；请查看 workflow 日志。";
                 }
               }
             } else if (process.env.CODEX_DELIVERY === "publish" && process.env.CODEX_NO_CHANGES === "true") {
@@ -1131,7 +1279,7 @@ jobs:
           if [ "$PUBLISH_OUTCOME" != "success" ]; then
             exit 1
           fi
-          if [ "$IS_PR" != "true" ] && [ -z "$EXISTING_PR_NUMBER" ] && [ "$CREATED_PR_OUTCOME" != "success" ]; then
+          if [ "$IS_PR" != "true" ] && [ "$CREATED_PR_OUTCOME" != "success" ]; then
             exit 1
           fi
 

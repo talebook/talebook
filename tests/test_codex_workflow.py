@@ -62,11 +62,30 @@ def progress_reporter_text():
     return PROGRESS_REPORTER.read_text(encoding="utf-8")
 
 
+def publish_pr_body(*, design=True):
+    design_reference = (
+        "{{DESIGN_LINKS:design/project/20260803-codex-pr-description.active.html}}"
+        if design
+        else "{{DESIGN_EXEMPTION}} 本次仅修正不改变行为的测试说明，因此豁免方案。"
+    )
+    return "\n\n".join(
+        (
+            "## 背景或目标\n修复自动创建的 PR 丢失评审信息。",
+            "## 关键改动\n- 使用 Codex 生成的完整正文模板。",
+            "## 实际验证\n{{TEST_RESULTS}}",
+            "## 风险与兼容性\n- 保留维护者在受控区外的手写内容。",
+            f"## 方案\n{design_reference}",
+            "## 视觉证据\n本次不涉及产品界面。",
+        )
+    )
+
+
 def run_publish_gate(
     tmp_path,
     result,
     *,
     changed=False,
+    design_document="",
     publish_block_reason="",
     issue_branches=(),
     run_id="123456",
@@ -98,6 +117,10 @@ def run_publish_gate(
     ).stdout.strip()
     (tmp_path / ".git" / "info" / "exclude").write_text(".codex-result.json\n", encoding="utf-8")
     (tmp_path / ".codex-result.json").write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+    if design_document:
+        design_path = tmp_path / design_document
+        design_path.parent.mkdir(parents=True, exist_ok=True)
+        design_path.write_text('<!doctype html><html lang="zh-CN"><body>active</body></html>\n', encoding="utf-8")
     if changed:
         (tmp_path / "tracked.txt").write_text("changed\n", encoding="utf-8")
 
@@ -144,6 +167,7 @@ def run_response_step(
                 "feature": "",
                 "commit_message": "",
                 "summary": "已完成处理，并保留执行计划。",
+                "pr_body": "",
                 "tests": list(tests),
             },
             ensure_ascii=False,
@@ -234,6 +258,90 @@ const finish = (error) => {
         "TEST_PROGRESS_BODY": progress_body,
         "TEST_GET_COMMENT_ERROR": "true" if get_comment_error else "false",
         "TEST_UPDATE_COMMENT_ERROR": "true" if update_comment_error else "false",
+        "TEST_TRACE_FILE": str(trace_file),
+    }
+    completed = subprocess.run(
+        ["node", "-e", harness],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return completed, json.loads(trace_file.read_text(encoding="utf-8"))
+
+
+def run_issue_pr_step(
+    tmp_path,
+    *,
+    result,
+    existing_pr_number="",
+    existing_body="",
+    commit_sha="a" * 40,
+):
+    result_file = tmp_path / ".codex-result.json"
+    result_file.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+    trace_file = tmp_path / "issue-pr-trace.json"
+    issue_pr_script = workflow_step(step_id="create_issue_pr")["with"]["script"]
+    harness = (
+        """
+const harnessFs = require("fs");
+const calls = [];
+const outputs = {};
+const github = {
+  rest: {
+    pulls: {
+      get: async (args) => {
+        calls.push({name: "get", args});
+        return {data: {number: args.pull_number, body: process.env.TEST_EXISTING_BODY, html_url: "https://github.test/talebook/talebook/pull/932"}};
+      },
+      create: async (args) => {
+        calls.push({name: "create", args});
+        return {data: {number: 932, body: args.body, html_url: "https://github.test/talebook/talebook/pull/932"}};
+      },
+      update: async (args) => {
+        calls.push({name: "update", args});
+        return {data: {number: args.pull_number, body: args.body, html_url: "https://github.test/talebook/talebook/pull/932"}};
+      },
+    },
+  },
+};
+const context = {
+  serverUrl: "https://github.test",
+  repo: {owner: "talebook", repo: "talebook"},
+};
+const core = {
+  setOutput: (name, value) => { outputs[name] = value; },
+};
+const finish = (error) => {
+  harnessFs.writeFileSync(
+    process.env.TEST_TRACE_FILE,
+    JSON.stringify({calls, outputs, error: error ? error.message : ""}),
+  );
+};
+(async () => {
+"""
+        + issue_pr_script
+        + """
+})().then(
+  () => finish(null),
+  (error) => {
+    finish(error);
+    process.exitCode = 1;
+  },
+);
+"""
+    )
+    env = {
+        **os.environ,
+        "RESULT_FILE": str(result_file),
+        "ISSUE_NUMBER": "928",
+        "ISSUE_TITLE": "浅灰主题下左侧栏收缩的bug",
+        "DEFAULT_BRANCH": "master",
+        "PUBLISH_BRANCH": "codex/issue-928-light-gray-sidebar-toggle",
+        "COMMIT_SHA": commit_sha,
+        "EXISTING_PR_NUMBER": existing_pr_number,
+        "TEST_EXISTING_BODY": existing_body,
         "TEST_TRACE_FILE": str(trace_file),
     }
     completed = subprocess.run(
@@ -500,9 +608,14 @@ def test_agent_contract_distinguishes_conversational_replies_from_code_publicati
     assert "--json" in run_step["run"]
     assert "tee .codex/tmp/codex-events.jsonl" in run_step["run"]
     assert run_step["env"]["CODEX_PROGRESS_TOKEN"] == "${{ steps.interaction_token.outputs.token }}"
-    assert all(field in prompt for field in ('"delivery"', '"feature"', '"commit_message"', '"summary"', '"tests"'))
+    assert all(
+        field in prompt for field in ('"delivery"', '"feature"', '"commit_message"', '"summary"', '"pr_body"', '"tests"')
+    )
     assert '"delivery": "reply"' in prompt
     assert '"delivery": "publish"' in prompt
+    assert "{{TEST_RESULTS}}" in prompt
+    assert "{{DESIGN_LINKS:design/" in prompt
+    assert "{{DESIGN_EXEMPTION}}" in prompt
     assert '"ready_to_publish"' not in prompt
     assert "不得根据关键词预先判断" in prompt
     assert "纯问答" in prompt
@@ -554,8 +667,13 @@ def test_publish_gate_rejects_incomplete_or_unsafe_changes():
 
     assert gate["env"]["RESULT_FILE"] == ".codex-result.json"
     assert gate["env"]["PUBLISH_BLOCK_REASON"] == "${{ steps.context.outputs.publish_block_reason }}"
-    assert '(keys | sort) == ["commit_message", "delivery", "feature", "summary", "tests"]' in script
+    assert '(keys | sort) == ["commit_message", "delivery", "feature", "pr_body", "summary", "tests"]' in script
     assert '(.delivery == "reply" or .delivery == "publish")' in script
+    assert '(.pr_body | type == "string")' in script
+    assert 'split("{{TEST_RESULTS")' in script
+    assert "DESIGN_LINKS:" in script
+    assert "DESIGN_EXEMPTION" in script
+    assert "方案文档不存在或不是文件" in script
     assert 'delivery="$(jq -r \'.delivery\' "$RESULT_FILE")"' in script
     assert 'echo "delivery=$delivery" >> "$GITHUB_OUTPUT"' in script
     assert "ready_to_publish" not in script
@@ -593,6 +711,7 @@ def test_publish_gate_executes_reply_and_publish_paths_against_a_real_git_worktr
         "feature": "",
         "commit_message": "",
         "summary": "当前运行模型由工作流配置决定。",
+        "pr_body": "",
         "tests": [],
     }
     publish = {
@@ -600,6 +719,7 @@ def test_publish_gate_executes_reply_and_publish_paths_against_a_real_git_worktr
         "feature": "conversation-routing",
         "commit_message": "fix(codex): route conversational requests",
         "summary": "已修复纯问答路由。",
+        "pr_body": publish_pr_body(design=False),
         "tests": [{"command": "pytest -q tests/test_codex_workflow.py", "result": "passed"}],
     }
 
@@ -644,6 +764,76 @@ def test_publish_gate_executes_reply_and_publish_paths_against_a_real_git_worktr
     )
     assert collision_outputs["ready"] == "true"
     assert collision_outputs["publish_branch"] == "codex/issue-875-conversation-routing-123456"
+
+
+@pytest.mark.skipif(
+    any(shutil.which(command) is None for command in ("bash", "git", "jq")),
+    reason="发布门禁行为测试需要 bash、git 和 jq",
+)
+def test_publish_gate_validates_pr_body_template_and_active_design_path(tmp_path):
+    base_publish = {
+        "delivery": "publish",
+        "feature": "codex-pr-description",
+        "commit_message": "fix(codex): publish compliant PR descriptions",
+        "summary": "已补齐 PR 正文。",
+        "pr_body": publish_pr_body(),
+        "tests": [{"command": "pytest -q", "result": "passed"}],
+    }
+    design_path = "design/project/20260803-codex-pr-description.active.html"
+
+    valid_outputs = run_publish_gate(
+        tmp_path / "valid-design",
+        base_publish,
+        changed=True,
+        design_document=design_path,
+    )
+    assert valid_outputs["ready"] == "true"
+    assert valid_outputs["contract_valid"] == "true"
+
+    missing_design_outputs = run_publish_gate(tmp_path / "missing-design", base_publish, changed=True)
+    assert missing_design_outputs["ready"] == "false"
+    assert missing_design_outputs["contract_valid"] == "false"
+    assert missing_design_outputs["reason"] == f"方案文档不存在或不是文件：{design_path}"
+
+    missing_heading = {**base_publish, "pr_body": publish_pr_body().replace("## 风险与兼容性", "## 风险")}
+    missing_heading_outputs = run_publish_gate(tmp_path / "missing-heading", missing_heading, changed=True)
+    assert missing_heading_outputs["contract_valid"] == "false"
+    assert missing_heading_outputs["reason"] == "Codex 结果不符合发布契约或 Conventional Commit 规则。"
+
+    duplicate_tests = {
+        **base_publish,
+        "pr_body": publish_pr_body(design=False).replace("{{TEST_RESULTS}}", "{{TEST_RESULTS}}\n{{TEST_RESULTS}}"),
+    }
+    duplicate_outputs = run_publish_gate(tmp_path / "duplicate-tests", duplicate_tests, changed=True)
+    assert duplicate_outputs["contract_valid"] == "false"
+
+    traversal_path = {
+        **base_publish,
+        "pr_body": publish_pr_body().replace(
+            "design/project/20260803-codex-pr-description.active.html",
+            "design/../20260803-codex-pr-description.active.html",
+        ),
+    }
+    traversal_outputs = run_publish_gate(tmp_path / "traversal-path", traversal_path, changed=True)
+    assert traversal_outputs["contract_valid"] == "false"
+
+    injected_boundary = {
+        **base_publish,
+        "pr_body": publish_pr_body(design=False) + "\n<!-- codex-pr-description:start -->",
+    }
+    injected_boundary_outputs = run_publish_gate(tmp_path / "injected-boundary", injected_boundary, changed=True)
+    assert injected_boundary_outputs["contract_valid"] == "false"
+
+    invalid_reply = {
+        "delivery": "reply",
+        "feature": "",
+        "commit_message": "",
+        "summary": "只回答问题。",
+        "pr_body": "不应为 reply 生成 PR 正文。",
+        "tests": [],
+    }
+    invalid_reply_outputs = run_publish_gate(tmp_path / "reply-with-body", invalid_reply)
+    assert invalid_reply_outputs["contract_valid"] == "false"
 
 
 def test_repository_wip_gate_runs_before_no_change_classification():
@@ -718,10 +908,142 @@ def test_first_successful_issue_run_creates_one_draft_pull_request():
     assert "steps.context.outputs.existing_issue_pr_number == ''" in create_pr["if"]
     assert create_pr["with"]["github-token"] == "${{ steps.app_token.outputs.token }}"
     assert "github.rest.pulls.create" in script
+    assert "github.rest.pulls.get" in script
+    assert "github.rest.pulls.update" in script
     assert "draft: true" in script
     assert "head: process.env.PUBLISH_BRANCH" in script
     assert "base: process.env.DEFAULT_BRANCH" in script
     assert "Closes #${process.env.ISSUE_NUMBER}" in script
+    assert "<!-- codex-pr-description:start -->" in script
+    assert "<!-- codex-pr-description:end -->" in script
+    assert "raw.githack.com" in script
+
+
+@requires_node
+def test_issue_pr_body_renders_validated_tests_and_immutable_design_links(tmp_path):
+    result = {
+        "delivery": "publish",
+        "feature": "codex-pr-description",
+        "commit_message": "fix(codex): publish compliant PR descriptions",
+        "summary": "已补齐 PR 正文。",
+        "pr_body": publish_pr_body(),
+        "tests": [
+            {
+                "command": "python3 -m pytest tests/test_codex_workflow.py",
+                "result": "passed",
+                "details": "92 passed",
+            }
+        ],
+    }
+    commit_sha = "609eeda88fd2676a08eb544f8e5f88ffe4f59f07"
+
+    completed, trace = run_issue_pr_step(tmp_path, result=result, commit_sha=commit_sha)
+
+    assert completed.returncode == 0, completed.stderr
+    create = next(call for call in trace["calls"] if call["name"] == "create")
+    body = create["args"]["body"]
+    assert "## 背景或目标" in body
+    assert "<code>python3 -m pytest tests/test_codex_workflow.py</code>" in body
+    assert "<strong>passed</strong>" in body
+    assert "92 passed" in body
+    assert (
+        "https://github.test/talebook/talebook/blob/609eeda88fd2676a08eb544f8e5f88ffe4f59f07/"
+        "design/project/20260803-codex-pr-description.active.html"
+    ) in body
+    assert (
+        "https://raw.githack.com/talebook/talebook/609eeda88fd2676a08eb544f8e5f88ffe4f59f07/"
+        "design/project/20260803-codex-pr-description.active.html"
+    ) in body
+    assert "{{TEST_RESULTS}}" not in body
+    assert "{{DESIGN_LINKS:" not in body
+    assert "Closes #928" in body
+    assert body.count("<!-- codex-pr-description:start -->") == 1
+    assert body.count("<!-- codex-pr-description:end -->") == 1
+    assert trace["outputs"]["pull_request_action"] == "created"
+
+
+@requires_node
+def test_existing_issue_pr_replaces_only_the_managed_description(tmp_path):
+    result = {
+        "delivery": "publish",
+        "feature": "codex-pr-description",
+        "commit_message": "fix(codex): publish compliant PR descriptions",
+        "summary": "已更新 PR 正文。",
+        "pr_body": publish_pr_body(design=False),
+        "tests": [{"command": "pytest -q", "result": "passed"}],
+    }
+    existing_body = (
+        "维护者前言\n\n<!-- codex-pr-description:start -->\n旧的自动说明\n<!-- codex-pr-description:end -->\n\n维护者附注"
+    )
+
+    completed, trace = run_issue_pr_step(
+        tmp_path,
+        result=result,
+        existing_pr_number="932",
+        existing_body=existing_body,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert not any(call["name"] == "create" for call in trace["calls"])
+    update = next(call for call in trace["calls"] if call["name"] == "update")
+    body = update["args"]["body"]
+    assert body.startswith("维护者前言")
+    assert body.endswith("维护者附注")
+    assert "旧的自动说明" not in body
+    assert "本次仅修正不改变行为的测试说明，因此豁免方案。" in body
+    assert "{{DESIGN_EXEMPTION}}" not in body
+    assert body.count("<!-- codex-pr-description:start -->") == 1
+    assert body.count("<!-- codex-pr-description:end -->") == 1
+    assert trace["outputs"]["pull_request_action"] == "updated"
+
+
+@requires_node
+def test_existing_unmanaged_issue_pr_appends_the_managed_description(tmp_path):
+    result = {
+        "delivery": "publish",
+        "feature": "codex-pr-description",
+        "commit_message": "fix(codex): publish compliant PR descriptions",
+        "summary": "已追加 PR 正文。",
+        "pr_body": publish_pr_body(design=False),
+        "tests": [{"command": "pytest -q", "result": "passed"}],
+    }
+
+    completed, trace = run_issue_pr_step(
+        tmp_path,
+        result=result,
+        existing_pr_number="932",
+        existing_body="维护者已有的正文，不应被覆盖。",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    update = next(call for call in trace["calls"] if call["name"] == "update")
+    body = update["args"]["body"]
+    assert body.startswith("维护者已有的正文，不应被覆盖。\n\n<!-- codex-pr-description:start -->")
+    assert "## 背景或目标" in body
+    assert trace["outputs"]["pull_request_action"] == "updated"
+
+
+@requires_node
+def test_existing_issue_pr_rejects_malformed_managed_markers(tmp_path):
+    result = {
+        "delivery": "publish",
+        "feature": "codex-pr-description",
+        "commit_message": "fix(codex): publish compliant PR descriptions",
+        "summary": "尝试更新 PR 正文。",
+        "pr_body": publish_pr_body(design=False),
+        "tests": [{"command": "pytest -q", "result": "passed"}],
+    }
+
+    completed, trace = run_issue_pr_step(
+        tmp_path,
+        result=result,
+        existing_pr_number="932",
+        existing_body="维护者正文\n<!-- codex-pr-description:start -->\n缺少结束标记",
+    )
+
+    assert completed.returncode != 0
+    assert "valid managed description boundary pair" in trace["error"]
+    assert not any(call["name"] == "update" for call in trace["calls"])
 
 
 def test_existing_issue_branch_without_a_pr_can_recover_after_a_partial_publish():
@@ -760,6 +1082,8 @@ def test_comment_reports_validated_metadata_and_remote_delivery_result():
     assert "test.result" in script
     assert "CODEX_COMMIT_SHA" in response["env"]
     assert "CREATED_PR_URL" in response["env"]
+    assert response["env"]["ISSUE_PR_ACTION"] == "${{ steps.create_issue_pr.outputs.pull_request_action }}"
+    assert "process.env.ISSUE_PR_ACTION" in script
     assert "github.rest.issues.updateComment" in script
 
 
@@ -783,6 +1107,8 @@ def test_publish_delivery_without_a_diff_only_succeeds_for_missing_pr_recovery()
     assert '未发布：${process.env.CODEX_GATE_REASON || "未产生仓库改动。"}' in response_script
     assert 'if [ "$DELIVERY" = "publish" ] && [ "$GATE_NO_CHANGES" = "true" ]; then' in final_status_script
     assert 'if [ "$CREATED_PR_OUTCOME" = "success" ]; then' in final_status_script
+    assert '[ "$IS_PR" != "true" ] && [ "$CREATED_PR_OUTCOME" != "success" ]' in final_status_script
+    assert '[ -z "$EXISTING_PR_NUMBER" ] && [ "$CREATED_PR_OUTCOME" != "success" ]' not in final_status_script
 
 
 def test_one_progress_comment_is_created_then_updated_throughout_the_run():
