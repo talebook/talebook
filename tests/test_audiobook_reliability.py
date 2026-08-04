@@ -1,6 +1,4 @@
 import datetime
-import hashlib
-import json
 import sys
 import tempfile
 from pathlib import Path
@@ -18,9 +16,7 @@ from webserver.services.audiobook import (
     audiobook_job_plan,
     create_audiobook_job_plan,
     merge_revision_manifest,
-    normalize_voicebook_script,
     read_script_workspace,
-    split_script_text,
 )
 
 
@@ -189,6 +185,77 @@ def test_event_sequence_is_idempotent_and_renews_lease():
         session.close()
 
 
+def test_inspect_completion_keeps_only_bounded_voicebook_quality_counters():
+    session_maker = _session_maker()
+    with tempfile.TemporaryDirectory() as directory:
+        scheduler = _scheduler(session_maker, AudiobookStorage(directory))
+        session = session_maker()
+        now = datetime.datetime.now()
+        edition = models.AudiobookEdition(
+            book_id=1,
+            status="draft",
+            engine="edgetts",
+            created_by=1,
+            create_time=now,
+            update_time=now,
+        )
+        session.add(edition)
+        session.flush()
+        job = models.AudiobookJob(
+            book_id=1,
+            edition_id=edition.id,
+            creator_id=1,
+            status="inspecting",
+            phase="INSPECTING",
+            config={},
+            config_hash="inspect-report",
+            data={"plan": create_audiobook_job_plan("advanced", now)},
+            create_time=now,
+            update_time=now,
+        )
+        session.add(job)
+        session.commit()
+
+        scheduler._consume_event(
+            job.id,
+            {
+                "seq": 1,
+                "event": "completed",
+                "normalization": {
+                    "version": 1,
+                    "chapters_before": 24,
+                    "chapters_after": 23,
+                    "segments_before": "not-an-integer",
+                    "segments_after": 1_000_000_001,
+                    "removed_chapter_count": 1,
+                    "renamed_chapter_count": 20,
+                    "removed_noncontent_block_count": 8,
+                    "locator_unmapped_count": -2,
+                    "details": ["must-not-be-persisted"],
+                },
+            },
+        )
+
+        session.expire_all()
+        updated = session.get(models.AudiobookJob, job.id)
+        assert updated.data["normalization"] == {
+            "version": 1,
+            "chapters_before": 24,
+            "chapters_after": 23,
+            "segments_after": 1_000_000_000,
+            "removed_chapter_count": 1,
+            "renamed_chapter_count": 20,
+            "removed_noncontent_block_count": 8,
+            "locator_unmapped_count": 0,
+        }
+        assert "normalization" not in updated.data["last_event"]
+
+        scheduler._consume_event(job.id, {"seq": 2, "event": "completed"})
+        session.expire_all()
+        assert "normalization" not in session.get(models.AudiobookJob, job.id).data
+        session.close()
+
+
 def test_generation_defaults_are_written_to_voicebook_role_table():
     session_maker = _session_maker()
     with tempfile.TemporaryDirectory() as directory:
@@ -225,98 +292,6 @@ def test_generation_defaults_are_written_to_voicebook_role_table():
         contents = script.read_text(encoding="utf-8")
         assert "旁白 | 旁白 | 人类 | 男 | 中年 | 中国 | 沉稳 | x1.25 |" in contents
         assert "韩立 | 主角 | 人类 | 男 | 青年 | 中国 | 克制 | x1.25 | edgetts=zh-CN-YunxiNeural" in contents
-
-
-def test_sentence_aware_script_splitting_targets_fifty_and_caps_eighty_characters():
-    text = "风停了。" + "甲" * 55 + "，" + "乙" * 45 + "。天边亮起微光，我们沿着长路继续向前。"
-    chunks = split_script_text(text)
-
-    assert "".join(chunk for chunk, _, _ in chunks) == text
-    assert all(0 < len(chunk) <= 80 for chunk, _, _ in chunks)
-    assert len(chunks) >= 2
-    assert any(28 <= len(chunk) <= 60 for chunk, _, _ in chunks)
-
-
-def test_script_normalization_drops_css_recovers_title_and_rewrites_locators():
-    with tempfile.TemporaryDirectory() as directory:
-        root = Path(directory)
-        script = root / "book.script"
-        locators = root / "book.script.locators.json"
-        long_text = "第 十 八 章 " + "雨停了。村民推开窗户，看见河面升起薄雾。" * 5
-        css_prose = "本章介绍 CSS 的排版用途，body { color: red; } 只是书中引用的示例，不应作为样式残留删除。"
-        script.write_text(
-            f"""---
-格式: voicebook-script
-版本: 1
-章节来源:
-  '1': Text/titlepage.xhtml
-  '2': Text/index_split_000.xhtml
-定位文件: book.script.locators.json
----
-
-## 角色表
-# 角色 | 定位 | 类型 | 性别 | 年龄段 | 地域 | 音色描述 | 语速 | 音色覆盖
-旁白 | 旁白 | 人类 | 男 | 中年 | 中国 | 沉稳 | x1.0 |
-
-## 章节 0001 | titlepage
-
-[旁白] @page {{padding: 0pt; margin:0pt}}
-[旁白] body {{ text-align: center; padding:0pt; margin: 0pt; }}
-
-## 章节 0002 | index_split_000
-
-[旁白] {long_text}
-[旁白] {css_prose}
-""",
-            encoding="utf-8",
-        )
-        segment_hash = hashlib.sha256(f"旁白\0{long_text}".encode()).hexdigest()
-        locators.write_text(
-            json.dumps(
-                {
-                    "format": "voicebook-locators",
-                    "version": 1,
-                    "segments": [
-                        {
-                            "chapter_number": 2,
-                            "segment_sha256": segment_hash,
-                            "occurrence": 0,
-                            "locator": {
-                                "type": "epub-dom-text",
-                                "href": "Text/index_split_000.xhtml",
-                                "dom_path": "html[1]/body[1]/p[1]",
-                                "start_char": 0,
-                                "end_char": len(long_text),
-                            },
-                        }
-                    ],
-                },
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
-
-        report = normalize_voicebook_script(script)
-        workspace = read_script_workspace(script)
-        locator_payload = json.loads(locators.read_text(encoding="utf-8"))
-        normalized_script = script.read_bytes()
-        normalized_locators = locators.read_bytes()
-        second_report = normalize_voicebook_script(script)
-
-        assert report["removed_style_lines"] == 2
-        assert report["removed_chapters"] == [{"number": 1, "title": "titlepage"}]
-        assert report["renamed_chapters"] == [{"number": 2, "from": "index_split_000", "to": "第十八章"}]
-        assert report["structural_changed"]
-        assert [(chapter["number"], chapter["title"]) for chapter in workspace["chapters"]] == [(1, "第十八章")]
-        assert all(len(line.split("] ", 1)[1]) <= 80 for line in workspace["chapters"][0]["lines"])
-        assert any("本章介绍 CSS" in line for line in workspace["chapters"][0]["lines"])
-        assert "## 章节 0001 | index_split_000" not in script.read_text(encoding="utf-8")
-        assert all(item["chapter_number"] == 1 for item in locator_payload["segments"])
-        assert locator_payload["segments"][0]["locator"]["start_char"] > 0
-        assert second_report["removed_style_lines"] == 0
-        assert not second_report["structural_changed"]
-        assert script.read_bytes() == normalized_script
-        assert locators.read_bytes() == normalized_locators
 
 
 def test_single_chapter_revision_manifest_preserves_unselected_chapters():

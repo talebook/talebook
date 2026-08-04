@@ -1241,7 +1241,7 @@
     "confirmAndGenerate": "Confirm and Generate",
     "regenerateChapter": "Save and Regenerate Chapter",
     "regenerateBook": "Regenerate Full Book",
-    "normalizationSummary": "Script cleanup removed {styles} style lines and {removed} non-content chapters, and renamed {renamed} technical chapter titles.",
+    "normalizationSummary": "Voicebook checked the new script: chapters {chaptersBefore} → {chaptersAfter}, segments {segmentsBefore} → {segmentsAfter}; removed {removed} non-content chapters and {blocks} non-content blocks, renamed {renamed} chapter titles, and left {unmapped} segments without precise locators.",
     "characters": "Characters and Voices",
     "chapterText": "Chapter Dialogue",
     "characterCasting": "Character Cast",

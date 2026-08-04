@@ -446,6 +446,13 @@ description: 高级模式测试
 
     def test_completed_edition_can_create_edit_and_regenerate_chapter_revision(self):
         source_id = self.seed_published_edition()
+        storage = AudiobookStorage()
+        source_directory = storage.edition_dir(source_id)
+        source_script = source_directory / "book.script"
+        source_locator = source_directory / "book.script.locators.json"
+        source_locator.write_bytes(b'{"format":"voicebook-locators","segments":[]}\n')
+        source_script_bytes = source_script.read_bytes()
+        source_locator_bytes = source_locator.read_bytes()
 
         created = self.json(f"/api/audio/{source_id}/revisions", method="POST", body="{}")
 
@@ -454,6 +461,11 @@ description: 高级模式测试
         self.assertEqual(created["edition"]["revision_of_edition_id"], source_id)
         self.assertEqual(created["job"]["status"], "awaiting_review")
         self.assertTrue(created["job"]["script_available"])
+        self.assertNotIn("normalization", created["job"]["data"])
+        self.assertFalse(created["job"]["data"]["revision"]["structural_changed"])
+        candidate_directory = storage.edition_dir(created["edition"]["id"])
+        self.assertEqual((candidate_directory / "book.script").read_bytes(), source_script_bytes)
+        self.assertEqual((candidate_directory / "book.script.locators.json").read_bytes(), source_locator_bytes)
         job_id = created["job"]["id"]
         workspace = self.json(f"/api/audio-job/{job_id}/workspace")
         self.assertTrue(workspace["workspace"]["editable"])

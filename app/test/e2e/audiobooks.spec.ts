@@ -107,6 +107,9 @@ test.describe('Audiobook production and playback', () => {
         // soon as inspection finishes; no second click should be necessary.
         await expect(page.getByText('角色配音表')).toBeVisible();
         await expect(page.getByText('旁白', { exact: true }).first()).toBeVisible();
+        await expect(page.getByTestId('script-normalization-report')).toContainText('章节 4 → 2');
+        await expect(page.getByTestId('script-normalization-report')).toContainText('清理 8 个非内容块');
+        expect(await page.getByTestId('script-normalization-report').evaluate(element => element.scrollHeight <= element.clientHeight)).toBeTruthy();
 
         await page.getByRole('tab', { name: '单章对白' }).click();
         const editor = page.locator('.script-editor textarea');
@@ -143,7 +146,7 @@ test.describe('Audiobook production and playback', () => {
         await page.getByTestId('create-audio-revision').click();
 
         await expect(page).toHaveURL('/audio-job/1');
-        await expect(page.getByTestId('script-normalization-report')).toContainText('移除 2 条样式文本');
+        await expect(page.getByTestId('script-normalization-report')).toHaveCount(0);
         await page.getByRole('tab', { name: '单章对白' }).click();
         await page.locator('.script-editor textarea').fill('[旁白] 海雾散开以后，码头终于露出了清晰的轮廓。');
         await page.getByTestId('regenerate-current-chapter').click();

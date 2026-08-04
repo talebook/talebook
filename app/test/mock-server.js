@@ -450,7 +450,17 @@ const workspacePayload = () => ({
     { number: 2, title: '第二章 灯塔来信', volume: '', lines: ['[旁白] 灯塔在远处亮起。'] },
   ],
   editable: true,
-  normalization: {},
+  normalization: {
+    version: 1,
+    chapters_before: 4,
+    chapters_after: 2,
+    segments_before: 2,
+    segments_after: 4,
+    removed_chapter_count: 2,
+    renamed_chapter_count: 2,
+    removed_noncontent_block_count: 8,
+    locator_unmapped_count: 0,
+  },
   revision_info: {},
 });
 
@@ -524,7 +534,7 @@ router.post('/api/audio/:editionId/revisions', eventHandler((event) => {
   audiobookJobPolls = 0;
   audiobookWorkspace = {
     ...workspacePayload(),
-    normalization: { removed_style_lines: 2, removed_chapters: [{ number: 1 }], renamed_chapters: [{ number: 2 }] },
+    normalization: {},
     revision_info: job.data.revision,
   };
   return { err: 'ok', edition, job };

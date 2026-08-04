@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>有声书剧本质量、修订版本与单章返工方案</title>
+  <title>已被替代：有声书剧本质量、修订版本与单章返工方案</title>
   <style>
     :root {
       --ink: #172536;
@@ -62,7 +62,7 @@
     .meta { position: relative; z-index: 1; margin-top: 34px; display: flex; flex-wrap: wrap; gap: 9px; }
     .meta span, .pill { padding: 5px 10px; display: inline-flex; align-items: center; border-radius: 999px; font-size: .73rem; font-weight: 750; }
     .meta span { color: #e8f3f5; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.15); }
-    .meta .active { color: #173c2d; background: #8ed0ab; border-color: #8ed0ab; }
+    .meta .superseded { color: #6f3f12; background: #f4cb91; border-color: #f4cb91; }
     section { margin-top: 28px; padding: clamp(24px, 4vw, 42px); background: var(--sheet); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(31, 55, 72, .055); }
     section:first-of-type { border-top: 5px solid var(--cyan); }
     h2 { margin-bottom: 20px; font: 740 clamp(1.55rem, 3vw, 2.25rem)/1.18 Georgia, "Noto Serif SC", serif; }
@@ -113,13 +113,19 @@
     <h1>有声书剧本质量、修订版本与单章返工方案</h1>
     <p>让“识别 → 审查 → 生成 → 发布”从一次性流水线变成可检查、可修订、可局部返工、可回滚的版本链；同时在生成前解决伪章节、CSS 误读和超长文本切片。</p>
     <div class="meta">
-      <span class="active">ACTIVE · 已验证</span>
+      <span class="superseded">SUPERSEDED · 已被替代</span>
       <span>创建日期：2026-08-03</span>
       <span>所属模块：app（主）</span>
       <span>影响范围：webserver / tests / voicebook 集成契约</span>
       <span>需求来源：PR 882 合并后真实体验反馈</span>
     </div>
   </header>
+
+  <section class="decision">
+    <p class="section-index">00 / 替代说明</p>
+    <h2>剧本内容质量职责已归还 Voicebook</h2>
+    <p>本方案中“Talebook 创建修订版时自动规范化旧剧本”的设计违反项目能力边界，已由 <code>design/app/20260803-audiobook-production-boundary.active.html</code> 替代。保留下文仅用于追溯当时的产品设计；其中剧本版本、编辑、返工、候选发布和备份生命周期仍有效，Talebook 内的 EPUB / CSS / 章节 / 切片规范化以及旧剧本补跑设计不再生效。</p>
+  </section>
 
   <section>
     <p class="section-index">01 / 原始诉求与证据</p>

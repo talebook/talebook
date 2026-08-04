@@ -1257,7 +1257,7 @@
     "confirmAndGenerate": "确认并开始生成",
     "regenerateChapter": "保存并重新生成本章",
     "regenerateBook": "整本重新生成",
-    "normalizationSummary": "剧本已自动清理：移除 {styles} 条样式文本、删除 {removed} 个非正文章节、修正 {renamed} 个技术章节名。",
+    "normalizationSummary": "Voicebook 新剧本检查：章节 {chaptersBefore} → {chaptersAfter}，片段 {segmentsBefore} → {segmentsAfter}；移除 {removed} 个非正文章节、清理 {blocks} 个非内容块、修正 {renamed} 个章节名，{unmapped} 个片段缺少精确定位。",
     "characters": "角色与音色",
     "chapterText": "单章对白",
     "characterCasting": "角色配音表",

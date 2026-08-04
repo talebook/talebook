@@ -382,16 +382,21 @@
                     </template>
                 </v-toolbar>
                 <v-alert
-                    v-if="workspace.normalization?.removed_style_lines || workspace.normalization?.removed_chapters?.length || workspace.normalization?.renamed_chapters?.length"
+                    v-if="hasNormalizationReport"
                     type="info"
                     variant="tonal"
                     class="normalization-alert"
                     data-testid="script-normalization-report"
                 >
                     {{ t('audiobook.normalizationSummary', {
-                        styles: workspace.normalization.removed_style_lines || 0,
-                        removed: workspace.normalization.removed_chapters?.length || 0,
-                        renamed: workspace.normalization.renamed_chapters?.length || 0,
+                        chaptersBefore: normalizationReport.chapters_before || 0,
+                        chaptersAfter: normalizationReport.chapters_after || 0,
+                        segmentsBefore: normalizationReport.segments_before || 0,
+                        segmentsAfter: normalizationReport.segments_after || 0,
+                        removed: normalizationReport.removed_chapter_count || 0,
+                        blocks: normalizationReport.removed_noncontent_block_count || 0,
+                        renamed: normalizationReport.renamed_chapter_count || 0,
+                        unmapped: normalizationReport.locator_unmapped_count || 0,
                     }) }}
                 </v-alert>
                 <v-tabs
@@ -649,6 +654,8 @@ const voiceOptions = computed(() => voices.value.map(item => ({
     label: `${item.name} · ${item.gender === 'male' ? t('audiobook.male') : t('audiobook.female')} · ${item.engine}`,
     value: `${item.engine}=${item.voice_id}`,
 })));
+const normalizationReport = computed(() => workspace.value?.normalization || {});
+const hasNormalizationReport = computed(() => Object.keys(normalizationReport.value).length > 0);
 
 watch(() => data.value?.jobs, (jobs) => {
     const selected = String(route.params.jid || '');
@@ -897,7 +904,7 @@ useHead({ title: () => t('audiobook.jobs') });
 .chapter-facts { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 5px 10px; }
 .workspace-card { background: rgb(var(--v-theme-background)); }
 .workspace-card :deep(.v-toolbar-title small) { margin-left: 8px; color: #f1b957; font: 700 .72rem ui-monospace, SFMono-Regular, Menlo, monospace; }
-.normalization-alert { height: auto !important; min-height: 72px; margin: 12px 24px 0; }
+.normalization-alert { flex: 0 0 auto; height: auto !important; min-height: 72px; margin: 12px 24px 0; }
 .normalization-alert :deep(.v-alert__content) { overflow: visible; line-height: 1.5; white-space: normal; }
 .workspace-window { height: calc(100vh - 112px); overflow: auto; }
 .workspace-pane { max-width: 1320px; margin: 0 auto; padding: 32px; }

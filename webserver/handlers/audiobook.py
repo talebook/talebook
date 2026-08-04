@@ -48,7 +48,6 @@ from webserver.services.audiobook import (
     confirm_audiobook_job_plan,
     create_audiobook_job_plan,
     initialize_audiobook_job_plan,
-    normalize_voicebook_script,
     read_script_workspace,
     request_cancel,
     reset_for_retry,
@@ -678,7 +677,6 @@ class AudiobookRevisionCreate(BaseHandler):
             shutil.copytree(source_directory, target_directory)
             target_script = target_directory / script_relative
             target_manifest = target_directory / manifest_relative
-            normalization = normalize_voicebook_script(target_script)
             edition.script_path = storage.relative(target_script)
             edition.manifest_path = storage.relative(target_manifest)
             job = AudiobookJob(
@@ -694,10 +692,9 @@ class AudiobookRevisionCreate(BaseHandler):
                 progress=0.20,
                 data={
                     "inspected": True,
-                    "normalization": normalization,
                     "revision": {
                         "source_edition_id": source.id,
-                        "structural_changed": bool(normalization.get("structural_changed")),
+                        "structural_changed": False,
                     },
                     "plan": create_audiobook_job_plan("advanced", now),
                 },

@@ -17,8 +17,6 @@ import time
 import uuid
 from pathlib import Path
 
-import yaml
-
 from webserver import loader
 from webserver.models import AudiobookChapter, AudiobookEdition, AudiobookJob
 from webserver.services.convert import ConvertService
@@ -30,23 +28,16 @@ ROLE_COLUMNS = 9
 CHAPTER_HEADING = re.compile(r"^##\s+章节\s+(\d+)\s*\|\s*(.*?)(?:\s+#\s*(.+))?$")
 SCRIPT_LINE = re.compile(r"^\[([^\]]+)\]\s+(.+)$")
 PLAN_PHASE_KEYS = ("queue", "inspect", "review", "generate", "finalize", "complete")
-SCRIPT_NORMALIZATION_VERSION = 1
-SCRIPT_SEGMENT_TARGET_CHARS = 50
-SCRIPT_SEGMENT_MIN_CHARS = 28
-SCRIPT_SEGMENT_MAX_CHARS = 80
-GENERIC_CHAPTER_TITLE = re.compile(
-    r"^(?:titlepage|cover(?:page)?|index(?:_split)?[_-]?\d+|chapter[_-]?\d+|[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})$",
-    re.IGNORECASE,
-)
-CHAPTER_TEXT_HEADING = re.compile(
-    r"^\s*(第\s*[0-9０-９一二三四五六七八九十百千万零〇两壹贰叁肆伍陆柒捌玖拾佰仟\s]+\s*"
-    r"(?:章|节|回|幕|集)|(?:序章|序幕|楔子|引子|前言|尾声|终章|后记|译后记|大结局))"
-    r"(?:[\s:：·、-]+)?",
-    re.IGNORECASE,
-)
-CSS_DECLARATION = re.compile(
-    r"(?:margin|padding|font(?:-family|-size|-weight)?|text-align|line-height|color|display|width|height)\s*:",
-    re.IGNORECASE,
+NORMALIZATION_REPORT_KEYS = (
+    "version",
+    "chapters_before",
+    "chapters_after",
+    "segments_before",
+    "segments_after",
+    "removed_chapter_count",
+    "renamed_chapter_count",
+    "removed_noncontent_block_count",
+    "locator_unmapped_count",
 )
 
 
@@ -64,6 +55,20 @@ def stable_site_uuid():
 
     secret = str(CONF.get("cookie_secret", "talebook"))
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"talebook-instance:{secret}"))
+
+
+def _bounded_normalization_report(value):
+    """Keep only bounded counters from Voicebook's optional inspect report."""
+
+    if not isinstance(value, dict):
+        return {}
+    report = {}
+    for key in NORMALIZATION_REPORT_KEYS:
+        item = value.get(key)
+        if isinstance(item, bool) or not isinstance(item, int):
+            continue
+        report[key] = max(0, min(item, 1_000_000_000))
+    return report
 
 
 class AudiobookStorage:
@@ -146,294 +151,6 @@ def _script_sections(path):
 def read_script_workspace(path):
     _, roles, chapters, revision = _script_sections(path)
     return {"characters": roles, "chapters": chapters, "revision": revision}
-
-
-def _segment_locator_key(tag, value):
-    normalized = " ".join(str(value).split())
-    return hashlib.sha256(f"{tag}\0{normalized}".encode("utf-8")).hexdigest()
-
-
-def _script_meta(lines):
-    if not lines or lines[0].strip() != "---":
-        return {}, -1
-    try:
-        end = next(index for index in range(1, len(lines)) if lines[index].strip() == "---")
-    except StopIteration:
-        return {}, -1
-    value = yaml.safe_load("\n".join(lines[1:end])) or {}
-    return (value if isinstance(value, dict) else {}), end
-
-
-def _is_stylesheet_text(value):
-    text = " ".join(str(value).split()).strip()
-    lowered = text.lower()
-    if not text:
-        return False
-    if lowered.startswith(("@page", "@font-face", "<?xml", "<!doctype")):
-        return True
-    selector = re.match(r"^(?:html|body|p|div|h[1-6]|\.[\w-]+|#[\w-]+)(?:\s+[^{}]+)?\s*\{", lowered)
-    return bool(selector and "}" in lowered and CSS_DECLARATION.search(lowered))
-
-
-def _trimmed_range(value, start, end):
-    while start < end and value[start].isspace():
-        start += 1
-    while end > start and value[end - 1].isspace():
-        end -= 1
-    return start, end
-
-
-def _sentence_ranges(value):
-    ranges = []
-    start = 0
-    for match in re.finditer(r"[。！？!?；;…]+[”’\"」』）)]*", value):
-        end = match.end()
-        left, right = _trimmed_range(value, start, end)
-        if left < right:
-            ranges.append((left, right))
-        start = end
-    left, right = _trimmed_range(value, start, len(value))
-    if left < right:
-        ranges.append((left, right))
-    return ranges or ([(0, len(value))] if value else [])
-
-
-def _split_long_range(value, start, end):
-    ranges = []
-    while end - start > SCRIPT_SEGMENT_MAX_CHARS:
-        minimum = start + SCRIPT_SEGMENT_MIN_CHARS
-        maximum = min(end, start + SCRIPT_SEGMENT_MAX_CHARS)
-        target = min(maximum, start + SCRIPT_SEGMENT_TARGET_CHARS)
-        candidates = [
-            match.end()
-            for match in re.finditer(r"[，,、：:）)】\]》〉」』”’]", value[start:maximum])
-            if minimum <= start + match.end() <= maximum
-        ]
-        cut = min(candidates, key=lambda item: abs((start + item) - target)) + start if candidates else maximum
-        left, right = _trimmed_range(value, start, cut)
-        if left < right:
-            ranges.append((left, right))
-        start = cut
-        while start < end and value[start].isspace():
-            start += 1
-    left, right = _trimmed_range(value, start, end)
-    if left < right:
-        ranges.append((left, right))
-    return ranges
-
-
-def split_script_text(value):
-    """Return sentence-aware text ranges targeting roughly fifty characters."""
-
-    text = str(value).strip()
-    units = []
-    for start, end in _sentence_ranges(text):
-        units.extend(_split_long_range(text, start, end))
-    grouped = []
-    for start, end in units:
-        if not grouped:
-            grouped.append([start, end])
-            continue
-        current = grouped[-1]
-        combined_length = end - current[0]
-        current_length = current[1] - current[0]
-        if combined_length <= SCRIPT_SEGMENT_MAX_CHARS and (
-            current_length < SCRIPT_SEGMENT_MIN_CHARS or combined_length <= SCRIPT_SEGMENT_TARGET_CHARS + 10
-        ):
-            current[1] = end
-        else:
-            grouped.append([start, end])
-    if len(grouped) > 1 and grouped[-1][1] - grouped[-1][0] < SCRIPT_SEGMENT_MIN_CHARS:
-        previous = grouped[-2]
-        if grouped[-1][1] - previous[0] <= SCRIPT_SEGMENT_MAX_CHARS:
-            previous[1] = grouped[-1][1]
-            grouped.pop()
-    return [(text[start:end], start, end) for start, end in grouped if text[start:end].strip()]
-
-
-def _normalized_locator(locator, source_text, start, end):
-    if not isinstance(locator, dict):
-        return None
-    value = dict(locator)
-    if isinstance(value.get("start_char"), int) and isinstance(value.get("end_char"), int):
-        base = int(value["start_char"])
-        value["start_char"] = base + start
-        value["end_char"] = base + end
-    value["text_sha256"] = hashlib.sha256(source_text[start:end].encode("utf-8")).hexdigest()
-    return value
-
-
-def _natural_chapter_heading(value):
-    match = CHAPTER_TEXT_HEADING.match(str(value))
-    if not match:
-        return "", 0
-    title = re.sub(r"\s+", "", match.group(1))
-    return title, match.end()
-
-
-def _load_script_locators(path, meta):
-    filename = str(meta.get("定位文件", "")).strip()
-    if not filename:
-        return {}, None
-    candidate = (Path(path).parent / filename).resolve()
-    if candidate.parent != Path(path).parent.resolve() or not candidate.is_file():
-        return {}, None
-    payload = json.loads(candidate.read_text(encoding="utf-8"))
-    entries = {}
-    for item in payload.get("segments", []):
-        key = (int(item.get("chapter_number", 0)), str(item.get("segment_sha256", "")), int(item.get("occurrence", 0)))
-        entries[key] = item.get("locator")
-    return entries, candidate
-
-
-def normalize_voicebook_script(path):
-    """Normalize generated script quality while preserving Voicebook locators."""
-
-    path = Path(path)
-    lines, _, chapters, _ = _script_sections(path)
-    meta, _ = _script_meta(lines)
-    locator_entries, locator_path = _load_script_locators(path, meta)
-    chapter_sources = meta.get("章节来源") if isinstance(meta.get("章节来源"), dict) else {}
-    report = {
-        "version": SCRIPT_NORMALIZATION_VERSION,
-        "chapters_before": len(chapters),
-        "chapters_after": 0,
-        "segments_before": 0,
-        "segments_after": 0,
-        "removed_chapters": [],
-        "renamed_chapters": [],
-        "removed_style_lines": 0,
-        "structural_changed": False,
-    }
-    normalized = []
-    occurrences = {}
-    for chapter in chapters:
-        segments = []
-        for raw in chapter.get("lines", []):
-            match = SCRIPT_LINE.fullmatch(raw)
-            if not match:
-                continue
-            tag, text = match.group(1).strip(), match.group(2).strip()
-            report["segments_before"] += 1
-            key = _segment_locator_key(tag, text)
-            occurrence_key = (chapter["number"], key)
-            occurrence = occurrences.get(occurrence_key, 0)
-            occurrences[occurrence_key] = occurrence + 1
-            locator = locator_entries.get((chapter["number"], key, occurrence))
-            if _is_stylesheet_text(text):
-                report["removed_style_lines"] += 1
-                continue
-            segments.append({"tag": tag, "text": text, "locator": locator})
-
-        original_title = chapter["title"]
-        title = original_title
-        inferred_end = 0
-        if GENERIC_CHAPTER_TITLE.fullmatch(original_title):
-            for segment in segments:
-                title, inferred_end = _natural_chapter_heading(segment["text"])
-                if title:
-                    if inferred_end:
-                        old_text = segment["text"]
-                        start, end = _trimmed_range(old_text, inferred_end, len(old_text))
-                        segment["text"] = old_text[start:end]
-                        segment["locator"] = _normalized_locator(segment["locator"], old_text, start, end)
-                    break
-            if not title:
-                title = f"第{len(normalized) + 1}章"
-
-        segments = [segment for segment in segments if segment["text"]]
-        text_size = sum(len(segment["text"]) for segment in segments)
-        if (
-            GENERIC_CHAPTER_TITLE.fullmatch(original_title)
-            and original_title.lower() in {"titlepage", "cover", "coverpage"}
-            and text_size < 50
-        ):
-            report["removed_chapters"].append({"number": chapter["number"], "title": original_title})
-            continue
-        if title != original_title:
-            report["renamed_chapters"].append({"number": chapter["number"], "from": original_title, "to": title})
-
-        output_segments = []
-        for segment in segments:
-            for chunk, start, end in split_script_text(segment["text"]):
-                output_segments.append(
-                    {
-                        "tag": segment["tag"],
-                        "text": chunk,
-                        "locator": _normalized_locator(segment["locator"], segment["text"], start, end),
-                    }
-                )
-        if not output_segments:
-            report["removed_chapters"].append({"number": chapter["number"], "title": original_title})
-            continue
-        normalized.append(
-            {
-                "old_number": chapter["number"],
-                "number": len(normalized) + 1,
-                "title": title,
-                "volume": chapter["volume"],
-                "source_key": str(chapter_sources.get(str(chapter["number"]), "")),
-                "segments": output_segments,
-            }
-        )
-
-    report["chapters_after"] = len(normalized)
-    report["segments_after"] = sum(len(chapter["segments"]) for chapter in normalized)
-    report["structural_changed"] = bool(
-        report["removed_chapters"]
-        or report["renamed_chapters"]
-        or any(chapter["old_number"] != chapter["number"] for chapter in normalized)
-    )
-    if not normalized:
-        raise ValueError("剧本清理后没有可朗读章节")
-
-    meta["章节来源"] = {str(chapter["number"]): chapter["source_key"] for chapter in normalized if chapter["source_key"]}
-    meta["Talebook规范化"] = {
-        "版本": SCRIPT_NORMALIZATION_VERSION,
-        "目标字数": SCRIPT_SEGMENT_TARGET_CHARS,
-        "最大字数": SCRIPT_SEGMENT_MAX_CHARS,
-    }
-    meta_lines = yaml.safe_dump(meta, allow_unicode=True, sort_keys=False, default_flow_style=False).rstrip().splitlines()
-    role_heading = lines.index("## 角色表")
-    first_chapter = chapters[0]["heading_index"] if chapters else len(lines)
-    updated = ["---", *meta_lines, "---", "", *lines[role_heading:first_chapter]]
-    while updated and not updated[-1].strip():
-        updated.pop()
-    updated.append("")
-    for chapter in normalized:
-        heading = f"## 章节 {chapter['number']:04d} | {chapter['title']}"
-        if chapter["volume"]:
-            heading += f"  # {chapter['volume']}"
-        updated.extend((heading, ""))
-        updated.extend(f"[{segment['tag']}] {segment['text']}" for segment in chapter["segments"])
-        updated.append("")
-    _atomic_text(path, "\n".join(updated).rstrip() + "\n")
-
-    if locator_path:
-        locator_rows = []
-        locator_occurrences = {}
-        for chapter in normalized:
-            for segment in chapter["segments"]:
-                if not segment["locator"]:
-                    continue
-                key = _segment_locator_key(segment["tag"], segment["text"])
-                occurrence_key = (chapter["number"], key)
-                occurrence = locator_occurrences.get(occurrence_key, 0)
-                locator_occurrences[occurrence_key] = occurrence + 1
-                locator_rows.append(
-                    {
-                        "chapter_number": chapter["number"],
-                        "segment_sha256": key,
-                        "occurrence": occurrence,
-                        "locator": segment["locator"],
-                    }
-                )
-        _atomic_text(
-            locator_path,
-            json.dumps({"format": "voicebook-locators", "version": 1, "segments": locator_rows}, ensure_ascii=False, indent=2)
-            + "\n",
-        )
-    return report
 
 
 def create_audiobook_job_plan(mode, created_at=None):
@@ -1074,8 +791,7 @@ class AudiobookScheduler:
                 session.expire_all()
                 job = session.get(AudiobookJob, job_id)
                 edition = session.get(AudiobookEdition, job.edition_id)
-                normalization = normalize_voicebook_script(script)
-                job.data = {**job.data, "inspected": True, "normalization": normalization}
+                job.data = {**job.data, "inspected": True}
                 edition.script_path = self.storage.relative(script)
                 self._apply_generation_defaults(script, job, edition)
                 workspace = read_script_workspace(script)
@@ -1267,6 +983,11 @@ class AudiobookScheduler:
                             "completed_at": timestamp,
                         }
                     )
+            elif name == "completed" and job.status == "inspecting":
+                data.pop("normalization", None)
+                normalization = _bounded_normalization_report(event.get("normalization"))
+                if normalization:
+                    data["normalization"] = normalization
             elif name == "completed" and job.status == "generating":
                 _mark_plan_phase(plan, "generate", "completed", timestamp)
                 job.progress = max(float(job.progress or 0), 0.95)
