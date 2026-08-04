@@ -352,7 +352,13 @@
                 <span v-if="item.extra.upload_history"> {{ t('admin.users.label.uploaded') }}{{ item.extra.upload_history.length }}{{ t('admin.users.label.books') }} </span>
             </template>
             <template #item.actions="{ item }">
-                <v-menu>
+                <span
+                    v-if="store.sys.demo_mode && item.is_demo"
+                    class="text-medium-emphasis text-body-2"
+                >
+                    {{ t('admin.users.label.demoAccountLocked') }}
+                </span>
+                <v-menu v-else>
                     <template #activator="{ props }">
                         <v-btn
                             color="primary"
@@ -501,7 +507,7 @@ const emailRule = (email) => {
     var re = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
     return re.test(email) || t('admin.users.message.invalidEmail');
 };
-const usernameRule = v => ((20 >= v.length && v.length >= 5) && /^[a-z][a-z0-9_]*$/.test(v)) || t('admin.users.message.invalidUsername');
+const usernameRule = v => ((20 >= v.length && v.length >= 2) && /^[a-z][a-z0-9_]*$/.test(v)) || t('admin.users.message.invalidUsername');
 const RE_PASSWORD = /^[-a-zA-Z0-9!@#$%^&*()_+=[\]{};':",./<>?|]*$/;
 const passwordRule = v => ((20 >= v.length && v.length >= 8) && RE_PASSWORD.test(v)) || t('admin.users.message.invalidPassword');
 const nicknameRule = v => v.length >= 2 || t('admin.users.message.invalidNickname');

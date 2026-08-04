@@ -529,7 +529,7 @@
     "pageTitle": "Private Library"
   },
   "validation": {
-    "usernameLength": "Username must be between 5 and 20 characters",
+    "usernameLength": "Username must be between 2 and 20 characters",
     "usernameFormat": "Username must start with a lowercase letter and can only contain lowercase letters, numbers, and underscores",
     "passwordLength": "Password must be between 8 and 20 characters",
     "passwordFormat": "Password contains invalid characters",
@@ -887,7 +887,8 @@
         "permissionEdit": "Edit",
         "permissionDelete": "Delete",
         "permissionPush": "Push",
-        "permissionRead": "Read"
+        "permissionRead": "Read",
+        "demoAccountLocked": "Actions are locked for this account in demo mode"
       },
       "placeholder": {
         "username": "Please enter username, starting with lowercase letters",
@@ -919,7 +920,7 @@
         "invalidEmail": "Invalid email format",
         "invalidNickname": "Nickname must be at least 2 characters",
         "invalidPassword": "Password must be between 8-20 characters",
-        "invalidUsername": "Username must start with a lowercase letter, contain only letters, numbers, and underscores, and be between 5-20 characters",
+        "invalidUsername": "Username must start with a lowercase letter, contain only letters, numbers, and underscores, and be between 2-20 characters",
         "required": "This field is required"
       }
     },
@@ -966,7 +967,7 @@
     "accessCode": "Access Code",
     "codeRule": "Access code is required",
     "completeSetup": "Complete Setup",
-    "userRule": "6 ~ 20 characters",
+    "userRule": "2 ~ 20 characters",
     "passRule": "8 ~ 20 characters",
     "emailRule": "Invalid email format",
     "apiServiceNormal": "API service is normal",

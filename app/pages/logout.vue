@@ -9,7 +9,7 @@
             md="4"
         >
             <v-card elevation="12">
-                <v-toolbar color="blue-grey">
+                <v-toolbar color="primary">
                     <v-toolbar-title />
                 </v-toolbar>
                 <v-card-text>

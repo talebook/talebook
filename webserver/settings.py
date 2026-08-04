@@ -155,6 +155,9 @@ settings = {
     'ALLOW_GUEST_UPLOAD' : False,
     'ALLOW_REGISTER' : False,
     'DEFAULT_USER_PERMISSION' : '',
+    # 公开演示站可开启单账号只读模式；账号需由部署者预先创建。
+    'DEMO_MODE' : False,
+    'DEMO_USERNAME' : 'demo',
     'ALLOW_FEEDBACK' : True,
     'OPDS_ENABLED' : True,
     'ENABLE_WEBDAV_SERVICE' : True,

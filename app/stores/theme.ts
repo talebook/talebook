@@ -41,6 +41,11 @@ export const useThemeStore = defineStore('themePlugin', () => {
     const activeTheme = ref<Theme | null>(readCachedActiveTheme())
     const loading = ref(false)
 
+    function hydrateCachedTheme() {
+        activeTheme.value = readCachedActiveTheme()
+        return activeTheme.value
+    }
+
     async function fetchActiveTheme() {
         const { $backend } = useNuxtApp()
         try {
@@ -85,6 +90,7 @@ export const useThemeStore = defineStore('themePlugin', () => {
     return {
         activeTheme,
         loading,
+        hydrateCachedTheme,
         fetchActiveTheme,
         activate,
         deactivate,
