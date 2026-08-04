@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>浅灰主题侧栏切换修复方案</title>
+  <title>浅灰主题侧栏切换修复方案（已被替代）</title>
   <style>
     :root {
       --fog: #eef0f1;
@@ -83,7 +83,7 @@
       <h1>把残留的 64px<br>彻底收回去</h1>
       <p>浅灰主题把“关闭侧栏”误实现为 rail 模式，并用头像代替菜单符号。本方案移除这组主题特例，让按钮含义、抽屉状态与其余内置主题重新一致。</p>
       <div class="meta">
-        <span class="status">ACTIVE · 已验证</span>
+        <span class="status">SUPERSEDED · 已被替代</span>
         <span>创建日期 2026-08-03</span>
         <span>所属模块 app</span>
         <span>需求来源 GitHub Issue #928</span>
@@ -91,6 +91,11 @@
     </header>
 
     <main>
+      <section>
+        <div class="label">Superseded / 状态纠正</div>
+        <h2>本方案的最终验收依据不足，已由真实环境验收方案替代</h2>
+        <p class="lead">2026-08-04，PR #932 评审指出本方案把短生命周期 mock + Playwright 当作最终验收并提前标记 ACTIVE，不符合前端真实环境验收要求。替代方案为 <code>design/app/20260804-light-gray-sidebar-validation.active.html</code>，其中记录 Docker 真实后端、Chrome DevTools MCP、截图与完整门禁结果。以下内容仅保留为历史实现记录，不再代表当前有效验收结论。</p>
+      </section>
       <section>
         <div class="label">原始诉求 / Evidence</div>
         <h2>用户报告的两个现象来自同一处主题分支</h2>
