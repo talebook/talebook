@@ -10,7 +10,7 @@
                 <!-- 出版社筛选 -->
                 <div class="mb-2">
                     <div class="d-flex align-center">
-                        <span class="mr-3">{{ $t('messages.publisher') }}{{ $t('messages.colon') }}</span>
+                        <span class="filter-label mr-3">{{ $t('messages.publisher') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
                             :column="false"
                             class="flex-grow-1"
@@ -75,7 +75,7 @@
                 <!-- 作者筛选 -->
                 <div class="mb-2">
                     <div class="d-flex align-center">
-                        <span class="mr-3">{{ $t('messages.author') }}{{ $t('messages.colon') }}</span>
+                        <span class="filter-label mr-3">{{ $t('messages.author') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
                             :column="false"
                             class="flex-grow-1"
@@ -140,7 +140,7 @@
                 <!-- 标签筛选 -->
                 <div class="mb-2">
                     <div class="d-flex align-center">
-                        <span class="mr-3">{{ $t('messages.tags') }}{{ $t('messages.colon') }}</span>
+                        <span class="filter-label mr-3">{{ $t('messages.tags') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
                             :column="false"
                             class="flex-grow-1"
@@ -205,7 +205,7 @@
                 <!-- 文件格式筛选 -->
                 <div class="mb-3">
                     <div class="d-flex align-center">
-                        <span class="mr-3">{{ $t('book.format') }}{{ $t('messages.colon') }}</span>
+                        <span class="filter-label mr-3">{{ $t('book.format') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
                             :column="false"
                             class="flex-grow-1"
@@ -268,9 +268,12 @@
                 </div>
 
                 <!-- 连载状态筛选（网络书） -->
-                <div class="mb-3">
+                <div
+                    v-if="store.sys.show_network_library !== false"
+                    class="mb-3"
+                >
                     <div class="d-flex align-center">
-                        <span class="mr-3">{{ $t('network.status.label') }}{{ $t('messages.colon') }}</span>
+                        <span class="filter-label mr-3">{{ $t('network.status.label') }}{{ $t('messages.colon') }}</span>
                         <v-chip-group
                             :column="false"
                             class="flex-grow-1"
@@ -538,6 +541,11 @@ useHead(() => ({
 
 .book-pager {
   margin-top: 30px;
+}
+
+.filter-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 /* 筛选按钮样式 */

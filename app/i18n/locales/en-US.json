@@ -718,6 +718,7 @@
         "siteFooter": "Site Footer",
         "footerExtraHtml": "Extra HTML in Footer",
         "sidebarExtraHtml": "Extra HTML in Sidebar",
+        "showNetworkLibrary": "Show network library entry and serialization filter",
         "showSidebarSys": "Show system information in sidebar",
         "showFeedback": "Show feedback button",
         "feedbackUrl": "Feedback URL",

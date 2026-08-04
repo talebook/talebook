@@ -41,6 +41,22 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
         await expect(page.locator('.settings-nav-item.active')).toHaveText('基础信息');
     });
 
+    test('基础信息中默认启用并可保存关闭网络书库展示开关', async ({ page }) => {
+        await page.goto('/admin/settings');
+        await expect(page.locator('.loading-page')).toBeHidden();
+
+        const checkbox = page.getByRole('checkbox', { name: '显示网络书库入口与连载状态筛选' });
+        await expect(checkbox).toBeVisible();
+        await expect(checkbox).toBeChecked();
+
+        await checkbox.uncheck();
+        await page.locator('.settings-titlebar').getByRole('button', { name: '保存配置' }).click();
+        await expect(checkbox).not.toBeChecked();
+
+        await page.goto('/');
+        await expect(page.locator('nav').getByRole('link', { name: '网络书库' })).toHaveCount(0);
+    });
+
     test('点击导航项跳转到对应分类并高亮', async ({ page }) => {
         await page.goto('/admin/settings');
         await expect(page.locator('.loading-page')).toBeHidden();

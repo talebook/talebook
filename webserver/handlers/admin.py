@@ -452,6 +452,7 @@ class AdminSettings(BaseHandler):
             "SIGNUP_MAIL_TITLE",
             "SOCIALS",
             "SHOW_SIDEBAR_SYS",
+            "SHOW_NETWORK_LIBRARY",
             "OPDS_ENABLED",
             "ENABLE_WEBDAV_SERVICE",
             "WEBDAV_SYNC_FOLDER",

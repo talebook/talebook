@@ -338,9 +338,11 @@ const navItems = computed(() => {
     const items = [
         { key: 'home', icon: 'mdi-home', href: '/', text: t('navigation.home') },
         { key: 'library', icon: 'mdi-book', href: '/library', text: t('navigation.localLibrary') },
-        { key: 'network', icon: 'mdi-cloud-search', href: '/network', text: t('navigation.networkLibrary') },
-        { key: 'audios', icon: 'mdi-book-music', href: '/audios', text: t('navigation.audiobooks'), badge: t('audiobook.beta') },
     ];
+    if (store.sys.show_network_library !== false) {
+        items.push({ key: 'network', icon: 'mdi-cloud-search', href: '/network', text: t('navigation.networkLibrary') });
+    }
+    items.push({ key: 'audios', icon: 'mdi-book-music', href: '/audios', text: t('navigation.audiobooks'), badge: t('audiobook.beta') });
     if (store.user.is_admin) {
         items.push({
             key: 'admin',

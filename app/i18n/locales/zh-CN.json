@@ -748,6 +748,7 @@
         "siteFooter": "网站脚注",
         "footerExtraHtml": "页脚额外 HTML 内容",
         "sidebarExtraHtml": "侧边栏额外 HTML 内容",
+        "showNetworkLibrary": "显示网络书库入口与连载状态筛选",
         "showSidebarSys": "在侧边栏中显示系统信息",
         "showFeedback": "显示反馈按钮",
         "feedbackUrl": "反馈按钮跳转地址",

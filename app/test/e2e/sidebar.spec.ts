@@ -88,6 +88,18 @@ test.describe('Navigation Sidebar', () => {
         await expect(page.getByRole('tab', { name: /已读完 \[1\]/ })).toHaveAttribute('aria-selected', 'true');
     });
 
+    test('Network library entry can be hidden without blocking the route', async ({ page, request }) => {
+        await request.post(`${mockApi}/_test/reset`, {
+            data: { installed: true, showNetworkLibrary: false }
+        });
+
+        await page.goto('/');
+        await expect(page.locator('nav').getByRole('link', { name: '网络书库' })).toHaveCount(0);
+
+        await page.goto('/network');
+        await expect(page.getByRole('heading', { name: '网络书库' })).toBeVisible();
+    });
+
     test('Sidebar stays visible at md width', async ({ page }) => {
         // md 断点（960~1279）下侧栏也应常驻展示，而非被折叠成抽屉
         await page.setViewportSize({ width: 1100, height: 800 });

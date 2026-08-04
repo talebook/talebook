@@ -304,6 +304,7 @@ class TestAppWithoutLogin(TestApp):
         self.assertEqual(d["user"]["is_login"], False)
         self.assertEqual(d["user"]["is_admin"], False)
         self.assertEqual(d["sys"]["books"], 13)
+        self.assertEqual(d["sys"]["show_network_library"], True)
         self.assertEqual(d["sys"]["upload"]["chunk_enabled"], True)
         self.assertEqual(d["sys"]["upload"]["chunk_threshold"], 8 * 1024 * 1024)
         self.assertEqual(d["sys"]["upload"]["chunk_size"], 4 * 1024 * 1024)
@@ -324,6 +325,15 @@ class TestAppWithoutLogin(TestApp):
         finally:
             main.CONF["UPLOAD_CHUNK_ENABLED"] = prev_enabled
             main.CONF["UPLOAD_CHUNK_THRESHOLD"] = prev_threshold
+
+    def test_user_info_reflects_network_library_visibility(self):
+        previous = main.CONF.get("SHOW_NETWORK_LIBRARY", True)
+        try:
+            main.CONF["SHOW_NETWORK_LIBRARY"] = False
+            d = self.json("/api/user/info")
+            self.assertEqual(d["sys"]["show_network_library"], False)
+        finally:
+            main.CONF["SHOW_NETWORK_LIBRARY"] = previous
 
     def test_book(self):
         d = self.json("/api/book/1")
