@@ -30,6 +30,22 @@ def test_pull_request_description_and_design_preview_rules_are_documented():
     ) in instructions
 
 
+def test_design_document_quality_is_not_bound_to_frontend_design_skill():
+    instructions = AGENTS.read_text(encoding="utf-8")
+
+    assert "frontend-design" not in instructions
+    assert all(
+        requirement in instructions
+        for requirement in (
+            "可离线阅读的单文件 HTML",
+            "原始诉求、目标、方案和测试结果",
+            "不添加纯装饰图表",
+            "测试结果应标记为待验证并记录计划验证项",
+            "与本次改动相关的测试失败时不得转为 ACTIVE",
+        )
+    )
+
+
 def test_workflow_changes_require_real_local_act_validation():
     instructions = WORKFLOW_AGENTS.read_text(encoding="utf-8")
 
