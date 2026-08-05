@@ -500,8 +500,8 @@
         <article class="test pass"><strong>Python lint / format · PASS</strong><span><code>ruff check tests/test_codex_workflow.py --no-cache</code>、<code>ruff format --check tests/test_codex_workflow.py</code>、<code>make lint-py-fix</code> 与 <code>make lint-py</code> 均通过；100 个后端文件未被改写。</span></article>
         <article class="test pass"><strong>Actions 静态检查 · PASS</strong><span><code>env GOMODCACHE=/private/tmp/talebook-actionlint-gomodcache go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -config-file .github/actionlint.yaml .github/workflows/codex.yml</code> 无错误输出。</span></article>
         <article class="test limited"><strong>真实 act · 到达外部边界</strong><span><code>act 0.2.82</code> 以临时 <code>issues/opened</code> + <code>bug</code> 事件、<code>-j codex</code>、<code>--pull=false</code> 命中真实 <code>Process Codex request</code> job；本地 dev 容器和 Token Action 启动成功，一次性 RSA 私钥完成 JWT 后在假 App client ID 请求 GitHub API 时得到预期 401。未使用生产凭据。</span></article>
-        <article class="test pass"><strong>Docker 全量回归 · PASS</strong><span><code>make test</code>：800 passed、20 skipped、21 warnings。宿主 <code>make pytest</code> 因 PATH 无裸 <code>pytest</code> 失败；等价 <code>python3 -m pytest</code> 又因缺少 Calibre、quickjs、txt2epub_next 与 Python 3.11 tomllib 在收集期停止，均由标准 Docker 入口替代。</span></article>
-        <article class="test pass"><strong>方案与补丁 · PASS</strong><span><code>make check-design</code>：78 份方案通过；<code>git diff --check</code> 通过。桌面 1440px 与移动 390px 的 WIP、ACTIVE 两轮渲染均无溢出或不可读区域。</span></article>
+        <article class="test pass"><strong>Docker 全量回归 · PASS</strong><span><code>make test</code>：802 passed、20 skipped、21 warnings。宿主 <code>make pytest</code> 因 PATH 无裸 <code>pytest</code> 失败；等价 <code>python3 -m pytest</code> 又因缺少 Calibre、quickjs、txt2epub_next 与 Python 3.11 tomllib 在收集期停止，均由标准 Docker 入口替代。</span></article>
+        <article class="test pass"><strong>方案与补丁 · PASS</strong><span><code>make check-design</code>：87 份方案通过；<code>git diff --check</code> 通过。桌面 1440px 与移动 390px 的 WIP、ACTIVE 两轮渲染均无溢出或不可读区域。</span></article>
       </div>
       <ul class="plain">
         <li>act 的事件 JSON、一次性 RSA 私钥和容器均已清理；没有提交临时文件，也没有使用生产 Secret、真实 OAuth Token 或长期 GitHub Token。</li>
@@ -511,6 +511,6 @@
     </section>
   </main>
 
-  <footer>ACTIVE · 已完成需求复述、grill、用户审查、实现与本地验证。实现基线：Draft PR #935 @ 6ff838b（堆叠于 origin/master）；保留其 PR 正文受控发布契约，不覆盖并行工作。</footer>
+  <footer>ACTIVE · 已完成需求复述、grill、用户审查、实现与本地验证。最终实现基于 origin/master @ d1aecad（已包含 PR #935）；保留其 PR 正文受控发布契约，不覆盖并行工作。</footer>
 </body>
 </html>
