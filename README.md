@@ -54,6 +54,15 @@ A better online books library management website built on Calibre + Vue
 
 从 [Releases](https://github.com/talebook/moke/releases) 页面下载对应平台的安装包（`.msi` / `.dmg` / `.AppImage`），即刻体验桌面端阅读。
 
+## 安卓客户端 — Talebook Android
+
+**[Talebook Android](https://github.com/yangjian1412/talebook-android)** 是社区开发的 Talebook 安卓阅读客户端，既可连接 Talebook 服务器，也可作为本地阅读器使用。
+
+* **在线与离线阅读**：支持从 Talebook 服务器在线阅读或缓存书籍，离线时也能继续阅读；
+* **本地书架**：可添加本地文件夹，阅读 EPUB、PDF 和 TXT 文件；
+* **阅读辅助**：支持阅读进度、书签、笔记、全文搜索、目录跳转和 TTS 朗读；
+* **多服务器与备份**：支持切换多个 Talebook 服务器，并可导入、导出阅读数据；
+
 ## Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/talebook.svg)
 
 部署比较简单，建议采用docker，镜像地址：[dockerhub](https://hub.docker.com/r/talebook/talebook)
