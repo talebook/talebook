@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 书库高基数筛选重设计方案：用可搜索选择替代横向翻页。" />
+    <link rel="icon" href="data:," />
+    <title>让书库筛选在上百个标签中仍可直接命中 · SUPERSEDED</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef4f5;
+        --panel: #fffefa;
+        --ink: #193039;
+        --muted: #526970;
+        --line: #cfdee2;
+        --accent: #0f7896;
+        --accent-soft: #e5f4f7;
+        --blue-soft: #edf7f9;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(15, 120, 150, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1440px, calc(100vw - 28px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card, .side-rail { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(15, 120, 150, .18), rgba(15, 120, 150, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 18px; align-items: start; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #91c8d5; background: linear-gradient(180deg, #f5fbfc 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #91c8d5; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .side-rail { position: sticky; top: 18px; padding: 18px; }
+      .side-rail h2 { margin-bottom: 11px; color: var(--muted); font-size: 12px; letter-spacing: .05em; text-transform: uppercase; }
+      .side-rail ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; }
+      .side-rail li { counter-increment: toc; }
+      .side-rail li + li { margin-top: 5px; }
+      .side-rail a { display: grid; grid-template-columns: 22px 1fr; gap: 7px; padding: 7px 8px; border-radius: 9px; color: #4f5f72; text-decoration: none; font-size: 13px; line-height: 1.35; }
+      .side-rail a::before { color: var(--accent); content: counter(toc, decimal-leading-zero); font: 700 10px/1.8 var(--mono); }
+      .side-rail a:hover { background: var(--accent-soft); }
+      .rail-note { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (max-width: 1120px) {
+        .content-grid { grid-template-columns: 1fr; }
+        .side-rail { position: static; grid-row: 1; }
+        .side-rail ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 10px; }
+        .rail-note { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: min(100vw - 20px, 1440px); padding-top: 10px; }
+        .hero, .card, .side-rail { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .side-rail ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .side-rail, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+      .filter-prototype { margin-top: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: #f7fbfc; }
+      .filter-prototype__head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 13px; color: var(--muted); font-size: 12px; font-weight: 700; }
+      .filter-prototype__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+      .filter-field { min-width: 0; padding: 10px 12px; border: 1px solid #9db9c1; border-radius: 10px; background: #fff; }
+      .filter-field b { display: block; margin-bottom: 4px; color: #31515b; font-size: 11px; }
+      .filter-field span { display: flex; justify-content: space-between; gap: 8px; color: #172f38; font-size: 14px; }
+      .filter-field em { color: var(--muted); font-size: 12px; font-style: normal; }
+      .quick-filter { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; }
+      .quick-filter strong { margin-right: 4px; color: #31515b; font-size: 12px; }
+      .option { padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; color: #435b63; background: #fff; font-size: 12px; }
+      .option.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+      @media (max-width: 720px) {
+        .filter-prototype__grid { grid-template-columns: 1fr; }
+        .filter-prototype__head { align-items: flex-start; flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>让书库筛选在上百个标签中仍可直接命中</h1>
+        <p class="sub">把高基数元数据从横向翻页 chip 改为可搜索目录选择器；保留少量固定选项的直接点选，让桌面与手机都无需横向追逐选项。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip">状态：SUPERSEDED</span>
+          <span class="chip">创建日期：2026-08-04</span>
+          <span class="chip">所属模块：app</span>
+          <span class="chip">影响范围：书库筛选、组件、E2E、验收截图</span>
+          <span class="chip">需求来源：PR #934 评审反馈</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn"><strong>替代说明：</strong>用户明确否决搜索框模式，要求保留原 tag 列表与显示更多。本方案已由 <code>design/app/20260804-progressive-library-chip-filters.active.html</code> 替代；原实现与验证记录保留用于追溯。</div>
+            <div class="callout warn">“这个筛序块左右选择的模式，肯定是不合理的设计啊，很可能这里会有一百多个 tag 的。”</div>
+            <p>PR #934 当前验收截图显示出版社 chip 溢出后由左右箭头翻页。用户进一步要求使用 <code>ui-ux-pro-max</code> 检查并重做。虽然页面只先渲染前 10 项，但“更多”位于同一横向轨道末端，仍要求用户通过空间位置寻找未知选项。</p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul><li>出版社、作者、标签达到上百项时仍可通过输入关键词直接命中，也可展开浏览。</li><li>筛选区在 375px、960px、1440px 视口均无横向翻页和页面级横向溢出。</li><li>选项展示关联书籍数，选择、清空、键盘操作有明确反馈。</li><li>保持当前单选语义、查询参数、元数据接口与网络书库显示开关。</li></ul></article>
+              <article class="choice"><h3>非目标</h3><ul><li>不增加多选、交并集筛选或标签层级。</li><li>不新增服务端搜索接口，也不改变 <code>show=all</code> 返回结构。</li><li>不重做书卡、分页、全局搜索和分类浏览页面。</li><li>不引入新字体、远程资源或独立视觉主题。</li></ul></article>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>3. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>前 10 个出版社在 960px 已放不下</td><td><code>document/screenshots/issue-927/library-network-visibility.png</code></td><td><code>v-chip-group</code> 启用左右翻页，“更多”也可能在视口外。</td></tr>
+                  <tr><td>作者、标签实际可达数万项</td><td><code>tests/cases/big-metadata.db</code> 含 14,951 位作者和 10,945 个标签；<code>webserver/handlers/meta.py</code> 在 <code>show=all</code> 时不设数量上限</td><td>横向定位和全部展开都不能随数据规模增长；可搜索目录是必要能力。</td></tr>
+                  <tr><td>接口已有名称与关联书数</td><td><code>get_category_with_count()</code> 返回 <code>id/name/count</code> 并按数量降序</td><td>前端可直接完成本地搜索、浏览和数量提示，无需改 API。</td></tr>
+                  <tr><td>现有 ACTIVE 方案仅修标题折行</td><td><code>design/app/20260804-network-library-visibility.active.html</code></td><td>该方案未处理高基数选项检索；本方案作为后续用户可见改动独立记录。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>ui-ux-pro-max 检查：</strong>当前设计触犯高严重度的“避免横向滚动”、键盘路径不直观和复杂选项缺少渐进披露；推荐使用带预测结果的 autocomplete，并保留可见字段标签、焦点状态和响应式重排。</div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>4. 方案</h2>
+            <div class="callout good"><strong>方案结论：</strong>把出版社、作者、标签交给同一可复用的 Vuetify autocomplete 组件，组件只负责展示、搜索、数量提示和抛出选中值；页面继续拥有筛选状态和取书请求。格式与连载状态数量固定，改为可换行 chip。清空高基数字段表示“全部”，失败时保留其他筛选与书单并显示既有错误反馈。</div>
+
+            <div class="filter-prototype" role="img" aria-label="桌面端三列可搜索元数据筛选，下方是可换行的格式与连载状态快捷选项">
+              <div class="filter-prototype__head"><span>目录筛选 / 输入关键词或展开浏览</span><span>无横向翻页</span></div>
+              <div class="filter-prototype__grid">
+                <div class="filter-field"><b>出版社</b><span>搜索全部出版社 <em>⌄</em></span></div>
+                <div class="filter-field"><b>作者</b><span>搜索全部作者 <em>⌄</em></span></div>
+                <div class="filter-field"><b>标签</b><span>搜索全部标签 <em>⌄</em></span></div>
+              </div>
+              <div class="quick-filter"><strong>格式</strong><span class="option active">全部</span><span class="option">EPUB</span><span class="option">PDF</span><span class="option">MOBI</span></div>
+              <div class="quick-filter"><strong>连载状态</strong><span class="option active">全部</span><span class="option">连载中</span><span class="option">已完本</span></div>
+            </div>
+
+            <div class="flow" aria-label="筛选交互流程">
+              <article class="step"><span class="label">Input</span><b>输入或展开</b><p>用户输入部分名称，或直接打开按书数降序的选项列表。</p></article>
+              <article class="step"><span class="label">Predict</span><b>即时缩小候选</b><p>autocomplete 在已加载元数据内匹配，并展示每项关联书数。</p></article>
+              <article class="step"><span class="label">Select</span><b>选中或清空</b><p>单选后立即刷新第一页；清空等价于“全部”，不发送该查询参数。</p></article>
+              <article class="step"><span class="label">Reflow</span><b>响应式重排</b><p>桌面三列、平板两列、手机单列；低基数 chip 自动换行。</p></article>
+            </div>
+
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+                <tbody>
+                  <tr><td>高基数控件</td><td>可搜索单选 autocomplete</td><td>兼顾已知目标搜索与未知选项浏览，原生支持键盘。</td><td>横向 chip、分页 chip、全部展开都会把检索成本转嫁给用户。</td></tr>
+                  <tr><td>“全部”表达</td><td>空值 + 字段内“全部”提示</td><td>清除动作自然，不把“全部”伪装成普通元数据。</td><td>把本地化文案写入筛选值会让状态与语言绑定。</td></tr>
+                  <tr><td>数量展示</td><td>下拉项尾部显示 <code>counts.books</code></td><td>复用已有接口和 i18n，帮助判断同名或近似项。</td><td>新增统计请求没有必要。</td></tr>
+                  <tr><td>低基数选项</td><td>换行 chip</td><td>格式和状态通常只有少量项，直接点选更快。</td><td>全部改下拉会降低常用固定选项的可见性。</td></tr>
+                  <tr><td>加载方式</td><td>四类元数据并行加载并显示 loading</td><td>避免作者、标签被串行请求延后，保持输入反馈。</td><td>继续串行会放大慢接口等待。</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>5. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>影响范围</h3><p>新增元数据筛选组件；重排 <code>app/pages/library.vue</code> 筛选区；扩充 mock 高基数数据、组件测试与书库 E2E；更新中英文既有文案复用方式与验收截图。无后端代码改动。</p></article>
+              <article class="choice"><h3>保持不变</h3><p><code>/api/publisher</code> 等接口、<code>/api/library</code> 查询参数、单选行为、分页、网络连载筛选条件、导航与管理员设置均不改变。</p></article>
+            </div>
+            <div class="callout danger"><strong>主要风险：</strong>autocomplete 清空值若仍被拼进查询会产生字符串 <code>null</code>；大量选项若全部同时渲染会影响菜单性能；移动端菜单和键盘可能挤压视口。分别用查询请求断言、Vuetify 虚拟列表、375px 实际渲染与键盘 E2E 缓解。</div>
+            <div class="callout"><strong>回滚：</strong>仅撤销前端组件、页面模板与测试数据即可恢复原 chip 筛选；无配置、数据库或 API 迁移。</div>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>6. 测试与验收结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>组件</td><td><code>npx vitest run test/components/LibraryMetadataFilter.spec.ts</code></td><td>可见标签、搜索配置、数量呈现契约、选择与清空事件。</td><td class="verified">通过，2/2</td></tr>
+                  <tr><td>E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:18000 PLAYWRIGHT_BASE_URL=http://127.0.0.1:13000 npx playwright test test/e2e/library.spec.ts --project=chromium</code></td><td>120 项中搜索并键盘选择；请求参数正确；清空恢复全部；无左右翻页。</td><td class="verified">通过，5/5</td></tr>
+                  <tr><td>大库实测</td><td><code>tests/cases/big-metadata.db</code> 临时副本 + Docker 后端 <code>127.0.0.1:18080</code></td><td>在 24,835 本书、1,663 个出版社、14,951 位作者、10,945 个标签上验证高位候选搜索。</td><td class="verified">通过：命中“新潮社”“西蒙·沙玛”“艳照门徒”，结果分别为 2、1、1 本；无横向溢出</td></tr>
+                  <tr><td>实际渲染</td><td>Chrome DevTools MCP：<code>/library</code>；375px、960px、1440px；明暗主题</td><td>字段重排、菜单、焦点、数量和 chip 换行正确，无页面横向溢出。</td><td class="verified">通过；新版截图为 <code>document/screenshots/issue-927/library-scalable-filters.png</code></td></tr>
+                  <tr><td>质量门禁</td><td><code>npm run lint</code>、<code>npm run build</code>、<code>git diff --check</code>、<code>make check-design</code></td><td>相关门禁通过。</td><td class="verified">通过；lint 仅保留仓库既有 193 条 warning，build 仅有既有 caniuse 与 chunk 提示</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout good"><strong>验收结论：</strong>自动化 mock 用于稳定覆盖 120 项、请求与清空行为；最终浏览器验收连接 <code>big-metadata.db</code> 的真实 Docker 后端。该 fixture 只有元数据库、没有对应电子书文件，因此 Calibre 格式接口在该隔离环境返回空列表；这不影响本次出版社、作者、标签高基数交互结论，也不是本次前端改动造成。</div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>7. 决策记录</h2>
+            <ol>
+              <li><strong>2026-08-04：</strong>用户指出横向选择无法承载上百个标签，并明确要求用 <code>ui-ux-pro-max</code> 检查后重做。</li>
+              <li><strong>2026-08-04：</strong>采用“高基数可搜索、低基数直接点选”的分层方案；保持单选与现有 API 契约。</li>
+              <li><strong>2026-08-04：</strong>现有网络书库可见性 ACTIVE 方案不做实质修改；本方案独立记录后续筛选交互变更。</li>
+              <li><strong>2026-08-04：</strong>按用户要求追加 <code>big-metadata.db</code> 真实验证；确认 14,951 位作者与 10,945 个标签仍可直接搜索，菜单只呈现可视候选且页面无横向溢出。</li>
+            </ol>
+          </section>
+        </main>
+
+        <aside class="side-rail" aria-label="方案目录">
+          <h2>目录卡</h2>
+          <ol>
+            <li><a href="#request">原始诉求</a></li>
+            <li><a href="#goals">目标与边界</a></li>
+            <li><a href="#evidence">现状与证据</a></li>
+            <li><a href="#design">方案</a></li>
+            <li><a href="#impact">影响与风险</a></li>
+            <li><a href="#tests">测试结果</a></li>
+            <li><a href="#decisions">决策记录</a></li>
+          </ol>
+          <p class="rail-note">信息层级像目录卡：先定位问题，再核对契约，最后验证路径。</p>
+        </aside>
+      </div>
+
+      <footer>Talebook internal design · app · SUPERSEDED · 2026-08-04</footer>
+    </div>
+  </body>
+</html>

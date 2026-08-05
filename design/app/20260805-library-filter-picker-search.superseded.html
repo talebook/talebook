@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>书库筛选浮窗搜索方案 · SUPERSEDED</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17242c;
+        --muted: #63727a;
+        --canvas: #edf2f4;
+        --paper: #fff;
+        --line: #d5dfe4;
+        --blue: #2684c7;
+        --blue-soft: #eaf5fb;
+        --green: #287454;
+        --amber: #a76219;
+        --shadow: 0 18px 54px rgba(28, 50, 62, .12);
+        --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: var(--canvas); font: 15px/1.65 var(--sans); }
+      code { padding: .12em .35em; border-radius: 4px; background: #edf1f3; font: .88em/1.5 var(--mono); }
+      .page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 46px; }
+      .hero { position: relative; overflow: hidden; padding: 40px 44px; color: #fff; background: #153f57; border-radius: 18px 18px 5px 18px; box-shadow: var(--shadow); }
+      .hero::after { position: absolute; right: 36px; bottom: 28px; width: 220px; height: 42px; border: 1px solid rgba(255,255,255,.28); border-radius: 7px; box-shadow: 0 12px 0 rgba(255,255,255,.08), 0 24px 0 rgba(255,255,255,.05); content: ""; transform: rotate(-3deg); }
+      .eyebrow { margin: 0 0 10px; color: #9ed3ed; font: 800 11px/1.4 var(--mono); letter-spacing: .13em; text-transform: uppercase; }
+      h1 { max-width: 790px; margin: 0; font-size: clamp(34px, 5vw, 56px); line-height: 1.07; letter-spacing: -.04em; }
+      .lead { max-width: 760px; margin: 18px 0 0; color: #dbeaf1; font-size: 17px; }
+      .meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 22px; }
+      .meta span { padding: 5px 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; font-size: 12px; }
+      .meta .status { color: #573612; background: #ffd8a3; border-color: transparent; font-weight: 800; }
+      .layout { display: grid; grid-template-columns: minmax(0, 1fr) 238px; gap: 20px; margin-top: 20px; }
+      main { display: grid; gap: 16px; }
+      section, aside { background: var(--paper); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(28,50,62,.06); }
+      section { padding: 27px 29px; border-radius: 14px 14px 4px 14px; }
+      h2 { margin: 0 0 14px; font-size: 24px; line-height: 1.25; }
+      p { margin: 9px 0; }
+      ul, ol { margin: 9px 0; padding-left: 1.35em; }
+      li + li { margin-top: 5px; }
+      .quote { margin: 14px 0; padding: 13px 16px; border-left: 4px solid var(--amber); background: #fff6e9; font-size: 17px; }
+      .decision { padding: 15px 17px; border: 1px solid #9dc9df; border-radius: 10px; background: var(--blue-soft); }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+      .note { padding: 14px 15px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfd; }
+      .note b { display: block; margin-bottom: 4px; color: var(--blue); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+      .prototype { margin-top: 16px; padding: 22px; border-radius: 12px; background: rgba(15,34,44,.42); }
+      .dialog { width: min(760px, 100%); margin: 0 auto; overflow: hidden; border-radius: 12px; background: #fff; box-shadow: 0 24px 70px rgba(18,35,44,.28); }
+      .dialog-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+      .dialog-head strong { display: block; }
+      .dialog-head small { display: block; color: var(--muted); font-size: 12px; }
+      .search-strip { padding: 11px 18px; border-bottom: 1px solid var(--line); background: #f7fafb; }
+      .search { display: flex; gap: 9px; align-items: center; height: 40px; padding: 0 12px; border: 1px solid #88afc3; border-radius: 7px; color: var(--muted); background: #fff; }
+      .search b { color: var(--blue); font-size: 18px; }
+      .search span { color: #33464f; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 16px 18px 22px; }
+      .chip { min-height: 32px; padding: 5px 10px; border: 1px solid #cbd5da; border-radius: 6px; color: #405159; background: #fff; font-size: 13px; }
+      .dialog-foot { display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+      .pages { display: flex; gap: 5px; }
+      .pages span { display: grid; place-items: center; min-width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 6px; }
+      .pages .current { color: #fff; background: var(--blue); border-color: var(--blue); }
+      .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      th, td { padding: 10px 11px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #4f6068; background: #f3f6f7; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      .pending { color: var(--amber); font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+      aside { position: sticky; top: 16px; align-self: start; padding: 18px; border-radius: 12px 12px 4px 12px; }
+      aside h2 { margin-bottom: 9px; font: 800 11px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+      aside ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; }
+      aside li { counter-increment: toc; }
+      aside a { display: grid; grid-template-columns: 24px 1fr; padding: 6px; color: var(--muted); text-decoration: none; }
+      aside a::before { color: var(--blue); content: counter(toc, decimal-leading-zero); font: 700 10px/2.4 var(--mono); }
+      footer { padding-top: 20px; color: var(--muted); font-size: 12px; text-align: center; }
+      @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } aside { position: static; grid-row: 1; } aside ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+      @media (max-width: 600px) { .page { width: min(100% - 20px, 1180px); padding-top: 10px; } .hero { padding: 27px 21px; } section { padding: 21px 18px; } .grid { grid-template-columns: 1fr; } .prototype { padding: 8px; } .dialog-foot { align-items: flex-start; flex-direction: column; gap: 8px; } aside ol { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @media print { body { background: #fff; } .page { width: 100%; padding: 0; } .hero, section, aside { box-shadow: none; } .layout { display: block; } aside { display: none; } section, .note, .prototype, .table-wrap { break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <p class="eyebrow">Talebook / App / PR #934</p>
+        <h1>在分类目录上加一条查找带</h1>
+        <p class="lead">浮窗仍是可浏览的标签目录；搜索只在需要时缩小目录，不取代标签列表，也不把主页面重新变成表单。</p>
+        <div class="meta" aria-label="方案元信息">
+          <span class="status">状态：SUPERSEDED</span>
+          <span>创建日期：2026-08-05</span>
+          <span>所属模块：app</span>
+          <span>需求来源：PR #934 用户追加反馈</span>
+        </div>
+      </header>
+
+      <div class="layout">
+        <main>
+          <section id="request">
+            <h2>1. 原始诉求</h2>
+            <div class="quote">“浮窗里面要支持搜索。”</div>
+            <p>上一版已经把上万项元数据放入可分页浮窗，并保留主页面紧凑标签列表。新要求是在浮窗内补充快速定位能力，解决冷门作者、出版社和标签需要连续翻页的问题。</p>
+            <p><strong>替代说明：</strong>搜索交互继续有效，但本方案的 13px / 32px 密度已被 <code>design/app/20260805-library-filter-density-refinement.active.html</code> 的 12px / 28px 高密度规格替代。</p>
+          </section>
+
+          <section id="decision">
+            <h2>2. 结论与边界</h2>
+            <div class="decision"><strong>搜索是浮窗目录的辅助工具。</strong>搜索框固定在标题与滚动标签区之间，对当前已加载的名称做客户端包含匹配；结果沿用每页 100 项的分页和原有单选行为。</div>
+            <div class="grid" style="margin-top: 12px">
+              <article class="note"><b>保留</b>主页面前 10 项、显示更多、紧凑 13px 标签、单选和后端排序。</article>
+              <article class="note"><b>新增</b>名称搜索、结果数、清除入口、无结果状态以及分页自动归一。</article>
+              <article class="note"><b>不做</b>不新增后端接口，不搜索书籍正文，不增加多选、模糊拼音或高级语法。</article>
+              <article class="note"><b>性能</b>最多过滤约 15,000 个短字符串；计算结果缓存，DOM 仍最多显示 100 个标签。</article>
+            </div>
+          </section>
+
+          <section id="visual">
+            <h2>3. 视觉与信息层级</h2>
+            <p><strong>主题：</strong>延续“图书馆目录卡”浮窗，新增一条固定的“查找带”。它像实体目录柜上的检索卡：边界清楚、位置稳定，但不抢走标签目录的主体地位。</p>
+            <ul>
+              <li>搜索区使用中性浅表面和蓝灰边线，输入高度约 40px；标签继续使用 13px、32px 高和 6px 间距。</li>
+              <li>搜索时标题摘要切换为“找到 n / 总数项”，让筛选范围可见；无关键词时仍显示总项数。</li>
+              <li>桌面搜索区与页脚固定，只有标签区域滚动；移动端保持全屏浮窗，搜索区不随结果滚走。</li>
+            </ul>
+            <div class="prototype" aria-label="浮窗搜索示意">
+              <div class="dialog">
+                <div class="dialog-head"><div><strong>选择标签</strong><small>找到 23 / 10,945 项 · 第 1 / 1 页</small></div><span>×</span></div>
+                <div class="search-strip"><div class="search"><b>⌕</b><span>推理</span></div></div>
+                <div class="chips"><span class="chip">推理</span><span class="chip">推理小说</span><span class="chip">侦探·推理</span><span class="chip">本格推理</span><span class="chip">社会派推理</span><span class="chip">推理悬疑</span></div>
+                <div class="dialog-foot"><span>每页 100 项</span><div class="pages"><span>‹</span><span class="current">1</span><span>›</span></div></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="interaction">
+            <h2>4. 交互与可访问性</h2>
+            <ol>
+              <li>打开浮窗时清空上次搜索；没有搜索词时，若已有选中项，仍打开其所在页。</li>
+              <li>输入去除首尾空格后按名称做大小写不敏感的包含匹配，每次变化回到结果第一页。</li>
+              <li>搜索结果继续每页 100 项；选择标签后立即关闭浮窗并刷新书单，主页面显示该选中项。</li>
+              <li>无结果时显示“没有匹配项”和“清除搜索”；清除后恢复完整目录第一页。</li>
+              <li>搜索框有可见标签、清除按钮和键盘焦点；标签继续提供 <code>aria-pressed</code>，浮窗继续支持 Escape。</li>
+            </ol>
+          </section>
+
+          <section id="risks">
+            <h2>5. 风险与回滚</h2>
+            <div class="grid">
+              <article class="note"><b>匹配预期</b>首版只做名称包含匹配，不承诺拼音、同义词或分词；文案使用“输入关键词筛选”说明范围。</article>
+              <article class="note"><b>移动端键盘</b>浮窗打开时不强制聚焦，避免软键盘遮挡浏览；用户点击搜索框后再唤起键盘。</article>
+              <article class="note"><b>性能</b>过滤使用 Vue computed 缓存，分页切片基于过滤结果；不会把全部结果渲染到 DOM。</article>
+              <article class="note"><b>回滚</b>移除查找带和过滤计算即可恢复上一版浮窗；API、URL 与数据库均无变化。</article>
+            </div>
+          </section>
+
+          <section id="tests">
+            <h2>6. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0">
+              <table>
+                <thead><tr><th>层级</th><th>验证内容</th><th>状态</th></tr></thead>
+                <tbody>
+                  <tr><td>组件</td><td><code>npx vitest run test/components/LibraryChipFilter.spec.ts</code>：输入过滤、结果分页、页码重置、空状态、清除、选择与重新打开清空搜索。</td><td class="verified">通过，3/3</td></tr>
+                  <tr><td>E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:18001 PLAYWRIGHT_BASE_URL=http://127.0.0.1:13001 npx playwright test test/e2e/library.spec.ts --project=chromium</code>：120 项 mock、搜索命中、空结果恢复、请求参数、手机键盘与无横向溢出。</td><td class="verified">通过，5/5</td></tr>
+                  <tr><td>真实大库</td><td>Docker 加载 <code>tests/cases/big-metadata.db</code>：24,835 本书、14,951 位作者、10,945 个标签；“推理”命中 49 项，带空格的混合大小写 <code>mYsTeRy</code> 命中 18 项；清除后恢复第一页 100 项。</td><td class="verified">通过</td></tr>
+                  <tr><td>渲染</td><td>Chrome DevTools MCP 实测 375px、960px、1440px，浅色与深色主题；桌面 860px 和手机全屏浮窗的搜索区、滚动结果、空状态均无横向溢出，控制台无告警。</td><td class="verified">通过</td></tr>
+                  <tr><td>门禁</td><td><code>npm run lint</code>（0 error，193 warning）、<code>npm run build</code>、<code>make check-design</code>、<code>git diff --check</code>。</td><td class="verified">通过</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="decisions">
+            <h2>7. 决策记录</h2>
+            <ol>
+              <li><strong>2026-08-05：</strong>用户要求浮窗支持搜索；搜索作为标签浏览的补充，不改变主页面交互。</li>
+              <li><strong>2026-08-05：</strong>选择客户端名称包含匹配，避免增加接口和网络往返。</li>
+              <li><strong>2026-08-05：</strong>搜索区固定、结果继续分页；移动端不自动聚焦，优先保留浏览空间。</li>
+              <li><strong>2026-08-05：</strong>用户反馈标签仍过大，本方案由高密度视觉方案替代；浮窗搜索、分页和选择逻辑保留。</li>
+            </ol>
+          </section>
+        </main>
+
+        <aside aria-label="方案目录">
+          <h2>目录卡</h2>
+          <ol>
+            <li><a href="#request">原始诉求</a></li>
+            <li><a href="#decision">结论与边界</a></li>
+            <li><a href="#visual">视觉层级</a></li>
+            <li><a href="#interaction">交互与无障碍</a></li>
+            <li><a href="#risks">风险与回滚</a></li>
+            <li><a href="#tests">测试计划</a></li>
+            <li><a href="#decisions">决策记录</a></li>
+          </ol>
+        </aside>
+      </div>
+      <footer>Talebook internal design · app · SUPERSEDED · 2026-08-05</footer>
+    </div>
+  </body>
+</html>

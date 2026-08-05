@@ -55,10 +55,16 @@ class TestAdminSettingsSecurity(TestWithAdminUser):
 
     def test_settings_update_allowed_for_admin(self):
         """管理员可以修改配置"""
-        with mock.patch("webserver.loader.SettingsLoader.set_store_path", return_value="/tmp/"):
-            req = json.dumps({"site_title": "TestTitle"})
-            d = self.json("/api/admin/settings", method="POST", body=req)
-            self.assertEqual(d["err"], "ok")
+        conf = loader.get_settings()
+        previous_show_network_library = conf.get("SHOW_NETWORK_LIBRARY", True)
+        try:
+            with mock.patch("webserver.loader.SettingsLoader.set_store_path", return_value="/tmp/"):
+                req = json.dumps({"site_title": "TestTitle", "SHOW_NETWORK_LIBRARY": False})
+                d = self.json("/api/admin/settings", method="POST", body=req)
+                self.assertEqual(d["err"], "ok")
+                self.assertFalse(d["rsp"]["SHOW_NETWORK_LIBRARY"])
+        finally:
+            conf["SHOW_NETWORK_LIBRARY"] = previous_show_network_library
 
     def test_settings_update_chunk_upload_settings(self):
         """管理员可以开关分片上传功能并自定义分片阈值/分片大小"""

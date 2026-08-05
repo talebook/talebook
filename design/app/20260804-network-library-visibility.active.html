@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook Issue #927：网络书库入口与本地书库连载状态筛选的统一可见性方案。" />
+    <link rel="icon" href="data:," />
+    <title>统一网络书库可见性开关 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17262b;
+        --ink-soft: #56676c;
+        --paper: #edf2f1;
+        --sheet: #ffffff;
+        --line: #c8d4d2;
+        --line-strong: #8ca19e;
+        --catalog: #176878;
+        --catalog-soft: #deedf0;
+        --binding: #a1472d;
+        --binding-soft: #f6e8e1;
+        --verified: #2c6b4e;
+        --verified-soft: #e0efe7;
+        --pending: #8d5e17;
+        --pending-soft: #f6eddc;
+        --content: 1140px;
+        font-family: Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: var(--paper); line-height: 1.72; }
+      a { color: var(--catalog); text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--binding); outline-offset: 3px; }
+      code {
+        padding: .1em .38em;
+        color: #134e59;
+        background: var(--catalog-soft);
+        border-radius: 2px;
+        font: 600 .9em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        overflow-wrap: anywhere;
+      }
+      .skip-link { position: fixed; z-index: 10; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+      .document { width: min(calc(100% - 28px), var(--content)); margin: 22px auto 56px; background: var(--sheet); box-shadow: 0 18px 60px rgba(23, 38, 43, .12); }
+      .hero { display: grid; grid-template-columns: 66px minmax(0, 1fr); border-bottom: 1px solid var(--line-strong); }
+      .spine { position: relative; overflow: hidden; color: #fff; background: var(--binding); }
+      .spine span { position: absolute; top: 26px; left: 20px; writing-mode: vertical-rl; font: 800 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .16em; }
+      .hero__body { padding: 52px clamp(24px, 5vw, 66px) 38px; }
+      .kicker, .label, .section-no, .toc strong, th {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: .09em;
+        text-transform: uppercase;
+      }
+      .kicker { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 0 0 24px; color: var(--catalog); font-size: 12px; font-weight: 800; }
+      .state { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; color: var(--verified); background: var(--verified-soft); border: 1px solid var(--verified); }
+      .state::before { width: 7px; height: 7px; background: var(--verified); border-radius: 50%; content: ""; }
+      h1, h2 { font-family: "Songti SC", "Noto Serif SC", STSong, Georgia, serif; }
+      h1 { max-width: 860px; margin: 0; font-size: clamp(38px, 6.2vw, 68px); line-height: 1.04; letter-spacing: -.035em; }
+      .lede { max-width: 820px; margin: 24px 0 0; color: var(--ink-soft); font-size: clamp(17px, 2vw, 20px); }
+      .thesis { display: grid; grid-template-columns: auto minmax(0, 1fr); max-width: 900px; margin-top: 30px; border: 1px solid var(--catalog); background: var(--catalog-soft); }
+      .thesis strong { display: grid; place-items: center; padding: 13px; color: #fff; background: var(--catalog); font: 800 10px/1.3 ui-monospace, monospace; letter-spacing: .12em; text-align: center; }
+      .thesis p { margin: 0; padding: 15px 18px; color: #134e59; font-weight: 700; }
+      .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; margin: 34px 0 0; border: 1px solid var(--line); background: var(--line); }
+      .meta div { min-width: 0; padding: 12px 14px; background: var(--sheet); }
+      .meta dt { color: var(--ink-soft); font-size: 11px; }
+      .meta dd { margin: 4px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+      .layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); }
+      .toc { padding: 38px 24px; border-right: 1px solid var(--line); background: #f6f9f8; }
+      .toc__inner { position: sticky; top: 24px; }
+      .toc strong { color: var(--binding); font-size: 11px; }
+      .toc ol { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: toc; }
+      .toc li { counter-increment: toc; }
+      .toc li + li { margin-top: 10px; }
+      .toc a { display: grid; grid-template-columns: 24px 1fr; gap: 6px; color: var(--ink-soft); text-decoration: none; font-size: 13px; line-height: 1.4; }
+      .toc a::before { color: var(--catalog); content: counter(toc, decimal-leading-zero); font: 700 10px/1.8 ui-monospace, monospace; }
+      main { min-width: 0; padding: 8px clamp(22px, 4vw, 54px) 70px; }
+      section { scroll-margin-top: 20px; padding: 44px 0; border-bottom: 1px solid var(--line); }
+      section:last-child { border-bottom: 0; }
+      .section-head { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 14px; align-items: start; margin-bottom: 22px; }
+      .section-no { padding-top: 7px; color: var(--binding); font-size: 11px; font-weight: 800; }
+      h2 { margin: 0; font-size: clamp(25px, 3.4vw, 36px); line-height: 1.18; letter-spacing: -.02em; }
+      h3 { margin: 24px 0 9px; font-size: 18px; line-height: 1.35; }
+      p { margin: 0 0 14px; }
+      ul, ol { padding-left: 1.25em; }
+      li + li { margin-top: 7px; }
+      .quote, .callout { margin: 18px 0; padding: 17px 19px; }
+      .quote { border-left: 5px solid var(--binding); background: var(--binding-soft); font-size: 18px; }
+      .callout { border-left: 5px solid var(--catalog); background: var(--catalog-soft); }
+      .callout--risk { border-left-color: var(--binding); background: var(--binding-soft); }
+      .callout--pending { border-left-color: var(--pending); background: var(--pending-soft); }
+      .callout p:last-child, .card p:last-child { margin-bottom: 0; }
+      .label { display: block; margin-bottom: 7px; color: var(--catalog); font-size: 10px; font-weight: 800; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .card { min-width: 0; padding: 18px; border: 1px solid var(--line); background: var(--sheet); }
+      .card--accent { border-top: 4px solid var(--catalog); }
+      .card--binding { border-top: 4px solid var(--binding); }
+      .signal-map {
+        display: grid;
+        grid-template-columns: minmax(160px, .9fr) 36px minmax(170px, 1fr) 36px minmax(220px, 1.2fr);
+        align-items: stretch;
+        margin: 22px 0;
+        padding: 18px;
+        color: #fff;
+        background: var(--ink);
+        overflow-x: auto;
+      }
+      .signal-node { min-width: 0; padding: 17px; border: 1px solid #6d8388; background: #203238; }
+      .signal-node b { display: block; margin-bottom: 7px; color: #a8d7df; }
+      .signal-node p { margin: 0; color: #d7e2e4; font-size: 13px; }
+      .signal-arrow { display: grid; place-items: center; color: #a8d7df; font-size: 22px; }
+      .signal-branch { display: grid; gap: 9px; min-width: 220px; }
+      .table-wrap { margin: 18px 0; overflow-x: auto; border: 1px solid var(--line); }
+      table { width: 100%; min-width: 700px; border-collapse: collapse; background: var(--sheet); font-size: 14px; }
+      th, td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #fff; background: var(--ink); font-size: 10px; }
+      tr:last-child td { border-bottom: 0; }
+      .pending { color: var(--pending); font-weight: 800; }
+      .footer { display: flex; justify-content: space-between; gap: 18px; padding: 20px 28px; color: var(--ink-soft); background: #f6f9f8; border-top: 1px solid var(--line); font: 600 11px/1.5 ui-monospace, monospace; }
+
+      @media (max-width: 780px) {
+        .document { width: 100%; margin: 0; box-shadow: none; }
+        .hero { grid-template-columns: 1fr; }
+        .spine { min-height: 12px; }
+        .spine span { display: none; }
+        .hero__body { padding: 34px 20px 28px; }
+        h1 { font-size: clamp(34px, 11vw, 52px); }
+        .meta, .grid { grid-template-columns: 1fr; }
+        .thesis { grid-template-columns: 1fr; }
+        .thesis strong { display: block; text-align: left; }
+        .layout { grid-template-columns: 1fr; }
+        .toc { padding: 20px; border-right: 0; border-bottom: 1px solid var(--line); }
+        .toc__inner { position: static; }
+        .toc ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+        .toc li + li { margin-top: 0; }
+        main { padding: 0 20px 48px; }
+        section { padding: 36px 0; }
+        .section-head { grid-template-columns: 1fr; gap: 3px; }
+        .signal-map { grid-template-columns: 1fr; gap: 9px; }
+        .signal-arrow { transform: rotate(90deg); }
+        .footer { flex-direction: column; }
+      }
+
+      @media (max-width: 440px) {
+        .toc ol { grid-template-columns: 1fr; }
+        .meta div { padding: 11px 12px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .document { width: 100%; margin: 0; box-shadow: none; }
+        .toc, .skip-link { display: none; }
+        .layout { display: block; }
+        .hero__body, main { padding-right: 20px; padding-left: 20px; }
+        h1, h2, h3 { break-after: avoid; }
+        .card, .callout, .signal-node, .table-wrap { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <article class="document">
+      <header class="hero">
+        <div class="spine" aria-hidden="true"><span>TALEBOOK · ISSUE 927 · 2026</span></div>
+        <div class="hero__body">
+          <p class="kicker"><span class="state">ACTIVE · 已验证</span><span>APP / 用户可见性与筛选布局</span></p>
+          <h1>一个开关，<br />收好网络书库入口</h1>
+          <p class="lede">为站点管理员提供向后兼容的网络书库显示设置，让两套侧栏和本地书库筛选服从同一信号；同时修复筛选标题在内容拥挤时逐字换行。</p>
+          <div class="thesis"><strong>核心<br />判断</strong><p>“是否显示网络书库”是站点级展示配置，不是资源权限；默认保持现状，关闭后只收起入口与专属筛选，不阻断直接访问。</p></div>
+          <dl class="meta" aria-label="方案元数据">
+            <div><dt>创建日期</dt><dd>2026-08-04</dd></div>
+            <div><dt>所属模块</dt><dd>app（影响 webserver）</dd></div>
+            <div><dt>当前状态</dt><dd>ACTIVE / 已完成验证</dd></div>
+            <div><dt>需求来源</dt><dd><a href="https://github.com/talebook/talebook/issues/927">GitHub Issue #927</a></dd></div>
+            <div><dt>影响范围</dt><dd>配置、用户系统信息、两套导航、书库筛选、测试</dd></div>
+          </dl>
+        </div>
+      </header>
+
+      <div class="layout">
+        <nav class="toc" aria-label="方案目录">
+          <div class="toc__inner">
+            <strong>Catalog / 目录</strong>
+            <ol>
+              <li><a href="#request">原始诉求</a></li>
+              <li><a href="#goals">目标与边界</a></li>
+              <li><a href="#evidence">现状与证据</a></li>
+              <li><a href="#design">方案与契约</a></li>
+              <li><a href="#impact">影响与风险</a></li>
+              <li><a href="#tests">测试计划</a></li>
+              <li><a href="#decisions">决策记录</a></li>
+            </ol>
+          </div>
+        </nav>
+
+        <main id="main-content">
+          <section id="request">
+            <div class="section-head"><span class="section-no">01 / Intent</span><h2>原始诉求</h2></div>
+            <div class="quote">“如果没有设置网络书库，‘已完本’和‘连载中’就不应该出现；在设置中增加一个是否显示网络书库，控制侧栏入口和这两个筛选选项。”</div>
+            <p>Issue 后续还补充：出版社较多时，筛选行左侧的“出版社”会被横向 chip 挤成两行。维护者要求解决这些问题并提交 PR。</p>
+          </section>
+
+          <section id="goals">
+            <div class="section-head"><span class="section-no">02 / Scope</span><h2>目标与边界</h2></div>
+            <div class="grid">
+              <article class="card card--accent"><span class="label">目标 / Goals</span><ul><li>新增可持久化站点设置 <code>SHOW_NETWORK_LIBRARY</code>。</li><li>同一设置控制经典侧栏、内置主题侧栏与书库连载状态筛选。</li><li>筛选标题在 chip 较多和窄视口下保持单行可读。</li><li>为配置传播、开关两态与布局回归补充自动化测试。</li></ul></article>
+              <article class="card card--binding"><span class="label">非目标 / Non-goals</span><ul><li>不把显示设置升级为权限开关，不拦截 <code>/network</code> 直接访问。</li><li>不自动探测书源数量，也不改变书源启停逻辑。</li><li>不删除网络书元数据，不改变搜索、保存或连载状态接口。</li><li>不隐藏已保存网络书卡片上的状态角标。</li></ul></article>
+            </div>
+          </section>
+
+          <section id="evidence">
+            <div class="section-head"><span class="section-no">03 / Evidence</span><h2>现状、根因与证据</h2></div>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>代码证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>两套侧栏总是显示网络书库</td><td><code>app/components/AppHeader.vue</code>、<code>app/components/themes/BuiltinThemeHeader.vue</code></td><td>两处都要读取同一系统配置，避免主题切换后行为分叉。</td></tr>
+                  <tr><td>本地书库总是显示连载状态筛选</td><td><code>app/pages/library.vue</code></td><td>筛选行应按站点开关条件渲染，关闭时不触发专属接口。</td></tr>
+                  <tr><td>“出版社”被挤成多行</td><td>筛选标题是 flex 子项，当前允许收缩和换行</td><td>为所有筛选标题统一设置 <code>flex: 0 0 auto</code> 与 <code>white-space: nowrap</code>。</td></tr>
+                  <tr><td>截图中的 <code>render_book_list</code> 异常</td><td><code>NetworkBaseHandler</code> 已继承 <code>ListHandler</code>，且 <code>tests/test_network_library.py</code> 已覆盖</td><td>目标分支已修复，本次只做回归验证，不重复改动。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><span class="label">兼容事实</span><p>旧配置文件不存在新键。后端默认值、接口回退值和 Pinia 首屏初始值必须一致为 <code>true</code>，才能保持升级前行为并避免 SSR 首屏闪烁。</p></div>
+          </section>
+
+          <section id="design">
+            <div class="section-head"><span class="section-no">04 / Design</span><h2>方案与契约</h2></div>
+            <div class="callout"><span class="label">方案结论</span><p>配置所有权留在现有后端 settings 体系；<code>/api/user/info</code> 将布尔值投影为 <code>sys.show_network_library</code>，前端只消费该只读系统状态。这样管理员保存、SSR 初始化和主题侧栏共享一条明确的数据路径。</p></div>
+
+            <div class="signal-map" role="img" aria-label="网络书库显示开关从管理员设置传播到系统信息，再分别控制两套侧栏和书库筛选">
+              <article class="signal-node"><b>管理员设置</b><p><code>SHOW_NETWORK_LIBRARY</code><br />默认开启，可持久化</p></article>
+              <div class="signal-arrow" aria-hidden="true">→</div>
+              <article class="signal-node"><b>系统信息</b><p><code>sys.show_network_library</code><br />随用户信息下发</p></article>
+              <div class="signal-arrow" aria-hidden="true">→</div>
+              <div class="signal-branch">
+                <article class="signal-node"><b>两套侧栏</b><p>插入或省略 <code>/network</code> 导航项</p></article>
+                <article class="signal-node"><b>本地书库</b><p>渲染或省略连载状态筛选行</p></article>
+              </div>
+            </div>
+
+            <h3>行为矩阵</h3>
+            <div class="table-wrap" role="region" aria-label="开关行为矩阵" tabindex="0">
+              <table>
+                <thead><tr><th>配置</th><th>侧栏入口</th><th>连载筛选</th><th>直接访问网络书库</th><th>书卡状态角标</th></tr></thead>
+                <tbody>
+                  <tr><td><code>true</code>（默认）</td><td>显示</td><td>显示</td><td>允许</td><td>保持显示</td></tr>
+                  <tr><td><code>false</code></td><td>隐藏</td><td>隐藏</td><td>仍允许</td><td>保持显示</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>不采用</th></tr></thead>
+                <tbody>
+                  <tr><td>默认值</td><td><code>true</code></td><td>旧部署无新键时保持现有入口，避免升级即隐藏已在使用的能力。</td><td>默认关闭会让既有网络书库用户升级后失去导航入口。</td></tr>
+                  <tr><td>显示与权限</td><td>仅控制展示</td><td>符合设置命名；已由用户确认，且不产生未经设计的权限变化。</td><td>路由拦截需要新的授权模型和错误契约，超出 issue 范围。</td></tr>
+                  <tr><td>无书源判断</td><td>由管理员显式设置</td><td>书源可能暂时停用或检测失败，数量不是稳定的产品意图信号。</td><td>按书源数量自动隐藏会造成入口随运行状态抖动。</td></tr>
+                  <tr><td>标题布局</td><td>所有筛选标题统一不收缩、不换行</td><td>解决出版社问题，也避免作者、标签和格式出现同类缺陷。</td><td>只给“出版社”特判会留下重复缺陷。</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="impact">
+            <div class="section-head"><span class="section-no">05 / Safety</span><h2>影响范围、风险与回滚</h2></div>
+            <div class="grid">
+              <article class="card card--accent"><span class="label">影响范围</span><p>后端默认配置与保存白名单、公开系统信息字段、Pinia 初始值、经典和内置主题侧栏、书库筛选布局、中英文文案、后端测试与前端组件/E2E 测试。</p></article>
+              <article class="card card--binding"><span class="label">保持不变</span><p>数据库结构、书源和网络书数据、API 路由与鉴权、直接访问语义、保存和搜索流程、现有 <code>render_book_list</code> 修复。</p></article>
+            </div>
+            <div class="callout callout--risk"><span class="label">主要风险</span><p>两套导航只改一处会导致主题间行为不一致；后端、Pinia 默认值不一致会造成 hydration 闪烁；测试 mock 未同步会产生假通过。通过两套组件断言、开关两态 E2E 和后端系统信息测试共同约束。</p></div>
+            <div class="callout"><span class="label">回滚</span><p>管理员可重新勾选立即恢复入口。代码回滚只需撤销配置投影和条件渲染；无数据迁移、无清理任务，旧配置中遗留的布尔键可安全忽略。</p></div>
+          </section>
+
+          <section id="tests">
+            <div class="section-head"><span class="section-no">06 / Verify</span><h2>测试计划与结果</h2></div>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>计划命令或页面</th><th>关键断言</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>后端完整测试</td><td><code>make test</code></td><td>管理员可保存布尔值；系统信息正确下发；网络列表既有修复不回归。</td><td>通过：798 passed，11 skipped，21 warnings。</td></tr>
+                  <tr><td>前端组件测试</td><td><code>npx vitest run test/components/AppHeader.spec.ts test/components/BuiltinThemeHeader.spec.ts</code></td><td>两套侧栏在开关两态下行为一致。</td><td>通过：2 个文件、9 项测试全部通过。</td></tr>
+                  <tr><td>前端 E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:8000 npx playwright test test/e2e/library.spec.ts test/e2e/sidebar.spec.ts test/e2e/settings.spec.ts --project=chromium</code><br />复核时追加 <code>--grep 'serialization|Network library|网络书库'</code>。</td><td>设置可保存关闭；入口和筛选同步隐藏；出版社标签保持单行；直接访问不受阻。</td><td>本次新增 4 项定向复核全部通过；全命令 14 项中 13 项通过，1 项现有用例因断言旧文案“正在阅读”，页面实际为“在读”而失败，与本改动无关。</td></tr>
+                  <tr><td>实际渲染</td><td>Chrome DevTools MCP：<code>/library</code>、<code>/network</code>；默认主题与 minimal 内置主题；开关两态；960px 与 1440px 视口</td><td>生产构建连接短生命周期 mock API，检查入口、筛选、直接访问、布局和控制台。</td><td>通过：两套导航行为一致；关闭后入口和筛选均为 0；<code>/network</code> 可直达；所有标题为 <code>nowrap</code>、24px 高；控制台无错误。截图：<code>document/screenshots/issue-927/library-network-visibility.png</code>。</td></tr>
+                  <tr><td>后端质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code></td><td>格式和 lint 通过。</td><td>通过：100 个文件格式不变，ruff 无错误。</td></tr>
+                  <tr><td>前端与方案门禁</td><td><code>cd app &amp;&amp; npm run lint</code>、<code>cd app &amp;&amp; npm run build</code>、<code>make check-design</code></td><td>前端 lint 与生产构建通过；激活后无 WIP 且单文件资源约束通过。</td><td>通过：eslint 0 errors（193 条仓库既有 warnings）；Nuxt 生产构建完成；方案门禁通过。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><span class="label">验证结论</span><p>配置保存、系统信息投影、两套导航、本地书库筛选与标签布局均按行为矩阵实现。唯一未通过项是既有 E2E 对当前“在读”文案的陈旧断言，不覆盖本次改动路径；相关新增用例和完整后端测试均已通过。</p></div>
+          </section>
+
+          <section id="decisions">
+            <div class="section-head"><span class="section-no">07 / Log</span><h2>决策记录</h2></div>
+            <ol>
+              <li><strong>2026-08-04：</strong>用户确认显示开关不承担权限职责；关闭后仍允许直接访问网络书库。</li>
+              <li><strong>2026-08-04：</strong>采用默认开启的兼容策略，并以管理员显式设置作为唯一显示意图，不以书源数量自动推断。</li>
+              <li><strong>2026-08-04：</strong>实现与方案一致；浏览器两态验收、后端完整测试、前端构建和质量门禁完成，方案转为 ACTIVE。</li>
+            </ol>
+          </section>
+        </main>
+      </div>
+
+      <footer class="footer"><span>Talebook internal design / app</span><span>ACTIVE · 2026-08-04 · 已验证</span></footer>
+    </article>
+  </body>
+</html>

@@ -31,6 +31,7 @@ const { pushMock, storeState } = vi.hoisted(() => ({
             version: 'test',
             friends: [],
             show_sidebar_sys: false,
+            show_network_library: true,
         },
         user: {
             is_login: false,
@@ -67,6 +68,7 @@ function mountHeader(variant: 'light-gray' | 'minimal' | 'graphite' | 'brass' | 
 describe('BuiltinThemeHeader.vue search', () => {
     beforeEach(() => {
         pushMock.mockReset();
+        storeState.sys.show_network_library = true;
     });
 
     it('uses the search API name query parameter for every shared themed header', async () => {
@@ -113,6 +115,27 @@ describe('BuiltinThemeHeader.vue search', () => {
 });
 
 describe('BuiltinThemeHeader.vue navigation', () => {
+    beforeEach(() => {
+        storeState.sys.show_network_library = true;
+    });
+
+    it('shows the network library link by default', () => {
+        const wrapper = mountHeader('minimal');
+
+        expect(wrapper.text()).toContain('navigation.networkLibrary');
+
+        wrapper.unmount();
+    });
+
+    it('hides the network library link when disabled', () => {
+        storeState.sys.show_network_library = false;
+        const wrapper = mountHeader('minimal');
+
+        expect(wrapper.text()).not.toContain('navigation.networkLibrary');
+
+        wrapper.unmount();
+    });
+
     it('uses the menu icon and fully toggles the light-gray drawer', async () => {
         const wrapper = mountHeader('light-gray');
         const header = wrapper.findComponent(BuiltinThemeHeader).vm as unknown as {

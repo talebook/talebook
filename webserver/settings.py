@@ -168,6 +168,7 @@ settings = {
     'FOOTER_EXTRA_HTML': '',
     'SIDEBAR_EXTRA_HTML': '<img class="ma-auto footer-logo" style="max-width: 130px; height: auto;" src="/logo/link.png">',
     'SHOW_SIDEBAR_SYS': True,
+    'SHOW_NETWORK_LIBRARY': True,
 
     # 首页设置
     'MAIN_PAGE_RANDOM_COUNT': 12,

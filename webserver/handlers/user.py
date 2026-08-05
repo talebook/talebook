@@ -436,6 +436,7 @@ class UserInfo(BaseHandler):
             "sidebar_extra_html": CONF["SIDEBAR_EXTRA_HTML"],
             "header": CONF["HEADER"],
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
+            "show_network_library": CONF.get("SHOW_NETWORK_LIBRARY", True),
             "FEEDBACK_URL": CONF["FEEDBACK_URL"],
             "allow": {
                 "register": CONF["ALLOW_REGISTER"] and not demo_mode.is_demo_mode(CONF),

@@ -13,6 +13,7 @@ const MOCK_DIR = path.join(__dirname, 'e2e/mocks');
 let isInstalled = true;
 let isLoggedIn = true;
 let demoMode = false;
+let showNetworkLibrary = true;
 let users = [];
 let saveStarted = false;
 let saveStatusPolls = 0;
@@ -130,6 +131,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   }
   isLoggedIn = body?.loggedIn !== false;
   demoMode = !!(body && body.demoMode);
+  showNetworkLibrary = body?.showNetworkLibrary !== false;
   console.log('[Mock] isInstalled set to:', isInstalled);
   users = [];
   saveStarted = false;
@@ -554,6 +556,7 @@ router.get('/api/user/info', eventHandler(() => ({
     version: '1.0.0',
     users: 5,
     friends: [],
+    show_network_library: showNetworkLibrary,
     allow: { register: true, download: true, push: true, read: true },
     upload: { chunk_enabled: true, chunk_threshold: 8 * 1024 * 1024, chunk_size: 4 * 1024 * 1024 },
     demo_mode: demoMode
@@ -623,6 +626,7 @@ router.get('/api/admin/settings', eventHandler(() => ({
   settings: {
     site_title: 'Talebook Mock',
     ALLOW_REGISTER: true,
+    SHOW_NETWORK_LIBRARY: showNetworkLibrary,
     SOCIALS: [],
     FRIENDS: [],
     smtp_server: 'smtp.example.com',
@@ -632,10 +636,13 @@ router.get('/api/admin/settings', eventHandler(() => ({
   }
 })));
 
-router.post('/api/admin/settings', eventHandler(() => ({
-  err: 'ok',
-  msg: 'Settings saved'
-})));
+router.post('/api/admin/settings', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body?.SHOW_NETWORK_LIBRARY !== undefined) {
+    showNetworkLibrary = body.SHOW_NETWORK_LIBRARY !== false;
+  }
+  return { err: 'ok', msg: 'Settings saved' };
+}));
 
 router.post('/api/admin/testmail', eventHandler(() => ({
   err: 'ok',
@@ -828,10 +835,33 @@ router.get('/api/library', eventHandler(() => {
   });
 }));
 
+const libraryFilterItems = {
+  publisher: Array.from({ length: 120 }, (_, index) => ({
+    id: index + 1,
+    name: `测试出版社${index + 1}`,
+    count: 120 - index,
+  })),
+  author: Array.from({ length: 120 }, (_, index) => ({
+    id: index + 1,
+    name: `测试作者${index + 1}`,
+    count: 120 - index,
+  })),
+  tag: Array.from({ length: 120 }, (_, index) => ({
+    id: index + 1,
+    name: `测试标签${index + 1}`,
+    count: 120 - index,
+  })),
+  format: [
+    { id: 'EPUB', name: 'EPUB', count: 96 },
+    { id: 'PDF', name: 'PDF', count: 18 },
+    { id: 'MOBI', name: 'MOBI', count: 6 },
+  ],
+};
+
 for (const filter of ['publisher', 'author', 'tag', 'format']) {
   router.get(`/api/${filter}`, eventHandler(() => ({
     err: 'ok',
-    items: [],
+    items: libraryFilterItems[filter],
   })));
 }
 

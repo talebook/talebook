@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>书库筛选高密度视觉方案</title>
+    <style>
+      :root { color-scheme: light; --ink:#18262d; --muted:#68767d; --paper:#fff; --canvas:#edf2f4; --line:#d5dfe4; --blue:#2684c7; --blue-soft:#eaf5fb; --amber:#a76219; --green:#287454; --sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; --mono:ui-monospace,SFMono-Regular,Menlo,monospace; }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin:0; color:var(--ink); background:var(--canvas); font:15px/1.65 var(--sans); }
+      code { padding:.12em .35em; border-radius:4px; background:#edf1f3; font:.88em/1.5 var(--mono); }
+      .page { width:min(1160px,calc(100% - 32px)); margin:auto; padding:24px 0 46px; }
+      .hero { position:relative; overflow:hidden; padding:38px 42px; color:#fff; background:#153f57; border-radius:18px 18px 5px 18px; box-shadow:0 18px 54px rgba(28,50,62,.12); }
+      .hero::after { position:absolute; right:34px; bottom:28px; width:230px; height:28px; border:1px solid rgba(255,255,255,.28); border-radius:5px; box-shadow:0 9px 0 rgba(255,255,255,.09),0 18px 0 rgba(255,255,255,.05); content:""; transform:rotate(-2deg); }
+      .eyebrow { margin:0 0 9px; color:#9ed3ed; font:800 11px/1.4 var(--mono); letter-spacing:.13em; text-transform:uppercase; }
+      h1 { max-width:780px; margin:0; font-size:clamp(34px,5vw,54px); line-height:1.07; letter-spacing:-.04em; }
+      .lead { max-width:760px; margin:17px 0 0; color:#dbeaf1; font-size:17px; }
+      .meta { display:flex; flex-wrap:wrap; gap:7px; margin-top:21px; }
+      .meta span { padding:5px 9px; border:1px solid rgba(255,255,255,.2); border-radius:999px; font-size:12px; }
+      .meta .status { color:#573612; background:#ffd8a3; border-color:transparent; font-weight:800; }
+      .layout { display:grid; grid-template-columns:minmax(0,1fr) 230px; gap:18px; margin-top:18px; }
+      main { display:grid; gap:15px; }
+      section,aside { background:var(--paper); border:1px solid var(--line); box-shadow:0 8px 24px rgba(28,50,62,.06); }
+      section { padding:25px 27px; border-radius:13px 13px 4px 13px; }
+      h2 { margin:0 0 13px; font-size:23px; line-height:1.25; }
+      p { margin:8px 0; }
+      ul,ol { margin:8px 0; padding-left:1.35em; }
+      li+li { margin-top:5px; }
+      .quote { margin:13px 0; padding:12px 15px; border-left:4px solid var(--amber); background:#fff6e9; font-size:17px; }
+      .decision { padding:14px 16px; border:1px solid #9dc9df; border-radius:9px; background:var(--blue-soft); }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+      .note { padding:13px 14px; border:1px solid var(--line); border-radius:9px; background:#fbfcfd; }
+      .note b { display:block; margin-bottom:3px; color:var(--blue); font-size:11px; letter-spacing:.07em; text-transform:uppercase; }
+      .prototype { margin-top:15px; padding:14px; border:1px solid #bdcdd5; border-radius:10px; background:#f8fafb; }
+      .filter-row { display:grid; grid-template-columns:68px minmax(0,1fr); gap:6px; align-items:start; }
+      .label { padding-top:4px; font-size:12px; font-weight:650; }
+      .chips { display:flex; flex-wrap:wrap; gap:4px; }
+      .chip { display:inline-flex; align-items:center; height:28px; padding:0 8px; border:1px solid #cbd5da; border-radius:5px; color:#405159; background:#fff; font-size:12px; line-height:1; }
+      .chip.active { color:#fff; background:var(--blue); border-color:var(--blue); }
+      .chip.more { color:var(--blue); background:var(--blue-soft); border-style:dashed; font-weight:700; }
+      .measure { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px; }
+      .measure div { padding:12px; border:1px solid var(--line); border-radius:8px; background:#fbfcfd; }
+      .measure strong { display:block; color:var(--blue); font:800 24px/1 var(--mono); }
+      .measure span { color:var(--muted); font-size:12px; }
+      .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:9px; }
+      table { width:100%; min-width:680px; border-collapse:collapse; font-size:13px; }
+      th,td { padding:9px 10px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { color:#4f6068; background:#f3f6f7; }
+      th:last-child,td:last-child { border-right:0; }
+      tr:last-child td { border-bottom:0; }
+      .pending { color:var(--amber); font-weight:800; }
+      .verified { color:var(--green); font-weight:800; }
+      aside { position:sticky; top:16px; align-self:start; padding:17px; border-radius:11px 11px 4px 11px; }
+      aside h2 { margin-bottom:8px; font:800 11px/1.4 var(--mono); letter-spacing:.1em; text-transform:uppercase; }
+      aside ol { margin:0; padding:0; list-style:none; counter-reset:toc; }
+      aside li { counter-increment:toc; }
+      aside a { display:grid; grid-template-columns:24px 1fr; padding:5px; color:var(--muted); text-decoration:none; }
+      aside a::before { color:var(--blue); content:counter(toc,decimal-leading-zero); font:700 10px/2.4 var(--mono); }
+      footer { padding-top:19px; color:var(--muted); font-size:12px; text-align:center; }
+      @media (max-width:860px) { .layout { grid-template-columns:1fr; } aside { position:static; grid-row:1; } aside ol { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); } }
+      @media (max-width:600px) { .page { width:min(100% - 20px,1160px); padding-top:10px; } .hero { padding:26px 20px; } section { padding:20px 17px; } .grid,.measure { grid-template-columns:1fr; } .filter-row { grid-template-columns:1fr; gap:3px; } .label { padding-top:0; } aside ol { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+      @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+      @media print { body { background:#fff; } .page { width:100%; padding:0; } .hero,section,aside { box-shadow:none; } .layout { display:block; } aside { display:none; } section,.note,.prototype,.table-wrap { break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <p class="eyebrow">Talebook / App / PR #934</p>
+        <h1>让筛选像目录索引，而不是一排按钮</h1>
+        <p class="lead">搜索与分页逻辑保持不变，再把标签从“控件尺寸”降到“索引尺寸”，让高密度元数据更适合扫读。</p>
+        <div class="meta" aria-label="方案元信息">
+          <span class="status">状态：ACTIVE</span><span>创建日期：2026-08-05</span><span>所属模块：app</span><span>需求来源：PR #934 用户追加反馈</span>
+        </div>
+      </header>
+      <div class="layout">
+        <main>
+          <section id="request">
+            <h2>1. 原始诉求</h2>
+            <div class="quote">“还是太大了。”</div>
+            <p>上一版已经将筛选标签缩到 13px / 32px，但用户仍认为视觉体量过大。本轮只收紧筛选密度，不改变浮窗搜索、分页、单选与主页面前 10 项策略。</p>
+          </section>
+          <section id="decision">
+            <h2>2. 密度决策</h2>
+            <div class="decision"><strong>降到 12px / 28px / 4px。</strong>文字、控件高度和标签间距同时缩小，避免只缩字号却仍保留大按钮轮廓；标题列与面板留白同步收紧。</div>
+            <div class="measure"><div><strong>12px</strong><span>标签与筛选标题字号</span></div><div><strong>28px</strong><span>标签与“显示更多”高度</span></div><div><strong>4px</strong><span>标签横纵间距</span></div></div>
+            <div class="grid" style="margin-top:10px">
+              <article class="note"><b>主页面</b>面板 8px 内边距，筛选行 6px 间距，标题列缩至约 68px。</article>
+              <article class="note"><b>浮窗</b>标签同样使用 12px / 28px / 4px；搜索框仍保持 40px，确保输入可用。</article>
+              <article class="note"><b>保留</b>搜索、结果数、空状态、分页、键盘操作、选中项回显及明暗主题。</article>
+              <article class="note"><b>不做</b>不改变书卡、全局导航、API、排序或数据库；不继续缩到低于 12px。</article>
+            </div>
+          </section>
+          <section id="prototype">
+            <h2>3. 实际比例</h2>
+            <p>视觉签名仍是图书馆目录卡，但标签从按钮感较强的 chip 调整为更接近索引签的紧凑矩形。</p>
+            <div class="prototype">
+              <div class="filter-row"><span class="label">标签：</span><div class="chips"><span class="chip active">全部</span><span class="chip">小说</span><span class="chip">历史</span><span class="chip">中国</span><span class="chip">文学</span><span class="chip">中国文学</span><span class="chip">外国文学</span><span class="chip">书籍</span><span class="chip">文化</span><span class="chip more">显示更多（10935）</span></div></div>
+            </div>
+          </section>
+          <section id="accessibility">
+            <h2>4. 可用性与边界</h2>
+            <ul>
+              <li>12px 是本轮下限，继续缩小会明显损害中英文混排和低分辨率屏幕的辨识度。</li>
+              <li>28px 标签适合高密度扫读；保留 4px 间隔、明显选中色与键盘焦点，避免相邻项混淆。</li>
+              <li>搜索框、关闭按钮和分页按钮不跟随标签缩到 28px，保持核心导航与输入操作的稳定性。</li>
+              <li>长标签继续省略并通过 title 暴露全文；手机浮窗仍全屏，标签区独立滚动。</li>
+            </ul>
+          </section>
+          <section id="tests">
+            <h2>5. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0">
+              <table><thead><tr><th>层级</th><th>验证内容</th><th>状态</th></tr></thead><tbody>
+                <tr><td>组件</td><td><code>npx vitest run test/components/LibraryChipFilter.spec.ts</code>：搜索过滤、分页、空状态、选择与重新打开。</td><td class="verified">通过，3/3</td></tr>
+                <tr><td>E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:18001 PLAYWRIGHT_BASE_URL=http://127.0.0.1:13001 npx playwright test test/e2e/library.spec.ts --project=chromium</code>：主页面、快捷筛选和浮窗标签均断言 12px 字号与不高于 30px，搜索、分页、手机键盘和选择流程无回归。</td><td class="verified">通过，5/5</td></tr>
+                <tr><td>真实大库</td><td>Docker 加载 <code>tests/cases/big-metadata.db</code>：24,835 本书、1,663 家出版社、14,951 位作者、10,945 个标签；Chrome DevTools MCP 实测 375px、960px、1440px 与明暗主题，标签计算样式为 12px / 28px，面板、浮窗和搜索结果均无横向溢出，控制台无告警。</td><td class="verified">通过</td></tr>
+                <tr><td>门禁</td><td><code>npm run lint</code>（0 error，193 warning）、<code>npm run build</code>、<code>make check-design</code>、<code>git diff --check</code>。</td><td class="verified">通过</td></tr>
+              </tbody></table>
+            </div>
+          </section>
+          <section id="decisions">
+            <h2>6. 决策记录</h2>
+            <ol><li><strong>2026-08-05：</strong>用户确认 13px / 32px 仍过大，改用 12px / 28px / 4px 的高密度规格。</li><li><strong>2026-08-05：</strong>搜索框、分页与关闭按钮保持原尺寸，只压缩可重复出现的大量标签。</li></ol>
+          </section>
+        </main>
+        <aside aria-label="方案目录"><h2>目录卡</h2><ol><li><a href="#request">原始诉求</a></li><li><a href="#decision">密度决策</a></li><li><a href="#prototype">实际比例</a></li><li><a href="#accessibility">可用性边界</a></li><li><a href="#tests">测试计划</a></li><li><a href="#decisions">决策记录</a></li></ol></aside>
+      </div>
+      <footer>Talebook internal design · app · ACTIVE · 2026-08-05</footer>
+    </div>
+  </body>
+</html>
