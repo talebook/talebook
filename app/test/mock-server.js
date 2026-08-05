@@ -835,12 +835,33 @@ router.get('/api/library', eventHandler(() => {
   });
 }));
 
+const libraryFilterItems = {
+  publisher: Array.from({ length: 120 }, (_, index) => ({
+    id: index + 1,
+    name: `测试出版社${index + 1}`,
+    count: 120 - index,
+  })),
+  author: Array.from({ length: 120 }, (_, index) => ({
+    id: index + 1,
+    name: `测试作者${index + 1}`,
+    count: 120 - index,
+  })),
+  tag: Array.from({ length: 120 }, (_, index) => ({
+    id: index + 1,
+    name: `测试标签${index + 1}`,
+    count: 120 - index,
+  })),
+  format: [
+    { id: 'EPUB', name: 'EPUB', count: 96 },
+    { id: 'PDF', name: 'PDF', count: 18 },
+    { id: 'MOBI', name: 'MOBI', count: 6 },
+  ],
+};
+
 for (const filter of ['publisher', 'author', 'tag', 'format']) {
   router.get(`/api/${filter}`, eventHandler(() => ({
     err: 'ok',
-    items: filter === 'publisher'
-      ? Array.from({ length: 12 }, (_, index) => ({ id: index + 1, name: `测试出版社${index + 1}` }))
-      : [],
+    items: libraryFilterItems[filter],
   })));
 }
 

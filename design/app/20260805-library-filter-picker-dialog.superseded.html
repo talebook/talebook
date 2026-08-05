@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>书库紧凑标签选择浮窗方案 · SUPERSEDED</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17242c;
+        --muted: #63727a;
+        --canvas: #edf2f4;
+        --paper: #ffffff;
+        --line: #d5dfe4;
+        --blue: #2684c7;
+        --blue-soft: #eaf5fb;
+        --amber: #a76219;
+        --green: #287454;
+        --shadow: 0 18px 54px rgba(28, 50, 62, .12);
+        --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: var(--canvas); font: 15px/1.65 var(--sans); }
+      code { padding: .12em .35em; border-radius: 4px; background: #edf1f3; font: .88em/1.5 var(--mono); }
+      .page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 46px; }
+      .hero { position: relative; overflow: hidden; padding: 40px 44px; color: #fff; background: #153f57; border-radius: 18px 18px 5px 18px; box-shadow: var(--shadow); }
+      .hero::after { position: absolute; right: 32px; bottom: -42px; width: 170px; height: 126px; border: 1px solid rgba(255,255,255,.24); border-radius: 14px; box-shadow: 22px -18px 0 rgba(255,255,255,.08), 44px -36px 0 rgba(255,255,255,.05); content: ""; transform: rotate(-5deg); }
+      .eyebrow { margin: 0 0 10px; color: #9ed3ed; font: 800 11px/1.4 var(--mono); letter-spacing: .13em; text-transform: uppercase; }
+      h1 { max-width: 780px; margin: 0; font-size: clamp(34px, 5vw, 56px); line-height: 1.07; letter-spacing: -.04em; }
+      .lead { max-width: 760px; margin: 18px 0 0; color: #dbeaf1; font-size: 17px; }
+      .meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 22px; }
+      .meta span { padding: 5px 9px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; font-size: 12px; }
+      .meta .status { color: #123c50; background: #b9e0cf; border-color: transparent; font-weight: 800; }
+      .layout { display: grid; grid-template-columns: minmax(0, 1fr) 238px; gap: 20px; margin-top: 20px; }
+      main { display: grid; gap: 16px; }
+      section, aside { background: var(--paper); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(28,50,62,.06); }
+      section { padding: 27px 29px; border-radius: 14px 14px 4px 14px; }
+      h2 { margin: 0 0 14px; font-size: 24px; line-height: 1.25; }
+      h3 { margin: 20px 0 8px; font-size: 17px; }
+      p { margin: 9px 0; }
+      ul, ol { margin: 9px 0; padding-left: 1.35em; }
+      li + li { margin-top: 5px; }
+      .quote { margin: 14px 0; padding: 13px 16px; border-left: 4px solid var(--amber); background: #fff6e9; font-size: 17px; }
+      .decision { padding: 15px 17px; border: 1px solid #9dc9df; border-radius: 10px; background: var(--blue-soft); }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+      .note { padding: 14px 15px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfd; }
+      .note b { display: block; margin-bottom: 4px; color: var(--blue); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+      .prototype { margin-top: 16px; padding: 17px; border: 1px solid #bdcdd5; border-radius: 12px; background: #f8fafb; }
+      .filter-row { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; align-items: start; }
+      .filter-label { padding-top: 5px; font-size: 13px; font-weight: 700; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+      .chip { min-height: 32px; padding: 5px 10px; border: 1px solid #cbd5da; border-radius: 6px; color: #405159; background: #fff; font-size: 13px; }
+      .chip.active { color: #fff; background: var(--blue); border-color: var(--blue); }
+      .chip.more { color: var(--blue); background: var(--blue-soft); border-style: dashed; font-weight: 700; }
+      .overlay-demo { position: relative; min-height: 330px; margin-top: 16px; padding: 24px; overflow: hidden; border-radius: 12px; background: rgba(15, 34, 44, .42); }
+      .dialog { width: min(720px, 100%); margin: 0 auto; background: #fff; border-radius: 13px; box-shadow: 0 24px 70px rgba(18,35,44,.28); }
+      .dialog-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+      .dialog-head strong { display: block; }
+      .dialog-head span { color: var(--muted); font-size: 12px; }
+      .close { width: 34px; height: 34px; border: 0; border-radius: 50%; color: var(--muted); background: #eef2f4; }
+      .dialog-body { padding: 16px 18px; }
+      .dialog-foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+      .pages { display: flex; gap: 5px; }
+      .pages span { display: grid; place-items: center; min-width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 6px; }
+      .pages .current { color: #fff; background: var(--blue); border-color: var(--blue); }
+      .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      th, td { padding: 10px 11px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #4f6068; background: #f3f6f7; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      .pending { color: var(--amber); font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+      aside { position: sticky; top: 16px; align-self: start; padding: 18px; border-radius: 12px 12px 4px 12px; }
+      aside h2 { margin-bottom: 9px; font: 800 11px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+      aside ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; }
+      aside li { counter-increment: toc; }
+      aside a { display: grid; grid-template-columns: 24px 1fr; padding: 6px; color: var(--muted); text-decoration: none; }
+      aside a::before { color: var(--blue); content: counter(toc, decimal-leading-zero); font: 700 10px/2.4 var(--mono); }
+      footer { padding-top: 20px; color: var(--muted); font-size: 12px; text-align: center; }
+      @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } aside { position: static; grid-row: 1; } aside ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+      @media (max-width: 600px) {
+        .page { width: min(100% - 20px, 1180px); padding-top: 10px; }
+        .hero { padding: 27px 21px; }
+        section { padding: 21px 18px; }
+        .grid { grid-template-columns: 1fr; }
+        .filter-row { grid-template-columns: 1fr; gap: 5px; }
+        .filter-label { padding-top: 0; }
+        .overlay-demo { padding: 8px; }
+        .dialog-body { max-height: 62vh; overflow-y: auto; }
+        aside ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @media print { body { background: #fff; } .page { width: 100%; padding: 0; } .hero, section, aside { box-shadow: none; } .layout { display: block; } aside { display: none; } section, .note, .prototype, .overlay-demo, .table-wrap { break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <p class="eyebrow">Talebook / App / PR #934</p>
+        <h1>把长标签目录放进浮窗，把书库留给书</h1>
+        <p class="lead">主页面只保留紧凑的前 10 项和“显示更多”；浮窗按页承载上万项元数据，保持纯标签浏览，不加入搜索框。</p>
+        <div class="meta" aria-label="方案元信息">
+          <span class="status">状态：SUPERSEDED</span>
+          <span>创建日期：2026-08-05</span>
+          <span>所属模块：app</span>
+          <span>需求来源：PR #934 用户追加反馈</span>
+        </div>
+      </header>
+
+      <div class="layout">
+        <main>
+          <section id="request">
+            <h2>1. 原始诉求</h2>
+            <div class="decision"><strong>替代说明：</strong>用户随后要求浮窗内支持搜索。本方案已由 <code>design/app/20260805-library-filter-picker-search.active.html</code> 替代；紧凑主页面与分页浮窗设计继续保留，新方案在此基础上增加目录搜索。</div>
+            <div class="quote">“点击【显示更多】后弹出浮窗来浏览和选择，这个交互形式会不会更好？而且，这个筛选 tag 文字太大了，整体改成小一些，紧凑一些。”</div>
+            <p>当前渐进式行内展开解决了横向箭头和一次性渲染问题，但展开 50 项会把书卡整体向下推移，移动端尤其明显。用户希望保留标签列表，同时把完整目录从主页面空间中分离。</p>
+          </section>
+
+          <section id="decision">
+            <h2>2. 结论与边界</h2>
+            <div class="decision"><strong>结论：浮窗更合适。</strong>它让“常用项快速点选”和“完整目录浏览”各自占据合适空间。主页面保持上下文，浮窗专注选择；对 10,945 个标签采用每页 100 项，避免全部渲染。</div>
+            <div class="grid" style="margin-top: 12px">
+              <article class="note"><b>保留</b>前 10 项、全部、显示更多、单选、后端排序、现有查询参数。</article>
+              <article class="note"><b>改变</b>显示更多不再行内追加；打开可关闭、可分页的标签目录浮窗。</article>
+              <article class="note"><b>不做</b>不放搜索框，不增加多选、字母索引、服务端分页或新接口。</article>
+              <article class="note"><b>性能边界</b>浮窗一次最多渲染 100 个简单 chip；10,945 项只产生约 110 页。</article>
+            </div>
+          </section>
+
+          <section id="visual">
+            <h2>3. 视觉与信息层级</h2>
+            <p><strong>主题：</strong>沿用 Talebook 现有 Vuetify 蓝色与中性表面，不制造独立视觉主题。签名元素是“目录卡片”浮窗：标题、总数、紧凑标签网格和页码像一本书的分类索引。</p>
+            <ul>
+              <li><strong>颜色：</strong>主蓝 <code>#2684c7</code>、浅蓝 <code>#eaf5fb</code>、墨色 <code>#17242c</code>、边线 <code>#d5dfe4</code>、白色表面 <code>#ffffff</code>。</li>
+              <li><strong>字号：</strong>筛选标签统一 13px；筛选行标题 13px 加粗；浮窗标题保持页面正文层级。</li>
+              <li><strong>密度：</strong>标签高约 32–34px，间距 6px；“显示更多”与标签同高，不再成为过大的视觉按钮。</li>
+              <li><strong>布局：</strong>桌面浮窗最大宽 860px、最大高约 78vh；移动端使用全屏浮窗，内容区独立纵向滚动。</li>
+            </ul>
+
+            <div class="prototype">
+              <div class="filter-row">
+                <span class="filter-label">标签：</span>
+                <div class="chips"><span class="chip active">全部</span><span class="chip">小说</span><span class="chip">历史</span><span class="chip">中国</span><span class="chip">文学</span><span class="chip">中国文学</span><span class="chip">外国文学</span><span class="chip more">显示更多（10935）</span></div>
+              </div>
+            </div>
+
+            <div class="overlay-demo" aria-label="标签选择浮窗示意">
+              <div class="dialog">
+                <div class="dialog-head"><div><strong>选择标签</strong><span>共 10,945 项 · 第 1 / 110 页</span></div><button class="close" aria-label="关闭">×</button></div>
+                <div class="dialog-body"><div class="chips"><span class="chip active">小说</span><span class="chip">历史</span><span class="chip">中国</span><span class="chip">文学</span><span class="chip">中国文学</span><span class="chip">外国文学</span><span class="chip">书籍</span><span class="chip">文化</span><span class="chip">美国</span><span class="chip">随笔</span><span class="chip">网络小说</span><span class="chip">经典</span><span class="chip">心理学</span><span class="chip">社会</span><span class="chip">科幻</span></div></div>
+                <div class="dialog-foot"><span>每页 100 项</span><div class="pages"><span>‹</span><span class="current">1</span><span>2</span><span>3</span><span>…</span><span>110</span><span>›</span></div></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="interaction">
+            <h2>4. 交互与可访问性</h2>
+            <ol>
+              <li>点击“显示更多”时，浮窗打开在第一页；若已有首批外选中项，则直接打开它所在页。</li>
+              <li>浮窗显示分类名称、总项数、当前页和每页数量；页码切换只替换当前 100 个标签。</li>
+              <li>点击任意标签后立即关闭浮窗并刷新书单第一页；主页面继续显示该选中项，即使它不在前 10 项。</li>
+              <li>浮窗支持 Escape、关闭按钮、遮罩关闭和焦点圈；打开后由 Vuetify 管理焦点限制与归还。</li>
+              <li>标签保留 <code>role="button"</code>、<code>aria-pressed</code> 与键盘 Enter；紧凑视觉不依赖仅悬停反馈。</li>
+            </ol>
+          </section>
+
+          <section id="risks">
+            <h2>5. 风险与回滚</h2>
+            <div class="grid">
+              <article class="note"><b>浏览效率</b>无搜索时查找冷门项需要翻页，这是用户明确选择纯标签浏览后的可接受权衡；保留后端按书数排序，让高频项靠前。</article>
+              <article class="note"><b>移动端密度</b>标签更小可能降低触控容错；通过 6px 间距、清晰按压态和接近全屏浮窗缓解，并在实际手机视口验收。</article>
+              <article class="note"><b>性能</b>全部元数据仍在内存，但 DOM 始终只渲染 10 或 100 项；不渲染上万节点。</article>
+              <article class="note"><b>回滚</b>恢复当前行内分批组件即可；API、数据库和 URL 无迁移。</article>
+            </div>
+          </section>
+
+          <section id="tests">
+            <h2>6. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0">
+              <table>
+                <thead><tr><th>层级</th><th>验证内容</th><th>状态</th></tr></thead>
+                <tbody>
+                  <tr><td>组件</td><td><code>npx vitest run test/components/LibraryChipFilter.spec.ts</code>：主页面 10 项、首批外选中项、打开/关闭浮窗、每页 100 项、页码、选中后关闭与 emit。</td><td class="verified">通过，2/2</td></tr>
+                  <tr><td>E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:18000 PLAYWRIGHT_BASE_URL=http://127.0.0.1:13000 npx playwright test test/e2e/library.spec.ts --project=chromium</code>：120 项 mock、第二页 20 项、选择第 117 项、请求参数、键盘、Escape 与移动端无溢出。</td><td class="verified">通过，5/5</td></tr>
+                  <tr><td>真实大库</td><td>Docker 加载 <code>tests/cases/big-metadata.db</code>：24,835 本书、1,663 家出版社、14,951 位作者、10,945 个标签；验证 110 页标签目录、第二页 100 项、选择后关闭与重新打开定位。</td><td class="verified">通过</td></tr>
+                  <tr><td>渲染</td><td>Chrome DevTools MCP 实测 375px、960px、1440px；浅色与深色主题；13px 字号、32px 高；桌面 860px 浮窗和手机全屏浮窗均无横向溢出，控制台无告警。</td><td class="verified">通过</td></tr>
+                  <tr><td>门禁</td><td><code>npm run lint</code>（0 error，193 条既有 warning）、<code>npm run build</code>、<code>make check-design</code>、<code>git diff --check</code>。</td><td class="verified">通过</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="decisions">
+            <h2>7. 决策记录</h2>
+            <ol>
+              <li><strong>2026-08-05：</strong>接受用户提出的浮窗方向，替代 2026-08-04 的行内渐进展开。</li>
+              <li><strong>2026-08-05：</strong>浮窗每页 100 项；主页面固定前 10 项，不增加搜索框。</li>
+              <li><strong>2026-08-05：</strong>标签视觉密度调整为 13px、32–34px 高和 6px 间距，重点减少筛选区高度。</li>
+              <li><strong>2026-08-05：</strong>用户追加浮窗搜索要求，本方案由搜索增强方案替代并转为 SUPERSEDED。</li>
+            </ol>
+          </section>
+        </main>
+
+        <aside aria-label="方案目录">
+          <h2>目录卡</h2>
+          <ol>
+            <li><a href="#request">原始诉求</a></li>
+            <li><a href="#decision">结论与边界</a></li>
+            <li><a href="#visual">视觉层级</a></li>
+            <li><a href="#interaction">交互与无障碍</a></li>
+            <li><a href="#risks">风险与回滚</a></li>
+            <li><a href="#tests">测试计划</a></li>
+            <li><a href="#decisions">决策记录</a></li>
+          </ol>
+        </aside>
+      </div>
+      <footer>Talebook internal design · app · SUPERSEDED · 2026-08-05</footer>
+    </div>
+  </body>
+</html>
