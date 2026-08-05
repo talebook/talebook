@@ -135,4 +135,25 @@ describe('BuiltinThemeHeader.vue navigation', () => {
 
         wrapper.unmount();
     });
+
+    it('uses the menu icon and fully toggles the light-gray drawer', async () => {
+        const wrapper = mountHeader('light-gray');
+        const header = wrapper.findComponent(BuiltinThemeHeader).vm as unknown as {
+            sidebar: boolean;
+        };
+
+        expect(wrapper.find('.tb-theme-nav-toggle .mdi-menu').exists()).toBe(true);
+        expect(wrapper.find('.tb-theme-avatar-toggle').exists()).toBe(false);
+        expect(header.sidebar).toBe(true);
+
+        await wrapper.get('.tb-theme-nav-toggle').trigger('click');
+
+        expect(header.sidebar).toBe(false);
+        expect(wrapper.find('.v-navigation-drawer--rail').exists()).toBe(false);
+
+        await wrapper.get('.tb-theme-nav-toggle').trigger('click');
+
+        expect(header.sidebar).toBe(true);
+        wrapper.unmount();
+    });
 });

@@ -78,7 +78,7 @@ test.describe('Navigation Sidebar', () => {
 
     test('Read books link opens the finished tab with its count', async ({ page }) => {
         await page.goto('/user/history');
-        await expect(page.getByRole('tab', { name: /正在阅读 \[0\]/ })).toHaveAttribute('aria-selected', 'true');
+        await expect(page.getByRole('tab', { name: /在读 \[0\]/ })).toHaveAttribute('aria-selected', 'true');
 
         const readBooksLink = page.locator('nav').getByRole('link', { name: /已读书目/ });
         await expect(readBooksLink).toContainText('1');
