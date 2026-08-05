@@ -78,7 +78,7 @@ test.describe('Navigation Sidebar', () => {
 
     test('Read books link opens the finished tab with its count', async ({ page }) => {
         await page.goto('/user/history');
-        await expect(page.getByRole('tab', { name: /正在阅读 \[0\]/ })).toHaveAttribute('aria-selected', 'true');
+        await expect(page.getByRole('tab', { name: /在读 \[0\]/ })).toHaveAttribute('aria-selected', 'true');
 
         const readBooksLink = page.locator('nav').getByRole('link', { name: /已读书目/ });
         await expect(readBooksLink).toContainText('1');
@@ -86,6 +86,18 @@ test.describe('Navigation Sidebar', () => {
 
         await expect(page).toHaveURL('/user/history?tab=finished');
         await expect(page.getByRole('tab', { name: /已读完 \[1\]/ })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    test('Network library entry can be hidden without blocking the route', async ({ page, request }) => {
+        await request.post(`${mockApi}/_test/reset`, {
+            data: { installed: true, showNetworkLibrary: false }
+        });
+
+        await page.goto('/');
+        await expect(page.locator('nav').getByRole('link', { name: '网络书库' })).toHaveCount(0);
+
+        await page.goto('/network');
+        await expect(page.getByRole('heading', { name: '网络书库' })).toBeVisible();
     });
 
     test('Sidebar stays visible at md width', async ({ page }) => {

@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>书库渐进式标签筛选方案 · SUPERSEDED</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172126;
+        --muted: #617078;
+        --paper: #f5f1e8;
+        --card: #fffdf8;
+        --line: #d7d0c2;
+        --blue: #216fa3;
+        --blue-soft: #e7f2f8;
+        --orange: #b65726;
+        --green: #317152;
+        --shadow: 0 10px 30px rgba(61, 50, 31, .08);
+        --serif: ui-serif, "Songti SC", "Noto Serif CJK SC", serif;
+        --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: var(--paper); font: 15px/1.7 var(--sans); }
+      a { color: var(--blue); }
+      code { padding: .12em .38em; border-radius: 4px; background: #eee9df; font: .88em/1.5 var(--mono); }
+      .page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 48px; }
+      .masthead { position: relative; overflow: hidden; padding: 42px 46px; color: #f8f4e9; background: #163b50; border-radius: 4px 4px 28px 4px; box-shadow: var(--shadow); }
+      .masthead::after { position: absolute; right: -34px; bottom: -72px; width: 220px; height: 220px; border: 28px solid rgba(255,255,255,.08); border-radius: 50%; content: ""; }
+      .eyebrow { margin: 0 0 12px; color: #a9d4e9; font: 700 12px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+      h1, h2, h3 { font-family: var(--serif); }
+      h1 { max-width: 760px; margin: 0; font-size: clamp(34px, 5vw, 58px); line-height: 1.08; letter-spacing: -.03em; }
+      .lead { max-width: 760px; margin: 20px 0 0; color: #d7e5eb; font-size: 17px; }
+      .metadata { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+      .metadata span { padding: 6px 10px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; font-size: 12px; }
+      .metadata .status { color: #143849; background: #bde3d0; border-color: transparent; font-weight: 800; }
+      .layout { display: grid; grid-template-columns: minmax(0, 1fr) 248px; gap: 22px; margin-top: 22px; }
+      main { display: grid; gap: 18px; }
+      section, aside { background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+      section { padding: 28px 30px; border-radius: 4px 20px 4px 4px; }
+      h2 { margin: 0 0 16px; font-size: 25px; line-height: 1.25; }
+      h3 { margin: 22px 0 8px; font-size: 18px; }
+      p { margin: 10px 0; }
+      ul, ol { margin: 10px 0; padding-left: 1.35em; }
+      li + li { margin-top: 5px; }
+      .quote { margin: 14px 0; padding: 14px 18px; border-left: 4px solid var(--orange); background: #fff4eb; font-family: var(--serif); font-size: 17px; }
+      .decision { margin: 16px 0; padding: 16px 18px; border: 1px solid #9cc5d8; background: var(--blue-soft); border-radius: 4px 14px 4px 4px; }
+      .decision strong { color: #174e70; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .note { padding: 15px 16px; border: 1px solid var(--line); border-radius: 4px 12px 4px 4px; background: #fff; }
+      .note b { display: block; margin-bottom: 5px; color: var(--orange); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+      .prototype { margin: 18px 0; padding: 20px; border: 1px solid #b8c9d1; background: #f8fbfc; border-radius: 4px 18px 4px 4px; }
+      .prototype-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 16px; color: var(--muted); font-size: 12px; font-weight: 700; }
+      .filter-row { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 0; border-top: 1px dashed #ccd7dc; }
+      .filter-row:first-of-type { border-top: 0; }
+      .filter-label { padding-top: 7px; font-weight: 800; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip { min-height: 34px; padding: 6px 12px; border: 1px solid #b9c6cb; border-radius: 7px; color: #354a54; background: #fff; font-size: 13px; }
+      .chip.active { color: #fff; background: var(--blue); border-color: var(--blue); }
+      .chip.more { color: var(--blue); background: var(--blue-soft); border-style: dashed; font-weight: 800; }
+      .sequence { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 15px; counter-reset: step; }
+      .sequence article { position: relative; min-height: 132px; padding: 15px; border-top: 3px solid var(--blue); background: #f8f6f0; counter-increment: step; }
+      .sequence article::before { display: block; margin-bottom: 13px; color: var(--blue); content: "0" counter(step); font: 800 12px/1 var(--mono); }
+      .sequence b { display: block; margin-bottom: 5px; }
+      .sequence p { margin: 0; color: var(--muted); font-size: 13px; }
+      .table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #4f5f67; background: #f3f0e9; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      .pending { color: var(--orange); font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+      aside { position: sticky; top: 18px; align-self: start; padding: 20px; border-radius: 4px 16px 4px 4px; }
+      aside h2 { margin-bottom: 10px; font: 800 12px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+      aside ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; }
+      aside li { counter-increment: toc; }
+      aside li + li { margin-top: 3px; }
+      aside a { display: grid; grid-template-columns: 25px 1fr; padding: 7px; color: var(--muted); text-decoration: none; }
+      aside a::before { color: var(--blue); content: counter(toc, decimal-leading-zero); font: 700 10px/2.4 var(--mono); }
+      footer { padding: 22px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
+      @media (max-width: 880px) {
+        .layout { grid-template-columns: 1fr; }
+        aside { position: static; grid-row: 1; }
+        aside ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .sequence { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 600px) {
+        .page { width: min(100% - 20px, 1180px); padding-top: 10px; }
+        .masthead { padding: 28px 22px; border-radius: 4px 4px 20px 4px; }
+        section { padding: 22px 18px; }
+        .grid, .sequence { grid-template-columns: 1fr; }
+        aside ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .filter-row { grid-template-columns: 1fr; gap: 5px; }
+        .filter-label { padding-top: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .masthead, section, aside { box-shadow: none; }
+        .layout { display: block; }
+        aside { display: none; }
+        section, .note, .prototype, .sequence article, .table-wrap { break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <p class="eyebrow">Talebook / App / PR #934</p>
+        <h1>保留标签列表，用渐进展开承载大书库</h1>
+        <p class="lead">出版社、作者与标签继续以熟悉的可点选列表呈现；去掉横向箭头与搜索框，用自动换行和“显示更多”分批披露上万项元数据。</p>
+        <div class="metadata" aria-label="方案元信息">
+          <span class="status">状态：SUPERSEDED</span>
+          <span>创建日期：2026-08-04</span>
+          <span>所属模块：app</span>
+          <span>需求来源：PR #934 用户复审</span>
+        </div>
+      </header>
+
+      <div class="layout">
+        <main>
+          <section id="request">
+            <h2>1. 原始诉求</h2>
+            <div class="decision"><strong>替代说明：</strong>用户进一步要求“显示更多”打开浮窗，并缩小标签文字、提高密度。本方案已由 <code>design/app/20260805-library-filter-picker-dialog.active.html</code> 替代；原实现与验证记录保留用于追溯。</div>
+            <div class="quote">“我不要这种搜索框的模式。你要保持原来的那种 tag 列表 + 显示更多。”</div>
+            <p>用户否决上一版将高基数元数据改成搜索框的方案。目标不是发明新的筛选方式，而是修好原标签列表的扩展能力：列表仍可扫视和直接点击，“显示更多”必须始终可发现，也不能把一万多项一次性渲染出来。</p>
+          </section>
+
+          <section id="goals">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="note"><b>目标</b>保留“全部 + 标签项 + 显示更多”的原有心智模型；所有标签自动换行，不出现左右翻页箭头；在 375px 到 1440px 都无页面级横向溢出。</article>
+              <article class="note"><b>性能边界</b>首屏只渲染前 10 项；每次点击“显示更多”新增 50 项；展开后提供“收起”，避免 <code>big-metadata.db</code> 的 10,945 个标签同时进入 DOM。</article>
+              <article class="note"><b>保持不变</b>单选语义、元数据排序、接口、查询参数、书籍分页、连载状态开关以及格式筛选不变。</article>
+              <article class="note"><b>非目标</b>不增加搜索、多选、标签层级、服务端分页或新的元数据接口；不重做书卡与全局搜索。</article>
+            </div>
+          </section>
+
+          <section id="evidence">
+            <h2>3. 证据与设计判断</h2>
+            <div class="table-wrap" role="region" aria-label="证据表" tabindex="0">
+              <table>
+                <thead><tr><th>证据</th><th>问题</th><th>设计回应</th></tr></thead>
+                <tbody>
+                  <tr><td>PR 截图在平板宽度已出现左右箭头</td><td>“更多”跟随横向轨道移动，发现成本高。</td><td>弃用 slide-group 横向轨道，使用普通 flex 换行。</td></tr>
+                  <tr><td><code>big-metadata.db</code> 含 1,663 个出版社、14,951 位作者、10,945 个标签</td><td>一次性展开会产生大量 DOM，卡顿且难以收回。</td><td>固定批量渐进披露，任一时刻只渲染用户主动展开的部分。</td></tr>
+                  <tr><td>用户明确要求原 tag 列表</td><td>搜索框改变既有浏览型交互，无法通过视觉扫视发现分类。</td><td>标签是主交互；“更多”是同行末端的次级操作。</td></tr>
+                  <tr><td>URL 可带入不在首批内的筛选值</td><td>深链选中项可能不可见。</td><td>若当前选中项不在已展开范围，额外附加显示并保持选中态。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="decision"><strong>UI/UX 结论：</strong>“自动换行 + 渐进披露”与用户的浏览任务匹配。44px 点击目标、可见焦点、<code>aria-pressed</code>、剩余数量和收起入口保证可用性；不使用横向滚动隐藏内容。</div>
+          </section>
+
+          <section id="design">
+            <h2>4. 交互方案</h2>
+            <div class="prototype" aria-label="筛选区示意">
+              <div class="prototype-head"><span>书库筛选 / 原标签列表</span><span>自动换行 · 无左右箭头</span></div>
+              <div class="filter-row">
+                <span class="filter-label">出版社：</span>
+                <div class="chips"><span class="chip active">全部</span><span class="chip">上海译文</span><span class="chip">中华书局</span><span class="chip">三联书店</span><span class="chip">人民文学</span><span class="chip more">显示更多（1653）</span></div>
+              </div>
+              <div class="filter-row">
+                <span class="filter-label">作者：</span>
+                <div class="chips"><span class="chip active">全部</span><span class="chip">鲁迅</span><span class="chip">余华</span><span class="chip">王小波</span><span class="chip">村上春树</span><span class="chip more">显示更多（14941）</span></div>
+              </div>
+              <div class="filter-row">
+                <span class="filter-label">标签：</span>
+                <div class="chips"><span class="chip active">全部</span><span class="chip">文学</span><span class="chip">历史</span><span class="chip">小说</span><span class="chip">科幻</span><span class="chip more">显示更多（10935）</span></div>
+              </div>
+            </div>
+
+            <div class="sequence" aria-label="展开流程">
+              <article><b>默认呈现</b><p>“全部”和前 10 项可直接点击；更多按钮紧跟其后并参与换行。</p></article>
+              <article><b>分批展开</b><p>每次点击追加 50 项，更多按钮同步显示尚未呈现的剩余数。</p></article>
+              <article><b>选择刷新</b><p>点选标签后立即刷新书单第一页；标签列表保持当前展开范围。</p></article>
+              <article><b>一键收起</b><p>展开后在末尾保留收起按钮；回到前 10 项，当前选中项仍可见。</p></article>
+            </div>
+
+            <h3>组件职责</h3>
+            <ul>
+              <li>新增复用筛选行组件，接收标签、选项、当前值、首批数量与批量大小，只抛出单选值。</li>
+              <li>组件内部维护已显示数量；数据源变化时不超过新数组长度。</li>
+              <li>页面继续拥有筛选状态和 API 请求；出版社、作者、标签使用渐进组件，格式和连载状态保持少量换行标签。</li>
+              <li>“全部”用 <code>null</code> 表达，不把本地化文案写进请求参数。</li>
+            </ul>
+          </section>
+
+          <section id="risks">
+            <h2>5. 风险、兼容性与回滚</h2>
+            <div class="grid">
+              <article class="note"><b>长列表风险</b>用户连续展开很多次时 DOM 仍会增长，但增长由明确操作触发且每批固定；收起可立即恢复轻量状态。</article>
+              <article class="note"><b>长文案风险</b>单个超长标签允许截断并保留 title；标签容器可收缩，避免撑宽页面。</article>
+              <article class="note"><b>兼容性</b>无后端、数据库、权限、配置与 URL 契约变化；仅改变书库筛选区的渲染与交互。</article>
+              <article class="note"><b>回滚</b>撤销新增组件和页面接入即可恢复旧筛选；不需要数据迁移。</article>
+            </div>
+          </section>
+
+          <section id="tests">
+            <h2>6. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0">
+              <table>
+                <thead><tr><th>层级</th><th>验证内容</th><th>状态</th></tr></thead>
+                <tbody>
+                  <tr><td>组件测试</td><td><code>npx vitest run test/components/LibraryChipFilter.spec.ts</code>：默认 10 项、追加 50 项、剩余数、收起、选中/清空事件、首批外选中项保持可见。</td><td class="verified">通过，2/2</td></tr>
+                  <tr><td>页面 E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:18000 PLAYWRIGHT_BASE_URL=http://127.0.0.1:13000 npx playwright test test/e2e/library.spec.ts --project=chromium</code>：120 项 mock 数据，无 slide-group 箭头；桌面和 375px 分批展开、鼠标与键盘选择、清空、开关状态和无横向溢出。</td><td class="verified">通过，5/5</td></tr>
+                  <tr><td>真实大库</td><td>使用 <code>tests/cases/big-metadata.db</code> 临时副本启动 Docker 后端 <code>127.0.0.1:18080</code>；实际数据为 24,835 本书、1,663 个出版社、14,951 位作者、10,945 个标签。标签点击一次由 10 项增至 60 项，剩余数由 10,935 更新为 10,885，并可收起和选择“政治学”。</td><td class="verified">通过</td></tr>
+                  <tr><td>实际渲染</td><td>Chrome DevTools MCP 检查 <code>/library</code> 的 375px、960px、1440px、实际明暗主题、44px 点击目标与页面宽度；截图为 <code>document/screenshots/issue-927/library-scalable-filters.png</code>。</td><td class="verified">通过；各视口页面与筛选面板均无横向溢出，slide-group 数为 0</td></tr>
+                  <tr><td>质量门禁</td><td><code>npm run lint</code>、<code>npm run build</code>、<code>git diff --check</code>、<code>make check-design</code>。</td><td class="verified">全部通过；79 份方案文档通过检查；lint 为 0 error、193 条仓库既有 warning，build 仅有既有 browserslist 与 chunk 提示</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="decisions">
+            <h2>7. 决策记录</h2>
+            <ol>
+              <li><strong>2026-08-04：</strong>用户否决搜索框，明确要求维持原 tag 列表和显示更多。</li>
+              <li><strong>2026-08-04：</strong>选定首屏 10 项、每批追加 50 项；这是可发现性、浏览连续性和大数据渲染成本之间的平衡。</li>
+              <li><strong>2026-08-04：</strong>本方案通过自动化与真实大库验证后转为 ACTIVE；上一版可搜索筛选方案同步标记为 SUPERSEDED，并指向本方案。</li>
+              <li><strong>2026-08-05：</strong>用户选择“主页面紧凑标签 + 显示更多浮窗”，本方案由新的浮窗方案替代并转为 SUPERSEDED。</li>
+            </ol>
+          </section>
+        </main>
+
+        <aside aria-label="方案目录">
+          <h2>目录卡</h2>
+          <ol>
+            <li><a href="#request">原始诉求</a></li>
+            <li><a href="#goals">目标与边界</a></li>
+            <li><a href="#evidence">证据与判断</a></li>
+            <li><a href="#design">交互方案</a></li>
+            <li><a href="#risks">风险与回滚</a></li>
+            <li><a href="#tests">测试计划</a></li>
+            <li><a href="#decisions">决策记录</a></li>
+          </ol>
+        </aside>
+      </div>
+      <footer>Talebook internal design · app · SUPERSEDED · 2026-08-04</footer>
+    </div>
+  </body>
+</html>

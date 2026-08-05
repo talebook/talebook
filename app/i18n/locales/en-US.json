@@ -172,6 +172,15 @@
     "title": "Library",
     "noBooks": "No books in library",
     "addBooksFirst": "Please add books to library first",
+    "selectFilter": "Select {label}",
+    "filterPickerSummary": "{count} items · Page {page} of {pages}",
+    "filterPickerSearchSummary": "{count} of {total} items · Page {page} of {pages}",
+    "filterPickerPageSize": "{count} items per page",
+    "closeFilterPicker": "Close {label} picker",
+    "searchFilter": "Search {label}",
+    "searchFilterHint": "Enter a keyword to filter",
+    "noMatchingFilter": "No matching {label}",
+    "clearFilterSearch": "Clear search",
     "message": {
       "fetchBooksFailed": "Failed to fetch books list"
     }
@@ -423,7 +432,7 @@
     "webdavIntroduction": "WebDAV Introduction",
     "all": "All",
     "collapse": "Collapse",
-    "more": "More",
+    "more": "Show more",
     "publisher": "Publisher",
     "author": "Author",
     "tags": "Tags",
@@ -719,6 +728,7 @@
         "siteFooter": "Site Footer",
         "footerExtraHtml": "Extra HTML in Footer",
         "sidebarExtraHtml": "Extra HTML in Sidebar",
+        "showNetworkLibrary": "Show network library entry and serialization filter",
         "showSidebarSys": "Show system information in sidebar",
         "showFeedback": "Show feedback button",
         "feedbackUrl": "Feedback URL",

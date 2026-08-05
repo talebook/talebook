@@ -4,7 +4,7 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('vue-i18n', () => ({
     useI18n: () => ({
@@ -24,6 +24,7 @@ const { pushMock, storeState } = vi.hoisted(() => ({
             allow: {},
             friends: [],
             show_sidebar_sys: false,
+            show_network_library: true,
         },
         user: {
             is_login: false,
@@ -61,6 +62,11 @@ function mountHeader() {
 }
 
 describe('AppHeader.vue', () => {
+    beforeEach(() => {
+        pushMock.mockReset();
+        storeState.sys.show_network_library = true;
+    });
+
     it('only wraps the site title text in the clickable/pointer area, not the whole title bar', () => {
         const wrapper = mountHeader();
 
@@ -82,6 +88,23 @@ describe('AppHeader.vue', () => {
 
         await wrapper.find('.site-title').trigger('click');
         expect(pushMock).toHaveBeenCalledWith('/');
+
+        wrapper.unmount();
+    });
+
+    it('shows the network library link by default', () => {
+        const wrapper = mountHeader();
+
+        expect(wrapper.text()).toContain('navigation.networkLibrary');
+
+        wrapper.unmount();
+    });
+
+    it('hides the network library link when disabled', () => {
+        storeState.sys.show_network_library = false;
+        const wrapper = mountHeader();
+
+        expect(wrapper.text()).not.toContain('navigation.networkLibrary');
 
         wrapper.unmount();
     });

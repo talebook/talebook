@@ -794,6 +794,7 @@ const cards = computed(() => [
             { icon: 'mdi-book-multiple', key: 'DEFAULT_PAGE_SIZE', label: t('admin.settings.label.defaultPageSize'), type: 'select',
                 items: [60, 100, 200, 500, 1000].map((v) => ({ text: String(v), value: v }))
             },
+            { key: 'SHOW_NETWORK_LIBRARY', label: t('admin.settings.label.showNetworkLibrary'), type: 'checkbox' },
             { key: 'SHOW_SIDEBAR_SYS', label: t('admin.settings.label.showSidebarSys'), type: 'checkbox' },
         ],
         groups: [

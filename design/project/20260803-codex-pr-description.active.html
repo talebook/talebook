@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex PR 正文受控发布方案（已验证）</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --blueprint: #eaf3f8;
+      --paper: #f9fcfd;
+      --ink: #173044;
+      --muted: #5d7180;
+      --line: #aac3d1;
+      --cobalt: #145b86;
+      --cobalt-deep: #0c3d5c;
+      --cyan: #73bfd3;
+      --amber: #e6a53a;
+      --amber-soft: #fff2cf;
+      --green: #26715d;
+      --red: #a44742;
+      --code: #102b3c;
+      --code-ink: #d8eef6;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 28px 24px 76px;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(20, 91, 134, .055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(20, 91, 134, .055) 1px, transparent 1px),
+        var(--blueprint);
+      background-size: 28px 28px;
+      font: 16px/1.7 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+
+    h1, h2, h3, .eyebrow, .meta, th, .tag, .stage, .seal {
+      font-family: "Avenir Next Condensed", "Arial Narrow", "PingFang SC", sans-serif;
+    }
+    h1 {
+      max-width: 900px;
+      margin: 0;
+      font-size: clamp(42px, 7vw, 78px);
+      line-height: .96;
+      letter-spacing: -.045em;
+    }
+    h2 {
+      margin: 56px 0 17px;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.08;
+      letter-spacing: -.025em;
+    }
+    h3 { margin: 0 0 9px; font-size: 20px; line-height: 1.25; }
+    p { margin: 10px 0; }
+    a { color: var(--cobalt); }
+    code {
+      padding: 2px 6px;
+      color: #12354a;
+      border: 1px solid #c0d3de;
+      border-radius: 4px;
+      background: #edf5f8;
+      font: .88em/1.5 "SFMono-Regular", Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(34px, 6vw, 68px);
+      color: #f4fbff;
+      background: var(--cobalt-deep);
+      border: 1px solid #082c43;
+      box-shadow: 0 22px 58px rgba(12, 61, 92, .22);
+    }
+    header::before {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 9px;
+      content: "";
+      background: repeating-linear-gradient(90deg, var(--amber) 0 42px, #f7c76f 42px 48px);
+    }
+    header::after {
+      position: absolute;
+      right: -60px;
+      bottom: -80px;
+      width: 310px;
+      height: 310px;
+      content: "";
+      border: 34px solid rgba(115, 191, 211, .13);
+      border-radius: 50%;
+    }
+    .eyebrow {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 17px;
+      color: #a9deeb;
+      font: 800 13px/1.2 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .thesis {
+      position: relative;
+      z-index: 1;
+      max-width: 780px;
+      margin-top: 22px;
+      color: #cfe6ef;
+      font-size: 18px;
+    }
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      margin-top: 30px;
+      border: 1px solid rgba(255, 255, 255, .18);
+      background: rgba(255, 255, 255, .18);
+    }
+    .meta div { min-height: 76px; padding: 12px 14px; background: rgba(8, 43, 64, .93); }
+    .meta span { display: block; color: #8fb5c8; font-size: 11px; letter-spacing: .1em; }
+    .meta strong { display: block; margin-top: 5px; color: #fff; font-size: 15px; line-height: 1.35; }
+    .meta .status { color: #ffd88e; }
+
+    main { display: block; }
+    section {
+      margin-top: 18px;
+      padding: clamp(24px, 4vw, 42px);
+      background: rgba(249, 252, 253, .96);
+      border: 1px solid var(--line);
+      box-shadow: 0 9px 28px rgba(23, 48, 68, .06);
+    }
+    .lead {
+      padding: 18px 21px;
+      border-left: 6px solid var(--cobalt);
+      background: #fff;
+    }
+    .evidence {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 13px;
+      margin-top: 20px;
+    }
+    .evidence article, .decision, .test-item {
+      padding: 19px 20px;
+      border: 1px solid #bfd1db;
+      background: #fff;
+    }
+    .evidence strong { display: block; margin-bottom: 7px; color: var(--cobalt); }
+    .quote {
+      margin-top: 18px;
+      padding: 18px 21px;
+      color: var(--code-ink);
+      background: var(--code);
+      border-left: 6px solid var(--amber);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      white-space: pre-wrap;
+    }
+
+    .manifest {
+      display: grid;
+      grid-template-columns: 1fr 88px 1.18fr;
+      align-items: stretch;
+      margin-top: 25px;
+      border: 1px solid var(--line);
+      background: var(--line);
+      gap: 1px;
+    }
+    .manifest > div { min-width: 0; padding: 25px; background: #fff; }
+    .manifest .seal {
+      display: grid;
+      place-items: center;
+      padding: 10px;
+      color: #fff;
+      background: var(--amber);
+      font-weight: 900;
+      letter-spacing: .11em;
+      text-align: center;
+      writing-mode: vertical-rl;
+    }
+    .manifest ul, .plain-list { margin: 13px 0 0; padding-left: 20px; }
+    .manifest li, .plain-list li { margin: 6px 0; }
+    .tag {
+      display: inline-block;
+      padding: 4px 8px;
+      color: var(--cobalt-deep);
+      border: 1px solid #9ebdcd;
+      background: #dff0f5;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .06em;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-top: 24px;
+    }
+    .stage {
+      position: relative;
+      min-height: 164px;
+      padding: 18px 17px;
+      color: #fff;
+      background: var(--cobalt);
+    }
+    .stage::after {
+      position: absolute;
+      top: 50%;
+      right: -10px;
+      z-index: 2;
+      width: 20px;
+      height: 2px;
+      content: "";
+      background: var(--amber);
+    }
+    .stage:last-child { background: var(--green); }
+    .stage:last-child::after { display: none; }
+    .stage small { display: block; margin-bottom: 21px; color: #bfe3ed; letter-spacing: .11em; }
+    .stage strong { display: block; font-size: 18px; line-height: 1.18; }
+    .stage span { display: block; margin-top: 10px; color: #d8edf3; font-family: "PingFang SC", sans-serif; font-size: 13px; line-height: 1.55; }
+
+    .decisions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .decision { border-top: 5px solid var(--cobalt); }
+    .decision.pending { border-top-color: var(--amber); background: var(--amber-soft); }
+    .decision.no { border-top-color: var(--red); }
+    .decision p { color: var(--muted); }
+
+    .contract {
+      overflow-x: auto;
+      margin-top: 22px;
+      padding: 20px 22px;
+      color: var(--code-ink);
+      background: var(--code);
+      border-left: 7px solid var(--cyan);
+    }
+    pre { margin: 0; font: 13px/1.62 "SFMono-Regular", Consolas, monospace; }
+
+    table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+    th, td { padding: 13px 14px; border-bottom: 1px solid #c8d8e1; text-align: left; vertical-align: top; }
+    th { color: #fff; background: var(--cobalt); font-size: 13px; letter-spacing: .05em; }
+    td:first-child { width: 23%; font-weight: 700; }
+    td:nth-child(2) { width: 43%; }
+
+    .tests {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .test-item { position: relative; padding-left: 48px; }
+    .test-item::before {
+      position: absolute;
+      top: 19px;
+      left: 17px;
+      content: "○";
+      color: var(--amber);
+      font-size: 22px;
+      font-weight: 900;
+    }
+    .test-item.pass::before { content: "✓"; color: var(--green); }
+    .test-item.limited::before { content: "△"; color: var(--amber); }
+    .test-item strong { display: block; }
+    .test-item span { color: var(--muted); font-size: 14px; }
+    .warning {
+      margin-top: 20px;
+      padding: 18px 20px;
+      color: #60410d;
+      border: 1px solid #e5bd72;
+      background: var(--amber-soft);
+    }
+    footer { padding: 28px 4px 0; color: var(--muted); font-size: 13px; }
+    :focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+
+    @media (max-width: 880px) {
+      .meta, .flow { grid-template-columns: 1fr 1fr; }
+      .stage:last-child { grid-column: 1 / -1; }
+      .stage::after { display: none; }
+      .manifest { grid-template-columns: 1fr; }
+      .manifest .seal { min-height: 46px; writing-mode: horizontal-tb; }
+    }
+    @media (max-width: 640px) {
+      body { padding: 14px 12px 48px; }
+      header, section { padding: 24px 20px; }
+      .meta, .evidence, .decisions, .tests, .flow { grid-template-columns: 1fr; }
+      .stage:last-child { grid-column: auto; }
+      table, thead, tbody, tr, th, td { display: block; }
+      thead { display: none; }
+      tr { padding: 12px 0; border-bottom: 1px solid #c8d8e1; }
+      td { width: auto !important; padding: 5px 0; border: 0; }
+      td::before { display: block; color: var(--muted); font-size: 11px; font-weight: 800; content: attr(data-label); }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Controlled publishing manifest · Issue automation</div>
+    <h1>让 PR 正文<br>经过同一道门禁</h1>
+    <p class="thesis">Codex 负责提交可校验的事实，workflow 在提交完成后用不可变 SHA 封印方案链接，再创建或更新 PR 的受控说明区。实现、验证和评审上下文不再在最后一跳丢失。</p>
+    <div class="meta">
+      <div><span>状态</span><strong class="status">ACTIVE · 已验证</strong></div>
+      <div><span>创建日期</span><strong>2026-08-03</strong></div>
+      <div><span>所属模块</span><strong>project</strong></div>
+      <div><span>需求来源</span><strong>维护者反馈 · PR #932</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <h2>01 / 原始诉求与已确认事实</h2>
+    <section>
+      <div class="lead"><strong>原始诉求：</strong>修复 Codex 处理 Issue 后创建的 PR 没有遵守 <code>AGENTS.md</code> 的问题，使 PR 正文提供详细说明和 ACTIVE 方案的 GitHub、RawGitHack 固定链接。</div>
+      <div class="evidence">
+        <article>
+          <strong>规则当时已经生效</strong>
+          <p>PR #932 的基线已要求正文包含背景、关键改动、真实验证、风险或兼容性、方案路径或豁免原因；界面改动还需截图或说明无法截图的原因。</p>
+        </article>
+        <article>
+          <strong>实现阶段没有完全失守</strong>
+          <p>同一提交包含 ACTIVE 方案、组件测试和 E2E 测试，证明 Codex 已读取仓库要求；信息是在发布交接阶段丢失。</p>
+        </article>
+        <article>
+          <strong>workflow 硬编码正文</strong>
+          <p><code>create_issue_pr</code> 无条件写入“Issue 的自动实现 + Closes”，没有消费结构化摘要、测试、风险或方案路径。</p>
+        </article>
+        <article>
+          <strong>完整 SHA 只能后置生成</strong>
+          <p>Codex 被禁止自行 commit、push 或调用 GitHub API；只有受控发布步骤完成提交后，workflow 才知道可用于固定链接的最终 SHA。</p>
+        </article>
+      </div>
+      <div class="quote">当前结果：Codex 产出方案与验证 → workflow 只保留两行固定模板
+目标结果：Codex 产出完整 Markdown 模板 → workflow 校验占位符 → commit SHA 封印 → PR 正文</div>
+    </section>
+
+    <h2>02 / 目标、边界与验收口径</h2>
+    <section>
+      <div class="manifest">
+        <div>
+          <span class="tag">MODEL-SIDE</span>
+          <h3>Codex 直接提交完整正文模板</h3>
+          <ul>
+            <li>用 Markdown 自由组织背景、改动、风险和视觉证据。</li>
+            <li>在实际验证位置放置唯一的 <code>{{TEST_RESULTS}}</code>。</li>
+            <li>在方案位置放置路径占位符或方案豁免占位符。</li>
+            <li>不预先猜测 commit SHA，也不重复书写测试事实。</li>
+          </ul>
+        </div>
+        <div class="seal">COMMIT SHA 封条</div>
+        <div>
+          <span class="tag">WORKFLOW-SIDE</span>
+          <h3>受控发布器只注入远端事实</h3>
+          <ul>
+            <li>校验正文长度、必备章节和受控占位符。</li>
+            <li>把门禁确认过的 <code>tests</code> 渲染进正文。</li>
+            <li>用发布后的完整 SHA 生成 GitHub blob 与 RawGitHack 链接。</li>
+            <li>追加 <code>Closes #N</code>，再创建或更新 PR 受控区。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="decisions">
+        <article class="decision">
+          <h3>目标：PR 正文可直接评审</h3>
+          <p>评审者不打开 workflow 日志，也能看到改动动机、范围、验证、风险、方案与视觉证据边界。</p>
+        </article>
+        <article class="decision">
+          <h3>目标：首次创建与后续提交一致</h3>
+          <p>首次 Issue 实现创建正文；已有 Codex PR 的后续发布同步更新正文和方案 SHA 链接。</p>
+        </article>
+        <article class="decision no">
+          <h3>非目标：允许模型直接操作 GitHub</h3>
+          <p>继续禁止 Codex commit、push、调用 <code>gh</code> 或 GitHub API；发布凭据和最终远端状态只由 workflow 掌握。</p>
+        </article>
+        <article class="decision no">
+          <h3>非目标：新增截图托管服务</h3>
+          <p>本次不引入图片上传或第三方托管。Codex 提供已有安全 URL；没有可发布截图时必须写明原因，正文不得静默省略视觉证据。</p>
+        </article>
+        <article class="decision">
+          <h3>已确认：维护者内容保护</h3>
+          <p>使用 HTML 注释标记 Codex 受控区。后续运行只替换这一段；无标记的现有正文在末尾追加受控区，避免覆盖人工编辑。</p>
+        </article>
+        <article class="decision">
+          <h3>已确认：严格门禁</h3>
+          <p>publish 模式缺少 <code>pr_body</code>、必备章节或占位符时拒绝发布，而不是退回两行模板；reply 模式使用空字符串。</p>
+        </article>
+      </div>
+    </section>
+
+    <h2>03 / 正文模板契约</h2>
+    <section>
+      <p>在现有 <code>.codex-result.json</code> 中只增加一个 <code>pr_body</code> 字符串。publish 模式由 Codex 直接写完整 Markdown；reply 模式必须为空字符串。workflow 不重组文案，只替换两个受控占位符并追加关闭语句。</p>
+      <div class="contract"><pre>{
+  "delivery": "publish",
+  "feature": "codex-pr-description",
+  "commit_message": "fix(codex): publish compliant PR descriptions",
+  "summary": "用于 Issue 进度评论的简短中文摘要。",
+  "pr_body": "## 背景或目标\n...\n\n## 关键改动\n...\n\n## 实际验证\n{{TEST_RESULTS}}\n\n## 风险与兼容性\n...\n\n## 方案\n{{DESIGN_LINKS:design/project/20260803-codex-pr-description.active.html}}\n\n## 视觉证据\n...",
+  "tests": [
+    {"command": "python3 -m pytest tests/test_codex_workflow.py", "result": "passed"}
+  ]
+}</pre></div>
+
+      <p>不需要方案时，把方案段改为 <code>{{DESIGN_EXEMPTION}}</code>，并紧接具体豁免原因。两个方案占位符必须恰好出现一个。正文中的截图 Markdown 或无法截图说明由 Codex 直接写入“视觉证据”章节。</p>
+
+      <table>
+        <thead><tr><th>门禁</th><th>规则</th><th>失败行为</th></tr></thead>
+        <tbody>
+          <tr><td data-label="门禁">正文完整性</td><td data-label="规则"><code>pr_body</code> 为有上限的非空字符串，并包含背景、关键改动、实际验证、风险与兼容性、方案、视觉证据六个固定二级标题。</td><td data-label="失败行为">拒绝 publish，不创建不完整 PR。</td></tr>
+          <tr><td data-label="门禁">真实测试注入</td><td data-label="规则"><code>{{TEST_RESULTS}}</code> 恰好出现一次；workflow 从已经通过 publish gate 的 <code>tests</code> 生成列表。</td><td data-label="失败行为">拒绝正文自报或遗漏验证记录。</td></tr>
+          <tr><td data-label="门禁">方案二选一</td><td data-label="规则"><code>{{DESIGN_LINKS:路径}}</code> 与 <code>{{DESIGN_EXEMPTION}}</code> 恰好出现一个；前者只允许合法且存在的 ACTIVE 文件，后者后面必须有原因。</td><td data-label="失败行为">拒绝 publish，提示方案引用不合规。</td></tr>
+          <tr><td data-label="门禁">视觉证据</td><td data-label="规则">视觉证据由正文直接表达：界面改动使用截图 Markdown，其他情况明确说明不涉及界面或无法截图原因。</td><td data-label="失败行为">固定标题使缺失内容在评审和契约测试中可见。</td></tr>
+          <tr><td data-label="门禁">正文标记</td><td data-label="规则">只接受零组或一组有序的 Codex 标记；重复、缺边界或顺序错误均不覆盖。</td><td data-label="失败行为">提交可保留，但 PR 更新失败并在进度评论中报告。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <h2>04 / 发布流程与幂等更新</h2>
+    <section>
+      <div class="flow" role="img" aria-label="Codex PR 正文模板从生成、校验、提交、封印到创建或更新 PR 的流程">
+        <div class="stage"><small>01 · MODEL</small><strong>编写正文</strong><span>写入 pr_body、tests 和提交元数据。</span></div>
+        <div class="stage"><small>02 · GATE</small><strong>验证模板</strong><span>长度、标题、占位符、方案路径与文件。</span></div>
+        <div class="stage"><small>03 · PUBLISH</small><strong>提交并推送</strong><span>受控 App 生成最终 commit SHA。</span></div>
+        <div class="stage"><small>04 · SEAL</small><strong>替换占位符</strong><span>注入真实测试和两条不可变方案链接。</span></div>
+        <div class="stage"><small>05 · PR</small><strong>创建或更新</strong><span>替换受控区，保留人工区，保持 Draft。</span></div>
+      </div>
+
+      <table>
+        <thead><tr><th>场景</th><th>正文行为</th><th>SHA 来源</th></tr></thead>
+        <tbody>
+          <tr><td data-label="场景">首次 Issue 发布</td><td data-label="正文行为">创建 Draft PR，正文仅包含完整 Codex 受控区与 <code>Closes #N</code>。</td><td data-label="SHA 来源">本轮 publish 输出。</td></tr>
+          <tr><td data-label="场景">已有 Codex PR 后续发布</td><td data-label="正文行为">读取现有正文；替换唯一受控区，无标记则在末尾追加。</td><td data-label="SHA 来源">本轮新提交。</td></tr>
+          <tr><td data-label="场景">分支已推送但 PR 缺失</td><td data-label="正文行为">补建 Draft PR；复用已经校验的结果文件。</td><td data-label="SHA 来源">checkout 的目标提交。</td></tr>
+          <tr><td data-label="场景">标记被破坏或出现多组</td><td data-label="正文行为">拒绝覆盖并报告错误，不猜测维护者意图。</td><td data-label="SHA 来源">不适用。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <h2>05 / 安全、兼容性与回滚</h2>
+    <section>
+      <div class="decisions">
+        <article class="decision">
+          <h3>不信任模型输出</h3>
+          <p>继续在 shell 门禁中校验严格键集合、类型、长度、固定标题和占位符。workflow 只解释自有的精确占位符，不执行正文内容，也不允许占位符路径逃逸 <code>design/</code>。</p>
+        </article>
+        <article class="decision">
+          <h3>不信任 checkout 辅助脚本</h3>
+          <p>Issue/PR 目标代码可能变化，正文渲染逻辑继续内联在受信任 workflow 版本中，不从 checkout 动态加载 JavaScript。</p>
+        </article>
+        <article class="decision">
+          <h3>兼容旧 PR</h3>
+          <p>旧正文没有标记时不删除原文，只追加受控区。新契约上线后，旧格式结果 fail closed，要求 Codex 按新 prompt 重新生成。</p>
+        </article>
+        <article class="decision">
+          <h3>回滚</h3>
+          <p>回滚 workflow、prompt 与契约测试即可停止新逻辑；已经写入 PR 的 Markdown 保持可读。受控标记只是 HTML 注释，不影响 GitHub 展示。</p>
+        </article>
+      </div>
+      <div class="warning"><strong>发布顺序约束：</strong>提交发生在 PR 更新前。如果远端提交成功但 PR API 更新失败，不能回滚已推送提交；最终状态必须明确报告“提交已发布、PR 正文更新失败”，下一次运行可重新渲染。</div>
+    </section>
+
+    <h2>06 / 测试结果</h2>
+    <section>
+      <p>核心契约、正文渲染、幂等更新、路径安全和全量项目回归均已通过。宿主机依赖不足与真实 GitHub App 凭据边界单独记录，不冒充成功。</p>
+      <div class="tests">
+        <div class="test-item pass"><strong><code>python3 -m pytest tests/test_codex_workflow.py -q</code></strong><span>PASS；43 passed in 8.84s。覆盖完整/缺失正文、固定章节、测试与方案占位符、路径穿越、ACTIVE 文件、首次创建、既有 PR 替换/追加、畸形标记和完整 SHA 双链接。</span></div>
+        <div class="test-item pass"><strong><code>make test</code></strong><span>PASS；Docker 测试镜像下 797 passed、16 skipped、20 warnings in 57.11s，包含全仓库回归。</span></div>
+        <div class="test-item pass"><strong>actionlint 1.7.12</strong><span>PASS；<code>go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -config-file .github/actionlint.yaml .github/workflows/codex.yml</code> 无输出，退出码 0。</span></div>
+        <div class="test-item pass"><strong>Python 与差异检查</strong><span>PASS；<code>make lint-py-fix</code>、<code>make lint-py</code>、<code>ruff check tests/test_codex_workflow.py</code>、<code>ruff format --check tests/test_codex_workflow.py</code> 和 <code>git diff --check</code> 全部通过。</span></div>
+        <div class="test-item pass"><strong>方案实际渲染</strong><span>PASS；本机 Chrome 分别以 1440×1100 和 390×844 视口打开单文件 HTML，桌面和移动端首屏无溢出、裁切或不可读内容。</span></div>
+        <div class="test-item limited"><strong><code>make pytest</code> 与宿主机全量 pytest</strong><span>ENVIRONMENT；Makefile 入口因 PATH 缺少 <code>pytest</code> 未启动；模块入口收集时缺 Calibre、QuickJS、<code>txt2epub_next</code> 与 Python 3.11 <code>tomllib</code>。已由 Docker <code>make test</code> 完整替代并通过。</span></div>
+        <div class="test-item limited"><strong><code>act issue_comment -W .github/workflows/codex.yml -j codex ... --pull=false</code></strong><span>BOUNDARY；act 0.2.82 成功启动真实 dev 容器、下载并执行 <code>create-github-app-token@v3</code>，随后因本地未提供生产 <code>CODEX_APP_CLIENT_ID</code>/私钥停止。真实 App Token、PR create/update 与 GitHub 评论写入必须在远端 Actions 冒烟通过后方可合并。</span></div>
+        <div class="test-item pass"><strong><code>make check-design</code></strong><span>PASS；77 design documents passed，路径、ACTIVE 状态、HTML 结构与单文件资源门禁全部通过。</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>ACTIVE · Codex 直接输出 <code>pr_body</code>，workflow 只注入经过验证的测试、完整 SHA 方案链接和关闭语句；远端 GitHub App 冒烟仍是合并前置条件。</footer>
+</body>
+</html>

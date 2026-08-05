@@ -31,6 +31,7 @@ const { pushMock, storeState } = vi.hoisted(() => ({
             version: 'test',
             friends: [],
             show_sidebar_sys: false,
+            show_network_library: true,
         },
         user: {
             is_login: false,
@@ -67,6 +68,7 @@ function mountHeader(variant: 'light-gray' | 'minimal' | 'graphite' | 'brass' | 
 describe('BuiltinThemeHeader.vue search', () => {
     beforeEach(() => {
         pushMock.mockReset();
+        storeState.sys.show_network_library = true;
     });
 
     it('uses the search API name query parameter for every shared themed header', async () => {
@@ -108,6 +110,50 @@ describe('BuiltinThemeHeader.vue search', () => {
         await wrapper.get('form').trigger('submit');
 
         expect(pushMock).not.toHaveBeenCalled();
+        wrapper.unmount();
+    });
+});
+
+describe('BuiltinThemeHeader.vue navigation', () => {
+    beforeEach(() => {
+        storeState.sys.show_network_library = true;
+    });
+
+    it('shows the network library link by default', () => {
+        const wrapper = mountHeader('minimal');
+
+        expect(wrapper.text()).toContain('navigation.networkLibrary');
+
+        wrapper.unmount();
+    });
+
+    it('hides the network library link when disabled', () => {
+        storeState.sys.show_network_library = false;
+        const wrapper = mountHeader('minimal');
+
+        expect(wrapper.text()).not.toContain('navigation.networkLibrary');
+
+        wrapper.unmount();
+    });
+
+    it('uses the menu icon and fully toggles the light-gray drawer', async () => {
+        const wrapper = mountHeader('light-gray');
+        const header = wrapper.findComponent(BuiltinThemeHeader).vm as unknown as {
+            sidebar: boolean;
+        };
+
+        expect(wrapper.find('.tb-theme-nav-toggle .mdi-menu').exists()).toBe(true);
+        expect(wrapper.find('.tb-theme-avatar-toggle').exists()).toBe(false);
+        expect(header.sidebar).toBe(true);
+
+        await wrapper.get('.tb-theme-nav-toggle').trigger('click');
+
+        expect(header.sidebar).toBe(false);
+        expect(wrapper.find('.v-navigation-drawer--rail').exists()).toBe(false);
+
+        await wrapper.get('.tb-theme-nav-toggle').trigger('click');
+
+        expect(header.sidebar).toBe(true);
         wrapper.unmount();
     });
 });

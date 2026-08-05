@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>浅灰主题侧栏修复验收补充方案</title>
+  <style>
+    :root {
+      --paper: #f3f6f8;
+      --sheet: #ffffff;
+      --ink: #17212b;
+      --muted: #5c6b78;
+      --rule: #bcc8d1;
+      --blue: #1d5d83;
+      --blue-soft: #dceaf2;
+      --amber: #b46b10;
+      --green: #2e7055;
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--paper); color: var(--ink); font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif; }
+    body { margin: 0; }
+    a { color: var(--blue); }
+    code { padding: .12em .34em; background: #e7edf1; border-radius: 2px; font: 500 .9em/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .page { width: min(1160px, calc(100% - 32px)); margin: 22px auto 64px; }
+    .masthead { display: grid; grid-template-columns: minmax(0, 1fr) 310px; border: 1px solid var(--rule); background: var(--sheet); }
+    .title-block { padding: clamp(30px, 6vw, 74px); }
+    .kicker, .label { color: var(--blue); font: 800 .72rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { max-width: 760px; margin: 22px 0 18px; font: 700 clamp(2.5rem, 6.5vw, 5.6rem)/.96 "Bodoni 72", Didot, "Songti SC", serif; letter-spacing: -.04em; }
+    .summary { max-width: 700px; margin: 0; color: var(--muted); font-size: 1.04rem; line-height: 1.85; }
+    .meta { display: grid; align-content: end; border-left: 1px solid var(--rule); background: var(--blue); color: #fff; }
+    .meta div { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.28); }
+    .meta span { display: block; margin-bottom: 6px; color: #c9dfeb; font: 700 .68rem/1.2 ui-monospace, monospace; letter-spacing: .1em; }
+    .meta strong { font-size: .94rem; }
+    main { display: grid; gap: 16px; margin-top: 16px; }
+    section { padding: clamp(24px, 5vw, 50px); border: 1px solid var(--rule); background: var(--sheet); }
+    h2 { max-width: 780px; margin: 10px 0 20px; font: 700 clamp(1.55rem, 3vw, 2.35rem)/1.15 "Bodoni 72", Didot, "Songti SC", serif; }
+    h3 { margin: 0 0 8px; font-size: 1rem; }
+    p, li, th, td { line-height: 1.75; }
+    .lead { max-width: 830px; color: var(--muted); }
+    .requirements { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 26px; }
+    .requirement { padding: 20px; background: var(--paper); border-top: 4px solid var(--blue); }
+    .requirement.warn { border-top-color: var(--amber); }
+    .requirement p { margin: 0; color: var(--muted); }
+    .ruler { margin: 30px 0 8px; padding: 24px; border: 1px solid var(--rule); background: linear-gradient(90deg, rgba(29,93,131,.08) 1px, transparent 1px) 0 0 / 24px 100%; }
+    .measure { display: grid; grid-template-columns: 240px minmax(180px, 1fr); min-height: 164px; }
+    .drawer { display: grid; place-items: center; color: #fff; background: var(--blue); font: 800 1.1rem/1.2 ui-monospace, monospace; }
+    .content { display: grid; place-items: center; border: 1px dashed var(--blue); background: rgba(255,255,255,.88); color: var(--muted); text-align: center; }
+    .axis { display: grid; grid-template-columns: 240px 1fr; margin-top: 10px; color: var(--muted); font: 700 .73rem/1.3 ui-monospace, monospace; }
+    .axis span:first-child { color: var(--blue); }
+    .zero { display: grid; grid-template-columns: 8px 1fr; min-height: 96px; margin-top: 14px; }
+    .zero-line { background: var(--green); }
+    .zero-result { display: grid; align-content: center; padding: 20px; border: 1px solid var(--rule); border-left: 0; }
+    .zero-result strong { color: var(--green); font-size: 1.2rem; }
+    .decision-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
+    .decision { padding: 20px; border-left: 4px solid var(--blue); background: var(--paper); }
+    .decision.boundary { border-left-color: var(--amber); }
+    .decision p { margin: 0; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+    th, td { padding: 13px 14px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+    th { color: var(--blue); font: 800 .72rem/1.25 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+    .pending { color: var(--amber); font-weight: 800; }
+    .passed { color: var(--green); font-weight: 800; }
+    .sequence { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 24px; background: var(--rule); border: 1px solid var(--rule); }
+    .sequence article { min-height: 142px; padding: 20px; background: var(--sheet); }
+    .sequence span { display: block; margin-bottom: 20px; color: var(--blue); font: 800 .7rem/1 ui-monospace, monospace; }
+    .note { margin-top: 20px; padding: 17px 19px; border-left: 5px solid var(--amber); background: #fff6e8; }
+    footer { padding-top: 18px; color: var(--muted); font-size: .78rem; }
+    :focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+    @media (max-width: 780px) {
+      .masthead { grid-template-columns: 1fr; }
+      .meta { border-left: 0; }
+      .requirements, .decision-grid, .sequence { grid-template-columns: 1fr; }
+      .measure, .axis { grid-template-columns: minmax(96px, 42%) 1fr; }
+      .drawer { width: 100%; }
+      table, tbody, tr, th, td { display: block; }
+      th { display: none; }
+      td { padding-left: 0; }
+      td::before { display: block; color: var(--blue); font: 800 .68rem/1.3 ui-monospace, monospace; content: attr(data-label); }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <div class="title-block">
+        <div class="kicker">PR #932 · Acceptance correction</div>
+        <h1>从 240px<br>量到 0px</h1>
+        <p class="summary">浅灰主题侧栏修复已完成真实环境验收。菜单按钮关闭抽屉后，侧栏完整移出视口、页面占位归零；本方案同时纠正旧方案把 mock 自动化测试当作最终验收的流程问题。</p>
+      </div>
+      <aside class="meta" aria-label="方案元数据">
+        <div><span>STATUS</span><strong>ACTIVE · 已完成真实环境验证</strong></div>
+        <div><span>CREATED</span><strong>2026-08-04</strong></div>
+        <div><span>MODULE</span><strong>app</strong></div>
+        <div><span>SOURCE</span><strong>Issue #928 / PR #932 评审</strong></div>
+      </aside>
+    </header>
+
+    <main>
+      <section>
+        <div class="label">原始诉求 / Review finding</div>
+        <h2>功能修复已有自动化覆盖，但最终验收证据不合规</h2>
+        <p class="lead">Issue #928 要求修复浅灰主题菜单图标异常和侧栏只能收回一半的问题。PR #932 已移除头像按钮、rail 属性与 <code>miniVariant</code> 分支，并补充组件及 E2E 测试；评审进一步指出，旧方案只记录 mock + Playwright 结果，却提前标记 ACTIVE，且 PR 正文缺少完整验证、截图和方案固定链接。</p>
+        <div class="requirements">
+          <article class="requirement"><h3>真实服务</h3><p>使用 Docker 运行 Talebook 后端，前端通过 <code>API_URL</code> 连接真实接口与书库状态。</p></article>
+          <article class="requirement"><h3>真实渲染</h3><p>使用 Chrome DevTools MCP 检查浅灰主题的展开、关闭、重新打开三个关键状态。</p></article>
+          <article class="requirement warn"><h3>完整交付</h3><p>PR 正文写明背景、改动、实际命令、风险、截图，以及新 ACTIVE 方案的固定 SHA 链接。</p></article>
+        </div>
+      </section>
+
+      <section>
+        <div class="label">目标 / Measured contract</div>
+        <h2>用可观察的布局值定义“完全关闭”</h2>
+        <p class="lead">验收不以“看起来收起”作为判断，而是同时检查抽屉状态类、计算宽度和主内容偏移。打开态保持 240px；关闭态抽屉不再 active、没有 rail 类，主内容左侧偏移归零；重新打开后恢复原值。</p>
+        <div class="ruler" role="img" aria-label="浅灰主题侧栏从 240 像素展开态切换到 0 像素关闭态的验收标尺">
+          <div class="measure">
+            <div class="drawer">DRAWER · 240px</div>
+            <div class="content">主内容左侧偏移 240px<br>抽屉 active，无 rail</div>
+          </div>
+          <div class="axis"><span>0 ————— 240px</span><span>content viewport</span></div>
+          <div class="zero">
+            <div class="zero-line"></div>
+            <div class="zero-result"><strong>CLOSED · 0px</strong><span>主内容偏移归零；抽屉 inactive；仍无 rail。</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="label">方案 / Verification path</div>
+        <h2>保持实现不变，补齐真实验收和治理闭环</h2>
+        <div class="decision-grid">
+          <article class="decision"><h3>代码边界</h3><p>保留 PR 现有的统一菜单图标与 <code>sidebar = !sidebar</code> 状态模型；只有发现真实环境回归时才调整业务代码，并同步补测试。</p></article>
+          <article class="decision"><h3>运行环境</h3><p>先执行 <code>make dev</code> 并确认 <code>/api/welcome</code> 可用，再以 <code>API_URL=http://127.0.0.1:8080</code> 启动 Nuxt。</p></article>
+          <article class="decision"><h3>浏览器证据</h3><p>Chrome DevTools MCP 在桌面视口访问实际页面，记录菜单图标、抽屉类名、计算宽度、主内容偏移、控制台与网络异常，并保存关闭态截图。</p></article>
+          <article class="decision boundary"><h3>文档状态</h3><p>本方案验证通过后转为 ACTIVE；旧方案转为 SUPERSEDED 并注明替代关系，不直接实质改写既有 ACTIVE 内容。</p></article>
+        </div>
+        <div class="sequence" aria-label="验收顺序">
+          <article><span>01 · BACKEND</span><strong>Docker 启动真实后端</strong><p>确认欢迎接口和真实数据链路可用。</p></article>
+          <article><span>02 · FRONTEND</span><strong>Nuxt 连接 8080</strong><p>禁止 mock 体验环境和 Chokidar polling。</p></article>
+          <article><span>03 · DEVTOOLS</span><strong>检查三种状态</strong><p>展开 → 关闭 → 重新打开，并核对像素值。</p></article>
+          <article><span>04 · DELIVERY</span><strong>回写并固定链接</strong><p>测试、截图、风险和 commit SHA 进入 PR 正文。</p></article>
+        </div>
+      </section>
+
+      <section>
+        <div class="label">测试结果 / Verified evidence</div>
+        <h2>真实后端、真实渲染与自动化证据已闭环</h2>
+        <table>
+          <thead><tr><th>命令或验收项</th><th>结果</th><th>实际证据</th></tr></thead>
+          <tbody>
+            <tr><td data-label="命令或验收项"><code>make dev</code> + <code>curl --fail --silent http://127.0.0.1:8080/api/welcome</code></td><td data-label="结果" class="passed">通过</td><td data-label="实际证据">Docker 后端完成初始化并提供真实演示书库；欢迎接口返回 <code>{"err":"free"}</code>。</td></tr>
+            <tr><td data-label="命令或验收项"><code>API_URL=http://127.0.0.1:8080 npx nuxt dev --port 3000 --host 127.0.0.1</code></td><td data-label="结果" class="passed">通过</td><td data-label="实际证据">Nuxt 连接 8080 真实后端启动，登录后可进入主题管理并激活浅灰主题。</td></tr>
+            <tr><td data-label="命令或验收项">Chrome DevTools MCP 实际渲染验收</td><td data-label="结果" class="passed">通过</td><td data-label="实际证据">1440px 桌面视口：展开态抽屉 active、无 rail、边界 0→240、正文左偏移 240px；关闭态抽屉 inactive、向左平移 240px 后边界 -240→0、正文占位 0；重新打开恢复。菜单始终为 <code>mdi-menu</code>，无头像。目标 API 请求均成功；控制台仅有 2 条与本次无关的既有翻译缺失 warning。关闭态截图保存为 <code>document/screenshots/light-gray-sidebar-toggle/closed.png</code>。</td></tr>
+            <tr><td data-label="命令或验收项"><code>npx vitest run test/components/BuiltinThemeHeader.spec.ts</code></td><td data-label="结果" class="passed">通过</td><td data-label="实际证据">1 个文件、4 个用例通过，覆盖菜单图标、完整关闭、重新打开与搜索行为。</td></tr>
+            <tr><td data-label="命令或验收项"><code>npx playwright test test/e2e/light-gray-sidebar.spec.ts --project=chromium</code></td><td data-label="结果" class="passed">通过</td><td data-label="实际证据">短生命周期 mock API 与临时 Nuxt 下 1/1 通过；仅作为隔离自动化回归，不替代上方真实后端验收。</td></tr>
+            <tr><td data-label="命令或验收项"><code>npm run lint</code> / <code>npm run build</code> / <code>make lint-py</code></td><td data-label="结果" class="passed">通过</td><td data-label="实际证据">前端 lint 退出码 0（193 个仓库既有 warning、0 error）；Nuxt 生产构建完成；Python lint 通过且 100 个文件已格式化。</td></tr>
+            <tr><td data-label="命令或验收项"><code>make pytest</code></td><td data-label="结果" class="pending">本机未执行</td><td data-label="实际证据">当前主机未安装 <code>pytest</code> 可执行文件，命令在测试收集前退出；后端未改动，最终以后续 GitHub <code>test-server</code> 检查为准。</td></tr>
+            <tr><td data-label="命令或验收项"><code>make check-design</code></td><td data-label="结果" class="passed">通过</td><td data-label="实际证据">方案状态、路径、HTML 结构和单文件资源约束校验通过；仓库不存在 WIP 合并项。</td></tr>
+          </tbody>
+        </table>
+        <div class="note"><strong>替代关系：</strong> 本方案替代 <code>design/app/20260803-light-gray-sidebar-toggle.superseded.html</code>。旧方案的 mock 验收不能支撑 ACTIVE 状态；本方案以真实 Docker 后端和 Chrome DevTools MCP 证据完成纠正。</div>
+      </section>
+    </main>
+    <footer>Talebook 内部开发方案 · 单文件离线 HTML · 2026-08-04</footer>
+  </div>
+</body>
+</html>

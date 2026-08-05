@@ -1,5 +1,5 @@
 <template>
-    <div :class="['tb-theme-header', `tb-theme-${variant}`, modeClass, { 'tb-theme-rail': miniVariant }]">
+    <div :class="['tb-theme-header', `tb-theme-${variant}`, modeClass]">
         <v-app-bar
             class="tb-theme-appbar"
             :density="isMinimal ? 'default' : 'compact'"
@@ -12,17 +12,7 @@
                 class="tb-theme-nav-toggle"
                 @click.stop="toggleDrawer"
             >
-                <v-avatar
-                    v-if="isLightGray"
-                    class="tb-theme-avatar-toggle"
-                    size="34"
-                    :image="store.user.is_login ? store.user.avatar : ''"
-                >
-                    <v-icon v-if="!store.user.avatar">
-                        mdi-account-circle
-                    </v-icon>
-                </v-avatar>
-                <v-icon v-else>
+                <v-icon>
                     mdi-menu
                 </v-icon>
             </v-btn>
@@ -209,8 +199,6 @@
             class="tb-theme-drawer"
             :order="2"
             mobile-breakpoint="md"
-            :rail="isLightGray && miniVariant"
-            :rail-width="64"
             :width="drawerWidth"
         >
             <v-list density="compact">
@@ -300,7 +288,6 @@ const display = useDisplay();
 const { locale, locales, setLocale, t } = useI18n();
 
 const sidebar = ref(true);
-const miniVariant = ref(false);
 const mobileSearch = ref(false);
 const search = ref('');
 const searchCategory = ref('all');
@@ -338,9 +325,11 @@ const navItems = computed(() => {
     const items = [
         { key: 'home', icon: 'mdi-home', href: '/', text: t('navigation.home') },
         { key: 'library', icon: 'mdi-book', href: '/library', text: t('navigation.localLibrary') },
-        { key: 'network', icon: 'mdi-cloud-search', href: '/network', text: t('navigation.networkLibrary') },
-        { key: 'audios', icon: 'mdi-book-music', href: '/audios', text: t('navigation.audiobooks'), badge: t('audiobook.beta') },
     ];
+    if (store.sys.show_network_library !== false) {
+        items.push({ key: 'network', icon: 'mdi-cloud-search', href: '/network', text: t('navigation.networkLibrary') });
+    }
+    items.push({ key: 'audios', icon: 'mdi-book-music', href: '/audios', text: t('navigation.audiobooks'), badge: t('audiobook.beta') });
     if (store.user.is_admin) {
         items.push({
             key: 'admin',
@@ -408,10 +397,6 @@ const navItems = computed(() => {
 });
 
 function toggleDrawer() {
-    if (isLightGray.value && sidebar.value) {
-        miniVariant.value = !miniVariant.value;
-        return;
-    }
     sidebar.value = !sidebar.value;
 }
 
@@ -558,24 +543,4 @@ onMounted(() => {
     min-height: 48px;
 }
 
-.tb-theme-light-gray.tb-theme-rail :deep(.v-list-subheader),
-.tb-theme-light-gray.tb-theme-rail :deep(.v-list-item-title),
-.tb-theme-light-gray.tb-theme-rail :deep(.v-list-item__append),
-.tb-theme-light-gray.tb-theme-rail :deep(.v-list-group__items) {
-    display: none !important;
-}
-
-.tb-theme-light-gray.tb-theme-rail :deep(.v-list-item) {
-    justify-content: center;
-    padding-inline: 0 !important;
-}
-
-.tb-theme-light-gray.tb-theme-rail :deep(.v-list-item__prepend) {
-    justify-content: center;
-    width: 64px !important;
-}
-
-.tb-theme-light-gray.tb-theme-rail :deep(.v-list-item__prepend > .v-icon) {
-    margin-inline-end: 0 !important;
-}
 </style>

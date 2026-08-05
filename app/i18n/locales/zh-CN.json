@@ -176,6 +176,15 @@
     "title": "图书馆",
     "noBooks": "本书库暂无藏书",
     "addBooksFirst": "请先添加书籍到书库",
+    "selectFilter": "选择{label}",
+    "filterPickerSummary": "共 {count} 项 · 第 {page} / {pages} 页",
+    "filterPickerSearchSummary": "找到 {count} / {total} 项 · 第 {page} / {pages} 页",
+    "filterPickerPageSize": "每页 {count} 项",
+    "closeFilterPicker": "关闭{label}选择",
+    "searchFilter": "搜索{label}",
+    "searchFilterHint": "输入关键词筛选",
+    "noMatchingFilter": "没有匹配的{label}",
+    "clearFilterSearch": "清除搜索",
     "message": {
       "fetchBooksFailed": "获取书籍列表失败"
     }
@@ -438,7 +447,7 @@
     "webdavIntroduction": "WebDAV 介绍",
     "all": "全部",
     "collapse": "收起",
-    "more": "更多",
+    "more": "显示更多",
     "publisher": "出版社",
     "author": "作者",
     "tags": "标签",
@@ -749,6 +758,7 @@
         "siteFooter": "网站脚注",
         "footerExtraHtml": "页脚额外 HTML 内容",
         "sidebarExtraHtml": "侧边栏额外 HTML 内容",
+        "showNetworkLibrary": "显示网络书库入口与连载状态筛选",
         "showSidebarSys": "在侧边栏中显示系统信息",
         "showFeedback": "显示反馈按钮",
         "feedbackUrl": "反馈按钮跳转地址",
