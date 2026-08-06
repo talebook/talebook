@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex 自动处理 Bug Issue 方案（已验证）</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --night: #07141d;
+      --panel: #0d202b;
+      --panel-2: #122b38;
+      --ink: #e8f2f4;
+      --muted: #9bb1b9;
+      --line: #294654;
+      --cyan: #42d9d0;
+      --cyan-soft: #b7f6f1;
+      --bug: #ff6b5e;
+      --amber: #ffc857;
+      --green: #78d6a7;
+      --paper: #f4f8f8;
+      --paper-ink: #122833;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 72px;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(66, 217, 208, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(66, 217, 208, .045) 1px, transparent 1px),
+        var(--night);
+      background-size: 32px 32px;
+      font: 16px/1.72 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+
+    h1, h2, h3, .eyebrow, .meta, .signal, th, .label, .gate strong {
+      font-family: "Arial Narrow", "Avenir Next Condensed", "PingFang SC", sans-serif;
+    }
+    h1 {
+      max-width: 920px;
+      margin: 0;
+      font-size: clamp(44px, 7.6vw, 86px);
+      line-height: .93;
+      letter-spacing: -.05em;
+    }
+    h2 {
+      margin: 58px 0 18px;
+      color: var(--cyan-soft);
+      font-size: clamp(29px, 4.2vw, 44px);
+      line-height: 1.05;
+      letter-spacing: -.03em;
+    }
+    h3 { margin: 0 0 8px; font-size: 20px; line-height: 1.25; }
+    p { margin: 9px 0; }
+    a { color: var(--cyan); }
+    code {
+      padding: 2px 6px;
+      color: #baf4ef;
+      border: 1px solid #315866;
+      border-radius: 3px;
+      background: #0a1a23;
+      font: .88em/1.5 "SFMono-Regular", Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+
+    header {
+      position: relative;
+      overflow: hidden;
+      min-height: 520px;
+      padding: clamp(34px, 6vw, 70px);
+      border: 1px solid #31515e;
+      background:
+        radial-gradient(circle at 86% 18%, rgba(255, 107, 94, .2), transparent 25%),
+        linear-gradient(135deg, #0f2a38 0 68%, #10222d 68%);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .34);
+    }
+    header::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: min(38%, 380px);
+      height: 14px;
+      content: "";
+      background: repeating-linear-gradient(90deg, var(--bug) 0 22px, transparent 22px 31px);
+    }
+    header::after {
+      position: absolute;
+      right: -92px;
+      bottom: -92px;
+      width: 330px;
+      height: 330px;
+      content: "BUG";
+      display: grid;
+      place-items: center;
+      color: rgba(255, 107, 94, .13);
+      border: 34px solid rgba(255, 107, 94, .12);
+      border-radius: 50%;
+      font: 900 72px/1 "Arial Narrow", sans-serif;
+      letter-spacing: -.04em;
+      transform: rotate(-11deg);
+    }
+    .eyebrow {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 20px;
+      color: var(--cyan);
+      font: 800 13px/1.2 "SFMono-Regular", Consolas, monospace;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .thesis {
+      position: relative;
+      z-index: 1;
+      max-width: 790px;
+      margin-top: 25px;
+      color: #c2d5da;
+      font-size: 19px;
+    }
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      margin-top: 34px;
+      border: 1px solid #3a5863;
+      background: #3a5863;
+    }
+    .meta div { min-height: 78px; padding: 13px 15px; background: rgba(7, 20, 29, .94); }
+    .meta span { display: block; color: #77929c; font-size: 11px; letter-spacing: .1em; }
+    .meta strong { display: block; margin-top: 6px; color: #f2fbfc; font-size: 15px; line-height: 1.3; }
+    .meta .wip { color: var(--amber); }
+
+    section {
+      margin-top: 16px;
+      padding: clamp(24px, 4vw, 42px);
+      border: 1px solid var(--line);
+      background: rgba(13, 32, 43, .96);
+      box-shadow: 0 10px 32px rgba(0, 0, 0, .16);
+    }
+    .lede {
+      padding: 20px 22px;
+      color: var(--paper-ink);
+      border-left: 7px solid var(--bug);
+      background: var(--paper);
+    }
+    .lede code { color: #0d5057; border-color: #b9d2d4; background: #e2efef; }
+    .facts, .decisions, .tests {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .fact, .decision, .test {
+      padding: 19px 20px;
+      border: 1px solid #31505d;
+      background: #0a1b24;
+    }
+    .fact strong, .decision strong, .test strong { display: block; color: var(--cyan); }
+    .fact p, .decision p, .test span { color: var(--muted); }
+    .decision { border-top: 5px solid var(--cyan); }
+    .decision.warn { border-top-color: var(--amber); }
+    .decision.stop { border-top-color: var(--bug); }
+
+    .issue-ticket {
+      position: relative;
+      display: grid;
+      grid-template-columns: 118px 1fr;
+      gap: 20px;
+      margin-top: 20px;
+      padding: 23px;
+      color: var(--paper-ink);
+      background: var(--paper);
+      border: 1px solid #c6d9dc;
+    }
+    .issue-ticket::before,
+    .issue-ticket::after {
+      position: absolute;
+      left: 118px;
+      width: 18px;
+      height: 18px;
+      content: "";
+      border-radius: 50%;
+      background: var(--panel);
+      transform: translateX(-50%);
+    }
+    .issue-ticket::before { top: -9px; }
+    .issue-ticket::after { bottom: -9px; }
+    .ticket-id {
+      display: grid;
+      align-content: center;
+      padding-right: 20px;
+      color: var(--bug);
+      border-right: 2px dashed #b7cdd1;
+      font: 900 32px/1 "Arial Narrow", sans-serif;
+    }
+    .ticket-id small { margin-top: 8px; color: #667e86; font: 12px/1.4 "SFMono-Regular", monospace; }
+    .issue-ticket code { color: #145560; border-color: #bed5d8; background: #e8f1f2; }
+
+    .rail {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 11px;
+      margin-top: 28px;
+    }
+    .rail::before {
+      position: absolute;
+      top: 36px;
+      right: 5%;
+      left: 5%;
+      height: 3px;
+      content: "";
+      background: linear-gradient(90deg, var(--bug), var(--amber) 35%, var(--cyan) 68%, var(--green));
+    }
+    .node {
+      position: relative;
+      z-index: 1;
+      min-height: 208px;
+      padding: 17px;
+      border: 1px solid #365664;
+      background: #0a1a23;
+    }
+    .signal {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      margin-bottom: 26px;
+      color: #06151d;
+      border: 6px solid var(--panel);
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 0 1px #4b6b77;
+      font-weight: 900;
+    }
+    .node:first-child .signal { background: var(--bug); }
+    .node:nth-child(2) .signal { background: var(--amber); }
+    .node:last-child .signal { background: var(--green); }
+    .node strong { display: block; font-size: 18px; }
+    .node span { display: block; margin-top: 9px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+
+    .fork {
+      display: grid;
+      grid-template-columns: 1fr 76px 1fr;
+      align-items: stretch;
+      gap: 1px;
+      margin-top: 24px;
+      border: 1px solid #365462;
+      background: #365462;
+    }
+    .fork > div { padding: 23px; background: #091b24; }
+    .fork .gate {
+      display: grid;
+      place-items: center;
+      padding: 8px;
+      color: #09212a;
+      background: var(--amber);
+      text-align: center;
+      writing-mode: vertical-rl;
+      letter-spacing: .08em;
+    }
+    .fork ul, .plain { margin: 12px 0 0; padding-left: 20px; }
+    .fork li, .plain li { margin: 6px 0; }
+    .label {
+      display: inline-block;
+      padding: 4px 8px;
+      color: #05272b;
+      background: var(--cyan);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .08em;
+    }
+    .label.manual { color: #3d2700; background: var(--amber); }
+
+    table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+    th, td { padding: 13px 14px; border-bottom: 1px solid #2e4a57; text-align: left; vertical-align: top; }
+    th { color: #06232a; background: var(--cyan); font-size: 13px; letter-spacing: .05em; }
+    td:first-child { width: 22%; color: #d9f2f2; font-weight: 700; }
+    td:nth-child(2) { width: 34%; }
+
+    .risk {
+      margin-top: 20px;
+      padding: 19px 21px;
+      color: #4a3000;
+      border: 1px solid #d8a83b;
+      background: #ffdf94;
+    }
+    .risk strong { display: block; }
+    .code-block {
+      overflow-x: auto;
+      margin-top: 20px;
+      padding: 20px 22px;
+      border-left: 7px solid var(--bug);
+      background: #06131b;
+    }
+    pre { margin: 0; color: #c6e2e5; font: 13px/1.65 "SFMono-Regular", Consolas, monospace; }
+    .test { position: relative; padding-left: 49px; }
+    .test::before {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      content: "○";
+      color: var(--amber);
+      font-size: 23px;
+      font-weight: 900;
+    }
+    .test.pass::before { content: "✓"; color: var(--green); }
+    .test.limited::before { content: "△"; color: var(--amber); }
+    footer { padding: 28px 5px 0; color: #77919a; font-size: 13px; }
+    :focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+
+    @media (max-width: 920px) {
+      .meta { grid-template-columns: 1fr 1fr; }
+      .rail { grid-template-columns: 1fr 1fr; }
+      .rail::before { display: none; }
+      .node:last-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 680px) {
+      body { padding: 13px 11px 44px; }
+      header, section { padding: 24px 19px; }
+      header { min-height: 0; }
+      .meta, .facts, .decisions, .tests, .rail { grid-template-columns: 1fr; }
+      .node:last-child { grid-column: auto; }
+      .issue-ticket { grid-template-columns: 1fr; }
+      .issue-ticket::before, .issue-ticket::after { display: none; }
+      .ticket-id { padding: 0 0 13px; border: 0; border-bottom: 2px dashed #b7cdd1; }
+      .fork { grid-template-columns: 1fr; }
+      .fork .gate { min-height: 44px; writing-mode: horizontal-tb; }
+      table, thead, tbody, tr, th, td { display: block; }
+      thead { display: none; }
+      tr { padding: 12px 0; border-bottom: 1px solid #2e4a57; }
+      td { width: auto !important; padding: 5px 0; border: 0; }
+      td::before { display: block; color: #78939c; font-size: 11px; font-weight: 800; content: attr(data-label); }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Talebook automation circuit · controlled draft delivery</div>
+    <h1>Bug 一创建，<br>Codex 就接手。</h1>
+    <p class="thesis">把新建缺陷从“等待维护者点名”推进到“自动分析与受控修复”，同时保留未信任输入隔离、真实测试、ACTIVE 方案与 Draft PR 人工评审四道硬门禁。</p>
+    <div class="meta">
+      <div><span>状态</span><strong class="wip">ACTIVE · 已验证</strong></div>
+      <div><span>创建日期</span><strong>2026-08-04</strong></div>
+      <div><span>所属模块</span><strong>project</strong></div>
+      <div><span>需求来源</span><strong><a href="https://github.com/talebook/talebook/issues/928">Issue #928</a> / 用户会话</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <h2>01 / 原始诉求与现场证据</h2>
+    <section>
+      <div class="lede"><strong>原始诉求：</strong>新增 Codex 自动处理 bug issue 的 workflow 能力，使 #928 这类 issue 创建后无需维护者再次评论，即可自动分析、实现、验证，并在有安全且可验证的改动时创建 Draft PR。</div>
+      <div class="issue-ticket">
+        <div class="ticket-id">#928<small>OPEN · BUG<br>AUTHOR: NONE</small></div>
+        <div>
+          <h3>浅灰主题下左侧栏收缩的 bug</h3>
+          <p>公开 issue 由外部用户创建，创建时已带 <code>bug</code> 标签，正文提供主题差异、复现动作、异常结果与截图。这正是自动入口必须覆盖、但不能视为可信指令的输入形态。</p>
+        </div>
+      </div>
+      <div class="facts">
+        <article class="fact"><strong>现有交付链已具备</strong><p><code>codex.yml</code> 已能从 Issue 分支产生受控 commit、fast-forward push 和 Draft PR，并持续更新同一条进度评论。</p></article>
+        <article class="fact"><strong>当前入口仍需维护者</strong><p>现有 job 只接受仓库 writer 在评论或 review 中显式写入 <code>@codex</code> 或 <code>/codex</code>。</p></article>
+        <article class="fact"><strong>Issue 模板已自动打标</strong><p><code>.github/ISSUE_TEMPLATE/我要反馈问题.md</code> 创建时附加 <code>bug</code> 标签，因此 <code>issues.opened</code> 可以直接识别目标。</p></article>
+        <article class="fact"><strong>权限与模型已经隔离</strong><p>交互与发布使用短期 App Token；Codex 子进程拿不到 GitHub 写凭据，workflow 文件修改也会被发布门禁拒绝。</p></article>
+      </div>
+    </section>
+
+    <h2>02 / 已确认决策与验收目标</h2>
+    <section>
+      <div class="decisions">
+        <article class="decision"><strong>只在创建时触发</strong><p>仅处理 <code>issues.opened</code> 且事件载荷已经包含 <code>bug</code> 标签的 issue；后续补标签、重新打开和历史 issue 均不触发。</p></article>
+        <article class="decision"><strong>外部作者可以触发</strong><p>覆盖 #928 的 <code>author_association: NONE</code>。issue 正文始终是未信任数据，不因自动授权而成为指令。</p></article>
+        <article class="decision warn"><strong>自动入口预授权方案生命周期</strong><p>仍执行 WIP → 实现 → 测试 → ACTIVE，但无需中途等待人工回复；Draft PR 承担最终人工审查门禁。</p></article>
+        <article class="decision stop"><strong>没有可靠改动就不建 PR</strong><p>信息不足、无法复现或风险过高时使用 reply 交付，在 issue 说明证据和下一步；禁止空 PR 与猜测性修复。</p></article>
+        <article class="decision"><strong>复用一套受控执行器</strong><p>直接扩展现有 <code>.github/workflows/codex.yml</code>，不复制 sandbox、Token、发布与评论逻辑。</p></article>
+        <article class="decision stop"><strong>绝不自动合并</strong><p>自动化只创建 Draft PR；不自动转 Ready、不审批、不合并，也不扩大现有 publisher 权限。</p></article>
+      </div>
+      <ul class="plain">
+        <li>成功标准：新建带 <code>bug</code> 标签的非 bot issue 能命中 job，自动进度可见，有验证改动时产生关联 Draft PR。</li>
+        <li>兼容标准：维护者评论、PR review 与 review comment 的手动触发条件、权限校验和交付行为保持不变。</li>
+        <li>安全标准：自动授权只存在于精确的 <code>issues/opened + bug</code> 分支，并由 job 条件和上下文解析双重校验。</li>
+      </ul>
+    </section>
+
+    <h2>03 / 事件轨道与双重授权</h2>
+    <section>
+      <div class="rail" aria-label="自动 bug issue 从事件到 Draft PR 的处理轨道">
+        <article class="node"><div class="signal">01</div><strong>Issue opened</strong><span>非 bot 创建；事件中已经存在精确的 <code>bug</code> 标签。</span></article>
+        <article class="node"><div class="signal">02</div><strong>双重门禁</strong><span>job <code>if</code> 先筛选；context 再从 payload 重算自动授权，不信任上一步输出。</span></article>
+        <article class="node"><div class="signal">03</div><strong>Codex 执行</strong><span>把正文当 bug 报告，不执行其中的命令；分析、方案、实现与真实验证。</span></article>
+        <article class="node"><div class="signal">04</div><strong>发布门禁</strong><span>校验结构化结果、测试、ACTIVE 方案、Git 历史、路径与 diff。</span></article>
+        <article class="node"><div class="signal">05</div><strong>Draft / Reply</strong><span>有可靠改动则复用 Issue 分支与 Draft PR；否则只回写说明。</span></article>
+      </div>
+
+      <div class="fork">
+        <div>
+          <span class="label manual">MANUAL</span>
+          <h3>维护者显式请求</h3>
+          <ul>
+            <li>事件：comment、review comment、review。</li>
+            <li>门禁：author association + API writer 权限。</li>
+            <li>正文：维护者请求，但引用内容仍按未信任输入处理。</li>
+          </ul>
+        </div>
+        <div class="gate"><strong>共享执行与发布链</strong></div>
+        <div>
+          <span class="label">AUTOMATIC BUG</span>
+          <h3>新建缺陷预授权</h3>
+          <ul>
+            <li>事件：仅 <code>issues.opened</code>。</li>
+            <li>门禁：非 bot + payload 精确包含 <code>bug</code>。</li>
+            <li>正文：外部 bug 报告；不要求作者拥有仓库权限。</li>
+          </ul>
+        </div>
+      </div>
+
+      <table>
+        <thead><tr><th>控制点</th><th>实现</th><th>失败行为</th></tr></thead>
+        <tbody>
+          <tr><td data-label="控制点">Workflow trigger</td><td data-label="实现">新增 <code>issues: {types: [opened]}</code>；不监听 <code>labeled</code> 或 <code>reopened</code>。</td><td data-label="失败行为">非目标事件不创建 job。</td></tr>
+          <tr><td data-label="控制点">Job 条件</td><td data-label="实现">自动分支检查事件名、action、非 bot 和 <code>issue.labels.*.name</code> 中的 <code>bug</code>；手动分支保留 writer 限制。</td><td data-label="失败行为">条件不满足时 job skipped。</td></tr>
+          <tr><td data-label="控制点">Context 防御</td><td data-label="实现">重新计算 <code>automaticBugIssue</code>，设置 <code>requestKind: automatic_bug_issue</code> 与授权来源；不得把任意 <code>issues</code> 事件直接授权。</td><td data-label="失败行为">授权为 false，后续 checkout 与 Codex 步骤不运行。</td></tr>
+          <tr><td data-label="控制点">目标解析</td><td data-label="实现">自动 issue 与手动 issue comment 复用默认分支、活动 Issue 分支和现有 Draft PR 解析。</td><td data-label="失败行为">多个活动分支时继续允许 reply，但阻止发布。</td></tr>
+          <tr><td data-label="控制点">模型指令</td><td data-label="实现">仅在自动模式声明方案中途确认已预授权；要求诊断 bug，正文不得改变系统任务；不确定时返回 reply。</td><td data-label="失败行为">不产生 diff，不请求 publisher token，不创建 PR。</td></tr>
+          <tr><td data-label="控制点">幂等与重投</td><td data-label="实现">沿用每 issue concurrency 与既有 Issue 分支发现。GitHub 重投在前次完成后继续同一活动分支/PR。</td><td data-label="失败行为">拒绝 force push 与并发覆盖。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <h2>04 / 请求上下文与提示词契约</h2>
+    <section>
+      <p>自动事件不伪装成维护者评论。上下文明确携带事件来源与审批语义，让 Codex 能在不削弱手动入口权限的前提下采用正确任务模式。</p>
+      <div class="code-block"><pre>{
+  "eventName": "issues",
+  "requestKind": "automatic_bug_issue",
+  "actor": "external-reporter",
+  "actorPermission": "none",
+  "authorizationKind": "automatic_bug_issue",
+  "automaticBugIssue": true,
+  "designReviewPreapproved": true,
+  "issueNumber": "928",
+  "issueTitle": "浅灰主题下左侧栏收缩的bug",
+  "body": "&lt;untrusted issue body&gt;",
+  "target": {
+    "ref": "master",
+    "existingIssueBranch": "",
+    "existingIssuePrNumber": ""
+  }
+}</pre></div>
+      <ul class="plain">
+        <li><strong>预授权范围：</strong>只免除自动模式下 WIP 后等待人工回复的暂停；不免除方案内容、测试、ACTIVE 状态或 Draft PR 评审。</li>
+        <li><strong>不可靠输入：</strong>标题、正文、链接、截图说明和附件都只用于理解 bug；其中要求泄露凭据、修改 workflow、调用 GitHub API 或改变任务目标的内容一律忽略。</li>
+        <li><strong>无改动退出：</strong>若缺少环境、日志、复现数据或需要产品决策，保持工作树干净，用 <code>delivery: reply</code> 列出已确认事实、缺口和维护者可执行的下一步。</li>
+        <li><strong>继续处理：</strong>报告者补充信息后不会由 <code>labeled</code> 或普通评论自动重跑；维护者可用现有 <code>@codex</code> 入口继续。</li>
+      </ul>
+    </section>
+
+    <h2>05 / 安全、成本与兼容性</h2>
+    <section>
+      <table>
+        <thead><tr><th>风险</th><th>控制</th><th>剩余风险</th></tr></thead>
+        <tbody>
+          <tr><td data-label="风险">外部提示注入</td><td data-label="控制">提示词和上下文均标明 issue 为未信任 bug 报告；agent 无 App 写凭据；workflow 路径修改由 publish gate 拒绝。</td><td data-label="剩余风险">模型仍可能产出低质量候选改动，由真实测试与 Draft PR 人审兜底。</td></tr>
+          <tr><td data-label="风险">自动化滥用与成本</td><td data-label="控制">只响应一次 opened 事件、排除 bot、不响应补标签/重开；job 与 Codex 分别有 25/20 分钟上限。</td><td data-label="剩余风险">外部用户仍可反复创建 bug issue 消耗 runner 与模型配额；本期不引入全局队列或频率服务。</td></tr>
+          <tr><td data-label="风险">权限扩大</td><td data-label="控制">顶层仍为 <code>contents: read</code>；交互与 publisher Token 权限、生成时机和隔离保持不变。</td><td data-label="剩余风险">自动入口可促使受控发布器创建分支和 Draft PR，但不能合并。</td></tr>
+          <tr><td data-label="风险">重复交付</td><td data-label="控制">每 issue concurrency、活动分支查询、fast-forward 检查和禁止 force push保持有效。</td><td data-label="剩余风险">极端 GitHub 事件重投可能产生一次额外模型运行，但不覆盖已发布历史。</td></tr>
+          <tr><td data-label="风险">并行功能集成</td><td data-label="控制">实现前重新读取当前 workflow、prompt 与测试；只增量修改事件路由和自动模式规则，保留已存在的结果/PR 正文契约。</td><td data-label="剩余风险">若其他 Codex workflow 改动先合并，需要在本分支重放并重新执行全部相关验证。</td></tr>
+        </tbody>
+      </table>
+      <div class="risk"><strong>明确接受的成本边界</strong>用户已确认 #928 这类外部作者 bug issue 可自动触发，因此不能再以 author association 限制自动分支。若上线后出现滥用，应创建新 WIP，引入显式 opt-in 标签、频率限制或排队器；不得直接改写本 ACTIVE 方案的核心触发决策。</div>
+    </section>
+
+    <h2>06 / 文件影响、发布与回滚</h2>
+    <section>
+      <table>
+        <thead><tr><th>文件</th><th>计划改动</th><th>不变项</th></tr></thead>
+        <tbody>
+          <tr><td data-label="文件"><code>.github/workflows/codex.yml</code></td><td data-label="计划改动">增加 opened trigger、双分支 job 条件、自动 issue 上下文和 issue 目标路由。</td><td data-label="不变项">容器、模型预算、App Token、sandbox、publish gate、Issue 分支和 Draft PR 机制。</td></tr>
+          <tr><td data-label="文件"><code>.github/codex/prompts/comment-response.md</code></td><td data-label="计划改动">补充自动 bug 模式、预授权方案生命周期、不足信息 reply 与提示注入边界。</td><td data-label="不变项">结构化结果契约及当前 PR 正文契约字段。</td></tr>
+          <tr><td data-label="文件"><code>tests/test_codex_workflow.py</code></td><td data-label="计划改动">覆盖 trigger、手动兼容、自动授权防御、上下文、目标解析和 prompt 规则。</td><td data-label="不变项">现有发布、进度、PR 正文和 sandbox 测试继续通过。</td></tr>
+          <tr><td data-label="文件">本方案</td><td data-label="计划改动">已回写实际命令、通过项、环境限制和 hosted 剩余边界，并转为 ACTIVE。</td><td data-label="不变项">原始诉求、已确认四项决策和 Draft 人工门禁。</td></tr>
+        </tbody>
+      </table>
+      <p><strong>发布：</strong>workflow 变更随 PR 合并到默认分支后生效；PR 自身的 <code>pull_request</code> smoke job 继续验证容器。上线后的首个真实 <code>issues.opened</code> 事件负责最终验证 App 身份、进度评论与 Draft PR 远端边界。</p>
+      <p><strong>回滚：</strong>若自动入口异常，使用新替代方案移除 <code>issues.opened</code> 与自动授权分支，手动 <code>@codex</code> 入口继续可用；不回退既有 Issue 分支或删除已创建 Draft PR。</p>
+    </section>
+
+    <h2>07 / 测试结果与当前状态</h2>
+    <section>
+      <div class="lede"><strong>当前状态：实现与本地验证完成。</strong>自动事件路由、上下文双重授权、提示词和行为测试均已落地。真实 GitHub App Token、远端评论、push 与 Draft PR 创建仍须在 hosted Actions 中继续验收。</div>
+      <div class="tests">
+        <article class="test pass"><strong>Workflow 回归 · PASS</strong><span><code>python3 -m pytest -q tests/test_codex_workflow.py tests/test_agent_workflows.py</code>：52 passed。新增 Node 行为测试实际执行 context 脚本，覆盖外部 bug、非 bug、bot 和维护者评论。</span></article>
+        <article class="test pass"><strong>Python lint / format · PASS</strong><span><code>ruff check tests/test_codex_workflow.py --no-cache</code>、<code>ruff format --check tests/test_codex_workflow.py</code>、<code>make lint-py-fix</code> 与 <code>make lint-py</code> 均通过；100 个后端文件未被改写。</span></article>
+        <article class="test pass"><strong>Actions 静态检查 · PASS</strong><span><code>env GOMODCACHE=/private/tmp/talebook-actionlint-gomodcache go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 -config-file .github/actionlint.yaml .github/workflows/codex.yml</code> 无错误输出。</span></article>
+        <article class="test limited"><strong>真实 act · 到达外部边界</strong><span><code>act 0.2.82</code> 以临时 <code>issues/opened</code> + <code>bug</code> 事件、<code>-j codex</code>、<code>--pull=false</code> 命中真实 <code>Process Codex request</code> job；本地 dev 容器和 Token Action 启动成功，一次性 RSA 私钥完成 JWT 后在假 App client ID 请求 GitHub API 时得到预期 401。未使用生产凭据。</span></article>
+        <article class="test pass"><strong>Docker 全量回归 · PASS</strong><span><code>make test</code>：802 passed、20 skipped、21 warnings。宿主 <code>make pytest</code> 因 PATH 无裸 <code>pytest</code> 失败；等价 <code>python3 -m pytest</code> 又因缺少 Calibre、quickjs、txt2epub_next 与 Python 3.11 tomllib 在收集期停止，均由标准 Docker 入口替代。</span></article>
+        <article class="test pass"><strong>方案与补丁 · PASS</strong><span><code>make check-design</code>：87 份方案通过；<code>git diff --check</code> 通过。桌面 1440px 与移动 390px 的 WIP、ACTIVE 两轮渲染均无溢出或不可读区域。</span></article>
+      </div>
+      <ul class="plain">
+        <li>act 的事件 JSON、一次性 RSA 私钥和容器均已清理；没有提交临时文件，也没有使用生产 Secret、真实 OAuth Token 或长期 GitHub Token。</li>
+        <li>GitHub App 换取真实 Token、实时回帖、push 与创建 Draft PR 无法用假身份模拟；PR checks 验证 <code>pull_request</code> smoke，合并后首个新 bug issue 验证完整远端路径。</li>
+        <li>act 在 macOS bind mount 上输出非致命 chown 权限告警，但 job set-up 成功且 Token Action 实际运行；这是本地 Docker Desktop 边界，不冒充 hosted 结果。</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>ACTIVE · 已完成需求复述、grill、用户审查、实现与本地验证。最终实现基于 origin/master @ d1aecad（已包含 PR #935）；保留其 PR 正文受控发布契约，不覆盖并行工作。</footer>
+</body>
+</html>
