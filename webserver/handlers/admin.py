@@ -275,7 +275,7 @@ class AdminOwnerMode(BaseHandler):
 
 
 class SettingsSaverLogic:
-    def update_nuxtjs_env(self):
+    def update_nuxtjs_env(self, settings):
         # update nuxtjs .env file
         nuxtjs_env = """
 TITLE="%(site_title)s"
@@ -283,15 +283,35 @@ TITLE_TEMPLATE="%%s | %(site_title)s"
 GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
 
 """
-        with open(CONF["nuxt_env_path"], "w") as f:
-            f.write(nuxtjs_env % CONF)
+        loader.atomic_write_text(settings["nuxt_env_path"], nuxtjs_env % settings)
+
+    @staticmethod
+    def _read_nuxtjs_env(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            return None
+
+    @staticmethod
+    def _restore_nuxtjs_env(path, previous):
+        if previous is None:
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass
+            return
+        loader.atomic_write_text(path, previous)
 
     def save_extra_settings(self, args):
-        if args != CONF:
-            CONF.update(args)
+        args["installed"] = True
+        candidate = dict(CONF)
+        candidate.update(args)
+        nuxt_env_path = candidate["nuxt_env_path"]
 
         try:
-            self.update_nuxtjs_env()
+            previous_nuxtjs_env = self._read_nuxtjs_env(nuxt_env_path)
+            self.update_nuxtjs_env(candidate)
         except:
             logging.error(traceback.format_exc())
             return {
@@ -299,19 +319,22 @@ GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
                 "msg": _("更新nuxtjs配置文件失败！请确保文件的权限为可写入！"),
             }
 
-        # don't update running environment for now
-        args["installed"] = True
         try:
             args.dumpfile()
         except:
             logging.error(traceback.format_exc())
+            try:
+                self._restore_nuxtjs_env(nuxt_env_path, previous_nuxtjs_env)
+            except:
+                logging.error("failed to roll back nuxtjs config:\n%s", traceback.format_exc())
             return {
                 "err": "file.permission",
                 "msg": _("更新磁盘配置文件失败！请确保配置文件的权限为可写入！"),
             }
 
-        # ok, it's safe to update current environment
-        CONF["installed"] = True
+        # Both files are durable now; only then expose the candidate to the running process.
+        if args != CONF:
+            CONF.update(args)
         return {"err": "ok", "rsp": args}
 
 
@@ -498,7 +521,7 @@ class AdminSettings(BaseHandler):
         ]
 
         args = loader.SettingsLoader()
-        args.clear()
+        args.update(CONF)
 
         for key, val in data.items():
             if SOCIAL_AUTH_SETTING_RE.match(key):
