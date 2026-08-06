@@ -87,24 +87,21 @@
     <table>
       <thead><tr><th>场景</th><th>断言</th><th>结果</th></tr></thead>
       <tbody>
-        <tr><td>保留内部配置</td><td>保存白名单字段后，落盘并重新加载仍保留 <code>user_database</code>、<code>ACTIVE_THEME</code> 和其它既有键。</td><td class="passed">通过：纯持久化测试；HTTP 集成用例已加入。</td></tr>
+        <tr><td>保留内部配置</td><td>保存白名单字段后，落盘并重新加载仍保留 <code>user_database</code>、<code>ACTIVE_THEME</code> 和其它既有键。</td><td class="passed">通过：纯持久化测试与 Docker HTTP 集成测试。</td></tr>
         <tr><td>允许字段更新</td><td><code>site_title</code> 等白名单字段在返回值、运行态和磁盘候选中更新。</td><td class="passed">通过：运行态与 <code>auto.py</code> 均为新值。</td></tr>
-        <tr><td>危险字段</td><td>请求中的 <code>user_database</code>、<code>ACTIVE_THEME</code>、未知键及恶意动态键不能覆盖服务端既有值。</td><td class="limited">HTTP 集成用例已覆盖；本机因缺少 Calibre 未进入用例执行，待 CI 确认。</td></tr>
+        <tr><td>危险字段</td><td>请求中的 <code>user_database</code>、<code>ACTIVE_THEME</code>、未知键及恶意动态键不能覆盖服务端既有值。</td><td class="passed">通过：Docker 中的 HTTP 集成用例已覆盖。</td></tr>
         <tr><td>落盘失败</td><td>模拟原子替换失败，原 <code>auto.py</code> 内容与 <code>CONF</code> 均不改变，临时文件被清理。</td><td class="passed">通过：失败回滚与原子替换测试。</td></tr>
-        <tr><td>回归与规范</td><td>相关 pytest、Python lint/format、<code>make check-design</code>。</td><td class="passed">纯持久化测试与 Ruff 已通过；方案检查见执行记录。</td></tr>
+        <tr><td>回归与规范</td><td>Docker 全量 pytest、Python lint/format、<code>make check-design</code>。</td><td class="passed">全量测试与 Ruff 已通过；方案检查见执行记录。</td></tr>
       </tbody>
     </table>
     <h3>实际执行记录</h3>
     <ul>
-      <li><code>uv run pytest -q tests/test_settings_persistence.py</code> — <strong>通过</strong>（3 passed）。</li>
-      <li><code>uv run ruff check ./webserver --no-cache</code> — <strong>通过</strong>。</li>
-      <li><code>uv run ruff format --diff ./webserver --no-cache</code> — <strong>通过</strong>（100 files already formatted）。</li>
-      <li><code>uv run ruff check tests/test_admin.py tests/test_settings_persistence.py --no-cache</code> 与对应 format diff — <strong>通过</strong>。</li>
-      <li><code>uv run python -m py_compile webserver/loader.py webserver/handlers/admin.py tests/test_admin.py tests/test_settings_persistence.py</code> — <strong>通过</strong>。</li>
-      <li><code>uv run pytest -q tests/test_admin.py::TestAdminSettingsSecurity</code> — <strong>环境阻塞</strong>：本机未安装 Calibre，Tornado 测试服务在模块初始化阶段报 <code>No module named 'calibre'</code>，12 个用例均未进入执行；这不是业务断言失败。新增 HTTP 用例保留在套件中，由具备 Calibre 的 CI 镜像执行。</li>
-      <li><code>make check-design</code> — 转为 ACTIVE 后执行并通过。</li>
+      <li><code>sudo make test</code> — <strong>通过</strong>：按项目 <code>AGENTS.md</code> 构建 Docker 测试镜像并执行全量 pytest，结果为 806 passed、20 skipped、21 warnings，耗时 70.46 秒；其中 <code>tests/test_admin.py</code> 与 <code>tests/test_settings_persistence.py</code> 均通过。</li>
+      <li>在同一 Docker 测试镜像中执行 <code>make lint-py-fix</code> — <strong>通过</strong>：All checks passed，100 files left unchanged。</li>
+      <li>在同一 Docker 测试镜像中执行 <code>make lint-py</code> — <strong>通过</strong>：All checks passed，100 files already formatted。</li>
+      <li><code>make check-design</code> — <strong>通过</strong>。</li>
     </ul>
-    <p>剩余风险：本机未完成真实 Tornado + Calibre 环境中的管理员 HTTP 保存回归，PR 合并前需以 CI 的后端测试结果确认；纯逻辑、持久化文件内容、运行态提交顺序、失败回滚和原子替换已在不依赖 Calibre 的测试中验证。</p>
+    <p>剩余风险：测试会保存并重新加载 MariaDB 连接串，但未连接真实 MariaDB 服务或在真实数据库进程上执行重启回归。Docker 中已覆盖 Tornado + Calibre 的管理员 HTTP 保存路径、纯逻辑、持久化文件内容、运行态提交顺序、失败回滚和原子替换。</p>
   </section>
 
   <footer>Talebook 内部开发方案 · ACTIVE · TAL-5 / GitHub Issue #944</footer>
