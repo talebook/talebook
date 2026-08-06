@@ -45,7 +45,7 @@ A better online books library management website built on Calibre + Vue
 
 ## 全平台客户端 — Moke
 
-**[Moke](https://github.com/talebook/moke)** 是 Talebook 的全平台客户端，跨平台支持 Windows、macOS、Linux、Android、iOS、iPadOS 及 OpenHarmony。启动后输入你的 Talebook 服务器地址即可浏览、搜索、下载并阅读电子书。
+**[Moke](https://github.com/talebook/moke)** 是 Talebook 的全平台客户端，跨平台支持 Windows、macOS、Linux、Android、iOS、iPadOS 及 OpenHarmony（Alpha，这个需要自己编译）。启动后输入你的 Talebook 服务器地址即可浏览、搜索、下载并阅读电子书。
 * **专业阅读器**：内嵌 [readest](https://github.com/readest/readest) 阅读器，支持 EPUB、PDF 等多种格式，提供高亮、笔记、书签、标注等进阶阅读功能；
 * **离线下载**：将服务器上的书籍一键下载到本地，断网也能随时打开阅读；支持批量下载和 EPUB 完整性校验；
 * **局域网友好**：完美支持自签名证书和 HTTP/HTTPS 局域网服务器，NAS 用户开箱即用；
