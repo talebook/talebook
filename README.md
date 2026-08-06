@@ -58,6 +58,7 @@ A better online books library management website built on Calibre + Vue
 * **用户数据面板**：阅读历史、下载历史、推送历史、上传历史分类展示，支持完整历史记录页；
 * **自动更新**：桌面端支持应用内版本检测、自动下载、更新日志展示、一键安装重启；
 * **扩展系统(Alpha)**：支持安装和管理本地扩展，扩展可提供后端进程和前端界面，通过 HTTP/WebSocket 与主应用通信；
+* **阅读器进阶能力**：TTS 语音朗读、RSVP 快速阅读、OPDS 目录浏览与订阅、多端云同步（WebDAV / KOReader KOSync）、AI 阅读助手、Word Lens 行间翻译、多词典与多翻译引擎、自定义主题/字体/背景纹理、阅读统计与阅读标尺、硬件翻页键绑定等；
 
 从 [Releases](https://github.com/talebook/moke/releases) 页面下载对应平台的安装包（`.msi` / `.exe` / `.dmg` / `.deb` / `.AppImage` / `.apk` / `.ipa`），即刻体验全平台阅读。
 
