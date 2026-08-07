@@ -6,6 +6,7 @@ import pytest
 
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "check_design_docs.py"
+TEMPLATE = Path(__file__).parents[1] / "design" / "TEMPLATE.html"
 
 
 def write_design(repo_root, relative_path, body=None):
@@ -52,9 +53,65 @@ def test_valid_active_design_passes(tmp_path):
     assert "1 design document(s) passed" in result.stdout
 
 
+def test_valid_template_passes_without_status_gate(tmp_path):
+    write_design(tmp_path, "TEMPLATE.html", html_with("<main><h1>WIP 方案模板</h1></main>"))
+
+    result = run_check(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 design document(s) passed" in result.stdout
+
+
+def test_repository_template_contains_signals_visual_and_responsive_baselines():
+    template = TEMPLATE.read_text(encoding="utf-8")
+
+    assert all(
+        requirement in template
+        for requirement in (
+            "原始诉求",
+            "目标与边界",
+            "产品功能矩阵",
+            "方案",
+            "测试计划与结果",
+            "--accent: #df6d16",
+            "@media (min-width: 1440px)",
+            "@media (max-width: 720px)",
+            "@media (prefers-reduced-motion: reduce)",
+            "@media print",
+            'class="skip-link"',
+            'class="chips"',
+            'class="card"',
+            'class="toc-edge"',
+            'class="toc-fab"',
+            'class="rail-title"',
+            'class="table-wrap"',
+            'id="feature-matrix"',
+            'class="feature-matrix"',
+            'class="matrix-legend"',
+            "matrix-conditional",
+            "API / 协议",
+            "width: min(1160px, calc(100vw - 32px))",
+            "grid-template-columns: 20px minmax(0, 1fr)",
+            "right: max(4px, calc((100vw - 1160px) / 2 - 136px))",
+            "width: 124px",
+            "document.querySelectorAll(\".toc-edge a[href^='#'], .toc-fab a[href^='#']\")",
+            'link.setAttribute("aria-current", "location")',
+            "meta tags 只是备选呈现组件",
+            "同一个工作只维护这一份方案",
+            "不创建或保留中间废弃文档",
+            "SUPERSEDED 只用于已独立生效的旧 ACTIVE",
+            'tabindex="0"',
+        )
+    )
+    assert 'class="spine"' not in template
+    assert 'class="side-rail"' not in template
+
+
 @pytest.mark.parametrize(
     "relative_path",
     [
+        "template.html",
+        "templates/TEMPLATE.html",
         "unknown/20260713-feature.active.html",
         "app/nested/20260713-feature.active.html",
         "app/20260230-feature.active.html",
@@ -104,6 +161,15 @@ def test_invalid_html_structure_fails(tmp_path, body):
     assert "invalid HTML structure" in result.stdout
 
 
+def test_template_still_requires_valid_html_structure(tmp_path):
+    write_design(tmp_path, "TEMPLATE.html", "<main>缺少完整 HTML 结构</main>")
+
+    result = run_check(tmp_path)
+
+    assert result.returncode == 1
+    assert "invalid HTML structure: design/TEMPLATE.html" in result.stdout
+
+
 @pytest.mark.parametrize(
     "resource",
     [
@@ -125,6 +191,15 @@ def test_external_resource_fails(tmp_path, resource):
 
     assert result.returncode == 1
     assert "external resource is not allowed" in result.stdout
+
+
+def test_template_still_rejects_external_resources(tmp_path):
+    write_design(tmp_path, "TEMPLATE.html", html_with('<link rel="stylesheet" href="./design.css">'))
+
+    result = run_check(tmp_path)
+
+    assert result.returncode == 1
+    assert "external resource is not allowed: design/TEMPLATE.html" in result.stdout
 
 
 def test_external_requirement_link_is_allowed(tmp_path):
