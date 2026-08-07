@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有声书修订清单原子提交方案</title>
+  <style>
+    :root {
+      --ink: #102a43;
+      --muted: #52687a;
+      --paper: #eef5fb;
+      --sheet: #ffffff;
+      --blue: #2d5bd1;
+      --cyan: #1f8ea3;
+      --amber: #d97706;
+      --red: #b42318;
+      --green: #18794e;
+      --line: #bfd0df;
+      --soft-blue: #e8efff;
+      --soft-cyan: #e6f5f7;
+      --soft-amber: #fff3dc;
+      --soft-red: #ffebe9;
+      --shadow: 0 18px 48px rgba(36, 68, 99, .12);
+    }
+    * { box-sizing: border-box; }
+    html { color-scheme: light; background: var(--paper); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(45, 91, 209, .055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45, 91, 209, .055) 1px, transparent 1px),
+        var(--paper);
+      background-size: 28px 28px;
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.65;
+    }
+    main { width: min(1160px, calc(100% - 36px)); margin: 0 auto; padding: 34px 0 88px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(30px, 6vw, 70px);
+      color: #f8fbff;
+      background: linear-gradient(118deg, #173f73, #275bb8 62%, #1f8ea3);
+      box-shadow: var(--shadow);
+    }
+    header::after {
+      content: "ACTIVE  ⇢  STAGING  ⇢  VALIDATE  ⇢  COMMIT";
+      position: absolute;
+      right: -12px;
+      bottom: 12px;
+      color: rgba(255,255,255,.09);
+      font: 800 clamp(1.1rem, 3.6vw, 3.2rem)/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: nowrap;
+    }
+    .kicker, .index {
+      margin: 0 0 12px;
+      color: #88e0e8;
+      font: 800 .72rem/1.25 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .17em;
+      text-transform: uppercase;
+    }
+    .index { color: var(--blue); }
+    h1, h2, h3 { margin: 0; line-height: 1.18; }
+    h1 { position: relative; z-index: 1; max-width: 850px; font: 760 clamp(2rem, 5vw, 4.4rem)/1.04 "Iowan Old Style", "Songti SC", serif; }
+    h2 { margin-bottom: 18px; font: 740 clamp(1.45rem, 3vw, 2.2rem)/1.18 "Iowan Old Style", "Songti SC", serif; }
+    h3 { margin: 20px 0 8px; font-size: 1rem; }
+    header > p:not(.kicker) { position: relative; z-index: 1; max-width: 800px; margin: 20px 0 0; color: rgba(248,251,255,.82); }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+    .meta span, .badge { display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; font-size: .73rem; font-weight: 760; }
+    .meta span { background: rgba(255,255,255,.11); border: 1px solid rgba(255,255,255,.18); }
+    .meta .wip { color: #68400c; background: #ffd98e; border-color: #ffd98e; }
+    section { margin-top: 26px; padding: clamp(24px, 4vw, 42px); background: var(--sheet); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(36, 68, 99, .06); }
+    p { margin: 8px 0; }
+    ul, ol { margin: 10px 0; padding-left: 1.3rem; }
+    li + li { margin-top: 7px; }
+    code { padding: 2px 6px; color: #17408e; background: var(--soft-blue); border-radius: 3px; font: .88em ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .quote { margin: 10px 0; padding: 14px 18px; color: #21435e; background: var(--soft-cyan); border-left: 4px solid var(--cyan); }
+    .warning { border-left: 5px solid var(--red); }
+    .decision { border-left: 5px solid var(--amber); }
+    .ledger {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 78px minmax(0, 1fr);
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      background: #f8fbff;
+    }
+    .rail { min-width: 0; padding: 22px; }
+    .rail.active { background: var(--soft-blue); }
+    .rail.staging { background: var(--soft-cyan); }
+    .rail h3 { margin-top: 0; font-family: "Iowan Old Style", "Songti SC", serif; font-size: 1.35rem; }
+    .gate { display: grid; place-items: center; color: white; background: var(--blue); writing-mode: vertical-rl; font: 800 .72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; }
+    .flow { display: flex; align-items: stretch; gap: 9px; overflow-x: auto; padding: 8px 0 4px; }
+    .node { min-width: 148px; padding: 14px; border: 1px solid var(--line); background: white; }
+    .node strong { display: block; margin-bottom: 5px; }
+    .node small { color: var(--muted); }
+    .arrow { align-self: center; color: var(--blue); font-size: 1.45rem; font-weight: 900; }
+    .table-wrap { overflow-x: auto; margin-top: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { padding: 12px 13px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { color: white; background: #173f73; font-size: .73rem; letter-spacing: .04em; }
+    tr:last-child td { border-bottom: 0; }
+    .yes { color: var(--green); font-weight: 760; }
+    .no { color: var(--red); font-weight: 760; }
+    .status-list { list-style: none; padding: 0; }
+    .status-list li { display: grid; grid-template-columns: 100px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .status-list li:last-child { border-bottom: 0; }
+    .pending { color: #72430a; background: #ffe2ab; }
+    .pass { color: #145d3e; background: #dff3e9; }
+    .small { color: var(--muted); font-size: .83rem; }
+    @media (max-width: 760px) {
+      main { width: min(100% - 22px, 1160px); padding-top: 11px; }
+      header, section { padding: 22px 18px; }
+      .ledger { grid-template-columns: 1fr; }
+      .gate { min-height: 44px; writing-mode: horizontal-tb; }
+      .status-list li { grid-template-columns: 1fr; gap: 5px; }
+      th, td { min-width: 150px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="kicker">Crash-safe revision ledger / 2026-08-07</p>
+    <h1>有声书修订清单原子提交方案</h1>
+    <p>修订任务不再让 Voicebook 直接覆盖候选版本正在生效的 manifest。新音频、timeline 与 manifest 先形成隔离 attempt，完整校验后再作为一个 edition revision 提交。</p>
+    <div class="meta">
+      <span class="wip">ACTIVE · 已验证</span>
+      <span>创建日期：2026-08-07</span>
+      <span>所属模块：webserver</span>
+      <span>影响范围：services / tests / Voicebook 调用编排</span>
+      <span>需求来源：Talebook PR #929 未解决评审</span>
+    </div>
+  </header>
+
+  <section class="decision">
+    <p class="index">01 / 原始诉求与共同决策</p>
+    <h2>manifest 与音频一起创建新版本</h2>
+    <div class="quote">“manifest 肯定也要创建新版本啊。”</div>
+    <p>用户确认的版本语义如下：用户可见版本以 <strong>edition revision</strong> 为单位；任务重试只是内部 attempt，不增加版本号。生成成功后得到候选版本，仍由管理员显式发布；失败或取消的 attempt 不替换候选版，也不计入历史备份数量。</p>
+    <ul>
+      <li>失败 attempt 继续使用现有 <code>AUDIOBOOK_FAILED_TEMP_DAYS</code>，默认保留 7 天供排障。</li>
+      <li>重试发现完整、可校验的暂存结果时直接继续提交；部分结果交给 Voicebook <code>--resume</code> 续跑；无效结果才重新生成。</li>
+      <li>不新增数据库字段、迁移、管理命令或 Voicebook 子命令。</li>
+    </ul>
+  </section>
+
+  <section class="warning">
+    <p class="index">02 / 缺陷证据</p>
+    <h2>内存基线无法跨越取消、异常与进程死亡</h2>
+    <p>当前单章修订在调用 Voicebook 前，从候选目录的 <code>manifest.v2.json</code> 读取完整基线到 Python 内存；Voicebook 随即把同一文件改写成所选章节清单。只有命令正常返回且合并成功时，Talebook 才把完整清单写回。</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>中断点</th><th>磁盘状态</th><th>重试后风险</th></tr></thead>
+        <tbody>
+          <tr><td>生成完成后收到取消</td><td>只剩所选章节 manifest</td><td>残缺文件被当成新基线</td></tr>
+          <tr><td>Voicebook 退出后工作进程死亡</td><td>内存基线消失</td><td>租约回收后无法恢复全章集合</td></tr>
+          <tr><td>合并或落盘异常</td><td>Voicebook 输出已覆盖原文件</td><td>失败重试可以“成功”完成残缺版本</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>现有纯函数测试只证明“完整基线 + 单章结果”能够合并，没有覆盖基线在磁盘上已经丢失的真实恢复路径。</p>
+  </section>
+
+  <section>
+    <p class="index">03 / 存储模型</p>
+    <h2>两条轨道，只在校验门后交汇</h2>
+    <div class="ledger" aria-label="候选版本与任务暂存区的双轨存储模型">
+      <article class="rail active">
+        <h3>Edition revision</h3>
+        <ul>
+          <li>当前 manifest 始终完整且可读</li>
+          <li>旧章节资产保持不可变</li>
+          <li>管理员发布前不影响线上版</li>
+          <li>通过 <code>manifest_path</code> 指向已提交清单</li>
+        </ul>
+      </article>
+      <div class="gate">VALIDATE + COMMIT</div>
+      <article class="rail staging">
+        <h3>Job attempt</h3>
+        <ul>
+          <li>Voicebook 只写 job 暂存目录</li>
+          <li>保存生成中的 manifest 与缓存</li>
+          <li>取消、失败和租约恢复可续跑</li>
+          <li>不成为用户可见版本</li>
+        </ul>
+      </article>
+    </div>
+    <h3>目录约定</h3>
+    <div class="flow" aria-label="修订产物提交顺序">
+      <div class="node"><strong>edition/current</strong><small>复制自来源版本的完整 manifest</small></div>
+      <span class="arrow">＋</span>
+      <div class="node"><strong>jobs/{id}/revision-output</strong><small>Voicebook 暂存 manifest、章节与 timeline</small></div>
+      <span class="arrow">→</span>
+      <div class="node"><strong>validate</strong><small>格式、章节集合、文件存在性与路径安全</small></div>
+      <span class="arrow">→</span>
+      <div class="node"><strong>edition/versions/job-{id}</strong><small>原子提交的不可变新资产</small></div>
+      <span class="arrow">＋</span>
+      <div class="node"><strong>edition/manifests/job-{id}.v2.json</strong><small>新的完整候选 manifest</small></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="index">04 / 状态与恢复</p>
+    <h2>切换指针是最后一步，所有路径都可幂等重放</h2>
+    <ol>
+      <li>修订任务从 <code>edition.manifest_path</code> 读取当前完整基线，但绝不修改该文件。</li>
+      <li>Voicebook 在 job 暂存目录生成；重试时带 <code>--resume</code>，复用完整章节与缓存。</li>
+      <li>Talebook 校验生成 manifest 的格式、章节选择、相对路径和实际文件；单章结果与完整基线合并，整本结果必须保持相同章节集合。</li>
+      <li>新资产先复制到临时版本目录，再通过目录重命名原子提交；新完整 manifest 使用临时文件原子替换。</li>
+      <li><code>_finalize()</code> 再次比较新旧章节集合，写入章节记录并更新 <code>edition.manifest_path</code>；数据库事务完成前，旧指针保持有效。</li>
+      <li>管理员显式发布候选 edition 后，旧 published edition 才进入 historical；原有备份保留与清理策略不变。</li>
+    </ol>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>恢复场景</th><th>处理</th><th>不变量</th></tr></thead>
+        <tbody>
+          <tr><td>取消</td><td>任务进入 cancelled；暂存结果保留供显式重试</td><td>edition 指针不变</td></tr>
+          <tr><td>Voicebook 中途失败</td><td>任务进入 failed；重试使用 <code>--resume</code></td><td>残缺 manifest 不进入 edition</td></tr>
+          <tr><td>提交前进程死亡</td><td>租约回收后重放校验与提交</td><td>旧版本持续完整</td></tr>
+          <tr><td>资产目录已提交、数据库未提交</td><td>识别确定性的 <code>job-{id}</code> 目录并幂等继续</td><td>不会产生用户可见重复版本</td></tr>
+          <tr><td>章节集合或资产校验失败</td><td>硬失败并保留诊断产物；显式重试先归档无效 manifest，再强制重建</td><td>禁止残缺版本变为 ready/published</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="index">05 / 边界与兼容性</p>
+    <h2>修复生命周期，不把内容逻辑拉回 Talebook</h2>
+    <ul>
+      <li><strong>Voicebook：</strong>继续负责从现有剧本生成所选音频、timeline 和 v2 manifest；无需新增命令或感知 Talebook 版本。</li>
+      <li><strong>Talebook：</strong>负责输出隔离、路径验证、完整清单合并、版本提交、候选发布和恢复。</li>
+      <li><strong>历史数据：</strong>不迁移、不重写；已有 edition 的旧 <code>manifest.v2.json</code> 仍可读取，新修订成功后才使用版本化路径。</li>
+      <li><strong>API / UI：</strong>接口和交互保持不变；任务完成后仍显示候选版，管理员决定发布。</li>
+      <li><strong>清理：</strong>历史 edition 按现有备份数显式清理；失败 attempt 按现有 7 天临时策略清理。</li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="index">06 / 测试与交付</p>
+    <h2>失败路径、兼容性与仓库门禁均已验证</h2>
+    <ul class="status-list">
+      <li><span class="badge pass">通过</span><span>取消发生在 Voicebook 已生成完整暂存 manifest 后，edition 当前 manifest 保持逐字节不变；显式重试使用 <code>--resume</code> 并提交包含全部章节的新候选 manifest。</span></li>
+      <li><span class="badge pass">通过</span><span>模拟合并异常后任务进入 failed、基线和 edition 指针不变；重试复用暂存产物并完成版本化提交。</span></li>
+      <li><span class="badge pass">通过</span><span>确定性的 <code>versions/job-{id}</code> 与 <code>manifests/job-{id}.v2.json</code> 可幂等重放；只有 finalize 数据库事务更新当前指针。</span></li>
+      <li><span class="badge pass">通过</span><span>单章选择、整本章节集合、终态章节下限、资产存在性和路径越界均有硬失败测试；无效 manifest 在重试前归档。</span></li>
+      <li><span class="badge pass">通过</span><span>现有创建修订、编辑剧本、候选发布、历史回滚与备份清理用例与可靠性用例合计 29 项全部通过。</span></li>
+      <li><span class="badge pass">通过</span><span>完整后端测试 810 passed、16 skipped；Python 格式化与 lint 通过；方案门禁通过。</span></li>
+    </ul>
+    <h3>实际命令与结果</h3>
+    <ul>
+      <li><code>docker run … talebook/test pytest -q tests/test_audiobook_reliability.py</code>：14 passed。</li>
+      <li><code>docker run … talebook/test pytest -q tests/test_audiobook_reliability.py tests/test_audiobook.py</code>：29 passed。</li>
+      <li><code>docker run … talebook/test make lint-py-fix</code> 与 <code>make lint-py</code>：通过，102 个后端文件格式一致。</li>
+      <li><code>docker run … talebook/test make pytest</code>：810 passed、16 skipped、31 warnings，耗时 69.40 秒；skip 和 warning 均为仓库既有环境型/弃用项，没有相关失败。</li>
+      <li><code>make check-design</code>：通过，方案路径、ACTIVE 状态、HTML 结构和单文件资源约束合格。</li>
+    </ul>
+    <p class="small">本次仅修改后端修订产物生命周期，API 与界面无变化，因此无需新增前端截图或浏览器渲染验收。未重新调用真实 EdgeTTS：语音内容与 Voicebook 生成契约未改变；专项测试使用真实文件系统、SQLite 事务和受控 Voicebook 进程返回值覆盖中断窗口。</p>
+  </section>
+</main>
+</body>
+</html>
