@@ -81,6 +81,11 @@ test.describe('Audiobook production and playback', () => {
         await page.getByTestId('play-audiobook').click();
         await expect(page.getByTestId('audiobook-player')).toBeVisible();
         await expect(page.getByTestId('audiobook-player')).toContainText('第一章 雾中的来客');
+
+        await page.goto('/audio-jobs');
+        await page.getByTestId('view-script-1').click();
+        await expect(page.getByText('角色配音表')).toBeVisible();
+        await expect(page.getByTestId('confirm-workspace')).toHaveCount(0);
         await expect.poll(async () => page.evaluate(() => Boolean(localStorage.getItem('talebook:audiobook-player:v1')))).toBe(true);
 
         await page.reload();
@@ -102,6 +107,9 @@ test.describe('Audiobook production and playback', () => {
         // soon as inspection finishes; no second click should be necessary.
         await expect(page.getByText('角色配音表')).toBeVisible();
         await expect(page.getByText('旁白', { exact: true }).first()).toBeVisible();
+        await expect(page.getByTestId('script-normalization-report')).toContainText('章节 4 → 2');
+        await expect(page.getByTestId('script-normalization-report')).toContainText('清理 8 个非内容块');
+        expect(await page.getByTestId('script-normalization-report').evaluate(element => element.scrollHeight <= element.clientHeight)).toBeTruthy();
 
         await page.getByRole('tab', { name: '单章对白' }).click();
         const editor = page.locator('.script-editor textarea');
@@ -127,6 +135,43 @@ test.describe('Audiobook production and playback', () => {
         await page.getByTestId('generate-audiobook').click();
         await expect(page.getByLabel('男主角音色（可选）')).toBeVisible();
         await expect(page.getByLabel('女主角音色（可选）')).toBeVisible();
+    });
+
+    test('creates a script revision, regenerates one chapter, and replaces only after completion', async ({ page, request }) => {
+        const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+        await request.post(`${mockApi}/_test/reset`, {
+            data: { installed: true, audiobookPublished: true },
+        });
+        await page.goto('/book/1/audios');
+        await page.getByTestId('create-audio-revision').click();
+
+        await expect(page).toHaveURL('/audio-job/1');
+        await expect(page.getByTestId('script-normalization-report')).toHaveCount(0);
+        await page.getByRole('tab', { name: '单章对白' }).click();
+        await page.locator('.script-editor textarea').fill('[旁白] 海雾散开以后，码头终于露出了清晰的轮廓。');
+        await page.getByTestId('regenerate-current-chapter').click();
+        await expect(page.locator('[data-job-id="1"] .job-topline')).toContainText('已完成', { timeout: 10_000 });
+
+        await page.goto('/book/1/audios');
+        await expect(page.getByTestId('publish-edition-4')).toHaveText('替换当前版本');
+        await page.getByTestId('publish-edition-4').click();
+        await expect(page.getByTestId('publish-edition-4')).toHaveCount(0);
+        await expect(page.getByTestId('edition-management')).toContainText('历史');
+    });
+
+    test('cleans only backups beyond the configured retention count', async ({ page, request }) => {
+        const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+        await request.post(`${mockApi}/_test/reset`, {
+            data: { installed: true, audiobookVersions: true, audiobookBackupCount: 5 },
+        });
+        page.once('dialog', dialog => dialog.accept());
+        await page.goto('/book/1/audios');
+
+        const cleanup = page.getByTestId('cleanup-audio-backups');
+        await expect(cleanup).toContainText('2');
+        await cleanup.click();
+        await expect(cleanup).toBeDisabled();
+        await expect(page.getByTestId('edition-management')).toContainText('现有 3 个历史备份');
     });
 
     test('blocks generation and explains when disk capacity is insufficient', async ({ page, request }) => {

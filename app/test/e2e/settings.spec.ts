@@ -34,11 +34,19 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
             await expect(page.locator('.settings-nav-group', { hasText: g })).toBeVisible();
         }
 
-        // 所有分类都渲染为 section（16 个）
-        await expect(page.locator('.settings-section')).toHaveCount(16);
+        // 所有分类都渲染为 section（17 个）
+        await expect(page.locator('.settings-section')).toHaveCount(17);
 
         // 首个导航项默认高亮
         await expect(page.locator('.settings-nav-item.active')).toHaveText('基础信息');
+    });
+
+    test('有声书版本设置展示默认备份保留数', async ({ page }) => {
+        await page.goto('/admin/settings');
+        await expect(page.locator('.loading-page')).toBeHidden();
+
+        await page.locator('.settings-nav-item', { hasText: '有声书版本设置' }).click();
+        await expect(page.getByLabel('每本有声书保留的历史版本数')).toHaveValue('3');
     });
 
     test('基础信息中默认启用并可保存关闭网络书库展示开关', async ({ page }) => {

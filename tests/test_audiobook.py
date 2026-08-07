@@ -100,6 +100,53 @@ class AudiobookFixture:
             )
             session.add(chapter)
             chapters.append(chapter)
+        script = directory / "book.script"
+        script.write_text(
+            """---
+格式: voicebook-script
+版本: 1
+章节来源:
+  '1': Text/section.xhtml
+---
+
+## 角色表
+# 角色 | 定位 | 类型 | 性别 | 年龄段 | 地域 | 音色描述 | 语速 | 音色覆盖
+旁白 | 旁白 | 人类 | 男 | 中年 | 中国 | 沉稳 | x1.0 |
+
+"""
+            + "\n".join(
+                f"## 章节 {number:04d} | 第 {number} 章\n\n[旁白] 第 {number} 章测试正文。\n"
+                for number in range(1, chapter_count + 1)
+            ),
+            encoding="utf-8",
+        )
+        manifest = directory / "manifest.v2.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "format": "voicebook-project",
+                    "version": 2,
+                    "duration_ms": chapter_count * 1200,
+                    "chapters": [
+                        {
+                            "number": chapter.number,
+                            "source_key": chapter.source_key,
+                            "title": chapter.title,
+                            "audio": f"chapters/{chapter.number:04d}.mp3",
+                            "timeline": f"timelines/{chapter.number:04d}.json",
+                            "duration_ms": chapter.duration_ms,
+                            "size_bytes": chapter.size_bytes,
+                            "sha256": chapter.content_hash,
+                        }
+                        for chapter in chapters
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        edition.script_path = AudiobookStorage().relative(script)
+        edition.manifest_path = AudiobookStorage().relative(manifest)
         edition.duration_ms = chapter_count * 1200
         edition.size_bytes = sum(chapter.size_bytes for chapter in chapters)
         session.commit()
@@ -396,6 +443,109 @@ description: 高级模式测试
         confirmed = self.json(f"/api/audio-job/{job.id}/confirm", method="POST", body="{}")
         self.assertEqual(confirmed["job"]["status"], "queued")
         self.assertTrue(confirmed["job"]["data"]["confirmed"])
+
+    def test_completed_edition_can_create_edit_and_regenerate_chapter_revision(self):
+        source_id = self.seed_published_edition()
+        storage = AudiobookStorage()
+        source_directory = storage.edition_dir(source_id)
+        source_script = source_directory / "book.script"
+        source_locator = source_directory / "book.script.locators.json"
+        source_locator.write_bytes(b'{"format":"voicebook-locators","segments":[]}\n')
+        source_script_bytes = source_script.read_bytes()
+        source_locator_bytes = source_locator.read_bytes()
+
+        created = self.json(f"/api/audio/{source_id}/revisions", method="POST", body="{}")
+
+        self.assertEqual(created["err"], "ok")
+        self.assertEqual(created["edition"]["revision_number"], 2)
+        self.assertEqual(created["edition"]["revision_of_edition_id"], source_id)
+        self.assertEqual(created["job"]["status"], "awaiting_review")
+        self.assertTrue(created["job"]["script_available"])
+        self.assertNotIn("normalization", created["job"]["data"])
+        self.assertFalse(created["job"]["data"]["revision"]["structural_changed"])
+        candidate_directory = storage.edition_dir(created["edition"]["id"])
+        self.assertEqual((candidate_directory / "book.script").read_bytes(), source_script_bytes)
+        self.assertEqual((candidate_directory / "book.script.locators.json").read_bytes(), source_locator_bytes)
+        job_id = created["job"]["id"]
+        workspace = self.json(f"/api/audio-job/{job_id}/workspace")
+        self.assertTrue(workspace["workspace"]["editable"])
+        self.assertEqual(workspace["workspace"]["revision_info"]["source_edition_id"], source_id)
+
+        updated = self.json(
+            f"/api/audio-job/{job_id}/workspace",
+            method="PATCH",
+            body=json.dumps(
+                {
+                    "kind": "chapter",
+                    "chapter_number": 1,
+                    "revision": workspace["workspace"]["revision"],
+                    "text": "[旁白] 这是重新整理后的第一章正文。",
+                }
+            ),
+        )
+        self.assertEqual(updated["err"], "ok")
+        confirmed = self.json(
+            f"/api/audio-job/{job_id}/confirm",
+            method="POST",
+            body=json.dumps({"scope": "chapter", "chapter_number": 1}),
+        )
+        self.assertEqual(confirmed["job"]["status"], "queued")
+        self.assertEqual(confirmed["job"]["chapter_selection"], "1")
+        self.assertEqual(confirmed["job"]["data"]["revision"]["scope"], "chapter")
+
+        session = test_main.get_db()
+        source = session.get(models.AudiobookEdition, source_id)
+        candidate = session.get(models.AudiobookEdition, created["edition"]["id"])
+        self.assertEqual(source.status, "published")
+        self.assertEqual(candidate.status, "draft")
+        self.assertNotEqual(source.script_path, candidate.script_path)
+
+    def test_revision_requires_full_book_after_cross_chapter_change(self):
+        source_id = self.seed_published_edition()
+        created = self.json(f"/api/audio/{source_id}/revisions", method="POST", body="{}")
+        session = test_main.get_db()
+        job = session.get(models.AudiobookJob, created["job"]["id"])
+        job.data = {**job.data, "script_changes": {"chapters": [2]}}
+        session.commit()
+
+        rejected = self.json(
+            f"/api/audio-job/{job.id}/confirm",
+            method="POST",
+            body=json.dumps({"scope": "chapter", "chapter_number": 1}),
+        )
+        self.assertEqual(rejected["err"], "revision.full_required")
+        confirmed = self.json(
+            f"/api/audio-job/{job.id}/confirm",
+            method="POST",
+            body=json.dumps({"scope": "book"}),
+        )
+        self.assertEqual(confirmed["err"], "ok")
+        self.assertEqual(confirmed["job"]["chapter_selection"], "")
+
+    def test_backup_cleanup_keeps_configured_newest_historical_editions(self):
+        edition_ids = [self.seed_published_edition(chapter_count=1) for _ in range(4)]
+        session = test_main.get_db()
+        for index, edition_id in enumerate(edition_ids):
+            edition = session.get(models.AudiobookEdition, edition_id)
+            edition.status = "historical"
+            edition.update_time = datetime.datetime.now() + datetime.timedelta(minutes=index)
+        session.commit()
+
+        with mock.patch.dict(audiobook_handlers.CONF, {"AUDIOBOOK_BACKUP_RETENTION": 2}):
+            detail = self.json(f"/api/book/{test_main.BID_EPUB}/audios")
+            cleaned = self.json(f"/api/book/{test_main.BID_EPUB}/audio-backups", method="DELETE")
+
+        self.assertEqual(detail["backup_retention"], 2)
+        self.assertEqual(cleaned["deleted_count"], 2)
+        self.assertGreater(cleaned["freed_bytes"], 0)
+        session.expire_all()
+        remaining = {
+            item.id
+            for item in session.query(models.AudiobookEdition)
+            .filter(models.AudiobookEdition.book_id == test_main.BID_EPUB)
+            .all()
+        }
+        self.assertEqual(remaining, set(edition_ids[-2:]))
 
     def test_manifest_range_progress_and_reading_state_are_independent(self):
         edition_id = self.seed_published_edition()

@@ -82,6 +82,16 @@
                         >
                             {{ t('audiobook.viewJobs') }}
                         </v-btn>
+                        <v-btn
+                            v-if="store.user.is_admin && publishedEdition?.has_script"
+                            variant="outlined"
+                            prepend-icon="mdi-file-document-edit-outline"
+                            :loading="revisingEditionId === publishedEdition.id"
+                            data-testid="create-audio-revision"
+                            @click="createRevision(publishedEdition)"
+                        >
+                            {{ t('audiobook.createRevision') }}
+                        </v-btn>
                     </div>
                 </div>
             </section>
@@ -117,7 +127,19 @@
                             {{ t('audiobook.editionManagementEyebrow') }}
                         </p>
                         <h2>{{ t('audiobook.editionManagement') }}</h2>
+                        <p>{{ t('audiobook.backupRetentionSummary', { count: historicalEditions.length, retention: backupRetention }) }}</p>
                     </div>
+                    <v-btn
+                        variant="outlined"
+                        color="error"
+                        prepend-icon="mdi-broom"
+                        :loading="cleaningBackups"
+                        :disabled="expiredBackupCount === 0"
+                        data-testid="cleanup-audio-backups"
+                        @click="cleanupBackups"
+                    >
+                        {{ t('audiobook.cleanupBackups', { count: expiredBackupCount }) }}
+                    </v-btn>
                 </div>
                 <v-list
                     class="edition-list"
@@ -137,7 +159,7 @@
                             </v-chip>
                         </template>
                         <v-list-item-title>
-                            {{ engineLabel(edition.engine) }} · {{ t('audiobook.chapterCount', { count: edition.chapter_count }) }}
+                            v{{ edition.revision_number || 1 }} · {{ engineLabel(edition.engine) }} · {{ t('audiobook.chapterCount', { count: edition.chapter_count }) }}
                         </v-list-item-title>
                         <v-list-item-subtitle>{{ edition.created_at }}</v-list-item-subtitle>
                         <template #append>
@@ -150,7 +172,16 @@
                                     :data-testid="`publish-edition-${edition.id}`"
                                     @click="changeEdition(edition, 'publish')"
                                 >
-                                    {{ t('audiobook.publishEdition') }}
+                                    {{ publishedEdition ? t('audiobook.replaceCurrentEdition') : t('audiobook.publishEdition') }}
+                                </v-btn>
+                                <v-btn
+                                    v-if="edition.has_script && edition.status === 'historical'"
+                                    size="small"
+                                    variant="text"
+                                    :loading="revisingEditionId === edition.id"
+                                    @click="createRevision(edition)"
+                                >
+                                    {{ t('audiobook.createRevision') }}
                                 </v-btn>
                                 <v-btn
                                     v-if="edition.status === 'historical'"
@@ -429,6 +460,8 @@ const { t } = useI18n();
 const bookId = Number(route.params.bid);
 const generationDialog = ref(false);
 const submitting = ref(false);
+const revisingEditionId = ref<number | null>(null);
+const cleaningBackups = ref(false);
 const selectedEditionId = ref<number | null>(null);
 const voiceCatalog = ref<any[]>([]);
 const generation = reactive({
@@ -455,6 +488,9 @@ const { data: detail, pending, error, refresh } = await useAsyncData(`audiobook-
 const publishedEditions = computed(() => (detail.value?.editions || []).filter((item: any) => item.status === 'published'));
 const publishedEdition = computed(() => publishedEditions.value.find((item: any) => item.id === selectedEditionId.value) || publishedEditions.value[0] || null);
 const managedEditions = computed(() => (detail.value?.editions || []).filter((item: any) => item.status !== 'published'));
+const historicalEditions = computed(() => managedEditions.value.filter((item: any) => item.status === 'historical'));
+const backupRetention = computed(() => Number(detail.value?.backup_retention ?? 3));
+const expiredBackupCount = computed(() => Math.max(0, historicalEditions.value.length - backupRetention.value));
 const canGenerate = computed(() => Boolean(detail.value?.generation?.can_generate));
 const voiceItems = computed(() => voiceCatalog.value
     .filter(item => item.engine === generation.engine)
@@ -499,6 +535,40 @@ async function submitGeneration() {
         $alert('error', message);
     } finally {
         submitting.value = false;
+    }
+}
+
+async function createRevision(edition: any) {
+    revisingEditionId.value = edition.id;
+    try {
+        const response = await $backend(`/audio/${edition.id}/revisions`, {
+            method: 'POST',
+            body: '{}',
+        });
+        if (response.err !== 'ok') {
+            $alert('error', response.msg);
+            return;
+        }
+        $alert('success', t('audiobook.revisionCreated'));
+        await router.push(`/audio-job/${response.job.id}`);
+    } finally {
+        revisingEditionId.value = null;
+    }
+}
+
+async function cleanupBackups() {
+    if (!globalThis.confirm(t('audiobook.confirmBackupCleanup', { count: expiredBackupCount.value }))) return;
+    cleaningBackups.value = true;
+    try {
+        const response = await $backend(`/book/${bookId}/audio-backups`, { method: 'DELETE' });
+        if (response.err !== 'ok') {
+            $alert('error', response.msg);
+            return;
+        }
+        $alert('success', t('audiobook.backupsCleaned', { count: response.deleted_count }));
+        await refresh();
+    } finally {
+        cleaningBackups.value = false;
     }
 }
 
@@ -558,6 +628,7 @@ useHead({ title: () => detail.value?.book?.title || t('audiobook.libraryTitle') 
 .chapter-section { margin-top: 48px; }
 .section-heading { margin-bottom: 18px; display: flex; justify-content: space-between; align-items: end; }
 .section-heading h2 { font: 700 2rem Georgia, 'Noto Serif SC', serif; }
+.section-heading p { margin-top: 5px; color: rgba(var(--v-theme-on-surface), .64); font-size: .78rem; }
 .edition-select { max-width: 250px; }
 .chapter-list { overflow: hidden; border: 1px solid rgba(var(--v-border-color), .13); border-radius: 20px; }
 .chapter-list :deep(.v-list-item) { min-height: 76px; border-bottom: 1px solid rgba(var(--v-border-color), .08); cursor: pointer; }

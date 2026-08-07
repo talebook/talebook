@@ -423,6 +423,15 @@ class AdminSettings(BaseHandler):
             except (TypeError, ValueError):
                 return {"err": "params.max_chunk_count", "msg": _("最大分片数量必须是正整数")}
 
+        if "AUDIOBOOK_BACKUP_RETENTION" in data:
+            try:
+                retention = int(data["AUDIOBOOK_BACKUP_RETENTION"])
+                if not 0 <= retention <= 20:
+                    raise ValueError("retention must be between 0 and 20")
+                data["AUDIOBOOK_BACKUP_RETENTION"] = retention
+            except (TypeError, ValueError):
+                return {"err": "params.audiobook_backup_retention", "msg": _("有声书备份保留数必须在 0 到 20 之间")}
+
         # 大小关系约束：总大小上限 ≥ 分片触发阈值 ≥ 单个分片大小，
         # 否则分片逻辑自相矛盾（如阈值小于单分片、或总大小小于阈值）
         size_keys = ("MAX_UPLOAD_SIZE", "UPLOAD_CHUNK_THRESHOLD", "UPLOAD_CHUNK_SIZE")
@@ -518,6 +527,7 @@ class AdminSettings(BaseHandler):
             "MAIN_PAGE_RANDOM_COUNT",
             "MAIN_PAGE_RECENT_COUNT",
             "DEFAULT_PAGE_SIZE",
+            "AUDIOBOOK_BACKUP_RETENTION",
         ]
 
         args = loader.SettingsLoader()

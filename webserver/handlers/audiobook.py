@@ -47,6 +47,7 @@ from webserver.services.audiobook import (
     audiobook_job_plan,
     confirm_audiobook_job_plan,
     create_audiobook_job_plan,
+    initialize_audiobook_job_plan,
     read_script_workspace,
     request_cancel,
     reset_for_retry,
@@ -74,18 +75,23 @@ def _json_body(handler):
 
 
 def _edition_dict(edition, chapters=None):
+    config = edition.config or {}
     data = {
         "id": edition.id,
         "book_id": edition.book_id,
         "status": edition.status,
         "engine": edition.engine,
-        "config": edition.config or {},
+        "config": config,
+        "has_script": bool(edition.script_path),
+        "revision_number": int(config.get("revision_number", 1)),
+        "revision_of_edition_id": config.get("revision_of_edition_id"),
         "chapter_count": edition.chapter_count,
         "completed_count": edition.completed_count,
         "duration_ms": edition.duration_ms,
         "size_bytes": edition.size_bytes,
         "created_by": edition.created_by,
         "created_at": edition.create_time.isoformat() if edition.create_time else None,
+        "updated_at": edition.update_time.isoformat() if edition.update_time else None,
         "published_at": edition.published_at.isoformat() if edition.published_at else None,
     }
     if chapters is not None:
@@ -106,7 +112,7 @@ def _chapter_dict(chapter):
     }
 
 
-def _job_dict(job, book=None, include_book=False):
+def _job_dict(job, book=None, include_book=False, edition=None):
     data = dict(job.data or {})
     data.pop("plan", None)
     value = {
@@ -129,6 +135,7 @@ def _job_dict(job, book=None, include_book=False):
         "plan": audiobook_job_plan(job),
         "created_at": job.create_time.isoformat() if job.create_time else None,
         "updated_at": job.update_time.isoformat() if job.update_time else None,
+        "script_available": bool(edition and edition.script_path),
     }
     if include_book:
         value["book"] = book
@@ -153,6 +160,19 @@ def _published_edition(session, book_id):
         .filter(AudiobookEdition.book_id == int(book_id), AudiobookEdition.status == "published")
         .first()
     )
+
+
+def _backup_retention():
+    try:
+        return max(0, min(20, int(CONF.get("AUDIOBOOK_BACKUP_RETENTION", 3))))
+    except (TypeError, ValueError):
+        return 3
+
+
+def _directory_size(path):
+    if not path.is_dir():
+        return 0
+    return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
 
 
 def _can_subscription_view(session, reader, book_id):
@@ -315,6 +335,7 @@ class AudiobookDetail(BaseHandler):
             "book": utils.BookFormatter(self, book).format(with_files=True),
             "editions": edition_values,
             "generation": _generation_capability(self, book),
+            "backup_retention": _backup_retention(),
         }
 
 
@@ -424,6 +445,13 @@ class AudiobookJobs(BaseHandler):
         if status:
             query = query.filter(AudiobookJob.status == status)
         jobs = query.order_by(AudiobookJob.create_time.desc()).limit(200).all()
+        edition_ids = {job.edition_id for job in jobs}
+        editions = {
+            edition.id: edition
+            for edition in (
+                self.session.query(AudiobookEdition).filter(AudiobookEdition.id.in_(edition_ids)).all() if edition_ids else []
+            )
+        }
         book_ids = {job.book_id for job in jobs}
         books = {}
         for source in self.db.get_data_as_dict(ids=list(book_ids)) if book_ids else []:
@@ -437,7 +465,9 @@ class AudiobookJobs(BaseHandler):
             }
         return {
             "err": "ok",
-            "jobs": [_job_dict(job, books.get(job.book_id), include_book=True) for job in jobs],
+            "jobs": [
+                _job_dict(job, books.get(job.book_id), include_book=True, edition=editions.get(job.edition_id)) for job in jobs
+            ],
         }
 
 
@@ -480,23 +510,31 @@ class AudiobookWorkspace(BaseHandler):
     def _job(self, job_id):
         job = self.session.get(AudiobookJob, int(job_id))
         if not job or (not self.is_admin() and job.creator_id != self.user_id()):
-            return None, None
+            return None, None, None
         edition = self.session.get(AudiobookEdition, job.edition_id)
         path = AudiobookStorage().resolve(edition.script_path, must_exist=True) if edition.script_path else None
-        return job, path
+        return job, edition, path
+
+    @staticmethod
+    def _workspace(job, path):
+        workspace = read_script_workspace(path)
+        workspace["editable"] = job.status == "awaiting_review"
+        workspace["normalization"] = (job.data or {}).get("normalization") or {}
+        workspace["revision_info"] = (job.data or {}).get("revision") or {}
+        return workspace
 
     @js
     @auth
     def get(self, job_id):
-        job, path = self._job(job_id)
+        job, edition, path = self._job(job_id)
         if not job or not path:
             return {"err": "not_found", "msg": _("审查脚本不存在")}
-        return {"err": "ok", "job": _job_dict(job), "workspace": read_script_workspace(path)}
+        return {"err": "ok", "job": _job_dict(job, edition=edition), "workspace": self._workspace(job, path)}
 
     @js
     @auth
     def patch(self, job_id):
-        job, path = self._job(job_id)
+        job, edition, path = self._job(job_id)
         if not job or not path:
             return {"err": "not_found", "msg": _("审查脚本不存在")}
         if job.status != "awaiting_review":
@@ -505,15 +543,24 @@ class AudiobookWorkspace(BaseHandler):
         try:
             if body.get("kind") == "characters":
                 workspace = save_script_roles(path, body.get("characters"), body.get("revision"))
+                changes = {**((job.data or {}).get("script_changes") or {}), "roles_changed": True}
             elif body.get("kind") == "chapter":
                 workspace = save_script_chapter(path, body.get("chapter_number"), body.get("text", ""), body.get("revision"))
+                changes = dict((job.data or {}).get("script_changes") or {})
+                changed_chapters = {int(value) for value in changes.get("chapters", [])}
+                changed_chapters.add(int(body.get("chapter_number")))
+                changes["chapters"] = sorted(changed_chapters)
             else:
                 return {"err": "params.invalid", "msg": _("审查操作无效")}
         except ScriptValidationError as exc:
             return {"err": "script.invalid", "msg": str(exc), "errors": exc.errors}
         except ValueError as exc:
             return {"err": "script.invalid", "msg": str(exc)}
-        return {"err": "ok", "workspace": workspace}
+        job.data = {**(job.data or {}), "script_changes": changes}
+        initialize_audiobook_job_plan(job, workspace)
+        job.update_time = utcnow()
+        self.session.commit()
+        return {"err": "ok", "workspace": self._workspace(job, path)}
 
 
 class AudiobookConfirm(BaseHandler):
@@ -525,15 +572,197 @@ class AudiobookConfirm(BaseHandler):
             return {"err": "not_found", "msg": _("任务不存在")}
         if job.status != "awaiting_review":
             return {"err": "state.invalid", "msg": _("任务当前不在审查阶段")}
+        try:
+            body = _json_body(self)
+        except ValueError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        data = dict(job.data or {})
+        revision = dict(data.get("revision") or {})
+        if revision:
+            scope = str(body.get("scope", "book"))
+            if scope not in {"book", "chapter"}:
+                return {"err": "params.invalid", "msg": _("重新生成范围无效")}
+            if scope == "chapter":
+                try:
+                    chapter_number = int(body.get("chapter_number"))
+                except (TypeError, ValueError):
+                    return {"err": "params.invalid", "msg": _("请选择要重新生成的章节")}
+                workspace = read_script_workspace(
+                    AudiobookStorage().resolve(
+                        self.session.get(AudiobookEdition, job.edition_id).script_path,
+                        must_exist=True,
+                    )
+                )
+                if chapter_number not in {int(item["number"]) for item in workspace.get("chapters", [])}:
+                    return {"err": "params.invalid", "msg": _("要重新生成的章节不存在")}
+                changes = data.get("script_changes") or {}
+                changed_chapters = {int(value) for value in changes.get("chapters", [])}
+                if (
+                    revision.get("structural_changed")
+                    or changes.get("roles_changed")
+                    or any(number != chapter_number for number in changed_chapters)
+                ):
+                    return {
+                        "err": "revision.full_required",
+                        "msg": _("章节结构、角色或其他章节已改变，需要整本重新生成"),
+                    }
+                job.chapter_selection = str(chapter_number)
+                revision.update({"scope": "chapter", "chapter_number": chapter_number})
+            else:
+                job.chapter_selection = ""
+                revision.update({"scope": "book"})
+                revision.pop("chapter_number", None)
+            data["revision"] = revision
         job.status = "queued"
         job.phase = "QUEUED"
         job.last_event_seq = -1
-        job.data = {**(job.data or {}), "confirmed": True}
+        job.data = {**data, "confirmed": True}
         confirm_audiobook_job_plan(job)
         job.update_time = utcnow()
         self.session.commit()
         AudiobookScheduler().wake()
         return {"err": "ok", "job": _job_dict(job)}
+
+
+class AudiobookRevisionCreate(BaseHandler):
+    @js
+    @is_admin
+    def post(self, edition_id):
+        source = self.session.get(AudiobookEdition, int(edition_id))
+        if not source:
+            return {"err": "not_found", "msg": _("有声版本不存在")}
+        if source.status not in {"published", "ready", "historical"} or not source.script_path or not source.manifest_path:
+            return {"err": "state.invalid", "msg": _("只有已生成且保留剧本的版本可以创建修订版")}
+        active = (
+            self.session.query(AudiobookJob)
+            .filter(AudiobookJob.book_id == source.book_id, AudiobookJob.status.in_(ACTIVE_JOB_STATUSES))
+            .first()
+        )
+        if active:
+            return {"err": "state.conflict", "msg": _("这本书已有进行中的制作任务")}
+
+        storage = AudiobookStorage()
+        storage.ensure()
+        source_directory = storage.edition_dir(source.id)
+        try:
+            source_script = storage.resolve(source.script_path, must_exist=True)
+            source_manifest = storage.resolve(source.manifest_path, must_exist=True)
+            script_relative = source_script.relative_to(source_directory)
+            manifest_relative = source_manifest.relative_to(source_directory)
+        except (FileNotFoundError, ValueError):
+            return {"err": "not_found", "msg": _("原版本的剧本或音频清单不存在")}
+
+        versions = [
+            int((item.config or {}).get("revision_number", 1))
+            for item in self.session.query(AudiobookEdition).filter(AudiobookEdition.book_id == source.book_id).all()
+        ]
+        now = utcnow()
+        config = {**(source.config or {})}
+        config.update({"revision_number": max(versions or [1]) + 1, "revision_of_edition_id": source.id})
+        edition = AudiobookEdition(
+            book_id=source.book_id,
+            status="draft",
+            engine=source.engine,
+            config=config,
+            source_fingerprint=source.source_fingerprint,
+            created_by=self.user_id(),
+            create_time=now,
+            update_time=now,
+        )
+        target_directory = None
+        try:
+            self.session.add(edition)
+            self.session.flush()
+            target_directory = storage.edition_dir(edition.id)
+            shutil.copytree(source_directory, target_directory)
+            target_script = target_directory / script_relative
+            target_manifest = target_directory / manifest_relative
+            edition.script_path = storage.relative(target_script)
+            edition.manifest_path = storage.relative(target_manifest)
+            job = AudiobookJob(
+                book_id=source.book_id,
+                edition_id=edition.id,
+                creator_id=self.user_id(),
+                mode="advanced",
+                status="awaiting_review",
+                phase="AWAITING_REVIEW",
+                config=config,
+                chapter_selection="",
+                config_hash=stable_json_hash({"revision_edition_id": edition.id, "source_edition_id": source.id}),
+                progress=0.20,
+                data={
+                    "inspected": True,
+                    "revision": {
+                        "source_edition_id": source.id,
+                        "structural_changed": False,
+                    },
+                    "plan": create_audiobook_job_plan("advanced", now),
+                },
+                create_time=now,
+                update_time=now,
+            )
+            self.session.add(job)
+            self.session.flush()
+            initialize_audiobook_job_plan(job, read_script_workspace(target_script))
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            if target_directory and target_directory.is_dir():
+                shutil.rmtree(target_directory)
+            raise
+        return {"err": "ok", "edition": _edition_dict(edition), "job": _job_dict(job, edition=edition)}
+
+
+class AudiobookBackupCleanup(BaseHandler):
+    @js
+    @is_admin
+    def delete(self, book_id):
+        retention = _backup_retention()
+        historical = (
+            self.session.query(AudiobookEdition)
+            .filter(AudiobookEdition.book_id == int(book_id), AudiobookEdition.status == "historical")
+            .order_by(AudiobookEdition.update_time.desc(), AudiobookEdition.id.desc())
+            .all()
+        )
+        storage = AudiobookStorage()
+        deleted = []
+        skipped = []
+        directories = []
+        job_directories = []
+        freed_bytes = 0
+        for edition in historical[retention:]:
+            jobs = self.session.query(AudiobookJob).filter(AudiobookJob.edition_id == edition.id).all()
+            if any(job.status in ACTIVE_JOB_STATUSES for job in jobs):
+                skipped.append(edition.id)
+                continue
+            directory = storage.edition_dir(edition.id)
+            freed_bytes += _directory_size(directory)
+            directories.append(directory)
+            job_directories.extend(storage.job_dir(job.id) for job in jobs)
+            self.session.query(AudiobookBookmark).filter(AudiobookBookmark.edition_id == edition.id).delete()
+            self.session.query(AudiobookProgress).filter(AudiobookProgress.edition_id == edition.id).delete()
+            self.session.query(AudiobookPlaybackSession).filter(AudiobookPlaybackSession.edition_id == edition.id).delete()
+            self.session.query(AudiobookChapter).filter(AudiobookChapter.edition_id == edition.id).delete()
+            self.session.query(AudiobookJob).filter(AudiobookJob.edition_id == edition.id).delete()
+            self.session.delete(edition)
+            deleted.append(edition.id)
+        self.session.commit()
+        cleanup_warnings = []
+        for directory in directories + job_directories:
+            try:
+                if directory.is_dir():
+                    shutil.rmtree(directory)
+            except OSError as exc:
+                cleanup_warnings.append(str(exc))
+        return {
+            "err": "ok",
+            "retention": retention,
+            "deleted_edition_ids": deleted,
+            "deleted_count": len(deleted),
+            "skipped_edition_ids": skipped,
+            "freed_bytes": freed_bytes,
+            "cleanup_warnings": cleanup_warnings,
+        }
 
 
 class AudiobookEditionAction(BaseHandler):
@@ -571,12 +800,24 @@ class AudiobookEditionAction(BaseHandler):
         elif action == "delete":
             if edition.status == "published":
                 return {"err": "state.invalid", "msg": _("当前发布版本不能直接删除")}
-            directory = AudiobookStorage().edition_dir(edition.id)
+            jobs = self.session.query(AudiobookJob).filter(AudiobookJob.edition_id == edition.id).all()
+            if any(job.status in ACTIVE_JOB_STATUSES for job in jobs):
+                return {"err": "state.invalid", "msg": _("进行中的制作版本不能删除，请先取消任务")}
+            storage = AudiobookStorage()
+            directory = storage.edition_dir(edition.id)
+            job_directories = [storage.job_dir(job.id) for job in jobs]
+            self.session.query(AudiobookBookmark).filter(AudiobookBookmark.edition_id == edition.id).delete()
+            self.session.query(AudiobookProgress).filter(AudiobookProgress.edition_id == edition.id).delete()
+            self.session.query(AudiobookPlaybackSession).filter(AudiobookPlaybackSession.edition_id == edition.id).delete()
             self.session.query(AudiobookChapter).filter(AudiobookChapter.edition_id == edition.id).delete()
+            self.session.query(AudiobookJob).filter(AudiobookJob.edition_id == edition.id).delete()
             self.session.delete(edition)
             self.session.commit()
             if directory.is_dir():
                 shutil.rmtree(directory)
+            for job_directory in job_directories:
+                if job_directory.is_dir():
+                    shutil.rmtree(job_directory)
             return {"err": "ok"}
         else:
             return {"err": "params.invalid", "msg": _("版本操作无效")}
@@ -1313,6 +1554,8 @@ def routes():
         (r"/api/audio-job/([0-9]+)", AudiobookJobAction),
         (r"/api/audio-job/([0-9]+)/workspace", AudiobookWorkspace),
         (r"/api/audio-job/([0-9]+)/confirm", AudiobookConfirm),
+        (r"/api/audio/([0-9]+)/revisions", AudiobookRevisionCreate),
+        (r"/api/book/([0-9]+)/audio-backups", AudiobookBackupCleanup),
         (r"/api/audio/([0-9]+)", AudiobookManifest),
         (r"/api/audio/([0-9]+)/chapter/([0-9]+)/timeline", AudiobookTimeline),
         (r"/media/audio/([0-9]+)/chapter/([0-9]+)\.mp3", AudiobookAudio),

@@ -15,7 +15,7 @@ import subprocess
 import threading
 import time
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from webserver import loader
 from webserver.models import AudiobookChapter, AudiobookEdition, AudiobookJob
@@ -28,6 +28,17 @@ ROLE_COLUMNS = 9
 CHAPTER_HEADING = re.compile(r"^##\s+章节\s+(\d+)\s*\|\s*(.*?)(?:\s+#\s*(.+))?$")
 SCRIPT_LINE = re.compile(r"^\[([^\]]+)\]\s+(.+)$")
 PLAN_PHASE_KEYS = ("queue", "inspect", "review", "generate", "finalize", "complete")
+NORMALIZATION_REPORT_KEYS = (
+    "version",
+    "chapters_before",
+    "chapters_after",
+    "segments_before",
+    "segments_after",
+    "removed_chapter_count",
+    "renamed_chapter_count",
+    "removed_noncontent_block_count",
+    "locator_unmapped_count",
+)
 
 
 def utcnow():
@@ -44,6 +55,20 @@ def stable_site_uuid():
 
     secret = str(CONF.get("cookie_secret", "talebook"))
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"talebook-instance:{secret}"))
+
+
+def _bounded_normalization_report(value):
+    """Keep only bounded counters from Voicebook's optional inspect report."""
+
+    if not isinstance(value, dict):
+        return {}
+    report = {}
+    for key in NORMALIZATION_REPORT_KEYS:
+        item = value.get(key)
+        if isinstance(item, bool) or not isinstance(item, int):
+            continue
+        report[key] = max(0, min(item, 1_000_000_000))
+    return report
 
 
 class AudiobookStorage:
@@ -388,8 +413,71 @@ def save_script_chapter(path, chapter_number, text, revision):
 
 def _atomic_text(path, value):
     temporary = path.with_name(f".{path.name}.tmp")
+    path.parent.mkdir(parents=True, exist_ok=True)
     temporary.write_text(value, encoding="utf-8")
     temporary.replace(path)
+
+
+def _manifest_chapter_map(manifest, label):
+    if manifest.get("format") != "voicebook-project" or manifest.get("version") != 2:
+        raise ValueError(f"{label}版本不兼容")
+    records = manifest.get("chapters")
+    if not isinstance(records, list) or not records:
+        raise ValueError(f"{label}没有章节")
+    chapters = {}
+    for record in records:
+        if not isinstance(record, dict):
+            raise ValueError(f"{label}章节格式错误")
+        try:
+            number = int(record["number"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"{label}章节编号无效") from exc
+        if number in chapters:
+            raise ValueError(f"{label}包含重复章节编号：{number}")
+        chapters[number] = dict(record)
+    return chapters
+
+
+def _safe_manifest_asset(root, value, label):
+    relative = PurePosixPath(str(value or ""))
+    if not relative.parts or relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+        raise ValueError(f"{label}路径无效")
+    root = Path(root).resolve()
+    candidate = (root / Path(*relative.parts)).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"{label}路径越界") from exc
+    if not candidate.is_file():
+        raise FileNotFoundError(candidate)
+    return relative, candidate
+
+
+def merge_revision_manifest(base_manifest, generated_manifest):
+    """Merge regenerated chapters into a complete revision manifest."""
+
+    base_records = _manifest_chapter_map(base_manifest, "修订来源 manifest")
+    replacements = _manifest_chapter_map(generated_manifest, "修订章节 manifest")
+    chapters = []
+    for source in base_manifest.get("chapters", []):
+        number = int(source["number"])
+        chapters.append(replacements.pop(number, dict(source)))
+    if replacements:
+        raise ValueError(f"修订章节不在来源版本中：{','.join(map(str, sorted(replacements)))}")
+    chapters.sort(key=lambda item: int(item["number"]))
+    return {
+        **base_manifest,
+        "engine": generated_manifest.get("engine", base_manifest.get("engine")),
+        "script_sha256": generated_manifest.get("script_sha256", ""),
+        "title": generated_manifest.get("title", base_manifest.get("title", "")),
+        "author": generated_manifest.get("author", base_manifest.get("author", "")),
+        "cast": generated_manifest.get("cast", base_manifest.get("cast", {})),
+        "selected_chapters": [int(item["number"]) for item in chapters],
+        "status": "completed",
+        "chapters": chapters,
+        "chapter_count": len(base_records),
+        "duration_ms": sum(int(item.get("duration_ms", 0)) for item in chapters),
+    }
 
 
 class ScriptValidationError(ValueError):
@@ -686,6 +774,77 @@ class AudiobookScheduler:
             role["voice_overrides"] = "; ".join(f"{key}={value}" for key, value in overrides.items())
         save_script_roles(script, roles, workspace["revision"])
 
+    def _commit_revision_output(self, job, edition, output_dir):
+        """Validate and commit a revision attempt without mutating its baseline manifest."""
+
+        edition_dir = self.storage.edition_dir(edition.id)
+        baseline_path = self.storage.resolve(edition.manifest_path, must_exist=True)
+        try:
+            baseline_path.relative_to(edition_dir.resolve())
+        except ValueError as exc:
+            raise ValueError("修订来源 manifest 不属于候选版本") from exc
+        generated_path = Path(output_dir) / "manifest.v2.json"
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        generated = json.loads(generated_path.read_text(encoding="utf-8"))
+        baseline_chapters = _manifest_chapter_map(baseline, "修订来源 manifest")
+        generated_chapters = _manifest_chapter_map(generated, "修订输出 manifest")
+        if generated.get("status") != "completed":
+            raise ValueError("修订输出 manifest 尚未完成")
+
+        revision = dict((job.data or {}).get("revision") or {})
+        scope = revision.get("scope", "book")
+        if scope == "chapter":
+            expected = {int(revision["chapter_number"])}
+            if set(generated_chapters) != expected:
+                raise ValueError("单章修订输出的章节集合与选择范围不一致")
+        elif scope == "book":
+            if set(generated_chapters) != set(baseline_chapters):
+                raise ValueError("整本修订输出的章节集合与来源版本不一致")
+        else:
+            raise ValueError("修订生成范围无效")
+
+        version_relative = PurePosixPath("versions") / f"job-{job.id}"
+        prepared_chapters = []
+        assets = []
+        for number in sorted(generated_chapters):
+            prepared = dict(generated_chapters[number])
+            for field, label in (("audio", "修订音频"), ("timeline", "修订时间轴")):
+                relative, source = _safe_manifest_asset(output_dir, prepared.get(field), label)
+                assets.append((relative, source))
+                prepared[field] = (version_relative / relative).as_posix()
+            prepared_chapters.append(prepared)
+        prepared_generated = {**generated, "chapters": prepared_chapters}
+        if scope == "chapter":
+            committed = merge_revision_manifest(baseline, prepared_generated)
+        else:
+            committed = {
+                **prepared_generated,
+                "selected_chapters": sorted(baseline_chapters),
+                "chapter_count": len(prepared_chapters),
+                "duration_ms": sum(int(item.get("duration_ms", 0)) for item in prepared_chapters),
+                "status": "completed",
+            }
+        if set(_manifest_chapter_map(committed, "修订候选 manifest")) != set(baseline_chapters):
+            raise ValueError("修订候选 manifest 章节集合与来源版本不一致")
+
+        version_dir = edition_dir / Path(*version_relative.parts)
+        if not version_dir.exists():
+            temporary = version_dir.with_name(f".{version_dir.name}.tmp")
+            if temporary.exists():
+                shutil.rmtree(temporary)
+            for relative, source in assets:
+                target = temporary / Path(*relative.parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            temporary.replace(version_dir)
+        for relative, _source in assets:
+            if not (version_dir / Path(*relative.parts)).is_file():
+                raise ValueError("已提交的修订资产不完整")
+
+        manifest_path = edition_dir / "manifests" / f"job-{job.id}.v2.json"
+        _atomic_text(manifest_path, json.dumps(committed, ensure_ascii=False, indent=2) + "\n")
+        return manifest_path
+
     def _source_path(self, job, job_dir):
         formats = {str(item).upper() for item in (self.book_db.new_api.formats(job.book_id) or [])}
         if "EPUB" in formats:
@@ -755,11 +914,22 @@ class AudiobookScheduler:
             job.data = data
             job.progress = max(float(job.progress or 0), 0.20)
             session.commit()
-            args = ["generate", str(script), "-o", str(edition_dir), "--engine", edition.engine, "--resume"]
+            revision = (job.data or {}).get("revision") or {}
+            output_dir = job_dir / "revision-output" if revision else edition_dir
+            output_dir.mkdir(parents=True, exist_ok=True)
+            args = ["generate", str(script), "-o", str(output_dir), "--engine", edition.engine]
+            if revision:
+                if revision.get("scope") == "chapter":
+                    args.extend(("--chapters", str(int(revision["chapter_number"]))))
+                args.append("--resume")
+            else:
+                args.append("--resume")
             status = process.run(job, args, on_event, on_control)
             if status == 3:
                 self._finish_cancelled(job_id)
                 return
+            if revision:
+                self._commit_revision_output(job, edition, output_dir)
             session.expire_all()
             job = session.get(AudiobookJob, job_id)
             data = dict(job.data or {})
@@ -775,6 +945,8 @@ class AudiobookScheduler:
             job.update_time = utcnow()
             session.commit()
             self._finalize(job_id)
+            if revision:
+                shutil.rmtree(output_dir, ignore_errors=True)
         except Exception as exc:
             logging.exception("audiobook job %s failed", job_id)
             session.rollback()
@@ -908,6 +1080,11 @@ class AudiobookScheduler:
                             "completed_at": timestamp,
                         }
                     )
+            elif name == "completed" and job.status == "inspecting":
+                data.pop("normalization", None)
+                normalization = _bounded_normalization_report(event.get("normalization"))
+                if normalization:
+                    data["normalization"] = normalization
             elif name == "completed" and job.status == "generating":
                 _mark_plan_phase(plan, "generate", "completed", timestamp)
                 job.progress = max(float(job.progress or 0), 0.95)
@@ -951,14 +1128,30 @@ class AudiobookScheduler:
             job = session.get(AudiobookJob, job_id)
             edition = session.get(AudiobookEdition, job.edition_id)
             edition_dir = self.storage.edition_dir(edition.id)
-            manifest_path = edition_dir / "manifest.v2.json"
+            data = dict(job.data or {})
+            revision = data.get("revision") or {}
+            if revision:
+                manifest_path = edition_dir / "manifests" / f"job-{job.id}.v2.json"
+                if not manifest_path.is_file():
+                    raise ValueError("修订候选 manifest 尚未提交")
+            else:
+                manifest_path = edition_dir / "manifest.v2.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            if manifest.get("format") != "voicebook-project" or manifest.get("version") != 2:
-                raise ValueError("Voicebook manifest 版本不兼容")
+            manifest_chapters = _manifest_chapter_map(manifest, "Voicebook manifest")
+            if revision:
+                baseline_path = self.storage.resolve(edition.manifest_path, must_exist=True)
+                baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+                baseline_chapters = _manifest_chapter_map(baseline, "修订来源 manifest")
+                if set(manifest_chapters) != set(baseline_chapters):
+                    raise ValueError("修订候选 manifest 章节集合与来源版本不一致")
             session.query(AudiobookChapter).filter(AudiobookChapter.edition_id == edition.id).delete()
             for record in manifest.get("chapters", []):
-                audio = self.storage.resolve(f"editions/{edition.id}/{record['audio']}", must_exist=True)
-                timeline = self.storage.resolve(f"editions/{edition.id}/{record['timeline']}", must_exist=True)
+                _audio_relative, audio = _safe_manifest_asset(edition_dir, record.get("audio"), "Voicebook 音频")
+                _timeline_relative, timeline = _safe_manifest_asset(
+                    edition_dir,
+                    record.get("timeline"),
+                    "Voicebook 时间轴",
+                )
                 chapter = AudiobookChapter(
                     edition_id=edition.id,
                     source_key=str(record.get("source_key", "")),
@@ -982,14 +1175,13 @@ class AudiobookScheduler:
                 .filter(AudiobookEdition.book_id == edition.book_id, AudiobookEdition.status == "published")
                 .first()
             )
-            complete = not bool(job.chapter_selection)
+            complete = bool(revision) or not bool(job.chapter_selection)
             if complete and not existing:
                 edition.status = "published"
                 edition.published_at = utcnow()
             else:
                 edition.status = "ready" if complete else "partial"
             edition.update_time = utcnow()
-            data = dict(job.data or {})
             plan = _copy_job_plan(data, job.mode)
             timestamp = utcnow().isoformat()
             _mark_plan_phase(plan, "finalize", "completed", timestamp)
@@ -1020,6 +1212,12 @@ def request_cancel(storage, job):
 def reset_for_retry(storage, job):
     cancel = storage.job_dir(job.id) / "cancel"
     cancel.unlink(missing_ok=True)
+    revision = (job.data or {}).get("revision") or {}
+    if revision and job.error_code in {"FileNotFoundError", "JSONDecodeError", "ValueError"}:
+        manifest = storage.job_dir(job.id) / "revision-output" / "manifest.v2.json"
+        if manifest.is_file():
+            archived = manifest.with_name(f"manifest.invalid-attempt-{max(1, int(job.attempts or 0))}.json")
+            manifest.replace(archived)
     job.cancel_requested = False
     job.cancel_requested_at = None
     job.status = "queued"

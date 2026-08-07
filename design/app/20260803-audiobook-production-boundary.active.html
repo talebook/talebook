@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有声书剧本生产边界与修订工作台方案</title>
+  <style>
+    :root {
+      --ink: #14232c;
+      --muted: #60717b;
+      --paper: #edf3f3;
+      --sheet: #fbfdfc;
+      --navy: #153947;
+      --teal: #258b88;
+      --amber: #e99a3b;
+      --red: #b9534f;
+      --line: #c9d7d8;
+      --soft-teal: #e2f1ef;
+      --soft-amber: #fff1dd;
+      --soft-red: #f8e7e5;
+      --shadow: 0 16px 42px rgba(20, 53, 63, .10);
+    }
+    * { box-sizing: border-box; }
+    html { color-scheme: light; background: var(--paper); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, transparent 0 23px, rgba(37, 139, 136, .08) 23px 24px, transparent 24px),
+        var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.68;
+    }
+    main { width: min(1160px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 88px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(30px, 6vw, 68px);
+      color: #f4fbfa;
+      background: var(--navy);
+      box-shadow: var(--shadow);
+    }
+    header::after {
+      content: "VOICEBOOK  →  TALEBOOK";
+      position: absolute;
+      right: -18px;
+      bottom: 10px;
+      color: rgba(255,255,255,.07);
+      font: 800 clamp(1.5rem, 5vw, 4.5rem)/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+    .kicker, .index {
+      margin: 0 0 12px;
+      color: #75d2cd;
+      font: 800 .73rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; line-height: 1.18; }
+    h1 { position: relative; z-index: 1; max-width: 900px; font: 760 clamp(2rem, 5vw, 4.25rem)/1.06 Georgia, "Songti SC", serif; }
+    h2 { margin-bottom: 20px; font: 740 clamp(1.5rem, 3vw, 2.2rem)/1.18 Georgia, "Songti SC", serif; }
+    h3 { margin: 22px 0 9px; font-size: 1.02rem; }
+    header > p:not(.kicker) { position: relative; z-index: 1; max-width: 820px; margin: 22px 0 0; color: rgba(244,251,250,.76); }
+    .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; }
+    .meta span, .tag { display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 999px; font-size: .74rem; font-weight: 760; }
+    .meta span { color: #e7f3f2; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.15); }
+    .meta .active { color: #173c2d; background: #8ed0ab; border-color: #8ed0ab; }
+    section { margin-top: 26px; padding: clamp(24px, 4vw, 42px); background: var(--sheet); border: 1px solid var(--line); box-shadow: 0 5px 22px rgba(20, 53, 63, .05); }
+    p { margin: 8px 0; }
+    ul, ol { margin: 10px 0; padding-left: 1.35rem; }
+    li + li { margin-top: 7px; }
+    code { padding: 2px 6px; color: #17545a; background: #e6efef; border-radius: 3px; font: .88em ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .quote { margin: 10px 0; padding: 14px 18px; color: #294a54; background: var(--soft-teal); border-left: 4px solid var(--teal); }
+    .boundary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr);
+      gap: 0;
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .lane { min-width: 0; padding: 24px; }
+    .lane h3 { margin-top: 0; font: 760 1.35rem/1.2 Georgia, "Songti SC", serif; }
+    .lane.voicebook { background: var(--soft-teal); }
+    .lane.talebook { background: var(--soft-amber); }
+    .gate { display: grid; place-items: center; color: #fff; background: var(--navy); writing-mode: vertical-rl; font: 800 .74rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .16em; }
+    .table-wrap { overflow-x: auto; margin-top: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { padding: 12px 13px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { color: #f2f8f8; background: var(--navy); font-size: .73rem; letter-spacing: .05em; }
+    tr:last-child td { border-bottom: 0; }
+    .yes { color: #175d59; font-weight: 760; }
+    .no { color: var(--red); font-weight: 760; }
+    .contract { margin-top: 18px; padding: 22px; background: #f3f7f7; border: 1px solid var(--line); }
+    .contract-line { display: flex; align-items: stretch; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+    .node { min-width: 145px; padding: 14px; border: 1px solid var(--line); background: #fff; }
+    .node strong { display: block; margin-bottom: 5px; }
+    .node small { color: var(--muted); }
+    .arrow { align-self: center; color: var(--teal); font-size: 1.5rem; font-weight: 900; }
+    .warning { border-left: 5px solid var(--red); }
+    .decision { border-left: 5px solid var(--amber); }
+    .status-list { list-style: none; padding: 0; }
+    .status-list li { display: grid; grid-template-columns: 92px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .status-list li:last-child { border-bottom: 0; }
+    .tag.pending { color: #754812; background: #ffe3b7; }
+    .tag.keep { color: #175d59; background: #dcefeb; }
+    .tag.remove { color: #8d3533; background: #f6dcda; }
+    .small { color: var(--muted); font-size: .83rem; }
+    @media (max-width: 760px) {
+      main { width: min(100% - 22px, 1160px); padding-top: 11px; }
+      header, section { padding: 22px 18px; }
+      .boundary { grid-template-columns: 1fr; }
+      .gate { min-height: 44px; writing-mode: horizontal-tb; }
+      .status-list li { grid-template-columns: 1fr; gap: 5px; }
+      th, td { min-width: 145px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="kicker">Capability boundary / 2026-08-03</p>
+    <h1>有声书剧本生产边界与修订工作台方案</h1>
+    <p>把剧本内容质量收回 Voicebook 的“新剧本生产”职责；Talebook 只编排任务、保存版本、展示生产报告，并继续提供可编辑、可局部返工、可回滚的管理工作台。</p>
+    <div class="meta">
+      <span class="active">ACTIVE · 已验证</span>
+      <span>创建日期：2026-08-03</span>
+      <span>所属模块：app（主）</span>
+      <span>影响范围：webserver / tests / Voicebook 集成契约</span>
+      <span>需求来源：PR 929 架构边界纠正</span>
+    </div>
+  </header>
+
+  <section class="decision">
+    <p class="index">01 / 原始诉求与最终澄清</p>
+    <h2>只保证以后生产正确，不治理历史存量</h2>
+    <div class="quote">“这个优化应该由 voicebook 来做，你要遵守好二者的能力界限。”</div>
+    <div class="quote">“为什么增加这些新命令？已有的剧本就不用管它了，大家只负责产生新的剧本时能正确就行了。”</div>
+    <p>本方案纠正原方案把剧本规范化放进 Talebook 的设计。新边界不增加管理员命令、迁移脚本或补跑入口，也不在创建修订版本时偷偷重写已有剧本。</p>
+    <ul>
+      <li><strong>新剧本：</strong>Voicebook 的既有 <code>inspect</code> / <code>convert</code> 流程从原书构建正确章节、正文、语言感知切片与 locator。</li>
+      <li><strong>已有剧本：</strong>保持原样；仍可查看、编辑、创建版本并调用 <code>generate</code> 返工音频，但不会自动清洗 CSS、重命名章节、重新切片或重编号。</li>
+      <li><strong>Talebook：</strong>不理解 EPUB 正文规则，不引入 YAML 解析依赖，不复制 Voicebook 的清洗算法。</li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="index">02 / 能力边界</p>
+    <h2>生产者对内容负责，宿主对生命周期负责</h2>
+    <div class="boundary" aria-label="Voicebook 与 Talebook 的职责边界">
+      <article class="lane voicebook">
+        <h3>Voicebook · 剧本生产者</h3>
+        <ul>
+          <li>利用 HTML / spine / nav / NCX 解析章节</li>
+          <li>在提取层排除样式、脚本、封面等非正文</li>
+          <li>恢复可读章节标题，无法恢复时诚实兜底</li>
+          <li>按确定性、语言感知规则生成语义切片</li>
+          <li>同步生成可追踪 locator</li>
+          <li>在既有完成事件中报告生产统计</li>
+        </ul>
+      </article>
+      <div class="gate">BOOK.SCRIPT + EVENT</div>
+      <article class="lane talebook">
+        <h3>Talebook · 任务宿主</h3>
+        <ul>
+          <li>新书发起 inspect；已有剧本发起 generate</li>
+          <li>保存剧本文件与版本关系</li>
+          <li>提供审核、编辑、章节返工入口</li>
+          <li>候选音频成功后原子发布</li>
+          <li>保留和显式清理历史备份</li>
+          <li>原样展示 Voicebook 的生产报告</li>
+        </ul>
+      </article>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>行为</th><th>Voicebook</th><th>Talebook</th></tr></thead>
+        <tbody>
+          <tr><td>判断 CSS / 非正文</td><td class="yes">拥有规则并测试</td><td class="no">不得实现</td></tr>
+          <tr><td>章节标题恢复与文本切片</td><td class="yes">从原书生成新剧本时完成</td><td class="no">不得二次加工</td></tr>
+          <tr><td>剧本人工编辑与版本链</td><td>无状态 CLI，不持有</td><td class="yes">拥有工作流与持久化</td></tr>
+          <tr><td>章节 / 整本重新生成</td><td><code>generate</code> 只读剧本并生成音频</td><td class="yes">决定范围并编排</td></tr>
+          <tr><td>已有剧本自动修复</td><td class="no">不补跑</td><td class="no">不迁移、不改写</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="index">03 / 唯一跨界契约</p>
+    <h2>Talebook 只接收产物与报告</h2>
+    <div class="contract">
+      <div class="contract-line" aria-label="新剧本生产契约流程">
+        <div class="node"><strong>Talebook</strong><small>新书调用既有 inspect</small></div>
+        <span class="arrow">→</span>
+        <div class="node"><strong>Voicebook</strong><small>解析并生成干净的新剧本</small></div>
+        <span class="arrow">→</span>
+        <div class="node"><strong>book.script</strong><small>章节、片段、角色与 locator</small></div>
+        <span class="arrow">+</span>
+        <div class="node"><strong>completed event</strong><small>可选、有界 normalization 计数</small></div>
+        <span class="arrow">→</span>
+        <div class="node"><strong>工作台</strong><small>保存并原样展示</small></div>
+      </div>
+    </div>
+    <p>Voicebook 在既有 JSONL <code>inspect completed</code> 事件中增加可选的 <code>normalization</code> 对象，只含前后章节数、前后片段数、移除/改名计数和 locator 降级计数，不携带正文或无界数组。Talebook 仅把它保存到 <code>Job.data</code> 并用于 UI 摘要；字段缺失或未来出现未知字段时继续展示已知计数，不自行扫描剧本来“补”报告。</p>
+    <ul>
+      <li>不增加 <code>normalize</code> 子命令。</li>
+      <li>不让 Talebook 读取 YAML frontmatter 来推导内容质量。</li>
+      <li>Voicebook 固定到推送后的不可变 commit，保证生产契约可复现。</li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="index">04 / 保留的 Talebook 产品能力</p>
+    <h2>版本、编辑和安全替换继续由工作台承担</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>能力</th><th>行为</th><th>边界约束</th></tr></thead>
+        <tbody>
+          <tr><td>查看与编辑剧本</td><td>完成任务也能查看；创建候选版本后编辑片段。</td><td>复制内容时保持原样，不做隐式清洗。</td></tr>
+          <tr><td>单章返工</td><td>只改对白且章节结构不变时，允许高级模式重生成当前章。</td><td>Talebook 选择范围；Voicebook <code>generate</code> 不修改输入剧本。</td></tr>
+          <tr><td>整本返工</td><td>结构变化或管理员主动选择时生成完整候选版。</td><td>仍使用已有剧本调用 <code>generate</code>；候选完成前线上版本不变。</td></tr>
+          <tr><td>发布替换</td><td>候选音频完整成功后由管理员确认，原子切换当前版本。</td><td>失败产物永不覆盖线上版。</td></tr>
+          <tr><td>备份清理</td><td>默认保留 3 个历史版，可配置 0–20；仅显式点击清理。</td><td>不删除当前版、候选版和运行中任务。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="warning">
+    <p class="index">05 / 明确不做</p>
+    <h2>不存在“顺手修复旧数据”</h2>
+    <ul>
+      <li>不为已有 <code>book.script</code> 增加迁移、批处理、管理命令或定时任务。</li>
+      <li>从旧版本创建修订版时只复制原剧本；若管理员要修正，只通过显式人工编辑完成。</li>
+      <li>不在 Talebook 中保留 CSS 检测、自然章节名识别、句子切分、locator 重写代码。</li>
+      <li>不改变旧版本的播放结果，也不承诺旧剧本出现生产报告。</li>
+      <li>不依据 <code>normalization</code> 报告决定是否允许返工；报告只用于解释新书 inspect 的生产结果。</li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="index">06 / 实施与测试</p>
+    <h2>越界实现已移除，新产物契约已验证</h2>
+    <ul class="status-list">
+      <li><span class="tag remove">已移除</span><span>Talebook 中的 YAML / CSS / 标题恢复 / 切片 / locator 规范化实现及其直接 PyYAML 依赖。</span></li>
+      <li><span class="tag keep">保留</span><span>剧本版本、编辑、单章与整本重生成、候选发布、备份保留与清理能力。</span></li>
+      <li><span class="tag keep">已实现</span><span>消费 Voicebook <code>inspect completed.normalization</code> 的有界计数；只保留约定整数键，字段缺失、类型错误或出现未知字段时安全降级。</span></li>
+      <li><span class="tag keep">已验证</span><span>后端测试覆盖：创建修订对 <code>book.script</code> 和 locator 做字节级复制；缺失报告正常完成；未知报告字段不进入任务数据。</span></li>
+      <li><span class="tag keep">已验证</span><span>前端 E2E 覆盖新书检查报告与旧任务无报告；真实 Docker 服务完成 EdgeTTS 高级任务 inspect，并由真实页面展示 Voicebook 报告。</span></li>
+      <li><span class="tag keep">已通过</span><span>后端 726 passed、11 skipped；有声书定向 24 passed；前端 E2E 8 passed；Python lint、前端 lint 与方案门禁均无错误。</span></li>
+    </ul>
+    <h3>实际验证记录</h3>
+    <ul>
+      <li><strong>Voicebook：</strong><code>UV_PROJECT_ENVIRONMENT=/private/tmp/voicebook-script-quality-venv uv --cache-dir /private/tmp/voicebook-uv-cache run python -m unittest discover -s tests -p 'test_*.py' -v</code>，49 / 49 通过；《百年孤独》《芳华》《罪与罚》《唐诗三百首》《三国志演义》《Sherlock Holmes》《红楼梦》7 本 EPUB 的真实样本评估均未残留技术章节名或 CSS，locator 唯一且可定位，中文切片不超过 80 字、英文不超过 40 词。</li>
+      <li><strong>Talebook 后端：</strong>测试镜像内执行 <code>pytest -q tests/test_audiobook_reliability.py tests/test_audiobook.py</code>，24 passed；执行完整 <code>pytest -q tests</code>，726 passed、11 skipped；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 通过。</li>
+      <li><strong>Talebook 前端：</strong><code>cd app &amp;&amp; npm run lint</code> 为 0 errors（194 个仓库既有 warning）；有声书 Playwright E2E 为 8 passed，包含新报告展示、旧修订无报告与报告区域不裁切验证。</li>
+      <li><strong>方案门禁：</strong><code>make check-design</code> 通过，75 份方案的路径、状态、HTML 结构与单文件资源约束均合格。</li>
+      <li><strong>真实服务：</strong>Docker 后端 <code>http://127.0.0.1:8080/api/welcome</code> 就绪，Nuxt 连接该后端；在 <code>/audio-job/1</code> 使用 EdgeTTS 高级模式完成真实 inspect，页面显示 Voicebook 的“章节 2 → 2、片段 3 → 4、清理 2 个非内容块、修正 1 个章节名”报告。1200×900 与 500×844 两种窗口均无横向溢出或报告裁切；控制台无 error，仅有仓库既有 Vuetify locale warning。截图：<code>document/screenshots/audiobook-script-revisions/voicebook-quality-report.png</code>。</li>
+      <li><strong>环境限制：</strong>重建完整开发镜像时，系统依赖 / Node 层超过 2 分钟无输出后人工中止；服务验收改用当天已有开发镜像挂载当前代码，并在容器内强制安装同一不可变 Voicebook commit，未降级为 mock。Qwen3TTS 按需求不作为本轮阻塞项。</li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="index">07 / 替代关系与发布顺序</p>
+    <h2>两仓顺序清晰，方案历史可追溯</h2>
+    <ol>
+      <li>Voicebook 完成新剧本质量修复与真实样本验证，推送不可变 commit <code>9ec9a4a15f3c545ba0b440ac406efaf8f2691e37</code>，并提交 <a href="https://github.com/talebook/voicebook/pull/3">Voicebook PR 3</a>。</li>
+      <li>Talebook 在同一个 PR 中同时固定该不可变 commit、移除本地规范化实现及对应越界测试并增加边界契约测试；不存在“先删除后更新依赖”的可部署窗口。</li>
+      <li>本方案验证完成后转为 ACTIVE；原方案转为 <code>design/app/20260803-audiobook-script-revisions.superseded.html</code>，并注明本方案及纠正原因。</li>
+      <li>PR 正文使用最终 commit SHA 提供方案文件和 RawGitHack 固定链接，并附真实渲染截图。</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

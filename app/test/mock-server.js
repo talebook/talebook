@@ -22,12 +22,13 @@ let booksourceCheckPolls = 0;
 let shelfBookIds = new Set();
 let readingStateByBookId = new Map();
 let activeThemeName = '';
-let audiobookPublished = false;
+let audiobookPublishedEdition = null;
 let audiobookJobs = [];
 let audiobookJobPolls = 0;
 let audiobookProgress = null;
 let audiobookManagedEditions = [];
 let audiobookCapacityOk = true;
+let audiobookWorkspace = null;
 let podcastTokenHint = '';
 
 const builtinThemes = [
@@ -143,28 +144,32 @@ router.post('/_test/reset', eventHandler(async (event) => {
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
-  audiobookPublished = false;
+  audiobookPublishedEdition = null;
   audiobookJobs = [];
   audiobookJobPolls = 0;
   audiobookProgress = null;
+  const backupCount = Number(body?.audiobookBackupCount || 1);
   audiobookManagedEditions = body?.audiobookVersions
     ? [
         {
           ...audiobookEdition(),
           id: 2,
           status: 'ready',
+          revision_number: 2,
           created_at: '2026-07-19T10:00:00',
           published_at: null,
         },
-        {
+        ...Array.from({ length: backupCount }, (_, index) => ({
           ...audiobookEdition(),
-          id: 3,
+          id: 3 + index,
           status: 'historical',
-          created_at: '2026-07-17T10:00:00',
-        },
+          revision_number: Math.max(1, backupCount - index),
+          created_at: `2026-07-${String(17 - index).padStart(2, '0')}T10:00:00`,
+        })),
       ]
     : [];
-  if (body?.audiobookVersions) audiobookPublished = true;
+  if (body?.audiobookVersions || body?.audiobookPublished) audiobookPublishedEdition = audiobookEdition();
+  audiobookWorkspace = workspacePayload();
   audiobookCapacityOk = body?.audiobookCapacityOk !== false;
   podcastTokenHint = '';
   return { status: 'ok' };
@@ -211,7 +216,10 @@ const audiobookEdition = () => ({
   book_id: 1,
   status: 'published',
   engine: 'edgetts',
-  config: { speed: 'x1.0' },
+  config: { speed: 'x1.0', revision_number: 1 },
+  has_script: true,
+  revision_number: 1,
+  revision_of_edition_id: null,
   chapter_count: 2,
   completed_count: 2,
   duration_ms: 8800,
@@ -339,10 +347,10 @@ const makeSilentWav = () => {
 const silentWav = makeSilentWav();
 
 router.get('/api/audios/home', eventHandler(() => {
-  if (!audiobookPublished) {
+  if (!audiobookPublishedEdition) {
     return { err: 'ok', enabled: true, continue_listening: [], recent: [], completed: [] };
   }
-  const book = { ...audiobookBook(), edition: audiobookEdition(), listening_progress: audiobookProgress };
+  const book = { ...audiobookBook(), edition: audiobookPublishedEdition, listening_progress: audiobookProgress };
   return {
     err: 'ok',
     enabled: true,
@@ -355,7 +363,8 @@ router.get('/api/audios/home', eventHandler(() => {
 router.get('/api/book/:bookId/audios', eventHandler(() => ({
   err: 'ok',
   book: audiobookBook(),
-  editions: [...(audiobookPublished ? [audiobookEdition()] : []), ...audiobookManagedEditions],
+  editions: [...(audiobookPublishedEdition ? [audiobookPublishedEdition] : []), ...audiobookManagedEditions],
+  backup_retention: 3,
   generation: {
     enabled: true,
     compatible: true,
@@ -403,11 +412,17 @@ router.get('/api/audio-jobs', eventHandler(() => {
       job.status = 'awaiting_review';
       job.phase = 'AWAITING_REVIEW';
       job.progress = 0.2;
+      job.script_available = true;
     } else if ((job.mode === 'quick' || job.data.confirmed) && audiobookJobPolls >= 2) {
       job.status = 'completed';
       job.phase = 'COMPLETED';
       job.progress = 1;
-      audiobookPublished = true;
+      audiobookPublishedEdition ||= audiobookEdition();
+      job.script_available = true;
+      if (job.data.revision) {
+        const candidate = audiobookManagedEditions.find(item => item.id === job.edition_id);
+        if (candidate) candidate.status = 'ready';
+      }
     } else if (job.status === 'queued') {
       job.status = 'generating';
       job.phase = 'GENERATING';
@@ -442,33 +457,108 @@ const workspacePayload = () => ({
     { number: 1, title: '第一章 雾中的来客', volume: '', lines: ['[旁白] 海雾漫过码头。', '[林夏] 那封信终于来了。'] },
     { number: 2, title: '第二章 灯塔来信', volume: '', lines: ['[旁白] 灯塔在远处亮起。'] },
   ],
+  editable: true,
+  normalization: {
+    version: 1,
+    chapters_before: 4,
+    chapters_after: 2,
+    segments_before: 2,
+    segments_after: 4,
+    removed_chapter_count: 2,
+    renamed_chapter_count: 2,
+    removed_noncontent_block_count: 8,
+    locator_unmapped_count: 0,
+  },
+  revision_info: {},
 });
 
-router.get('/api/audio-job/:jobId/workspace', eventHandler(() => ({ err: 'ok', workspace: workspacePayload(), job: audiobookJobs[0] })));
+router.get('/api/audio-job/:jobId/workspace', eventHandler(() => ({
+  err: 'ok',
+  workspace: { ...audiobookWorkspace, editable: audiobookJobs[0]?.status === 'awaiting_review' },
+  job: audiobookJobs[0],
+})));
 router.patch('/api/audio-job/:jobId/workspace', eventHandler(async (event) => {
   const body = await readBody(event);
   if (body?.kind === 'chapter' && String(body.text || '').includes('[未知角色]')) {
     return { err: 'script.invalid', msg: '章节脚本校验失败', errors: [{ line: 1, message: '未定义角色：未知角色' }] };
   }
-  const workspace = workspacePayload();
   if (body?.kind === 'chapter') {
-    const chapter = workspace.chapters.find(item => item.number === Number(body.chapter_number));
+    const chapter = audiobookWorkspace.chapters.find(item => item.number === Number(body.chapter_number));
     chapter.lines = String(body.text || '').split('\n').filter(Boolean);
   }
-  return { err: 'ok', workspace };
+  audiobookWorkspace.revision = `mock-${Date.now()}`;
+  return { err: 'ok', workspace: audiobookWorkspace };
 }));
-router.post('/api/audio-job/:jobId/confirm', eventHandler(() => {
+router.post('/api/audio-job/:jobId/confirm', eventHandler(async (event) => {
+  const body = await readBody(event);
   const job = audiobookJobs[0];
   job.status = 'queued';
   job.phase = 'QUEUED';
-  job.data = { ...job.data, confirmed: true };
+  job.data = {
+    ...job.data,
+    confirmed: true,
+    revision: job.data.revision ? { ...job.data.revision, scope: body?.scope || 'book', chapter_number: body?.chapter_number } : undefined,
+  };
+  job.chapter_selection = body?.scope === 'chapter' ? String(body.chapter_number) : '';
   audiobookJobPolls = 0;
   return { err: 'ok', job };
 }));
 
+router.post('/api/audio/:editionId/revisions', eventHandler((event) => {
+  const sourceId = Number(getRouterParam(event, 'editionId'));
+  const editionId = Math.max(3, ...audiobookManagedEditions.map(item => item.id)) + 1;
+  const edition = {
+    ...audiobookEdition(),
+    id: editionId,
+    status: 'draft',
+    revision_number: Math.max(
+      audiobookPublishedEdition?.revision_number || 1,
+      ...audiobookManagedEditions.map(item => item.revision_number || 1),
+    ) + 1,
+    revision_of_edition_id: sourceId,
+    created_at: '2026-08-03T10:00:00',
+    published_at: null,
+  };
+  edition.config = { ...edition.config, revision_number: edition.revision_number, revision_of_edition_id: sourceId };
+  audiobookManagedEditions.unshift(edition);
+  const job = {
+    id: 1,
+    book_id: 1,
+    edition_id: editionId,
+    creator_id: 1,
+    mode: 'advanced',
+    status: 'awaiting_review',
+    phase: 'AWAITING_REVIEW',
+    priority: 0,
+    config: edition.config,
+    chapter_selection: '',
+    progress: 0.2,
+    script_available: true,
+    data: { revision: { source_edition_id: sourceId, structural_changed: false } },
+    created_at: '2026-08-03T10:00:00',
+    updated_at: '2026-08-03T10:00:00',
+  };
+  audiobookJobs = [job];
+  audiobookJobPolls = 0;
+  audiobookWorkspace = {
+    ...workspacePayload(),
+    normalization: {},
+    revision_info: job.data.revision,
+  };
+  return { err: 'ok', edition, job };
+}));
+
+router.delete('/api/book/:bookId/audio-backups', eventHandler(() => {
+  const historical = audiobookManagedEditions.filter(item => item.status === 'historical');
+  const deleted = historical.slice(3);
+  const deletedIds = new Set(deleted.map(item => item.id));
+  audiobookManagedEditions = audiobookManagedEditions.filter(item => !deletedIds.has(item.id));
+  return { err: 'ok', retention: 3, deleted_count: deleted.length, deleted_edition_ids: [...deletedIds], freed_bytes: deleted.length * 17688 };
+}));
+
 router.get('/api/audio/:editionId', eventHandler(() => ({
   err: 'ok',
-  manifest: audiobookEdition(),
+  manifest: audiobookPublishedEdition || audiobookEdition(),
   progress: audiobookProgress,
 })));
 router.patch('/api/audio/:editionId', eventHandler(async (event) => {
@@ -477,7 +567,11 @@ router.patch('/api/audio/:editionId', eventHandler(async (event) => {
   const editionId = Number(getRouterParam(event, 'editionId'));
   const edition = audiobookManagedEditions.find(item => item.id === editionId);
   audiobookManagedEditions = audiobookManagedEditions.filter(item => item.id !== editionId);
-  return { err: 'ok', edition: edition ? { ...edition, status: body.action === 'delete' ? 'deleted' : 'published' } : audiobookEdition() };
+  if (edition && body.action !== 'delete') {
+    if (audiobookPublishedEdition) audiobookManagedEditions.unshift({ ...audiobookPublishedEdition, status: 'historical' });
+    audiobookPublishedEdition = { ...edition, status: 'published', published_at: '2026-08-03T10:10:00' };
+  }
+  return { err: 'ok', edition: edition ? { ...edition, status: body.action === 'delete' ? 'deleted' : 'published' } : (audiobookPublishedEdition || audiobookEdition()) };
 }));
 router.get('/api/audio/:editionId/chapter/:number/timeline', eventHandler((event) => {
   const number = Number(getRouterParam(event, 'number'));
@@ -632,7 +726,8 @@ router.get('/api/admin/settings', eventHandler(() => ({
     smtp_server: 'smtp.example.com',
     smtp_username: 'user',
     smtp_password: 'password',
-    smtp_encryption: 'SSL'
+    smtp_encryption: 'SSL',
+    AUDIOBOOK_BACKUP_RETENTION: 3,
   }
 })));
 
