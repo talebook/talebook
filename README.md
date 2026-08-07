@@ -43,16 +43,24 @@ A better online books library management website built on Calibre + Vue
 * **基础设施**：升级 Tornado 6.5，改用 uv 管理 Python 依赖，新增数据库迁移工具；使用独立维护的 `talebook/talebook-base` slim 基础镜像，构建提速。
 
 
-## 桌面客户端 — Moke
+## 全平台客户端 — Moke
 
-**[Moke](https://github.com/talebook/moke)** 是 Talebook 的桌面客户端，跨平台支持 Windows、macOS 和 Linux。启动后输入你的 Talebook 服务器地址即可浏览、搜索、下载并阅读电子书。
-
-* **专业阅读器**：内嵌 [readest](https://github.com/readest/readest) 阅读器，支持 EPUB、PDF 等多种格式，提供高亮、笔记、书签等进阶阅读功能；
-* **离线下载**：将服务器上的书籍一键下载到本地，断网也能随时打开阅读；
+**[Moke](https://github.com/talebook/moke)** 是 Talebook 的全平台客户端，跨平台支持 Windows、macOS、Linux、Android、iOS、iPadOS 及 OpenHarmony（Alpha，这个需要自己编译）。启动后输入你的 Talebook 服务器地址即可浏览、搜索、下载并阅读电子书。
+* **专业阅读器**：内嵌 [readest](https://github.com/readest/readest) 阅读器，支持 EPUB、PDF 等多种格式，提供高亮、笔记、书签、标注等进阶阅读功能；
+* **离线下载**：将服务器上的书籍一键下载到本地，断网也能随时打开阅读；支持批量下载和 EPUB 完整性校验；
 * **局域网友好**：完美支持自签名证书和 HTTP/HTTPS 局域网服务器，NAS 用户开箱即用；
-* **完整认证**：支持访问码、登录、注册等 Talebook 的全部认证方式；
+* **完整认证**：支持访问码、登录、注册、密码重置等 Talebook 的全部认证方式，内置 GeeTest 人机验证；
+* **墨水屏模式**：专为墨水屏设备优化的高对比度黑白显示模式，支持手动开启及自动检测（Kindle 等设备），去除所有半透明、模糊和渐变效果；
+* **阅读进度同步**：自动与服务器同步阅读进度（页码、章节、百分比），多设备无缝衔接；
+* **批量操作**：书库/书架/搜索结果支持多选模式，批量加入书架、移出书架、下载，支持全选和 Shift 范围选择；
+* **多视图模式**：支持网格、列表、表格三种视图，表格视图可按标题、作者、出版社、格式、大小、添加时间排序；
+* **右键菜单**：桌面端右键 / 移动端长按书籍卡片，弹出快捷菜单（加入/移出书架、查看详情、下载）；
+* **用户数据面板**：阅读历史、下载历史、推送历史、上传历史分类展示，支持完整历史记录页；
+* **自动更新**：桌面端支持应用内版本检测、自动下载、更新日志展示、一键安装重启；
+* **扩展系统(Alpha)**：支持安装和管理本地扩展，扩展可提供后端进程和前端界面，通过 HTTP/WebSocket 与主应用通信；
+* **阅读器进阶能力**：TTS 语音朗读、RSVP 快速阅读、OPDS 目录浏览与订阅、多端云同步（WebDAV / KOReader KOSync）、AI 阅读助手、Word Lens 行间翻译、多词典与多翻译引擎、自定义主题/字体/背景纹理、阅读统计与阅读标尺、硬件翻页键绑定等；
 
-从 [Releases](https://github.com/talebook/moke/releases) 页面下载对应平台的安装包（`.msi` / `.dmg` / `.AppImage`），即刻体验桌面端阅读。
+从 [Releases](https://github.com/talebook/moke/releases) 页面下载对应平台的安装包（`.msi` / `.exe` / `.dmg` / `.deb` / `.AppImage` / `.apk` / `.ipa`），即刻体验全平台阅读。
 
 ## 安卓客户端 — Talebook Android
 

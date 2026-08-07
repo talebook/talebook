@@ -1,6 +1,8 @@
 name: Codex
 
 on:
+  issues:
+    types: [opened]
   issue_comment:
     types: [created]
   pull_request:
@@ -16,37 +18,46 @@ permissions:
 
 jobs:
   codex:
-    name: Respond to maintainer request
+    name: Process Codex request
     timeout-minutes: 25
     concurrency:
       group: codex-${{ github.repository }}-${{ github.event.issue.number || github.event.pull_request.number }}
       cancel-in-progress: false
     if: |
       !endsWith(github.actor, '[bot]') &&
-      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association) &&
       (
         (
-          github.event_name == 'issue_comment' &&
-          (
-            contains(github.event.comment.body, '@codex') ||
-            contains(github.event.comment.body, '@Codex') ||
-            contains(github.event.comment.body, '/codex')
-          )
+          github.event_name == 'issues' &&
+          github.event.action == 'opened' &&
+          contains(github.event.issue.labels.*.name, 'bug')
         ) ||
         (
-          github.event_name == 'pull_request_review_comment' &&
+          contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association) &&
           (
-            contains(github.event.comment.body, '@codex') ||
-            contains(github.event.comment.body, '@Codex') ||
-            contains(github.event.comment.body, '/codex')
-          )
-        ) ||
-        (
-          github.event_name == 'pull_request_review' &&
-          (
-            contains(github.event.review.body, '@codex') ||
-            contains(github.event.review.body, '@Codex') ||
-            contains(github.event.review.body, '/codex')
+            (
+              github.event_name == 'issue_comment' &&
+              (
+                contains(github.event.comment.body, '@codex') ||
+                contains(github.event.comment.body, '@Codex') ||
+                contains(github.event.comment.body, '/codex')
+              )
+            ) ||
+            (
+              github.event_name == 'pull_request_review_comment' &&
+              (
+                contains(github.event.comment.body, '@codex') ||
+                contains(github.event.comment.body, '@Codex') ||
+                contains(github.event.comment.body, '/codex')
+              )
+            ) ||
+            (
+              github.event_name == 'pull_request_review' &&
+              (
+                contains(github.event.review.body, '@codex') ||
+                contains(github.event.review.body, '@Codex') ||
+                contains(github.event.review.body, '/codex')
+              )
+            )
           )
         )
       )
@@ -104,6 +115,8 @@ jobs:
             let issueTitle = "";
             let pr = null;
             let requestKind = eventName;
+            let automaticBugIssue = false;
+            let authorizationKind = "none";
             let triggerIssueCommentId = "";
             let triggerReviewCommentId = "";
             let supportedTarget = false;
@@ -118,7 +131,21 @@ jobs:
             const historicalIssueBranches = [];
             const defaultBranch = payload.repository.default_branch;
 
-            if (eventName === "issue_comment") {
+            if (eventName === "issues") {
+              const issueActor = payload.issue?.user?.login || context.actor;
+              const issueLabels = Array.isArray(payload.issue?.labels) ? payload.issue.labels : [];
+              automaticBugIssue = (
+                payload.action === "opened" &&
+                !payload.issue?.pull_request &&
+                !String(issueActor).endsWith("[bot]") &&
+                issueLabels.some((label) => typeof label?.name === "string" && label.name.toLowerCase() === "bug")
+              );
+              body = payload.issue?.body || "";
+              actor = issueActor;
+              issueNumber = payload.issue?.number ? String(payload.issue.number) : "";
+              issueTitle = payload.issue?.title || "";
+              requestKind = automaticBugIssue ? "automatic_bug_issue" : "issue_event";
+            } else if (eventName === "issue_comment") {
               body = payload.comment.body || "";
               actor = payload.comment.user.login;
               issueNumber = String(payload.issue.number);
@@ -161,22 +188,38 @@ jobs:
               requestKind = "pull_request_review";
             }
 
+            const manualRequest = ["issue_comment", "pull_request_review_comment", "pull_request_review"].includes(
+              eventName,
+            );
             let permission = "none";
+            let manualAuthorized = false;
             let authorized = false;
-            try {
-              const permissionResult = await github.rest.repos.getCollaboratorPermissionLevel({
-                owner,
-                repo,
-                username: actor,
-              });
-              permission = permissionResult.data.permission || "none";
-              authorized = ["admin", "maintain", "write"].includes(permission);
-            } catch (error) {
-              core.warning(`Could not resolve repository permission for ${actor}: ${error.message}`);
+            if (manualRequest) {
+              try {
+                const permissionResult = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username: actor,
+                });
+                permission = permissionResult.data.permission || "none";
+                manualAuthorized = ["admin", "maintain", "write"].includes(permission);
+              } catch (error) {
+                core.warning(`Could not resolve repository permission for ${actor}: ${error.message}`);
+              }
+            }
+            authorized = automaticBugIssue || manualAuthorized;
+            if (automaticBugIssue) {
+              authorizationKind = "automatic_bug_issue";
+            } else if (manualAuthorized) {
+              authorizationKind = "repository_writer";
             }
 
             if (!authorized) {
-              core.warning(`Skipping Codex request from ${actor}; repository permission is ${permission}.`);
+              if (manualRequest) {
+                core.warning(`Skipping Codex request from ${actor}; repository permission is ${permission}.`);
+              } else {
+                core.warning(`Skipping unsupported Codex event ${eventName} from ${actor}.`);
+              }
             }
 
             if (authorized) {
@@ -220,7 +263,7 @@ jobs:
                 targetRef = pr.head.ref;
                 targetSha = pr.head.sha;
               }
-            } else if (authorized && requestKind === "issue_comment") {
+            } else if (authorized && (requestKind === "issue_comment" || automaticBugIssue)) {
               const refPrefix = `heads/codex/issue-${issueNumber}-`;
               const refs = await github.paginate(github.rest.git.listMatchingRefs, {
                 owner,
@@ -282,6 +325,9 @@ jobs:
               requestKind,
               actor,
               actorPermission: permission,
+              authorizationKind,
+              automaticBugIssue,
+              designReviewPreapproved: automaticBugIssue,
               issueNumber,
               issueTitle,
               body,
@@ -396,6 +442,7 @@ jobs:
             }
 
             core.setOutput("authorized", authorized ? "true" : "false");
+            core.setOutput("automatic_bug_issue", automaticBugIssue ? "true" : "false");
             core.setOutput("is_pr", pr ? "true" : "false");
             core.setOutput("issue_number", issueNumber);
             core.setOutput("pr_number", pr ? String(pr.number) : "");

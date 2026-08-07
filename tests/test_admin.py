@@ -66,6 +66,54 @@ class TestAdminSettingsSecurity(TestWithAdminUser):
         finally:
             conf["SHOW_NETWORK_LIBRARY"] = previous_show_network_library
 
+    def test_settings_update_preserves_internal_settings(self):
+        """页面保存只覆盖白名单字段，数据库、主题和其它内部配置应保留"""
+        conf = loader.get_settings()
+        tracked = {
+            "site_title": conf.get("site_title"),
+            "user_database": conf.get("user_database"),
+            "ACTIVE_THEME": conf.get("ACTIVE_THEME"),
+            "INTERNAL_ONLY_TEST_VALUE": conf.get("INTERNAL_ONLY_TEST_VALUE"),
+        }
+        had_internal_value = "INTERNAL_ONLY_TEST_VALUE" in conf
+        try:
+            conf["user_database"] = "mysql+pymysql://talebook:secret@db.example.com/books"
+            conf["ACTIVE_THEME"] = "graphite"
+            conf["INTERNAL_ONLY_TEST_VALUE"] = "keep-me"
+            with tempfile.TemporaryDirectory() as tmpdir:
+                with mock.patch("webserver.loader.SettingsLoader.set_store_path", return_value=tmpdir):
+                    req = json.dumps(
+                        {
+                            "site_title": "Updated title",
+                            "user_database": "sqlite:////tmp/attacker.db",
+                            "ACTIVE_THEME": "attacker-theme",
+                            "INTERNAL_ONLY_TEST_VALUE": "replace-me",
+                        }
+                    )
+                    d = self.json("/api/admin/settings", method="POST", body=req)
+
+                path = os.path.join(tmpdir, "auto.py")
+                namespace = {}
+                with open(path, encoding="utf-8") as f:
+                    exec(compile(f.read(), path, "exec"), namespace)
+                saved = namespace["settings"]
+
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual(d["rsp"]["site_title"], "Updated title")
+            self.assertEqual(saved["site_title"], "Updated title")
+            self.assertEqual(saved["user_database"], "mysql+pymysql://talebook:secret@db.example.com/books")
+            self.assertEqual(saved["ACTIVE_THEME"], "graphite")
+            self.assertEqual(saved["INTERNAL_ONLY_TEST_VALUE"], "keep-me")
+            self.assertEqual(d["rsp"]["user_database"], saved["user_database"])
+            self.assertEqual(d["rsp"]["ACTIVE_THEME"], "graphite")
+            self.assertEqual(d["rsp"]["INTERNAL_ONLY_TEST_VALUE"], "keep-me")
+        finally:
+            for key, value in tracked.items():
+                if key == "INTERNAL_ONLY_TEST_VALUE" and not had_internal_value:
+                    conf.pop(key, None)
+                else:
+                    conf[key] = value
+
     def test_settings_update_chunk_upload_settings(self):
         """管理员可以开关分片上传功能并自定义分片阈值/分片大小"""
         conf = loader.get_settings()
