@@ -306,7 +306,7 @@
                         density="compact"
                         class="mt-4"
                     >
-                        {{ t('audiobook.deleteAudiobookBookPreserved', { title: detail?.book?.title || '' }) }}
+                        {{ t('audiobook.deleteAudiobookBookPreserved') }}
                     </v-alert>
                 </v-card-text>
                 <v-card-actions>

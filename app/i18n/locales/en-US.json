@@ -1162,7 +1162,7 @@
     "deleteAudiobook": "Delete audiobook",
     "deleteAudiobookTitle": "Delete this entire audiobook?",
     "deleteAudiobookWarning": "Every audiobook edition, production job, script, log, and listening record will be permanently deleted. This cannot be undone.",
-    "deleteAudiobookBookPreserved": "The ebook “{title}” and its ebook files will be kept.",
+    "deleteAudiobookBookPreserved": "This operation will not delete the original ebook file.",
     "deleteAudiobookConfirm": "Delete permanently",
     "deleteAudiobookSuccess": "The audiobook and all related data were deleted",
     "deleteAudiobookFailed": "Could not delete the audiobook. Check the service and try again.",

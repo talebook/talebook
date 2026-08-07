@@ -1178,7 +1178,7 @@
     "deleteAudiobook": "删除有声书",
     "deleteAudiobookTitle": "删除整本有声书？",
     "deleteAudiobookWarning": "所有有声版本、历史、处理任务、剧本、日志和收听记录都会永久删除，此操作无法撤销。",
-    "deleteAudiobookBookPreserved": "正文书籍《{title}》及其电子书文件会保留。",
+    "deleteAudiobookBookPreserved": "本次操作不会删除原始电子书文件。",
     "deleteAudiobookConfirm": "永久删除",
     "deleteAudiobookSuccess": "有声书及全部关联数据已删除",
     "deleteAudiobookFailed": "删除有声书失败，请检查服务状态后重试。",

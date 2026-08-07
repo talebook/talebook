@@ -110,7 +110,7 @@ test.describe('Audiobook production and playback', () => {
         await page.getByTestId('delete-audiobook').click();
         const dialog = page.getByTestId('delete-audiobook-dialog');
         await expect(dialog).toContainText('所有有声版本、历史、处理任务、剧本、日志和收听记录都会永久删除');
-        await expect(dialog).toContainText('正文书籍《百年孤独》及其电子书文件会保留');
+        await expect(dialog).toContainText('本次操作不会删除原始电子书文件');
         await dialog.getByRole('button', { name: '取消' }).click();
         await expect(dialog).toHaveCount(0);
         await expect(page.locator('.chapter-list').getByText('第一章 雾中的来客')).toBeVisible();
