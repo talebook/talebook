@@ -2,10 +2,13 @@
 # -*- coding: UTF-8 -*-
 
 import logging
-import requests
+import threading
 import traceback
-from webserver.i18n import _
+
+import requests
+
 from webserver.constants import CHROME_HEADERS, META_SOURCE_GOOGLE, META_SOURCE_AMAZON
+from webserver.i18n import _
 
 KEY = "Calibre"
 
@@ -14,6 +17,58 @@ _SOURCE_TO_PLUGIN = {
     "google": "Google",
     "amazon": "Amazon.com",
 }
+_PLUGIN_INIT_LOCK = threading.Lock()
+
+
+class CalibreMetadataSourceUnavailable(RuntimeError):
+    """Raised when a configured Calibre metadata source is absent from the registry."""
+
+    def __init__(self, sources, reason=None):
+        self.sources = tuple(sorted(set(sources)))
+        message = "Calibre 元数据插件不可用：%s" % ", ".join(self.sources)
+        if reason:
+            message = "%s（%s）" % (message, reason)
+        super().__init__(message)
+
+
+def _enabled_metadata_plugin_names():
+    from calibre.customize.ui import metadata_plugins
+
+    return frozenset(plugin.name for plugin in metadata_plugins({"identify"}))
+
+
+def ensure_calibre_metadata_plugins():
+    """Register bundled Google/Amazon sources omitted by Calibre's slim standalone set."""
+
+    expected = frozenset(_SOURCE_TO_PLUGIN.values())
+    with _PLUGIN_INIT_LOCK:
+        registered = _enabled_metadata_plugin_names()
+        if expected <= registered:
+            return registered
+
+        missing = expected - registered
+        try:
+            from calibre.customize import ui
+            from calibre.ebooks.metadata.sources.amazon import Amazon
+            from calibre.ebooks.metadata.sources.google import GoogleBooks
+
+            plugin_classes = (GoogleBooks, Amazon)
+            builtin_names = {plugin.name for plugin in ui.builtin_plugins}
+            ui.builtin_plugins.extend(plugin for plugin in plugin_classes if plugin.name not in builtin_names)
+            ui.builtin_names = frozenset(plugin.name for plugin in ui.builtin_plugins)
+            ui.initialize_plugins()
+        except Exception as e:
+            logging.error("Calibre 元数据插件注册失败，缺失来源=%s：%s", ", ".join(sorted(missing)), e)
+            raise CalibreMetadataSourceUnavailable(missing, str(e)) from e
+
+        registered = _enabled_metadata_plugin_names()
+        missing = expected - registered
+        if missing:
+            logging.error("Calibre 元数据插件注册后仍不可用，缺失来源=%s", ", ".join(sorted(missing)))
+            raise CalibreMetadataSourceUnavailable(missing)
+
+        logging.info("Calibre 元数据插件已注册：%s", ", ".join(sorted(expected)))
+        return registered
 
 
 class CalibreMetadataApi:
@@ -24,6 +79,7 @@ class CalibreMetadataApi:
 
     @classmethod
     def _ensure_patched(cls):
+        registered = ensure_calibre_metadata_plugins()
         if not cls._patched:
             try:
                 from calibre.ebooks.metadata.sources.update import patch_plugins
@@ -32,6 +88,7 @@ class CalibreMetadataApi:
                 cls._patched = True
             except Exception as e:
                 logging.warning("calibre patch_plugins 失败：%s", e)
+        return registered
 
     @staticmethod
     def _make_log_abort():
@@ -56,7 +113,11 @@ class CalibreMetadataApi:
     def _identify(cls, timeout=30, source=None, **kwargs):
         from calibre.ebooks.metadata.sources.identify import identify
 
-        cls._ensure_patched()
+        registered = cls._ensure_patched()
+        if source not in registered:
+            error = CalibreMetadataSourceUnavailable({source})
+            logging.error("%s", error)
+            raise error
         log, abort = cls._make_log_abort()
         return identify(log, abort, allowed_plugins={source}, timeout=timeout, **kwargs)
 
@@ -96,6 +157,8 @@ class CalibreMetadataApi:
                     # Calibre Google 插件的评分是 0-5，乘以 2 转换为 0-10
                     result.rating = int(result.rating) * 2 if result.rating is not None else 0
             return results[:1]
+        except CalibreMetadataSourceUnavailable:
+            raise
         except Exception as e:
             logging.error(_("CalibreMetadataApi ISBN 查询失败 isbn=%s: %s"), isbn, e)
             logging.error(traceback.format_exc())
@@ -127,6 +190,8 @@ class CalibreMetadataApi:
                     if amazon_plugin and amazon_plugin.cached_cover_url_is_reliable:
                         result.cover_url = amazon_plugin.get_cached_cover_url(result.identifiers)
             return results[:3]
+        except CalibreMetadataSourceUnavailable:
+            raise
         except Exception as e:
             logging.error(_("CalibreMetadataApi 书名查询失败 title=%s: %s"), title, e)
             return None

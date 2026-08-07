@@ -104,6 +104,15 @@ def init_calibre():
 
         logging.error(traceback.format_exc())
         raise ImportError(_("Can not import calibre. Please set the correct options.\n%s" % e))
+
+    from webserver.plugins.meta.calibre.api import CalibreMetadataSourceUnavailable, ensure_calibre_metadata_plugins
+
+    try:
+        ensure_calibre_metadata_plugins()
+    except CalibreMetadataSourceUnavailable as e:
+        # Google/Amazon are optional sources. Keep the service available, but leave a
+        # clear startup diagnostic; queries for a missing source raise the same error.
+        logging.error("Calibre 元数据插件初始化失败：%s", e)
     if not options.with_library:
         sys.stderr.write(
             _("No saved library path. Use the --with-library option to specify the path to the library you want to use.")
