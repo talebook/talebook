@@ -16,21 +16,24 @@ def atomic_write_text(path, text):
     fd, temp_path = tempfile.mkstemp(dir=directory, prefix=".%s." % filename, suffix=".tmp")
     try:
         try:
-            mode = stat.S_IMODE(os.stat(path).st_mode)
-        except FileNotFoundError:
-            mode = 0o644
-        os.fchmod(fd, mode)
-        with os.fdopen(fd, "w", encoding="utf-8") as output:
+            try:
+                mode = stat.S_IMODE(os.stat(path).st_mode)
+            except FileNotFoundError:
+                mode = 0o644
+            os.fchmod(fd, mode)
+            output = os.fdopen(fd, "w", encoding="utf-8")
+        except Exception:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            raise
+
+        with output:
             output.write(text)
             output.flush()
             os.fsync(output.fileno())
         os.replace(temp_path, path)
-    except Exception:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-        raise
     finally:
         try:
             os.remove(temp_path)

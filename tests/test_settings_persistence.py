@@ -74,16 +74,34 @@ def test_settings_dumpfile_replace_failure_is_atomic(tmp_path):
     with mock.patch.object(settings, "set_store_path", return_value=str(tmp_path)):
         with mock.patch("webserver.loader.os.replace", side_effect=OSError("replace failed")):
             with mock.patch("webserver.loader.os.remove", wraps=os.remove) as remove:
-                try:
-                    settings.dumpfile()
-                except OSError:
-                    pass
-                else:
-                    raise AssertionError("replace failure must be propagated")
+                with mock.patch("webserver.loader.os.close", wraps=os.close) as close:
+                    try:
+                        settings.dumpfile()
+                    except OSError:
+                        pass
+                    else:
+                        raise AssertionError("replace failure must be propagated")
 
     assert path.read_text(encoding="utf-8") == "original config\n"
     assert sorted(item.name for item in tmp_path.iterdir()) == ["auto.py"]
     assert remove.called
+    close.assert_not_called()
+
+
+def test_atomic_write_closes_descriptor_when_fdopen_fails(tmp_path):
+    path = tmp_path / "auto.py"
+
+    with mock.patch("webserver.loader.os.fdopen", side_effect=OSError("fdopen failed")):
+        with mock.patch("webserver.loader.os.close", wraps=os.close) as close:
+            try:
+                loader.atomic_write_text(str(path), "new config\n")
+            except OSError:
+                pass
+            else:
+                raise AssertionError("fdopen failure must be propagated")
+
+    assert sorted(item.name for item in tmp_path.iterdir()) == []
+    close.assert_called_once()
 
 
 def test_update_config_passes_current_settings_to_nuxt_writer():
