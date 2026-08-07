@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案模板及单工作单文档治理方案。" />
+    <link rel="icon" href="data:," />
+    <title>统一内部方案模板与单文档生命周期 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #fff;
+        --ink: #182132;
+        --text: #2f3b4e;
+        --muted: #657187;
+        --line: #d8e0ec;
+        --accent: #b55408;
+        --accent-soft: #fff1e4;
+        --green: #1c7550;
+        --green-soft: #e5f4ec;
+        --shadow: 0 14px 34px rgba(15, 23, 42, .075);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at 90% 0, rgba(223, 109, 22, .11), transparent 25%), linear-gradient(180deg, #fbfcff, var(--bg));
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: inherit; }
+      a:focus-visible, summary:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; font: .9em var(--mono); }
+      .skip-link { position: fixed; z-index: 30; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: none; }
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { border: 1px solid var(--line); border-radius: 20px; background: var(--panel); box-shadow: var(--shadow); }
+      .hero { margin-bottom: 18px; padding: 32px 34px; }
+      h1 { margin: 0 0 10px; font-size: clamp(31px, 4vw, 49px); line-height: 1.12; letter-spacing: -.03em; }
+      h2 { margin: 0 0 14px; font-size: 23px; line-height: 1.3; }
+      h3 { margin: 0 0 7px; font-size: 16px; }
+      p, li, td, th { color: var(--text); font-size: 14px; }
+      .sub { max-width: 900px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { padding: 5px 11px; color: #536176; border-radius: 999px; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #974a0d; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 24px; }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid #efbe8c; border-radius: 14px; background: #fffaf5; }
+      .callout.good { border-color: #a8d7c1; background: #f0faf5; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .choice { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fbfcfe; }
+      .choice ul { margin: 8px 0 0; padding-left: 20px; }
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+      .step { position: relative; min-height: 126px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: #fbfcfe; }
+      .step:not(:last-child)::after { content: "→"; position: absolute; z-index: 1; top: 45%; right: -17px; color: var(--accent); font-weight: 900; }
+      .step b { display: block; margin-bottom: 5px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: inline-block; margin-bottom: 8px; color: var(--accent); font: 800 11px var(--mono); letter-spacing: .05em; text-transform: uppercase; }
+      .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 760px; border-collapse: collapse; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #536176; background: #f8fafc; font-size: 12px; white-space: nowrap; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      .pending { color: #995b08; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #974a0d; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      footer { color: var(--muted); font-size: 12px; text-align: center; }
+      .toc-edge { display: none; }
+      .toc-fab { position: fixed; z-index: 20; right: 14px; bottom: 14px; }
+      .toc-fab > summary { cursor: pointer; list-style: none; padding: 10px 15px; border: 1px solid var(--line); border-radius: 999px; background: var(--ink); color: #fff; box-shadow: var(--shadow); font-size: 13px; font-weight: 800; }
+      .toc-fab > summary::-webkit-details-marker { display: none; }
+      .toc-fab nav { position: absolute; right: 0; bottom: 50px; width: 280px; max-height: min(520px, calc(100vh - 90px)); overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: var(--shadow); }
+      .toc-fab a { display: block; padding: 8px 10px; border-radius: 9px; color: var(--muted); text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { color: var(--ink); background: #f3f5f9; }
+      @media (min-width: 1440px) {
+        .toc-fab { display: none; }
+        .toc-edge { position: fixed; z-index: 20; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: grid; width: 124px; padding: 8px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255, 255, 255, .94); box-shadow: var(--shadow); transform: translateY(-50%); }
+        .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 6px; align-items: start; padding: 8px 7px; border-radius: 10px; color: var(--muted); text-decoration: none; font-size: 11px; line-height: 1.35; }
+        .toc-edge a:hover { color: var(--ink); background: #f3f5f9; }
+        .rail-index { color: var(--accent); font: 800 10px var(--mono); }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step:not(:last-child)::after { content: "↓"; top: auto; right: 14px; bottom: -18px; }
+        .toc-fab { right: 10px; bottom: 10px; }
+        .toc-fab nav { width: min(310px, calc(100vw - 20px)); }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print { body { background: #fff; } .page { width: 100%; padding: 0; } .hero, .card { box-shadow: none; } .toc-edge, .toc-fab, .skip-link { display: none; } .step, .choice, .table-wrap { break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request"><span class="rail-index">01</span><span>原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span>目标边界</span></a>
+      <a href="#template"><span class="rail-index">03</span><span>模板基线</span></a>
+      <a href="#matrix"><span class="rail-index">04</span><span>功能矩阵</span></a>
+      <a href="#lifecycle"><span class="rail-index">05</span><span>单文档生命周期</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span>影响风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span>测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span>决策记录</span></a>
+    </nav>
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <a href="#request">01 原始诉求</a><a href="#goals">02 目标与边界</a><a href="#template">03 模板基线</a><a href="#matrix">04 产品功能矩阵</a><a href="#lifecycle">05 单文档生命周期</a><a href="#impact">06 影响与风险</a><a href="#tests">07 测试结果</a><a href="#decisions">08 决策记录</a>
+      </nav>
+    </details>
+    <div class="page">
+      <header class="hero">
+        <h1>统一内部方案模板与单文档生命周期</h1>
+        <p class="sub">提供可离线复制、支持 PC 与手机的方案基础格式，并将同一工作的澄清、设计迭代、实现与验证持续收敛在一份文档中。</p>
+        <div class="chips" aria-label="方案元信息"><span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-03</span><span class="chip">所属模块：project</span><span class="chip">影响范围：design / scripts / tests</span><span class="chip">需求来源：用户直接要求</span></div>
+      </header>
+      <main id="main-content">
+        <section id="request" class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout">“你根据 design 里面的历史方案文档，总结一套模版+样式（支持PC+手机），以后design方案时直接套用模版基础格式。”</div>
+          <p>后续反馈确定：视觉参考 <code>~/20260803-signals-in-ai-repo.wip.html</code>；顶部元信息使用小型 tags；目录不能挤压正文，宽屏展示完整右侧目录，窄屏使用浮动目录；模板提供可选产品功能矩阵。</p>
+          <div class="callout"><strong>新增治理要求：</strong>“一个工作只写一份文档，不要保留中间的过程废弃文档。”</div>
+        </section>
+        <section id="goals" class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice"><h3>目标</h3><ul><li>复制一份 HTML 即可开始合规 WIP。</li><li>PC 正文足够宽，手机不产生整页横向滚动。</li><li>同一工作从 WIP 到 ACTIVE 只维护一份方案。</li><li>保留可访问性、离线阅读和打印基线。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>不强制所有方案使用完全相同的视觉主题。</li><li>不要求每份方案保留全部可选章节。</li><li>不由脚本猜测两个文件是否属于同一工作。</li><li>不删除已合并生效、由独立后续工作替代的历史方案。</li></ul></article>
+          </div>
+        </section>
+        <section id="template" class="card">
+          <h2>3. 模板基线</h2>
+          <div class="callout good"><strong>最终形态：</strong><code>design/TEMPLATE.html</code> 采用 Signals 风格白色卡片、橙色焦点色和轻量阴影；meta 信息用小型 tags 呈现，正文最大宽度为 1160px。</div>
+          <ul><li>宽屏完整目录漂浮在正文外侧，展示编号和章节名；空间不足时自动切换到不占正文宽度的浮动目录。</li><li>必备内容包括原始诉求、目标、方案和测试结果；功能矩阵、证据、图表和决策记录按需保留。</li><li>所有 CSS、脚本和图形内联，不依赖 CDN、远程字体或仓库资源。</li></ul>
+        </section>
+        <section id="matrix" class="card">
+          <h2>4. 产品功能矩阵</h2>
+          <p>矩阵是备选章节，以用户任务为行，按实际角色、入口和协议增删列；手机端只允许表格容器局部横向滚动。</p>
+          <div class="matrix-legend" aria-label="功能矩阵图例"><span class="matrix-yes">支持</span><span class="matrix-conditional">条件支持</span><span class="matrix-no">不支持 / 不在范围</span></div>
+          <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0"><table><thead><tr><th>功能域</th><th>用户任务</th><th>游客</th><th>登录用户</th><th>管理员</th><th>Web</th><th>移动端</th><th>API / 协议</th><th>验收口径</th></tr></thead><tbody><tr><td>发现与浏览</td><td>按条件发现内容</td><td><span class="matrix-state matrix-conditional">条件</span></td><td><span class="matrix-state matrix-yes">支持</span></td><td><span class="matrix-state matrix-yes">支持</span></td><td><span class="matrix-state matrix-yes">支持</span></td><td><span class="matrix-state matrix-yes">支持</span></td><td><span class="matrix-state matrix-no">—</span></td><td>入口、结果和权限均符合预期</td></tr></tbody></table></div>
+        </section>
+        <section id="lifecycle" class="card">
+          <h2>5. 单工作单文档生命周期</h2>
+          <div class="flow" aria-label="方案生命周期">
+            <article class="step"><span class="label">Create</span><b>创建唯一 WIP</b><p>使用首次创建日期和稳定 feature 命名。</p></article>
+            <article class="step"><span class="label">Iterate</span><b>原文件持续更新</b><p>grill、反馈、候选比较和实现偏离均写回同一份 WIP。</p></article>
+            <article class="step"><span class="label">Verify</span><b>回写真正结果</b><p>记录命令、页面、失败项和未执行原因。</p></article>
+            <article class="step"><span class="label">Activate</span><b>只留下 ACTIVE</b><p>验证完成后改状态和文件名，不保留中间废弃文档。</p></article>
+          </div>
+          <div class="callout"><strong>SUPERSEDED 边界：</strong>只用于某份已经合并并独立生效的 ACTIVE，后来被另一个工作替代。它不能用于保存同一工作中的过程稿、方案 A/B/C 或反馈轮次。</div>
+        </section>
+        <section id="impact" class="card">
+          <h2>6. 影响范围、风险与回滚</h2>
+          <div class="grid"><article class="choice"><h3>改动</h3><p>更新 <code>AGENTS.md</code>、<code>design/TEMPLATE.html</code> 及对应测试；本次模板工作最终只保留本方案。</p></article><article class="choice"><h3>保持不变</h3><p>方案路径、状态值、单文件 HTML 约束和 WIP 合并门禁不变；语义归组仍由开发者与评审判断。</p></article></div>
+          <div class="callout"><strong>风险：</strong>若过早转为 ACTIVE，后续同工作反馈容易再次产生文档。缓解方式是仅在实现与验证真正完成时转 ACTIVE。</div>
+        </section>
+        <section id="tests" class="card">
+          <h2>7. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0"><table><thead><tr><th>验证项</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead><tbody><tr><td>规范契约</td><td><code>python3 -m pytest tests/test_check_design_docs.py tests/test_project_instructions.py -q</code></td><td>单文档规则和模板结构受回归保护</td><td class="verified">32 passed，2.43s</td></tr><tr><td>代码质量</td><td><code>ruff check ... --no-cache</code>；<code>ruff format --check ...</code>；<code>git diff --check</code></td><td>相关 Python 文件和补丁格式通过</td><td class="verified">3 个 Python 文件全部通过，无空白错误</td></tr><tr><td>实际渲染</td><td>Chrome 1440×1000 与 390×844；desktop + mobile Lighthouse snapshot</td><td>正文、目录、矩阵和局部滚动正常</td><td class="verified">PC 正文 1160px、目录 124px、间隔 4.5px；手机正文 370px，矩阵在 328px 容器内滚动，整页无横向溢出；两端 Lighthouse 四项均 100、33 项通过，控制台无错误</td></tr><tr><td>方案门禁</td><td><code>make check-design</code></td><td>WIP 阶段只拦截本方案；ACTIVE 后全量通过</td><td class="verified">WIP 预检仅拦截本方案；转 ACTIVE 后 78 份方案文件全部通过</td></tr></tbody></table></div>
+        </section>
+        <section id="decisions" class="card">
+          <h2>8. 决策记录</h2>
+          <ol><li><strong>2026-08-03：</strong>创建通用方案模板工作，模板允许按主题调整，meta tags 作为备选组件。</li><li><strong>2026-08-04 至 2026-08-06：</strong>同一工作的视觉、目录和功能矩阵反馈收敛到最终模板，不再视为独立方案。</li><li><strong>2026-08-07：</strong>同一工作只维护一份方案；删除此前未合并的中间废弃文档。</li></ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · project · ACTIVE · 2026-08-03 · 2026-08-07 验证完成</footer>
+    </div>
+  </body>
+</html>
