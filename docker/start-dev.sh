@@ -53,6 +53,8 @@ if [ "x$permission" != "x$PUID:$PGID" ]; then
 fi
 
 # 设置系统文件的权限
+# .env 通过同目录临时文件原子替换；只调整目录节点，不递归修改 app 源码与依赖。
+chown talebook:talebook /var/www/talebook/app
 chown -R talebook:talebook \
   /run/talebook \
   /data/books/ssl \
