@@ -379,6 +379,34 @@ router.get('/api/book/:bookId/audios', eventHandler(() => ({
   },
 })));
 
+router.delete('/api/book/:bookId/audios', eventHandler(() => {
+  const activeJobs = audiobookJobs.filter(item => ['queued', 'inspecting', 'awaiting_review', 'generating', 'finalizing'].includes(item.status));
+  const editions = (audiobookPublishedEdition ? 1 : 0) + audiobookManagedEditions.length;
+  const chapters = audiobookPublishedEdition ? audiobookChapters.length : 0;
+  const jobs = audiobookJobs.length;
+  const progress = audiobookProgress ? 1 : 0;
+  audiobookPublishedEdition = null;
+  audiobookJobs = [];
+  audiobookJobPolls = 0;
+  audiobookProgress = null;
+  audiobookManagedEditions = [];
+  return {
+    err: 'ok',
+    deleted: {
+      editions,
+      chapters,
+      jobs,
+      progress,
+      bookmarks: 0,
+      sessions: 0,
+      daily_stats: 0,
+      podcast_audits: 0,
+      podcast_preferences: 0,
+      active_jobs_cancelled: activeJobs.length,
+    },
+  };
+}));
+
 router.post('/api/book/:bookId/audio-jobs', eventHandler(async (event) => {
   const body = await readBody(event);
   const duplicate = audiobookJobs.find(item => ['queued', 'inspecting', 'awaiting_review', 'generating', 'finalizing'].includes(item.status));

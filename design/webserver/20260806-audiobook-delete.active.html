@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 按书籍彻底删除有声书全部版本、任务、收听数据与媒体文件的内部实现方案。" />
+    <link rel="icon" href="data:," />
+    <title>按书籍彻底删除有声书 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #edf1f7;
+        --paper: #fbfcfe;
+        --ink: #172238;
+        --muted: #5f6b7e;
+        --line: #cfd7e3;
+        --danger: #a82f3d;
+        --danger-deep: #702330;
+        --danger-soft: #f9e8eb;
+        --amber: #b87917;
+        --amber-soft: #fff3da;
+        --safe: #287668;
+        --safe-soft: #e3f3ef;
+        --blue-soft: #e7eef9;
+        --shadow: 0 18px 44px rgba(32, 47, 73, .1);
+        --display: "Avenir Next", "Segoe UI", "PingFang SC", sans-serif;
+        --body: "Iowan Old Style", "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+        --utility: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          linear-gradient(90deg, rgba(168, 47, 61, .035) 1px, transparent 1px) 0 0 / 28px 28px,
+          linear-gradient(rgba(168, 47, 61, .035) 1px, transparent 1px) 0 0 / 28px 28px,
+          var(--bg);
+        font-family: var(--body);
+        line-height: 1.7;
+      }
+      a { color: var(--danger-deep); text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--danger); outline-offset: 3px; }
+      code, .mono { font-family: var(--utility); font-size: .9em; }
+      code { padding: .12em .36em; border-radius: 4px; background: #e9edf4; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 30; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 58px; }
+      .hero, .card { background: rgba(251, 252, 254, .98); border: 1px solid var(--line); box-shadow: var(--shadow); }
+      .hero { position: relative; min-height: 360px; margin-bottom: 18px; padding: 34px 40px 36px 92px; overflow: hidden; border-radius: 24px; }
+      .hero::before { position: absolute; inset: 0 auto 0 0; width: 58px; color: #fff; background: var(--danger-deep); content: "DELETE / AUDIOS"; font: 800 11px/58px var(--utility); letter-spacing: .18em; text-align: center; text-orientation: mixed; writing-mode: vertical-rl; }
+      .hero::after { position: absolute; right: -120px; bottom: -190px; width: 470px; height: 470px; border: 70px solid rgba(168, 47, 61, .09); border-radius: 50%; content: ""; pointer-events: none; }
+      .hero-kicker { position: relative; z-index: 1; margin: 0 0 30px; color: var(--danger); font: 800 11px/1.2 var(--utility); letter-spacing: .16em; text-transform: uppercase; }
+      h1 { position: relative; z-index: 1; max-width: 820px; margin: 0 0 18px; font: 760 clamp(34px, 5vw, 62px)/1.06 var(--display); letter-spacing: -.045em; }
+      .sub { position: relative; z-index: 1; max-width: 850px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+      .chip { display: inline-flex; min-height: 31px; align-items: center; padding: 5px 11px; color: #516076; background: #e8edf4; border-radius: 999px; font: 750 12px/1.3 var(--display); }
+      .chip.wip { color: var(--danger-deep); background: var(--danger-soft); }
+      .chip.active { color: var(--safe); background: var(--safe-soft); }
+
+      .card { margin-bottom: 18px; padding: 28px 30px; border-radius: 20px; scroll-margin-top: 18px; }
+      h2 { margin: 0 0 16px; font: 760 24px/1.24 var(--display); letter-spacing: -.02em; }
+      h3 { margin: 22px 0 10px; font: 750 17px/1.35 var(--display); }
+      p { margin: 0 0 13px; }
+      p, li { color: #2d3a50; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.target { border-top: 5px solid var(--safe); background: linear-gradient(180deg, var(--safe-soft), #fff 45%); }
+      .choice.boundary { border-top: 5px solid var(--ink); }
+      .callout { margin-top: 14px; padding: 15px 17px; border: 1px solid var(--line); border-radius: 14px; background: #f4f7fb; }
+      .callout.warn { border-color: #e6c88e; background: var(--amber-soft); }
+      .callout.good { border-color: #a7d4c9; background: var(--safe-soft); }
+      .callout.danger { border-color: #dbadb4; background: var(--danger-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .perimeter { display: grid; grid-template-columns: minmax(300px, .9fr) minmax(0, 1.1fr); gap: 24px; align-items: center; margin-top: 20px; padding: 22px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: #f7f9fc; }
+      .perimeter svg { display: block; width: 100%; height: auto; }
+      .legend { display: grid; gap: 10px; }
+      .legend-row { display: grid; grid-template-columns: 12px 1fr; gap: 10px; align-items: start; }
+      .legend-dot { width: 12px; height: 12px; margin-top: 6px; border-radius: 50%; background: var(--danger); }
+      .legend-dot.safe { background: var(--safe); }
+      .legend-dot.shared { background: #8290a5; }
+      .legend-row strong { display: block; font-family: var(--display); font-size: 14px; }
+      .legend-row p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+      .step { position: relative; min-height: 142px; padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .step + .step::before { position: absolute; top: 20px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: #fff; background: var(--danger); border-radius: 50%; content: "→"; font: 800 13px/1 var(--display); }
+      .step b { display: block; margin-bottom: 7px; font: 750 14px/1.35 var(--display); }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 9px; color: var(--danger); font: 800 10px/1.3 var(--utility); letter-spacing: .1em; text-transform: uppercase; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 720px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #536076; background: #f2f5f9; font: 750 12px/1.4 var(--display); }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      .state { display: inline-flex; min-height: 25px; align-items: center; padding: 3px 8px; border-radius: 999px; font: 800 11px/1.2 var(--display); white-space: nowrap; }
+      .state.delete { color: var(--danger-deep); background: var(--danger-soft); }
+      .state.keep { color: var(--safe); background: var(--safe-soft); }
+      .state.block { color: var(--amber); background: var(--amber-soft); }
+      pre { margin: 14px 0 0; padding: 16px 18px; overflow-x: auto; color: #eef3f9; background: #202b3d; border-radius: 14px; font: 13px/1.68 var(--utility); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: var(--amber); font-weight: 800; }
+      .passed { color: var(--safe); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 3px; align-items: center; min-height: 36px; padding: 6px 5px; color: #657287; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--danger); background: var(--danger-soft); }
+      .rail-index { font: 800 10px/1 var(--utility); text-align: center; }
+      .rail-title { overflow: hidden; font: 700 12px/1.3 var(--display); text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: var(--danger-deep); }
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: var(--ink); border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font: 800 12px/1.2 var(--display); list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #f5a5af; content: "≡"; font-size: 17px; }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font: 800 11px/1.3 var(--display); letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font: 700 13px/1.35 var(--display); }
+      .toc-fab a:hover, .toc-fab a[aria-current="location"] { color: var(--danger-deep); background: var(--danger-soft); }
+      footer { margin-top: 16px; color: var(--muted); font: 12px/1.5 var(--utility); text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(251, 252, 254, .97); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 760px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero { min-height: 0; padding: 26px 20px 28px 58px; border-radius: 16px; }
+        .hero::before { width: 38px; font-size: 9px; line-height: 38px; }
+        .hero-kicker { margin-bottom: 20px; }
+        h1 { font-size: clamp(31px, 10vw, 45px); }
+        .sub { font-size: 15px; }
+        .card { padding: 22px 19px; border-radius: 16px; }
+        .grid, .flow, .perimeter { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre, .perimeter { break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标边界</span></a>
+      <a href="#evidence"><span class="rail-index">03</span><span class="rail-title">现状证据</span></a>
+      <a href="#scope"><span class="rail-index">04</span><span class="rail-title">清理范围</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">实现方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">风险回滚</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试计划</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#scope">清理范围</a>
+        <a href="#design">实现方案</a>
+        <a href="#impact">影响、风险与回滚</a>
+        <a href="#tests">测试计划与结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <header class="hero">
+        <p class="hero-kicker">Destructive operation contract · book scoped</p>
+        <h1>按书籍彻底删除有声书</h1>
+        <p class="sub">为管理员提供一个明确、可确认、可重试的整本删除入口：正文书籍继续保留，有声书的所有版本、任务、收听痕迹与独占文件全部清空。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-06</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：webserver / app / tests</span>
+          <span class="chip">需求来源：用户 quick fix</span>
+        </div>
+      </header>
+
+      <main id="main-content">
+        <section id="request" class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn"><strong>首次诉求：</strong>“quick fix: new git wt， 给有声书增加删除功能”</div>
+          <div class="callout danger"><strong>grill 后最终确认：</strong>“还是不区分了，就一个删除按钮，删了就全删。”</div>
+          <p>当前页面已经允许管理员逐个删除候选或历史版本，但后端明确禁止删除正在发布的版本，因此无法把某本书的有声内容完整移除。此次需求不是删除 Calibre 正文书，也不是只下架当前版本，而是按 <code>book_id</code> 清空整个有声书域。</p>
+        </section>
+
+        <section id="goals" class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice target">
+              <h3>必须达成</h3>
+              <ul>
+                <li>管理员能在书籍的有声书详情页发起整本删除，并在不可逆操作前看到清晰确认。</li>
+                <li>删除该书所有发布、候选、历史、草稿和部分章节版本，以及对应任务、用户数据、统计、审计与独占文件。</li>
+                <li>删除成功后立即从有声书馆藏、阅读器注入和 Podcast Feed 消失；当前浏览器若正在播放该书则关闭播放器并清理本地恢复状态。</li>
+                <li>保留正文书籍、封面、收藏、阅读进度和其他书籍的有声书数据。</li>
+              </ul>
+            </article>
+            <article class="choice boundary">
+              <h3>明确不做</h3>
+              <ul>
+                <li>不删除 Calibre 书籍及 EPUB、TXT 等正文格式。</li>
+                <li>不自动回滚或重新发布任何历史有声版本，因为全部版本都属于清理范围。</li>
+                <li>不清空全局 TTS 分段缓存或公共音色预览；这些资源无法安全归属单本书，且可能被其他书复用。</li>
+                <li>不改变现有单版本发布、回滚和候选/历史版本删除能力。</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="evidence" class="card">
+          <h2>3. 现状、根因与证据</h2>
+          <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+            <table>
+              <thead><tr><th>观察</th><th>代码证据</th><th>结论</th></tr></thead>
+              <tbody>
+                <tr><td>发布版本无法删除</td><td><code>webserver/handlers/audiobook.py</code> 的 <code>AudiobookEditionAction.patch()</code></td><td><code>action=delete</code> 遇到 <code>published</code> 会返回 <code>state.invalid</code>。</td></tr>
+                <tr><td>删除入口只覆盖非发布版本</td><td><code>app/pages/book/[bid]/audios.vue</code> 的 <code>managedEditions</code></td><td>页面仅在“候选与历史版本”列表展示逐版本删除，没有整本有声书删除入口。</td></tr>
+                <tr><td>数据跨越多个表与目录</td><td><code>webserver/models.py</code> 与 <code>AudiobookStorage</code></td><td>完整清理必须按书籍先解析版本、章节和任务 ID，再按外键依赖顺序删除。</td></tr>
+                <tr><td>运行中任务会继续写目录</td><td><code>AudiobookScheduler._process()</code> 与 <code>VoicebookProcess.run()</code></td><td>单按钮语义要求接口在同一次操作中写入取消标记、删除任务使租约失效，并保证后续事件不会重建数据。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout"><strong>已证实边界：</strong>公开馆藏、阅读器和 Podcast 都只读取 <code>status=published</code> 的版本；全部版本记录移除后，这些消费面无需额外下架状态即可一致消失。</div>
+        </section>
+
+        <section id="scope" class="card">
+          <h2>4. 删除边界：书芯保留，声音外层清空</h2>
+          <p>视觉上的删除边界以正文书籍为中心：红色环内是本次不可逆清理对象，绿色书芯是不变量；灰色共享缓存位于边界外。</p>
+          <div class="perimeter">
+            <svg viewBox="0 0 420 420" role="img" aria-labelledby="perimeter-title perimeter-desc">
+              <title id="perimeter-title">有声书整本删除边界图</title>
+              <desc id="perimeter-desc">保留中心正文书籍，删除外围所有有声版本、章节、任务、播放数据、统计、审计与独占文件，共享缓存保留。</desc>
+              <circle cx="210" cy="210" r="178" fill="#f9e8eb" stroke="#a82f3d" stroke-width="3" stroke-dasharray="10 8" />
+              <circle cx="210" cy="210" r="118" fill="#fbfcfe" stroke="#d7a1aa" stroke-width="2" />
+              <rect x="153" y="145" width="114" height="130" rx="10" fill="#287668" />
+              <path d="M174 161h70v94h-70z" fill="#e3f3ef" />
+              <path d="M174 161c17 0 27 4 35 11 8-7 18-11 35-11v94c-17 0-27 3-35 10-8-7-18-10-35-10z" fill="#f8fffd" stroke="#287668" stroke-width="2" />
+              <text x="209" y="204" text-anchor="middle" font-family="Avenir Next, Segoe UI, sans-serif" font-size="15" font-weight="700" fill="#174d44">正文书籍</text>
+              <text x="209" y="225" text-anchor="middle" font-family="Avenir Next, Segoe UI, sans-serif" font-size="11" fill="#287668">保留</text>
+              <g font-family="SFMono-Regular, Consolas, monospace" font-size="10" font-weight="700" fill="#702330">
+                <text x="210" y="59" text-anchor="middle">EDITIONS · CHAPTERS</text>
+                <text x="210" y="374" text-anchor="middle">PROGRESS · BOOKMARKS · SESSIONS</text>
+                <text x="49" y="213" text-anchor="middle" transform="rotate(-90 49 213)">JOBS · WORKSPACES</text>
+                <text x="371" y="213" text-anchor="middle" transform="rotate(90 371 213)">STATS · PODCAST AUDITS</text>
+              </g>
+              <path d="M340 330l35 35" stroke="#8290a5" stroke-width="2" />
+              <circle cx="386" cy="376" r="9" fill="#8290a5" />
+              <text x="329" y="404" font-family="SFMono-Regular, Consolas, monospace" font-size="9" fill="#657287">SHARED CACHE / KEEP</text>
+            </svg>
+            <div class="legend">
+              <div class="legend-row"><span class="legend-dot"></span><div><strong>删除：有声书专属域</strong><p>所有版本、章节、任务、工作目录、收听数据、统计和 Podcast 审计。</p></div></div>
+              <div class="legend-row"><span class="legend-dot safe"></span><div><strong>保留：正文书籍</strong><p>Calibre 元数据、电子书格式、收藏与文字阅读状态不受影响。</p></div></div>
+              <div class="legend-row"><span class="legend-dot shared"></span><div><strong>保留：共享缓存</strong><p>内容寻址的 TTS 分段缓存和音色预览可能被其他书复用，不能按书安全识别。</p></div></div>
+            </div>
+          </div>
+
+          <div class="table-wrap" role="region" aria-label="数据清理矩阵" tabindex="0">
+            <table>
+              <thead><tr><th>资源</th><th>定位条件</th><th>处理</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr><td><code>AudiobookEdition</code> / <code>AudiobookChapter</code></td><td>版本 <code>book_id</code> 与派生 ID</td><td><span class="state delete">全部删除</span></td><td>覆盖 published、ready、partial、historical、draft 等所有状态。</td></tr>
+                <tr><td><code>AudiobookJob</code></td><td><code>book_id</code></td><td><span class="state delete">全部删除</span></td><td>活跃任务先写取消标记并失效租约；所有状态的制作历史都在同一次操作中删除。</td></tr>
+                <tr><td>Progress / Bookmark / PlaybackSession</td><td><code>edition_id</code></td><td><span class="state delete">全部删除</span></td><td>清除所有用户的进度、书签和播放会话。</td></tr>
+                <tr><td>DailyStat / PodcastAccessLog</td><td><code>book_id</code>，并兼容派生 ID</td><td><span class="state delete">全部删除</span></td><td>即使审计记录已标记 protected，也服从用户确认的“所有数据”。</td></tr>
+                <tr><td>PodcastSubscription.hidden_books</td><td>隐藏书籍 ID 列表</td><td><span class="state delete">移除引用</span></td><td>订阅本身和 Token 保留，仅清掉目标书 ID。</td></tr>
+                <tr><td><code>editions/{id}</code> / <code>jobs/{id}</code></td><td>数据库解析出的可信 ID</td><td><span class="state delete">递归删除</span></td><td>只通过 <code>AudiobookStorage</code> 解析受控路径。</td></tr>
+                <tr><td>正文书籍及共享缓存</td><td>不适用</td><td><span class="state keep">保留</span></td><td>不是单本有声书独占资源。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="design" class="card">
+          <h2>5. 实现方案</h2>
+          <div class="callout good"><strong>方案结论：</strong>在现有书籍有声资源上新增管理员专用 <code>DELETE /api/book/{book_id}/audios</code>。接口以 <code>book_id</code> 为唯一删除边界，返回各类资源的删除计数；前端用独立危险操作对话框解释“删声音、留正文”。</div>
+
+          <div class="flow" aria-label="整本有声书删除时序">
+            <article class="step"><span class="label">Guard</span><b>管理员确认</b><p>页面展示不可恢复范围；后端用 <code>@is_admin</code> 重新鉴权。</p></article>
+            <article class="step"><span class="label">Quiesce</span><b>终止活跃任务</b><p>对活跃任务写取消文件和取消状态；删除任务行使 worker 租约失效，后续事件因任务不存在而忽略。</p></article>
+            <article class="step"><span class="label">Purge</span><b>清数据再清文件</b><p>按外键依赖从叶子表向版本表删除并提交，再移除已解析的版本/任务目录。</p></article>
+            <article class="step"><span class="label">Refresh</span><b>收敛客户端状态</b><p>关闭当前书播放器、清本地恢复记录、刷新详情为空态并提示完成。</p></article>
+          </div>
+
+          <h3>接口契约</h3>
+          <pre aria-label="整本有声书删除接口示例"><code>DELETE /api/book/42/audios
+
+成功：
+{
+  "err": "ok",
+  "deleted": {
+    "editions": 3,
+    "chapters": 86,
+    "jobs": 4,
+    "progress": 2,
+    "bookmarks": 1,
+    "sessions": 7,
+    "daily_stats": 12,
+    "podcast_audits": 19,
+    "podcast_preferences": 1,
+    "active_jobs_cancelled": 1
+  }
+}</code></pre>
+
+          <h3>前端交互</h3>
+          <div class="table-wrap" role="region" aria-label="前端删除交互" tabindex="0">
+            <table>
+              <thead><tr><th>状态</th><th>呈现</th><th>行为</th></tr></thead>
+              <tbody>
+                <tr><td>管理员且存在任意版本</td><td>Hero 操作区显示红色“删除有声书”按钮</td><td>不与“删除正文书”混用文案。</td></tr>
+                <tr><td>确认对话框</td><td>列明所有版本、任务和收听记录都会永久删除；正文书名明确标注保留</td><td>取消无副作用；确认按钮提交期间禁用并显示 loading。</td></tr>
+                <tr><td>删除成功</td><td>全局成功提示，详情页进入“还没有可收听版本”空态</td><td>若正在播放目标书，调用播放器 <code>close()</code> 清理音频对象和 localStorage。</td></tr>
+                <tr><td>存在活跃任务</td><td>仍由同一个确认按钮完成</td><td>后端先发出取消信号，再删除任务、版本与文件；用户无需先去任务页操作。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="impact" class="card">
+          <h2>6. 影响范围、风险与回滚</h2>
+          <div class="grid">
+            <article class="choice target">
+              <h3>实际改动</h3>
+              <p><code>webserver/handlers/audiobook.py</code> 增加整本删除方法与数据清理；<code>app/pages/book/[bid]/audios.vue</code> 增加危险操作入口；中英文 i18n、mock API、后端集成测试和前端 E2E 同步更新。</p>
+            </article>
+            <article class="choice boundary">
+              <h3>兼容与部署</h3>
+              <p>复用现有路由和数据库表，不新增迁移、配置或依赖。GET 契约、媒体路径、Podcast Token 和单版本 PATCH 操作保持兼容。</p>
+            </article>
+          </div>
+          <div class="callout danger"><strong>主要风险：</strong>误删不可恢复。缓解方式是管理员权限、整本专用文案、确认对话框、严格的 <code>book_id</code> 查询边界、受控路径解析，以及覆盖“目标书清空、其他书与正文保留”的测试。</div>
+          <div class="callout warn"><strong>并发风险：</strong>活跃 Voicebook 子进程可能仍持有文件句柄。接口先写取消文件，再删除任务行令租约失效；worker 下一次控制检查会终止子进程，删除后的事件因任务不存在而被忽略。定向测试必须覆盖删除后不重建任务、版本或章节。</div>
+          <div class="callout"><strong>失败与回滚：</strong>数据库清理先在单一事务中完成；提交后再删除已解析的独占目录。目录删除失败时响应明确给出清理失败，不恢复已删除的数据库数据，并允许管理员依据错误日志人工清理残留目录。发布后若回滚代码，已删除的数据与媒体不可恢复，这是交互中必须明确告知的产品事实。</div>
+        </section>
+
+        <section id="tests" class="card">
+          <h2>7. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>实际命令或页面</th><th>关键断言</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>后端集成</td><td><code>docker run … pytest -q tests/test_audiobook.py tests/test_audiobook_reliability.py</code>；<code>docker run … pytest -q tests</code></td><td>管理员整本删除清空全部表与目录；活跃任务被取消且不重建数据；其他书不受影响；非管理员被拒绝。</td><td class="passed">定向 21 passed；全量 801 passed、16 skipped</td></tr>
+                <tr><td>前端 E2E</td><td><code>PLAYWRIGHT_BASE_URL=… MOCK_API_URL=… npx playwright test test/e2e/audiobooks.spec.ts --project=chromium</code></td><td>按钮权限、确认文案、取消、成功空态、当前播放器关闭、移动端无横向溢出。</td><td class="passed">7 passed</td></tr>
+                <tr><td>静态与构建</td><td><code>make lint-py</code>；<code>cd app &amp;&amp; npm run lint</code>；<code>cd app &amp;&amp; npm run build</code></td><td>后端检查与前端构建通过，i18n JSON 可编译且不出现非法字面量。</td><td class="passed">通过；前端 lint 为 0 errors、193 个既有 warnings</td></tr>
+                <tr><td>实际渲染</td><td>真实 Docker 后端的 <code>/book/1/audios</code>，明亮/暗色、1440×1000 与 390×844</td><td>危险操作层级明确、对话框可取消，正文保留提示清晰，无横向溢出和控制台错误；未确认删除真实数据。</td><td class="passed">通过；已留存桌面与移动端截图</td></tr>
+                <tr><td>方案门禁</td><td><code>make check-design</code></td><td>路径、ACTIVE 状态、HTML 结构和单文件资源约束通过。</td><td class="passed">通过</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout good"><strong>验收结论：</strong>业务测试、全量回归、生产构建、真实后端渲染与方案门禁全部通过。构建只报告既有 Browserslist 数据和大 chunk 警告；全量后端只报告既有弃用与 SQLAlchemy 警告，均未产生失败。</div>
+        </section>
+
+        <section id="decisions" class="card">
+          <h2>8. 决策记录</h2>
+          <ol>
+            <li><strong>2026-08-06：</strong>使用新 worktree <code>feat/20260806-audiobook-delete</code>，基于 <code>origin/master</code> 隔离开发。</li>
+            <li><strong>2026-08-06：</strong>用户确认“删除整个有声书”是按书籍删除所有版本、历史和全部关联数据；正文书籍保留。</li>
+            <li><strong>2026-08-06：</strong>共享 TTS 缓存不具备可靠的单书归属，删除它会伤及其他书，因此不纳入“关联数据”；所有可以用书籍、版本、章节或任务 ID 确定归属的数据均删除。</li>
+            <li><strong>2026-08-07：</strong>曾讨论把有声书删除与处理任务删除拆成两个入口，用户最终撤回该方向，明确只保留一个按钮并清理全部数据。</li>
+            <li><strong>2026-08-07：</strong>活跃任务不再阻塞删除；同一次请求先发取消信号，再通过删除任务行失效租约并清理全部数据。</li>
+            <li><strong>2026-08-07：</strong>定向与全量回归、前端 E2E 和生产构建均通过；真实 Docker 数据下完成桌面、深色与移动端渲染验收，方案转为 ACTIVE。</li>
+          </ol>
+        </section>
+      </main>
+
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-08-06</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll("main > section[id]")];
+        const links = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !links.length) return;
+        let ticking = false;
+        const sync = () => {
+          ticking = false;
+          let current = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) current = section;
+            else break;
+          }
+          for (const link of links) {
+            if (link.getAttribute("href") === `#${current.id}`) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const schedule = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(sync);
+        };
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", schedule, { passive: true });
+        addEventListener("resize", schedule);
+        sync();
+      })();
+    </script>
+  </body>
+</html>
