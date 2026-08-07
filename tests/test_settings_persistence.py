@@ -20,6 +20,12 @@ def _candidate(nuxt_env_path):
     }
 
 
+def test_legacy_metadata_sources_migrate_to_booksource_without_removing_baidu():
+    value = admin.normalize_meta_sources(["baidu", "youshu", "biquge", "booksource", "douban"])
+
+    assert value == ["baidu", "booksource", "douban"]
+
+
 def test_settings_saver_persists_complete_candidate(tmp_path):
     conf = _candidate(tmp_path / ".env")
     args = loader.SettingsLoader()

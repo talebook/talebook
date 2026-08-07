@@ -38,9 +38,34 @@ from webserver.settings import settings as DEFAULT_SETTINGS
 CONF = loader.get_settings()
 
 # 元数据源配置
-META_ALL_SOURCES = ["douban", "douban_v2", "baidu", "google", "amazon", "xinhua", "tomato", "qimao", "ai", "neodb", "biquge"]
-DEFAULT_META_SOURCES = ["douban", "baidu", "xinhua"]
+META_ALL_SOURCES = [
+    "douban",
+    "douban_v2",
+    "baidu",
+    "google",
+    "amazon",
+    "xinhua",
+    "tomato",
+    "qimao",
+    "ai",
+    "neodb",
+    "booksource",
+]
+DEFAULT_META_SOURCES = ["douban", "baidu", "xinhua", "booksource"]
 SOCIAL_AUTH_SETTING_RE = re.compile(r"^SOCIAL_AUTH_[A-Z0-9_]+_(KEY|SECRET)$")
+
+
+def normalize_meta_sources(value):
+    """把下线的固定站点选项迁移到通用在线书源，并保持百度百科独立。"""
+    if not isinstance(value, list):
+        return list(DEFAULT_META_SOURCES)
+    aliases = {"biquge": "booksource", "youshu": "booksource"}
+    normalized = []
+    for source in value:
+        source = aliases.get(source, source)
+        if source in META_ALL_SOURCES and source not in normalized:
+            normalized.append(source)
+    return normalized
 
 
 class AdminUsers(BaseHandler):
@@ -379,8 +404,9 @@ class AdminSettings(BaseHandler):
         settings_dict = dict(DEFAULT_SETTINGS) if self.is_demo_fake_admin() else dict(CONF)
         # 添加元数据源配置
         settings_dict["META_ALL_SOURCES"] = META_ALL_SOURCES
-        if "META_SELECTED_SOURCES" not in settings_dict:
-            settings_dict["META_SELECTED_SOURCES"] = DEFAULT_META_SOURCES
+        settings_dict["META_SELECTED_SOURCES"] = normalize_meta_sources(
+            settings_dict.get("META_SELECTED_SOURCES", DEFAULT_META_SOURCES)
+        )
 
         return {"err": "ok", "settings": settings_dict, "sns": sns, "site_url": self.site_url}
 
@@ -399,6 +425,8 @@ class AdminSettings(BaseHandler):
         if not self.admin_user:
             return {"err": "permission", "msg": _("无权访问此接口")}
         data = tornado.escape.json_decode(self.request.body)
+        if "META_SELECTED_SOURCES" in data:
+            data["META_SELECTED_SOURCES"] = normalize_meta_sources(data["META_SELECTED_SOURCES"])
 
         # 验证：如果启用了私人图书馆模式，访问码不能为空
         invite_mode = data.get("INVITE_MODE", False)

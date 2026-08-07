@@ -9,6 +9,7 @@ import os
 import random
 import re
 import shutil
+import threading
 import time
 import urllib
 
@@ -22,7 +23,7 @@ from webserver.constants import (
     META_SOURCE_AI,
     META_SOURCE_AMAZON,
     META_SOURCE_BAIDU,
-    META_SOURCE_BIQUGE,
+    META_SOURCE_BOOKSOURCE,
     META_SOURCE_DOUBAN,
     META_SOURCE_DOUBAN_V2,
     META_SOURCE_GOOGLE,
@@ -39,6 +40,16 @@ from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
 from webserver.services.autofill import AutoFillService
+from webserver.services.booksource.metadata import (
+    KEY as BOOKSOURCE_KEY,
+)
+from webserver.services.booksource.metadata import (
+    BookSourceMetadataService,
+    MetadataSearchResult,
+    collect_metadata_sources,
+    load_builtin_sources,
+    metadata_to_evidence,
+)
 from webserver.services.convert import CONVERSION_TARGETS, ConvertService
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
@@ -229,35 +240,53 @@ class BookRefer(BaseHandler):
     def plugin_search_books(self, mi):
         tasks = self._build_search_tasks(mi)
         if not tasks:
+            self._refer_summary = {"event": "summary", "failures": [], "total": 0, "completed": 0}
             return []
 
         logging.info("并行查询 %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
         books = []
+        failures = []
+        completed = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
             future_map = {executor.submit(fn): name for name, fn in tasks.items()}
             done, not_done = concurrent.futures.wait(future_map, timeout=self.REFER_TIMEOUT)
             for f in not_done:
-                logging.warning("查询 %s 超时，已跳过", future_map[f])
+                name = future_map[f]
+                logging.warning("查询 %s 超时，已跳过", name)
+                failures.append(self._refer_failure(name, "timeout", "查询超时"))
             for f in done:
                 name = future_map[f]
+                completed += 1
                 try:
                     result = f.result()
-                    books.extend(result)
-                    logging.info("%s 查询完成：%d 条", name, len(result))
+                    result_books, result_failures = self._unpack_search_result(name, result)
+                    books.extend(result_books)
+                    failures.extend(result_failures)
+                    logging.info("%s 查询完成：%d 条", name, len(result_books))
                 except Exception as e:
                     logging.error("%s 查询失败：%s", name, e)
+                    failures.append(self._refer_failure(name, "fetch_failed", "查询失败"))
 
+        self._refer_summary = {
+            "event": "summary",
+            "failures": self._dedupe_failures(failures),
+            "total": len(tasks),
+            "completed": completed,
+        }
         logging.info("所有信息源查询完成，共找到 %d 条结果", len(books))
         return books
 
     async def plugin_search_books_stream(self, mi):
         tasks = self._build_search_tasks(mi)
         if not tasks:
+            yield {"event": "summary", "failures": [], "total": 0, "completed": 0}
             return
 
         logging.info("并行查询(流式) %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
         loop = asyncio.get_event_loop()
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks))
+        failures = []
+        completed = 0
         try:
             pending_map = {loop.run_in_executor(executor, fn): name for name, fn in tasks.items()}
             deadline = time.time() + self.REFER_TIMEOUT
@@ -265,8 +294,9 @@ class BookRefer(BaseHandler):
             while pending_map:
                 remaining = deadline - time.time()
                 if remaining <= 0:
-                    for fut in pending_map:
-                        logging.warning("查询 %s 超时，已跳过", pending_map[fut])
+                    for fut, name in pending_map.items():
+                        logging.warning("查询 %s 超时，已跳过", name)
+                        failures.append(self._refer_failure(name, "timeout", "查询超时"))
                     break
 
                 done_set, _ = await asyncio.wait(
@@ -277,15 +307,51 @@ class BookRefer(BaseHandler):
 
                 for fut in done_set:
                     name = pending_map.pop(fut)
+                    completed += 1
                     try:
                         result = fut.result()
-                        logging.info("%s 查询完成：%d 条", name, len(result))
-                        for b in result:
+                        result_books, result_failures = self._unpack_search_result(name, result)
+                        failures.extend(result_failures)
+                        logging.info("%s 查询完成：%d 条", name, len(result_books))
+                        for b in result_books:
                             yield b
                     except Exception as e:
                         logging.error("%s 查询失败：%s", name, e)
+                        failures.append(self._refer_failure(name, "fetch_failed", "查询失败"))
         finally:
             executor.shutdown(wait=False)
+        yield {
+            "event": "summary",
+            "failures": self._dedupe_failures(failures),
+            "total": len(tasks),
+            "completed": completed,
+        }
+
+    @staticmethod
+    def _refer_failure(source, code, message):
+        return {"source": source, "code": code, "message": message}
+
+    def _unpack_search_result(self, name, result):
+        if isinstance(result, MetadataSearchResult):
+            books = list(result.books or [])
+            failures = list(result.failures or [])
+        else:
+            books = list(result or [])
+            failures = []
+        if not books and not failures:
+            failures.append(self._refer_failure(name, "no_result", "未找到匹配图书"))
+        return books, failures
+
+    @staticmethod
+    def _dedupe_failures(failures):
+        seen = set()
+        output = []
+        for failure in failures:
+            key = (failure.get("source"), failure.get("code"))
+            if key not in seen:
+                seen.add(key)
+                output.append(failure)
+        return output
 
     def _build_search_tasks(self, mi):
         sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
@@ -294,7 +360,30 @@ class BookRefer(BaseHandler):
             return {}
 
         title = re.sub("[(（].*", "", mi.title)
+        author = mi.authors[0] if getattr(mi, "authors", None) else None
         tasks = {}
+
+        metadata_service = None
+        metadata_result = None
+        metadata_lock = threading.Lock()
+        if META_SOURCE_BOOKSOURCE in sources or META_SOURCE_AI in sources:
+            try:
+                metadata_sources = collect_metadata_sources(self.session, CONF.get("BOOKSOURCE_METADATA_TOP_K", 10))
+            except Exception as err:
+                logging.warning("读取在线书源失败，将只尝试内置快照：%s", err)
+                metadata_sources = load_builtin_sources()
+            metadata_service = BookSourceMetadataService(
+                metadata_sources,
+                CONF.get("cookie_secret", "talebook"),
+                config=CONF,
+            )
+
+            def _lookup_online_sources():
+                nonlocal metadata_result
+                with metadata_lock:
+                    if metadata_result is None:
+                        metadata_result = metadata_service.search(title, author)
+                    return metadata_result
 
         if META_SOURCE_DOUBAN in sources:
 
@@ -335,7 +424,7 @@ class BookRefer(BaseHandler):
 
             def _baidu():
                 api = baike.BaiduBaikeApi(copy_image=False)
-                book = api.get_book(title)
+                book = api.get_book(title, author)
                 return [book] if book else []
 
             tasks["baidu"] = _baidu
@@ -363,20 +452,11 @@ class BookRefer(BaseHandler):
 
             tasks["xhsd"] = _xhsd
 
-        if hasattr(youshu, "YoushuApi"):
-
-            def _youshu():
-                api = youshu.YoushuApi(copy_image=True)
-                book = api.get_book(title)
-                return [book] if book else []
-
-            tasks["youshu"] = _youshu
-
         if META_SOURCE_TOMATO in sources:
 
             def _tomato():
                 api = tomato.TomatoNovelApi(copy_image=False)
-                book = api.get_book(title)
+                book = api.get_book(title, author)
                 return [book] if book else []
 
             tasks["tomato"] = _tomato
@@ -385,7 +465,7 @@ class BookRefer(BaseHandler):
 
             def _qimao():
                 api = qimao.QimaoNovelApi(copy_image=False)
-                book = api.get_book(title)
+                book = api.get_book(title, author)
                 return [book] if book else []
 
             tasks["qimao"] = _qimao
@@ -402,14 +482,12 @@ class BookRefer(BaseHandler):
 
             tasks["neodb"] = _neodb
 
-        if META_SOURCE_BIQUGE in sources:
+        if META_SOURCE_BOOKSOURCE in sources:
 
-            def _biquge():
-                api = biquge.BiqugeApi(copy_image=False)
-                book = api.get_book(title)
-                return [book] if book else []
+            def _booksource():
+                return _lookup_online_sources()
 
-            tasks["biquge"] = _biquge
+            tasks["booksource"] = _booksource
 
         if META_SOURCE_AI in sources:
 
@@ -422,9 +500,14 @@ class BookRefer(BaseHandler):
                     use_thinking=CONF.get("ai_use_thinking", False),
                     copy_image=False,
                 )
-                book = api.get_book(title, mi.authors[0] if mi.authors else None)
+                online = _lookup_online_sources()
+                evidence = [metadata_to_evidence(book) for book in online.books]
+                book = api.get_book(title, author, evidence=evidence)
                 logging.info("AI 查询结果：%d 条", 1 if book else 0)
-                return [book] if book else []
+                failures = list(online.failures)
+                if not book:
+                    failures.append(self._refer_failure("ai", "no_result", "AI 未生成可验证的元数据"))
+                return MetadataSearchResult(books=[book] if book else [], failures=failures)
 
             tasks["ai"] = _ai
 
@@ -436,7 +519,7 @@ class BookRefer(BaseHandler):
             title = re.sub("[(（].*", "", mi.title)
             api = baike.BaiduBaikeApi(copy_image=True)
             try:
-                refer_mi = api.get_book(title)
+                refer_mi = api.get_book(title, mi.authors[0] if mi.authors else None, expected_id=provider_value)
             except Exception as e:
                 logging.error("获取百度百科书籍信息失败: %s", e)
                 raise RuntimeError(
@@ -466,13 +549,7 @@ class BookRefer(BaseHandler):
                 logging.error("获取豆瓣书籍信息失败: %s", e)
                 raise RuntimeError({"err": "httprequest.douban.failed", "msg": _("豆瓣接口查询失败")})
         elif provider_key == youshu.KEY:
-            title = re.sub("[(（].*", "", mi.title)
-            api = youshu.YoushuApi(copy_image=True)
-            try:
-                refer_mi = api.get_book(title)
-            except Exception as e:
-                logging.error("获取优书网书籍信息失败：%s", e)
-                raise RuntimeError({"err": "httprequest.youshu.failed", "msg": _("优书网查询失败")})
+            raise RuntimeError({"err": "source.replaced", "msg": _("该固定来源已替换为在线书源，请重新搜索")})
         elif provider_key == tomato.KEY:
             title = re.sub("[(（].*", "", mi.title)
             api = tomato.TomatoNovelApi(copy_image=True)
@@ -504,13 +581,19 @@ class BookRefer(BaseHandler):
                 logging.error("NeoDB query failed: %s", e)
                 raise RuntimeError({"err": "httprequest.neodb.failed", "msg": _("NeoDB查询失败")})
         elif provider_key == biquge.KEY:
-            title = re.sub("[(（].*", "", mi.title)
-            api = biquge.BiqugeApi(copy_image=True)
+            raise RuntimeError({"err": "source.replaced", "msg": _("该固定来源已替换为在线书源，请重新搜索")})
+        elif provider_key == BOOKSOURCE_KEY:
             try:
-                refer_mi = api.get_book(title)
+                sources = collect_metadata_sources(self.session, CONF.get("BOOKSOURCE_METADATA_TOP_K", 10))
+                service = BookSourceMetadataService(
+                    sources,
+                    CONF.get("cookie_secret", "talebook"),
+                    config=CONF,
+                )
+                refer_mi = service.apply(provider_value, self.session, copy_image=True)
             except Exception as e:
-                logging.error("获取笔趣阁书籍信息失败：%s", e)
-                raise RuntimeError({"err": "httprequest.biquge.failed", "msg": _("笔趣阁查询失败")})
+                logging.error("获取在线书源书籍信息失败：%s", e)
+                raise RuntimeError({"err": "httprequest.booksource.failed", "msg": _("在线书源查询失败")})
         elif provider_key == calibre.KEY:
             if mi.isbn:
                 try:
@@ -548,7 +631,14 @@ class BookRefer(BaseHandler):
                 copy_image=True,
             )
             try:
-                refer_mi = api.get_book(title, mi.authors[0] if mi.authors else None)
+                sources = collect_metadata_sources(self.session, CONF.get("BOOKSOURCE_METADATA_TOP_K", 10))
+                online = BookSourceMetadataService(
+                    sources,
+                    CONF.get("cookie_secret", "talebook"),
+                    config=CONF,
+                ).search(title, mi.authors[0] if mi.authors else None)
+                evidence = [metadata_to_evidence(book) for book in online.books]
+                refer_mi = api.get_book(title, mi.authors[0] if mi.authors else None, evidence=evidence)
             except Exception as e:
                 logging.error("获取 AI 书籍信息失败：%s", e)
                 raise RuntimeError(
@@ -595,6 +685,10 @@ class BookRefer(BaseHandler):
             logging.info("[STREAM] 元信息已发送")
 
             async for b in self.plugin_search_books_stream(mi):
+                if isinstance(b, dict) and b.get("event") == "summary":
+                    self.write(json.dumps(b, ensure_ascii=False) + "\n")
+                    await self.flush()
+                    continue
                 d = self._fmt_refer_book(b)
                 if d:
                     self.write(json.dumps(d, ensure_ascii=False) + "\n")
@@ -613,7 +707,7 @@ class BookRefer(BaseHandler):
                 rsp.append(d)
 
         logging.info("成功处理 %d/%d 个书籍信息", len(rsp), len(books))
-        return {"err": "ok", "books": rsp}
+        return {"err": "ok", "books": rsp, "summary": self._refer_summary}
 
     def _fmt_refer_book(self, b):
         keys = [

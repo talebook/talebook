@@ -14,6 +14,7 @@ from webserver.services.booksource.analyze_url import AnalyzeUrl
 from webserver.services.booksource.book_source import BookSource
 from webserver.services.booksource.engine import BookDetail, BookSourceEngine, Chapter
 from webserver.services.booksource.exceptions import JsRuleUnsupported
+from webserver.services.booksource.js_runtime import run_js
 
 
 CASES = os.path.join(os.path.dirname(__file__), "cases", "booksource")
@@ -207,6 +208,9 @@ class TestAnalyzeUrl(unittest.TestCase):
         raw = {"bookSourceUrl": "http://x.com", "bookSourceName": "T"}
         raw.update(kw)
         return BookSource(raw)
+
+    def test_url_js_supports_pure_md5_helper(self):
+        self.assertEqual(run_js("java.md5Encode('abc')"), "900150983cd24fb0d6963f7d28e17f72")
 
     def test_variable_substitution_and_relative(self):
         sess = FakeSession({"/search": "<html>ok</html>"})

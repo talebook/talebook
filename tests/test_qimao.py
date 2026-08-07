@@ -63,6 +63,37 @@ QIMAO_SEARCH_RESPONSE = {
     },
 }
 
+QIMAO_CURRENT_SEARCH_RESPONSE = {
+    "code": 0,
+    "data": {
+        "books": [
+            {
+                "id": QIMAO_BOOK_ID,
+                "title": "斗破苍穹",
+                "author": "天蚕土豆",
+                "intro": "这里是属于斗气的世界。",
+                "image_link": "https://example.com/current-cover.jpg",
+                "ptags": ["玄幻", "热血"],
+            }
+        ]
+    },
+}
+
+QIMAO_CURRENT_DETAIL_RESPONSE = {
+    "code": 0,
+    "data": {
+        "book": {
+            "id": QIMAO_BOOK_ID,
+            "title": "斗破苍穹",
+            "author": "天蚕土豆",
+            "intro": "这里是属于斗气的世界，没有花俏艳丽的魔法。",
+            "image_link": "https://example.com/current-cover.jpg",
+            "category1_name": "玄幻",
+            "category2_name": "东方玄幻",
+        }
+    },
+}
+
 
 class TestSignUtils(unittest.TestCase):
     """签名工具函数测试"""
@@ -145,6 +176,17 @@ class TestQimaoNovelApi(unittest.TestCase):
         self.assertEqual(results, [])
 
     @mock.patch("webserver.plugins.meta.qimao.api.requests.get")
+    def test_search_books_current_schema(self, mk):
+        """兼容线上 data.books 与 id 字段。"""
+        response = mock.Mock(status_code=200)
+        response.json.return_value = QIMAO_CURRENT_SEARCH_RESPONSE
+        mk.return_value = response
+
+        results = QimaoNovelApi(copy_image=False).search_books("斗破苍穹")
+
+        self.assertEqual(results[0]["id"], QIMAO_BOOK_ID)
+
+    @mock.patch("webserver.plugins.meta.qimao.api.requests.get")
     def test_search_books_exception(self, mk):
         """测试搜索网络异常"""
         mk.side_effect = Exception("网络错误")
@@ -209,6 +251,24 @@ class TestQimaoNovelApi(unittest.TestCase):
         api = QimaoNovelApi(copy_image=False)
         mi = api.get_book_by_id("invalid_id")
         self.assertIsNone(mi)
+
+    @mock.patch("webserver.plugins.meta.qimao.api.requests.get")
+    def test_get_book_current_schema(self, mk):
+        """当前搜索与详情结构应完整映射标题、作者、简介、封面和分类。"""
+        search_response = mock.Mock(status_code=200)
+        search_response.json.return_value = QIMAO_CURRENT_SEARCH_RESPONSE
+        detail_response = mock.Mock(status_code=200)
+        detail_response.json.return_value = QIMAO_CURRENT_DETAIL_RESPONSE
+        mk.side_effect = [search_response, detail_response]
+
+        mi = QimaoNovelApi(copy_image=False).get_book("斗破苍穹", "天蚕土豆")
+
+        self.assertIsNotNone(mi)
+        self.assertEqual(mi.title, "斗破苍穹")
+        self.assertEqual(mi.authors, ["天蚕土豆"])
+        self.assertEqual(mi.comments, "这里是属于斗气的世界，没有花俏艳丽的魔法。")
+        self.assertEqual(mi.cover_url, "https://example.com/current-cover.jpg")
+        self.assertEqual(mi.tags, ["玄幻", "东方玄幻"])
 
     @mock.patch("webserver.plugins.meta.qimao.api.requests.get")
     def test_get_book_exact_match(self, mk):

@@ -67,6 +67,16 @@ test.describe('Book Detail Page', () => {
         expect(undefinedBookRequests).toEqual([]);
     });
 
+    test('keeps successful metadata results when another source fails', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await page.getByRole('button', { name: '管理' }).click();
+        await page.getByText('从互联网更新信息').click();
+
+        await expect(page.getByText('Mock Metadata Result')).toBeVisible();
+        await expect(page.getByText(/Online Source B/)).toBeVisible();
+        await expect(page.getByText(/其余结果仍可正常使用/)).toBeVisible();
+    });
+
     test('opens the unified conversion dialog for a TXT book', async ({ page }) => {
         await page.goto('/book/2');
         await page.getByText('文件处理').click();

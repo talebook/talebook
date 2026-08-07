@@ -647,6 +647,9 @@ class TestProxyImageWhitelist(unittest.TestCase):
     def test_deep_subdomain_allowed(self):
         self.assertTrue(self.handler.is_whitelist("a.b.doubanio.com"))
 
+    def test_builtin_qimao_cover_cdn_allowed(self):
+        self.assertTrue(self.handler.is_whitelist("cdn.wtzw.com"))
+
     def test_suffix_bypass_blocked(self):
         """attackerbcebos.com 以 bcebos.com 结尾，但不是合法子域名，必须被拒绝"""
         self.assertFalse(self.handler.is_whitelist("attackerbcebos.com"))

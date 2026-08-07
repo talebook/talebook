@@ -128,11 +128,14 @@ settings = {
     'douban_max_count'  : 2,
     'auto_fill_meta'    : False,
     'auto_fill_keep_cover': True,
-    'META_SELECTED_SOURCES': ["douban", "baidu", "google", "amazon", "xinhua"],
+    'META_SELECTED_SOURCES': ["douban", "baidu", "google", "amazon", "xinhua", "booksource"],
     'ai_api_url'        : "https://api.openai.com/v1/chat/completions",
     'ai_api_key'        : "",
     'ai_model'          : "gpt-3.5-turbo",
     'ai_use_thinking'   : False,
+    'BOOKSOURCE_METADATA_TOP_K': 10,
+    'BOOKSOURCE_METADATA_WORKERS': 6,
+    'BOOKSOURCE_METADATA_TOKEN_TTL': 3600,
 
     'avatar_service'    : "https://cravatar.cn",
 
