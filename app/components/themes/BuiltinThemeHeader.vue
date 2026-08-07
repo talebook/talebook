@@ -330,6 +330,9 @@ const navItems = computed(() => {
         items.push({ key: 'network', icon: 'mdi-cloud-search', href: '/network', text: t('navigation.networkLibrary') });
     }
     items.push({ key: 'audios', icon: 'mdi-book-music', href: '/audios', text: t('navigation.audiobooks'), badge: t('audiobook.beta') });
+    if (store.user.is_login) {
+        items.push({ key: 'shelf', icon: 'mdi-bookshelf', href: '/user/shelf', text: t('navigation.myShelf') });
+    }
     if (store.user.is_admin) {
         items.push({
             key: 'admin',

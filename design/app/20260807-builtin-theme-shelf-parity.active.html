@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>内置主题“我的书架”导航一致性修复</title>
+  <style>
+    :root { color-scheme:light; --ink:#172033; --muted:#59677c; --line:#dbe2ea; --paper:#fff; --bg:#f4f6f8; --accent:#7b3f16; --soft:#fbefe7; --ok:#187451; --pending:#9a6700; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; }
+    main { width:min(1040px,calc(100% - 32px)); margin:32px auto 64px; }
+    header,section { margin-bottom:18px; padding:25px 29px; border:1px solid var(--line); border-radius:14px; background:var(--paper); }
+    header { border-top:5px solid var(--accent); }
+    h1 { margin:0 0 8px; font-size:29px; }
+    h2 { margin:0 0 12px; font-size:20px; }
+    h3 { margin:0 0 7px; font-size:16px; }
+    p,ul { margin:8px 0; }
+    code { padding:2px 5px; border-radius:5px; background:#eef1f5; }
+    .lead { color:var(--muted); font-size:16px; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .tag { padding:4px 10px; border-radius:999px; color:var(--muted); background:#eef1f5; font-size:13px; }
+    .status { color:var(--ok); background:#e3f5ec; font-weight:700; }
+    .callout { padding:13px 16px; border-left:4px solid var(--accent); background:var(--soft); }
+    .compare { display:grid; grid-template-columns:1fr 52px 1fr; align-items:stretch; gap:8px; margin:18px 0; }
+    .panel { padding:16px; border:1px solid var(--line); border-radius:10px; background:#fafbfc; }
+    .arrow { display:grid; place-items:center; color:var(--accent); font-size:25px; }
+    .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:18px; }
+    .flow article { padding:15px; border-top:4px solid var(--accent); background:#fafbfc; }
+    .flow span { color:var(--accent); font:700 12px/1.2 ui-monospace,monospace; }
+    table { width:100%; border-collapse:collapse; margin-top:14px; }
+    th,td { padding:10px 12px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f7f8fa; }
+    .pending { color:var(--pending); font-weight:700; }
+    .passed { color:var(--ok); font-weight:700; }
+    footer { color:var(--muted); text-align:center; font-size:13px; }
+    @media (max-width:760px) { main{width:min(100% - 20px,1040px);margin-top:10px} header,section{padding:20px} .compare,.flow{grid-template-columns:1fr} .arrow{transform:rotate(90deg)} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>内置主题“我的书架”导航一致性修复</h1>
+    <p class="lead">让所有非默认内置主题与默认主题保持一致：已登录用户可在左侧栏进入“我的书架”，游客不显示该入口；同时确认系统设置保存不会再清除当前激活主题。</p>
+    <div class="meta">
+      <span class="tag status">状态：ACTIVE</span>
+      <span class="tag">创建日期：2026-08-07</span>
+      <span class="tag">所属模块：app</span>
+      <span class="tag">影响范围：内置主题共享导航、前端回归测试</span>
+      <span class="tag">需求来源：TAL-6 / GitHub Issue #941</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>原始诉求与根因</h2>
+    <p>Issue #941 报告两个问题：非默认主题左侧栏缺少“我的书架”；激活非默认主题后，再次保存系统设置会恢复默认主题。</p>
+    <div class="compare" aria-label="默认主题和非默认内置主题导航差异">
+      <article class="panel"><h3>默认主题</h3><p><code>AppHeader.vue</code> 会在 <code>store.user.is_login</code> 为真时加入 <code>/user/shelf</code>。</p></article>
+      <div class="arrow">→</div>
+      <article class="panel"><h3>非默认内置主题</h3><p>五个主题共用 <code>BuiltinThemeHeader.vue</code>，其 <code>navItems</code> 未加入书架项，属于导航定义遗漏。</p></article>
+    </div>
+    <div class="callout">设置保存问题已由当前基线的 <code>design/webserver/20260806-admin-settings-preserve-config.active.html</code> 修复：保存候选以完整 <code>CONF</code> 为基线，页面仅覆盖白名单字段，因此 <code>ACTIVE_THEME</code> 会保留。此次不重复修改后端，只执行针对性回归验证。</div>
+  </section>
+
+  <section>
+    <h2>目标、边界与决策</h2>
+    <ul>
+      <li>浅灰、极简、石墨、黄铜、暖红五个非默认内置主题均显示相同的书架入口。</li>
+      <li>入口只对已登录用户显示，使用既有文案 <code>navigation.myShelf</code>、图标 <code>mdi-bookshelf</code> 和路径 <code>/user/shelf</code>。</li>
+      <li>位置与默认主题一致：在书库/有声书入口之后、管理员入口之前。</li>
+      <li>不改变默认主题、不调整书架页面或权限接口、不重构整个导航模型。</li>
+      <li>不把 <code>ACTIVE_THEME</code> 暴露为管理员设置页面可写字段；保留应继续由服务端完整候选机制保证。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>实现与验证路径</h2>
+    <div class="flow" aria-label="修复流程">
+      <article><span>01 · NAV</span><h3>补齐入口</h3><p>在共享 <code>navItems</code> 中按登录态插入书架项，一次覆盖五个主题。</p></article>
+      <article><span>02 · COMPONENT</span><h3>组件回归</h3><p>分别断言游客隐藏、登录用户显示，并核对链接目标。</p></article>
+      <article><span>03 · SETTINGS</span><h3>持久化回归</h3><p>运行现有后端测试，确认保存配置前后的 <code>ACTIVE_THEME</code> 均为原值。</p></article>
+      <article><span>04 · RENDER</span><h3>实际渲染</h3><p>连接真实 Docker 后端，在桌面 Chrome 验证非默认主题侧栏与设置保存后的主题状态。</p></article>
+    </div>
+  </section>
+
+  <section>
+    <h2>测试与验收结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>预期</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td><code>npx vitest run test/components/BuiltinThemeHeader.spec.ts --reporter=dot</code></td><td>1 个文件、12 个用例通过；参数化覆盖浅灰、极简、石墨、黄铜、暖红五个主题，另覆盖游客隐藏和既有导航行为。</td><td class="passed">通过</td></tr>
+        <tr><td>Docker 后端定向回归</td><td><code>test_settings_update_preserves_internal_settings</code> 与 <code>test_settings_saver_persists_complete_candidate</code> 共 2 个用例通过，确认 <code>ACTIVE_THEME</code> 在接口返回与落盘配置中保持不变。</td><td class="passed">通过</td></tr>
+        <tr><td><code>npm run lint</code></td><td>退出码 0；0 个 error、193 个仓库既有 warning，本次变更未新增错误。</td><td class="passed">通过</td></tr>
+        <tr><td><code>npm run build</code></td><td>Nuxt 客户端、SSR 服务端和 Nitro 产物构建完成；仅有既有 Browserslist 数据与大 chunk 提示。</td><td class="passed">通过</td></tr>
+        <tr><td><code>make check-design</code></td><td>方案路径、ACTIVE 状态、HTML 与单文件资源约束通过。</td><td class="passed">通过</td></tr>
+        <tr><td>真实 Docker 后端 + Chromium 渲染</td><td>1440×900 桌面视口中，浅灰主题侧栏显示“我的书架”且目标为 <code>/user/shelf</code>；系统设置原样保存后，<code>/api/themes/active</code> 仍返回 <code>light-gray</code>，页面保留对应主题类，控制台与页面错误均为 0。截图：<code>document/screenshots/builtin-theme-shelf-parity/light-gray-shelf.png</code>。</td><td class="passed">通过</td></tr>
+      </tbody>
+    </table>
+    <p><strong>剩余风险：</strong>真实浏览器只抽验浅灰主题；五个非默认主题复用同一个 <code>BuiltinThemeHeader.vue</code>，其余四个主题由同一组件的参数化测试覆盖。真实后端容器启动时暴露了基线镜像对应用目录原子写入权限不足的问题，本次仅为临时验收容器补充目录写权限，未把该无关镜像问题纳入本修复。</p>
+  </section>
+
+  <footer>Talebook 内部开发方案 · ACTIVE · TAL-6 / GitHub Issue #941</footer>
+</main>
+</body>
+</html>
