@@ -4,7 +4,7 @@
 import os
 from unittest import mock
 
-from webserver import loader
+from webserver import loader, main
 from webserver.handlers import admin
 
 
@@ -84,3 +84,20 @@ def test_settings_dumpfile_replace_failure_is_atomic(tmp_path):
     assert path.read_text(encoding="utf-8") == "original config\n"
     assert sorted(item.name for item in tmp_path.iterdir()) == ["auto.py"]
     assert remove.called
+
+
+def test_update_config_passes_current_settings_to_nuxt_writer():
+    previous_update_config = main.options.update_config
+    main.options.update_config = True
+    try:
+        with mock.patch.object(admin.SettingsSaverLogic, "update_nuxtjs_env") as update_nuxtjs_env:
+            try:
+                main.make_app()
+            except SystemExit as exc:
+                assert exc.code == 0
+            else:
+                raise AssertionError("--update-config must exit after updating the Nuxt environment")
+    finally:
+        main.options.update_config = previous_update_config
+
+    update_nuxtjs_env.assert_called_once_with(main.CONF)

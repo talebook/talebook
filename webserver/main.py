@@ -202,7 +202,7 @@ def make_app():
         from webserver.handlers.admin import SettingsSaverLogic
 
         logic = SettingsSaverLogic()
-        logic.update_nuxtjs_env()
+        logic.update_nuxtjs_env(CONF)
         logging.info("done")
         sys.exit(0)
 

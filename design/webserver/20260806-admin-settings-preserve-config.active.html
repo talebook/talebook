@@ -91,12 +91,13 @@
         <tr><td>允许字段更新</td><td><code>site_title</code> 等白名单字段在返回值、运行态和磁盘候选中更新。</td><td class="passed">通过：运行态与 <code>auto.py</code> 均为新值。</td></tr>
         <tr><td>危险字段</td><td>请求中的 <code>user_database</code>、<code>ACTIVE_THEME</code>、未知键及恶意动态键不能覆盖服务端既有值。</td><td class="passed">通过：Docker 中的 HTTP 集成用例已覆盖。</td></tr>
         <tr><td>落盘失败</td><td>模拟原子替换失败，原 <code>auto.py</code> 内容与 <code>CONF</code> 均不改变，临时文件被清理。</td><td class="passed">通过：失败回滚与原子替换测试。</td></tr>
-        <tr><td>回归与规范</td><td>Docker 全量 pytest、Python lint/format、<code>make check-design</code>。</td><td class="passed">全量测试与 Ruff 已通过；方案检查见执行记录。</td></tr>
+        <tr><td>回归与规范</td><td>Docker 全量 pytest、<code>production-spa</code> 镜像构建、Python lint/format、<code>make check-design</code>。</td><td class="passed">全量测试、生产镜像构建与 Ruff 已通过；方案检查见执行记录。</td></tr>
       </tbody>
     </table>
     <h3>实际执行记录</h3>
     <ul>
-      <li><code>sudo make test</code> — <strong>通过</strong>：按项目 <code>AGENTS.md</code> 构建 Docker 测试镜像并执行全量 pytest，结果为 806 passed、20 skipped、21 warnings，耗时 70.46 秒；其中 <code>tests/test_admin.py</code> 与 <code>tests/test_settings_persistence.py</code> 均通过。</li>
+      <li><code>sudo make test</code> — <strong>通过</strong>：按项目 <code>AGENTS.md</code> 构建 Docker 测试镜像并执行全量 pytest，结果为 807 passed、20 skipped、21 warnings，耗时 73.26 秒；其中 <code>tests/test_admin.py</code> 与包含 <code>--update-config</code> 回归用例的 <code>tests/test_settings_persistence.py</code> 均通过。</li>
+      <li><code>sudo docker build --build-arg GIT_VERSION=v26.08.03-18-g17f561b6 --target production-spa --platform linux/amd64 -t talebook/ci-fix-production-spa .</code> — <strong>通过</strong>：未修改 Dockerfile，生产镜像初始化中的 <code>python3 server.py --update-config</code> 正常完成。</li>
       <li>在同一 Docker 测试镜像中执行 <code>make lint-py-fix</code> — <strong>通过</strong>：All checks passed，100 files left unchanged。</li>
       <li>在同一 Docker 测试镜像中执行 <code>make lint-py</code> — <strong>通过</strong>：All checks passed，100 files already formatted。</li>
       <li><code>make check-design</code> — <strong>通过</strong>。</li>
