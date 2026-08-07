@@ -246,15 +246,15 @@
       <li><span class="badge pass">通过</span><span>确定性的 <code>versions/job-{id}</code> 与 <code>manifests/job-{id}.v2.json</code> 可幂等重放；只有 finalize 数据库事务更新当前指针。</span></li>
       <li><span class="badge pass">通过</span><span>单章选择、整本章节集合、终态章节下限、资产存在性和路径越界均有硬失败测试；无效 manifest 在重试前归档。</span></li>
       <li><span class="badge pass">通过</span><span>现有创建修订、编辑剧本、候选发布、历史回滚与备份清理用例与可靠性用例合计 29 项全部通过。</span></li>
-      <li><span class="badge pass">通过</span><span>完整后端测试 810 passed、16 skipped；Python 格式化与 lint 通过；方案门禁通过。</span></li>
+      <li><span class="badge pass">通过</span><span>合并最新 master 后完整后端测试 819 passed、20 skipped；Python 格式化与 lint 通过；方案门禁通过。</span></li>
     </ul>
     <h3>实际命令与结果</h3>
     <ul>
       <li><code>docker run … talebook/test pytest -q tests/test_audiobook_reliability.py</code>：14 passed。</li>
       <li><code>docker run … talebook/test pytest -q tests/test_audiobook_reliability.py tests/test_audiobook.py</code>：29 passed。</li>
       <li><code>docker run … talebook/test make lint-py-fix</code> 与 <code>make lint-py</code>：通过，102 个后端文件格式一致。</li>
-      <li><code>docker run … talebook/test make pytest</code>：810 passed、16 skipped、31 warnings，耗时 69.40 秒；skip 和 warning 均为仓库既有环境型/弃用项，没有相关失败。</li>
-      <li><code>make check-design</code>：通过，方案路径、ACTIVE 状态、HTML 结构和单文件资源约束合格。</li>
+      <li><code>docker run … talebook/test make pytest</code>：合并最新 master 后为 819 passed、20 skipped、31 warnings，耗时 54.93 秒；skip 和 warning 均为仓库既有环境型/弃用项，没有相关失败。</li>
+      <li><code>make check-design</code>：91 份方案通过，路径、ACTIVE 状态、HTML 结构和单文件资源约束合格。</li>
     </ul>
     <p class="small">本次仅修改后端修订产物生命周期，API 与界面无变化，因此无需新增前端截图或浏览器渲染验收。未重新调用真实 EdgeTTS：语音内容与 Voicebook 生成契约未改变；专项测试使用真实文件系统、SQLite 事务和受控 Voicebook 进程返回值覆盖中断窗口。</p>
   </section>
