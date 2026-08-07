@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>管理员设置保存保留内部配置</title>
+  <style>
+    :root { color-scheme:light; --ink:#172033; --muted:#5b6a80; --line:#dce3ec; --paper:#fff; --bg:#f4f6f9; --accent:#2457c5; --soft:#eaf0ff; --ok:#187a5c; --warn:#9a6700; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1040px,calc(100% - 32px)); margin:32px auto 64px; }
+    header,section { margin-bottom:18px; padding:24px 28px; border:1px solid var(--line); border-radius:14px; background:var(--paper); }
+    header { border-top:5px solid var(--accent); }
+    h1 { margin:0 0 8px; font-size:28px; }
+    h2 { margin:0 0 12px; font-size:20px; }
+    h3 { margin:18px 0 8px; font-size:16px; }
+    p,ul,ol { margin:8px 0; }
+    code { padding:2px 5px; border-radius:5px; background:#eef1f5; }
+    .lead { color:var(--muted); font-size:16px; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .tag { padding:4px 10px; border-radius:999px; color:var(--muted); background:#eef1f5; font-size:13px; }
+    .status { color:var(--ok); background:#e3f5ec; font-weight:700; }
+    .callout { padding:12px 15px; border-left:4px solid var(--accent); background:var(--soft); }
+    .flow { display:grid; grid-template-columns:1fr 34px 1fr 34px 1fr 34px 1fr; align-items:center; gap:6px; margin:16px 0; }
+    .node { min-height:108px; padding:13px; border:1px solid var(--line); border-radius:10px; background:#fafbfc; }
+    .arrow { color:var(--accent); text-align:center; font-size:22px; }
+    table { width:100%; border-collapse:collapse; margin:12px 0; }
+    th,td { padding:9px 11px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f7f8fa; }
+    .passed { color:var(--ok); font-weight:700; }
+    .limited { color:var(--warn); font-weight:700; }
+    footer { color:var(--muted); text-align:center; font-size:13px; }
+    @media (max-width:780px) { main{width:min(100% - 20px,1040px);margin-top:10px} header,section{padding:20px} .flow{grid-template-columns:1fr} .arrow{transform:rotate(90deg)} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>管理员设置保存保留内部配置</h1>
+    <p class="lead">修复系统配置页面只保存页面白名单字段、导致 MariaDB 连接串、已激活主题等内部配置从 <code>auto.py</code> 消失的问题，同时保持接口写入白名单，并让失败保存不提前污染运行态或留下半写文件。</p>
+    <div class="meta">
+      <span class="tag status">状态：ACTIVE</span>
+      <span class="tag">创建日期：2026-08-06</span>
+      <span class="tag">所属模块：webserver</span>
+      <span class="tag">影响范围：AdminSettings、SettingsLoader、配置落盘</span>
+      <span class="tag">需求来源：Multica TAL-5 / GitHub Issue #944</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>原始诉求与复现</h2>
+    <p>管理员保存任意系统配置后，现有 MariaDB <code>user_database</code> 会在重启或重新加载时恢复为默认 SQLite；<code>ACTIVE_THEME</code> 等不由该页面编辑的配置也会丢失。接口目前新建 <code>SettingsLoader</code> 后立即 <code>clear()</code>，再仅写入请求中的白名单字段，因此生成的 <code>auto.py</code> 只剩本次页面提交内容。</p>
+    <div class="callout">基线复现：只提交 <code>site_title</code> 后，生成文件仅包含 <code>installed</code> 与 <code>site_title</code>，不再包含 <code>user_database</code> 或 <code>ACTIVE_THEME</code>。</div>
+  </section>
+
+  <section>
+    <h2>目标与边界</h2>
+    <ul>
+      <li>以当前服务端完整配置为保存候选，只覆盖明确列入页面白名单或合法 <code>SOCIAL_AUTH_*</code> 模式的请求字段。</li>
+      <li>保存后 MariaDB 连接、激活主题及其它非页面配置在运行态和重新加载后保持不变。</li>
+      <li>未知字段、非完整匹配的动态键和 Python 语法型恶意键继续被忽略，不能借“保留配置”扩大客户端可写范围。</li>
+      <li><code>auto.py</code> 使用同目录临时文件、刷新并 <code>fsync</code> 后通过 <code>os.replace</code> 原子替换；异常时清理临时文件并保留原文件。</li>
+      <li>所有持久化步骤成功后才更新 <code>CONF</code>；失败响应不能留下候选运行态。</li>
+    </ul>
+    <p><strong>非目标：</strong>不重构设置页面、不改变数据库迁移流程、不新增可编辑配置项，也不把所有任意 <code>CONF</code> 键开放给请求。</p>
+  </section>
+
+  <section>
+    <h2>方案</h2>
+    <div class="flow" aria-label="配置保存流程">
+      <div class="node"><strong>读取基线</strong><br>加载默认、<code>auto.py</code> 与本地覆盖，得到完整候选。</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>过滤覆盖</strong><br>仅把白名单字段和严格匹配的社交登录键写入候选。</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>安全落盘</strong><br>派生 Nuxt 环境文件并原子写入 <code>auto.py</code>；后一步失败时恢复前一步。</div>
+      <div class="arrow">→</div>
+      <div class="node"><strong>提交运行态</strong><br>磁盘步骤全部成功后，以完整候选更新 <code>CONF</code>。</div>
+    </div>
+    <h3>保留与授权分离</h3>
+    <p>“保留已有键”是服务端基线行为；“允许客户端修改键”仍由现有 <code>KEYS</code> 与锚定的 <code>SOCIAL_AUTH_SETTING_RE</code> 决定。请求中的 <code>user_database</code>、<code>ACTIVE_THEME</code> 或构造动态键不会进入覆盖循环，但服务端已经持有的同名配置会原样留在候选中。</p>
+    <h3>失败一致性</h3>
+    <p><code>SettingsSaverLogic</code> 不再在写盘前调用 <code>CONF.update()</code>。Nuxt 环境文件按候选配置生成并保留旧快照；随后原子写入 <code>auto.py</code>。若第二步失败，使用旧快照恢复 Nuxt 环境文件；无论哪一步失败，均不提交运行态。单个配置文件的替换使用同目录临时文件，避免跨文件系统替换和进程中断导致截断。</p>
+  </section>
+
+  <section>
+    <h2>测试与验收结果</h2>
+    <table>
+      <thead><tr><th>场景</th><th>断言</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td>保留内部配置</td><td>保存白名单字段后，落盘并重新加载仍保留 <code>user_database</code>、<code>ACTIVE_THEME</code> 和其它既有键。</td><td class="passed">通过：纯持久化测试与 Docker HTTP 集成测试。</td></tr>
+        <tr><td>允许字段更新</td><td><code>site_title</code> 等白名单字段在返回值、运行态和磁盘候选中更新。</td><td class="passed">通过：运行态与 <code>auto.py</code> 均为新值。</td></tr>
+        <tr><td>危险字段</td><td>请求中的 <code>user_database</code>、<code>ACTIVE_THEME</code>、未知键及恶意动态键不能覆盖服务端既有值。</td><td class="passed">通过：Docker 中的 HTTP 集成用例已覆盖。</td></tr>
+        <tr><td>落盘失败</td><td>模拟原子替换失败，原 <code>auto.py</code> 内容与 <code>CONF</code> 均不改变，临时文件被清理，且已转移所有权的文件描述符不会被重复关闭。</td><td class="passed">通过：失败回滚、原子替换与文件描述符所有权测试。</td></tr>
+        <tr><td>回归与规范</td><td>Docker 全量 pytest、<code>production-spa</code> 镜像构建、Python lint/format、<code>make check-design</code>。</td><td class="passed">全量测试、生产镜像构建与 Ruff 已通过；方案检查见执行记录。</td></tr>
+      </tbody>
+    </table>
+    <h3>实际执行记录</h3>
+    <ul>
+      <li><code>sudo make test</code> — <strong>通过</strong>：按项目 <code>AGENTS.md</code> 构建 Docker 测试镜像并执行全量 pytest，结果为 808 passed、20 skipped、20 warnings，耗时 68.83 秒；其中 <code>tests/test_admin.py</code> 与包含 <code>--update-config</code>、原子替换及文件描述符所有权回归用例的 <code>tests/test_settings_persistence.py</code> 均通过。</li>
+      <li><code>sudo docker build --build-arg GIT_VERSION=v26.08.03-19-g6a9c788a-dirty --target production-spa --platform linux/amd64 -t talebook/ci-review-production-spa .</code> — <strong>通过</strong>：未修改 Dockerfile，生产镜像初始化中的 <code>python3 server.py --update-config</code> 正常完成。</li>
+      <li>在同一 Docker 测试镜像中执行 <code>make lint-py-fix</code> — <strong>通过</strong>：All checks passed，100 files left unchanged。</li>
+      <li>在同一 Docker 测试镜像中执行 <code>make lint-py</code> — <strong>通过</strong>：All checks passed，100 files already formatted。</li>
+      <li><code>make check-design</code> — <strong>通过</strong>。</li>
+    </ul>
+    <p>剩余风险：测试会保存并重新加载 MariaDB 连接串，但未连接真实 MariaDB 服务或在真实数据库进程上执行重启回归。Docker 中已覆盖 Tornado + Calibre 的管理员 HTTP 保存路径、纯逻辑、持久化文件内容、运行态提交顺序、失败回滚和原子替换。</p>
+  </section>
+
+  <footer>Talebook 内部开发方案 · ACTIVE · TAL-5 / GitHub Issue #944</footer>
+</main>
+</body>
+</html>
