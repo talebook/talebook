@@ -93,6 +93,43 @@ test.describe('Audiobook production and playback', () => {
         await expect(page.getByTestId('audiobook-player')).toContainText('第一章 雾中的来客');
     });
 
+    test('deletes the entire audiobook while keeping the ebook', async ({ page, request }) => {
+        const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+        await request.post(`${mockApi}/_test/reset`, {
+            data: { installed: true, audiobookVersions: true },
+        });
+        await request.post(`${mockApi}/api/book/1/audio-jobs`, {
+            data: { mode: 'quick', engine: 'edgetts', speed: 'x1.0' },
+        });
+        await page.goto('/book/1/audios');
+
+        await page.getByTestId('play-audiobook').click();
+        await expect(page.getByTestId('audiobook-player')).toBeVisible();
+        await expect.poll(async () => page.evaluate(() => Boolean(localStorage.getItem('talebook:audiobook-player:v1')))).toBe(true);
+
+        await page.getByTestId('delete-audiobook').click();
+        const dialog = page.getByTestId('delete-audiobook-dialog');
+        await expect(dialog).toContainText('所有有声版本、历史、处理任务、剧本、日志和收听记录都会永久删除');
+        await expect(dialog).toContainText('正文书籍《百年孤独》及其电子书文件会保留');
+        await dialog.getByRole('button', { name: '取消' }).click();
+        await expect(dialog).toHaveCount(0);
+        await expect(page.locator('.chapter-list').getByText('第一章 雾中的来客')).toBeVisible();
+
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.getByTestId('delete-audiobook').click();
+        await expect(dialog).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+        await page.getByTestId('confirm-delete-audiobook').click();
+
+        await expect(dialog).toHaveCount(0);
+        await expect(page.getByText('这本书还没有可收听版本')).toBeVisible();
+        await expect(page.getByTestId('delete-audiobook')).toHaveCount(0);
+        await expect(page.getByTestId('audiobook-player')).toHaveCount(0);
+        await expect.poll(async () => page.evaluate(() => localStorage.getItem('talebook:audiobook-player:v1'))).toBeNull();
+        const jobs = await request.get(`${mockApi}/api/audio-jobs`);
+        expect((await jobs.json()).jobs).toEqual([]);
+    });
+
     test('reviews characters and chapter text in advanced mode', async ({ page }) => {
         await page.goto('/book/1/audios');
         await page.getByTestId('generate-audiobook').click();

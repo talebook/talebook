@@ -92,6 +92,16 @@
                         >
                             {{ t('audiobook.createRevision') }}
                         </v-btn>
+                        <v-btn
+                            v-if="canDeleteAudiobook"
+                            color="error"
+                            variant="text"
+                            prepend-icon="mdi-delete-outline"
+                            data-testid="delete-audiobook"
+                            @click="deleteDialog = true"
+                        >
+                            {{ t('audiobook.deleteAudiobook') }}
+                        </v-btn>
                     </div>
                 </div>
             </section>
@@ -280,6 +290,48 @@
         </template>
 
         <v-dialog
+            v-model="deleteDialog"
+            max-width="560"
+        >
+            <v-card
+                class="delete-dialog"
+                data-testid="delete-audiobook-dialog"
+            >
+                <v-card-title>{{ t('audiobook.deleteAudiobookTitle') }}</v-card-title>
+                <v-card-text>
+                    <p>{{ t('audiobook.deleteAudiobookWarning') }}</p>
+                    <v-alert
+                        type="info"
+                        variant="tonal"
+                        density="compact"
+                        class="mt-4"
+                    >
+                        {{ t('audiobook.deleteAudiobookBookPreserved', { title: detail?.book?.title || '' }) }}
+                    </v-alert>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn
+                        variant="text"
+                        :disabled="deleting"
+                        @click="deleteDialog = false"
+                    >
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                    <v-btn
+                        color="error"
+                        variant="flat"
+                        :loading="deleting"
+                        data-testid="confirm-delete-audiobook"
+                        @click="deleteAudiobook"
+                    >
+                        {{ t('audiobook.deleteAudiobookConfirm') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog
             v-model="generationDialog"
             :max-width="generation.mode === 'advanced' ? 860 : 720"
         >
@@ -459,9 +511,11 @@ const { $backend, $alert } = useNuxtApp();
 const { t } = useI18n();
 const bookId = Number(route.params.bid);
 const generationDialog = ref(false);
+const deleteDialog = ref(false);
 const submitting = ref(false);
 const revisingEditionId = ref<number | null>(null);
 const cleaningBackups = ref(false);
+const deleting = ref(false);
 const selectedEditionId = ref<number | null>(null);
 const voiceCatalog = ref<any[]>([]);
 const generation = reactive({
@@ -492,6 +546,9 @@ const historicalEditions = computed(() => managedEditions.value.filter((item: an
 const backupRetention = computed(() => Number(detail.value?.backup_retention ?? 3));
 const expiredBackupCount = computed(() => Math.max(0, historicalEditions.value.length - backupRetention.value));
 const canGenerate = computed(() => Boolean(detail.value?.generation?.can_generate));
+const canDeleteAudiobook = computed(() => Boolean(
+    detail.value?.generation?.can_manage && detail.value?.editions?.length,
+));
 const voiceItems = computed(() => voiceCatalog.value
     .filter(item => item.engine === generation.engine)
     .map(item => ({ title: item.name || item.voice_id, value: item.voice_id })));
@@ -572,6 +629,29 @@ async function cleanupBackups() {
     }
 }
 
+async function deleteAudiobook() {
+    deleting.value = true;
+    try {
+        const response = await $backend(`/book/${bookId}/audios`, { method: 'DELETE' });
+        if (response.err !== 'ok' && response.err !== 'audiobook.cleanup_failed') {
+            $alert('error', response.msg || t('audiobook.deleteAudiobookFailed'));
+            return;
+        }
+        if (player.book?.id === bookId) player.close();
+        deleteDialog.value = false;
+        $alert(
+            response.err === 'ok' ? 'success' : 'error',
+            response.err === 'ok' ? t('audiobook.deleteAudiobookSuccess') : response.msg,
+        );
+        await refresh();
+    } catch (error) {
+        const message = error instanceof Error && error.message ? error.message : t('audiobook.deleteAudiobookFailed');
+        $alert('error', message);
+    } finally {
+        deleting.value = false;
+    }
+}
+
 async function changeEdition(edition: any, action: 'publish' | 'rollback' | 'delete') {
     let allowPartial = false;
     if (edition.status === 'partial' && action === 'publish') {
@@ -635,6 +715,7 @@ useHead({ title: () => detail.value?.book?.title || t('audiobook.libraryTitle') 
 .chapter-list :deep(.v-list-item:last-child) { border-bottom: 0; }
 .chapter-active { background: rgba(217,154,43,.1); }
 .chapter-number { margin-right: 18px; color: #ad7418; font: 700 1.25rem Georgia, serif; }
+.delete-dialog { border-top: 5px solid rgb(var(--v-theme-error)); }
 .generation-dialog { border-top: 5px solid #d99a2b; }
 .advanced-entry { position: relative; overflow: hidden; margin-bottom: 22px; padding: 24px; color: #fffaf0; background: radial-gradient(circle at 92% 8%, rgba(241,185,87,.2), transparent 34%), linear-gradient(135deg, #132131, #263b48 58%, #42301f); border-radius: 20px; }
 .advanced-kicker { margin-bottom: 6px; color: #f1b957; font-size: .72rem; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
