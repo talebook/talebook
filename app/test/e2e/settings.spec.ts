@@ -79,6 +79,17 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
         await expect(page.locator('.settings-nav-item.active')).toHaveText('互联网书籍信息源');
     });
 
+    test('元数据来源保留百度百科并使用在线书源替代固定站点', async ({ page }) => {
+        await page.goto('/admin/settings');
+        await expect(page.locator('.loading-page')).toBeHidden();
+
+        await page.locator('#sec-bookInfoSources .v-select').click();
+
+        await expect(page.getByRole('option', { name: '百度百科' })).toBeVisible();
+        await expect(page.getByRole('option', { name: '在线书源' })).toBeVisible();
+        await expect(page.getByRole('option', { name: '笔趣阁' })).toHaveCount(0);
+    });
+
     test('滚动内容时菜单自动选中对应分类（scroll-spy）', async ({ page }) => {
         await page.goto('/admin/settings');
         await expect(page.locator('.loading-page')).toBeHidden();

@@ -201,6 +201,17 @@
                             </v-btn>
                         </v-toolbar>
                         <v-card-text class="pt-4">
+                            <v-alert
+                                v-if="!refer_books_loading && refer_summary.failures.length > 0"
+                                class="mb-4"
+                                type="warning"
+                                variant="tonal"
+                            >
+                                {{ t('book.referPartialFailure', {
+                                    count: refer_summary.failures.length,
+                                    sources: refer_failed_sources,
+                                }) }}
+                            </v-alert>
                             <p
                                 v-if="refer_books_loading"
                                 class="py-6 text-center"
@@ -214,7 +225,7 @@
                                 v-else-if="refer_books.length === 0"
                                 class="py-6 text-center"
                             >
-                                {{ t('book.noMatchingBooks') }}
+                                {{ t(refer_summary.failures.length > 0 ? 'book.noMatchingBooksWithFailures' : 'book.noMatchingBooks') }}
                             </p>
                             <template v-else>
                                 <p class="mb-4">
@@ -1073,6 +1084,10 @@ const deviceTypes = ref([]);
 const refer_books_loading = ref(false);
 const refer_books_setting_btn_loading = ref(false);
 const refer_books = ref([]);
+const refer_summary = ref({ failures: [], total: 0, completed: 0 });
+const refer_failed_sources = computed(() => {
+    return [...new Set(refer_summary.value.failures.map(item => item.source).filter(Boolean))].join('、');
+});
 
 // Upload format
 const dialog_upload_format = ref(false);
@@ -1300,6 +1315,7 @@ const get_refer = async () => {
     dialog_refer.value = true;
     refer_books_loading.value = true;
     refer_books.value = [];
+    refer_summary.value = { failures: [], total: 0, completed: 0 };
 
     let firstLine = true;
     try {
@@ -1307,6 +1323,12 @@ const get_refer = async () => {
             if (firstLine) {
                 firstLine = false;
                 refer_books_loading.value = false;
+            } else if (data.event === 'summary') {
+                refer_summary.value = {
+                    failures: Array.isArray(data.failures) ? data.failures : [],
+                    total: data.total || 0,
+                    completed: data.completed || 0,
+                };
             } else {
                 data.href = '';
                 if (!data.cover_url || data.cover_url === '') {

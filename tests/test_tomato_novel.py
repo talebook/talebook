@@ -226,6 +226,37 @@ class TestTomatoPage(unittest.TestCase):
         info = page.get_info()
         self.assertEqual(info["book_id"], TOMATO_BOOK_INFO["book_id"])
 
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.time.sleep")
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.requests.get")
+    def test_normal_book_text_containing_verification_is_not_blocked(self, mk, _sleep):
+        """正文中的普通“验证”字样不能误判为人机验证页。"""
+        response = mock.Mock(status_code=200, url=TOMATO_BOOK_INFO["url"])
+        response.text = """
+        <html><head><title>验证历史</title></head><body>
+        <h1>验证历史</h1><div class="author-name">作者甲</div>
+        <div class="page-abstract-content">一部验证历史材料的小说。</div>
+        </body></html>
+        """
+        mk.return_value = response
+
+        page = Page(TOMATO_BOOK_INFO["book_id"])
+
+        self.assertEqual(page.get_info()["title"], "验证历史")
+
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.time.sleep")
+    @mock.patch("webserver.plugins.meta.tomato.tomato.tomato.requests.get")
+    def test_dedicated_captcha_page_is_blocked(self, mk, _sleep):
+        """明确的安全验证页仍应抛出 VerifyError。"""
+        response = mock.Mock(status_code=403, url="https://fanqienovel.com/verify/captcha")
+        response.text = """
+        <html><head><title>安全验证</title></head>
+        <body><div id="captcha_container">请完成人机验证</div></body></html>
+        """
+        mk.return_value = response
+
+        with self.assertRaises(VerifyError):
+            Page(TOMATO_BOOK_INFO["book_id"])
+
     def test_get_info(self):
         """测试获取书籍信息"""
         info = TOMATO_PAGE.get_info()

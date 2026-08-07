@@ -125,10 +125,8 @@ class QimaoNovelApi:
                 timeout=API_TIMEOUT,
             )
             data = resp.json()
-            book_list = data.get("data", {}).get("book_list", [])
-            if not book_list:
-                # 兼容另一种字段名
-                book_list = data.get("data", {}).get("ret_data", [])
+            payload = data.get("data", {}) or {}
+            book_list = payload.get("books") or payload.get("book_list") or payload.get("ret_data") or []
             return book_list or []
         except Exception as e:
             logging.error(_("七猫小说搜索异常：%s") % e)
@@ -146,7 +144,10 @@ class QimaoNovelApi:
                 timeout=API_TIMEOUT,
             )
             data = resp.json()
-            return data.get("data", {}) or {}
+            detail = data.get("data", {}) or {}
+            if isinstance(detail, dict) and isinstance(detail.get("book"), dict):
+                detail = detail["book"]
+            return detail if isinstance(detail, dict) else {}
         except Exception as e:
             logging.error(_("七猫小说获取详情异常：%s") % e)
             return {}
@@ -167,17 +168,17 @@ class QimaoNovelApi:
 
         # 优先精确匹配书名
         for item in results:
-            item_title = item.get("book_name") or item.get("title", "")
-            item_author = item.get("author_name") or item.get("author", "")
+            item_title = item.get("book_name") or item.get("title") or item.get("original_title", "")
+            item_author = item.get("author_name") or item.get("author") or item.get("original_author", "")
             if item_title == title:
                 if not author or item_author == author:
-                    book_id = str(item.get("book_id", ""))
+                    book_id = str(item.get("book_id") or item.get("id") or "")
                     if book_id:
                         return self.get_book_by_id(book_id)
 
         # 没有精确匹配则用第一条结果
         first = results[0]
-        book_id = str(first.get("book_id", ""))
+        book_id = str(first.get("book_id") or first.get("id") or "")
         if book_id:
             return self.get_book_by_id(book_id)
         return None
@@ -202,7 +203,9 @@ class QimaoNovelApi:
         mi.isbn = QIMAO_ISBN
 
         # 标签：可能是字符串（逗号分隔）或列表
-        raw_tags = detail.get("category_name") or detail.get("tags", "")
+        category_tags = [detail.get("category1_name"), detail.get("category2_name")]
+        category_tags = [tag for tag in category_tags if tag]
+        raw_tags = category_tags or detail.get("category_name") or detail.get("ptags") or detail.get("tags", "")
         if isinstance(raw_tags, list):
             mi.tags = raw_tags[:8]
         elif isinstance(raw_tags, str) and raw_tags:
@@ -210,11 +213,11 @@ class QimaoNovelApi:
         else:
             mi.tags = []
 
-        mi.comments = detail.get("abstract") or detail.get("summary", "")
+        mi.comments = detail.get("abstract") or detail.get("intro") or detail.get("summary", "")
         mi.pubdate = utcnow()
         mi.timestamp = mi.pubdate
 
-        cover_url = detail.get("thumb_url") or detail.get("cover", "")
+        cover_url = detail.get("thumb_url") or detail.get("image_link") or detail.get("cover", "")
         mi.cover_url = cover_url
         mi.cover_data = self.get_cover(cover_url)
 

@@ -30,6 +30,7 @@ META_SOURCE_TOMATO = "tomato"
 META_SOURCE_QIMAO = "qimao"
 META_SOURCE_DOUBAN_V2 = "douban_v2"
 META_SOURCE_NEODB = "neodb"
+META_SOURCE_BOOKSOURCE = "booksource"
 
 # 书籍类型
 BOOK_TYPE_EBOOK = "ebook"

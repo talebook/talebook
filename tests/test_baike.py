@@ -29,7 +29,7 @@ except ImportError:
 
     logging.warning("Calibre 未安装，部分测试可能无法运行")
 
-from webserver.plugins.meta.baike.api import BAIKE_ISBN, KEY, BaiduBaikeApi
+from webserver.plugins.meta.baike.api import BAIKE_ATTEMPTS, BAIKE_ENDPOINT, BAIKE_ISBN, KEY, BaiduBaikeApi
 from webserver.plugins.meta.baike.baidubaike.baidubaike import Page, Search
 
 
@@ -66,6 +66,23 @@ def get_mock_page():
 
 BAIKE_PAGE = get_mock_page()
 
+BAIKE_API_DATA = {
+    "id": 2653,
+    "newLemmaId": 2653,
+    "key": "东周列国志",
+    "title": "东周列国志",
+    "desc": "明代冯梦龙创作的长篇历史演义小说",
+    "abstract": "《东周列国志》是明代冯梦龙创作、清代蔡元放改编的长篇历史演义小说。",
+    "image": "https://bkimg.cdn.bcebos.com/pic/book-cover.jpg",
+    "card": [
+        {"key": "m27_nameC", "name": "作品名称", "value": ["东周列国志"]},
+        {"key": "m27_author", "name": "作者", "value": ["冯梦龙、蔡元放"]},
+        {"key": "publisher", "name": "出版社", "value": ["人民文学出版社"]},
+        {"key": "isbn", "name": "ISBN", "value": ["9787020009435"]},
+        {"key": "m27_genre", "name": "文学体裁", "value": ["长篇历史演义小说"]},
+    ],
+}
+
 
 class TestBaiduBaikeApi(unittest.TestCase):
     """百度百科 API 测试类"""
@@ -87,32 +104,40 @@ class TestBaiduBaikeApi(unittest.TestCase):
         self.assertFalse(api.copy_image)
         self.assertTrue(api.manual_select)
 
-    @mock.patch.object(BaiduBaikeApi, "_metadata")
+    @mock.patch("webserver.plugins.meta.baike.api.requests.get")
     def test_get_book_success(self, mk):
-        """测试成功获取书籍"""
+        """结构化接口返回图书词条时构造元数据。"""
+        response = mock.Mock(status_code=200)
+        response.json.return_value = BAIKE_API_DATA
+        mk.return_value = response
         api = BaiduBaikeApi(copy_image=False)
 
-        # 模拟 _baike 返回 Page 对象
-        with mock.patch.object(api, "_baike") as mock_baike:
-            mock_baike.return_value = BAIKE_PAGE
-            mk.return_value = mock.Mock(title="东周列国志")
+        result = api.get_book("东周列国志", "冯梦龙")
 
-            result = api.get_book("东周列国志")
-            self.assertIsNotNone(result)
-            mock_baike.assert_called_once()
+        self.assertIsNotNone(result)
+        self.assertEqual(result.title, "东周列国志")
+        self.assertEqual(result.authors, ["冯梦龙、蔡元放"])
+        self.assertEqual(result.provider_value, "2653")
+        self.assertEqual(result.website, "https://baike.baidu.com/item/2653")
+        request = mk.call_args
+        self.assertEqual(request.args[0], BAIKE_ENDPOINT)
+        self.assertEqual(request.kwargs["params"]["bk_key"], "东周列国志")
+        self.assertNotIn("/search/word", request.args[0])
 
-    def test_get_book_not_found(self):
-        """测试书籍未找到"""
+    @mock.patch("webserver.plugins.meta.baike.api.requests.get")
+    def test_get_book_not_found(self, mk):
+        """errno 非零且没有作者可重试时返回空。"""
+        response = mock.Mock(status_code=200)
+        response.json.return_value = {"errno": 2}
+        mk.return_value = response
         api = BaiduBaikeApi(copy_image=False)
 
-        # 模拟 _baike 返回 None（词条不存在）
-        with mock.patch.object(api, "_baike") as mock_baike:
-            mock_baike.return_value = None
+        result = api.get_book("不存在的书籍")
 
-            result = api.get_book("不存在的书籍")
-            self.assertIsNone(result)
+        self.assertIsNone(result)
+        self.assertEqual(mk.call_count, BAIKE_ATTEMPTS)
 
-    @mock.patch("webserver.plugins.meta.baike.baidubaike.baidubaike.requests.get")
+    @mock.patch("webserver.plugins.meta.baike.api.requests.get")
     def test_get_book_with_exception(self, mk):
         """测试异常情况"""
         api = BaiduBaikeApi(copy_image=False)
@@ -120,38 +145,52 @@ class TestBaiduBaikeApi(unittest.TestCase):
         # 模拟网络请求异常
         mk.side_effect = Exception("网络错误")
 
-        # _baike 应该捕获异常并返回 None
-        result = api._baike("测试书籍")
+        result = api.get_book("测试书籍")
         self.assertIsNone(result)
+        self.assertEqual(mk.call_count, BAIKE_ATTEMPTS)
 
-    @mock.patch.object(BaiduBaikeApi, "_metadata")
-    def test_metadata_fields(self, mk):
-        """测试元数据字段"""
+    @mock.patch("webserver.plugins.meta.baike.api.requests.get")
+    def test_retries_once_with_author_after_wrong_entity(self, mk):
+        """首个同名非图书词条应带作者重试一次。"""
+        wrong = mock.Mock(status_code=200)
+        wrong.json.return_value = {
+            "id": 999,
+            "key": "活着",
+            "desc": "1994年张艺谋执导的电影",
+            "card": [{"key": "导演", "value": "张艺谋"}],
+        }
+        correct = mock.Mock(status_code=200)
+        correct.json.return_value = {
+            **BAIKE_API_DATA,
+            "key": "活着",
+            "title": "活着",
+            "id": 1000,
+            "newLemmaId": 1000,
+            "card": [
+                {"key": "作品名称", "value": "活着"},
+                {"key": "作者", "value": "余华"},
+            ],
+        }
+        mk.side_effect = [wrong, correct]
         api = BaiduBaikeApi(copy_image=False)
 
-        # 模拟 Metadata 对象
-        mock_mi = mock.Mock()
-        mock_mi.title = BAIKE_PAGE_DATA["info"]["title"]
-        mock_mi.authors = [BAIKE_PAGE_DATA["info"]["author"]]
-        mock_mi.author_sort = BAIKE_PAGE_DATA["info"]["author"]
-        mock_mi.isbn = BAIKE_ISBN
-        mock_mi.tags = BAIKE_PAGE_DATA["tags"]
-        mock_mi.comments = BAIKE_PAGE_DATA["summary"]
-        mock_mi.source = "百度百科"
-        mock_mi.provider_key = KEY
-        mock_mi.provider_value = BAIKE_PAGE_DATA["id"]
-        mock_mi.cover_url = BAIKE_PAGE_DATA["image"]
-        mock_mi.cover_data = None
+        result = api.get_book("活着", "余华")
 
-        mk.return_value = mock_mi
+        self.assertIsNotNone(result)
+        self.assertEqual(result.authors, ["余华"])
+        self.assertEqual(mk.call_count, 2)
+        self.assertEqual(mk.call_args_list[1].kwargs["params"]["bk_key"], "活着 余华")
 
-        with mock.patch.object(api, "_baike") as mock_baike:
-            mock_baike.return_value = BAIKE_PAGE
+    @mock.patch("webserver.plugins.meta.baike.api.requests.get")
+    def test_rejects_mismatched_provider_id(self, mk):
+        """应用旧搜索结果时不能接受已漂移到其他词条的响应。"""
+        response = mock.Mock(status_code=200)
+        response.json.return_value = BAIKE_API_DATA
+        mk.return_value = response
 
-            result = api.get_book("东周列国志")
-            self.assertIsNotNone(result)
-            self.assertEqual(result.source, "百度百科")
-            self.assertEqual(result.provider_key, KEY)
+        result = BaiduBaikeApi(copy_image=False).get_book("东周列国志", expected_id="999")
+
+        self.assertIsNone(result)
 
 
 class TestBaikePage(unittest.TestCase):

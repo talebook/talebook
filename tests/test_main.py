@@ -783,6 +783,44 @@ class TestRefer(TestWithUserLogin):
                 self.assertEqual(r["err"], "ok")
 
 
+class TestReferFailureSummary(TestWithUserLogin):
+    @staticmethod
+    def _tasks():
+        def failed():
+            raise RuntimeError("upstream failed")
+
+        return {
+            "working-source": lambda: [
+                {
+                    "title": "可用结果",
+                    "author": "作者",
+                    "source": "可用源",
+                    "provider_key": "BookSource",
+                    "provider_value": "signed-token",
+                }
+            ],
+            "failed-source": failed,
+        }
+
+    def test_non_stream_response_keeps_results_and_reports_failure(self):
+        with mock.patch.object(webserver.handlers.book.BookRefer, "_build_search_tasks", return_value=self._tasks()):
+            data = self.json("/api/book/1/refer")
+
+        self.assertEqual([book["title"] for book in data["books"]], ["可用结果"])
+        self.assertEqual(data["summary"]["failures"][0]["source"], "failed-source")
+        self.assertEqual(data["summary"]["failures"][0]["code"], "fetch_failed")
+
+    def test_stream_ends_with_summary_control_frame(self):
+        with mock.patch.object(webserver.handlers.book.BookRefer, "_build_search_tasks", return_value=self._tasks()):
+            response = self.fetch("/api/book/1/refer?stream=1", request_timeout=60)
+
+        frames = [json.loads(line) for line in response.body.decode("utf-8").splitlines()]
+        self.assertEqual(frames[0]["err"], "ok")
+        self.assertEqual(frames[1]["title"], "可用结果")
+        self.assertEqual(frames[-1]["event"], "summary")
+        self.assertEqual(frames[-1]["failures"][0]["source"], "failed-source")
+
+
 class TestUserSignUp(TestWithUserLogin):
     @classmethod
     def setUpClass(self):
