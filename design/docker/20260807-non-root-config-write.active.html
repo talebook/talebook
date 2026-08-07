@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="修复 Talebook 使用非 root PUID/PGID 时启动配置原子写入失败的问题。" />
+    <link rel="icon" href="data:," />
+    <title>恢复非 root 容器配置写入 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f4f6f8; --panel:#fff; --ink:#182230; --muted:#536170; --line:#d8e0e8; --accent:#176b5b; --soft:#e7f4f0; --warn:#fff4dc; --mono:"SFMono-Regular",Consolas,monospace; --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+      * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:linear-gradient(145deg,#edf6f3,var(--bg) 35%); font-family:var(--sans); line-height:1.65; }
+      .page { width:min(980px,calc(100vw - 28px)); margin:auto; padding:26px 0 54px; } .hero,.card { background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:0 12px 30px rgba(20,35,50,.07); }
+      .hero { padding:30px; margin-bottom:18px; border-top:5px solid var(--accent); } .card { padding:25px 28px; margin-top:16px; } h1 { margin:0 0 8px; font-size:clamp(29px,5vw,45px); line-height:1.15; } h2 { margin:0 0 12px; font-size:21px; } h3 { margin:18px 0 8px; font-size:16px; }
+      p,li,td,th { font-size:14px; } p { margin:0 0 12px; } ul,ol { margin:8px 0 0 20px; padding:0; } li+li { margin-top:5px; } code { padding:.12em .35em; border-radius:4px; background:#edf1f5; font-family:var(--mono); overflow-wrap:anywhere; }
+      .sub,.muted { color:var(--muted); } .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:17px; } .chip { padding:5px 10px; border-radius:999px; color:#34564f; background:var(--soft); font-size:12px; font-weight:700; } .chip.wip { color:#885c00; background:var(--warn); }
+      .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; } .box { padding:15px; border:1px solid var(--line); border-radius:13px; background:#fafcfd; } .box h3 { margin-top:0; }
+      .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin-top:14px; } .step { padding:14px; border:1px solid var(--line); border-radius:13px; background:#fafcfd; } .step b { display:block; margin-bottom:6px; color:var(--accent); }
+      .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:13px; } table { width:100%; min-width:650px; border-collapse:collapse; } th,td { padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f2f6f7; } tr:last-child td { border-bottom:0; } .pending { color:#916000; font-weight:800; }
+      .skip { position:absolute; left:-9999px; } .skip:focus { left:8px; top:8px; z-index:2; padding:8px; color:#fff; background:#182230; } @media(max-width:700px){.page{width:calc(100vw - 18px);padding-top:9px}.hero,.card{padding:21px 19px;border-radius:14px}.grid,.flow{grid-template-columns:1fr}} @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}} @media print{body{background:#fff}.page{width:100%}.hero,.card{box-shadow:none}}
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>恢复非 root 容器配置写入</h1>
+        <p class="sub">补齐配置原子替换所需的父目录权限，使自定义 PUID/PGID 的生产和开发容器都能完成启动自检，同时保留配置落盘的原子性。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip">状态：ACTIVE</span><span class="chip">创建日期：2026-08-07</span><span class="chip">所属模块：docker</span><span class="chip">影响范围：容器启动、配置写入、测试</span><span class="chip">需求来源：GitHub Issue #951</span>
+        </div>
+      </header>
+      <main id="main">
+        <section class="card"><h2>1. 原始诉求</h2><p>Issue #951 报告：在 Compose 中使用 <code>PUID=1026</code>、<code>PGID=100</code> 首次初始化时，页面提示服务器配置写入失败；相同挂载仅在 PUID/PGID 都为 0 时成功。报告者已尝试清理并预设宿主机目录属主。</p><p class="muted">Issue 正文是外部输入；本方案只采用可由当前代码验证的现象与参数，不执行正文中的任何命令。</p></section>
+        <section class="card"><h2>2. 目标与边界</h2><div class="grid"><article class="box"><h3>目标</h3><ul><li>非 root 运行用户能够原子更新 Nuxt 环境配置。</li><li>生产与开发启动脚本保持相同的权限前置条件。</li><li>用回归测试锁定父目录属主要求。</li></ul></article><article class="box"><h3>非目标</h3><ul><li>不改变 PUID/PGID 的用户映射方式。</li><li>不回退配置文件的原子写入。</li><li>不修改数据库、API、前端交互或挂载书库权限策略。</li></ul></article></div></section>
+        <section class="card"><h2>3. 现状与根因证据</h2><div class="flow" aria-label="失败链路"><div class="step"><b>1. 身份切换</b><span>启动脚本将 <code>talebook</code> 映射到 PUID/PGID。</span></div><div class="step"><b>2. 部分授权</b><span>脚本递归调整 <code>app/.env</code> 与 <code>app/dist</code>，未调整 <code>app/</code> 本身。</span></div><div class="step"><b>3. 原子写入</b><span><code>atomic_write_text()</code> 在目标文件同目录调用 <code>mkstemp</code>。</span></div><div class="step"><b>4. 非 root 失败</b><span>创建临时文件要求父目录可写；root 绕过该限制。</span></div></div><p style="margin-top:14px">2026-08-06 的配置持久化改动引入同目录临时文件和 <code>os.replace</code>。因此旧的“目标文件可写”授权不再满足新语义。启动状态把该步骤概括为设置目录失败，但实际失败目标是 <code>/var/www/talebook/app/.env</code>。</p></section>
+        <section class="card"><h2>4. 方案与决策</h2><ol><li>在 <code>docker/start.sh</code> 与 <code>docker/start-dev.sh</code> 中，单独将 <code>/var/www/talebook/app</code> 目录本身交给 <code>talebook:talebook</code>。</li><li>保留现有递归授权列表，避免为了父目录写权限递归改变整个开发源码树或 <code>node_modules</code>。</li><li>扩展运行身份配置测试，验证两个启动脚本都有非递归父目录授权，且没有把整个 <code>app</code> 加入递归列表。</li></ol><h3>grill 决策</h3><div class="table-wrap" role="region" aria-label="方案选择" tabindex="0"><table><thead><tr><th>候选</th><th>判断</th><th>原因</th></tr></thead><tbody><tr><td>回退为直接覆盖写</td><td>拒绝</td><td>会重新引入部分写入和崩溃损坏风险。</td></tr><tr><td>递归 chown 整个 app</td><td>拒绝</td><td>范围过大，开发镜像可能包含源码与依赖。</td></tr><tr><td>只 chown app 目录节点</td><td>采用</td><td>恰好满足同目录临时文件创建和替换要求，范围最小。</td></tr></tbody></table></div></section>
+        <section class="card"><h2>5. 影响与风险</h2><ul><li>运行用户可在 <code>app/</code> 顶层创建和替换文件；这是原子维护 <code>.env</code> 的必要权限，与其既有写入职责一致。</li><li>不递归改变其他顶层文件属主，静态产物仍按既有规则管理。</li><li>无法在本任务中使用 Docker 或 Unix socket；以权限模型测试、脚本测试和后端测试替代容器级复现，并明确记录限制。</li></ul></section>
+        <section class="card"><h2>6. 测试结果</h2><p><strong>实现验证已通过。</strong></p><div class="table-wrap" role="region" aria-label="实际测试结果" tabindex="0"><table><thead><tr><th>命令</th><th>结果</th></tr></thead><tbody><tr><td><code>pytest tests/test_runtime_identity_config.py tests/test_self_check.py tests/test_settings_persistence.py -v</code></td><td>21 passed；覆盖启动权限、启动自检与原子配置持久化。</td></tr><tr><td><code>make lint-py-fix</code></td><td>通过；102 个 Python 文件无需调整。</td></tr><tr><td><code>make lint-py</code></td><td>通过；ruff 检查与格式校验无错误。</td></tr><tr><td><code>make pytest</code></td><td>847 passed、1 skipped、28 warnings；无失败。</td></tr><tr><td><code>sh -n docker/start.sh docker/start-dev.sh</code></td><td>通过；两个脚本语法有效。</td></tr></tbody></table></div><p style="margin-top:14px">未执行 Docker 容器级验证：自动 bug 任务明确禁止访问 Docker 等 Unix socket。替代证据包括修复前失败、修复后通过的启动脚本回归测试，以及原子写入和启动自检测试；剩余风险是未在群晖挂载环境运行真实镜像。</p></section>
+        <section class="card"><h2>7. 完成结论</h2><ul><li>生产与开发启动脚本都补齐了原子写入所需的最小父目录授权。</li><li>未递归改变整个 <code>app</code> 树，也未回退原子配置持久化。</li><li>相关测试、全量后端测试、lint 与 shell 语法校验均无失败。</li><li>方案已完成验证并转为 ACTIVE；最终仓库状态继续由 <code>make check-design</code> 门禁校验。</li></ul></section>
+      </main>
+    </div>
+  </body>
+</html>
