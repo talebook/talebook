@@ -4,6 +4,7 @@
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -19,6 +20,7 @@ class TestSelfCheckSteps(unittest.TestCase):
         self.data_dir = os.path.join(self.tmpdir, "data")
         self.status_dir = os.path.join(self.tmpdir, "status")
         os.makedirs(os.path.join(self.data_dir, "books", "library"))
+        os.makedirs(os.path.join(self.data_dir, "books", "settings"))
 
         self._orig_data_dir = self_check.DATA_DIR
         self._orig_status_dir = self_check.STATUS_DIR
@@ -51,12 +53,15 @@ class TestSelfCheckSteps(unittest.TestCase):
         self.assertIsNone(code)
         with open(os.path.join(self.data_dir, ".permission")) as f:
             self.assertEqual(f.read().strip(), "1000:1000")
-        chown_call, write_test_call = m_run.call_args_list
+        chown_call, library_probe, settings_probe = m_run.call_args_list
         self.assertEqual(chown_call.args[0][:2], ["chown", "-R"])
-        self.assertEqual(write_test_call.args[0][0], "gosu")
+        self.assertEqual(library_probe.args[0][0], "gosu")
+        self.assertEqual(library_probe.args[0][-1], os.path.join(self.data_dir, "books", "library"))
+        self.assertEqual(settings_probe.args[0][0], "gosu")
+        self.assertEqual(settings_probe.args[0][-1], os.path.join(self.data_dir, "books", "settings"))
 
     @mock.patch("webserver.self_check.run")
-    def test_check_permission_skips_chown_when_unchanged(self, m_run):
+    def test_check_permission_repairs_settings_when_identity_unchanged(self, m_run):
         with open(os.path.join(self.data_dir, ".permission"), "w") as f:
             f.write("1000:1000")
         m_run.return_value = True
@@ -65,8 +70,13 @@ class TestSelfCheckSteps(unittest.TestCase):
 
         self.assertTrue(ok)
         self.assertIsNone(code)
-        self.assertEqual(m_run.call_count, 1)
-        self.assertEqual(m_run.call_args.args[0][0], "gosu")
+        self.assertEqual(m_run.call_count, 3)
+        settings_chown, library_probe, settings_probe = m_run.call_args_list
+        self.assertEqual(
+            settings_chown.args[0], ["chown", "-R", "talebook:talebook", os.path.join(self.data_dir, "books", "settings")]
+        )
+        self.assertEqual(library_probe.args[0][-1], os.path.join(self.data_dir, "books", "library"))
+        self.assertEqual(settings_probe.args[0][-1], os.path.join(self.data_dir, "books", "settings"))
 
     @mock.patch("webserver.self_check.run")
     def test_check_permission_chown_failure(self, m_run):
@@ -77,11 +87,55 @@ class TestSelfCheckSteps(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.data_dir, ".permission")))
 
     @mock.patch("webserver.self_check.run")
-    def test_check_permission_write_test_failure(self, m_run):
+    def test_check_permission_library_atomic_write_failure(self, m_run):
         m_run.side_effect = [True, False]
         ok, code = self_check.check_permission()
         self.assertFalse(ok)
         self.assertEqual(code, "permission_denied")
+
+    @mock.patch("webserver.self_check.run")
+    def test_check_permission_settings_chown_failure_when_identity_unchanged(self, m_run):
+        with open(os.path.join(self.data_dir, ".permission"), "w") as f:
+            f.write("1000:1000")
+        m_run.return_value = False
+
+        ok, code = self_check.check_permission()
+
+        self.assertFalse(ok)
+        self.assertEqual(code, "permission_denied")
+        m_run.assert_called_once_with(["chown", "-R", "talebook:talebook", os.path.join(self.data_dir, "books", "settings")])
+
+    @mock.patch("webserver.self_check.run")
+    def test_check_permission_settings_atomic_write_failure(self, m_run):
+        m_run.side_effect = [True, True, False]
+
+        ok, code = self_check.check_permission()
+
+        self.assertFalse(ok)
+        self.assertEqual(code, "permission_denied")
+
+    @mock.patch("webserver.self_check.run")
+    def test_check_atomic_write_uses_application_identity_and_rename(self, m_run):
+        m_run.return_value = True
+        directory = os.path.join(self.data_dir, "books", "settings")
+
+        self.assertTrue(self_check.check_atomic_write(directory))
+
+        command = m_run.call_args.args[0]
+        self.assertEqual(command[:3], ["gosu", "talebook:talebook", "sh"])
+        self.assertIn("mktemp", command[4])
+        self.assertIn("mv", command[4])
+        self.assertEqual(command[-1], directory)
+
+    def test_atomic_write_probe_creates_renames_and_cleans_up(self):
+        directory = os.path.join(self.data_dir, "books", "settings")
+
+        subprocess.run(
+            ["sh", "-c", self_check.ATOMIC_WRITE_PROBE, "talebook-write-check", directory],
+            check=True,
+        )
+
+        self.assertEqual(os.listdir(directory), [])
 
     @mock.patch("webserver.self_check.run")
     def test_check_nginx_config(self, m_run):

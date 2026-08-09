@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="修复容器挂载环境中配置目录权限初始化与写入自检不完整的问题。" />
+    <link rel="icon" href="data:," />
+    <title>补齐容器配置目录权限修复与原子写入自检 · ACTIVE</title>
+    <style>
+      :root { color-scheme:light; --bg:#f4f7f6; --panel:#fff; --ink:#182724; --muted:#586b67; --line:#d4e0dd; --accent:#087f6b; --accent-soft:#e6f5f1; --warn:#9b5d00; --warn-soft:#fff5df; --red:#a43d3d; --red-soft:#fdecec; --shadow:0 14px 34px rgba(18,54,48,.08); --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; --mono:"SFMono-Regular",Consolas,monospace; }
+      * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; color:var(--ink); background:radial-gradient(circle at top right,#dff3ee,transparent 28%),var(--bg); font-family:var(--sans); line-height:1.68; }
+      .skip { position:fixed; left:-9999px; } .skip:focus { left:8px; top:8px; z-index:3; padding:8px 12px; color:#fff; background:var(--ink); }
+      .page { width:min(1080px,calc(100vw - 30px)); margin:auto; padding:26px 0 54px; } .hero,.card { background:var(--panel); border:1px solid var(--line); border-radius:19px; box-shadow:var(--shadow); }
+      .hero { padding:31px 33px; border-top:5px solid var(--accent); } .card { margin-top:17px; padding:25px 28px; } h1 { margin:0 0 10px; font-size:clamp(30px,5vw,46px); line-height:1.15; } h2 { margin:0 0 13px; font-size:22px; } h3 { margin:18px 0 8px; font-size:16px; } p { margin:0 0 12px; } p,li,td,th { font-size:14px; } ul,ol { margin:8px 0 0 21px; padding:0; } li+li { margin-top:5px; }
+      code { padding:.12em .35em; border-radius:4px; background:#edf2f1; font-family:var(--mono); overflow-wrap:anywhere; } .sub,.muted { color:var(--muted); } .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; } .chip { padding:5px 10px; border-radius:999px; color:#315d55; background:var(--accent-soft); font-size:12px; font-weight:750; } .chip.wip { color:var(--warn); background:var(--warn-soft); }
+      .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; } .box,.callout { padding:15px 16px; border:1px solid var(--line); border-radius:13px; background:#fafcfb; } .box h3 { margin-top:0; } .callout { margin-top:13px; } .callout.warn { border-color:#ecd09b; background:var(--warn-soft); } .callout.danger { border-color:#e6b7b7; background:var(--red-soft); }
+      .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin-top:14px; } .step { min-height:132px; padding:14px; border:1px solid var(--line); border-radius:13px; background:linear-gradient(#fff,#f8fbfa); } .step b { display:block; margin-bottom:6px; color:var(--accent); } .step p { margin:0; color:var(--muted); font-size:13px; }
+      .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:13px; } table { width:100%; min-width:720px; border-collapse:collapse; } th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f0f6f4; } th:last-child,td:last-child { border-right:0; } tr:last-child td { border-bottom:0; } .pending { color:var(--warn); font-weight:800; }
+      footer { margin-top:16px; color:var(--muted); font-size:12px; text-align:center; } @media(max-width:720px){.page{width:calc(100vw - 18px);padding-top:9px}.hero,.card{padding:21px 19px;border-radius:15px}.grid,.flow{grid-template-columns:1fr}.step{min-height:0}} @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}} @media print{body{background:#fff}.page{width:100%;padding:0}.hero,.card{box-shadow:none}}
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>补齐容器配置目录权限修复与原子写入自检</h1>
+        <p class="sub">让普通 PUID/PGID 在 QNAP 等绑定挂载环境中既能完成启动配置生成，也能持续保存管理员配置；在启动阶段准确验证真正被写入的目录。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-09</span>
+          <span class="chip">所属模块：docker</span>
+          <span class="chip">影响范围：docker、webserver、自检测试</span>
+          <span class="chip">需求来源：GitHub Issue #953</span>
+        </div>
+      </header>
+      <main id="main">
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“使用威联通 Container Station 创建 Talebook 后出现文件权限问题：master 提示服务器配置写入失败；包含 Issue #951 候选修复的 SSR 镜像可启动，但保存管理员设置时提示磁盘配置文件不可写。”</div>
+          <p>Issue 同时给出两个可写绑定挂载：宿主目录到 <code>/data</code> ，另一宿主目录到 <code>/data/books/library</code> 。正文来自外部用户，本方案只采用代码和截图能够相互印证的现象，不执行正文中的任何命令。</p>
+        </section>
+
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="box"><h3>目标</h3><ul><li>生产与 SSR 启动路径均满足同目录临时文件加原子替换的权限条件。</li><li><code>.permission</code> 标记未变化时，也能修复体积很小的 <code>settings/</code> 目录。</li><li>自检以 <code>talebook</code> 身份覆盖 <code>library/</code> 与 <code>settings/</code> 的原子写入能力。</li></ul></article>
+            <article class="box"><h3>非目标</h3><ul><li>不绕过宿主机只读挂载、NAS ACL 或真正禁止 chown 的限制。</li><li>不改 API、数据库、PUID/PGID 映射和管理员设置的持久化格式。</li><li>不每次递归扫描大型书库，也不递归修改整个 <code>app/</code> 源码与依赖。</li></ul></article>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>3. 现状、根因与证据</h2>
+          <div class="table-wrap" role="region" aria-label="根因证据" tabindex="0">
+            <table>
+              <thead><tr><th>观察</th><th>代码证据</th><th>结论</th></tr></thead>
+              <tbody>
+                <tr><td>master 在 <code>update-config</code> 阶段失败</td><td><code>atomic_write_text()</code> 在目标同目录调用 <code>mkstemp</code> ；启动脚本只递归授权 <code>app/.env</code> 和 <code>app/dist</code> ，没有授权 <code>app/</code> 目录节点。</td><td>文件本身可写不足以支持原子替换，非 root 用户还需要父目录写权限。</td></tr>
+                <tr><td>候选镜像启动后仍不能保存设置</td><td><code>check_permission()</code> 在 PUID/PGID 标记相同时完全跳过 <code>/data/books</code> 修复；预置复制、目录重建或 NAS 权限变化不会使标记失效。</td><td>标记只表示曾处理过身份，不能证明当前 <code>settings/</code> 可写。</td></tr>
+                <tr><td>权限步骤可通过但配置仍失败</td><td>生产自检只写 <code>library/test_writeable.txt</code> ；SSR 脚本的同类探针甚至由 root 执行。Issue 又把 <code>library/</code> 作为独立绑定挂载。</td><td>现有探针既不是应用身份的完整覆盖，也无法代表另一个挂载下的 <code>settings/</code> 。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout"><strong>可证实边界：</strong>上述缺口可由当前代码和测试稳定证明；无法在本任务中使用 Docker 或 QNAP 主机复现真实 ACL。若定向 chown 后应用身份探针仍失败，容器应明确停在权限检查，而不是伪装成后续配置逻辑故障。</div>
+        </section>
+
+        <section class="card">
+          <h2>4. 方案</h2>
+          <div class="flow" aria-label="修复流程">
+            <article class="step"><b>1. 映射身份</b><p>继续按 PUID/PGID 更新 <code>talebook</code> 用户和组。</p></article>
+            <article class="step"><b>2. 最小修复</b><p>授权 <code>app/</code> 目录节点；标记未变化时只递归修复小型 <code>settings/</code> 。</p></article>
+            <article class="step"><b>3. 真实探针</b><p>以应用身份在 <code>library/</code> 和 <code>settings/</code> 创建临时文件并重命名。</p></article>
+            <article class="step"><b>4. 明确结果</b><p>全部通过才继续；任一失败归入权限错误并停止业务进程。</p></article>
+          </div>
+          <h3>grill 决策</h3>
+          <div class="table-wrap" role="region" aria-label="关键决策" tabindex="0">
+            <table>
+              <thead><tr><th>问题</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+              <tbody>
+                <tr><td>如何处理 <code>.permission</code> 失真</td><td>身份变化时保留全量 chown；未变化时定向 chown <code>settings/</code> 。</td><td>配置目录很小，可在每次启动安全修复，同时避免大型书库启动成本。</td><td>删除标记并每次全量 chown；只更新标记格式但仍不验证目录。</td></tr>
+                <tr><td>怎样证明配置可落盘</td><td>以应用身份执行创建加同目录重命名探针。</td><td>匹配 <code>atomic_write_text()</code> 的真实权限需求，并覆盖绑定挂载边界。</td><td>只检查文件 mode；只由 root 写普通测试文件。</td></tr>
+                <tr><td>如何修复 Nuxt 配置目录</td><td>只 chown <code>app/</code> 目录节点。</td><td>满足 <code>.env</code> 原子替换，不递归影响源码、静态产物和依赖。</td><td>回退直接覆盖写；递归 chown 整个前端目录。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>5. 影响范围、风险与回滚</h2>
+          <div class="grid">
+            <article class="box"><h3>影响范围</h3><p><code>docker/start.sh</code>、<code>docker/start-dev.sh</code>、<code>webserver/self_check.py</code> 及对应后端测试。容器启动时会多一次小目录 chown 或两次原子写探针。</p></article>
+            <article class="box"><h3>保持不变</h3><p>标记命中时仍不遍历书库；配置内容、API 行为、数据库、卷路径及运行用户策略均不变化。</p></article>
+          </div>
+          <div class="callout danger"><strong>主要风险：</strong>宿主 ACL 可能允许 root 的 chown 命令返回成功却仍阻止应用用户写入；新增探针会把该情况提前暴露为权限失败。探针使用唯一临时文件并清理，不触碰现有配置。</div>
+          <div class="callout"><strong>回滚：</strong>代码级回滚三处权限初始化与探针改动即可；不产生数据迁移或永久格式变化。已修复的目录属主无需回退。</div>
+        </section>
+
+        <section class="card">
+          <h2>6. 测试结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>计划命令</th><th>验收点</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>定向单测</td><td><code>pytest tests/test_self_check.py tests/test_runtime_identity_config.py tests/test_settings_persistence.py -v</code></td><td>标记变化/不变、定向 chown、双目录原子探针、两套脚本权限契约与配置原子写入均覆盖。</td><td>通过：26 passed。</td></tr>
+                <tr><td>Shell 语法</td><td><code>sh -n docker/start.sh docker/start-dev.sh</code></td><td>两个入口脚本语法有效。</td><td>通过，无输出。</td></tr>
+                <tr><td>格式与 lint</td><td><code>make lint-py-fix</code><br /><code>make lint-py</code></td><td>后端格式与静态检查无错误。</td><td>通过：102 个 Python 文件无需格式调整，ruff 无错误。</td></tr>
+                <tr><td>全量后端测试</td><td><code>make pytest</code></td><td>全量测试无失败。</td><td>通过：852 passed、1 skipped、28 warnings；跳过项及警告均为既有测试状态。</td></tr>
+                <tr><td>方案门禁</td><td><code>make check-design</code></td><td>路径、状态、HTML 结构和单文件资源符合规范。</td><td>通过：94 份方案文档通过检查。</td></tr>
+                <tr><td>真实容器 / QNAP</td><td>未执行 Docker 或 NAS 实机验证。</td><td>自动 bug 任务禁止访问 Docker 等 Unix socket；Draft PR 镜像评审阶段验证真实 QNAP ACL。</td><td>未执行：以脚本语法、应用身份探针实测和启动契约测试替代；保留 NAS ACL 环境风险。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>7. 决策记录</h2>
+          <ol>
+            <li><strong>2026-08-09：</strong>自动 bug 入口已预授权方案生命周期；基于代码证据直接完成 grill，不等待外部 Issue 作者补充。</li>
+            <li><strong>2026-08-09：</strong>将 master 的父目录缺口与候选 SSR 镜像暴露出的 settings 缺口视为同一条用户任务的两个连续阻塞点，一并修复。</li>
+            <li><strong>2026-08-09：</strong>不将 Container Station 显示的“可写”视为应用 UID 的 POSIX/ACL 写入证明，最终以应用身份探针为准。</li>
+            <li><strong>2026-08-09：</strong>实现未偏离方案；定向测试、Shell 语法、格式、lint、全量后端测试与最终文档门禁均通过，方案已转为 ACTIVE。</li>
+          </ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · docker · ACTIVE · 2026-08-09</footer>
+    </div>
+  </body>
+</html>
