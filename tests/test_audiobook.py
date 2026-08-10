@@ -29,6 +29,7 @@ class AudiobookFixture:
             models.AudiobookBookmark,
             models.AudiobookPlaybackSession,
             models.AudiobookProgress,
+            models.AudiobookDailyStat,
             models.AudiobookChapter,
             models.AudiobookJob,
             models.AudiobookEdition,
@@ -179,6 +180,194 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         self.assertEqual(self.fetch("/api/audiobooks").code, 404)
         self.assertEqual(self.fetch(f"/api/audiobooks/{edition_id}/manifest").code, 404)
         self.assertEqual(self.fetch(f"/api/audiobook-editions/{edition_id}").code, 404)
+
+    def test_delete_audiobook_removes_all_related_data_and_keeps_book(self):
+        published_id = self.seed_published_edition()
+        session = test_main.get_db()
+        now = datetime.datetime.now()
+        published = session.get(models.AudiobookEdition, published_id)
+        chapter = (
+            session.query(models.AudiobookChapter)
+            .filter(models.AudiobookChapter.edition_id == published_id)
+            .order_by(models.AudiobookChapter.number)
+            .first()
+        )
+        historical = models.AudiobookEdition(
+            book_id=test_main.BID_EPUB,
+            status="historical",
+            engine="edgetts",
+            config={},
+            created_by=1,
+            create_time=now,
+            update_time=now,
+        )
+        draft = models.AudiobookEdition(
+            book_id=test_main.BID_EPUB,
+            status="draft",
+            engine="edgetts",
+            config={},
+            created_by=1,
+            create_time=now,
+            update_time=now,
+        )
+        other = models.AudiobookEdition(
+            book_id=test_main.BID_TXT,
+            status="historical",
+            engine="edgetts",
+            config={},
+            created_by=1,
+            create_time=now,
+            update_time=now,
+        )
+        session.add_all((historical, draft, other))
+        session.flush()
+        job = models.AudiobookJob(
+            book_id=test_main.BID_EPUB,
+            edition_id=draft.id,
+            creator_id=1,
+            mode="quick",
+            status="generating",
+            phase="GENERATING",
+            config={},
+            config_hash="delete-all",
+            data={},
+            create_time=now,
+            update_time=now,
+        )
+        progress = models.AudiobookProgress(
+            reader_id=1,
+            edition_id=published.id,
+            chapter_id=chapter.id,
+            position_ms=500,
+            listened_ms=500,
+            update_time=now,
+        )
+        bookmark = models.AudiobookBookmark(
+            reader_id=1,
+            edition_id=published.id,
+            chapter_id=chapter.id,
+            position_ms=300,
+            create_time=now,
+        )
+        playback = models.AudiobookPlaybackSession(
+            uuid="delete-audiobook-session",
+            reader_id=1,
+            edition_id=published.id,
+            source="web",
+            started_at=now,
+        )
+        subscription = models.PodcastSubscription(
+            reader_id=1,
+            token_hash="delete-audiobook-token",
+            token_hint="delete",
+            active=True,
+            hidden_books={"ids": [test_main.BID_EPUB, test_main.BID_TXT]},
+            create_time=now,
+        )
+        daily_stat = models.AudiobookDailyStat(
+            date=now.date(),
+            scope="book",
+            reader_id=1,
+            book_id=test_main.BID_EPUB,
+            chapter_id=chapter.id,
+            source="web",
+            listened_ms=500,
+        )
+        session.add_all((job, progress, bookmark, playback, subscription, daily_stat))
+        session.flush()
+        audit = models.PodcastAccessLog(
+            subscription_id=subscription.id,
+            book_id=test_main.BID_EPUB,
+            edition_id=published.id,
+            chapter_id=chapter.id,
+            kind="audio",
+            protected=True,
+            create_time=now,
+        )
+        session.add(audit)
+        session.commit()
+        job_id = job.id
+
+        storage = AudiobookStorage()
+        target_directories = [
+            storage.edition_dir(historical.id),
+            storage.edition_dir(draft.id),
+            storage.job_dir(job.id),
+        ]
+        for directory in target_directories:
+            directory.mkdir(parents=True)
+            (directory / "artifact.txt").write_text("delete me", encoding="utf-8")
+        other_directory = storage.edition_dir(other.id)
+        other_directory.mkdir(parents=True)
+        (other_directory / "keep.txt").write_text("keep me", encoding="utf-8")
+
+        response = self.json(f"/api/book/{test_main.BID_EPUB}/audios", method="DELETE")
+        self.assertEqual(response["err"], "ok")
+        self.assertEqual(
+            response["deleted"],
+            {
+                "editions": 3,
+                "chapters": 2,
+                "jobs": 1,
+                "progress": 1,
+                "bookmarks": 1,
+                "sessions": 1,
+                "daily_stats": 1,
+                "podcast_audits": 1,
+                "podcast_preferences": 1,
+                "active_jobs_cancelled": 1,
+            },
+        )
+
+        session.expire_all()
+        self.assertEqual(
+            session.query(models.AudiobookEdition).filter(models.AudiobookEdition.book_id == test_main.BID_EPUB).count(),
+            0,
+        )
+        self.assertEqual(session.query(models.AudiobookJob).filter(models.AudiobookJob.book_id == test_main.BID_EPUB).count(), 0)
+        self.assertEqual(session.query(models.AudiobookProgress).count(), 0)
+        self.assertEqual(session.query(models.AudiobookBookmark).count(), 0)
+        self.assertEqual(session.query(models.AudiobookPlaybackSession).count(), 0)
+        self.assertEqual(session.query(models.AudiobookDailyStat).count(), 0)
+        self.assertEqual(session.query(models.PodcastAccessLog).count(), 0)
+        self.assertEqual(session.get(models.PodcastSubscription, subscription.id).hidden_books, {"ids": [test_main.BID_TXT]})
+        self.assertIsNotNone(session.get(models.AudiobookEdition, other.id))
+        self.assertTrue(other_directory.is_dir())
+        for directory in target_directories + [storage.edition_dir(published_id)]:
+            self.assertFalse(directory.exists())
+
+        AudiobookScheduler()._consume_event(job_id, {"seq": 1, "event": "chapter_completed", "chapter_number": 1})
+        session.expire_all()
+        self.assertEqual(session.query(models.AudiobookJob).filter(models.AudiobookJob.id == job_id).count(), 0)
+        self.assertEqual(
+            session.query(models.AudiobookEdition).filter(models.AudiobookEdition.book_id == test_main.BID_EPUB).count(),
+            0,
+        )
+
+        detail = self.json(f"/api/book/{test_main.BID_EPUB}/audios")
+        self.assertEqual(detail["book"]["id"], test_main.BID_EPUB)
+        self.assertEqual(detail["editions"], [])
+        repeated = self.json(f"/api/book/{test_main.BID_EPUB}/audios", method="DELETE")
+        self.assertEqual(repeated["err"], "ok")
+        self.assertEqual(repeated["deleted"]["editions"], 0)
+        self.assertEqual(repeated["deleted"]["jobs"], 0)
+
+    def test_delete_audiobook_requires_admin(self):
+        edition_id = self.seed_published_edition()
+        session = test_main.get_db()
+        user = session.get(models.Reader, 1)
+        original_admin = user.admin
+        user.admin = False
+        session.commit()
+        try:
+            response = self.json(f"/api/book/{test_main.BID_EPUB}/audios", method="DELETE")
+            self.assertEqual(response["err"], "permission.not_admin")
+            session.expire_all()
+            self.assertIsNotNone(session.get(models.AudiobookEdition, edition_id))
+        finally:
+            user = session.get(models.Reader, 1)
+            user.admin = original_admin
+            session.commit()
 
     def test_reader_page_injects_published_audiobook(self):
         edition_id = self.seed_published_edition()

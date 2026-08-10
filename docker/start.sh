@@ -44,6 +44,8 @@ mkdir -p /root/.npm /run/talebook /data/books/ssl
 
 # 设置系统文件的权限（数量较少，且 nginx/诊断页在自检完成前就需要可用，必须先于 supervisord 启动前就绪）
 mkdir -p /data/log/nginx /var/www/talebook/status
+# .env 通过同目录临时文件原子替换；只调整目录节点，不递归修改 app 源码与依赖。
+chown talebook:talebook /var/www/talebook/app
 chown -R talebook:talebook \
   /run/talebook \
   /data/books/ssl \

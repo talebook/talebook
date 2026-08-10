@@ -117,6 +117,31 @@ describe('BuiltinThemeHeader.vue search', () => {
 describe('BuiltinThemeHeader.vue navigation', () => {
     beforeEach(() => {
         storeState.sys.show_network_library = true;
+        storeState.user.is_login = false;
+        storeState.user.is_admin = false;
+    });
+
+    it.each(['light-gray', 'minimal', 'graphite', 'brass', 'warm-red'] as const)(
+        'shows My Shelf to signed-in users in the %s theme',
+        (variant) => {
+            storeState.user.is_login = true;
+            const wrapper = mountHeader(variant);
+
+            const shelfLink = wrapper.findAllComponents({ name: 'VListItem' })
+                .find(item => item.text().includes('navigation.myShelf'));
+            expect(shelfLink).toBeDefined();
+            expect(shelfLink?.props('to')).toBe('/user/shelf');
+
+            wrapper.unmount();
+        },
+    );
+
+    it('hides My Shelf from signed-out users', () => {
+        const wrapper = mountHeader('minimal');
+
+        expect(wrapper.text()).not.toContain('navigation.myShelf');
+
+        wrapper.unmount();
     });
 
     it('shows the network library link by default', () => {

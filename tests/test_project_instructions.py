@@ -46,6 +46,36 @@ def test_design_document_quality_is_not_bound_to_frontend_design_skill():
     )
 
 
+def test_design_template_usage_is_documented():
+    instructions = AGENTS.read_text(encoding="utf-8")
+
+    assert all(
+        requirement in instructions
+        for requirement in (
+            "`design/TEMPLATE.html`",
+            "默认复制",
+            "响应式与可访问性基线",
+            "允许按主题调整",
+            "不参与 WIP/ACTIVE 状态门禁",
+        )
+    )
+
+
+def test_each_work_item_keeps_one_design_document():
+    instructions = AGENTS.read_text(encoding="utf-8")
+
+    assert all(
+        requirement in instructions
+        for requirement in (
+            "同一个工作只维护一份方案",
+            "不得为同一工作中的设计迭代、反馈轮次或废弃选项创建多份方案",
+            "最终不保留同一工作的中间稿、未生效版本或废弃方案文件",
+            "SUPERSEDED 仅用于已经合并并独立生效的 ACTIVE",
+            "不得用 SUPERSEDED 保存同一工作中的过程稿、方案 A/B/C 或反馈轮次",
+        )
+    )
+
+
 def test_workflow_changes_require_real_local_act_validation():
     instructions = WORKFLOW_AGENTS.read_text(encoding="utf-8")
 

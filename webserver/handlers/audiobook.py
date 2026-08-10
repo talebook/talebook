@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import ipaddress
 import json
+import logging
 import re
 import secrets
 import shutil
@@ -21,7 +22,7 @@ from xml.sax.saxutils import escape
 
 import tornado.escape
 import tornado.web
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from webserver import loader, utils
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
@@ -29,6 +30,7 @@ from webserver.i18n import _
 from webserver.models import (
     AudiobookBookmark,
     AudiobookChapter,
+    AudiobookDailyStat,
     AudiobookEdition,
     AudiobookJob,
     AudiobookPlaybackSession,
@@ -337,6 +339,121 @@ class AudiobookDetail(BaseHandler):
             "generation": _generation_capability(self, book),
             "backup_retention": _backup_retention(),
         }
+
+    @js
+    @is_admin
+    def delete(self, book_id):
+        book_id = int(book_id)
+        storage = AudiobookStorage()
+        editions = self.session.query(AudiobookEdition).filter(AudiobookEdition.book_id == book_id).all()
+        jobs = self.session.query(AudiobookJob).filter(AudiobookJob.book_id == book_id).all()
+        edition_ids = [edition.id for edition in editions]
+        job_ids = [job.id for job in jobs]
+        chapter_ids = (
+            [
+                chapter_id
+                for (chapter_id,) in self.session.query(AudiobookChapter.id)
+                .filter(AudiobookChapter.edition_id.in_(edition_ids))
+                .all()
+            ]
+            if edition_ids
+            else []
+        )
+
+        active_jobs_cancelled = 0
+        for job in jobs:
+            if job.status in ACTIVE_JOB_STATUSES:
+                request_cancel(storage, job)
+                active_jobs_cancelled += 1
+
+        deleted = {
+            "editions": len(edition_ids),
+            "chapters": 0,
+            "jobs": len(job_ids),
+            "progress": 0,
+            "bookmarks": 0,
+            "sessions": 0,
+            "daily_stats": 0,
+            "podcast_audits": 0,
+            "podcast_preferences": 0,
+            "active_jobs_cancelled": active_jobs_cancelled,
+        }
+        if edition_ids:
+            deleted["bookmarks"] = (
+                self.session.query(AudiobookBookmark)
+                .filter(AudiobookBookmark.edition_id.in_(edition_ids))
+                .delete(synchronize_session=False)
+            )
+            deleted["progress"] = (
+                self.session.query(AudiobookProgress)
+                .filter(AudiobookProgress.edition_id.in_(edition_ids))
+                .delete(synchronize_session=False)
+            )
+            deleted["sessions"] = (
+                self.session.query(AudiobookPlaybackSession)
+                .filter(AudiobookPlaybackSession.edition_id.in_(edition_ids))
+                .delete(synchronize_session=False)
+            )
+
+        daily_stat_filters = [AudiobookDailyStat.book_id == book_id]
+        podcast_audit_filters = [PodcastAccessLog.book_id == book_id]
+        if edition_ids:
+            podcast_audit_filters.append(PodcastAccessLog.edition_id.in_(edition_ids))
+        if chapter_ids:
+            daily_stat_filters.append(AudiobookDailyStat.chapter_id.in_(chapter_ids))
+            podcast_audit_filters.append(PodcastAccessLog.chapter_id.in_(chapter_ids))
+        deleted["daily_stats"] = (
+            self.session.query(AudiobookDailyStat).filter(or_(*daily_stat_filters)).delete(synchronize_session=False)
+        )
+        deleted["podcast_audits"] = (
+            self.session.query(PodcastAccessLog).filter(or_(*podcast_audit_filters)).delete(synchronize_session=False)
+        )
+
+        subscriptions = self.session.query(PodcastSubscription).all()
+        for subscription in subscriptions:
+            hidden_ids = list((subscription.hidden_books or {}).get("ids", []))
+            filtered_ids = []
+            for value in hidden_ids:
+                try:
+                    matches_book = int(value) == book_id
+                except (TypeError, ValueError):
+                    matches_book = False
+                if not matches_book:
+                    filtered_ids.append(value)
+            if filtered_ids != hidden_ids:
+                subscription.hidden_books = {**(subscription.hidden_books or {}), "ids": filtered_ids}
+                deleted["podcast_preferences"] += 1
+
+        if edition_ids:
+            deleted["chapters"] = (
+                self.session.query(AudiobookChapter)
+                .filter(AudiobookChapter.edition_id.in_(edition_ids))
+                .delete(synchronize_session=False)
+            )
+        if job_ids:
+            self.session.query(AudiobookJob).filter(AudiobookJob.id.in_(job_ids)).delete(synchronize_session=False)
+        if edition_ids:
+            self.session.query(AudiobookEdition).filter(AudiobookEdition.id.in_(edition_ids)).delete(synchronize_session=False)
+        self.session.commit()
+
+        cleanup_failures = 0
+        for directory in [storage.job_dir(job_id) for job_id in job_ids] + [
+            storage.edition_dir(edition_id) for edition_id in edition_ids
+        ]:
+            try:
+                if directory.is_dir():
+                    shutil.rmtree(directory)
+            except OSError:
+                cleanup_failures += 1
+                logging.exception("failed to remove audiobook directory after deleting book %s", book_id)
+        if cleanup_failures:
+            return {
+                "err": "audiobook.cleanup_failed",
+                "msg": _("有声书数据已删除，但部分媒体文件清理失败，请检查服务日志"),
+                "deleted": deleted,
+                "cleanup_failures": cleanup_failures,
+            }
+        return {"err": "ok", "deleted": deleted}
 
 
 class AudiobookJobCreate(BaseHandler):

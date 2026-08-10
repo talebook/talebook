@@ -28,6 +28,7 @@ RESOURCE_ATTRIBUTES = {
     "video": ("src", "poster"),
 }
 CSS_URL_PATTERN = re.compile(r"url\(\s*(['\"]?)(.*?)\1\s*\)", re.IGNORECASE)
+TEMPLATE_PATH = Path("TEMPLATE.html")
 
 
 def css_has_external_resource(css):
@@ -105,6 +106,8 @@ class DesignHTMLParser(HTMLParser):
 
 def validate_path(repo_root, design_root, path):
     relative_path = path.relative_to(design_root)
+    if relative_path == TEMPLATE_PATH:
+        return True
     if len(relative_path.parts) != 2:
         return False
 
