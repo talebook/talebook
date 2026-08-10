@@ -39,11 +39,10 @@ Talebook 提供独立的 [Agent Skill](https://github.com/talebook/skills)，可
 * **远程书库**：浏览远程书库与网络书源，将搜索到的内容保存到本地书库；
 * **管理与部署**：执行经过确认的管理员操作，并辅助使用 Docker Compose 部署或更新 Talebook。
 
-在支持 Agent Skills 的 AI 工具中，可以先查看仓库提供的 Skill，再安装 `talebook`：
+在支持 Agent Skills 的 AI 工具中，可使用以下命令全局安装 `talebook` Skill：
 
 ```bash
-npx skills add talebook/skills --list
-npx skills add talebook/skills --skill talebook
+npx skills add talebook/skills -g
 ```
 
 连接实例时建议通过环境变量提供站点和登录信息，避免密码进入命令历史：
