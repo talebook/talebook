@@ -50,9 +50,14 @@ if [ "x$permission" != "x$PUID:$PGID" ]; then
     echo "updating '/data/' permission to $PUID:$PGID"
     chown -R talebook:talebook /data
     echo "$PUID:$PGID" > $permission_file
+else
+    # settings 目录体积很小；标记命中时仍定向修复，避免宿主目录重建或预置文件复制后属主失真。
+    chown -R talebook:talebook /data/books/settings || exit 1
 fi
 
 # 设置系统文件的权限
+# .env 通过同目录临时文件原子替换；只调整目录节点，不递归修改 app 源码与依赖。
+chown talebook:talebook /var/www/talebook/app
 chown -R talebook:talebook \
   /run/talebook \
   /data/books/ssl \
@@ -80,15 +85,24 @@ if [ -f "${APP_DIR}/package.json" ] && [ ! -d "${APP_DIR}/node_modules" ]; then
   cd "${APP_DIR}" && gosu talebook:talebook npm install
 fi
 
-# 检测权限
-TEST_WRITE_FILE=/data/books/library/test_writeable.txt
-date > $TEST_WRITE_FILE
-if [ $? -ne 0 ]; then
-    echo "目录权限异常，无法写入";
-    exit 1
-else
-    rm $TEST_WRITE_FILE
-fi
+# 以业务进程身份覆盖两个可能来自不同挂载的目录，并验证配置原子写入所需的重命名能力。
+check_atomic_write() {
+    directory=$1
+    gosu talebook:talebook sh -c '
+        set -eu
+        tmp=$(mktemp "$1/.talebook-write-test.XXXXXX")
+        moved="${tmp}.replace"
+        trap '\''rm -f "$tmp" "$moved"'\'' 0
+        mv "$tmp" "$moved"
+    ' talebook-write-check "$directory"
+}
+
+for directory in /data/books/library /data/books/settings; do
+    if ! check_atomic_write "$directory"; then
+        echo "目录权限异常，无法以 PUID/PGID 原子写入 $directory"
+        exit 1
+    fi
+done
 
 # 启动
 export PYTHONDONTWRITEBYTECODE=1

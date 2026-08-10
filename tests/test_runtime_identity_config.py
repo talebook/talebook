@@ -45,3 +45,22 @@ def test_start_scripts_prepare_nginx_runtime_directories():
         assert "/var/log/nginx" in script
         assert "PUID=0 runs Talebook application processes as root" in script
         assert "chmod 0600 /data/books/ssl/ssl.key" in script
+
+
+def test_start_scripts_grant_atomic_nuxt_config_parent_without_recursive_app_chown():
+    for relative_path in ("docker/start.sh", "docker/start-dev.sh"):
+        script = read(relative_path)
+
+        assert "chown talebook:talebook /var/www/talebook/app" in script
+        recursive_chown = script.split("chown -R talebook:talebook \\", 1)[1].split("\n\n", 1)[0]
+        assert "  /var/www/talebook/app \\" not in recursive_chown
+
+
+def test_ssr_start_repairs_settings_and_probes_both_mounts_as_application_user():
+    script = read("docker/start-dev.sh")
+
+    assert "chown -R talebook:talebook /data/books/settings || exit 1" in script
+    assert "gosu talebook:talebook sh -c" in script
+    assert "for directory in /data/books/library /data/books/settings" in script
+    assert "mktemp" in script
+    assert 'mv "$tmp" "$moved"' in script

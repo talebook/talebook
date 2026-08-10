@@ -26,6 +26,12 @@ STATUS_DIR = os.environ.get("TALEBOOK_STATUS_DIR", "/var/www/talebook/status")
 RUN_USER = os.environ.get("TALEBOOK_RUN_USER", "talebook")
 
 SCHEMA_VERSION = 1
+ATOMIC_WRITE_PROBE = """set -eu
+tmp=$(mktemp "$1/.talebook-write-test.XXXXXX")
+moved="${tmp}.replace"
+trap 'rm -f "$tmp" "$moved"' 0
+mv "$tmp" "$moved"
+"""
 
 
 def _status_path():
@@ -62,26 +68,36 @@ def run(cmd):
     return result.returncode == 0
 
 
+def check_atomic_write(directory):
+    """以业务进程身份验证目录支持同目录临时文件和原子替换。"""
+    identity = "%s:%s" % (RUN_USER, RUN_USER)
+    cmd = ["gosu", identity, "sh", "-c", ATOMIC_WRITE_PROBE, "talebook-write-check", directory]
+    return run(cmd)
+
+
 def check_permission():
-    """校验 /data/books 的属主与写入权限，仅在 PUID/PGID 变化时重新 chown（避免大型书库每次重启都全量 chown）。"""
+    """修复 /data/books 的属主，并校验书库与配置目录的原子写入能力。"""
     permission_file = os.path.join(DATA_DIR, ".permission")
     current = "%s:%s" % (os.environ.get("PUID", "0"), os.environ.get("PGID", "0"))
+    books_dir = os.path.join(DATA_DIR, "books")
+    settings_dir = os.path.join(books_dir, "settings")
     previous = None
     if os.path.exists(permission_file):
         with open(permission_file) as f:
             previous = f.read().strip()
 
     if previous != current:
-        books_dir = os.path.join(DATA_DIR, "books")
         if not run(["chown", "-R", "%s:%s" % (RUN_USER, RUN_USER), books_dir]):
             return False, "permission_denied"
         with open(permission_file, "w") as f:
             f.write(current)
-
-    test_file = os.path.join(DATA_DIR, "books", "library", "test_writeable.txt")
-    write_test = "date > '{0}' && rm -f '{0}'".format(test_file)
-    if not run(["gosu", "%s:%s" % (RUN_USER, RUN_USER), "sh", "-c", write_test]):
+    elif not run(["chown", "-R", "%s:%s" % (RUN_USER, RUN_USER), settings_dir]):
+        # settings 很小，标记命中时仍定向修复，避免宿主目录重建或预置文件复制后属主失真。
         return False, "permission_denied"
+
+    for directory in (os.path.join(books_dir, "library"), settings_dir):
+        if not check_atomic_write(directory):
+            return False, "permission_denied"
 
     return True, None
 
