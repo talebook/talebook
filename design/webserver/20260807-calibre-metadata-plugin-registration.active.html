@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>slim runtime 的 Calibre 元数据插件注册修复</title>
+  <style>
+    :root { color-scheme:light; --ink:#25231f; --muted:#68645d; --line:#dedbd4; --paper:#fff; --bg:#f7f6f2; --accent:#4f46a5; --soft:#f0eefb; --ok:#267257; --warn:#966319; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.65 "Anthropic Sans",-apple-system,"system-ui","Segoe UI",sans-serif; }
+    main { width:min(1040px,calc(100% - 32px)); margin:32px auto 64px; }
+    header,section { margin-bottom:18px; padding:24px 28px; border:0.5px solid var(--line); border-radius:16px; background:var(--paper); }
+    header { border-top:5px solid var(--accent); }
+    h1 { margin:0 0 8px; font-size:28px; font-weight:500; }
+    h2 { margin:0 0 12px; font-size:20px; font-weight:500; }
+    h3 { margin:18px 0 8px; font-size:16px; font-weight:500; }
+    p,ul { margin:8px 0; }
+    code { padding:2px 5px; border-radius:5px; background:#efeee9; }
+    .lead { color:var(--muted); font-size:16px; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .tag { padding:4px 10px; border-radius:999px; color:var(--muted); background:#efeee9; font-size:13px; }
+    .status { color:var(--warn); background:#fff3dc; font-weight:500; }
+    .callout { padding:12px 15px; border-left:4px solid var(--accent); background:var(--soft); }
+    .diagram { overflow-x:auto; margin:18px 0 8px; }
+    table { width:100%; border-collapse:collapse; margin:12px 0; }
+    th,td { padding:9px 11px; border:0.5px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f7f6f2; font-weight:500; }
+    .pending { color:var(--warn); font-weight:500; }
+    footer { color:var(--muted); text-align:center; font-size:13px; }
+    @media (max-width:720px) { main{width:min(100% - 20px,1040px);margin-top:10px} header,section{padding:20px} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>slim runtime 的 Calibre 元数据插件注册修复</h1>
+    <p class="lead">让 production slim 镜像中的 Google 与 Amazon.com 元数据源进入 Calibre identify 注册表，并用真实调度链路测试防止“插件缺失却静默返回空结果”。</p>
+    <div class="meta">
+      <span class="tag status">状态：ACTIVE</span>
+      <span class="tag">创建日期：2026-08-07</span>
+      <span class="tag">所属模块：webserver</span>
+      <span class="tag">影响范围：Calibre 初始化、元数据查询、Docker 测试</span>
+      <span class="tag">需求来源：Multica TAL-7 / GitHub Issue #907</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>原始诉求与根因</h2>
+    <p>production 镜像使用 <code>talebook/talebook-base:slim-v8.5.0</code>。镜像保留了 <code>google.py</code> 与 <code>amazon.py</code>，但设置了 standalone converter 模式并裁掉 <code>calibre.devices</code>。完整的 <code>calibre.customize.builtins</code> 因设备模块缺失而无法导入，standalone 内置集合又不包含元数据源，最终 identify 注册表为空。</p>
+    <div class="callout">已在固定 digest <code>sha256:4bca0299…be5e</code> 中复现：<code>initialize_plugins()</code> 后 identify 插件为 <code>[]</code>；现有 <code>patch_plugins()</code> 只替换已经注册的插件，不能创建缺失项。</div>
+  </section>
+
+  <section>
+    <h2>目标与边界</h2>
+    <ul>
+      <li>启动 Calibre 后，Google 与 Amazon.com 都能在启用的 identify 注册表中找到。</li>
+      <li>只在来源缺失时补充 slim 镜像内已有的官方插件类；完整 Calibre runtime 保持原初始化结果。</li>
+      <li>初始化必须幂等且并发安全，不能重复注册或在请求并发时重建注册表。</li>
+      <li>请求的来源仍不可用时，抛出带来源名称的专用异常并写错误日志，不能伪装成普通空结果。</li>
+      <li>测试必须经过真实 <code>calibre.ebooks.metadata.sources.identify.identify()</code> 调度；只替换已注册插件实例的网络方法以提供可控结果。</li>
+    </ul>
+    <p><strong>非目标：</strong>不恢复 slim 镜像中全部设备驱动，不修改 talebook-base，不改变元数据源优先级、搜索结果格式或外部站点协议。</p>
+  </section>
+
+  <section>
+    <h2>方案</h2>
+    <div class="diagram">
+      <svg width="100%" viewBox="0 0 680 500" role="img" xmlns="http://www.w3.org/2000/svg">
+        <title>Calibre 元数据插件注册与查询流程</title>
+        <desc>启动时检查 identify 注册表，在 slim runtime 中补充 Google 和 Amazon 类并重新初始化，随后查询通过真实 identify 调度；缺失来源走明确错误分支。</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <rect x="245" y="24" width="190" height="46" rx="23" fill="rgb(238,237,249)" stroke="rgb(161,156,210)" stroke-width="0.5"/>
+        <text x="340" y="52" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="14" font-weight="500" fill="rgb(62,52,130)">init_calibre()</text>
+        <path d="M340 70V102" fill="none" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <rect x="210" y="104" width="260" height="62" rx="10" fill="rgb(232,241,250)" stroke="rgb(134,174,210)" stroke-width="0.5"/>
+        <text x="340" y="130" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="14" font-weight="500" fill="rgb(36,83,124)">检查启用的 identify 注册表</text>
+        <text x="340" y="151" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="12" fill="rgb(65,91,113)">Google / Amazon.com 是否齐全？</text>
+        <path d="M210 135H132V196" fill="none" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="151" y="124" font-family="Anthropic Sans, system-ui, sans-serif" font-size="12" fill="rgb(104,100,93)">否</text>
+        <rect x="42" y="198" width="180" height="82" rx="10" fill="rgb(251,238,230)" stroke="rgb(216,157,121)" stroke-width="0.5"/>
+        <text x="132" y="225" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="14" font-weight="500" fill="rgb(139,72,38)">补充 bundled classes</text>
+        <text x="132" y="247" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="12" fill="rgb(120,79,58)">GoogleBooks + Amazon</text>
+        <text x="132" y="265" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="12" fill="rgb(120,79,58)">刷新 builtin_names 并初始化</text>
+        <path d="M470 135H548V196" fill="none" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="513" y="124" font-family="Anthropic Sans, system-ui, sans-serif" font-size="12" fill="rgb(104,100,93)">是</text>
+        <rect x="458" y="198" width="180" height="82" rx="10" fill="rgb(232,245,238)" stroke="rgb(125,185,154)" stroke-width="0.5"/>
+        <text x="548" y="225" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="14" font-weight="500" fill="rgb(37,105,78)">保留完整 runtime</text>
+        <text x="548" y="247" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="12" fill="rgb(64,105,87)">不修改已注册插件</text>
+        <text x="548" y="265" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="12" fill="rgb(64,105,87)">仅执行后续补丁检查</text>
+        <path d="M132 280V316H340" fill="none" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <path d="M548 280V316H340" fill="none" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <rect x="218" y="318" width="244" height="62" rx="10" fill="rgb(238,237,249)" stroke="rgb(161,156,210)" stroke-width="0.5"/>
+        <text x="340" y="344" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="14" font-weight="500" fill="rgb(62,52,130)">查询入口校验目标来源</text>
+        <text x="340" y="365" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="12" fill="rgb(84,78,132)">存在则交给 Calibre identify()</text>
+        <path d="M340 380V412" fill="none" stroke="rgb(115,114,108)" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <rect x="212" y="414" width="256" height="54" rx="27" fill="rgb(232,245,238)" stroke="rgb(125,185,154)" stroke-width="0.5"/>
+        <text x="340" y="438" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="14" font-weight="500" fill="rgb(37,105,78)">真实插件调用并返回 Metadata</text>
+        <text x="340" y="456" text-anchor="middle" font-family="Anthropic Sans, system-ui, sans-serif" font-size="12" fill="rgb(64,105,87)">缺失则记录来源并抛专用异常</text>
+      </svg>
+    </div>
+    <h3>注册策略</h3>
+    <p>新增一个带锁的幂等初始化函数。它先读取 <code>metadata_plugins({"identify"})</code>；只有目标来源缺失时，才从镜像中现存的 Calibre source 模块导入类，加入 standalone 的 <code>builtin_plugins</code> 与 <code>builtin_names</code>，并调用 Calibre 自身的 <code>initialize_plugins()</code> 完成实例化、排序和配置应用。</p>
+    <h3>调用与诊断</h3>
+    <p><code>init_calibre()</code> 在 Calibre 路径建立后主动执行初始化，避免首次并发请求重建注册表。查询入口仍重复做廉价幂等检查以覆盖直接调用。目标插件缺失时使用 <code>CalibreMetadataSourceUnavailable</code>，且 ISBN/书名包装层不吞掉该异常。</p>
+  </section>
+
+  <section>
+    <h2>测试计划与验收状态</h2>
+    <table>
+      <thead><tr><th>场景</th><th>断言</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>slim 注册</td><td>固定 slim 基础镜像中，启动初始化后 Google 与 Amazon.com 都进入启用的 identify 注册表。</td><td>通过：production 镜像中分别注册版本 1.1.2 与 1.3.13。</td></tr>
+        <tr><td>真实调度</td><td>以可控插件实例替换网络动作，Calibre 的真实 identify dispatcher 分别进入 Google 和 Amazon.com。</td><td>通过：两个参数化调度用例均命中目标插件并返回可控 Metadata。</td></tr>
+        <tr><td>幂等性</td><td>重复初始化不增加同名插件，也不重建已完备的注册表。</td><td>通过：重复调用前后两个插件实例标识保持一致。</td></tr>
+        <tr><td>缺失诊断</td><td>请求不存在的已配置来源时记录来源名称并抛专用异常，包装层不返回普通空结果。</td><td>通过：异常类型、来源名称与错误日志均有断言。</td></tr>
+        <tr><td>回归与规范</td><td>相关 pytest、全量 Docker pytest、Python format/lint、production 镜像构建与设计检查通过。</td><td>通过：详见下方执行记录。</td></tr>
+      </tbody>
+    </table>
+    <h3>实际执行记录</h3>
+    <ul>
+      <li><code>pytest tests/test_calibre_metadata.py -v</code>（Docker slim test stage）— 5 passed；覆盖注册、幂等、Google/Amazon 真实调度与缺失诊断。</li>
+      <li><code>pytest tests/test_calibre_metadata.py tests/test_autofill.py tests/test_main.py -q</code> — 93 passed、1 skipped；覆盖元数据服务和 Tornado HTTP 回归。</li>
+      <li><code>pytest --log-file=unittest.log --log-level=INFO tests -q</code> — 813 passed、20 skipped、21 warnings，耗时 70.29 秒。</li>
+      <li><code>ruff check webserver --no-cache</code> 与 <code>ruff format --diff webserver --output-format concise --no-cache</code> — 通过，100 个文件已格式化。</li>
+      <li><code>docker build --target production --build-arg GIT_VERSION=TAL-7 -t talebook/issue-907-fix -f Dockerfile .</code> — 通过。</li>
+      <li>production 镜像执行 <code>main.init_calibre()</code> 后检查注册表 — Google 1.1.2 与 Amazon.com 1.3.13 均已启用。</li>
+    </ul>
+    <p>剩余风险：该修复使用 Calibre UI 模块暴露的 registry globals 补齐 standalone 集合，Calibre 大版本改变内部接口时可能需要同步调整；已通过固定 8.5.0 production 测试与明确失败诊断控制。本次在 amd64 production 镜像验证，未执行 arm64/armv7 容器；逻辑不含架构分支。外部 Google/Amazon 网络可用性不属于注册修复的稳定测试条件，因此测试用可控插件动作隔离网络。</p>
+  </section>
+
+  <footer>Talebook 内部开发方案 · ACTIVE · TAL-7 / GitHub Issue #907</footer>
+</main>
+</body>
+</html>
