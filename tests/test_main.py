@@ -282,6 +282,20 @@ class TestAppWithoutLogin(TestApp):
         rsp = self.fetch("/api/book/1.epub", follow_redirects=False)
         self.assertEqual(rsp.code, 302)
 
+    def test_guest_read_content_uses_read_permission_not_download_permission(self):
+        original_read = main.CONF["ALLOW_GUEST_READ"]
+        original_download = main.CONF["ALLOW_GUEST_DOWNLOAD"]
+        try:
+            main.CONF["ALLOW_GUEST_READ"] = True
+            main.CONF["ALLOW_GUEST_DOWNLOAD"] = False
+            rsp = self.fetch("/read/%d/content.epub" % BID_EPUB, follow_redirects=False)
+            self.assertEqual(rsp.code, 200)
+            self.assertEqual(rsp.headers["Content-Type"], "application/epub+zip")
+            self.assertTrue(rsp.body.startswith(b"PK"))
+        finally:
+            main.CONF["ALLOW_GUEST_READ"] = original_read
+            main.CONF["ALLOW_GUEST_DOWNLOAD"] = original_download
+
     def test_push(self):
         d = self.json("/api/book/1/mailto", method="POST", body=json.dumps({"email": "unittest@gmail.com"}))
         self.assertEqual(d["err"], "user.need_login")
@@ -660,6 +674,38 @@ class TestBook(TestWithUserLogin):
             for bid in BIDS:
                 rsp = self.fetch("/read/%s" % bid, follow_redirects=False)
                 self.assertEqual(rsp.code, 302 if bid == BID_PDF or bid == BID_TXT else 200)
+
+    def test_readest_launch_and_explicit_legacy_fallback(self):
+        with mock.patch.dict(webserver.handlers.book.CONF, {"EPUB_VIEWER": "readest.html"}):
+            rsp = self.fetch("/read/%d" % BID_EPUB)
+            body = rsp.body.decode("utf-8")
+            self.assertEqual(rsp.code, 200)
+            self.assertIn("/read/1/content.epub", body)
+            self.assertIn("talebook", body)
+            self.assertIn("/read/1?reader=creader", body)
+
+            rsp = self.fetch("/read/%d?reader=creader" % BID_EPUB)
+            body = rsp.body.decode("utf-8")
+            self.assertEqual(rsp.code, 200)
+            self.assertIn("candle-reader.es.js", body)
+            self.assertNotIn("/read/1/content.epub", body)
+
+    def test_read_content_does_not_require_download_permission(self):
+        with mock_permission() as user:
+            user.set_permission("S")
+            rsp = self.fetch("/read/%d/content.epub" % BID_EPUB)
+            self.assertEqual(rsp.code, 200)
+            self.assertEqual(rsp.headers["Content-Type"], "application/epub+zip")
+            self.assertEqual(rsp.headers["Cache-Control"], "private, no-store")
+            self.assertEqual(rsp.headers["X-Content-Type-Options"], "nosniff")
+
+            partial = self.fetch("/read/%d/content.epub" % BID_EPUB, headers={"Range": "bytes=0-3"})
+            self.assertEqual(partial.code, 206)
+            self.assertEqual(partial.headers["Content-Range"], "bytes 0-3/%d" % len(rsp.body))
+            self.assertEqual(partial.body, rsp.body[:4])
+
+            download = self.fetch("/api/book/%d.epub" % BID_EPUB)
+            self.assertEqual(download.code, 403)
 
     def test_read_waits_for_conversion(self):
         with mock.patch("webserver.services.convert.ConvertService.convert_and_save", return_value="Yo"):
@@ -1249,6 +1295,12 @@ class TestBookDetailScope(TestApp):
         with temporary_book_scope(BID_EPUB, "private", collector_id=1):
             with mock.patch.object(BaseHandler, "user_id", return_value=2):
                 rsp = self.fetch("/read/%d" % BID_EPUB)
+                self.assertEqual(rsp.code, 404)
+
+    def test_other_user_cannot_read_private_epub_archive_by_direct_url(self):
+        with temporary_book_scope(BID_EPUB, "private", collector_id=1):
+            with mock.patch.object(BaseHandler, "user_id", return_value=2):
+                rsp = self.fetch("/read/%d/content.epub" % BID_EPUB)
                 self.assertEqual(rsp.code, 404)
 
     def test_other_user_cannot_read_private_epub_content_by_direct_url(self):

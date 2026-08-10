@@ -993,7 +993,7 @@ const cards = computed(() => [
                 items: [{text: t('admin.settings.option.pinyinDir'), value: 'en'}, {text: t('admin.settings.option.chineseDir'), value: 'utf8'} ]
             },
             { icon: 'mdi-information', key: 'EPUB_VIEWER', label: t('admin.settings.label.epubViewer'), type: 'select',
-                items: [{text: t('admin.settings.option.oldEpubReader'), value: 'epubjs.html'}, {text: t('admin.settings.option.candleReader'), value: 'creader.html'} ]
+                items: [{text: t('admin.settings.option.oldEpubReader'), value: 'epubjs.html'}, {text: t('admin.settings.option.candleReader'), value: 'creader.html'}, {text: t('admin.settings.option.readestReader'), value: 'readest.html'} ]
             },
             { icon: 'mdi-information', key: 'avatar_service', label: t('admin.settings.label.avatarService') },
             { icon: 'mdi-information', key: 'MAX_UPLOAD_SIZE', label: t('admin.settings.label.maxUploadSize') },

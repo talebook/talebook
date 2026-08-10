@@ -49,6 +49,18 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
         await expect(page.getByLabel('每本有声书保留的历史版本数')).toHaveValue('3');
     });
 
+    test('高级设置可选择 Readest 并保留旧 EPUB 阅读器', async ({ page }) => {
+        await page.goto('/admin/settings');
+        await expect(page.locator('.loading-page')).toBeHidden({ timeout: 10000 });
+
+        await page.locator('.settings-nav-item', { hasText: '高级配置项' }).click();
+        await page.getByRole('combobox', { name: 'EPUB 阅读器' }).press('ArrowDown');
+
+        await expect(page.getByRole('option', { name: 'Readest' })).toBeVisible();
+        await expect(page.getByRole('option', { name: /Candle Reader/ })).toBeVisible();
+        await expect(page.getByRole('option', { name: /Epub Reader/ })).toBeVisible();
+    });
+
     test('基础信息中默认启用并可保存关闭网络书库展示开关', async ({ page }) => {
         await page.goto('/admin/settings');
         await expect(page.locator('.loading-page')).toBeHidden();

@@ -1,5 +1,52 @@
 # syntax=docker/dockerfile:1.6
 # ----------------------------------------
+# Readest 专用浏览器嵌入构建。源码与三个共享依赖均固定到可审计 commit；
+# 产物是 /readest/ 下的纯静态文件，运行时不增加 Node sidecar。
+FROM node:22-slim AS readest-prepared
+ARG READEST_COMMIT=40aec944b890965232810394e7acf7ae03ee52c3
+ARG FOLIATE_COMMIT=dd71f2be356563c16a23272686189fcfb45d0b82
+ARG SIMPLECC_COMMIT=5e5b56f5b82394e7df07f9171ac70f4578b24a32
+ARG JS_MDICT_COMMIT=d01bf62af872b1fbeacb2f18446460960e7400de
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+ENV COREPACK_ENABLE_PROJECT_SPEC=0
+
+ADD https://github.com/hehetoshang/readest.git#${READEST_COMMIT} /readest
+ADD https://github.com/hehetoshang/foliate-js.git#${FOLIATE_COMMIT} /vendor/foliate-js
+ADD https://github.com/readest/simplecc-wasm.git#${SIMPLECC_COMMIT} /vendor/simplecc-wasm
+ADD https://github.com/readest/js-mdict.git#${JS_MDICT_COMMIT} /vendor/js-mdict
+
+WORKDIR /readest
+RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
+# pnpm's normal recursive install can consider this external-workspace layout
+# current without creating package links. A deploy materializes a standalone,
+# fully linked Readest app and keeps the source checkout immutable/auditable.
+RUN --mount=type=cache,id=readest-pnpm,sharing=locked,target=/pnpm/store \
+    --mount=type=cache,id=readest-pnpm-meta,sharing=locked,target=/root/.cache/pnpm \
+    pnpm --pm-on-fail=ignore --filter @readest/readest-app deploy \
+        --prod=false --legacy --ignore-scripts --store-dir /pnpm/store /readest/apps/readest-app-deployed && \
+    test -x /readest/apps/readest-app-deployed/node_modules/.bin/mkdirp
+WORKDIR /readest/apps/readest-app-deployed
+# The deployment is already fully linked. Use npm only as a script runner so
+# pnpm does not try to reinterpret the standalone app as the original workspace.
+RUN test -f /vendor/foliate-js/vendor/pdfjs/annotation_layer_builder.css && \
+    test -x node_modules/.bin/postcss && \
+    sed -i 's/pnpm /npm run /g' package.json && \
+    npm run setup-vendors && \
+    cp /vendor/simplecc-wasm/dist/web/* public/vendor/simplecc/ && \
+    test -f public/vendor/pdfjs/pdf.min.mjs && \
+    test -f public/vendor/simplecc/simplecc_wasm.js && \
+    test -f public/vendor/jieba/jieba_rs_wasm.js
+
+FROM readest-prepared AS readest-builder
+WORKDIR /readest/apps/readest-app-deployed
+RUN npm run build-embedded-web
+COPY document/third-party/readest.md /readest/out/readest/SOURCE.md
+RUN cp /readest/LICENSE /readest/out/readest/LICENSE-AGPL-3.0.txt && test -f /readest/out/readest/index.html
+
+
+# ----------------------------------------
 # 第一阶段，拉取 node 基础镜像并安装依赖，执行构建
 FROM node:20-alpine AS builder
 ARG BUILD_COUNTRY=""
@@ -24,6 +71,8 @@ RUN npm run build-spa
 RUN rm -rf dist && cp -r .output/public dist
 RUN if [ ! -f dist/index.html ]; then cp dist/200.html dist/index.html; fi
 RUN cp -r dist package* /app-static/
+COPY --from=readest-builder /readest/out/readest /app-static/dist/readest
+COPY --from=readest-builder /readest/out/readest /app-ssr/.output/public/readest
 
 
 # ----------------------------------------

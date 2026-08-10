@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{{ book.title }}</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui,-apple-system,"Segoe UI","PingFang SC",sans-serif; }
+      html,body,#reader { width:100%; height:100%; margin:0; overflow:hidden; background:#f7f7f4; }
+      #reader { display:none; border:0; }
+      #state { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:24px; background:#f7f7f4; color:#252b2d; text-align:center; }
+      .panel { width:min(480px,100%); }
+      .spinner { width:42px; height:42px; margin:0 auto 22px; border:4px solid #d8dddc; border-top-color:#176b68; border-radius:50%; animation:spin 1s linear infinite; }
+      h1 { margin:0 0 10px; font-size:22px; }
+      p { margin:0 0 16px; color:#58666a; line-height:1.65; }
+      a { display:inline-flex; padding:9px 15px; border:1px solid #176b68; border-radius:999px; color:#176b68; text-decoration:none; font-weight:700; }
+      #details { display:none; margin-top:12px; font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+      @keyframes spin { to { transform:rotate(360deg); } }
+      @media (prefers-color-scheme:dark) { html,body,#reader,#state { background:#171a1b; } #state { color:#f1f3f2; } p { color:#aeb8b6; } }
+      @media (prefers-reduced-motion:reduce) { .spinner { animation:none; border-top-color:#d8dddc; } }
+    </style>
+  </head>
+  <body>
+    <iframe id="reader" title="Readest 阅读器" allow="fullscreen"></iframe>
+    <div id="state" role="status" aria-live="polite">
+      <div class="panel">
+        <div class="spinner" aria-hidden="true"></div>
+        <h1>{{ book.title }}</h1>
+        <p id="message">{% if is_ready %}正在安全加载 EPUB…{% else %}服务器正在将本书转换为 EPUB，完成后会自动打开。{% endif %}</p>
+        <a href="{{ readest_fallback_url }}">使用 Candle Reader 打开</a>
+        <div id="details"></div>
+      </div>
+    </div>
+    <script>
+      (() => {
+        const contentUrl = "{{ readest_content_url }}";
+        const fallbackUrl = "{{ readest_fallback_url }}";
+        const bookId = "{{ book.id }}";
+        const restoreProgress = {{ readest_progress_json | safe }};
+        const initiallyReady = {{ "true" if is_ready else "false" }};
+        const maxBytes = 512 * 1024 * 1024;
+        const state = document.getElementById('state');
+        const message = document.getElementById('message');
+        const details = document.getElementById('details');
+        const reader = document.getElementById('reader');
+        let objectUrl = null;
+        let retries = initiallyReady ? 1 : 180;
+
+        function fail(error) {
+          document.querySelector('.spinner').style.display = 'none';
+          message.textContent = 'Readest 无法打开本书，请重试或切换到 Candle Reader。';
+          details.style.display = 'block';
+          details.textContent = error instanceof Error ? error.message : String(error);
+        }
+
+        function retry() {
+          retries -= 1;
+          if (retries <= 0) {
+            fail(new Error('EPUB 转换或内容加载超时'));
+            return;
+          }
+          window.setTimeout(load, 2000);
+        }
+
+        async function verifyReadestAssets() {
+          const response = await fetch('/readest/index.html', { credentials: 'same-origin', cache: 'no-cache' });
+          if (!response.ok) throw new Error('Readest 静态资源缺失');
+          const shell = await response.text();
+          if (!shell.includes('Readest')) throw new Error('Readest 静态资源未正确构建');
+        }
+
+        async function load() {
+          try {
+            await verifyReadestAssets();
+            const response = await fetch(contentUrl, { credentials: 'same-origin', redirect: 'follow', cache: 'no-store' });
+            if (!response.ok) {
+              if (!initiallyReady && response.status === 404) return retry();
+              throw new Error(`EPUB 请求失败（${response.status}）`);
+            }
+            if (response.redirected) throw new Error('EPUB 请求被重定向，请重新登录');
+            const contentType = (response.headers.get('content-type') || '').toLowerCase();
+            if (contentType.includes('text/html') || contentType.includes('application/json')) {
+              throw new Error('服务器返回的不是 EPUB 文件');
+            }
+            const declaredSize = Number(response.headers.get('content-length') || 0);
+            if (declaredSize > maxBytes) throw new Error('EPUB 超过 512 MiB 浏览器嵌入上限');
+            const blob = await response.blob();
+            if (!blob.size || blob.size > maxBytes) throw new Error('EPUB 为空或超过 512 MiB 浏览器嵌入上限');
+            const magic = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+            if (magic[0] !== 0x50 || magic[1] !== 0x4b) throw new Error('EPUB 文件签名无效');
+
+            objectUrl = URL.createObjectURL(blob);
+            const params = new URLSearchParams({
+              talebook: '1',
+              moke: '1',
+              mokeBookId: bookId,
+              mokeServerUrl: window.location.origin,
+              file: objectUrl,
+            });
+            if (restoreProgress) params.set('mokeRestoreProgress', JSON.stringify(restoreProgress));
+            reader.src = `/readest/?${params.toString()}`;
+            reader.style.display = 'block';
+            state.style.display = 'none';
+          } catch (error) {
+            fail(error);
+          }
+        }
+
+        window.addEventListener('pagehide', () => {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+        }, { once: true });
+        document.querySelector('a').addEventListener('click', () => {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          window.location.href = fallbackUrl;
+        });
+        void load();
+      })();
+    </script>
+  </body>
+</html>

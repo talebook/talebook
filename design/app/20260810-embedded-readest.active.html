@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 同源嵌入 Readest 的架构、权限、构建、回退与验证方案。" />
+    <link rel="icon" href="data:," />
+    <title>Talebook 同源嵌入 Readest</title>
+    <style>
+      :root { color-scheme: light; --bg:#f4f7f8; --panel:#fff; --ink:#17232b; --muted:#52636f; --line:#cfdae0; --accent:#176b68; --soft:#e7f4f2; --warn:#9b5b09; --warn-soft:#fff4dd; --ok:#176744; --ok-soft:#e6f5ed; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:linear-gradient(150deg,#edf7f6,var(--bg) 35%); font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+      main { width:min(1080px,calc(100vw - 28px)); margin:0 auto; padding:28px 0 56px; }
+      header,section { margin-bottom:18px; padding:24px 28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 10px 28px rgba(30,55,65,.07); }
+      header { border-top:6px solid var(--accent); }
+      h1 { margin:0 0 10px; font-size:clamp(30px,5vw,48px); line-height:1.12; }
+      h2 { margin:0 0 14px; font-size:22px; }
+      h3 { margin:20px 0 8px; font-size:17px; }
+      p { margin:0 0 12px; }
+      ul,ol { margin:8px 0 0 22px; padding:0; }
+      li + li { margin-top:6px; }
+      code { padding:.12em .35em; border-radius:5px; background:#eef2f4; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+      .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      .chip { padding:5px 10px; border-radius:999px; background:#edf2f4; color:var(--muted); font-size:12px; font-weight:700; }
+      .chip.wip { color:var(--warn); background:var(--warn-soft); }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .box { padding:16px; border:1px solid var(--line); border-radius:14px; background:#fbfcfd; }
+      .box h3 { margin-top:0; }
+      .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
+      .step { padding:15px; border:1px solid #b9d8d4; border-radius:13px; background:var(--soft); }
+      .step b { display:block; margin-bottom:5px; }
+      .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:13px; }
+      table { width:100%; min-width:760px; border-collapse:collapse; }
+      th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { background:#f1f5f6; color:#40515c; font-size:12px; }
+      tr:last-child td { border-bottom:0; }
+      th:last-child,td:last-child { border-right:0; }
+      .warn,.good { padding:13px 15px; border-radius:12px; }
+      .warn { color:#6f430b; background:var(--warn-soft); border:1px solid #efd5a7; }
+      .good { color:var(--ok); background:var(--ok-soft); border:1px solid #b8dcc8; }
+      .pending { color:var(--warn); font-weight:800; }
+      @media (max-width:760px) { main { width:calc(100vw - 18px); padding-top:10px; } header,section { padding:20px 18px; border-radius:15px; } .grid,.flow { grid-template-columns:1fr; } }
+      @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+      @media print { body { background:#fff; } main { width:100%; } header,section { box-shadow:none; break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Talebook 同源嵌入 Readest</h1>
+        <p>在保留 `/read/{id}` 权限入口、转换流程和旧阅读器回退的前提下，构建专用 Readest 静态产物并由 Talebook 镜像同源托管。</p>
+        <div class="meta">
+          <span class="chip wip">状态：WIP</span>
+          <span class="chip">创建日期：2026-08-10</span>
+          <span class="chip">所属模块：app（跨 webserver / Docker）</span>
+          <span class="chip">需求来源：TAL-11</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>1. 原始诉求</h2>
+        <div class="warn">“让 Talebook Web 端可直接使用 Moke 维护的 Readest 阅读器，同时保留现有权限、历史、转换和旧阅读器回退能力；不要求用户另行部署或登录 Readest 云服务。”</div>
+        <p>首期聚焦 EPUB 与现有 MOBI/AZW/AZW3 转 EPUB 路径。PDF、TXT 保持原阅读器，直至 Range、内存、编码和定位能力达到同等可靠性。</p>
+      </section>
+
+      <section>
+        <h2>2. 目标与边界</h2>
+        <div class="grid">
+          <article class="box"><h3>目标</h3><ul><li>后台新增 Readest 选项，默认仍为 Candle Reader。</li><li>书籍内容只从同源、受阅读权限保护的接口进入浏览器 Blob。</li><li>登录用户保存并恢复 <code>moke.readest.progress.v1</code>。</li><li>转换、资源缺失、内容错误均有明确状态与旧阅读器入口。</li></ul></article>
+          <article class="box"><h3>非目标</h3><ul><li>不引入 Readest 账号、云同步、支付或外部存储。</li><li>不改变 PDF.js 与 TXT 阅读路径。</li><li>不承诺 Readest 笔记跨端同步。</li><li>不把 Readest AGPL 源码并入 Talebook 的 BSD 许可声明。</li></ul></article>
+        </div>
+      </section>
+
+      <section>
+        <h2>3. 用户与格式矩阵</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>场景</th><th>Readest</th><th>权限</th><th>失败与回退</th></tr></thead>
+          <tbody>
+            <tr><td>EPUB</td><td>直接加载归档 Blob</td><td>沿用可见性与在线阅读权限</td><td>显示错误并链接 Candle Reader</td></tr>
+            <tr><td>MOBI / AZW / AZW3</td><td>等待服务器生成 EPUB 后加载</td><td>与 EPUB 相同</td><td>转换超时可刷新或回退</td></tr>
+            <tr><td>PDF</td><td>本期不接入</td><td>保持原下载权限检查</td><td>继续 PDF.js</td></tr>
+            <tr><td>TXT</td><td>本期不接入</td><td>保持原规则</td><td>继续文本阅读页</td></tr>
+            <tr><td>匿名用户</td><td>受 <code>ALLOW_GUEST_READ</code> 控制</td><td>不要求下载权限</td><td>不读写账号进度</td></tr>
+            <tr><td>登录用户</td><td>可保存/恢复精确位置</td><td>激活状态与 <code>can_read</code> 不变</td><td>旧 schema 或书籍 ID 不符时忽略</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section>
+        <h2>4. 技术证据与门禁</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>观察</th><th>证据</th><th>决策</th></tr></thead>
+          <tbody>
+            <tr><td>Talebook 的 EPUB 入口已集中完成权限、历史与格式分流。</td><td><code>webserver/handlers/book.py:1605</code></td><td>继续以 <code>/read/{id}</code> 为唯一入口。</td></tr>
+            <tr><td>下载接口要求 <code>can_save</code>，不能用于仅有阅读权限的用户。</td><td><code>webserver/handlers/book.py:1019</code></td><td>新增只服务 EPUB 的阅读内容流，复用 <code>can_view_book</code> 与阅读权限。</td></tr>
+            <tr><td>Readest Web 默认拒绝 <code>file=</code>，但 Web AppService 可导入浏览器 <code>File</code>。</td><td><code>apps/readest-app/src/helpers/openWith.ts</code></td><td>仅在 <code>talebook=1</code> 时接收同源 Blob URL，拒绝任意 HTTP URL。</td></tr>
+            <tr><td>Readest 可静态导出，但 Web 动态分享路由需嵌入构建分支。</td><td><code>next.config.mjs</code> 与实际 <code>build-embedded-web</code></td><td>专用环境保持 Web 存储能力，关闭 runtime config/PWA，并输出到 <code>out/readest</code>。</td></tr>
+            <tr><td>当前静态产物约 156 MiB。</td><td>本地 <code>du -sh out/readest</code></td><td>本期不切换默认阅读器；PR 评审镜像增量后再决定后续瘦身。</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section>
+        <h2>5. 架构与数据流</h2>
+        <div class="flow">
+          <div class="step"><b>1. 权限入口</b><span><code>/read/{id}</code> 完成游客、账号、可见性、历史和格式判断。</span></div>
+          <div class="step"><b>2. 内容预取</b><span>Readest 启动页轮询受保护 EPUB 流，校验 HTTP、大小与 ZIP 魔数。</span></div>
+          <div class="step"><b>3. 同源嵌入</b><span>父页创建 Blob URL，Readest 仅将同源 Blob 转为临时 <code>File</code>。</span></div>
+          <div class="step"><b>4. 进度闭环</b><span>恢复经 schema/book-id 校验；翻页由同源 <code>fetch</code> 节流保存。</span></div>
+        </div>
+        <h3>阅读器选择与回退</h3>
+        <p><code>EPUB_VIEWER=readest.html</code> 启用新路径；<code>?reader=creader</code> 和 <code>?reader=epubjs</code> 是受控覆盖。管理员切回配置不需要迁移数据。</p>
+        <h3>构建拓扑</h3>
+        <p>Talebook 固定 Readest fork 及其 foliate-js、simplecc-wasm、js-mdict 依赖 commit。Docker 的独立 Node 24 build stage 生成静态产物，再复制到 SPA 和 SSR 都会托管的前端 public 根目录。运行时不启动额外 Node 服务。</p>
+      </section>
+
+      <section>
+        <h2>6. 安全、许可与运维</h2>
+        <ul>
+          <li>内容端点不接受文件路径参数，只从书籍 ID 解析 Calibre 已登记的 EPUB 路径；返回 <code>application/epub+zip</code>。</li>
+          <li>启动页拒绝重定向、HTML/JSON、非 ZIP 内容、空文件和超过 512 MiB 的响应。</li>
+          <li>Readest 嵌入参数只接受父页创建的同源 Blob URL；浏览器进度写入固定到当前 origin。</li>
+          <li>Readest 继续以 AGPLv3 独立作品和源码 commit 分发；镜像包含其许可证、源码地址、精确 commit 与第三方依赖声明。Talebook 自有代码继续 BSD-2-Clause。</li>
+          <li>Readest 构建资源缺失时不静默白屏；用户可立即返回 Candle Reader。默认配置保持 Candle Reader。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>7. 测试与验收</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>层级</th><th>覆盖</th><th>当前结果</th></tr></thead>
+          <tbody>
+            <tr><td>Readest 单元</td><td>同源 Blob 接收、恶意 URL 拒绝、浏览器进度 POST</td><td class="good">30 项定向测试通过</td></tr>
+            <tr><td>Readest 静态构建</td><td>Web AppService + export、basePath、无 runtime sidecar</td><td class="good"><code>build-embedded-web</code> 通过，15 个静态页面</td></tr>
+            <tr><td>Talebook 后端</td><td>权限矩阵、内容类型、格式分流、转换等待、回退</td><td class="good">完整后端测试 91 项通过、1 项跳过；Ruff 通过</td></tr>
+            <tr><td>Talebook 前端</td><td>后台选项与双语文案</td><td class="good">Chromium 定向用例 1 项通过；ESLint 0 错误（193 条既有警告）</td></tr>
+            <tr><td>生产镜像</td><td>SPA/SSR 资源复制、amd64/arm64 Dockerfile 语义</td><td class="good">builder 与 <code>docker build --check</code> 通过；两类产物均含 155.1 MiB Readest 与许可文件</td></tr>
+            <tr><td>真实浏览器</td><td>桌面/移动 EPUB、恢复、错误、转换与回退截图</td><td class="pending">后台选择器已在 Chromium 验证；完整阅读器场景待集成环境补测</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section>
+        <h2>8. 决策记录</h2>
+        <ol>
+          <li>选择静态产物同源托管，不采用 Next.js sidecar。</li>
+          <li>不复用下载接口，避免把“可阅读”错误收紧为“可下载”。</li>
+          <li>不直接把书籍 HTTP URL交给 Readest；由 Talebook 父页校验并转为 Blob。</li>
+          <li>本期不改变默认阅读器，原因是静态产物体积与外部 fork 稳定性仍需真实镜像评审。</li>
+          <li>最终测试无相关失败后，本文件已定稿为 <code>.active.html</code>。</li>
+        </ol>
+      </section>
+    </main>
+  </body>
+</html>

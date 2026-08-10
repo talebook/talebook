@@ -1602,31 +1602,110 @@ class BookUploadComplete(BookUploadBase):
         return self.import_uploaded_book(fpath, fmt)
 
 
+def require_online_read_permission(handler):
+    """Apply the shared online-reading gate without requiring download permission."""
+    guest_like = not handler.current_user or demo_mode.is_demo_restricted(CONF, handler.current_user)
+    if guest_like:
+        if not CONF["ALLOW_GUEST_READ"]:
+            handler.redirect("/login")
+            raise web.Finish()
+    elif handler.current_user.can_read():
+        if not handler.current_user.is_active():
+            raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
+    else:
+        raise web.HTTPError(403, reason=_("无权在线阅读"))
+    return guest_like
+
+
+class BookReadContent(BaseHandler, web.StaticFileHandler):
+    """Serve the EPUB archive to an embedded same-origin reader."""
+
+    def initialize(self):
+        self.root = "/"
+        self.default_filename = None
+        self.book_id = None
+        BaseHandler.initialize(self)
+
+    def prepare(self):
+        BaseHandler.prepare(self)
+        require_online_read_permission(self)
+
+    def parse_url_path(self, book_id):
+        book = self.get_book_or_404(book_id)
+        path = book.get("fmt_epub")
+        if not path:
+            raise web.HTTPError(404, reason=_("EPUB 尚未准备好"))
+        self.book_id = book["id"]
+        return path
+
+    @classmethod
+    def get_absolute_path(cls, root, path):
+        return path
+
+    def get_content_type(self):
+        return "application/epub+zip"
+
+    def set_extra_headers(self, path):
+        self.set_header("Content-Disposition", 'inline; filename="book-%s.epub"' % self.book_id)
+        self.set_header("Cache-Control", "private, no-store")
+        self.set_header("X-Content-Type-Options", "nosniff")
+
+
 class BookRead(BaseHandler):
+    EPUB_VIEWERS = {
+        "readest": "readest.html",
+        "creader": "creader.html",
+        "epubjs": "epubjs.html",
+    }
+
+    def selected_epub_viewer(self):
+        requested = self.get_argument("reader", "")
+        if requested:
+            return self.EPUB_VIEWERS.get(requested, "creader.html")
+        configured = CONF.get("EPUB_VIEWER", "creader.html")
+        if configured not in self.EPUB_VIEWERS.values():
+            return "creader.html"
+        return configured
+
+    def readest_progress(self, book_id):
+        user_id = self.user_id()
+        if not user_id:
+            return None
+        reading_state = (
+            self.session.query(ReadingState)
+            .filter(ReadingState.book_id == int(book_id), ReadingState.reader_id == user_id)
+            .first()
+        )
+        if not reading_state:
+            return None
+        progress = reading_state.get_progress()
+        if not isinstance(progress, dict) or progress.get("schema") != "moke.readest.progress.v1":
+            return None
+        if str(progress.get("moke_book_id", "")) != str(book_id):
+            return None
+        return progress
+
     def render_epub(self, book, is_ready, audiobook_edition=None):
+        viewer = self.selected_epub_viewer()
+        progress = self.readest_progress(book["id"]) if viewer == "readest.html" else None
+        progress_json = json.dumps(progress, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e")
         return self.html_page(
-            "book/" + CONF["EPUB_VIEWER"],
+            "book/" + viewer,
             {
                 "book": book,
                 "epub_dir": "/get/extract/%s" % book["id"],
                 "is_ready": is_ready,
                 "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
                 "audiobook_edition_id": audiobook_edition.id if audiobook_edition else None,
+                "readest_content_url": "/read/%s/content.epub" % book["id"],
+                "readest_fallback_url": "/read/%s?reader=creader" % book["id"],
+                "readest_progress_json": progress_json,
             },
         )
 
     def get(self, id):
-        # 演示模式下，未登录访客与演示账号的在线阅读权限统一遵循“访客权限”配置，
-        # 忽略演示账号自身的权限位（该账号默认拥有完整权限，用于伪装管理员体验）。
-        guest_like = not self.current_user or demo_mode.is_demo_restricted(CONF, self.current_user)
-        if guest_like:
-            if not CONF["ALLOW_GUEST_READ"]:
-                return self.redirect("/login")
-        elif self.current_user.can_read():
-            if not self.current_user.is_active():
-                raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
-        else:
-            raise web.HTTPError(403, reason=_("无权在线阅读"))
+        # 演示账号与未登录访客继续统一遵循访客在线阅读配置。
+        guest_like = require_online_read_permission(self)
 
         book = self.get_book_or_404(id)
         book_id = book["id"]
@@ -2578,6 +2657,7 @@ def routes():
         (r"/api/book/([0-9]+)/delete_format", BookDeleteFormat),
         (r"/api/book/([0-9]+)/separate", BookSeparate),
         (r"/api/book/([0-9]+)/savemeta", BookSaveMeta),
+        (r"/read/([0-9]+)/content\.epub", BookReadContent),
         (r"/read/([0-9]+)", BookRead),
         (r"/api/read/txt", TxtRead),
         (r"/api/book/txt/init", BookTxtInit),
