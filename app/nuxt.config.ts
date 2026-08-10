@@ -13,13 +13,13 @@ export default defineNuxtConfig({
         '@pinia/nuxt',
         '@nuxtjs/i18n'
     ],
-    css: [
-        '@mdi/font/css/materialdesignicons.css'
-    ],
     vuetify: {
         vuetifyOptions: {
             icons: {
-                defaultSet: 'mdi',
+                // A pre-create plugin replaces this with the repository-owned
+                // SVG registry. `custom` prevents the module from adding a CDN
+                // or icon-font stylesheet before that hook runs.
+                defaultSet: 'custom',
             },
             theme: {
                 defaultTheme: 'light',
