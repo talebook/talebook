@@ -30,6 +30,41 @@ A better online books library management website built on Calibre + Vue
 
 本项目曾用名：calibre-webserver
 
+## AI Skills — 用自然语言管理 Talebook
+
+Talebook 提供独立的 [Agent Skill](https://github.com/talebook/skills)，可让支持 Agent Skills 的 AI 工具通过自然语言安全地操作自托管实例：
+
+* **书库操作**：搜索和浏览书籍，上传、下载与收藏图书，管理书架、阅读状态和接收设备；
+* **有声书**：列出、查看和下载已发布的有声书；
+* **远程书库**：浏览远程书库与网络书源，将搜索到的内容保存到本地书库；
+* **管理与部署**：执行经过确认的管理员操作，并辅助使用 Docker Compose 部署或更新 Talebook。
+
+在支持 Agent Skills 的 AI 工具中，可使用以下命令全局安装 `talebook` Skill：
+
+```bash
+npx skills add talebook/skills -g
+```
+
+连接实例时建议通过环境变量提供站点和登录信息，避免密码进入命令历史：
+
+```bash
+export TALEBOOK_URL="https://books.example.com"
+export TALEBOOK_USERNAME="your-username"
+export TALEBOOK_PASSWORD="your-password"
+```
+
+安装后直接用自然语言描述任务即可，Skill 会自动触发：
+
+```text
+帮我在书库里找一下《三体》，把找到的那本加入收藏。
+把 ~/Downloads/三体.epub 上传到我的书库。
+把《三体》的 mobi 推送到我的 Kindle。
+```
+
+在 Claude Code 中也可以用 `/talebook` 显式调用。
+
+Skill 会在写入前确认目标与权限，对管理员写入、删除和批量操作先展示影响并请求确认，执行后再查询状态进行核验。完整说明与源码见 [talebook/skills](https://github.com/talebook/skills)。
+
 ## 近一年更新亮点
 
 * **网络书库与书源**：新增 Legado 风格书源解析引擎，可在线搜索、阅读网络小说并保存为 txt/epub 入库；配套书源管理界面（批量启停/删除、有效性体检、分页搜索）。
