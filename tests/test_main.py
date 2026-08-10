@@ -784,6 +784,18 @@ class TestRefer(TestWithUserLogin):
 
 
 class TestReferFailureSummary(TestWithUserLogin):
+    malicious_failure = {
+        "source": '<img src=x onerror="alert(1)">',
+        "code": "bad<code>",
+        "message": '<script>alert("x")</script>',
+        "details": "must-not-leak",
+    }
+    escaped_failure = {
+        "source": "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;",
+        "code": "bad&lt;code&gt;",
+        "message": "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;",
+    }
+
     @staticmethod
     def _tasks():
         def failed():
@@ -800,6 +812,9 @@ class TestReferFailureSummary(TestWithUserLogin):
                 }
             ],
             "failed-source": failed,
+            "tainted-source": lambda: webserver.handlers.book.MetadataSearchResult(
+                failures=[TestReferFailureSummary.malicious_failure]
+            ),
         }
 
     def test_non_stream_response_keeps_results_and_reports_failure(self):
@@ -807,8 +822,12 @@ class TestReferFailureSummary(TestWithUserLogin):
             data = self.json("/api/book/1/refer")
 
         self.assertEqual([book["title"] for book in data["books"]], ["可用结果"])
-        self.assertEqual(data["summary"]["failures"][0]["source"], "failed-source")
-        self.assertEqual(data["summary"]["failures"][0]["code"], "fetch_failed")
+        self.assertIn(
+            {"source": "failed-source", "code": "fetch_failed", "message": "查询失败"},
+            data["summary"]["failures"],
+        )
+        self.assertIn(self.escaped_failure, data["summary"]["failures"])
+        self.assertNotIn("details", next(f for f in data["summary"]["failures"] if f == self.escaped_failure))
 
     def test_stream_ends_with_summary_control_frame(self):
         with mock.patch.object(webserver.handlers.book.BookRefer, "_build_search_tasks", return_value=self._tasks()):
@@ -818,7 +837,8 @@ class TestReferFailureSummary(TestWithUserLogin):
         self.assertEqual(frames[0]["err"], "ok")
         self.assertEqual(frames[1]["title"], "可用结果")
         self.assertEqual(frames[-1]["event"], "summary")
-        self.assertEqual(frames[-1]["failures"][0]["source"], "failed-source")
+        self.assertIn(self.escaped_failure, frames[-1]["failures"])
+        self.assertNotIn("<script>", response.body.decode("utf-8"))
 
 
 class TestUserSignUp(TestWithUserLogin):

@@ -3,6 +3,7 @@
 import asyncio
 import concurrent.futures
 import datetime
+import html
 import json
 import logging
 import os
@@ -347,10 +348,13 @@ class BookRefer(BaseHandler):
         seen = set()
         output = []
         for failure in failures:
-            key = (failure.get("source"), failure.get("code"))
+            safe_failure = {
+                field: html.escape(str(failure.get(field) or ""), quote=True) for field in ("source", "code", "message")
+            }
+            key = (safe_failure["source"], safe_failure["code"])
             if key not in seen:
                 seen.add(key)
-                output.append(failure)
+                output.append(safe_failure)
         return output
 
     def _build_search_tasks(self, mi):
