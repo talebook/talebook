@@ -53,11 +53,15 @@ export TALEBOOK_USERNAME="your-username"
 export TALEBOOK_PASSWORD="your-password"
 ```
 
-安装后即可提出自然语言任务，也可以显式调用 `$talebook`：
+安装后直接用自然语言描述任务即可，Skill 会自动触发：
 
 ```text
-使用 $talebook 检查当前身份，搜索标题包含“三体”的书籍并加入收藏。
+帮我在书库里找一下《三体》，把找到的那本加入收藏。
+把 ~/Downloads/三体.epub 上传到我的书库。
+把《三体》的 mobi 推送到我的 Kindle。
 ```
+
+在 Claude Code 中也可以用 `/talebook` 显式调用。
 
 Skill 会在写入前确认目标与权限，对管理员写入、删除和批量操作先展示影响并请求确认，执行后再查询状态进行核验。完整说明与源码见 [talebook/skills](https://github.com/talebook/skills)。
 
