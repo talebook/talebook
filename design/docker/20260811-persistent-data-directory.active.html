@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook Docker 默认数据目录持久化方案。" />
+    <link rel="icon" href="data:," />
+    <title>让 Docker 默认数据目录跨容器重建保留 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f6f4;
+        --panel: #fff;
+        --ink: #17251f;
+        --muted: #58675f;
+        --line: #d8e2dc;
+        --accent: #216e4c;
+        --soft: #e8f5ee;
+        --warn: #fff5dd;
+        --danger: #fff0ee;
+        --shadow: 0 12px 30px rgba(21, 48, 36, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: linear-gradient(145deg, #edf5f0, var(--bg) 42%); font-family: var(--sans); line-height: 1.68; }
+      code { padding: .1em .34em; border-radius: 4px; background: #edf2ef; font-family: var(--mono); overflow-wrap: anywhere; }
+      a { color: var(--accent); text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid #d58b2d; outline-offset: 3px; }
+      .skip-link { position: fixed; top: 8px; left: 8px; z-index: 20; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+      .page { width: min(1040px, calc(100vw - 32px)); margin: 0 auto; padding: 28px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { margin-bottom: 18px; padding: 32px; border-top: 6px solid var(--accent); }
+      h1 { margin: 0 0 10px; font-size: clamp(30px, 4.5vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { max-width: 820px; margin: 0; color: var(--muted); font-size: 16px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { padding: 5px 11px; color: #385447; background: var(--soft); border-radius: 999px; font-size: 12px; font-weight: 700; }
+      .chip.active { color: #175c3d; background: var(--soft); }
+      .card { margin-bottom: 18px; padding: 25px 28px; scroll-margin-top: 18px; }
+      h2 { margin: 0 0 14px; font-size: 22px; }
+      h3 { margin: 0 0 8px; font-size: 16px; }
+      p { margin: 0 0 12px; }
+      p, li { color: #293b33; font-size: 14px; }
+      ul, ol { margin: 8px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .choice, .callout { padding: 15px 16px; border: 1px solid var(--line); border-radius: 14px; background: #fafcfb; }
+      .choice.good, .callout.good { border-color: #b9d8c7; background: var(--soft); }
+      .callout.warn { border-color: #ead29b; background: var(--warn); }
+      .callout.danger { border-color: #e4b9b4; background: var(--danger); }
+      .callout + .callout { margin-top: 12px; }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+      .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+      .step { padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+      .step b { display: block; margin-bottom: 5px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 12px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+      .table-wrap { margin-top: 12px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 13px; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #486055; background: #f5f8f6; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px; overflow-x: auto; color: #ecf7f0; background: #21382e; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; }
+      .pending { color: #96600d; font-weight: 800; }
+      footer { color: var(--muted); font-size: 12px; text-align: center; }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero, .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print { body { background: #fff; } .page { width: 100%; padding: 0; } .hero, .card { box-shadow: none; } .skip-link { display: none; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>让 Docker 默认数据目录跨容器重建保留</h1>
+        <p class="sub">修正生产部署示例把数据放在临时目录的默认值，同时保持容器内数据契约和已有部署的显式覆盖能力。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-11</span>
+          <span class="chip">所属模块：docker</span>
+          <span class="chip">影响范围：Compose 与部署文档</span>
+          <span class="chip">需求来源：GitHub Issue #959</span>
+        </div>
+      </header>
+      <main id="main-content">
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“talebook不能保留持久化配置吗，重新构建容器导致初始化了”</div>
+          <p>报告没有提供部署命令、卷检查结果或主机清理记录。仓库证据足以确认：应用配置本应持久化，但生产示例选择了不适合作为长期数据位置的宿主机临时目录。</p>
+        </section>
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice good"><h3>目标</h3><ul><li>新部署默认将整个 <code>/data</code> 保存到 Compose 文件旁的 <code>./data</code>。</li><li>允许通过 <code>TALEBOOK_DATA_DIR</code> 使用已有目录或绝对路径。</li><li>文档明确配置、数据库和书库均依赖同一个数据挂载。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>不改变容器内 <code>/data</code> 路径或配置格式。</li><li>不自动搬迁、删除或覆盖现有 <code>/tmp/demo</code>。</li><li>不修改开发 Compose 的隔离测试数据目录。</li></ul></article>
+          </div>
+        </section>
+        <section class="card">
+          <h2>3. 现状、根因与证据</h2>
+          <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+            <table>
+              <thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead>
+              <tbody>
+                <tr><td>管理员配置会写入持久目录</td><td><code>webserver/settings.py</code> 与 <code>webserver/loader.py</code></td><td><code>auto.py</code> 位于 <code>/data/books/settings</code>。</td></tr>
+                <tr><td>启动不会主动覆盖已有配置</td><td><code>docker/start.sh</code></td><td>预置文件只在目标缺失时复制，已有非空数据库也会保留。</td></tr>
+                <tr><td>生产示例使用临时宿主目录</td><td><code>docker-compose.yml</code> 与根 README</td><td><code>/tmp/demo:/data</code> 可能因主机清理或重启消失，随后容器会按首次启动初始化。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout"><strong>事实与推断：</strong>无法仅凭 Issue 确认报告者主机上的具体清理事件；本次修复针对仓库可证实的危险默认值，不声称恢复已丢失数据。</div>
+        </section>
+        <section class="card">
+          <h2>4. 方案</h2>
+          <div class="callout good"><strong>方案结论：</strong>生产 Compose 使用 <code>${TALEBOOK_DATA_DIR:-./data}:/data</code>。默认目录可见、可备份，并在镜像或容器重建后复用；已有用户可以将变量指向原目录，避免强制迁移。</div>
+          <div class="flow" aria-label="数据持久化流程">
+            <article class="step"><span class="label">Configure</span><b>解析数据目录</b><p>环境变量优先，否则使用 Compose 同级的 <code>./data</code>。</p></article>
+            <article class="step"><span class="label">Mount</span><b>挂载整个 /data</b><p>配置、用户库、Calibre 书库与资源共同持久化。</p></article>
+            <article class="step"><span class="label">Rebuild</span><b>替换容器</b><p>镜像层变化不改变宿主机目录。</p></article>
+            <article class="step"><span class="label">Reuse</span><b>加载已有状态</b><p>启动脚本检测已有数据库和配置，不重新灌入。</p></article>
+          </div>
+          <pre aria-label="Compose 数据目录契约"><code>volumes:
+  - "${TALEBOOK_DATA_DIR:-./data}:/data"</code></pre>
+        </section>
+        <section class="card">
+          <h2>5. Grill 决策与兼容性</h2>
+          <div class="table-wrap" role="region" aria-label="设计决策" tabindex="0">
+            <table>
+              <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>未选方案</th></tr></thead>
+              <tbody>
+                <tr><td>持久化粒度</td><td>整个 <code>/data</code></td><td>配置、用户库和书库存在一致性关系，符合现有镜像契约。</td><td>仅挂载 settings 会丢失用户数据库与图书。</td></tr>
+                <tr><td>默认存储</td><td>Compose 相对绑定目录</td><td>用户可直接查看和备份，且不受 <code>down -v</code> 删除命名卷影响。</td><td>命名卷不利于新用户定位文件。</td></tr>
+                <tr><td>旧路径兼容</td><td>环境变量显式覆盖</td><td>不在自动化流程中猜测或移动用户数据。</td><td>自动迁移有覆盖、权限和跨文件系统风险。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>6. 影响范围、风险与回滚</h2>
+          <div class="grid">
+            <article class="choice good"><h3>影响范围</h3><p>修改生产 <code>docker-compose.yml</code>、中英文部署说明与代码知识库示例，并增加静态配置回归测试。</p></article>
+            <article class="choice"><h3>保持不变</h3><p>镜像启动逻辑、应用配置、API、数据库、端口、PUID/PGID 和开发环境均不改变。</p></article>
+          </div>
+          <div class="callout danger"><strong>主要风险：</strong>直接覆盖 Compose 的既有用户会看到默认源目录从 <code>/tmp/demo</code> 变为 <code>./data</code>。文档要求升级前通过 <code>TALEBOOK_DATA_DIR=/tmp/demo</code> 保持原路径，或在停服与备份后自行迁移。</div>
+          <div class="callout"><strong>回滚：</strong>恢复原 Compose 映射或设置 <code>TALEBOOK_DATA_DIR</code> 即可；本次不改变数据格式，无需数据库回滚。</div>
+        </section>
+        <section class="card">
+          <h2>7. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>实际命令</th><th>预期</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>配置与相关回归</td><td><code>pytest -q tests/test_docker_persistence_config.py tests/test_settings_persistence.py tests/test_runtime_identity_config.py</code></td><td>生产 Compose 使用持久化默认目录，配置保存和启动契约保持通过。</td><td><strong>通过：</strong>13 passed in 0.60s。</td></tr>
+                <tr><td>完整后端测试</td><td><code>make pytest</code></td><td>全部后端回归无失败。</td><td><strong>通过：</strong>880 passed, 1 skipped, 28 warnings in 73.74s；跳过项为既有 OPDS category search 测试。</td></tr>
+                <tr><td>Python 质量</td><td><code>make lint-py-fix</code>；<code>ruff check tests/test_docker_persistence_config.py --no-cache</code>；<code>ruff format --check tests/test_docker_persistence_config.py --no-cache</code>；<code>make lint-py</code></td><td>新增测试和后端代码风格均通过。</td><td><strong>通过：</strong>无 lint 或格式错误，103 个后端文件无需修改。</td></tr>
+                <tr><td>方案质量</td><td><code>make check-design</code></td><td>ACTIVE 路径、HTML 结构和单文件资源约束通过。</td><td><strong>通过：</strong>100 份方案文档通过检查。</td></tr>
+                <tr><td>容器实测</td><td>未执行</td><td>工作流明确禁止访问 Docker Unix socket。</td><td><strong>受环境限制：</strong>以 Compose YAML 解析、启动脚本契约和设置持久化测试替代；剩余风险是未在本环境真实重建容器。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>8. 决策记录</h2>
+          <ol>
+            <li><strong>2026-08-11：</strong>自动 bug 入口已预授权方案评审；根据仓库证据将修复范围限定为生产部署危险默认值。</li>
+            <li><strong>2026-08-11：</strong>选择可覆盖的相对绑定目录，不执行数据迁移，不修改开发 Compose。</li>
+          </ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · docker · ACTIVE · 2026-08-11</footer>
+    </div>
+  </body>
+</html>
