@@ -1,0 +1,33 @@
+[
+  {
+    "snapshotId": "qimao-20250904",
+    "snapshotSource": "https://github.com/yuedu520/yuedu/blob/b5524f41d80fe4071c3d695fd1d6990cd6de97aa/250904.json",
+    "bookSourceName": "七猫小说（元数据快照）",
+    "bookSourceUrl": "https://api-bc.wtzw.com",
+    "bookSourceGroup": "内置元数据",
+    "bookSourceType": 0,
+    "bookSourceComment": "裁剪自社区在线书源，只保留搜索和图书详情规则，不提供目录与正文。",
+    "enabled": true,
+    "weight": 0,
+    "searchUrl": "@js:(function(){var sk='d3dGiJc651gSQ8w1';var h={'app-version':'77800','platform':'android','reg':'0','AUTHORIZATION':'','application-id':'com.****.reader','net-env':'1','channel':'unknown','qm-params':''};var p={'gender':'3','imei_ip':'2937357107','page':page,'wd':key};function enc(o){return Object.keys(o).map(function(k){return '&'+k+'='+encodeURIComponent(o[k])}).join('')}h.sign=java.md5Encode(Object.keys(h).sort().map(function(k){return k+'='+h[k]}).join('')+sk);p.sign=java.md5Encode(Object.keys(p).sort().map(function(k){return k+'='+p[k]}).join('')+sk);return '/api/v5/search/words?'+enc(p)+','+JSON.stringify({'headers':h})})()",
+    "ruleSearch": {
+      "bookList": "data.books",
+      "name": "original_title || title",
+      "author": "original_author || author",
+      "kind": "ptags",
+      "wordCount": "words_num",
+      "intro": "intro",
+      "coverUrl": "image_link",
+      "bookUrl": "id@js:(function(){var sk='d3dGiJc651gSQ8w1';var h={'app-version':'77800','platform':'android','reg':'0','AUTHORIZATION':'','application-id':'com.****.reader','net-env':'1','channel':'unknown','qm-params':''};var p={'id':result,'imei_ip':'2937357107','teeny_mode':0};function enc(o){return Object.keys(o).map(function(k){return '&'+k+'='+encodeURIComponent(o[k])}).join('')}h.sign=java.md5Encode(Object.keys(h).sort().map(function(k){return k+'='+h[k]}).join('')+sk);p.sign=java.md5Encode(Object.keys(p).sort().map(function(k){return k+'='+p[k]}).join('')+sk);return 'https://api-bc.wtzw.com/api/v4/book/detail?'+enc(p)+','+JSON.stringify({'headers':h})})()"
+    },
+    "ruleBookInfo": {
+      "init": "data.book",
+      "name": "title",
+      "author": "author",
+      "kind": "book_tag_list[*].title || category_over_words || category1_name",
+      "wordCount": "words_num",
+      "intro": "intro",
+      "coverUrl": "image_link"
+    }
+  }
+]

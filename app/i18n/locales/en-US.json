@@ -63,6 +63,8 @@
     "noDownloadFormats": "No downloadable formats available for this book",
     "internetSync": "Sync book information from internet",
     "noMatchingBooks": "No matching book information",
+    "noMatchingBooksWithFailures": "No match was found this time. You can retry the failed sources later.",
+    "referPartialFailure": "{count} sources did not complete: {sources}. Results from other sources remain available.",
     "selectMatchingBook": "Please select the most matching record to copy as this book's description:",
     "setInfoAndImage": "Set book info and image",
     "setOnlyInfo": "Set only book info",
@@ -850,7 +852,7 @@
         "xinhua": "Xinhua Bookstore",
         "tomato": "Tomato Novel",
         "qimao": "Qimao Novel",
-        "biquge": "Biquge",
+        "booksource": "Online Book Sources",
         "douban_v2": "Douban V2",
         "neodb": "NeoDB"
       }

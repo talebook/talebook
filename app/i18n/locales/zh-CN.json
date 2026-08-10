@@ -67,6 +67,8 @@
     "noDownloadFormats": "本书暂无可供下载的文件格式",
     "internetSync": "从互联网同步书籍信息",
     "noMatchingBooks": "无匹配的书籍信息",
+    "noMatchingBooksWithFailures": "本次未找到匹配记录，可稍后重试失败的来源。",
+    "referPartialFailure": "有 {count} 个来源未完成：{sources}。其余结果仍可正常使用。",
     "selectMatchingBook": "请选择最匹配的记录复制为本书的描述信息：",
     "setInfoAndImage": "设置书籍信息及图片",
     "setOnlyInfo": "仅设置书籍信息",
@@ -880,7 +882,7 @@
         "xinhua": "新华书店",
         "tomato": "番茄小说",
         "qimao": "七猫小说",
-        "biquge": "笔趣阁",
+        "booksource": "在线书源",
         "douban_v2": "豆瓣V2",
         "neodb": "NeoDB"
       }

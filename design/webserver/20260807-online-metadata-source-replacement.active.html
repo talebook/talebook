@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook Issue #937 在线元数据源替换、书源复用与 DeepSeek 兼容 AI 联网方案。" />
+    <link rel="icon" href="data:," />
+    <title>用在线书源替换失效的网文元数据接口 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f2f5f3;
+        --panel: #ffffff;
+        --ink: #0b1f33;
+        --muted: #516476;
+        --line: #cbd7d5;
+        --route: #247b9e;
+        --route-soft: #e4f1f5;
+        --live: #267457;
+        --live-soft: #e2f1e9;
+        --verify: #d66b27;
+        --verify-soft: #fff0e4;
+        --fault: #a63f4b;
+        --fault-soft: #fae9ec;
+        --night: #102a40;
+        --display: "Kaiti SC", STKaiti, KaiTi, "Songti SC", serif;
+        --body: "Avenir Next", Avenir, "PingFang SC", "Microsoft YaHei", sans-serif;
+        --utility: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        --shadow: 0 18px 44px rgba(11, 31, 51, .09);
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          linear-gradient(rgba(36, 123, 158, .035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(36, 123, 158, .035) 1px, transparent 1px),
+          var(--paper);
+        background-size: 26px 26px;
+        font-family: var(--body);
+        line-height: 1.68;
+      }
+      a { color: #126989; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--verify); outline-offset: 3px; }
+      code, pre, .utility { font-family: var(--utility); }
+      code { padding: .12em .36em; border-radius: 4px; background: #e9efef; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 30; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--night); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 26px 0 58px; }
+      .hero, .card { background: rgba(255, 255, 255, .97); border: 1px solid var(--line); box-shadow: var(--shadow); }
+      .hero { position: relative; min-height: 315px; margin-bottom: 18px; padding: 34px 38px; border-radius: 8px 30px 8px 8px; overflow: hidden; }
+      .hero::after {
+        position: absolute; right: -55px; bottom: -84px; width: 360px; height: 260px;
+        background: repeating-linear-gradient(135deg, transparent 0 16px, rgba(36, 123, 158, .08) 16px 18px);
+        content: ""; transform: rotate(-7deg); pointer-events: none;
+      }
+      .eyebrow { margin: 0 0 14px; color: var(--route); font: 800 11px/1.3 var(--utility); letter-spacing: .14em; text-transform: uppercase; }
+      h1 { position: relative; z-index: 1; max-width: 900px; margin: 0 0 14px; font-family: var(--display); font-size: clamp(36px, 5.5vw, 66px); font-weight: 700; line-height: 1.03; letter-spacing: -.045em; }
+      .sub { position: relative; z-index: 1; max-width: 850px; margin: 0; color: var(--muted); font-size: 16px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+      .chip { display: inline-flex; min-height: 30px; align-items: center; padding: 5px 10px; color: #3f5363; border: 1px solid #d4dfdf; border-radius: 4px; background: #f4f7f6; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #914414; border-color: #efbc98; background: var(--verify-soft); }
+      .chip.active { color: var(--live); border-color: #9ac9b5; background: var(--live-soft); }
+
+      .card { margin-bottom: 18px; padding: 28px 30px; border-radius: 8px; scroll-margin-top: 18px; }
+      h2 { display: flex; gap: 12px; align-items: baseline; margin: 0 0 17px; font-family: var(--display); font-size: 25px; line-height: 1.25; }
+      h2 .index { color: var(--route); font: 800 11px/1 var(--utility); letter-spacing: .08em; }
+      h3 { margin: 24px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #263c4e; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .choice { padding: 17px 18px; border: 1px solid var(--line); border-radius: 6px; background: #fbfcfc; }
+      .choice h3 { margin-top: 0; }
+      .choice.live { border-top: 4px solid var(--live); background: linear-gradient(180deg, var(--live-soft), #fff 48%); }
+      .choice.boundary { border-top: 4px solid var(--fault); }
+      .callout { margin: 15px 0 0; padding: 14px 16px; border-left: 4px solid var(--route); background: var(--route-soft); }
+      .callout.warn { border-color: var(--verify); background: var(--verify-soft); }
+      .callout.danger { border-color: var(--fault); background: var(--fault-soft); }
+      .callout.good { border-color: var(--live); background: var(--live-soft); }
+      .callout p:last-child { margin-bottom: 0; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+      table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13px; }
+      th, td { padding: 11px 12px; border-right: 1px solid #dce4e3; border-bottom: 1px solid #dce4e3; text-align: left; vertical-align: top; }
+      th { color: #486071; background: #edf3f2; font: 800 11px/1.4 var(--utility); letter-spacing: .025em; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      .state { display: inline-flex; padding: 3px 7px; border-radius: 3px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .state.live { color: var(--live); background: var(--live-soft); }
+      .state.fault { color: var(--fault); background: var(--fault-soft); }
+      .state.conditional { color: #914414; background: var(--verify-soft); }
+      .pending { color: #9a560f; font-weight: 800; }
+      .passed { color: var(--live); font-weight: 800; }
+
+      .route-board { position: relative; display: grid; grid-template-columns: 1fr 90px 1.15fr 90px 1fr; gap: 10px; align-items: stretch; margin: 20px 0 10px; padding: 20px; color: #eaf4f6; background: var(--night); border-radius: 8px; overflow: hidden; }
+      .route-board::before { position: absolute; inset: 0; background: radial-gradient(circle at 72% 35%, rgba(57, 162, 190, .18), transparent 35%); content: ""; }
+      .route-stack, .route-node, .route-arrow { position: relative; z-index: 1; }
+      .route-stack { display: grid; gap: 8px; }
+      .route-node { display: flex; min-height: 54px; flex-direction: column; justify-content: center; padding: 10px 12px; border: 1px solid rgba(194, 220, 225, .27); border-radius: 5px; background: rgba(255, 255, 255, .055); }
+      .route-node b { color: #fff; font-size: 13px; }
+      .route-node small { margin-top: 2px; color: #a9c3ca; font-size: 11px; }
+      .route-node.dead { border-color: rgba(239, 143, 153, .45); background: rgba(166, 63, 75, .15); }
+      .route-node.dead b { text-decoration: line-through; text-decoration-color: #ef8f99; text-decoration-thickness: 2px; }
+      .route-node.pool { border-color: rgba(92, 191, 152, .55); background: rgba(38, 116, 87, .21); }
+      .route-node.ai { border-color: rgba(227, 139, 82, .55); background: rgba(214, 107, 39, .13); }
+      .route-arrow { display: grid; place-items: center; color: #70bdd2; font: 900 22px/1 var(--utility); }
+      .route-arrow span { display: block; padding: 5px; border-top: 2px solid currentColor; }
+      .route-caption { margin: 0; color: var(--muted); font-size: 12px; text-align: center; }
+
+      .sequence { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 16px; }
+      .step { position: relative; min-height: 142px; padding: 14px; border: 1px solid var(--line); background: #fbfcfc; }
+      .step + .step::before { position: absolute; top: 17px; left: -15px; color: var(--route); background: var(--paper); content: "→"; font-weight: 900; }
+      .step .label { display: block; margin-bottom: 8px; color: var(--route); font: 800 10px/1.2 var(--utility); letter-spacing: .08em; text-transform: uppercase; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 12px; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eaf4f6; background: var(--night); border-radius: 6px; font: 12px/1.65 var(--utility); }
+
+      .toc { position: fixed; z-index: 20; right: max(8px, calc((100vw - 1160px) / 2 - 140px)); top: 50%; display: none; width: 128px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); transform: translateY(-50%); }
+      .toc a { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 4px; min-height: 34px; align-items: center; padding: 5px; color: var(--muted); text-decoration: none; }
+      .toc a:hover, .toc a[aria-current="location"] { color: #fff; background: var(--route); }
+      .toc .n { font: 800 9px/1 var(--utility); }
+      .toc .t { overflow: hidden; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-fab { position: fixed; z-index: 20; right: 14px; bottom: 14px; }
+      .toc-fab summary { padding: 10px 14px; color: #fff; background: var(--night); border-radius: 5px; box-shadow: var(--shadow); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab nav { position: absolute; right: 0; bottom: 50px; width: min(290px, calc(100vw - 28px)); padding: 8px; background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
+      .toc-fab a { display: block; padding: 8px 10px; color: var(--muted); text-decoration: none; }
+      .toc-fab a:hover { background: var(--route-soft); }
+      footer { margin-top: 16px; color: var(--muted); font: 11px/1.5 var(--utility); text-align: center; }
+
+      @media (min-width: 1450px) { .toc { display: block; } .toc-fab { display: none; } }
+      @media (max-width: 860px) {
+        .route-board { grid-template-columns: 1fr; }
+        .route-arrow { min-height: 30px; transform: rotate(90deg); }
+        .sequence { grid-template-columns: 1fr 1fr; }
+        .step + .step::before { display: none; }
+      }
+      @media (max-width: 680px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero { min-height: 0; padding: 25px 20px; border-radius: 6px 20px 6px 6px; }
+        h1 { font-size: clamp(34px, 12vw, 52px); }
+        .card { padding: 22px 18px; }
+        .grid, .sequence { grid-template-columns: 1fr; }
+        .route-board { padding: 14px; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .toc, .toc-fab, .skip-link { display: none; }
+        .route-board { color-adjust: exact; print-color-adjust: exact; }
+        .choice, .callout, .route-board, .step, .table-wrap, pre { break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <nav class="toc" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="n">01</span><span class="t">原始诉求</span></a>
+      <a href="#scope"><span class="n">02</span><span class="t">目标边界</span></a>
+      <a href="#evidence"><span class="n">03</span><span class="t">证据根因</span></a>
+      <a href="#architecture"><span class="n">04</span><span class="t">架构方案</span></a>
+      <a href="#contracts"><span class="n">05</span><span class="t">契约兼容</span></a>
+      <a href="#sources"><span class="n">06</span><span class="t">来源修复</span></a>
+      <a href="#risk"><span class="n">07</span><span class="t">风险回滚</span></a>
+      <a href="#tests"><span class="n">08</span><span class="t">测试计划</span></a>
+      <a href="#decisions"><span class="n">09</span><span class="t">决策记录</span></a>
+    </nav>
+
+    <details class="toc-fab">
+      <summary>章节目录</summary>
+      <nav aria-label="章节目录">
+        <a href="#request">原始诉求</a><a href="#scope">目标与边界</a><a href="#evidence">现状与证据</a>
+        <a href="#architecture">架构方案</a><a href="#contracts">契约与兼容</a><a href="#sources">逐源修复</a>
+        <a href="#risk">风险与回滚</a><a href="#tests">测试计划</a><a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <header class="hero">
+        <p class="eyebrow">Talebook / metadata routing / issue 937</p>
+        <h1>把失效入口<br />接回真实书源</h1>
+        <p class="sub">用在线书源替换优书网和旧笔趣阁，同时以零 Key 的结构化 JSON 路径保留百度百科；并修复七猫、番茄，让 DeepSeek 等 Chat Completions 模型基于可追溯在线证据整理元数据。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-07</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：webserver / app / tests</span>
+          <span class="chip">需求来源：GitHub Issue #937</span>
+        </div>
+      </header>
+
+      <main id="main-content">
+        <section id="request" class="card">
+          <h2><span class="index">01</span>原始诉求</h2>
+          <div class="callout warn"><strong>Issue #937：</strong>“网文刮削接口全部失效”，优书网报错、百度触发安全验证、笔趣阁等不可用，AI 模型没有联网搜索。</div>
+          <p>用户进一步确认：“都修复，不要下线数据源，你到在线书源 JSON 里找找”“直接替换”，并要求百度百科方案“不使用 Key”。需求来源：<a href="https://github.com/talebook/talebook/issues/937">GitHub Issue #937</a> 。</p>
+          <p>本方案把“修复”定义为：停止调用已被登录墙、验证码或域名漂移永久阻断的旧路径；优书网和旧笔趣阁改由真实在线书源替代，百度百科则保留独立来源名并改走零 Key 结构化 JSON 兼容接口。任何暂时失败都不会删除或自动下线来源。</p>
+        </section>
+
+        <section id="scope" class="card">
+          <h2><span class="index">02</span>目标与边界</h2>
+          <div class="grid">
+            <article class="choice live">
+              <h3>必须交付</h3>
+              <ul>
+                <li>设置页保留“百度百科”，新增“在线书源”替换优书网与旧笔趣阁；所有结果展示真实来源名。</li>
+                <li>百度百科不新增 Key：停止公开 HTML 抓取，改用在线规则中仍可访问的结构化 JSON 接口，严格校验题名、义项与图书字段。</li>
+                <li>搜索管理员已导入且启用的书源；仓库同时内置版本化、可审计的 JSON 快照作为空库兜底。</li>
+                <li>修复七猫新响应字段与番茄“正文含验证二字即误判”的独立缺陷。</li>
+                <li>AI 先取得在线书源证据再整理，保持 DeepSeek 等 OpenAI Chat Completions 兼容接口可用。</li>
+                <li>单源失败不阻断其他来源，用户能看到部分失败摘要与下一步指引。</li>
+              </ul>
+            </article>
+            <article class="choice boundary">
+              <h3>明确不做</h3>
+              <ul>
+                <li>不恢复优书网或已漂移笔趣阁的品牌伪装；百度结果只在真实命中百度结构化接口时标注“百度百科”。</li>
+                <li>不要求百度 AppBuilder / 千帆 API Key，不引入付费百科 API，也不复用 DeepSeek 等模型的 Key。</li>
+                <li>不在每次元数据搜索时从 GitHub 拉订阅，不把远程仓库变成运行时单点依赖。</li>
+                <li>不执行书源里的 <code>java.ajax</code>、<code>java.post</code>、WebView、登录和设备环境脚本。</li>
+                <li>不删除、禁用或清洗管理员已导入的来源；兼容性失败只记为本次查询失败。</li>
+                <li>不承诺所有 Legado 方言都兼容，也不扩展正文下载或付费内容能力。</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section id="evidence" class="card">
+          <h2><span class="index">03</span>现状、根因与证据</h2>
+          <div class="table-wrap" role="region" aria-label="问题证据矩阵" tabindex="0">
+            <table>
+              <thead><tr><th>来源</th><th>2026-08-05 实测</th><th>代码根因</th><th>处理结论</th></tr></thead>
+              <tbody>
+                <tr><td>优书网</td><td><span class="state fault">登录 / 验证墙</span></td><td><code>YoushuApi</code> 把登录页当搜索命中继续解析；且当前无视管理员勾选，始终创建任务。</td><td>停止旧调用，迁移到“在线书源”。</td></tr>
+                <tr><td>百度百科</td><td><span class="state conditional">HTML 403；旧 JSON 部分可用</span></td><td>现实现只抓公开 HTML，未使用在线规则指向的 <code>BaikeLemmaCardApi</code>；旧 JSON 会以 HTTP 200 返回 <code>errno</code>，且同名义项可能选错。</td><td>保留独立来源；改用零 Key JSON，严格验错与消歧，失败后由在线书源兜底。</td></tr>
+                <tr><td>旧笔趣阁</td><td><span class="state fault">404 / 域名已漂移</span></td><td><code>xbiqugu.la</code> 固定端点已不提供原搜索协议。</td><td>停止固定域名插件，改用真实来源池。</td></tr>
+                <tr><td>番茄小说</td><td><span class="state conditional">搜索与详情可达</span></td><td>详情 HTML 任意位置出现“验证”就抛 <code>VerifyError</code>；真实章节名可触发误判。</td><td>改为结构化挑战特征判定。</td></tr>
+                <tr><td>七猫小说</td><td><span class="state conditional">接口 200，解析为空</span></td><td>搜索已使用 <code>data.books</code>、<code>id/title/author/image_link</code>；代码仍读旧字段。</td><td>兼容新旧字段并锁定契约测试。</td></tr>
+                <tr><td>AI</td><td><span class="state conditional">仅模型记忆</span></td><td>请求只有 <code>model/messages/temperature</code>，提示词要求“look up”却没有任何在线证据。</td><td>书源检索前置，Chat Completions 负责证据整理。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout">
+            <strong>在线 JSON 调查：</strong>XIU2/Yuedu 的 26 个来源中，大量条目依赖网络型 JavaScript、验证码或已经失效；“酷我小说”搜索接口返回空集合，“熊猫看书”证书异常，简单站点也存在超时。七猫签名 API 来源提供了可复用的新字段与纯计算签名思路，但必须裁剪掉网络型脚本。候选证据固定到 <a href="https://github.com/XIU2/Yuedu/commit/470e6d7bcd5c1a7b1c2a063f919959e8174b4302">XIU2/Yuedu 470e6d7</a> 与 <a href="https://github.com/yuedu520/yuedu/blob/b5524f41d80fe4071c3d695fd1d6990cd6de97aa/250904.json">yuedu520/250904.json</a>；内置快照不照单全收，只保留通过 Talebook 实测的元数据规则。
+          </div>
+          <div class="callout warn">
+            <strong>百度零 Key 调查：</strong>在线 Legado 字典规则 <a href="https://github.com/linyves/DictRuleForLegado/blob/cc694b812cb74c1da553088a92969f783a93ba8d/baidubaike.json">baidubaike.json</a> 指向历史 <code>BaikeLemmaCardApi</code>。2026-08-07 实测《东周列国志》《法神重生》等可返回 <code>card/image/abstract</code>，但《百年孤独》等会返回 <code>{"errno":2}</code>，不同出口或时刻也可能产生差异。因此该接口是无 SLA 的尽力能力，不得把单次 HTTP 200 当作成功；公开词条 HTML 则稳定触发 403，不再调用。
+          </div>
+        </section>
+
+        <section id="architecture" class="card">
+          <h2><span class="index">04</span>架构方案：一个入口，多条真实线路</h2>
+          <div class="callout good"><strong>核心结论：</strong><code>BookSourceModel + BookSourceEngine</code> 继续拥有书源解析和安全边界；新增元数据适配层只负责选择来源、并发检索、转换 Calibre Metadata、签发结果令牌以及向 AI 提供证据，不复制一套抓取器。</div>
+
+          <div class="route-board" role="img" aria-label="失效 HTML 与旧站入口分别汇入百度零 Key 适配器和在线书源适配层，再路由到结构化百度接口、来源池和 AI">
+            <div class="route-stack">
+              <div class="route-node dead"><b>优书网</b><small>登录墙 / 无条件执行</small></div>
+              <div class="route-node dead"><b>百度公开 HTML</b><small>403 安全验证</small></div>
+              <div class="route-node dead"><b>旧笔趣阁</b><small>域名与协议漂移</small></div>
+            </div>
+            <div class="route-arrow" aria-hidden="true"><span>→</span></div>
+            <div class="route-stack">
+              <div class="route-node"><b>百度零 Key 适配器</b><small>验错、图书义项校验、有限重试</small></div>
+              <div class="route-node"><b>在线书源元数据适配层</b><small>并发、去重、来源标注、失败隔离</small></div>
+              <div class="route-node"><b>签名结果令牌</b><small>来源 ID + 书籍 URL + HMAC</small></div>
+            </div>
+            <div class="route-arrow" aria-hidden="true"><span>→</span></div>
+            <div class="route-stack">
+              <div class="route-node pool"><b>百度结构化兼容接口</b><small>无 Key、无 HTML、尽力返回</small></div>
+              <div class="route-node pool"><b>管理员启用的 JSON 书源</b><small>权重优先，保留真实站名</small></div>
+              <div class="route-node pool"><b>内置已验证快照</b><small>空库兜底，版本随发布</small></div>
+              <div class="route-node ai"><b>DeepSeek 等 AI</b><small>只整理已取得的在线证据</small></div>
+            </div>
+          </div>
+          <p class="route-caption">百度来源名与旧配置保持不变，只移除 HTML 网络路径；优书网与旧笔趣阁名称仅参与配置迁移。任何来源都不会因一次元数据失败而被自动停用。</p>
+
+          <h3>一次查询的处理顺序</h3>
+          <div class="sequence" aria-label="元数据搜索处理顺序">
+            <article class="step"><span class="label">Select</span><b>选择来源</b><p>按启用、健康状态和权重取前 N 个；与内置快照按 URL 去重。</p></article>
+            <article class="step"><span class="label">Search</span><b>隔离并发</b><p>复用受限书源引擎；每个来源独立超时与错误。</p></article>
+            <article class="step"><span class="label">Convert</span><b>转换结果</b><p>映射标题、作者、标签、简介、封面和真实来源。</p></article>
+            <article class="step"><span class="label">Ground</span><b>共享给 AI</b><p>同一次检索只执行一次；证据裁剪后进入 Chat Completions。</p></article>
+            <article class="step"><span class="label">Apply</span><b>校验后应用</b><p>验证服务器签名与来源状态，再抓详情和封面。</p></article>
+          </div>
+
+          <h3>来源选择与时限</h3>
+          <ul>
+            <li>复用现有权重排序；元数据入口新增较小的 <code>BOOKSOURCE_METADATA_TOP_K</code>（默认 10），避免网络书库的 50 源规模耗尽 30 秒引用超时。</li>
+            <li>复用 <code>BOOKSOURCE_MAX_WORKERS</code> 与 <code>BOOKSOURCE_HTTP_TIMEOUT</code>，但总查询受 <code>BookRefer.REFER_TIMEOUT</code> 限制；未完成任务只记为部分失败。</li>
+            <li>管理员已导入来源优先；内置来源仅补足缺失 URL，不覆盖管理员版本，也不运行时拉远程订阅。</li>
+            <li>标题与作者相同的重复结果按信息完整度合并；来源名保留首个命中站点，AI 证据仍保留多个来源供交叉校验。</li>
+            <li>百度每次查询先使用规范化题名；响应必须包含匹配题名、摘要或基本信息卡，并呈现图书/小说义项。错误义项或 <code>errno</code> 只允许再用“题名 + 已知作者”或“题名 + 小说”重试一次，随后结束百度任务，不循环探测。</li>
+          </ul>
+        </section>
+
+        <section id="contracts" class="card">
+          <h2><span class="index">05</span>接口契约、配置与兼容</h2>
+          <div class="table-wrap" role="region" aria-label="契约变化" tabindex="0">
+            <table>
+              <thead><tr><th>契约</th><th>新行为</th><th>兼容策略</th></tr></thead>
+              <tbody>
+                <tr><td><code>META_SELECTED_SOURCES</code></td><td>保留 <code>baidu</code> 并新增 <code>booksource</code>；设置页不再列出 <code>biquge</code> 或历史 <code>youshu</code>。</td><td>读取与保存时仅把优书网、笔趣阁旧值映射为一个 <code>booksource</code> 并去重；百度旧值原样保留，旧 <code>auto.py</code> 无需手改。</td></tr>
+                <tr><td><code>GET /api/admin/settings</code></td><td><code>META_ALL_SOURCES</code> 同时返回“百度百科”和“在线书源”。</td><td>其余来源和值不变；默认选择保留百度并加入在线书源兜底。</td></tr>
+                <tr><td><code>GET /api/book/:id/refer?stream=1</code></td><td>书籍帧增加真实来源；结束前可发送带失败摘要的控制帧。</td><td>控制帧含明确 <code>event=summary</code>，新版前端不当作书籍；首行握手保持。</td></tr>
+                <tr><td><code>POST /api/book/:id/refer</code></td><td>在线书源使用 <code>provider_key=BookSource</code> 和服务器签发的有时限令牌；百度继续使用 <code>BaiduBaike</code>，应用前复查题名与义项。</td><td>百度 provider 保持兼容；旧优书/笔趣阁令牌不再新发，历史请求返回明确的来源已替换错误。</td></tr>
+                <tr><td>AI Chat Completions</td><td>只发送通用 <code>model/messages/temperature</code>；证据在消息正文中，解析 <code>content</code> 与可选 <code>reasoning_content</code>。</td><td>DeepSeek 不需要专有 tool 或 <code>thinking</code> 参数；模型是否推理由管理员所选模型决定。</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>签名令牌</h3>
+          <pre aria-label="在线书源结果令牌载荷"><code>{
+  "v": 1,
+  "source": "db:42" | "builtin:qimao-api",
+  "book_url": "https://example.invalid/book/123",
+  "issued_at": 1786000000
+}
+
+provider_value = tornado.web.create_signed_value(cookie_secret, "booksource-meta", payload)
+</code></pre>
+          <p>应用时使用同一密钥验签并限制令牌寿命；数据库来源必须仍存在且启用，内置来源必须仍在当前快照中。客户端不能替换 <code>book_url</code> 发起任意请求。</p>
+
+          <h3>流式失败摘要</h3>
+          <p>适配层记录 <code>timeout</code>、<code>fetch_failed</code>、<code>rule_unsupported</code>、<code>no_result</code>、<code>legacy_errno</code> 和 <code>entity_mismatch</code>。页面在存在结果时显示“部分来源未返回”，零结果时引导管理员检查书源管理；不展示异常堆栈或远程响应正文。</p>
+        </section>
+
+        <section id="sources" class="card">
+          <h2><span class="index">06</span>逐源修复与内置快照</h2>
+          <div class="table-wrap" role="region" aria-label="逐源实施清单" tabindex="0">
+            <table>
+              <thead><tr><th>工作项</th><th>实现</th><th>关键验收</th></tr></thead>
+              <tbody>
+                <tr><td>旧站替换</td><td>删除 <code>BookRefer</code> 对优书的无条件任务，移除固定笔趣阁任务分支及设置项；两者旧配置统一映射到在线书源。</td><td>旧配置只创建一次在线书源任务；日志中不再访问优书网和固定笔趣阁域名。</td></tr>
+                <tr><td>百度零 Key 修复</td><td>重写百度适配器，固定请求 <code>BaikeLemmaCardApi</code> 的 HTTPS host；解析 <code>card/image/abstract</code>，检查 <code>errno</code>、题名和图书义项。接口存在间歇性 <code>errno</code>，每个查询至多尝试三次；首个义项不匹配时再带作者消歧。彻底停止 <code>/search/word</code> 与词条 HTML 解析。</td><td>完整响应可生成作者、简介、封面和来源；<code>errno</code>、错误义项、非 JSON、超时均安全返回未命中，且在线书源任务继续。</td></tr>
+                <tr><td>在线书源适配器</td><td>新增查询/转换服务，复用 <code>BookSourceEngine.search()</code>、<code>book_info()</code> 和封面下载；返回真实来源。</td><td>搜索卡片可单独应用信息、封面或两者，篡改令牌被拒绝。</td></tr>
+                <tr><td>内置 JSON 快照</td><td>把现有假示例替换为元数据用途的已验证来源集合；首个来源从 yuedu520 七猫签名源裁剪，补齐受限运行时所需的纯 MD5 帮助函数，移除正文解密、网络 JS 与伪分类 URL；将七猫封面 CDN 纳入图片代理精确白名单。</td><td>快照记录上游 URL、commit、裁剪说明和抓取日期；至少两个不同书名可搜索并抓详情，封面代理仍拒绝未知域、伪后缀和非标准端口。</td></tr>
+                <tr><td>七猫独立插件</td><td>搜索兼容 <code>books/book_list/ret_data</code>，ID 兼容 <code>id/book_id</code>；详情兼容 <code>intro/image_link/category1_name/category2_name</code> 与旧字段。</td><td>新旧 fixture 均返回标题、作者、简介、标签、封面与稳定 provider ID。</td></tr>
+                <tr><td>番茄独立插件</td><td>验证码判断改用 HTTP 状态、最终 URL、页面标题和专用 DOM/脚本标志，不扫描全文普通词语。</td><td>章节或简介含“验证”不误报；真实挑战页仍抛 <code>VerifyError</code>。</td></tr>
+                <tr><td>AI 联网证据</td><td>在线书源查询使用请求级共享缓存；证据以限制字段、条数和字符数的 JSON 写入 prompt，要求模型只据证据输出，AI 结果标明证据来源。</td><td>DeepSeek 兼容请求不含专有工具参数；没有证据时返回 unknown，不伪造联网结果。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout good"><strong>内置来源门禁已通过：</strong>2026-08-07 已直接使用 Talebook 的 <code>BookSourceEngine</code> 对《三体》《斗破苍穹》《西游记》完成真实搜索与详情闭环；搜索及详情均返回 HTTPS 封面，七猫 CDN 实测为 <code>200 image/jpeg</code>。快照固定到 yuedu520 提交 <code>b5524f41</code>，只保留元数据规则。</div>
+        </section>
+
+        <section id="risk" class="card">
+          <h2><span class="index">07</span>影响范围、风险与回滚</h2>
+          <div class="grid">
+            <article class="choice live">
+              <h3>代码与体验</h3>
+              <ul>
+                <li><code>webserver/handlers/book.py</code>：来源编排、旧值别名、流式摘要与应用分支。</li>
+                <li><code>webserver/services/booksource/</code>：元数据搜索复用、纯计算 JS 帮助函数、内置 JSON。</li>
+                <li><code>webserver/plugins/meta/baike</code>、<code>qimao</code>、<code>tomato</code>、<code>ai</code>：零 Key 结构化适配、契约修复与证据整理。</li>
+                <li><code>app/pages/admin/settings.vue</code>、书籍详情弹窗和中英文文案：新来源名与失败摘要。</li>
+              </ul>
+            </article>
+            <article class="choice">
+              <h3>保持不变</h3>
+              <ul>
+                <li>数据库结构、Calibre 元数据写入方式、用户书籍权限不变。</li>
+                <li>网络书库的导入、启停、权重、体检、阅读和保存接口不变。</li>
+                <li>豆瓣、Google、Amazon、新华、NeoDB 等其他来源不变。</li>
+                <li>在线来源失败不会自动修改 <code>BookSourceModel.enabled</code>。</li>
+              </ul>
+            </article>
+          </div>
+          <div class="callout danger"><strong>主要风险：</strong>百度历史 JSON 接口无官方 SLA，可能限流、漏词或选择错误义项；本方案用 schema 校验、图书义项校验、有限重试和多源并发把它限定为尽力能力，不承诺单源全命中。其他第三方站点也会变化；通过版本化快照、真实联调、逐源失败隔离和真实来源展示降低影响。导入规则可能构造 SSRF；继续禁止网络型 JS，并用签名令牌阻止客户端篡改详情 URL。大量来源使用独立 TOP K、并发上限和总时限约束。</div>
+          <div class="callout"><strong>回滚：</strong>代码和内置 JSON 可随提交整体回滚，不涉及库表迁移。百度配置值始终保留；优书网与笔趣阁旧值保留读取别名，因此前滚或回滚都不要求管理员修改 <code>auto.py</code>。管理员已导入来源不被写改，无数据恢复步骤。</div>
+        </section>
+
+        <section id="tests" class="card">
+          <h2><span class="index">08</span>测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>计划命令 / 页面</th><th>关键断言</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>后端相关回归</td><td><code>docker run … talebook/test pytest -q tests/test_baike.py … tests/test_main.py::TestReferFailureSummary</code></td><td>百度完整 JSON、<code>errno</code>、错义项、重试、停止 HTML 请求；来源转换、MD5、令牌验签、部分失败摘要、新旧响应与验证码精确判定。</td><td class="passed">136 passed</td></tr>
+                <tr><td>完整后端</td><td><code>docker run … talebook/test pytest tests</code></td><td>官方测试镜像覆盖全部后端用例；宿主机未安装 Calibre，因此以项目 Docker 测试环境替代本机 <code>make pytest</code>。</td><td class="passed">838 passed，20 skipped</td></tr>
+                <tr><td>AI 契约</td><td><code>pytest -q tests/test_ai_meta.py</code>（纳入相关与完整回归）</td><td>标准 Chat Completions 请求不发送厂商专有 <code>thinking</code> / tools 字段；兼容 <code>reasoning_content</code> 响应；证据为空不调用模型。</td><td class="passed">2 passed</td></tr>
+                <tr><td>前端测试</td><td><code>cd app &amp;&amp; npm run lint</code>；<code>MOCK_API_URL=http://127.0.0.1:28080 npx playwright test … --grep 'keeps successful|元数据来源保留'</code></td><td>设置页同时显示百度百科与在线书源；流摘要不进入书卡，部分失败警告保留成功结果。</td><td class="passed">lint 0 errors（193 个既有 warnings）；Chromium 2 passed</td></tr>
+                <tr><td>真实网络</td><td>Talebook 引擎实测百度、《三体》《斗破苍穹》《西游记》、七猫独立插件、番茄挑战页和七猫封面 CDN。</td><td>百度《东周列国志》《西游记》成功且错误义项拒绝；七猫搜索 → 详情及封面非空；番茄当前真实挑战页被精确识别，不绕过验证码。</td><td class="passed">通过；第三方接口仍属尽力能力</td></tr>
+                <tr><td>实际渲染</td><td>隔离 Docker 后端 <code>127.0.0.1:28081</code> + 工作树 Nuxt <code>127.0.0.1:3000</code>；Chrome DevTools 登录管理员后验证设置页与《西游记》同步弹窗。</td><td>设置页保留百度、加入在线书源且无旧笔趣阁；弹窗真实显示百度和七猫结果，三个旧来源失败时仍保留结果并显示警告。</td><td class="passed">桌面视口通过；本次交互无新增异常</td></tr>
+                <tr><td>质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>相关门禁全部通过；完整测试使用含 Calibre 的官方测试镜像。</td><td class="passed">通过；92 份方案文档通过检查</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout good"><strong>验证说明：</strong>实现、单元/集成测试、真实网络与真实后端浏览器验收均已完成。书籍详情页观察到的 SSR hydration 警告为既有问题，不由本次弹窗改动产生；前端 lint 的 193 个 warning 也均为仓库现状，本次无 error。</div>
+        </section>
+
+        <section id="decisions" class="card">
+          <h2><span class="index">09</span>决策记录</h2>
+          <ol>
+            <li><strong>2026-08-05：</strong>用户确认失效入口直接替换，结果显示真实提供者名称，不做品牌伪装；百度百科是否存在可保留路径当时尚待调查。</li>
+            <li><strong>2026-08-05：</strong>用户确认统一使用“在线书源”元数据入口，搜索管理员已导入且启用的 Legado JSON 来源。</li>
+            <li><strong>2026-08-05：</strong>用户要求确保 DeepSeek 等模型可用；采用书源证据 + 通用 Chat Completions，不依赖厂商专有联网工具。</li>
+            <li><strong>2026-08-06：</strong>用户确认仓库内置已验证 JSON 快照；管理员来源优先，远程订阅只手动更新，不随搜索动态下载。</li>
+            <li><strong>2026-08-06：</strong>用户曾确认设置页移除三个失效入口；该决定中的百度部分被 2026-08-07 零 Key 调查结论取代，优书网与旧笔趣阁部分保持。</li>
+            <li><strong>2026-08-07：</strong>用户确认保留但不执行不兼容网络型 JavaScript 规则；失败显式标记，不下线书源。</li>
+            <li><strong>2026-08-07：</strong>在线 JSON 调查确认百度历史结构化接口仍部分可用；用户明确拒绝 Key 方案。最终设计保留独立“百度百科”，采用零 Key JSON 尽力查询、严格义项校验和在线书源兜底，不调用公开 HTML。</li>
+          </ol>
+        </section>
+      </main>
+
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-08-07</footer>
+    </div>
+
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll("main > section[id]")];
+        const links = [...document.querySelectorAll(".toc a[href^='#']")];
+        const floating = document.querySelector(".toc-fab");
+        const sync = () => {
+          let current = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) current = section;
+            else break;
+          }
+          for (const link of links) {
+            if (link.getAttribute("href") === `#${current.id}`) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        floating?.addEventListener("click", (event) => { if (event.target.closest("a")) floating.open = false; });
+        addEventListener("keydown", (event) => { if (event.key === "Escape" && floating?.open) floating.open = false; });
+        addEventListener("scroll", sync, { passive: true });
+        addEventListener("resize", sync);
+        sync();
+      })();
+    </script>
+  </body>
+</html>

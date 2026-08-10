@@ -756,6 +756,8 @@ router.get('/api/admin/settings', eventHandler(() => ({
     smtp_password: 'password',
     smtp_encryption: 'SSL',
     AUDIOBOOK_BACKUP_RETENTION: 3,
+    META_ALL_SOURCES: ['douban', 'baidu', 'xinhua', 'booksource', 'ai'],
+    META_SELECTED_SOURCES: ['douban', 'baidu', 'booksource']
   }
 })));
 
@@ -899,6 +901,32 @@ router.post('/api/book/:id/edit', eventHandler(() => ({
   err: 'ok',
   msg: 'Book updated'
 })));
+
+router.get('/api/book/:id/refer', eventHandler(() => {
+  const frames = [
+    { err: 'ok' },
+    {
+      title: 'Mock Metadata Result',
+      author: 'Mock Author',
+      author_sort: 'Mock Author',
+      source: 'Online Source A',
+      website: 'https://example.com/book/1',
+      cover_url: '',
+      provider_key: 'BookSource',
+      provider_value: 'signed-token',
+      comments: 'Mock metadata introduction'
+    },
+    {
+      event: 'summary',
+      failures: [{ source: 'Online Source B', code: 'timeout', message: '查询超时' }],
+      total: 2,
+      completed: 1
+    }
+  ];
+  return new Response(frames.map(frame => JSON.stringify(frame)).join('\n') + '\n', {
+    headers: { 'Content-Type': 'application/x-ndjson' }
+  });
+}));
 
 // Admin Imports
 app.use('/api/admin/scan/list', eventHandler(() => ({

@@ -46,6 +46,53 @@ def run_js(code, result="", variables=None, base_url="", time_limit=DEFAULT_TIME
     ctx.eval(
         """
         var __talebook_vars = JSON.parse(__talebook_vars_json || "{}");
+        function __talebook_md5(value) {
+            var text = unescape(encodeURIComponent(String(value)));
+            var bytes = [];
+            for (var bi = 0; bi < text.length; bi++) bytes.push(text.charCodeAt(bi));
+            var bitLength = bytes.length * 8;
+            bytes.push(128);
+            while ((bytes.length % 64) !== 56) bytes.push(0);
+            for (var li = 0; li < 8; li++) bytes.push(Math.floor(bitLength / Math.pow(256, li)) & 255);
+            var shifts = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
+                          5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+                          4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
+                          6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+            var constants = [];
+            for (var ci = 0; ci < 64; ci++) constants[ci] = (Math.floor(Math.abs(Math.sin(ci + 1)) * 4294967296) | 0);
+            function add(x, y) { return (x + y) | 0; }
+            function rotate(x, count) { return (x << count) | (x >>> (32 - count)); }
+            var state = [1732584193, -271733879, -1732584194, 271733878];
+            for (var offset = 0; offset < bytes.length; offset += 64) {
+                var words = [];
+                for (var wi = 0; wi < 16; wi++) {
+                    var pos = offset + wi * 4;
+                    words[wi] = bytes[pos] | (bytes[pos + 1] << 8) | (bytes[pos + 2] << 16) | (bytes[pos + 3] << 24);
+                }
+                var a = state[0], b = state[1], c = state[2], d = state[3];
+                for (var i = 0; i < 64; i++) {
+                    var f, g;
+                    if (i < 16) { f = (b & c) | ((~b) & d); g = i; }
+                    else if (i < 32) { f = (d & b) | ((~d) & c); g = (5 * i + 1) % 16; }
+                    else if (i < 48) { f = b ^ c ^ d; g = (3 * i + 5) % 16; }
+                    else { f = c ^ (b | (~d)); g = (7 * i) % 16; }
+                    var previousD = d;
+                    d = c;
+                    c = b;
+                    b = add(b, rotate(add(add(a, f), add(constants[i], words[g])), shifts[i]));
+                    a = previousD;
+                }
+                state[0] = add(state[0], a);
+                state[1] = add(state[1], b);
+                state[2] = add(state[2], c);
+                state[3] = add(state[3], d);
+            }
+            var hex = "";
+            for (var si = 0; si < 4; si++) {
+                for (var sj = 0; sj < 4; sj++) hex += ((state[si] >>> (sj * 8)) & 255).toString(16).padStart(2, "0");
+            }
+            return hex;
+        }
         var java = Object.freeze({
             get: function(key) { return __talebook_vars[String(key)] || ""; },
             put: function(key, value) { __talebook_vars[String(key)] = value == null ? "" : String(value); return value; },
@@ -57,7 +104,8 @@ def run_js(code, result="", variables=None, base_url="", time_limit=DEFAULT_TIME
             log: function() { return ""; },
             t2s: function(value) { return value == null ? "" : String(value); },
             s2t: function(value) { return value == null ? "" : String(value); },
-            encodeURI: function(value) { return encodeURIComponent(String(value)); }
+            encodeURI: function(value) { return encodeURIComponent(String(value)); },
+            md5Encode: function(value) { return __talebook_md5(value); }
         });
         var book = Object.freeze({
             origin: __talebook_origin,

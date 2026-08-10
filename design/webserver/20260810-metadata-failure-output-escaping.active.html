@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="PR #950 元数据失败摘要输出转义安全修复方案。" />
+    <link rel="icon" href="data:," />
+    <title>元数据失败摘要输出转义 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #edf3f7;
+        --paper: #ffffff;
+        --ink: #12202c;
+        --muted: #5b6976;
+        --line: #cbd8e1;
+        --navy: #173f5f;
+        --navy-soft: #e6f0f6;
+        --amber: #a65a00;
+        --amber-soft: #fff3dd;
+        --safe: #087f6a;
+        --safe-soft: #e0f4ef;
+        --danger: #b23a48;
+        --danger-soft: #fbeaed;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background-color: var(--canvas);
+        background-image: linear-gradient(rgba(23, 63, 95, .045) 1px, transparent 1px), linear-gradient(90deg, rgba(23, 63, 95, .045) 1px, transparent 1px);
+        background-size: 28px 28px;
+        font: 15px/1.68 var(--sans);
+      }
+      a { color: var(--navy); text-underline-offset: 3px; }
+      a:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+      code { padding: .12em .35em; border-radius: 4px; background: #eef2f5; font: .9em var(--mono); overflow-wrap: anywhere; }
+      .skip-link { position: fixed; top: 8px; left: 8px; z-index: 20; padding: 8px 12px; color: white; background: var(--ink); transform: translateY(-150%); }
+      .skip-link:focus { transform: translateY(0); }
+      .page { width: min(1040px, calc(100vw - 32px)); margin: 0 auto; padding: 28px 0 64px; }
+      .hero, .card { border: 1px solid var(--line); background: var(--paper); box-shadow: 0 12px 28px rgba(18, 32, 44, .08); }
+      .hero { position: relative; margin-bottom: 18px; padding: 34px; border-radius: 6px 24px 24px 6px; border-left: 8px solid var(--danger); overflow: hidden; }
+      .hero::after { position: absolute; right: 24px; bottom: 20px; color: rgba(23, 63, 95, .08); content: "ESCAPE BEFORE EMIT"; font: 800 28px/1 var(--mono); letter-spacing: -.05em; pointer-events: none; }
+      h1 { position: relative; z-index: 1; margin: 0 0 10px; font-size: clamp(30px, 5vw, 48px); line-height: 1.1; letter-spacing: -.035em; }
+      .lead { position: relative; z-index: 1; max-width: 780px; margin: 0; color: var(--muted); font-size: 17px; }
+      .meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { padding: 5px 10px; border-radius: 999px; color: #425463; background: #e9eff3; font-size: 12px; font-weight: 750; }
+      .chip.status { color: var(--amber); background: var(--amber-soft); }
+      .card { margin-bottom: 18px; padding: 26px 28px; border-radius: 18px; scroll-margin-top: 16px; }
+      h2 { margin: 0 0 14px; font-size: 22px; line-height: 1.3; }
+      h3 { margin: 20px 0 8px; font-size: 16px; }
+      p, ul, ol { margin: 9px 0; }
+      li + li { margin-top: 6px; }
+      .callout { padding: 14px 16px; border-left: 4px solid var(--amber); background: var(--amber-soft); }
+      .callout.good { border-color: var(--safe); background: var(--safe-soft); }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .panel { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfd; }
+      .panel h3 { margin-top: 0; }
+      .trace { display: grid; grid-template-columns: 1fr 48px 1fr 48px 1fr; align-items: stretch; gap: 7px; margin-top: 16px; }
+      .node { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #f8fafb; }
+      .node.untrusted { border-color: #e5a9b1; background: var(--danger-soft); }
+      .node.safe { border-color: #98d0c5; background: var(--safe-soft); }
+      .node b { display: block; margin-bottom: 6px; }
+      .node small { color: var(--muted); }
+      .arrow { display: grid; place-items: center; color: var(--navy); font: 800 22px var(--mono); }
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: white; font-size: 13px; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #455868; background: var(--navy-soft); }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      .pending { color: var(--amber); font-weight: 800; }
+      .verified { color: var(--safe); font-weight: 800; }
+      pre { padding: 14px 16px; overflow-x: auto; color: #eef7fb; background: var(--navy); border-radius: 12px; font: 13px/1.6 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; }
+      footer { color: var(--muted); text-align: center; font-size: 12px; }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero { padding: 25px 20px; border-radius: 5px 16px 16px 5px; }
+        .hero::after { display: none; }
+        .card { padding: 21px 19px; }
+        .grid, .trace { grid-template-columns: 1fr; }
+        .arrow { transform: rotate(90deg); }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @media print {
+        body { background: white; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .skip-link { display: none; }
+        .panel, .node, .table-wrap, pre { break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>元数据失败摘要输出转义</h1>
+        <p class="lead">收紧在线书源失败信息从不可信输入到 NDJSON 响应的最后一道边界，解决 PR #950 的 CodeQL 反射型 XSS 评审问题，同时保持现有流式协议结构。</p>
+        <div class="meta" aria-label="方案元信息">
+          <span class="chip status">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-10</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：元数据失败摘要、测试</span>
+          <span class="chip">需求来源：PR #950 Review / CodeQL #152</span>
+        </div>
+      </header>
+
+      <main id="main-content">
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout">“解决 PR 里的评审问题。”评审线程指出 <code>webserver/handlers/book.py</code> 的流式失败摘要存在 reflected server-side XSS 数据流。</div>
+          <p>CodeQL 将 <code>_dedupe_failures(failures)</code> 的入参识别为用户可控值，并追踪至 <code>self.write(json.dumps(...))</code>。现有响应虽然声明为 <code>application/x-ndjson</code>，但失败对象仍缺少显式的输出编码边界。</p>
+        </section>
+
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="panel"><h3>目标</h3><ul><li>失败摘要进入响应前逐字段转义。</li><li>仅保留 <code>source</code>、<code>code</code>、<code>message</code> 三个协议字段。</li><li>同步与流式响应采用同一份安全化结果。</li><li>恶意标签无法原样进入 HTTP 响应体。</li></ul></article>
+            <article class="panel"><h3>非目标</h3><ul><li>不改变书籍结果帧或搜索排序。</li><li>不修改 API 路径、数据库、配置和权限。</li><li>不把服务端失败文本当 HTML 渲染。</li><li>不关闭在线书源或删除失败诊断。</li></ul></article>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>3. 现状、根因与证据</h2>
+          <div class="table-wrap" role="region" aria-label="根因证据" tabindex="0">
+            <table>
+              <thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead>
+              <tbody>
+                <tr><td>CodeQL 高危告警</td><td><code>py/reflective-xss</code>，source 为 <code>_dedupe_failures</code> 入参，sink 为流式 <code>self.write</code>。</td><td>必须在共享失败摘要构造处建立显式 sanitizer。</td></tr>
+                <tr><td>失败信息来源不止固定常量</td><td><code>MetadataSearchResult.failures</code> 可携带在线书源名称和运行时错误摘要。</td><td>不能依赖当前调用方“通常可信”。</td></tr>
+                <tr><td>两个输出入口共用摘要</td><td>普通 JSON 返回 <code>summary</code>；流式接口发送 <code>event=summary</code> 控制帧。</td><td>在去重阶段安全化，避免两个入口各自遗漏。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>4. 方案</h2>
+          <div class="callout good"><strong>核心结论：</strong>把失败摘要视为不可信文本。在 <code>_dedupe_failures</code> 中先投影白名单字段，再使用标准库 <code>html.escape(..., quote=True)</code> 对每个值做输出转义，随后才参与去重并进入响应。</div>
+          <div class="trace" aria-label="失败摘要可信边界流程">
+            <div class="node untrusted"><b>不可信失败对象</b><small>在线书源名称、代码、消息，可能包含标签与引号。</small></div>
+            <div class="arrow">→</div>
+            <div class="node"><b>白名单 + 转义</b><small>只保留三字段；非字符串统一转为字符串；HTML 特殊字符实体化。</small></div>
+            <div class="arrow">→</div>
+            <div class="node safe"><b>安全摘要帧</b><small>普通 JSON 与 NDJSON 共用，前端继续按纯文本显示。</small></div>
+          </div>
+          <h3>关键契约</h3>
+          <pre aria-label="失败摘要伪代码"><code>safe = {
+  field: html.escape(str(failure.get(field, "")), quote=True)
+  for field in ("source", "code", "message")
+}
+dedupe_key = (safe["source"], safe["code"])</code></pre>
+          <p>选用标准库转义而不是正则删除标签：实体化不会误删正常文本，且是 CodeQL 规则明确认可的 sanitizer。字段投影同时阻止未来调用方把额外对象属性无意暴露给客户端。</p>
+        </section>
+
+        <section class="card">
+          <h2>5. 影响范围、风险与回滚</h2>
+          <div class="grid">
+            <article class="panel"><h3>影响范围</h3><p>只修改 <code>BookRefer</code> 失败摘要的规范化逻辑和对应后端回归测试。含 HTML 特殊字符的来源名或消息会以实体文本返回。</p></article>
+            <article class="panel"><h3>保持不变</h3><p>成功书籍数据、失败分类、去重键语义、流式帧顺序、HTTP Content-Type、前端控制帧识别均保持不变。</p></article>
+          </div>
+          <div class="callout"><strong>主要风险：</strong>调用方若曾期待失败消息中的标签被解释为 HTML，将看到实体文本；当前前端按普通文本显示失败信息，这一变化符合既有安全边界。回归测试覆盖普通 JSON 与 NDJSON 两条路径。</div>
+          <p><strong>回滚：</strong>可按单个 follow-up 提交回滚；无数据迁移、配置清理或部署前置条件。</p>
+        </section>
+
+        <section class="card">
+          <h2>6. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>实际命令或检查</th><th>预期</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>HTTP 回归</td><td><code>docker run --rm -v &lt;worktree&gt;:/workspace -w /workspace talebook/test:latest pytest -q tests/test_main.py::TestReferFailureSummary</code></td><td>普通 JSON 与 NDJSON 均返回实体化文本，原始脚本标签不进入响应。</td><td class="verified">通过：2 passed，4.65 秒</td></tr>
+                <tr><td>后端完整测试</td><td><code>docker run --rm -v &lt;worktree&gt;:/workspace -w /workspace talebook/test:latest pytest tests -q</code></td><td>所有既有测试通过或仅保留已知跳过项。</td><td class="verified">通过：859 passed、20 skipped、21 条既有警告，67.02 秒</td></tr>
+                <tr><td>格式与静态检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code></td><td>Python 格式及 lint 通过。</td><td class="verified">通过：ruff 自动格式化 1 个文件；随后 lint 0 错误</td></tr>
+                <tr><td>前端兼容门禁</td><td><code>cd app &amp;&amp; npm run lint</code></td><td>未修改前端，确认合并最新 master 后仍无 lint 错误。</td><td class="verified">通过：0 errors、193 条既有 warnings</td></tr>
+                <tr><td>方案门禁</td><td><code>make check-design</code></td><td>ACTIVE 文件路径、结构和单文件资源校验通过。</td><td class="verified">通过：合并前自检 WIP 仅命中预期状态门禁；转 ACTIVE 后执行完整门禁</td></tr>
+                <tr><td>CodeQL</td><td>PR 最新提交的 Python CodeQL 检查</td><td><code>py/reflective-xss</code> 告警不再出现在最新分析。</td><td class="pending">受限：远端只分析已推送提交；本地以规则认可的 <code>html.escape</code> sanitizer、白名单投影及两条 HTTP 回归替代验证，推送后继续核对</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout">宿主机没有完整 Calibre Python 运行环境，因此后端测试使用仓库标准 <code>talebook/test:latest</code> 镜像挂载当前 worktree 执行。CodeQL 只能在推送提交后由 GitHub Actions 运行；若远端仍报告同一数据流，本方案保持当前安全边界并按新 sink 继续补充修复。</div>
+        </section>
+
+        <section class="card">
+          <h2>7. 决策记录</h2>
+          <ol>
+            <li><strong>2026-08-10：</strong>评审问题明确且只有一个安全正确方向，无需新增用户选项；保持 API 结构并收紧输出编码。</li>
+            <li><strong>2026-08-10：</strong>在共享去重函数中安全化，避免只修流式 sink 而遗漏普通 JSON 响应。</li>
+            <li><strong>2026-08-10：</strong>采用标准库 <code>html.escape</code>，同时投影协议白名单字段，不以手写正则作为安全边界。</li>
+          </ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-08-10</footer>
+    </div>
+  </body>
+</html>

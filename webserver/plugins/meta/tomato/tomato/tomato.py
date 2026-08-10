@@ -225,8 +225,8 @@ class Page(object):
         if not self.soup or not self.html:
             raise PageError(book_id)
 
-        # 检查是否需要验证
-        if "验证" in self.html or "vf" in self.html:
+        # 仅识别明确的验证页信号，避免书名或简介中的普通“验证”字样误报。
+        if self._is_verification_page():
             raise VerifyError(book_id)
 
         # 尝试从 HTML 中解析数据
@@ -278,6 +278,9 @@ class Page(object):
 
         try:
             response = requests.get(url, timeout=15, headers=headers)
+            self.http_status = response.status_code
+            response_url = getattr(response, "url", None)
+            self.final_url = response_url if isinstance(response_url, str) else url
             self.html = response.text
 
             try:
@@ -285,8 +288,37 @@ class Page(object):
             except Exception:
                 self.soup = BeautifulSoup(self.html, "html.parser")
         except Exception:
+            self.http_status = None
+            self.final_url = url
             self.html = ""
             self.soup = None
+
+    def _is_verification_page(self):
+        if self.http_status in (403, 429):
+            return True
+
+        final_url = (self.final_url or "").lower()
+        if any(marker in final_url for marker in ("/verify", "captcha", "seccaptcha")):
+            return True
+
+        title = ""
+        if self.soup and self.soup.title:
+            title = self.soup.title.get_text(strip=True)
+        if title in {"安全验证", "访问验证", "人机验证", "验证码"}:
+            return True
+
+        if self.soup:
+            selectors = (
+                "#vf",
+                "#captcha_container",
+                "#captcha-container",
+                ".captcha-container",
+                "[class*='seccaptcha']",
+                "script[src*='captcha']",
+            )
+            if any(self.soup.select_one(selector) for selector in selectors):
+                return True
+        return False
 
     def _parse_html_data(self):
         """从 HTML 中解析书籍数据"""

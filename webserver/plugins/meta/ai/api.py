@@ -21,11 +21,15 @@ class AIBookApi:
         self.copy_image = copy_image
         self.manual_select = manual_select
 
-    def get_book(self, title, author=None):
+    def get_book(self, title, author=None, evidence=None):
         logging.debug(f"AIBookApi.get_book called with title: {repr(title)}, author: {repr(author)}")
 
+        if evidence == []:
+            logging.info("Skip AI metadata lookup because no online evidence is available for: %s", title)
+            return None
+
         # 构建提示词
-        prompt = self._build_prompt(title, author)
+        prompt = self._build_prompt(title, author, evidence=evidence)
 
         # 调用AI API
         response = self._call_ai_api(prompt)
@@ -47,18 +51,29 @@ class AIBookApi:
     # 无效作者占位符，传给 AI 前过滤掉
     _UNKNOWN_AUTHORS = {"unknown", "佚名", "unknown author", ""}
 
-    def _build_prompt(self, title, author=None):
+    def _build_prompt(self, title, author=None, evidence=None):
         # 剥除书名号等标点，避免干扰模型识别
         title = re.sub(r"[《》「」『』【】〔〕<>]", "", title).strip()
         author_clean = author.strip() if author else ""
         author_hint = f" by {author_clean}" if author_clean.lower() not in self._UNKNOWN_AUTHORS else ""
 
-        prompt = """You are a book metadata assistant. Look up the book and return its information as JSON.
+        evidence_text = ""
+        if evidence is not None:
+            safe_evidence = []
+            allowed_fields = {"source", "title", "author", "authors", "intro", "summary", "tags", "website", "cover_url"}
+            for item in evidence[:8]:
+                if not isinstance(item, dict):
+                    continue
+                safe_item = {key: item[key] for key in allowed_fields if item.get(key) not in (None, "", [])}
+                safe_evidence.append(safe_item)
+            evidence_text = json.dumps(safe_evidence, ensure_ascii=False)[:12000]
+
+        prompt = """You are a book metadata assistant. Return book information as JSON using only the supplied evidence.
 
 Instructions:
 - Output ONLY a valid JSON object, no other text.
-- If you know the book, fill in all fields with accurate data.
-- If the book is completely unknown to you, set status to "unknown".
+- Never add facts that are absent from the evidence.
+- If the evidence is empty, conflicting, or does not identify the requested book, set status to "unknown".
 
 JSON schema (example):
 {{
@@ -73,7 +88,8 @@ JSON schema (example):
 }}
 
 Book to look up: {title}{author_hint}
-""".format(title=title, author_hint=author_hint)
+Evidence JSON: {evidence}
+""".format(title=title, author_hint=author_hint, evidence=evidence_text or "not supplied")
         return prompt
 
     def _call_ai_api(self, prompt):
@@ -92,9 +108,6 @@ Book to look up: {title}{author_hint}
                 ],
                 "temperature": 0.3,
             }
-            if self.use_thinking:
-                payload["thinking"] = {"type": "enabled"}
-
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=25)
 
             if response.status_code != 200:
