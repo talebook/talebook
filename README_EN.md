@@ -49,6 +49,14 @@ Deployment is relatively simple, it is recommended to use docker, image address:
 It is recommended to use `docker-compose`, download the configuration file [docker-compose.yml](docker-compose.yml) from the repository, and then execute the command to start.
 If you want to modify the mounted directories or ports, please modify the docker-compose.yml file.
 
+By default, the Compose file keeps Talebook settings, the user database, and the library together in `data/` next to `docker-compose.yml`. Rebuilding or replacing the container does not remove those files. Back up this directory regularly, and do not keep long-lived data under `/tmp`, which the host may clean. To use another location, set an absolute path in a colocated `.env` file:
+
+```dotenv
+TALEBOOK_DATA_DIR=/path/to/talebook-data
+```
+
+If an existing deployment still uses `/tmp/demo`, back it up before updating the Compose file and set `TALEBOOK_DATA_DIR=/tmp/demo` to keep mounting the existing data. Alternatively, migrate it while the container is stopped. Do not complete setup again without first mounting the original data.
+
 ```
 wget https://raw.githubusercontent.com/talebook/talebook/master/docker-compose.yml
 docker-compose -f docker-compose.yml  up -d
@@ -62,7 +70,7 @@ If using native docker, then execute the command:
 
 For example
 
-`docker run -d --name talebook -p 8080:80 -v /tmp/demo:/data talebook/talebook`
+`mkdir -p "$PWD/data" && docker run -d --name talebook -p 8080:80 -v "$PWD/data:/data" talebook/talebook`
 
 
 

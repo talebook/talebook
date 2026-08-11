@@ -1504,7 +1504,7 @@ services:
     restart: always
     image: talebook/talebook
     volumes:
-      - /tmp/demo:/data
+      - "${TALEBOOK_DATA_DIR:-./data}:/data"
     ports:
       - "8080:80"
       - "8443:443"
@@ -1521,6 +1521,8 @@ services:
 ```
 
 #### 启动命令
+
+默认数据目录为 Compose 文件旁的 `./data`，其中包含配置、用户数据库和书库。生产环境不要使用可能被系统清理的 `/tmp`；需要复用已有目录时，在 `.env` 中设置 `TALEBOOK_DATA_DIR`。
 
 ```bash
 # 下载 docker-compose.yml
@@ -1539,7 +1541,7 @@ docker-compose logs -f talebook
 docker run -d \
   --name talebook \
   -p 8080:80 \
-  -v /tmp/demo:/data \
+  -v "$PWD/data:/data" \
   talebook/talebook
 ```
 
