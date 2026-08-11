@@ -50,7 +50,7 @@
         <h1>Talebook 同源嵌入 Readest</h1>
         <p>在保留 `/read/{id}` 权限入口、转换流程和旧阅读器回退的前提下，构建专用 Readest 静态产物并由 Talebook 镜像同源托管。</p>
         <div class="meta">
-          <span class="chip wip">状态：WIP</span>
+          <span class="chip">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-08-10</span>
           <span class="chip">所属模块：app（跨 webserver / Docker）</span>
           <span class="chip">需求来源：TAL-11</span>
@@ -59,14 +59,14 @@
 
       <section>
         <h2>1. 原始诉求</h2>
-        <div class="warn">“让 Talebook Web 端可直接使用 Moke 维护的 Readest 阅读器，同时保留现有权限、历史、转换和旧阅读器回退能力；不要求用户另行部署或登录 Readest 云服务。”</div>
+        <div class="warn">“让 Talebook Web 端可直接使用 Moke 维护的 Readest 阅读器，同时保留现有权限、历史、转换和旧阅读器回退能力；不要求用户另行部署或登录 Readest 云服务。” PR 评审进一步要求解决启用构建后静态产物增加约 155.1 MiB、明显大于 Candle Reader 的问题。</div>
         <p>首期聚焦 EPUB 与现有 MOBI/AZW/AZW3 转 EPUB 路径。PDF、TXT 保持原阅读器，直至 Range、内存、编码和定位能力达到同等可靠性。</p>
       </section>
 
       <section>
         <h2>2. 目标与边界</h2>
         <div class="grid">
-          <article class="box"><h3>目标</h3><ul><li>后台新增 Readest 选项，默认仍为 Candle Reader。</li><li>书籍内容只从同源、受阅读权限保护的接口进入浏览器 Blob。</li><li>登录用户保存并恢复 <code>moke.readest.progress.v1</code>。</li><li>转换、资源缺失、内容错误均有明确状态与旧阅读器入口。</li></ul></article>
+          <article class="box"><h3>目标</h3><ul><li>后台新增 Readest 选项，默认仍为 Candle Reader。</li><li>书籍内容只从同源、受阅读权限保护的接口进入浏览器 Blob。</li><li>登录用户保存并恢复 <code>moke.readest.progress.v1</code>。</li><li>裁剪后静态产物不超过 50 MiB，并由构建门禁阻止体积回涨。</li><li>转换、资源缺失、内容错误均有明确状态与旧阅读器入口。</li></ul></article>
           <article class="box"><h3>非目标</h3><ul><li>不引入 Readest 账号、云同步、支付或外部存储。</li><li>不改变 PDF.js 与 TXT 阅读路径。</li><li>不承诺 Readest 笔记跨端同步。</li><li>不把 Readest AGPL 源码并入 Talebook 的 BSD 许可声明。</li></ul></article>
         </div>
       </section>
@@ -95,7 +95,9 @@
             <tr><td>下载接口要求 <code>can_save</code>，不能用于仅有阅读权限的用户。</td><td><code>webserver/handlers/book.py:1019</code></td><td>新增只服务 EPUB 的阅读内容流，复用 <code>can_view_book</code> 与阅读权限。</td></tr>
             <tr><td>Readest Web 默认拒绝 <code>file=</code>，但 Web AppService 可导入浏览器 <code>File</code>。</td><td><code>apps/readest-app/src/helpers/openWith.ts</code></td><td>仅在 <code>talebook=1</code> 时接收同源 Blob URL，拒绝任意 HTTP URL。</td></tr>
             <tr><td>Readest 可静态导出，但 Web 动态分享路由需嵌入构建分支。</td><td><code>next.config.mjs</code> 与实际 <code>build-embedded-web</code></td><td>专用环境保持 Web 存储能力，关闭 runtime config/PWA，并输出到 <code>out/readest</code>。</td></tr>
-            <tr><td>当前静态产物约 156 MiB。</td><td>本地 <code>du -sh out/readest</code></td><td>本期不切换默认阅读器；PR 评审镜像增量后再决定后续瘦身。</td></tr>
+            <tr><td>原始静态产物为 156 MiB，其中 186 个 sourcemap 共 105,934,986 字节。</td><td>固定 commit 本地执行 <code>build-embedded-web</code> 后逐文件统计</td><td>生产镜像不分发调试映射；保留编译后的 JS、CSS、WASM 与语言资源。</td></tr>
+            <tr><td><code>vendor/pdfjs</code> 占 5,247,446 字节。</td><td>Talebook 格式矩阵只把 EPUB 与转码后的 EPUB 交给 Readest</td><td>裁剪 PDF.js 公共运行资源；PDF 仍由 Talebook 既有阅读器处理。</td></tr>
+            <tr><td>仅删除 sourcemap 与 PDF.js 公共资源后预计约 47 MiB。</td><td>原始固定构建的文件字节数差额</td><td>设置 50 MiB 硬上限并验证入口、阅读页、中英文资源、分词与简繁转换资源仍存在。</td></tr>
           </tbody>
         </table></div>
       </section>
@@ -111,7 +113,14 @@
         <h3>阅读器选择与回退</h3>
         <p><code>EPUB_VIEWER=readest.html</code> 启用新路径；<code>?reader=creader</code> 和 <code>?reader=epubjs</code> 是受控覆盖。管理员切回配置不需要迁移数据。</p>
         <h3>构建拓扑</h3>
-        <p>Talebook 固定 Readest fork 及其 foliate-js、simplecc-wasm、js-mdict 依赖 commit。Docker 的独立 Node 24 build stage 生成静态产物，再复制到 SPA 和 SSR 都会托管的前端 public 根目录。运行时不启动额外 Node 服务。</p>
+        <p>Talebook 固定 Readest fork 及其 foliate-js、simplecc-wasm、js-mdict 依赖 commit。Docker 的独立 Node 22 build stage 生成静态产物，复制许可说明后运行仓库内裁剪脚本，最后才复制到 SPA 和 SSR 托管目录。裁剪脚本删除生产环境不需要的 sourcemap 与 EPUB-only 接入不会访问的 <code>vendor/pdfjs</code>，校验核心文件并以 50 MiB 为失败阈值；运行时不增加 Node sidecar。</p>
+        <h3>评审反馈 grill 结论</h3>
+        <ul>
+          <li><strong>体积口径：</strong>以构建目录内所有常规文件的原始字节和为门禁口径，不用镜像层压缩率掩盖静态产物膨胀。</li>
+          <li><strong>功能边界：</strong>继续保留 Readest 的 EPUB 阅读、主题、全部语言包、结巴分词、简繁转换和浏览器数据库；不为追求 8 MiB 猜测性删除共享 chunk。</li>
+          <li><strong>PDF 边界：</strong>Talebook 不向 Readest 传入 PDF，因此只移除静态导出中的 PDF.js 公共运行目录；Readest 编译所需依赖和 Talebook 原 PDF 阅读路径均不变。</li>
+          <li><strong>回归约束：</strong>脚本必须在缺失核心文件或超过 50 MiB 时失败，并通过独立测试覆盖裁剪、幂等与超限场景。</li>
+        </ul>
       </section>
 
       <section>
@@ -122,6 +131,7 @@
           <li>Readest 嵌入参数只接受父页创建的同源 Blob URL；浏览器进度写入固定到当前 origin。</li>
           <li>Readest 继续以 AGPLv3 独立作品和源码 commit 分发；镜像包含其许可证、源码地址、精确 commit 与第三方依赖声明。Talebook 自有代码继续 BSD-2-Clause。</li>
           <li>Readest 构建资源缺失时不静默白屏；用户可立即返回 Candle Reader。默认配置保持 Candle Reader。</li>
+          <li>裁剪只作用于临时构建输出，不修改固定上游源码；AGPL 许可和精确源码说明继续随产物分发。</li>
         </ul>
       </section>
 
@@ -131,10 +141,11 @@
           <thead><tr><th>层级</th><th>覆盖</th><th>当前结果</th></tr></thead>
           <tbody>
             <tr><td>Readest 单元</td><td>同源 Blob 接收、恶意 URL 拒绝、浏览器进度 POST</td><td class="good">30 项定向测试通过</td></tr>
-            <tr><td>Readest 静态构建</td><td>Web AppService + export、basePath、无 runtime sidecar</td><td class="good"><code>build-embedded-web</code> 通过，15 个静态页面</td></tr>
-            <tr><td>Talebook 后端</td><td>权限矩阵、内容类型、格式分流、转换等待、回退</td><td class="good">完整后端测试 91 项通过、1 项跳过；Ruff 通过</td></tr>
-            <tr><td>Talebook 前端</td><td>后台选项与双语文案</td><td class="good">Chromium 定向用例 1 项通过；ESLint 0 错误（193 条既有警告）</td></tr>
-            <tr><td>生产镜像</td><td>SPA/SSR 资源复制、amd64/arm64 Dockerfile 语义</td><td class="good">builder 与 <code>docker build --check</code> 通过；两类产物均含 155.1 MiB Readest 与许可文件</td></tr>
+            <tr><td>Readest 静态构建</td><td>Web AppService + export、basePath、无 runtime sidecar、裁剪后体积</td><td class="good"><code>build-embedded-web</code> 通过并输出 15 个页面；裁剪 186 个 sourcemap 与 PDF.js 公共目录后为 49,310,615 字节（约 47.0 MiB），低于 50 MiB 门禁</td></tr>
+            <tr><td>裁剪回归</td><td>核心资源前置校验、裁剪、幂等、超限失败、Docker 复制顺序</td><td class="good"><code>tests/test_readest_build.py</code> 4 项通过；连同 Docker 阶段测试共 14 项通过</td></tr>
+            <tr><td>Talebook 后端</td><td>权限矩阵、内容类型、格式分流、转换等待、回退及完整回归</td><td class="good"><code>make pytest</code>：886 项通过、1 项跳过；<code>make lint-py</code> 通过</td></tr>
+            <tr><td>Talebook 前端</td><td>后台选项、双语文案与 lint</td><td class="good">既有 Chromium 定向用例 1 项通过；本轮 ESLint 0 错误（193 条既有警告）</td></tr>
+            <tr><td>生产镜像</td><td>SPA/SSR 资源复制、Dockerfile 裁剪顺序</td><td>任务禁止访问 Docker Unix socket，未执行镜像构建；以固定源码的等价本地 Node 构建、真实裁剪结果和 Dockerfile 顺序测试替代，剩余风险为实际 BuildKit 环境差异</td></tr>
             <tr><td>真实浏览器</td><td>桌面/移动 EPUB、恢复、错误、转换与回退截图</td><td class="pending">后台选择器已在 Chromium 验证；完整阅读器场景待集成环境补测</td></tr>
           </tbody>
         </table></div>
@@ -146,8 +157,9 @@
           <li>选择静态产物同源托管，不采用 Next.js sidecar。</li>
           <li>不复用下载接口，避免把“可阅读”错误收紧为“可下载”。</li>
           <li>不直接把书籍 HTTP URL交给 Readest；由 Talebook 父页校验并转为 Blob。</li>
-          <li>本期不改变默认阅读器，原因是静态产物体积与外部 fork 稳定性仍需真实镜像评审。</li>
-          <li>最终测试无相关失败后，本文件已定稿为 <code>.active.html</code>。</li>
+          <li>本期不改变默认阅读器；体积门禁解决镜像无界增长，但外部 fork 的功能稳定性仍需继续评审。</li>
+          <li>评审反馈后不另建方案，恢复同一文件为 WIP 并在这里记录体积分析、裁剪边界和验证结果。</li>
+          <li>相关自动化、完整固定源码构建与 50 MiB 门禁均通过，本文件转为 <code>.active.html</code>。</li>
         </ol>
       </section>
     </main>

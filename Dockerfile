@@ -41,9 +41,11 @@ RUN test -f /vendor/foliate-js/vendor/pdfjs/annotation_layer_builder.css && \
 
 FROM readest-prepared AS readest-builder
 WORKDIR /readest/apps/readest-app-deployed
+COPY scripts/prune-readest.sh /usr/local/bin/prune-readest
 RUN npm run build-embedded-web
 COPY document/third-party/readest.md /readest/out/readest/SOURCE.md
-RUN cp /readest/LICENSE /readest/out/readest/LICENSE-AGPL-3.0.txt && test -f /readest/out/readest/index.html
+RUN cp /readest/LICENSE /readest/out/readest/LICENSE-AGPL-3.0.txt && \
+    sh /usr/local/bin/prune-readest /readest/out/readest
 
 
 # ----------------------------------------
