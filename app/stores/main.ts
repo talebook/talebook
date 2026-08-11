@@ -60,7 +60,10 @@ export const useMainStore = defineStore('main', () => {
   }
 
   function login(data: any) {
-    if (data != undefined) {
+    // 控制类错误信封（例如首次安装时的 not_installed）不包含 sys/user。
+    // 只有完整的用户信息响应才能替换初始化默认值，否则页头、页脚等计算属性
+    // 会在跳转完成前读到 undefined。
+    if (data?.sys && data?.user) {
       sys.value = data.sys
       user.value = data.user
     }

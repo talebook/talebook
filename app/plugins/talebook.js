@@ -2,6 +2,17 @@ import { useMainStore } from '@/stores/main';
 
 export default defineNuxtPlugin((nuxtApp) => {
   const store = useMainStore();
+  const activeRedirects = new Map();
+
+  nuxtApp.$router.afterEach((to) => {
+    for (const [targetPath, reached] of activeRedirects) {
+      if (to.path === targetPath) {
+        activeRedirects.set(targetPath, true);
+      } else if (reached) {
+        activeRedirects.delete(targetPath);
+      }
+    }
+  });
 
   function showAlert(alert_type, alert_msg, alert_to) {
     store.setAlert({ type: alert_type, msg: alert_msg, to: alert_to });
@@ -13,19 +24,37 @@ export default defineNuxtPlugin((nuxtApp) => {
   }
 
   // 统一处理后端返回的控制类错误信封（未安装/未邀请/未登录/异常），触发跳转或提示。
+  function currentRoute() {
+    return nuxtApp.runWithContext(() => useRoute());
+  }
+
+  async function redirectOnce(target, logMessage) {
+    const targetPath = target.split('?')[0];
+    const route = currentRoute();
+    if (route.path === targetPath || activeRedirects.has(targetPath)) {
+      return;
+    }
+
+    activeRedirects.set(targetPath, false);
+    try {
+      if (logMessage) console.log(logMessage);
+      await nuxtApp.runWithContext(() => navigateTo(target, { redirectCode: 302 }));
+    } catch (error) {
+      activeRedirects.delete(targetPath);
+      throw error;
+    }
+  }
+
   async function handleErrorEnvelope(data) {
     if (data.err === 'not_installed') {
-      console.log('[Talebook] Redirecting to /install');
-      await nuxtApp.runWithContext(() => navigateTo('/install', { redirectCode: 302 }));
+      await redirectOnce('/install', '[Talebook] Redirecting to /install');
     } else if (data.err === 'not_invited') {
-      const route = useRoute();
+      const route = currentRoute();
       var next = route.fullPath;
       next = next ? '?next=' + next : '';
-      if (route.path !== '/welcome') {
-        await nuxtApp.runWithContext(() => navigateTo('/welcome' + next, { redirectCode: 302 }));
-      }
+      await redirectOnce('/welcome' + next);
     } else if (data.err === 'user.need_login') {
-      await nuxtApp.runWithContext(() => navigateTo('/login', { redirectCode: 302 }));
+      await redirectOnce('/login');
     } else if (data.err === 'exception') {
       store.setAlert({ type: 'error', msg: data.msg, to: null });
     }
