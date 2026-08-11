@@ -1,4 +1,0 @@
-interface:
-  display_name: "Talebook 操作助手"
-  short_description: "安全浏览、操作、管理和部署 Talebook 实例"
-  default_prompt: "使用 $talebook 操作我的书库，先检查当前身份和权限。"
