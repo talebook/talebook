@@ -112,11 +112,16 @@ def validate_path(repo_root, design_root, path):
         return False
 
     module, filename = relative_path.parts
-    module_is_valid = module == "project" or (
-        module not in RESERVED_MODULES and not module.startswith(".") and (repo_root / module).is_dir()
-    )
     match = FILENAME_PATTERN.fullmatch(filename)
-    if not module_is_valid or match is None:
+    if match is None:
+        return False
+
+    module_is_valid = module == "project" or (
+        module not in RESERVED_MODULES
+        and not module.startswith(".")
+        and ((repo_root / module).is_dir() or match.group("status") == "superseded")
+    )
+    if not module_is_valid:
         return False
 
     try:

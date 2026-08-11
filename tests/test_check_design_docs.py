@@ -53,6 +53,24 @@ def test_valid_active_design_passes(tmp_path):
     assert "1 design document(s) passed" in result.stdout
 
 
+def test_superseded_design_for_removed_module_remains_valid(tmp_path):
+    write_design(tmp_path, "retired/20260713-retired-feature.superseded.html")
+
+    result = run_check(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 design document(s) passed" in result.stdout
+
+
+def test_active_design_for_removed_module_remains_invalid(tmp_path):
+    write_design(tmp_path, "retired/20260713-retired-feature.active.html")
+
+    result = run_check(tmp_path)
+
+    assert result.returncode == 1
+    assert "invalid design document path" in result.stdout
+
+
 def test_valid_template_passes_without_status_gate(tmp_path):
     write_design(tmp_path, "TEMPLATE.html", html_with("<main><h1>WIP 方案模板</h1></main>"))
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0f2740">
-  <title>Talebook 操作型 Agent Skill 方案 · ACTIVE</title>
+  <title>Talebook 操作型 Agent Skill 方案 · SUPERSEDED</title>
   <style>
     :root {
       --canvas: #eef3f5;
@@ -78,7 +78,7 @@
     .meta div { display: inline-flex; gap: 7px; align-items: center; padding: 7px 10px; border: 1px solid rgba(255, 255, 255, .18); border-radius: 999px; background: rgba(255, 255, 255, .08); }
     .meta dt { color: #aebfca; font-size: 11px; }
     .meta dd { margin: 0; font: 700 11px/1.3 ui-monospace, monospace; overflow-wrap: anywhere; }
-    .active { color: #71e0bd; }
+    .superseded { color: #efad4e; }
     section { margin-top: 22px; padding: clamp(22px, 4vw, 36px); background: var(--panel); border: 1px solid var(--line); border-radius: 18px; }
     h2 { margin: 8px 0 20px; font: 800 clamp(23px, 3vw, 29px)/1.18 "Avenir Next", Avenir, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.02em; text-wrap: balance; scroll-margin-top: 24px; }
     h3 { margin: 0 0 8px; font-size: 18px; text-wrap: balance; }
@@ -148,7 +148,7 @@
         <dl class="meta">
           <div><dt>创建日期</dt><dd>2026-07-31</dd></div>
           <div><dt>所属模块</dt><dd>skills / talebook</dd></div>
-          <div><dt>状态</dt><dd class="active">ACTIVE</dd></div>
+          <div><dt>状态</dt><dd class="superseded">SUPERSEDED</dd></div>
           <div><dt>需求来源</dt><dd>PR #916 用户对话</dd></div>
         </dl>
         <div class="command">$ talebook-cli.py --site books.example.com audios download --book-id 42 --output ./三体有声书</div>
@@ -303,10 +303,10 @@ admin opds ... | settings ... | trash ... | ssl ... | themes ... | logs ...</pre
           <tr><td data-label="风险">有声书下载耗尽内存、截断或留下半成品</td><td data-label="控制">固定分块流式写入、响应长度与传输完整性校验、净化文件名、拒绝覆盖、逐章临时文件、整本临时目录和原子落位。</td></tr>
         </tbody>
       </table>
-      <p>整个 Skill 可以从 <code>skills/talebook/</code> 独立移除，不影响 Talebook 后端数据、API 或前端。核心命令或安全模型以后发生变化时，应直接创建新的替代方案，不在本 ACTIVE 文件中追加过程记录。</p>
+      <p>整个 Skill 可以从 <code>skills/talebook/</code> 独立移除，不影响 Talebook 后端数据、API 或前端。自 2026-08-11 起，Skill 已迁移至独立的 <code>talebook/skills</code> 仓库，本方案仅保留为主仓库曾内置该实现的历史记录。</p>
     </section>
 
-    <footer>Talebook Agent Skill · One final design for PR #916 · ACTIVE since 2026-07-31.</footer>
+    <footer>Talebook Agent Skill · ACTIVE since 2026-07-31 · SUPERSEDED on 2026-08-11 by talebook/skills.</footer>
   </main>
 </body>
 </html>
