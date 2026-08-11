@@ -101,7 +101,7 @@
                                     size="48"
                                     color="grey"
                                 >
-                                    mdi-device-unknown
+                                    mdi-devices
                                 </v-icon>
                                 <p class="mt-2 text-medium-emphasis">
                                     {{ t('book.noDevices') }}<br>

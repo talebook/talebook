@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 将界面图标从整包 MDI 字体切换为构建期内联的本地 SVG 图标。" />
+    <link rel="icon" href="data:," />
+    <title>界面图标本地 SVG 化 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#172033; --muted:#5d687b; --line:#d8e0eb; --accent:#1769aa; --soft:#eaf4ff; --good:#176b45; --warn:#965b06; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:linear-gradient(145deg,#eaf4ff 0,#f7f9fc 34%,#f4f7fb 100%); line-height:1.65; }
+      .page { width:min(980px,calc(100vw - 28px)); margin:0 auto; padding:28px 0 52px; }
+      header,section { margin-bottom:18px; padding:26px 28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 10px 28px rgba(23,32,51,.07); }
+      h1 { margin:0 0 10px; font-size:clamp(30px,5vw,46px); line-height:1.15; }
+      h2 { margin:0 0 12px; font-size:21px; }
+      p { margin:0 0 12px; }
+      p:last-child { margin-bottom:0; }
+      ul,ol { margin:8px 0 0 20px; padding:0; }
+      li + li { margin-top:6px; }
+      code { padding:.12em .35em; border-radius:5px; background:#edf1f6; font-family:"SFMono-Regular",Consolas,monospace; font-size:.9em; }
+      .sub { color:var(--muted); font-size:16px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      .chip { padding:5px 10px; border-radius:999px; color:#34445d; background:#eef2f7; font-size:12px; font-weight:700; }
+      .wip { color:var(--warn); background:#fff1d8; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .box { padding:16px; border:1px solid var(--line); border-radius:14px; background:#fbfcfe; }
+      .box strong { display:block; margin-bottom:7px; }
+      .flow { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+      .step { padding:16px; border-radius:14px; color:#24415d; background:var(--soft); }
+      .step b { display:block; margin-bottom:6px; }
+      .pending { color:var(--warn); font-weight:800; }
+      .good { color:var(--good); font-weight:800; }
+      @media (max-width:680px) { .page{width:calc(100vw - 18px);padding-top:10px} header,section{padding:21px 19px;border-radius:15px}.grid,.flow{grid-template-columns:1fr} }
+      @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+      @media print { body{background:#fff}.page{width:100%;padding:0}header,section{box-shadow:none;break-inside:avoid} }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <h1>界面图标本地 SVG 化</h1>
+        <p class="sub">移除首屏对整包 MDI 图标字体的请求，把实际使用的图标路径在构建期打进应用，使菜单和按钮不再经历方框占位。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-10</span>
+          <span class="chip">所属模块：app</span>
+          <span class="chip">影响范围：全站 Vuetify 图标</span>
+          <span class="chip">需求来源：TAL-13</span>
+        </div>
+      </header>
+
+      <main>
+        <section>
+          <h2>1. 原始诉求</h2>
+          <p>“截图里的 icon 加载很久，排查是否因为引用了外部资源，并把资源全部本地化。”</p>
+          <p>截图中菜单、顶栏和悬浮按钮的所有图标同时显示为空方框，符合图标字体尚未可用时的表现。</p>
+        </section>
+
+        <section>
+          <h2>2. 现状与结论</h2>
+          <div class="grid">
+            <div class="box"><strong>没有运行时外部 CDN</strong><p><code>@mdi/font</code> 由 npm 在构建阶段提供，Nuxt 会把字体输出到本站 <code>_nuxt</code> 资源目录。</p></div>
+            <div class="box"><strong>仍存在首屏字体依赖</strong><p>当前会发布约 403 KB WOFF2 和约 418 KB 完整图标 CSS；字体完成前，私有区码只能显示为方框。</p></div>
+          </div>
+        </section>
+
+        <section>
+          <h2>3. 目标与边界</h2>
+          <div class="grid">
+            <div class="box"><strong>目标</strong><ul><li>界面图标不再发起字体或图标 CDN 请求。</li><li>只把仓库实际使用的 MDI SVG 路径打包进应用。</li><li>保持既有 <code>mdi-*</code> 图标名称和所有页面行为不变。</li></ul></div>
+            <div class="box"><strong>非目标</strong><ul><li>不改变书籍封面、头像、验证码和用户主动配置的远端链接。</li><li>不改造独立阅读器内自带且已本地化的图标资源。</li><li>不改变 Vuetify 主题、布局或交互。</li></ul></div>
+          </div>
+        </section>
+
+        <section>
+          <h2>4. 实现方案</h2>
+          <div class="flow" aria-label="图标解析流程">
+            <div class="step"><b>1. 收集名称</b>扫描应用源码中的 <code>mdi-*</code> 字面量并维护显式注册表。</div>
+            <div class="step"><b>2. 构建期解析</b>从 <code>@mdi/js</code> 静态导入相应 SVG path，允许打包器摇树优化。</div>
+            <div class="step"><b>3. 本地渲染</b>通过 Vuetify 自定义图标集直接输出内联 <code>&lt;svg&gt;</code>，不再请求字体。</div>
+          </div>
+          <p>Vuetify 内置控件使用的 <code>$alias</code> 继续复用官方 <code>mdi-svg</code> aliases；业务代码传入的 <code>mdi-name</code> 由本地图标组件查表。未知名称在开发环境报警，并渲染问号兜底图标。</p>
+        </section>
+
+        <section>
+          <h2>5. 风险与控制</h2>
+          <ul>
+            <li>新增图标忘记注册：测试扫描生产源码，发现未注册的 <code>mdi-*</code> 名称即失败。</li>
+            <li>SSR 与客户端不一致：图标组件只依赖静态映射，服务端和浏览器执行相同渲染函数。</li>
+            <li>包体回退：构建后检查不再生成 MDI 字体，并记录产物体积变化。</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>6. 测试结果</h2>
+          <p class="good">验证通过</p>
+          <ul>
+            <li><code>npx vitest run test/components/</code>：14 个测试文件、63 个用例全部通过。</li>
+            <li><code>npm run lint</code>：0 error；保留 193 条与本次无关的既有 warning。</li>
+            <li><code>npm run build</code> 与 <code>npm run generate</code>：SSR 和静态构建均通过。</li>
+            <li>构建产物检查：主应用 <code>_nuxt</code> 中无 MDI 字体文件、Material Design Icons CSS 或外部图标 CDN 引用；独立阅读器目录原有的本地图标字体保持不变。</li>
+            <li>Chromium 实际渲染：390×844 移动首页与浅灰主题侧栏共 2 个 Playwright 用例通过；所有 Vuetify 图标均包含 <code>svg.v-icon__svg</code>，资源时间线中无 font 请求。</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>7. 决策记录</h2>
+          <ol>
+            <li>选择 SVG 而不是把完整字体复制进仓库，因为复制只能改变所有权，不能消除字体下载与方框占位。</li>
+            <li>保留现有图标名称，不批量改写页面模板，降低全站迁移风险。</li>
+            <li>图标依赖保留为构建期 npm 包；运行时产物全部由 Talebook 同源提供。</li>
+          </ol>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

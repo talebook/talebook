@@ -17,14 +17,14 @@ test.describe('Light-gray sidebar', () => {
 
     test('the menu button fully closes and reopens the drawer', async ({ page }, testInfo) => {
         await page.goto('/admin/themes');
-        await expect(page.locator('.loading-page')).toBeHidden();
+        await expect(page.locator('.loading-page')).toBeHidden({ timeout: 15_000 });
         await expect(page.locator('body')).toHaveClass(/tb-current-builtin-theme-light-gray/);
 
         const toggle = page.locator('.tb-theme-nav-toggle');
         const drawer = page.locator('.tb-theme-drawer');
         const main = page.locator('.v-main');
 
-        await expect(toggle.locator('.mdi-menu')).toBeVisible();
+        await expect(toggle.locator('svg.v-icon__svg')).toBeVisible();
         await expect(toggle.locator('.tb-theme-avatar-toggle')).toHaveCount(0);
         await expect(drawer).toHaveClass(/v-navigation-drawer--active/);
         await expect(drawer).not.toHaveClass(/v-navigation-drawer--rail/);

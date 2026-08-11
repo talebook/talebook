@@ -259,7 +259,7 @@
                         v-if="job.status === 'awaiting_review'"
                         color="primary"
                         variant="flat"
-                        prepend-icon="mdi-script-text-edit"
+                        prepend-icon="mdi-script-text-outline"
                         data-testid="edit-workspace"
                         @click.stop="openWorkspace(job)"
                     >
