@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 网络书库仅由用户动作触发搜索的缺陷修复方案。" />
+    <link rel="icon" href="data:," />
+    <title>网络书库仅由用户动作触发搜索 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      使用步骤：
+      1. cp design/TEMPLATE.html design/<module>/yyyymmdd-<feature>.wip.html
+      2. 同一个工作只维护这一份方案；grill、反馈、候选比较、实现偏离和测试结果都更新同一份 WIP，不创建或保留中间废弃文档。
+      3. 替换所有“〔……〕”占位内容，并让 title、h1、状态和文件名保持一致；迭代期间保持首次创建日期和 feature 不变。
+      4. 保留标注 REQUIRED 的内容；按需删除标注 OPTIONAL 的组件、tags 与目录项。
+      5. meta tags 只是备选呈现组件，不要求固定数量；但标题、日期、模块、状态及存在时的需求来源仍须在顶部清楚展示。
+      6. 可按主题修改 :root token、标题处理与专用图表，但保留响应式、focus、reduced-motion、打印和表格滚动基线。
+      7. 创建时测试结果写“待验证”；完成后回写实际命令、页面、结果、失败项与未执行原因，再把唯一 WIP 转为 ACTIVE。
+      8. SUPERSEDED 只用于已独立生效的旧 ACTIVE 被另一个后续工作替代，不用于保存本工作的设计过程。
+    -->
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <!-- OPTIONAL：宽屏页边轨道。删减章节时同步维护轨道、浮动目录与正文 section。 -->
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">产品功能矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <!-- OPTIONAL：视口没有足够页边余白时自动使用，不压缩正文。details 提供无脚本可用的开合能力。 -->
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#feature-matrix">产品功能矩阵</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <!-- REQUIRED：标题、摘要和顶部元信息。tags 可增删，不固定字段数量。 -->
+      <header class="hero">
+        <h1>网络书库仅由用户动作触发搜索</h1>
+        <p class="sub">保留上次搜索缓存的即时展示，但停止页面挂载时的后台重搜，避免用户未操作便创建耗时的书源搜索任务。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-12</span>
+          <span class="chip">所属模块：app</span>
+          <!-- OPTIONAL：按需保留、删除或新增 tags。 -->
+          <span class="chip">影响范围：网络书库搜索页与 E2E 测试</span>
+          <span class="chip">需求来源：GitHub Issue #965</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <!-- REQUIRED：保留用户原话或可追溯的原始需求，不要只写二次概括。 -->
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“每次一打开在线书库，它就自动开始上一次的搜索，我都没搜，它就自己开始搜了。”</div>
+            <p>Issue 附图显示网络书库打开后沿用旧关键词，同时搜索按钮进入加载态并出现“已完成 5/50 个书源”的进度。该行为会消耗书源搜索资源，也违背“搜索由本次用户动作发起”的预期。</p>
+          </section>
+
+          <!-- REQUIRED：目标与非目标一起写，防止范围在实现期漂移。 -->
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul><li>重新进入或刷新网络书库时，不自动调用网络搜索接口。</li><li>仍从本地缓存恢复上次关键词、范围、页码和结果，避免返回页面后历史结果丢失。</li><li>点击搜索、回车和翻页继续正常发起搜索。</li></ul></article>
+              <article class="choice"><h3>非目标</h3><ul><li>不清除或迁移现有 <code>localStorage</code> 缓存。</li><li>不改变后端搜索任务、轮询协议与书源排序。</li><li>不调整网络书库布局、文案或视觉样式。</li></ul></article>
+            </div>
+          </section>
+
+          <!-- OPTIONAL：用户可感知功能、角色权限或多入口覆盖发生变化时建议保留；按产品实际角色和入口增删列。 -->
+          <section id="feature-matrix" class="card">
+            <h2>3. 产品功能矩阵</h2>
+            <p>本次改变发生在 Web 网络书库入口，不改变角色权限与 API 能力。</p>
+            <div class="matrix-legend" aria-label="功能矩阵图例">
+              <span class="matrix-yes">支持</span>
+              <span class="matrix-conditional">条件支持</span>
+              <span class="matrix-no">不支持 / 不在范围</span>
+            </div>
+            <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0">
+              <table class="feature-matrix">
+                <thead><tr><th>功能域</th><th>用户任务 / 功能</th><th>游客</th><th>登录用户</th><th>管理员</th><th>Web</th><th>移动端</th><th>API / 协议</th><th>验收口径</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">缓存恢复</th>
+                    <td><strong>返回网络书库查看上次结果</strong><br /><span class="matrix-note">即时显示缓存，不创建搜索任务。</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td>进入 <code>/network</code> 后显示缓存内容，且没有 <code>/api/network/search</code> 请求。</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">主动搜索</th>
+                    <td><strong>用户提交关键词或切换结果页</strong><br /><span class="matrix-note">显式动作仍按原协议创建与轮询任务。</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td>点击搜索后产生一次搜索请求并显示匹配结果。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- OPTIONAL：复杂缺陷、兼容性或架构改动建议保留证据表；简单改动可以删除。 -->
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>打开页面后出现旧关键词、加载按钮及 5/50 搜索进度。</td><td>Issue #965 附图；<code>app/pages/network/index.vue</code> 的 <code>onMounted</code></td><td>不是浏览器自动提交表单，而是页面代码恢复缓存后调用 <code>fetchSearch</code>。</td></tr>
+                  <tr><td>缓存恢复本身已有 E2E 约束。</td><td><code>app/test/e2e/network.spec.ts</code> 的缓存恢复用例；提交 <code>4edbf002</code></td><td>无需删除缓存能力，只需切断挂载与新搜索任务之间的隐式触发。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>事实与推断：</strong>根因可由静态调用链和附图直接证实。实现后需用请求计数断言证明二次进入页面不会调用搜索接口，同时缓存结果仍可见。</div>
+          </section>
+
+          <!-- REQUIRED：先给核心方案，再按内容选用流程、决策表、代码或 SVG。 -->
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <div class="callout good"><strong>方案结论：</strong>页面挂载只负责恢复本地缓存和加载书源，不再执行 <code>fetchSearch</code>。搜索任务仍由 <code>doSearch</code> 与 <code>changeSearchPage</code> 两个显式用户路径负责，缓存读写格式保持不变。</div>
+
+            <!-- OPTIONAL：有顺序依赖时使用流程；没有真实顺序时不要为了装饰编号。 -->
+            <div class="flow" aria-label="核心处理流程">
+              <article class="step"><span class="label">Enter</span><b>进入网络书库</b><p>读取上次搜索元数据与缓存条目。</p></article>
+              <article class="step"><span class="label">Restore</span><b>恢复静态状态</b><p>回填关键词、范围、页码、结果与失败源列表。</p></article>
+              <article class="step"><span class="label">Idle</span><b>保持空闲</b><p>不调用搜索接口，不显示搜索进度或加载态。</p></article>
+              <article class="step"><span class="label">Action</span><b>等待用户动作</b><p>点击搜索、回车或翻页后才创建新任务。</p></article>
+            </div>
+
+            <!-- OPTIONAL：存在多个候选方案或跨模块契约时保留。 -->
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+                <tbody>
+                  <tr><td>缓存与刷新</td><td>恢复缓存但不后台刷新</td><td>解决无操作搜索，同时保留返回页面的上下文。</td><td>完全删除缓存会让返回页面丢失结果；保留自动刷新无法解决 Issue。</td></tr>
+                  <tr><td>测试信号</td><td>监听搜索接口请求数量</td><td>既验证可见缓存，也验证没有隐藏的网络副作用。</td><td>只断言按钮未加载可能漏掉快速完成的自动请求。</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- OPTIONAL：展示命令、契约或伪代码。 -->
+            <pre aria-label="核心行为伪代码"><code>onMounted:
+  restoreCachedSearch()
+  loadSources()
+  // 不调用 fetchSearch
+
+onUserSubmit / onPageChange:
+  fetchSearch(page)</code></pre>
+          </section>
+
+          <!-- REQUIRED FOR MATERIAL CHANGES：简单且无风险的改动可合并为一段，但不能隐去风险。 -->
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>影响范围</h3><p><code>app/pages/network/index.vue</code> 的挂载行为，以及 <code>app/test/e2e/network.spec.ts</code> 对缓存恢复的验收。用户再次打开页面时不再看到自动搜索进度。</p></article>
+              <article class="choice"><h3>保持不变</h3><p>后端 API、缓存键及数据结构、主动搜索与分页、搜索轮询、登录权限、界面布局和 i18n 文案均不变。</p></article>
+            </div>
+            <div class="callout danger"><strong>主要风险：</strong>恢复的结果可能不是最新数据；但它被明确视为历史缓存，用户主动搜索即可刷新。E2E 同时覆盖缓存展示与主动搜索，防止误伤原能力。</div>
+            <div class="callout"><strong>回滚：</strong>仅需恢复挂载阶段的 <code>fetchSearch</code> 调用；不涉及数据、配置、迁移或缓存清理。</div>
+          </section>
+
+          <!-- REQUIRED：WIP 阶段写计划与待验证；完成后必须替换为真实执行记录。 -->
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>页面 E2E</td><td><code>cd app &amp;&amp; LD_LIBRARY_PATH=/__w/talebook/talebook/.codex-runtime/playwright-libs/root/usr/lib/x86_64-linux-gnu:/usr/lib/talebook-calibre/lib npx playwright test test/e2e/network.spec.ts</code></td><td>首次主动搜索正常；离开后返回可见缓存；返回过程搜索接口请求数不增加。</td><td class="verified">通过：6/6</td></tr>
+                  <tr><td>前端 lint</td><td><code>cd app &amp;&amp; npm run lint</code></td><td>页面与测试通过 ESLint。</td><td class="verified">通过：0 error；193 条既有 warning</td></tr>
+                  <tr><td>实际渲染</td><td>Playwright Chromium、mock API、<code>/network</code>、1440×900；<code>document/screenshots/issue-965/network-cache-restored-idle.png</code></td><td>缓存恢复后按钮空闲、无进度条。</td><td class="verified">通过；当前 runner 未提供 Chrome DevTools MCP，按自动化测试例外使用短生命周期 mock 与 Chromium 验证，未作为用户体验环境。</td></tr>
+                  <tr><td>方案门禁</td><td><code>make check-design</code></td><td>路径、状态、HTML 结构和单文件资源约束通过。</td><td class="verified">转 ACTIVE 后执行并通过</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout good"><strong>验证结论：</strong>主动搜索、缓存恢复、返回页面不自动重搜均已由 Chromium E2E 覆盖；lint 与方案门禁通过，截图已留存供评审。</div>
+          </section>
+
+          <!-- OPTIONAL：grill 结论、实现偏离或后续修订需要可追溯时保留。 -->
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-08-12：</strong>自动 bug 入口已预授权方案评审；依据代码、提交历史和附图，确认保留缓存恢复、取消挂载重搜。</li>
+              <li><strong>2026-08-12：</strong>不新增“自动刷新”开关。该行为没有明确用户意图，配置会增加理解与维护成本。</li>
+              <li><strong>2026-08-12：</strong>实现未偏离方案。完整网络书库 E2E、lint 和实际 Chromium 渲染验证完成，方案转为 ACTIVE。</li>
+            </ol>
+          </section>
+        </main>
+
+      </div>
+
+      <!-- REQUIRED：转 ACTIVE 时同步更新这里、title、顶部状态和文件名。 -->
+      <footer>Talebook internal design · app · ACTIVE · 2026-08-12</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>
