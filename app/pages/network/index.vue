@@ -539,10 +539,6 @@ onMounted(async () => {
     }
     const rsp = await $backend('/network/sources');
     if (rsp.err === 'ok') sources.value = rsp.items || [];
-    // stale-while-revalidate：恢复缓存后台再跑一次最新搜索刷新结果
-    if (searched.value && (keyword.value || '').trim()) {
-        fetchSearch(searchPage.value);
-    }
 });
 
 onBeforeUnmount(() => {
