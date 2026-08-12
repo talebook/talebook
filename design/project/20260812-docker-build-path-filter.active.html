@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docker Build Workflow 路径过滤方案 · ACTIVE</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1e293b;
+      --muted: #64748b;
+      --line: #d7dee8;
+      --paper: #f7fafc;
+      --accent: #0f766e;
+      --accent-bg: #e6f5f3;
+      --warn: #9a5b13;
+      --warn-bg: #fff7e8;
+      --code: #edf2f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 42px 20px 72px;
+      color: var(--ink);
+      background: var(--paper);
+      font: 16px/1.68 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    main { max-width: 980px; margin: 0 auto; }
+    header, section {
+      margin-bottom: 18px;
+      padding: 26px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+    h1 { margin: 0 0 12px; font-size: clamp(30px, 5vw, 46px); line-height: 1.16; }
+    h2 { margin: 0 0 14px; font-size: 22px; line-height: 1.3; }
+    p { margin: 0 0 12px; }
+    p:last-child { margin-bottom: 0; }
+    code { padding: 2px 5px; border-radius: 4px; background: var(--code); font-size: .9em; }
+    ul { margin: 10px 0 0 22px; padding: 0; }
+    li + li { margin-top: 6px; }
+    table { width: 100%; margin-top: 12px; border-collapse: collapse; background: #fff; }
+    th, td { padding: 11px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); background: #f1f5f9; font-size: 13px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 13px; }
+    .status { color: var(--warn); font-weight: 800; }
+    .summary { padding: 16px 18px; background: var(--accent-bg); border-left: 4px solid var(--accent); }
+    .warn { padding: 14px 16px; background: var(--warn-bg); border-left: 4px solid var(--warn); }
+    @media (max-width: 680px) {
+      body { padding: 18px 12px 46px; }
+      header, section { padding: 20px; border-radius: 10px; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Docker Build Workflow 只在镜像输入变化时运行</h1>
+    <p class="summary">为 <code>.github/workflows/build.yml</code> 增加路径过滤，让文档、设计、测试夹具等不进入 Docker 镜像的改动不再触发重型多架构构建；真正影响前端、后端或镜像运行配置的改动仍会构建。</p>
+    <div class="meta">
+      <span>创建日期：2026-08-12</span>
+      <span>所属模块：project</span>
+      <span>状态：<b class="status">ACTIVE</b></span>
+      <span>需求来源：TB-25 给 docker build actions 增加 filter</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. 原始诉求</h2>
+    <div class="warn">“参考 multica 仓库 CI 的做法，增加 filter，只有真正修改前端和后端代码时才触发 docker build workflow，最终达到提效的目的。”</div>
+    <p>现有 <code>build.yml</code> 在 <code>master</code>、开发分支、Codex/Claude 分支、版本 tag 和 PR 上都会进入 Docker 构建链路。对于只改文档、设计方案或普通测试的提交，这会浪费 Docker Buildx、QEMU 和镜像推送相关 runner 时间。</p>
+  </section>
+
+  <section>
+    <h2>2. 目标与边界</h2>
+    <table>
+      <thead><tr><th>类型</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>目标</td><td>PR 和分支 push 只有在 Docker 镜像输入变化时运行 <code>prepare</code>、<code>build</code>、<code>merge</code> 重型链路。</td></tr>
+        <tr><td>目标</td><td>保留 tag 发布构建，避免版本发布因为没有可比较路径而被误跳过。</td></tr>
+        <tr><td>边界</td><td>不改变镜像 target、tag 规则、Buildx cache、Docker Hub 登录和 manifest 合并逻辑。</td></tr>
+        <tr><td>非目标</td><td>不为 <code>ci.yml</code> 的后端或前端测试 job 单独增加过滤；本次只处理 Docker build workflow。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. 方案</h2>
+    <ul>
+      <li>新增轻量 <code>changes</code> job，使用 <code>dorny/paths-filter@v3</code> 输出 <code>docker</code> 布尔结果。</li>
+      <li>push 事件以 <code>github.event.before</code> 作为比较基准，避免开发分支早先的代码改动导致后续文档提交反复触发 Docker 构建；PR 事件仍由 action 使用 PR base 检测。</li>
+      <li><code>prepare</code> 改为依赖 <code>changes</code>，并只在 <code>needs.changes.outputs.docker == 'true'</code> 时运行；后续 <code>build</code> 和 <code>merge</code> 通过原有 <code>needs</code> 自动跳过。</li>
+      <li>过滤路径覆盖 Dockerfile 实际复制或依赖的前端、后端、Nginx、Supervisor、启动脚本、requirements、Compose 与 Makefile 输入。</li>
+      <li>tag push 跳过路径检测并直接放行，继续承担发布镜像职责。</li>
+    </ul>
+    <table>
+      <thead><tr><th>会触发 Docker 构建</th><th>不会触发 Docker 构建</th></tr></thead>
+      <tbody>
+        <tr><td><code>app/**</code>、<code>webserver/**</code>、<code>server.py</code></td><td><code>README.md</code>、<code>document/**</code>、<code>design/**</code></td></tr>
+        <tr><td><code>Dockerfile</code>、<code>.dockerignore</code>、<code>docker/**</code></td><td><code>tests/**</code> 中不进入镜像构建 target 的普通测试变更</td></tr>
+        <tr><td><code>conf/nginx/**</code>、<code>conf/supervisor/**</code>、<code>requirements*.txt</code>、<code>docker-compose*.yml</code>、<code>Makefile</code></td><td>项目规划、调研、截图和开发说明类文件</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>4. 风险与回滚</h2>
+    <ul>
+      <li>路径列表漏掉真实镜像输入会导致构建被跳过；因此列表按 Dockerfile 的 <code>COPY</code>、依赖安装和运行配置逐项映射，并用单元测试固定。</li>
+      <li>若未来 Dockerfile 新增复制路径，必须同步更新 filter 和测试。</li>
+      <li>回滚只需移除 <code>changes</code> job，并恢复 <code>prepare</code> 不带 <code>needs</code> 和 <code>if</code> 的原状。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>5. 测试结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>当前结果</th></tr></thead>
+      <tbody>
+        <tr><td><code>uv run --extra test pytest tests/test_dev_container_workflow.py -q</code></td><td>通过：2 passed。先前 <code>uv run --extra test</code> 暴露既有 <code>PyYAML</code> 测试依赖缺失，因此同步补充到 <code>requirements-test.txt</code> 和 <code>pyproject.toml</code>。</td></tr>
+        <tr><td><code>uv run --extra test pytest tests/test_dev_container_workflow.py tests/test_ci_workflow.py tests/test_agent_workflows.py tests/test_claude_review_workflow.py -q</code></td><td>通过：7 passed，覆盖当前仓库中解析 GitHub Actions YAML 的核心回归测试。</td></tr>
+        <tr><td><code>git diff --check</code></td><td>通过：无空白错误。</td></tr>
+        <tr><td><code>make check-design</code></td><td>通过：103 design document(s) passed。</td></tr>
+        <tr><td><code>act</code> 真实 workflow</td><td>未执行：当前环境没有 <code>act</code> 命令，也没有 <code>gh act</code> 扩展；已确认 Docker 可用但缺少 workflow 本地执行入口。风险是第三方 Action bootstrap 仍需在真实 GitHub Actions 中验收。</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

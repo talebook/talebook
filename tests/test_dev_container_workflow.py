@@ -34,3 +34,45 @@ def test_build_workflow_only_publishes_the_validated_dev_image_from_master():
     )
     assert step["with"]["tags"] == "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev"
     assert step["with"]["labels"] == "org.opencontainers.image.revision=${{ github.sha }}"
+
+
+def test_build_workflow_filters_docker_jobs_to_image_inputs():
+    jobs = workflow("build.yml")["jobs"]
+    changes = jobs["changes"]
+    prepare = jobs["prepare"]
+
+    assert changes["permissions"] == {"contents": "read", "pull-requests": "read"}
+    assert changes["outputs"]["docker"] == "${{ steps.decide.outputs.docker }}"
+    assert prepare["needs"] == "changes"
+    assert prepare["if"] == "${{ needs.changes.outputs.docker == 'true' }}"
+
+    filter_step = workflow_step(changes, "Filter Docker build inputs")
+    assert filter_step["if"] == "github.ref_type != 'tag'"
+    assert filter_step["uses"] == "dorny/paths-filter@v3"
+    assert filter_step["with"]["base"] == "${{ github.event_name == 'push' && github.event.before || '' }}"
+
+    filters = yaml.safe_load(filter_step["with"]["filters"])
+    assert filters == {
+        "docker": [
+            "app/**",
+            "webserver/**",
+            "conf/nginx/**",
+            "conf/supervisor/**",
+            "docker/**",
+            "Dockerfile",
+            ".dockerignore",
+            "Makefile",
+            "server.py",
+            "requirements.txt",
+            "requirements-test.txt",
+            "docker-compose.yml",
+            "docker-compose.dev.yml",
+        ]
+    }
+
+    decide = workflow_step(changes, "Decide Docker build")
+    assert decide["env"] == {
+        "REF_TYPE": "${{ github.ref_type }}",
+        "DOCKER_CHANGED": "${{ steps.filter.outputs.docker }}",
+    }
+    assert '[[ "$REF_TYPE" == "tag" || "$DOCKER_CHANGED" == "true" ]]' in decide["run"]
