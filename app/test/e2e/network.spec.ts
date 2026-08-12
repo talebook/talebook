@@ -32,18 +32,27 @@ test.describe('Network Library', () => {
         await expect(page.getByText('选择书源').last()).toBeVisible();
     });
 
-    test('search results are cached and restored after navigating back', async ({ page }) => {
+    test('search results are restored without automatically searching again', async ({ page }) => {
+        let searchRequests = 0;
+        page.on('request', (request) => {
+            const url = new URL(request.url());
+            if (url.pathname === '/api/network/search') searchRequests += 1;
+        });
+
         await page.goto('/network');
         await expect(page.getByText('共 1 个书源')).toBeVisible();
         await page.getByPlaceholder('输入书名或作者，回车搜索').fill('剑来');
         await page.getByRole('button', { name: '搜索' }).first().click();
         await expect(page.getByText('剑来的故事')).toBeVisible();
+        expect(searchRequests).toBe(1);
 
-        // 离开页面再返回，应从本地缓存即时恢复上次的关键词与结果
+        // 离开页面再返回，应恢复缓存，但不能替用户重新发起上一次搜索
         await page.goto('/');
         await page.goto('/network');
+        await expect(page.getByText('共 1 个书源')).toBeVisible();
         await expect(page.getByPlaceholder('输入书名或作者，回车搜索')).toHaveValue('剑来');
         await expect(page.getByText('剑来的故事')).toBeVisible();
+        expect(searchRequests).toBe(1);
     });
 
     test('book detail shows chapters and read button', async ({ page }) => {

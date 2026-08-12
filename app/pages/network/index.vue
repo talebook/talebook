@@ -523,7 +523,7 @@ const changeExplorePage = (n) => {
 
 onMounted(async () => {
     const { $backend } = useNuxtApp();
-    // 后退/刷新时，先从本地缓存即时恢复上次搜索，避免历史结果丢失
+    // 后退/刷新时从本地缓存即时恢复上次搜索；只有用户明确提交时才重新请求
     const store = readCacheStore();
     if (store.last && (store.last.keyword || '').trim()) {
         keyword.value = store.last.keyword;
@@ -539,10 +539,6 @@ onMounted(async () => {
     }
     const rsp = await $backend('/network/sources');
     if (rsp.err === 'ok') sources.value = rsp.items || [];
-    // stale-while-revalidate：恢复缓存后台再跑一次最新搜索刷新结果
-    if (searched.value && (keyword.value || '').trim()) {
-        fetchSearch(searchPage.value);
-    }
 });
 
 onBeforeUnmount(() => {
