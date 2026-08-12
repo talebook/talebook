@@ -62,6 +62,51 @@ def _is_path_in_roots(path, roots=None):
     return False
 
 
+def _safe_directory_for_listing(requested, roots):
+    fallback = roots[0] if roots else _normalize_path(SCAN_DIR_PREFIX)
+    requested_path = _normalize_path(requested)
+    if not requested_path:
+        return fallback
+
+    for root in roots:
+        if not _is_path_in_roots(requested_path, [root]):
+            continue
+        relative = os.path.relpath(requested_path, root)
+        if relative in ("", "."):
+            return root
+
+        parts = [part for part in relative.split(os.sep) if part and part != "."]
+        if any(part == ".." or (os.path.altsep and os.path.altsep in part) for part in parts):
+            continue
+
+        current = root
+        valid = True
+        for part in parts:
+            matched_name = None
+            try:
+                for name in os.listdir(current):
+                    if name == part:
+                        matched_name = name
+                        break
+            except OSError:
+                valid = False
+                break
+            if matched_name is None:
+                valid = False
+                break
+
+            child = os.path.join(current, matched_name)
+            if os.path.islink(child) or not os.path.isdir(child):
+                valid = False
+                break
+            current = _normalize_path(child)
+
+        if valid:
+            return current
+
+    return fallback
+
+
 def _directory_message(result):
     if not result["in_allowed_roots"]:
         return _("该目录不在允许的导入范围内，请选择允许的导入目录。")
@@ -426,9 +471,7 @@ class ImportDirectoryList(BaseHandler):
     def get(self):
         roots = _configured_allowed_roots()
         requested = self.get_argument("path", "") or CONF.get("scan_upload_path") or roots[0]
-        path = _normalize_path(requested)
-        if not _is_path_in_roots(path, roots) or not os.path.isdir(path) or os.path.islink(path):
-            path = roots[0]
+        path = _safe_directory_for_listing(requested, roots)
 
         items = []
         try:

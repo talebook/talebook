@@ -2,19 +2,17 @@
 # -*- coding: UTF-8 -*-
 
 import json
-import logging
 import os
 import tempfile
 import threading
 import time
-import unittest
+import urllib.parse
 from unittest import mock
 
 from tests.test_main import TestWithUserLogin, testdir
 from tests.test_main import setUpModule as init
 from webserver import handlers, loader, main
 from webserver.models import ScanFile
-from webserver.services import AsyncService
 from webserver.services.scan import ScanService
 
 
@@ -55,9 +53,6 @@ class TestScan(TestWithUserLogin):
         d = self.json("/api/admin/scan/list?num=10000")
         self.assertGreaterEqual(d["total"], self.RECORDS_COUNT)
 
-        titles = set(["天行者", "我的一生", "book", "凡人修仙之仙界篇", "语言哲学"])
-        scan_titles = set([book["title"] for book in d["items"]])
-
     def test_scan_background(self):
         self.async_service.return_value = True
 
@@ -88,6 +83,19 @@ class TestScan(TestWithUserLogin):
 
 
 class TestImportSettings(TestWithUserLogin):
+    def _with_import_roots(self, root):
+        previous = {
+            "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+            "scan_upload_path": main.CONF.get("scan_upload_path"),
+        }
+        main.CONF["import_allowed_roots"] = [root]
+        main.CONF["scan_upload_path"] = root
+        return previous
+
+    def _restore_import_roots(self, previous):
+        for key, value in previous.items():
+            main.CONF[key] = value
+
     def test_directory_check_counts_supported_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             epub_path = os.path.join(tmpdir, "book.epub")
@@ -113,6 +121,47 @@ class TestImportSettings(TestWithUserLogin):
         self.assertEqual(d["err"], "ok")
         self.assertEqual(d["directory"]["status"], "ok")
         self.assertEqual(d["directory"]["supported_file_count"], 1)
+
+    def test_directory_list_accepts_allowed_child_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child = os.path.join(tmpdir, "child")
+            grandchild = os.path.join(child, "grandchild")
+            os.makedirs(grandchild)
+
+            previous = self._with_import_roots(tmpdir)
+            try:
+                d = self.json(
+                    "/api/admin/import/directory/list?" + urllib.parse.urlencode({"path": child}),
+                    method="GET",
+                )
+            finally:
+                self._restore_import_roots(previous)
+
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["path"], os.path.realpath(child))
+        self.assertIn("grandchild", [item["name"] for item in d["items"]])
+
+    def test_directory_list_rejects_path_escape(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = os.path.join(tmpdir, "root")
+            outside = os.path.join(tmpdir, "outside")
+            os.makedirs(os.path.join(root, "allowed"))
+            os.makedirs(os.path.join(outside, "secret"))
+
+            previous = self._with_import_roots(root)
+            try:
+                escaped = os.path.join(root, "..", "outside")
+                d = self.json(
+                    "/api/admin/import/directory/list?" + urllib.parse.urlencode({"path": escaped}),
+                    method="GET",
+                )
+            finally:
+                self._restore_import_roots(previous)
+
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["path"], os.path.realpath(root))
+        self.assertIn("allowed", [item["name"] for item in d["items"]])
+        self.assertNotIn("secret", [item["name"] for item in d["items"]])
 
     def test_save_import_settings_persists_mode_and_directory(self):
         with tempfile.TemporaryDirectory() as tmpdir:
