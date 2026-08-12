@@ -29,13 +29,14 @@
       "download_url": "https://www.gutenberg.org/ebooks/24264.epub3.images",
       "retrieved_on": "2026-07-23",
       "source_sha256": "cca1a10b5302d42378eac8e601497983cc545e845d98f261a0348e72538b3b4f",
-      "sha256": "3ec0e02f008a6cb49b30e888ffda77ebdea90edba6cd4505e51c8d02fb2f4ec8",
+      "sha256": "fa12595ec7717270c41de1c9471fd9a6c113e4454fe3c0a3f350a4c5edf73ad3",
       "chapter_count": 120,
       "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
       "transformations": [
         "Traditional Chinese to Simplified Chinese with OpenCC t2s",
         "Normalized title, author and language metadata",
-        "Rebuilt EPUB navigation from 120 source chapter headings"
+        "Rebuilt EPUB navigation from 120 source chapter headings",
+        "Replaced default cover image with the selected B2 person ink-wash design"
       ]
     },
     {
@@ -49,13 +50,14 @@
       "download_url": "https://www.gutenberg.org/ebooks/23962.epub3.images",
       "retrieved_on": "2026-07-23",
       "source_sha256": "b229817ffc91e7cea1c092cd576bf1bb0bc8a43f20d6429ee4d3ca5da8095371",
-      "sha256": "07efe08564be8151c64fff55a34487b6588bc42f43686dc930af6d067cfc1e59",
+      "sha256": "a94879c4c6c8b18b609323fbebe6f4533bcdcc3dd0990d817fee43e564cc4aeb",
       "chapter_count": 100,
       "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
       "transformations": [
         "Traditional Chinese to Simplified Chinese with OpenCC t2s",
         "Normalized title, author and language metadata",
-        "Rebuilt EPUB navigation from 100 source chapter headings"
+        "Rebuilt EPUB navigation from 100 source chapter headings",
+        "Replaced default cover image with the selected B2 person ink-wash design"
       ]
     },
     {
@@ -69,13 +71,14 @@
       "download_url": "https://www.gutenberg.org/ebooks/23950.epub3.images",
       "retrieved_on": "2026-07-23",
       "source_sha256": "e6f7ac2b2f2888067c3680900afb371f3f2c415cdcaa44a9fe9bfbc87397f592",
-      "sha256": "0c1779300cdac9524cc634c738a0451db2b012951d61532ee8f6951d5d959cb3",
+      "sha256": "cfc59cf83542b2747d8e04b1c93965c10acedb850281eb4ec0ac927dc93a1a9a",
       "chapter_count": 120,
       "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
       "transformations": [
         "Traditional Chinese to Simplified Chinese with OpenCC t2s",
         "Normalized title, author and language metadata",
-        "Rebuilt EPUB navigation from 120 source chapter headings"
+        "Rebuilt EPUB navigation from 120 source chapter headings",
+        "Replaced default cover image with the selected B2 person ink-wash design"
       ]
     },
     {
@@ -89,13 +92,14 @@
       "download_url": "https://www.gutenberg.org/ebooks/23863.epub3.images",
       "retrieved_on": "2026-07-23",
       "source_sha256": "30dfc12741580629cc0b32af58175294d3d7acb4823a3e382a790ca73501e100",
-      "sha256": "9aa508bc95a5509c48da26e15686ca9aba5e7216b172bf6c81a9080b7654380e",
+      "sha256": "a9b74d94858266e09654f74b4867458f089f03f6471d4bbb4fd30552880adf56",
       "chapter_count": 70,
       "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
       "transformations": [
         "Traditional Chinese to Simplified Chinese with OpenCC t2s",
         "Normalized title, author and language metadata",
-        "Rebuilt EPUB navigation from 70 source chapter headings"
+        "Rebuilt EPUB navigation from 70 source chapter headings",
+        "Replaced default cover image with the selected B2 person ink-wash design"
       ]
     },
     {
@@ -109,13 +113,14 @@
       "download_url": "https://www.gutenberg.org/ebooks/7337.epub3.images",
       "retrieved_on": "2026-07-23",
       "source_sha256": "da417e611524b2795bfebb36035f7bc706147492d7b99f5c36c859cc950ddf4b",
-      "sha256": "b4241ab2d3f9f1d29660493c60d65abc1feabeff5e47b808ab29da7ecd0887c3",
+      "sha256": "0b322829db756ec0e592fea778647ff7e79d820ac1b9573120c394bd38cf1cae",
       "chapter_count": 81,
       "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
       "transformations": [
         "Traditional Chinese to Simplified Chinese with OpenCC t2s",
         "Normalized title, author and language metadata",
-        "Rebuilt EPUB navigation from 81 source chapter headings"
+        "Rebuilt EPUB navigation from 81 source chapter headings",
+        "Replaced default cover image with the selected B2 person ink-wash design"
       ]
     },
     {
