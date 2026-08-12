@@ -120,12 +120,14 @@ test.describe('Private Library Access Gate', () => {
 
     test('redirects to the welcome page without corrupting bootstrap state', async ({ page }) => {
         const undefinedErrors: string[] = [];
+        const consoleErrors: string[] = [];
         const pageErrors: string[] = [];
         const welcomeRedirects: number[] = [];
 
         page.on('console', message => {
             const text = message.text();
             if (/TypeError|Cannot read properties of undefined/.test(text)) undefinedErrors.push(text);
+            if (message.type() === 'error' || /Hydration.*mismatch|Hydration completed/.test(text)) consoleErrors.push(text);
         });
         page.on('pageerror', error => pageErrors.push(error.message));
         page.on('response', response => {
@@ -142,6 +144,7 @@ test.describe('Private Library Access Gate', () => {
 
         expect(welcomeRedirects).toEqual([302]);
         expect(undefinedErrors).toEqual([]);
+        expect(consoleErrors).toEqual([]);
         expect(pageErrors).toEqual([]);
     });
 });

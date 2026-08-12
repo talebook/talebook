@@ -150,7 +150,6 @@ definePageMeta({
 
 const is_err = ref(false);
 const msg = ref('');
-const welcome = ref(t('welcomePage.welcomeText'));
 const loading = ref(false);
 const invite_code = ref('');
 
@@ -167,8 +166,7 @@ const captchaVerified = ref(false);
 const captchaData = ref(null);
 const showCaptchaDialog = ref(false);
 
-// 修复1: 移除 await，正确使用 useAsyncData
-const { data: welcomeData } = useAsyncData('welcome', async () => {
+const { data: welcomeData } = await useAsyncData('welcome', async () => {
     try {
         const response = await $backend('/welcome');
         return response;
@@ -177,6 +175,8 @@ const { data: welcomeData } = useAsyncData('welcome', async () => {
         return { err: 'error', msg: '网络错误' };
     }
 });
+
+const welcome = computed(() => welcomeData.value?.welcome || t('welcomePage.welcomeText'));
 
 // 检查是否启用了验证码
 const checkCaptchaEnabled = async () => {
@@ -191,12 +191,8 @@ const checkCaptchaEnabled = async () => {
     }
 };
 
-// 修复2: 使用 watch 监听数据变化
 watch(welcomeData, (newData) => {
     if (newData) {
-        if (newData.welcome) {
-            welcome.value = newData.welcome;
-        }
         if (newData.err === 'free') {
             router.push(route.query.next || '/');
         } else if (newData.err === 'not_installed') {
@@ -323,4 +319,3 @@ useHead(() => ({
     margin-top: 100px;
 }
 </style>
-
