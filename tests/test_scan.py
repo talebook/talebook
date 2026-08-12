@@ -12,7 +12,7 @@ from unittest import mock
 
 from tests.test_main import TestWithUserLogin, testdir
 from tests.test_main import setUpModule as init
-from webserver import handlers
+from webserver import handlers, loader, main
 from webserver.models import ScanFile
 from webserver.services import AsyncService
 from webserver.services.scan import ScanService
@@ -87,6 +87,67 @@ class TestScan(TestWithUserLogin):
         self.assertEqual(d["err"], "ok")
 
 
+class TestImportSettings(TestWithUserLogin):
+    def test_directory_check_counts_supported_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            epub_path = os.path.join(tmpdir, "book.epub")
+            with open(epub_path, "wb") as f:
+                f.write(b"epub")
+            with open(os.path.join(tmpdir, "note.doc"), "wb") as f:
+                f.write(b"doc")
+
+            previous_roots = main.CONF.get("import_allowed_roots")
+            previous_scan_path = main.CONF.get("scan_upload_path")
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                main.CONF["scan_upload_path"] = tmpdir
+                d = self.json(
+                    "/api/admin/import/directory/check",
+                    method="POST",
+                    body=json.dumps({"path": tmpdir}),
+                )
+            finally:
+                main.CONF["import_allowed_roots"] = previous_roots
+                main.CONF["scan_upload_path"] = previous_scan_path
+
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["directory"]["status"], "ok")
+        self.assertEqual(d["directory"]["supported_file_count"], 1)
+
+    def test_save_import_settings_persists_mode_and_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_mode": main.CONF.get("import_mode"),
+                "import_auto_watch_enabled": main.CONF.get("import_auto_watch_enabled"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+                "nuxt_env_path": main.CONF.get("nuxt_env_path"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                main.CONF["nuxt_env_path"] = os.path.join(tmpdir, ".env")
+                with mock.patch.object(loader.SettingsLoader, "set_store_path", return_value=tmpdir):
+                    d = self.json(
+                        "/api/admin/import/settings",
+                        method="POST",
+                        body=json.dumps(
+                            {
+                                "scan_upload_path": tmpdir,
+                                "import_mode": "index",
+                                "auto_watch_enabled": False,
+                            }
+                        ),
+                    )
+                self.assertEqual(d["err"], "ok")
+                self.assertEqual(d["settings"]["scan_upload_path"], tmpdir)
+                self.assertEqual(d["settings"]["import_mode"], "index")
+                self.assertEqual(main.CONF["scan_upload_path"], tmpdir)
+                self.assertEqual(main.CONF["import_mode"], "index")
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
+
+
 class TestScanContinue(TestWithUserLogin):
     NEW_ROW_ID = 69
 
@@ -143,6 +204,35 @@ class TestImport(TestWithUserLogin):
         req = {"hashlist": "all"}
         d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
+
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
+    def test_import_index_mode_marks_scanfile_without_copying_to_library(self, m1):
+        hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
+        req = {"hashlist": [hash], "import_mode": "index"}
+        d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
+        self.assertEqual(d["err"], "ok")
+        m1.assert_not_called()
+
+        session = self.get_app().settings["ScopedSession"]
+        session.rollback()
+        row = session.query(ScanFile).filter(ScanFile.id == self.READY_ROW_ID).one()
+        self.assertEqual(row.status, ScanFile.INDEXED)
+        self.assertEqual(row.data["import_mode"], "index")
+        self.assertEqual(row.data["source_path"], testdir + "/cases/new.epub")
+
+    @mock.patch("calibre.db.legacy.LibraryDatabase.format_abspath")
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
+    @mock.patch("webserver.services.scan.os.remove")
+    def test_import_move_mode_deletes_source_after_successful_import(self, remove, import_book, format_abspath):
+        import_book.return_value = 1008610086
+        format_abspath.return_value = testdir + "/cases/new.epub"
+        hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
+        req = {"hashlist": [hash], "import_mode": "move"}
+
+        d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
+
+        self.assertEqual(d["err"], "ok")
+        remove.assert_called_once_with(testdir + "/cases/new.epub")
 
 
 class TestScanPDFTitle(TestWithUserLogin):

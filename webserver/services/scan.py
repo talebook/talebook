@@ -5,19 +5,132 @@ import datetime
 import hashlib
 import logging
 import os
+import threading
 import time
 
-from webserver import utils
+from webserver import loader, utils
 from webserver.i18n import _
 from webserver.models import Item, ScanFile
 from webserver.services import AsyncService
 from webserver.services.autofill import AutoFillService
 
 
+CONF = loader.get_settings()
 SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
+IMPORT_MODE_INDEX = "index"
+IMPORT_MODE_COPY = "copy"
+IMPORT_MODE_MOVE = "move"
+IMPORT_MODES = (IMPORT_MODE_INDEX, IMPORT_MODE_COPY, IMPORT_MODE_MOVE)
+
+
+def normalize_import_mode(import_mode=None, delete_after=False):
+    if import_mode in IMPORT_MODES:
+        return import_mode
+    if delete_after:
+        return IMPORT_MODE_MOVE
+    saved_mode = CONF.get("import_mode", IMPORT_MODE_COPY)
+    return saved_mode if saved_mode in IMPORT_MODES else IMPORT_MODE_COPY
 
 
 class ScanService(AsyncService):
+    _watch_lock = threading.Lock()
+    _watch_generation = 0
+    _watch_status = {
+        "state": "off",
+        "queued": 0,
+        "running": 0,
+        "failed": 0,
+        "last_scan_at": None,
+        "message": "",
+    }
+
+    def get_watch_status(self):
+        with self._watch_lock:
+            return dict(self._watch_status)
+
+    def _update_watch_status(self, **values):
+        with self._watch_lock:
+            self._watch_status.update(values)
+
+    def stop_auto_watch(self, message=""):
+        with self._watch_lock:
+            self.__class__._watch_generation += 1
+            self._watch_status.update({"state": "off", "message": message})
+            return self.__class__._watch_generation
+
+    @AsyncService.register_service
+    def run_auto_watch(self, path_dir, user_id, import_mode=None, interval=None, limit=None, generation=None, run_once=False):
+        import_mode = normalize_import_mode(import_mode)
+        interval = max(5, int(interval or CONF.get("import_watch_interval_seconds", 30)))
+        limit = max(1, int(limit or CONF.get("import_scan_batch_size", 500)))
+        if generation is None:
+            generation = self.__class__._watch_generation
+
+        self._update_watch_status(state="starting", message="")
+        while True:
+            with self._watch_lock:
+                current_generation = self.__class__._watch_generation
+            if generation != current_generation or not CONF.get("import_auto_watch_enabled", False):
+                self._update_watch_status(state="off", message=_("自动监控已关闭"))
+                return
+
+            try:
+                self._update_watch_status(state="scanning", message="")
+                self._do_scan(path_dir, limit=limit)
+                self.session.rollback()
+                query = self.session.query(ScanFile).filter(ScanFile.status == ScanFile.READY)
+                queued = query.count()
+                failed = (
+                    self.session.query(ScanFile).filter(ScanFile.status.in_([ScanFile.FAILED, ScanFile.DELETE_FAILED])).count()
+                )
+                self._update_watch_status(
+                    state="queued" if queued else "watching",
+                    queued=queued,
+                    running=0,
+                    failed=failed,
+                    last_scan_at=datetime.datetime.now().isoformat(timespec="seconds"),
+                    message="",
+                )
+                if queued:
+                    self._update_watch_status(state="importing", running=queued)
+                    self._do_import(None, user_id, import_mode=import_mode)
+                    self.session.rollback()
+                    failed = (
+                        self.session.query(ScanFile)
+                        .filter(ScanFile.status.in_([ScanFile.FAILED, ScanFile.DELETE_FAILED]))
+                        .count()
+                    )
+                    self._update_watch_status(
+                        state="failed" if failed else "watching",
+                        queued=0,
+                        running=0,
+                        failed=failed,
+                        last_scan_at=datetime.datetime.now().isoformat(timespec="seconds"),
+                    )
+            except Exception as err:
+                logging.exception("auto import watch failed: %s", err)
+                self._update_watch_status(state="failed", message=str(err))
+
+            if run_once:
+                return
+            time.sleep(interval)
+
+    def start_auto_watch(self, path_dir, user_id, import_mode=None, run_once=False):
+        with self._watch_lock:
+            self.__class__._watch_generation += 1
+            generation = self.__class__._watch_generation
+        run_once = run_once or not self.async_mode()
+        self.run_auto_watch(
+            path_dir,
+            user_id,
+            import_mode=import_mode,
+            interval=CONF.get("import_watch_interval_seconds", 30),
+            limit=CONF.get("import_scan_batch_size", 500),
+            generation=generation,
+            run_once=run_once,
+        )
+        return generation
+
     def save_or_rollback(self, row):
         try:
             # 直接使用session.add和flush，避免多次commit导致的事务冲突
@@ -45,7 +158,10 @@ class ScanService(AsyncService):
         return query
 
     @AsyncService.register_service
-    def do_scan(self, path_dir):
+    def do_scan(self, path_dir, limit=None):
+        return self._do_scan(path_dir, limit=limit)
+
+    def _do_scan(self, path_dir, limit=None):
         from calibre.ebooks.metadata.meta import get_metadata
 
         logging.info("<%s> we are: db=%s, session=%s", self, self.db, self.session)
@@ -56,7 +172,11 @@ class ScanService(AsyncService):
         tasks = []
         for dirpath, dirnames, filenames in os.walk(path_dir):
             # 排除隐藏文件夹（以.开头或@__thumb等）
-            dirnames[:] = [d for d in dirnames if not (d.startswith(".") or d.startswith("@__"))]
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if not (d.startswith(".") or d.startswith("@__") or os.path.islink(os.path.join(dirpath, d)))
+            ]
 
             for fname in filenames:
                 # 排除隐藏文件
@@ -64,13 +184,17 @@ class ScanService(AsyncService):
                     continue
 
                 fpath = os.path.join(dirpath, fname)
-                if not os.path.isfile(fpath):
+                if os.path.islink(fpath) or not os.path.isfile(fpath):
                     continue
 
                 fmt = fpath.split(".")[-1].lower()
                 if fmt in SCAN_EXT:
                     has_books = True
                     tasks.append((fname, fpath, fmt))
+                    if limit and len(tasks) >= limit:
+                        break
+            if limit and len(tasks) >= limit:
+                break
 
         # 检查是否有符合条件的书籍文件
         if not has_books:
@@ -229,10 +353,70 @@ class ScanService(AsyncService):
             if row.status == ScanFile.EXIST:
                 continue
 
+    def _set_row_data(self, row, **values):
+        data = dict(row.data or {})
+        data.update(values)
+        row.data = data
+
+    def _library_format_exists(self, row, fmt):
+        if not row.book_id:
+            return False
+        try:
+            target = self.db.format_abspath(row.book_id, fmt.upper(), index_is_id=True)
+            return bool(target and os.path.exists(target))
+        except Exception as err:
+            # Calibre versions used by tests and deployments differ. If the import
+            # API returned a book id but format_abspath is unavailable, keep the
+            # legacy behavior and do not block source cleanup on introspection.
+            logging.info("skip library format existence check for book %s: %s", row.book_id, err)
+            return True
+
+    def _delete_source_after_import(self, row, fpath, fmt):
+        if not self._library_format_exists(row, fmt):
+            row.status = ScanFile.DELETE_FAILED
+            self._set_row_data(row, delete_error=_("书库目标文件未确认存在，未删除源文件"))
+            self.save_or_rollback(row)
+            return False
+
+        try:
+            os.remove(fpath)
+            logging.info("删除源文件: %s", fpath)
+            return True
+        except Exception as err:
+            logging.error("删除源文件失败: %s, %s", fpath, err)
+            row.status = ScanFile.DELETE_FAILED
+            self._set_row_data(row, delete_error=str(err))
+            self.save_or_rollback(row)
+            return False
+
+    def _mark_imported(self, row, fpath, fmt, import_mode, delete_source=True):
+        row.status = ScanFile.IMPORTED
+        self._set_row_data(row, import_mode=import_mode)
+        self.save_or_rollback(row)
+        if import_mode == IMPORT_MODE_MOVE and delete_source:
+            self._delete_source_after_import(row, fpath, fmt)
+
+    def _mark_indexed(self, row, fpath, fmt, import_id, same_author_book_id=None):
+        row.import_id = import_id
+        row.book_id = same_author_book_id or 0
+        row.status = ScanFile.INDEXED
+        self._set_row_data(
+            row,
+            import_mode=IMPORT_MODE_INDEX,
+            source_path=fpath,
+            format=fmt.upper(),
+            index_note=_("仅索引模式未复制源文件到 Calibre 书库"),
+        )
+        self.save_or_rollback(row)
+
     @AsyncService.register_service
-    def do_import(self, hashlist, user_id, delete_after=False):
+    def do_import(self, hashlist, user_id, delete_after=False, import_mode=None):
+        return self._do_import(hashlist, user_id, delete_after=delete_after, import_mode=import_mode)
+
+    def _do_import(self, hashlist, user_id, delete_after=False, import_mode=None):
         from calibre.ebooks.metadata.meta import get_metadata
 
+        import_mode = normalize_import_mode(import_mode, delete_after)
         # 生成任务ID
         import_id = int(time.time())
 
@@ -253,6 +437,9 @@ class ScanService(AsyncService):
             fpath = row.path
             fname = os.path.basename(row.path)
             fmt = fpath.split(".")[-1].lower()
+            row.status = ScanFile.IMPORTING
+            self._set_row_data(row, import_mode=import_mode)
+            self.save_or_rollback(row)
             mi = None
             try:
                 with open(fpath, "rb") as stream:
@@ -297,29 +484,31 @@ class ScanService(AsyncService):
                         same_author_book_id = b["id"]
                         if fmt.upper() in b.get("available_formats", ""):
                             row.status = ScanFile.EXIST
+                            self._set_row_data(row, import_mode=import_mode)
+                            self.save_or_rollback(row)
                             break
 
                 if same_author_book_id and row.status != ScanFile.EXIST:
+                    if import_mode == IMPORT_MODE_INDEX:
+                        logging.info("index [%s] from %s with existing book %s", repr(mi.title), fpath, same_author_book_id)
+                        self._mark_indexed(row, fpath, fmt, import_id, same_author_book_id=same_author_book_id)
+                        continue
+
                     # 同名同作者，添加格式到现有书籍
                     row.book_id = same_author_book_id
                     logging.info("import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
                     self.db.add_format(row.book_id, fmt.upper(), fpath, True)
-                    row.status = ScanFile.IMPORTED
-                    self.save_or_rollback(row)
-
-                    # 如果需要导入后删除源文件
-                    if delete_after:
-                        try:
-                            os.remove(fpath)
-                            logging.info("删除源文件: %s", fpath)
-                        except Exception as err:
-                            logging.error("删除源文件失败: %s, %s", fpath, err)
+                    self._mark_imported(row, fpath, fmt, import_mode)
                 elif row.status != ScanFile.EXIST:
+                    if import_mode == IMPORT_MODE_INDEX:
+                        logging.info("index [%s] from %s as new external file", repr(mi.title), fpath)
+                        self._mark_indexed(row, fpath, fmt, import_id)
+                        continue
+
                     # 同名不同作者，导入为新书
                     logging.info("import [%s] from %s as new book (different author)", repr(mi.title), fpath)
                     row.book_id = self.db.import_book(mi, [fpath])
-                    row.status = ScanFile.IMPORTED
-                    self.save_or_rollback(row)
+                    self._mark_imported(row, fpath, fmt, import_mode)
 
                     # 添加关联表
                     item = Item()
@@ -332,22 +521,18 @@ class ScanService(AsyncService):
                     try:
                         item.save()
                         imported.append(row.book_id)
-
-                        # 如果需要导入后删除源文件
-                        if delete_after:
-                            try:
-                                os.remove(fpath)
-                                logging.info("删除源文件: %s", fpath)
-                            except Exception as err:
-                                logging.error("删除源文件失败: %s, %s", fpath, err)
                     except Exception as err:
                         self.session.rollback()
                         logging.error("save link error: %s", err)
             else:
+                if import_mode == IMPORT_MODE_INDEX:
+                    logging.info("index [%s] from %s", repr(mi.title), fpath)
+                    self._mark_indexed(row, fpath, fmt, import_id)
+                    continue
+
                 logging.info("import [%s] from %s", repr(mi.title), fpath)
                 row.book_id = self.db.import_book(mi, [fpath])
-                row.status = ScanFile.IMPORTED
-                self.save_or_rollback(row)
+                self._mark_imported(row, fpath, fmt, import_mode)
 
                 # 添加关联表
                 item = Item()
@@ -360,17 +545,10 @@ class ScanService(AsyncService):
                 try:
                     item.save()
                     imported.append(row.book_id)
-
-                    # 如果需要导入后删除源文件
-                    if delete_after:
-                        try:
-                            os.remove(fpath)
-                            logging.info("删除源文件: %s", fpath)
-                        except Exception as err:
-                            logging.error("删除源文件失败: %s, %s", fpath, err)
                 except Exception as err:
                     self.session.rollback()
                     logging.error("save link error: %s", err)
 
         # 全部导入完毕后，开始拉取书籍信息
-        AutoFillService().auto_fill_all(imported)
+        if imported:
+            AutoFillService().auto_fill_all(imported)

@@ -368,8 +368,12 @@ class ScanFile(Base, SQLAlchemyMixin):
     NEW = "new"
     DROP = "drop"
     READY = "ready"
+    QUEUED = "queued"
+    IMPORTING = "importing"
     EXIST = "exist"
     IMPORTED = "imported"
+    INDEXED = "indexed"
+    DELETE_FAILED = "delete_failed"
     DOWNLOADING = "downloading"
     FAILED = "failed"
 
