@@ -1,4 +1,5 @@
 import json
+import urllib.parse
 from pathlib import Path
 from unittest import mock
 
@@ -22,7 +23,13 @@ class TestReadestEmbed(TestWithUserLogin):
     def test_readest_entry_keeps_book_read_permission_gate(self):
         response = self.fetch("/read/%d?reader=readest" % BID_EPUB, follow_redirects=False)
         self.assertEqual(response.code, 302)
-        self.assertEqual(response.headers["Location"], "/static/readest/talebook-embed/index.html?book=%d" % BID_EPUB)
+        location = urllib.parse.urlsplit(response.headers["Location"])
+        query = urllib.parse.parse_qs(location.query)
+        self.assertEqual(location.path, "/static/reader/reader.html")
+        self.assertEqual(query["moke"], ["1"])
+        self.assertEqual(query["mokeBookId"], [str(BID_EPUB)])
+        self.assertEqual(query["mokeReturnTo"], ["/book/%d" % BID_EPUB])
+        self.assertIn("/read/resource/%d.epub?revision=" % BID_EPUB, query["file"][0])
 
     def test_candle_fallback_keeps_existing_reader(self):
         response = self.fetch("/read/%d?reader=candle" % BID_EPUB)
@@ -170,11 +177,11 @@ class TestReadestEmbed(TestWithUserLogin):
         nginx = (Path(__file__).parents[1] / "conf" / "nginx" / "talebook.conf").read_text(encoding="utf-8")
         nuxt = (Path(__file__).parents[1] / "app" / "nuxt.config.ts").read_text(encoding="utf-8")
         dockerfile = (Path(__file__).parents[1] / "Dockerfile").read_text(encoding="utf-8")
-        self.assertIn("location = /static/readest/talebook-embed/index.html", nginx)
+        self.assertIn("location = /static/reader/reader.html", nginx)
         self.assertIn("Content-Security-Policy", nginx)
         self.assertIn("immutable", nginx)
-        self.assertIn("/static/readest/talebook-embed/**", nuxt)
-        self.assertIn("build-baseline.json", dockerfile)
+        self.assertIn("/static/reader/**", nuxt)
+        self.assertIn("static/reader/reader.html", dockerfile)
 
     def test_missing_book_and_unsupported_engine(self):
         self.assertEqual(self.fetch("/read/resource/999999.epub").code, 404)

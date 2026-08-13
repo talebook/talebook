@@ -1663,7 +1663,17 @@ class BookRead(BaseHandler):
 
         if self.get_argument("reader", "") == "readest":
             if book.get("fmt_epub"):
-                return self.redirect("/static/readest/talebook-embed/index.html?book=%d" % book_id)
+                revision = reader_resource_revision(book["fmt_epub"])
+                resource_url = "/read/resource/%d.epub?revision=%s" % (book_id, revision)
+                reader_query = urllib.parse.urlencode(
+                    {
+                        "file": resource_url,
+                        "moke": "1",
+                        "mokeBookId": str(book_id),
+                        "mokeReturnTo": "/book/%d" % book_id,
+                    }
+                )
+                return self.redirect("/static/reader/reader.html?%s" % reader_query)
             if ConvertService().is_book_converting(book):
                 self.set_status(409)
                 error = "reader.conversion_pending"
