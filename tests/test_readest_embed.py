@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from unittest import mock
 
 from webserver.handlers.base import BaseHandler
@@ -37,9 +38,20 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertEqual(body["resource"]["mime"], "application/epub+zip")
         self.assertTrue(body["resource"]["range"])
         self.assertEqual(body["navigation"]["fallback"], "/read/%d?reader=candle" % BID_EPUB)
+        self.assertIn("revision=", body["resource"]["url"])
         self.assertEqual(
             [key for key, enabled in body["capabilities"].items() if enabled],
-            ["readerCore", "localSettings"],
+            [
+                "readerCore",
+                "navigation",
+                "tableOfContents",
+                "textSearch",
+                "localPosition",
+                "localSettings",
+                "layoutSettings",
+                "appearanceSettings",
+                "languageSettings",
+            ],
         )
 
         full = self.fetch(body["resource"]["url"])
@@ -73,6 +85,25 @@ class TestReadestEmbed(TestWithUserLogin):
             finally:
                 user._user.active = original_active
                 user._session.commit()
+
+    def test_bootstrap_returns_structured_activation_and_permission_errors(self):
+        with mock_permission() as user:
+            user.set_permission("R")
+            denied = self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB)
+        self.assertEqual(denied.code, 403)
+        self.assertEqual(json.loads(denied.body)["err"], "user.no_permission")
+
+        with mock_permission() as user:
+            original_active = user.active
+            user._user.active = False
+            user._session.commit()
+            try:
+                inactive = self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB)
+            finally:
+                user._user.active = original_active
+                user._session.commit()
+        self.assertEqual(inactive.code, 403)
+        self.assertEqual(json.loads(inactive.body)["err"], "user.activation_required")
 
     def test_guest_setting_applies_to_bootstrap_and_resource(self):
         with mock.patch.dict(CONF, {"ALLOW_GUEST_READ": False}):
@@ -113,6 +144,37 @@ class TestReadestEmbed(TestWithUserLogin):
         with mock.patch("webserver.handlers.book.os.stat", return_value=changed_stat):
             changed = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
         self.assertNotEqual(initial["book"]["revision"], changed["book"]["revision"])
+
+    def test_stale_resource_revision_is_rejected(self):
+        bootstrap = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
+        with mock.patch("webserver.handlers.book.reader_resource_revision", return_value="new-revision"):
+            changed = self.fetch(bootstrap["resource"]["url"])
+        self.assertEqual(changed.code, 409)
+
+    def test_readest_entry_reports_conversion_and_unsupported_format(self):
+        converting = {"id": 77, "title": "Converting", "fmt_mobi": "/tmp/book.mobi"}
+        with mock.patch.object(BaseHandler, "get_book_or_404", return_value=converting):
+            with mock.patch("webserver.handlers.book.ConvertService.is_book_converting", return_value=True):
+                response = self.fetch("/read/77?reader=readest")
+        self.assertEqual(response.code, 409)
+        self.assertIn(b"reader.conversion_pending", response.body)
+        self.assertIn(b"reader=candle", response.body)
+
+        unsupported = {"id": 78, "title": "Unsupported"}
+        with mock.patch.object(BaseHandler, "get_book_or_404", return_value=unsupported):
+            response = self.fetch("/read/78?reader=readest")
+        self.assertEqual(response.code, 415)
+        self.assertIn(b"reader.format_unsupported", response.body)
+
+    def test_embed_static_deployment_contract_has_csp_and_cache_boundaries(self):
+        nginx = (Path(__file__).parents[1] / "conf" / "nginx" / "talebook.conf").read_text(encoding="utf-8")
+        nuxt = (Path(__file__).parents[1] / "app" / "nuxt.config.ts").read_text(encoding="utf-8")
+        dockerfile = (Path(__file__).parents[1] / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("location = /static/readest/talebook-embed/index.html", nginx)
+        self.assertIn("Content-Security-Policy", nginx)
+        self.assertIn("immutable", nginx)
+        self.assertIn("/static/readest/talebook-embed/**", nuxt)
+        self.assertIn("build-baseline.json", dockerfile)
 
     def test_missing_book_and_unsupported_engine(self):
         self.assertEqual(self.fetch("/read/resource/999999.epub").code, 404)

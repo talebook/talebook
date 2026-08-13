@@ -18,9 +18,13 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 COPY app/ /build/
 RUN mkdir -p /app-ssr/ /app-static/
 RUN npm run build
+RUN test -f .output/public/static/readest/talebook-embed/build-baseline.json && \
+    test -f .output/public/static/readest/talebook-embed/manifest.json
 RUN ls -al
 RUN cp -r .output package* /app-ssr/
 RUN npm run build-spa
+RUN test -f .output/public/static/readest/talebook-embed/build-baseline.json && \
+    test -f .output/public/static/readest/talebook-embed/manifest.json
 RUN rm -rf dist && cp -r .output/public dist
 RUN if [ ! -f dist/index.html ]; then cp dist/200.html dist/index.html; fi
 RUN cp -r dist package* /app-static/

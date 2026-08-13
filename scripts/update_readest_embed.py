@@ -22,7 +22,10 @@ def main():
     if baseline.get("schema") != "readest.talebook-embed.baseline.v1":
         raise SystemExit("invalid Readest embed baseline")
     allowed = {item["file"]: item["sha256"] for item in baseline["files"]}
-    publish = {name: digest for name, digest in allowed.items() if not name.startswith(".vite/")}
+    manifest_name = ".vite/manifest.json"
+    if manifest_name not in allowed:
+        raise SystemExit("missing Vite build manifest")
+    publish = {name: digest for name, digest in allowed.items() if name != manifest_name}
     for name, digest in publish.items():
         data = (args.dist / name).read_bytes()
         if hashlib.sha256(data).hexdigest() != digest:
@@ -37,8 +40,9 @@ def main():
         destination = args.target / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(args.dist / name, destination)
+    shutil.copy2(args.dist / manifest_name, args.target / "manifest.json")
     shutil.copy2(baseline_path, args.target / baseline_path.name)
-    print(f"copied {len(publish)} verified files to {args.target}")
+    print(f"copied {len(publish)} verified files and manifest to {args.target}")
 
 
 if __name__ == "__main__":

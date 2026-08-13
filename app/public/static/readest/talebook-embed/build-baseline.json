@@ -1,9 +1,24 @@
 {
   "schema": "readest.talebook-embed.baseline.v1",
-  "readestCommit": "d335c688682f04b3581ba26390008788c9339789",
+  "readestCommit": "b0cff89ca2bd4b685d0d06f9d5fa59c5d41a31ff",
   "capabilities": {
     "readerCore": true,
+    "navigation": true,
+    "tableOfContents": true,
+    "textSearch": true,
+    "localPosition": true,
     "localSettings": true,
+    "layoutSettings": true,
+    "appearanceSettings": true,
+    "languageSettings": true,
+    "customFonts": false,
+    "backgroundImages": false,
+    "annotations": false,
+    "serverProgress": false,
+    "pdf": false,
+    "dictionaries": false,
+    "translation": false,
+    "tts": false,
     "library": false,
     "account": false,
     "auth": false,
@@ -23,38 +38,59 @@
     "tauri": false
   },
   "totals": {
-    "raw": 414916,
-    "gzip": 153689,
-    "brotli": 134444
+    "raw": 496284,
+    "gzip": 180809,
+    "brotli": 158409
   },
   "files": [
     {
       "file": ".vite/manifest.json",
-      "sha256": "1d339bb55e54faeb109d507d373c205506a87b68f73a01970f75f1ef660aa680",
-      "raw": 185,
-      "gzip": 143,
-      "brotli": 119
+      "sha256": "30fe83a303a2a48003e409933888840546303b8756f100f5b6d0f9e9ba042b4f",
+      "raw": 968,
+      "gzip": 294,
+      "brotli": 257
     },
     {
-      "file": "assets/index-BRoB0_9-.js",
-      "sha256": "e6a0d64e05ff32a42bce36c7b10a9dc38cf7e2d7fa76c136cb00c71c934fa0c2",
-      "raw": 412857,
-      "gzip": 152598,
-      "brotli": 133625
+      "file": "assets/fixed-layout-Ya1NtM7x.js",
+      "sha256": "2a1be91156cbb4913db6bfaa30a842f3af2dc7822d64b5da41f0777dc9992143",
+      "raw": 34300,
+      "gzip": 10868,
+      "brotli": 9660
     },
     {
-      "file": "assets/index-Dp-sPEoH.css",
-      "sha256": "48c73f9ab7d8523d1047de58609c940f2a31ddfef83ac0893a2d8b48cdc86eab",
-      "raw": 1371,
-      "gzip": 654,
-      "brotli": 513
+      "file": "assets/index-B8LJXiCf.js",
+      "sha256": "259d0c1003051c310c274702cb21d0ad67ab864255e713178559023abdb7a7a0",
+      "raw": 388401,
+      "gzip": 146228,
+      "brotli": 127913
+    },
+    {
+      "file": "assets/index-Bg62sR4S.css",
+      "sha256": "d8159ba2a6e37348b1f60445c337e578732964f30375d48435ac1fc7813971fe",
+      "raw": 3662,
+      "gzip": 1340,
+      "brotli": 1107
+    },
+    {
+      "file": "assets/paginator-eH6UsiQ7.js",
+      "sha256": "cc7bb15704a2b0585af1ed23c4449d11acba5056958b956a46229478cf35a573",
+      "raw": 62891,
+      "gzip": 19403,
+      "brotli": 17136
+    },
+    {
+      "file": "assets/search-DLmEs4wV.js",
+      "sha256": "f3193ede3bbc9f42cb250d0e5d6e6b7e509261aefb704c312948c01bd5ece5ee",
+      "raw": 5277,
+      "gzip": 2256,
+      "brotli": 2053
     },
     {
       "file": "index.html",
-      "sha256": "bb9fbdc2f4c77a71caef42955314347de894128abead74a5d7e9c59a62c3571d",
-      "raw": 503,
-      "gzip": 294,
-      "brotli": 187
+      "sha256": "c995bdd6a52b27cbebfbbb7b83a129a34ab4824ea7951962dc5a5473a504a507",
+      "raw": 785,
+      "gzip": 420,
+      "brotli": 283
     }
   ]
 }

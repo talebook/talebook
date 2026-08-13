@@ -1,0 +1,34 @@
+{
+  "../../../vendor/foliate-js/fixed-layout.js": {
+    "file": "assets/fixed-layout-Ya1NtM7x.js",
+    "name": "fixed-layout",
+    "src": "../../../vendor/foliate-js/fixed-layout.js",
+    "isDynamicEntry": true
+  },
+  "../../../vendor/foliate-js/paginator.js": {
+    "file": "assets/paginator-eH6UsiQ7.js",
+    "name": "paginator",
+    "src": "../../../vendor/foliate-js/paginator.js",
+    "isDynamicEntry": true
+  },
+  "../../../vendor/foliate-js/search.js": {
+    "file": "assets/search-DLmEs4wV.js",
+    "name": "search",
+    "src": "../../../vendor/foliate-js/search.js",
+    "isDynamicEntry": true
+  },
+  "index.html": {
+    "file": "assets/index-B8LJXiCf.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "dynamicImports": [
+      "../../../vendor/foliate-js/fixed-layout.js",
+      "../../../vendor/foliate-js/paginator.js",
+      "../../../vendor/foliate-js/search.js"
+    ],
+    "css": [
+      "assets/index-Bg62sR4S.css"
+    ]
+  }
+}

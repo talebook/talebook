@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="same-origin" />
+    <title>{{ book.title }} · Readest</title>
+    <style>
+      body { display: grid; min-height: 100vh; margin: 0; place-items: center; color: #241f1a; background: #fffdf8; font: 16px/1.6 system-ui, sans-serif; }
+      main { width: min(34rem, calc(100% - 2rem)); padding: 1.5rem; border: 1px solid #241f1a38; border-radius: .75rem; text-align: center; }
+      .code { color: #6b6259; font-family: ui-monospace, monospace; }
+      nav { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; margin-top: 1.25rem; }
+      a { padding: .55rem .8rem; border: 1px solid #241f1a55; border-radius: .4rem; color: inherit; text-decoration: none; }
+      a:focus-visible { outline: 3px solid #8a4b24; outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>暂时无法使用 Readest</h1>
+      <p>{{ message }}</p>
+      <p class="code">{{ error }}</p>
+      <nav aria-label="恢复操作">
+        <a href="/read/{{ book.id }}?reader=readest">重试</a>
+        <a href="/book/{{ book.id }}">返回书籍页</a>
+        <a href="/read/{{ book.id }}?reader=candle">改用 Candle</a>
+      </nav>
+    </main>
+  </body>
+</html>
