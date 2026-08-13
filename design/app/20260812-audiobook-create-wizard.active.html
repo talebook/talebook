@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>有声书创建向导方案 · ACTIVE</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #1d2733;
+      --muted: #5f6d7b;
+      --line: #d5dde6;
+      --accent: #9d6a13;
+      --accent-soft: #fff4df;
+      --green: #247158;
+      --blue: #2a667f;
+      --red: #9d3d3d;
+      --shadow: 0 14px 36px rgba(24, 39, 54, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: linear-gradient(180deg, #fbfcfd 0%, var(--bg) 100%);
+      font: 15px/1.72 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .wrap { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 36px 0 72px; }
+    header, section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+    header { padding: 34px 36px; border-top: 8px solid var(--accent); }
+    h1 { margin: 0; font-size: clamp(2rem, 5vw, 4rem); line-height: 1.08; letter-spacing: -.03em; }
+    .lede { max-width: 850px; margin: 16px 0 0; color: var(--muted); font-size: 1.05rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+    .chip { padding: 5px 10px; border-radius: 999px; color: #5a6471; background: #edf1f5; font-size: .78rem; font-weight: 750; }
+    .chip.active { color: var(--green); background: #e1f2ea; }
+    main { margin-top: 18px; display: grid; gap: 18px; }
+    section { padding: 26px 28px; }
+    h2 { margin: 0 0 14px; font-size: 1.42rem; line-height: 1.25; }
+    h3 { margin: 18px 0 8px; font-size: 1rem; }
+    p { margin: 0 0 12px; }
+    p, li { color: #2c3a49; }
+    code { padding: .12em .38em; border-radius: 5px; background: #eef2f6; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .quote { padding: 14px 16px; border-left: 4px solid var(--accent); background: var(--accent-soft); font-weight: 650; }
+    .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+    .step { min-height: 120px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfd; }
+    .step b { display: block; margin-bottom: 6px; color: var(--accent); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .card { padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfd; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+    table { width: 100%; min-width: 760px; border-collapse: collapse; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #536272; background: #f1f4f7; font-size: .78rem; }
+    tr:last-child td { border-bottom: 0; }
+    .ok { color: var(--green); font-weight: 800; }
+    .pending { color: var(--accent); font-weight: 800; }
+    .risk { color: var(--red); font-weight: 800; }
+    @media (max-width: 780px) {
+      .wrap { width: calc(100% - 20px); padding-top: 16px; }
+      header, section { padding: 22px 18px; }
+      .flow, .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>有声书创建向导方案</h1>
+      <p class="lede">把“有声书”主入口从任务监控语义中解耦，新增可发现、可校验、可提交的创建向导，让用户从有声书中心完成选书、配置、提交和查看进度的闭环。</p>
+      <div class="meta" aria-label="方案元信息">
+        <span class="chip active">状态：ACTIVE</span>
+        <span class="chip">创建日期：2026-08-12</span>
+        <span class="chip">所属模块：app</span>
+        <span class="chip">需求来源：TB-18</span>
+        <span class="chip">影响范围：Nuxt 页面 / E2E / mock API</span>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <h2>1. 原始诉求</h2>
+        <div class="quote">“有声书页面没有【创建】按钮。点击【有声书】按钮后会直接进入任务页面，导致没有办法创建有声书。希望提供可用的有声书创建入口。”</div>
+        <p>后续产品和交互补充要求：有声书主入口应是有声书中心；制作任务页只做进度和返工管理；创建应进入选书向导，并明确展示可创建、已有任务、已有版本、需转换和无权限等状态。</p>
+      </section>
+
+      <section>
+        <h2>2. 目标与边界</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>目标</h3>
+            <ul>
+              <li><code>/audios</code> 首屏和空状态都能直接进入“创建有声书”。</li>
+              <li>新增 <code>/audios/create</code>，完成选书、格式校验、生成配置和任务提交。</li>
+              <li>单书有声页识别已有活跃任务，避免重复创建。</li>
+              <li>不支持格式走现有 <code>/book/:id?convert=epub</code> 转换入口。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>边界</h3>
+            <ul>
+              <li>不改 Voicebook 生成协议，不新增批量任务。</li>
+              <li>不在向导内重做文件转换，只复用既有转换弹窗。</li>
+              <li>全局普通读者隐藏创建入口仍受当前用户信息字段限制；书籍级权限由 <code>generation.permitted</code> 拦截。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>3. 路径关系</h2>
+        <div class="flow" aria-label="有声书创建路径">
+          <div class="step"><b>/audios</b><p>有声书中心，展示续听、已发布版本、Podcast 和创建入口。</p></div>
+          <div class="step"><b>/audios/create</b><p>创建向导，读取书库列表并对选中书籍做有声书资格校验。</p></div>
+          <div class="step"><b>/audio-job/:id</b><p>创建成功后进入任务详情；高级模式待审查时打开工作台。</p></div>
+          <div class="step"><b>/book/:id/audios</b><p>单书上下文，支持直接创建、查看任务、收听或创建修订版。</p></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>4. 状态机</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>状态</th><th>判断来源</th><th>页面表现</th><th>主操作</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>可创建</td><td><code>generation.can_generate</code></td><td>显示快捷/高级模式、引擎、语速、章节和主角音色配置。</td><td>加入制作队列或开始识别</td></tr>
+              <tr><td>已有活跃任务</td><td><code>/audio-jobs</code> 中同书籍 queued/inspecting/awaiting_review/generating/finalizing</td><td>隐藏重复创建按钮，提示已有任务。</td><td>查看制作进度或继续审查</td></tr>
+              <tr><td>已有发布版本</td><td><code>editions.status === published</code></td><td>提示已有版本，同时允许创建修订版。</td><td>创建新任务或打开单书页</td></tr>
+              <tr><td>格式不支持</td><td><code>generation.reason === format.not_supported</code> 或非 EPUB/TXT</td><td>禁用生成配置，说明需先转换。</td><td>转换为 EPUB 后创建</td></tr>
+              <tr><td>权限/容量/开关限制</td><td><code>generation.reason</code>、<code>capacity</code>、<code>health</code></td><td>展示具体原因，不提交任务。</td><td>登录、联系管理员或等待容量恢复</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>5. 实现落点</h2>
+        <ul>
+          <li><code>app/pages/audios/index.vue</code>：新增主创建入口和空状态创建入口。</li>
+          <li><code>app/pages/audios/create.vue</code>：新增创建向导，复用 <code>$backend_stream('/library')</code>、<code>/book/:id/audios</code>、<code>/audio-jobs</code> 和 <code>POST /book/:id/audio-jobs</code>。</li>
+          <li><code>app/pages/book/[bid]/audios.vue</code>：加入活跃任务优先级、格式转换入口和 <code>?create=1</code> 自动打开弹窗。</li>
+          <li><code>app/components/AudioJobsPage.vue</code>：任务页顶部和空状态回流到创建向导。</li>
+          <li><code>app/pages/book/[bid]/index.vue</code>：支持 <code>?convert=epub</code> 自动打开既有转换弹窗。</li>
+          <li><code>app/test/mock-server.js</code> 和 <code>app/test/e2e/audiobooks.spec.ts</code>：补齐不同格式、活跃任务和向导提交的测试数据与覆盖。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>6. 风险与兼容性</h2>
+        <ul>
+          <li>创建向导对选中书籍逐本调用 <code>/book/:id/audios</code> 做准确校验；列表未选中项先用书库格式做轻量状态提示。</li>
+          <li>当前 <code>/user/info</code> 没有全局 <code>can_create_audiobook</code> 字段，因此全局入口无法完全表达“管理员或获准所有者”。最终提交仍由后端书籍级权限校验保证。</li>
+          <li>任务页继续是管理员/创建者可见的生产监控台，不作为普通读者收听入口。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>7. 测试结果</h2>
+        <ul>
+          <li><span class="ok">通过</span>：<code>cd app &amp;&amp; npm run lint</code>，0 errors，193 warnings（现有 Vue template 缩进/属性顺序类 warning）。</li>
+          <li><span class="ok">通过</span>：<code>cd app &amp;&amp; PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 MOCK_API_URL=http://127.0.0.1:8080 npx playwright test test/e2e/audiobooks.spec.ts</code>，12 passed。</li>
+          <li><span class="ok">通过</span>：<code>make check-design</code>，105 design document(s) passed。</li>
+          <li><span class="ok">通过</span>：Chrome DevTools 检查 <code>/audios/create?book=1</code> 桌面视口和 <code>/audios/create?book=3</code> 390px 移动端视口，选书、不可创建状态、EPUB 转换入口均可见，页面无横向溢出。</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

@@ -66,13 +66,33 @@
                             {{ resumeLabel }}
                         </v-btn>
                         <v-btn
-                            v-if="canGenerate"
+                            v-if="activeJob"
+                            color="amber-darken-2"
+                            variant="flat"
+                            prepend-icon="mdi-progress-wrench"
+                            :to="`/audio-job/${activeJob.id}`"
+                            data-testid="view-active-audio-job"
+                        >
+                            {{ activeJobActionLabel }}
+                        </v-btn>
+                        <v-btn
+                            v-if="canGenerate && !activeJob"
                             variant="outlined"
                             prepend-icon="mdi-waveform"
                             data-testid="generate-audiobook"
                             @click="generationDialog = true"
                         >
                             {{ t('audiobook.generate') }}
+                        </v-btn>
+                        <v-btn
+                            v-if="formatNotSupported && !activeJob"
+                            color="amber-lighten-2"
+                            variant="outlined"
+                            prepend-icon="mdi-swap-horizontal"
+                            :to="`/book/${bookId}?convert=epub`"
+                            data-testid="convert-audiobook-source"
+                        >
+                            {{ t('audiobook.convertToEpubThenCreate') }}
                         </v-btn>
                         <v-btn
                             v-if="store.user.is_admin"
@@ -124,6 +144,15 @@
                 data-testid="audiobook-capacity-warning"
             >
                 {{ t('audiobook.capacityUnavailable') }}
+            </v-alert>
+            <v-alert
+                v-if="formatNotSupported && !activeJob"
+                type="info"
+                variant="tonal"
+                class="mt-5"
+                data-testid="audiobook-format-warning"
+            >
+                {{ t('audiobook.unsupportedFormatDescription') }}
             </v-alert>
 
             <section
@@ -273,17 +302,34 @@
                 v-else
                 icon="mdi-waveform"
                 :title="t('audiobook.noEditionTitle')"
-                :text="canGenerate ? t('audiobook.noEditionAdmin') : t('audiobook.noEditionReader')"
+                :text="noEditionText"
             >
                 <template
-                    v-if="canGenerate"
+                    v-if="activeJob || canGenerate || formatNotSupported"
                     #actions
                 >
                     <v-btn
+                        v-if="activeJob"
+                        color="primary"
+                        :to="`/audio-job/${activeJob.id}`"
+                        data-testid="view-active-audio-job-empty"
+                    >
+                        {{ activeJobActionLabel }}
+                    </v-btn>
+                    <v-btn
+                        v-else-if="canGenerate"
                         color="primary"
                         @click="generationDialog = true"
                     >
                         {{ t('audiobook.generate') }}
+                    </v-btn>
+                    <v-btn
+                        v-else
+                        color="primary"
+                        variant="flat"
+                        :to="`/book/${bookId}?convert=epub`"
+                    >
+                        {{ t('audiobook.convertToEpubThenCreate') }}
                     </v-btn>
                 </template>
             </v-empty-state>
@@ -527,6 +573,7 @@ const generation = reactive({
     protagonist_voices: { male: '', female: '' },
 });
 const speeds = ['x0.75', 'x0.9', 'x1.0', 'x1.1', 'x1.25', 'x1.5'];
+const activeJobStatuses = ['queued', 'inspecting', 'awaiting_review', 'generating', 'finalizing'];
 const engines = computed(() => [
     { title: t('audiobook.edgeTts'), value: 'edgetts' },
     { title: t('audiobook.qwenTts'), value: 'qwen3tts' },
@@ -539,6 +586,14 @@ const { data: detail, pending, error, refresh } = await useAsyncData(`audiobook-
     return response;
 });
 
+const { data: jobData, refresh: refreshJobs } = await useAsyncData(`audiobook-book-jobs-${bookId}`, async () => {
+    if (!store.user.is_login) await store.loadUserInfo();
+    if (!store.user.is_login) return { jobs: [] };
+    const response = await $backend('/audio-jobs');
+    if (response.err !== 'ok') return { jobs: [] };
+    return response;
+}, { default: () => ({ jobs: [] }) });
+
 const publishedEditions = computed(() => (detail.value?.editions || []).filter((item: any) => item.status === 'published'));
 const publishedEdition = computed(() => publishedEditions.value.find((item: any) => item.id === selectedEditionId.value) || publishedEditions.value[0] || null);
 const managedEditions = computed(() => (detail.value?.editions || []).filter((item: any) => item.status !== 'published'));
@@ -546,6 +601,13 @@ const historicalEditions = computed(() => managedEditions.value.filter((item: an
 const backupRetention = computed(() => Number(detail.value?.backup_retention ?? 3));
 const expiredBackupCount = computed(() => Math.max(0, historicalEditions.value.length - backupRetention.value));
 const canGenerate = computed(() => Boolean(detail.value?.generation?.can_generate));
+const activeJob = computed(() => (jobData.value?.jobs || []).find((job: any) => (
+    Number(job.book_id) === bookId && activeJobStatuses.includes(job.status)
+)) || null);
+const formatNotSupported = computed(() => (
+    detail.value?.generation?.reason === 'format.not_supported'
+    || detail.value?.generation?.compatible === false
+));
 const canDeleteAudiobook = computed(() => Boolean(
     detail.value?.generation?.can_manage && detail.value?.editions?.length,
 ));
@@ -553,6 +615,16 @@ const voiceItems = computed(() => voiceCatalog.value
     .filter(item => item.engine === generation.engine)
     .map(item => ({ title: item.name || item.voice_id, value: item.voice_id })));
 const resumeLabel = computed(() => player.book?.id === bookId ? t('audiobook.continueListening') : t('audiobook.startListening'));
+const activeJobActionLabel = computed(() => (
+    activeJob.value?.status === 'awaiting_review'
+        ? t('audiobook.continueScriptReview')
+        : t('audiobook.viewProductionProgress')
+));
+const noEditionText = computed(() => {
+    if (activeJob.value) return t('audiobook.noEditionActiveJob');
+    if (formatNotSupported.value) return t('audiobook.unsupportedFormatDescription');
+    return canGenerate.value ? t('audiobook.noEditionAdmin') : t('audiobook.noEditionReader');
+});
 
 watch(publishedEditions, (items) => {
     if (!selectedEditionId.value && items.length) selectedEditionId.value = items[0].id;
@@ -563,6 +635,23 @@ watch(generationDialog, async (open) => {
     const response = await $backend('/audio-voices');
     if (response.err === 'ok') voiceCatalog.value = response.catalog?.voices || [];
 });
+
+watch(() => store.user.is_login, (loggedIn) => {
+    if (loggedIn) void refreshJobs();
+}, { immediate: true });
+
+watch([
+    () => route.query.create,
+    canGenerate,
+    () => activeJob.value?.id,
+], ([create]) => {
+    if (create !== '1') return;
+    if (activeJob.value) {
+        generationDialog.value = false;
+        return;
+    }
+    if (canGenerate.value) generationDialog.value = true;
+}, { immediate: true });
 
 async function playChapter(chapter: any) {
     if (!publishedEdition.value || !detail.value?.book) return;

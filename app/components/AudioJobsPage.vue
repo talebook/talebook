@@ -18,13 +18,24 @@
                 </div>
                 <p>{{ t('audiobook.jobsDescription') }}</p>
             </div>
-            <v-btn
-                prepend-icon="mdi-book-music"
-                variant="outlined"
-                to="/audios"
-            >
-                {{ t('audiobook.openLibrary') }}
-            </v-btn>
+            <div class="jobs-header-actions">
+                <v-btn
+                    prepend-icon="mdi-plus"
+                    color="primary"
+                    variant="flat"
+                    to="/audios/create"
+                    data-testid="create-audiobook-from-jobs"
+                >
+                    {{ t('audiobook.createAudiobook') }}
+                </v-btn>
+                <v-btn
+                    prepend-icon="mdi-book-music"
+                    variant="outlined"
+                    to="/audios"
+                >
+                    {{ t('audiobook.openLibrary') }}
+                </v-btn>
+            </div>
         </header>
 
         <div class="filter-row">
@@ -313,11 +324,11 @@
                 <v-btn
                     color="primary"
                     variant="flat"
-                    prepend-icon="mdi-library-shelves"
-                    to="/library"
+                    prepend-icon="mdi-plus"
+                    to="/audios/create"
                     data-testid="open-library-to-create-job"
                 >
-                    {{ t('audiobook.openLibraryToCreateJob') }}
+                    {{ t('audiobook.createAudiobook') }}
                 </v-btn>
             </template>
         </v-empty-state>
@@ -845,6 +856,7 @@ useHead({ title: () => t('audiobook.jobs') });
 .jobs-header h1 { font: 700 clamp(2.2rem, 5vw, 4rem) Georgia, 'Noto Serif SC', serif; }
 .title-row { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 14px; }
 .jobs-header p:not(.eyebrow) { color: rgba(var(--v-theme-on-surface), .64); }
+.jobs-header-actions { max-width: 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .eyebrow { color: #9d6a13; font-size: .75rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .filter-row { margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; }
 .job-list { display: grid; gap: 14px; }
@@ -927,6 +939,8 @@ useHead({ title: () => t('audiobook.jobs') });
 .script-editor :deep(textarea) { font: .96rem/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; }
 @media (max-width: 760px) {
     .jobs-header, .job-body { align-items: start; grid-template-columns: 1fr; flex-direction: column; }
+    .jobs-header-actions { width: 100%; justify-content: flex-start; }
+    .jobs-header-actions :deep(.v-btn) { flex: 1 1 100%; min-width: 0; }
     .job-body { gap: 16px; }
     .job-book, .job-plan-toggle { width: 100%; }
     .plan-heading { align-items: start; flex-direction: column; }

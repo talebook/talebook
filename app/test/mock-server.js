@@ -221,9 +221,9 @@ const audiobookChapters = [
   },
 ];
 
-const audiobookEdition = () => ({
+const audiobookEdition = (bookId = 1) => ({
   id: 1,
-  book_id: 1,
+  book_id: Number(bookId),
   status: 'published',
   engine: 'edgetts',
   config: { speed: 'x1.0', revision_number: 1 },
@@ -239,15 +239,34 @@ const audiobookEdition = () => ({
   chapters: audiobookChapters,
 });
 
-const audiobookBook = () => {
-  const data = readJson('api_book_1.json');
-  return data?.book || {
-    id: 1,
-    title: '百年孤独',
-    authors: ['加西亚·马尔克斯'],
-    files: [{ format: 'EPUB' }],
-    img: '/get/cover/1',
+const recentBook = (bookId) => {
+  const data = readJson('api_recent.json');
+  return (data?.books || []).find(book => Number(book.id) === Number(bookId));
+};
+
+const audiobookBook = (bookId = 1) => {
+  const numericId = Number(bookId) || 1;
+  const recent = recentBook(numericId);
+  if (recent) return recent;
+  const data = readJson(`api_book_${numericId}.json`);
+  const book = data?.book;
+  return book || {
+    id: numericId,
+    title: `Mock Book ${numericId}`,
+    author: 'Mock Author',
+    authors: ['Mock Author'],
+    available_formats: ['epub'],
+    files: [{ format: 'epub' }],
+    img: `/get/cover/${numericId}.jpg`,
+    thumb: `/get/thumb_60x80/${numericId}.jpg`,
   };
+};
+
+const audiobookBookFormats = (book) => {
+  const values = book.available_formats?.length
+    ? book.available_formats
+    : (book.files || []).map(item => item.format);
+  return new Set((values || []).map(item => String(item).toUpperCase()));
 };
 
 const audiobookJobPlan = (job) => {
@@ -321,7 +340,7 @@ const audiobookJobPlan = (job) => {
 };
 
 const audiobookJobPayload = (job) => {
-  const book = audiobookBook();
+  const book = audiobookBook(job.book_id);
   return {
     ...job,
     book: {
@@ -370,24 +389,32 @@ router.get('/api/audios/home', eventHandler(() => {
   };
 }));
 
-router.get('/api/book/:bookId/audios', eventHandler(() => ({
-  err: 'ok',
-  book: audiobookBook(),
-  editions: [...(audiobookPublishedEdition ? [audiobookPublishedEdition] : []), ...audiobookManagedEditions],
-  backup_retention: 3,
-  generation: {
-    enabled: true,
-    compatible: true,
-    permitted: true,
-    can_generate: audiobookCapacityOk,
-    can_manage: true,
-    reason: '',
-    health: { ok: true, version: 'voicebook-tool 0.4.0', reason: '' },
-    capacity: { ok: audiobookCapacityOk, free_bytes: audiobookCapacityOk ? 10737418240 : 1073741824, minimum_bytes: 5368709120 },
-    engines: ['edgetts', 'qwen3tts'],
-    quality_options: ['standard'],
-  },
-})));
+router.get('/api/book/:bookId/audios', eventHandler((event) => {
+  const bookId = Number(getRouterParam(event, 'bookId'));
+  const book = audiobookBook(bookId);
+  const compatible = ['EPUB', 'TXT'].some(format => audiobookBookFormats(book).has(format));
+  const publishedEdition = audiobookPublishedEdition && Number(audiobookPublishedEdition.book_id) === bookId
+    ? audiobookPublishedEdition
+    : null;
+  return {
+    err: 'ok',
+    book,
+    editions: [...(publishedEdition ? [publishedEdition] : []), ...audiobookManagedEditions],
+    backup_retention: 3,
+    generation: {
+      enabled: true,
+      compatible,
+      permitted: true,
+      can_generate: audiobookCapacityOk && compatible,
+      can_manage: true,
+      reason: compatible ? (audiobookCapacityOk ? '' : 'disk.low') : 'format.not_supported',
+      health: compatible ? { ok: true, version: 'voicebook-tool 0.4.0', reason: '' } : null,
+      capacity: { ok: audiobookCapacityOk, free_bytes: audiobookCapacityOk ? 10737418240 : 1073741824, minimum_bytes: 5368709120 },
+      engines: ['edgetts', 'qwen3tts'],
+      quality_options: ['standard'],
+    },
+  };
+}));
 
 router.delete('/api/book/:bookId/audios', eventHandler(() => {
   const activeJobs = audiobookJobs.filter(item => ['queued', 'inspecting', 'awaiting_review', 'generating', 'finalizing'].includes(item.status));
@@ -419,11 +446,18 @@ router.delete('/api/book/:bookId/audios', eventHandler(() => {
 
 router.post('/api/book/:bookId/audio-jobs', eventHandler(async (event) => {
   const body = await readBody(event);
-  const duplicate = audiobookJobs.find(item => ['queued', 'inspecting', 'awaiting_review', 'generating', 'finalizing'].includes(item.status));
+  const bookId = Number(getRouterParam(event, 'bookId'));
+  const book = audiobookBook(bookId);
+  if (!['EPUB', 'TXT'].some(format => audiobookBookFormats(book).has(format))) {
+    return { err: 'format.not_supported', msg: '生成有声书需要 EPUB 或 TXT 格式' };
+  }
+  const duplicate = audiobookJobs.find(item => (
+    Number(item.book_id) === bookId && ['queued', 'inspecting', 'awaiting_review', 'generating', 'finalizing'].includes(item.status)
+  ));
   if (duplicate) return { err: 'ok', job: duplicate, deduplicated: true };
   const job = {
     id: 1,
-    book_id: Number(getRouterParam(event, 'bookId')),
+    book_id: bookId,
     edition_id: 1,
     creator_id: 1,
     mode: body?.mode || 'quick',
@@ -455,7 +489,7 @@ router.get('/api/audio-jobs', eventHandler(() => {
       job.status = 'completed';
       job.phase = 'COMPLETED';
       job.progress = 1;
-      audiobookPublishedEdition ||= audiobookEdition();
+      audiobookPublishedEdition ||= audiobookEdition(job.book_id);
       job.script_available = true;
       if (job.data.revision) {
         const candidate = audiobookManagedEditions.find(item => item.id === job.edition_id);
