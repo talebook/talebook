@@ -373,6 +373,7 @@ const engines = computed(() => [
 ]);
 
 const { data: jobData, refresh: refreshJobs } = await useAsyncData('audiobook-create-jobs', async () => {
+    if (!store.user.is_login) await store.loadUserInfo();
     if (!store.user.is_login) return { jobs: [] };
     const response = await $backend('/audio-jobs');
     if (response.err !== 'ok') return { jobs: [] };
@@ -454,7 +455,13 @@ async function fetchBooks() {
                 books.value.push(data);
             }
         }
-        if (!selectedBookId.value && books.value.length) selectBook(books.value[0], false);
+        const routeBookId = Number(route.query.book) || selectedBookId.value;
+        if (routeBookId && books.value.some(book => Number(book.id) === Number(routeBookId))) {
+            selectedBookId.value = Number(routeBookId);
+            await loadBookDetail(Number(routeBookId));
+        } else if (!selectedBookId.value && books.value.length) {
+            selectBook(books.value[0], false);
+        }
     } catch (error) {
         loadError.value = error instanceof Error && error.message ? error.message : t('audiobook.loadFailed');
     } finally {

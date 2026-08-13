@@ -587,6 +587,7 @@ const { data: detail, pending, error, refresh } = await useAsyncData(`audiobook-
 });
 
 const { data: jobData, refresh: refreshJobs } = await useAsyncData(`audiobook-book-jobs-${bookId}`, async () => {
+    if (!store.user.is_login) await store.loadUserInfo();
     if (!store.user.is_login) return { jobs: [] };
     const response = await $backend('/audio-jobs');
     if (response.err !== 'ok') return { jobs: [] };
@@ -644,7 +645,12 @@ watch([
     canGenerate,
     () => activeJob.value?.id,
 ], ([create]) => {
-    if (create === '1' && canGenerate.value && !activeJob.value) generationDialog.value = true;
+    if (create !== '1') return;
+    if (activeJob.value) {
+        generationDialog.value = false;
+        return;
+    }
+    if (canGenerate.value) generationDialog.value = true;
 }, { immediate: true });
 
 async function playChapter(chapter: any) {
