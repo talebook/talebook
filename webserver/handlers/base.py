@@ -20,6 +20,7 @@ from webserver.i18n import _, set_language
 
 # import social_tornado.handlers
 from webserver.models import Item, Message, Reader, ReadingState
+from webserver.services.external_index import is_external_index_format
 
 
 messages = defaultdict(list)
@@ -494,14 +495,20 @@ class BaseHandler(web.RequestHandler):
         logging.info("[SAVE_META] save meta for book id:%d, fmt:%s", book_id, fmt if fmt else "ALL")
 
         supported_formats = []
+        skipped_external_formats = []
         for f in ["epub", "azw3", "pdf"]:
             if fmt and f != fmt.lower():
                 continue
             fmt_key = "fmt_%s" % f
             if fmt_key in book:
+                if is_external_index_format(self.session, book_id, f):
+                    skipped_external_formats.append(f.upper())
+                    continue
                 supported_formats.append((f, book[fmt_key]))
 
         if not supported_formats:
+            if skipped_external_formats:
+                return {"err": "external.index.readonly", "msg": _("仅索引书籍不会写入原始文件元数据")}
             if fmt:
                 return {"err": "format.not_supported", "msg": _("书籍没有指定的格式：%s") % fmt.upper()}
             return {"err": "format.not_supported", "msg": _("书籍没有支持的格式（需要 EPUB、AZW3 或 PDF）")}

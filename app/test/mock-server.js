@@ -32,6 +32,21 @@ let audiobookManagedEditions = [];
 let audiobookCapacityOk = true;
 let audiobookWorkspace = null;
 let podcastTokenHint = '';
+let importSettings = {
+  scan_upload_path: '/mock/scan/dir',
+  import_mode: 'copy',
+  auto_watch_enabled: false,
+  directory_check: {
+    status: 'ok',
+    path: '/mock/scan/dir',
+    readable: true,
+    writable: true,
+    in_allowed_roots: true,
+    supported_file_count: 2,
+    msg: '目录可用。发现 2 个支持格式文件。'
+  },
+  watch_status: { state: 'off', queued: 0, running: 0, failed: 0, last_scan_at: null }
+};
 
 const builtinThemes = [
   {
@@ -158,6 +173,21 @@ router.post('/_test/reset', eventHandler(async (event) => {
   audiobookJobs = [];
   audiobookJobPolls = 0;
   audiobookProgress = null;
+  importSettings = {
+    scan_upload_path: '/mock/scan/dir',
+    import_mode: 'copy',
+    auto_watch_enabled: false,
+    directory_check: {
+      status: 'ok',
+      path: '/mock/scan/dir',
+      readable: true,
+      writable: true,
+      in_allowed_roots: true,
+      supported_file_count: 2,
+      msg: '目录可用。发现 2 个支持格式文件。'
+    },
+    watch_status: { state: 'off', queued: 0, running: 0, failed: 0, last_scan_at: null }
+  };
   const backupCount = Number(body?.audiobookBackupCount || 1);
   audiobookManagedEditions = body?.audiobookVersions
     ? [
@@ -979,13 +1009,103 @@ router.get('/api/book/:id/refer', eventHandler(() => {
 // Admin Imports
 app.use('/api/admin/scan/list', eventHandler(() => ({
   err: 'ok',
-  scan_dir: '/mock/scan/dir',
-  summary: { done: 5, todo: 2 },
+  scan_dir: importSettings.scan_upload_path,
+  import_mode: importSettings.import_mode,
+  auto_watch_enabled: importSettings.auto_watch_enabled,
+  watch_status: importSettings.watch_status,
+  summary: { done: 5, todo: 2, failed: 0 },
   total: 2,
   items: [
     { id: 1, status: 'new', path: '/books/new1.epub', title: 'New Book 1', author: 'Author 1', create_time: '2023-01-02' },
     { id: 2, status: 'exist', path: '/books/exist.epub', title: 'Existing Book', author: 'Author 2', create_time: '2023-01-01' }
   ]
+})));
+
+router.get('/api/admin/import/settings', eventHandler(() => ({
+  err: 'ok',
+  settings: importSettings
+})));
+
+router.post('/api/admin/import/settings', eventHandler(async (event) => {
+  const body = await readBody(event);
+  importSettings = {
+    ...importSettings,
+    scan_upload_path: body.scan_upload_path,
+    import_mode: body.import_mode,
+    auto_watch_enabled: !!body.auto_watch_enabled,
+    directory_check: {
+      status: 'ok',
+      path: body.scan_upload_path,
+      readable: true,
+      writable: body.scan_upload_path !== '/mock/read-only',
+      in_allowed_roots: true,
+      supported_file_count: 3,
+      msg: body.scan_upload_path === '/mock/read-only'
+        ? '目录不可写，仍可读取导入；剪切模式将不可用。'
+        : '目录可用。发现 3 个支持格式文件。'
+    },
+    watch_status: body.auto_watch_enabled
+      ? { state: 'scanning', queued: 0, running: 0, failed: 0, last_scan_at: null }
+      : { state: 'off', queued: 0, running: 0, failed: 0, last_scan_at: null }
+  };
+  return { err: 'ok', msg: '导入设置已保存', settings: importSettings };
+}));
+
+router.post('/api/admin/import/directory/check', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const targetPath = body.path || '/mock/scan/dir';
+  if (targetPath === '/mock/missing') {
+    return {
+      err: 'ok',
+      msg: '目录不存在，请检查路径或先在服务器上创建目录。',
+      directory: {
+        status: 'error',
+        path: targetPath,
+        readable: false,
+        writable: false,
+        in_allowed_roots: true,
+        supported_file_count: 0,
+        msg: '目录不存在，请检查路径或先在服务器上创建目录。'
+      }
+    };
+  }
+  return {
+    err: 'ok',
+    msg: targetPath === '/mock/read-only'
+      ? '目录不可写，仍可读取导入；剪切模式将不可用。'
+      : '目录可用。发现 3 个支持格式文件。',
+    directory: {
+      status: targetPath === '/mock/read-only' ? 'warning' : 'ok',
+      path: targetPath,
+      readable: true,
+      writable: targetPath !== '/mock/read-only',
+      in_allowed_roots: true,
+      supported_file_count: 3,
+      msg: targetPath === '/mock/read-only'
+        ? '目录不可写，仍可读取导入；剪切模式将不可用。'
+        : '目录可用。发现 3 个支持格式文件。'
+    }
+  };
+}));
+
+router.get('/api/admin/import/directory/list', eventHandler((event) => {
+  const query = getQuery(event);
+  const currentPath = query.path || '/mock/scan/dir';
+  return {
+    err: 'ok',
+    path: currentPath,
+    parent: currentPath === '/mock/scan/dir' ? '' : '/mock/scan/dir',
+    allowed_roots: ['/mock/scan/dir'],
+    items: [
+      { name: 'incoming', path: '/mock/scan/dir/incoming', readable: true, writable: true, is_symlink: false, in_allowed_roots: true },
+      { name: 'read-only', path: '/mock/read-only', readable: true, writable: false, is_symlink: false, in_allowed_roots: true }
+    ]
+  };
+}));
+
+router.get('/api/admin/import/watch/status', eventHandler(() => ({
+  err: 'ok',
+  watch_status: importSettings.watch_status
 })));
 
 router.post('/api/admin/scan/run', eventHandler(() => ({
@@ -996,7 +1116,7 @@ router.post('/api/admin/scan/run', eventHandler(() => ({
 router.get('/api/admin/scan/status', eventHandler(() => ({
   err: 'ok',
   status: { new: 0 },
-  summary: { done: 5, todo: 2 }
+  summary: { done: 5, todo: 2, failed: 0 }
 })));
 
 router.post('/api/admin/import/run', eventHandler(() => ({
@@ -1007,7 +1127,7 @@ router.post('/api/admin/import/run', eventHandler(() => ({
 router.get('/api/admin/import/status', eventHandler(() => ({
   err: 'ok',
   status: { ready: 0 },
-  summary: { done: 6, todo: 1 }
+  summary: { done: 6, todo: 1, failed: 0 }
 })));
 
 router.post('/api/admin/scan/delete', eventHandler(() => ({

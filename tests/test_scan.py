@@ -2,20 +2,19 @@
 # -*- coding: UTF-8 -*-
 
 import json
-import logging
 import os
 import tempfile
 import threading
 import time
-import unittest
+import urllib.parse
 from unittest import mock
 
 from tests.test_main import TestWithUserLogin, testdir
 from tests.test_main import setUpModule as init
-from webserver import handlers
-from webserver.models import ScanFile
-from webserver.services import AsyncService
-from webserver.services.scan import ScanService
+from webserver import handlers, loader, main
+from webserver.models import Item, ScanFile
+from webserver.services.external_index import delete_external_index_book_record
+from webserver.services.scan import SCAN_EXT, ScanService
 
 
 def setUpModule():
@@ -55,9 +54,6 @@ class TestScan(TestWithUserLogin):
         d = self.json("/api/admin/scan/list?num=10000")
         self.assertGreaterEqual(d["total"], self.RECORDS_COUNT)
 
-        titles = set(["天行者", "我的一生", "book", "凡人修仙之仙界篇", "语言哲学"])
-        scan_titles = set([book["title"] for book in d["items"]])
-
     def test_scan_background(self):
         self.async_service.return_value = True
 
@@ -85,6 +81,121 @@ class TestScan(TestWithUserLogin):
     def test_import_status(self):
         d = self.json("/api/admin/import/status")
         self.assertEqual(d["err"], "ok")
+
+
+class TestImportSettings(TestWithUserLogin):
+    def _with_import_roots(self, root):
+        previous = {
+            "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+            "scan_upload_path": main.CONF.get("scan_upload_path"),
+        }
+        main.CONF["import_allowed_roots"] = [root]
+        main.CONF["scan_upload_path"] = root
+        return previous
+
+    def _restore_import_roots(self, previous):
+        for key, value in previous.items():
+            main.CONF[key] = value
+
+    def test_directory_check_counts_supported_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            epub_path = os.path.join(tmpdir, "book.epub")
+            with open(epub_path, "wb") as f:
+                f.write(b"epub")
+            with open(os.path.join(tmpdir, "note.doc"), "wb") as f:
+                f.write(b"doc")
+
+            previous_roots = main.CONF.get("import_allowed_roots")
+            previous_scan_path = main.CONF.get("scan_upload_path")
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                main.CONF["scan_upload_path"] = tmpdir
+                d = self.json(
+                    "/api/admin/import/directory/check",
+                    method="POST",
+                    body=json.dumps({"path": tmpdir}),
+                )
+            finally:
+                main.CONF["import_allowed_roots"] = previous_roots
+                main.CONF["scan_upload_path"] = previous_scan_path
+
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["directory"]["status"], "ok")
+        self.assertEqual(d["directory"]["supported_file_count"], 1)
+
+    def test_directory_list_accepts_allowed_child_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child = os.path.join(tmpdir, "child")
+            grandchild = os.path.join(child, "grandchild")
+            os.makedirs(grandchild)
+
+            previous = self._with_import_roots(tmpdir)
+            try:
+                d = self.json(
+                    "/api/admin/import/directory/list?" + urllib.parse.urlencode({"path": child}),
+                    method="GET",
+                )
+            finally:
+                self._restore_import_roots(previous)
+
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["path"], os.path.realpath(child))
+        self.assertIn("grandchild", [item["name"] for item in d["items"]])
+
+    def test_directory_list_rejects_path_escape(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = os.path.join(tmpdir, "root")
+            outside = os.path.join(tmpdir, "outside")
+            os.makedirs(os.path.join(root, "allowed"))
+            os.makedirs(os.path.join(outside, "secret"))
+
+            previous = self._with_import_roots(root)
+            try:
+                escaped = os.path.join(root, "..", "outside")
+                d = self.json(
+                    "/api/admin/import/directory/list?" + urllib.parse.urlencode({"path": escaped}),
+                    method="GET",
+                )
+            finally:
+                self._restore_import_roots(previous)
+
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["path"], os.path.realpath(root))
+        self.assertIn("allowed", [item["name"] for item in d["items"]])
+        self.assertNotIn("secret", [item["name"] for item in d["items"]])
+
+    def test_save_import_settings_persists_mode_and_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_mode": main.CONF.get("import_mode"),
+                "import_auto_watch_enabled": main.CONF.get("import_auto_watch_enabled"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+                "nuxt_env_path": main.CONF.get("nuxt_env_path"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                main.CONF["nuxt_env_path"] = os.path.join(tmpdir, ".env")
+                with mock.patch.object(loader.SettingsLoader, "set_store_path", return_value=tmpdir):
+                    d = self.json(
+                        "/api/admin/import/settings",
+                        method="POST",
+                        body=json.dumps(
+                            {
+                                "scan_upload_path": tmpdir,
+                                "import_mode": "index",
+                                "auto_watch_enabled": False,
+                            }
+                        ),
+                    )
+                self.assertEqual(d["err"], "ok")
+                self.assertEqual(d["settings"]["scan_upload_path"], tmpdir)
+                self.assertEqual(d["settings"]["import_mode"], "index")
+                self.assertEqual(main.CONF["scan_upload_path"], tmpdir)
+                self.assertEqual(main.CONF["import_mode"], "index")
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
 
 
 class TestScanContinue(TestWithUserLogin):
@@ -115,16 +226,37 @@ class TestScanContinue(TestWithUserLogin):
 class TestImport(TestWithUserLogin):
     READY_ROW_ID = 69
 
+    def _cleanup_external_books(self, book_ids):
+        legacy = self.get_app().settings["legacy"]
+        session = self.get_app().settings["ScopedSession"]
+        session.rollback()
+        for book_id in set(book_id for book_id in book_ids if book_id):
+            try:
+                delete_external_index_book_record(legacy, book_id)
+            except Exception:
+                pass
+            session.query(Item).filter(Item.book_id == book_id).delete()
+        session.commit()
+
     def setUp(self):
         # 将这行记录设置为可导入的状态
         session = self.get_app().settings["ScopedSession"]
         session.rollback()
 
-        row = session.query(ScanFile).filter(ScanFile.id == self.READY_ROW_ID).one()
+        row = session.query(ScanFile).filter(ScanFile.id == self.READY_ROW_ID).first()
+        if not row:
+            row = ScanFile(
+                testdir + "/cases/new.epub",
+                "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13",
+                0,
+            )
+            row.id = self.READY_ROW_ID
+            session.add(row)
         row.path = testdir + "/cases/new.epub"
         row.status = ScanFile.READY
         row.book_id = 0
         row.import_id = 0
+        row.hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
         row.save()
         session.commit()
         return super().setUp()
@@ -143,6 +275,149 @@ class TestImport(TestWithUserLogin):
         req = {"hashlist": "all"}
         d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
         self.assertEqual(d["err"], "ok")
+
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
+    def test_import_index_mode_records_original_path_in_calibre(self, m1):
+        hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
+        req = {"hashlist": [hash], "import_mode": "index"}
+        book_id = None
+        session = self.get_app().settings["ScopedSession"]
+        try:
+            d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
+            self.assertEqual(d["err"], "ok")
+            m1.assert_not_called()
+
+            session.rollback()
+            row = session.query(ScanFile).filter(ScanFile.id == self.READY_ROW_ID).one()
+            book_id = row.book_id
+            source_path = os.path.realpath(testdir + "/cases/new.epub")
+            self.assertEqual(row.status, ScanFile.INDEXED)
+            self.assertGreater(book_id, 0)
+            self.assertEqual(row.data["import_mode"], "index")
+            self.assertEqual(row.data["source_path"], source_path)
+            self.assertTrue(row.data["external_path"])
+
+            legacy = self.get_app().settings["legacy"]
+            self.assertEqual(legacy.format_abspath(book_id, "EPUB", index_is_id=True), source_path)
+            item = session.query(Item).filter(Item.book_id == book_id).one()
+            self.assertEqual(item.src_path, source_path)
+        finally:
+            self._cleanup_external_books([book_id])
+
+    @mock.patch("calibre.ebooks.metadata.meta.get_metadata")
+    def test_import_index_mode_supports_all_supported_formats(self, get_metadata):
+        from calibre.ebooks.metadata.book.base import Metadata
+
+        def metadata_for_file(stream, stream_type, use_libprs_metadata):
+            name = os.path.basename(stream.name)
+            return Metadata("Indexed %s" % name, ["Author %s" % stream_type.upper()])
+
+        get_metadata.side_effect = metadata_for_file
+        session = self.get_app().settings["ScopedSession"]
+        legacy = self.get_app().settings["legacy"]
+        book_ids = []
+        hashes = []
+        rows = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            try:
+                for index, ext in enumerate(SCAN_EXT):
+                    source_path = os.path.join(tmpdir, "indexed_%s.%s" % (index, ext))
+                    with open(source_path, "wb") as f:
+                        f.write(("indexed %s" % ext).encode("utf-8"))
+                    hash_value = "sha256:index-mode-%s" % ext
+                    row = ScanFile(source_path, hash_value, 10000 + index)
+                    row.status = ScanFile.READY
+                    session.add(row)
+                    rows.append((row, source_path, ext.upper()))
+                    hashes.append(hash_value)
+                session.commit()
+
+                req = {"hashlist": hashes, "import_mode": "index"}
+                d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
+                self.assertEqual(d["err"], "ok")
+
+                session.rollback()
+                for row, source_path, fmt in rows:
+                    imported_row = session.query(ScanFile).filter(ScanFile.hash == row.hash).one()
+                    book_ids.append(imported_row.book_id)
+                    self.assertEqual(imported_row.status, ScanFile.INDEXED)
+                    self.assertEqual(imported_row.data["format"], fmt)
+                    self.assertEqual(
+                        legacy.format_abspath(imported_row.book_id, fmt, index_is_id=True),
+                        os.path.realpath(source_path),
+                    )
+            finally:
+                self._cleanup_external_books(book_ids)
+                session.rollback()
+                session.query(ScanFile).filter(ScanFile.hash.in_(hashes)).delete(synchronize_session=False)
+                session.commit()
+
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
+    def test_delete_indexed_book_keeps_original_file(self, m1):
+        hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
+        req = {"hashlist": [hash], "import_mode": "index"}
+        session = self.get_app().settings["ScopedSession"]
+        legacy = self.get_app().settings["legacy"]
+        book_id = None
+        source_path = os.path.realpath(testdir + "/cases/new.epub")
+        try:
+            d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
+            self.assertEqual(d["err"], "ok")
+            m1.assert_not_called()
+
+            session.rollback()
+            row = session.query(ScanFile).filter(ScanFile.id == self.READY_ROW_ID).one()
+            book_id = row.book_id
+            self.assertTrue(os.path.exists(source_path))
+
+            d = self.json("/api/book/%d/delete" % book_id, method="POST", body="")
+            self.assertEqual(d["err"], "ok")
+            self.assertTrue(os.path.exists(source_path))
+            self.assertEqual(legacy.get_data_as_dict(ids=[book_id]), [])
+            session.rollback()
+            self.assertIsNone(session.query(Item).filter(Item.book_id == book_id).first())
+            self.assertEqual(session.query(ScanFile).filter(ScanFile.book_id == book_id).count(), 0)
+            book_id = None
+        finally:
+            self._cleanup_external_books([book_id])
+
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
+    def test_edit_indexed_book_preserves_original_path(self, m1):
+        hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
+        req = {"hashlist": [hash], "import_mode": "index"}
+        session = self.get_app().settings["ScopedSession"]
+        legacy = self.get_app().settings["legacy"]
+        book_id = None
+        source_path = os.path.realpath(testdir + "/cases/new.epub")
+        try:
+            d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
+            self.assertEqual(d["err"], "ok")
+            m1.assert_not_called()
+
+            session.rollback()
+            row = session.query(ScanFile).filter(ScanFile.id == self.READY_ROW_ID).one()
+            book_id = row.book_id
+            body = {"title": "索引模式标题更新", "authors": ["索引模式作者"]}
+            d = self.json("/api/book/%d/edit" % book_id, method="POST", body=json.dumps(body))
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual(legacy.format_abspath(book_id, "EPUB", index_is_id=True), source_path)
+        finally:
+            self._cleanup_external_books([book_id])
+
+    @mock.patch("calibre.db.legacy.LibraryDatabase.format_abspath")
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book")
+    @mock.patch("webserver.services.scan.os.remove")
+    def test_import_move_mode_deletes_source_after_successful_import(self, remove, import_book, format_abspath):
+        import_book.return_value = 1008610086
+        format_abspath.return_value = testdir + "/cases/new.epub"
+        hash = "sha256:3cfd51afe17f3051e24921825c05e1df0bce03d22837a916a4d4ddcbf0301a13"
+        req = {"hashlist": [hash], "import_mode": "move"}
+
+        d = self.json("/api/admin/import/run", method="POST", body=json.dumps(req))
+
+        self.assertEqual(d["err"], "ok")
+        remove.assert_called_once_with(testdir + "/cases/new.epub")
 
 
 class TestScanPDFTitle(TestWithUserLogin):

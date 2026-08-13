@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>导入设置与自动监控实现方案 · Active</title>
+    <style>
+      :root { color-scheme: light; --bg: #f7f8fb; --card: #fff; --ink: #1f2937; --muted: #5f6b7a; --line: #d9e0ea; --accent: #216869; --warn: #9a5c09; --good: #1f7a53; --bad: #a43d3d; --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.65 var(--sans); }
+      main { width: min(1040px, calc(100vw - 32px)); margin: 0 auto; padding: 28px 0 48px; }
+      header, section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px; margin-bottom: 16px; }
+      h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 42px); line-height: 1.15; }
+      h2 { margin: 0 0 12px; font-size: 22px; }
+      h3 { margin: 18px 0 8px; font-size: 16px; }
+      p { margin: 0 0 10px; }
+      ul { margin: 8px 0 0 22px; padding: 0; }
+      li + li { margin-top: 5px; }
+      code { font-family: var(--mono); background: #eef2f5; padding: 1px 5px; border-radius: 4px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+      .chip { padding: 5px 10px; border-radius: 999px; background: #eef2f5; color: var(--muted); font-size: 12px; font-weight: 700; }
+      .chip.active { color: var(--good); background: #eef9f3; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .box { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: #fbfcfe; }
+      .box.good { border-color: #b7d8c8; background: #eef9f3; }
+      .box.warn { border-color: #ead3a2; background: #fff9eb; }
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+      .step { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #fbfcfe; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+      th, td { border: 1px solid var(--line); padding: 9px; vertical-align: top; text-align: left; }
+      th { background: #eef2f5; }
+      .pending { color: var(--warn); font-weight: 800; }
+      .verified { color: var(--good); font-weight: 800; }
+      @media (max-width: 720px) { main { width: calc(100vw - 20px); padding-top: 12px; } header, section { padding: 18px; } .grid, .flow { grid-template-columns: 1fr; } }
+      @media print { body { background: #fff; } header, section { break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>导入设置与自动监控实现方案</h1>
+        <p>在现有管理后台导入页上扩展设置入口、目录检测、导入模式和异步监控能力，优先复用现有 <code>ScanFile</code> 与 <code>ScanService</code>。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：Active</span>
+          <span class="chip">创建日期：2026-08-12</span>
+          <span class="chip">所属模块：app</span>
+          <span class="chip">影响范围：app/pages/admin/imports.vue、webserver/handlers/scan.py、webserver/services/scan.py</span>
+          <span class="chip">需求来源：TB-20 / TB-21</span>
+        </div>
+      </header>
+
+      <section id="request">
+        <h2>1. 原始诉求</h2>
+        <p>talebook 的导入图书页面需要新增“导入设置”按钮和浮窗，支持设定服务器导入目录、三种导入模式，以及“自动监控并导入新书籍”。目录选择要通过服务器目录选择对话框完成；自动监控要异步处理大量文件；导入模式包含仅索引、复制到书库、剪切到书库，并在界面解释逻辑。</p>
+      </section>
+
+      <section id="goals">
+        <h2>2. 目标与边界</h2>
+        <div class="grid">
+          <div class="box good">
+            <h3>本次实现</h3>
+            <ul>
+              <li>新增导入设置 API、目录检测 API、目录浏览 API。</li>
+              <li>保存 <code>scan_upload_path</code>、<code>import_mode</code>、<code>import_auto_watch_enabled</code> 并刷新页面摘要。</li>
+              <li>手动导入和自动导入使用任务开始时的导入模式快照。</li>
+              <li>剪切模式仅在导入成功后删除源文件，删除失败写入可见状态。</li>
+              <li>自动监控用后台线程周期扫描和入队，避免阻塞 Web 请求。</li>
+            </ul>
+          </div>
+          <div class="box warn">
+            <h3>技术边界</h3>
+            <ul>
+              <li>Calibre 外部文件引用能力不可在当前环境验证；仅索引模式以扫描索引和状态留痕落地，避免假装完成不可读的外链书库。</li>
+              <li>文件系统事件在 Docker/NAS 上不稳定，本期采用定时补偿扫描，后续可接入事件监听。</li>
+              <li>重试队列先提供失败项可见和批量重试入口，复杂退避可在后续服务化队列表中扩展。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="design">
+        <h2>3. 方案</h2>
+        <div class="flow" aria-label="处理流程">
+          <div class="step"><strong>读取设置</strong><p>导入页加载 <code>/api/admin/import/settings</code>，得到目录、模式、监控和状态摘要。</p></div>
+          <div class="step"><strong>检测目录</strong><p>保存前规范化路径，校验允许根、存在性、读写权限、软链接和候选文件数量。</p></div>
+          <div class="step"><strong>扫描入队</strong><p>手动扫描或监控轮询调用现有扫描服务，跳过隐藏项和软链接，并限制单轮候选数。</p></div>
+          <div class="step"><strong>导入执行</strong><p>复制、剪切、仅索引统一从保存设置生成任务快照，状态回写到 <code>ScanFile</code>。</p></div>
+        </div>
+        <table>
+          <thead><tr><th>接口</th><th>用途</th><th>关键行为</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET/POST /api/admin/import/settings</code></td><td>读取和保存导入设置</td><td>复用配置持久化；首次开启监控触发一次异步扫描。</td></tr>
+            <tr><td><code>POST /api/admin/import/directory/check</code></td><td>目录检测</td><td>返回 readable、writable、in_allowed_roots、supported_file_count、warning/error。</td></tr>
+            <tr><td><code>GET /api/admin/import/directory/list</code></td><td>目录选择器</td><td>只列出允许根内目录；不跟随软链接。</td></tr>
+            <tr><td><code>POST /api/admin/import/run</code></td><td>导入执行</td><td>兼容旧 <code>delete_after</code>，新参数 <code>import_mode</code> 优先。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="impact">
+        <h2>4. 影响与风险</h2>
+        <ul>
+          <li>新增配置键需要默认值，老实例升级后自动监控默认关闭，导入模式默认复制。</li>
+          <li>导入页移除旧的“导入后删除源文件”复选框，由“剪切到书库”替代。</li>
+          <li>目录白名单默认限制为 <code>/data/books/imports/</code>，测试环境允许复写。</li>
+          <li>仅索引模式以“已索引”状态可见，后续若确认 Calibre 外部引用能力，再扩展为真正可阅读记录。</li>
+        </ul>
+      </section>
+
+      <section id="tests">
+        <h2>5. 测试计划与结果</h2>
+        <table>
+          <thead><tr><th>命令</th><th>状态</th><th>覆盖点</th></tr></thead>
+          <tbody>
+            <tr><td><code>docker run ... talebook/test pytest tests/test_scan.py -v</code></td><td class="verified">通过</td><td>设置 API、目录检测、导入模式、剪切后删除、自动监控入队。</td></tr>
+            <tr><td><code>docker run ... talebook/test ruff check ./webserver --no-cache</code></td><td class="verified">通过</td><td>后端扫描与导入设置代码静态检查。</td></tr>
+            <tr><td><code>docker run ... talebook/test ruff format --diff ./webserver --output-format concise --no-cache</code></td><td class="verified">通过</td><td>后端格式化检查。</td></tr>
+            <tr><td><code>cd app &amp;&amp; npm run lint</code></td><td class="verified">通过</td><td>前端 lint；保留项目既有 warning。</td></tr>
+            <tr><td><code>cd app &amp;&amp; npx playwright test test/e2e/admin-imports.spec.ts</code></td><td class="verified">通过</td><td>导入设置按钮、浮窗、模式说明、目录选择、目录检测和保存。</td></tr>
+            <tr><td><code>make check-design</code></td><td class="verified">通过</td><td>方案文档路径、状态和单文件 HTML 约束。</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>

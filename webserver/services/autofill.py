@@ -22,6 +22,7 @@ from webserver.plugins.meta import baike, douban, douban_v2, neodb
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.meta.calibre.api import CalibreMetadataApi
 from webserver.services import AsyncService
+from webserver.services.external_index import set_metadata_preserving_external_paths
 
 
 CONF = loader.get_settings()
@@ -125,7 +126,8 @@ class AutoFillService(AsyncService):
         refer_mi.title_sort = utils.get_title_sort(refer_mi.title)
 
         mi.smart_update(refer_mi, replace_metadata=True)
-        self.db.set_metadata(book_id, mi, ignore_errors=True)
+        session = self.session if self.session_maker else None
+        set_metadata_preserving_external_paths(self.db, session, book_id, mi, ignore_errors=True)
         logging.info(_("自动更新书籍 id=[%d] 的信息，title=%s"), book_id, mi.title)
         return True
 
