@@ -13,6 +13,10 @@ from webserver.i18n import _
 from webserver.models import Item, ScanFile
 from webserver.services import AsyncService
 from webserver.services.autofill import AutoFillService
+from webserver.services.external_index import (
+    EXTERNAL_INDEX_FLAG,
+    add_external_index_record,
+)
 
 
 CONF = loader.get_settings()
@@ -396,18 +400,51 @@ class ScanService(AsyncService):
         if import_mode == IMPORT_MODE_MOVE and delete_source:
             self._delete_source_after_import(row, fpath, fmt)
 
-    def _mark_indexed(self, row, fpath, fmt, import_id, same_author_book_id=None):
+    def _ensure_indexed_item(self, book_id, user_id, fpath):
+        item = self.session.query(Item).filter(Item.book_id == book_id).first()
+        if not item:
+            item = Item()
+            item.book_id = book_id
+            item.collector_id = user_id
+            try:
+                item.create_time = self.db.new_api.field_for("timestamp", book_id)
+            except Exception:
+                pass
+            self.session.add(item)
+        item.src_path = os.path.realpath(os.path.abspath(fpath))
+        return item
+
+    def _mark_indexed(self, row, mi, fpath, fmt, import_id, user_id, same_author_book_id=None):
+        try:
+            book_id, created = add_external_index_record(
+                self.db,
+                self.session,
+                mi,
+                fpath,
+                fmt,
+                existing_book_id=same_author_book_id,
+            )
+        except Exception as err:
+            logging.exception("index external book failed: %s", err)
+            row.status = ScanFile.FAILED
+            self._set_row_data(row, import_mode=IMPORT_MODE_INDEX, index_error=str(err))
+            self.save_or_rollback(row)
+            return False
+
         row.import_id = import_id
-        row.book_id = same_author_book_id or 0
+        row.book_id = book_id
         row.status = ScanFile.INDEXED
+        self._ensure_indexed_item(book_id, user_id, fpath)
         self._set_row_data(
             row,
             import_mode=IMPORT_MODE_INDEX,
-            source_path=fpath,
+            source_path=os.path.realpath(os.path.abspath(fpath)),
             format=fmt.upper(),
-            index_note=_("仅索引模式未复制源文件到 Calibre 书库"),
+            created_book=created,
+            **{EXTERNAL_INDEX_FLAG: True},
+            index_note=_("仅索引模式已将原始文件路径写入 Calibre 书库"),
         )
-        self.save_or_rollback(row)
+        return self.save_or_rollback(row)
 
     @AsyncService.register_service
     def do_import(self, hashlist, user_id, delete_after=False, import_mode=None):
@@ -491,7 +528,7 @@ class ScanService(AsyncService):
                 if same_author_book_id and row.status != ScanFile.EXIST:
                     if import_mode == IMPORT_MODE_INDEX:
                         logging.info("index [%s] from %s with existing book %s", repr(mi.title), fpath, same_author_book_id)
-                        self._mark_indexed(row, fpath, fmt, import_id, same_author_book_id=same_author_book_id)
+                        self._mark_indexed(row, mi, fpath, fmt, import_id, user_id, same_author_book_id=same_author_book_id)
                         continue
 
                     # 同名同作者，添加格式到现有书籍
@@ -502,7 +539,7 @@ class ScanService(AsyncService):
                 elif row.status != ScanFile.EXIST:
                     if import_mode == IMPORT_MODE_INDEX:
                         logging.info("index [%s] from %s as new external file", repr(mi.title), fpath)
-                        self._mark_indexed(row, fpath, fmt, import_id)
+                        self._mark_indexed(row, mi, fpath, fmt, import_id, user_id)
                         continue
 
                     # 同名不同作者，导入为新书
@@ -527,7 +564,7 @@ class ScanService(AsyncService):
             else:
                 if import_mode == IMPORT_MODE_INDEX:
                     logging.info("index [%s] from %s", repr(mi.title), fpath)
-                    self._mark_indexed(row, fpath, fmt, import_id)
+                    self._mark_indexed(row, mi, fpath, fmt, import_id, user_id)
                     continue
 
                 logging.info("import [%s] from %s", repr(mi.title), fpath)

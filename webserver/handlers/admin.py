@@ -18,9 +18,10 @@ from webserver.base.trash_manager import TrashManager
 from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.i18n import _
-from webserver.models import Reader, ScanFile
+from webserver.models import Item, Reader, ScanFile
 from webserver.services.autofill import AutoFillService
 from webserver.services.batch_convert import BatchConvertService
+from webserver.services.external_index import delete_external_index_book_record, is_external_index_book
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
 from webserver.services.ssl_certificate import (
@@ -983,10 +984,18 @@ class AdminBookDelete(BaseHandler):
         deleted_count = 0
         for bid in idlist:
             try:
-                # 删除图书
-                self.db.delete_book(bid)
+                external_indexed = is_external_index_book(self.session, bid)
+                if external_indexed:
+                    delete_external_index_book_record(self.db, bid)
+                    self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
+                    self.session.query(Item).filter(Item.book_id == bid).delete()
+                    self.session.commit()
+                else:
+                    # 删除图书
+                    self.db.delete_book(bid)
                 deleted_count += 1
             except Exception as e:
+                self.session.rollback()
                 logging.error(f"Failed to delete book {bid}: {e}")
                 continue
 

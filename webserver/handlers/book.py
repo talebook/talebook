@@ -52,6 +52,12 @@ from webserver.services.booksource.metadata import (
     metadata_to_evidence,
 )
 from webserver.services.convert import CONVERSION_TARGETS, ConvertService
+from webserver.services.external_index import (
+    delete_external_index_book_record,
+    is_external_index_book,
+    remove_formats_preserving_external_files,
+    set_metadata_preserving_external_paths,
+)
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
 
@@ -827,7 +833,7 @@ class BookRefer(BaseHandler):
                     self.db.set_tags(book_id, mi.tags)
             mi.smart_update(refer_mi, replace_metadata=True)
 
-        self.db.set_metadata(book_id, mi)
+        set_metadata_preserving_external_paths(self.db, self.session, book_id, mi)
         if cover_fallback:
             return {
                 "err": "ok",
@@ -902,7 +908,7 @@ class BookEdit(BaseHandler):
         if "tags" in data and not data["tags"]:
             self.db.set_tags(bid, [])
 
-        self.db.set_metadata(bid, mi)
+        set_metadata_preserving_external_paths(self.db, self.session, bid, mi)
         return {"err": "ok", "msg": _("更新成功")}
 
     def upload_cover(self, bid):
@@ -981,7 +987,7 @@ class BookEdit(BaseHandler):
             mi.last_modified = datetime.utcnow()
 
             # 保存元数据
-            self.db.set_metadata(bid, mi)
+            set_metadata_preserving_external_paths(self.db, self.session, bid, mi)
 
             # 清除缓存，确保下次获取书籍信息时从数据库读取最新数据
             self.cache.invalidate()
@@ -1006,11 +1012,17 @@ class BookDelete(BaseHandler):
         if not can_manage or not (self.is_admin() or self.is_book_owner(bid, self.user_id())):
             return {"err": "permission", "msg": _("无权操作")}
 
-        self.db.delete_book(bid)
+        external_indexed = is_external_index_book(self.session, bid)
+        if external_indexed:
+            delete_external_index_book_record(self.db, bid)
+        else:
+            self.db.delete_book(bid)
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
         from webserver.models import ScanFile
 
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
+        if external_indexed:
+            self.session.query(Item).filter(Item.book_id == bid).delete()
         self.session.commit()
         self.add_msg("success", _("删除书籍《%s》") % book["title"])
         return {"err": "ok", "msg": _("删除成功")}
@@ -1060,6 +1072,8 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
             raise web.HTTPError(404, reason=_("%s格式无法下载" % fmt))
 
         path = book["fmt_%s" % fmt]
+        if not os.path.exists(path):
+            raise web.HTTPError(404, reason=_("格式文件不存在: %s") % path)
         book["fmt"] = fmt
         book["title"] = urllib.parse.quote_plus(book["title"])
         fname = "%(id)d-%(title)s.%(fmt)s" % book
@@ -2052,7 +2066,7 @@ class BookDeleteFormat(BaseHandler):
             return {"err": "last.format", "msg": _("书籍只有一个格式，无法刪除")}
 
         try:
-            self.cache.remove_formats({bid: [fmt.upper()]})
+            remove_formats_preserving_external_files(self.db, self.session, bid, [fmt.upper()])
             self.add_msg("success", _("删除书籍《%s》的%s格式") % (book["title"], fmt))
             return {"err": "ok", "msg": _("删除%s格式成功") % fmt}
         except Exception as e:
@@ -2140,7 +2154,7 @@ class BookSeparate(BaseHandler):
             self.session.add(item)
             self.session.commit()
 
-            self.cache.remove_formats({book_id: [fmt.upper()]})
+            remove_formats_preserving_external_files(self.db, self.session, book_id, [fmt.upper()])
 
             logging.info("[SEPARATE] Successfully separated format %s from book %d to new book %d", fmt, book_id, new_book_id)
             self.add_msg("success", _("成功将 %s 格式分离为新书籍") % fmt.upper())
