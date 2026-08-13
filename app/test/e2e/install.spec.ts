@@ -13,12 +13,25 @@ test.describe('Install Flow', () => {
     });
 
     test('Redirects to install page when not installed', async ({ page }) => {
+        const installRedirects: number[] = [];
+        const undefinedErrors: string[] = [];
+        const pageErrors: string[] = [];
+
+        page.on('console', message => {
+            const text = message.text();
+            if (/TypeError|Cannot read properties of undefined/.test(text)) undefinedErrors.push(text);
+        });
+        page.on('pageerror', error => pageErrors.push(error.message));
+
     // Log network requests
         page.on('response', response => {
             if (response.url().includes('/_nuxt/')) return;
             console.log(`<< ${response.status()} ${response.url()}`);
             if (response.status() >= 300 && response.status() < 400) {
                 console.log(`   -> Redirect to ${response.headers()['location']}`);
+                if ((response.headers()['location'] || '').includes('/install')) {
+                    installRedirects.push(response.status());
+                }
             }
         });
 
@@ -33,6 +46,11 @@ test.describe('Install Flow', () => {
     
         // Check install form
         await expect(page.getByText('安装 TaleBook')).toBeVisible();
+        await page.waitForLoadState('networkidle');
+
+        expect(installRedirects).toEqual([302]);
+        expect(undefinedErrors).toEqual([]);
+        expect(pageErrors).toEqual([]);
     });
 
     test('Install redirect uses 302, not a cacheable 301', async ({ page }) => {
@@ -89,5 +107,44 @@ test.describe('Install Flow', () => {
         // Should see homepage content
         // Mock server returns static title "Talebook Mock" regardless of what we submitted
         await expect(page.getByText('Talebook Mock').first()).toBeVisible();
+    });
+});
+
+test.describe('Private Library Access Gate', () => {
+    test.beforeEach(async ({ request }) => {
+        const response = await request.post(`${mockApi}/_test/reset`, {
+            data: { installed: true, inviteMode: true, invited: false }
+        });
+        expect(response.ok()).toBeTruthy();
+    });
+
+    test('redirects to the welcome page without corrupting bootstrap state', async ({ page }) => {
+        const undefinedErrors: string[] = [];
+        const consoleErrors: string[] = [];
+        const pageErrors: string[] = [];
+        const welcomeRedirects: number[] = [];
+
+        page.on('console', message => {
+            const text = message.text();
+            if (/TypeError|Cannot read properties of undefined/.test(text)) undefinedErrors.push(text);
+            if (message.type() === 'error' || /Hydration.*mismatch|Hydration completed/.test(text)) consoleErrors.push(text);
+        });
+        page.on('pageerror', error => pageErrors.push(error.message));
+        page.on('response', response => {
+            const location = response.headers()['location'] || '';
+            if (response.status() >= 300 && response.status() < 400 && location.includes('/welcome')) {
+                welcomeRedirects.push(response.status());
+            }
+        });
+
+        await page.goto('/');
+        await expect(page).toHaveURL(/\/welcome(?:\?|$)/, { timeout: 10000 });
+        await expect(page.getByText('请输入访问码').first()).toBeVisible();
+        await page.waitForLoadState('networkidle');
+
+        expect(welcomeRedirects).toEqual([302]);
+        expect(undefinedErrors).toEqual([]);
+        expect(consoleErrors).toEqual([]);
+        expect(pageErrors).toEqual([]);
     });
 });

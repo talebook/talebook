@@ -12,6 +12,8 @@ const MOCK_DIR = path.join(__dirname, 'e2e/mocks');
 // State
 let isInstalled = true;
 let isLoggedIn = true;
+let inviteMode = false;
+let isInvited = true;
 let demoMode = false;
 let showNetworkLibrary = true;
 let users = [];
@@ -110,6 +112,12 @@ const listThemes = () => builtinThemes.map(theme => ({
   active: activeThemeName === theme.name,
 }));
 
+const accessControlEnvelope = () => {
+  if (!isInstalled) return { err: 'not_installed', msg: 'System not installed' };
+  if (inviteMode && !isInvited) return { err: 'not_invited' };
+  return null;
+};
+
 const app = createApp();
 const router = createRouter();
 
@@ -131,6 +139,8 @@ router.post('/_test/reset', eventHandler(async (event) => {
     isInstalled = true;
   }
   isLoggedIn = body?.loggedIn !== false;
+  inviteMode = !!body?.inviteMode;
+  isInvited = body?.invited !== false;
   demoMode = !!(body && body.demoMode);
   showNetworkLibrary = body?.showNetworkLibrary !== false;
   console.log('[Mock] isInstalled set to:', isInstalled);
@@ -666,7 +676,7 @@ router.get('/media/audio/:editionId/chapter/:number.mp3', eventHandler((event) =
   });
 }));
 
-router.get('/api/user/info', eventHandler(() => ({
+router.get('/api/user/info', eventHandler(() => accessControlEnvelope() || ({
   err: 'ok',
   sys: {
     title: 'Talebook Mock',
@@ -702,7 +712,7 @@ router.get('/api/captcha/config', eventHandler(() => ({
   config: { enabled: false, scenes: {} },
 })));
 
-router.get('/api/user/messages', eventHandler(() => ({
+router.get('/api/user/messages', eventHandler(() => accessControlEnvelope() || ({
   err: 'ok',
   total: 0,
   messages: []
@@ -724,10 +734,14 @@ router.get('/get/thumb_60x80/:id', eventHandler(() => (
 
 router.get('/api/index', eventHandler(() => {
   console.log('[Mock] GET /api/index, isInstalled:', isInstalled);
-  if (!isInstalled) {
-    return { err: 'not_installed', msg: 'System not installed' };
-  }
+  const accessError = accessControlEnvelope();
+  if (accessError) return accessError;
   return readJson('api_index.json') || { err: 'error', msg: 'mock not found' };
+}));
+
+router.get('/api/welcome', eventHandler(() => {
+  if (!inviteMode || isInvited) return { err: 'free', msg: 'No invitation required' };
+  return { err: 'ok', msg: '', welcome: '请输入访问码' };
 }));
 
 router.post('/api/admin/install', eventHandler(async (event) => {
@@ -1293,7 +1307,7 @@ router.get('/api/network/save/status', eventHandler(() => {
 }));
 
 // Theme API — return empty state so layout doesn't open an error dialog
-router.get('/api/themes/active', eventHandler(() => ({
+router.get('/api/themes/active', eventHandler(() => accessControlEnvelope() || ({
   err: 'ok',
   theme: listThemes().find(theme => theme.active) || null,
 })));

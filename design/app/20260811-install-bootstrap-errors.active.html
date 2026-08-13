@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 安装态启动错误修复方案" />
+    <title>安装态保留安全状态并合并重复跳转 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg: #f3f6fa; --panel: #fff; --ink: #203047; --muted: #59697d; --line: #d6dfeb; --accent: #b54d23; --soft: #fff1e9; --ok: #176b4a; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: var(--bg); font: 15px/1.65 system-ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif; }
+      main { width: min(960px, calc(100% - 28px)); margin: 28px auto 56px; }
+      header, section { margin-bottom: 18px; padding: 24px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
+      h1 { margin: 0 0 8px; font-size: clamp(28px, 5vw, 44px); line-height: 1.15; }
+      h2 { margin: 0 0 12px; font-size: 22px; }
+      p { margin: 0 0 10px; }
+      ul, ol { margin: 8px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+      code { padding: 2px 5px; border-radius: 5px; background: #eef2f7; font-family: ui-monospace, monospace; }
+      .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+      .chip { padding: 5px 10px; border-radius: 999px; color: var(--muted); background: #edf2f7; font-size: 12px; font-weight: 700; }
+      .chip.status { color: var(--accent); background: var(--soft); }
+      .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      .step { padding: 16px; border: 1px solid var(--line); border-radius: 13px; }
+      .step strong { display: block; margin-bottom: 6px; color: var(--accent); }
+      .pending { color: var(--accent); font-weight: 700; }
+      .verified { color: var(--ok); font-weight: 700; }
+      @media (max-width: 680px) { main { margin-top: 14px; } header, section { padding: 20px; } .flow { grid-template-columns: 1fr; } }
+      @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+      @media print { body { background: #fff; } main { width: 100%; margin: 0; } header, section { break-inside: avoid; box-shadow: none; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>安装态保留安全状态并合并重复跳转</h1>
+        <p>后端尚未安装或私有图书馆尚未通过访问码时，前端应只发起一次有效导航，并在导航期间保持 Pinia 的安全默认配置，避免布局组件读取未定义字段。</p>
+        <div class="meta" aria-label="方案元信息">
+          <span class="chip status">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-11</span>
+          <span class="chip">所属模块：app</span>
+          <span class="chip">影响范围：启动状态、控制信封、安装与私有图书馆流程</span>
+          <span class="chip">需求来源：TB-17</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>1. 原始诉求</h2>
+        <p>安装页面出现多项 <code>Cannot read properties of undefined</code>，并反复输出 <code>[Talebook] Redirecting to /install</code>；补充条件为已启用“私有图书馆”模式。</p>
+      </section>
+
+      <section>
+        <h2>2. 目标与边界</h2>
+        <ul>
+          <li><code>not_installed</code> 与 <code>not_invited</code> 响应不得把 <code>store.sys</code> 或 <code>store.user</code> 替换为 <code>undefined</code>。</li>
+          <li>同一目标的并发控制信封只触发一次导航；已经位于目标页时不再导航或打印日志。</li>
+          <li>保持后端响应结构、302 跳转语义和安装表单行为不变。</li>
+          <li>本次不重构全部启动请求，也不改变主题或消息的加载时机。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>3. 现状与证据</h2>
+        <p><code>loadUserInfo()</code> 无条件调用 <code>login(rsp)</code>；而 <code>login()</code> 只判断响应对象存在，随后直接读取不存在的 <code>rsp.sys</code> 与 <code>rsp.user</code>。未安装时响应为 <code>not_installed</code>，私有图书馆未获访问许可时响应为 <code>not_invited</code>；布局、主题和页面请求会并发收到同类控制信封并各自调用导航。</p>
+      </section>
+
+      <section>
+        <h2>4. 方案</h2>
+        <div class="flow">
+          <div class="step"><strong>验证数据</strong>只有同时存在 <code>sys</code> 与 <code>user</code> 时才更新全局状态。</div>
+          <div class="step"><strong>合并导航</strong>按目标路径记录进行中的跳转，并跳过当前已到达的目标。</div>
+          <div class="step"><strong>真实回归</strong>让 mock 覆盖未安装态与私有图书馆访问门禁，断言各自只导航一次且无页面 TypeError。</div>
+        </div>
+      </section>
+
+      <section>
+        <h2>5. 影响与风险</h2>
+        <p>成功响应仍按原结构覆盖状态；错误响应改为保留默认值。去重只覆盖同一目标路径：到达目标后继续保留记录，离开该目标页时释放，因此后续真实状态变化仍可再次触发跳转。</p>
+      </section>
+
+      <section>
+        <h2>6. 测试结果</h2>
+        <ul class="verified">
+          <li><code>npx playwright test test/e2e/install.spec.ts --project=chromium</code>：4 项通过，覆盖安装态、302 语义、安装完成及私有图书馆访问门禁；两个异常态均无页面 TypeError。</li>
+          <li><code>npx vitest run test/stores/main.nuxt.spec.ts test/plugins/talebook.nuxt.spec.ts</code>：10 项通过；测试环境仍输出既有 Vuetify i18n 初始化警告。</li>
+          <li><code>npm run lint</code>：通过，0 error；仓库既有 193 条 warning。</li>
+          <li><code>npm run build</code>：生产构建通过；保留既有 Browserslist 数据与大 chunk 提示。</li>
+          <li><code>python3 scripts/check_design_docs.py</code>：以 ACTIVE 路径预检，102 份方案全部通过。</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
