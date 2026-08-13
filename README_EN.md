@@ -44,7 +44,7 @@ This project was previously named: calibre-webserver
 
 ## Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/talebook.svg)
 
-Deployment is relatively simple, it is recommended to use docker, image address: [dockerhub](https://hub.docker.com/r/talebook/talebook)
+Docker is the recommended deployment method. Images are published to both [Docker Hub](https://hub.docker.com/r/talebook/talebook) and [GitHub Container Registry](https://github.com/talebook/talebook/pkgs/container/talebook); pull them as `talebook/talebook` or `ghcr.io/talebook/talebook`, respectively.
 
 It is recommended to use `docker-compose`, download the configuration file [docker-compose.yml](docker-compose.yml) from the repository, and then execute the command to start.
 If you want to modify the mounted directories or ports, please modify the docker-compose.yml file.

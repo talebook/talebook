@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Talebook 同步发布 Docker Hub 与 GitHub Container Registry 镜像的内部方案。">
+  <link rel="icon" href="data:,">
+  <title>同步发布 Talebook GHCR 镜像 · ACTIVE</title>
+  <style>
+    :root { color-scheme: light; --ink:#172033; --muted:#607086; --line:#d8e0eb; --paper:#f5f8fc; --accent:#4056b4; --accent-bg:#edf0ff; --warn:#8a5511; --warn-bg:#fff5df; --ok:#176b49; --ok-bg:#e8f6ef; --code:#eef2f7; }
+    * { box-sizing: border-box; }
+    body { margin:0; padding:42px 20px 72px; color:var(--ink); background:linear-gradient(135deg,#f9fbff,var(--paper)); font:16px/1.68 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width:980px; margin:0 auto; }
+    header,section { margin-bottom:18px; padding:26px; background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:0 10px 26px rgba(32,48,78,.06); }
+    h1 { margin:0 0 12px; font-size:clamp(30px,5vw,46px); line-height:1.16; }
+    h2 { margin:0 0 14px; font-size:22px; line-height:1.3; }
+    p { margin:0 0 12px; } p:last-child { margin-bottom:0; }
+    code { padding:2px 5px; border-radius:4px; background:var(--code); font-size:.9em; overflow-wrap:anywhere; }
+    ul { margin:10px 0 0 22px; padding:0; } li+li { margin-top:6px; }
+    table { width:100%; margin-top:12px; border-collapse:collapse; background:#fff; }
+    th,td { padding:11px 12px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); background:#f5f7fb; font-size:13px; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px 16px; color:var(--muted); font-size:13px; }
+    .status { color:var(--warn); font-weight:800; }
+    .summary { padding:16px 18px; background:var(--accent-bg); border-left:4px solid var(--accent); }
+    .request { padding:14px 16px; background:var(--warn-bg); border-left:4px solid var(--warn); }
+    .decision { padding:14px 16px; background:var(--ok-bg); border-left:4px solid var(--ok); }
+    @media(max-width:680px){ body{padding:18px 12px 46px} header,section{padding:20px;border-radius:11px} table{display:block;overflow-x:auto} }
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+    @media print{body{background:#fff;padding:0}header,section{box-shadow:none;break-inside:avoid}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>同步发布 Talebook GHCR 镜像</h1>
+    <p class="summary">在保留 Docker Hub 发布契约的同时，把同一次多架构构建产物推送到 <code>ghcr.io/talebook/talebook</code>，不重复执行耗时的镜像构建。</p>
+    <div class="meta">
+      <span>创建日期：2026-08-13</span><span>所属模块：project</span><span>状态：<b class="status">ACTIVE</b></span><span>影响范围：GitHub Actions / 镜像发布</span><span>需求来源：TB-37</span>
+    </div>
+  </header>
+  <section>
+    <h2>1. 原始诉求</h2>
+    <div class="request">“给 talebook 项目增加 ghcr 镜像。”</div>
+    <p>当前 <code>.github/workflows/build.yml</code> 只登录 Docker Hub，并把 SPA、SSR 和开发镜像发布到 <code>docker.io/talebook/talebook</code>。仓库 workflow 已具有 <code>packages: write</code> 权限，但没有使用 GitHub 提供的令牌发布 GHCR。</p>
+  </section>
+  <section>
+    <h2>2. 目标与边界</h2>
+    <table>
+      <thead><tr><th>类型</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>目标</td><td>push 与版本 tag 发布时，同步产生 <code>ghcr.io/talebook/talebook</code> 的 SPA、SSR 与 <code>dev</code> 镜像。</td></tr>
+        <tr><td>目标</td><td>GHCR 沿用 Docker Hub 的 tag 和多架构集合，用户切换 registry 时无需改变 tag 语义。</td></tr>
+        <tr><td>保持不变</td><td>PR 只构建不推送；Docker Hub 主镜像与兼容别名 <code>talebook/calibre-webserver</code> 继续发布。</td></tr>
+        <tr><td>非目标</td><td>不迁移或删除 Docker Hub 镜像，不改变 Dockerfile、运行时内容与 Compose 默认镜像。</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <section>
+    <h2>3. 方案</h2>
+    <p class="decision"><strong>结论：</strong>每个平台的 Buildx action 增加第二个 registry exporter，将相同构建结果按 digest 推送到 Docker Hub 和 GHCR；merge job 再分别从两个 registry 的 digest 创建同构 multi-arch manifest。</p>
+    <ul>
+      <li>增加 <code>GHCR_REGISTRY=ghcr.io</code>，镜像名继续取 <code>github.repository</code>，从而自然得到 <code>ghcr.io/talebook/talebook</code>。</li>
+      <li>build 与 merge job 使用 <code>github.actor</code> 和短期 <code>GITHUB_TOKEN</code> 登录 GHCR，权限限定为现有的 <code>packages: write</code>。</li>
+      <li>SPA、SSR 的单架构产物一次构建、双 registry 输出；manifest 脚本循环 registry，分别引用各自 registry 内的 digest。</li>
+      <li><code>dev</code> target 仍只在 master push 时发布，但一次为 Docker Hub 与 GHCR 打两个 tag。</li>
+      <li>把 <code>.github/workflows/build.yml</code> 纳入 Docker 路径过滤，确保发布配置自身变化会触发构建验证。</li>
+    </ul>
+    <table>
+      <thead><tr><th>触发</th><th>GHCR SPA</th><th>GHCR SSR</th><th>GHCR dev</th></tr></thead>
+      <tbody>
+        <tr><td>版本 tag <code>v*</code></td><td><code>latest</code>、版本号</td><td><code>server-side-render</code>、带版本号 tag</td><td>不变更</td></tr>
+        <tr><td><code>master</code> push</td><td><code>master</code></td><td><code>server-side-render</code></td><td><code>dev</code></td></tr>
+        <tr><td>受支持开发分支 push</td><td>安全化分支名</td><td>带安全化分支名 tag</td><td>不发布</td></tr>
+        <tr><td>pull request</td><td>不推送</td><td>不推送</td><td>只验证构建、不推送</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <section>
+    <h2>4. 风险与回滚</h2>
+    <ul>
+      <li>首次发布依赖组织允许仓库的 <code>GITHUB_TOKEN</code> 创建或写入 package；真实权限边界需由 GitHub Actions 验证。</li>
+      <li>双 registry 推送增加上传时间和存储占用，但不会重复运行 Dockerfile 构建阶段。</li>
+      <li>任一 registry 推送失败会令发布 job 失败，避免两个来源悄然产生不同版本。</li>
+      <li>回滚可移除 GHCR 登录、第二 exporter、第二 manifest 循环目标和 dev 的 GHCR tag，不涉及镜像内容或数据迁移。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>5. 测试计划与结果</h2>
+    <table>
+      <thead><tr><th>验证项</th><th>当前结果</th></tr></thead>
+      <tbody>
+        <tr><td><code>PYTHONPATH=.tools/python-packages python3 -m pytest tests/test_dev_container_workflow.py -q</code></td><td>通过：3 passed，覆盖登录凭据、双 exporter、manifest registry 循环与 dev tags。</td></tr>
+        <tr><td><code>PYTHONPATH=.tools/python-packages python3 -m pytest tests/test_dev_container_workflow.py tests/test_ci_workflow.py tests/test_agent_workflows.py tests/test_claude_review_workflow.py -q</code></td><td>通过：8 passed，覆盖仓库现有 workflow 核心回归。</td></tr>
+        <tr><td><code>act pull_request -W .github/workflows/build.yml -j build -e event.json --pull=false --matrix platform:linux/amd64</code></td><td>受环境限制：使用 act 0.2.89 执行真实 workflow；<code>changes</code>、<code>prepare</code>、QEMU、Buildx 和 PR 的 <code>type=image,push=false</code> 输出均成功，两个 registry 登录按预期跳过。随后 <code>docker/build-push-action@v5</code> 两次在拉取 <code>docker/dockerfile:1.6</code> 时遇到 Docker Hub 网络超时，未完成 SPA/SSR 构建。合并前必须以真实 GitHub Actions 的 PR build 成功作为门禁。</td></tr>
+        <tr><td><code>make check-design</code> 与 <code>git diff --check</code></td><td>通过：方案文档结构、单文件资源约束及空白检查均通过。</td></tr>
+        <tr><td>真实 push/tag 发布</td><td>本地不能安全模拟 GitHub package 写入；PR 合并后的 Actions 是 GHCR 权限与远端 manifest 的最终验收边界。</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>
