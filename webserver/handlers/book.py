@@ -1633,9 +1633,9 @@ class BookUploadComplete(BookUploadBase):
 
 
 class BookRead(BaseHandler):
-    def render_epub(self, book, is_ready, audiobook_edition=None):
+    def render_epub(self, book, is_ready, audiobook_edition=None, viewer=None):
         return self.html_page(
-            "book/" + CONF["EPUB_VIEWER"],
+            "book/" + (viewer or CONF["EPUB_VIEWER"]),
             {
                 "book": book,
                 "epub_dir": "/get/extract/%s" % book["id"],
@@ -1661,7 +1661,11 @@ class BookRead(BaseHandler):
         self.user_history("read_history", book)
         self.count_increase(book_id, count_download=1)
 
-        if self.get_argument("reader", "") == "readest":
+        requested_reader = self.get_argument("reader", "")
+        use_readest = requested_reader == "readest" or (
+            not requested_reader and CONF["EPUB_VIEWER"] == "readest"
+        )
+        if use_readest:
             if book.get("fmt_epub"):
                 revision = reader_resource_revision(book["fmt_epub"])
                 resource_url = "/read/resource/%d.epub?revision=%s" % (book_id, revision)
@@ -1688,6 +1692,13 @@ class BookRead(BaseHandler):
             )
 
         if book.get("fmt_epub"):
+            if requested_reader == "candle":
+                return self.render_epub(
+                    book,
+                    is_ready=True,
+                    audiobook_edition=audiobook_edition,
+                    viewer="creader.html",
+                )
             return self.render_epub(book, is_ready=True, audiobook_edition=audiobook_edition)
 
         if "fmt_pdf" in book:

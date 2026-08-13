@@ -36,6 +36,19 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertEqual(response.code, 200)
         self.assertIn(b"candle-reader", response.body)
 
+    def test_readest_can_be_selected_as_default_reader(self):
+        with mock.patch.dict(CONF, {"EPUB_VIEWER": "readest"}):
+            response = self.fetch("/read/%d" % BID_EPUB, follow_redirects=False)
+        self.assertEqual(response.code, 302)
+        location = urllib.parse.urlsplit(response.headers["Location"])
+        self.assertEqual(location.path, "/readest/reader.html")
+
+    def test_explicit_candle_overrides_readest_default(self):
+        with mock.patch.dict(CONF, {"EPUB_VIEWER": "readest"}):
+            response = self.fetch("/read/%d?reader=candle" % BID_EPUB)
+        self.assertEqual(response.code, 200)
+        self.assertIn(b"candle-reader", response.body)
+
     def test_bootstrap_and_resource_support_epub_range_and_cache_revocation(self):
         bootstrap = self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB)
         self.assertEqual(bootstrap.code, 200)
