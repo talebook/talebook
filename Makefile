@@ -1,4 +1,4 @@
-.PHONY: all build test check-design update-readest-reader
+.PHONY: all build test check-design
 
 VER = $(shell git branch --show-current | tr '/' '-')
 IMAGE = talebook/talebook:$(VER)
@@ -6,7 +6,6 @@ REPO1 := talebook/talebook:latest
 REPO2 := talebook/calibre-webserver:latest
 TAG1 := talebook/talebook:server-side-render
 TAG2 = talebook/talebook:server-side-render-$(VER)
-MOKE_DIR ?= ../moke
 
 all: lint-py-fix build up
 
@@ -14,10 +13,6 @@ init:
 	pip3 install -r requirements.txt -r requirements-test.txt
 	#python3 -m pip install --upgrade pip
 	#uv sync
-
-update-readest-reader:
-	cd $(MOKE_DIR) && pnpm build:talebook-reader
-	python3 scripts/update_readest_reader.py $(MOKE_DIR)/readest/out/talebook-reader
 
 build: test build-spa build-ssr
 

@@ -25,7 +25,7 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertEqual(response.code, 302)
         location = urllib.parse.urlsplit(response.headers["Location"])
         query = urllib.parse.parse_qs(location.query)
-        self.assertEqual(location.path, "/static/reader/reader.html")
+        self.assertEqual(location.path, "/readest/reader.html")
         self.assertEqual(query["moke"], ["1"])
         self.assertEqual(query["mokeBookId"], [str(BID_EPUB)])
         self.assertEqual(query["mokeReturnTo"], ["/book/%d" % BID_EPUB])
@@ -176,12 +176,10 @@ class TestReadestEmbed(TestWithUserLogin):
     def test_embed_static_deployment_contract_has_csp_and_cache_boundaries(self):
         nginx = (Path(__file__).parents[1] / "conf" / "nginx" / "talebook.conf").read_text(encoding="utf-8")
         nuxt = (Path(__file__).parents[1] / "app" / "nuxt.config.ts").read_text(encoding="utf-8")
-        dockerfile = (Path(__file__).parents[1] / "Dockerfile").read_text(encoding="utf-8")
-        self.assertIn("location = /static/reader/reader.html", nginx)
+        self.assertIn("location = /readest/reader.html", nginx)
         self.assertIn("Content-Security-Policy", nginx)
         self.assertIn("immutable", nginx)
-        self.assertIn("/static/reader/**", nuxt)
-        self.assertIn("static/reader/reader.html", dockerfile)
+        self.assertIn("/readest/**", nuxt)
 
     def test_missing_book_and_unsupported_engine(self):
         self.assertEqual(self.fetch("/read/resource/999999.epub").code, 404)

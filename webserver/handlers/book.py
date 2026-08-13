@@ -1673,7 +1673,7 @@ class BookRead(BaseHandler):
                         "mokeReturnTo": "/book/%d" % book_id,
                     }
                 )
-                return self.redirect("/static/reader/reader.html?%s" % reader_query)
+                return self.redirect("/readest/reader.html?%s" % reader_query)
             if ConvertService().is_book_converting(book):
                 self.set_status(409)
                 error = "reader.conversion_pending"
