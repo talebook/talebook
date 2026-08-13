@@ -1,0 +1,60 @@
+{
+  "schema": "readest.talebook-embed.baseline.v1",
+  "readestCommit": "d335c688682f04b3581ba26390008788c9339789",
+  "capabilities": {
+    "readerCore": true,
+    "localSettings": true,
+    "library": false,
+    "account": false,
+    "auth": false,
+    "cloud": false,
+    "sync": false,
+    "payment": false,
+    "upgrade": false,
+    "updater": false,
+    "send": false,
+    "rss": false,
+    "opds": false,
+    "integrations": false,
+    "telemetry": false,
+    "aiAssistant": false,
+    "reedy": false,
+    "readestGateway": false,
+    "tauri": false
+  },
+  "totals": {
+    "raw": 414916,
+    "gzip": 153689,
+    "brotli": 134444
+  },
+  "files": [
+    {
+      "file": ".vite/manifest.json",
+      "sha256": "1d339bb55e54faeb109d507d373c205506a87b68f73a01970f75f1ef660aa680",
+      "raw": 185,
+      "gzip": 143,
+      "brotli": 119
+    },
+    {
+      "file": "assets/index-BRoB0_9-.js",
+      "sha256": "e6a0d64e05ff32a42bce36c7b10a9dc38cf7e2d7fa76c136cb00c71c934fa0c2",
+      "raw": 412857,
+      "gzip": 152598,
+      "brotli": 133625
+    },
+    {
+      "file": "assets/index-Dp-sPEoH.css",
+      "sha256": "48c73f9ab7d8523d1047de58609c940f2a31ddfef83ac0893a2d8b48cdc86eab",
+      "raw": 1371,
+      "gzip": 654,
+      "brotli": 513
+    },
+    {
+      "file": "index.html",
+      "sha256": "bb9fbdc2f4c77a71caef42955314347de894128abead74a5d7e9c59a62c3571d",
+      "raw": 503,
+      "gzip": 294,
+      "brotli": 187
+    }
+  ]
+}
