@@ -22,9 +22,59 @@ permissions:
 
 jobs:
   # ----------------------------------------
+  # 只在 Docker 镜像输入发生变化时继续重型构建。
+  # 文档、方案、测试夹具等纯仓库维护改动不需要重新构建并推送镜像。
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      docker: ${{ steps.decide.outputs.docker }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Filter Docker build inputs
+        id: filter
+        if: github.ref_type != 'tag'
+        uses: dorny/paths-filter@v3
+        with:
+          base: ${{ github.event_name == 'push' && github.event.before || '' }}
+          filters: |
+            docker:
+              - 'app/**'
+              - 'webserver/**'
+              - 'conf/nginx/**'
+              - 'conf/supervisor/**'
+              - 'docker/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'Makefile'
+              - 'server.py'
+              - 'requirements.txt'
+              - 'requirements-test.txt'
+              - 'docker-compose.yml'
+              - 'docker-compose.dev.yml'
+
+      - name: Decide Docker build
+        id: decide
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          DOCKER_CHANGED: ${{ steps.filter.outputs.docker }}
+        run: |
+          if [[ "$REF_TYPE" == "tag" || "$DOCKER_CHANGED" == "true" ]]; then
+            echo "docker=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docker=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ----------------------------------------
   # 计算构建矩阵与公共构建参数。
   # PR 只构 linux/amd64；push/tag 构建全部架构，每个架构一个独立 job。
   prepare:
+    needs: changes
+    if: ${{ needs.changes.outputs.docker == 'true' }}
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
