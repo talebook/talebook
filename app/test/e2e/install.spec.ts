@@ -108,6 +108,35 @@ test.describe('Install Flow', () => {
         // Mock server returns static title "Talebook Mock" regardless of what we submitted
         await expect(page.getByText('Talebook Mock').first()).toBeVisible();
     });
+
+    test('Can complete installation with private library enabled', async ({ page }) => {
+        let installPostData = '';
+        page.on('request', request => {
+            if (request.url().includes('/api/admin/install')) {
+                installPostData = request.postData() || '';
+            }
+        });
+
+        await page.goto('/install');
+
+        await page.getByLabel('网站标题').fill('Private TaleBook');
+        await page.getByLabel('管理员用户名').fill('admin');
+        await page.getByLabel('管理员登录密码').fill('password123');
+        await page.getByLabel('管理员Email').fill('admin@example.com');
+        await page.getByLabel('开启私人图书馆模式').check();
+        await page.getByLabel('访问码').fill('private-code');
+
+        await page.getByRole('button', { name: '完成设置' }).click();
+
+        await expect(page.getByText('配置写入成功')).toBeVisible({ timeout: 5000 });
+        await expect(page.getByText('API服务正常')).toBeVisible({ timeout: 10000 });
+        await expect(page).toHaveURL('/', { timeout: 15000 });
+        await expect(page.getByText('Talebook Mock').first()).toBeVisible();
+
+        const params = new URLSearchParams(installPostData);
+        expect(params.get('invite')).toBe('true');
+        expect(params.get('code')).toBe('private-code');
+    });
 });
 
 test.describe('Private Library Access Gate', () => {
