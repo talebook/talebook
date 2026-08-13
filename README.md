@@ -108,7 +108,7 @@ Skill 会在写入前确认目标与权限，对管理员写入、删除和批�
 
 ## Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/talebook.svg)
 
-部署比较简单，建议采用docker，镜像地址：[dockerhub](https://hub.docker.com/r/talebook/talebook)
+部署比较简单，建议采用 Docker。镜像同时发布到 [Docker Hub](https://hub.docker.com/r/talebook/talebook) 和 [GitHub Container Registry](https://github.com/talebook/talebook/pkgs/container/talebook)，可分别使用 `talebook/talebook` 或 `ghcr.io/talebook/talebook` 拉取。
 
 推荐使用`docker-compose`，下载仓库中的配置文件[docker-compose.yml](docker-compose.yml)，然后执行命令启动即可。
 若希望修改挂载的目录或端口，请修改docker-compose.yml文件。

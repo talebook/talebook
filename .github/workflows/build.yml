@@ -15,6 +15,7 @@ on:
 
 env:
   REGISTRY: docker.io
+  GHCR_REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 permissions:
@@ -56,6 +57,7 @@ jobs:
               - 'requirements-test.txt'
               - 'docker-compose.yml'
               - 'docker-compose.dev.yml'
+              - '.github/workflows/build.yml'
 
       - name: Decide Docker build
         id: decide
@@ -145,16 +147,30 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set build outputs
         id: out
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "value=type=image,push=false" >> $GITHUB_OUTPUT
           else
-            echo "value=type=image,name=${REGISTRY}/${IMAGE_NAME},push-by-digest=true,name-canonical=true,push=true" >> $GITHUB_OUTPUT
+            {
+              echo "value<<EOF"
+              echo "type=image,name=${REGISTRY}/${IMAGE_NAME},push-by-digest=true,name-canonical=true,push=true"
+              echo "type=image,name=${GHCR_REGISTRY}/${IMAGE_NAME},push-by-digest=true,name-canonical=true,push=true"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           fi
         env:
           REGISTRY: ${{ env.REGISTRY }}
+          GHCR_REGISTRY: ${{ env.GHCR_REGISTRY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
 
       - name: Build SPA
@@ -192,7 +208,9 @@ jobs:
           platforms: linux/amd64
           provenance: false
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+            ${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}:dev
           labels: org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=dev-linux-amd64
           cache-to: type=gha,scope=dev-linux-amd64,mode=max
@@ -241,57 +259,70 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # SPA 镜像：talebook/talebook:latest / <ver> / master / <branch>，
-      # 以及 calibre-webserver:latest / master（仅 talebook/talebook 仓库）
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # SPA 镜像：两个 registry 中的 talebook/talebook:latest / <ver> / master / <branch>，
+      # 以及 Docker Hub 的 calibre-webserver:latest / master（仅 talebook/talebook 仓库）
       - name: Create SPA manifest
         run: |
-          IMAGE="${REGISTRY}/${IMAGE_NAME}"
-          TAGS=()
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            TAGS+=("-t" "${IMAGE}:latest" "-t" "${IMAGE}:${GITHUB_REF_NAME}")
-          fi
-          if [[ "$GITHUB_REF" == "refs/heads/master" ]]; then
-            TAGS+=("-t" "${IMAGE}:master")
-          fi
-          if [[ "$GITHUB_REF" == refs/heads/dev/* || "$GITHUB_REF" == refs/heads/claude/* || "$GITHUB_REF" == refs/heads/codex/* ]]; then
-            TAGS+=("-t" "${IMAGE}:${SAFE_REF_NAME}")
-          fi
-          if [[ "$GITHUB_REPOSITORY" == "talebook/talebook" ]]; then
+          for TARGET_REGISTRY in "$REGISTRY" "$GHCR_REGISTRY"; do
+            IMAGE="${TARGET_REGISTRY}/${IMAGE_NAME}"
+            TAGS=()
             if [[ $GITHUB_REF == refs/tags/* ]]; then
-              TAGS+=("-t" "${REGISTRY}/talebook/calibre-webserver:latest")
+              TAGS+=("-t" "${IMAGE}:latest" "-t" "${IMAGE}:${GITHUB_REF_NAME}")
             fi
             if [[ "$GITHUB_REF" == "refs/heads/master" ]]; then
-              TAGS+=("-t" "${REGISTRY}/talebook/calibre-webserver:master")
+              TAGS+=("-t" "${IMAGE}:master")
             fi
-          fi
-          if [[ ${#TAGS[@]} -eq 0 ]]; then echo "No SPA tags for this ref, skip."; exit 0; fi
-          SRCS=()
-          for f in /tmp/digests/spa/*; do SRCS+=("${IMAGE}@$(cat "$f")"); done
-          docker buildx imagetools create "${TAGS[@]}" "${SRCS[@]}"
+            if [[ "$GITHUB_REF" == refs/heads/dev/* || "$GITHUB_REF" == refs/heads/claude/* || "$GITHUB_REF" == refs/heads/codex/* ]]; then
+              TAGS+=("-t" "${IMAGE}:${SAFE_REF_NAME}")
+            fi
+            if [[ "$TARGET_REGISTRY" == "$REGISTRY" && "$GITHUB_REPOSITORY" == "talebook/talebook" ]]; then
+              if [[ $GITHUB_REF == refs/tags/* ]]; then
+                TAGS+=("-t" "${REGISTRY}/talebook/calibre-webserver:latest")
+              fi
+              if [[ "$GITHUB_REF" == "refs/heads/master" ]]; then
+                TAGS+=("-t" "${REGISTRY}/talebook/calibre-webserver:master")
+              fi
+            fi
+            if [[ ${#TAGS[@]} -eq 0 ]]; then continue; fi
+            SRCS=()
+            for f in /tmp/digests/spa/*; do SRCS+=("${IMAGE}@$(cat "$f")"); done
+            docker buildx imagetools create "${TAGS[@]}" "${SRCS[@]}"
+          done
         env:
           REGISTRY: ${{ env.REGISTRY }}
+          GHCR_REGISTRY: ${{ env.GHCR_REGISTRY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           SAFE_REF_NAME: ${{ needs.prepare.outputs.safe_ref_name }}
 
-      # SSR 镜像：talebook/talebook:server-side-render / server-side-render-<ver|branch>
+      # 两个 registry 的 SSR 镜像：server-side-render / server-side-render-<ver|branch>
       - name: Create SSR manifest
         run: |
-          IMAGE="${REGISTRY}/${IMAGE_NAME}"
-          TAGS=()
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            TAGS+=("-t" "${IMAGE}:server-side-render" "-t" "${IMAGE}:server-side-render-${GITHUB_REF_NAME}")
-          fi
-          if [[ "$GITHUB_REF" == "refs/heads/master" ]]; then
-            TAGS+=("-t" "${IMAGE}:server-side-render")
-          fi
-          if [[ "$GITHUB_REF" == refs/heads/dev/* || "$GITHUB_REF" == refs/heads/claude/* || "$GITHUB_REF" == refs/heads/codex/* ]]; then
-            TAGS+=("-t" "${IMAGE}:server-side-render-${SAFE_REF_NAME}")
-          fi
-          if [[ ${#TAGS[@]} -eq 0 ]]; then echo "No SSR tags for this ref, skip."; exit 0; fi
-          SRCS=()
-          for f in /tmp/digests/ssr/*; do SRCS+=("${IMAGE}@$(cat "$f")"); done
-          docker buildx imagetools create "${TAGS[@]}" "${SRCS[@]}"
+          for TARGET_REGISTRY in "$REGISTRY" "$GHCR_REGISTRY"; do
+            IMAGE="${TARGET_REGISTRY}/${IMAGE_NAME}"
+            TAGS=()
+            if [[ $GITHUB_REF == refs/tags/* ]]; then
+              TAGS+=("-t" "${IMAGE}:server-side-render" "-t" "${IMAGE}:server-side-render-${GITHUB_REF_NAME}")
+            fi
+            if [[ "$GITHUB_REF" == "refs/heads/master" ]]; then
+              TAGS+=("-t" "${IMAGE}:server-side-render")
+            fi
+            if [[ "$GITHUB_REF" == refs/heads/dev/* || "$GITHUB_REF" == refs/heads/claude/* || "$GITHUB_REF" == refs/heads/codex/* ]]; then
+              TAGS+=("-t" "${IMAGE}:server-side-render-${SAFE_REF_NAME}")
+            fi
+            if [[ ${#TAGS[@]} -eq 0 ]]; then continue; fi
+            SRCS=()
+            for f in /tmp/digests/ssr/*; do SRCS+=("${IMAGE}@$(cat "$f")"); done
+            docker buildx imagetools create "${TAGS[@]}" "${SRCS[@]}"
+          done
         env:
           REGISTRY: ${{ env.REGISTRY }}
+          GHCR_REGISTRY: ${{ env.GHCR_REGISTRY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           SAFE_REF_NAME: ${{ needs.prepare.outputs.safe_ref_name }}

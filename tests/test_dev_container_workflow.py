@@ -19,7 +19,8 @@ def workflow_step(job, name):
 
 
 def test_build_workflow_only_publishes_the_validated_dev_image_from_master():
-    build_job = workflow("build.yml")["jobs"]["build"]
+    build_workflow = workflow("build.yml")
+    build_job = build_workflow["jobs"]["build"]
     step = workflow_step(build_job, "Build development image")
 
     assert step["if"] == (
@@ -32,8 +33,44 @@ def test_build_workflow_only_publishes_the_validated_dev_image_from_master():
     assert step["with"]["push"] == (
         "${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}"
     )
-    assert step["with"]["tags"] == "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev"
+    assert step["with"]["tags"].splitlines() == [
+        "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev",
+        "${{ env.GHCR_REGISTRY }}/${{ env.IMAGE_NAME }}:dev",
+    ]
     assert step["with"]["labels"] == "org.opencontainers.image.revision=${{ github.sha }}"
+
+
+def test_build_workflow_publishes_docker_hub_and_ghcr_from_the_same_build():
+    build_workflow = workflow("build.yml")
+    jobs = build_workflow["jobs"]
+    build = jobs["build"]
+    merge = jobs["merge"]
+
+    assert build_workflow["env"] == {
+        "REGISTRY": "docker.io",
+        "GHCR_REGISTRY": "ghcr.io",
+        "IMAGE_NAME": "${{ github.repository }}",
+    }
+
+    for job in (build, merge):
+        login = workflow_step(job, "Log in to GitHub Container Registry")
+        assert login["uses"] == "docker/login-action@v3"
+        assert login["with"] == {
+            "registry": "${{ env.GHCR_REGISTRY }}",
+            "username": "${{ github.actor }}",
+            "password": "${{ secrets.GITHUB_TOKEN }}",
+        }
+
+    outputs = workflow_step(build, "Set build outputs")
+    assert "type=image,name=${REGISTRY}/${IMAGE_NAME}" in outputs["run"]
+    assert "type=image,name=${GHCR_REGISTRY}/${IMAGE_NAME}" in outputs["run"]
+    assert outputs["env"]["GHCR_REGISTRY"] == "${{ env.GHCR_REGISTRY }}"
+
+    for name in ("Create SPA manifest", "Create SSR manifest"):
+        manifest = workflow_step(merge, name)
+        assert 'for TARGET_REGISTRY in "$REGISTRY" "$GHCR_REGISTRY"' in manifest["run"]
+        assert 'SRCS+=("${IMAGE}@$(cat "$f")")' in manifest["run"]
+        assert manifest["env"]["GHCR_REGISTRY"] == "${{ env.GHCR_REGISTRY }}"
 
 
 def test_build_workflow_filters_docker_jobs_to_image_inputs():
@@ -67,6 +104,7 @@ def test_build_workflow_filters_docker_jobs_to_image_inputs():
             "requirements-test.txt",
             "docker-compose.yml",
             "docker-compose.dev.yml",
+            ".github/workflows/build.yml",
         ]
     }
 
