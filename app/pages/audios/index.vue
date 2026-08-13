@@ -22,8 +22,18 @@
             </div>
             <div class="hero-actions">
                 <v-btn
+                    v-if="store.user.is_login"
                     color="amber-lighten-2"
                     variant="flat"
+                    prepend-icon="mdi-plus"
+                    to="/audios/create"
+                    data-testid="create-audiobook-entry"
+                >
+                    {{ t('audiobook.createAudiobook') }}
+                </v-btn>
+                <v-btn
+                    color="amber-lighten-2"
+                    variant="outlined"
                     prepend-icon="mdi-rss"
                     @click="openPodcast"
                 >
@@ -147,7 +157,22 @@
                     icon="mdi-book-music-outline"
                     :title="t('audiobook.emptyTitle')"
                     :text="t('audiobook.emptyDescription')"
-                />
+                >
+                    <template
+                        v-if="store.user.is_login"
+                        #actions
+                    >
+                        <v-btn
+                            color="primary"
+                            variant="flat"
+                            prepend-icon="mdi-plus"
+                            to="/audios/create"
+                            data-testid="create-audiobook-empty"
+                        >
+                            {{ t('audiobook.createAudiobook') }}
+                        </v-btn>
+                    </template>
+                </v-empty-state>
             </section>
         </template>
 

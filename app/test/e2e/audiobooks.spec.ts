@@ -14,10 +14,12 @@ test.describe('Audiobook production and playback', () => {
 
     test('marks audiobook navigation and pages as Beta', async ({ page }) => {
         await page.goto('/audios');
-        const audiobookNav = page.locator('nav a[href="/audios"]');
-        await expect(audiobookNav.locator('.v-list-item-title')).toHaveText('有声书');
-        await expect(audiobookNav.getByTestId('audiobook-nav-beta')).toHaveText('Beta');
+        await expect(page.getByTestId('audiobook-nav-beta')).toHaveText('Beta', { timeout: 15_000 });
+        const audiobookNav = page.locator('a[href="/audios"]').filter({ has: page.getByTestId('audiobook-nav-beta') });
+        await expect(audiobookNav).toContainText('有声书');
         await expect(page.getByTestId('audiobook-beta')).toHaveText('Beta');
+        await expect(page.getByTestId('create-audiobook-entry')).toHaveAttribute('href', '/audios/create');
+        await expect(page.getByTestId('create-audiobook-empty')).toHaveAttribute('href', '/audios/create');
 
         await page.goto('/book/1/audios');
         await expect(page.getByTestId('audiobook-beta')).toHaveText('Beta');
@@ -25,10 +27,46 @@ test.describe('Audiobook production and playback', () => {
         await page.goto('/audio-jobs');
         await expect(page.getByTestId('audiobook-beta')).toHaveText('Beta');
         await expect(page.getByTestId('audio-job-empty-state')).toBeVisible();
-        await expect(page.getByTestId('open-library-to-create-job')).toHaveAttribute('href', '/library');
+        await expect(page.getByTestId('create-audiobook-from-jobs')).toHaveAttribute('href', '/audios/create');
+        await expect(page.getByTestId('open-library-to-create-job')).toHaveAttribute('href', '/audios/create');
 
         await page.getByText('管理', { exact: true }).click();
         await expect(page.getByRole('link', { name: '有声书任务' })).toHaveAttribute('href', '/audio-jobs');
+    });
+
+    test('creates an audiobook from the center wizard', async ({ page }) => {
+        await page.goto('/audios/create?book=1');
+        await expect(page.getByRole('heading', { name: '创建有声书' })).toBeVisible();
+        await expect(page.getByTestId('selected-book-panel')).toContainText('百年孤独');
+        await expect(page.getByTestId('wizard-book-status-1')).toContainText('可创建');
+
+        await page.getByTestId('submit-create-wizard').click();
+        await expect(page).toHaveURL('/audio-job/1');
+        await expect(page.locator('[data-job-id="1"]')).toContainText('百年孤独');
+    });
+
+    test('guides unsupported formats to EPUB conversion before creation', async ({ page }) => {
+        await page.goto('/audios/create?book=3');
+        await expect(page.getByTestId('selected-book-panel')).toContainText('安徒生童话');
+        await expect(page.getByTestId('create-wizard-unsupported-format')).toContainText('需要先转换为 EPUB');
+        await expect(page.getByTestId('convert-selected-book')).toHaveAttribute('href', '/book/3?convert=epub');
+        await expect(page.getByTestId('submit-create-wizard')).toHaveCount(0);
+    });
+
+    test('routes active jobs instead of creating duplicates', async ({ page, request }) => {
+        const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+        await request.post(`${mockApi}/api/book/1/audio-jobs`, {
+            data: { mode: 'advanced', engine: 'edgetts', speed: 'x1.0' },
+        });
+
+        await page.goto('/book/1/audios?create=1');
+        await expect(page.getByTestId('generate-audiobook')).toHaveCount(0);
+        await expect(page.getByTestId('view-active-audio-job')).toHaveAttribute('href', '/audio-job/1');
+
+        await page.goto('/audios/create?book=1');
+        await expect(page.getByTestId('create-wizard-active-job')).toContainText('已有制作中的任务');
+        await expect(page.getByTestId('view-active-job-from-wizard')).toHaveAttribute('href', '/audio-job/1');
+        await expect(page.getByTestId('submit-create-wizard')).toHaveCount(0);
     });
 
     test('shows the real book and expands every generation step', async ({ page, request }) => {

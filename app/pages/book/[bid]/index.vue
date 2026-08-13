@@ -1419,6 +1419,10 @@ const show_conversion_dialog = () => {
     dialog_convert.value = true;
 };
 
+watch(() => route.query.convert, (target) => {
+    if (target === 'epub') dialog_convert.value = true;
+}, { immediate: true });
+
 const confirm_conversion = async (option) => {
     converting_book.value = true;
     try {
