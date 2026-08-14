@@ -29,6 +29,7 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertEqual(query["moke"], ["1"])
         self.assertEqual(query["mokeBookId"], [str(BID_EPUB)])
         self.assertEqual(query["mokeReturnTo"], ["/book/%d" % BID_EPUB])
+        self.assertTrue(query["file"][0].startswith("http://"))
         self.assertIn("/read/resource/%d.epub?revision=" % BID_EPUB, query["file"][0])
 
     def test_candle_fallback_keeps_existing_reader(self):

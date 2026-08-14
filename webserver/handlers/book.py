@@ -1668,7 +1668,7 @@ class BookRead(BaseHandler):
         if use_readest:
             if book.get("fmt_epub"):
                 revision = reader_resource_revision(book["fmt_epub"])
-                resource_url = "/read/resource/%d.epub?revision=%s" % (book_id, revision)
+                resource_url = self.site_url + "/read/resource/%d.epub?revision=%s" % (book_id, revision)
                 reader_query = urllib.parse.urlencode(
                     {
                         "file": resource_url,
