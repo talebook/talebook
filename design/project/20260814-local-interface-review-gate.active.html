@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 大型功能本地界面审查门禁方案。" />
+    <link rel="icon" href="data:," />
+    <title>大型功能在激活方案前完成本地界面审查 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f7fb;
+        --panel: #fff;
+        --ink: #1f2937;
+        --muted: #586477;
+        --line: #d7e0ea;
+        --accent: #245e8a;
+        --accent-soft: #e9f3fb;
+        --warn: #8d5511;
+        --warn-soft: #fff5df;
+        --ok: #176843;
+        --ok-soft: #e7f5ed;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: linear-gradient(150deg, #eef5fb 0, var(--bg) 36%, #f8fafc 100%); font-family: var(--sans); line-height: 1.68; }
+      .skip-link { position: fixed; top: 8px; left: 8px; z-index: 2; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+      .page { width: min(1080px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 52px; }
+      .hero, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 12px 32px rgba(31, 41, 55, .07); }
+      .hero { padding: 30px 32px; border-top: 5px solid var(--accent); }
+      .card { margin-top: 18px; padding: 25px 28px; }
+      h1 { margin: 0 0 9px; font-size: clamp(29px, 4vw, 45px); line-height: 1.14; letter-spacing: -.025em; }
+      h2 { margin: 0 0 13px; font-size: 22px; }
+      h3 { margin: 0 0 7px; font-size: 16px; }
+      p { margin: 0 0 12px; }
+      p, li, td, th { font-size: 14px; }
+      ul, ol { margin: 8px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+      code { padding: .1em .34em; border-radius: 4px; background: #eef2f6; font-family: var(--mono); font-size: .9em; overflow-wrap: anywhere; }
+      .sub { max-width: 850px; color: var(--muted); font-size: 16px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+      .chip { padding: 5px 10px; color: #536176; background: #edf2f7; border-radius: 999px; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: var(--warn); background: var(--warn-soft); }
+      .chip.active { color: var(--ok); background: var(--ok-soft); }
+      .callout { margin-top: 13px; padding: 14px 16px; background: var(--accent-soft); border: 1px solid #bfd8ea; border-radius: 13px; }
+      .callout.warn { color: #5f431d; background: var(--warn-soft); border-color: #ead29f; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .choice { padding: 16px; border: 1px solid var(--line); border-radius: 14px; }
+      .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 15px; }
+      .step { position: relative; min-height: 132px; padding: 14px; background: #fbfdff; border: 1px solid var(--line); border-radius: 14px; }
+      .step + .step::before { position: absolute; top: 16px; left: -15px; width: 20px; height: 20px; color: var(--accent); background: #fff; border: 1px solid #accbe1; border-radius: 50%; content: "→"; font-weight: 800; line-height: 18px; text-align: center; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+      .step p { color: var(--muted); font-size: 12px; }
+      .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 13px; }
+      table { width: 100%; min-width: 700px; border-collapse: collapse; }
+      th, td { padding: 10px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #526175; background: #f6f9fc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      .pending { color: var(--warn); font-weight: 800; }
+      footer { padding-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+      @media (max-width: 820px) { .flow { grid-template-columns: 1fr; } .step { min-height: 0; } .step + .step::before { top: -15px; left: 16px; transform: rotate(90deg); } }
+      @media (max-width: 640px) { .page { width: calc(100vw - 20px); padding-top: 10px; } .hero, .card { border-radius: 15px; } .hero { padding: 23px 20px; } .card { padding: 20px 18px; } .grid { grid-template-columns: 1fr; } }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @media print { body { background: #fff; } .page { width: 100%; } .hero, .card { box-shadow: none; } .skip-link { display: none; } .step, .choice, .table-wrap { break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>大型功能在激活方案前完成本地界面审查</h1>
+        <p class="sub">为会改变产品界面的重大功能增加可追溯的本地审查门禁，让界面问题在方案转为 ACTIVE 前被发现、处理并留下记录。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-14</span>
+          <span class="chip">所属模块：project</span>
+          <span class="chip">影响范围：AGENTS.md、项目规范测试、界面审查 skills</span>
+          <span class="chip">需求来源：用户直接要求</span>
+        </div>
+      </header>
+
+      <main id="main-content">
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“更新一下 Talebook 项目的 AGENTS.md，要求在做大型功能时必须使用 interface-review skill 审查本地变更。”</div>
+          <p>现有流程要求重要改动创建方案、完成测试并回写结果，但没有明确要求大型界面功能在激活方案前审查本地变更的完整影响面。</p>
+        </section>
+
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice">
+              <h3>目标</h3>
+              <ul>
+                <li>大型功能涉及界面时，必须显式执行 <code>interface-review</code>。</li>
+                <li>审查覆盖当前分支相对默认分支的已提交和未提交本地变更。</li>
+                <li>审查范围、结论和问题处理情况回写同一份 WIP。</li>
+              </ul>
+            </article>
+            <article class="choice">
+              <h3>非目标</h3>
+              <ul>
+                <li>不把所有需要方案的配置、部署、修复工作都定义为大型功能。</li>
+                <li>不以界面审查替代正确性、测试、安全或性能审查。</li>
+                <li>不定制上游 <code>interface-review</code> 或 <code>better-*</code> skill 的规则内容。</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>3. 规则与流程</h2>
+          <p>本规则中的“大型功能”限定为新功能、用户可感知行为变化和跨模块功能。只要影响页面、交互、文案或其他前端消费者，就进入强制审查流程。</p>
+          <div class="flow" aria-label="大型功能审查流程">
+            <article class="step"><span class="label">Qualify</span><h3>识别范围</h3><p>确认是否属于大型功能以及是否存在界面影响。</p></article>
+            <article class="step"><span class="label">Test</span><h3>常规验证</h3><p>先完成与功能相关的自动化和运行验证。</p></article>
+            <article class="step"><span class="label">Review</span><h3>本地审查</h3><p>以 <code>full</code> 模式审查分支提交和未提交变更。</p></article>
+            <article class="step"><span class="label">Record</span><h3>处理留痕</h3><p>修复阻塞项，并把范围、结论和处理情况写回 WIP。</p></article>
+            <article class="step"><span class="label">Activate</span><h3>激活方案</h3><p>相关门禁通过后，方案才可转为 ACTIVE。</p></article>
+          </div>
+          <div class="callout"><strong>纯后端豁免：</strong>若大型功能确认不影响任何用户界面，可以不执行该 skill，但必须在 WIP 中记录“无界面影响”、判断依据和剩余风险。</div>
+        </section>
+
+        <section class="card">
+          <h2>4. 影响、风险与回滚</h2>
+          <div class="grid">
+            <article class="choice"><h3>影响范围</h3><p>更新根目录 <code>AGENTS.md</code> 的开发流程；安装 <code>interface-review</code> 与七个 <code>better-*</code> 依赖并更新 <code>skills-lock.json</code>；扩展 <code>tests/test_project_instructions.py</code> 保护规则和依赖完整性。</p></article>
+            <article class="choice"><h3>保持不变</h3><p>现有五阶段方案流程、WIP/ACTIVE 生命周期、前端浏览器验收以及各代码质量门禁保持不变。</p></article>
+          </div>
+          <div class="callout warn"><strong>风险：</strong>规则过宽会让纯后端工作执行无意义的界面审查；通过明确界面影响条件和可追溯豁免控制。规则过窄会遗漏共享组件的消费者；通过审查完整本地变更而非单文件控制。</div>
+          <p><strong>回滚：</strong>移除新增规范段落及对应测试即可；不涉及产品数据、接口或部署回滚。</p>
+        </section>
+
+        <section class="card">
+          <h2>5. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>计划命令或检查</th><th>预期</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>规范与 skill 契约</td><td><code>python3 -m pytest tests/test_project_instructions.py tests/test_check_design_docs.py -q</code></td><td>审查范围、时机、模式、留痕、豁免及 skill 依赖完整性均有断言保护。</td><td>通过：37 passed；2 条 warning 仅为受沙箱限制无法写入 <code>.pytest_cache</code>。</td></tr>
+                <tr><td>方案结构</td><td><code>python3 scripts/check_design_docs.py</code></td><td>WIP 阶段仅因预期的合并门禁失败，HTML 结构和资源约束没有其他错误。</td><td>符合预期：唯一错误为本方案处于 WIP，未发现结构或外部资源错误。</td></tr>
+                <tr><td>补丁质量</td><td><code>git diff --check</code></td><td>无空白错误。</td><td>通过。</td></tr>
+                <tr><td>界面审查</td><td>检查本次改动的文件范围</td><td>工程治理、skill 和测试文本不影响用户界面，记录豁免依据。</td><td>豁免：仅修改工程规范、审查 skill、锁文件、规范测试和内部方案，不影响页面、交互、产品文案或前端消费者。</td></tr>
+                <tr><td>ACTIVE 门禁</td><td><code>make check-design</code></td><td>转为 ACTIVE 后全部方案通过。</td><td>通过：108 份方案文档的路径、HTML 结构、单文件资源和状态门禁全部通过。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>6. 决策记录</h2>
+          <ol>
+            <li><strong>2026-08-14：</strong>大型功能限定为新功能、用户可感知行为变化和跨模块功能，不等同于所有必须创建方案的改动。</li>
+            <li><strong>2026-08-14：</strong>审查位于常规测试之后、方案转为 ACTIVE 之前；存在 <code>HIGH</code> 或 <code>MEDIUM</code> 问题时修复后重新审查。</li>
+            <li><strong>2026-08-14：</strong>审查范围、最终结论和问题处理情况必须回写同一份 WIP。</li>
+            <li><strong>2026-08-14：</strong>纯后端且无界面影响时允许豁免，但必须记录判断依据。</li>
+            <li><strong>2026-08-14：</strong>PR 必须同时安装并锁定 <code>interface-review</code> 及七个 <code>better-*</code> 依赖，避免规范引用无法执行；不相关且无锁记录的 <code>web-design-guidelines</code> 不纳入本 PR。</li>
+          </ol>
+        </section>
+      </main>
+
+      <footer>Talebook internal design · project · ACTIVE · 2026-08-14</footer>
+    </div>
+  </body>
+</html>
