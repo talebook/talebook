@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 插件公共后端底座：协议、持久对象、Secret 与执行治理方案。" />
+    <link rel="icon" href="data:," />
+    <title>插件公共后端底座 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#182233; --muted:#5d697a; --line:#d7e0eb; --accent:#315f91; --soft:#edf5ff; --good:#18734b; --warn:#9a5c09; --mono:"SFMono-Regular",Consolas,monospace; }
+      * { box-sizing:border-box; } html { scroll-behavior:smooth; }
+      body { margin:0; color:var(--ink); background:linear-gradient(150deg,#eef5ff 0,var(--bg) 26%,#f8fafc 100%); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; line-height:1.68; }
+      .skip-link { position:fixed; top:8px; left:8px; z-index:10; padding:8px 12px; color:#fff; background:var(--ink); transform:translateY(-160%); } .skip-link:focus { transform:none; }
+      .page { width:min(1160px,calc(100vw - 32px)); margin:auto; padding:24px 0 56px; }
+      .hero,.card { border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 12px 30px rgba(15,23,42,.07); }
+      .hero { padding:30px 32px; margin-bottom:18px; } h1 { margin:0 0 10px; font-size:clamp(30px,4vw,46px); line-height:1.15; } h2 { margin:0 0 14px; font-size:23px; } h3 { margin:20px 0 8px; font-size:17px; }
+      p,li { color:#2d3a4d; font-size:14px; } .sub { color:var(--muted); font-size:17px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; } .chip { padding:5px 11px; border-radius:999px; color:#4f6074; background:#edf1f6; font-size:12px; font-weight:700; } .wip { color:var(--warn); background:#fff5de; }
+      .card { margin-bottom:18px; padding:25px 28px; scroll-margin-top:16px; } .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .choice,.callout { padding:15px 17px; border:1px solid var(--line); border-radius:14px; background:#fafcff; } .choice h3 { margin-top:0; } .callout { margin:12px 0; } .good { border-color:#b9dccb; background:#edf9f3; }
+      code { padding:.12em .35em; border-radius:4px; background:#eef2f7; font-family:var(--mono); font-size:.9em; overflow-wrap:anywhere; }
+      pre { padding:15px 17px; overflow:auto; color:#eef4fb; background:#223148; border-radius:14px; font:13px/1.6 var(--mono); }
+      .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:14px; } table { width:100%; min-width:760px; border-collapse:collapse; font-size:13px; } th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f5f8fc; color:#526174; } tr:last-child td { border-bottom:0; } th:last-child,td:last-child { border-right:0; }
+      .flow { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; } .step { padding:14px; border:1px solid var(--line); border-radius:14px; background:var(--soft); } .step b { display:block; font-size:13px; } .step span { color:var(--muted); font-size:12px; }
+      nav { position:sticky; top:0; z-index:4; display:flex; gap:6px; overflow:auto; padding:8px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.95); } nav a { padding:6px 9px; color:var(--accent); text-decoration:none; white-space:nowrap; font-size:12px; font-weight:700; }
+      @media (max-width:720px) { .page { width:calc(100vw - 20px); padding-top:10px; } .hero,.card { padding:21px 19px; border-radius:15px; } .grid,.flow { grid-template-columns:1fr; } }
+      @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+      @media print { body { background:#fff; } .page { width:100%; } .hero,.card { box-shadow:none; } nav,.skip-link { display:none; } .table-wrap,pre { break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>插件公共后端底座</h1>
+        <p class="sub">以受控 manifest 和持久运行状态机统一四类插件能力，使后续管理页与第三方适配器共享安装、连接、凭据、执行日志、幂等和回滚语义。</p>
+        <div class="chips"><span class="chip">状态：ACTIVE</span><span class="chip">创建日期：2026-08-14</span><span class="chip">所属模块：webserver</span><span class="chip">需求来源：TB-40 / TB-14</span><span class="chip">无界面影响</span></div>
+      </header>
+      <nav aria-label="章节目录"><a href="#request">原始诉求</a><a href="#goals">目标与边界</a><a href="#protocol">协议</a><a href="#data">数据模型</a><a href="#runtime">运行时</a><a href="#security">安全</a><a href="#impact">迁移与风险</a><a href="#tests">测试结果</a><a href="#decisions">决策</a></nav>
+      <main id="main-content">
+        <section id="request" class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout">“实现 Talebook 插件系统的公共后端底座：冻结 manifest/category/capability/runtime action 与协议版本；建立 definitions、installations、connections、secrets、runs、run items、entity matches、source records、permissions；支持 test、preview、run、游标、连接防并发、失败项重试、来源追踪和安全回滚，并以 mock provider 验证跨 Tab 复用。”</div>
+          <p>批准来源为 TB-14 的完整插件方案；AI、具体第三方业务和管理页视觉不属于本次。书源明确排除 Calibre Content Server 与 Calibre-Web。</p>
+        </section>
+        <section id="goals" class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice"><h3>目标</h3><ul><li>一套版本化协议覆盖元数据、笔记、评价、书源。</li><li>实例级和用户级连接共享安装，Secret 始终密文落库且普通序列化只给掩码。</li><li>执行可诊断、可重试、同源幂等；失败不推进游标。</li><li>每连接持久租约防并发；429、401、超时和退避形成结构化结果。</li><li>按 run 回滚时保护本地修改并持久化冲突。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>不实现任意代码热加载、插件市场或签名分发。</li><li>不实现具体第三方 API、AI 或四 Tab 管理界面。</li><li>不把 Calibre 主库对象复制进 SQLAlchemy；真实域写入由后续 adapter 负责。</li><li>不承诺跨进程强制终止已超时的第三方线程；平台只关闭结果并拒绝写入。</li></ul></article>
+          </div>
+        </section>
+        <section id="protocol" class="card">
+          <h2>3. 冻结协议</h2>
+          <p>协议版本固定为 <code>talebook.plugin/v1</code>。manifest 必填 <code>id</code>、<code>version</code>、<code>categories</code>、<code>capabilities</code>、<code>runtime_kind</code>、<code>actions</code>、<code>auth_schema</code>、<code>config_schema</code>、<code>permissions</code>、<code>data_policy</code>、<code>compatibility</code>、<code>homepage</code>、<code>license</code>。</p>
+          <div class="table-wrap"><table><thead><tr><th>枚举</th><th>值</th><th>约束</th></tr></thead><tbody>
+            <tr><td>category</td><td><code>metadata</code> / <code>annotations</code> / <code>reviews</code> / <code>book_sources</code></td><td>capability 使用 <code>category.verb</code>，且前缀必须在 categories 中。</td></tr>
+            <tr><td>runtime_kind</td><td><code>builtin</code> / <code>file</code> / <code>http</code> / <code>managed_process</code></td><td>V1 不允许 Web 进程动态 import 用户代码。</td></tr>
+            <tr><td>action</td><td><code>test</code> / <code>preview</code> / <code>run</code> / <code>retry</code> / <code>rollback</code></td><td>全部产生持久 run；preview 不写 source record。</td></tr>
+            <tr><td>run status</td><td><code>queued</code> → <code>running</code> → <code>succeeded</code> / <code>failed</code> / <code>partial</code> / <code>rolled_back</code></td><td>仅终态可重试或回滚；状态转换由 runtime 校验。</td></tr>
+            <tr><td>health</td><td><code>unknown</code> / <code>healthy</code> / <code>degraded</code> / <code>unauthorized</code></td><td>401 不重试；429/超时退避后标 degraded。</td></tr>
+          </tbody></table></div>
+        </section>
+        <section id="data" class="card">
+          <h2>4. 持久对象</h2>
+          <div class="table-wrap"><table><thead><tr><th>表</th><th>职责</th><th>关键约束</th></tr></thead><tbody>
+            <tr><td>plugin_definitions</td><td>规范化 manifest</td><td><code>(plugin_key, version)</code> 唯一，保存协议版本与 schemas。</td></tr>
+            <tr><td>plugin_installations</td><td>实例安装、启停和配置</td><td>一个 plugin_key 只保留一个当前安装；四 Tab 共用。</td></tr>
+            <tr><td>plugin_connections</td><td>实例/用户连接、游标、健康、调度和租约</td><td><code>(installation, owner_type, owner_id, name)</code> 唯一；租约原子获取。</td></tr>
+            <tr><td>plugin_secrets</td><td>加密凭据与轮换版本</td><td>密文、key id、掩码 hint；API 模型不暴露 ciphertext。</td></tr>
+            <tr><td>plugin_runs / plugin_run_items</td><td>状态机、计数、结构化错误、逐项结果</td><td>日志先脱敏；失败/partial 不写 connection.cursor。</td></tr>
+            <tr><td>plugin_entity_matches</td><td>外部实体与书籍匹配</td><td>来源外部 ID 唯一；置信度和人工确认可审计。</td></tr>
+            <tr><td>plugin_source_records</td><td>幂等、来源追踪与回滚</td><td><code>(connection, entity_type, external_id)</code> 唯一；本地修改阻止静默回滚。</td></tr>
+            <tr><td>plugin_permissions</td><td>管理员批准的数据范围</td><td>批准、撤销时间和操作者持久化。</td></tr>
+          </tbody></table></div>
+        </section>
+        <section id="runtime" class="card">
+          <h2>5. 公共执行流程</h2>
+          <div class="flow"><div class="step"><b>1. 排队</b><span>创建 queued run，记录 action/trigger/requester。</span></div><div class="step"><b>2. 取租约</b><span>原子更新 connection lease；已有有效租约返回 concurrent_run。</span></div><div class="step"><b>3. 调 Provider</b><span>注入只读配置、临时解密 secret、游标、deadline 和目标失败项。</span></div><div class="step"><b>4. 写结果</b><span>preview 仅记录 items；run 以来源键 upsert，逐项失败形成 partial。</span></div><div class="step"><b>5. 收尾</b><span>全成功才推进游标；更新 health，释放租约，错误与日志脱敏。</span></div></div>
+          <h3>重试与回滚</h3><p><code>retry</code> 只把目标 run 的失败 external_id 交给 provider；成功后产生独立审计 run。<code>rollback</code> 仅处理目标 run 写入且仍为 active 的 source record；<code>local_modified=true</code> 的记录变为 conflict item，不删除、不改来源状态。</p>
+          <h3>最小 mock provider</h3><p>内置 <code>talebook.mock.multi-tab</code> 同时声明 <code>metadata.lookup</code> 和 <code>reviews.import</code>，支持 test、preview、run、指定项失败、401、429、重复输入、游标及 rollback，证明跨两个 Tab 复用同一 installation、connection、secret 和 run log。</p>
+        </section>
+        <section id="security" class="card">
+          <h2>6. Secret 与日志安全</h2>
+          <ul><li>使用 Fernet 认证加密；密钥优先取 <code>PLUGIN_SECRET_KEY</code>，兼容使用已修改的非默认 cookie secret；默认占位 key 会拒绝保存凭据。密文带 key id 和版本，支持重新加密轮换。</li><li>Secret 只在 provider 调用边界内解密为短生命周期 dict；模型/handler/run item/异常不序列化明文。</li><li>脱敏器递归处理结构化数据，替换实际 secret 值和常见 bearer/token/key/password 字段；错误只持久化稳定 error code 与截断后的安全消息。</li><li>实例连接仅管理员创建；用户连接必须绑定当前 user id。安装权限单独持久化，不因 manifest 升级自动扩大。</li></ul>
+        </section>
+        <section id="impact" class="card">
+          <h2>7. 迁移、影响与风险</h2>
+          <p>SQLAlchemy <code>create_all</code> 会创建新表，现有 <code>migrate_db.py</code> 仍负责增量列；本次不修改任何既有表和 Calibre 主库。内置 definition 采用幂等 bootstrap，不自动安装，避免升级后获得新权限。</p>
+          <div class="grid"><article class="choice"><h3>兼容性</h3><ul><li>无现有 API 路径变化。</li><li>只新增 <code>/api/admin/plugins/*</code> 管理接口。</li><li>旧元数据/书源路径暂不迁移。</li></ul></article><article class="choice"><h3>剩余风险</h3><ul><li>Python 线程超时后底层阻塞调用可能短暂存活，但其结果不再提交。</li><li>多进程租约依赖数据库时钟与 lease TTL；长任务需续租扩展。</li><li>真实域回滚需 adapter 事务钩子，本底座只管理 source record。</li></ul></article></div>
+          <p><strong>界面审查豁免：</strong>本次只新增后端模型、服务与 JSON API，不修改页面、文案、布局或现有前端消费者，因此无需 interface-review。</p>
+        </section>
+        <section id="tests" class="card">
+          <h2>8. 测试计划与结果</h2>
+          <div class="callout good"><strong>已通过：</strong>插件专项、既有模型与设计文档校验测试共 75 项通过；后端 Ruff 检查与格式检查通过；方案检查和 diff 空白检查通过。</div>
+          <div class="table-wrap"><table><thead><tr><th>命令</th><th>结果</th><th>覆盖</th></tr></thead><tbody>
+            <tr><td><code>python3 -m pytest tests/test_models.py tests/test_plugin_runtime.py tests/test_check_design_docs.py -q</code></td><td>75 passed</td><td>manifest、九类表、密文/掩码/轮换、权限、跨 Tab mock、test/preview/run/retry/rollback、幂等、游标、防并发、401、429、timeout、脱敏与回滚保护。</td></tr>
+            <tr><td><code>make lint-py-fix</code></td><td>通过</td><td>109 个后端 Python 文件，无额外格式改动。</td></tr>
+            <tr><td><code>make lint-py</code></td><td>通过</td><td>Ruff check 与 format diff。</td></tr>
+            <tr><td><code>make check-design</code></td><td>通过</td><td>ACTIVE 路径、HTML 结构和单文件资源约束。</td></tr>
+            <tr><td><code>git diff --check</code></td><td>通过</td><td>补丁空白与冲突标记。</td></tr>
+          </tbody></table></div>
+          <p><strong>未执行：</strong>完整 <code>make test</code>。标准测试镜像在 apt 获取 10.1 MB 索引时耗时约 11 分钟，随后还需 129 MB ffmpeg 依赖；备用 Calibre 基础镜像的 Python 依赖安装又因 PyPI 下载 Jinja2 超时失败。两次均为网络依赖下载失败，尚未进入测试阶段。替代验证为本机 Python 3.11 上的 75 项相关回归；剩余风险是未在仓库 Python 3.13/Calibre 完整镜像中跑全量 suite。</p>
+        </section>
+        <section id="decisions" class="card">
+          <h2>9. 决策记录</h2>
+          <div class="table-wrap"><table><thead><tr><th>决策</th><th>结论</th><th>原因</th></tr></thead><tbody>
+            <tr><td>动态代码</td><td>V1 不在 Web 进程加载</td><td>避免插件拿到无限权限；builtin registry 是本次可执行边界。</td></tr>
+            <tr><td>definition 与 installation</td><td>分离</td><td>定义可版本化，安装保存实例配置和批准权限；跨 Tab 不重复安装。</td></tr>
+            <tr><td>失败游标</td><td>仅全成功推进</td><td>partial/failed 保留旧 cursor，避免跳过失败数据。</td></tr>
+            <tr><td>连接并发</td><td>数据库租约，不只进程锁</td><td>兼容多 worker；崩溃后 TTL 可恢复。</td></tr>
+            <tr><td>Secret 密钥</td><td>显式 key 优先，兼容派生</td><td>新部署可独立轮换，旧部署不因缺配置写入明文。</td></tr>
+          </tbody></table></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
