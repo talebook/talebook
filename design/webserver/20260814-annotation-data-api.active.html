@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annotation 数据域与服务端 API · ACTIVE</title>
+<style>
+  :root { color-scheme: light; --ink:#172033; --muted:#5f6b7a; --line:#d9e0ea; --panel:#f7f9fc; --accent:#3758c8; --warn:#fff4d6; }
+  * { box-sizing: border-box; }
+  body { margin:0 auto; max-width:1080px; padding:32px 24px 64px; color:var(--ink); background:#fff; font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+  h1 { margin:0 0 8px; font-size:30px; line-height:1.25; }
+  h2 { margin:36px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--line); font-size:21px; }
+  h3 { margin:24px 0 8px; font-size:17px; }
+  code { padding:2px 5px; border-radius:4px; background:#eef2f8; }
+  table { width:100%; border-collapse:collapse; margin:14px 0; font-size:14px; }
+  th,td { padding:9px 10px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { background:var(--panel); }
+  .meta { display:flex; flex-wrap:wrap; gap:8px 20px; color:var(--muted); }
+  .badge { padding:2px 10px; border-radius:999px; color:#fff; background:var(--accent); font-weight:700; }
+  .callout { margin:16px 0; padding:12px 16px; border-left:4px solid #d49b18; background:var(--warn); }
+  .flow { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:16px 0; }
+  .flow div { min-height:96px; padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+  .flow strong { display:block; margin-bottom:5px; color:var(--accent); }
+  @media (max-width:720px) { body{padding:22px 16px 48px}.flow{grid-template-columns:1fr}table{display:block;overflow-x:auto} }
+</style>
+</head>
+<body>
+<h1>Annotation 数据域与服务端 API</h1>
+<div class="meta">
+  <span class="badge">ACTIVE</span>
+  <span>创建日期：2026-08-14</span>
+  <span>所属模块：webserver</span>
+  <span>需求来源：Multica TB-42</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<p>为微信读书、Readwise、Web、Moke 与 Readest 等笔记插件提供统一服务端契约：个人高亮、笔记与书签可幂等导入、查询、导出和按来源删除；无法精确定位的记录仍可按章节展示；章评使用独立数据域；管理员不能借普通接口读取其他用户的私密正文。</p>
+
+<h2>2. 目标与边界</h2>
+<ul>
+  <li>个人 annotation 以当前登录用户为强制租户边界，书籍访问同时服从现有 <code>can_view_book</code> 权限。</li>
+  <li>支持 <code>highlight</code>、<code>note</code>、<code>bookmark</code>，允许 <code>cfi=NULL</code> 并保留章节、引用文本与来源位置。</li>
+  <li>支持客户端 <code>client_id</code> 幂等，以及 <code>owner + book + source + external_id</code> 来源幂等。</li>
+  <li>章评写入独立表；其正文按书籍可见性读取，写入、修改和来源删除仅限导入者，不复用个人 annotation 的私密查询。</li>
+  <li>本次只提供后端数据与 JSON API，不改页面和阅读器；外部插件连接管理由后续插件底座承接。</li>
+</ul>
+
+<h2>3. 数据模型</h2>
+<div class="flow">
+  <div><strong>book_annotations</strong>用户私密数据。保存内容、定位、来源标识、远端时间与人工修改时间。</div>
+  <div><strong>chapter_comments</strong>章评独立数据。读取服从书籍可见性，写操作归导入者。</div>
+  <div><strong>readers / Calibre books</strong>用户外键由认证库维护；书籍存在性和可见性继续由 Calibre 与 Item.scope 判定。</div>
+</div>
+<table>
+<thead><tr><th>分组</th><th>关键字段</th><th>约束与说明</th></tr></thead>
+<tbody>
+<tr><td>身份</td><td><code>reader_id</code>、<code>book_id</code></td><td>annotation 的所有读写固定到当前用户；chapter comment 的 reader 是导入者。</td></tr>
+<tr><td>内容</td><td><code>kind</code>、<code>text</code>、<code>refer_text</code>、<code>color</code></td><td>kind 仅允许 highlight / note / bookmark；正文不进入管理接口。</td></tr>
+<tr><td>定位</td><td><code>cfi</code>、<code>chapter</code>、<code>source_position</code></td><td>CFI 可空；章节与来源位置提供降级展示。</td></tr>
+<tr><td>来源</td><td><code>source</code>、<code>external_id</code>、<code>connection_id</code>、<code>run_id</code>、<code>raw_hash</code>、<code>remote_updated_at</code></td><td>与插件 source record / connection / run 对齐，均可随 API 返回。</td></tr>
+<tr><td>冲突</td><td><code>user_modified_at</code>、<code>update_time</code></td><td>人工 PUT 后，后续来源 upsert 默认只刷新来源元数据，不覆盖正文。</td></tr>
+</tbody>
+</table>
+
+<h2>4. API 契约</h2>
+<table>
+<thead><tr><th>方法</th><th>路径</th><th>行为</th></tr></thead>
+<tbody>
+<tr><td>GET / POST</td><td><code>/api/book/:book_id/annotations</code></td><td>列出当前用户该书记录；按 client_id 或 source + external_id 幂等 upsert。</td></tr>
+<tr><td>PUT / DELETE</td><td><code>/api/book/:book_id/annotations/:id</code></td><td>仅 owner 修改或删除；PUT 标记人工修改保护。</td></tr>
+<tr><td>GET / DELETE</td><td><code>/api/annotations</code></td><td>按 book/source/run/connection 查询；DELETE 至少提供一个来源筛选，默认保留人工修改记录。</td></tr>
+<tr><td>GET</td><td><code>/api/annotations/export</code></td><td>返回带 schema version 和导出时间的 JSON 数据集，接受相同筛选。</td></tr>
+<tr><td>GET / POST</td><td><code>/api/book/:book_id/chapter-comments</code></td><td>按书读取章评；登录用户可幂等导入。</td></tr>
+<tr><td>PUT / DELETE</td><td><code>/api/book/:book_id/chapter-comments/:id</code></td><td>仅导入者修改或删除。</td></tr>
+<tr><td>GET / DELETE</td><td><code>/api/chapter-comments</code></td><td>按 source/run/connection 查询或来源清理；不会触及 annotations。</td></tr>
+<tr><td>GET</td><td><code>/api/chapter-comments/export</code></td><td>按相同来源条件导出导入者的章评，并提供独立 schema version。</td></tr>
+</tbody>
+</table>
+<p>所有端点返回 HTTP 200 的 Talebook JSON 错误契约；写接口使用 <code>@js + @auth</code>。章评集合读取也要求登录，避免在缺少产品公开策略前扩大公开面。</p>
+
+<h2>5. 幂等与冲突规则</h2>
+<ol>
+  <li>有 <code>external_id</code> 时优先按 owner + book + source + external_id 查找；否则按 owner + book + client_id 查找。</li>
+  <li><code>raw_hash</code> 相同视为重复投递；早于现存 <code>remote_updated_at</code> 的来源事件视为 stale，不回滚内容。同一远端时间允许来源修正后重新解析。</li>
+  <li>通过单条 PUT 修改内容后写入 <code>user_modified_at</code>；来源 upsert 返回 <code>conflict_protected=true</code>，保留内容但允许更新 connection/run/hash/remote time，便于审计本次同步。</li>
+  <li>来源批量删除默认跳过人工修改记录，显式 <code>include_modified=true</code> 才删除；返回删除数与保护数。</li>
+</ol>
+<div class="callout">普通管理接口不增加 annotation 查询能力。管理员调用 annotation API 时仍只以自己的 reader_id 查询，不能越权读取其他用户正文。</div>
+
+<h2>6. Migration</h2>
+<p>补强 <code>compare_and_migrate</code>：先按 SQLAlchemy metadata 创建缺失表，再沿用现有逻辑为既有表补列。新表由 metadata 一次性创建，因此唯一约束、索引和外键随 migration 落地；已有表不做破坏性重建。</p>
+
+<h2>7. 测试计划与结果</h2>
+<table>
+<thead><tr><th>层级</th><th>验证项</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td>模型 / migration</td><td>唯一约束、nullable CFI、缺失表创建</td><td><code>tests/test_annotations.py</code> 通过</td></tr>
+<tr><td>Annotation API</td><td>权限、幂等、来源查询与导出、来源删除、人工修改保护、stale 保护</td><td>聚焦测试 12 项通过</td></tr>
+<tr><td>Chapter comments</td><td>独立存储、书籍可见性、导入者写权限、删除互不影响</td><td>聚焦测试通过</td></tr>
+<tr><td>工程检查</td><td>ruff、完整 pytest、check-design</td><td>完整后端测试 837 passed / 20 skipped / 7 subtests passed；ruff 通过；check-design 通过</td></tr>
+</tbody>
+</table>
+
+<h2>8. 风险与兼容性</h2>
+<ul>
+  <li>旧 SQLite / MySQL 通过缺失表创建获得新域，不修改 Calibre metadata 数据库。</li>
+  <li>当前连接和 run 只是稳定字符串引用；插件底座未来可在不改变记录结构的前提下增加实体表和外键映射。</li>
+  <li>章评的跨用户可见性被限制在登录且可查看该书的用户；若产品未来要求完全公开或完全私密，需要独立策略变更。</li>
+  <li>本次仅新增服务端数据、迁移和 JSON API，没有页面、交互、文案或其他界面消费者变更，因此豁免 interface-review；剩余风险是外部插件仍需按本契约完成接入。</li>
+</ul>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>阅读笔记 / 高亮后端同步设计 · ACTIVE</title>
+<title>阅读笔记 / 高亮后端同步设计 · SUPERSEDED</title>
 <style>
   :root { color-scheme: light dark; }
   body { font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; color: #1f2328; background: #fff; }
@@ -17,7 +17,7 @@
   th { background: #f6f8fa; }
   .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; color: #57606a; font-size: 14px; margin: 8px 0 16px; }
   .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; }
-  .active { background: #dafbe1; color: #1a7f37; }
+  .active { background: #ffebe9; color: #cf222e; }
   .todo { color: #8250df; font-weight: 600; }
   .warn { background: #fff8c5; padding: 8px 12px; border-left: 3px solid #d4a72c; margin: 12px 0; }
   ul { padding-left: 22px; }
@@ -26,11 +26,12 @@
 <body>
 <h1>阅读笔记 / 高亮后端同步设计</h1>
 <div class="meta">
-  <span><span class="badge active">ACTIVE</span> 待实现</span>
+  <span><span class="badge active">SUPERSEDED</span> 已由 20260814-annotation-data-api 替代</span>
   <span>创建日期：2026-07-16</span>
   <span>所属模块：webserver（主） + candle-reader（外部仓库）</span>
   <span>需求来源：Issue #181（"能否支持笔记功能"）</span>
 </div>
+<div class="warn">本方案已被 <code>design/webserver/20260814-annotation-data-api.active.html</code> 替代。新方案扩展了插件来源字段、批量查询/导出/删除、冲突保护与独立 chapter_comments 数据域，并作为当前有效契约。</div>
 
 <h2>1. 原始诉求</h2>
 <blockquote>
