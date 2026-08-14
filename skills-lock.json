@@ -1,11 +1,59 @@
 {
   "version": 1,
   "skills": {
+    "better-accessibility": {
+      "source": "jakubkrehel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/better-accessibility/SKILL.md",
+      "computedHash": "92df340b5c1173e483709a3f2108291b3efab2f753237b8dd5616d0f15726b97"
+    },
+    "better-colors": {
+      "source": "jakubkrehel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/better-colors/SKILL.md",
+      "computedHash": "f6e8d90078bd6bcdec9712fbb57dcccd8ce53fa54460a5face894b4f22156880"
+    },
+    "better-interface": {
+      "source": "jakubkrehel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/better-interface/SKILL.md",
+      "computedHash": "473f26f945e7d7f6e71a9ac2559b926b077b9e6aa8dc45745302b5554a80be2e"
+    },
+    "better-layout": {
+      "source": "jakubkrehel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/better-layout/SKILL.md",
+      "computedHash": "c55d3ca32e2c32918a8ec81769031b77cdfe8557f30ff65ce9bcca4052859e8b"
+    },
+    "better-typography": {
+      "source": "jakubkrehel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/better-typography/SKILL.md",
+      "computedHash": "4c57c2586713bf4803a5f365d244069f57c0af5a61d0e8ffd7eaa254e027755d"
+    },
+    "better-ui": {
+      "source": "jakubkrehel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/better-ui/SKILL.md",
+      "computedHash": "8d9413a5e9d27ca2dd09fd58358634ad7713b7c91f1004235cd5df0430f46f75"
+    },
+    "better-writing": {
+      "source": "jakubkrehel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/better-writing/SKILL.md",
+      "computedHash": "4f860b739a2f4d8877225272297b1fbfb1848954fc3903058d1386d535e0b460"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "93f53fd1c0352d3d7ec17b8f73d7351bf76f4821e55d123c9d2abc2c53ba48e4"
+    },
+    "interface-review": {
+      "source": "jakubkrehel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/interface-review/SKILL.md",
+      "computedHash": "f495eafe40a20f8d051c8d50c8f60fe73c915871eddc118af3a4a63a317fec4b"
     }
   }
 }

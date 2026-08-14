@@ -1,9 +1,12 @@
+import json
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / "AGENTS.md"
 WORKFLOW_AGENTS = ROOT / ".github" / "workflows" / "AGENTS.md"
+SKILLS_ROOT = ROOT / ".agents" / "skills"
+SKILLS_LOCK = ROOT / "skills-lock.json"
 
 
 def test_pull_request_description_and_design_preview_rules_are_documented():
@@ -74,6 +77,54 @@ def test_each_work_item_keeps_one_design_document():
             "不得用 SUPERSEDED 保存同一工作中的过程稿、方案 A/B/C 或反馈轮次",
         )
     )
+
+
+def test_large_features_require_full_local_interface_review_before_activation():
+    instructions = AGENTS.read_text(encoding="utf-8")
+
+    assert all(
+        requirement in instructions
+        for requirement in (
+            "#### 大型功能的本地界面审查",
+            "仅包括新功能、用户可感知行为变化和跨模块功能",
+            "`interface-review` skill",
+            "`full` 模式",
+            "当前分支相对默认分支的全部本地变更",
+            "已提交和未提交内容",
+            "将方案转为 ACTIVE 前",
+            "`HIGH` 或 `MEDIUM` 问题时不得转为 ACTIVE",
+            "修复后必须重新执行 `interface-review`",
+            "审查范围、最终结论和问题处理情况",
+            "无界面影响",
+            "判断依据和剩余风险",
+        )
+    )
+
+
+def test_interface_review_skill_and_domain_dependencies_are_installed():
+    expected_locked_skills = {
+        "better-accessibility",
+        "better-colors",
+        "better-interface",
+        "better-layout",
+        "better-typography",
+        "better-ui",
+        "better-writing",
+        "interface-review",
+    }
+    expected_repo_skills = expected_locked_skills | {"web-design-guidelines"}
+    locked_skills = json.loads(SKILLS_LOCK.read_text(encoding="utf-8"))["skills"]
+
+    assert expected_locked_skills <= locked_skills.keys()
+    for skill_name in expected_repo_skills:
+        instructions = (SKILLS_ROOT / skill_name / "SKILL.md").read_text(encoding="utf-8")
+        assert f"name: {skill_name}" in instructions
+    assert "disable-model-invocation: true" in (SKILLS_ROOT / "interface-review" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "vercel-labs/web-interface-guidelines" in (
+        SKILLS_ROOT / "web-design-guidelines" / "SKILL.md"
+    ).read_text(encoding="utf-8")
 
 
 def test_workflow_changes_require_real_local_act_validation():
