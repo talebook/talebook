@@ -78,7 +78,7 @@
           <span class="chip active">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-08-14</span>
           <span class="chip">所属模块：project</span>
-          <span class="chip">影响范围：AGENTS.md、项目规范测试、界面审查 skills</span>
+          <span class="chip">影响范围：AGENTS.md、项目规范测试、界面审查与 Web 规范 skills</span>
           <span class="chip">需求来源：用户直接要求</span>
         </div>
       </header>
@@ -128,7 +128,7 @@
         <section class="card">
           <h2>4. 影响、风险与回滚</h2>
           <div class="grid">
-            <article class="choice"><h3>影响范围</h3><p>更新根目录 <code>AGENTS.md</code> 的开发流程；安装 <code>interface-review</code> 与七个 <code>better-*</code> 依赖并更新 <code>skills-lock.json</code>；扩展 <code>tests/test_project_instructions.py</code> 保护规则和依赖完整性。</p></article>
+            <article class="choice"><h3>影响范围</h3><p>更新根目录 <code>AGENTS.md</code> 的开发流程；安装 <code>interface-review</code> 与七个 <code>better-*</code> 依赖并更新 <code>skills-lock.json</code>；加入独立的 <code>web-design-guidelines</code> skill；扩展 <code>tests/test_project_instructions.py</code> 保护规则和 skill 完整性。</p></article>
             <article class="choice"><h3>保持不变</h3><p>现有五阶段方案流程、WIP/ACTIVE 生命周期、前端浏览器验收以及各代码质量门禁保持不变。</p></article>
           </div>
           <div class="callout warn"><strong>风险：</strong>规则过宽会让纯后端工作执行无意义的界面审查；通过明确界面影响条件和可追溯豁免控制。规则过窄会遗漏共享组件的消费者；通过审查完整本地变更而非单文件控制。</div>
@@ -141,10 +141,10 @@
             <table>
               <thead><tr><th>验证层</th><th>计划命令或检查</th><th>预期</th><th>结果</th></tr></thead>
               <tbody>
-                <tr><td>规范与 skill 契约</td><td><code>python3 -m pytest tests/test_project_instructions.py tests/test_check_design_docs.py -q</code></td><td>审查范围、时机、模式、留痕、豁免及 skill 依赖完整性均有断言保护。</td><td>通过：37 passed；2 条 warning 仅为受沙箱限制无法写入 <code>.pytest_cache</code>。</td></tr>
+                <tr><td>规范与 skill 契约</td><td><code>python3 -m pytest tests/test_project_instructions.py tests/test_check_design_docs.py -q</code></td><td>审查规则、依赖及 <code>web-design-guidelines</code> 来源均有断言保护。</td><td>通过：37 passed；2 条 warning 仅为受沙箱限制无法写入 <code>.pytest_cache</code>。</td></tr>
                 <tr><td>方案结构</td><td><code>python3 scripts/check_design_docs.py</code></td><td>WIP 阶段仅因预期的合并门禁失败，HTML 结构和资源约束没有其他错误。</td><td>符合预期：唯一错误为本方案处于 WIP，未发现结构或外部资源错误。</td></tr>
                 <tr><td>补丁质量</td><td><code>git diff --check</code></td><td>无空白错误。</td><td>通过。</td></tr>
-                <tr><td>界面审查</td><td>检查本次改动的文件范围</td><td>工程治理、skill 和测试文本不影响用户界面，记录豁免依据。</td><td>豁免：仅修改工程规范、审查 skill、锁文件、规范测试和内部方案，不影响页面、交互、产品文案或前端消费者。</td></tr>
+                <tr><td>界面审查</td><td>检查本次改动的文件范围</td><td>工程治理、skill 和测试文本不影响用户界面，记录豁免依据。</td><td>豁免：新增一个 agent skill 并更新规范测试与内部方案，不影响页面、交互、产品文案或前端消费者。</td></tr>
                 <tr><td>ACTIVE 门禁</td><td><code>make check-design</code></td><td>转为 ACTIVE 后全部方案通过。</td><td>通过：108 份方案文档的路径、HTML 结构、单文件资源和状态门禁全部通过。</td></tr>
               </tbody>
             </table>
@@ -158,7 +158,8 @@
             <li><strong>2026-08-14：</strong>审查位于常规测试之后、方案转为 ACTIVE 之前；存在 <code>HIGH</code> 或 <code>MEDIUM</code> 问题时修复后重新审查。</li>
             <li><strong>2026-08-14：</strong>审查范围、最终结论和问题处理情况必须回写同一份 WIP。</li>
             <li><strong>2026-08-14：</strong>纯后端且无界面影响时允许豁免，但必须记录判断依据。</li>
-            <li><strong>2026-08-14：</strong>PR 必须同时安装并锁定 <code>interface-review</code> 及七个 <code>better-*</code> 依赖，避免规范引用无法执行；不相关且无锁记录的 <code>web-design-guidelines</code> 不纳入本 PR。</li>
+            <li><strong>2026-08-14：</strong>PR 必须同时安装并锁定 <code>interface-review</code> 及七个 <code>better-*</code> 依赖，避免规范引用无法执行。</li>
+            <li><strong>2026-08-14：</strong>用户进一步要求将独立的 <code>web-design-guidelines</code> 一并提交；该 skill 作为按 Vercel Web Interface Guidelines 审查指定文件的补充能力纳入同一 PR。</li>
           </ol>
         </section>
       </main>

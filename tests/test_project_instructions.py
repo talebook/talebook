@@ -102,7 +102,7 @@ def test_large_features_require_full_local_interface_review_before_activation():
 
 
 def test_interface_review_skill_and_domain_dependencies_are_installed():
-    expected_skills = {
+    expected_locked_skills = {
         "better-accessibility",
         "better-colors",
         "better-interface",
@@ -112,15 +112,19 @@ def test_interface_review_skill_and_domain_dependencies_are_installed():
         "better-writing",
         "interface-review",
     }
+    expected_repo_skills = expected_locked_skills | {"web-design-guidelines"}
     locked_skills = json.loads(SKILLS_LOCK.read_text(encoding="utf-8"))["skills"]
 
-    assert expected_skills <= locked_skills.keys()
-    for skill_name in expected_skills:
+    assert expected_locked_skills <= locked_skills.keys()
+    for skill_name in expected_repo_skills:
         instructions = (SKILLS_ROOT / skill_name / "SKILL.md").read_text(encoding="utf-8")
         assert f"name: {skill_name}" in instructions
     assert "disable-model-invocation: true" in (SKILLS_ROOT / "interface-review" / "SKILL.md").read_text(
         encoding="utf-8"
     )
+    assert "vercel-labs/web-interface-guidelines" in (
+        SKILLS_ROOT / "web-design-guidelines" / "SKILL.md"
+    ).read_text(encoding="utf-8")
 
 
 def test_workflow_changes_require_real_local_act_validation():
