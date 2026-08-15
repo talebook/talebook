@@ -862,6 +862,7 @@
         "chineseDir": "Use Chinese directory names (UTF8, more beautiful)",
         "oldEpubReader": "Epub Reader (Old Version)",
         "candleReader": "Candle Reader (Beta, supports chapter comments)",
+        "readestReader": "Readest Reader",
         "none": "Disabled",
         "image": "Image CAPTCHA (no configuration needed)",
         "geetest": "GeeTest"

@@ -892,6 +892,7 @@
         "chineseDir": "使用中文目录名 (UTF8 编码，更美观)",
         "oldEpubReader": "Epub Reader（旧版）",
         "candleReader": "Candle Reader（Beta 版，支持章评功能）",
+        "readestReader": "Readest Reader",
         "none": "不启用",
         "image": "图形验证码 (无需配置)",
         "geetest": "GeeTest (极验)"

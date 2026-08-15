@@ -45,6 +45,12 @@ export default defineNuxtConfig({
         }
     },
     routeRules: {
+        '/readest/**': {
+            headers: {
+                'Content-Security-Policy': "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline' blob:; font-src 'self' data:; object-src 'none'; frame-src blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+                'X-Content-Type-Options': 'nosniff',
+            },
+        },
         '/api/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/api/**' },
         '/get/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/get/**' },
         '/read/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/read/**' },

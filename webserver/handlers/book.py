@@ -65,6 +65,36 @@ from webserver.services.mail import MailService
 CONF = loader.get_settings()
 
 
+def reader_resource_revision(path):
+    stat = os.stat(path)
+    return "%x-%x" % (stat.st_mtime_ns, stat.st_size)
+
+
+def require_online_read_permission(handler, structured=False):
+    """Apply the permission policy shared by /read and reader resources."""
+    guest_like = not handler.current_user or demo_mode.is_demo_restricted(CONF, handler.current_user)
+    if guest_like:
+        if not CONF["ALLOW_GUEST_READ"]:
+            handler.redirect("/login")
+            return False
+    elif handler.current_user.can_read():
+        if not handler.current_user.is_active():
+            if structured:
+                handler.set_status(403)
+                handler.write({"err": "user.activation_required", "msg": _("请先激活账号")})
+                handler.finish()
+                return False
+            raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
+    else:
+        if structured:
+            handler.set_status(403)
+            handler.write({"err": "user.no_permission", "msg": _("无权在线阅读")})
+            handler.finish()
+            return False
+        raise web.HTTPError(403, reason=_("无权在线阅读"))
+    return True
+
+
 class Index(BaseHandler):
     def fmt(self, b):
         return utils.BookFormatter(self, b).format()
@@ -1617,9 +1647,9 @@ class BookUploadComplete(BookUploadBase):
 
 
 class BookRead(BaseHandler):
-    def render_epub(self, book, is_ready, audiobook_edition=None):
+    def render_epub(self, book, is_ready, audiobook_edition=None, viewer=None):
         return self.html_page(
-            "book/" + CONF["EPUB_VIEWER"],
+            "book/" + (viewer or CONF["EPUB_VIEWER"]),
             {
                 "book": book,
                 "epub_dir": "/get/extract/%s" % book["id"],
@@ -1630,17 +1660,9 @@ class BookRead(BaseHandler):
         )
 
     def get(self, id):
-        # 演示模式下，未登录访客与演示账号的在线阅读权限统一遵循“访客权限”配置，
-        # 忽略演示账号自身的权限位（该账号默认拥有完整权限，用于伪装管理员体验）。
         guest_like = not self.current_user or demo_mode.is_demo_restricted(CONF, self.current_user)
-        if guest_like:
-            if not CONF["ALLOW_GUEST_READ"]:
-                return self.redirect("/login")
-        elif self.current_user.can_read():
-            if not self.current_user.is_active():
-                raise web.HTTPError(403, reason=_("无权在线阅读，请先登录注册邮箱激活账号。"))
-        else:
-            raise web.HTTPError(403, reason=_("无权在线阅读"))
+        if not require_online_read_permission(self):
+            return
 
         book = self.get_book_or_404(id)
         book_id = book["id"]
@@ -1653,7 +1675,42 @@ class BookRead(BaseHandler):
         self.user_history("read_history", book)
         self.count_increase(book_id, count_download=1)
 
+        requested_reader = self.get_argument("reader", "")
+        use_readest = requested_reader == "readest" or (not requested_reader and CONF["EPUB_VIEWER"] == "readest")
+        if use_readest:
+            if book.get("fmt_epub"):
+                revision = reader_resource_revision(book["fmt_epub"])
+                resource_url = self.site_url + "/read/resource/%d.epub?revision=%s" % (book_id, revision)
+                reader_query = urllib.parse.urlencode(
+                    {
+                        "file": resource_url,
+                        "moke": "1",
+                        "mokeBookId": str(book_id),
+                        "mokeReturnTo": "/book/%d" % book_id,
+                    }
+                )
+                return self.redirect("/readest/reader.html?%s" % reader_query)
+            if ConvertService().is_book_converting(book):
+                self.set_status(409)
+                error = "reader.conversion_pending"
+                message = _("本书正在转换为 EPUB，请稍后重试")
+            else:
+                self.set_status(415)
+                error = "reader.format_unsupported"
+                message = _("Readest 当前仅支持 EPUB 格式")
+            return self.html_page(
+                "book/readest_error.html",
+                {"book": book, "error": error, "message": message},
+            )
+
         if book.get("fmt_epub"):
+            if requested_reader == "candle":
+                return self.render_epub(
+                    book,
+                    is_ready=True,
+                    audiobook_edition=audiobook_edition,
+                    viewer="creader.html",
+                )
             return self.render_epub(book, is_ready=True, audiobook_edition=audiobook_edition)
 
         if "fmt_pdf" in book:
@@ -1682,6 +1739,118 @@ class BookRead(BaseHandler):
             ConvertService().convert_and_save(self.user_id(), book, fpath, "epub")
             return self.render_epub(book, is_ready=False, audiobook_edition=audiobook_edition)
         raise web.HTTPError(404, reason=_("抱歉，在线阅读器暂不支持该格式的书籍"))
+
+
+class BookReaderBootstrap(BaseHandler):
+    @js
+    def get(self, id):
+        if self.get_argument("engine", "") != "readest":
+            self.set_status(400)
+            return {"err": "reader.engine_unsupported"}
+        if not require_online_read_permission(self, structured=True):
+            return
+        book = self.get_book(id, raise_exception=False)
+        if not book:
+            self.set_status(404)
+            return {"err": "book.not_found"}
+        fpath = book.get("fmt_epub")
+        if not fpath:
+            if ConvertService().is_book_converting(book):
+                self.set_status(409)
+                return {"err": "reader.conversion_pending"}
+            self.set_status(404)
+            return {"err": "reader.format_unsupported"}
+        revision = reader_resource_revision(fpath)
+        return {
+            "err": "ok",
+            "schema": "talebook.reader.bootstrap.v1",
+            "engine": "readest",
+            "book": {
+                "id": book["id"],
+                "title": book["title"],
+                "format": "epub",
+                "revision": revision,
+            },
+            "resource": {
+                "kind": "authorized-epub-url",
+                "url": "/read/resource/%d.epub?revision=%s" % (book["id"], revision),
+                "mime": "application/epub+zip",
+                "range": True,
+            },
+            "navigation": {
+                "back": "/book/%d" % book["id"],
+                "fallback": "/read/%d?reader=candle" % book["id"],
+            },
+            "capabilities": {
+                "readerCore": True,
+                "navigation": True,
+                "tableOfContents": True,
+                "textSearch": True,
+                "localPosition": True,
+                "localSettings": True,
+                "layoutSettings": True,
+                "appearanceSettings": True,
+                "languageSettings": True,
+                "customFonts": False,
+                "backgroundImages": False,
+                "annotations": False,
+                "serverProgress": False,
+                "pdf": False,
+                "dictionaries": False,
+                "translation": False,
+                "tts": False,
+                "library": False,
+                "account": False,
+                "auth": False,
+                "cloud": False,
+                "sync": False,
+                "payment": False,
+                "upgrade": False,
+                "updater": False,
+                "send": False,
+                "rss": False,
+                "opds": False,
+                "integrations": False,
+                "telemetry": False,
+                "aiAssistant": False,
+                "reedy": False,
+                "readestGateway": False,
+                "tauri": False,
+            },
+        }
+
+
+class BookReaderResource(BaseHandler, web.StaticFileHandler):
+    """Stream an EPUB using online-reading, rather than download, permission."""
+
+    def initialize(self):
+        self.root = "/"
+        self.default_filename = None
+        BaseHandler.initialize(self)
+
+    def prepare(self):
+        BaseHandler.prepare(self)
+        if not require_online_read_permission(self):
+            return
+
+    def parse_url_path(self, url_path):
+        match = re.fullmatch(r"([0-9]+)\.epub", url_path, re.IGNORECASE)
+        if not match:
+            raise web.HTTPError(404)
+        book = self.get_book_or_404(match.group(1))
+        fpath = book.get("fmt_epub")
+        if not fpath:
+            raise web.HTTPError(404, reason=_("EPUB 格式不存在"))
+        expected_revision = self.get_argument("revision", "")
+        if expected_revision and expected_revision != reader_resource_revision(fpath):
+            raise web.HTTPError(409, reason=_("EPUB 资源已更新，请重新加载"))
+        return fpath
+
+    def set_extra_headers(self, path):
+        self.set_header("Content-Type", "application/epub+zip")
+        self.set_header("Content-Disposition", 'inline; filename="book.epub"')
+        self.set_header("Cache-Control", "private, no-store")
+        self.set_header("X-Content-Type-Options", "nosniff")
 
 
 class TxtRead(BaseHandler):
@@ -2593,6 +2762,8 @@ def routes():
         (r"/api/book/([0-9]+)/separate", BookSeparate),
         (r"/api/book/([0-9]+)/savemeta", BookSaveMeta),
         (r"/read/([0-9]+)", BookRead),
+        (r"/read/resource/([0-9]+\.epub)", BookReaderResource),
+        (r"/api/book/([0-9]+)/reader-bootstrap", BookReaderBootstrap),
         (r"/api/read/txt", TxtRead),
         (r"/api/book/txt/init", BookTxtInit),
         (r"/api/book/([0-9]+)/favorite", BookFavorite),
