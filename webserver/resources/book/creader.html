@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>{{ book.title }}</title>
 
   <base href="{{RES}}/static/candle-reader/" />
@@ -13,8 +13,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="anonymous">
   <link rel="preload" as="style" onload="this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap">
   <link rel="stylesheet" crossorigin href="style.css?v=v1.1.0">
+  <link rel="stylesheet" href="{{RES}}/static/js/ai-top5.css?v=top5.v1">
 
   <script src="js/epub-v0.3.88.js"></script>
+  <script defer src="{{RES}}/static/js/ai-top5.js?v=top5.v1"></script>
   <script  type="module">
     import { Reader } from "./candle-reader.es.js?v=v1.1.0"
 
@@ -30,6 +32,7 @@
         audiobook_edition_id: {% if audiobook_edition_id %}{{audiobook_edition_id}}{% else %}null{% endif %},
         audiobook_manifest_url: {% if audiobook_edition_id %}"{{RES}}/api/audio/{{audiobook_edition_id}}"{% else %}""{% endif %},
       })
+      window.TalebookSummaryDuckInit?.({ bookId: {{book.id}} })
     }
 
     {% if is_ready %}

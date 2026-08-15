@@ -536,6 +536,41 @@ class ReadingState(Base, SQLAlchemyMixin):
         return self.progress or {}
 
 
+class AITop5Result(Base, SQLAlchemyMixin):
+    """A creator-private, chapter-scoped AI TOP5 artifact."""
+
+    __tablename__ = "ai_top5_results"
+
+    id = Column(String(36), primary_key=True)
+    request_key = Column(String(64), unique=True, nullable=False, index=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    book_version = Column(String(128), nullable=False)
+    chapter_href = Column(String(1024), nullable=False)
+    chapter_title = Column(String(512), default="")
+    chapter_text_hash = Column(String(64), nullable=False)
+    chapter_length = Column(Integer, nullable=False)
+    status = Column(String(24), default="queued", nullable=False, index=True)
+    progress_message = Column(String(256), default="")
+    qa_data = Column(MutableDict.as_mutable(JSONType), default={})
+    ai_draft = Column(MutableDict.as_mutable(JSONType), default={})
+    user_revision = Column(MutableDict.as_mutable(JSONType), default={})
+    schema_version = Column(String(32), default="top5.v1", nullable=False)
+    prompt_version = Column(String(32), default="top5.zh.v1", nullable=False)
+    runtime_name = Column(String(64), default="")
+    runtime_session_id = Column(String(128), default="")
+    usage = Column(MutableDict.as_mutable(JSONType), default={})
+    error_code = Column(String(128), default="")
+    error_message = Column(String(500), default="")
+    cancel_requested = Column(Boolean, default=False, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime)
+
+    creator = relationship(Reader, backref="ai_top5_results")
+
+
 class BookSourceModel(Base, SQLAlchemyMixin):
     """网络书源（Legado 书源 JSON）。"""
 

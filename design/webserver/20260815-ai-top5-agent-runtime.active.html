@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="总结鸭 TOP5 与运行时无关 AgentRuntime 的内部实现方案。" />
+    <link rel="icon" href="data:," />
+    <title>总结鸭 TOP5 与 Codex app-server AgentRuntime · ACTIVE</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#f5f1eb; --panel:#fffdf9; --ink:#26211d; --muted:#665e57; --line:#d8cec4; --accent:#c74419; --soft:#fff0e8; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif; }
+      main, header { width:min(1040px,calc(100% - 28px)); margin:auto; }
+      header { padding:46px 0 24px; }
+      h1 { margin:0 0 10px; font-size:clamp(30px,5vw,50px); line-height:1.1; }
+      h2 { margin:0 0 12px; font-size:22px; }
+      h3 { color:var(--accent); }
+      section { margin:0 0 18px; padding:24px; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
+      .meta { display:flex; flex-wrap:wrap; gap:8px; color:var(--muted); }
+      .meta span { padding:5px 10px; border-radius:999px; background:var(--soft); }
+      .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+      .flow div { padding:14px; border:1px solid var(--line); border-radius:12px; }
+      table { width:100%; border-collapse:collapse; }
+      th,td { padding:10px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+      code { padding:2px 5px; border-radius:5px; background:var(--soft); }
+      .pending { color:#955200; font-weight:700; }
+      @media (max-width:720px) { .flow { grid-template-columns:1fr; } section { padding:18px; } }
+      @media (prefers-color-scheme:dark) { :root { --bg:#181513; --panel:#24201d; --ink:#f6eee7; --muted:#c7bbb0; --line:#56483f; --soft:#41261d; --accent:#ff7547; } }
+      @media print { body { background:#fff; } section { break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>总结鸭 TOP5 与 Codex app-server AgentRuntime</h1>
+      <p>在 EPUB 当前章节内生成恰好五组可核验问答，并以无工具、无书库访问的短生命周期运行时隔离模型执行。</p>
+      <div class="meta">
+        <span>状态：ACTIVE</span><span>创建日期：2026-08-15</span><span>所属模块：webserver / reader</span>
+        <span>需求来源：TB-53</span><span>基线：master（远端无 feat/ai_1.0）</span>
+      </div>
+    </header>
+    <main>
+      <section>
+        <h2>1. 原始诉求</h2>
+        <p>用户在 EPUB 当前章节主动触发“总结鸭”，得到结构化 TOP5 问答；事实性答案必须带章节内引用，并支持回跳、编辑、保存、删除、整组重生成、取消、重试和 Markdown 导出。首版模型执行只允许经 Codex app-server，不直接调用 OpenAI API 或 SDK。</p>
+      </section>
+      <section>
+        <h2>2. 目标与边界</h2>
+        <table>
+          <thead><tr><th>目标</th><th>明确不做</th></tr></thead>
+          <tbody><tr><td>运行时稳定接口、Codex stdio 适配器、结果/引用双重校验、创建者隔离、任务状态与安全阅读器 UI。</td><td>Claude Code 与 Trae 真实适配器、PDF/OCR、跨书研究、角色卡、前情提要、公开分享及全书后台扫描。</td></tr></tbody>
+        </table>
+      </section>
+      <section>
+        <h2>3. 核心流程</h2>
+        <div class="flow">
+          <div><strong>权限与输入</strong><br />后端再次校验书籍可见性；仅接收裁剪后的当前章节文本、标题和 locator 范围。</div>
+          <div><strong>隔离运行</strong><br />临时空目录启动 <code>codex app-server --listen stdio://</code>，禁止审批、网络和写入。</div>
+          <div><strong>终态校验</strong><br />仅接受 <code>turn/completed</code>；业务层重验 schema、Markdown 和章节内引用。</div>
+          <div><strong>成果交付</strong><br />按创建者保存 AI 原稿与用户修订稿；前端可编辑、回跳、导出、重试或删除。</div>
+        </div>
+      </section>
+      <section>
+        <h2>4. AgentRuntime 契约</h2>
+        <p>能力位至少包含 <code>native_output_schema</code>、<code>resume</code>、<code>cancel</code>、<code>usage</code>、<code>model_selection</code>。一次生成发布启动、进度和唯一终态事件；错误只暴露分类和脱敏消息。Codex 适配器按官方协议执行 <code>initialize</code> / <code>initialized</code> / <code>thread/start</code> / <code>turn/start.outputSchema</code> / <code>turn/completed</code> / <code>thread/delete</code>，取消时发送 <code>turn/interrupt</code> 并清理进程组。</p>
+        <p>固定验证版本范围为 <code>&gt;=0.147.0,&lt;0.148.0</code>；不匹配、缺失、未登录、额度、崩溃、握手/首进度/静默/总时长超时均失败关闭。</p>
+      </section>
+      <section>
+        <h2>5. 数据、权限与安全</h2>
+        <ul>
+          <li>保存创建者、book id/version、章节 href/title/hash/长度、五问五答及 locator、AI 原稿、用户稿、schema/prompt 版本、状态、用量与时间。</li>
+          <li>列表、详情、编辑、删除、取消与导出均限定创建者，同时每次读取重新校验书籍权限和版本。</li>
+          <li>不持久化章节正文或完整提示；任务目录为空且只读，无 MCP、动态工具、网络或书库目录。</li>
+          <li>Markdown 仅支持纯文本与 <code>**</code>/<code>__</code> 强调；所有 HTML、style、script 和危险 URL 作为文本处理。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>6. API 与界面</h2>
+        <p><code>/api/ai/top5</code> 创建/列表，<code>/api/ai/top5/:id</code> 查询/编辑/删除，附加 <code>cancel</code> 与 <code>export</code> 操作。阅读器浮动入口打开侧栏，状态依次为待处理、生成中、成功、失败或已取消；引用按钮向宿主派发 locator 回跳事件。</p>
+        <p>亮暗主题均使用橙红 token，结构顺序固定为编号、问题、答案、原文引用。键盘焦点、状态提示和窄屏布局纳入验收。</p>
+      </section>
+      <section>
+        <h2>7. 风险与关闭策略</h2>
+        <ul>
+          <li>阅读器当前没有稳定章节抽取 API：提供显式桥接事件，并仅在同源 EPUB iframe 可读时自动采集；不可读时提示用户重试。</li>
+          <li>Codex 协议随 CLI 版本变化：版本门禁、保存 fixture、未知消息容忍、缺终态失败。</li>
+          <li>进程泄漏与取消竞态：单任务进程组、幂等取消、唯一终态锁和 finally 清理。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>8. 测试结果</h2>
+        <ul>
+          <li>后端完整测试：<code>837 passed, 20 skipped, 7 subtests passed</code>；TOP5 定向测试：<code>14 passed</code>。</li>
+          <li>后端 Ruff：107 个 Python 文件通过格式与 lint 检查。</li>
+          <li>前端定向 Vitest：<code>3 passed</code>；Chromium 亮色、暗色及 320px 键盘/重排 E2E：<code>3 passed</code>。</li>
+          <li>ESLint：0 errors，193 个既有 warnings。完整 Vitest 仅有一个无关既有失败：<code>LocalMdiIcons.spec.ts</code> 缺失三个未由本变更引入的图标，并有依赖本地 3000 端口的既有用例。</li>
+          <li>橙红强调色与背景对比度：亮色 5.67:1，暗色 6.41:1。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>9. 界面 Full Review</h2>
+        <p>范围为相对 <code>origin/master</code> 的全部未提交变更；直接审阅阅读器入口、空态、加载、成功、失败、取消、编辑、窄屏、亮暗主题和键盘路径。快照、fixture、测试结果和二进制图片不作为源码审阅对象，但检查了引用它们的 E2E 与真实 Chromium 渲染。</p>
+        <p>首轮发现并修复三个引入问题：弹窗焦点可逃逸/背景未 inert、编辑文本域缺少程序化标签、绝对定位 footer 在 320px/缩放时可能遮挡内容。同时补齐稳定 live region、背景滚动隔离、焦点恢复、保存失败保留草稿和可缩放 viewport。复查无剩余 HIGH 或 MEDIUM；Accessibility、Layout、Writing、Typography、Colors、UI 六个领域 verdict 为 <strong>Approve</strong>。</p>
+        <p>刻意保留的设计决策：引用使用描边按钮而非静态引文以明确回跳能力；问题标题继续使用橙红色，因为这是 TB-53 的明确视觉语义，并已通过亮暗对比度测试；生成 spinner 在 reduced-motion 下减速而非取消，属于功能性进度反馈。</p>
+      </section>
+    </main>
+  </body>
+</html>
