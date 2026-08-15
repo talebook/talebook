@@ -960,5 +960,288 @@ class InstalledTheme(Base, SQLAlchemyMixin):
         }
 
 
+class PluginDefinition(Base, SQLAlchemyMixin):
+    """Versioned, validated plugin manifest stored independently from installation state."""
+
+    __tablename__ = "plugin_definitions"
+    __table_args__ = (UniqueConstraint("plugin_key", "version", name="uq_plugin_definition_key_version"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    plugin_key = Column(String(200), nullable=False, index=True)
+    version = Column(String(64), nullable=False)
+    protocol_version = Column(String(64), nullable=False)
+    name = Column(String(200), nullable=False)
+    runtime_kind = Column(String(32), nullable=False)
+    categories = Column(JSONType, default=list, nullable=False)
+    capabilities = Column(JSONType, default=list, nullable=False)
+    actions = Column(JSONType, default=list, nullable=False)
+    auth_schema = Column(MutableDict.as_mutable(JSONType), default={})
+    config_schema = Column(MutableDict.as_mutable(JSONType), default={})
+    permissions = Column(JSONType, default=list, nullable=False)
+    data_policy = Column(MutableDict.as_mutable(JSONType), default={})
+    compatibility = Column(MutableDict.as_mutable(JSONType), default={})
+    homepage = Column(String(1000), default="")
+    license = Column(String(100), default="")
+    manifest = Column(MutableDict.as_mutable(JSONType), default={})
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    def to_public_dict(self):
+        return {
+            "id": self.id,
+            "plugin_key": self.plugin_key,
+            "version": self.version,
+            "protocol_version": self.protocol_version,
+            "name": self.name,
+            "runtime_kind": self.runtime_kind,
+            "categories": list(self.categories or []),
+            "capabilities": list(self.capabilities or []),
+            "actions": list(self.actions or []),
+            "auth_schema": dict(self.auth_schema or {}),
+            "config_schema": dict(self.config_schema or {}),
+            "permissions": list(self.permissions or []),
+            "data_policy": dict(self.data_policy or {}),
+            "compatibility": dict(self.compatibility or {}),
+            "homepage": self.homepage or "",
+            "license": self.license or "",
+        }
+
+
+class PluginInstallation(Base, SQLAlchemyMixin):
+    """The single instance-wide installation reused by every capability tab."""
+
+    __tablename__ = "plugin_installations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    plugin_key = Column(String(200), unique=True, nullable=False, index=True)
+    definition_id = Column(Integer, ForeignKey("plugin_definitions.id"), nullable=False, index=True)
+    version = Column(String(64), nullable=False)
+    enabled = Column(Boolean, default=True, nullable=False, index=True)
+    scope = Column(String(32), default="instance", nullable=False)
+    config = Column(MutableDict.as_mutable(JSONType), default={})
+    installed_from = Column(String(1000), default="builtin")
+    checksum = Column(String(128), default="")
+    status = Column(String(32), default="active", nullable=False, index=True)
+    installed_by = Column(Integer, ForeignKey("readers.id"), nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    def to_public_dict(self, definition=None):
+        data = {
+            "id": self.id,
+            "plugin_key": self.plugin_key,
+            "version": self.version,
+            "enabled": bool(self.enabled),
+            "scope": self.scope,
+            "config": dict(self.config or {}),
+            "installed_from": self.installed_from,
+            "checksum": self.checksum,
+            "status": self.status,
+        }
+        if definition is not None:
+            data["definition"] = definition.to_public_dict()
+        return data
+
+
+class PluginSecret(Base, SQLAlchemyMixin):
+    """Encrypted connection credential. Public serialization deliberately omits ciphertext."""
+
+    __tablename__ = "plugin_secrets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    owner_type = Column(String(32), nullable=False, index=True)
+    owner_id = Column(Integer, nullable=False, index=True)
+    kind = Column(String(64), default="credentials", nullable=False)
+    ciphertext = Column(Text, nullable=False)
+    key_id = Column(String(64), nullable=False)
+    version = Column(Integer, default=1, nullable=False)
+    mask_hint = Column(String(32), default="")
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    last_rotated_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    def to_public_dict(self):
+        return {
+            "configured": bool(self.ciphertext),
+            "kind": self.kind,
+            "mask": "••••" + (self.mask_hint or ""),
+            "version": self.version,
+            "last_rotated_at": self.last_rotated_at.isoformat() if self.last_rotated_at else None,
+        }
+
+
+class PluginConnection(Base, SQLAlchemyMixin):
+    """Instance- or user-owned plugin connection, cursor and persistent execution lease."""
+
+    __tablename__ = "plugin_connections"
+    __table_args__ = (
+        UniqueConstraint("installation_id", "owner_type", "owner_id", "name", name="uq_plugin_connection_owner_name"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    installation_id = Column(Integer, ForeignKey("plugin_installations.id"), nullable=False, index=True)
+    owner_type = Column(String(32), nullable=False, index=True)
+    owner_id = Column(Integer, nullable=False, index=True)
+    name = Column(String(200), default="default", nullable=False)
+    secret_id = Column(Integer, ForeignKey("plugin_secrets.id"), index=True)
+    config = Column(MutableDict.as_mutable(JSONType), default={})
+    scopes = Column(JSONType, default=list, nullable=False)
+    schedule = Column(String(128), default="")
+    cursor = Column(MutableDict.as_mutable(JSONType), default={})
+    health = Column(String(32), default="unknown", nullable=False, index=True)
+    health_message = Column(String(500), default="")
+    enabled = Column(Boolean, default=True, nullable=False, index=True)
+    lease_token = Column(String(64), default="", index=True)
+    lease_until = Column(DateTime)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    def to_public_dict(self, secret=None):
+        return {
+            "id": self.id,
+            "installation_id": self.installation_id,
+            "owner_type": self.owner_type,
+            "owner_id": self.owner_id,
+            "name": self.name,
+            "config": dict(self.config or {}),
+            "scopes": list(self.scopes or []),
+            "schedule": self.schedule or "",
+            "cursor": dict(self.cursor or {}),
+            "health": self.health,
+            "health_message": self.health_message or "",
+            "enabled": bool(self.enabled),
+            "secret": secret.to_public_dict() if secret else {"configured": False, "mask": ""},
+        }
+
+
+class PluginRun(Base, SQLAlchemyMixin):
+    """Durable state machine record for every test, preview, run, retry and rollback."""
+
+    __tablename__ = "plugin_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    connection_id = Column(Integer, ForeignKey("plugin_connections.id"), nullable=False, index=True)
+    parent_run_id = Column(Integer, ForeignKey("plugin_runs.id"), index=True)
+    action = Column(String(32), nullable=False, index=True)
+    trigger = Column(String(32), default="manual", nullable=False)
+    status = Column(String(32), default="queued", nullable=False, index=True)
+    requested_by = Column(Integer, ForeignKey("readers.id"), nullable=False)
+    counts = Column(MutableDict.as_mutable(JSONType), default={})
+    cursor_before = Column(MutableDict.as_mutable(JSONType), default={})
+    cursor_after = Column(MutableDict.as_mutable(JSONType), default={})
+    error_code = Column(String(128), default="")
+    error_message = Column(String(1000), default="")
+    attempt = Column(Integer, default=0, nullable=False)
+    duration_ms = Column(BigInteger, default=0, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False, index=True)
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime)
+
+    def to_public_dict(self):
+        return {
+            "id": self.id,
+            "connection_id": self.connection_id,
+            "parent_run_id": self.parent_run_id,
+            "action": self.action,
+            "trigger": self.trigger,
+            "status": self.status,
+            "requested_by": self.requested_by,
+            "counts": dict(self.counts or {}),
+            "cursor_before": dict(self.cursor_before or {}),
+            "cursor_after": dict(self.cursor_after or {}),
+            "error_code": self.error_code or "",
+            "error_message": self.error_message or "",
+            "attempt": self.attempt,
+            "duration_ms": self.duration_ms,
+            "created_at": self.create_time.isoformat() if self.create_time else None,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+        }
+
+
+class PluginRunItem(Base, SQLAlchemyMixin):
+    __tablename__ = "plugin_run_items"
+    __table_args__ = (UniqueConstraint("run_id", "external_id", name="uq_plugin_run_item_external"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(Integer, ForeignKey("plugin_runs.id"), nullable=False, index=True)
+    external_id = Column(String(500), nullable=False)
+    entity_type = Column(String(64), nullable=False, index=True)
+    status = Column(String(32), nullable=False, index=True)
+    operation = Column(String(32), default="")
+    error_code = Column(String(128), default="")
+    error_message = Column(String(1000), default="")
+    payload_hash = Column(String(64), default="")
+    data = Column(MutableDict.as_mutable(JSONType), default={})
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    def to_public_dict(self, include_data=False):
+        value = {
+            "id": self.id,
+            "run_id": self.run_id,
+            "external_id": self.external_id,
+            "entity_type": self.entity_type,
+            "status": self.status,
+            "operation": self.operation or "",
+            "error_code": self.error_code or "",
+            "error_message": self.error_message or "",
+            "payload_hash": self.payload_hash or "",
+        }
+        if include_data:
+            value["data"] = dict(self.data or {})
+        return value
+
+
+class PluginEntityMatch(Base, SQLAlchemyMixin):
+    __tablename__ = "plugin_entity_matches"
+    __table_args__ = (UniqueConstraint("connection_id", "source_type", "external_id", name="uq_plugin_entity_match_source"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    connection_id = Column(Integer, ForeignKey("plugin_connections.id"), nullable=False, index=True)
+    source_type = Column(String(64), nullable=False)
+    external_id = Column(String(500), nullable=False)
+    book_id = Column(Integer, nullable=False, index=True)
+    method = Column(String(32), nullable=False)
+    confidence = Column(Float, default=0.0, nullable=False)
+    status = Column(String(32), default="candidate", nullable=False)
+    confirmed_by = Column(Integer, ForeignKey("readers.id"))
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+
+class PluginSourceRecord(Base, SQLAlchemyMixin):
+    __tablename__ = "plugin_source_records"
+    __table_args__ = (
+        UniqueConstraint("connection_id", "entity_type", "external_id", name="uq_plugin_source_record_identity"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    connection_id = Column(Integer, ForeignKey("plugin_connections.id"), nullable=False, index=True)
+    source = Column(String(200), nullable=False, index=True)
+    external_id = Column(String(500), nullable=False)
+    entity_type = Column(String(64), nullable=False, index=True)
+    entity_id = Column(String(500), default="")
+    run_id = Column(Integer, ForeignKey("plugin_runs.id"), nullable=False, index=True)
+    raw_hash = Column(String(64), nullable=False)
+    remote_updated_at = Column(DateTime)
+    local_modified = Column(Boolean, default=False, nullable=False)
+    status = Column(String(32), default="active", nullable=False, index=True)
+    data = Column(MutableDict.as_mutable(JSONType), default={})
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    rolled_back_at = Column(DateTime)
+
+
+class PluginPermission(Base, SQLAlchemyMixin):
+    __tablename__ = "plugin_permissions"
+    __table_args__ = (UniqueConstraint("installation_id", "permission", "scope", name="uq_plugin_permission_install_scope"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    installation_id = Column(Integer, ForeignKey("plugin_installations.id"), nullable=False, index=True)
+    permission = Column(String(200), nullable=False)
+    scope = Column(String(200), default="instance", nullable=False)
+    approved_by = Column(Integer, ForeignKey("readers.id"), nullable=False)
+    approved_at = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    revoked_at = Column(DateTime)
+
+
 def user_syncdb(engine):
     Base.metadata.create_all(engine)

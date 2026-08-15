@@ -28,6 +28,9 @@ settings = {
     "extract_path"  : "/data/books/extract/",
     "with_library"  : "/data/books/library/",
     "cookie_secret" : "cookie_secret",
+    # Independent encryption key for plugin credentials. When empty, the runtime
+    # accepts only a non-default cookie_secret as compatible key material.
+    "PLUGIN_SECRET_KEY": "",
     "cookie_expire" : 7*86400,
     "login_url"     : "/login",
     "user_database" : 'sqlite:////data/books/calibre-webserver.db',

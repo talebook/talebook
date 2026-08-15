@@ -15,6 +15,7 @@ txt2epub-next==1.0.0
 # build-in support for MYSQL
 pymysql
 bcrypt
+cryptography>=38.0.0
 psutil
 requests-toolbelt
 
