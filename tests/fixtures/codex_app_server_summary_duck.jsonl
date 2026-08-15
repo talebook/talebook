@@ -1,0 +1,9 @@
+{"id":1,"result":{"userAgent":"codex-cli/0.147.0","platformFamily":"unix","platformOs":"linux"}}
+{"id":2,"result":{"thread":{"id":"thr_fixture","sessionId":"thr_fixture","ephemeral":false}}}
+{"method":"thread/started","params":{"thread":{"id":"thr_fixture"}}}
+{"id":3,"result":{"turn":{"id":"turn_fixture","status":"inProgress","items":[],"error":null}}}
+{"method":"turn/started","params":{"turn":{"id":"turn_fixture","status":"inProgress","items":[],"error":null}}}
+{"method":"item/completed","params":{"threadId":"thr_fixture","turnId":"turn_fixture","item":{"id":"item_fixture","type":"agentMessage","text":"{\"items\":[]}","phase":"final_answer"}}}
+{"method":"thread/tokenUsage/updated","params":{"threadId":"thr_fixture","tokenUsage":{"inputTokens":12,"outputTokens":34,"totalTokens":46}}}
+{"method":"turn/completed","params":{"threadId":"thr_fixture","turn":{"id":"turn_fixture","status":"completed","items":[],"error":null}}}
+{"id":90,"result":{}}
