@@ -1662,9 +1662,7 @@ class BookRead(BaseHandler):
         self.count_increase(book_id, count_download=1)
 
         requested_reader = self.get_argument("reader", "")
-        use_readest = requested_reader == "readest" or (
-            not requested_reader and CONF["EPUB_VIEWER"] == "readest"
-        )
+        use_readest = requested_reader == "readest" or (not requested_reader and CONF["EPUB_VIEWER"] == "readest")
         if use_readest:
             if book.get("fmt_epub"):
                 revision = reader_resource_revision(book["fmt_epub"])
