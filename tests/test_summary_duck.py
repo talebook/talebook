@@ -9,18 +9,18 @@ from unittest import mock
 from tests import test_main
 from webserver import models
 from webserver.services.agent_runtime import RuntimeEventType, RuntimeRequest
-from webserver.services.ai_top5 import (
+from webserver.services.codex_app_server import CodexAppServerRuntime
+from webserver.services.summary_duck import (
     FEATURE_KEY,
     PROMPT_VERSION,
-    TOP5_OUTPUT_SCHEMA,
-    AITop5Service,
-    Top5ValidationError,
+    SUMMARY_DUCK_OUTPUT_SCHEMA,
+    SummaryDuckService,
+    SummaryDuckValidationError,
     build_prompt,
     clean_markdown,
     validate_chapter_input,
-    validate_top5,
+    validate_summary_duck,
 )
-from webserver.services.codex_app_server import CodexAppServerRuntime
 
 
 def setUpModule():
@@ -50,30 +50,30 @@ def valid_payload(text=CHAPTER, href=HREF):
     return {"items": items}
 
 
-class Top5ValidationTest(unittest.TestCase):
+class SummaryDuckValidationTest(unittest.TestCase):
     def test_accepts_exactly_five_grounded_items(self):
-        checked = validate_top5(valid_payload(), CHAPTER, HREF)
+        checked = validate_summary_duck(valid_payload(), CHAPTER, HREF)
         self.assertEqual(len(checked["items"]), 5)
         self.assertIn("**问题", checked["items"][0]["question"])
 
     def test_rejects_out_of_bounds_or_mismatched_citation(self):
         payload = valid_payload()
         payload["items"][0]["citations"][0]["end"] = len(CHAPTER) + 1
-        with self.assertRaisesRegex(Top5ValidationError, "越界"):
-            validate_top5(payload, CHAPTER, HREF)
+        with self.assertRaisesRegex(SummaryDuckValidationError, "越界"):
+            validate_summary_duck(payload, CHAPTER, HREF)
 
         payload = valid_payload()
         payload["items"][0]["citations"][0]["quote"] = "伪造引用"
-        with self.assertRaisesRegex(Top5ValidationError, "不匹配"):
-            validate_top5(payload, CHAPTER, HREF)
+        with self.assertRaisesRegex(SummaryDuckValidationError, "不匹配"):
+            validate_summary_duck(payload, CHAPTER, HREF)
 
     def test_rejects_wrong_count_and_cross_chapter_href(self):
-        with self.assertRaisesRegex(Top5ValidationError, "恰好"):
-            validate_top5({"items": valid_payload()["items"][:4]}, CHAPTER, HREF)
+        with self.assertRaisesRegex(SummaryDuckValidationError, "恰好"):
+            validate_summary_duck({"items": valid_payload()["items"][:4]}, CHAPTER, HREF)
         payload = valid_payload()
         payload["items"][2]["citations"][0]["href"] = "other.xhtml"
-        with self.assertRaisesRegex(Top5ValidationError, "当前章节"):
-            validate_top5(payload, CHAPTER, HREF)
+        with self.assertRaisesRegex(SummaryDuckValidationError, "当前章节"):
+            validate_summary_duck(payload, CHAPTER, HREF)
 
     def test_markdown_cleaning_escapes_html_idempotently(self):
         once = clean_markdown("**重点** <script>alert(1)</script>", 100)
@@ -85,7 +85,7 @@ class Top5ValidationTest(unittest.TestCase):
     def test_chapter_is_minimized_and_capped(self):
         chapter = validate_chapter_input("正文事实。" * 6000, HREF, "标题")
         self.assertLessEqual(len(chapter["text"]), 20_000)
-        with self.assertRaisesRegex(Top5ValidationError, "过短"):
+        with self.assertRaisesRegex(SummaryDuckValidationError, "过短"):
             validate_chapter_input("太短", HREF)
 
     def test_prompt_reconstructs_the_chapter_instead_of_producing_five_generic_summaries(self):
@@ -144,7 +144,9 @@ class CodexProtocolContractTest(unittest.TestCase):
                 }
             )
             events = []
-            result = runtime.generate(RuntimeRequest("fixture-task", "minimal prompt", TOP5_OUTPUT_SCHEMA), events.append)
+            result = runtime.generate(
+                RuntimeRequest("fixture-task", "minimal prompt", SUMMARY_DUCK_OUTPUT_SCHEMA), events.append
+            )
             self.assertEqual(result.session_id, "thr_fixture")
             self.assertEqual(result.usage["outputTokens"], 34)
             self.assertEqual(events[-1].type, RuntimeEventType.COMPLETED)
@@ -163,7 +165,7 @@ class CodexProtocolContractTest(unittest.TestCase):
         self.assertNotIn("thread/start", source)
 
     def test_saved_protocol_fixture_has_one_authoritative_terminal(self):
-        fixture = Path("tests/fixtures/codex_app_server_top5.jsonl")
+        fixture = Path("tests/fixtures/codex_app_server_summary_duck.jsonl")
         messages = [json.loads(line) for line in fixture.read_text(encoding="utf-8").splitlines()]
         methods = [message.get("method") for message in messages]
         self.assertIn("item/completed", methods)
@@ -171,28 +173,27 @@ class CodexProtocolContractTest(unittest.TestCase):
         self.assertEqual(messages[-2]["params"]["turn"]["status"], "completed")
 
 
-class Top5APITest(test_main.TestWithUserLogin):
+class SummaryDuckAPITest(test_main.TestWithUserLogin):
     def setUp(self):
         super().setUp()
         session = test_main.get_db()
-        session.query(models.AIGeneration).delete()
+        session.query(models.AITask).delete()
         session.commit()
 
     def tearDown(self):
         session = test_main.get_db()
-        session.query(models.AIGeneration).delete()
+        session.query(models.AITask).delete()
         session.commit()
         super().tearDown()
 
     def _create(self):
-        with mock.patch.object(AITop5Service, "submit"):
+        with mock.patch.object(SummaryDuckService, "submit"):
             return self.json(
-                "/api/ai/generations",
+                "/api/ai/summary_duck/tasks",
                 method="POST",
                 headers={"Content-Type": "application/json"},
                 body=json.dumps(
                     {
-                        "feature": FEATURE_KEY,
                         "book_id": test_main.BID_EPUB,
                         "chapter_text": CHAPTER,
                         "chapter_href": HREF,
@@ -201,33 +202,33 @@ class Top5APITest(test_main.TestWithUserLogin):
                 ),
             )
 
-    def test_generic_generation_api_routes_by_feature(self):
+    def test_generic_task_api_routes_by_feature_path(self):
         unknown = self.json(
-            "/api/ai/generations",
+            "/api/ai/unknown/tasks",
             method="POST",
             headers={"Content-Type": "application/json"},
-            body=json.dumps({"feature": "unknown"}),
+            body=json.dumps({}),
         )
         self.assertEqual(unknown["err"], "ai.feature_not_found")
 
         source = Path("webserver/handlers/ai.py").read_text(encoding="utf-8")
-        self.assertIn('r"/api/ai/generations"', source)
-        self.assertNotIn('r"/api/ai/top5"', source)
+        self.assertIn('r"/api/ai/([a-z][a-z0-9_]*)/tasks"', source)
+        self.assertNotIn('r"/api/ai/generations"', source)
 
     def test_create_is_idempotent_and_creator_scoped(self):
         first = self._create()
         second = self._create()
         self.assertEqual(first["err"], "ok")
-        self.assertEqual(first["artifact"]["feature"], FEATURE_KEY)
-        self.assertEqual(first["artifact"]["id"], second["artifact"]["id"])
+        self.assertEqual(first["task"]["feature"], FEATURE_KEY)
+        self.assertEqual(first["task"]["id"], second["task"]["id"])
         self.assertTrue(second["idempotent"])
 
-        listed = self.json(f"/api/ai/generations?feature={FEATURE_KEY}&book_id={test_main.BID_EPUB}")
+        listed = self.json(f"/api/ai/{FEATURE_KEY}/tasks?book_id={test_main.BID_EPUB}")
         self.assertEqual(listed["err"], "ok")
-        self.assertEqual(listed["items"][0]["id"], first["artifact"]["id"])
+        self.assertEqual(listed["tasks"][0]["id"], first["task"]["id"])
 
         session = test_main.get_db()
-        other = models.AIGeneration(
+        other = models.AITask(
             id="11111111-1111-1111-1111-111111111111",
             request_key="f" * 64,
             feature=FEATURE_KEY,
@@ -240,13 +241,13 @@ class Top5APITest(test_main.TestWithUserLogin):
         )
         session.add(other)
         session.commit()
-        hidden = self.json(f"/api/ai/generations/{other.id}")
+        hidden = self.json(f"/api/ai/{FEATURE_KEY}/tasks/{other.id}")
         self.assertEqual(hidden["err"], "ai.not_found")
 
-    def test_successful_artifact_can_be_edited_cancelled_exported_and_deleted(self):
-        created = self._create()["artifact"]
+    def test_successful_task_can_be_edited_cancelled_exported_and_deleted(self):
+        created = self._create()["task"]
         session = test_main.get_db()
-        record = session.get(models.AIGeneration, created["id"])
+        record = session.get(models.AITask, created["id"])
         record.status = "succeeded"
         record.ai_draft = valid_payload()
         record.result_data = valid_payload()
@@ -256,41 +257,41 @@ class Top5APITest(test_main.TestWithUserLogin):
         edited = valid_payload()["items"]
         edited[0]["answer"] = "用户修订的 **答案**"
         response = self.json(
-            f"/api/ai/generations/{record.id}",
+            f"/api/ai/{FEATURE_KEY}/tasks/{record.id}",
             method="PATCH",
             headers={"Content-Type": "application/json"},
             body=json.dumps({"items": edited}),
         )
         self.assertEqual(response["err"], "ok")
-        self.assertIn("用户修订", response["artifact"]["items"][0]["answer"])
+        self.assertIn("用户修订", response["task"]["items"][0]["answer"])
 
-        export = self.fetch(f"/api/ai/generations/{record.id}/export")
+        export = self.fetch(f"/api/ai/{FEATURE_KEY}/tasks/{record.id}/export")
         self.assertEqual(export.code, 200)
         self.assertIn("text/markdown", export.headers["Content-Type"])
         self.assertIn("用户修订", export.body.decode("utf-8"))
 
-        response = self.json(f"/api/ai/generations/{record.id}", method="DELETE")
+        response = self.json(f"/api/ai/{FEATURE_KEY}/tasks/{record.id}", method="DELETE")
         self.assertEqual(response["err"], "ok")
-        self.assertIsNone(test_main.get_db().get(models.AIGeneration, created["id"]))
+        self.assertIsNone(test_main.get_db().get(models.AITask, created["id"]))
 
     def test_book_version_change_fails_closed(self):
-        artifact = self._create()["artifact"]
+        task = self._create()["task"]
         with mock.patch("webserver.handlers.ai._book_version", return_value="changed"):
-            response = self.json(f"/api/ai/generations/{artifact['id']}")
+            response = self.json(f"/api/ai/{FEATURE_KEY}/tasks/{task['id']}")
         self.assertEqual(response["err"], "ai.book_version_changed")
 
     def test_private_book_permissions_are_rechecked(self):
-        artifact = self._create()["artifact"]
-        with mock.patch("webserver.handlers.ai._AIGenerationBase.can_view_book", return_value=False):
-            response = self.json(f"/api/ai/generations/{artifact['id']}")
+        task = self._create()["task"]
+        with mock.patch("webserver.handlers.ai._AITaskBase.can_view_book", return_value=False):
+            response = self.json(f"/api/ai/{FEATURE_KEY}/tasks/{task['id']}")
         self.assertEqual(response["err"], "ai.not_found")
 
 
 class StaticReaderContractTest(unittest.TestCase):
     def test_reader_wires_safe_summary_duck_assets(self):
         template = Path("webserver/resources/book/creader.html").read_text(encoding="utf-8")
-        script = Path("app/public/static/js/ai-top5.js").read_text(encoding="utf-8")
-        style = Path("app/public/static/js/ai-top5.css").read_text(encoding="utf-8")
+        script = Path("app/public/static/js/summary-duck.js").read_text(encoding="utf-8")
+        style = Path("app/public/static/js/summary-duck.css").read_text(encoding="utf-8")
         self.assertIn("TalebookSummaryDuckInit", template)
         self.assertIn("talebook:ai-citation", script)
         self.assertNotIn(".innerHTML", script)
@@ -302,11 +303,11 @@ class StaticReaderContractTest(unittest.TestCase):
         self.assertIn("summary-duck__answer", style)
         self.assertIn("summary-duck__citation", style)
 
-    def test_book_delete_propagates_to_ai_artifacts(self):
+    def test_book_delete_propagates_to_ai_tasks(self):
         source = Path("webserver/handlers/book.py").read_text(encoding="utf-8")
         delete_block = source[source.index("class BookDelete") : source.index("class BookDownload")]
-        self.assertIn("AIGeneration", delete_block)
-        self.assertIn("AIGeneration.book_id == bid", delete_block)
+        self.assertIn("AITask", delete_block)
+        self.assertIn("AITask.book_id == bid", delete_block)
 
 
 if __name__ == "__main__":

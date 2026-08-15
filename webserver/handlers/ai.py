@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Feature-routed API for creator-private AI generation artifacts."""
+"""Feature-routed API for creator-private AI tasks."""
 
 import datetime
 import hashlib
@@ -11,19 +11,19 @@ from sqlalchemy.exc import IntegrityError
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
-from webserver.models import AIGeneration
-from webserver.services.ai_top5 import (
+from webserver.models import AITask
+from webserver.services.summary_duck import (
     FEATURE_KEY,
     PROMPT_VERSION,
     SCHEMA_VERSION,
-    AITop5Service,
-    Top5ValidationError,
-    artifact_dict,
-    artifact_items,
+    SummaryDuckService,
+    SummaryDuckValidationError,
     chapter_hash,
     clean_markdown,
     export_markdown,
     request_key,
+    task_dict,
+    task_items,
     validate_chapter_input,
 )
 
@@ -35,9 +35,9 @@ def _json_body(handler):
     try:
         value = json.loads(handler.request.body or b"{}")
     except (TypeError, ValueError):
-        raise Top5ValidationError("请求 JSON 无效")
+        raise SummaryDuckValidationError("请求 JSON 无效")
     if not isinstance(value, dict):
-        raise Top5ValidationError("请求 JSON 必须是对象")
+        raise SummaryDuckValidationError("请求 JSON 必须是对象")
     return value
 
 
@@ -51,18 +51,18 @@ def _book_version(book):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:32]
 
 
-class SummaryTop5Feature:
-    """TOP5 behavior plugged into the stable AI generation HTTP surface."""
+class SummaryDuckFeature:
+    """Summary Duck behavior plugged into the stable AI task HTTP surface."""
 
     key = FEATURE_KEY
 
     @staticmethod
     def enabled():
-        return CONF.get("AI_ENABLED", True) and CONF.get("AI_SUMMARY_TOP5_ENABLED", True)
+        return CONF.get("AI_ENABLED", True) and CONF.get("AI_SUMMARY_DUCK_ENABLED", True)
 
     @staticmethod
     def service(handler):
-        service = AITop5Service()
+        service = SummaryDuckService()
         service.setup(handler.settings["SessionMaker"], CONF)
         return service
 
@@ -89,17 +89,17 @@ class SummaryTop5Feature:
         if not book:
             return {"err": "book.not_found", "msg": "书籍不存在"}
         records = (
-            handler.session.query(AIGeneration)
+            handler.session.query(AITask)
             .filter(
-                AIGeneration.feature == cls.key,
-                AIGeneration.creator_id == handler.user_id(),
-                AIGeneration.book_id == book_id,
-                AIGeneration.book_version == _book_version(book),
+                AITask.feature == cls.key,
+                AITask.creator_id == handler.user_id(),
+                AITask.book_id == book_id,
+                AITask.book_version == _book_version(book),
             )
-            .order_by(AIGeneration.create_time.desc())
+            .order_by(AITask.create_time.desc())
             .all()
         )
-        return {"err": "ok", "items": artifact_items(records)}
+        return {"err": "ok", "tasks": task_items(records)}
 
     @classmethod
     def create(cls, handler, body):
@@ -108,7 +108,7 @@ class SummaryTop5Feature:
         try:
             book_id = int(body.get("book_id", 0))
             chapter = validate_chapter_input(body.get("chapter_text"), body.get("chapter_href"), body.get("chapter_title"))
-        except (TypeError, ValueError, Top5ValidationError) as exc:
+        except (TypeError, ValueError, SummaryDuckValidationError) as exc:
             return {"err": "params.invalid", "msg": str(exc)}
         book = handler.get_book(book_id, raise_exception=False)
         if not book or not book.get("fmt_epub") or not handler.can_view_book(book_id):
@@ -118,7 +118,7 @@ class SummaryTop5Feature:
         key = request_key(handler.user_id(), book_id, version, chapter["href"], text_hash)
         if bool(body.get("regenerate")):
             key = hashlib.sha256((key + ":" + uuid.uuid4().hex).encode("utf-8")).hexdigest()
-        existing = handler.session.query(AIGeneration).filter(AIGeneration.request_key == key).first()
+        existing = handler.session.query(AITask).filter(AITask.request_key == key).first()
         if existing:
             if existing.creator_id != handler.user_id() or existing.feature != cls.key:
                 return {"err": "ai.conflict", "msg": "无法创建总结"}
@@ -131,8 +131,8 @@ class SummaryTop5Feature:
                 existing.update_time = datetime.datetime.now()
                 handler.session.commit()
                 cls.service(handler).submit(existing.id, chapter)
-            return {"err": "ok", "artifact": artifact_dict(existing), "idempotent": True}
-        record = AIGeneration(
+            return {"err": "ok", "task": task_dict(existing), "idempotent": True}
+        record = AITask(
             id=str(uuid.uuid4()),
             request_key=key,
             feature=cls.key,
@@ -153,11 +153,11 @@ class SummaryTop5Feature:
             handler.session.commit()
         except IntegrityError:
             handler.session.rollback()
-            record = handler.session.query(AIGeneration).filter(AIGeneration.request_key == key).first()
+            record = handler.session.query(AITask).filter(AITask.request_key == key).first()
             if not record or record.creator_id != handler.user_id() or record.feature != cls.key:
                 return {"err": "ai.conflict", "msg": "无法创建总结"}
         cls.service(handler).submit(record.id, chapter)
-        return {"err": "ok", "artifact": artifact_dict(record), "idempotent": False}
+        return {"err": "ok", "task": task_dict(record), "idempotent": False}
 
     @staticmethod
     def update(handler, record, body):
@@ -167,15 +167,15 @@ class SummaryTop5Feature:
             items = body.get("items")
             original = (record.ai_draft or {}).get("items", [])
             if not isinstance(items, list) or len(items) != 5 or len(original) != 5:
-                raise Top5ValidationError("结果必须恰好包含五组问答")
+                raise SummaryDuckValidationError("结果必须恰好包含五组问答")
             revision = []
             for index, item in enumerate(items):
                 if not isinstance(item, dict):
-                    raise Top5ValidationError("问答结构无效")
+                    raise SummaryDuckValidationError("问答结构无效")
                 # Locators are immutable because the minimized chapter text is intentionally not persisted.
                 citations = item.get("citations", original[index].get("citations", []))
                 if citations != original[index].get("citations", []):
-                    raise Top5ValidationError("原文引用不可在编辑时修改")
+                    raise SummaryDuckValidationError("原文引用不可在编辑时修改")
                 revision.append(
                     {
                         "question": clean_markdown(item.get("question"), 300),
@@ -183,13 +183,13 @@ class SummaryTop5Feature:
                         "citations": citations,
                     }
                 )
-        except Top5ValidationError as exc:
+        except SummaryDuckValidationError as exc:
             return {"err": "params.invalid", "msg": str(exc)}
         record.user_revision = {"items": revision}
         record.result_data = {"items": revision}
         record.update_time = datetime.datetime.now()
         handler.session.commit()
-        return {"err": "ok", "artifact": artifact_dict(record)}
+        return {"err": "ok", "task": task_dict(record)}
 
     @staticmethod
     def export(handler, record):
@@ -197,103 +197,109 @@ class SummaryTop5Feature:
             handler.set_header("Content-Type", "application/json; charset=UTF-8")
             handler.write({"err": "ai.not_ready", "msg": "总结尚未完成"})
             return
-        filename = f"top5-{record.book_id}-{record.id[:8]}.md"
+        filename = f"summary-duck-{record.book_id}-{record.id[:8]}.md"
         handler.set_header("Content-Type", "text/markdown; charset=UTF-8")
         handler.set_header("Content-Disposition", f'attachment; filename="{filename}"')
         handler.write(export_markdown(record))
 
 
-AI_FEATURES = {SummaryTop5Feature.key: SummaryTop5Feature}
+AI_FEATURES = {SummaryDuckFeature.key: SummaryDuckFeature}
 
 
 def _feature(name):
     return AI_FEATURES.get(str(name or "").strip())
 
 
-class _AIGenerationBase(BaseHandler):
-    def _own_record(self, artifact_id):
+class _AITaskBase(BaseHandler):
+    def _own_task(self, feature_key, task_id):
         return (
-            self.session.query(AIGeneration)
-            .filter(AIGeneration.id == artifact_id, AIGeneration.creator_id == self.user_id())
+            self.session.query(AITask)
+            .filter(
+                AITask.id == task_id,
+                AITask.feature == feature_key,
+                AITask.creator_id == self.user_id(),
+            )
             .first()
         )
 
-    def _visible_record(self, artifact_id):
-        record = self._own_record(artifact_id)
-        feature = _feature(record.feature) if record else None
-        if not record or not feature:
-            return None, None, {"err": "ai.not_found", "msg": "AI 结果不存在"}
+    def _visible_task(self, feature_name, task_id):
+        feature = _feature(feature_name)
+        if not feature:
+            return None, None, {"err": "ai.feature_not_found", "msg": "不支持的 AI 功能"}
+        record = self._own_task(feature.key, task_id)
+        if not record:
+            return None, None, {"err": "ai.not_found", "msg": "AI 任务不存在"}
         visible, error = feature.can_access(self, record)
         if not visible:
             return None, None, error
         return record, feature, None
 
 
-class AIGenerationCollection(_AIGenerationBase):
+class AITaskCollection(_AITaskBase):
     @js
     @auth
-    def get(self):
-        feature = _feature(self.get_argument("feature", ""))
+    def get(self, feature_name):
+        feature = _feature(feature_name)
         if not feature:
             return {"err": "ai.feature_not_found", "msg": "不支持的 AI 功能"}
         return feature.list(self)
 
     @js
     @auth
-    def post(self):
+    def post(self, feature_name):
         if not CONF.get("AI_ENABLED", True):
             return {"err": "ai.disabled", "msg": "AI 功能未启用"}
         try:
             body = _json_body(self)
-        except Top5ValidationError as exc:
+        except SummaryDuckValidationError as exc:
             return {"err": "params.invalid", "msg": str(exc)}
-        feature = _feature(body.get("feature"))
+        feature = _feature(feature_name)
         if not feature:
             return {"err": "ai.feature_not_found", "msg": "不支持的 AI 功能"}
         return feature.create(self, body)
 
 
-class AIGenerationItem(_AIGenerationBase):
+class AITaskItem(_AITaskBase):
     @js
     @auth
-    def get(self, artifact_id):
-        record, _feature_adapter, error = self._visible_record(artifact_id)
-        return error or {"err": "ok", "artifact": artifact_dict(record)}
+    def get(self, feature_name, task_id):
+        record, _feature_adapter, error = self._visible_task(feature_name, task_id)
+        return error or {"err": "ok", "task": task_dict(record)}
 
     @js
     @auth
-    def patch(self, artifact_id):
-        record, feature, error = self._visible_record(artifact_id)
+    def patch(self, feature_name, task_id):
+        record, feature, error = self._visible_task(feature_name, task_id)
         if error:
             return error
         try:
             body = _json_body(self)
-        except Top5ValidationError as exc:
+        except SummaryDuckValidationError as exc:
             return {"err": "params.invalid", "msg": str(exc)}
         return feature.update(self, record, body)
 
     @js
     @auth
-    def delete(self, artifact_id):
-        record, feature, error = self._visible_record(artifact_id)
+    def delete(self, feature_name, task_id):
+        record, feature, error = self._visible_task(feature_name, task_id)
         if error:
             return error
         if record.status in {"queued", "running"}:
             feature.service(self).cancel(record.id)
         self.session.delete(record)
         self.session.commit()
-        return {"err": "ok", "msg": "AI 结果已删除"}
+        return {"err": "ok", "msg": "AI 任务已删除"}
 
 
-class AIGenerationCancel(_AIGenerationBase):
+class AITaskCancel(_AITaskBase):
     @js
     @auth
-    def post(self, artifact_id):
-        record, feature, error = self._visible_record(artifact_id)
+    def post(self, feature_name, task_id):
+        record, feature, error = self._visible_task(feature_name, task_id)
         if error:
             return error
         if record.status not in {"queued", "running"}:
-            return {"err": "ok", "artifact": artifact_dict(record), "idempotent": True}
+            return {"err": "ok", "task": task_dict(record), "idempotent": True}
         record.cancel_requested = True
         record.progress_message = "正在取消"
         record.update_time = datetime.datetime.now()
@@ -303,13 +309,13 @@ class AIGenerationCancel(_AIGenerationBase):
             record.status = "cancelled"
             record.finished_at = datetime.datetime.now()
             self.session.commit()
-        return {"err": "ok", "artifact": artifact_dict(record), "idempotent": False}
+        return {"err": "ok", "task": task_dict(record), "idempotent": False}
 
 
-class AIGenerationExport(_AIGenerationBase):
+class AITaskExport(_AITaskBase):
     @auth
-    def get(self, artifact_id):
-        record, feature, error = self._visible_record(artifact_id)
+    def get(self, feature_name, task_id):
+        record, feature, error = self._visible_task(feature_name, task_id)
         if error:
             self.set_header("Content-Type", "application/json; charset=UTF-8")
             self.write(error)
@@ -319,8 +325,8 @@ class AIGenerationExport(_AIGenerationBase):
 
 def routes():
     return [
-        (r"/api/ai/generations", AIGenerationCollection),
-        (r"/api/ai/generations/([0-9a-f-]+)", AIGenerationItem),
-        (r"/api/ai/generations/([0-9a-f-]+)/cancel", AIGenerationCancel),
-        (r"/api/ai/generations/([0-9a-f-]+)/export", AIGenerationExport),
+        (r"/api/ai/([a-z][a-z0-9_]*)/tasks", AITaskCollection),
+        (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)", AITaskItem),
+        (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)/cancel", AITaskCancel),
+        (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)/export", AITaskExport),
     ]

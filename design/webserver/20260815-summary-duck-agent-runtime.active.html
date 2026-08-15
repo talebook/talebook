@@ -75,7 +75,7 @@
       </section>
       <section>
         <h2>6. API 与界面</h2>
-        <p>公共接口统一为 <code>/api/ai/generations</code> 创建/列表及 <code>/api/ai/generations/:id</code> 查询/编辑/删除，附加 <code>cancel</code> 与 <code>export</code> 操作。调用方通过稳定的 <code>feature</code> key 选择能力，后端 feature registry 负责分发；未来增加 AI 功能只注册业务适配器，不再新增一组 HTTP 路由。阅读器浮动入口打开侧栏，状态依次为待处理、生成中、成功、失败或已取消；引用按钮向宿主派发 locator 回跳事件。</p>
+        <p>公共接口统一为 <code>/api/ai/:feature/tasks</code> 创建/列表及 <code>/api/ai/:feature/tasks/:id</code> 查询/编辑/删除，附加 <code>cancel</code> 与 <code>export</code> 操作。稳定的 feature key 是 URL 中间段；后端 feature registry 负责分发，首个 key 为 <code>summary_duck</code>。未来增加 AI 功能只注册业务适配器，共用任务路由和 <code>AITask</code> 持久化模型。阅读器浮动入口打开侧栏，状态依次为待处理、生成中、成功、失败或已取消；引用按钮向宿主派发 locator 回跳事件。</p>
         <p>亮暗主题均使用橙红 token，结构顺序固定为编号、问题、答案、原文引用。键盘焦点、状态提示和窄屏布局纳入验收。</p>
       </section>
       <section>
@@ -105,10 +105,11 @@
       <section>
         <h2>10. PR 评审修订</h2>
         <ul>
-          <li>HTTP 层从 TOP5 专用路由改为 feature-routed 通用生成接口；持久化实体同步改为带 <code>feature</code> 的 <code>AIGeneration</code>。</li>
+          <li>HTTP 层使用 <code>/api/ai/:feature/tasks</code> 通用任务接口；持久化实体统一为带 <code>feature</code> 的 <code>AITask</code>/<code>ai_tasks</code>。</li>
           <li><code>AI_CODEX_IDENTITY_PATH</code> 明确为包含专用 <code>auth.json</code> 的身份目录，任务只复制凭据到临时 <code>CODEX_HOME</code>。</li>
           <li>版本解析不再依赖 CLI 输出中的 <code>codex-cli</code> 产品标签；实际执行命令始终是 <code>codex</code>。</li>
-          <li>提示词升级为 <code>top5.zh.v2</code>：分别覆盖中心判断、关键机制、决定性证据、边界张力和后续含义，并为非虚构/叙事章节提供不同选题框架、逐条引用规则和输出前自检。</li>
+          <li>特性 key、schema/prompt 版本、服务/静态资源/测试/fixture 文件名统一使用 <code>summary_duck</code>，提示词版本为 <code>summary_duck.zh.v2</code>。</li>
+          <li>提示词分别覆盖中心判断、关键机制、决定性证据、边界张力和后续含义，并为非虚构/叙事章节提供不同选题框架、逐条引用规则和输出前自检。</li>
         </ul>
       </section>
     </main>

@@ -536,10 +536,10 @@ class ReadingState(Base, SQLAlchemyMixin):
         return self.progress or {}
 
 
-class AIGeneration(Base, SQLAlchemyMixin):
-    """A creator-private AI generation artifact routed by feature key."""
+class AITask(Base, SQLAlchemyMixin):
+    """A creator-private AI task routed by feature key."""
 
-    __tablename__ = "ai_generations"
+    __tablename__ = "ai_tasks"
 
     id = Column(String(36), primary_key=True)
     request_key = Column(String(64), unique=True, nullable=False, index=True)
@@ -556,8 +556,8 @@ class AIGeneration(Base, SQLAlchemyMixin):
     result_data = Column(MutableDict.as_mutable(JSONType), default={})
     ai_draft = Column(MutableDict.as_mutable(JSONType), default={})
     user_revision = Column(MutableDict.as_mutable(JSONType), default={})
-    schema_version = Column(String(32), default="top5.v1", nullable=False)
-    prompt_version = Column(String(32), default="top5.zh.v1", nullable=False)
+    schema_version = Column(String(32), default="summary_duck.v1", nullable=False)
+    prompt_version = Column(String(32), default="summary_duck.zh.v2", nullable=False)
     runtime_name = Column(String(64), default="")
     runtime_session_id = Column(String(128), default="")
     usage = Column(MutableDict.as_mutable(JSONType), default={})
@@ -569,7 +569,7 @@ class AIGeneration(Base, SQLAlchemyMixin):
     started_at = Column(DateTime)
     finished_at = Column(DateTime)
 
-    creator = relationship(Reader, backref="ai_generations")
+    creator = relationship(Reader, backref="ai_tasks")
 
 
 class BookSourceModel(Base, SQLAlchemyMixin):

@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const script = readFileSync(resolve(process.cwd(), 'public/static/js/ai-top5.js'), 'utf8');
-const style = readFileSync(resolve(process.cwd(), 'public/static/js/ai-top5.css'), 'utf8');
+const script = readFileSync(resolve(process.cwd(), 'public/static/js/summary-duck.js'), 'utf8');
+const style = readFileSync(resolve(process.cwd(), 'public/static/js/summary-duck.css'), 'utf8');
 
 function luminance(hex: string) {
     const values = [1, 3, 5].map(offset => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255)
@@ -38,9 +38,9 @@ describe('Summary Duck static reader integration', () => {
         }
         expect(script).not.toContain('http://');
         expect(script).not.toContain('https://');
-        expect(script).toContain('/api/ai/generations');
-        expect(script).toContain('summary_top5');
-        expect(script).not.toContain('/api/ai/top5');
+        expect(script).toContain('/api/ai/summary_duck/tasks');
+        expect(script).not.toContain('/api/ai/generations');
+        expect(script).not.toContain('summary_top5');
     });
 
     it('defines ordered question parts and accessible light/dark tokens', () => {
