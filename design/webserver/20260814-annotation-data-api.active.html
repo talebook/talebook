@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annotation 数据域与服务端 API · ACTIVE</title>
+<style>
+  :root { color-scheme: light; --ink:#172033; --muted:#5f6b7a; --line:#d9e0ea; --panel:#f7f9fc; --accent:#3758c8; --warn:#fff4d6; }
+  * { box-sizing: border-box; }
+  body { margin:0 auto; max-width:1080px; padding:32px 24px 64px; color:var(--ink); background:#fff; font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+  h1 { margin:0 0 8px; font-size:30px; line-height:1.25; }
+  h2 { margin:36px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--line); font-size:21px; }
+  h3 { margin:24px 0 8px; font-size:17px; }
+  code { padding:2px 5px; border-radius:4px; background:#eef2f8; }
+  table { width:100%; border-collapse:collapse; margin:14px 0; font-size:14px; }
+  th,td { padding:9px 10px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { background:var(--panel); }
+  .meta { display:flex; flex-wrap:wrap; gap:8px 20px; color:var(--muted); }
+  .badge { padding:2px 10px; border-radius:999px; color:#fff; background:var(--accent); font-weight:700; }
+  .callout { margin:16px 0; padding:12px 16px; border-left:4px solid #d49b18; background:var(--warn); }
+  .flow { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:16px 0; }
+  .flow div { min-height:96px; padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+  .flow strong { display:block; margin-bottom:5px; color:var(--accent); }
+  @media (max-width:720px) { body{padding:22px 16px 48px}.flow{grid-template-columns:1fr}table{display:block;overflow-x:auto} }
+</style>
+</head>
+<body>
+<h1>Annotation 数据域与服务端 API</h1>
+<div class="meta">
+  <span class="badge">ACTIVE</span>
+  <span>创建日期：2026-08-14</span>
+  <span>所属模块：webserver</span>
+  <span>需求来源：Multica TB-42</span>
+</div>
+
+<h2>1. 原始诉求</h2>
+<p>为微信读书、BRS、Calibre、Web、Moke 与 Readest 等笔记来源提供统一服务端契约。2026-08-15 评审确认：Talebook 的 <code>annotations</code> 是唯一权威内容表；章评也是 annotation 类型，不另建内容表；Calibre 等系统只是可导入、可回写的 source。用户新建或修改非私有 annotation 后，由后台任务异步写入所有已注册 source。</p>
+
+<h2>2. 目标与边界</h2>
+<ul>
+  <li><code>annotations</code> 保存权威正文、位置、隐私和 owner；外部系统不得成为内容主表。</li>
+  <li>支持 <code>highlight</code>、<code>note</code>、<code>bookmark</code>、<code>chapter_comment</code>，允许 <code>cfi=NULL</code> 并保留章节级定位。</li>
+  <li>私有记录只对 owner 可见；非私有记录对所有有该书阅读权限的登录用户可见，但只有 owner 可修改或删除。</li>
+  <li><code>annotation_sources</code> 只保存一条权威记录在各外部系统中的映射和同步状态，所有外部引用字段统一使用 <code>source_</code> 前缀。</li>
+  <li>本次提供 source writer 注册和异步分发契约；BRS、微信读书、Calibre 的具体认证与网络适配由对应插件注册 writer，不在本任务内硬编码。</li>
+</ul>
+
+<h2>3. 数据模型</h2>
+<div class="flow">
+  <div><strong>annotations</strong>Talebook 权威内容。私人笔记和公共章评使用同一生命周期。</div>
+  <div><strong>annotation_sources</strong>一对多外部副本映射。Calibre、微信读书、BRS 都只是 source。</div>
+  <div><strong>source writers</strong>非私有记录提交后异步扇出；失败状态留在映射表，权威内容不回滚。</div>
+</div>
+<table>
+<thead><tr><th>分组</th><th>关键字段</th><th>约束与说明</th></tr></thead>
+<tbody>
+<tr><td>权威身份</td><td><code>annotations.id</code>、<code>reader_id</code>、<code>book_id</code>、<code>client_id</code></td><td><code>(reader_id, book_id, client_id)</code> 保证 Talebook 客户端幂等；书籍仍是跨数据库逻辑引用。</td></tr>
+<tr><td>权威内容</td><td><code>annotation_type</code>、<code>content</code>、<code>quote_text</code>、<code>color</code>、<code>author_name</code></td><td>章评用 <code>chapter_comment</code> 类型表达，不再创建 <code>chapter_comments</code> 表。</td></tr>
+<tr><td>位置与隐私</td><td><code>cfi</code>、<code>chapter</code>、<code>is_private</code></td><td>CFI 可空；<code>is_private=true</code> 为安全默认值，且不会向外部 source 扇出。</td></tr>
+<tr><td>外部身份</td><td><code>source_name</code>、<code>source_connection_id</code>、<code>source_annotation_id</code></td><td>位于 <code>annotation_sources</code>；外部唯一键为三者组合，每条 annotation 在同一 source connection 只有一个副本。</td></tr>
+<tr><td>外部状态</td><td><code>source_run_id</code>、<code>source_position</code>、<code>source_raw_hash</code>、<code>source_updated_at</code></td><td>用于来源幂等、旧事件保护和定位追踪，避免无前缀字段被误认为 Talebook 权威属性。</td></tr>
+<tr><td>同步状态</td><td><code>source_sync_status</code>、<code>source_synced_at</code>、<code>source_sync_error</code></td><td>状态为 pending / synced / failed；外部失败只更新副本状态，不回滚 <code>annotations</code>。</td></tr>
+</tbody>
+</table>
+
+<h2>4. API 契约</h2>
+<table>
+<thead><tr><th>方法</th><th>路径</th><th>行为</th></tr></thead>
+<tbody>
+<tr><td>GET / POST</td><td><code>/api/book/:book_id/annotations</code></td><td>GET 返回 owner 私有记录及该书公共记录；POST 按 client_id 或 source 三元身份幂等 upsert。</td></tr>
+<tr><td>PUT / DELETE</td><td><code>/api/book/:book_id/annotations/:id</code></td><td>仅 owner 修改或删除；非私有内容更新后再次异步扇出。</td></tr>
+<tr><td>GET / DELETE</td><td><code>/api/annotations</code></td><td>仅管理当前用户权威记录；来源筛选字段均为 <code>source_*</code>。DELETE 来源筛选只解除匹配 source 映射，不删除权威正文。</td></tr>
+<tr><td>GET</td><td><code>/api/annotations/export</code></td><td>导出 Talebook 权威记录以及每条记录的 <code>sources</code> 映射列表。</td></tr>
+</tbody>
+</table>
+<p>不再提供 <code>/api/*/chapter-comments</code> 路由。创建 payload 使用 <code>annotation_type</code>、<code>content</code>、<code>quote_text</code>、<code>is_private</code>；来源导入额外携带 <code>source_name</code>、<code>source_connection_id</code>、<code>source_annotation_id</code> 等统一前缀字段。</p>
+
+<h2>5. 幂等与冲突规则</h2>
+<ol>
+  <li>有 <code>source_name + source_connection_id + source_annotation_id</code> 时优先按 source 映射查找；本地创建则按 owner + book + client_id 查找。</li>
+  <li>早于现存 <code>source_updated_at</code> 且 hash 不同的来源事件视为 stale，不回滚权威内容。</li>
+  <li>通过 Talebook PUT 修改内容后写入 <code>user_modified_at</code>；后续来源导入只刷新该 source 映射并返回 <code>conflict_protected=true</code>。</li>
+  <li>来源清理删除的是 <code>annotation_sources</code> 映射。权威 annotation 只能通过单条 owner DELETE 删除。</li>
+</ol>
+<div class="callout">管理员不会获得读取他人私有正文的旁路；公共 annotation 也必须先通过该书现有可见性校验。</div>
+
+<h2>6. 异步 source 扇出</h2>
+<ol>
+  <li>handler 先提交 Talebook 权威事务，再把 annotation id 放入 <code>AnnotationSyncService</code> 队列。</li>
+  <li>服务枚举插件注册的 source writer；为每个 writer upsert 一条 pending 映射，然后调用 writer。</li>
+  <li>成功后记录外部 id、hash、远端时间并标记 synced；异常写入 failed 与错误摘要，其他 source 继续执行。</li>
+  <li>私有 annotation 不入队；来源导入可排除原 source，避免回环，同时仍可扇出到其他已注册 source。</li>
+</ol>
+
+<h2>7. Migration</h2>
+<p>PR 尚未合入且旧新表均未发布，因此直接以最终模型创建 <code>annotations</code> 与 <code>annotation_sources</code>，不为草稿中的 <code>book_annotations</code> / <code>chapter_comments</code> 增加兼容迁移。<code>compare_and_migrate</code> 仍先创建缺失整表，确保唯一约束、索引和 FK 一并落地。</p>
+
+<h2>8. 测试计划与结果</h2>
+<table>
+<thead><tr><th>层级</th><th>验证项</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td>模型 / migration</td><td>最终表名、两组唯一约束、级联删除、nullable CFI</td><td><code>tests/test_annotations.py</code> 通过</td></tr>
+<tr><td>Annotation API</td><td>本地/来源幂等、公共与私有可见性、章评同表、owner 写权限、stale 与冲突保护</td><td>聚焦回归 13 passed</td></tr>
+<tr><td>Source 同步</td><td>私有不扇出、公共异步调用全部 writer、失败隔离、来源映射状态</td><td>Calibre / 微信读书模拟 writer 测试通过</td></tr>
+<tr><td>工程检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、完整 pytest、<code>make check-design</code></td><td>Ruff 通过；完整后端 838 passed / 20 skipped；方案校验通过</td></tr>
+</tbody>
+</table>
+
+<h2>9. 风险与兼容性</h2>
+<ul>
+  <li>外部写入不是数据库事务的一部分，允许短暂最终一致；pending / failed 状态用于观察和后续重试。</li>
+  <li>删除向外部 source 的传播和持久化重试调度暂不在本任务内，后续插件实现必须补齐。</li>
+  <li><code>book_id</code> 仍是跨用户库与 Calibre 库的逻辑引用，数据库无法建立 FK。</li>
+  <li>本次仅调整后端数据、迁移与 JSON API，没有页面、交互或文案变化，因此豁免 interface-review；外部消费者必须切换到新字段名。</li>
+</ul>
+</body>
+</html>

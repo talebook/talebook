@@ -536,6 +536,108 @@ class ReadingState(Base, SQLAlchemyMixin):
         return self.progress or {}
 
 
+class Annotation(Base, SQLAlchemyMixin):
+    """Talebook's authoritative annotation content."""
+
+    __tablename__ = "annotations"
+    __table_args__ = (UniqueConstraint("reader_id", "book_id", "client_id", name="uq_annotation_client_id"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reader_id = Column(Integer, ForeignKey("readers.id", ondelete="CASCADE"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    client_id = Column(String(64), nullable=True)
+    annotation_type = Column(String(32), nullable=False, index=True)
+    is_private = Column(Boolean, default=True, nullable=False, index=True)
+    cfi = Column(Text, nullable=True)
+    chapter = Column(String(500), default="")
+    quote_text = Column(Text, default="")
+    content = Column(Text, default="")
+    color = Column(String(32), default="")
+    author_name = Column(String(255), default="")
+    user_modified_at = Column(DateTime, nullable=True)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    reader = relationship(Reader, backref="annotations")
+    sources = relationship(
+        "AnnotationSource",
+        back_populates="annotation",
+        cascade="all, delete-orphan",
+        order_by="AnnotationSource.id",
+    )
+
+    def to_api_dict(self):
+        return {
+            "id": self.id,
+            "book_id": self.book_id,
+            "client_id": self.client_id,
+            "annotation_type": self.annotation_type,
+            "is_private": self.is_private,
+            "cfi": self.cfi,
+            "chapter": self.chapter or "",
+            "quote_text": self.quote_text or "",
+            "content": self.content or "",
+            "color": self.color or "",
+            "author_name": self.author_name or "",
+            "user_modified_at": self.user_modified_at.isoformat() if self.user_modified_at else None,
+            "created_at": self.create_time.isoformat() if self.create_time else None,
+            "updated_at": self.update_time.isoformat() if self.update_time else None,
+            "sources": [source.to_api_dict() for source in self.sources],
+        }
+
+
+class AnnotationSource(Base, SQLAlchemyMixin):
+    """An external replica and sync state for an authoritative annotation."""
+
+    __tablename__ = "annotation_sources"
+    __table_args__ = (
+        UniqueConstraint(
+            "annotation_id",
+            "source_name",
+            "source_connection_id",
+            name="uq_annotation_source_connection",
+        ),
+        UniqueConstraint(
+            "source_name",
+            "source_connection_id",
+            "source_annotation_id",
+            name="uq_annotation_source_identity",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    annotation_id = Column(Integer, ForeignKey("annotations.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_name = Column(String(64), nullable=False, index=True)
+    source_connection_id = Column(String(128), default="", nullable=False, index=True)
+    source_annotation_id = Column(String(255), nullable=True)
+    source_run_id = Column(String(128), nullable=True, index=True)
+    source_position = Column(Text, nullable=True)
+    source_raw_hash = Column(String(128), nullable=True)
+    source_updated_at = Column(DateTime, nullable=True)
+    source_sync_status = Column(String(16), default="synced", nullable=False, index=True)
+    source_synced_at = Column(DateTime, nullable=True)
+    source_sync_error = Column(Text, nullable=True)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    annotation = relationship(Annotation, back_populates="sources")
+
+    def to_api_dict(self):
+        return {
+            "id": self.id,
+            "source_name": self.source_name,
+            "source_connection_id": self.source_connection_id,
+            "source_annotation_id": self.source_annotation_id,
+            "source_run_id": self.source_run_id,
+            "source_position": self.source_position,
+            "source_raw_hash": self.source_raw_hash,
+            "source_updated_at": self.source_updated_at.isoformat() if self.source_updated_at else None,
+            "source_sync_status": self.source_sync_status,
+            "source_synced_at": self.source_synced_at.isoformat() if self.source_synced_at else None,
+            "source_sync_error": self.source_sync_error,
+        }
+
+
 class BookSourceModel(Base, SQLAlchemyMixin):
     """网络书源（Legado 书源 JSON）。"""
 

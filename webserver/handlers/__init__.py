@@ -6,13 +6,28 @@ import logging
 def routes():
     from webserver.webdav import handler as webdav
 
-    from . import admin, audiobook, book, booksource_admin, captcha, files, meta, network_library, opds, scan, theme, user
+    from . import (
+        admin,
+        annotations,
+        audiobook,
+        book,
+        booksource_admin,
+        captcha,
+        files,
+        meta,
+        network_library,
+        opds,
+        scan,
+        theme,
+        user,
+    )
 
     routes = []
     routes += admin.routes()
     routes += scan.routes()
     routes += opds.routes()
     routes += book.routes()
+    routes += annotations.routes()
     routes += user.routes()
     routes += meta.routes()
     routes += booksource_admin.routes()
