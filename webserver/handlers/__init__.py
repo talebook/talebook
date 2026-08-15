@@ -8,6 +8,7 @@ def routes():
 
     from . import (
         admin,
+        annotations,
         audiobook,
         book,
         booksource_admin,
@@ -27,6 +28,7 @@ def routes():
     routes += scan.routes()
     routes += opds.routes()
     routes += book.routes()
+    routes += annotations.routes()
     routes += user.routes()
     routes += meta.routes()
     routes += booksource_admin.routes()

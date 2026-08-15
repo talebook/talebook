@@ -10,8 +10,8 @@ Usage:
 Features:
     1. Read all table definitions from models.py
     2. Compare with actual database schema
-    3. Automatically add missing columns
-    4. Will not delete existing fields (data safety guaranteed)
+    3. Automatically create missing tables and add missing columns
+    4. Will not delete existing fields or tables (data safety guaranteed)
 """
 
 import json
@@ -170,13 +170,23 @@ def compare_and_migrate(engine):
     model_columns = get_model_columns()
     db_columns = get_database_columns(engine)
 
+    # Create whole missing tables first so their constraints and indexes are
+    # preserved. Existing tables keep the historical additive-column behavior.
+    missing_tables = [table for table in models.Base.metadata.sorted_tables if table.name not in db_columns]
+    for table in missing_tables:
+        logger.info("Creating missing table '%s'", table.name)
+        table.create(engine, checkfirst=True)
+
+    if missing_tables:
+        db_columns = get_database_columns(engine)
+
     # Compare and generate migration operations
     migrations_needed = []
 
     for table_name, columns in model_columns.items():
         if table_name not in db_columns:
-            logger.info(f"Table '{table_name}' does not exist, will be created later")
-            continue
+            logger.error("Table '%s' is still missing after create_all migration", table_name)
+            return False
 
         for col_name, col_def in columns.items():
             if col_name not in db_columns[table_name]:
