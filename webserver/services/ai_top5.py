@@ -11,14 +11,15 @@ import re
 import threading
 from typing import Any, Dict, Iterable, List, Optional
 
-from webserver.models import AITop5Result
+from webserver.models import AIGeneration
 from webserver.services.agent_runtime import AgentRuntimeError, RuntimeEvent, RuntimeRequest
 from webserver.services.codex_app_server import CodexAppServerRuntime
 
 
 LOG = logging.getLogger(__name__)
 SCHEMA_VERSION = "top5.v1"
-PROMPT_VERSION = "top5.zh.v1"
+PROMPT_VERSION = "top5.zh.v2"
+FEATURE_KEY = "summary_top5"
 MAX_CHAPTER_CHARACTERS = 20_000
 MAX_QUESTION_CHARACTERS = 300
 MAX_ANSWER_CHARACTERS = 4_000
@@ -130,14 +131,49 @@ def validate_chapter_input(chapter_text: Any, chapter_href: Any, chapter_title: 
 
 def build_prompt(chapter: Dict[str, str]) -> str:
     instructions = {
-        "task": "为严肃阅读者生成当前章节最值得掌握的五组问答",
-        "rules": [
-            "只使用输入章节，不使用外部知识，不调用任何工具",
-            "恰好输出五组，问题简洁、答案准确；答案可用 **重点** Markdown",
-            "每个答案至少一条引用；start/end 是 Python 字符下标，quote 必须等于正文[start:end]",
-            "href 必须原样复制 chapter.href；不要输出 HTML、链接、style 或 script",
+        "role": "你是严肃阅读场景中的资深编辑和苏格拉底式阅读教练。你的任务不是压缩段落，而是帮助读者重建本章的论证或叙事结构。",
+        "objective": "从当前章节中选出最值得读者记住、追问和复核的五个问题，并给出可由原文逐字核验的答案。",
+        "source_boundary": [
+            "只能使用 chapter.text；不得补充外部知识、常识推断、作者背景或章节之外的信息。",
+            "忽略目录、推广、二维码、赞赏、上一篇/下一篇、图片占位和其他与正文论证无关的页面噪声。",
+            "如果某个分析维度在原文中没有充分证据，改选另一个有证据的问题，不得臆测。",
         ],
-        "chapter": chapter,
+        "selection_framework": [
+            "优先覆盖中心判断：本章最重要、最值得关注的主张、冲突或转折是什么，为什么重要。",
+            "覆盖关键机制：作者如何解释因果链、人物动机、系统关系或事件推进。",
+            "覆盖决定性证据：哪些事实、数据、例子、细节或原话最能支持中心判断。",
+            "覆盖边界与张力：原文明确呈现的风险、限制、反例、代价、矛盾或不确定性是什么。",
+            "覆盖后续含义：原文支持的影响、选择、启示、伏笔或尚待回答的问题是什么。",
+            "五题必须彼此区分并共同覆盖章节；不要把同一结论换词重复，也不要机械照搬小标题。",
+            "非虚构章节按主张—机制—证据—风险—含义组织；叙事章节按冲突—动机—关键细节—主题张力—后果/伏笔组织。",
+        ],
+        "question_rules": [
+            "问题应让未读原文的人也能理解，使用具体对象和关系，避免‘本章讲了什么’之类空泛问法。",
+            "每题只问一个核心问题，优先使用为什么、如何、什么证据、什么限制、意味着什么。",
+            "问题保持简洁，必要的核心短语可用 **...** 或 __...__ 强调，不要输出编号。",
+        ],
+        "answer_rules": [
+            "先用一句话直接回答，再用原文中的逻辑或事实展开；通常为 2—5 句，信息密度优先于篇幅。",
+            "区分原文事实、作者判断与推论，不把观点伪装成事实，不夸大确定性。",
+            "每个答案只强调 1—3 个真正关键的短语；不得整段加粗，不得使用标题、列表或引用块替代答案。",
+            "答案中的每个关键事实都必须被 citations 中至少一处原文覆盖；证据不足时收窄答案。",
+        ],
+        "citation_rules": [
+            "每个答案提供 1—3 条最小充分引用，优先选择直接支持结论的连续原文，不要引用整段无关上下文。",
+            "href 必须逐字复制 chapter.href。start/end 是 chapter.text 的 Python/Unicode 字符下标，end 为开区间。",
+            "quote 必须逐字等于 chapter.text[start:end]，包括标点和空白；提交前逐条自行核对，不得改写引用。",
+        ],
+        "format_rules": [
+            "只输出符合 output schema 的 JSON 对象，恰好五组 items，顺序按阅读价值从高到低。",
+            "只允许纯文本及 **...** / __...__ 强调；不得输出 HTML、链接、图片、style、script 或代码围栏。",
+            "使用章节主要语言作答；术语、人名、数字和专有名词保持原文写法。",
+        ],
+        "quality_check": [
+            "五题是否各有独立价值并覆盖章节核心，而非五段摘要。",
+            "每个答案是否先给结论、再给依据，且没有超出原文。",
+            "每条 quote、start、end、href 是否可机械校验。任一项不满足时先修正再输出。",
+        ],
+        "chapter": {**chapter, "length": len(chapter["text"])},
         "schema_version": SCHEMA_VERSION,
         "prompt_version": PROMPT_VERSION,
     }
@@ -149,12 +185,12 @@ def chapter_hash(chapter_text: str) -> str:
 
 
 def request_key(creator_id: int, book_id: int, book_version: str, chapter_href: str, text_hash: str) -> str:
-    raw = f"{creator_id}:{book_id}:{book_version}:{chapter_href}:{text_hash}:{SCHEMA_VERSION}:{PROMPT_VERSION}"
+    raw = f"{FEATURE_KEY}:{creator_id}:{book_id}:{book_version}:{chapter_href}:{text_hash}:{SCHEMA_VERSION}:{PROMPT_VERSION}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def export_markdown(record: AITop5Result) -> str:
-    data = record.user_revision or record.qa_data or {}
+def export_markdown(record: AIGeneration) -> str:
+    data = record.user_revision or record.result_data or {}
     lines = [f"# 总结鸭 TOP5：{record.chapter_title or record.chapter_href}", ""]
     for number, item in enumerate(data.get("items", []), 1):
         lines.extend([f"## {number}. {item.get('question', '')}", "", item.get("answer", ""), "", "原文引用："])
@@ -206,7 +242,7 @@ class AITop5Service:
     def _update_event(self, record_id: str, event: RuntimeEvent) -> None:
         session = self.session_maker()
         try:
-            record = session.get(AITop5Result, record_id)
+            record = session.get(AIGeneration, record_id)
             if not record:
                 return
             record.progress_message = event.message[:256]
@@ -222,7 +258,7 @@ class AITop5Service:
     def _run(self, record_id: str, chapter: Dict[str, str]) -> None:
         session = self.session_maker()
         try:
-            record = session.get(AITop5Result, record_id)
+            record = session.get(AIGeneration, record_id)
             if not record or record.status not in {"queued", "failed", "cancelled"}:
                 return
             if record.cancel_requested:
@@ -253,14 +289,14 @@ class AITop5Service:
             checked = validate_top5(result.output, chapter["text"], chapter["href"])
             session = self.session_maker()
             try:
-                record = session.get(AITop5Result, record_id)
+                record = session.get(AIGeneration, record_id)
                 if not record:
                     return
                 if record.cancel_requested:
                     record.status = "cancelled"
                 else:
                     record.status = "succeeded"
-                    record.qa_data = checked
+                    record.result_data = checked
                     record.ai_draft = checked
                     record.user_revision = checked
                     record.usage = result.usage or {}
@@ -274,7 +310,7 @@ class AITop5Service:
         except (AgentRuntimeError, Top5ValidationError) as exc:
             session = self.session_maker()
             try:
-                record = session.get(AITop5Result, record_id)
+                record = session.get(AIGeneration, record_id)
                 if not record:
                     return
                 cancelled = isinstance(exc, AgentRuntimeError) and exc.code.value == "runtime.cancelled"
@@ -291,7 +327,7 @@ class AITop5Service:
             LOG.exception("AI TOP5 task failed record_id=%s", record_id)
             session = self.session_maker()
             try:
-                record = session.get(AITop5Result, record_id)
+                record = session.get(AIGeneration, record_id)
                 if record:
                     record.status = "failed"
                     record.error_code = "runtime.internal"
@@ -315,14 +351,15 @@ class AITop5Service:
         self.submit(record_id, chapter)
 
 
-def artifact_items(records: Iterable[AITop5Result]) -> List[Dict[str, Any]]:
+def artifact_items(records: Iterable[AIGeneration]) -> List[Dict[str, Any]]:
     return [artifact_dict(record) for record in records]
 
 
-def artifact_dict(record: AITop5Result) -> Dict[str, Any]:
-    data = record.user_revision or record.qa_data or {}
+def artifact_dict(record: AIGeneration) -> Dict[str, Any]:
+    data = record.user_revision or record.result_data or {}
     return {
         "id": record.id,
+        "feature": record.feature,
         "book_id": record.book_id,
         "book_version": record.book_version,
         "chapter_href": record.chapter_href,

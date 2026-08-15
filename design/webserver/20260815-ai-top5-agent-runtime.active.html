@@ -75,7 +75,7 @@
       </section>
       <section>
         <h2>6. API 与界面</h2>
-        <p><code>/api/ai/top5</code> 创建/列表，<code>/api/ai/top5/:id</code> 查询/编辑/删除，附加 <code>cancel</code> 与 <code>export</code> 操作。阅读器浮动入口打开侧栏，状态依次为待处理、生成中、成功、失败或已取消；引用按钮向宿主派发 locator 回跳事件。</p>
+        <p>公共接口统一为 <code>/api/ai/generations</code> 创建/列表及 <code>/api/ai/generations/:id</code> 查询/编辑/删除，附加 <code>cancel</code> 与 <code>export</code> 操作。调用方通过稳定的 <code>feature</code> key 选择能力，后端 feature registry 负责分发；未来增加 AI 功能只注册业务适配器，不再新增一组 HTTP 路由。阅读器浮动入口打开侧栏，状态依次为待处理、生成中、成功、失败或已取消；引用按钮向宿主派发 locator 回跳事件。</p>
         <p>亮暗主题均使用橙红 token，结构顺序固定为编号、问题、答案、原文引用。键盘焦点、状态提示和窄屏布局纳入验收。</p>
       </section>
       <section>
@@ -89,7 +89,7 @@
       <section>
         <h2>8. 测试结果</h2>
         <ul>
-          <li>后端完整测试：<code>837 passed, 20 skipped, 7 subtests passed</code>；TOP5 定向测试：<code>14 passed</code>。</li>
+          <li>后端完整测试：<code>841 passed, 20 skipped</code>；TOP5 定向测试：<code>16 passed</code>。</li>
           <li>后端 Ruff：107 个 Python 文件通过格式与 lint 检查。</li>
           <li>前端定向 Vitest：<code>3 passed</code>；Chromium 亮色、暗色及 320px 键盘/重排 E2E：<code>3 passed</code>。</li>
           <li>ESLint：0 errors，193 个既有 warnings。完整 Vitest 仅有一个无关既有失败：<code>LocalMdiIcons.spec.ts</code> 缺失三个未由本变更引入的图标，并有依赖本地 3000 端口的既有用例。</li>
@@ -101,6 +101,15 @@
         <p>范围为相对 <code>origin/master</code> 的全部未提交变更；直接审阅阅读器入口、空态、加载、成功、失败、取消、编辑、窄屏、亮暗主题和键盘路径。快照、fixture、测试结果和二进制图片不作为源码审阅对象，但检查了引用它们的 E2E 与真实 Chromium 渲染。</p>
         <p>首轮发现并修复三个引入问题：弹窗焦点可逃逸/背景未 inert、编辑文本域缺少程序化标签、绝对定位 footer 在 320px/缩放时可能遮挡内容。同时补齐稳定 live region、背景滚动隔离、焦点恢复、保存失败保留草稿和可缩放 viewport。复查无剩余 HIGH 或 MEDIUM；Accessibility、Layout、Writing、Typography、Colors、UI 六个领域 verdict 为 <strong>Approve</strong>。</p>
         <p>刻意保留的设计决策：引用使用描边按钮而非静态引文以明确回跳能力；问题标题继续使用橙红色，因为这是 TB-53 的明确视觉语义，并已通过亮暗对比度测试；生成 spinner 在 reduced-motion 下减速而非取消，属于功能性进度反馈。</p>
+      </section>
+      <section>
+        <h2>10. PR 评审修订</h2>
+        <ul>
+          <li>HTTP 层从 TOP5 专用路由改为 feature-routed 通用生成接口；持久化实体同步改为带 <code>feature</code> 的 <code>AIGeneration</code>。</li>
+          <li><code>AI_CODEX_IDENTITY_PATH</code> 明确为包含专用 <code>auth.json</code> 的身份目录，任务只复制凭据到临时 <code>CODEX_HOME</code>。</li>
+          <li>版本解析不再依赖 CLI 输出中的 <code>codex-cli</code> 产品标签；实际执行命令始终是 <code>codex</code>。</li>
+          <li>提示词升级为 <code>top5.zh.v2</code>：分别覆盖中心判断、关键机制、决定性证据、边界张力和后续含义，并为非虚构/叙事章节提供不同选题框架、逐条引用规则和输出前自检。</li>
+        </ul>
       </section>
     </main>
   </body>

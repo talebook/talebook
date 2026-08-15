@@ -5,6 +5,7 @@ const chapter = '第一段给出关键事实，第二段解释原因，第三段
 
 const artifact = {
     id: '11111111-1111-1111-1111-111111111111',
+    feature: 'summary_top5',
     book_id: 1,
     book_version: 'fixture',
     chapter_href: 'Text/chapter-1.xhtml',
@@ -28,7 +29,7 @@ const artifact = {
 };
 
 async function mount(page) {
-    await page.route('**/api/ai/top5?book_id=1', route => route.fulfill({
+    await page.route('**/api/ai/generations?feature=summary_top5&book_id=1', route => route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({ err: 'ok', items: [artifact] }),
     }));

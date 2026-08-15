@@ -536,13 +536,14 @@ class ReadingState(Base, SQLAlchemyMixin):
         return self.progress or {}
 
 
-class AITop5Result(Base, SQLAlchemyMixin):
-    """A creator-private, chapter-scoped AI TOP5 artifact."""
+class AIGeneration(Base, SQLAlchemyMixin):
+    """A creator-private AI generation artifact routed by feature key."""
 
-    __tablename__ = "ai_top5_results"
+    __tablename__ = "ai_generations"
 
     id = Column(String(36), primary_key=True)
     request_key = Column(String(64), unique=True, nullable=False, index=True)
+    feature = Column(String(64), nullable=False, index=True)
     creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
     book_id = Column(Integer, nullable=False, index=True)
     book_version = Column(String(128), nullable=False)
@@ -552,7 +553,7 @@ class AITop5Result(Base, SQLAlchemyMixin):
     chapter_length = Column(Integer, nullable=False)
     status = Column(String(24), default="queued", nullable=False, index=True)
     progress_message = Column(String(256), default="")
-    qa_data = Column(MutableDict.as_mutable(JSONType), default={})
+    result_data = Column(MutableDict.as_mutable(JSONType), default={})
     ai_draft = Column(MutableDict.as_mutable(JSONType), default={})
     user_revision = Column(MutableDict.as_mutable(JSONType), default={})
     schema_version = Column(String(32), default="top5.v1", nullable=False)
@@ -568,7 +569,7 @@ class AITop5Result(Base, SQLAlchemyMixin):
     started_at = Column(DateTime)
     finished_at = Column(DateTime)
 
-    creator = relationship(Reader, backref="ai_top5_results")
+    creator = relationship(Reader, backref="ai_generations")
 
 
 class BookSourceModel(Base, SQLAlchemyMixin):

@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  const FEATURE = "summary_top5";
+  const GENERATIONS_API = "/api/ai/generations";
   const state = {
     bookId: null, artifact: null, chapter: null, pollTimer: null, editing: false,
     editorDraft: null, previousFocus: null, inertElements: []
@@ -216,7 +218,9 @@
       return;
     }
     try {
-      const payload = await request(`/api/ai/top5?book_id=${encodeURIComponent(state.bookId)}`);
+      const payload = await request(
+        `${GENERATIONS_API}?feature=${encodeURIComponent(FEATURE)}&book_id=${encodeURIComponent(state.bookId)}`
+      );
       state.artifact = payload.items[0] || null;
       if (state.artifact) renderArtifact();
       else renderReady();
@@ -244,10 +248,11 @@
     renderStatus("正在提交当前章节…", false, true);
     renderFooter([{ text: "关闭", action: "close" }]);
     try {
-      const payload = await request("/api/ai/top5", {
+      const payload = await request(GENERATIONS_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          feature: FEATURE,
           book_id: Number(state.bookId), chapter_text: chapter.text, chapter_href: chapter.href,
           chapter_title: chapter.title, regenerate: Boolean(regenerate)
         })
@@ -329,7 +334,7 @@
     window.clearTimeout(state.pollTimer);
     state.pollTimer = window.setTimeout(async function () {
       try {
-        const payload = await request(`/api/ai/top5/${state.artifact.id}`);
+        const payload = await request(`${GENERATIONS_API}/${state.artifact.id}`);
         state.artifact = payload.artifact;
         renderArtifact();
       } catch (error) {
@@ -341,7 +346,7 @@
 
   async function cancelArtifact() {
     try {
-      const payload = await request(`/api/ai/top5/${state.artifact.id}/cancel`, { method: "POST" });
+      const payload = await request(`${GENERATIONS_API}/${state.artifact.id}/cancel`, { method: "POST" });
       state.artifact = payload.artifact;
       renderArtifact();
     } catch (error) { renderStatus(error.message, true); }
@@ -357,7 +362,7 @@
     });
     state.editorDraft = items;
     try {
-      const payload = await request(`/api/ai/top5/${state.artifact.id}`, {
+      const payload = await request(`${GENERATIONS_API}/${state.artifact.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: items })
       });
       state.artifact = payload.artifact;
@@ -375,7 +380,7 @@
   async function deleteArtifact() {
     if (!window.confirm("删除这组总结？此操作无法撤销。")) return;
     try {
-      await request(`/api/ai/top5/${state.artifact.id}`, { method: "DELETE" });
+      await request(`${GENERATIONS_API}/${state.artifact.id}`, { method: "DELETE" });
       state.artifact = null;
       renderReady();
     } catch (error) { renderStatus(error.message, true); }
@@ -425,7 +430,7 @@
     else if (action === "cancel-edit") { state.editing = false; state.editorDraft = null; renderArtifact(); }
     else if (action === "save") saveEdits();
     else if (action === "delete") deleteArtifact();
-    else if (action === "export") window.location.assign(`/api/ai/top5/${state.artifact.id}/export`);
+    else if (action === "export") window.location.assign(`${GENERATIONS_API}/${state.artifact.id}/export`);
     else if (action === "citation") jumpToCitation(Number(target.dataset.item), Number(target.dataset.citation));
   }
 

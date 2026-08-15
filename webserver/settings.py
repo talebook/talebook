@@ -79,9 +79,12 @@ settings = {
     "EPUB_VIEWER": "creader.html",
     "PDF_VIEWER": "/static/pdfjs/web/viewer.html?file=%(pdf_url)s",
 
-    # 总结鸭 TOP5：只通过独立身份的 Codex app-server stdio 适配器生成。
-    "AI_TOP5_ENABLED": True,
+    # AI 生成统一开关；具体能力挂载到 /api/ai/generations 的 feature registry。
+    "AI_ENABLED": True,
+    "AI_SUMMARY_TOP5_ENABLED": True,
     "AI_CODEX_COMMAND": "codex",
+    # 专用于 Talebook AI 任务的 Codex 身份目录，须包含由 `codex login` 生成的 auth.json。
+    # 运行任务时只会把 auth.json 复制到临时 CODEX_HOME，不会把此目录或书库暴露给生成进程。
     "AI_CODEX_IDENTITY_PATH": "/data/books/settings/codex-ai",
     "AI_CODEX_MODEL": "",
     "AI_CODEX_MIN_VERSION": "0.147.0",

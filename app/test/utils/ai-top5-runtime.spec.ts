@@ -38,6 +38,9 @@ describe('Summary Duck static reader integration', () => {
         }
         expect(script).not.toContain('http://');
         expect(script).not.toContain('https://');
+        expect(script).toContain('/api/ai/generations');
+        expect(script).toContain('summary_top5');
+        expect(script).not.toContain('/api/ai/top5');
     });
 
     it('defines ordered question parts and accessible light/dark tokens', () => {

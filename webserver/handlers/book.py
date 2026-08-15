@@ -1018,10 +1018,10 @@ class BookDelete(BaseHandler):
         else:
             self.db.delete_book(bid)
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
-        from webserver.models import AITop5Result, ScanFile
+        from webserver.models import AIGeneration, ScanFile
 
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
-        self.session.query(AITop5Result).filter(AITop5Result.book_id == bid).delete()
+        self.session.query(AIGeneration).filter(AIGeneration.book_id == bid).delete()
         if external_indexed:
             self.session.query(Item).filter(Item.book_id == bid).delete()
         self.session.commit()

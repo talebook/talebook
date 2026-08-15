@@ -10,9 +10,12 @@ from tests import test_main
 from webserver import models
 from webserver.services.agent_runtime import RuntimeEventType, RuntimeRequest
 from webserver.services.ai_top5 import (
+    FEATURE_KEY,
+    PROMPT_VERSION,
     TOP5_OUTPUT_SCHEMA,
     AITop5Service,
     Top5ValidationError,
+    build_prompt,
     clean_markdown,
     validate_chapter_input,
     validate_top5,
@@ -84,6 +87,20 @@ class Top5ValidationTest(unittest.TestCase):
         self.assertLessEqual(len(chapter["text"]), 20_000)
         with self.assertRaisesRegex(Top5ValidationError, "过短"):
             validate_chapter_input("太短", HREF)
+
+    def test_prompt_reconstructs_the_chapter_instead_of_producing_five_generic_summaries(self):
+        prompt = json.loads(build_prompt({"text": CHAPTER, "href": HREF, "title": "第一章"}))
+        self.assertEqual(prompt["prompt_version"], PROMPT_VERSION)
+        self.assertEqual(prompt["chapter"]["length"], len(CHAPTER))
+        self.assertIn("中心判断", "".join(prompt["selection_framework"]))
+        self.assertIn("关键机制", "".join(prompt["selection_framework"]))
+        self.assertIn("决定性证据", "".join(prompt["selection_framework"]))
+        self.assertIn("边界与张力", "".join(prompt["selection_framework"]))
+        self.assertIn("后续含义", "".join(prompt["selection_framework"]))
+        self.assertIn("不得臆测", "".join(prompt["source_boundary"]))
+        self.assertIn("逐字等于", "".join(prompt["citation_rules"]))
+        self.assertNotIn("http://", json.dumps(prompt, ensure_ascii=False))
+        self.assertNotIn("https://", json.dumps(prompt, ensure_ascii=False))
 
 
 class CodexProtocolContractTest(unittest.TestCase):
@@ -158,37 +175,62 @@ class Top5APITest(test_main.TestWithUserLogin):
     def setUp(self):
         super().setUp()
         session = test_main.get_db()
-        session.query(models.AITop5Result).delete()
+        session.query(models.AIGeneration).delete()
         session.commit()
 
     def tearDown(self):
         session = test_main.get_db()
-        session.query(models.AITop5Result).delete()
+        session.query(models.AIGeneration).delete()
         session.commit()
         super().tearDown()
 
     def _create(self):
         with mock.patch.object(AITop5Service, "submit"):
             return self.json(
-                "/api/ai/top5",
+                "/api/ai/generations",
                 method="POST",
                 headers={"Content-Type": "application/json"},
                 body=json.dumps(
-                    {"book_id": test_main.BID_EPUB, "chapter_text": CHAPTER, "chapter_href": HREF, "chapter_title": "第一章"}
+                    {
+                        "feature": FEATURE_KEY,
+                        "book_id": test_main.BID_EPUB,
+                        "chapter_text": CHAPTER,
+                        "chapter_href": HREF,
+                        "chapter_title": "第一章",
+                    }
                 ),
             )
+
+    def test_generic_generation_api_routes_by_feature(self):
+        unknown = self.json(
+            "/api/ai/generations",
+            method="POST",
+            headers={"Content-Type": "application/json"},
+            body=json.dumps({"feature": "unknown"}),
+        )
+        self.assertEqual(unknown["err"], "ai.feature_not_found")
+
+        source = Path("webserver/handlers/ai.py").read_text(encoding="utf-8")
+        self.assertIn('r"/api/ai/generations"', source)
+        self.assertNotIn('r"/api/ai/top5"', source)
 
     def test_create_is_idempotent_and_creator_scoped(self):
         first = self._create()
         second = self._create()
         self.assertEqual(first["err"], "ok")
+        self.assertEqual(first["artifact"]["feature"], FEATURE_KEY)
         self.assertEqual(first["artifact"]["id"], second["artifact"]["id"])
         self.assertTrue(second["idempotent"])
 
+        listed = self.json(f"/api/ai/generations?feature={FEATURE_KEY}&book_id={test_main.BID_EPUB}")
+        self.assertEqual(listed["err"], "ok")
+        self.assertEqual(listed["items"][0]["id"], first["artifact"]["id"])
+
         session = test_main.get_db()
-        other = models.AITop5Result(
+        other = models.AIGeneration(
             id="11111111-1111-1111-1111-111111111111",
             request_key="f" * 64,
+            feature=FEATURE_KEY,
             creator_id=2,
             book_id=test_main.BID_EPUB,
             book_version="other",
@@ -198,23 +240,23 @@ class Top5APITest(test_main.TestWithUserLogin):
         )
         session.add(other)
         session.commit()
-        hidden = self.json(f"/api/ai/top5/{other.id}")
+        hidden = self.json(f"/api/ai/generations/{other.id}")
         self.assertEqual(hidden["err"], "ai.not_found")
 
     def test_successful_artifact_can_be_edited_cancelled_exported_and_deleted(self):
         created = self._create()["artifact"]
         session = test_main.get_db()
-        record = session.get(models.AITop5Result, created["id"])
+        record = session.get(models.AIGeneration, created["id"])
         record.status = "succeeded"
         record.ai_draft = valid_payload()
-        record.qa_data = valid_payload()
+        record.result_data = valid_payload()
         record.user_revision = valid_payload()
         session.commit()
 
         edited = valid_payload()["items"]
         edited[0]["answer"] = "用户修订的 **答案**"
         response = self.json(
-            f"/api/ai/top5/{record.id}",
+            f"/api/ai/generations/{record.id}",
             method="PATCH",
             headers={"Content-Type": "application/json"},
             body=json.dumps({"items": edited}),
@@ -222,25 +264,25 @@ class Top5APITest(test_main.TestWithUserLogin):
         self.assertEqual(response["err"], "ok")
         self.assertIn("用户修订", response["artifact"]["items"][0]["answer"])
 
-        export = self.fetch(f"/api/ai/top5/{record.id}/export")
+        export = self.fetch(f"/api/ai/generations/{record.id}/export")
         self.assertEqual(export.code, 200)
         self.assertIn("text/markdown", export.headers["Content-Type"])
         self.assertIn("用户修订", export.body.decode("utf-8"))
 
-        response = self.json(f"/api/ai/top5/{record.id}", method="DELETE")
+        response = self.json(f"/api/ai/generations/{record.id}", method="DELETE")
         self.assertEqual(response["err"], "ok")
-        self.assertIsNone(test_main.get_db().get(models.AITop5Result, created["id"]))
+        self.assertIsNone(test_main.get_db().get(models.AIGeneration, created["id"]))
 
     def test_book_version_change_fails_closed(self):
         artifact = self._create()["artifact"]
         with mock.patch("webserver.handlers.ai._book_version", return_value="changed"):
-            response = self.json(f"/api/ai/top5/{artifact['id']}")
+            response = self.json(f"/api/ai/generations/{artifact['id']}")
         self.assertEqual(response["err"], "ai.book_version_changed")
 
     def test_private_book_permissions_are_rechecked(self):
         artifact = self._create()["artifact"]
-        with mock.patch("webserver.handlers.ai._Top5Base.can_view_book", return_value=False):
-            response = self.json(f"/api/ai/top5/{artifact['id']}")
+        with mock.patch("webserver.handlers.ai._AIGenerationBase.can_view_book", return_value=False):
+            response = self.json(f"/api/ai/generations/{artifact['id']}")
         self.assertEqual(response["err"], "ai.not_found")
 
 
@@ -263,8 +305,8 @@ class StaticReaderContractTest(unittest.TestCase):
     def test_book_delete_propagates_to_ai_artifacts(self):
         source = Path("webserver/handlers/book.py").read_text(encoding="utf-8")
         delete_block = source[source.index("class BookDelete") : source.index("class BookDownload")]
-        self.assertIn("AITop5Result", delete_block)
-        self.assertIn("AITop5Result.book_id == bid", delete_block)
+        self.assertIn("AIGeneration", delete_block)
+        self.assertIn("AIGeneration.book_id == bid", delete_block)
 
 
 if __name__ == "__main__":

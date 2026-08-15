@@ -35,7 +35,9 @@ from webserver.services.agent_runtime import (
 
 
 LOG = logging.getLogger(__name__)
-VERSION_RE = re.compile(r"(?:codex-cli\s+)?(\d+)\.(\d+)\.(\d+)")
+# The executable is `codex`; parse only the semantic version so the adapter is
+# independent of the product label printed by a particular CLI release.
+VERSION_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 
 
 class _ActiveTask:
