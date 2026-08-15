@@ -34,31 +34,32 @@
 </div>
 
 <h2>1. 原始诉求</h2>
-<p>为微信读书、Readwise、Web、Moke 与 Readest 等笔记插件提供统一服务端契约：个人高亮、笔记与书签可幂等导入、查询、导出和按来源删除；无法精确定位的记录仍可按章节展示；章评使用独立数据域；管理员不能借普通接口读取其他用户的私密正文。</p>
+<p>为微信读书、BRS、Calibre、Web、Moke 与 Readest 等笔记来源提供统一服务端契约。2026-08-15 评审确认：Talebook 的 <code>annotations</code> 是唯一权威内容表；章评也是 annotation 类型，不另建内容表；Calibre 等系统只是可导入、可回写的 source。用户新建或修改非私有 annotation 后，由后台任务异步写入所有已注册 source。</p>
 
 <h2>2. 目标与边界</h2>
 <ul>
-  <li>个人 annotation 以当前登录用户为强制租户边界，书籍访问同时服从现有 <code>can_view_book</code> 权限。</li>
-  <li>支持 <code>highlight</code>、<code>note</code>、<code>bookmark</code>，允许 <code>cfi=NULL</code> 并保留章节、引用文本与来源位置。</li>
-  <li>支持客户端 <code>client_id</code> 幂等，以及 <code>owner + book + source + external_id</code> 来源幂等。</li>
-  <li>章评写入独立表；其正文按书籍可见性读取，写入、修改和来源删除仅限导入者，不复用个人 annotation 的私密查询。</li>
-  <li>本次只提供后端数据与 JSON API，不改页面和阅读器；外部插件连接管理由后续插件底座承接。</li>
+  <li><code>annotations</code> 保存权威正文、位置、隐私和 owner；外部系统不得成为内容主表。</li>
+  <li>支持 <code>highlight</code>、<code>note</code>、<code>bookmark</code>、<code>chapter_comment</code>，允许 <code>cfi=NULL</code> 并保留章节级定位。</li>
+  <li>私有记录只对 owner 可见；非私有记录对所有有该书阅读权限的登录用户可见，但只有 owner 可修改或删除。</li>
+  <li><code>annotation_sources</code> 只保存一条权威记录在各外部系统中的映射和同步状态，所有外部引用字段统一使用 <code>source_</code> 前缀。</li>
+  <li>本次提供 source writer 注册和异步分发契约；BRS、微信读书、Calibre 的具体认证与网络适配由对应插件注册 writer，不在本任务内硬编码。</li>
 </ul>
 
 <h2>3. 数据模型</h2>
 <div class="flow">
-  <div><strong>book_annotations</strong>用户私密数据。保存内容、定位、来源标识、远端时间与人工修改时间。</div>
-  <div><strong>chapter_comments</strong>章评独立数据。读取服从书籍可见性，写操作归导入者。</div>
-  <div><strong>readers / Calibre books</strong>用户外键由认证库维护；书籍存在性和可见性继续由 Calibre 与 Item.scope 判定。</div>
+  <div><strong>annotations</strong>Talebook 权威内容。私人笔记和公共章评使用同一生命周期。</div>
+  <div><strong>annotation_sources</strong>一对多外部副本映射。Calibre、微信读书、BRS 都只是 source。</div>
+  <div><strong>source writers</strong>非私有记录提交后异步扇出；失败状态留在映射表，权威内容不回滚。</div>
 </div>
 <table>
 <thead><tr><th>分组</th><th>关键字段</th><th>约束与说明</th></tr></thead>
 <tbody>
-<tr><td>身份</td><td><code>reader_id</code>、<code>book_id</code></td><td>annotation 的所有读写固定到当前用户；chapter comment 的 reader 是导入者。</td></tr>
-<tr><td>内容</td><td><code>kind</code>、<code>text</code>、<code>refer_text</code>、<code>color</code></td><td>kind 仅允许 highlight / note / bookmark；正文不进入管理接口。</td></tr>
-<tr><td>定位</td><td><code>cfi</code>、<code>chapter</code>、<code>source_position</code></td><td>CFI 可空；章节与来源位置提供降级展示。</td></tr>
-<tr><td>来源</td><td><code>source</code>、<code>external_id</code>、<code>connection_id</code>、<code>run_id</code>、<code>raw_hash</code>、<code>remote_updated_at</code></td><td>与插件 source record / connection / run 对齐，均可随 API 返回。</td></tr>
-<tr><td>冲突</td><td><code>user_modified_at</code>、<code>update_time</code></td><td>人工 PUT 后，后续来源 upsert 默认只刷新来源元数据，不覆盖正文。</td></tr>
+<tr><td>权威身份</td><td><code>annotations.id</code>、<code>reader_id</code>、<code>book_id</code>、<code>client_id</code></td><td><code>(reader_id, book_id, client_id)</code> 保证 Talebook 客户端幂等；书籍仍是跨数据库逻辑引用。</td></tr>
+<tr><td>权威内容</td><td><code>annotation_type</code>、<code>content</code>、<code>quote_text</code>、<code>color</code>、<code>author_name</code></td><td>章评用 <code>chapter_comment</code> 类型表达，不再创建 <code>chapter_comments</code> 表。</td></tr>
+<tr><td>位置与隐私</td><td><code>cfi</code>、<code>chapter</code>、<code>is_private</code></td><td>CFI 可空；<code>is_private=true</code> 为安全默认值，且不会向外部 source 扇出。</td></tr>
+<tr><td>外部身份</td><td><code>source_name</code>、<code>source_connection_id</code>、<code>source_annotation_id</code></td><td>位于 <code>annotation_sources</code>；外部唯一键为三者组合，每条 annotation 在同一 source connection 只有一个副本。</td></tr>
+<tr><td>外部状态</td><td><code>source_run_id</code>、<code>source_position</code>、<code>source_raw_hash</code>、<code>source_updated_at</code></td><td>用于来源幂等、旧事件保护和定位追踪，避免无前缀字段被误认为 Talebook 权威属性。</td></tr>
+<tr><td>同步状态</td><td><code>source_sync_status</code>、<code>source_synced_at</code>、<code>source_sync_error</code></td><td>状态为 pending / synced / failed；外部失败只更新副本状态，不回滚 <code>annotations</code>。</td></tr>
 </tbody>
 </table>
 
@@ -66,47 +67,51 @@
 <table>
 <thead><tr><th>方法</th><th>路径</th><th>行为</th></tr></thead>
 <tbody>
-<tr><td>GET / POST</td><td><code>/api/book/:book_id/annotations</code></td><td>列出当前用户该书记录；按 client_id 或 source + external_id 幂等 upsert。</td></tr>
-<tr><td>PUT / DELETE</td><td><code>/api/book/:book_id/annotations/:id</code></td><td>仅 owner 修改或删除；PUT 标记人工修改保护。</td></tr>
-<tr><td>GET / DELETE</td><td><code>/api/annotations</code></td><td>按 book/source/run/connection 查询；DELETE 至少提供一个来源筛选，默认保留人工修改记录。</td></tr>
-<tr><td>GET</td><td><code>/api/annotations/export</code></td><td>返回带 schema version 和导出时间的 JSON 数据集，接受相同筛选。</td></tr>
-<tr><td>GET / POST</td><td><code>/api/book/:book_id/chapter-comments</code></td><td>按书读取章评；登录用户可幂等导入。</td></tr>
-<tr><td>PUT / DELETE</td><td><code>/api/book/:book_id/chapter-comments/:id</code></td><td>仅导入者修改或删除。</td></tr>
-<tr><td>GET / DELETE</td><td><code>/api/chapter-comments</code></td><td>按 source/run/connection 查询或来源清理；不会触及 annotations。</td></tr>
-<tr><td>GET</td><td><code>/api/chapter-comments/export</code></td><td>按相同来源条件导出导入者的章评，并提供独立 schema version。</td></tr>
+<tr><td>GET / POST</td><td><code>/api/book/:book_id/annotations</code></td><td>GET 返回 owner 私有记录及该书公共记录；POST 按 client_id 或 source 三元身份幂等 upsert。</td></tr>
+<tr><td>PUT / DELETE</td><td><code>/api/book/:book_id/annotations/:id</code></td><td>仅 owner 修改或删除；非私有内容更新后再次异步扇出。</td></tr>
+<tr><td>GET / DELETE</td><td><code>/api/annotations</code></td><td>仅管理当前用户权威记录；来源筛选字段均为 <code>source_*</code>。DELETE 来源筛选只解除匹配 source 映射，不删除权威正文。</td></tr>
+<tr><td>GET</td><td><code>/api/annotations/export</code></td><td>导出 Talebook 权威记录以及每条记录的 <code>sources</code> 映射列表。</td></tr>
 </tbody>
 </table>
-<p>所有端点返回 HTTP 200 的 Talebook JSON 错误契约；写接口使用 <code>@js + @auth</code>。章评集合读取也要求登录，避免在缺少产品公开策略前扩大公开面。</p>
+<p>不再提供 <code>/api/*/chapter-comments</code> 路由。创建 payload 使用 <code>annotation_type</code>、<code>content</code>、<code>quote_text</code>、<code>is_private</code>；来源导入额外携带 <code>source_name</code>、<code>source_connection_id</code>、<code>source_annotation_id</code> 等统一前缀字段。</p>
 
 <h2>5. 幂等与冲突规则</h2>
 <ol>
-  <li>有 <code>external_id</code> 时优先按 owner + book + source + external_id 查找；否则按 owner + book + client_id 查找。</li>
-  <li><code>raw_hash</code> 相同视为重复投递；早于现存 <code>remote_updated_at</code> 的来源事件视为 stale，不回滚内容。同一远端时间允许来源修正后重新解析。</li>
-  <li>通过单条 PUT 修改内容后写入 <code>user_modified_at</code>；来源 upsert 返回 <code>conflict_protected=true</code>，保留内容但允许更新 connection/run/hash/remote time，便于审计本次同步。</li>
-  <li>来源批量删除默认跳过人工修改记录，显式 <code>include_modified=true</code> 才删除；返回删除数与保护数。</li>
+  <li>有 <code>source_name + source_connection_id + source_annotation_id</code> 时优先按 source 映射查找；本地创建则按 owner + book + client_id 查找。</li>
+  <li>早于现存 <code>source_updated_at</code> 且 hash 不同的来源事件视为 stale，不回滚权威内容。</li>
+  <li>通过 Talebook PUT 修改内容后写入 <code>user_modified_at</code>；后续来源导入只刷新该 source 映射并返回 <code>conflict_protected=true</code>。</li>
+  <li>来源清理删除的是 <code>annotation_sources</code> 映射。权威 annotation 只能通过单条 owner DELETE 删除。</li>
 </ol>
-<div class="callout">普通管理接口不增加 annotation 查询能力。管理员调用 annotation API 时仍只以自己的 reader_id 查询，不能越权读取其他用户正文。</div>
+<div class="callout">管理员不会获得读取他人私有正文的旁路；公共 annotation 也必须先通过该书现有可见性校验。</div>
 
-<h2>6. Migration</h2>
-<p>补强 <code>compare_and_migrate</code>：先按 SQLAlchemy metadata 创建缺失表，再沿用现有逻辑为既有表补列。新表由 metadata 一次性创建，因此唯一约束、索引和外键随 migration 落地；已有表不做破坏性重建。</p>
+<h2>6. 异步 source 扇出</h2>
+<ol>
+  <li>handler 先提交 Talebook 权威事务，再把 annotation id 放入 <code>AnnotationSyncService</code> 队列。</li>
+  <li>服务枚举插件注册的 source writer；为每个 writer upsert 一条 pending 映射，然后调用 writer。</li>
+  <li>成功后记录外部 id、hash、远端时间并标记 synced；异常写入 failed 与错误摘要，其他 source 继续执行。</li>
+  <li>私有 annotation 不入队；来源导入可排除原 source，避免回环，同时仍可扇出到其他已注册 source。</li>
+</ol>
 
-<h2>7. 测试计划与结果</h2>
+<h2>7. Migration</h2>
+<p>PR 尚未合入且旧新表均未发布，因此直接以最终模型创建 <code>annotations</code> 与 <code>annotation_sources</code>，不为草稿中的 <code>book_annotations</code> / <code>chapter_comments</code> 增加兼容迁移。<code>compare_and_migrate</code> 仍先创建缺失整表，确保唯一约束、索引和 FK 一并落地。</p>
+
+<h2>8. 测试计划与结果</h2>
 <table>
 <thead><tr><th>层级</th><th>验证项</th><th>状态</th></tr></thead>
 <tbody>
-<tr><td>模型 / migration</td><td>唯一约束、nullable CFI、缺失表创建</td><td><code>tests/test_annotations.py</code> 通过</td></tr>
-<tr><td>Annotation API</td><td>权限、幂等、来源查询与导出、来源删除、人工修改保护、stale 保护</td><td>聚焦测试 12 项通过</td></tr>
-<tr><td>Chapter comments</td><td>独立存储、书籍可见性、导入者写权限、删除互不影响</td><td>聚焦测试通过</td></tr>
-<tr><td>工程检查</td><td>ruff、完整 pytest、check-design</td><td>完整后端测试 837 passed / 20 skipped / 7 subtests passed；ruff 通过；check-design 通过</td></tr>
+<tr><td>模型 / migration</td><td>最终表名、两组唯一约束、级联删除、nullable CFI</td><td><code>tests/test_annotations.py</code> 通过</td></tr>
+<tr><td>Annotation API</td><td>本地/来源幂等、公共与私有可见性、章评同表、owner 写权限、stale 与冲突保护</td><td>聚焦回归 13 passed</td></tr>
+<tr><td>Source 同步</td><td>私有不扇出、公共异步调用全部 writer、失败隔离、来源映射状态</td><td>Calibre / 微信读书模拟 writer 测试通过</td></tr>
+<tr><td>工程检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、完整 pytest、<code>make check-design</code></td><td>Ruff 通过；完整后端 838 passed / 20 skipped；方案校验通过</td></tr>
 </tbody>
 </table>
 
-<h2>8. 风险与兼容性</h2>
+<h2>9. 风险与兼容性</h2>
 <ul>
-  <li>旧 SQLite / MySQL 通过缺失表创建获得新域，不修改 Calibre metadata 数据库。</li>
-  <li>当前连接和 run 只是稳定字符串引用；插件底座未来可在不改变记录结构的前提下增加实体表和外键映射。</li>
-  <li>章评的跨用户可见性被限制在登录且可查看该书的用户；若产品未来要求完全公开或完全私密，需要独立策略变更。</li>
-  <li>本次仅新增服务端数据、迁移和 JSON API，没有页面、交互、文案或其他界面消费者变更，因此豁免 interface-review；剩余风险是外部插件仍需按本契约完成接入。</li>
+  <li>外部写入不是数据库事务的一部分，允许短暂最终一致；pending / failed 状态用于观察和后续重试。</li>
+  <li>删除向外部 source 的传播和持久化重试调度暂不在本任务内，后续插件实现必须补齐。</li>
+  <li><code>book_id</code> 仍是跨用户库与 Calibre 库的逻辑引用，数据库无法建立 FK。</li>
+  <li>本次仅调整后端数据、迁移与 JSON API，没有页面、交互或文案变化，因此豁免 interface-review；外部消费者必须切换到新字段名。</li>
 </ul>
 </body>
 </html>
