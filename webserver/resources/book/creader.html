@@ -88,6 +88,45 @@
     @keyframes converting-spin {
       to { transform: rotate(360deg); }
     }
+    #annotation-toggle {
+      position: fixed;
+      z-index: 10020;
+      top: max(72px, calc(env(safe-area-inset-top) + 58px));
+      right: 14px;
+      display: inline-flex;
+      min-width: 46px;
+      min-height: 46px;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 13px;
+      color: #fff;
+      background: #315f7d;
+      border: 0;
+      border-radius: 999px;
+      box-shadow: 0 9px 24px rgba(20, 42, 56, .28);
+      cursor: pointer;
+      font: 600 14px/1 Roboto, sans-serif;
+    }
+    #annotation-toggle:focus-visible, #annotation-close:focus-visible { outline: 3px solid #ffca67; outline-offset: 3px; }
+    #annotation-shell {
+      position: fixed;
+      z-index: 10030;
+      inset: 0 0 0 auto;
+      width: min(460px, 94vw);
+      background: #fff;
+      box-shadow: -14px 0 42px rgba(15, 35, 47, .28);
+      transform: translateX(105%);
+      visibility: hidden;
+      pointer-events: none;
+      transition: transform .22s ease, visibility 0s linear .22s;
+    }
+    #annotation-shell[data-open="true"] { transform: translateX(0); visibility: visible; pointer-events: auto; transition-delay: 0s; }
+    #annotation-shell header { display:flex; height:52px; align-items:center; justify-content:space-between; padding:0 10px 0 18px; color:#20333f; border-bottom:1px solid #dde5e9; font:700 15px/1 Roboto,sans-serif; }
+    #annotation-close { display:grid; width:38px; height:38px; place-items:center; color:#20333f; background:transparent; border:0; border-radius:50%; cursor:pointer; font-size:24px; }
+    #annotation-frame { display:block; width:100%; height:calc(100% - 52px); border:0; }
+    @media (max-width: 560px) { #annotation-toggle span { display:none; } #annotation-shell { width:100vw; } }
+    @media (prefers-reduced-motion: reduce) { #annotation-shell { transition:none; } }
   </style>
 </head>
 <body>
@@ -97,5 +136,76 @@
     <h3>{{ book.title }}</h3>
     <p id="converting-msg">首次在线阅读，服务器正在将本书转换为 EPUB 格式，<br>预计需要 1~2 分钟，请耐心等待，转换完成后将自动打开。</p>
   </div>
+  {% if request.user %}
+  <button id="annotation-toggle" type="button" aria-controls="annotation-shell" aria-expanded="false" aria-label="打开阅读笔记">
+    <span aria-hidden="true">✎</span><span>阅读笔记</span>
+  </button>
+  <aside id="annotation-shell" data-open="false" aria-hidden="true" aria-label="阅读笔记" inert>
+    <header><span>阅读笔记</span><button id="annotation-close" type="button" aria-label="关闭阅读笔记">×</button></header>
+    <iframe id="annotation-frame" title="阅读笔记" loading="lazy" src="/book/{{book.id}}/annotations?reader=1"></iframe>
+  </aside>
+  <script>
+    (function () {
+      const shell = document.getElementById('annotation-shell');
+      const toggle = document.getElementById('annotation-toggle');
+      const close = document.getElementById('annotation-close');
+      const frame = document.getElementById('annotation-frame');
+
+      function setPanel(open) {
+        shell.dataset.open = open ? 'true' : 'false';
+        shell.setAttribute('aria-hidden', String(!open));
+        shell.inert = !open;
+        toggle.setAttribute('aria-expanded', String(open));
+        if (open) close.focus(); else toggle.focus();
+      }
+      toggle.addEventListener('click', function () { setPanel(shell.dataset.open !== 'true'); });
+      close.addEventListener('click', function () { setPanel(false); });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && shell.dataset.open === 'true') setPanel(false);
+      });
+
+      function readerProxy() {
+        let instance = document.getElementById('reader')?.__vueParentComponent;
+        while (instance) {
+          if (instance.proxy?.rendition?.display) return instance.proxy;
+          instance = instance.parent;
+        }
+        return null;
+      }
+
+      async function locate(data, source) {
+        if (!data.cfi) {
+          source.postMessage({ type: 'talebook:annotation-location-result', ok: false, chapterOnly: true }, window.location.origin);
+          return;
+        }
+        let proxy = readerProxy();
+        for (let attempt = 0; !proxy && attempt < 20; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          proxy = readerProxy();
+        }
+        try {
+          if (!proxy) throw new Error('reader unavailable');
+          await proxy.rendition.display(data.cfi);
+          setPanel(false);
+          source.postMessage({ type: 'talebook:annotation-location-result', ok: true }, window.location.origin);
+        } catch (error) {
+          source.postMessage({ type: 'talebook:annotation-location-result', ok: false, chapterOnly: false }, window.location.origin);
+        }
+      }
+
+      window.addEventListener('message', function (event) {
+        if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
+        if (event.data?.type === 'talebook:annotation-locate') locate(event.data, event.source);
+      });
+
+      const initial = new URLSearchParams(window.location.search);
+      if (initial.get('cfi')) {
+        window.addEventListener('load', function () {
+          locate({ cfi: initial.get('cfi') }, frame.contentWindow);
+        });
+      }
+    })();
+  </script>
+  {% endif %}
 </body>
 </html>

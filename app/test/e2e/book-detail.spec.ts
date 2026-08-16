@@ -152,4 +152,42 @@ test.describe('Book Detail Page', () => {
             await expect(seriesChip).toContainText(apiBook.book.series);
         }
     });
+
+    test('shows imported annotations with their real source and chapter-only fallback', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+
+        await expect(page.getByRole('heading', { name: /笔记与高亮/ })).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText('微信读书', { exact: true })).toBeVisible();
+        await expect(page.getByText('这是从微信读书导入的章节级笔记。')).toBeVisible();
+        await expect(page.getByText('仅章节定位').first()).toBeVisible();
+        await expect(page.getByText('Talebook 原生', { exact: true })).toBeVisible();
+    });
+
+    test('filters annotations by source and deletes an owned note', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByRole('heading', { name: /笔记与高亮/ })).toBeVisible({ timeout: 15_000 });
+
+        await page.locator('.annotation-panel__filter .v-field__input').click();
+        await page.getByRole('option', { name: 'Talebook 原生' }).click();
+        await expect(page.getByText('Talebook 原生笔记，拥有精确定位。')).toBeVisible();
+        await expect(page.getByText('这是从微信读书导入的章节级笔记。')).not.toBeVisible();
+
+        await page.getByRole('button', { name: '管理“第二章 灯塔来信”中的笔记' }).click();
+        await page.getByText('删除这条笔记').click();
+        await page.getByRole('button', { name: '删除', exact: true }).click();
+        await expect(page.getByText('笔记已删除。')).toBeVisible();
+        await expect(page.getByText('Talebook 原生笔记，拥有精确定位。')).not.toBeVisible();
+    });
+
+    test('undoes one imported run while keeping the note content', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByRole('heading', { name: /笔记与高亮/ })).toBeVisible({ timeout: 15_000 });
+
+        await page.getByRole('button', { name: '撤销导入' }).first().click();
+        await expect(page.getByText('撤销这批导入？')).toBeVisible();
+        await page.getByRole('button', { name: '撤销导入' }).last().click();
+        await expect(page.getByText(/已撤销 1 条来源关联/)).toBeVisible();
+        await expect(page.getByText('这是从微信读书导入的章节级笔记。')).toBeVisible();
+        await expect(page.getByText('Talebook 原生').first()).toBeVisible();
+    });
 });

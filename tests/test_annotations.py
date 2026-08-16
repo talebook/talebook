@@ -73,6 +73,10 @@ class TestAnnotationAuthentication(TestApp):
         d = self.json("/api/book/%d/annotations" % BID_EPUB)
         self.assertEqual(d["err"], "user.need_login")
 
+    def test_guest_reader_does_not_render_private_annotation_panel(self):
+        rsp = self.fetch("/read/%d" % BID_EPUB)
+        self.assertNotIn('/book/%d/annotations?reader=1' % BID_EPUB, rsp.body.decode("utf-8"))
+
 
 class TestAnnotations(TestWithUserLogin):
     def setUp(self):
@@ -140,6 +144,14 @@ class TestAnnotations(TestWithUserLogin):
             method="POST",
             body=json.dumps(data),
         )
+
+    def test_reader_hosts_the_authenticated_annotation_panel(self):
+        rsp = self.fetch("/read/%d" % BID_EPUB)
+        body = rsp.body.decode("utf-8")
+        self.assertIn('/book/%d/annotations?reader=1' % BID_EPUB, body)
+        self.assertIn("talebook:annotation-locate", body)
+        self.assertIn('aria-hidden="true"', body)
+        self.assertIn("shell.inert = !open", body)
 
     def test_source_upsert_is_idempotent_and_uses_prefixed_source_fields(self):
         first = self._post_source()
@@ -210,16 +222,21 @@ class TestAnnotations(TestWithUserLogin):
         annotation_id = created["annotation"]["id"]
         self.assertEqual(get_db().query(models.Annotation).filter_by(annotation_type="chapter_comment").count(), 1)
 
+        d = self.json("/api/book/%d/annotations" % BID_EPUB)
+        self.assertTrue(d["annotations"][0]["can_edit"])
+
         self.user.return_value = 2
         d = self.json("/api/book/%d/annotations" % BID_EPUB)
         self.assertEqual(len(d["annotations"]), 1)
         self.assertEqual(d["annotations"][0]["content"], "公开章评")
+        self.assertFalse(d["annotations"][0]["can_edit"])
         d = self.json(
             "/api/book/%d/annotations/%d" % (BID_EPUB, annotation_id),
             method="PUT",
             body=json.dumps({"content": "越权修改"}),
         )
         self.assertEqual(d["err"], "annotation.not_found")
+
         d = self.json(
             "/api/book/%d/annotations/%d" % (BID_EPUB, annotation_id),
             method="DELETE",

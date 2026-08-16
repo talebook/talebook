@@ -32,6 +32,23 @@
             </v-virtual-scroll>
         </v-navigation-drawer>
 
+        <v-navigation-drawer
+            v-model="annotationsSidebar"
+            :order="2"
+            location="right"
+            width="440"
+            class="annotation-drawer"
+            temporary
+            :theme="mainStore.theme"
+        >
+            <AnnotationPanel
+                :book-id="bookid"
+                chapter-navigation
+                compact
+                @locate="locateTxtAnnotation"
+            />
+        </v-navigation-drawer>
+
         <v-app-bar
             class="px-0"
             :color="mainStore.theme === 'light' ? 'blue' : undefined"
@@ -47,6 +64,14 @@
                 {{ name }}
             </v-toolbar-title>
             <v-spacer />
+            <v-btn
+                v-if="mainStore.user.is_login"
+                icon
+                :aria-label="t('annotations.openPanel')"
+                @click="annotationsSidebar = !annotationsSidebar"
+            >
+                <v-icon>mdi-note-multiple-outline</v-icon>
+            </v-btn>
             <!-- 主题切换按钮 -->
             <v-btn
                 icon
@@ -251,6 +276,7 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
 import AppFooter from '~/components/AppFooter.vue';
+import AnnotationPanel from '~/components/AnnotationPanel.vue';
 
 const { locale, locales, setLocale } = useI18n();
 
@@ -274,6 +300,7 @@ const { $backend } = useNuxtApp();
 
 const bookid = route.params.bid;
 const sidebar = ref(false);
+const annotationsSidebar = ref(false);
 const content = ref([]);
 const inited = ref(false);
 const wait = ref(0);
@@ -388,6 +415,21 @@ const getNovelContent = (i) => {
             }
         });
 };
+
+const locateTxtAnnotation = (annotation) => {
+    const chapter = String(annotation.chapter || '').trim();
+    const index = content.value.findIndex(item => {
+        const title = String(item.title || '').trim();
+        return chapter && (title === chapter || title.includes(chapter) || chapter.includes(title));
+    });
+    if (index < 0) {
+        mainStore.setAlert({ type: 'error', msg: t('annotations.locationFailed'), to: null });
+        return;
+    }
+    annotationsSidebar.value = false;
+    getNovelContent(index);
+    mainStore.setAlert({ type: 'success', msg: t('annotations.chapterLocationDone'), to: null });
+};
 </script>
 
 <style scoped>
@@ -411,6 +453,10 @@ const getNovelContent = (i) => {
 .novel-content {
     word-wrap: break-word;
     line-height: 1.8;
+}
+
+.annotation-drawer {
+    max-width: 92vw;
 }
 
 #txt-main.v-theme--dark .novel-content :deep(h3) {

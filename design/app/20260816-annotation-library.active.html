@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>阅读笔记与来源治理 · ACTIVE</title>
+<style>
+  :root { color-scheme: light; --ink:#1f2933; --muted:#607080; --line:#d9e1e8; --paper:#f7f8f6; --blue:#315f7d; --blue-soft:#e8f1f5; --amber:#a86613; --amber-soft:#fff2d9; --green:#276749; --green-soft:#e8f5ed; }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body { margin:0; color:var(--ink); background:var(--paper); font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+  .skip { position:absolute; left:-999px; top:8px; } .skip:focus { left:12px; z-index:2; padding:8px 12px; background:#fff; }
+  .page { width:min(1040px,calc(100vw - 32px)); margin:auto; padding:28px 0 56px; }
+  header,section { margin-bottom:18px; padding:26px 30px; border:1px solid var(--line); border-radius:18px; background:#fff; box-shadow:0 10px 28px rgba(36,55,68,.05); }
+  header { position:relative; overflow:hidden; border-top:5px solid var(--blue); }
+  header::after { position:absolute; right:-50px; top:-65px; width:190px; height:190px; border:25px solid var(--blue-soft); border-radius:50%; content:""; }
+  h1 { position:relative; z-index:1; margin:0 0 8px; font-size:clamp(30px,5vw,46px); line-height:1.15; letter-spacing:-.03em; }
+  h2 { margin:0 0 14px; font-size:22px; } h3 { margin:18px 0 8px; font-size:17px; }
+  p { margin:0 0 12px; } ul,ol { margin:8px 0 0 20px; padding:0; } li+li { margin-top:5px; }
+  .meta,.grid,.flow { display:grid; gap:12px; } .meta { position:relative; z-index:1; grid-template-columns:repeat(4,max-content); margin-top:16px; }
+  .chip { padding:3px 10px; border-radius:999px; color:#435467; background:#edf1f4; font-size:12px; font-weight:700; } .chip.wip { color:var(--amber); background:var(--amber-soft); }
+  .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .flow { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .box,.step { padding:15px 17px; border:1px solid var(--line); border-radius:13px; background:#fbfcfd; }
+  .step b { display:block; color:var(--blue); } .step p,.muted { color:var(--muted); }
+  .callout { padding:14px 16px; border-left:4px solid var(--amber); background:var(--amber-soft); }
+  .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:13px; } table { width:100%; min-width:680px; border-collapse:collapse; }
+  th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f3f6f8; } tr:last-child td { border-bottom:0; } th:last-child,td:last-child { border-right:0; }
+  code { padding:2px 5px; border-radius:4px; background:#eef2f5; }
+  @media(max-width:720px){ .page{width:calc(100vw - 20px);padding-top:10px}header,section{padding:21px 19px;border-radius:15px}.meta,.grid,.flow{grid-template-columns:1fr}.chip{width:max-content} }
+  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  @media print{body{background:#fff}.page{width:100%;padding:0}header,section{box-shadow:none;break-inside:avoid}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<div class="page">
+<header>
+  <h1>阅读笔记与来源治理</h1>
+  <p>让读者在书籍详情和阅读过程中辨认、筛选并管理来自 Talebook 与外部阅读服务的笔记，同时保留无法精确定位的章节级记录。</p>
+  <div class="meta" aria-label="方案元信息"><span class="chip">状态：ACTIVE</span><span class="chip">创建日期：2026-08-16</span><span class="chip">所属模块：app</span><span class="chip">需求来源：TB-44</span></div>
+</header>
+<main id="main">
+<section><h2>1. 原始诉求</h2><div class="callout">“展示原生及外部导入的高亮、笔记、书签，支持按来源筛选；CFI 可用时精确定位，CFI 为空时按章节展示并明确降级；支持删除自己的笔记，以及按 run/source 撤销导入数据。”</div></section>
+<section><h2>2. 目标与边界</h2><div class="grid"><article class="box"><h3>目标</h3><ul><li>同一组件覆盖书籍详情和阅读器入口。</li><li>来源、类型、章节、原文、时间和定位能力一眼可辨。</li><li>加载、空、权限、删除竞态、定位失败和部分回滚均有可行动反馈。</li><li>键盘、焦点、窄屏与明暗主题可用。</li></ul></article><article class="box"><h3>非目标</h3><ul><li>不在本任务内实现外部平台认证和导入器。</li><li>不改变“来源清理只解除映射、不删除权威正文”的服务端语义。</li><li>不在 Candle Reader 内创建或编辑笔记；本期展示和导航。</li></ul></article></div></section>
+<section><h2>3. 产品功能矩阵</h2><div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0"><table><thead><tr><th>任务</th><th>书籍详情</th><th>Web 阅读器</th><th>权限与结果</th></tr></thead><tbody><tr><td>查看与筛选笔记</td><td>完整列表及来源筛选</td><td>侧边笔记栏及当前章节提示</td><td>登录用户；403/未登录显示明确提示</td></tr><tr><td>定位</td><td>打开阅读器并携带 CFI/章节</td><td>向阅读器发送定位请求；失败可重试</td><td>无 CFI 时仅章节级展示，不丢记录</td></tr><tr><td>删除</td><td>仅 owner 可见操作</td><td>仅 owner 可见操作</td><td>二次确认；已删除竞态转为可理解状态</td></tr><tr><td>撤销导入</td><td>按 source/run 操作</td><td>按 source/run 操作</td><td>报告解除数量，数量不完整时标记部分完成</td></tr></tbody></table></div></section>
+<section><h2>4. 现状与证据</h2><ul><li><code>/api/book/:id/annotations</code> 已返回 annotation 与 sources；CFI 允许为空。</li><li><code>DELETE /api/annotations</code> 按 source 筛选只删除来源映射。</li><li>当前返回未暴露列表项的 owner 能力，前端无法可靠隐藏他人的删除操作；本次增加只读 <code>can_edit</code> 能力字段。</li><li>主 EPUB 入口是 Candle Reader 的服务端模板，需以宿主覆盖层接入，避免修改 vendored reader bundle。</li></ul></section>
+<section><h2>5. 方案</h2><div class="flow" aria-label="交互流程"><article class="step"><b>读取</b><p>统一组件调用书籍笔记 API。</p></article><article class="step"><b>辨认</b><p>按来源和类型分组，显示来源徽标。</p></article><article class="step"><b>行动</b><p>精确定位、删除或按批次撤销。</p></article><article class="step"><b>反馈</b><p>刷新权威列表并保留成功或降级提示。</p></article></div><h3>界面方向</h3><p>采用“页边批注夹”隐喻：克制的蓝灰主体配来源色条，列表项像夹在书页旁的批注卡。签名元素是沿卡片左侧连续的来源线，帮助读者扫视时追踪来源，而不是依赖颜色或徽标单独判断。</p><h3>关键决策</h3><div class="table-wrap" role="region" aria-label="关键决策" tabindex="0"><table><thead><tr><th>决策</th><th>选择</th><th>理由</th></tr></thead><tbody><tr><td>组件所有权</td><td>Nuxt 共享组件；Candle Reader 使用轻量原生宿主</td><td>避免直接改动打包后的第三方阅读器，同时让详情页保留完整管理体验。</td></tr><tr><td>定位协议</td><td>详情页 query + 阅读器事件/URL 桥接</td><td>CFI 存在时尝试精确定位；无 CFI 时只展示章节说明。</td></tr><tr><td>删除权限</td><td>服务端提供 <code>can_edit</code></td><td>不泄露 reader id，也不让客户端猜测所有权。</td></tr><tr><td>来源撤销</td><td>source/run/connection 三元筛选</td><td>与 API 契约一致，避免误删相邻导入批次。</td></tr></tbody></table></div></section>
+<section><h2>6. 影响、风险与回滚</h2><div class="grid"><article class="box"><h3>影响</h3><p>新增共享笔记组件、详情页入口、阅读器覆盖层、i18n、mock/E2E/组件测试，以及 API 权限能力字段。</p></article><article class="box"><h3>风险与回滚</h3><p>Candle Reader 的定位 API 可能因版本差异不可用，必须显式反馈定位失败且保留章节信息。可独立移除宿主脚本和组件，不影响 annotation 数据或 API 写入。</p></article></div></section>
+<section><h2>7. 验证结果</h2><div class="table-wrap" role="region" aria-label="验证结果" tabindex="0"><table><thead><tr><th>检查</th><th>范围与结果</th></tr></thead><tbody>
+<tr><td>后端聚焦测试</td><td><code>docker run … talebook/test pytest tests/test_annotations.py -q</code>：15 项通过；覆盖 owner 能力字段、跨用户只读、登录门禁及 Candle Reader 宿主。</td></tr>
+<tr><td>组件测试</td><td><code>npx vitest run test/components/AnnotationPanel.spec.ts</code>：5 项通过；覆盖来源显示、章节降级、宿主章节能力、筛选、删除竞态和权限错误。</td></tr>
+<tr><td>详情页 E2E</td><td><code>npx playwright test test/e2e/book-detail.spec.ts --project=chromium --grep …</code>：新增的 3 条流程全部通过，耗时 36.9 秒。</td></tr>
+<tr><td>静态与构建门禁</td><td><code>npm run lint -- --quiet</code>、<code>make lint-py-fix</code>、<code>make lint-py</code>、Python 编译、locale JSON 解析、<code>npm run build</code>、<code>git diff --check</code> 均通过。</td></tr>
+<tr><td>实际渲染</td><td>Playwright Chromium 使用 mock API 验证 1440×1000 桌面与 390×844 移动视图；来源、降级徽标、操作层级、换行和图标均清晰。截图：<code>document/screenshots/tb-44/annotations-desktop.png</code>、<code>document/screenshots/tb-44/annotations-mobile.png</code>。</td></tr>
+</tbody></table></div>
+<h3>界面审查</h3><p>按 <code>origin/feat/plugins@c175c3576e08</code> 对 0 个已提交变更及当前工作区执行 full change-scoped review；排除 2 个 PNG 二进制截图，展开书籍详情、内嵌笔记页、TXT 阅读器和 Candle Reader 四个受影响界面。Accessibility、Layout、Writing、Typography、Colors、UI 六个领域全部完成。</p><p>审查期间修复两项 introduced 问题：关闭的 Candle Reader 侧栏仍在 Tab 顺序中；无 CFI 记录在不能导航章节的宿主中仍显示“查看章节”。修复后重新运行组件、后端与 E2E，并复核桌面/移动渲染，最终结论为 <strong>Approve</strong>，无遗留 actionable finding。</p>
+<h3>已知基线与环境边界</h3><ul><li><code>LocalMdiIcons.spec.ts</code> 仍报告集成分支既有的 <code>mdi-arrow-up</code>、<code>mdi-folder-outline</code>、<code>mdi-shield-check-outline</code> 三个缺失图标；TB-44 新增图标已全部注册。</li><li>i18n 辅助脚本硬编码 <code>/Users/bytedance/code/talebook/app</code>，本环境不可用，因此以 JSON 解析、lint、构建和浏览器渲染验证 locale。</li><li>新建 Docker 测试镜像曾因 GitHub 依赖下载停滞而取消；使用已有 <code>talebook/test</code> 镜像挂载当前源码完成 15 项聚焦测试。</li></ul></section>
+<section><h2>8. 决策记录</h2><ul><li>2026-08-16：选择复用组件加阅读器宿主，不修改 vendored Candle Reader bundle。</li><li>2026-08-16：外部来源始终显示真实 source name；Talebook 原生记录使用明确“Talebook”来源徽标。</li><li>2026-08-16：来源回滚完成后重新读取列表，以服务端权威结果计算完整或部分完成。</li><li>2026-08-16：章节操作按宿主真实能力展示；TXT 可章节匹配，详情页与 EPUB 宿主仅保留明确的章节级降级信息。</li><li>2026-08-16：Candle Reader 侧栏关闭时使用 <code>inert</code>、<code>aria-hidden</code> 与 visibility 同步移出可访问树和键盘路径。</li></ul></section>
+</main>
+</div>
+</body>
+</html>
