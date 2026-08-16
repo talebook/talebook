@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook AI 辅助整理总入口与统一任务中心内部方案。" />
+    <link rel="icon" href="data:," />
+    <title>用注册协议汇聚 AI 辅助整理能力与任务 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f5f2ea; --panel:#fffdf8; --ink:#17211d; --muted:#5d6963; --line:#d8ddd5; --accent:#176b52; --soft:#e9f4ef; --warn:#fff1ce; --danger:#9d3f3f; --shadow:0 14px 34px rgba(24,42,34,.09); --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif; --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace; }
+      * { box-sizing:border-box; }
+      html { scroll-behavior:smooth; }
+      body { margin:0; color:var(--ink); background:radial-gradient(circle at 90% 0,rgba(23,107,82,.13),transparent 24%),var(--bg); font-family:var(--sans); line-height:1.68; }
+      a { color:var(--accent); text-underline-offset:3px; }
+      a:focus-visible,[tabindex="0"]:focus-visible { outline:3px solid #d58b20; outline-offset:3px; }
+      code { padding:.1em .34em; border-radius:5px; background:#edf0ed; font-family:var(--mono); overflow-wrap:anywhere; }
+      .skip { position:fixed; top:8px; left:8px; z-index:4; padding:8px 12px; color:white; background:var(--ink); transform:translateY(-160%); }
+      .skip:focus { transform:translateY(0); }
+      .page { width:min(1120px,calc(100vw - 28px)); margin:auto; padding:24px 0 54px; }
+      .hero,.card { border:1px solid var(--line); border-radius:20px; background:var(--panel); box-shadow:var(--shadow); }
+      .hero { padding:32px 34px; }
+      h1 { margin:0 0 10px; font-size:clamp(30px,4vw,48px); line-height:1.12; letter-spacing:-.025em; }
+      h2 { margin:0 0 14px; font-size:23px; line-height:1.25; }
+      h3 { margin:20px 0 8px; font-size:17px; }
+      p,li,td,th { font-size:14px; }
+      p { margin:0 0 12px; }
+      ul,ol { margin:8px 0 0 20px; padding:0; }
+      li+li { margin-top:5px; }
+      .sub { max-width:900px; color:var(--muted); font-size:17px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      .chip { padding:5px 11px; border-radius:999px; color:#4b5c55; background:#edf1ee; font-size:12px; font-weight:700; }
+      .chip.active { color:#075a42; background:var(--soft); }
+      .card { margin-top:18px; padding:26px 28px; scroll-margin-top:16px; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; }
+      .choice,.callout { padding:15px 17px; border:1px solid var(--line); border-radius:15px; background:#fff; }
+      .choice h3 { margin-top:0; }
+      .callout { margin-top:13px; background:#f7faf8; }
+      .callout.good { border-color:#a9d4c4; background:var(--soft); }
+      .callout.warn { border-color:#ead3a0; background:#fff9e9; }
+      .callout.danger { border-color:#dfb7b7; background:#fff0f0; }
+      .table-wrap { margin-top:13px; overflow:auto; border:1px solid var(--line); border-radius:14px; }
+      table { width:100%; min-width:720px; border-collapse:collapse; background:white; }
+      th,td { padding:11px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { color:#526159; background:#f4f7f5; font-size:12px; }
+      th:last-child,td:last-child { border-right:0; }
+      tr:last-child td { border-bottom:0; }
+      .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
+      .step { min-height:126px; padding:15px; border:1px solid var(--line); border-radius:15px; background:white; }
+      .step b { display:block; margin-bottom:6px; }
+      .step small { color:var(--accent); font-family:var(--mono); font-weight:800; letter-spacing:.06em; }
+      .step p { color:var(--muted); font-size:13px; }
+      .pending { color:#925d08; font-weight:800; }
+      footer { margin-top:16px; color:var(--muted); font-size:12px; text-align:center; }
+      @media (max-width:720px) { .page{width:calc(100vw - 18px);padding-top:9px}.hero,.card{border-radius:16px}.hero{padding:23px 20px}.card{padding:21px 19px}.grid,.flow{grid-template-columns:1fr}.step{min-height:0}.sub{font-size:15px} }
+      @media (prefers-reduced-motion:reduce) { html{scroll-behavior:auto} }
+      @media print { body{background:white}.page{width:100%;padding:0}.hero,.card{box-shadow:none}.skip{display:none}.choice,.callout,.step,.table-wrap{break-inside:avoid} }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>用注册协议汇聚 AI 辅助整理能力与任务</h1>
+        <p class="sub">为登录用户提供一个稳定的“辅助整理”入口：发现当前可用能力、查看自己有权限的任务，并把写操作安全地送回具体功能。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-16</span><span class="chip">所属模块：webserver / app</span><span class="chip">需求来源：TB-58</span><span class="chip">影响：AI API、导航、响应式页面</span>
+        </div>
+      </header>
+      <main id="main">
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“新增‘辅助整理’导航入口与响应式页面；能力和任务通过注册结构汇总，支持状态与书库筛选、分页、局部错误、详情跳转，以及服务端声明并复验权限后的取消 / 重试。入口不得直接持有业务写权限，也不得感知 AI provider。”</div>
+          <p>当前 <code>feat/ai_1.0</code> 已有运行时中立的 <code>AgentRuntime</code>、创作者私有的 <code>AITask</code> 与总结鸭适配器，但只有阅读器内的单功能入口，用户无法集中发现能力和任务。</p>
+        </section>
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice"><h3>目标</h3><ul><li>注册对象是能力元数据与任务投影的唯一来源，核心入口不按 feature 写分支。</li><li>列表只返回当前用户、逐书 ACL 通过的最小摘要，并支持 category、library、page、page_size。</li><li>页面分别承受能力注册失败和任务列表失败；一个能力探测异常只禁用该卡片。</li><li>取消 / 重试只在摘要声明 allowed_actions 后出现，执行时仍重新查任务、所有权和资源 ACL。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>不复制总结鸭编辑、导出或预览页面，不新增工作流编排、定时或串联。</li><li>不保存章节正文、AI 成果或原始内部错误到总入口响应或埋点。</li><li>不让总入口调用 OpenAI、Codex 或未来 Claude Code / Trae 协议。</li><li>不承诺现有功能无法安全重试时强行提供重试；动作由适配器逐任务声明。</li></ul></article>
+          </div>
+        </section>
+        <section class="card">
+          <h2>3. 产品功能矩阵</h2>
+          <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0">
+            <table><thead><tr><th>用户任务</th><th>游客</th><th>登录用户</th><th>桌面</th><th>移动端</th><th>验收口径</th></tr></thead><tbody>
+              <tr><td>发现已注册能力</td><td>不显示导航；接口拒绝</td><td>按权限和 flag 返回</td><td>能力卡片网格</td><td>单列卡片</td><td>禁用原因可见，其他卡不受异常影响</td></tr>
+              <tr><td>查看自己的任务</td><td>拒绝</td><td>支持四类状态、书库与分页</td><td>筛选条 + 列表</td><td>可换行筛选 + 列表</td><td>不返回正文、成果、其他用户任务或原始错误</td></tr>
+              <tr><td>进入详情</td><td>拒绝</td><td>适配器给出业务入口</td><td>整行明确按钮</td><td>触控按钮</td><td>写入仍在功能自身的预览 / 确认流</td></tr>
+              <tr><td>取消 / 重试</td><td>拒绝</td><td>条件支持</td><td>取消二次确认</td><td>取消二次确认</td><td>服务端重验 ownership、ACL、状态和适配器能力</td></tr>
+            </tbody></table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>4. 现状与证据</h2>
+          <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0"><table><thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead><tbody>
+            <tr><td>AI HTTP 表面已按 feature 路由</td><td><code>webserver/handlers/ai.py</code> 的 <code>AI_FEATURES</code> 与通用 task route</td><td>扩展注册对象，无需另建 provider API</td></tr>
+            <tr><td>任务表已隔离创建者</td><td><code>AITask.creator_id</code> 和 <code>_own_task</code></td><td>中心查询必须延续 creator filter，并逐记录做书籍 ACL</td></tr>
+            <tr><td>总结鸭不持久化章节正文</td><td><code>chapter_text_hash</code>、长度与定位器，不保存正文</td><td>中心不能在缺少源正文时伪装可重试；动作声明为 false</td></tr>
+            <tr><td>存在两套主导航渲染器</td><td><code>AppHeader.vue</code> 与 <code>BuiltinThemeHeader.vue</code></td><td>两处均加入登录用户入口并覆盖测试</td></tr>
+          </tbody></table></div>
+        </section>
+        <section class="card">
+          <h2>5. 方案</h2>
+          <div class="callout good"><strong>方案结论：</strong>在 AI handler 内把 feature registry 升级成稳定适配协议；新增只读 hub API 和窄动作 API。前端只消费能力、状态类别、最小对象摘要、详情 URL 和 allowed_actions，不识别 Codex 事件或具体 feature。</div>
+          <div class="flow" aria-label="数据与动作流程">
+            <article class="step"><small>REGISTER</small><b>能力自描述</b><p>ID、名称、说明、图标、范围、入口、权限、flag 和探测结果由适配器提供。</p></article>
+            <article class="step"><small>PROJECT</small><b>最小任务投影</b><p>中心按 creator 查询候选，再逐项 ACL 和 feature 投影，单项异常形成局部错误。</p></article>
+            <article class="step"><small>DISPLAY</small><b>统一页面</b><p>按 category / library 过滤、分页，呈现能力、汇总计数、空态与失败重试。</p></article>
+            <article class="step"><small>DELEGATE</small><b>动作回送适配器</b><p>中心重验可见性与状态；取消先确认，业务写入仍留在业务详情页。</p></article>
+          </div>
+          <h3>稳定响应契约</h3>
+          <div class="table-wrap" role="region" aria-label="响应契约" tabindex="0"><table><thead><tr><th>对象</th><th>字段</th><th>隐私 / 兼容约束</th></tr></thead><tbody>
+            <tr><td>capability</td><td>id、name、description、icon、scope、entry、permissions、feature_flag、available、reason</td><td>reason 是枚举 / 安全文案；单能力异常不让 endpoint 失败</td></tr>
+            <tr><td>task summary</td><td>id、feature、object、category、status、progress、timestamps、detail_url、allowed_actions、safe_error</td><td>object 只含 library / book id / title / chapter title；safe_error 仅脱敏码与安全文案</td></tr>
+            <tr><td>pagination</td><td>page、page_size、total、pages；另含 category_counts 与 libraries</td><td>计数和筛选只基于已通过 ACL 的集合</td></tr>
+          </tbody></table></div>
+          <h3>状态映射</h3>
+          <div class="table-wrap" role="region" aria-label="状态映射" tabindex="0"><table><thead><tr><th>统一类别</th><th>当前原始状态</th><th>动作</th></tr></thead><tbody>
+            <tr><td>running</td><td>queued、running</td><td>仅适配器与运行时均可取消时 cancel</td></tr>
+            <tr><td>pending_confirmation</td><td>未来功能注册的 review / preview 状态</td><td>仅跳业务详情确认</td></tr>
+            <tr><td>failed</td><td>failed、cancelled</td><td>只有能从持久化安全输入重建请求的功能才 retry</td></tr>
+            <tr><td>completed</td><td>succeeded</td><td>只进入业务详情</td></tr>
+          </tbody></table></div>
+        </section>
+        <section class="card">
+          <h2>6. 影响、风险与回滚</h2>
+          <div class="grid"><article class="choice"><h3>影响范围</h3><p>AI handler 与注册协议、响应式 Nuxt 页面、两套导航、中文 / 英文 i18n、Python API 测试、Vue 组件 / E2E 测试和访问埋点。本次不加库表，不做迁移。</p></article><article class="choice"><h3>保持不变</h3><p><code>AgentRuntime</code> 协议、总结鸭原 API、正文最小化策略、结果编辑与导出、业务确认责任边界保持不变。</p></article></div>
+          <div class="callout danger"><strong>主要风险：</strong>跨能力状态语义漂移 → 映射由适配器测试锁定；列表查询当前用户的全部候选任务，数据增长后需关注查询和逐书 ACL 成本，逐能力异常已隔离；详情泄露 → creator + ACL 后才构造摘要；误取消 → 前端确认与服务端二次状态校验。</div>
+          <div class="callout"><strong>回滚：</strong>页面和 hub routes 可整体回滚；数据表无变化。功能总 flag 关闭时卡片保留禁用说明，入口仍可展示历史任务；若需完全隐藏可回滚导航提交。</div>
+        </section>
+        <section class="card">
+          <h2>7. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0"><table><thead><tr><th>验证层</th><th>实际命令或页面</th><th>关键验收</th><th>结果</th></tr></thead><tbody>
+            <tr><td>后端 API</td><td>Docker 目标环境运行 <code>tests/test_ai_hub.py tests/test_summary_duck.py</code></td><td>注册、flag、状态、筛选、分页、ACL、局部错误、取消复验和既有总结鸭回归</td><td>25 passed（1.88s）</td></tr>
+            <tr><td>前端组件</td><td>完整相关 Vitest；另运行 hub / header / icon 聚焦集</td><td>能力卡、筛选、分页、空态、错误、动作确认、两套导航与图标</td><td>16 files / 75 tests passed；聚焦集 28 / 28 passed</td></tr>
+            <tr><td>E2E / 渲染</td><td>生产构建 Playwright：hub 与 Summary Duck 桌面、移动、明暗主题</td><td>统一状态、筛选与动作、键盘焦点、320px 回流、明暗对比和 reduced motion</td><td>hub 3 / 3 passed；Summary Duck 3 / 3 passed</td></tr>
+            <tr><td>构建与门禁</td><td><code>npm run build</code>、<code>npm run lint</code>、<code>make lint-py-fix</code>、<code>make lint-py</code>、locale JSON parse、<code>git diff --check</code>、<code>make check-design</code></td><td>生产构建、前后端静态检查、翻译格式、补丁与设计状态</td><td>通过；前端 lint 为 0 errors / 193 个仓库既有 warnings</td></tr>
+            <tr><td>完整测试限制</td><td><code>make test</code></td><td>全仓回归</td><td>未完成：全新 Docker 依赖下载停滞；不计为通过，以上目标测试为本次权威结果</td></tr>
+            <tr><td>界面审查</td><td><code>interface-review full</code>，基线 <code>origin/master@1f0a4bd</code></td><td>35 个 union 文件；排除快照、测试结果和 fixture 后审查 30 个文件，并检查 5 个 <code>BuiltinThemeHeader</code> 消费点</td><td>Approve；本次引入 / 回归问题为 0</td></tr>
+          </tbody></table></div>
+          <div class="callout good"><strong>界面审查结论：Approve。</strong>审查修复了卡片次级文字与禁用背景的主题对比、任务详情图标语义、筛选器本地化可访问名称、重载前陈旧局部错误、reduced-motion 动画，以及 iOS 文本框缩放；E2E 补充 320px 水平回流和明暗主题对比断言。两套 header 中若干既有 icon-only 控件仍缺少可访问名称，均早于本次变更，不属于本次引入或回归问题。</div>
+          <div class="callout warn"><strong>渲染工具限制：</strong>环境未提供 Chrome DevTools MCP，因此用生产构建上的 Playwright 完成真实浏览器渲染、交互、键盘、主题与响应式检查，并保存移动端基准截图。</div>
+        </section>
+        <section class="card">
+          <h2>8. 决策记录</h2>
+          <ol><li><strong>2026-08-16：</strong>需求已给出权限、注册、provider 中立和非目标边界，无需等待额外产品选择；采用“适配器自描述 + 中心只投影”的最小完整设计。</li><li><strong>2026-08-16：</strong>本地实例当前只有一个 AI 任务书库，仍保留 library 字段与筛选协议，值为稳定的 <code>local</code>，为未来注册能力扩展留出兼容面。</li><li><strong>2026-08-16：</strong>总结鸭因不持久化章节正文，失败任务不在中心声明 retry，避免绕过阅读器重新采集与用户确认。</li></ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · webserver / app · ACTIVE · 2026-08-16</footer>
+    </div>
+  </body>
+</html>

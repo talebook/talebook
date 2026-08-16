@@ -331,6 +331,7 @@ const navItems = computed(() => {
     }
     items.push({ key: 'audios', icon: 'mdi-book-music', href: '/audios', text: t('navigation.audiobooks'), badge: t('audiobook.beta') });
     if (store.user.is_login) {
+        items.push({ key: 'ai-assistant', icon: 'mdi-broom', href: '/ai-assistant', text: t('navigation.aiAssistant') });
         items.push({ key: 'shelf', icon: 'mdi-bookshelf', href: '/user/shelf', text: t('navigation.myShelf') });
     }
     if (store.user.is_admin) {

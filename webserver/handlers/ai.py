@@ -4,7 +4,10 @@
 import datetime
 import hashlib
 import json
+import logging
+import math
 import os
+import time
 import uuid
 
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import AITask
+from webserver.services.ai_registry import AIFeatureRegistry
 from webserver.services.summary_duck import (
     FEATURE_KEY,
     PROMPT_VERSION,
@@ -29,6 +33,16 @@ from webserver.services.summary_duck import (
 
 
 CONF = loader.get_settings()
+LOG = logging.getLogger(__name__)
+
+TASK_CATEGORIES = ("running", "pending_confirmation", "failed", "completed")
+TASK_STATUS_CATEGORIES = {
+    "queued": "running",
+    "running": "running",
+    "failed": "failed",
+    "cancelled": "failed",
+    "succeeded": "completed",
+}
 
 
 def _json_body(handler):
@@ -55,6 +69,7 @@ class SummaryDuckFeature:
     """Summary Duck behavior plugged into the stable AI task HTTP surface."""
 
     key = FEATURE_KEY
+    _probe_cache = None
 
     @staticmethod
     def enabled():
@@ -65,6 +80,37 @@ class SummaryDuckFeature:
         service = SummaryDuckService()
         service.setup(handler.settings["SessionMaker"], CONF)
         return service
+
+    @classmethod
+    def capability(cls, handler):
+        result = {
+            "id": cls.key,
+            "name": "总结鸭 TOP5",
+            "description": "提炼当前章节最值得记住的五组问答，并附上可核对的原文引用。",
+            "icon": "mdi-duck",
+            "scope": "chapter",
+            "entry": "/library",
+            "permissions": ["login", "book.read"],
+            "feature_flag": "AI_SUMMARY_DUCK_ENABLED",
+            "available": False,
+            "reason": "",
+        }
+        if not CONF.get("AI_ENABLED", True):
+            result["reason"] = "ai_disabled"
+            return result
+        if not CONF.get("AI_SUMMARY_DUCK_ENABLED", True):
+            result["reason"] = "feature_disabled"
+            return result
+
+        now = time.monotonic()
+        if cls._probe_cache is None or now - cls._probe_cache[0] > 60:
+            probe = cls.service(handler).runtime.probe()
+            cls._probe_cache = (now, probe)
+        else:
+            probe = cls._probe_cache[1]
+        result["available"] = bool(probe.available)
+        result["reason"] = "" if probe.available else "runtime.%s" % (probe.reason or "unavailable")
+        return result
 
     @staticmethod
     def can_access(handler, record):
@@ -202,12 +248,72 @@ class SummaryDuckFeature:
         handler.set_header("Content-Disposition", f'attachment; filename="{filename}"')
         handler.write(export_markdown(record))
 
+    @classmethod
+    def task_summary(cls, handler, record):
+        book = handler.get_book(record.book_id, raise_exception=False)
+        if not book:
+            raise ValueError("book is no longer visible")
+        category = TASK_STATUS_CATEGORIES.get(record.status)
+        if not category:
+            raise ValueError("unsupported task status")
+        return {
+            "id": record.id,
+            "feature": cls.key,
+            "object": {
+                "library": "local",
+                "book_id": record.book_id,
+                "book_title": str(book.get("title") or "")[:300],
+                "chapter_title": str(record.chapter_title or "")[:300],
+            },
+            "category": category,
+            "status": record.status,
+            "progress": None,
+            "progress_message": str(record.progress_message or "")[:256],
+            "created_at": record.create_time.isoformat() if record.create_time else None,
+            "updated_at": record.update_time.isoformat() if record.update_time else None,
+            "detail_url": "/read/%s?ai_task=%s" % (record.book_id, record.id),
+            "allowed_actions": {
+                "cancel": record.status in {"queued", "running"},
+                # Retrying needs chapter text, which is deliberately not persisted.
+                "retry": False,
+            },
+            "safe_error": {"code": record.error_code} if record.error_code else None,
+        }
 
-AI_FEATURES = {SummaryDuckFeature.key: SummaryDuckFeature}
+    @classmethod
+    def cancel(cls, handler, record):
+        if record.status not in {"queued", "running"}:
+            return {"err": "ai.action_not_allowed", "msg": "当前任务不可取消"}
+        record.cancel_requested = True
+        record.progress_message = "正在取消"
+        record.update_time = datetime.datetime.now()
+        handler.session.commit()
+        active = cls.service(handler).cancel(record.id)
+        if not active and record.status == "queued":
+            record.status = "cancelled"
+            record.finished_at = datetime.datetime.now()
+            record.update_time = record.finished_at
+            handler.session.commit()
+        return {"err": "ok", "task": cls.task_summary(handler, record)}
+
+    @staticmethod
+    def retry(handler, record):
+        return {"err": "ai.action_not_allowed", "msg": "请从原功能重新提交任务"}
+
+
+AI_FEATURES = AIFeatureRegistry([SummaryDuckFeature])
 
 
 def _feature(name):
     return AI_FEATURES.get(str(name or "").strip())
+
+
+def _page_argument(handler, name, default, minimum, maximum):
+    try:
+        value = int(handler.get_argument(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return min(maximum, max(minimum, value))
 
 
 class _AITaskBase(BaseHandler):
@@ -300,15 +406,9 @@ class AITaskCancel(_AITaskBase):
             return error
         if record.status not in {"queued", "running"}:
             return {"err": "ok", "task": task_dict(record), "idempotent": True}
-        record.cancel_requested = True
-        record.progress_message = "正在取消"
-        record.update_time = datetime.datetime.now()
-        self.session.commit()
-        active = feature.service(self).cancel(record.id)
-        if not active and record.status == "queued":
-            record.status = "cancelled"
-            record.finished_at = datetime.datetime.now()
-            self.session.commit()
+        response = feature.cancel(self, record)
+        if response.get("err") != "ok":
+            return response
         return {"err": "ok", "task": task_dict(record), "idempotent": False}
 
 
@@ -323,8 +423,131 @@ class AITaskExport(_AITaskBase):
         feature.export(self, record)
 
 
+class AIHubCapabilities(_AITaskBase):
+    @js
+    @auth
+    def get(self):
+        capabilities, partial_errors = AI_FEATURES.capabilities(self)
+        return {"err": "ok", "capabilities": capabilities, "partial_errors": partial_errors}
+
+
+class AIHubTasks(_AITaskBase):
+    @js
+    @auth
+    def get(self):
+        category = str(self.get_argument("category", "all") or "all")
+        library = str(self.get_argument("library", "all") or "all")
+        if category not in {"all", *TASK_CATEGORIES}:
+            return {"err": "params.invalid", "msg": "任务状态筛选无效"}
+        if library not in {"all", "local"}:
+            return {"err": "params.invalid", "msg": "书库筛选无效"}
+        page = _page_argument(self, "page", 1, 1, 1_000_000)
+        page_size = _page_argument(self, "page_size", 12, 1, 50)
+
+        records = (
+            self.session.query(AITask)
+            .filter(AITask.creator_id == self.user_id())
+            .order_by(AITask.update_time.desc(), AITask.create_time.desc())
+            .all()
+        )
+        summaries = []
+        error_features = set()
+        partial_errors = []
+        for record in records:
+            feature = _feature(record.feature)
+            if not feature:
+                if record.feature not in error_features:
+                    partial_errors.append({"feature": record.feature, "code": "feature_unregistered"})
+                    error_features.add(record.feature)
+                continue
+            try:
+                visible, _error = feature.can_access(self, record)
+                if not visible:
+                    continue
+                summaries.append(feature.task_summary(self, record))
+            except Exception:
+                LOG.exception("AI task projection failed feature=%s task=%s", record.feature, record.id)
+                if record.feature not in error_features:
+                    partial_errors.append({"feature": record.feature, "code": "task_projection_failed"})
+                    error_features.add(record.feature)
+
+        category_counts = {name: 0 for name in TASK_CATEGORIES}
+        for summary in summaries:
+            category_counts[summary["category"]] += 1
+        filtered = [item for item in summaries if library == "all" or item["object"]["library"] == library]
+        if category != "all":
+            filtered = [item for item in filtered if item["category"] == category]
+        total = len(filtered)
+        start = (page - 1) * page_size
+        tasks = filtered[start : start + page_size]
+        return {
+            "err": "ok",
+            "tasks": tasks,
+            "category_counts": category_counts,
+            "libraries": [{"id": "local", "name": "本地书库"}],
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "pages": math.ceil(total / page_size) if total else 0,
+            },
+            "partial_errors": partial_errors,
+        }
+
+
+class AIHubTaskAction(_AITaskBase):
+    @js
+    @auth
+    def post(self, feature_name, task_id, action):
+        record, feature, error = self._visible_task(feature_name, task_id)
+        if error:
+            return error
+        try:
+            summary = feature.task_summary(self, record)
+        except Exception:
+            LOG.exception("AI hub action projection failed feature=%s task=%s", feature_name, task_id)
+            return {"err": "ai.not_found", "msg": "AI 任务不存在"}
+        if action not in {"cancel", "retry"} or not summary["allowed_actions"].get(action, False):
+            return {"err": "ai.action_not_allowed", "msg": "当前任务不支持此操作"}
+        return getattr(feature, action)(self, record)
+
+
+class AIHubEvent(_AITaskBase):
+    @js
+    @auth
+    def post(self):
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        event = str(body.get("event") or "")
+        feature_name = str(body.get("feature") or "")
+        task_id = str(body.get("task_id") or "")
+        if event not in {"hub_view", "capability_open", "task_open"}:
+            return {"err": "params.invalid", "msg": "埋点事件无效"}
+        feature = _feature(feature_name) if feature_name else None
+        if event != "hub_view" and not feature:
+            return {"err": "params.invalid", "msg": "AI 功能无效"}
+        if event == "task_open":
+            record, _feature_adapter, error = self._visible_task(feature_name, task_id)
+            if error or not record:
+                return error or {"err": "ai.not_found", "msg": "AI 任务不存在"}
+        LOG.info(
+            "ai_hub_event event=%s feature=%s user_id=%s has_task=%s",
+            event,
+            feature_name,
+            self.user_id(),
+            bool(task_id),
+        )
+        return {"err": "ok"}
+
+
 def routes():
     return [
+        (r"/api/ai/hub/capabilities", AIHubCapabilities),
+        (r"/api/ai/hub/tasks", AIHubTasks),
+        (r"/api/ai/hub/tasks/([a-z][a-z0-9_]*)/([0-9a-f-]+)/(cancel|retry)", AIHubTaskAction),
+        (r"/api/ai/hub/events", AIHubEvent),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks", AITaskCollection),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)", AITaskItem),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)/cancel", AITaskCancel),

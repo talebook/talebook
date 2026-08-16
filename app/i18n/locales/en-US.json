@@ -223,7 +223,85 @@
     "systemLogs": "System Logs",
     "myShelf": "My Shelf",
     "audiobooks": "Audiobooks",
-    "readBooks": "Read Books"
+    "readBooks": "Read Books",
+    "aiAssistant": "AI Assistant"
+  },
+  "aiAssistant": {
+    "eyebrow": "AI workspace",
+    "title": "Organize with clarity",
+    "description": "Discover intelligent tools for your library and follow running, review-ready, and failed tasks. Each feature still owns its preview and confirmation flow.",
+    "capabilityEyebrow": "Capability catalog",
+    "capabilities": "Available tools",
+    "capabilitiesDescription": "Features register themselves. If one is unavailable, the remaining tools and tasks continue to work.",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "noDescription": "No description is available for this tool yet.",
+    "privateByDefault": "Only accessible content is shown",
+    "openCapability": "Get started",
+    "noCapabilities": "No registered tools yet",
+    "noCapabilitiesDescription": "New features will appear here automatically.",
+    "taskEyebrow": "Task center",
+    "tasks": "My organization tasks",
+    "tasksDescription": "Only your tasks and the minimum needed context are shown. Book text, generated results, and internal errors stay out of this list.",
+    "taskFilters": "Task filters",
+    "statusAll": "All",
+    "statusRunning": "Running",
+    "statusPending": "Needs review",
+    "statusFailed": "Failed",
+    "statusCompleted": "Recently completed",
+    "libraryFilter": "Library",
+    "allLibraries": "All libraries",
+    "partialError": "Tasks from some features could not be loaded. The remaining results are unaffected.",
+    "partialCapabilityError": "Some capability checks failed; the remaining tools are shown.",
+    "loadCapabilitiesFailed": "The capability catalog could not be loaded. Try again shortly.",
+    "loadTasksFailed": "The task list could not be loaded. Try again shortly.",
+    "noTasks": "No tasks match these filters",
+    "noTasksDescription": "Start using a tool and its progress will appear here.",
+    "deletedBook": "Book no longer accessible",
+    "openTask": "View details",
+    "pagination": "Task pages",
+    "cancelTitle": "Cancel this task?",
+    "cancelDescription": "This requests cancellation of the current task for “{title}”. This hub never performs business writes.",
+    "confirmCancel": "Cancel task",
+    "cancelRequested": "Cancellation requested",
+    "retryRequested": "Retry requested",
+    "actionFailed": "The action failed. Refresh and try again.",
+    "unknownTime": "Time unknown",
+    "scope": {
+      "chapter": "Works on the current chapter",
+      "book": "Works on one book",
+      "library": "Works across a library",
+      "unknown": "Scope not specified"
+    },
+    "availability": {
+      "ai_disabled": "AI features are paused for this site. Historical tasks remain visible below.",
+      "feature_disabled": "An administrator has not enabled this tool.",
+      "capability_probe_failed": "The tool status check failed. Refresh shortly.",
+      "runtime": {
+        "not_installed": "The AI runtime is not installed.",
+        "not_authenticated": "The AI runtime is not signed in.",
+        "version_unsupported": "The installed AI runtime version is not supported.",
+        "unavailable": "The AI runtime is temporarily unavailable."
+      }
+    },
+    "message": {
+      "running": "Task in progress",
+      "pending_confirmation": "Result waiting for your review",
+      "failed": "Task did not complete",
+      "completed": "Task completed"
+    },
+    "error": {
+      "generic": "The task did not complete. Open its details for available next steps.",
+      "runtime": {
+        "internal": "The AI runtime failed temporarily. Open the details to try again.",
+        "unavailable": "The AI runtime is temporarily unavailable.",
+        "not_authenticated": "The AI runtime is not signed in.",
+        "usage_limit": "AI usage is temporarily unavailable."
+      },
+      "result": {
+        "invalid": "The generated result did not pass validation."
+      }
+    }
   },
   "network": {
     "title": "Network Library",
