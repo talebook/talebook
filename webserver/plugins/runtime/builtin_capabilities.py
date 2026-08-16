@@ -1,12 +1,12 @@
 from .protocol import PROTOCOL_VERSION, ProviderResult
 
 
-class LegacyBuiltinProvider:
-    """Expose an existing Talebook capability through the plugin catalog.
+class BuiltinCapabilityProvider:
+    """Expose a Talebook-owned capability through the plugin catalog.
 
     The provider owns no duplicate configuration. Its management action points
-    back to the existing API/UI while the shared plugin runtime supplies health
-    checks and durable run history.
+    to the capability's native UI while the shared plugin runtime supplies
+    health checks and durable run history.
     """
 
     def __init__(self, manifest):
@@ -30,7 +30,7 @@ def _manifest(plugin_id, name, description, categories, capabilities, permission
         "auth_schema": {"type": "object", "properties": {}},
         "config_schema": {"type": "object", "properties": {}},
         "permissions": permissions,
-        "data_policy": {"stores_full_text": False, "retention": "legacy_source"},
+        "data_policy": {"stores_full_text": False, "retention": "source_owned"},
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": "https://github.com/talebook/talebook",
         "license": "GPL-3.0",
@@ -38,8 +38,8 @@ def _manifest(plugin_id, name, description, categories, capabilities, permission
     }
 
 
-LEGACY_PROVIDERS = (
-    LegacyBuiltinProvider(
+BUILTIN_CAPABILITY_PROVIDERS = (
+    BuiltinCapabilityProvider(
         _manifest(
             "talebook.metadata.builtin",
             "Talebook 元数据",
@@ -55,7 +55,7 @@ LEGACY_PROVIDERS = (
             },
         )
     ),
-    LegacyBuiltinProvider(
+    BuiltinCapabilityProvider(
         _manifest(
             "talebook.book-source.opds",
             "Generic OPDS",
@@ -71,7 +71,7 @@ LEGACY_PROVIDERS = (
             },
         )
     ),
-    LegacyBuiltinProvider(
+    BuiltinCapabilityProvider(
         _manifest(
             "talebook.book-source.legado",
             "Legado 在线书源",

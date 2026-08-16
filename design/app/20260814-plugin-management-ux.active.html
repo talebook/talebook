@@ -77,7 +77,7 @@
           <h2>3. 实现架构</h2>
           <div class="flow"><div class="step"><b>1. 注册定义</b><span>三个 trusted builtin provider 声明 category、capability、权限与管理动作。</span></div><div class="step"><b>2. 幂等迁移</b><span>首次访问目录时创建共享 installation 与无凭据 instance connection。</span></div><div class="step"><b>3. 读取旧事实</b><span>元数据设置、OpdsSource、BookSourceModel 实时形成配置/启用摘要。</span></div><div class="step"><b>4. 统一治理</b><span>测试、健康和后续执行进入 plugin runs；旧业务仍走成熟 adapter。</span></div></div>
           <div class="table-wrap"><table><thead><tr><th>层</th><th>职责</th><th>关键文件</th></tr></thead><tbody>
-            <tr><td>目录适配</td><td>声明 <code>talebook.metadata.builtin</code>、<code>talebook.book-source.opds</code>、<code>talebook.book-source.legado</code>；只允许空 auth schema 的受信内置连接无 Secret 执行。</td><td><code>webserver/plugins/runtime/legacy.py</code><br><code>webserver/services/plugin_runtime.py</code></td></tr>
+            <tr><td>目录适配</td><td>声明 <code>talebook.metadata.builtin</code>、<code>talebook.book-source.opds</code>、<code>talebook.book-source.legado</code>；只允许空 auth schema 的受信内置连接无 Secret 执行。</td><td><code>webserver/plugins/runtime/builtin_capabilities.py</code><br><code>webserver/services/plugin_runtime.py</code></td></tr>
             <tr><td>管理 API</td><td>返回定义、安装、旧状态计数；支持安装/连接启停、连接动作、全局运行与单次运行明细。</td><td><code>webserver/handlers/plugins.py</code><br><code>webserver/models.py</code></td></tr>
             <tr><td>管理 UI</td><td>目录与详情、运行列表/明细、复用旧 OPDS/Legado 消费者、导航和双语文案。</td><td><code>app/pages/admin/plugins/**</code><br><code>app/components/**Header.vue</code></td></tr>
             <tr><td>验证夹具</td><td>mock API、Chromium 流程、移动端与键盘焦点回归。</td><td><code>app/test/mock-server.js</code><br><code>app/test/e2e/plugins.spec.ts</code></td></tr>

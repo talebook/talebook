@@ -9,7 +9,7 @@ def setUpModule():
 
 
 class TestPluginsApi(TestWithAdminUser):
-    def test_catalog_migrates_legacy_capabilities_without_excluded_sources(self):
+    def test_catalog_bootstraps_builtin_capabilities_without_excluded_sources(self):
         data = self.json("/api/admin/plugins")
 
         self.assertEqual(data["err"], "ok")
@@ -21,7 +21,7 @@ class TestPluginsApi(TestWithAdminUser):
         self.assertNotIn("calibre content server", payload)
         self.assertNotIn("calibre-web", payload)
         self.assertNotIn('"ai"', payload)
-        self.assertIn("legacy_state", data)
+        self.assertIn("builtin_state", data)
 
     def test_installation_state_can_be_disabled_and_reenabled_without_deleting_connection(self):
         catalog = self.json("/api/admin/plugins")

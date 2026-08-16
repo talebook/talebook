@@ -130,7 +130,7 @@
                                     variant="tonal"
                                     size="40"
                                 >
-                                    <v-icon>{{ plugin.ui.icon || 'mdi-puzzle-outline' }}</v-icon>
+                                    <v-icon>{{ plugin.ui.icon || 'mdi-power-plug-outline' }}</v-icon>
                                 </v-avatar>
                             </template>
                             <v-card-title class="text-subtitle-1">
@@ -195,7 +195,7 @@
 
             <section
                 v-if="showLegado"
-                ref="legacyPanel"
+                ref="legadoPanel"
                 class="mt-6"
                 tabindex="-1"
             >
@@ -212,7 +212,7 @@
                         {{ t('common.close') }}
                     </v-btn>
                 </div>
-                <LegacyBookSources embedded />
+                <EmbeddedBookSources embedded />
             </section>
         </v-card-text>
 
@@ -338,7 +338,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import LegacyBookSources from '~/pages/admin/booksources.vue';
+import EmbeddedBookSources from '~/pages/admin/booksources.vue';
 import OpdsImportDialog from '~/components/OpdsImportDialog.vue';
 import { useMainStore } from '@/stores/main';
 
@@ -363,7 +363,7 @@ const definitions = ref([]);
 const installations = ref([]);
 const connections = ref([]);
 const runs = ref([]);
-const legacyState = ref({});
+const builtinState = ref({});
 const loading = ref(true);
 const error = ref(false);
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '');
@@ -371,7 +371,7 @@ const statusFilter = ref(typeof route.query.status === 'string' ? route.query.st
 const actionLoading = ref(false);
 const toggleLoading = ref(false);
 const showLegado = ref(false);
-const legacyPanel = ref(null);
+const legadoPanel = ref(null);
 const opdsDialog = ref(null);
 const selectedPluginKey = ref(typeof route.query.plugin === 'string' ? route.query.plugin : '');
 let filterTimer = null;
@@ -437,7 +437,7 @@ function capabilityLabel(value) {
 }
 
 function summary(plugin) {
-    const state = legacyState.value[plugin.plugin_key];
+    const state = builtinState.value[plugin.plugin_key];
     if (state) return t('pluginManagement.sourceSummary', { configured: state.configured, enabled: state.enabled });
     const latest = pluginRuns(plugin)[0];
     return latest
@@ -544,7 +544,7 @@ async function openLegado() {
     showLegado.value = true;
     await router.replace({ query: { ...route.query, tab: 'book_sources', manage: 'legado' } });
     await nextTick();
-    legacyPanel.value?.focus();
+    legadoPanel.value?.focus();
 }
 
 function closeLegado() {
@@ -566,7 +566,7 @@ async function load() {
         if ([catalogRsp, connectionRsp, runRsp].some(rsp => rsp.err !== 'ok')) throw new Error('plugin catalog failed');
         definitions.value = catalogRsp.definitions || [];
         installations.value = catalogRsp.installations || [];
-        legacyState.value = catalogRsp.legacy_state || {};
+        builtinState.value = catalogRsp.builtin_state || {};
         connections.value = connectionRsp.connections || [];
         runs.value = runRsp.runs || [];
     } catch {

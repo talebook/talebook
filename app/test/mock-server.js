@@ -1394,7 +1394,7 @@ router.get('/api/admin/plugins', eventHandler(() => ({
   err: 'ok',
   definitions: pluginDefinitions,
   installations: pluginInstallations,
-  legacy_state: {
+  builtin_state: {
     'talebook.metadata.builtin': { configured: 3, enabled: 3, sources: ['douban', 'baidu', 'neodb'] },
     'talebook.book-source.opds': { configured: 1, enabled: 1 },
     'talebook.book-source.legado': { configured: 1, enabled: 1 },

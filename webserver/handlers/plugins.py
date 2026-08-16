@@ -18,7 +18,7 @@ from webserver.services.plugin_jobs import execute_plugin_run
 from webserver.services.plugin_runtime import (
     PluginRuntime,
     PluginRuntimeError,
-    ensure_legacy_installations,
+    ensure_builtin_capability_installations,
     install_builtin,
     save_connection,
 )
@@ -44,7 +44,7 @@ class AdminPlugins(BaseHandler):
     @is_admin
     def get(self):
         try:
-            ensure_legacy_installations(self.session, self.user_id(), loader.get_settings())
+            ensure_builtin_capability_installations(self.session, self.user_id(), loader.get_settings())
             definitions = self.session.query(PluginDefinition).order_by(PluginDefinition.id).all()
             installations = self.session.query(PluginInstallation).order_by(PluginInstallation.id).all()
             definition_map = {item.id: item for item in definitions}
@@ -57,7 +57,7 @@ class AdminPlugins(BaseHandler):
                 "err": "ok",
                 "definitions": [item.to_public_dict() for item in definitions],
                 "installations": [item.to_public_dict(definition_map.get(item.definition_id)) for item in installations],
-                "legacy_state": {
+                "builtin_state": {
                     "talebook.metadata.builtin": {
                         "configured": len(configured_metadata),
                         "enabled": len(configured_metadata),

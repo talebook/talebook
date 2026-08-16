@@ -1,5 +1,5 @@
+from .builtin_capabilities import BUILTIN_CAPABILITY_PROVIDERS, BuiltinCapabilityProvider
 from .mock import MockMultiTabProvider
-from .legacy import LEGACY_PROVIDERS, LegacyBuiltinProvider
 from .protocol import (
     ACTIONS,
     CATEGORIES,
@@ -20,8 +20,8 @@ __all__ = [
     "PROTOCOL_VERSION",
     "ManifestError",
     "MockMultiTabProvider",
-    "LegacyBuiltinProvider",
-    "LEGACY_PROVIDERS",
+    "BuiltinCapabilityProvider",
+    "BUILTIN_CAPABILITY_PROVIDERS",
     "PluginManifest",
     "ProviderAuthError",
     "ProviderError",

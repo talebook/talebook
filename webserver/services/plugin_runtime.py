@@ -21,7 +21,7 @@ from webserver.models import (
 )
 from webserver.plugins.runtime import (
     ACTIONS,
-    LEGACY_PROVIDERS,
+    BUILTIN_CAPABILITY_PROVIDERS,
     MockMultiTabProvider,
     PluginManifest,
     ProviderAuthError,
@@ -65,8 +65,8 @@ class PluginRegistry:
 
 REGISTRY = PluginRegistry()
 REGISTRY.register(MockMultiTabProvider())
-for _legacy_provider in LEGACY_PROVIDERS:
-    REGISTRY.register(_legacy_provider)
+for _builtin_provider in BUILTIN_CAPABILITY_PROVIDERS:
+    REGISTRY.register(_builtin_provider)
 
 
 def ensure_builtin_definitions(session, registry=REGISTRY):
@@ -100,11 +100,11 @@ def ensure_builtin_definitions(session, registry=REGISTRY):
     return definitions
 
 
-def ensure_legacy_installations(session, installed_by, settings, registry=REGISTRY):
-    """Idempotently register built-ins while keeping legacy tables as truth."""
+def ensure_builtin_capability_installations(session, installed_by, settings, registry=REGISTRY):
+    """Idempotently install Talebook-owned capabilities in the shared runtime."""
     ensure_builtin_definitions(session, registry)
     installations = []
-    for provider in LEGACY_PROVIDERS:
+    for provider in BUILTIN_CAPABILITY_PROVIDERS:
         plugin_key = provider.manifest["id"]
         installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
         if installation is None:

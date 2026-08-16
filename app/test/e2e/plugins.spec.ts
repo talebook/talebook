@@ -39,7 +39,7 @@ test.describe('Plugin management', () => {
         await expect(page.getByText('成功').first()).toBeVisible();
     });
 
-    test('legacy book source URL redirects into the plugin source tab', async ({ page }) => {
+    test('old book source URL redirects into the plugin source tab', async ({ page }) => {
         await page.goto('/admin/booksources');
         await expect(page).toHaveURL(/\/admin\/plugins\?.*tab=book_sources/);
         await expect(page.getByText('Legado 书源管理')).toBeVisible();
