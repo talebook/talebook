@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="AI 金句卡片、章节推荐与 Markdown/PNG 导出的内部实现方案。" />
+    <link rel="icon" href="data:," />
+    <title>AI 金句卡片与双格式导出 · ACTIVE</title>
+    <style>
+      :root { color-scheme:light dark; --bg:#f4f0e8; --panel:#fffdf8; --ink:#25221f; --muted:#675f58; --line:#d8cfc5; --accent:#8d3d25; --soft:#f9e9df; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif; }
+      header,main { width:min(1080px,calc(100% - 28px)); margin:auto; }
+      header { padding:42px 0 24px; }
+      h1 { margin:0 0 10px; font-size:clamp(30px,5vw,50px); line-height:1.08; }
+      h2 { margin:0 0 12px; font-size:22px; }
+      section { margin:0 0 18px; padding:24px; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
+      .meta,.flow { display:grid; gap:10px; }
+      .meta { grid-template-columns:repeat(5,max-content); color:var(--muted); }
+      .meta span { padding:5px 10px; border-radius:999px; background:var(--soft); }
+      .flow { grid-template-columns:repeat(4,1fr); }
+      .flow div { padding:14px; border:1px solid var(--line); border-radius:12px; }
+      table { width:100%; border-collapse:collapse; }
+      th,td { padding:10px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+      code { padding:2px 5px; border-radius:5px; background:var(--soft); }
+      .passed { color:#236539; font-weight:700; }
+      @media (max-width:760px) { .meta,.flow { grid-template-columns:1fr; } section { padding:18px; } }
+      @media (prefers-color-scheme:dark) { :root { --bg:#191614; --panel:#25211e; --ink:#f8f0e9; --muted:#c8bbb0; --line:#584a40; --soft:#42291f; --accent:#ff916c; } }
+      @media print { body { background:#fff; } section { break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>AI 金句卡片与双格式导出</h1>
+      <p>把 EPUB 选文转成可核验、可编辑、可回跳、可复习的私人成果，并在章节内主动推荐最多五条候选。</p>
+      <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-16</span><span>所属模块：webserver / reader</span><span>需求来源：TB-54</span><span>基线：feat/ai_1.0</span></div>
+    </header>
+    <main>
+      <section><h2>1. 原始诉求</h2><p>首版仅支持 locator 稳定的 EPUB。用户可将当前选文制成金句卡，也可请求章节推荐；确认后保存逐字原句、AI 解释、主题、笔记、书名/章节、locator 与时间。必须支持编辑、删除、去重、精确回跳及 Markdown/PNG 导出，并在 AI 不可用时保留手动摘录。</p></section>
+      <section><h2>2. 目标与边界</h2><table><thead><tr><th>首版目标</th><th>明确不做</th></tr></thead><tbody><tr><td>选文制卡、最多五条章节候选、逐字校验、创建者隔离、来源版本失效、卡片管理、双格式导出、AgentRuntime 复用。</td><td>PDF/OCR、全书后台扫描、跨书聚类、知识图谱、公开社区、整章批量摘录、Claude Code/Trae 真适配器。</td></tr></tbody></table></section>
+      <section><h2>3. 核心流程</h2><div class="flow"><div><strong>采集</strong><br />阅读器提取当前章节或选区及 href/start/end。</div><div><strong>校验</strong><br />后端限制长度、核验 locator 与原句，按书版本和创建者去重。</div><div><strong>生成</strong><br />推荐只经现有 AgentRuntime，输出 schema 白名单并逐候选复核。</div><div><strong>成果</strong><br />确认后保存；可编辑说明/主题/笔记、回跳、删除及 Markdown/PNG 导出。</div></div></section>
+      <section><h2>4. 数据与 API</h2><p>新增 <code>quote_cards</code>，保存 UUID、创建者、书籍/版本、章节、逐字原句或改写笔记类型、locator、校验摘要、AI 原稿、用户说明、主题、笔记、schema/prompt 版本、来源有效标记和时间。推荐任务继续使用 <code>AITask</code> 与 <code>/api/ai/quote_card/tasks</code>；成果使用 <code>/api/quote-cards</code> 列表/创建/编辑/删除，另提供 Markdown 导出。</p></section>
+      <section><h2>5. 权限、安全与失败</h2><ul><li>所有卡片和推荐任务限定创建者，并在每次访问时重验原书 ACL；删书同步清理。</li><li>书籍版本变化时卡片仍可读但标记来源失效、禁用回跳；重新验证成功前不恢复逐字引用状态。</li><li>逐字引用的原句和 locator 不允许在编辑时变化；用户要改原句须显式转为“摘录改写/笔记”。</li><li>正文仅作结构化数据；解释、主题和笔记限制长度并转义 HTML。运行时不获得书库、MCP 或写工具。</li><li>AI 缺失、未登录、限额、协议错误、崩溃、超时、取消及 schema 错误沿用 AgentRuntime 分类；手动保存不依赖 AI。</li></ul></section>
+      <section><h2>6. 界面与导出</h2><p>阅读器提供“金句”入口，优先识别当前选区，并提供“推荐本章金句”和“已保存”管理视图。候选按原句、为什么重要、主题、来源展示，用户编辑后确认。PNG 在浏览器 Canvas 中生成，不上传正文；单卡和批量 Markdown 均限制引用长度并保留来源。亮暗主题、320px 窄屏、键盘焦点和安全 DOM 构造纳入验收。</p></section>
+      <section><h2>7. 去重与兼容策略</h2><p>逐字引用以创建者、书版本、章节 href、范围和规范化原句摘要形成唯一键。重复创建返回现有卡片，界面允许打开或显式合并说明/主题/笔记，不静默新增。旧数据库通过现有 <code>create_all</code>/迁移脚本创建新表；现有 <code>summary_duck</code> API 与数据不变。</p></section>
+      <section><h2>8. 测试计划与结果</h2><ul><li class="passed">完整后端：配置好 Calibre 的测试容器执行 <code>pytest tests</code>，854 passed、20 skipped。</li><li class="passed">定向后端：<code>pytest -q tests/test_summary_duck.py tests/test_quote_cards.py</code>，29 passed；覆盖输入与 locator 校验、最多五条、服务端 EPUB 正文提取、创建/编辑/类型降级/删除、去重合并、版本失效、ACL、删除传播、Markdown 导出及 AI 成功/失败/取消/手动降级。</li><li class="passed">前端静态测试：<code>npx vitest run test/utils/quote-cards-runtime.spec.ts</code>，3 passed；覆盖安全 DOM、运行时中立、双格式导出、焦点/惰性背景、亮暗主题对比度、16 px 输入、稳定 live region 与保存后编辑动作。</li><li class="passed">实际渲染：<code>npx playwright test test/e2e/quote-cards-render.spec.ts</code>，4 passed；Chromium 验证亮色、暗色、320 px、键盘焦点陷阱、XSS 安全、失败后草稿保留及浏览器 PNG 下载，并生成两张基准截图。</li><li class="passed">质量门禁：<code>make lint-py-fix</code> 与 <code>make lint-py</code> 通过；<code>npm run lint</code> 为 0 errors、193 个既有 warnings；<code>git diff --check</code> 通过。</li><li>完整 Vitest 仍依赖仓库约定的 3000 端口开发服务，并存在既有 <code>LocalMdiIcons.spec.ts</code> 缺图标失败；本改动以定向 Vitest、Playwright 和完整后端套件替代验证，剩余风险限于未覆盖的 Nuxt 全量回归。</li></ul></section>
+      <section><h2>9. Full interface review</h2><p>以 <code>origin/feat/ai_1.0</code> 为 PR 基线，用 <code>interface-review full</code> 审查当前分支全部 15 个本地变更文件；排除两张 Playwright 快照二进制后审查 13 个文件，并扩展到唯一直接界面消费者 <code>creader.html</code>，无未展开消费者。无删除的可访问性、焦点、语义、文案或颜色信号。</p><table><thead><tr><th>领域</th><th>覆盖</th><th>最终结果</th></tr></thead><tbody><tr><td>Accessibility</td><td>对话框语义、焦点陷阱与恢复、惰性背景、键盘、表单标签、live region、等待/错误/空状态、320 px 与 reduced motion。</td><td>Clear</td></tr><tr><td>Layout</td><td>侧栏、滚动正文与固定 footer、按钮换行、安全区、窄屏及内容增长。</td><td>Clear</td></tr><tr><td>Writing</td><td>入口、操作、空状态、错误、删除与逐字引用降级文案。</td><td>Clear</td></tr><tr><td>Typography</td><td>层级、正文行高、标签、长文本、16 px 移动输入与截断。</td><td>Clear</td></tr><tr><td>Colors</td><td>亮暗主题所有文字和操作前景/背景组合；实测 WCAG 比值最低 5.87:1。</td><td>Clear</td></tr><tr><td>UI</td><td>卡片/输入/按钮表面、主次动作、状态、亮暗截图及加载动效。</td><td>Clear</td></tr></tbody></table><p>审查中已修复：暗色主按钮前景对比度、失败保存的草稿保留、移动输入字号、“查看已保存”导航文案、选区偏移流一致性、候选保存的 pending/稳定播报，以及修改成功后仍可继续保存。保留原生删除确认，因为文案明确说明不可撤销且符合阅读器既有轻量交互；保留结构性卡片边框和 15 px 面板密度，输入已独立为 16 px。最终无未解决 HIGH、MEDIUM 或 LOW 问题，结论：<strong>Approve</strong>。</p></section>
+    </main>
+  </body>
+</html>
