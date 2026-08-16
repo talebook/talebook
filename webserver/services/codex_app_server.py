@@ -293,7 +293,7 @@ class CodexAppServerRuntime(AgentRuntime):
                     "cwd": str(workdir),
                     "approvalPolicy": "never",
                     "sandbox": "readOnly",
-                    "serviceName": "talebook_summary_duck",
+                    "serviceName": request.service_name,
                 }
                 if request.model or self.model:
                     thread_params["model"] = request.model or self.model
@@ -317,7 +317,7 @@ class CodexAppServerRuntime(AgentRuntime):
                 active.turn_id = turn.get("id")
                 if not active.turn_id:
                     raise AgentRuntimeError(RuntimeErrorCode.PROTOCOL, "AI 运行时未返回任务 ID")
-                on_event(RuntimeEvent(RuntimeEventType.STARTED, "正在分析当前章节", active.thread_id))
+                on_event(RuntimeEvent(RuntimeEventType.STARTED, "AI 任务已启动", active.thread_id))
 
                 started_at = time.monotonic()
                 last_message_at = started_at
@@ -344,7 +344,7 @@ class CodexAppServerRuntime(AgentRuntime):
                     if method in {"turn/started", "item/started", "item/completed", "item/agentMessage/delta"}:
                         if not first_progress:
                             first_progress = True
-                            on_event(RuntimeEvent(RuntimeEventType.PROGRESS, "正在生成五组问答", active.thread_id))
+                            on_event(RuntimeEvent(RuntimeEventType.PROGRESS, "AI 正在生成结构化结果", active.thread_id))
                     if method == "item/completed":
                         item = params.get("item") if isinstance(params.get("item"), dict) else {}
                         if item.get("type") == "agentMessage" and item.get("text"):

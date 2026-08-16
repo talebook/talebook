@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 创建者私有、可版本化、可试运行的 SKILL 沉淀方案。" />
+    <link rel="icon" href="data:," />
+    <title>可版本化、可试运行的 SKILL 沉淀 · ACTIVE</title>
+    <style>
+      :root { color-scheme:light dark; --bg:#f3f5f3; --panel:#fff; --ink:#20251f; --muted:#5e695d; --line:#d7ddd5; --accent:#356b43; --soft:#e8f3e9; --warn:#8a5612; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:linear-gradient(145deg,var(--bg),#edf2ec); font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif; }
+      header,main { width:min(1080px,calc(100% - 28px)); margin:auto; }
+      header { padding:46px 0 24px; }
+      h1 { margin:0 0 10px; font-size:clamp(30px,5vw,50px); line-height:1.1; }
+      h2 { margin:0 0 12px; font-size:22px; }
+      p { margin:0 0 12px; }
+      section { margin:0 0 18px; padding:24px; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
+      .meta,.flow { display:flex; flex-wrap:wrap; gap:9px; }
+      .meta span { padding:5px 10px; color:var(--muted); border-radius:999px; background:var(--soft); }
+      .flow article { flex:1 1 190px; padding:14px; border:1px solid var(--line); border-radius:12px; }
+      table { width:100%; border-collapse:collapse; }
+      th,td { padding:10px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+      code { padding:2px 5px; border-radius:5px; background:var(--soft); overflow-wrap:anywhere; }
+      .pending { color:var(--warn); font-weight:750; }
+      @media (max-width:720px) { section { padding:18px; } }
+      @media (prefers-color-scheme:dark) { :root { --bg:#141814; --panel:#202620; --ink:#edf4ec; --muted:#bdc8bb; --line:#455144; --soft:#263c2b; --accent:#8bd19a; --warn:#efbc74; } body { background:var(--bg); } }
+      @media print { body { background:#fff; } section { break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>可版本化、可试运行的 SKILL 沉淀</h1>
+      <p>把一次有效的 AI 工作方法变成创建者私有、结构明确、可审阅回滚且只能在隔离运行时手动执行的资产。</p>
+      <div class="meta">
+        <span>状态：ACTIVE</span><span>创建日期：2026-08-16</span><span>所属模块：webserver / app</span>
+        <span>需求来源：TB-56</span><span>基线：feat/ai_1.0</span>
+      </div>
+    </header>
+    <main>
+      <section>
+        <h2>1. 原始诉求</h2>
+        <p>“支持从已完成的 AI 成果/任务生成 SKILL 草稿，也支持空白模板创建；提供结构化字段与 Markdown 编辑、预览、样例试运行、草稿/启用/停用、版本记录和回滚；AI 中心提供创建者私有的列表、搜索、版本和手动运行，并展示版本、输入摘要、授权上下文、进度与唯一终态。”</p>
+      </section>
+      <section>
+        <h2>2. 目标与边界</h2>
+        <table>
+          <thead><tr><th>首版交付</th><th>明确不做</th></tr></thead>
+          <tbody><tr><td>manifest 与 Markdown 双表示、不可变版本、启停/回滚、敏感信息门禁、输入输出 schema 校验、Codex app-server 试运行与手动运行、私有列表和运行记录。</td><td>公开市场、团队共享、远程导入、后台静默触发、自我修改、任意脚本/依赖安装、MCP、任意系统写入。</td></tr></tbody>
+        </table>
+      </section>
+      <section>
+        <h2>3. 产品流程</h2>
+        <div class="flow">
+          <article><strong>起草</strong><br />从空白模板或本人已成功 AI 任务提取最小来源摘要，不复制整段正文或会话。</article>
+          <article><strong>审阅保存</strong><br />编辑结构化 manifest 与 Markdown；先校验必填项/schema，再扫描密钥、邮箱与本地路径。</article>
+          <article><strong>试运行</strong><br />指定不可变版本和样例输入；运行前重验 owner、状态、schema 与授权上下文。</article>
+          <article><strong>启用复用</strong><br />试运行成功后才能启用；每次保存产生新版本，可停用或回滚为新的当前版本。</article>
+        </div>
+      </section>
+      <section>
+        <h2>4. 数据与状态</h2>
+        <p><code>skills</code> 保存 owner、名称、描述、状态与当前版本；<code>skill_versions</code> 保存版本号、manifest、Markdown、来源摘要和内容哈希；<code>skill_runs</code> 固定绑定 owner、skill/version、运行模式、输入摘要、授权上下文、进度、唯一终态、输出或脱敏错误。</p>
+        <p>版本不可原地改写：编辑保存、回滚都创建新的单调递增版本。状态为 <code>draft</code>、<code>enabled</code>、<code>disabled</code>；运行终态为 <code>succeeded</code>、<code>failed</code> 或 <code>cancelled</code>。</p>
+      </section>
+      <section>
+        <h2>5. manifest 与 API</h2>
+        <p>manifest 必含名称、描述、适用范围、前提、触发说明、输入 schema、步骤、术语/例子、失败条件、输出 schema、来源与自测；只接受 JSON Schema 的安全子集。API 使用 <code>/api/ai/skills</code>、<code>/api/ai/skills/:id</code>、<code>/versions</code>、<code>/rollback</code>、<code>/status</code>、<code>/runs</code> 和 <code>/runs/:id/cancel</code>，所有入口均需登录且以当前用户过滤。</p>
+      </section>
+      <section>
+        <h2>6. 运行时与权限</h2>
+        <p>继续使用统一 <code>AgentRuntime</code> 与 Codex app-server；每次把指定版本物化为提示中的数据块，不写入用户全局技能目录。运行目录为空、只读、无 readable roots、审批关闭、无 MCP；限制输入体积、schema 深度、总时长与并发。成功必须同时满足 app-server 完成终态、输出 JSON 解析、输出 schema 和任务仍归当前 owner。</p>
+        <p>创建来源、读取版本、启停、回滚、运行、轮询和取消都重验 owner。运行保存授权上下文摘要而非长期权限；涉及书籍的上下文只记录当次重新验证后的资源标识。</p>
+      </section>
+      <section>
+        <h2>7. 安全策略</h2>
+        <ul>
+          <li>保存前扫描常见 API key、token、私钥、邮箱、Unix/Windows 用户路径；默认拒绝，并返回类别与字段位置，不回显完整命中值。</li>
+          <li>来源和 Markdown 明确作为不可信数据，不可覆盖系统指令；不接受脚本、依赖、工具声明或远程 URL 导入。</li>
+          <li>限制 manifest/Markdown/input/output 大小、schema 深度与步骤数量；日志和错误不持久化提示词、输入正文、凭据或进程原始输出。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>8. 界面</h2>
+        <p>登录用户可从导航进入 AI 中心：搜索和状态筛选在左侧列表，右侧编辑名称/描述、结构字段和 Markdown，可查看版本、预览、试运行、启停与回滚。运行卡明确显示 SKILL 版本、输入摘要、授权上下文、进度与一个终态；亮暗主题、320px 重排、键盘路径、错误与空态纳入验证。</p>
+      </section>
+      <section>
+        <h2>9. 风险与兼容性</h2>
+        <ul>
+          <li>旧数据库：新增表由现有 <code>create_all</code> 建表，不修改已有列。</li>
+          <li>schema 复杂度：首版拒绝引用、组合关键字和远程 schema，只实现 object/array/string/number/integer/boolean/null 及基础约束。</li>
+          <li>运行时不可用或中断：任务失败关闭并保留可重试版本，不把草稿误标为启用。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>10. 测试结果</h2>
+        <table>
+          <thead><tr><th>检查</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td><code>python3 -m unittest tests.test_skill_library -v</code>（生产镜像挂载当前代码）</td><td>11 项通过；覆盖 owner 隔离、起草、敏感扫描、schema、版本、试运行门禁、回滚、取消、超时、非法输出、运行终态与删除级联。</td></tr>
+            <tr><td><code>python3 -m unittest tests.test_summary_duck -v</code>（生产镜像挂载当前代码）</td><td>16 项通过；统一 Runtime 与 Codex 协议回归通过。</td></tr>
+            <tr><td><code>npx vitest run test/components/SkillLibraryPage.spec.ts</code>；<code>npx vitest run test/components/AppHeader.spec.ts</code></td><td>分别 4 项、5 项通过；Nuxt 测试环境仍输出既有 i18n 加载警告，不影响断言。</td></tr>
+            <tr><td><code>npx playwright test test/e2e/skill-library.spec.ts --update-snapshots</code></td><td>Chromium 2 项通过；验证亮色桌面、暗色 390px 移动端、编辑器与运行契约，并生成两张基线截图。</td></tr>
+            <tr><td><code>npm run lint</code>；<code>npm run build</code></td><td>均通过；lint 为 0 error、193 个仓库既有 warning，构建仅保留既有 browserslist 与 chunk-size warning。</td></tr>
+            <tr><td><code>ruff check …</code>；<code>python3 -m py_compile …</code>；<code>git diff --check</code></td><td>均通过。</td></tr>
+          </tbody>
+        </table>
+        <p>完整 <code>python3 -m unittest discover tests -v</code> 在基线生产镜像中运行 616 项，因镜像/套件既有环境问题结束为 4 failures、17 errors：缺少 <code>pytest</code>、Calibre 测试库列不匹配、全量执行中的临时数据库缺少 <code>ai_tasks</code>/<code>skills</code> 表等；上述相关模块已用独立新进程定向运行并全部通过。</p>
+        <p>Chrome DevTools MCP 在当前运行环境不可用，因此无法执行仓库要求的该工具检查；使用真实 Chromium Playwright、桌面/移动端双主题截图与人工视觉检查作为替代，未把 mock API 结果视为真实数据验收。</p>
+      </section>
+      <section>
+        <h2>11. interface-review full</h2>
+        <p>范围为 <code>origin/feat/ai_1.0</code>（<code>7207cf49ddf5b2a4b6dd5bc6fb1230b61c62a08f</code>）到当前工作树的全部本地变更；排除生成截图与构建产物，展开检查了 SKILL 工作台、导航入口、默认布局主区域、亮暗主题和 390px 窄屏。Accessibility、Layout、Writing、Typography、Colors、UI 六个领域均完成检查。</p>
+        <table>
+          <thead><tr><th>初次发现</th><th>处理</th></tr></thead>
+          <tbody>
+            <tr><td>HIGH：切换 SKILL 或载入版本会无提示覆盖未保存修改。</td><td>增加脏状态跟踪和明确的“放弃修改”确认；补组件测试。</td></tr>
+            <tr><td>MEDIUM：编辑器在应用已有主区域内创建嵌套 <code>main</code> landmark。</td><td>改为带标题关联的 <code>section</code>。</td></tr>
+            <tr><td>MEDIUM：从任务创建使用泛化“确认”动作词。</td><td>改为结果明确的“创建 SKILL”。</td></tr>
+            <tr><td>MEDIUM：载入历史版本或保留未保存修改时，仍可启用/运行当前已保存版本，容易误判实际执行内容。</td><td>显式标记未保存或正在查看的版本，并在编辑器与当前版本不同步时禁用启用、试运行和手动运行。</td></tr>
+            <tr><td>MEDIUM：列表选择/焦点和方向相关样式依赖物理左边。</td><td>增加 <code>aria-pressed</code> 与完整焦点轮廓，改用逻辑边框和 <code>text-align: start</code>。</td></tr>
+          </tbody>
+        </table>
+        <p>修复后重新执行完整界面审查和 Playwright 渲染验证，未留下 HIGH、MEDIUM 或其他可执行的本次变更问题，最终结论：<strong>Approve</strong>。曾考虑增加页面级动画、扩大卡片阴影和改变 Vuetify 密度；这些会增加高频操作注意成本或偏离既有组件系统，故不采纳。</p>
+      </section>
+      <section>
+        <h2>12. 决策记录</h2>
+        <p>Issue 已明确产品边界，未再阻塞等待选择：首版采用通用但受限的 JSON Schema 子集；启用前要求至少一次当前版本试运行成功；“从成果生成”只提取本人成功任务的类型、版本和结果结构摘要，避免复制正文；回滚产生新版本以保留完整审计链。</p>
+      </section>
+    </main>
+  </body>
+</html>

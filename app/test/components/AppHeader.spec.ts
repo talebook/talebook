@@ -108,4 +108,14 @@ describe('AppHeader.vue', () => {
 
         wrapper.unmount();
     });
+
+    it('shows the private AI SKILL center in navigation for signed-in users', () => {
+        storeState.user.is_login = true;
+        const wrapper = mountHeader();
+
+        expect(wrapper.text()).toContain('navigation.aiSkills');
+
+        wrapper.unmount();
+        storeState.user.is_login = false;
+    });
 });
