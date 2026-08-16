@@ -32,6 +32,7 @@ let audiobookManagedEditions = [];
 let audiobookCapacityOk = true;
 let audiobookWorkspace = null;
 let podcastTokenHint = '';
+let tagOrganizerTask = null;
 let importSettings = {
   scan_upload_path: '/mock/scan/dir',
   import_mode: 'copy',
@@ -212,6 +213,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   audiobookWorkspace = workspacePayload();
   audiobookCapacityOk = body?.audiobookCapacityOk !== false;
   podcastTokenHint = '';
+  tagOrganizerTask = null;
   return { status: 'ok' };
 }));
 
@@ -807,6 +809,79 @@ router.get('/api/welcome', eventHandler(() => {
   if (!inviteMode || isInvited) return { err: 'free', msg: 'No invitation required' };
   return { err: 'ok', msg: '', welcome: '请输入访问码' };
 }));
+
+const makeTagOrganizerTask = () => ({
+  id: '11111111-2222-3333-4444-555555555555',
+  feature: 'tag_organizer',
+  status: 'ready',
+  scope: { type: 'all', tags: [{ name: 'sci-fi', count: 2 }] },
+  books: [
+    { id: 1, title: '星海纪事', tags: ['sci-fi', '太空歌剧'] },
+    { id: 2, title: '未来简史', tags: ['sci-fi', '历史'] },
+  ],
+  suggestions: [
+    {
+      id: 'suggestion-one', source: 'sci-fi', action: 'merge', target: '科幻',
+      reason: '与书库现有中文标签语义一致，合并后更容易浏览。', confidence: 0.93,
+      selected: true, origin: 'agent', excluded_book_ids: [],
+    },
+    {
+      id: 'suggestion-two', source: '太空歌剧', action: 'keep', target: '',
+      reason: '标签具有独立且明确的细分语义，建议保留。', confidence: 0.74,
+      selected: false, origin: 'agent', excluded_book_ids: [],
+    },
+  ],
+  preview: {}, result: {}, metrics: { suggested: 2 }, error: null,
+});
+
+router.get('/api/ai/tag_organizer/tasks', eventHandler(() => ({
+  err: 'ok', tasks: tagOrganizerTask ? [tagOrganizerTask] : [],
+})));
+
+router.post('/api/ai/tag_organizer/tasks', eventHandler(() => {
+  tagOrganizerTask = makeTagOrganizerTask();
+  return { err: 'ok', task: tagOrganizerTask, idempotent: false };
+}));
+
+router.get('/api/ai/tag_organizer/tasks/:id', eventHandler(() => ({ err: 'ok', task: tagOrganizerTask })));
+
+router.patch('/api/ai/tag_organizer/tasks/:id', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const edits = new Map((body?.adjustments || []).map(item => [item.id, item]));
+  tagOrganizerTask.suggestions = tagOrganizerTask.suggestions.map(item => ({ ...item, ...(edits.get(item.id) || {}) }));
+  return { err: 'ok', task: tagOrganizerTask };
+}));
+
+router.post('/api/ai/tag_organizer/tasks/:id/preview', eventHandler(() => {
+  tagOrganizerTask.status = 'previewed';
+  tagOrganizerTask.preview = {
+    token: 'preview-token',
+    summary: { changed_books: 2, conflicts: 0 },
+    conflicts: [],
+    changes: [
+      { book_id: 1, title: '星海纪事', before_tags: ['sci-fi', '太空歌剧'], after_tags: ['科幻', '太空歌剧'] },
+      { book_id: 2, title: '未来简史', before_tags: ['sci-fi', '历史'], after_tags: ['科幻', '历史'] },
+    ],
+  };
+  return { err: 'ok', task: tagOrganizerTask };
+}));
+
+router.post('/api/ai/tag_organizer/tasks/:id/execute', eventHandler(() => {
+  tagOrganizerTask.status = 'executed';
+  tagOrganizerTask.result = { succeeded: 2, skipped: 0, failed: 0, undone: 0 };
+  return { err: 'ok', task: tagOrganizerTask, idempotent: false };
+}));
+
+router.post('/api/ai/tag_organizer/tasks/:id/retry', eventHandler(() => ({
+  err: 'ok', task: tagOrganizerTask, idempotent: true,
+})));
+
+router.post('/api/ai/tag_organizer/tasks/:id/undo', eventHandler(() => {
+  tagOrganizerTask.result = { ...tagOrganizerTask.result, undone: 2, undo_conflicts: 0 };
+  return { err: 'ok', task: tagOrganizerTask, idempotent: false };
+}));
+
+router.post('/api/ai/tag_organizer/tasks/:id/analysis-retry', eventHandler(() => ({ err: 'ok', task: tagOrganizerTask })));
 
 router.post('/api/admin/install', eventHandler(async (event) => {
   const body = await readBody(event); // or parse multipart/form-data if needed

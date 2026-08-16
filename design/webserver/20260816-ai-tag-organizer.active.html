@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="TB-59 AI 标签整理、预览确认、幂等执行和安全撤销方案。" />
+    <link rel="icon" href="data:," />
+    <title>AI 标签整理：先建议、后预览、可安全撤销 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#f4f1ea; --panel:#fffdf8; --ink:#222b2b; --muted:#66706f; --line:#d9d4c8; --accent:#9a4a2a; --soft:#f5e7dc; --ok:#236247; --warn:#8a5b13; --danger:#9b3434; }
+      * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; color:var(--ink); background:linear-gradient(135deg,#f9f6ef,var(--bg)); font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+      a { color:var(--accent); } a:focus-visible,[tabindex="0"]:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+      .page { width:min(1080px,calc(100vw - 28px)); margin:auto; padding:28px 0 56px; } header,section { margin-bottom:18px; padding:26px 28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 10px 26px rgba(49,39,25,.07); }
+      h1 { margin:0 0 8px; font-size:clamp(30px,5vw,48px); line-height:1.1; } h2 { margin:0 0 14px; font-size:23px; } h3 { margin:20px 0 8px; } p { margin:0 0 12px; } .sub { color:var(--muted); font-size:17px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; } .chip { padding:5px 10px; border-radius:999px; background:#ede8de; font-size:12px; font-weight:700; } .active { color:var(--ok); background:#dff2e8; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; } .box { padding:16px; border:1px solid var(--line); border-radius:14px; } .box.good { background:#eaf5ef; } .box.warn { background:#fff5df; }
+      .flow { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; } .step { padding:14px; border:1px solid var(--line); border-radius:13px; background:#fbfaf6; } .step b { display:block; margin-bottom:5px; } .step span { color:var(--muted); font-size:13px; }
+      .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:13px; } table { width:100%; min-width:720px; border-collapse:collapse; } th,td { padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f2eee5; } tr:last-child td { border-bottom:0; }
+      code { padding:.1em .35em; border-radius:4px; background:#eee9df; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; } ul { margin:8px 0 0 20px; padding:0; } li+li { margin-top:5px; } .pending { color:var(--warn); font-weight:800; }
+      @media (max-width:760px) { .grid,.flow { grid-template-columns:1fr; } header,section { padding:21px 19px; } }
+      @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+      @media (prefers-color-scheme:dark) { :root { --bg:#171b1b; --panel:#202626; --ink:#edf1ef; --muted:#b1bcba; --line:#46504e; --soft:#4b3026; } body { background:#171b1b; } .chip,code,th { background:#303837; } .box.good { background:#1c382d; } .box.warn { background:#3b311d; } .step { background:#252c2b; } }
+      @media print { body { background:#fff; } header,section { box-shadow:none; break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <h1>AI 标签整理：先建议、后预览、可安全撤销</h1>
+        <p class="sub">为长期书库提供可解释、可修改、可排除书籍的标签整理任务；任何写入都必须经过预览和二次确认。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-16</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：webserver、app、tests</span><span class="chip">需求来源：TB-59</span>
+        </div>
+      </header>
+
+      <main>
+        <section id="request">
+          <h2>1. 原始诉求</h2>
+          <div class="box warn">长期书库存在同义、繁简、大小写、全半角、错别字、低使用率和粒度不一致标签。系统应先用确定性规则归一格式，再通过统一 AgentRuntime 提供语义建议；用户可修改目标、排除书籍、预览、确认、部分重试和整体撤销，且不得越权、跨库或覆盖后续人工修改。</div>
+        </section>
+
+        <section id="goals">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="box good"><h3>目标</h3><ul><li>建议包含动作、源/目标、理由、置信度、冲突和影响书籍。</li><li>保存用户选择但不写库；预览时重算准确变更集。</li><li>确认时重查 ACL 与版本，幂等执行并保存前后快照。</li><li>撤销只恢复仍处于本任务写入后状态的书籍，冲突显式跳过。</li></ul></article>
+            <article class="box"><h3>非目标</h3><ul><li>不自动生成全库新标签或构建多层本体。</li><li>不把正文或无关书籍元数据发给模型。</li><li>不支持未经确认的自动执行。</li><li>不跨 Calibre 书库合并同名标签。</li></ul></article>
+          </div>
+        </section>
+
+        <section id="design">
+          <h2>3. 方案与数据流</h2>
+          <div class="flow" aria-label="任务处理流程">
+            <article class="step"><b>分析</b><span>读取可编辑书籍的标签和最小标题标识，记录基线版本。</span></article>
+            <article class="step"><b>建议</b><span>确定性格式规则先产出；其余标签交给 Codex app-server。</span></article>
+            <article class="step"><b>调整</b><span>用户接受、忽略、改目标或排除单书，不产生写入。</span></article>
+            <article class="step"><b>预览/执行</b><span>服务端重查权限和版本，展示后再使用幂等键确认。</span></article>
+            <article class="step"><b>撤销</b><span>按任务快照恢复；检测后续人工修改并跳过冲突。</span></article>
+          </div>
+          <h3>持久化</h3>
+          <div class="table-wrap" tabindex="0" role="region" aria-label="持久化字段">
+            <table><thead><tr><th>对象</th><th>用途</th><th>关键不变量</th></tr></thead><tbody>
+              <tr><td><code>TagOrganizationTask</code></td><td>任务状态、范围、建议、用户调整、预览、执行结果、Runtime 状态与指标。</td><td>创建者私有；幂等 request/execute/undo key 唯一；不保存正文。</td></tr>
+              <tr><td><code>TagOrganizationChange</code></td><td>每本书执行前/后的标签和版本、结果及撤销结果。</td><td>按 task + book 唯一；撤销仅在 current == after 时恢复 before。</td></tr>
+            </tbody></table>
+          </div>
+          <h3>接口</h3>
+          <div class="table-wrap" tabindex="0" role="region" aria-label="接口契约">
+            <table><thead><tr><th>接口</th><th>语义</th><th>写库</th></tr></thead><tbody>
+              <tr><td><code>POST /api/ai/tag_organizer/tasks</code></td><td>创建分析任务；scope 支持全部可编辑书籍、book_ids 或 tags。</td><td>仅任务库</td></tr>
+              <tr><td><code>PATCH .../tasks/:id</code></td><td>保存选择、目标和排除书籍。</td><td>仅任务库</td></tr>
+              <tr><td><code>POST .../:id/preview</code></td><td>重查 ACL/版本并生成精确逐书变更。</td><td>仅任务库</td></tr>
+              <tr><td><code>POST .../:id/execute</code></td><td>要求 preview token 和 idempotency key；逐书版本检查后应用。</td><td>Calibre + 快照</td></tr>
+              <tr><td><code>POST .../:id/retry</code></td><td>只重试失败或冲突后重新满足条件的变更。</td><td>Calibre + 快照</td></tr>
+              <tr><td><code>POST .../:id/undo</code></td><td>要求 idempotency key；恢复未被后续修改的成功变更。</td><td>Calibre + 撤销结果</td></tr>
+            </tbody></table>
+          </div>
+        </section>
+
+        <section id="security">
+          <h2>4. 权限、并发和失败语义</h2>
+          <ul>
+            <li>入口要求登录、<code>Reader.can_edit()</code>，并对每本书要求管理员或收藏者所有权；无权书籍不进入建议、预览或执行。</li>
+            <li>分析只发送标签名称、使用量和匿名化对象编号；标题仅在本地影响列表展示，不进入 Agent prompt。</li>
+            <li>Runtime 非终态、协议错误或 schema 校验失败只将任务标为 failed，不生成可预览建议。</li>
+            <li>预览 token 绑定规范化调整、可编辑书籍及其标签版本；确认阶段任何变化都成为显式冲突。</li>
+            <li>Calibre 写入置于库锁内；每本书持久化 before/after snapshot 和结果，中途异常作为可重试的部分失败显式报告。</li>
+          </ul>
+        </section>
+
+        <section id="tests">
+          <h2>5. 测试结果</h2>
+          <p><strong>验证通过。</strong> 功能、权限/冲突语义、安全撤销和响应式交互均已在本分支验证。</p>
+          <ul>
+            <li><code>pytest -q tests/test_tag_organizer.py</code> 在 Calibre 测试镜像中 8/8 通过：包含确定性规则、闭合 schema、低置信默认不选、排除/去重、预览与幂等执行、安全撤销、ACL 变化、Runtime 协议失败不写入及部分重试总数。宿主环境未安装 Calibre，因此使用仓库 Docker test target 运行集成测试。</li>
+            <li><code>make lint-py</code> 通过；<code>npm run lint</code> 0 errors（仅有仓库已有警告）；<code>npm run build</code> 通过。</li>
+            <li>Playwright Chromium 3/3 通过：完整建议→预览→确认→执行→撤销流程、320px 窄屏，以及英文深色模式；评审态视觉快照已固化。</li>
+            <li>Chrome DevTools MCP 在当前环境不可用；使用真实 Playwright Chromium 渲染作为等价可视化验证。</li>
+            <li>interface-review full 结论：<strong>Approve</strong>。评审中发现的重复 <code>main</code> landmark、状态更新未稳定播报和流程当前步骤未标记问题已修复；无剩余中/高严重度问题。</li>
+          </ul>
+        </section>
+
+        <section id="decisions">
+          <h2>6. 决策记录</h2>
+          <div class="table-wrap" tabindex="0" role="region" aria-label="决策记录"><table><thead><tr><th>日期</th><th>决策</th><th>理由</th></tr></thead><tbody>
+            <tr><td>2026-08-16</td><td>使用独立标签整理任务模型，不扩展书籍章节型 <code>AITask</code>。</td><td>范围、版本、预览、执行和撤销状态与章节生成字段不同，避免大量空字段和错误耦合。</td></tr>
+            <tr><td>2026-08-16</td><td>格式等价建议确定性生成，语义建议由 Runtime 补充。</td><td>降低成本、保持可复现；模型不拥有写入权限。</td></tr>
+            <tr><td>2026-08-16</td><td>采用逐书快照与补偿回滚。</td><td>Calibre API 是写入权威且不与 Talebook SQLAlchemy session 共享事务。</td></tr>
+          </tbody></table></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
