@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import io
 import json
 import logging
 import re
 import threading
+import unicodedata
+import zipfile
 from typing import Any, Dict, Iterable, List, Optional
 
 from webserver.models import Skill, SkillRun, SkillVersion
@@ -19,6 +22,7 @@ LOG = logging.getLogger(__name__)
 MANIFEST_VERSION = "talebook.skill.v1"
 REQUIRED_MANIFEST_FIELDS = {
     "name",
+    "package_name",
     "description",
     "scope",
     "prerequisites",
@@ -48,6 +52,8 @@ TYPE_SCHEMA_KEYS = {
     "null": set(),
 }
 TERMINAL_STATUSES = {"succeeded", "failed", "cancelled"}
+MAX_SKILL_BODY_LINES = 500
+SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 class SkillValidationError(ValueError):
@@ -213,6 +219,7 @@ def validate_manifest(value: Any) -> Dict[str, Any]:
         raise SkillValidationError("manifest 字段无效" + ("：" + "；".join(details) if details else ""))
     manifest = {
         "name": _clean_text(value["name"], "name", 120),
+        "package_name": _clean_text(value["package_name"], "package_name", 64),
         "description": _clean_text(value["description"], "description", 500),
         "scope": _clean_text(value["scope"], "scope", 2_000),
         "prerequisites": _text_list(value["prerequisites"], "prerequisites"),
@@ -225,6 +232,8 @@ def validate_manifest(value: Any) -> Dict[str, Any]:
         "sources": value["sources"],
         "self_tests": value["self_tests"],
     }
+    if not SKILL_NAME_PATTERN.fullmatch(manifest["package_name"]):
+        raise SkillValidationError("package_name 只能使用小写字母、数字和单连字符，且不能以连字符开头或结尾")
     validate_schema_definition(manifest["input_schema"], "input_schema")
     validate_schema_definition(manifest["output_schema"], "output_schema")
     if manifest["input_schema"].get("type") != "object" or manifest["output_schema"].get("type") != "object":
@@ -291,6 +300,8 @@ def validate_version_payload(
 ) -> Dict[str, Any]:
     manifest = validate_manifest(manifest_value)
     markdown = _clean_text(markdown_value, "markdown", max_markdown_characters)
+    if len(markdown.splitlines()) > MAX_SKILL_BODY_LINES - 6:
+        raise SkillValidationError(f"SKILL.md 正文不能超过 {MAX_SKILL_BODY_LINES} 行")
     findings = scan_sensitive(manifest, markdown)
     hard_block = any(finding["hard_block"] for finding in findings)
     if findings and (hard_block or not sensitive_acknowledged):
@@ -298,9 +309,91 @@ def validate_version_payload(
     return {"manifest": manifest, "markdown": markdown, "findings": findings}
 
 
+def portable_skill_name(display_name: str, stable_id: str = "") -> str:
+    """Return a portable Agent Skills directory/frontmatter name."""
+    ascii_name = unicodedata.normalize("NFKD", display_name).encode("ascii", "ignore").decode("ascii")
+    name = re.sub(r"[^a-z0-9]+", "-", ascii_name.lower()).strip("-")
+    if not name:
+        seed = stable_id or display_name
+        name = f"skill-{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:8]}"
+    name = name[:63].rstrip("-")
+    if not name or not SKILL_NAME_PATTERN.fullmatch(name):
+        raise SkillValidationError("无法生成符合规则的 SKILL 名称")
+    return name
+
+
+def _portable_description(manifest: Dict[str, Any]) -> str:
+    description = manifest["description"].strip()
+    trigger = manifest["trigger"].strip()
+    combined = f"{description} Use when: {trigger}" if trigger else description
+    return combined[:1_024].rstrip()
+
+
+def build_skill_package(version: SkillVersion) -> Dict[str, Any]:
+    """Materialize one immutable DB version as a portable Agent Skills folder."""
+    manifest = version.manifest or {}
+    checked_manifest = validate_manifest(manifest)
+    body = _clean_text(version.markdown or "", "markdown", 40_000)
+    reference_note = (
+        "\n\n## Structured contract\n\n"
+        "Read `references/contract.json` when validating structured input, output, sources, or self-tests."
+    )
+    portable_body = body.rstrip() + reference_note
+    if len(portable_body.splitlines()) > MAX_SKILL_BODY_LINES:
+        raise SkillValidationError(f"SKILL.md 正文不能超过 {MAX_SKILL_BODY_LINES} 行")
+    name = checked_manifest["package_name"]
+    frontmatter = (
+        f"---\nname: {name}\ndescription: {json.dumps(_portable_description(checked_manifest), ensure_ascii=False)}\n---\n\n"
+    )
+    skill_markdown = frontmatter + portable_body + "\n"
+    contract = {
+        "input_schema": checked_manifest["input_schema"],
+        "output_schema": checked_manifest["output_schema"],
+        "sources": checked_manifest["sources"],
+        "self_tests": checked_manifest["self_tests"],
+    }
+    files = [
+        {
+            "path": "SKILL.md",
+            "content_type": "text/markdown",
+            "content": skill_markdown,
+            "size": len(skill_markdown.encode("utf-8")),
+        },
+        {
+            "path": "references/contract.json",
+            "content_type": "application/json",
+            "content": json.dumps(contract, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            "size": 0,
+        },
+    ]
+    files[1]["size"] = len(files[1]["content"].encode("utf-8"))
+    return {
+        "name": name,
+        "folder": name,
+        "filename": f"{name}-v{version.version}.zip",
+        "version": version.version,
+        "content_hash": version.content_hash,
+        "format": "agent-skills.v1",
+        "files": files,
+    }
+
+
+def build_skill_zip(package: Dict[str, Any]) -> bytes:
+    """Create a deterministic ZIP with one top-level skill folder."""
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for file in package["files"]:
+            info = zipfile.ZipInfo(f"{package['folder']}/{file['path']}", date_time=(2020, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, file["content"].encode("utf-8"))
+    return output.getvalue()
+
+
 def default_manifest(name: str = "未命名 SKILL", description: str = "描述这个 SKILL 解决的问题。") -> Dict[str, Any]:
     return {
         "name": name[:120],
+        "package_name": portable_skill_name(name),
         "description": description[:500],
         "scope": "说明适用任务、资源和边界。",
         "prerequisites": [],

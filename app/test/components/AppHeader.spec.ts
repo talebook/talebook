@@ -1,4 +1,3 @@
-// @vitest-environment nuxt
 import { mount } from '@vue/test-utils';
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createVuetify } from 'vuetify';

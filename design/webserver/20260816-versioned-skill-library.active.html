@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Talebook 创建者私有、可版本化、可试运行的 SKILL 沉淀方案。" />
+    <meta name="description" content="Talebook 创建者私有、可生成 Agent Skills ZIP、可查看下载删除、可版本化试运行的 SKILL 方案。" />
     <link rel="icon" href="data:," />
     <title>可版本化、可试运行的 SKILL 沉淀 · ACTIVE</title>
     <style>
@@ -31,7 +31,7 @@
   <body>
     <header>
       <h1>可版本化、可试运行的 SKILL 沉淀</h1>
-      <p>把一次有效的 AI 工作方法变成创建者私有、结构明确、可审阅回滚且只能在隔离运行时手动执行的资产。</p>
+      <p>把一次有效的 AI 工作方法变成符合 Agent Skills 目录规范、可查看与下载 ZIP、可删除，并可审阅回滚和隔离试运行的创建者私有资产。</p>
       <div class="meta">
         <span>状态：ACTIVE</span><span>创建日期：2026-08-16</span><span>所属模块：webserver / app</span>
         <span>需求来源：TB-56</span><span>基线：feat/ai_1.0</span>
@@ -41,19 +41,21 @@
       <section>
         <h2>1. 原始诉求</h2>
         <p>“支持从已完成的 AI 成果/任务生成 SKILL 草稿，也支持空白模板创建；提供结构化字段与 Markdown 编辑、预览、样例试运行、草稿/启用/停用、版本记录和回滚；AI 中心提供创建者私有的列表、搜索、版本和手动运行，并展示版本、输入摘要、授权上下文、进度与唯一终态。”</p>
+        <p><strong>评审反馈：</strong>初版把数据库 manifest 当作产品本体，不符合 Agent Skills 的自包含目录规则。核心流程必须是生成 SKILL ZIP、查看包内文件、下载与删除；每个 ZIP 必须有单一同名根目录、必需的 <code>SKILL.md</code>，以及真正需要时才加载的 <code>scripts/</code>、<code>references/</code>、<code>assets/</code>。</p>
       </section>
       <section>
         <h2>2. 目标与边界</h2>
         <table>
           <thead><tr><th>首版交付</th><th>明确不做</th></tr></thead>
-          <tbody><tr><td>manifest 与 Markdown 双表示、不可变版本、启停/回滚、敏感信息门禁、输入输出 schema 校验、Codex app-server 试运行与手动运行、私有列表和运行记录。</td><td>公开市场、团队共享、远程导入、后台静默触发、自我修改、任意脚本/依赖安装、MCP、任意系统写入。</td></tr></tbody>
+          <tbody><tr><td>以 Agent Skills 文件夹为交付本体；生成、查看、下载 ZIP、删除；严格 hyphen-case 包名；<code>SKILL.md</code> 仅含 <code>name</code>/<code>description</code> frontmatter；按需引用 <code>references/contract.json</code>。数据库继续承担私有版本、启停/回滚、敏感信息门禁、schema 校验、试运行和运行记录。</td><td>公开市场、团队共享、远程导入、上传任意 ZIP、后台静默触发、自我修改、任意脚本/依赖安装、MCP、任意系统写入。</td></tr></tbody>
         </table>
       </section>
       <section>
         <h2>3. 产品流程</h2>
         <div class="flow">
-          <article><strong>起草</strong><br />从空白模板或本人已成功 AI 任务提取最小来源摘要，不复制整段正文或会话。</article>
-          <article><strong>审阅保存</strong><br />编辑结构化 manifest 与 Markdown；先校验必填项/schema，再扫描密钥、邮箱与本地路径。</article>
+          <article><strong>生成</strong><br />从空白模板或本人已成功 AI 任务提取最小来源摘要，生成可下载的 Agent Skills 文件夹版本，不复制整段正文或会话。</article>
+          <article><strong>查看与保存</strong><br />编辑显示名、hyphen-case 包名、结构字段与 Markdown；查看 <code>SKILL.md</code> 和引用文件，保存即生成不可变新版 ZIP。</article>
+          <article><strong>下载或删除</strong><br />下载精确保存版本的 ZIP；删除前明确确认，删除 SKILL、版本和终态运行记录，活跃运行必须先取消。</article>
           <article><strong>试运行</strong><br />指定不可变版本和样例输入；运行前重验 owner、状态、schema 与授权上下文。</article>
           <article><strong>启用复用</strong><br />试运行成功后才能启用；每次保存产生新版本，可停用或回滚为新的当前版本。</article>
         </div>
@@ -65,7 +67,8 @@
       </section>
       <section>
         <h2>5. manifest 与 API</h2>
-        <p>manifest 必含名称、描述、适用范围、前提、触发说明、输入 schema、步骤、术语/例子、失败条件、输出 schema、来源与自测；只接受 JSON Schema 的安全子集。API 使用 <code>/api/ai/skills</code>、<code>/api/ai/skills/:id</code>、<code>/versions</code>、<code>/rollback</code>、<code>/status</code>、<code>/runs</code> 和 <code>/runs/:id/cancel</code>，所有入口均需登录且以当前用户过滤。</p>
+        <p>manifest 必含显示名、符合 <code>^[a-z0-9]+(?:-[a-z0-9]+)*$</code> 且不超过 64 位的包名、描述、适用范围、前提、触发说明、输入 schema、步骤、术语/例子、失败条件、输出 schema、来源与自测；只接受 JSON Schema 的安全子集。物化后的 ZIP 以包名作为唯一根目录；<code>SKILL.md</code> frontmatter 只写同名 <code>name</code> 与同时说明用途和触发时机的 <code>description</code>，正文限制 500 行，并明确何时读取 <code>references/contract.json</code>。</p>
+        <p>API 在原有创建、详情、版本、回滚、状态与运行端点外，增加 <code>/api/ai/skills/:id/package</code> 查看精确保存版本的文件列表与内容，以及 <code>/api/ai/skills/:id/download</code> 下载确定性 ZIP；删除继续使用详情端点的 <code>DELETE</code>。所有入口均需登录并以当前 owner 过滤。</p>
       </section>
       <section>
         <h2>6. 运行时与权限</h2>
@@ -77,12 +80,12 @@
         <ul>
           <li>保存前扫描常见 API key、token、私钥、邮箱、Unix/Windows 用户路径；默认拒绝，并返回类别与字段位置，不回显完整命中值。</li>
           <li>来源和 Markdown 明确作为不可信数据，不可覆盖系统指令；不接受脚本、依赖、工具声明或远程 URL 导入。</li>
-          <li>限制 manifest/Markdown/input/output 大小、schema 深度与步骤数量；日志和错误不持久化提示词、输入正文、凭据或进程原始输出。</li>
+          <li>限制 manifest/Markdown/input/output 大小、SKILL 正文行数、schema 深度与步骤数量；ZIP 路径由服务端静态生成，禁止用户路径穿越；日志和错误不持久化提示词、输入正文、凭据或进程原始输出。</li>
         </ul>
       </section>
       <section>
         <h2>8. 界面</h2>
-        <p>登录用户可从导航进入 AI 中心：搜索和状态筛选在左侧列表，右侧编辑名称/描述、结构字段和 Markdown，可查看版本、预览、试运行、启停与回滚。运行卡明确显示 SKILL 版本、输入摘要、授权上下文、进度与一个终态；亮暗主题、320px 重排、键盘路径、错误与空态纳入验证。</p>
+        <p>登录用户可从导航进入“SKILL 生成器”：搜索和状态筛选在左侧列表，右侧把“下载 ZIP”“删除 SKILL”设为直接动作，并提供“文件包”标签查看 <code>SKILL.md</code> 与 <code>references/contract.json</code>。编辑器分离显示名和包名，保存动作明确为“保存并生成新版 ZIP”；版本、预览、试运行、启停与回滚作为扩展能力保留。亮暗主题、390px 重排、键盘路径、删除确认、错误与空态纳入验证。</p>
       </section>
       <section>
         <h2>9. 风险与兼容性</h2>
@@ -97,11 +100,12 @@
         <table>
           <thead><tr><th>检查</th><th>结果</th></tr></thead>
           <tbody>
-            <tr><td><code>python3 -m unittest tests.test_skill_library -v</code>（生产镜像挂载当前代码）</td><td>11 项通过；覆盖 owner 隔离、起草、敏感扫描、schema、版本、试运行门禁、回滚、取消、超时、非法输出、运行终态与删除级联。</td></tr>
+            <tr><td><code>python3 -m unittest tests.test_skill_library -v</code>（生产镜像挂载当前代码）</td><td>14 项通过；新增覆盖包名规则、500 行渐进披露限制、文件查看、ZIP 目录/frontmatter/引用内容、下载响应与确定性字节；原有 owner 隔离、版本、试运行、运行终态和删除级联继续通过。</td></tr>
             <tr><td><code>python3 -m unittest tests.test_summary_duck -v</code>（生产镜像挂载当前代码）</td><td>16 项通过；统一 Runtime 与 Codex 协议回归通过。</td></tr>
-            <tr><td><code>npx vitest run test/components/SkillLibraryPage.spec.ts</code>；<code>npx vitest run test/components/AppHeader.spec.ts</code></td><td>分别 4 项、5 项通过；Nuxt 测试环境仍输出既有 i18n 加载警告，不影响断言。</td></tr>
-            <tr><td><code>npx playwright test test/e2e/skill-library.spec.ts --update-snapshots</code></td><td>Chromium 2 项通过；验证亮色桌面、暗色 390px 移动端、编辑器与运行契约，并生成两张基线截图。</td></tr>
-            <tr><td><code>npm run lint</code>；<code>npm run build</code></td><td>均通过；lint 为 0 error、193 个仓库既有 warning，构建仅保留既有 browserslist 与 chunk-size warning。</td></tr>
+            <tr><td><code>npx vitest run test/components/SkillLibraryPage.spec.ts test/components/AppHeader.spec.ts</code></td><td>2 个文件、11 项通过：SKILL 组件 6 项覆盖 locale 结构、查看文件、下载链接和删除确认；AppHeader 5 项回归通过。为 Nuxt 4 下未落盘的 i18n 虚拟模板增加 Vitest 夹具，避免收集阶段缓存竞态。</td></tr>
+            <tr><td><code>skill-creator/scripts/quick_validate.py &lt;generated-skill&gt;</code></td><td>使用生产生成函数物化真实目录后返回 <code>Skill is valid!</code>；非手写替代样例。</td></tr>
+            <tr><td><code>npx playwright test test/e2e/skill-library.spec.ts --update-snapshots</code></td><td>2 项通过；验证新版生成器、文件查看、亮色桌面与暗色 390px 移动端，两张截图基线已更新并人工复核。</td></tr>
+            <tr><td><code>npm run lint</code>；<code>npm run build</code></td><td>均通过；lint 为 0 error、193 个仓库既有 warning，完整 Nuxt 客户端与 Nitro 服务端构建成功。</td></tr>
             <tr><td><code>ruff check …</code>；<code>python3 -m py_compile …</code>；<code>git diff --check</code></td><td>均通过。</td></tr>
           </tbody>
         </table>
@@ -110,7 +114,7 @@
       </section>
       <section>
         <h2>11. interface-review full</h2>
-        <p>范围为 <code>origin/feat/ai_1.0</code>（<code>7207cf49ddf5b2a4b6dd5bc6fb1230b61c62a08f</code>）到当前工作树的全部本地变更；排除生成截图与构建产物，展开检查了 SKILL 工作台、导航入口、默认布局主区域、亮暗主题和 390px 窄屏。Accessibility、Layout、Writing、Typography、Colors、UI 六个领域均完成检查。</p>
+        <p>完整审查范围为 <code>origin/feat/ai_1.0</code>（merge base：<code>7207cf49ddf5b2a4b6dd5bc6fb1230b61c62a08f</code>）到当前工作树的全部实现差异，排除截图二进制和测试生成物。</p>
         <table>
           <thead><tr><th>初次发现</th><th>处理</th></tr></thead>
           <tbody>
@@ -119,13 +123,15 @@
             <tr><td>MEDIUM：从任务创建使用泛化“确认”动作词。</td><td>改为结果明确的“创建 SKILL”。</td></tr>
             <tr><td>MEDIUM：载入历史版本或保留未保存修改时，仍可启用/运行当前已保存版本，容易误判实际执行内容。</td><td>显式标记未保存或正在查看的版本，并在编辑器与当前版本不同步时禁用启用、试运行和手动运行。</td></tr>
             <tr><td>MEDIUM：列表选择/焦点和方向相关样式依赖物理左边。</td><td>增加 <code>aria-pressed</code> 与完整焦点轮廓，改用逻辑边框和 <code>text-align: start</code>。</td></tr>
+            <tr><td>MEDIUM：文件选中态只依赖颜色；ZIP 下载在包信息载入前临时指向 <code>#</code>。</td><td>选中项增加边线、字重和 <code>aria-pressed</code>；下载动作增加加载态并在 URL 可用前禁用。</td></tr>
+            <tr><td>MEDIUM：生成/创建术语不一致，移动端包名提示会被浮动操作区遮挡。</td><td>核心流程统一为“生成”，缩短提示并为窄屏增加安全右侧留白；修正 i18n 命名空间并加 locale 结构测试。</td></tr>
           </tbody>
         </table>
-        <p>修复后重新执行完整界面审查和 Playwright 渲染验证，未留下 HIGH、MEDIUM 或其他可执行的本次变更问题，最终结论：<strong>Approve</strong>。曾考虑增加页面级动画、扩大卡片阴影和改变 Vuetify 密度；这些会增加高频操作注意成本或偏离既有组件系统，故不采纳。</p>
+        <p><strong>最终结论：Approve。</strong>完整复审与真实 Chromium 双视口渲染后无遗留 HIGH 或 MEDIUM 问题；Chrome DevTools MCP 不可用的工具限制已在测试结果中单独记录。</p>
       </section>
       <section>
         <h2>12. 决策记录</h2>
-        <p>Issue 已明确产品边界，未再阻塞等待选择：首版采用通用但受限的 JSON Schema 子集；启用前要求至少一次当前版本试运行成功；“从成果生成”只提取本人成功任务的类型、版本和结果结构摘要，避免复制正文；回滚产生新版本以保留完整审计链。</p>
+        <p>Issue 已明确产品边界，未再阻塞等待选择：首版采用通用但受限的 JSON Schema 子集；启用前要求至少一次当前版本试运行成功；“从成果生成”只提取本人成功任务的类型、版本和结果结构摘要，避免复制正文；回滚产生新版本以保留完整审计链。评审反馈后纠正产品本体：数据库 manifest 是编辑、版本与运行的权威来源，但用户交付物是符合 Agent Skills 规则的自包含 ZIP；查看、下载和删除成为核心动作，试运行与启停是附加能力。</p>
       </section>
     </main>
   </body>

@@ -144,6 +144,24 @@
                         </div>
                         <div class="editor-actions">
                             <v-btn
+                                variant="outlined"
+                                prepend-icon="mdi-download"
+                                :href="packageDownloadUrl"
+                                :disabled="!packageInfo"
+                                data-testid="download-skill-package"
+                            >
+                                {{ t('skills.downloadZip') }}
+                            </v-btn>
+                            <v-btn
+                                color="error"
+                                variant="text"
+                                prepend-icon="mdi-delete-outline"
+                                data-testid="delete-skill"
+                                @click="deleteDialog = true"
+                            >
+                                {{ t('skills.deleteSkill') }}
+                            </v-btn>
+                            <v-btn
                                 v-if="selected.status !== 'disabled'"
                                 variant="text"
                                 @click="changeStatus('disabled')"
@@ -187,6 +205,9 @@
                         <v-tab value="preview">
                             {{ t('skills.preview') }}
                         </v-tab>
+                        <v-tab value="package">
+                            {{ t('skills.packageFiles') }}
+                        </v-tab>
                         <v-tab value="versions">
                             {{ t('skills.versions') }}
                         </v-tab>
@@ -202,6 +223,14 @@
                                     v-model="editor.name"
                                     :label="t('skills.name')"
                                     counter="120"
+                                />
+                                <v-text-field
+                                    v-model="editor.packageName"
+                                    class="package-name-field"
+                                    :label="t('skills.packageName')"
+                                    :hint="t('skills.packageNameHint')"
+                                    persistent-hint
+                                    counter="64"
                                 />
                                 <v-text-field
                                     v-model="editor.description"
@@ -343,6 +372,59 @@
                                 <h3>{{ t('skills.markdownBody') }}</h3>
                                 <pre>{{ editor.markdown }}</pre>
                             </article>
+                        </v-window-item>
+
+                        <v-window-item value="package">
+                            <v-progress-linear
+                                v-if="packageLoading"
+                                indeterminate
+                                color="primary"
+                                :aria-label="t('skills.packageLoading')"
+                            />
+                            <section
+                                v-else-if="packageInfo"
+                                class="package-browser"
+                                data-testid="skill-package-browser"
+                            >
+                                <div class="package-heading">
+                                    <div>
+                                        <p class="eyebrow">
+                                            {{ t('skills.portablePackage') }}
+                                        </p>
+                                        <h3>{{ packageInfo.filename }}</h3>
+                                        <p>{{ t('skills.packageHint', { version: packageInfo.version }) }}</p>
+                                    </div>
+                                    <v-btn
+                                        color="primary"
+                                        prepend-icon="mdi-download"
+                                        :href="packageDownloadUrl"
+                                    >
+                                        {{ t('skills.downloadZip') }}
+                                    </v-btn>
+                                </div>
+                                <div class="package-layout">
+                                    <nav :aria-label="t('skills.packageFiles')">
+                                        <button
+                                            v-for="file in packageInfo.files"
+                                            :key="file.path"
+                                            type="button"
+                                            class="package-file"
+                                            :class="{ active: activePackagePath === file.path }"
+                                            :aria-pressed="activePackagePath === file.path"
+                                            @click="activePackagePath = file.path"
+                                        >
+                                            <span>{{ file.path }}</span>
+                                            <small>{{ file.size }} B</small>
+                                        </button>
+                                    </nav>
+                                    <article>
+                                        <div class="package-file-title">
+                                            {{ activePackageFile?.path }}
+                                        </div>
+                                        <pre>{{ activePackageFile?.content }}</pre>
+                                    </article>
+                                </div>
+                            </section>
                         </v-window-item>
 
                         <v-window-item value="versions">
@@ -539,6 +621,30 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
+
+        <v-dialog
+            v-model="deleteDialog"
+            max-width="520"
+        >
+            <v-card>
+                <v-card-title>{{ t('skills.deleteTitle', { name: selected?.name }) }}</v-card-title>
+                <v-card-text>{{ t('skills.deleteHint') }}</v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn @click="deleteDialog = false">
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                    <v-btn
+                        color="error"
+                        :loading="deleting"
+                        data-testid="confirm-delete-skill"
+                        @click="confirmDelete"
+                    >
+                        {{ t('skills.deleteSkill') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -580,14 +686,35 @@ interface SkillRun {
     error?: { code: string; message: string };
 }
 
+interface SkillPackageFile {
+    path: string;
+    content_type: string;
+    content: string;
+    size: number;
+}
+
+interface SkillPackage {
+    name: string;
+    folder: string;
+    filename: string;
+    version: number;
+    format: string;
+    download_url: string;
+    files: SkillPackageFile[];
+}
+
 const { t } = useI18n();
 const { $backend } = useNuxtApp();
 const skills = ref<SkillSummary[]>([]);
 const selected = ref<SkillDetail | null>(null);
 const versions = ref<SkillVersion[]>([]);
 const runs = ref<SkillRun[]>([]);
+const packageInfo = ref<SkillPackage | null>(null);
+const activePackagePath = ref('SKILL.md');
 const loadingList = ref(false);
+const packageLoading = ref(false);
 const saving = ref(false);
+const deleting = ref(false);
 const query = ref('');
 const statusFilter = ref('');
 const tab = ref('edit');
@@ -597,6 +724,7 @@ const sourceTaskId = ref('');
 const rollbackDialog = ref(false);
 const rollbackTarget = ref(0);
 const discardDialog = ref(false);
+const deleteDialog = ref(false);
 const editorBaseline = ref('');
 const editorVersion = ref(0);
 let pendingDiscardAction: null | (() => Promise<void> | void) = null;
@@ -606,7 +734,7 @@ const runInput = ref('{\n  "content": ""\n}');
 const pollTimers = new Map<string, ReturnType<typeof setInterval>>();
 
 const editor = reactive({
-    name: '', description: '', scope: '', trigger: '', prerequisites: '', steps: '', termsExamples: '',
+    name: '', packageName: '', description: '', scope: '', trigger: '', prerequisites: '', steps: '', termsExamples: '',
     failureConditions: '', inputSchema: '{}', outputSchema: '{}', sources: '[]', selfTests: '[]', markdown: '',
 });
 
@@ -622,6 +750,10 @@ const editorMatchesCurrentVersion = computed(
     () => Boolean(selected.value) && editorVersion.value === selected.value?.current_version,
 );
 const editorReadyToRun = computed(() => editorMatchesCurrentVersion.value && !hasUnsavedChanges.value);
+const packageDownloadUrl = computed(() => packageInfo.value?.download_url || '#');
+const activePackageFile = computed(
+    () => packageInfo.value?.files.find(file => file.path === activePackagePath.value) || packageInfo.value?.files[0],
+);
 
 onMounted(loadSkills);
 onBeforeUnmount(() => pollTimers.forEach(timer => clearInterval(timer)));
@@ -665,7 +797,7 @@ async function selectSkill(id: string) {
         const response = await request(`/ai/skills/${id}`);
         selected.value = response.skill;
         loadVersionIntoEditor(response.skill.version);
-        await Promise.all([loadVersions(), loadRuns()]);
+        await Promise.all([loadVersions(), loadRuns(), loadPackage()]);
     } catch (error) {
         errorMessage.value = messageOf(error);
     }
@@ -701,6 +833,7 @@ async function createSkill(payload: Record<string, unknown>) {
 function buildManifest() {
     return {
         name: editor.name,
+        package_name: editor.packageName,
         description: editor.description,
         scope: editor.scope,
         prerequisites: splitLines(editor.prerequisites),
@@ -732,7 +865,7 @@ async function saveVersion() {
         );
         selected.value = response.skill;
         loadVersionIntoEditor(response.skill.version);
-        await Promise.all([loadSkills(), loadVersions(), loadRuns()]);
+        await Promise.all([loadSkills(), loadVersions(), loadRuns(), loadPackage()]);
     } catch (error) {
         errorMessage.value = messageOf(error);
     } finally {
@@ -743,6 +876,7 @@ async function saveVersion() {
 function loadVersionIntoEditor(version: SkillVersion) {
     const manifest = version.manifest;
     editor.name = manifest.name || '';
+    editor.packageName = manifest.package_name || '';
     editor.description = manifest.description || '';
     editor.scope = manifest.scope || '';
     editor.trigger = manifest.trigger || '';
@@ -803,6 +937,18 @@ async function loadRuns() {
     response.runs.filter((run: SkillRun) => ['queued', 'running'].includes(run.status)).forEach(startPolling);
 }
 
+async function loadPackage() {
+    if (!selected.value) return;
+    packageLoading.value = true;
+    try {
+        const response = await request(`/ai/skills/${selected.value.id}/package?version=${selected.value.current_version}`);
+        packageInfo.value = response.package;
+        activePackagePath.value = response.package.files[0]?.path || '';
+    } finally {
+        packageLoading.value = false;
+    }
+}
+
 async function changeStatus(status: string) {
     if (!selected.value) return;
     errorMessage.value = '';
@@ -835,7 +981,7 @@ async function confirmRollback() {
         selected.value = response.skill;
         loadVersionIntoEditor(response.skill.version);
         rollbackDialog.value = false;
-        await Promise.all([loadSkills(), loadVersions(), loadRuns()]);
+        await Promise.all([loadSkills(), loadVersions(), loadRuns(), loadPackage()]);
     } catch (error) {
         errorMessage.value = messageOf(error);
     }
@@ -885,6 +1031,27 @@ async function cancelRun(run: SkillRun) {
         if (index >= 0) runs.value[index] = response.run;
     } catch (error) {
         errorMessage.value = messageOf(error);
+    }
+}
+
+async function confirmDelete() {
+    if (!selected.value) return;
+    deleting.value = true;
+    errorMessage.value = '';
+    try {
+        await request(`/ai/skills/${selected.value.id}`, jsonOptions('DELETE', {}));
+        pollTimers.forEach(timer => clearInterval(timer));
+        pollTimers.clear();
+        selected.value = null;
+        packageInfo.value = null;
+        versions.value = [];
+        runs.value = [];
+        deleteDialog.value = false;
+        await loadSkills();
+    } catch (error) {
+        errorMessage.value = messageOf(error);
+    } finally {
+        deleting.value = false;
     }
 }
 
@@ -971,6 +1138,20 @@ function authorizationSummary(context: Record<string, any>) {
 .skill-preview h3 { margin: 28px 0 8px; }
 .preview-description { max-width: 760px; color: rgb(var(--v-theme-on-surface-variant)); font-size: 18px; }
 .preview-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+.package-browser { overflow: hidden; border: 1px solid rgb(var(--v-theme-surface-variant)); border-radius: 18px; }
+.package-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px; border-block-end: 1px solid rgb(var(--v-theme-surface-variant)); background: rgba(var(--v-theme-primary), .06); }
+.package-heading h3,.package-heading p { margin: 0; }
+.package-heading h3 { overflow-wrap: anywhere; }
+.package-heading p:not(.eyebrow) { margin-top: 5px; color: rgb(var(--v-theme-on-surface-variant)); font-size: 13px; }
+.package-layout { display: grid; grid-template-columns: minmax(190px, 260px) minmax(0, 1fr); min-height: 430px; }
+.package-layout nav { border-inline-end: 1px solid rgb(var(--v-theme-surface-variant)); background: rgba(var(--v-theme-surface-variant), .14); }
+.package-file { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; color: inherit; border: 0; border-block-end: 1px solid rgba(var(--v-theme-on-surface), .08); border-inline-start: 3px solid transparent; background: transparent; cursor: pointer; text-align: start; }
+.package-file:hover,.package-file:focus-visible,.package-file.active { background: rgba(var(--v-theme-primary), .1); }
+.package-file.active { border-inline-start-color: rgb(var(--v-theme-primary)); font-weight: 700; }
+.package-file:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -3px; }
+.package-file small { color: rgb(var(--v-theme-on-surface-variant)); white-space: nowrap; }
+.package-layout article { min-width: 0; padding: 18px; }
+.package-file-title { margin-bottom: 10px; font-weight: 750; }
 pre { max-width: 100%; padding: 16px; overflow: auto; border-radius: 12px; background: rgba(var(--v-theme-on-surface), .07); font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
 .version-list,.run-list { display: grid; gap: 12px; }
 .run-console { margin-bottom: 18px; padding: 18px; border: 1px solid rgb(var(--v-theme-surface-variant)); border-radius: 16px; background: rgba(var(--v-theme-primary), .05); }
@@ -981,10 +1162,11 @@ pre { max-width: 100%; padding: 16px; overflow: auto; border-radius: 12px; backg
 .run-metadata dt { color: rgb(var(--v-theme-on-surface-variant)); font-size: 11px; font-weight: 750; text-transform: uppercase; }
 .run-metadata dd { margin: 4px 0 0; overflow-wrap: anywhere; }
 @media (max-width: 900px) {
-    .skill-hero,.editor-heading,.run-console-heading { align-items: stretch; flex-direction: column; }
+    .skill-hero,.editor-heading,.run-console-heading,.package-heading { align-items: stretch; flex-direction: column; }
     .skill-workbench { grid-template-columns: 1fr; }
     .skill-list-panel { max-height: 360px; overflow: auto; border-block-end: 1px solid rgb(var(--v-theme-surface-variant)); border-inline-end: 0; }
-    .editor-grid,.schema-grid,.preview-columns,.run-metadata { grid-template-columns: 1fr; }
+    .editor-grid,.schema-grid,.preview-columns,.run-metadata,.package-layout { grid-template-columns: 1fr; }
+    .package-layout nav { border-block-end: 1px solid rgb(var(--v-theme-surface-variant)); border-inline-end: 0; }
 }
 @media (max-width: 520px) {
     .skill-page { padding: 8px 0 28px; }
@@ -992,6 +1174,7 @@ pre { max-width: 100%; padding: 16px; overflow: auto; border-radius: 12px; backg
     .skill-hero,.skill-editor-panel { padding: 19px 16px; }
     .hero-actions,.editor-actions,.run-actions { display: grid; grid-template-columns: 1fr; }
     .hero-actions :deep(.v-btn),.editor-actions :deep(.v-btn),.run-actions :deep(.v-btn) { width: 100%; }
+    .package-name-field :deep(.v-messages) { padding-inline-end: 52px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 </style>

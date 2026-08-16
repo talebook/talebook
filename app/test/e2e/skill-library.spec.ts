@@ -12,6 +12,7 @@ const version = {
     markdown: '# 阅读摘要整理\n\n聚焦中心判断、关键机制、证据、边界与含义。',
     manifest: {
         name: '阅读摘要整理',
+        package_name: 'reading-summary',
         description: '把长篇阅读内容整理为有证据边界的固定格式摘要。',
         scope: '适用于读书笔记、章节复盘和研究材料整理；不补充输入之外的事实。',
         prerequisites: ['输入包含可理解的正文'],
@@ -65,12 +66,37 @@ const run = {
     finished_at: '2026-08-16T08:35:08',
 };
 
+const packageInfo = {
+    name: 'reading-summary',
+    folder: 'reading-summary',
+    filename: 'reading-summary-v3.zip',
+    version: 3,
+    content_hash: version.content_hash,
+    format: 'agent-skills.v1',
+    download_url: `/api/ai/skills/${skillId}/download?version=3`,
+    files: [
+        {
+            path: 'SKILL.md',
+            content_type: 'text/markdown',
+            size: 286,
+            content: '---\nname: reading-summary\ndescription: "把阅读内容整理为固定格式。 Use when: 手动整理阅读材料"\n---\n\n# 阅读摘要整理\n\n按证据边界完成摘要。',
+        },
+        {
+            path: 'references/contract.json',
+            content_type: 'application/json',
+            size: 162,
+            content: '{\n  "input_schema": { "type": "object" },\n  "output_schema": { "type": "object" }\n}',
+        },
+    ],
+};
+
 async function routeSkills(page: Page) {
     await page.route('**/api/ai/skills**', async (route) => {
         const request = route.request();
         const path = new URL(request.url()).pathname;
         let body;
         if (path === '/api/ai/skills') body = { err: 'ok', skills: [skill] };
+        else if (path.endsWith('/package')) body = { err: 'ok', package: packageInfo };
         else if (path.endsWith('/versions')) body = { err: 'ok', versions: [version] };
         else if (path.endsWith('/runs')) body = { err: 'ok', runs: [run] };
         else if (path === `/api/ai/skills/${skillId}`) body = { err: 'ok', skill };
@@ -86,9 +112,14 @@ test.beforeEach(async ({ page, request }) => {
 
 test('renders the versioned SKILL editor and complete run contract in light theme', async ({ page }) => {
     await page.goto('/ai/skills');
-    await expect(page.getByRole('heading', { name: 'SKILL 工作台' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'SKILL 生成器' })).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: /阅读摘要整理/ }).click();
     await expect(page.getByLabel('名称')).toHaveValue('阅读摘要整理');
+    await expect(page.getByRole('link', { name: '下载 ZIP' })).toHaveAttribute('href', packageInfo.download_url);
+
+    await page.getByRole('tab', { name: '文件包' }).click();
+    await expect(page.getByTestId('skill-package-browser')).toContainText('SKILL.md');
+    await expect(page.getByTestId('skill-package-browser')).toContainText('name: reading-summary');
     await expect(page.locator('.skill-workbench')).toHaveScreenshot('skill-library-light.png', { animations: 'disabled' });
 
     await page.getByRole('tab', { name: '运行' }).click();
@@ -107,5 +138,5 @@ test('keeps the workbench readable in dark theme and at mobile width', async ({ 
     await expect(page.locator('.skill-workbench')).toHaveScreenshot('skill-library-dark-mobile.png', {
         animations: 'disabled',
     });
-    await expect(page.getByRole('button', { name: '保存新版本' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '保存并生成新版 ZIP' })).toBeVisible();
 });

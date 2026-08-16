@@ -12,6 +12,8 @@ from webserver.services.skill_library import (
     SensitiveContentError,
     SkillRunService,
     SkillValidationError,
+    build_skill_package,
+    build_skill_zip,
     content_hash,
     default_manifest,
     run_dict,
@@ -265,6 +267,53 @@ class SkillItem(_SkillBase):
         return {"err": "ok", "msg": "SKILL 已删除"}
 
 
+class SkillPackage(_SkillBase):
+    @js
+    @auth
+    def get(self, skill_id):
+        skill = self._own_skill(skill_id)
+        if not skill:
+            return {"err": "skill.not_found", "msg": "SKILL 不存在"}
+        try:
+            version_number = int(self.get_argument("version", skill.current_version))
+        except (TypeError, ValueError):
+            return {"err": "params.invalid", "msg": "version 无效"}
+        version = self._version(skill, version_number)
+        if not version:
+            return {"err": "skill.version_not_found", "msg": "SKILL 版本不存在"}
+        try:
+            package = build_skill_package(version)
+        except SkillValidationError as exc:
+            return _error(exc)
+        package["download_url"] = f"/api/ai/skills/{skill.id}/download?version={version.version}"
+        return {"err": "ok", "package": package}
+
+
+class SkillDownload(_SkillBase):
+    @js
+    @auth
+    def get(self, skill_id):
+        skill = self._own_skill(skill_id)
+        if not skill:
+            return {"err": "skill.not_found", "msg": "SKILL 不存在"}
+        try:
+            version_number = int(self.get_argument("version", skill.current_version))
+        except (TypeError, ValueError):
+            return {"err": "params.invalid", "msg": "version 无效"}
+        version = self._version(skill, version_number)
+        if not version:
+            return {"err": "skill.version_not_found", "msg": "SKILL 版本不存在"}
+        try:
+            package = build_skill_package(version)
+            payload = build_skill_zip(package)
+        except SkillValidationError as exc:
+            return _error(exc)
+        self.set_header("Content-Type", "application/zip")
+        self.set_header("Content-Disposition", f'attachment; filename="{package["filename"]}"')
+        self.set_header("X-Content-Type-Options", "nosniff")
+        return payload
+
+
 class SkillVersions(_SkillBase):
     @js
     @auth
@@ -484,6 +533,8 @@ class SkillRunCancel(_SkillBase):
 def routes():
     return [
         (r"/api/ai/skills", SkillCollection),
+        (r"/api/ai/skills/([0-9a-f-]+)/package", SkillPackage),
+        (r"/api/ai/skills/([0-9a-f-]+)/download", SkillDownload),
         (r"/api/ai/skills/([0-9a-f-]+)", SkillItem),
         (r"/api/ai/skills/([0-9a-f-]+)/versions", SkillVersions),
         (r"/api/ai/skills/([0-9a-f-]+)/rollback", SkillRollback),

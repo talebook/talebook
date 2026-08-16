@@ -1,5 +1,7 @@
+import io
 import json
 import unittest
+import zipfile
 from unittest import mock
 
 from tests import test_main
@@ -15,6 +17,8 @@ from webserver.services.skill_library import (
     SensitiveContentError,
     SkillRunService,
     SkillValidationError,
+    build_skill_package,
+    build_skill_zip,
     default_manifest,
     validate_schema_definition,
     validate_schema_value,
@@ -68,6 +72,17 @@ class SkillManifestValidationTest(unittest.TestCase):
         self.assertFalse(email.exception.hard_block)
         checked = validate_version_payload(manifest, "联系 reader@example.com 获取样例", True)
         self.assertEqual(checked["findings"][0]["kind"], "email")
+
+    def test_skill_body_respects_progressive_disclosure_limit(self):
+        manifest = default_manifest()
+        with self.assertRaisesRegex(SkillValidationError, "500 行"):
+            validate_version_payload(manifest, "\n".join(f"step {index}" for index in range(500)), False)
+
+    def test_package_name_must_match_agent_skills_hyphen_case(self):
+        manifest = default_manifest()
+        manifest["package_name"] = "Bad_Name"
+        with self.assertRaisesRegex(SkillValidationError, "package_name"):
+            validate_version_payload(manifest, "# Invalid package name", False)
 
 
 class FakeRuntime:
@@ -189,6 +204,37 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         self.assertIn("skill-source-fixture", serialized)
         self.assertNotIn("不应复制的正文", serialized)
         self.assertNotIn("reader@example.com", serialized)
+
+    def test_view_and_download_portable_skill_package(self):
+        skill = self._create()["skill"]
+        package_response = self.json(f"/api/ai/skills/{skill['id']}/package")
+        self.assertEqual(package_response["err"], "ok")
+        package = package_response["package"]
+        self.assertRegex(package["name"], r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+        self.assertLessEqual(len(package["name"]), 64)
+        self.assertEqual([item["path"] for item in package["files"]], ["SKILL.md", "references/contract.json"])
+        skill_md = package["files"][0]["content"]
+        frontmatter = skill_md.split("---", 2)[1]
+        self.assertEqual([line.split(":", 1)[0] for line in frontmatter.strip().splitlines()], ["name", "description"])
+        self.assertIn(f"name: {package['name']}", skill_md)
+        self.assertIn("references/contract.json", skill_md)
+
+        downloaded = self.fetch(package["download_url"])
+        self.assertEqual(downloaded.code, 200)
+        self.assertEqual(downloaded.headers["Content-Type"], "application/zip")
+        self.assertIn(package["filename"], downloaded.headers["Content-Disposition"])
+        with zipfile.ZipFile(io.BytesIO(downloaded.body)) as archive:
+            self.assertEqual(
+                archive.namelist(),
+                [f"{package['name']}/SKILL.md", f"{package['name']}/references/contract.json"],
+            )
+            self.assertEqual(archive.read(f"{package['name']}/SKILL.md").decode(), skill_md)
+            contract = json.loads(archive.read(f"{package['name']}/references/contract.json"))
+            self.assertEqual(contract["input_schema"]["type"], "object")
+
+        session = test_main.get_db()
+        version = session.get(models.SkillVersion, skill["version"]["id"])
+        self.assertEqual(build_skill_zip(build_skill_package(version)), downloaded.body)
 
     def test_sensitive_findings_do_not_echo_value(self):
         manifest = default_manifest("安全测试", "测试敏感内容门禁。")
