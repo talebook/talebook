@@ -11,7 +11,9 @@
                 Beta
             </v-chip>
         </v-card-title>
-        <v-card-text class="pb-0"> {{ t('admin.books.message.bookTableInfo') }}</v-card-text>
+        <v-card-text class="pb-0">
+            {{ t('admin.books.message.bookTableInfo') }}
+        </v-card-text>
         <v-card-actions class="pt-0">
             <v-btn
                 :disabled="loading"
@@ -32,6 +34,17 @@
                 <v-icon start>
                     mdi-information
                 </v-icon>{{ t('admin.books.button.autoUpdateBookInfo') }}
+            </v-btn>
+            <v-btn
+                v-if="books_selected.length > 0"
+                :disabled="loading || books_selected.length > 50"
+                variant="outlined"
+                color="primary"
+                @click="aiMetadataDialog = true"
+            >
+                <v-icon start>
+                    mdi-auto-fix
+                </v-icon>{{ t('aiMetadata.openButton') }} ({{ books_selected.length }})
             </v-btn>
             <v-btn
                 :disabled="loading"
@@ -65,6 +78,13 @@
                 hide-details
             />
         </v-card-actions>
+        <v-card-text
+            v-if="books_selected.length > 50"
+            class="pt-0 text-warning text-body-2"
+            role="alert"
+        >
+            {{ t('aiMetadata.batchLimit', { count: books_selected.length, max: 50 }) }}
+        </v-card-text>
         
         <v-data-table-server
             v-model="books_selected"
@@ -494,6 +514,12 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
+
+        <AIMetadataReviewDialog
+            v-model="aiMetadataDialog"
+            :book-ids="books_selected.map(Number)"
+            @applied="onAiMetadataApplied"
+        />
     </v-card>
 </template>
 
@@ -514,6 +540,7 @@ const snackText = ref('');
 const meta_dialog = ref(false);
 const delete_dialog = ref(false);
 const kindle_convert_dialog = ref(false);
+const aiMetadataDialog = ref(false);
 const coverFile = ref(null);
 
 const books_selected = ref([]);
@@ -593,6 +620,11 @@ const getDataFromApi = () => {
         .finally(() => {
             loading.value = false;
         });
+};
+
+const onAiMetadataApplied = () => {
+    books_selected.value = [];
+    getDataFromApi();
 };
 
 const refresh_progress = () => {

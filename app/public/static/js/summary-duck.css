@@ -110,4 +110,4 @@ html[data-summary-duck-open="true"] { overflow: hidden; }
   .summary-duck__footer button { flex: 1 1 auto; }
 }
 
-@media (prefers-reduced-motion: reduce) { .summary-duck__spinner { animation-duration: 2s; } }
+@media (prefers-reduced-motion: reduce) { .summary-duck__spinner { animation: none; } }

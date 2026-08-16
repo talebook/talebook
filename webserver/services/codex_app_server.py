@@ -344,7 +344,7 @@ class CodexAppServerRuntime(AgentRuntime):
                     if method in {"turn/started", "item/started", "item/completed", "item/agentMessage/delta"}:
                         if not first_progress:
                             first_progress = True
-                            on_event(RuntimeEvent(RuntimeEventType.PROGRESS, "正在生成五组问答", active.thread_id))
+                            on_event(RuntimeEvent(RuntimeEventType.PROGRESS, "AI 正在生成", active.thread_id))
                     if method == "item/completed":
                         item = params.get("item") if isinstance(params.get("item"), dict) else {}
                         if item.get("type") == "agentMessage" and item.get("text"):
