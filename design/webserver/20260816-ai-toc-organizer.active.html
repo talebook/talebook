@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI 目录诊断、整理与安全回滚方案</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f3f6fa; --card:#fff; --ink:#172033; --muted:#627086; --line:#d9e1ec; --accent:#3859c7; --safe:#15745a; --risk:#a14e16; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.65 system-ui,sans-serif; }
+    main { width:min(1040px,calc(100% - 28px)); margin:28px auto 64px; } header,section { margin:0 0 18px; padding:24px; background:var(--card); border:1px solid var(--line); border-radius:18px; }
+    h1 { margin:0 0 8px; font-size:clamp(28px,5vw,46px); line-height:1.1; } h2 { margin:0 0 12px; font-size:22px; } h3 { margin:18px 0 6px; }
+    p,ul,ol { margin:8px 0; } code { padding:2px 5px; border-radius:5px; background:#e9eef7; } .meta { display:flex; flex-wrap:wrap; gap:8px; color:var(--muted); }
+    .meta span { padding:4px 9px; border:1px solid var(--line); border-radius:999px; } .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .flow article { padding:14px; border:1px solid var(--line); border-radius:12px; } .good { color:var(--safe); } .warn { color:var(--risk); }
+    table { width:100%; border-collapse:collapse; } th,td { padding:10px; border:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#edf2f8; }
+    footer { color:var(--muted); text-align:center; }
+    .table { overflow:auto; } @media(max-width:720px){ header,section{padding:18px}.flow{grid-template-columns:1fr} }
+    @media(prefers-color-scheme:dark){ :root{--bg:#111827;--card:#182235;--ink:#edf2f7;--muted:#a8b3c5;--line:#334158} code,th{background:#233149} }
+  </style>
+</head>
+<body><main>
+  <header>
+    <h1>AI 目录诊断、整理与安全回滚</h1>
+    <p>在不改写正文的前提下，把 EPUB 目录问题变成可解释、可逐项编辑、可确认应用且可撤销的结构化变更。</p>
+    <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-16</span><span>所属模块：webserver</span><span>需求来源：TB-60</span><span>影响：后端、阅读器、EPUB 文件</span></div>
+  </header>
+  <section><h2>1. 原始诉求</h2><p>TB-60 要求诊断目录缺失、重复、空标题、广告噪声、层级或顺序异常与无效锚点；结合目录、章节标题和有限正文生成建议树，展示带理由、证据、置信度与风险的 diff，并通过“预览—确认—应用—撤销”安全落盘。权限过滤必须先于模型输入，预览绑定文件版本，正文前后保持不变，写入失败不得留下半写文件。</p></section>
+  <section><h2>2. 目标与边界</h2><ul><li>仅书籍拥有者、编辑者或管理员可以分析和写入，运行时永远不直接访问书库。</li><li>模型只接收服务端提取的目录、manifest/spine、标题、锚点和受限正文摘要。</li><li>模型协议终态、schema、节点引用和锚点全部通过后才暴露预览。</li><li>应用采用同目录临时副本、完整性与正文哈希校验、快照和原子替换；版本不一致立即拒绝。</li></ul><p><strong>非目标：</strong>不改正文、封面或元数据，不尝试修复任意损坏 EPUB；没有安全写入路径时只返回诊断。</p></section>
+  <section><h2>3. 核心流程</h2><div class="flow"><article><b>诊断</b><p>受控服务解析 EPUB，机械发现缺失、重复、空标题、噪声、顺序、层级与无效锚点。</p></article><article><b>建议</b><p>统一 AgentRuntime 生成扁平建议树和变更；后端再校验 schema、证据与锚点。</p></article><article><b>确认</b><p>用户逐项选择节点并编辑标题或父级，PATCH 保存草案，POST 二次确认。</p></article><article><b>应用/撤销</b><p>版本锁、快照、临时 EPUB、正文哈希、原子替换；撤销同样校验当前版本。</p></article></div></section>
+  <section><h2>4. 数据与 API</h2><div class="table"><table><thead><tr><th>对象</th><th>内容</th><th>约束</th></tr></thead><tbody><tr><td><code>AITask</code></td><td>诊断输入哈希、AI 草案、用户修订、运行状态、应用审计</td><td>按 creator/book ACL 查询；删书清理</td></tr><tr><td>建议节点</td><td>id、parent_id、label、href、reason、evidence、confidence、risk、selected</td><td>id 唯一、父级无环、href 必须命中 manifest 文档或文档内 id</td></tr><tr><td>快照</td><td>任务专属原 EPUB 副本及 SHA-256</td><td>权限继承书籍；删除任务/书籍时清理</td></tr><tr><td>接口</td><td>tasks 列表/创建/查询/编辑/取消/删除，另有 apply、undo</td><td>全部登录、写权限、幂等、版本绑定</td></tr></tbody></table></div></section>
+  <section><h2>5. EPUB 写入不变量</h2><ol><li>锁内重新读取当前版本；必须等于预览版本。</li><li>原文件复制为任务快照；临时文件与目标位于同一文件系统。</li><li>只替换或创建 EPUB3 nav / EPUB2 NCX 以及必要的 OPF manifest 元素；其他 ZIP entry 原始字节保持一致。</li><li>校验 mimetype、container、OPF、所有目录 href 和 ZIP CRC，并比较所有正文 entry 的 SHA-256。</li><li><code>os.replace</code> 原子替换；任意失败删除临时文件并保留原文件。</li></ol></section>
+  <section><h2>6. 风险与回滚</h2><p class="warn"><strong>高风险：</strong>错误锚点、并发覆盖、非标准命名空间、写入中断和旧预览覆盖新文件。通过严格锚点校验、文件版本锁、保守 XML 修改、临时副本校验和原子替换阻断。</p><p class="good"><strong>回滚：</strong>每次成功应用保留原文件快照；只有当前文件仍是该任务产生的版本时才允许撤销，撤销也通过临时副本与完整性校验后原子替换。</p></section>
+  <section><h2>7. 测试计划与结果</h2><div class="table"><table><thead><tr><th>层级</th><th>实际命令与覆盖</th><th>结果</th></tr></thead><tbody>
+    <tr><td>后端聚焦回归</td><td><code>docker run … talebook/test pytest -q tests/test_ai_toc.py tests/test_summary_duck.py</code>；覆盖 nav/NCX 解析与写入、诊断、schema/锚点/父级校验、正文哈希、版本冲突、原子失败、应用与撤销、权限、模板资源隔离和快照清理。</td><td>30 passed</td></tr>
+    <tr><td>前端静态契约</td><td><code>npx vitest run test/utils/toc-organizer-runtime.spec.ts test/utils/summary-duck-runtime.spec.ts</code>；覆盖安全 DOM、确认语义、事件边界、焦点、深色/移动端和 reduced-motion。</td><td>6 passed</td></tr>
+    <tr><td>真实浏览器 E2E</td><td><code>npx playwright test test/e2e/toc-organizer-render.spec.ts test/e2e/summary-duck-render.spec.ts</code>；Chromium 覆盖浅色桌面、深色 320px、编辑与应用确认、删除确认、焦点约束，以及两个 AI 入口不重叠且不会串联触发。</td><td>8 passed；黄金截图见对应 <code>*.spec.ts-snapshots/</code></td></tr>
+    <tr><td>Python 门禁</td><td><code>make lint-py-fix &amp;&amp; make lint-py</code></td><td>通过；107 个文件格式一致</td></tr>
+    <tr><td>前端门禁</td><td><code>npm run lint</code></td><td>0 errors；193 条均为本次范围外既有 warning</td></tr>
+    <tr><td>全量后端</td><td><code>make test</code></td><td>未完成：共享 BuildKit 依赖层被另一工作区占用超过 25 分钟后终止；以已构建的同一 <code>talebook/test</code> 镜像完成 30 项功能与相邻 Summary Duck 回归。剩余风险是未获得全仓 pytest 结果。</td></tr>
+    <tr><td>浏览器工具限制</td><td>仓库要求 Chrome DevTools MCP，但本运行环境未提供该工具；改用真实 Chromium Playwright、像素快照和人工逐张检查。</td><td>桌面浅色、桌面深色、320px 深色均已验证</td></tr>
+  </tbody></table></div></section>
+  <section><h2>8. interface-review full</h2>
+    <p>按 <code>interface-review full</code> 审查当前分支相对默认分支 <code>origin/master</code> 的全部已提交与未提交变更。基准为 <code>1f0a4bd4837b29eda6d401f062f036eefcdff436</code>；4 个已提交 commit，复核时另有 22 个未提交文件。合并去重后审查 22 个非生成文件；排除 4 张 Playwright 黄金截图和 1 个运行时 JSONL fixture。受影响消费者扩展到 EPUB reader 模板、Summary Duck 面板和 TOC Organizer 面板，没有其他直接消费者未展开。</p>
+    <div class="table"><table><thead><tr><th>领域</th><th>覆盖</th><th>最终结论</th></tr></thead><tbody>
+      <tr><td>Accessibility</td><td>键盘完成路径、焦点陷阱与恢复、inert 背景、动态状态、24px 勾选目标、减少动态效果、200%/320px 重排</td><td>Clear</td></tr>
+      <tr><td>Layout</td><td>桌面与 320px、滚动区/固定操作区、安全区、两个悬浮入口、双面板层级</td><td>Clear</td></tr>
+      <tr><td>Writing</td><td>动词优先按钮、应用/撤销/删除后果、中文风险与操作枚举、刷新提示、空/错/忙状态</td><td>Clear</td></tr>
+      <tr><td>Typography</td><td><code>lang="zh-CN"</code>、允许缩放、移动输入 16px、按钮不折行、长路径换行</td><td>Clear</td></tr>
+      <tr><td>Colors</td><td>浅色与深色正文、辅助文字、危险动作、输入边界和焦点环；抽样 WCAG 对比度均达到适用阈值</td><td>Clear</td></tr>
+      <tr><td>UI</td><td>四张黄金截图、浅/深主题、桌面/移动布局、加载/结果/确认/应用状态</td><td>Clear</td></tr>
+    </tbody></table></div>
+    <p><strong>已处理问题：</strong>两个入口重叠与跨组件事件串联、弱焦点/边界和深色文字、iOS 输入缩放、颜色单独表达严重度、原生 OK/Cancel 确认、未授权资源暴露、错误语言标记、应用后刷新提示、误导性的 diff 勾选，以及 reduced-motion 下仍旋转。修复后重跑完整审查，无 HIGH、MEDIUM 或 LOW 遗留项。</p>
+    <p><strong>被否决候选：</strong>未引入 Vuetify（EPUB reader 是既有原生脚本表面，引入第二套运行时会增加耦合）；未增加装饰性动画或按压缩放（这是高频阅读工具，静态状态反馈更克制）；未把桌面面板改成全屏（保留阅读上下文且现有滚动与固定操作区已通过窄屏验证）。</p>
+    <p><strong>最终结论：Approve。</strong></p>
+  </section>
+  <section><h2>9. 决策记录</h2><ol><li><strong>2026-08-16：</strong>复用统一 AITask 与 AgentRuntime；目录功能独立 feature adapter 和 service。</li><li><strong>2026-08-16：</strong>模型输出采用扁平节点而非递归 schema，便于原生 schema 约束与后端无环校验。</li><li><strong>2026-08-16：</strong>仅业务服务拥有 EPUB 路径与写权限；Codex app-server 继续在空只读 workdir 中运行。</li><li><strong>2026-08-16：</strong>两个 reader AI 工具共享视觉层级但各自限定事件委托范围，确保任一模态打开时另一个入口不可交互。</li></ol></section>
+  <footer><p>状态：ACTIVE · 最后验证：2026-08-16 · 对应需求：TB-60</p></footer>
+</main></body></html>

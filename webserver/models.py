@@ -556,6 +556,7 @@ class AITask(Base, SQLAlchemyMixin):
     result_data = Column(MutableDict.as_mutable(JSONType), default={})
     ai_draft = Column(MutableDict.as_mutable(JSONType), default={})
     user_revision = Column(MutableDict.as_mutable(JSONType), default={})
+    application_data = Column(MutableDict.as_mutable(JSONType), default={})
     schema_version = Column(String(32), default="summary_duck.v1", nullable=False)
     prompt_version = Column(String(32), default="summary_duck.zh.v2", nullable=False)
     runtime_name = Column(String(64), default="")

@@ -283,6 +283,9 @@ class SummaryDuckService:
                     prompt=build_prompt(chapter),
                     output_schema=SUMMARY_DUCK_OUTPUT_SCHEMA,
                     model=self.config.get("AI_CODEX_MODEL", "") or None,
+                    service_name="talebook_summary_duck",
+                    started_message="正在分析当前章节",
+                    progress_message="正在生成五组问答",
                 ),
                 lambda event: self._update_event(record_id, event),
             )

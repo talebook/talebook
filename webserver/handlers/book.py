@@ -1019,8 +1019,13 @@ class BookDelete(BaseHandler):
             self.db.delete_book(bid)
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
         from webserver.models import AITask, ScanFile
+        from webserver.services.ai_toc import FEATURE_KEY as TOC_FEATURE_KEY
+        from webserver.services.ai_toc import cleanup_task_files
 
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
+        toc_tasks = self.session.query(AITask).filter(AITask.book_id == bid, AITask.feature == TOC_FEATURE_KEY).all()
+        for task in toc_tasks:
+            cleanup_task_files(CONF, task)
         self.session.query(AITask).filter(AITask.book_id == bid).delete()
         if external_indexed:
             self.session.query(Item).filter(Item.book_id == bid).delete()
@@ -1619,6 +1624,11 @@ class BookUploadComplete(BookUploadBase):
 
 class BookRead(BaseHandler):
     def render_epub(self, book, is_ready, audiobook_edition=None):
+        can_manage_ai_toc = bool(
+            self.current_user
+            and self.current_user.can_edit()
+            and (self.is_admin() or self.is_book_owner(book["id"], self.user_id()))
+        )
         return self.html_page(
             "book/" + CONF["EPUB_VIEWER"],
             {
@@ -1627,6 +1637,7 @@ class BookRead(BaseHandler):
                 "is_ready": is_ready,
                 "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
                 "audiobook_edition_id": audiobook_edition.id if audiobook_edition else None,
+                "can_manage_ai_toc": can_manage_ai_toc,
             },
         )
 

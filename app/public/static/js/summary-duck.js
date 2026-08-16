@@ -373,8 +373,20 @@
     }
   }
 
+  function confirmDeleteArtifact() {
+    el.body.replaceChildren();
+    const status = node("div", "summary-duck__status");
+    status.append(node("h3", "", "删除这组总结？"));
+    status.append(node("p", "", "这会删除五组问答和编辑记录，此操作无法撤销。"));
+    el.body.append(status);
+    renderFooter([
+      { text: "删除总结", action: "delete-confirm", danger: true },
+      { text: "取消", action: "render" }
+    ]);
+    el.footer.querySelector('[data-action="render"]')?.focus();
+  }
+
   async function deleteArtifact() {
-    if (!window.confirm("删除这组总结？此操作无法撤销。")) return;
     try {
       await request(`${TASKS_API}/${state.artifact.id}`, { method: "DELETE" });
       state.artifact = null;
@@ -413,7 +425,7 @@
 
   function onClick(event) {
     const target = event.target.closest("[data-action]");
-    if (!target) return;
+    if (!target || (target !== el.launcher && target !== el.backdrop && !el.panel.contains(target))) return;
     const action = target.dataset.action;
     if (action === "open") open();
     else if (action === "close") close();
@@ -425,7 +437,9 @@
     else if (action === "edit") { state.editing = true; state.editorDraft = null; renderArtifact(); }
     else if (action === "cancel-edit") { state.editing = false; state.editorDraft = null; renderArtifact(); }
     else if (action === "save") saveEdits();
-    else if (action === "delete") deleteArtifact();
+    else if (action === "delete") confirmDeleteArtifact();
+    else if (action === "delete-confirm") deleteArtifact();
+    else if (action === "render") renderArtifact();
     else if (action === "export") window.location.assign(`${TASKS_API}/${state.artifact.id}/export`);
     else if (action === "citation") jumpToCitation(Number(target.dataset.item), Number(target.dataset.citation));
   }

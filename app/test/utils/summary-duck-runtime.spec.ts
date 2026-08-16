@@ -50,7 +50,12 @@ describe('Summary Duck static reader integration', () => {
         expect(style).toContain('prefers-color-scheme: dark');
         expect(style).toContain('--duck-accent: #ff7953');
         expect(style).toContain(':focus-visible');
+        expect(style).toContain('--duck-control-line');
+        expect(style).toContain('animation: none');
         expect(script).toContain('trapFocus');
+        expect(script).toContain('!el.panel.contains(target)');
+        expect(script).toContain('delete-confirm');
+        expect(script).not.toContain('window.confirm');
         expect(script).toContain('item.inert = true');
         expect(script).toContain('qLabel.htmlFor = q.id');
         expect(style).toContain('min-height: 0');

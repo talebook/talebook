@@ -84,6 +84,23 @@ test('keeps keyboard focus inside the modal and reflows actions at 320px', async
     expect(bodyBox && footerBox && bodyBox.y + bodyBox.height <= footerBox.y + 1).toBeTruthy();
 });
 
+test('uses an explicit in-panel confirmation before deleting a summary', async ({ page }) => {
+    let deleted = false;
+    await page.route(`**/api/ai/summary_duck/tasks/${artifact.id}`, async route => {
+        if (route.request().method() === 'DELETE') {
+            deleted = true;
+            await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ err: 'ok' }) });
+        }
+    });
+    await mount(page);
+    await page.getByRole('button', { name: '删除', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '删除这组总结？' })).toBeVisible();
+    expect(deleted).toBe(false);
+    await page.getByRole('button', { name: '删除总结' }).click();
+    await expect(page.locator('.summary-duck__status')).toContainText('只把当前章节的必要正文发送给隔离运行时');
+    expect(deleted).toBe(true);
+});
+
 declare global {
     interface Window {
         TalebookSummaryDuckInit: (options: { bookId: number }) => void;
