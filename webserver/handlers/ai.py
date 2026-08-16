@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Feature-routed API for creator-private AI tasks."""
 
+import asyncio
 import datetime
 import hashlib
 import json
@@ -11,7 +12,28 @@ from sqlalchemy.exc import IntegrityError
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
-from webserver.models import AITask
+from webserver.models import AITask, ProtagonistAgent, ProtagonistConversation, ProtagonistMessage, ReadingState
+from webserver.services.protagonist_agent import (
+    CHAT_PROMPT_VERSION,
+    CHAT_SCHEMA_VERSION,
+    MANIFEST_PROMPT_VERSION,
+    MANIFEST_SCHEMA_VERSION,
+    ProtagonistService,
+    ProtagonistValidationError,
+    agent_dict,
+    bounded_evidence,
+    conversation_dict,
+    epub_spine,
+    evidence_hash,
+    message_dict,
+    new_id,
+    preview_dict,
+    resolve_cutoff,
+    validate_user_prompt,
+)
+from webserver.services.protagonist_agent import (
+    FEATURE_KEY as PROTAGONIST_FEATURE_KEY,
+)
 from webserver.services.summary_duck import (
     FEATURE_KEY,
     PROMPT_VERSION,
@@ -323,10 +345,544 @@ class AITaskExport(_AITaskBase):
         feature.export(self, record)
 
 
+class _ProtagonistBase(BaseHandler):
+    def _service(self):
+        service = ProtagonistService()
+        service.setup(self.settings["SessionMaker"], CONF)
+        return service
+
+    def _book(self, book_id, expected_version=""):
+        try:
+            book_id = int(book_id)
+        except (TypeError, ValueError):
+            return None, {"err": "params.invalid", "msg": "书籍参数无效"}
+        if not self.can_view_book(book_id):
+            return None, {"err": "book.not_found", "msg": "书籍不存在"}
+        book = self.get_book(book_id, raise_exception=False)
+        if not book or not book.get("fmt_epub"):
+            return None, {"err": "book.not_found", "msg": "仅支持可访问的 EPUB 书籍"}
+        if expected_version and _book_version(book) != expected_version:
+            return None, {"err": "ai.book_version_changed", "msg": "书籍版本已变化，派生 Agent 已暂停"}
+        return book, None
+
+    def _own_preview(self, preview_id):
+        return (
+            self.session.query(AITask)
+            .filter(
+                AITask.id == preview_id,
+                AITask.feature == PROTAGONIST_FEATURE_KEY,
+                AITask.creator_id == self.user_id(),
+            )
+            .first()
+        )
+
+    def _own_agent(self, agent_id):
+        return (
+            self.session.query(ProtagonistAgent)
+            .filter(ProtagonistAgent.id == agent_id, ProtagonistAgent.creator_id == self.user_id())
+            .first()
+        )
+
+    def _agent_access(self, agent_id):
+        agent = self._own_agent(agent_id)
+        if not agent:
+            return None, None, {"err": "ai.not_found", "msg": "Agent 不存在"}
+        book, error = self._book(agent.book_id, agent.book_version)
+        if error:
+            return None, None, error
+        return agent, book, None
+
+    def _conversation_access(self, conversation_id):
+        conversation = (
+            self.session.query(ProtagonistConversation)
+            .filter(
+                ProtagonistConversation.id == conversation_id,
+                ProtagonistConversation.creator_id == self.user_id(),
+            )
+            .first()
+        )
+        if not conversation:
+            return None, None, None, {"err": "ai.not_found", "msg": "会话不存在"}
+        agent, book, error = self._agent_access(conversation.agent_id)
+        return conversation, agent, book, error
+
+    def _message_access(self, message_id):
+        message = (
+            self.session.query(ProtagonistMessage)
+            .filter(ProtagonistMessage.id == message_id, ProtagonistMessage.creator_id == self.user_id())
+            .first()
+        )
+        if not message:
+            return None, None, None, None, {"err": "ai.not_found", "msg": "消息不存在"}
+        conversation, agent, book, error = self._conversation_access(message.conversation_id)
+        return message, conversation, agent, book, error
+
+    def _evidence(self, book, cutoff_index):
+        chapters = epub_spine(book["fmt_epub"])
+        return chapters, bounded_evidence(chapters, cutoff_index)
+
+
+class ProtagonistSpine(_ProtagonistBase):
+    @js
+    @auth
+    def get(self):
+        book, error = self._book(self.get_argument("book_id", ""))
+        if error:
+            return error
+        try:
+            chapters = epub_spine(book["fmt_epub"])
+            state = (
+                self.session.query(ReadingState)
+                .filter(ReadingState.book_id == book["id"], ReadingState.reader_id == self.user_id())
+                .first()
+            )
+            cutoff = resolve_cutoff(chapters, progress=state.get_progress() if state else {})
+        except ProtagonistValidationError as exc:
+            return {"err": "ai.source_invalid", "msg": str(exc)}
+        return {
+            "err": "ok",
+            "chapters": [{key: chapter[key] for key in ("index", "href", "title")} for chapter in chapters],
+            "default_cutoff": {key: cutoff[key] for key in ("index", "href", "title")},
+        }
+
+
+class ProtagonistPreviews(_ProtagonistBase):
+    @js
+    @auth
+    def post(self):
+        if not CONF.get("AI_ENABLED", True):
+            return {"err": "ai.disabled", "msg": "AI 功能未启用"}
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        book, error = self._book(body.get("book_id"))
+        if error:
+            return error
+        requested_name = str(body.get("name", "") or "").strip()
+        if len(requested_name) > 200:
+            return {"err": "params.invalid", "msg": "主角名称过长"}
+        try:
+            chapters = epub_spine(book["fmt_epub"])
+            state = (
+                self.session.query(ReadingState)
+                .filter(ReadingState.book_id == book["id"], ReadingState.reader_id == self.user_id())
+                .first()
+            )
+            cutoff = resolve_cutoff(
+                chapters,
+                requested_href=str(body.get("cutoff_href", "") or ""),
+                progress=state.get_progress() if state else {},
+            )
+            evidence = bounded_evidence(chapters, cutoff["index"])
+        except ProtagonistValidationError as exc:
+            return {"err": "ai.source_invalid", "msg": str(exc)}
+        version = _book_version(book)
+        raw_key = ":".join(
+            [
+                PROTAGONIST_FEATURE_KEY,
+                str(self.user_id()),
+                str(book["id"]),
+                version,
+                cutoff["href"],
+                evidence_hash(evidence),
+                requested_name,
+                MANIFEST_SCHEMA_VERSION,
+                MANIFEST_PROMPT_VERSION,
+            ]
+        )
+        request_key_value = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+        if body.get("regenerate"):
+            request_key_value = hashlib.sha256((request_key_value + uuid.uuid4().hex).encode("utf-8")).hexdigest()
+        existing = self.session.query(AITask).filter(AITask.request_key == request_key_value).first()
+        if existing:
+            return {"err": "ok", "preview": preview_dict(existing), "idempotent": True}
+        record = AITask(
+            id=new_id(),
+            request_key=request_key_value,
+            feature=PROTAGONIST_FEATURE_KEY,
+            creator_id=self.user_id(),
+            book_id=book["id"],
+            book_version=version,
+            chapter_href=cutoff["href"],
+            chapter_title=cutoff["title"],
+            chapter_text_hash=evidence_hash(evidence),
+            chapter_length=sum(len(chapter["text"]) for chapter in evidence),
+            status="queued",
+            progress_message="等待生成角色预览",
+            ai_draft={"requested_name": requested_name, "cutoff_index": cutoff["index"]},
+            schema_version=MANIFEST_SCHEMA_VERSION,
+            prompt_version=MANIFEST_PROMPT_VERSION,
+        )
+        self.session.add(record)
+        self.session.commit()
+        self._service().submit_preview(record.id, evidence, requested_name)
+        return {"err": "ok", "preview": preview_dict(record), "idempotent": False}
+
+
+class ProtagonistPreviewItem(_ProtagonistBase):
+    @js
+    @auth
+    def get(self, preview_id):
+        record = self._own_preview(preview_id)
+        if not record:
+            return {"err": "ai.not_found", "msg": "预览不存在"}
+        _book, error = self._book(record.book_id, record.book_version)
+        return error or {"err": "ok", "preview": preview_dict(record)}
+
+    @js
+    @auth
+    def delete(self, preview_id):
+        record = self._own_preview(preview_id)
+        if not record:
+            return {"err": "ai.not_found", "msg": "预览不存在"}
+        if record.status in {"queued", "running"}:
+            self._service().cancel(record.id)
+        self.session.delete(record)
+        self.session.commit()
+        return {"err": "ok"}
+
+
+class ProtagonistPreviewCancel(_ProtagonistBase):
+    @js
+    @auth
+    def post(self, preview_id):
+        record = self._own_preview(preview_id)
+        if not record:
+            return {"err": "ai.not_found", "msg": "预览不存在"}
+        if record.status not in {"queued", "running"}:
+            return {"err": "ok", "preview": preview_dict(record), "idempotent": True}
+        record.cancel_requested = True
+        record.progress_message = "正在取消"
+        self.session.commit()
+        active = self._service().cancel(record.id)
+        if not active and record.status == "queued":
+            record.status = "cancelled"
+            record.finished_at = datetime.datetime.now()
+            self.session.commit()
+        return {"err": "ok", "preview": preview_dict(record), "idempotent": False}
+
+
+class ProtagonistAgents(_ProtagonistBase):
+    @js
+    @auth
+    def get(self):
+        query = self.session.query(ProtagonistAgent).filter(ProtagonistAgent.creator_id == self.user_id())
+        book_id = self.get_argument("book_id", "")
+        if book_id:
+            try:
+                query = query.filter(ProtagonistAgent.book_id == int(book_id))
+            except ValueError:
+                return {"err": "params.invalid", "msg": "书籍参数无效"}
+        records = query.order_by(ProtagonistAgent.update_time.desc()).all()
+        visible = []
+        for record in records:
+            _book, error = self._book(record.book_id, record.book_version)
+            if not error:
+                visible.append(agent_dict(record))
+        return {"err": "ok", "agents": visible}
+
+    @js
+    @auth
+    def post(self):
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        preview = self._own_preview(str(body.get("preview_id", "")))
+        if not preview or preview.status != "succeeded" or not preview.result_data:
+            return {"err": "ai.preview_not_ready", "msg": "角色预览尚未就绪"}
+        _book, error = self._book(preview.book_id, preview.book_version)
+        if error:
+            return error
+        manifest = dict(preview.result_data)
+        context = preview.ai_draft or {}
+        record = ProtagonistAgent(
+            id=new_id(),
+            creator_id=self.user_id(),
+            book_id=preview.book_id,
+            book_version=preview.book_version,
+            display_name=manifest["display_name"],
+            manifest=manifest,
+            cutoff_href=preview.chapter_href,
+            cutoff_title=preview.chapter_title,
+            cutoff_index=int(context.get("cutoff_index", 0)),
+            schema_version=preview.schema_version,
+            prompt_version=preview.prompt_version,
+        )
+        self.session.add(record)
+        self.session.commit()
+        return {"err": "ok", "agent": agent_dict(record)}
+
+
+class ProtagonistAgentItem(_ProtagonistBase):
+    @js
+    @auth
+    def get(self, agent_id):
+        agent, _book, error = self._agent_access(agent_id)
+        return error or {"err": "ok", "agent": agent_dict(agent)}
+
+    @js
+    @auth
+    def patch(self, agent_id):
+        agent, _book, error = self._agent_access(agent_id)
+        if error:
+            return error
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        preview = self._own_preview(str(body.get("preview_id", "")))
+        if (
+            not preview
+            or preview.status != "succeeded"
+            or preview.book_id != agent.book_id
+            or preview.book_version != agent.book_version
+            or (preview.ai_draft or {}).get("requested_name") != agent.display_name
+        ):
+            return {"err": "ai.preview_required", "msg": "调整边界前需要生成并确认新的安全预览"}
+        new_index = int((preview.ai_draft or {}).get("cutoff_index", 0))
+        if new_index > agent.cutoff_index and not bool(body.get("spoiler_confirmed")):
+            return {"err": "ai.spoiler_confirmation_required", "msg": "提高知识边界需要再次确认剧透风险"}
+        manifest = dict(preview.result_data or {})
+        if not manifest:
+            return {"err": "ai.preview_required", "msg": "新的安全预览不可用"}
+        agent.display_name = manifest["display_name"]
+        agent.manifest = manifest
+        agent.cutoff_href = preview.chapter_href
+        agent.cutoff_title = preview.chapter_title
+        agent.cutoff_index = new_index
+        agent.schema_version = preview.schema_version
+        agent.prompt_version = preview.prompt_version
+        agent.update_time = datetime.datetime.now()
+        self.session.commit()
+        return {"err": "ok", "agent": agent_dict(agent)}
+
+    @js
+    @auth
+    def delete(self, agent_id):
+        agent = self._own_agent(agent_id)
+        if not agent:
+            return {"err": "ai.not_found", "msg": "Agent 不存在"}
+        conversation_ids = [row[0] for row in self.session.query(ProtagonistConversation.id).filter_by(agent_id=agent.id)]
+        if conversation_ids:
+            messages = self.session.query(ProtagonistMessage).filter(ProtagonistMessage.conversation_id.in_(conversation_ids))
+            for message in messages.filter(ProtagonistMessage.status.in_(["queued", "running"])):
+                self._service().cancel(message.id)
+            messages.delete(synchronize_session=False)
+            self.session.query(ProtagonistConversation).filter(ProtagonistConversation.id.in_(conversation_ids)).delete(
+                synchronize_session=False
+            )
+        self.session.delete(agent)
+        self.session.commit()
+        return {"err": "ok", "msg": "Agent、私有会话与反馈已删除"}
+
+
+class ProtagonistConversations(_ProtagonistBase):
+    @js
+    @auth
+    def post(self, agent_id):
+        agent, _book, error = self._agent_access(agent_id)
+        if error:
+            return error
+        record = ProtagonistConversation(
+            id=new_id(),
+            agent_id=agent.id,
+            creator_id=self.user_id(),
+            cutoff_href=agent.cutoff_href,
+            cutoff_title=agent.cutoff_title,
+            cutoff_index=agent.cutoff_index,
+        )
+        self.session.add(record)
+        self.session.commit()
+        return {"err": "ok", "conversation": conversation_dict(record)}
+
+
+class ProtagonistConversationItem(_ProtagonistBase):
+    @js
+    @auth
+    def get(self, conversation_id):
+        conversation, _agent, _book, error = self._conversation_access(conversation_id)
+        if error:
+            return error
+        messages = (
+            self.session.query(ProtagonistMessage)
+            .filter(ProtagonistMessage.conversation_id == conversation.id)
+            .order_by(ProtagonistMessage.create_time.asc(), ProtagonistMessage.id.asc())
+            .all()
+        )
+        return {"err": "ok", "conversation": conversation_dict(conversation, messages)}
+
+    @js
+    @auth
+    def delete(self, conversation_id):
+        conversation, _agent, _book, error = self._conversation_access(conversation_id)
+        if error:
+            return error
+        messages = self.session.query(ProtagonistMessage).filter(ProtagonistMessage.conversation_id == conversation.id)
+        for message in messages.filter(ProtagonistMessage.status.in_(["queued", "running"])):
+            self._service().cancel(message.id)
+        messages.delete(synchronize_session=False)
+        self.session.delete(conversation)
+        self.session.commit()
+        return {"err": "ok"}
+
+
+class ProtagonistMessages(_ProtagonistBase):
+    def _create_message(self, conversation, agent, book, user_content):
+        try:
+            content = validate_user_prompt(user_content)
+            _chapters, evidence = self._evidence(book, conversation.cutoff_index)
+        except ProtagonistValidationError as exc:
+            return None, {"err": "ai.request_blocked", "msg": str(exc)}
+        previous = (
+            self.session.query(ProtagonistMessage)
+            .filter(
+                ProtagonistMessage.conversation_id == conversation.id,
+                ProtagonistMessage.status == "succeeded",
+            )
+            .order_by(ProtagonistMessage.create_time.asc())
+            .all()
+        )
+        history = []
+        for message in previous[-6:]:
+            history.extend(
+                [
+                    {"role": "user", "content": message.user_content},
+                    {"role": "assistant", "content": message.assistant_content},
+                ]
+            )
+        record = ProtagonistMessage(
+            id=new_id(),
+            conversation_id=conversation.id,
+            creator_id=self.user_id(),
+            user_content=content,
+            status="queued",
+            progress_message="等待生成",
+            schema_version=CHAT_SCHEMA_VERSION,
+            prompt_version=CHAT_PROMPT_VERSION,
+        )
+        conversation.update_time = datetime.datetime.now()
+        self.session.add(record)
+        self.session.commit()
+        self._service().submit_message(record.id, dict(agent.manifest or {}), evidence, history)
+        return record, None
+
+    @js
+    @auth
+    def post(self, conversation_id):
+        conversation, agent, book, error = self._conversation_access(conversation_id)
+        if error:
+            return error
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        record, error = self._create_message(conversation, agent, book, body.get("content"))
+        return error or {"err": "ok", "message": message_dict(record)}
+
+
+class ProtagonistMessageCancel(_ProtagonistBase):
+    @js
+    @auth
+    def post(self, message_id):
+        message, _conversation, _agent, _book, error = self._message_access(message_id)
+        if error:
+            return error
+        if message.status not in {"queued", "running"}:
+            return {"err": "ok", "message": message_dict(message), "idempotent": True}
+        message.cancel_requested = True
+        message.progress_message = "正在取消"
+        self.session.commit()
+        active = self._service().cancel(message.id)
+        if not active and message.status == "queued":
+            message.status = "cancelled"
+            message.finished_at = datetime.datetime.now()
+            self.session.commit()
+        return {"err": "ok", "message": message_dict(message), "idempotent": False}
+
+
+class ProtagonistMessageRetry(ProtagonistMessages):
+    @js
+    @auth
+    def post(self, message_id):
+        message, conversation, agent, book, error = self._message_access(message_id)
+        if error:
+            return error
+        if message.status in {"queued", "running"}:
+            return {"err": "ai.busy", "msg": "消息仍在生成"}
+        record, error = self._create_message(conversation, agent, book, message.user_content)
+        return error or {"err": "ok", "message": message_dict(record)}
+
+
+class ProtagonistMessageFeedback(_ProtagonistBase):
+    @js
+    @auth
+    def patch(self, message_id):
+        message, _conversation, _agent, _book, error = self._message_access(message_id)
+        if error:
+            return error
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        feedback = str(body.get("feedback", ""))
+        if feedback not in {"", "not_like", "spoiler", "too_much_quote"}:
+            return {"err": "params.invalid", "msg": "反馈类型无效"}
+        message.feedback = feedback
+        message.update_time = datetime.datetime.now()
+        self.session.commit()
+        return {"err": "ok", "message": message_dict(message)}
+
+
+class ProtagonistMessageStream(_ProtagonistBase):
+    @auth
+    async def get(self, message_id):
+        message, _conversation, _agent, _book, error = self._message_access(message_id)
+        if error:
+            self.set_header("Content-Type", "application/json; charset=UTF-8")
+            self.write(error)
+            return
+        self.set_header("Content-Type", "application/x-ndjson; charset=UTF-8")
+        self.set_header("Cache-Control", "no-cache, no-store")
+        self.set_header("X-Accel-Buffering", "no")
+        last_snapshot = None
+        for _attempt in range(240):
+            self.session.expire_all()
+            message = self.session.get(ProtagonistMessage, message_id)
+            if not message:
+                break
+            snapshot = message_dict(message)
+            serialized = json.dumps({"type": "message", "message": snapshot}, ensure_ascii=False)
+            if serialized != last_snapshot:
+                try:
+                    self.write(serialized + "\n")
+                    await self.flush()
+                except Exception:
+                    return
+                last_snapshot = serialized
+            if message.status in {"succeeded", "failed", "cancelled"}:
+                break
+            await asyncio.sleep(0.5)
+
+
 def routes():
     return [
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks", AITaskCollection),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)", AITaskItem),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)/cancel", AITaskCancel),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)/export", AITaskExport),
+        (r"/api/ai/protagonist/spine", ProtagonistSpine),
+        (r"/api/ai/protagonist/previews", ProtagonistPreviews),
+        (r"/api/ai/protagonist/previews/([0-9a-f-]+)", ProtagonistPreviewItem),
+        (r"/api/ai/protagonist/previews/([0-9a-f-]+)/cancel", ProtagonistPreviewCancel),
+        (r"/api/ai/protagonist/agents", ProtagonistAgents),
+        (r"/api/ai/protagonist/agents/([0-9a-f-]+)", ProtagonistAgentItem),
+        (r"/api/ai/protagonist/agents/([0-9a-f-]+)/conversations", ProtagonistConversations),
+        (r"/api/ai/protagonist/conversations/([0-9a-f-]+)", ProtagonistConversationItem),
+        (r"/api/ai/protagonist/conversations/([0-9a-f-]+)/messages", ProtagonistMessages),
+        (r"/api/ai/protagonist/messages/([0-9a-f-]+)/stream", ProtagonistMessageStream),
+        (r"/api/ai/protagonist/messages/([0-9a-f-]+)/cancel", ProtagonistMessageCancel),
+        (r"/api/ai/protagonist/messages/([0-9a-f-]+)/retry", ProtagonistMessageRetry),
+        (r"/api/ai/protagonist/messages/([0-9a-f-]+)/feedback", ProtagonistMessageFeedback),
     ]

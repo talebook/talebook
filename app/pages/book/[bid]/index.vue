@@ -536,6 +536,20 @@
                         </v-btn>
 
                         <v-btn
+                            v-if="book.id > 0 && store.user.is_login && hasEpubFormat"
+                            color="deep-orange-darken-2"
+                            variant="elevated"
+                            class="mx-2"
+                            :to="'/book/' + book.id + '/protagonist-agent'"
+                            data-testid="open-protagonist-agent"
+                        >
+                            <v-icon start>
+                                mdi-account-star-outline
+                            </v-icon>
+                            {{ t('protagonist.title') }}
+                        </v-btn>
+
+                        <v-btn
                             v-if="book.id > 0"
                             color="primary"
                             variant="elevated"
@@ -1162,6 +1176,11 @@ const hasCompatibleFormats = computed(() => {
     const formats = book.value.files.map(x => x.format.toLowerCase());
     const compatible = ['epub', 'azw3', 'pdf', 'txt', 'mobi', 'azw'];
     return formats.some(f => compatible.includes(f));
+});
+
+const hasEpubFormat = computed(() => {
+    if (!book.value || !book.value.files) return false;
+    return book.value.files.some(file => file.format.toLowerCase() === 'epub');
 });
 
 const selectedFormat = computed(() => {

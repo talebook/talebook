@@ -1018,10 +1018,55 @@ class BookDelete(BaseHandler):
         else:
             self.db.delete_book(bid)
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
-        from webserver.models import AITask, ScanFile
+        from webserver.models import (
+            AITask,
+            ProtagonistAgent,
+            ProtagonistConversation,
+            ProtagonistMessage,
+            ScanFile,
+        )
+        from webserver.services.protagonist_agent import FEATURE_KEY as PROTAGONIST_FEATURE_KEY
+        from webserver.services.protagonist_agent import ProtagonistService
 
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
+        protagonist_runtime = ProtagonistService()
+        protagonist_runtime.setup(self.settings["SessionMaker"], CONF)
+        active_preview_ids = [
+            row[0]
+            for row in self.session.query(AITask.id).filter(
+                AITask.book_id == bid,
+                AITask.feature == PROTAGONIST_FEATURE_KEY,
+                AITask.status.in_(["queued", "running"]),
+            )
+        ]
+        for preview_id in active_preview_ids:
+            protagonist_runtime.cancel(preview_id)
         self.session.query(AITask).filter(AITask.book_id == bid).delete()
+        agent_ids = [row[0] for row in self.session.query(ProtagonistAgent.id).filter(ProtagonistAgent.book_id == bid)]
+        if agent_ids:
+            conversation_ids = [
+                row[0]
+                for row in self.session.query(ProtagonistConversation.id).filter(
+                    ProtagonistConversation.agent_id.in_(agent_ids)
+                )
+            ]
+            if conversation_ids:
+                active_message_ids = [
+                    row[0]
+                    for row in self.session.query(ProtagonistMessage.id).filter(
+                        ProtagonistMessage.conversation_id.in_(conversation_ids),
+                        ProtagonistMessage.status.in_(["queued", "running"]),
+                    )
+                ]
+                for message_id in active_message_ids:
+                    protagonist_runtime.cancel(message_id)
+                self.session.query(ProtagonistMessage).filter(ProtagonistMessage.conversation_id.in_(conversation_ids)).delete(
+                    synchronize_session=False
+                )
+                self.session.query(ProtagonistConversation).filter(ProtagonistConversation.id.in_(conversation_ids)).delete(
+                    synchronize_session=False
+                )
+            self.session.query(ProtagonistAgent).filter(ProtagonistAgent.id.in_(agent_ids)).delete(synchronize_session=False)
         if external_indexed:
             self.session.query(Item).filter(Item.book_id == bid).delete()
         self.session.commit()
