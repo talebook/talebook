@@ -572,6 +572,38 @@ class AITask(Base, SQLAlchemyMixin):
     creator = relationship(Reader, backref="ai_tasks")
 
 
+class QuoteCard(Base, SQLAlchemyMixin):
+    """Creator-private, source-grounded quote card."""
+
+    __tablename__ = "quote_cards"
+    __table_args__ = (UniqueConstraint("creator_id", "book_id", "book_version", "source_hash", name="uq_quote_card_source"),)
+
+    id = Column(String(36), primary_key=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    book_version = Column(String(128), nullable=False)
+    book_title = Column(String(512), default="")
+    chapter_href = Column(String(1024), nullable=False)
+    chapter_title = Column(String(512), default="")
+    quote_type = Column(String(24), default="verbatim", nullable=False)
+    verbatim_quote = Column(Text, nullable=False)
+    quote_text = Column(Text, nullable=False)
+    locator = Column(MutableDict.as_mutable(JSONType), default={})
+    source_hash = Column(String(64), nullable=False, index=True)
+    source_valid = Column(Boolean, default=True, nullable=False)
+    ai_draft = Column(MutableDict.as_mutable(JSONType), default={})
+    user_revision = Column(MutableDict.as_mutable(JSONType), default={})
+    explanation = Column(Text, default="")
+    topics = Column(MutableDict.as_mutable(JSONType), default={})
+    note = Column(Text, default="")
+    schema_version = Column(String(32), default="quote_card.v1", nullable=False)
+    prompt_version = Column(String(32), default="quote_card.zh.v1", nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    creator = relationship(Reader, backref="quote_cards")
+
+
 class BookSourceModel(Base, SQLAlchemyMixin):
     """网络书源（Legado 书源 JSON）。"""
 

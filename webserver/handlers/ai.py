@@ -12,6 +12,31 @@ from sqlalchemy.exc import IntegrityError
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import AITask
+from webserver.services.quote_card import (
+    FEATURE_KEY as QUOTE_CARD_FEATURE_KEY,
+)
+from webserver.services.quote_card import (
+    PROMPT_VERSION as QUOTE_CARD_PROMPT_VERSION,
+)
+from webserver.services.quote_card import (
+    SCHEMA_VERSION as QUOTE_CARD_SCHEMA_VERSION,
+)
+from webserver.services.quote_card import (
+    QuoteCardService,
+    QuoteCardValidationError,
+)
+from webserver.services.quote_card import (
+    chapter_hash as quote_card_chapter_hash,
+)
+from webserver.services.quote_card import (
+    load_epub_chapter as load_quote_card_chapter,
+)
+from webserver.services.quote_card import (
+    request_key as quote_card_request_key,
+)
+from webserver.services.quote_card import (
+    validate_chapter_input as validate_quote_card_chapter,
+)
 from webserver.services.summary_duck import (
     FEATURE_KEY,
     PROMPT_VERSION,
@@ -203,7 +228,134 @@ class SummaryDuckFeature:
         handler.write(export_markdown(record))
 
 
-AI_FEATURES = {SummaryDuckFeature.key: SummaryDuckFeature}
+class QuoteCardFeature:
+    """Chapter quote recommendations on the shared AI task surface."""
+
+    key = QUOTE_CARD_FEATURE_KEY
+
+    @staticmethod
+    def enabled():
+        return CONF.get("AI_ENABLED", True) and CONF.get("AI_QUOTE_CARD_ENABLED", True)
+
+    @staticmethod
+    def service(handler):
+        service = QuoteCardService()
+        service.setup(handler.settings["SessionMaker"], CONF)
+        return service
+
+    @staticmethod
+    def can_access(handler, record):
+        if not handler.can_view_book(record.book_id):
+            return False, {"err": "ai.not_found", "msg": "AI 结果不存在"}
+        book = handler.get_book(record.book_id, raise_exception=False)
+        if not book:
+            return False, {"err": "ai.not_found", "msg": "AI 结果不存在"}
+        if _book_version(book) != record.book_version:
+            return False, {"err": "ai.book_version_changed", "msg": "书籍版本已变化，请重新推荐"}
+        return True, None
+
+    @classmethod
+    def list(cls, handler):
+        try:
+            book_id = int(handler.get_argument("book_id", "0") or 0)
+        except (TypeError, ValueError):
+            book_id = 0
+        if not book_id or not handler.can_view_book(book_id):
+            return {"err": "book.not_found", "msg": "书籍不存在"}
+        book = handler.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "book.not_found", "msg": "书籍不存在"}
+        records = (
+            handler.session.query(AITask)
+            .filter(
+                AITask.feature == cls.key,
+                AITask.creator_id == handler.user_id(),
+                AITask.book_id == book_id,
+                AITask.book_version == _book_version(book),
+            )
+            .order_by(AITask.create_time.desc())
+            .all()
+        )
+        return {"err": "ok", "tasks": task_items(records)}
+
+    @classmethod
+    def create(cls, handler, body):
+        if not cls.enabled():
+            return {"err": "ai.disabled", "msg": "章节金句推荐未启用，仍可手动保存选文"}
+        try:
+            book_id = int(body.get("book_id", 0))
+            chapter = validate_quote_card_chapter(
+                body.get("chapter_text"), body.get("chapter_href"), body.get("chapter_title")
+            )
+        except (TypeError, ValueError, QuoteCardValidationError) as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        book = handler.get_book(book_id, raise_exception=False)
+        if not book or not book.get("fmt_epub") or not handler.can_view_book(book_id):
+            return {"err": "book.not_found", "msg": "仅支持可访问的 EPUB 书籍"}
+        try:
+            chapter = load_quote_card_chapter(book.get("fmt_epub"), chapter["href"], chapter["title"])
+        except QuoteCardValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        version = _book_version(book)
+        text_hash = quote_card_chapter_hash(chapter["text"])
+        key = quote_card_request_key(handler.user_id(), book_id, version, chapter["href"], text_hash)
+        if bool(body.get("regenerate")):
+            key = hashlib.sha256((key + ":" + uuid.uuid4().hex).encode("utf-8")).hexdigest()
+        existing = handler.session.query(AITask).filter(AITask.request_key == key).first()
+        if existing:
+            if existing.creator_id != handler.user_id() or existing.feature != cls.key:
+                return {"err": "ai.conflict", "msg": "无法创建章节推荐"}
+            if existing.status in {"failed", "cancelled"}:
+                existing.status = "queued"
+                existing.cancel_requested = False
+                existing.error_code = ""
+                existing.error_message = ""
+                existing.progress_message = "等待推荐"
+                existing.update_time = datetime.datetime.now()
+                handler.session.commit()
+                cls.service(handler).submit(existing.id, chapter)
+            return {"err": "ok", "task": task_dict(existing), "idempotent": True}
+        record = AITask(
+            id=str(uuid.uuid4()),
+            request_key=key,
+            feature=cls.key,
+            creator_id=handler.user_id(),
+            book_id=book_id,
+            book_version=version,
+            chapter_href=chapter["href"],
+            chapter_title=chapter["title"],
+            chapter_text_hash=text_hash,
+            chapter_length=len(chapter["text"]),
+            status="queued",
+            progress_message="等待推荐",
+            schema_version=QUOTE_CARD_SCHEMA_VERSION,
+            prompt_version=QUOTE_CARD_PROMPT_VERSION,
+        )
+        handler.session.add(record)
+        try:
+            handler.session.commit()
+        except IntegrityError:
+            handler.session.rollback()
+            record = handler.session.query(AITask).filter(AITask.request_key == key).first()
+            if not record or record.creator_id != handler.user_id() or record.feature != cls.key:
+                return {"err": "ai.conflict", "msg": "无法创建章节推荐"}
+        cls.service(handler).submit(record.id, chapter)
+        return {"err": "ok", "task": task_dict(record), "idempotent": False}
+
+    @staticmethod
+    def update(_handler, _record, _body):
+        return {"err": "ai.not_editable", "msg": "推荐候选需确认保存为卡片后再编辑"}
+
+    @staticmethod
+    def export(handler, _record):
+        handler.set_header("Content-Type", "application/json; charset=UTF-8")
+        handler.write({"err": "ai.export_not_supported", "msg": "请先保存候选，再导出金句卡片"})
+
+
+AI_FEATURES = {
+    SummaryDuckFeature.key: SummaryDuckFeature,
+    QuoteCardFeature.key: QuoteCardFeature,
+}
 
 
 def _feature(name):
