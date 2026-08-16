@@ -21,6 +21,7 @@ let saveStarted = false;
 let saveStatusPolls = 0;
 let booksourceCheckRunning = false;
 let booksourceCheckPolls = 0;
+let pluginRuns = [];
 let shelfBookIds = new Set();
 let readingStateByBookId = new Map();
 let activeThemeName = '';
@@ -164,6 +165,8 @@ router.post('/_test/reset', eventHandler(async (event) => {
   saveStatusPolls = 0;
   booksourceCheckRunning = false;
   booksourceCheckPolls = 0;
+  pluginRuns = [];
+  pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
@@ -1325,6 +1328,119 @@ router.get('/api/book/:id', eventHandler((event) => {
     
   return { err: 'ok', msg: 'mock action' };
 }));
+
+const pluginDefinitions = [
+  {
+    id: 1,
+    plugin_key: 'talebook.metadata.builtin',
+    name: 'Talebook 元数据',
+    description: '复用现有非 AI 元数据来源与自动补全流程。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['metadata'],
+    capabilities: ['metadata.lookup'],
+    actions: ['test'],
+    permissions: ['books.read', 'books.write'],
+    ui: { icon: 'mdi-book-search-outline', manage_kind: 'metadata', primary_action: 'configure' },
+  },
+  {
+    id: 2,
+    plugin_key: 'talebook.book-source.opds',
+    name: 'Generic OPDS',
+    description: '管理已保存的 OPDS 目录，并浏览、搜索与批量导入。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['book_sources'],
+    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    actions: ['test'],
+    permissions: ['books.read', 'books.write', 'network.read'],
+    ui: { icon: 'mdi-rss-box', manage_kind: 'opds', primary_action: 'browse' },
+  },
+  {
+    id: 3,
+    plugin_key: 'talebook.book-source.legado',
+    name: 'Legado 在线书源',
+    description: '管理、导入、搜索、阅读与体检兼容 Legado 的在线书源。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['book_sources'],
+    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    actions: ['test'],
+    permissions: ['books.read', 'books.write', 'network.read'],
+    ui: { icon: 'mdi-book-cog-outline', manage_kind: 'legado', primary_action: 'manage' },
+  },
+];
+let pluginInstallations = pluginDefinitions.map((definition, index) => ({
+  id: index + 1,
+  plugin_key: definition.plugin_key,
+  version: definition.version,
+  enabled: true,
+  status: 'active',
+  definition,
+}));
+const pluginConnections = pluginInstallations.map(installation => ({
+  id: installation.id,
+  installation_id: installation.id,
+  owner_type: 'instance',
+  owner_id: 0,
+  name: '内置连接',
+  enabled: true,
+  health: 'unknown',
+  health_message: '',
+  secret: { configured: false, mask: '' },
+}));
+
+router.get('/api/admin/plugins', eventHandler(() => ({
+  err: 'ok',
+  definitions: pluginDefinitions,
+  installations: pluginInstallations,
+  legacy_state: {
+    'talebook.metadata.builtin': { configured: 3, enabled: 3, sources: ['douban', 'baidu', 'neodb'] },
+    'talebook.book-source.opds': { configured: 1, enabled: 1 },
+    'talebook.book-source.legado': { configured: 1, enabled: 1 },
+  },
+})));
+
+router.get('/api/admin/plugins/connections', eventHandler(() => ({
+  err: 'ok', connections: pluginConnections, user_connection_health: [],
+})));
+
+router.post('/api/admin/plugins/installations/:id/state', eventHandler(async (event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  const body = await readBody(event);
+  pluginInstallations = pluginInstallations.map(item => item.id === id ? { ...item, enabled: Boolean(body.enabled) } : item);
+  return { err: 'ok', installation: pluginInstallations.find(item => item.id === id) };
+}));
+
+router.get('/api/admin/plugins/runs', eventHandler(() => ({ err: 'ok', runs: pluginRuns })));
+
+router.get('/api/admin/plugins/runs/:id', eventHandler((event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  const run = pluginRuns.find(item => item.id === id);
+  return run ? { err: 'ok', run, items: [] } : { err: 'plugin.run_missing', msg: 'Run not found' };
+}));
+
+router.post('/api/admin/plugins/connections/:id/:action', eventHandler((event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  const action = getRouterParam(event, 'action');
+  const run = {
+    id: pluginRuns.length + 1,
+    connection_id: id,
+    action,
+    status: 'succeeded',
+    counts: { written: 0, updated: 0, skipped: 0, failed: 0, conflicts: 0 },
+    duration_ms: 12,
+    created_at: new Date().toISOString(),
+  };
+  pluginRuns = [run, ...pluginRuns];
+  return { err: 'ok', run };
+}));
+
+router.get('/api/admin/opds/sources', eventHandler(() => ({
+  err: 'ok',
+  count: 1,
+  items: [{ id: 1, name: '测试 OPDS', url: 'https://example.com/opds', description: '', active: true }],
+})));
 
 // Admin book sources
 router.get('/api/admin/booksource/list', eventHandler(() => ({

@@ -344,7 +344,7 @@ const navItems = computed(() => {
                 { icon: 'mdi-library-shelves', href: '/admin/books', text: t('navigation.books') },
                 { icon: 'mdi-playlist-music', href: '/audio-jobs', text: t('navigation.audiobookJobs') },
                 { icon: 'mdi-import', href: '/admin/imports', text: t('navigation.import') },
-                { icon: 'mdi-book-cog', href: '/admin/booksources', text: t('navigation.bookSources') },
+                { icon: 'mdi-puzzle', href: '/admin/plugins', text: t('navigation.plugins') },
                 { icon: 'mdi-palette', href: '/admin/themes', text: t('navigation.themes') },
                 { icon: 'mdi-text-box-outline', href: '/admin/logs', text: t('navigation.systemLogs') },
             ],

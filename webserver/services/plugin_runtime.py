@@ -8,6 +8,7 @@ from concurrent.futures import TimeoutError as FutureTimeoutError
 
 from sqlalchemy import or_
 
+from webserver.constants import AUTO_FILL_META
 from webserver.models import (
     PluginConnection,
     PluginDefinition,
@@ -20,6 +21,7 @@ from webserver.models import (
 )
 from webserver.plugins.runtime import (
     ACTIONS,
+    LEGACY_PROVIDERS,
     MockMultiTabProvider,
     PluginManifest,
     ProviderAuthError,
@@ -63,6 +65,8 @@ class PluginRegistry:
 
 REGISTRY = PluginRegistry()
 REGISTRY.register(MockMultiTabProvider())
+for _legacy_provider in LEGACY_PROVIDERS:
+    REGISTRY.register(_legacy_provider)
 
 
 def ensure_builtin_definitions(session, registry=REGISTRY):
@@ -94,6 +98,49 @@ def ensure_builtin_definitions(session, registry=REGISTRY):
         definitions.append(definition)
     session.commit()
     return definitions
+
+
+def ensure_legacy_installations(session, installed_by, settings, registry=REGISTRY):
+    """Idempotently register built-ins while keeping legacy tables as truth."""
+    ensure_builtin_definitions(session, registry)
+    installations = []
+    for provider in LEGACY_PROVIDERS:
+        plugin_key = provider.manifest["id"]
+        installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
+        if installation is None:
+            enabled = True
+            if plugin_key == "talebook.metadata.builtin":
+                enabled = bool(settings.get(AUTO_FILL_META, False))
+            installation = install_builtin(session, plugin_key, installed_by)
+            installation.enabled = enabled
+            session.commit()
+        connection = (
+            session.query(PluginConnection)
+            .filter(
+                PluginConnection.installation_id == installation.id,
+                PluginConnection.owner_type == "instance",
+                PluginConnection.owner_id == 0,
+                PluginConnection.name == "内置连接",
+            )
+            .first()
+        )
+        if connection is None:
+            connection = PluginConnection(
+                installation_id=installation.id,
+                owner_type="instance",
+                owner_id=0,
+                name="内置连接",
+                config={},
+                scopes=list(provider.manifest["permissions"]),
+                health="unknown",
+                enabled=True,
+                create_time=datetime.datetime.now(),
+                update_time=datetime.datetime.now(),
+            )
+            session.add(connection)
+            session.commit()
+        installations.append(installation)
+    return installations
 
 
 def install_builtin(session, plugin_key, installed_by, config=None, approved_permissions=None, registry=REGISTRY):
@@ -385,8 +432,13 @@ class PluginRuntime:
         return run
 
     def _load_secrets(self, connection):
-        secret = self.session.get(PluginSecret, connection.secret_id)
+        secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
         if secret is None:
+            installation = self.session.get(PluginInstallation, connection.installation_id)
+            definition = self.session.get(PluginDefinition, installation.definition_id)
+            auth_schema = definition.auth_schema or {}
+            if not auth_schema.get("properties") and not auth_schema.get("required"):
+                return {}
             raise PluginRuntimeError("plugin.credentials_missing", "Plugin connection has no credentials")
         cipher = SecretCipher(self.settings)
         if secret.key_id != cipher.key_id:

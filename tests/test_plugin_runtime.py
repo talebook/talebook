@@ -20,6 +20,7 @@ from webserver.services.plugin_runtime import (
     PluginRuntime,
     PluginRuntimeError,
     ensure_builtin_definitions,
+    ensure_legacy_installations,
     install_builtin,
     rotate_connection_secret,
     save_connection,
@@ -94,11 +95,44 @@ def test_builtin_definition_installation_and_permissions_are_shared(db_session):
     installation = install_builtin(db_session, PLUGIN_KEY, installed_by=7)
     definition = db_session.get(PluginDefinition, installation.definition_id)
 
-    assert len(definitions) == 1
+    assert len(definitions) >= 1
     assert definition.categories == ["metadata", "reviews"]
     assert installation.scope == "shared"
     assert installation.plugin_key == PLUGIN_KEY
     assert db_session.query(PluginPermission).filter(PluginPermission.installation_id == installation.id).count() == 2
+
+
+def test_legacy_capabilities_are_registered_without_ai_or_calibre_server(db_session):
+    definitions = ensure_builtin_definitions(db_session)
+    legacy = {item.plugin_key: item for item in definitions if item.plugin_key.startswith("talebook.")}
+
+    assert "talebook.metadata.builtin" in legacy
+    assert "talebook.book-source.opds" in legacy
+    assert "talebook.book-source.legado" in legacy
+    catalog = json.dumps([item.to_public_dict() for item in legacy.values()], ensure_ascii=False).lower()
+    assert "calibre content server" not in catalog
+    assert "calibre-web" not in catalog
+    assert '"ai"' not in catalog
+    assert legacy["talebook.book-source.opds"].to_public_dict()["ui"]["manage_kind"] == "opds"
+
+
+def test_legacy_installation_migration_is_idempotent_and_keeps_empty_auth_local(db_session):
+    settings = {**SETTINGS, "auto_fill_meta": False}
+    first = ensure_legacy_installations(db_session, installed_by=1, settings=settings)
+    second = ensure_legacy_installations(db_session, installed_by=1, settings=settings)
+
+    assert len(first) == len(second) == 3
+    assert db_session.query(PluginConnection).count() == 3
+    metadata = next(item for item in first if item.plugin_key == "talebook.metadata.builtin")
+    assert metadata.enabled is False
+    opds = next(item for item in first if item.plugin_key == "talebook.book-source.opds")
+    connection = db_session.query(PluginConnection).filter(PluginConnection.installation_id == opds.id).one()
+    assert connection.secret_id is None
+
+    run = PluginRuntime(db_session, settings).prepare_run(connection.id, "test", requested_by=1)
+    PluginRuntime(db_session, settings).execute(run.id)
+    assert run.status == "succeeded"
+    assert connection.health == "healthy"
 
 
 def test_reinstall_does_not_silently_reapprove_revoked_permissions(db_session):
