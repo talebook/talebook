@@ -32,6 +32,15 @@ let audiobookManagedEditions = [];
 let audiobookCapacityOk = true;
 let audiobookWorkspace = null;
 let podcastTokenHint = '';
+let recommendationFeedback = new Map();
+let recommendationFeedbackId = 0;
+let recommendationPreferences = {
+  personalization_enabled: true,
+  topics: [],
+  length: '',
+  difficulty: '',
+  seed_book_ids: [],
+};
 let importSettings = {
   scan_upload_path: '/mock/scan/dir',
   import_mode: 'copy',
@@ -212,6 +221,15 @@ router.post('/_test/reset', eventHandler(async (event) => {
   audiobookWorkspace = workspacePayload();
   audiobookCapacityOk = body?.audiobookCapacityOk !== false;
   podcastTokenHint = '';
+  recommendationFeedback = new Map();
+  recommendationFeedbackId = 0;
+  recommendationPreferences = {
+    personalization_enabled: true,
+    topics: [],
+    length: '',
+    difficulty: '',
+    seed_book_ids: [],
+  };
   return { status: 'ok' };
 }));
 
@@ -803,6 +821,57 @@ router.get('/api/index', eventHandler(() => {
   return readJson('api_index.json') || { err: 'error', msg: 'mock not found' };
 }));
 
+router.get('/api/ai/recommendations', eventHandler((event) => {
+  const query = getQuery(event);
+  const source = query.refresh === '1' ? 'agent' : 'deterministic';
+  const data = readJson('api_index.json') || { random_books: [] };
+  const excluded = new Set([...recommendationFeedback.values()].map(item => item.book_id));
+  const books = (data.random_books || []).filter(book => !excluded.has(book.id)).slice(0, 4).map((book, index) => ({
+    ...book,
+    state: { favorite: 0, wants: shelfBookIds.has(book.id) ? 1 : 0, read_state: 0 },
+    recommendation: {
+      rank: index + 1,
+      reason: index === 0 ? '延续你选择的文学主题，同时保留不同作者的探索。' : '根据书库主题与评分选出的非剧透推荐。',
+      evidence: index === 0 ? ['topic:文学'] : ['library_rating'],
+      confidence: index === 0 ? 'medium' : 'low',
+    },
+  }));
+  return {
+    err: 'ok', books, source, fallback: source !== 'agent', fallback_reason: source === 'agent' ? '' : 'runtime.unavailable',
+    cached: false, generated_at: '2026-08-16T10:00:00',
+    signal_summary: { cold_start: recommendationPreferences.topics.length === 0, signal_count: recommendationPreferences.topics.length },
+    preferences: recommendationPreferences,
+  };
+}));
+
+router.patch('/api/ai/recommendations/preferences', eventHandler(async (event) => {
+  const body = await readBody(event);
+  recommendationPreferences = { ...recommendationPreferences, ...(body || {}) };
+  return { err: 'ok', preferences: recommendationPreferences };
+}));
+
+router.post('/api/ai/recommendations/feedback', eventHandler(async (event) => {
+  const body = await readBody(event);
+  recommendationFeedbackId += 1;
+  const feedback = { id: recommendationFeedbackId, book_id: Number(body.book_id), action: body.action };
+  recommendationFeedback.set(feedback.id, feedback);
+  return { err: 'ok', feedback, undo_seconds: 10 };
+}));
+
+router.delete('/api/ai/recommendations/feedback/:id', eventHandler((event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  recommendationFeedback.delete(id);
+  return { err: 'ok', feedback_id: id };
+}));
+
+router.delete('/api/ai/recommendations/feedback', eventHandler(() => {
+  const cleared = recommendationFeedback.size;
+  recommendationFeedback.clear();
+  return { err: 'ok', cleared };
+}));
+
+router.post('/api/ai/recommendations/events', eventHandler(() => ({ err: 'ok' })));
+
 router.get('/api/welcome', eventHandler(() => {
   if (!inviteMode || isInvited) return { err: 'free', msg: 'No invitation required' };
   return { err: 'ok', msg: '', welcome: '请输入访问码' };
@@ -1252,6 +1321,8 @@ router.get('/api/shelf', eventHandler(() => {
     books: shelfBooks,
   };
 }));
+
+router.get('/api/favorites', eventHandler(() => ({ err: 'ok', title: '我的收藏', total: 0, books: [] })));
 
 router.post('/api/book/:id/shelf', eventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'));

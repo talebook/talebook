@@ -485,7 +485,10 @@ const items = computed(() => {
         { icon: 'mdi-book-music', href: '/audios', text: $t('navigation.audiobooks'), badge: $t('audiobook.beta') },
     ];
     var shelf_links = store.user.is_login
-        ? [{ icon: 'mdi-bookshelf', href: '/user/shelf', text: $t('navigation.myShelf') }]
+        ? [
+            { icon: 'mdi-bookshelf', href: '/user/shelf', text: $t('navigation.myShelf') },
+            { icon: 'mdi-book-open-outline', href: '/recommendations', text: $t('navigation.recommendations') },
+        ]
         : [];
     var admin_links = [
         {
