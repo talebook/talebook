@@ -572,6 +572,60 @@ class AITask(Base, SQLAlchemyMixin):
     creator = relationship(Reader, backref="ai_tasks")
 
 
+class TagOrganizationTask(Base, SQLAlchemyMixin):
+    """Creator-private, preview-gated tag organization task."""
+
+    __tablename__ = "tag_organization_tasks"
+
+    id = Column(String(36), primary_key=True)
+    request_key = Column(String(64), unique=True, nullable=False, index=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    status = Column(String(24), default="analyzing", nullable=False, index=True)
+    scope_data = Column(MutableDict.as_mutable(JSONType), default={})
+    suggestions = Column(MutableDict.as_mutable(JSONType), default={})
+    adjustments = Column(MutableDict.as_mutable(JSONType), default={})
+    preview_data = Column(MutableDict.as_mutable(JSONType), default={})
+    result_data = Column(MutableDict.as_mutable(JSONType), default={})
+    metrics = Column(MutableDict.as_mutable(JSONType), default={})
+    schema_version = Column(String(32), default="tag_organizer.v1", nullable=False)
+    prompt_version = Column(String(32), default="tag_organizer.zh.v1", nullable=False)
+    runtime_name = Column(String(64), default="")
+    runtime_session_id = Column(String(128), default="")
+    usage = Column(MutableDict.as_mutable(JSONType), default={})
+    error_code = Column(String(128), default="")
+    error_message = Column(String(500), default="")
+    execute_key = Column(String(64), unique=True, index=True)
+    undo_key = Column(String(64), unique=True, index=True)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    finished_at = Column(DateTime)
+
+    creator = relationship(Reader, backref="tag_organization_tasks")
+
+
+class TagOrganizationChange(Base, SQLAlchemyMixin):
+    """Per-book before/after state used for retry and conflict-safe undo."""
+
+    __tablename__ = "tag_organization_changes"
+    __table_args__ = (UniqueConstraint("task_id", "book_id", name="uq_tag_organization_task_book"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String(36), ForeignKey("tag_organization_tasks.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    title = Column(String(512), default="")
+    before_tags = Column(JSONType, default=list)
+    after_tags = Column(JSONType, default=list)
+    before_version = Column(String(64), default="")
+    after_version = Column(String(64), default="")
+    status = Column(String(24), default="pending", nullable=False, index=True)
+    error_code = Column(String(128), default="")
+    error_message = Column(String(500), default="")
+    undo_status = Column(String(24), default="")
+    undo_error = Column(String(500), default="")
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+
 class BookSourceModel(Base, SQLAlchemyMixin):
     """网络书源（Legado 书源 JSON）。"""
 
