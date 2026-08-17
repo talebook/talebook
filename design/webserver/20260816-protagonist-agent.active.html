@@ -44,7 +44,7 @@
       <li><code>npx nuxi typecheck</code> 在进入项目类型检查前因临时解析到的 <code>vue-tsc@3.3.10</code> 与锁定 TypeScript export map 不兼容而失败（<code>ERR_PACKAGE_PATH_NOT_EXPORTED: ./lib/tsc</code>）；风险由完整生产构建和目标 Vitest 通过覆盖，未将其记为功能通过。</li>
     </ul>
     <h3>Full interface review</h3>
-    <p>按项目要求以 full 模式审查当前分支相对默认分支 <code>origin/master@1f0a4bd</code> 的全部本地变化：<code>HEAD@049f1c92</code> 前置 5 个提交，加 11 个未提交路径，共 28 个路径；排除运行时 <code>.venv</code>，界面范围覆盖 Summary Duck 阅读器入口/弹层以及本功能的书籍详情入口、推荐/自选创建、预览、空态、聊天、加载、失败、取消、反馈、删除、窄屏和亮暗主题代码。直接消费者展开到 <code>creader.html</code>、书籍详情页和 <code>ManifestPreview</code> 的唯一页面调用方。</p>
+    <p>按项目要求以 full 模式审查当前分支相对默认分支 <code>origin/master@1f0a4bd</code> 的全部已提交与未提交变化，并在目标分支更新合入后再次复核冲突区域；排除运行时 <code>.venv</code>。界面范围覆盖 Summary Duck 阅读器入口/弹层、猜你喜欢页面，以及本功能的书籍详情入口、推荐/自选创建、预览、空态、聊天、加载、失败、取消、反馈、删除、窄屏和亮暗主题代码。直接消费者展开到 <code>creader.html</code>、书籍详情页和 <code>ManifestPreview</code> 的唯一页面调用方。</p>
     <p>Accessibility、Layout、Writing、Typography、Colors、UI 六个领域均已审阅。初版审查修复了聊天标签、pressed 状态、键盘焦点、取消入口、英文来源标点、辅助文字对比度、RTL 缩进和聊天滚动等问题；本轮产品转向后重新审查，进一步把英文标题由仅暗示虚构角色的 “Character-inspired” 改为 “Person-inspired”，将自定义人物空值错误放到输入框旁并由 Vuetify 建立可访问关联，同时在 420px 以下纵向排列模式选项。复查未发现可操作的 HIGH / MEDIUM。</p>
     <p>刻意保留的设计：AI 衍生标识、思维盲区与删除风险继续使用明确文字表达；Vuetify 原生输入、单选和对话框负责键盘语义、错误关联、焦点陷阱和恢复；原有 Summary Duck 使用已经验证的静态阅读器注入方式，而不在本功能中重写为第二套组件。</p>
     <p>验证缺口：当前智能体运行环境未提供 Chrome DevTools MCP，且已占用的真实 Docker 实例不是本 checkout，未冒险替换现有服务，因此本功能没有新增真实后端浏览器截图；界面视觉判断以源码、组件测试、已有 Summary Duck Chromium 亮暗/320px 快照和完整 Nuxt 生产构建为替代。合并前仍建议在可用的 Chrome DevTools MCP 环境下补一次真实 EPUB、登录态、亮暗主题与 320px 人工验收。</p>

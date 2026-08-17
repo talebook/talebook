@@ -35,6 +35,7 @@ export const useMainStore = defineStore('main', () => {
     footer_extra_html: '',
     friends: [],
     show_network_library: true,
+    ai_recommendations_enabled: false,
     upload: {
       chunk_enabled: true,
       chunk_threshold: 8 * 1024 * 1024,
