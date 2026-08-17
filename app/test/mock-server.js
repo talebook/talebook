@@ -170,6 +170,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   booksourceCheckPolls = 0;
   pluginRuns = [];
   pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
+  pluginConnections = pluginConnections.filter(item => item.installation_id <= 3);
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
   annotationsByBookId = new Map([[1, mockAnnotations(1)]]);
@@ -1478,6 +1479,21 @@ const pluginDefinitions = [
     permissions: ['books.read', 'books.write', 'network.read'],
     ui: { icon: 'mdi-book-cog-outline', manage_kind: 'legado', primary_action: 'manage' },
   },
+  {
+    id: 4,
+    plugin_key: 'talebook.metadata.open-library',
+    name: 'Open Library',
+    description: '按 ISBN 获取元数据与可用评分，并生成逐字段安全候选。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['metadata', 'reviews'],
+    capabilities: ['metadata.lookup', 'reviews.lookup'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: { queries: { type: 'array' } } },
+    permissions: ['books.read', 'plugin_records.write', 'network.read'],
+    ui: { icon: 'mdi-library-outline', primary_action: 'configure' },
+  },
 ];
 let pluginInstallations = pluginDefinitions.map((definition, index) => ({
   id: index + 1,
@@ -1487,7 +1503,7 @@ let pluginInstallations = pluginDefinitions.map((definition, index) => ({
   status: 'active',
   definition,
 }));
-const pluginConnections = pluginInstallations.map(installation => ({
+let pluginConnections = pluginInstallations.filter(installation => installation.id <= 3).map(installation => ({
   id: installation.id,
   installation_id: installation.id,
   owner_type: 'instance',
@@ -1513,6 +1529,25 @@ router.get('/api/admin/plugins', eventHandler(() => ({
 router.get('/api/admin/plugins/connections', eventHandler(() => ({
   err: 'ok', connections: pluginConnections, user_connection_health: [],
 })));
+
+router.post('/api/admin/plugins/connections', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const connection = {
+    id: pluginConnections.length + 1,
+    installation_id: Number(body.installation_id),
+    owner_type: 'instance',
+    owner_id: 0,
+    name: body.name || 'default',
+    config: body.config || {},
+    scopes: body.scopes || [],
+    enabled: true,
+    health: 'unknown',
+    health_message: '',
+    secret: { configured: Object.keys(body.credentials || {}).length > 0, mask: '' },
+  };
+  pluginConnections.push(connection);
+  return { err: 'ok', connection };
+}));
 
 router.post('/api/admin/plugins/installations/:id/state', eventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'));

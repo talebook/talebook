@@ -99,6 +99,9 @@
                             {{ itemStatusLabel(item.status) }}
                         </v-chip>
                     </template>
+                    <template #item.data="{ item }">
+                        <PluginRunItemPreview :data="item.data" />
+                    </template>
                     <template #no-data>
                         <div class="text-medium-emphasis pa-6">
                             {{ t('pluginManagement.noRunItems') }}
@@ -129,6 +132,7 @@ const headers = computed(() => [
     { title: t('pluginManagement.entityType'), key: 'entity_type' },
     { title: t('pluginManagement.status'), key: 'status' },
     { title: t('pluginManagement.operation'), key: 'operation' },
+    { title: t('pluginManagement.previewData'), key: 'data', sortable: false },
     { title: t('pluginManagement.errorCode'), key: 'error_code' },
 ]);
 const metrics = computed(() => [

@@ -217,10 +217,11 @@
         </v-card-text>
 
         <v-dialog
-            v-model="drawerOpen"
+            :model-value="drawerOpen"
             max-width="520"
             scrollable
             class="plugin-drawer-dialog"
+            @update:model-value="updateDrawerOpen"
             @after-leave="restoreDetailFocus"
         >
             <v-card v-if="selectedPlugin">
@@ -274,6 +275,15 @@
 
                     <div class="d-flex flex-wrap ga-2 mt-3">
                         <v-btn
+                            v-if="selectedPlugin.installation && !selectedConnection"
+                            color="primary"
+                            variant="tonal"
+                            prepend-icon="mdi-connection"
+                            @click="openConnectionForm"
+                        >
+                            {{ t('pluginManagement.createConnection') }}
+                        </v-btn>
+                        <v-btn
                             v-if="selectedConnection"
                             variant="outlined"
                             prepend-icon="mdi-connection"
@@ -282,6 +292,27 @@
                             @click="runAction(selectedConnection, 'test')"
                         >
                             {{ t('pluginManagement.testConnection') }}
+                        </v-btn>
+                        <v-btn
+                            v-if="selectedConnection && selectedPlugin.actions.includes('preview')"
+                            variant="outlined"
+                            prepend-icon="mdi-eye-outline"
+                            :loading="actionLoading"
+                            :disabled="!selectedPlugin.installation?.enabled || !selectedConnection.enabled"
+                            @click="runAction(selectedConnection, 'preview')"
+                        >
+                            {{ t('pluginManagement.preview') }}
+                        </v-btn>
+                        <v-btn
+                            v-if="selectedConnection && selectedPlugin.actions.includes('run')"
+                            color="primary"
+                            variant="tonal"
+                            prepend-icon="mdi-play-outline"
+                            :loading="actionLoading"
+                            :disabled="!selectedPlugin.installation?.enabled || !selectedConnection.enabled"
+                            @click="runAction(selectedConnection, 'run')"
+                        >
+                            {{ t('pluginManagement.runNow') }}
                         </v-btn>
                         <v-btn
                             v-if="selectedPlugin.installation"
@@ -331,6 +362,99 @@
             </v-card>
         </v-dialog>
 
+        <v-dialog
+            v-model="connectionDialogOpen"
+            max-width="680"
+            persistent
+            aria-labelledby="plugin-connection-dialog-title"
+            @after-leave="restoreConnectionFocus"
+        >
+            <v-card v-if="selectedPlugin">
+                <v-card-title id="plugin-connection-dialog-title">
+                    {{ t('pluginManagement.createConnectionFor', { name: selectedPlugin.name }) }}
+                </v-card-title>
+                <v-card-text>
+                    <v-text-field
+                        v-model="connectionName"
+                        :label="t('pluginManagement.connectionName')"
+                        variant="outlined"
+                        autocomplete="off"
+                    />
+                    <template
+                        v-for="field in credentialFields"
+                        :key="field.key"
+                    >
+                        <v-textarea
+                            v-if="field.key === 'content' || field.key === 'archive_base64'"
+                            :id="credentialInputId(field.key)"
+                            v-model="credentialValues[field.key]"
+                            :label="field.title"
+                            variant="outlined"
+                            rows="5"
+                            :required="field.required"
+                            :error-messages="credentialFieldErrors[field.key] || []"
+                            :aria-invalid="Boolean(credentialFieldErrors[field.key])"
+                            autocomplete="off"
+                        />
+                        <v-text-field
+                            v-else
+                            :id="credentialInputId(field.key)"
+                            v-model="credentialValues[field.key]"
+                            :label="field.title"
+                            variant="outlined"
+                            type="password"
+                            :required="field.required"
+                            :error-messages="credentialFieldErrors[field.key] || []"
+                            :aria-invalid="Boolean(credentialFieldErrors[field.key])"
+                            autocomplete="new-password"
+                        />
+                    </template>
+                    <v-textarea
+                        id="plugin-public-config"
+                        v-model="connectionConfigText"
+                        :label="t('pluginManagement.publicConfigJson')"
+                        :hint="t('pluginManagement.publicConfigHint')"
+                        persistent-hint
+                        :error-messages="connectionConfigError ? [connectionConfigError] : []"
+                        :aria-invalid="Boolean(connectionConfigError)"
+                        variant="outlined"
+                        rows="8"
+                        spellcheck="false"
+                        class="connection-config-json"
+                    />
+                    <v-alert
+                        v-if="connectionFormError"
+                        ref="connectionErrorAlert"
+                        type="error"
+                        variant="tonal"
+                        density="compact"
+                        role="alert"
+                        tabindex="-1"
+                    >
+                        {{ connectionFormError }}
+                    </v-alert>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn
+                        variant="text"
+                        :disabled="connectionSaving"
+                        @click="connectionDialogOpen = false"
+                    >
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                    <v-btn
+                        color="primary"
+                        variant="tonal"
+                        :loading="connectionSaving"
+                        @click="savePluginConnection"
+                    >
+                        {{ t('common.save') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <OpdsImportDialog ref="opdsDialog" />
     </v-card>
 </template>
@@ -370,12 +494,23 @@ const search = ref(typeof route.query.q === 'string' ? route.query.q : '');
 const statusFilter = ref(typeof route.query.status === 'string' ? route.query.status : 'all');
 const actionLoading = ref(false);
 const toggleLoading = ref(false);
+const connectionDialogOpen = ref(false);
+const connectionSaving = ref(false);
+const connectionName = ref('default');
+const connectionConfigText = ref('{}');
+const connectionFormError = ref('');
+const connectionConfigError = ref('');
+const credentialFieldErrors = ref({});
+const credentialValues = ref({});
+const connectionErrorAlert = ref(null);
 const showLegado = ref(false);
 const legadoPanel = ref(null);
 const opdsDialog = ref(null);
 const selectedPluginKey = ref(typeof route.query.plugin === 'string' ? route.query.plugin : '');
+const drawerOpen = ref(false);
 let filterTimer = null;
 let detailTrigger = null;
+let connectionTrigger = null;
 
 const statusOptions = computed(() => [
     { title: t('pluginManagement.statusAll'), value: 'all' },
@@ -404,13 +539,18 @@ const filteredPlugins = computed(() => {
     });
 });
 const selectedPlugin = computed(() => catalog.value.find(item => item.plugin_key === selectedPluginKey.value) || null);
-const drawerOpen = computed({
-    get: () => Boolean(selectedPlugin.value),
-    set: value => { if (!value) closeDetails(); },
-});
 const selectedConnection = computed(() => {
     const installationId = selectedPlugin.value?.installation?.id;
     return connections.value.find(item => item.installation_id === installationId) || null;
+});
+const credentialFields = computed(() => {
+    const schema = selectedPlugin.value?.auth_schema || {};
+    const required = new Set(schema.required || []);
+    return Object.entries(schema.properties || {}).map(([key, value]) => ({
+        key,
+        title: value.title || key,
+        required: required.has(key),
+    }));
 });
 
 function statusInfo(plugin) {
@@ -452,6 +592,7 @@ function attentionCount(tab) {
 function primaryActionLabel(plugin) {
     if (!plugin.installation) return t('pluginManagement.install');
     if (!plugin.installation.enabled) return t('pluginManagement.enable');
+    if (!connections.value.some(item => item.installation_id === plugin.installation.id)) return t('pluginManagement.configure');
     if (plugin.ui.manage_kind === 'opds') return t('pluginManagement.browse');
     if (plugin.ui.manage_kind === 'legado') return t('pluginManagement.manage');
     if (plugin.ui.manage_kind === 'metadata') return t('pluginManagement.configure');
@@ -461,6 +602,11 @@ function primaryActionLabel(plugin) {
 async function primaryAction(plugin) {
     if (!plugin.installation) return install(plugin);
     if (!plugin.installation.enabled) return toggleInstallation(plugin);
+    if (!connections.value.some(item => item.installation_id === plugin.installation.id)) {
+        selectedPluginKey.value = plugin.plugin_key;
+        openConnectionForm();
+        return;
+    }
     if (plugin.ui.manage_kind === 'opds') return opdsDialog.value?.open();
     if (plugin.ui.manage_kind === 'legado') return openLegado();
     if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/settings#metadata');
@@ -506,6 +652,79 @@ async function runAction(connection, action) {
     }
 }
 
+function openConnectionForm() {
+    connectionTrigger = document.activeElement;
+    connectionName.value = 'default';
+    connectionConfigText.value = '{}';
+    credentialValues.value = Object.fromEntries(credentialFields.value.map(field => [field.key, '']));
+    credentialFieldErrors.value = {};
+    connectionConfigError.value = '';
+    connectionFormError.value = '';
+    connectionDialogOpen.value = true;
+}
+
+async function savePluginConnection() {
+    connectionFormError.value = '';
+    connectionConfigError.value = '';
+    credentialFieldErrors.value = {};
+    let config;
+    try {
+        config = JSON.parse(connectionConfigText.value || '{}');
+        if (!config || Array.isArray(config) || typeof config !== 'object') throw new Error();
+    } catch {
+        connectionConfigError.value = t('pluginManagement.publicConfigInvalid');
+        await nextTick();
+        document.getElementById('plugin-public-config')?.focus();
+        return;
+    }
+    const credentials = Object.fromEntries(
+        Object.entries(credentialValues.value).filter(([, value]) => typeof value === 'string' && value.length),
+    );
+    const missing = credentialFields.value.find(field => field.required && !credentials[field.key]);
+    if (missing) {
+        credentialFieldErrors.value = {
+            [missing.key]: [t('pluginManagement.credentialRequired', { field: missing.title })],
+        };
+        await nextTick();
+        document.getElementById(credentialInputId(missing.key))?.focus();
+        return;
+    }
+    connectionSaving.value = true;
+    try {
+        const rsp = await $backend('/admin/plugins/connections', {
+            method: 'POST',
+            body: JSON.stringify({
+                installation_id: selectedPlugin.value.installation.id,
+                owner_type: 'instance',
+                name: connectionName.value || 'default',
+                credentials,
+                config,
+                scopes: selectedPlugin.value.permissions,
+            }),
+        });
+        if (rsp.err === 'ok') {
+            connectionDialogOpen.value = false;
+            $alert?.('success', t('pluginManagement.connectionSaved'));
+            await load();
+        } else {
+            connectionFormError.value = rsp.msg || rsp.err;
+            await nextTick();
+            connectionErrorAlert.value?.$el?.focus?.();
+        }
+    } finally {
+        connectionSaving.value = false;
+    }
+}
+
+function credentialInputId(key) {
+    return `plugin-credential-${String(key).replace(/[^a-z0-9_-]/gi, '-')}`;
+}
+
+function restoreConnectionFocus() {
+    connectionTrigger?.focus();
+    connectionTrigger = null;
+}
+
 function pluginRuns(plugin) {
     const ids = new Set(connections.value
         .filter(item => item.installation_id === plugin.installation?.id)
@@ -525,14 +744,21 @@ function clearFilters() {
 function openDetails(plugin) {
     detailTrigger = document.activeElement;
     selectedPluginKey.value = plugin.plugin_key;
+    drawerOpen.value = true;
     router.replace({ query: { ...route.query, plugin: plugin.plugin_key } });
 }
 
 function closeDetails() {
+    drawerOpen.value = false;
     selectedPluginKey.value = '';
     const query = { ...route.query };
     delete query.plugin;
     router.replace({ query });
+}
+
+function updateDrawerOpen(value) {
+    if (value) drawerOpen.value = true;
+    else if (drawerOpen.value) closeDetails();
 }
 
 function restoreDetailFocus() {
@@ -569,6 +795,7 @@ async function load() {
         builtinState.value = catalogRsp.builtin_state || {};
         connections.value = connectionRsp.connections || [];
         runs.value = runRsp.runs || [];
+        drawerOpen.value = Boolean(selectedPlugin.value);
     } catch {
         error.value = true;
     } finally {
@@ -577,7 +804,10 @@ async function load() {
 }
 
 watch(() => route.query.manage, value => { showLegado.value = value === 'legado'; }, { immediate: true });
-watch(() => route.query.plugin, value => { selectedPluginKey.value = typeof value === 'string' ? value : ''; });
+watch(() => route.query.plugin, (value) => {
+    selectedPluginKey.value = typeof value === 'string' ? value : '';
+    drawerOpen.value = Boolean(selectedPlugin.value);
+});
 watch(() => route.query.q, value => {
     const next = typeof value === 'string' ? value : '';
     if (next !== search.value) search.value = next;

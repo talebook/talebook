@@ -39,6 +39,36 @@ test.describe('Plugin management', () => {
         await expect(page.getByText('成功').first()).toBeVisible();
     });
 
+    test('creates a no-secret connector connection, previews it, and keeps config explicit', async ({ page }) => {
+        await page.goto('/admin/plugins?tab=metadata');
+        const card = page.locator('.plugin-card').filter({ hasText: 'Open Library' });
+        const configureButton = card.getByRole('button', { name: '配置' });
+        await configureButton.click();
+
+        let form = page.getByRole('dialog', { name: /配置 Open Library 连接/ });
+        await form.getByRole('button', { name: '取消' }).click();
+        await expect(configureButton).toBeFocused();
+        await configureButton.click();
+
+        form = page.getByRole('dialog', { name: /配置 Open Library 连接/ });
+        const configInput = form.getByRole('textbox', { name: '公开配置（JSON）' });
+        await expect(configInput).toBeVisible();
+        await configInput.fill('[');
+        await form.getByRole('button', { name: '保存' }).click();
+        await expect(form.getByText('公开配置必须是有效的 JSON 对象。')).toBeVisible();
+        await expect(configInput).toHaveAttribute('aria-invalid', 'true');
+        await expect(configInput).toBeFocused();
+
+        await configInput.fill(JSON.stringify({
+            queries: [{ book_id: 1, isbn: '9781234567897', current_metadata: {}, locked_fields: [] }],
+        }));
+        await form.getByRole('button', { name: '保存' }).click();
+
+        await expect(page.getByText('default · 尚未测试')).toBeVisible();
+        await page.getByRole('button', { name: '预览' }).click();
+        await expect(page.getByText(/上次执行：成功/)).toBeVisible();
+    });
+
     test('old book source URL redirects into the plugin source tab', async ({ page }) => {
         await page.goto('/admin/booksources');
         await expect(page).toHaveURL(/\/admin\/plugins\?.*tab=book_sources/);

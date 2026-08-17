@@ -22,6 +22,7 @@ from webserver.models import (
 from webserver.plugins.runtime import (
     ACTIONS,
     BUILTIN_CAPABILITY_PROVIDERS,
+    EXTERNAL_CONNECTOR_PROVIDERS,
     MockMultiTabProvider,
     PluginManifest,
     ProviderAuthError,
@@ -67,6 +68,8 @@ REGISTRY = PluginRegistry()
 REGISTRY.register(MockMultiTabProvider())
 for _builtin_provider in BUILTIN_CAPABILITY_PROVIDERS:
     REGISTRY.register(_builtin_provider)
+for _connector_provider in EXTERNAL_CONNECTOR_PROVIDERS:
+    REGISTRY.register(_connector_provider)
 
 
 def ensure_builtin_definitions(session, registry=REGISTRY):
@@ -223,6 +226,9 @@ def save_connection(
     if installation is None or installation.status != "active":
         raise PluginRuntimeError("plugin.installation_missing", "Plugin installation is not active")
     definition = session.get(PluginDefinition, installation.definition_id)
+    allowed_owners = set((definition.manifest or {}).get("connection_owners") or ["instance", "user"])
+    if owner_type not in allowed_owners:
+        raise PluginRuntimeError("plugin.owner_forbidden", "This plugin does not support this connection owner")
     _validate_credentials(definition, credentials)
     _validate_public_config(config or {}, credentials)
     approved = {
@@ -235,7 +241,9 @@ def save_connection(
     if requested_scopes - approved:
         raise PluginRuntimeError("plugin.scope_not_approved", "Connection requests permissions that were not approved")
 
-    cipher = SecretCipher(settings)
+    auth_schema = definition.auth_schema or {}
+    stores_credentials = bool(auth_schema.get("properties") or auth_schema.get("required"))
+    cipher = SecretCipher(settings) if stores_credentials else None
     connection = (
         session.query(PluginConnection)
         .filter(
@@ -257,26 +265,27 @@ def save_connection(
         )
         session.add(connection)
         session.flush()
-    secret = session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
-    if secret is None:
-        secret = PluginSecret(
-            owner_type=owner_type,
-            owner_id=owner_id,
-            kind="credentials",
-            ciphertext="pending",
-            key_id=cipher.key_id,
-            create_time=now,
-            last_rotated_at=now,
-        )
-        session.add(secret)
-        session.flush()
-        connection.secret_id = secret.id
-    else:
-        secret.version = int(secret.version or 0) + 1
-        secret.last_rotated_at = now
-    secret.ciphertext = cipher.encrypt(credentials)
-    secret.key_id = cipher.key_id
-    secret.mask_hint = secret_mask_hint(credentials)
+    if stores_credentials:
+        secret = session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
+        if secret is None:
+            secret = PluginSecret(
+                owner_type=owner_type,
+                owner_id=owner_id,
+                kind="credentials",
+                ciphertext="pending",
+                key_id=cipher.key_id,
+                create_time=now,
+                last_rotated_at=now,
+            )
+            session.add(secret)
+            session.flush()
+            connection.secret_id = secret.id
+        else:
+            secret.version = int(secret.version or 0) + 1
+            secret.last_rotated_at = now
+        secret.ciphertext = cipher.encrypt(credentials)
+        secret.key_id = cipher.key_id
+        secret.mask_hint = secret_mask_hint(credentials)
     connection.config = dict(config or {})
     connection.scopes = sorted(requested_scopes)
     connection.schedule = schedule or ""
