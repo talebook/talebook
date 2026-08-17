@@ -1,6 +1,8 @@
 import json
+import tempfile
 import threading
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -85,6 +87,23 @@ class KnowledgeGraphValidationTest(unittest.TestCase):
         self.assertEqual(selected[0]["href"], self.chapter["href"])
         self.assertGreater(len(selected[0]["text"]), 80)
 
+    def test_nested_package_uses_opf_relative_reader_href(self):
+        container = """<?xml version="1.0"?>
+        <container><rootfiles><rootfile full-path="OPS/package.opf"/></rootfiles></container>"""
+        package = """<?xml version="1.0"?>
+        <package><manifest><item id="chapter" href="text/chapter%202.html"
+        media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>"""
+        chapter = "<html><body><p>" + ("reader-facing chapter text " * 8) + "</p></body></html>"
+        with tempfile.NamedTemporaryFile(suffix=".epub") as epub:
+            with zipfile.ZipFile(epub.name, "w") as archive:
+                archive.writestr("META-INF/container.xml", container)
+                archive.writestr("OPS/package.opf", package)
+                archive.writestr("OPS/text/chapter 2.html", chapter)
+            chapters = extract_epub_chapters(epub.name)
+            selected = extract_epub_chapters(epub.name, ["text/chapter%202.html"])
+        self.assertEqual(chapters[0]["href"], "text/chapter 2.html")
+        self.assertEqual(selected[0]["href"], "text/chapter 2.html")
+
     def test_validates_every_node_and_relation_citation(self):
         checked = validate_segment(valid_segment(self.chapter), self.chapter)
         self.assertEqual(len(checked["entities"]), 2)
@@ -143,6 +162,14 @@ class KnowledgeGraphValidationTest(unittest.TestCase):
         merged = merge_segments([checked])
         self.assertEqual(merged["graph"]["nodes"], [])
         self.assertGreaterEqual(len(merged["review"]["low_confidence"]), 3)
+
+    def test_citation_coverage_uses_high_confidence_candidates_as_denominator(self):
+        checked = validate_segment(valid_segment(self.chapter), self.chapter)
+        checked["entities"][0]["citations"] = []
+        checked["relations"][0]["citations"] = []
+        merged = merge_segments([checked])
+        self.assertEqual(merged["stats"]["node_citation_coverage"], 0.5)
+        self.assertEqual(merged["stats"]["relation_citation_coverage"], 0.0)
 
 
 class _FakeGraphRuntime:

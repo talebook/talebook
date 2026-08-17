@@ -324,22 +324,38 @@ def extract_epub_chapters(
         except (KeyError, StopIteration, ElementTree.ParseError) as exc:
             raise KnowledgeGraphValidationError("EPUB 目录结构无效") from exc
         opf_dir = posixpath.dirname(opf_path)
-        manifest: Dict[str, Tuple[str, str]] = {}
+        # Keep the ZIP member name separate from the OPF-relative href exposed to
+        # epub.js.  They differ whenever the package document lives in a
+        # subdirectory (for example OPS/package.opf + chapter2.html).
+        manifest: Dict[str, Tuple[str, str, str]] = {}
         spine_ids: List[str] = []
         for node in package.iter():
             name = _xml_local(node.tag)
             if name == "item" and node.attrib.get("id") and node.attrib.get("href"):
-                href = posixpath.normpath(posixpath.join(opf_dir, unquote(node.attrib["href"])))
-                manifest[node.attrib["id"]] = (href, node.attrib.get("media-type", ""))
+                reader_href = posixpath.normpath(unquote(urlparse(node.attrib["href"]).path))
+                archive_href = posixpath.normpath(posixpath.join(opf_dir, reader_href))
+                manifest[node.attrib["id"]] = (
+                    archive_href,
+                    reader_href,
+                    node.attrib.get("media-type", ""),
+                )
             elif name == "itemref" and node.attrib.get("idref") and node.attrib.get("linear", "yes") != "no":
                 spine_ids.append(node.attrib["idref"])
         candidates = [manifest[item_id] for item_id in spine_ids if item_id in manifest]
-        candidates = [(href, media) for href, media in candidates if media in {"application/xhtml+xml", "text/html", ""}]
+        candidates = [
+            (archive_href, reader_href, media)
+            for archive_href, reader_href, media in candidates
+            if media in {"application/xhtml+xml", "text/html", ""}
+        ]
         if requested_hrefs:
-            matched: List[Tuple[str, str]] = []
+            matched: List[Tuple[str, str, str]] = []
             missing = []
             for requested in requested_hrefs:
-                options = [candidate for candidate in candidates if _requested_match(requested, candidate[0])]
+                options = [
+                    candidate
+                    for candidate in candidates
+                    if _requested_match(requested, candidate[1]) or _requested_match(requested, candidate[0])
+                ]
                 if len(options) == 1:
                     if options[0] not in matched:
                         matched.append(options[0])
@@ -354,9 +370,9 @@ def extract_epub_chapters(
             raise KnowledgeGraphValidationError(f"所选范围超过 {max_chapters} 章，请缩小范围")
         chapters: List[Dict[str, str]] = []
         total = 0
-        for href, _media in candidates:
+        for archive_href, reader_href, _media in candidates:
             try:
-                document = _decode_document(archive.read(href))
+                document = _decode_document(archive.read(archive_href))
             except KeyError as exc:
                 raise KnowledgeGraphValidationError("EPUB 正文章节缺失") from exc
             parser = _XHTMLTextExtractor()
@@ -368,8 +384,8 @@ def extract_epub_chapters(
             total += len(text)
             if total > max_total_characters:
                 raise KnowledgeGraphValidationError(f"所选正文超过 {max_total_characters} 字，请缩小范围")
-            title = " ".join(parser.title_parts).strip()[:512] or posixpath.basename(href)
-            chapters.append({"href": href, "title": title, "text": text})
+            title = " ".join(parser.title_parts).strip()[:512] or posixpath.basename(reader_href)
+            chapters.append({"href": reader_href, "title": title, "text": text})
         if not chapters:
             raise KnowledgeGraphValidationError("所选范围没有足够正文")
         return chapters
@@ -528,15 +544,21 @@ def merge_segments(segments: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             }
         )
 
-    formal_nodes = [node for node in merged_nodes if node["confidence"] >= CONFIDENCE_THRESHOLD and node["citations"]]
+    high_confidence_nodes = [node for node in merged_nodes if node["confidence"] >= CONFIDENCE_THRESHOLD]
+    high_confidence_ids = {node["id"] for node in high_confidence_nodes}
+    formal_nodes = [node for node in high_confidence_nodes if node["citations"]]
     formal_ids = {node["id"] for node in formal_nodes}
-    formal_relations = [
+    high_confidence_relations = [
         relation
         for relation in merged_relations
         if relation["confidence"] >= CONFIDENCE_THRESHOLD
-        and relation["citations"]
-        and relation["source"] in formal_ids
-        and relation["target"] in formal_ids
+        and relation["source"] in high_confidence_ids
+        and relation["target"] in high_confidence_ids
+    ]
+    formal_relations = [
+        relation
+        for relation in high_confidence_relations
+        if relation["citations"] and relation["source"] in formal_ids and relation["target"] in formal_ids
     ]
     degree = defaultdict(int)
     for relation in formal_relations:
@@ -550,11 +572,15 @@ def merge_segments(segments: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     low_confidence.extend(
         {"kind": "relation", "item": relation} for relation in merged_relations if relation not in formal_relations
     )
-    node_coverage = 1.0 if not formal_nodes else sum(bool(node["citations"]) for node in formal_nodes) / len(formal_nodes)
+    node_coverage = (
+        1.0
+        if not high_confidence_nodes
+        else sum(bool(node["citations"]) for node in high_confidence_nodes) / len(high_confidence_nodes)
+    )
     relation_coverage = (
         1.0
-        if not formal_relations
-        else sum(bool(relation["citations"]) for relation in formal_relations) / len(formal_relations)
+        if not high_confidence_relations
+        else sum(bool(relation["citations"]) for relation in high_confidence_relations) / len(high_confidence_relations)
     )
     return {
         "graph": {"nodes": formal_nodes, "relations": formal_relations},

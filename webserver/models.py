@@ -572,6 +572,69 @@ class AITask(Base, SQLAlchemyMixin):
     creator = relationship(Reader, backref="ai_tasks")
 
 
+class RecommendationPreference(Base, SQLAlchemyMixin):
+    """Current-user controls for explainable book recommendations."""
+
+    __tablename__ = "recommendation_preferences"
+
+    reader_id = Column(Integer, ForeignKey("readers.id"), primary_key=True)
+    personalization_enabled = Column(Boolean, default=True, nullable=False)
+    selections = Column(MutableDict.as_mutable(JSONType), default={})
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    reader = relationship(Reader, backref="recommendation_preference", uselist=False)
+
+
+class RecommendationFeedback(Base, SQLAlchemyMixin):
+    """Creator-private explicit feedback used to correct later recommendations."""
+
+    __tablename__ = "recommendation_feedback"
+    __table_args__ = (UniqueConstraint("reader_id", "book_id", "action", name="uq_recommendation_feedback"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    action = Column(String(32), nullable=False)
+    context = Column(MutableDict.as_mutable(JSONType), default={})
+    active = Column(Boolean, default=True, nullable=False, index=True)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    reader = relationship(Reader, backref="recommendation_feedback")
+
+
+class RecommendationSnapshot(Base, SQLAlchemyMixin):
+    """Short-lived, user-private recommendation cache without prompts or history."""
+
+    __tablename__ = "recommendation_snapshots"
+
+    reader_id = Column(Integer, ForeignKey("readers.id"), primary_key=True)
+    cache_key = Column(String(64), nullable=False, index=True)
+    source = Column(String(32), default="deterministic", nullable=False)
+    fallback_reason = Column(String(64), default="")
+    result_data = Column(MutableDict.as_mutable(JSONType), default={})
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+
+    reader = relationship(Reader, backref="recommendation_snapshot", uselist=False)
+
+
+class RecommendationEvent(Base, SQLAlchemyMixin):
+    """Minimal product event for recommendation quality and fallback metrics."""
+
+    __tablename__ = "recommendation_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, default=0, nullable=False, index=True)
+    event_type = Column(String(48), nullable=False, index=True)
+    source = Column(String(32), default="", nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False, index=True)
+
+    reader = relationship(Reader, backref="recommendation_events")
+
+
 class BookSourceModel(Base, SQLAlchemyMixin):
     """网络书源（Legado 书源 JSON）。"""
 

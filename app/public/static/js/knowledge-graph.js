@@ -114,22 +114,35 @@
     delete document.documentElement.dataset.knowledgeGraphOpen;
   }
 
-  function currentFrame() {
-    const frames = Array.from(document.querySelectorAll("#reader iframe"));
-    if (!frames.length) return null;
-    const center = window.innerHeight / 2;
-    return frames.find(function (frame) {
-      const box = frame.getBoundingClientRect();
-      return box.top <= center && box.bottom >= center;
-    }) || frames[0];
+  function cleanHref(value) {
+    const path = String(value || "").split("#")[0].split("?")[0];
+    try { return decodeURIComponent(path).replace(/^\.\//, "").replace(/^\//, ""); }
+    catch (_error) { return path.replace(/^\.\//, "").replace(/^\//, ""); }
+  }
+
+  function hrefMatches(left, right) {
+    left = cleanHref(left); right = cleanHref(right);
+    return Boolean(left && right && (left === right || left.endsWith("/" + right) || right.endsWith("/" + left)));
+  }
+
+  function tocItemForHref(items, href) {
+    for (const item of items || []) {
+      if (hrefMatches(item.href, href)) return item;
+      const child = tocItemForHref(item.subitems || item.children, href);
+      if (child) return child;
+    }
+    return null;
   }
 
   function currentChapter() {
-    const frame = currentFrame();
-    if (!frame) return null;
+    const reader = readerProxy();
+    const location = reader && reader.rendition && reader.rendition.currentLocation();
+    const href = location && location.start && cleanHref(location.start.href);
+    if (!href) return null;
+    const tocItem = tocItemForHref(reader.toc_items, href);
     return {
-      href: frame.getAttribute("src") || frame.dataset.href || "",
-      title: document.querySelector("#status-bar-left")?.textContent?.trim() || "当前章节"
+      href: href,
+      title: (tocItem && tocItem.label && tocItem.label.trim()) || reader.current_toc_title || "当前章节"
     };
   }
 
@@ -613,17 +626,29 @@
     return app ? visit(app._instance) : null;
   }
 
-  function matchingFrame(href) {
-    const clean = String(href).split("#")[0];
-    return Array.from(document.querySelectorAll("#reader iframe")).find(function (frame) {
-      const source = decodeURIComponent((frame.getAttribute("src") || "").split("?")[0]);
-      return source === clean || source.endsWith("/" + clean) || clean.endsWith("/" + source.replace(/^\//, ""));
-    });
+  function renditionViews(rendition) {
+    if (!rendition || typeof rendition.views !== "function") return [];
+    const views = rendition.views();
+    if (Array.isArray(views)) return views;
+    return views && Array.isArray(views._views) ? views._views : [];
   }
 
-  function highlightCitation(frame, citation) {
+  function renderedContent(reader, href) {
+    const rendition = reader && reader.rendition;
+    const contents = rendition && typeof rendition.getContents === "function" ? rendition.getContents() : [];
+    const view = renditionViews(rendition).find(function (candidate) {
+      return candidate && candidate.section && hrefMatches(candidate.section.href, href);
+    });
+    if (view && view.contents) return view.contents;
+    if (view) {
+      return contents.find(function (content) { return content && content.sectionIndex === view.index; }) || null;
+    }
+    return null;
+  }
+
+  function highlightCitation(content, citation) {
     try {
-      const doc = frame && frame.contentDocument;
+      const doc = content && (content.document || content.contentDocument);
       if (!doc || !doc.body) return false;
       const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
         acceptNode: function (textNode) {
@@ -666,18 +691,16 @@
 
   async function jumpToRawCitation(citation) {
     window.dispatchEvent(new CustomEvent("talebook:ai-citation", { detail: citation }));
-    let frame = matchingFrame(citation.href);
-    if (!frame) {
-      const reader = readerProxy();
-      if (reader && reader.rendition) {
-        try { await reader.rendition.display(citation.href); } catch (_error) { /* stable bridge event remains available */ }
-        for (let attempt = 0; attempt < 12 && !frame; attempt += 1) {
-          await new Promise(function (resolve) { window.setTimeout(resolve, 100); });
-          frame = matchingFrame(citation.href);
-        }
+    const reader = readerProxy();
+    let content = renderedContent(reader, citation.href);
+    if (!content && reader && reader.rendition) {
+      try { await reader.rendition.display(citation.href); } catch (_error) { /* stable bridge event remains available */ }
+      for (let attempt = 0; attempt < 12 && !content; attempt += 1) {
+        await new Promise(function (resolve) { window.setTimeout(resolve, 100); });
+        content = renderedContent(reader, citation.href);
       }
     }
-    const highlighted = highlightCitation(frame, citation);
+    const highlighted = highlightCitation(content, citation);
     close();
     if (!highlighted) window.setTimeout(function () { window.alert("已跳到引用章节；若未高亮，请在当前页查找引用短句。"); }, 0);
   }
@@ -708,7 +731,7 @@
     else if (action === "regenerate" && window.confirm("重新生成会保留当前成果并创建一份新图谱，继续吗？")) generate(taskRequest(true));
     else if (action === "zoom-in") { state.zoom = Math.min(2, state.zoom + 0.2); if (el.zoomLabel) el.zoomLabel.textContent = `${Math.round(state.zoom * 100)}%`; renderGraphArea(); }
     else if (action === "zoom-out") { state.zoom = Math.max(0.6, state.zoom - 0.2); if (el.zoomLabel) el.zoomLabel.textContent = `${Math.round(state.zoom * 100)}%`; renderGraphArea(); }
-    else if (action === "zoom-reset") { state.zoom = 1; renderGraphArea(); }
+    else if (action === "zoom-reset") { state.zoom = 1; if (el.zoomLabel) el.zoomLabel.textContent = "100%"; renderGraphArea(); }
     else if (action === "more-nodes") { state.coreLimit += 20; renderGraphArea(state.selectedNode); }
     else if (action === "expand-neighbors") {
       const graph = state.artifact.graph;
