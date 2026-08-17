@@ -72,6 +72,17 @@
                                 {{ t('recommendations.personalizationHint') }}
                             </p>
                         </v-col>
+                        <v-col cols="12">
+                            <v-switch
+                                v-model="preferences.popular_enabled"
+                                color="primary"
+                                hide-details
+                                :label="t('recommendations.popularMode')"
+                            />
+                            <p class="text-body-2 text-medium-emphasis mb-0">
+                                {{ t('recommendations.popularModeHint') }}
+                            </p>
+                        </v-col>
                         <v-col
                             cols="12"
                             md="6"
@@ -265,6 +276,7 @@ const settingsPanel = ref<string | undefined>();
 const clearDialog = ref(false);
 const preferences = reactive({
     personalization_enabled: true,
+    popular_enabled: true,
     topics: [] as string[],
     length: '',
     difficulty: '',
@@ -290,6 +302,7 @@ useHead({ title: () => t('recommendations.pageTitle') });
 const applyPreferences = (value: any) => {
     Object.assign(preferences, {
         personalization_enabled: value?.personalization_enabled !== false,
+        popular_enabled: value?.popular_enabled !== false,
         topics: value?.topics || [],
         length: value?.length || '',
         difficulty: value?.difficulty || '',

@@ -71,6 +71,7 @@ def normalize_preferences(value: Any) -> Dict[str, Any]:
         "length": length,
         "difficulty": difficulty,
         "seed_book_ids": seed_book_ids,
+        "popular_enabled": data.get("popular_enabled") is not False,
     }
 
 
@@ -262,7 +263,7 @@ def deterministic_candidates(
             rating = float(book.get("rating", 0) or 0)
         except (TypeError, ValueError):
             rating = 0.0
-        if rating:
+        if rating and explicit["popular_enabled"]:
             score += min(2.0, rating / 5.0)
             evidence.append("library_rating")
 
@@ -296,6 +297,7 @@ def deterministic_candidates(
         "length": explicit["length"],
         "difficulty": explicit["difficulty"],
         "seed_count": len(seed_ids),
+        "popular_enabled": explicit["popular_enabled"],
     }
     return ranked, summary
 

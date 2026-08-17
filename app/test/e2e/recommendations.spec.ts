@@ -23,7 +23,7 @@ test.describe('Explainable recommendations', () => {
     test('shows grounded cards, fallback disclosure, and cold-start controls', async ({ page }) => {
         await openRecommendations(page);
         await expect(page.getByTestId('recommendation-fallback')).toBeVisible();
-        await expect(page.getByTestId('recommendation-card')).toHaveCount(4);
+        await expect(page.getByTestId('recommendation-card')).toHaveCount(8);
         await expect(page.getByLabel('推荐依据').first()).toBeVisible();
         await expect(page.getByText('使用我的阅读与收藏行为')).toBeVisible();
         await expect(page.getByLabel('想读的主题')).toBeVisible();
@@ -32,13 +32,13 @@ test.describe('Explainable recommendations', () => {
     test('applies feedback immediately and supports short undo', async ({ page }) => {
         await openRecommendations(page);
         const cards = page.getByTestId('recommendation-card');
-        await expect(cards).toHaveCount(4);
+        await expect(cards).toHaveCount(8);
         await cards.first().getByRole('button', { name: '调整' }).click();
         await page.getByText('不感兴趣', { exact: true }).click();
-        await expect(cards).toHaveCount(3);
+        await expect(cards).toHaveCount(7);
         await expect(page.getByText('已减少这本书的推荐')).toBeVisible();
         await page.getByRole('button', { name: '撤销' }).click();
-        await expect(cards).toHaveCount(4);
+        await expect(cards).toHaveCount(8);
     });
 
     test('keeps the recommendation layout usable on a narrow screen', async ({ page }) => {

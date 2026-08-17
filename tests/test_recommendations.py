@@ -91,6 +91,20 @@ class RecommendationRankingTest(unittest.TestCase):
         self.assertNotIn(1, [item["book_id"] for item in ranked])
         self.assertEqual(ranked[-1]["book_id"], 2)
 
+    def test_popular_mode_controls_library_rating_signal(self):
+        books = [book(1, "高评分候选", ["文学"], rating=10)]
+        enabled, _summary = deterministic_candidates(books, {}, [], {}, False, reader_id=1)
+        disabled, _summary = deterministic_candidates(
+            books,
+            {},
+            [],
+            {"popular_enabled": False},
+            False,
+            reader_id=1,
+        )
+        self.assertIn("library_rating", enabled[0]["evidence"])
+        self.assertNotIn("library_rating", disabled[0]["evidence"])
+
     def test_runtime_output_rejects_unknown_evidence(self):
         candidates = [{"book_id": 2, "allowed_evidence": ["topic:历史"]}]
         payload = {
@@ -204,6 +218,7 @@ class RecommendationAPITest(test_main.TestWithUserLogin):
             body=json.dumps(
                 {
                     "personalization_enabled": False,
+                    "popular_enabled": False,
                     "topics": ["历史"],
                     "length": "short",
                     "difficulty": "deep",
@@ -213,7 +228,12 @@ class RecommendationAPITest(test_main.TestWithUserLogin):
         )
         self.assertEqual(response["err"], "ok")
         self.assertFalse(response["preferences"]["personalization_enabled"])
+        self.assertFalse(response["preferences"]["popular_enabled"])
         self.assertEqual(response["preferences"]["topics"], ["历史"])
+
+    def test_user_info_exposes_home_recommendation_capability(self):
+        response = self.json("/api/user/info")
+        self.assertTrue(response["sys"]["ai_recommendations_enabled"])
 
     @mock.patch(
         "webserver.handlers.recommendations.generate_with_runtime",

@@ -36,6 +36,7 @@ let recommendationFeedback = new Map();
 let recommendationFeedbackId = 0;
 let recommendationPreferences = {
   personalization_enabled: true,
+  popular_enabled: true,
   topics: [],
   length: '',
   difficulty: '',
@@ -225,6 +226,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   recommendationFeedbackId = 0;
   recommendationPreferences = {
     personalization_enabled: true,
+    popular_enabled: true,
     topics: [],
     length: '',
     difficulty: '',
@@ -771,6 +773,7 @@ router.get('/api/user/info', eventHandler(() => accessControlEnvelope() || ({
     users: 5,
     friends: [],
     show_network_library: showNetworkLibrary,
+    ai_recommendations_enabled: true,
     allow: { register: true, download: true, push: true, read: true },
     upload: { chunk_enabled: true, chunk_threshold: 8 * 1024 * 1024, chunk_size: 4 * 1024 * 1024 },
     demo_mode: demoMode
@@ -826,7 +829,8 @@ router.get('/api/ai/recommendations', eventHandler((event) => {
   const source = query.refresh === '1' ? 'agent' : 'deterministic';
   const data = readJson('api_index.json') || { random_books: [] };
   const excluded = new Set([...recommendationFeedback.values()].map(item => item.book_id));
-  const books = (data.random_books || []).filter(book => !excluded.has(book.id)).slice(0, 4).map((book, index) => ({
+  const limit = Math.max(1, Math.min(12, Number(query.limit) || 8));
+  const books = (data.random_books || []).filter(book => !excluded.has(book.id)).slice(0, limit).map((book, index) => ({
     ...book,
     state: { favorite: 0, wants: shelfBookIds.has(book.id) ? 1 : 0, read_state: 0 },
     recommendation: {

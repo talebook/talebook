@@ -40,7 +40,7 @@
         <section>
           <h2>2. 目标与边界</h2>
           <div class="grid">
-            <article class="card"><h3>目标</h3><ul><li>登录用户获得 1–12 本当前可读书籍及可追溯、非剧透理由。</li><li>收藏、想读、在读、完读、最近阅读、全局书籍评分和显式反馈影响后续排序。</li><li>冷启动可选主题、长度、难度与种子书；信号不足时明确显示低置信度。</li><li>关闭行为个性化后只使用本次显式偏好；反馈可清空、单步撤销。</li></ul></article>
+            <article class="card"><h3>目标</h3><ul><li>登录用户在首页获得 10–12 本当前可读书籍及可追溯、非剧透理由；书库不足时返回全部合格项。</li><li>收藏、想读、在读、完读、最近阅读、全局书籍评分和显式反馈影响后续排序。</li><li>冷启动可选主题、长度、难度与种子书；信号不足时明确显示低置信度。</li><li>关闭行为个性化后只使用本次显式偏好；反馈可清空、单步撤销。</li></ul></article>
             <article class="card"><h3>非目标</h3><ul><li>不推荐书库外资源、购买链接、广告或付费排序。</li><li>不使用其他成员的阅读状态或反馈，不建立敏感人格标签。</li><li>不发送全文、完整阅读历史或任何书库文件给 Runtime。</li><li>不让前端或业务层依赖 Codex 专有事件。</li></ul></article>
           </div>
         </section>
@@ -49,7 +49,7 @@
           <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0"><table>
             <thead><tr><th>任务</th><th>游客</th><th>登录用户</th><th>Web / 移动端</th><th>验收</th></tr></thead>
             <tbody>
-              <tr><td>浏览推荐与理由</td><td>不支持</td><td>支持</td><td>响应式推荐页</td><td>每本可进入详情或开始阅读；降级和置信度可见</td></tr>
+              <tr><td>浏览推荐与理由</td><td>保留原随机推荐</td><td>支持</td><td>首页 10–12 本低干扰模块；高级页提供完整理由与纠偏</td><td>首页每本可进入详情；降级可见，高级页可开始阅读与纠偏</td></tr>
               <tr><td>冷启动选择</td><td>不支持</td><td>支持</td><td>主题、长度、难度、种子书</td><td>无历史仍能生成，且不宣称高置信个性化</td></tr>
               <tr><td>纠偏与撤销</td><td>不支持</td><td>支持</td><td>不感兴趣、减少此类、已读过、撤销</td><td>反馈只影响当前用户，下一批结果生效</td></tr>
               <tr><td>隐私控制</td><td>不支持</td><td>支持</td><td>关闭行为个性化、清除反馈</td><td>关闭后请求摘要不含历史信号</td></tr>
@@ -84,27 +84,29 @@
         </section>
         <section>
           <h2>7. 测试结果</h2>
-          <p class="ok">2026-08-16 验证通过。</p>
+          <p class="ok">2026-08-17 完成产品反馈修订并验证通过。</p>
           <ul>
             <li><code>make lint-py-fix</code> 与 <code>make lint-py</code>：通过。</li>
-            <li><code>docker run --rm -v "$PWD":"$PWD" -w "$PWD" talebook/test pytest -q tests</code>：855 passed、20 skipped；25 条均为既有弃用或 SQLAlchemy 警告。</li>
-            <li><code>docker ... pytest -q tests/test_recommendations.py tests/test_summary_duck.py</code>：30 passed，覆盖候选排序、显式种子依据、个性化关闭、反馈/撤销/清空、缓存、Runtime schema、降级与 ACL。</li>
+            <li><code>docker run --rm -v "$PWD":"$PWD" -w "$PWD" talebook/test pytest -q tests</code>：857 passed、20 skipped；25 条均为既有弃用或 SQLAlchemy 警告。</li>
+            <li>推荐后端定向测试：16 passed；全量结果同时覆盖候选排序、显式种子依据、历史与书库评分开关、反馈/撤销/清空、缓存、Runtime schema、降级与 ACL。</li>
             <li><code>cd app &amp;&amp; npm run lint</code>：0 errors；193 条为仓库既有 warning，本次新增文件无 warning。</li>
-            <li><code>npx vitest run test/components/RecommendationCard.spec.ts</code>：3 passed；<code>npx playwright test test/e2e/recommendations.spec.ts</code>：3 passed。</li>
-            <li>Playwright Chromium 实际渲染：<code>/recommendations</code> 在 1440×1000 与 320×720 下均为 0px 横向溢出；验证冷启动设置、确定性降级披露、四张解释卡、反馈移除与撤销。Chrome DevTools MCP 在本运行环境不可用，因此以同一 Chromium 引擎的 Playwright 渲染、截图和计算样式检查替代。</li>
+            <li><code>npx vitest run test/components/HomeRecommendations.spec.ts test/components/RecommendationCard.spec.ts</code>：7 passed。</li>
+            <li><code>npx playwright test test/e2e/home.spec.ts test/e2e/recommendations.spec.ts</code>：12 passed；覆盖登录首页、游客回退、10 本首页书单、隐藏选项、开关持久化、高级页反馈与窄屏布局。</li>
+            <li>Playwright Chromium 实际渲染：<code>/</code> 与 <code>/recommendations</code> 在 1440×1000 与 320×720 下均为 0px 横向溢出；首页选项弹层在 320×720 内完整可见，40×40 px 图标按钮满足目标尺寸，Tab 可进入首个开关，Escape 关闭后焦点返回入口。Chrome DevTools MCP 在本运行环境不可用，因此以同一 Chromium 引擎的 Playwright 渲染、截图和计算样式检查替代。</li>
             <li><code>npm test -- recommendations.spec.ts</code> 未作为结果：仓库既有脚本误写为 <code>pagewright</code>，会在启动测试前失败；改用项目文档指定的 <code>npx playwright test</code> 后全部通过。</li>
           </ul>
           <h3>interface-review full</h3>
-          <p>范围为当前分支相对 <code>origin/feat/ai_1.0</code>（merge-base <code>7207cf49ddf5b2a4b6dd5bc6fb1230b61c62a08f</code>）的 0 个已提交变更与 15 个未提交源文件；排除两张本地验证截图。扩展检查推荐页、推荐卡与登录侧栏入口。</p>
+          <p>范围为当前分支相对 PR 基线 <code>origin/feat/ai_1.0</code>（merge-base <code>7207cf49ddf5b2a4b6dd5bc6fb1230b61c62a08f</code>）的 1 个已提交 commit 与 16 个排除后未提交源文件，共 22 个唯一变更路径；排除 <code>app/test-results/</code> 和两张本地验证 PNG。扩展检查首页、推荐卡、高级推荐页、登录侧栏及能力开关消费者；无未展开的直接消费者。</p>
           <ul>
-            <li>可访问性、布局、文案、排版、颜色与 UI 状态均完成检查；最终结论为 <strong>Approve</strong>，无剩余 HIGH、MEDIUM 或 LOW 问题。</li>
-            <li>审查中修正：作者文字误用低对比主题 token；空状态与错误状态缺少直接下一步；种子书依据被误标成行为阅读历史。</li>
-            <li>保留 10 秒撤销窗口，因为 TB-61 明确要求短时撤销，且设置区仍提供清空反馈与行为个性化开关；保留书名单行截断，因为完整书名可通过同卡片详情入口访问。</li>
+            <li>可访问性、布局、文案、排版、颜色与 UI 状态均完成检查；最终结论为 <strong>Approve</strong>，无剩余 Introduced 或 Regression 的 HIGH、MEDIUM、LOW 问题。</li>
+            <li>本轮审查中修正：隐藏选项内容采用 dialog 语义后，入口仍被 Vuetify 默认声明为 menu；弹层宽度只设在子卡片上，导致定位层按 40 px 入口计算并在窄屏裁切；旧图标字体也不能渲染 <code>mdi-tune-variant</code>。现已统一 dialog 语义，把 320 px 宽度交给定位层，改用可渲染的 <code>mdi-tune</code>，并验证实际弹层边界与 Tab/Escape 焦点路径。此前审查已修正作者低对比 token、空/错状态下一步和种子书依据标记。</li>
+            <li>经渲染测量，首页提示与推荐理由在浅色表面的 WCAG 对比度均为 5.74:1；窄屏为 0px 横向溢出。主题色继续使用 Vuetify 语义 token，未引入孤立颜色系统。</li>
+            <li>审查后保留：10 秒撤销窗口是 TB-61 明确要求，且设置区仍提供清空反馈；首页书名/理由截断的完整内容可经同卡片详情入口访问；“你的笔记”保持禁用并解释缺少通用笔记索引，避免伪造推荐信号。</li>
           </ul>
         </section>
         <section>
           <h2>8. 决策记录</h2>
-          <ol><li>复用统一 AgentRuntime，不增加 OpenAI API/SDK；Claude Code 与 Trae 继续保持适配器边界。</li><li>HTTP 使用独立推荐资源 API，不把推荐伪装成以单书章节为中心的 <code>AITask</code>。</li><li>Codex 只重排候选和撰写理由；召回、权限、排除、缓存和最终验证全部由服务端掌控。</li><li>界面入口只对登录用户显示；游客不会看到一个必然失败的导航项。</li></ol>
+          <ol><li>复用统一 AgentRuntime，不增加 OpenAI API/SDK；Claude Code 与 Trae 继续保持适配器边界。</li><li>HTTP 使用独立推荐资源 API，不把推荐伪装成以单书章节为中心的 <code>AITask</code>。</li><li>Codex 只重排候选和撰写理由；召回、权限、排除、缓存和最终验证全部由服务端掌控。</li><li>2026-08-17 产品反馈将主要入口由侧栏独立页改为首页模块，每批展示 10–12 本；高级页保留为首页低干扰设置入口，不再占用侧栏。</li><li>首页的隐蔽选项先提供“历史阅读”和“大家喜欢”：后者严格映射到书库评分，不读取其他成员行为；“你的笔记”在缺少通用笔记索引时只说明能力边界，不伪造信号。</li></ol>
         </section>
       </main>
     </div>
