@@ -1439,6 +1439,29 @@
       "readest": "Readest"
     }
   },
+  "wereadImport": {
+    "open": "导入微信读书",
+    "title": "导入微信读书笔记",
+    "bookmarkNotice": "微信读书官方目前只提供书签数量，不能导出书签正文。本功能会导入划线、想法、章节点评和整本书评。",
+    "exportFile": "官方导出 JSON",
+    "exportHint": "支持单本书或多本书批量导出；文件内容只用于本次私有导入。",
+    "or": "或者",
+    "apiKey": "微信读书 API Key",
+    "apiKeyHint": "可在微信读书 App 的“设置 → 微信读书 Skill”中获取。",
+    "savedKeyHint": "已保存密钥 {mask}；留空即可继续使用。",
+    "invalidFile": "无法读取这个 JSON 文件，请检查文件格式。",
+    "failed": "微信读书导入失败，请重试。",
+    "fetched": "共解析 {count} 条",
+    "needsConfirmation": "有 {count} 本书需要确认",
+    "ready": "书籍匹配已就绪",
+    "matchTitle": "确认书籍匹配",
+    "unknownBook": "未命名书籍",
+    "selectMatch": "选择 Talebook 中的书",
+    "result": "写入或更新 {written} 条，跳过重复 {skipped} 条，失败或待确认 {failed} 条。",
+    "test": "测试连接",
+    "preview": "预览",
+    "import": "确认导入"
+  },
   "pluginManagement": {
     "title": "插件",
     "description": "连接外部服务，补全书籍信息、导入笔记与评价，或添加书源。",

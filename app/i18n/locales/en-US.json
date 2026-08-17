@@ -1423,6 +1423,29 @@
       "readest": "Readest"
     }
   },
+  "wereadImport": {
+    "open": "Import WeRead",
+    "title": "Import WeRead notes",
+    "bookmarkNotice": "WeRead currently exports bookmark counts, not bookmark text. Highlights, thoughts, chapter comments, and whole-book reviews will be imported.",
+    "exportFile": "Official export JSON",
+    "exportHint": "Single-book and batch exports are supported. The contents remain private to this import.",
+    "or": "or",
+    "apiKey": "WeRead API key",
+    "apiKeyHint": "Find it in WeRead Settings → WeRead Skill.",
+    "savedKeyHint": "Saved credential {mask}; leave this blank to reuse it.",
+    "invalidFile": "This JSON file could not be read. Check its format.",
+    "failed": "The WeRead import failed. Try again.",
+    "fetched": "{count} items parsed",
+    "needsConfirmation": "{count} books need confirmation",
+    "ready": "Book matches are ready",
+    "matchTitle": "Confirm book matches",
+    "unknownBook": "Untitled book",
+    "selectMatch": "Choose a Talebook book",
+    "result": "{written} written or updated, {skipped} duplicates skipped, and {failed} failed or awaiting confirmation.",
+    "test": "Test connection",
+    "preview": "Preview",
+    "import": "Import"
+  },
   "pluginManagement": {
     "title": "Plugins",
     "description": "Connect external services to enrich books, import notes and reviews, or add book sources.",

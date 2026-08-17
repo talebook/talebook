@@ -1,0 +1,259 @@
+from types import SimpleNamespace
+import zipfile
+import urllib.error
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from webserver.models import (
+    Annotation,
+    AnnotationSource,
+    Base,
+    PluginConnection,
+    PluginEntityMatch,
+    PluginRunItem,
+    PluginSourceRecord,
+)
+from webserver.plugins.runtime import (
+    WEREAD_PLUGIN_KEY,
+    ProviderAuthError,
+    ProviderRateLimitError,
+    WereadProvider,
+    parse_weread_export,
+)
+from webserver.services.plugin_runtime import PluginRuntime, install_builtin, save_connection
+from webserver.services.weread_annotations import confirm_match, locate_epub_quote, normalize_text
+
+
+SETTINGS = {"PLUGIN_SECRET_KEY": "weread-unit-test-key", "cookie_secret": "unused-cookie-secret"}
+SAMPLE = {
+    "book": {"bookId": "3300045871", "title": "活着", "author": "余华"},
+    "chapters": [{"chapterUid": 12, "title": "第一章"}],
+    "bookmarks": [
+        {
+            "bookmarkId": "b1",
+            "chapterUid": 12,
+            "markText": "人是为活着本身而活着的",
+            "range": "2959-3007",
+            "createTime": 1778312777,
+            "colorStyle": "orange",
+            "type": 1,
+        },
+        {"bookmarkId": "bookmark-only", "type": 0},
+    ],
+    "reviews": [
+        {
+            "review": {
+                "reviewId": "r1",
+                "content": "这句话值得反复读",
+                "abstract": "人是为活着本身而活着的",
+                "range": "2959-3007",
+                "chapterUid": 12,
+                "chapterName": "第一章",
+                "createTime": 1778312777,
+            }
+        },
+        {"reviewId": "r2", "content": "五星推荐", "star": 5, "createTime": 1778312778},
+    ],
+}
+
+
+class FakeNewAPI:
+    def __init__(self, owner):
+        self.owner = owner
+
+    def all_book_ids(self):
+        return list(self.owner.books)
+
+
+class FakeCalibreDB:
+    def __init__(self, books, epub_path=None):
+        self.books = books
+        self.new_api = FakeNewAPI(self)
+        self.epub_path = epub_path
+
+    def get_metadata(self, book_id, index_is_id=True):
+        value = self.books[int(book_id)]
+        return SimpleNamespace(
+            title=value["title"],
+            authors=value["authors"],
+            isbn=value.get("isbn", ""),
+            identifiers=value.get("identifiers", {}),
+        )
+
+    def format_abspath(self, book_id, fmt, index_is_id=True):
+        return self.epub_path
+
+
+@pytest.fixture
+def db_session():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    try:
+        yield session
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def build_connection(session):
+    installation = install_builtin(session, WEREAD_PLUGIN_KEY, installed_by=1)
+    return save_connection(
+        session,
+        SETTINGS,
+        installation.id,
+        "user",
+        1,
+        {},
+        name="微信读书",
+    )
+
+
+def execute(session, connection, calibre_db, payload=SAMPLE, action="run", parent_run_id=None):
+    runtime = PluginRuntime(session, SETTINGS, sleeper=lambda _: None, calibre_db=calibre_db)
+    run = runtime.prepare_run(
+        connection.id,
+        action,
+        requested_by=1,
+        parent_run_id=parent_run_id,
+        input_data={"export": payload, "allowed_book_ids": list(calibre_db.books)},
+    )
+    runtime.execute(run.id)
+    session.refresh(run)
+    return run
+
+
+def test_parser_covers_issue_943_and_does_not_invent_bookmark_content():
+    items = parse_weread_export(SAMPLE)
+    assert len(items) == 3
+    assert [item.entity_type for item in items] == ["annotation", "annotation", "annotation"]
+    assert items[0].external_id == "weread:3300045871:bookmark:b1"
+    assert items[0].data == {
+        "source_book_id": "3300045871",
+        "book": {"provider_id": "3300045871", "isbn": "", "title": "活着", "author": "余华"},
+        "annotation_type": "highlight",
+        "chapter": "第一章",
+        "quote_text": "人是为活着本身而活着的",
+        "content": "",
+        "color": "orange",
+        "user_modified_at": "2026-05-09T07:46:17Z",
+        "source_position": "chapterUid=12;range=2959-3007",
+    }
+    assert items[1].data["annotation_type"] == "note"
+    assert items[2].data["chapter"] == "整本书评"
+    assert all("bookmark-only" not in item.external_id for item in items)
+    assert len(parse_weread_export([SAMPLE, SAMPLE])) == 3
+
+
+@pytest.mark.parametrize(
+    ("status", "error_type"),
+    [(401, ProviderAuthError), (403, ProviderAuthError), (429, ProviderRateLimitError)],
+)
+def test_gateway_maps_auth_and_rate_limit_errors_without_leaking_key(status, error_type):
+    def opener(*_args, **_kwargs):
+        raise urllib.error.HTTPError("https://example.invalid", status, "rejected", {"Retry-After": "0"}, None)
+
+    provider = WereadProvider(opener=opener)
+    with pytest.raises(error_type) as exc:
+        provider._gateway("wrk-do-not-leak", "/user/notebooks", count=1)
+    assert "wrk-do-not-leak" not in str(exc.value)
+
+
+def test_normalization_handles_fullwidth_case_and_spacing():
+    assert normalize_text(" Ａl-i v e ") == normalize_text("ALIVE")
+    assert normalize_text("活著") == normalize_text("活着")
+
+
+def test_unique_epub_text_node_generates_cfi_but_ambiguous_text_does_not(tmp_path):
+    epub = tmp_path / "book.epub"
+    with zipfile.ZipFile(epub, "w") as archive:
+        archive.writestr(
+            "META-INF/container.xml",
+            """<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OPS/content.opf"/></rootfiles></container>""",
+        )
+        archive.writestr(
+            "OPS/content.opf",
+            """<package xmlns="http://www.idpf.org/2007/opf"><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>""",
+        )
+        archive.writestr(
+            "OPS/chapter.xhtml",
+            """<html xmlns="http://www.w3.org/1999/xhtml"><body><p id="only">这是唯一，能够定位的原文。</p><p>重复的较长原文</p><p>重复的较长原文</p></body></html>""",
+        )
+    calibre = FakeCalibreDB({7: {"title": "活着", "authors": ["余华"]}}, str(epub))
+
+    cfi = locate_epub_quote(calibre, 7, "这是唯一 能够定位的原文")
+    assert cfi.startswith("epubcfi(/6/2[chapter]!")
+    assert locate_epub_quote(calibre, 7, "重复的较长原文") is None
+
+
+def test_end_to_end_import_is_idempotent_and_materializes_no_cfi_annotations(db_session):
+    calibre = FakeCalibreDB({7: {"title": "活着", "authors": ["余华"]}})
+    connection = build_connection(db_session)
+
+    first = execute(db_session, connection, calibre)
+    second = execute(db_session, connection, calibre)
+
+    assert first.status == "succeeded"
+    assert first.counts["written"] == 3
+    assert second.status == "succeeded"
+    assert second.counts["written"] == 0
+    assert second.counts["skipped"] == 3
+    assert db_session.query(Annotation).count() == 3
+    assert db_session.query(AnnotationSource).count() == 3
+    assert db_session.query(PluginSourceRecord).count() == 3
+    annotations = db_session.query(Annotation).order_by(Annotation.id).all()
+    assert {item.book_id for item in annotations} == {7}
+    assert all(item.cfi is None for item in annotations)
+    assert annotations[0].sources[0].source_position == "chapterUid=12;range=2959-3007"
+    assert connection.cursor == {"last_sync_at": "2026-05-09T07:46:18Z"}
+
+
+def test_multiple_candidates_never_write_until_user_confirms(db_session):
+    calibre = FakeCalibreDB(
+        {
+            7: {"title": "活着", "authors": ["余华"]},
+            8: {"title": "活着", "authors": ["余华"]},
+        }
+    )
+    connection = build_connection(db_session)
+
+    blocked = execute(db_session, connection, calibre)
+    blocked_items = db_session.query(PluginRunItem).filter(PluginRunItem.run_id == blocked.id).all()
+
+    assert blocked.status == "failed"
+    assert blocked.counts["conflicts"] == 3
+    assert db_session.query(Annotation).count() == 0
+    assert db_session.query(PluginSourceRecord).count() == 0
+    assert {candidate["book_id"] for candidate in blocked_items[0].data["candidates"]} == {7, 8}
+    assert connection.cursor == {}
+
+    confirm_match(db_session, connection.id, "3300045871", 8, 1, calibre, [7, 8])
+    imported = execute(db_session, connection, calibre)
+    assert imported.status == "succeeded"
+    assert {item.book_id for item in db_session.query(Annotation).all()} == {8}
+    match = db_session.query(PluginEntityMatch).one()
+    assert match.status == "confirmed"
+    assert match.confirmed_by == 1
+
+
+def test_rollback_deletes_only_annotations_materialized_by_source_run(db_session):
+    calibre = FakeCalibreDB({7: {"title": "活着", "authors": ["余华"]}})
+    connection = build_connection(db_session)
+    imported = execute(db_session, connection, calibre)
+
+    rolled_back = execute(db_session, connection, calibre, action="rollback", parent_run_id=imported.id)
+
+    assert rolled_back.status == "rolled_back"
+    assert db_session.query(Annotation).count() == 0
+    assert {record.status for record in db_session.query(PluginSourceRecord).all()} == {"rolled_back"}
+
+
+def test_private_export_never_appears_in_public_run_payload(db_session):
+    calibre = FakeCalibreDB({7: {"title": "活着", "authors": ["余华"]}})
+    connection = build_connection(db_session)
+    run = execute(db_session, connection, calibre)
+    assert "input_data" not in run.to_public_dict()
+    assert "人是为活着本身而活着的" not in str(run.to_public_dict())
+    assert db_session.get(PluginConnection, connection.id).owner_type == "user"

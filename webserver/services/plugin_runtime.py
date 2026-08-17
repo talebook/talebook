@@ -28,6 +28,7 @@ from webserver.plugins.runtime import (
     ProviderError,
     ProviderRateLimitError,
     ProviderResult,
+    WereadProvider,
 )
 from webserver.services.plugin_secrets import SENSITIVE_KEY_RE, SecretCipher, SecretCipherError, redact, secret_mask_hint
 
@@ -65,6 +66,7 @@ class PluginRegistry:
 
 REGISTRY = PluginRegistry()
 REGISTRY.register(MockMultiTabProvider())
+REGISTRY.register(WereadProvider())
 for _builtin_provider in BUILTIN_CAPABILITY_PROVIDERS:
     REGISTRY.register(_builtin_provider)
 
@@ -235,7 +237,6 @@ def save_connection(
     if requested_scopes - approved:
         raise PluginRuntimeError("plugin.scope_not_approved", "Connection requests permissions that were not approved")
 
-    cipher = SecretCipher(settings)
     connection = (
         session.query(PluginConnection)
         .filter(
@@ -257,26 +258,28 @@ def save_connection(
         )
         session.add(connection)
         session.flush()
-    secret = session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
-    if secret is None:
-        secret = PluginSecret(
-            owner_type=owner_type,
-            owner_id=owner_id,
-            kind="credentials",
-            ciphertext="pending",
-            key_id=cipher.key_id,
-            create_time=now,
-            last_rotated_at=now,
-        )
-        session.add(secret)
-        session.flush()
-        connection.secret_id = secret.id
-    else:
-        secret.version = int(secret.version or 0) + 1
-        secret.last_rotated_at = now
-    secret.ciphertext = cipher.encrypt(credentials)
-    secret.key_id = cipher.key_id
-    secret.mask_hint = secret_mask_hint(credentials)
+    if credentials:
+        cipher = SecretCipher(settings)
+        secret = session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
+        if secret is None:
+            secret = PluginSecret(
+                owner_type=owner_type,
+                owner_id=owner_id,
+                kind="credentials",
+                ciphertext="pending",
+                key_id=cipher.key_id,
+                create_time=now,
+                last_rotated_at=now,
+            )
+            session.add(secret)
+            session.flush()
+            connection.secret_id = secret.id
+        else:
+            secret.version = int(secret.version or 0) + 1
+            secret.last_rotated_at = now
+        secret.ciphertext = cipher.encrypt(credentials)
+        secret.key_id = cipher.key_id
+        secret.mask_hint = secret_mask_hint(credentials)
     connection.config = dict(config or {})
     connection.scopes = sorted(requested_scopes)
     connection.schedule = schedule or ""
@@ -339,13 +342,14 @@ def _validate_public_config(config, credentials=None):
 
 
 class PluginRuntime:
-    def __init__(self, session, settings, registry=REGISTRY, sleeper=time.sleep):
+    def __init__(self, session, settings, registry=REGISTRY, sleeper=time.sleep, calibre_db=None):
         self.session = session
         self.settings = settings
         self.registry = registry
         self.sleeper = sleeper
+        self.calibre_db = calibre_db
 
-    def prepare_run(self, connection_id, action, requested_by, trigger="manual", parent_run_id=None):
+    def prepare_run(self, connection_id, action, requested_by, trigger="manual", parent_run_id=None, input_data=None):
         if action not in ACTIONS:
             raise PluginRuntimeError("plugin.action_invalid", "Unsupported plugin action")
         connection = self.session.get(PluginConnection, connection_id)
@@ -366,6 +370,7 @@ class PluginRuntime:
                 raise PluginRuntimeError("plugin.retry_not_allowed", "Only failed or partial runs can be retried")
             if action == "rollback" and parent.action not in {"run", "retry"}:
                 raise PluginRuntimeError("plugin.rollback_not_allowed", "Only write runs can be rolled back")
+        private_input = dict(parent.input_data or {}) if action == "retry" and parent is not None else dict(input_data or {})
         run = PluginRun(
             connection_id=connection_id,
             parent_run_id=parent.id if parent else None,
@@ -376,6 +381,7 @@ class PluginRuntime:
             counts=dict(DEFAULT_COUNTS),
             cursor_before=dict(connection.cursor or {}),
             cursor_after=dict(connection.cursor or {}),
+            input_data=private_input,
             create_time=datetime.datetime.now(),
         )
         self.session.add(run)
@@ -437,7 +443,7 @@ class PluginRuntime:
             installation = self.session.get(PluginInstallation, connection.installation_id)
             definition = self.session.get(PluginDefinition, installation.definition_id)
             auth_schema = definition.auth_schema or {}
-            if not auth_schema.get("properties") and not auth_schema.get("required"):
+            if not auth_schema.get("required"):
                 return {}
             raise PluginRuntimeError("plugin.credentials_missing", "Plugin connection has no credentials")
         cipher = SecretCipher(self.settings)
@@ -450,14 +456,17 @@ class PluginRuntime:
         provider = self.registry.get(installation.plugin_key)
         target_ids = []
         if run.action == "retry":
+            parent_run = self.session.get(PluginRun, run.parent_run_id)
             target_ids = [
                 item.external_id
                 for item in self.session.query(PluginRunItem)
                 .filter(PluginRunItem.run_id == run.parent_run_id, PluginRunItem.status == "failed")
                 .all()
             ]
-            if not target_ids:
+            if not target_ids and not parent_run.error_code:
                 raise PluginRuntimeError("plugin.retry_empty", "The source run has no failed items")
+        else:
+            parent_run = None
         max_retries = max(0, min(5, int((connection.config or {}).get("max_retries", 2))))
         base_backoff = max(0.0, min(60.0, float((connection.config or {}).get("backoff_seconds", 0.05))))
         last_error = None
@@ -472,6 +481,7 @@ class PluginRuntime:
                 "secrets": dict(secrets),
                 "scopes": list(connection.scopes or []),
                 "target_external_ids": target_ids,
+                "input_data": dict((parent_run.input_data if parent_run else run.input_data) or {}),
                 "deadline": (datetime.datetime.now() + datetime.timedelta(seconds=timeout)).isoformat(),
             }
             try:
@@ -507,6 +517,8 @@ class PluginRuntime:
             executor.shutdown(wait=False, cancel_futures=True)
 
     def _apply_result(self, run, connection, result, secrets):
+        from webserver.services.weread_annotations import materialize_annotation, prepare_annotation_item
+
         counts = dict(DEFAULT_COUNTS)
         counts["fetched"] = len(result.items)
         for item in result.items:
@@ -537,6 +549,28 @@ class PluginRuntime:
                 )
                 counts["failed"] += 1
                 continue
+            if item.entity_type == "annotation":
+                allowed_book_ids = (run.input_data or {}).get("allowed_book_ids")
+                safe_data, matched = prepare_annotation_item(
+                    self.session,
+                    connection,
+                    safe_data,
+                    self.calibre_db,
+                    allowed_book_ids,
+                )
+                if not matched:
+                    self._add_item(
+                        run,
+                        item.external_id,
+                        item.entity_type,
+                        "conflict",
+                        "confirmation_required",
+                        "plugin.book_match_confirmation_required",
+                        "Book match must be confirmed before import",
+                        safe_data,
+                    )
+                    counts["conflicts"] += 1
+                    continue
             payload_hash = hashlib.sha256(
                 json.dumps(safe_data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
             ).hexdigest()
@@ -545,7 +579,17 @@ class PluginRuntime:
                     run, item.external_id, item.entity_type, "previewed", "preview", "", "", safe_data, payload_hash
                 )
                 continue
-            operation, status = self._upsert_source_record(run, connection, item, safe_data, payload_hash)
+            operation, status, record = self._upsert_source_record(run, connection, item, safe_data, payload_hash)
+            if item.entity_type == "annotation" and status != "conflict":
+                materialize_annotation(
+                    self.session,
+                    run,
+                    connection,
+                    record,
+                    safe_data,
+                    payload_hash,
+                    self.calibre_db,
+                )
             self._add_item(run, item.external_id, item.entity_type, status, operation, "", "", safe_data, payload_hash)
             if status == "conflict":
                 counts["conflicts"] += 1
@@ -601,11 +645,12 @@ class PluginRuntime:
                 update_time=now,
             )
             self.session.add(record)
-            return "created", "succeeded"
+            self.session.flush()
+            return "created", "succeeded", record
         if record.local_modified and record.raw_hash != payload_hash:
-            return "protected", "conflict"
+            return "protected", "conflict", record
         if record.status == "active" and record.raw_hash == payload_hash:
-            return "skipped", "succeeded"
+            return "skipped", "succeeded", record
         record.run_id = run.id
         record.raw_hash = payload_hash
         record.remote_updated_at = remote_updated_at
@@ -613,9 +658,11 @@ class PluginRuntime:
         record.data = safe_data
         record.update_time = now
         record.rolled_back_at = None
-        return "updated", "succeeded"
+        return "updated", "succeeded", record
 
     def _rollback(self, run, connection):
+        from webserver.services.weread_annotations import rollback_materialized_annotation
+
         parent = self.session.get(PluginRun, run.parent_run_id)
         records = (
             self.session.query(PluginSourceRecord)
@@ -640,6 +687,8 @@ class PluginRuntime:
                     record.raw_hash,
                 )
                 continue
+            if record.entity_type == "annotation":
+                rollback_materialized_annotation(self.session, record)
             record.status = "rolled_back"
             record.rolled_back_at = now
             record.update_time = now

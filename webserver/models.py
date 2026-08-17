@@ -1131,6 +1131,9 @@ class PluginRun(Base, SQLAlchemyMixin):
     counts = Column(MutableDict.as_mutable(JSONType), default={})
     cursor_before = Column(MutableDict.as_mutable(JSONType), default={})
     cursor_after = Column(MutableDict.as_mutable(JSONType), default={})
+    # Private, retryable input (for example an uploaded export). Deliberately
+    # omitted from to_public_dict so personal data cannot leak via run APIs.
+    input_data = Column(MutableDict.as_mutable(JSONType), default={})
     error_code = Column(String(128), default="")
     error_message = Column(String(1000), default="")
     attempt = Column(Integer, default=0, nullable=False)

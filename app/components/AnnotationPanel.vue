@@ -9,14 +9,20 @@
                 {{ t('annotations.title') }}
                 <span v-if="!loading" class="annotation-panel__count">{{ filteredAnnotations.length }}</span>
             </h2>
-            <v-btn
-                icon="mdi-refresh"
-                size="small"
-                variant="text"
-                :aria-label="t('annotations.refresh')"
-                :loading="loading"
-                @click="loadAnnotations"
-            />
+            <div class="d-flex align-center ga-1">
+                <WeReadImportDialog
+                    :backend="backend"
+                    @imported="loadAnnotations"
+                />
+                <v-btn
+                    icon="mdi-refresh"
+                    size="small"
+                    variant="text"
+                    :aria-label="t('annotations.refresh')"
+                    :loading="loading"
+                    @click="loadAnnotations"
+                />
+            </div>
         </header>
 
         <div v-if="!loading && annotations.length" class="annotation-panel__controls">
@@ -193,6 +199,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import WeReadImportDialog from '~/components/WeReadImportDialog.vue';
 
 const props = defineProps({
     bookId: { type: [Number, String], required: true },

@@ -7,4 +7,4 @@ from webserver.services.plugin_runtime import PluginRuntime
 def execute_plugin_run(service, run_id):
     """Execute one previously persisted run on the shared background queue."""
 
-    return PluginRuntime(service.session, loader.get_settings()).execute(run_id)
+    return PluginRuntime(service.session, loader.get_settings(), calibre_db=service.db).execute(run_id)

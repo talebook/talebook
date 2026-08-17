@@ -13,6 +13,7 @@ from webserver.models import (
     PluginRunItem,
     PluginSecret,
 )
+from webserver.plugins.runtime import WEREAD_PLUGIN_KEY
 from webserver.services.async_service import AsyncService
 from webserver.services.plugin_jobs import execute_plugin_run
 from webserver.services.plugin_runtime import (
@@ -23,6 +24,7 @@ from webserver.services.plugin_runtime import (
     save_connection,
 )
 from webserver.services.plugin_secrets import SecretCipherError
+from webserver.services.weread_annotations import all_book_ids, confirm_match
 
 
 def _body(handler):
@@ -297,6 +299,12 @@ class UserPluginAction(BaseHandler):
             connection = self.session.get(PluginConnection, int(connection_id))
             if connection is None or connection.owner_type != "user" or connection.owner_id != self.user_id():
                 raise PluginRuntimeError("plugin.connection_forbidden", "Plugin connection is not available")
+            installation = self.session.get(PluginInstallation, connection.installation_id)
+            if installation.plugin_key == WEREAD_PLUGIN_KEY and action in {"test", "preview", "run"}:
+                raise PluginRuntimeError(
+                    "plugin.action_requires_import_endpoint",
+                    "WeRead actions must use the private import endpoint",
+                )
             req = _body(self)
             run = PluginRuntime(self.session, loader.get_settings()).prepare_run(
                 connection.id,
@@ -332,6 +340,140 @@ class UserPluginRuns(BaseHandler):
         return {"err": "ok", "runs": [run.to_public_dict() for run in runs]}
 
 
+class UserPluginRunDetail(BaseHandler):
+    @js
+    @auth
+    def get(self, run_id):
+        try:
+            run = self.session.get(PluginRun, int(run_id))
+        except (TypeError, ValueError):
+            run = None
+        connection = self.session.get(PluginConnection, run.connection_id) if run is not None else None
+        if connection is None or connection.owner_type != "user" or connection.owner_id != self.user_id():
+            return {"err": "plugin.run_missing", "msg": "Plugin run was not found"}
+        items = self.session.query(PluginRunItem).filter(PluginRunItem.run_id == run.id).order_by(PluginRunItem.id).all()
+        return {"err": "ok", "run": run.to_public_dict(), "items": [item.to_public_dict(include_data=True) for item in items]}
+
+
+class UserWereadImport(BaseHandler):
+    def _allowed_book_ids(self):
+        return [book_id for book_id in all_book_ids(self.db) if self.get_book(book_id, raise_exception=False) is not None]
+
+    def _connection(self):
+        installation = (
+            self.session.query(PluginInstallation).filter(PluginInstallation.plugin_key == WEREAD_PLUGIN_KEY).first()
+        )
+        if installation is None:
+            return None, None
+        connection = (
+            self.session.query(PluginConnection)
+            .filter(
+                PluginConnection.installation_id == installation.id,
+                PluginConnection.owner_type == "user",
+                PluginConnection.owner_id == self.user_id(),
+                PluginConnection.name == "微信读书",
+            )
+            .first()
+        )
+        return installation, connection
+
+    @js
+    @auth
+    def get(self):
+        _, connection = self._connection()
+        if connection is None:
+            return {"err": "ok", "connection": None, "runs": []}
+        secret = self.session.get(PluginSecret, connection.secret_id)
+        runs = (
+            self.session.query(PluginRun)
+            .filter(PluginRun.connection_id == connection.id)
+            .order_by(PluginRun.id.desc())
+            .limit(20)
+            .all()
+        )
+        return {
+            "err": "ok",
+            "connection": connection.to_public_dict(secret),
+            "runs": [run.to_public_dict() for run in runs],
+        }
+
+    @js
+    @auth
+    def post(self):
+        try:
+            req = _body(self)
+            action = req.get("action", "preview")
+            if action not in {"test", "preview", "run"}:
+                raise PluginRuntimeError("plugin.action_invalid", "Unsupported WeRead import action")
+            export_data = req.get("export")
+            api_key = req.get("api_key")
+            if api_key is not None and (not isinstance(api_key, str) or not api_key.strip()):
+                raise PluginRuntimeError("plugin.credentials_invalid", "WeRead API key must be a non-empty string")
+
+            installation, connection = self._connection()
+            if installation is None:
+                installation = install_builtin(self.session, WEREAD_PLUGIN_KEY, self.user_id())
+            if connection is None or api_key:
+                credentials = {"api_key": api_key.strip()} if api_key else {}
+                connection = save_connection(
+                    self.session,
+                    loader.get_settings(),
+                    installation.id,
+                    "user",
+                    self.user_id(),
+                    credentials,
+                    name="微信读书",
+                )
+            if export_data is None and not api_key:
+                secret = self.session.get(PluginSecret, connection.secret_id) if connection else None
+                if secret is None or not secret.mask_hint:
+                    raise PluginRuntimeError(
+                        "plugin.credentials_missing",
+                        "Provide a WeRead API key or official export JSON",
+                    )
+
+            allowed_book_ids = self._allowed_book_ids()
+            matches = req.get("matches") or {}
+            if not isinstance(matches, dict):
+                raise PluginRuntimeError("plugin.request_invalid", "matches must be an object")
+            for source_book_id, book_id in matches.items():
+                try:
+                    confirm_match(
+                        self.session,
+                        connection.id,
+                        str(source_book_id),
+                        int(book_id),
+                        self.user_id(),
+                        self.db,
+                        allowed_book_ids,
+                    )
+                except (TypeError, ValueError) as exc:
+                    raise PluginRuntimeError("plugin.match_book_forbidden", str(exc)) from exc
+
+            input_data = {"allowed_book_ids": allowed_book_ids}
+            if export_data is not None:
+                input_data["export"] = export_data
+            runtime = PluginRuntime(self.session, loader.get_settings(), calibre_db=self.db)
+            run = runtime.prepare_run(
+                connection.id,
+                action,
+                self.user_id(),
+                trigger="manual",
+                input_data=input_data,
+            )
+            runtime.execute(run.id)
+            self.session.refresh(run)
+            items = self.session.query(PluginRunItem).filter(PluginRunItem.run_id == run.id).order_by(PluginRunItem.id).all()
+            return {
+                "err": "ok",
+                "connection": connection.to_public_dict(self.session.get(PluginSecret, connection.secret_id)),
+                "run": run.to_public_dict(),
+                "items": [item.to_public_dict(include_data=True) for item in items],
+            }
+        except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
 def routes():
     return [
         (r"/api/admin/plugins", AdminPlugins),
@@ -345,4 +487,6 @@ def routes():
         (r"/api/plugins/connections", UserPluginConnections),
         (r"/api/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", UserPluginAction),
         (r"/api/plugins/runs", UserPluginRuns),
+        (r"/api/plugins/runs/([0-9]+)", UserPluginRunDetail),
+        (r"/api/plugins/weread/import", UserWereadImport),
     ]

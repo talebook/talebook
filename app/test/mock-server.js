@@ -27,6 +27,7 @@ let readingStateByBookId = new Map();
 let annotationsByBookId = new Map();
 let annotationPermissionDenied = false;
 let annotationPartialRollback = false;
+let wereadRunId = 500;
 let activeThemeName = '';
 let audiobookPublishedEdition = null;
 let audiobookJobs = [];
@@ -175,6 +176,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   annotationsByBookId = new Map([[1, mockAnnotations(1)]]);
   annotationPermissionDenied = !!body?.annotationPermissionDenied;
   annotationPartialRollback = !!body?.annotationPartialRollback;
+  wereadRunId = 500;
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
@@ -1421,6 +1423,64 @@ router.delete('/api/annotations', eventHandler((event) => {
     });
   }
   return { err: 'ok', sources_deleted: deleted, annotations_deleted: 0 };
+}));
+
+router.get('/api/plugins/weread/import', eventHandler(() => ({
+  err: 'ok',
+  connection: null,
+  runs: [],
+})));
+
+router.post('/api/plugins/weread/import', eventHandler(async (event) => {
+  const body = await readBody(event);
+  wereadRunId += 1;
+  if (body?.action === 'test') {
+    return {
+      err: 'ok',
+      connection: { id: 88, secret: { configured: true, mask: '••••test' } },
+      run: { id: wereadRunId, status: 'succeeded', counts: { fetched: 0 } },
+      items: [],
+    };
+  }
+  if (body?.action === 'preview') {
+    return {
+      err: 'ok',
+      connection: { id: 88, secret: { configured: false, mask: '' } },
+      run: { id: wereadRunId, status: 'failed', counts: { fetched: 2, conflicts: 2 } },
+      items: [{
+        external_id: 'weread:3300045871:bookmark:b1',
+        entity_type: 'annotation',
+        status: 'conflict',
+        data: {
+          source_book_id: '3300045871',
+          book: { provider_id: '3300045871', title: '活着', author: '余华' },
+          match_status: 'confirmation_required',
+          candidates: [{ book_id: 1, title: '活着', author: '余华', confidence: 0.94 }],
+        },
+      }],
+    };
+  }
+  const imported = {
+    id: 102,
+    book_id: 1,
+    annotation_type: 'highlight',
+    is_private: true,
+    can_edit: true,
+    cfi: null,
+    chapter: '第一章',
+    quote_text: '人是为活着本身而活着的',
+    content: '',
+    created_at: '2026-08-17T12:00:00',
+    updated_at: '2026-08-17T12:00:00',
+    sources: [{ source_name: 'weread', source_connection_id: '88', source_run_id: String(wereadRunId) }],
+  };
+  annotationsByBookId.set(1, [...(annotationsByBookId.get(1) || []).filter(item => item.id !== 102), imported]);
+  return {
+    err: 'ok',
+    connection: { id: 88, secret: { configured: false, mask: '' } },
+    run: { id: wereadRunId, status: 'succeeded', counts: { fetched: 2, written: 2, updated: 0, skipped: 0, failed: 0, conflicts: 0 } },
+    items: [],
+  };
 }));
 
 // Book Detail

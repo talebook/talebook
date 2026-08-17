@@ -12,6 +12,7 @@ from .protocol import (
     ProviderRateLimitError,
     ProviderResult,
 )
+from .weread import WEREAD_PLUGIN_KEY, WereadProvider, parse_weread_export
 
 
 __all__ = [
@@ -28,4 +29,7 @@ __all__ = [
     "ProviderItem",
     "ProviderRateLimitError",
     "ProviderResult",
+    "WEREAD_PLUGIN_KEY",
+    "WereadProvider",
+    "parse_weread_export",
 ]

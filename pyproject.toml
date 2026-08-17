@@ -9,6 +9,7 @@ dependencies = [
     "chardet>=5.2.0",
     "cryptography>=38.0.0",
     "lxml>=5.0.0",
+    "zhconv>=1.4.3",
     "jsonpath-ng>=1.6.0",
     "quickjs>=1.19.4",
     "apsw>=3.51.2.0",
