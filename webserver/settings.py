@@ -86,6 +86,8 @@ settings = {
     "AI_SKILL_MAX_ACTIVE_RUNS": 2,
     "AI_SKILL_MAX_MARKDOWN_CHARACTERS": 40_000,
     "AI_SKILL_MAX_INPUT_CHARACTERS": 32_000,
+    "AI_RECOMMENDATIONS_ENABLED": True,
+    "AI_RECOMMENDATIONS_CACHE_SECONDS": 900,
     "AI_CODEX_COMMAND": "codex",
     # 专用于 Talebook AI 任务的 Codex 身份目录，须包含由 `codex login` 生成的 auth.json。
     # 运行任务时只会把 auth.json 复制到临时 CODEX_HOME，不会把此目录或书库暴露给生成进程。

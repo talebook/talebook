@@ -17,6 +17,7 @@ def routes():
         meta,
         network_library,
         opds,
+        recommendations,
         scan,
         skill_library,
         theme,
@@ -35,6 +36,7 @@ def routes():
     routes += audiobook.routes()
     routes += ai.routes()
     routes += skill_library.routes()
+    routes += recommendations.routes()
     captcha_routes = captcha.routes()
     routes += captcha_routes
     logging.info("CAPTCHA routes registered: %s", [r[0] for r in captcha_routes])
