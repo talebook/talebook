@@ -1010,6 +1010,18 @@
                 </v-card>
             </v-col>
         </v-row>
+
+        <v-row
+            v-if="book.id > 0 && store.user.is_login"
+            class="mt-4"
+        >
+            <v-col cols="12">
+                <AnnotationPanel
+                    :book-id="book.id"
+                    @locate="openAnnotationInReader"
+                />
+            </v-col>
+        </v-row>
     </div>
 </template>
 
@@ -1021,6 +1033,7 @@ import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 import BookCards_Small from '~/components/BookCards_Small.vue';
 import BookConvertDialog from '~/components/BookConvertDialog.vue';
+import AnnotationPanel from '~/components/AnnotationPanel.vue';
 import { READING_STATE, useBookReadingState } from '~/composables/useBookReadingState';
 
 const route = useRoute();
@@ -1195,6 +1208,13 @@ const hasEpubAzw3OrPDF = computed(() => {
     const formats = book.value.files.map(f => f.format.toLowerCase());
     return formats.some(f => ['epub', 'azw3', 'pdf'].includes(f));
 });
+
+const openAnnotationInReader = (annotation) => {
+    const query = new URLSearchParams();
+    if (annotation.cfi) query.set('cfi', annotation.cfi);
+    if (annotation.chapter) query.set('chapter', annotation.chapter);
+    window.open(`/read/${book.value.id}?${query.toString()}`, '_blank', 'noopener');
+};
 
 useHead({
     title: () => book.value.title || t('book.detailsTitle')

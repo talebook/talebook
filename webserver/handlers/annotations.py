@@ -54,6 +54,11 @@ def _as_bool(value):
 
 
 class AnnotationHandlerMixin:
+    def _annotation_dict(self, annotation):
+        data = annotation.to_api_dict()
+        data["can_edit"] = annotation.reader_id == self.user_id()
+        return data
+
     def _json_body(self):
         try:
             data = tornado.escape.json_decode(self.request.body)
@@ -127,7 +132,7 @@ class BookAnnotations(AnnotationHandlerMixin, BaseHandler):
         )
         query = self._apply_filters(query, include_book=False)
         annotations = query.order_by(Annotation.chapter, Annotation.cfi, Annotation.id).all()
-        return {"err": "ok", "annotations": [item.to_api_dict() for item in annotations]}
+        return {"err": "ok", "annotations": [self._annotation_dict(item) for item in annotations]}
 
     @js
     @auth
@@ -223,7 +228,7 @@ class BookAnnotations(AnnotationHandlerMixin, BaseHandler):
             ):
                 return {
                     "err": "ok",
-                    "annotation": annotation.to_api_dict(),
+                    "annotation": self._annotation_dict(annotation),
                     "created": False,
                     "stale_ignored": True,
                     "conflict_protected": False,
@@ -278,7 +283,7 @@ class BookAnnotations(AnnotationHandlerMixin, BaseHandler):
             )
         return {
             "err": "ok",
-            "annotation": annotation.to_api_dict(),
+            "annotation": self._annotation_dict(annotation),
             "created": created,
             "stale_ignored": False,
             "conflict_protected": conflict_protected,
@@ -348,7 +353,11 @@ class BookAnnotationItem(AnnotationHandlerMixin, BaseHandler):
             self.session.commit()
             if not annotation.is_private:
                 AnnotationSyncService().sync_annotation(annotation.id)
-        return {"err": "ok", "annotation": annotation.to_api_dict(), "sync_enqueued": changed and not annotation.is_private}
+        return {
+            "err": "ok",
+            "annotation": self._annotation_dict(annotation),
+            "sync_enqueued": changed and not annotation.is_private,
+        }
 
     @js
     @auth
@@ -376,7 +385,7 @@ class AnnotationCollection(AnnotationHandlerMixin, BaseHandler):
             return {"err": "params.invalid", "msg": _("书籍参数错误")}
         annotations = query.order_by(Annotation.book_id, Annotation.id).all()
         annotations = [item for item in annotations if self.can_view_book(item.book_id)]
-        return {"err": "ok", "annotations": [item.to_api_dict() for item in annotations]}
+        return {"err": "ok", "annotations": [self._annotation_dict(item) for item in annotations]}
 
     @js
     @auth
@@ -401,7 +410,7 @@ class AnnotationExport(AnnotationCollection):
         if query is None:
             return {"err": "params.invalid", "msg": _("书籍参数错误")}
         annotations = query.order_by(Annotation.book_id, Annotation.id).all()
-        annotations = [item.to_api_dict() for item in annotations if self.can_view_book(item.book_id)]
+        annotations = [self._annotation_dict(item) for item in annotations if self.can_view_book(item.book_id)]
         return {
             "err": "ok",
             "export": {

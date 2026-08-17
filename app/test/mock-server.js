@@ -24,6 +24,9 @@ let booksourceCheckPolls = 0;
 let pluginRuns = [];
 let shelfBookIds = new Set();
 let readingStateByBookId = new Map();
+let annotationsByBookId = new Map();
+let annotationPermissionDenied = false;
+let annotationPartialRollback = false;
 let activeThemeName = '';
 let audiobookPublishedEdition = null;
 let audiobookJobs = [];
@@ -169,6 +172,9 @@ router.post('/_test/reset', eventHandler(async (event) => {
   pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
+  annotationsByBookId = new Map([[1, mockAnnotations(1)]]);
+  annotationPermissionDenied = !!body?.annotationPermissionDenied;
+  annotationPartialRollback = !!body?.annotationPartialRollback;
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
@@ -230,6 +236,65 @@ const readJson = (filename) => {
   }
   return null;
 };
+
+const mockAnnotations = (bookId) => [
+  {
+    id: 101,
+    book_id: Number(bookId),
+    annotation_type: 'highlight',
+    is_private: true,
+    can_edit: true,
+    cfi: null,
+    chapter: '第一章 雾中的来客',
+    quote_text: '雾把远处的灯塔藏进了清晨。',
+    content: '这是从微信读书导入的章节级笔记。',
+    created_at: '2026-08-14T10:00:00',
+    updated_at: '2026-08-15T11:30:00',
+    sources: [{
+      source_name: 'weread',
+      source_connection_id: 'mock-account',
+      source_annotation_id: 'weread-101',
+      source_run_id: 'sample-run-1',
+      source_position: 'chapter:1',
+      source_sync_status: 'synced',
+    }],
+  },
+  {
+    id: 102,
+    book_id: Number(bookId),
+    annotation_type: 'note',
+    is_private: true,
+    can_edit: true,
+    cfi: 'epubcfi(/6/4!/4/2/2)',
+    chapter: '第二章 灯塔来信',
+    quote_text: '信纸边缘留下了一圈盐粒。',
+    content: 'Talebook 原生笔记，拥有精确定位。',
+    created_at: '2026-08-15T09:00:00',
+    updated_at: '2026-08-15T09:00:00',
+    sources: [],
+  },
+  {
+    id: 103,
+    book_id: Number(bookId),
+    annotation_type: 'chapter_comment',
+    is_private: false,
+    can_edit: false,
+    cfi: null,
+    chapter: '第一章 雾中的来客',
+    quote_text: '',
+    content: '另一位读者留下的公开章评。',
+    author_name: '读者甲',
+    created_at: '2026-08-15T12:00:00',
+    updated_at: '2026-08-15T12:00:00',
+    sources: [{
+      source_name: 'readest',
+      source_connection_id: 'public-feed',
+      source_annotation_id: 'readest-103',
+      source_run_id: 'public-run',
+      source_sync_status: 'synced',
+    }],
+  },
+];
 
 const audiobookChapters = [
   {
@@ -1313,6 +1378,50 @@ router.get('/api/book/txt/init', eventHandler(() => ({
   err: 'ok',
   msg: '未解析',
 })));
+
+router.get('/api/book/:id/annotations', eventHandler((event) => {
+  if (annotationPermissionDenied) return { err: 'params.book.invalid', msg: '无权访问' };
+  const bookId = Number(getRouterParam(event, 'id'));
+  const query = getQuery(event);
+  let annotations = annotationsByBookId.get(bookId) || [];
+  if (query.source_name) {
+    annotations = annotations.filter(annotation => {
+      if (query.source_name === 'talebook') return !annotation.sources.length;
+      return annotation.sources.some(source => source.source_name === query.source_name);
+    });
+  }
+  return { err: 'ok', annotations };
+}));
+
+router.delete('/api/book/:id/annotations/:annotationId', eventHandler((event) => {
+  const bookId = Number(getRouterParam(event, 'id'));
+  const annotationId = Number(getRouterParam(event, 'annotationId'));
+  const annotations = annotationsByBookId.get(bookId) || [];
+  const annotation = annotations.find(item => item.id === annotationId);
+  if (!annotation?.can_edit) return { err: 'annotation.not_found', msg: '笔记不存在' };
+  annotationsByBookId.set(bookId, annotations.filter(item => item.id !== annotationId));
+  return { err: 'ok', deleted: 1 };
+}));
+
+router.delete('/api/annotations', eventHandler((event) => {
+  const query = getQuery(event);
+  const bookId = Number(query.book_id);
+  const annotations = annotationsByBookId.get(bookId) || [];
+  let deleted = 0;
+  for (const annotation of annotations) {
+    annotation.sources = annotation.sources.filter(source => {
+      const matches = source.source_name === query.source_name
+        && source.source_connection_id === String(query.source_connection_id || '')
+        && (!query.source_run_id || source.source_run_id === query.source_run_id);
+      if (matches && (!annotationPartialRollback || deleted === 0)) {
+        deleted += 1;
+        return false;
+      }
+      return true;
+    });
+  }
+  return { err: 'ok', sources_deleted: deleted, annotations_deleted: 0 };
+}));
 
 // Book Detail
 router.get('/api/book/:id', eventHandler((event) => {
