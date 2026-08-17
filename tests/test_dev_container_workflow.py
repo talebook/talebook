@@ -114,3 +114,38 @@ def test_build_workflow_filters_docker_jobs_to_image_inputs():
         "DOCKER_CHANGED": "${{ steps.filter.outputs.docker }}",
     }
     assert '[[ "$REF_TYPE" == "tag" || "$DOCKER_CHANGED" == "true" ]]' in decide["run"]
+
+
+def test_docker_root_context_is_a_runtime_input_allowlist():
+    rules = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+
+    assert rules[1] == "**"
+    for path in (
+        "!Dockerfile",
+        "!requirements.txt",
+        "!requirements-test.txt",
+        "!server.py",
+        "!app/**",
+        "!conf/**",
+        "!docker/**",
+        "!webserver/**",
+    ):
+        assert path in rules
+
+    assert "!tests/**" not in rules
+    assert "!design/**" not in rules
+    assert "!document/**" not in rules
+    assert "app/test" in rules
+
+
+def test_test_sources_use_a_named_context_without_leaking_into_dev_image():
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "FROM server AS test-dependencies" in dockerfile
+    assert "FROM test-dependencies AS test" in dockerfile
+    assert "COPY --from=test-source / /var/www/talebook/tests/" in dockerfile
+    assert "FROM test-dependencies AS dev" in dockerfile
+    assert "FROM test AS dev" not in dockerfile
+    assert "COPY tests/" not in dockerfile
+    assert "--build-context test-source=./tests" in makefile

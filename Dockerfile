@@ -128,12 +128,17 @@ RUN --mount=from=python-wheel-build,source=/opt/wheels,target=/tmp/talebook-whee
 
 
 # ----------------------------------------
-# 测试阶段
-FROM server AS test
+# 测试依赖层：test 与 dev 复用工具，但只有 test target 接收测试源码。
+FROM server AS test-dependencies
 COPY requirements-test.txt /tmp/
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r /tmp/requirements-test.txt
-COPY webserver/ /var/www/talebook/webserver/
-COPY tests/ /var/www/talebook/tests/
+
+
+# ----------------------------------------
+# 测试阶段
+# 构建：docker build --build-context test-source=./tests --target test -t talebook/test .
+FROM test-dependencies AS test
+COPY --from=test-source / /var/www/talebook/tests/
 CMD ["pytest", "/var/www/talebook/tests"]
 
 
@@ -247,7 +252,7 @@ RUN rm -rf /var/www/talebook/app/.output/public/logo && \
 # 开发环境（前端使用 npm run dev，可将本地 app/ 目录挂载进来实时开发）
 # 构建：docker build --target dev -t talebook/talebook:dev .
 # 使用：docker-compose -f dev.yml up
-FROM test AS dev
+FROM test-dependencies AS dev
 ARG BUILD_COUNTRY=""
 ARG GIT_VERSION=""
 ARG TARGETARCH

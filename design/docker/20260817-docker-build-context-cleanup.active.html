@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Talebook Docker 构建上下文与历史截图清理方案。">
+  <link rel="icon" href="data:,">
+  <title>收紧 Docker 构建上下文并清理过期截图 · ACTIVE</title>
+  <style>
+    :root { color-scheme: light; --ink: #223047; --muted: #607087; --line: #d8e0ea; --paper: #f4f7fa; --panel: #fff; --accent: #176b87; --soft: #e9f5f8; --warn: #8a5313; --warn-soft: #fff5e3; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px 18px 64px; color: var(--ink); background: linear-gradient(150deg, #eef6f8, var(--paper) 35%); font: 15px/1.7 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    main { max-width: 980px; margin: 0 auto; }
+    header, section { margin-bottom: 18px; padding: 25px 28px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+    h1 { margin: 0 0 10px; font-size: clamp(29px, 5vw, 44px); line-height: 1.18; }
+    h2 { margin: 0 0 13px; font-size: 21px; }
+    p { margin: 0 0 11px; }
+    p:last-child { margin-bottom: 0; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li + li { margin-top: 5px; }
+    code { padding: 2px 5px; border-radius: 4px; background: #eef2f6; font-size: .9em; overflow-wrap: anywhere; }
+    .summary { padding: 14px 16px; background: var(--soft); border-left: 4px solid var(--accent); }
+    .request { padding: 14px 16px; background: var(--warn-soft); border-left: 4px solid var(--warn); }
+    .meta { display: flex; flex-wrap: wrap; gap: 7px 15px; margin-top: 17px; color: var(--muted); font-size: 13px; }
+    .status { color: var(--warn); font-weight: 800; }
+    table { width: 100%; margin-top: 12px; border-collapse: collapse; }
+    th, td { padding: 10px 11px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); background: #f7f9fb; font-size: 13px; }
+    .pending { color: var(--warn); font-weight: 800; }
+    footer { color: var(--muted); font-size: 12px; text-align: center; }
+    @media (max-width: 640px) { body { padding: 12px 9px 40px; } header, section { padding: 20px 17px; border-radius: 12px; } .table-wrap { overflow-x: auto; } table { min-width: 620px; } }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+    @media print { body { padding: 0; background: #fff; } header, section { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>收紧 Docker 构建上下文并清理过期截图</h1>
+    <p class="summary">让生产与开发镜像只接收实际构建输入；测试源码仅在测试 target 中通过独立上下文提供，同时删除没有任何文档引用的历史截图。</p>
+    <div class="meta">
+      <span>创建日期：2026-08-17</span><span>所属模块：docker</span><span>状态：<b class="status">ACTIVE</b></span>
+      <span>影响范围：Dockerfile、Makefile、.dockerignore、tests、document/screenshots</span><span>需求来源：TB-63</span>
+    </div>
+  </header>
+  <section>
+    <h2>1. 原始诉求</h2>
+    <p class="request">“清理 talebook 项目中一些历史过期的截图。优化 dockerfile 构建流程，不要把 test、design 等测试代码和方案文档打包进去，以节省空间。”</p>
+    <p>现状中生产镜像虽未执行 <code>COPY tests/</code> 或 <code>COPY design/</code>，但根构建上下文没有排除这些目录；同时 <code>dev</code> 继承 <code>test</code>，会把后端测试源码带入开发镜像。</p>
+  </section>
+  <section>
+    <h2>2. 目标与边界</h2>
+    <ul>
+      <li>根 Docker 上下文只保留 Dockerfile 实际使用的运行与构建输入，排除 <code>tests/</code>、<code>design/</code>、<code>document/</code> 等非运行内容。</li>
+      <li><code>make test</code> 继续能构建并运行完整后端测试；开发镜像继续提供 pytest 等测试工具。</li>
+      <li>开发镜像不再继承带测试源码的 test stage，生产 SPA/SSR 镜像内容和运行契约不变。</li>
+      <li>截图只删除没有任何 tracked 文件或所属目录引用的项目；保留 README 展示图和仍被方案引用的验证证据。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>3. 方案</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>决策点</th><th>方案</th><th>理由</th></tr></thead>
+      <tbody>
+        <tr><td>根构建上下文</td><td><code>.dockerignore</code> 改为运行输入 allowlist，再排除前端测试和本地产物。</td><td>默认拒绝未来新增的文档、截图与方案目录，避免逐项黑名单遗漏。</td></tr>
+        <tr><td>后端测试源码</td><td>test target 使用 <code>--build-context test-source=./tests</code>；Makefile 统一传参。</td><td>生产/dev 构建不发送测试源码，测试 target 仍保持自包含。</td></tr>
+        <tr><td>stage 继承</td><td>新增只安装测试依赖的 <code>test-dependencies</code> stage；test 与 dev 并列继承。</td><td>复用工具层且防止 dev 继承 test stage 中的源码。</td></tr>
+        <tr><td>截图判定</td><td>精确文件路径与父目录路径均没有 tracked 文本引用才删除。</td><td>使用可复验的保守规则，不破坏已记录证据。</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+  <section>
+    <h2>4. 风险与回滚</h2>
+    <ul>
+      <li>allowlist 漏掉新 COPY 输入会导致构建失败；用静态回归测试固定允许路径，并通过 Docker build check 验证实际解析。</li>
+      <li>直接执行 <code>docker build --target test</code> 的调用方必须同步传入 named context；仓库入口统一由 Makefile 覆盖，并在 Dockerfile 注释中记录命令。</li>
+      <li>截图删除只影响仓库历史附件，不影响运行时；Git 历史可恢复。整体回滚只需恢复本次提交。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>5. 测试计划与结果</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>验证项</th><th>预期</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td><code>pytest tests/test_dev_container_workflow.py -q</code></td><td>上下文 allowlist、named context、stage 继承和 Makefile 参数均被固定。</td><td>通过：5 passed。</td></tr>
+        <tr><td><code>docker build --check --target production -f Dockerfile .</code></td><td>生产 target 在收紧后的上下文中通过 Dockerfile 检查。</td><td>通过：Check complete, no warnings found。</td></tr>
+        <tr><td><code>docker build --check --build-context test-source=./tests --target test -f Dockerfile .</code></td><td>测试 target 能解析独立测试上下文。</td><td>通过：Check complete, no warnings found。</td></tr>
+        <tr><td>真实 test target 构建与上下文体积核对</td><td>根上下文和测试上下文独立传输；仅删除零引用截图。</td><td>部分通过：真实构建显示根上下文 1.54 kB、test-source 82.01 MB；随后基础镜像的 <code>apt-get update</code> 四分钟无进展，主动取消，未宣称完整构建通过。删除 30 个零引用 PNG，共 2,814,725 bytes。</td></tr>
+        <tr><td><code>make check-design</code> 与 <code>git diff --check</code></td><td>方案和补丁质量门禁通过。</td><td>通过：109 design document(s) passed；无空白错误。</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+  <footer>Talebook internal design · docker · ACTIVE · 2026-08-17</footer>
+</main>
+</body>
+</html>
