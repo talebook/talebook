@@ -37,7 +37,7 @@
 <main>
   <header>
     <h1>收紧 Docker 构建上下文并清理过期截图</h1>
-    <p class="summary">让生产与开发镜像只接收实际构建输入；测试源码仅在测试 target 中通过独立上下文提供，同时删除没有任何文档引用的历史截图。</p>
+    <p class="summary">让生产 SPA/SSR 镜像只包含运行输入；测试源码保留在 test 并由 dev 继承，同时删除没有任何文档引用的历史截图。</p>
     <div class="meta">
       <span>创建日期：2026-08-17</span><span>所属模块：docker</span><span>状态：<b class="status">ACTIVE</b></span>
       <span>影响范围：Dockerfile、Makefile、.dockerignore、tests、document/screenshots</span><span>需求来源：TB-63</span>
@@ -46,14 +46,14 @@
   <section>
     <h2>1. 原始诉求</h2>
     <p class="request">“清理 talebook 项目中一些历史过期的截图。优化 dockerfile 构建流程，不要把 test、design 等测试代码和方案文档打包进去，以节省空间。”</p>
-    <p>现状中生产镜像虽未执行 <code>COPY tests/</code> 或 <code>COPY design/</code>，但根构建上下文没有排除这些目录；同时 <code>dev</code> 继承 <code>test</code>，会把后端测试源码带入开发镜像。</p>
+    <p>现状中生产镜像虽未执行 <code>COPY tests/</code> 或 <code>COPY design/</code>，但根构建上下文没有按 Dockerfile 输入收敛。用户进一步确认 dev 可以继承 test 并包含测试源码，精简边界只针对 production/SSR。</p>
   </section>
   <section>
     <h2>2. 目标与边界</h2>
     <ul>
-      <li>根 Docker 上下文只保留 Dockerfile 实际使用的运行与构建输入，排除 <code>tests/</code>、<code>design/</code>、<code>document/</code> 等非运行内容。</li>
-      <li><code>make test</code> 继续能构建并运行完整后端测试；开发镜像继续提供 pytest 等测试工具。</li>
-      <li>开发镜像不再继承带测试源码的 test stage，生产 SPA/SSR 镜像内容和运行契约不变。</li>
+      <li>根 Docker 上下文只允许各 target 实际使用的输入，排除 <code>design/</code>、<code>document/</code> 等不被任何镜像消费的内容；保留 test/dev 需要的 <code>tests/</code>。</li>
+      <li><code>make test</code> 继续能构建并运行完整后端测试；开发镜像继续继承 test 的测试源码与工具。</li>
+      <li>生产 SPA/SSR 不继承 test/dev stage，也不执行 <code>COPY tests/</code>，镜像内容和运行契约保持不变。</li>
       <li>截图只删除没有任何 tracked 文件或所属目录引用的项目；保留 README 展示图和仍被方案引用的验证证据。</li>
     </ul>
   </section>
@@ -62,9 +62,9 @@
     <div class="table-wrap"><table>
       <thead><tr><th>决策点</th><th>方案</th><th>理由</th></tr></thead>
       <tbody>
-        <tr><td>根构建上下文</td><td><code>.dockerignore</code> 改为运行输入 allowlist，再排除前端测试和本地产物。</td><td>默认拒绝未来新增的文档、截图与方案目录，避免逐项黑名单遗漏。</td></tr>
-        <tr><td>后端测试源码</td><td>test target 使用 <code>--build-context test-source=./tests</code>；Makefile 统一传参。</td><td>生产/dev 构建不发送测试源码，测试 target 仍保持自包含。</td></tr>
-        <tr><td>stage 继承</td><td>新增只安装测试依赖的 <code>test-dependencies</code> stage；test 与 dev 并列继承。</td><td>复用工具层且防止 dev 继承 test stage 中的源码。</td></tr>
+        <tr><td>根构建上下文</td><td><code>.dockerignore</code> 改为 target 输入 allowlist，允许 app、webserver、conf、docker 与 tests，排除设计、文档、截图和本地产物。</td><td>默认拒绝未来新增的非镜像资料，同时不破坏 test/dev 的既有能力。</td></tr>
+        <tr><td>后端测试源码</td><td>test stage 继续执行 <code>COPY tests/</code>；dev 继续 <code>FROM test</code>。</td><td>dev 可以比 test 更大，测试源码只存在于 test/dev 分支。</td></tr>
+        <tr><td>生产边界</td><td>production/SSR 直接继承 server，不继承 test/dev。</td><td>多阶段构建只把目标 stage 及其祖先装入最终镜像，因此生产镜像不包含测试源码或工具。</td></tr>
         <tr><td>截图判定</td><td>精确文件路径与父目录路径均没有 tracked 文本引用才删除。</td><td>使用可复验的保守规则，不破坏已记录证据。</td></tr>
       </tbody>
     </table></div>
@@ -73,7 +73,7 @@
     <h2>4. 风险与回滚</h2>
     <ul>
       <li>allowlist 漏掉新 COPY 输入会导致构建失败；用静态回归测试固定允许路径，并通过 Docker build check 验证实际解析。</li>
-      <li>直接执行 <code>docker build --target test</code> 的调用方必须同步传入 named context；仓库入口统一由 Makefile 覆盖，并在 Dockerfile 注释中记录命令。</li>
+      <li><code>tests/</code> 对构建上下文可见，但只有 test/dev 的可达 COPY 会消费它；回归测试固定 production stage 不复制测试源码。</li>
       <li>截图删除只影响仓库历史附件，不影响运行时；Git 历史可恢复。整体回滚只需恢复本次提交。</li>
     </ul>
   </section>
@@ -82,10 +82,10 @@
     <div class="table-wrap"><table>
       <thead><tr><th>验证项</th><th>预期</th><th>结果</th></tr></thead>
       <tbody>
-        <tr><td><code>pytest tests/test_dev_container_workflow.py -q</code></td><td>上下文 allowlist、named context、stage 继承和 Makefile 参数均被固定。</td><td>通过：5 passed。</td></tr>
-        <tr><td><code>docker build --check --target production -f Dockerfile .</code></td><td>生产 target 在收紧后的上下文中通过 Dockerfile 检查。</td><td>通过：Check complete, no warnings found。</td></tr>
-        <tr><td><code>docker build --check --build-context test-source=./tests --target test -f Dockerfile .</code></td><td>测试 target 能解析独立测试上下文。</td><td>通过：Check complete, no warnings found。</td></tr>
-        <tr><td>真实 test target 构建与上下文体积核对</td><td>根上下文和测试上下文独立传输；仅删除零引用截图。</td><td>部分通过：真实构建显示根上下文 1.54 kB、test-source 82.01 MB；随后基础镜像的 <code>apt-get update</code> 四分钟无进展，主动取消，未宣称完整构建通过。删除 30 个零引用 PNG，共 2,814,725 bytes。</td></tr>
+        <tr><td><code>pytest tests/test_docker_stages.py tests/test_dev_container_workflow.py -q</code></td><td>stage 继承、生产边界和 allowlist 均被固定。</td><td>通过：15 passed，包含 CI 原失败的两条断言。</td></tr>
+        <tr><td><code>make pytest</code></td><td>完整后端测试通过，修复 GitHub Actions 的 test-server 失败。</td><td>环境受限：宿主机缺少 Calibre，CI 同款 <code>talebook-base</code> 容器在 <code>make init</code> 下载 voicebook GitHub tarball 时连续超时，均未进入完整断言；等待 PR CI 复验。</td></tr>
+        <tr><td>Docker production / production-ssr / test / dev target checks</td><td>四个 target 均能解析收紧后的上下文与 stage 关系。</td><td>通过：四个 <code>docker build --check</code> 均无 warning。</td></tr>
+        <tr><td>截图引用与体积核对</td><td>仅删除零引用截图。</td><td>通过：删除 30 个零引用 PNG，共 2,814,725 bytes。</td></tr>
         <tr><td><code>make check-design</code> 与 <code>git diff --check</code></td><td>方案和补丁质量门禁通过。</td><td>通过：109 design document(s) passed；无空白错误。</td></tr>
       </tbody>
     </table></div>

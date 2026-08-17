@@ -30,8 +30,7 @@ build-dev:
 
 test:
 	rm -f unittest.log
-	docker build --build-context test-source=./tests --build-arg BUILD_COUNTRY=CN \
-		-t talebook/test --target test -f Dockerfile .
+	docker build --build-arg BUILD_COUNTRY=CN -t talebook/test --target test -f Dockerfile .
 	docker run --rm --name=talebook-docker-test -v "$$PWD":"$$PWD" -w "$$PWD" talebook/test pytest --log-file=unittest.log --log-level=INFO tests
 
 lint-ui:

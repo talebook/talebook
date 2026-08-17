@@ -129,23 +129,22 @@ def test_docker_root_context_is_a_runtime_input_allowlist():
         "!conf/**",
         "!docker/**",
         "!webserver/**",
+        "!tests/**",
     ):
         assert path in rules
 
-    assert "!tests/**" not in rules
     assert "!design/**" not in rules
     assert "!document/**" not in rules
     assert "app/test" in rules
 
 
-def test_test_sources_use_a_named_context_without_leaking_into_dev_image():
+def test_test_sources_are_available_to_test_and_dev_but_not_production():
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    production = dockerfile.split("FROM server AS production", 1)[1].split("\nFROM ", 1)[0]
 
-    assert "FROM server AS test-dependencies" in dockerfile
-    assert "FROM test-dependencies AS test" in dockerfile
-    assert "COPY --from=test-source / /var/www/talebook/tests/" in dockerfile
-    assert "FROM test-dependencies AS dev" in dockerfile
-    assert "FROM test AS dev" not in dockerfile
-    assert "COPY tests/" not in dockerfile
-    assert "--build-context test-source=./tests" in makefile
+    assert "FROM server AS test" in dockerfile
+    assert "COPY tests/ /var/www/talebook/tests/" in dockerfile
+    assert "FROM test AS dev" in dockerfile
+    assert "COPY tests/" not in production
+    assert "--build-context" not in makefile

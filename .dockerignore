@@ -12,6 +12,8 @@
 !docker/**
 !webserver/
 !webserver/**
+!tests/
+!tests/**
 
 # Frontend development and test material is not needed by image builds.
 app/.env
