@@ -332,6 +332,10 @@ import { useI18n } from 'vue-i18n';
 import BookSourceImportDialog from '~/components/BookSourceImportDialog.vue';
 import { useMainStore } from '@/stores/main';
 
+const props = defineProps({
+    embedded: { type: Boolean, default: false },
+});
+
 const { t } = useI18n();
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
@@ -543,10 +547,16 @@ watch(sourceTab, () => {
     load();
 });
 
-onMounted(load);
+onMounted(() => {
+    if (!props.embedded) {
+        navigateTo('/admin/plugins?tab=book_sources&manage=legado', { replace: true });
+        return;
+    }
+    load();
+});
 onBeforeUnmount(clearCheckPoll);
 
-useHead(() => ({ title: t('booksource.title') }));
+useHead(() => (props.embedded ? {} : { title: t('booksource.title') }));
 </script>
 
 <style scoped>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 管理 → 插件页面与既有元数据、Generic OPDS、Legado 迁移实现记录。" />
+    <link rel="icon" href="data:," />
+    <title>插件管理与既有能力迁移 · ACTIVE</title>
+    <style>
+      :root { color-scheme:light; --bg:#f3f6fa; --panel:#fff; --ink:#172234; --muted:#5c6878; --line:#d6dee9; --accent:#1867c0; --soft:#edf5ff; --good:#176c48; --good-bg:#ebf8f1; --warn:#8a5708; --warn-bg:#fff5dc; --mono:"SFMono-Regular",Consolas,monospace; }
+      * { box-sizing:border-box; }
+      html { scroll-behavior:smooth; }
+      body { margin:0; color:var(--ink); background:linear-gradient(145deg,#eaf3ff 0,var(--bg) 26%,#f9fafc 100%); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; line-height:1.66; }
+      .skip { position:fixed; left:10px; top:8px; z-index:10; padding:8px 12px; color:#fff; background:var(--ink); transform:translateY(-150%); }
+      .skip:focus { transform:none; }
+      .page { width:min(1160px,calc(100vw - 32px)); margin:auto; padding:24px 0 56px; }
+      .hero,.card { border:1px solid var(--line); border-radius:17px; background:var(--panel); box-shadow:0 12px 30px rgba(15,23,42,.07); }
+      .hero { padding:30px 32px; margin-bottom:18px; }
+      h1 { margin:0 0 10px; font-size:clamp(30px,4vw,45px); line-height:1.15; }
+      h2 { margin:0 0 14px; font-size:23px; }
+      h3 { margin:18px 0 8px; font-size:17px; }
+      p,li,td,th { font-size:14px; }
+      p,li { color:#2c394b; }
+      .lead { color:var(--muted); font-size:17px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      .chip { padding:5px 11px; border-radius:999px; color:#46576c; background:#edf1f6; font-size:12px; font-weight:700; }
+      nav { position:sticky; top:0; z-index:4; display:flex; gap:5px; overflow:auto; padding:8px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.96); }
+      nav a { padding:6px 9px; color:var(--accent); text-decoration:none; white-space:nowrap; font-size:12px; font-weight:700; }
+      .card { margin:18px 0; padding:25px 28px; scroll-margin-top:16px; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .box,.callout { padding:15px 17px; border:1px solid var(--line); border-radius:13px; background:#fafcff; }
+      .box h3 { margin-top:0; }
+      .callout { margin:12px 0; }
+      .good { border-color:#b9ddca; background:var(--good-bg); }
+      .warn { border-color:#ecd49e; background:var(--warn-bg); }
+      .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:13px; }
+      table { width:100%; min-width:760px; border-collapse:collapse; }
+      th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { color:#4d5d70; background:#f4f7fb; }
+      tr:last-child td { border-bottom:0; }
+      th:last-child,td:last-child { border-right:0; }
+      code { padding:.12em .35em; border-radius:4px; background:#edf1f6; font-family:var(--mono); font-size:.9em; overflow-wrap:anywhere; }
+      .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+      .step { padding:14px; border:1px solid var(--line); border-radius:13px; background:var(--soft); }
+      .step b { display:block; font-size:13px; }
+      .step span { color:var(--muted); font-size:12px; }
+      @media (max-width:720px) { .page { width:calc(100vw - 20px); padding-top:10px; } .hero,.card { padding:21px 19px; border-radius:15px; } .grid,.flow { grid-template-columns:1fr; } }
+      @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+      @media print { body { background:#fff; } .page { width:100%; } .hero,.card { box-shadow:none; } nav,.skip { display:none; } .table-wrap { break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>插件管理与既有能力迁移</h1>
+        <p class="lead">以「管理 → 插件」统一四类业务入口；现有非 AI 元数据、Generic OPDS 与 Legado 继续使用原配置和数据表，同时获得统一目录、连接健康与执行记录。</p>
+        <div class="chips"><span class="chip">状态：ACTIVE</span><span class="chip">日期：2026-08-14</span><span class="chip">模块：app / webserver</span><span class="chip">需求：TB-43</span><span class="chip">依据：TB-41 定稿</span></div>
+      </header>
+      <nav aria-label="章节目录"><a href="#request">诉求</a><a href="#scope">边界</a><a href="#architecture">架构</a><a href="#experience">页面</a><a href="#migration">迁移</a><a href="#review">界面审查</a><a href="#tests">验证</a><a href="#risks">风险</a></nav>
+      <main id="main-content">
+        <section id="request" class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout">在插件公共底座与 UX 定稿后，实现 <code>/admin/plugins</code> 的元数据、笔记（含章评）、评价、书源四个 Tab；提供目录、详情、搜索/筛选、启停、连接测试、执行记录、失败项重试与回滚入口；把 Talebook 既有非 AI 元数据、Generic OPDS 和 Legado 能力迁入，保留旧入口一版兼容跳转，并确保数据库只有一套事实。</div>
+          <p>验收重点是升级后旧配置、启用状态和核心行为零回退，既有能力进入统一插件目录并共享底座运行治理。实现输入来自 TB-41 批准的交互稿 <code>20260814-plugin-management-ux.wip.html</code>。</p>
+        </section>
+
+        <section id="scope" class="card">
+          <h2>2. 范围与硬边界</h2>
+          <div class="grid">
+            <article class="box"><h3>本次交付</h3><ul><li>四 Tab 目录、状态优先卡片、搜索与状态筛选，筛选写入 URL。</li><li>右侧详情弹窗、权限、连接健康/测试、最近运行和安装启停。</li><li>全局执行记录、单次运行明细、失败项重试与可回滚运行入口。</li><li>复用现有 OPDS 导入弹窗和 Legado 管理页；旧书源路由兼容跳转。</li><li>内置能力注册、旧状态迁移、API 和回归测试。</li></ul></article>
+            <article class="box"><h3>明确排除</h3><ul><li>不接入 AI，也不把 AI 元数据源写入插件目录或状态摘要。</li><li>不接入 Calibre Content Server 或 Calibre-Web。</li><li>不复制 OPDS、Legado 或元数据配置，不改变其既有业务数据表。</li><li>不在本次引入任意代码热加载、插件市场或新的 Secret 展示方式。</li></ul></article>
+          </div>
+        </section>
+
+        <section id="architecture" class="card">
+          <h2>3. 实现架构</h2>
+          <div class="flow"><div class="step"><b>1. 注册定义</b><span>三个 trusted builtin provider 声明 category、capability、权限与管理动作。</span></div><div class="step"><b>2. 幂等迁移</b><span>首次访问目录时创建共享 installation 与无凭据 instance connection。</span></div><div class="step"><b>3. 读取旧事实</b><span>元数据设置、OpdsSource、BookSourceModel 实时形成配置/启用摘要。</span></div><div class="step"><b>4. 统一治理</b><span>测试、健康和后续执行进入 plugin runs；旧业务仍走成熟 adapter。</span></div></div>
+          <div class="table-wrap"><table><thead><tr><th>层</th><th>职责</th><th>关键文件</th></tr></thead><tbody>
+            <tr><td>目录适配</td><td>声明 <code>talebook.metadata.builtin</code>、<code>talebook.book-source.opds</code>、<code>talebook.book-source.legado</code>；只允许空 auth schema 的受信内置连接无 Secret 执行。</td><td><code>webserver/plugins/runtime/builtin_capabilities.py</code><br><code>webserver/services/plugin_runtime.py</code></td></tr>
+            <tr><td>管理 API</td><td>返回定义、安装、旧状态计数；支持安装/连接启停、连接动作、全局运行与单次运行明细。</td><td><code>webserver/handlers/plugins.py</code><br><code>webserver/models.py</code></td></tr>
+            <tr><td>管理 UI</td><td>目录与详情、运行列表/明细、复用旧 OPDS/Legado 消费者、导航和双语文案。</td><td><code>app/pages/admin/plugins/**</code><br><code>app/components/**Header.vue</code></td></tr>
+            <tr><td>验证夹具</td><td>mock API、Chromium 流程、移动端与键盘焦点回归。</td><td><code>app/test/mock-server.js</code><br><code>app/test/e2e/plugins.spec.ts</code></td></tr>
+          </tbody></table></div>
+        </section>
+
+        <section id="experience" class="card">
+          <h2>4. 页面与状态</h2>
+          <div class="table-wrap"><table><thead><tr><th>区域</th><th>行为</th><th>恢复/退出</th></tr></thead><tbody>
+            <tr><td>插件目录</td><td>四个 ARIA Tab；名称/说明/能力搜索；全部、需处理、已启用、已停用筛选；loading、加载失败、空分类与无结果分别呈现。</td><td><code>tab</code>、<code>q</code>、<code>status</code> 保留在 URL；无结果可一键清除。</td></tr>
+            <tr><td>卡片</td><td>每张只突出一个主动作，状态同时使用图标、文字与颜色；能力、配置数量和最近执行为次要信息。</td><td>详情或既有管理动作返回目录上下文。</td></tr>
+            <tr><td>详情</td><td>右侧全高响应式 dialog 展示连接健康、测试、权限、最近五次运行与停用入口；长 plugin key 可换行。</td><td>关闭按钮和 Esc 可退出；关闭后焦点回到触发按钮。</td></tr>
+            <tr><td>执行记录</td><td>独立横向入口；状态/连接筛选；表格展示插件、动作、计数与时间；运行详情展示指标和逐项结果。</td><td>明确返回插件页或运行列表；失败/部分成功可重试，合格运行可确认回滚。</td></tr>
+            <tr><td>书源兼容</td><td>Generic OPDS 继续打开现有导入弹窗；Legado 在插件页嵌入现有完整管理消费者。</td><td><code>/admin/booksources</code> 跳至 <code>/admin/plugins?tab=book_sources&amp;manage=legado</code>。</td></tr>
+          </tbody></table></div>
+        </section>
+
+        <section id="migration" class="card">
+          <h2>5. 迁移与兼容决策</h2>
+          <ul><li><strong>单一事实：</strong>OPDS 仍读写 <code>OpdsSource</code>，Legado 仍读写 <code>BookSourceModel</code>，元数据仍读取现有 settings；插件表只保存统一 definition、installation、connection 与 run 治理数据。</li><li><strong>幂等启动：</strong>每个内置能力只创建一条共享安装和一条“内置连接”；重复访问不会重复迁移。</li><li><strong>启用状态：</strong>元数据 installation 首次取现有 <code>auto_fill_meta</code>；各来源配置/启用数量实时从旧事实计算，停用插件不删除旧配置或已导入数据。</li><li><strong>行为复用：</strong>元数据配置跳回原设置锚点；OPDS 与 Legado 直接复用现有组件和 API，避免并行实现导致功能回退。</li><li><strong>安全：</strong>普通序列化不暴露 Secret；本次三个内置 provider 的 auth schema 为空，因此不制造虚假凭据，也不放宽需认证 provider 的校验。</li></ul>
+        </section>
+
+        <section id="review" class="card">
+          <h2>6. 完整界面审查</h2>
+          <div class="callout good"><strong>结论：Approve。</strong>审查基线为 <code>origin/master</code>（merge base <code>1f0a4bd4837b29eda6d401f062f036eefcdff436</code>）；审查覆盖 UI 差异两侧、导航/旧路由/复用组件/API mock 等直接消费者，以及 1440px 桌面、375px 手机、键盘焦点、loading/error/empty/no-result 和危险操作。</div>
+          <div class="table-wrap"><table><thead><tr><th>发现</th><th>等级</th><th>处理</th></tr></thead><tbody>
+            <tr><td>首版抽屉组件没有形成可用的右侧详情面板。</td><td>MEDIUM</td><td>改为右对齐、全高、可滚动的响应式 <code>v-dialog</code>。</td></tr>
+            <tr><td>页面/详情标题缺少明确语义层级。</td><td>MEDIUM</td><td>目录、运行列表、运行详情使用 <code>h1</code>，详情与嵌入管理区使用 <code>h2</code>。</td></tr>
+            <tr><td>搜索和状态筛选刷新后会丢失。</td><td>MEDIUM</td><td>300ms 防抖同步 <code>q</code>/<code>status</code>，并监听浏览器历史恢复。</td></tr>
+            <tr><td>375px 下标题说明被单行样式裁切。</td><td>MEDIUM</td><td>标题 copy 允许收缩与换行，并增加不溢出断言。</td></tr>
+            <tr><td>Esc 关闭详情后焦点没有回到触发按钮。</td><td>MEDIUM</td><td>记录触发元素，在 dialog <code>after-leave</code> 后恢复焦点并增加键盘用例。</td></tr>
+            <tr><td>状态值、运行项状态和数字可读性不足。</td><td>LOW</td><td>状态全部本地化且不只依赖颜色；运行指标启用 tabular numerals；长 key 可换行。</td></tr>
+          </tbody></table></div>
+          <p><strong>剩余 HIGH/MEDIUM：</strong>无。截图证据为 <code>document/screenshots/plugin-management/plugin-management-desktop.png</code> 与 <code>document/screenshots/plugin-management/plugin-management-mobile.png</code>，由本地 mock API 驱动，仅用于渲染与回归证据，不作为用户体验环境。</p>
+        </section>
+
+        <section id="tests" class="card">
+          <h2>7. 验证结果</h2>
+          <div class="callout good"><strong>已通过：</strong>插件运行时专项 22 项；Chromium 插件/书源相关 6 项；前端 ESLint 0 error；Nuxt 生产构建、Python Ruff、设计文档和 diff 空白检查通过。</div>
+          <div class="table-wrap"><table><thead><tr><th>命令</th><th>结果</th><th>覆盖</th></tr></thead><tbody>
+            <tr><td><code>pytest -q tests/test_plugin_runtime.py</code></td><td>22 passed</td><td>注册、迁移幂等、无凭据内置连接、Secret 边界、test/preview/run/retry/rollback、游标、并发、脱敏。</td></tr>
+            <tr><td><code>npx playwright test test/e2e/plugins.spec.ts test/e2e/booksources.spec.ts --project=chromium</code></td><td>6 passed</td><td>四 Tab、排除项、详情/连接测试、共享运行记录、旧路由、Legado 回归、375px、URL 筛选、焦点限制/Esc/恢复。</td></tr>
+            <tr><td><code>npm run lint</code></td><td>0 errors</td><td>仓库仍有 193 条既有 warning，本次无 lint error。</td></tr>
+            <tr><td><code>npm run build</code></td><td>通过</td><td>Nuxt 客户端、SSR 与 Nitro 生产包。</td></tr>
+            <tr><td><code>make lint-py</code></td><td>通过</td><td>Ruff check 与 format diff。</td></tr>
+            <tr><td><code>make check-design</code></td><td>通过</td><td>ACTIVE 路径、HTML 结构、单文件资源约束。</td></tr>
+            <tr><td><code>git diff --check</code></td><td>通过</td><td>空白错误与冲突标记。</td></tr>
+          </tbody></table></div>
+          <p><strong>环境限制：</strong><code>tests/test_plugins_api.py</code> 在本地收集阶段会由完整应用初始化触发 <code>ModuleNotFoundError: calibre</code>；失败发生在测试断言之前。该文件已覆盖目录迁移、安装启停不删连接和运行详情错误脱敏，需由带 Calibre 的 CI/Docker 环境执行。</p>
+        </section>
+
+        <section id="risks" class="card">
+          <h2>8. 风险与后续</h2>
+          <div class="grid"><article class="box"><h3>兼容风险</h3><ul><li>旧入口承诺保留一版；未来删除前需确认外部书签与文档已迁移。</li><li>插件安装启停是治理开关，不反写或删除每个旧来源的单独启用状态。</li><li>完整 HTTP API 回归依赖 Calibre 运行环境，本机只能完成纯 SQLAlchemy 与浏览器 mock 验证。</li></ul></article><article class="box"><h3>演进方向</h3><ul><li>新增真实第三方 provider 时复用现有四 Tab 和 connection/run API，不增加第五个日志 Tab。</li><li>写入型 provider 应提供独立 preview/review 工作区，再进入执行与来源治理。</li><li>把成熟旧业务逐步接入 source records 时，仍保持旧域表为事实源并用 adapter 事务桥接。</li></ul></article></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
