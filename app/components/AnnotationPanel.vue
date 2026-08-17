@@ -5,15 +5,10 @@
         :aria-labelledby="headingId"
     >
         <header class="annotation-panel__header">
-            <div>
-                <p class="annotation-panel__eyebrow">
-                    {{ t('annotations.eyebrow') }}
-                </p>
-                <h2 :id="headingId" class="annotation-panel__title">
-                    {{ t('annotations.title') }}
-                    <span v-if="!loading" class="annotation-panel__count">{{ filteredAnnotations.length }}</span>
-                </h2>
-            </div>
+            <h2 :id="headingId" class="annotation-panel__title">
+                {{ t('annotations.title') }}
+                <span v-if="!loading" class="annotation-panel__count">{{ filteredAnnotations.length }}</span>
+            </h2>
             <v-btn
                 icon="mdi-refresh"
                 size="small"
@@ -63,7 +58,7 @@
         <v-alert
             v-if="feedback"
             ref="feedbackAlert"
-            class="mb-4"
+            class="mb-2"
             :type="feedback.type"
             variant="tonal"
             closable
@@ -101,7 +96,7 @@
                 :class="{ 'annotation-card--external': annotation.sources.length > 0 }"
             >
                 <div class="annotation-card__topline">
-                    <div class="annotation-card__badges">
+                    <div class="annotation-card__meta">
                         <v-chip size="small" variant="tonal" :prepend-icon="typeIcon(annotation.annotation_type)">
                             {{ typeLabel(annotation.annotation_type) }}
                         </v-chip>
@@ -114,6 +109,13 @@
                         >
                             {{ source.label }}
                         </v-chip>
+                        <span class="annotation-card__chapter">
+                            <v-icon size="14">mdi-book-open-variant</v-icon>
+                            <span>{{ annotation.chapter || t('annotations.unknownChapter') }}</span>
+                        </span>
+                        <span v-if="!annotation.cfi" class="annotation-card__fallback">
+                            {{ t('annotations.chapterOnly') }}
+                        </span>
                     </div>
                     <v-menu v-if="annotation.can_edit">
                         <template #activator="{ props: menuProps }">
@@ -134,14 +136,6 @@
                         </v-list>
                     </v-menu>
                 </div>
-
-                <p class="annotation-card__chapter">
-                    <v-icon size="16">mdi-book-open-variant</v-icon>
-                    <span>{{ annotation.chapter || t('annotations.unknownChapter') }}</span>
-                    <span v-if="!annotation.cfi" class="annotation-card__fallback">
-                        {{ t('annotations.chapterOnly') }}
-                    </span>
-                </p>
 
                 <blockquote v-if="annotation.quote_text" class="annotation-card__quote">
                     {{ annotation.quote_text }}
@@ -414,27 +408,28 @@ watch(() => props.bookId, loadAnnotations);
 </script>
 
 <style scoped>
-.annotation-panel { --annotation-line:#315f7d; padding:clamp(18px,3vw,28px); border:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); border-radius:18px; background:rgb(var(--v-theme-surface)); }
-.annotation-panel__header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
-.annotation-panel__eyebrow { margin:0 0 3px; color:rgb(var(--v-theme-primary)); font-size:.72rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
-.annotation-panel__title { margin:0; font-size:clamp(1.35rem,3vw,1.75rem); line-height:1.25; }
-.annotation-panel__count { display:inline-grid; min-width:1.8rem; height:1.8rem; margin-left:.35rem; place-items:center; color:rgb(var(--v-theme-on-primary)); background:rgb(var(--v-theme-primary)); border-radius:999px; font-size:.8rem; vertical-align:middle; }
-.annotation-panel__controls { display:grid; grid-template-columns:minmax(180px,260px) minmax(300px,1fr); gap:12px; align-items:start; margin-bottom:18px; }
-.annotation-panel__rollback { display:grid; grid-template-columns:minmax(190px,1fr) auto; gap:10px; align-items:start; }
-.annotation-panel__state { display:flex; min-height:160px; align-items:center; justify-content:center; gap:12px; color:rgba(var(--v-theme-on-surface),.72); }
+.annotation-panel { --annotation-line:#315f7d; padding:clamp(12px,2vw,18px); border:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); border-radius:14px; background:rgb(var(--v-theme-surface)); }
+.annotation-panel__header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.annotation-panel__title { margin:0; font-size:clamp(1.25rem,2.2vw,1.45rem); line-height:1.2; }
+.annotation-panel__count { display:inline-grid; min-width:1.45rem; height:1.45rem; margin-inline-start:.25rem; place-items:center; color:rgb(var(--v-theme-on-primary)); background:rgb(var(--v-theme-primary)); border-radius:999px; font-size:.75rem; vertical-align:middle; }
+.annotation-panel__controls { display:grid; grid-template-columns:minmax(180px,240px) minmax(280px,1fr); gap:8px; align-items:start; margin-bottom:10px; }
+.annotation-panel__rollback { display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:8px; align-items:start; }
+.annotation-panel__state { display:flex; min-height:120px; align-items:center; justify-content:center; gap:10px; color:rgba(var(--v-theme-on-surface),.72); }
 .annotation-panel__state--empty { flex-direction:column; text-align:center; }.annotation-panel__state--empty strong{color:rgb(var(--v-theme-on-surface));}
-.annotation-list { display:grid; gap:14px; margin:0; padding:0; list-style:none; }
-.annotation-card { position:relative; overflow:hidden; padding:16px 18px 14px 21px; border:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); border-radius:13px; background:rgba(var(--v-theme-on-surface),.035); }
-.annotation-card::before { position:absolute; inset:0 auto 0 0; width:4px; background:var(--annotation-line); content:""; }
+.annotation-list { display:grid; gap:7px; margin:0; padding:0; list-style:none; }
+.annotation-card { position:relative; overflow:hidden; padding:9px 11px 8px 14px; border:1px solid rgba(var(--v-border-color),var(--v-border-opacity)); border-radius:9px; background:rgba(var(--v-theme-on-surface),.035); }
+.annotation-card::before { position:absolute; inset:0 auto 0 0; width:3px; background:var(--annotation-line); content:""; }
 .annotation-card--external::before { background:#5c6bc0; }
-.annotation-card__topline,.annotation-card__footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.annotation-card__badges { display:flex; flex-wrap:wrap; gap:6px; }
-.annotation-card__chapter { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:13px 0 9px; font-size:.84rem; font-weight:700; }
-.annotation-card__fallback { padding:2px 7px; color:#8a5a00; background:#fff2ce; border-radius:999px; font-size:.72rem; font-weight:700; }
-.annotation-card__quote { margin:10px 0; padding:2px 0 2px 14px; color:rgba(var(--v-theme-on-surface),.76); border-left:2px solid rgba(var(--v-theme-primary),.4); font-family:"Noto Serif SC","Songti SC",serif; }
-.annotation-card__content { margin:10px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
-.annotation-card__footer { margin-top:12px; color:rgba(var(--v-theme-on-surface),.68); font-size:.75rem; }
-.annotation-panel--compact { min-height:100vh; border:0; border-radius:0; }
-@media(max-width:700px){.annotation-panel{padding:16px;border-radius:12px}.annotation-panel__controls{grid-template-columns:1fr}.annotation-panel__rollback{grid-template-columns:1fr}.annotation-card__footer{align-items:flex-start;flex-direction:column}.annotation-card__footer .v-btn{align-self:flex-end}}
+.annotation-card__topline,.annotation-card__footer { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.annotation-card__topline { align-items:flex-start; }
+.annotation-card__meta { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; min-width:0; }
+.annotation-card__chapter { display:inline-flex; align-items:center; gap:4px; font-size:.78rem; font-weight:700; }
+.annotation-card__fallback { padding:1px 5px; color:#8a5a00; background:#fff2ce; border-radius:999px; font-size:.75rem; font-weight:700; }
+.annotation-card__quote { margin:6px 0 3px; padding:0 0 0 10px; color:rgba(var(--v-theme-on-surface),.76); border-left:2px solid rgba(var(--v-theme-primary),.4); font-family:"Noto Serif SC","Songti SC",serif; line-height:1.5; }
+.annotation-card__content { margin:3px 0; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.45; }
+.annotation-card__footer { min-height:28px; margin-top:4px; color:rgba(var(--v-theme-on-surface),.68); font-size:.75rem; flex-wrap:wrap; }
+.annotation-card__footer .v-btn { margin-inline-start:auto; }
+.annotation-panel--compact { min-height:100vh; padding:10px; border:0; border-radius:0; }
+@media(max-width:700px){.annotation-panel{padding:10px;border-radius:10px}.annotation-panel__controls{grid-template-columns:1fr}.annotation-card{padding-inline:12px 9px}.annotation-card__topline{gap:4px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition-duration:.01ms!important}}
 </style>

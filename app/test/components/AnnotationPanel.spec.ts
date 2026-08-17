@@ -76,6 +76,7 @@ describe('AnnotationPanel', () => {
         expect(wrapper.text()).toContain('原文引用');
         expect(wrapper.text()).toContain('仅章节定位');
         expect(wrapper.findAll('.annotation-card')).toHaveLength(2);
+        expect(wrapper.findAll('.annotation-card__topline .annotation-card__chapter')).toHaveLength(2);
         expect(wrapper.findAll('.annotation-card__footer button')).toHaveLength(1);
         expect(wrapper.findAll('button[aria-label="annotations.actionsFor"]')).toHaveLength(1);
         wrapper.unmount();
