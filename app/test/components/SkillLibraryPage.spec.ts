@@ -90,6 +90,8 @@ const packageInfo = {
     version: 1,
     format: 'agent-skills.v1',
     download_url: `/api/ai/skills/${skill.id}/download?version=1`,
+    storage_path: `skills/1/${skill.id}/v1/reading-summary`,
+    archive_path: `skills/1/${skill.id}/v1/reading-summary-v1.zip`,
     files: [
         {
             path: 'SKILL.md',
@@ -184,6 +186,7 @@ describe('SkillLibraryPage.vue', () => {
         await flushPromises();
         const browser = wrapper.find('[data-testid="skill-package-browser"]');
         expect(browser.text()).toContain('reading-summary-v1.zip');
+        expect(browser.text()).toContain(packageInfo.storage_path);
         expect(browser.text()).toContain('SKILL.md');
         expect(browser.text()).toContain('name: reading-summary');
         expect(wrapper.find('[data-testid="download-skill-package"]').attributes('href')).toBe(packageInfo.download_url);

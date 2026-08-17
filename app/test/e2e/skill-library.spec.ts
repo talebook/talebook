@@ -74,6 +74,8 @@ const packageInfo = {
     content_hash: version.content_hash,
     format: 'agent-skills.v1',
     download_url: `/api/ai/skills/${skillId}/download?version=3`,
+    storage_path: `skills/1/${skillId}/v3/reading-summary`,
+    archive_path: `skills/1/${skillId}/v3/reading-summary-v3.zip`,
     files: [
         {
             path: 'SKILL.md',

@@ -393,6 +393,9 @@
                                         </p>
                                         <h3>{{ packageInfo.filename }}</h3>
                                         <p>{{ t('skills.packageHint', { version: packageInfo.version }) }}</p>
+                                        <p class="storage-path">
+                                            {{ t('skills.storagePath') }}：<code>{{ packageInfo.storage_path }}</code>
+                                        </p>
                                     </div>
                                     <v-btn
                                         color="primary"
@@ -700,6 +703,8 @@ interface SkillPackage {
     version: number;
     format: string;
     download_url: string;
+    storage_path: string;
+    archive_path: string;
     files: SkillPackageFile[];
 }
 
@@ -1143,6 +1148,8 @@ function authorizationSummary(context: Record<string, any>) {
 .package-heading h3,.package-heading p { margin: 0; }
 .package-heading h3 { overflow-wrap: anywhere; }
 .package-heading p:not(.eyebrow) { margin-top: 5px; color: rgb(var(--v-theme-on-surface-variant)); font-size: 13px; }
+.storage-path { overflow-wrap: anywhere; }
+.storage-path code { padding: 2px 5px; border-radius: 5px; background: rgba(var(--v-theme-on-surface), .07); }
 .package-layout { display: grid; grid-template-columns: minmax(190px, 260px) minmax(0, 1fr); min-height: 430px; }
 .package-layout nav { border-inline-end: 1px solid rgb(var(--v-theme-surface-variant)); background: rgba(var(--v-theme-surface-variant), .14); }
 .package-file { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; color: inherit; border: 0; border-block-end: 1px solid rgba(var(--v-theme-on-surface), .08); border-inline-start: 3px solid transparent; background: transparent; cursor: pointer; text-align: start; }

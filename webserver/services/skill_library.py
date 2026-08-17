@@ -15,6 +15,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from webserver.models import Skill, SkillRun, SkillVersion
 from webserver.services.agent_runtime import AgentRuntimeError, RuntimeEvent, RuntimeRequest
+from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore
 from webserver.services.codex_app_server import CodexAppServerRuntime
 
 
@@ -54,6 +55,7 @@ TYPE_SCHEMA_KEYS = {
 TERMINAL_STATUSES = {"succeeded", "failed", "cancelled"}
 MAX_SKILL_BODY_LINES = 500
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+SKILL_ARTIFACT_FEATURE = "skills"
 
 
 class SkillValidationError(ValueError):
@@ -388,6 +390,40 @@ def build_skill_zip(package: Dict[str, Any]) -> bytes:
             info.external_attr = 0o644 << 16
             archive.writestr(info, file["content"].encode("utf-8"))
     return output.getvalue()
+
+
+def materialize_skill_package(version: SkillVersion, owner_id: int, artifact_root: str) -> Dict[str, Any]:
+    """Persist one immutable SKILL folder and ZIP below the shared AI artifact root."""
+    package = build_skill_package(version)
+    archive = build_skill_zip(package)
+    files = {f"{package['folder']}/{item['path']}": item["content"].encode("utf-8") for item in package["files"]}
+    files[package["filename"]] = archive
+    store = AIArtifactStore(artifact_root)
+    version_path = store.materialize(
+        SKILL_ARTIFACT_FEATURE,
+        owner_id,
+        version.skill_id,
+        version.version,
+        files,
+    )
+    package["storage_path"] = store.relative_path(version_path / package["folder"])
+    package["archive_path"] = store.relative_path(version_path / package["filename"])
+    return package
+
+
+def read_skill_package_zip(version: SkillVersion, owner_id: int, artifact_root: str) -> tuple[Dict[str, Any], bytes]:
+    """Return the persisted ZIP, recreating it from the immutable DB version if missing or corrupt."""
+    package = materialize_skill_package(version, owner_id, artifact_root)
+    archive_path = AIArtifactStore(artifact_root).root / package["archive_path"]
+    try:
+        return package, archive_path.read_bytes()
+    except OSError as exc:
+        raise AIArtifactError("SKILL ZIP 读取失败") from exc
+
+
+def delete_skill_artifacts(owner_id: int, skill_id: str, artifact_root: str) -> None:
+    """Remove every persisted version for one creator-owned SKILL."""
+    AIArtifactStore(artifact_root).delete_artifact(SKILL_ARTIFACT_FEATURE, owner_id, skill_id)
 
 
 def default_manifest(name: str = "未命名 SKILL", description: str = "描述这个 SKILL 解决的问题。") -> Dict[str, Any]:

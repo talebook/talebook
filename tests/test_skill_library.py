@@ -1,11 +1,15 @@
 import io
 import json
+import tempfile
 import unittest
 import zipfile
+from pathlib import Path
 from unittest import mock
 
 from tests import test_main
 from webserver import models
+from webserver.handlers import skill_library as skill_handlers
+from webserver.services.ai_artifacts import AIArtifactError
 from webserver.services.agent_runtime import (
     AgentRuntimeError,
     RuntimeErrorCode,
@@ -110,6 +114,12 @@ class TimeoutRuntime(FakeRuntime):
 
 class SkillLibraryAPITest(test_main.TestWithUserLogin):
     def setUp(self):
+        self.artifact_root = tempfile.TemporaryDirectory()
+        self.artifact_config = mock.patch.dict(
+            skill_handlers.CONF,
+            {"AI_ARTIFACT_ROOT": self.artifact_root.name},
+        )
+        self.artifact_config.start()
         super().setUp()
         self.user.return_value = 1
         self._clear()
@@ -118,6 +128,8 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         self.user.return_value = 1
         self._clear()
         super().tearDown()
+        self.artifact_config.stop()
+        self.artifact_root.cleanup()
 
     def _clear(self):
         session = test_main.get_db()
@@ -160,6 +172,9 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         updated = self._update(skill, manifest)
         self.assertEqual(updated["err"], "ok")
         self.assertEqual(updated["skill"]["current_version"], 2)
+        artifact_path = Path(self.artifact_root.name) / "skills" / "1" / skill["id"]
+        self.assertTrue((artifact_path / "v1").is_dir())
+        self.assertTrue((artifact_path / "v2").is_dir())
         versions = self.json(f"/api/ai/skills/{skill['id']}/versions")
         self.assertEqual([item["version"] for item in versions["versions"]], [2, 1])
 
@@ -197,13 +212,23 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         session.commit()
 
         response = self._create(source_task_id=task.id)
-        self.assertEqual(response["err"], "ok")
+        self.assertEqual(response["err"], "ok", response)
         version = response["skill"]["version"]
         serialized = json.dumps(version, ensure_ascii=False)
         self.assertIn(task.id, serialized)
         self.assertIn("skill-source-fixture", serialized)
         self.assertNotIn("不应复制的正文", serialized)
         self.assertNotIn("reader@example.com", serialized)
+
+    def test_storage_failure_rolls_back_new_skill(self):
+        with mock.patch.object(
+            skill_handlers,
+            "materialize_skill_package",
+            side_effect=AIArtifactError("read only"),
+        ):
+            response = self._create()
+        self.assertEqual(response["err"], "skill.storage_failed")
+        self.assertEqual(test_main.get_db().query(models.Skill).count(), 0)
 
     def test_view_and_download_portable_skill_package(self):
         skill = self._create()["skill"]
@@ -213,6 +238,11 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         self.assertRegex(package["name"], r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
         self.assertLessEqual(len(package["name"]), 64)
         self.assertEqual([item["path"] for item in package["files"]], ["SKILL.md", "references/contract.json"])
+        version_dir = Path(self.artifact_root.name) / "skills" / "1" / skill["id"] / "v1"
+        self.assertEqual(package["storage_path"], f"skills/1/{skill['id']}/v1/{package['name']}")
+        self.assertEqual(package["archive_path"], f"skills/1/{skill['id']}/v1/{package['filename']}")
+        self.assertTrue((version_dir / package["name"] / "SKILL.md").is_file())
+        self.assertTrue((version_dir / package["filename"]).is_file())
         skill_md = package["files"][0]["content"]
         frontmatter = skill_md.split("---", 2)[1]
         self.assertEqual([line.split(":", 1)[0] for line in frontmatter.strip().splitlines()], ["name", "description"])
@@ -305,6 +335,8 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
 
     def test_delete_cascades_versions_and_terminal_runs(self):
         skill = self._create()["skill"]
+        artifact_path = Path(self.artifact_root.name) / "skills" / "1" / skill["id"]
+        self.assertTrue(artifact_path.is_dir())
         with mock.patch.object(SkillRunService, "submit"):
             run = self.json(
                 f"/api/ai/skills/{skill['id']}/runs",
@@ -321,6 +353,7 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         self.assertEqual(session.query(models.Skill).filter_by(id=skill["id"]).count(), 0)
         self.assertEqual(session.query(models.SkillVersion).filter_by(skill_id=skill["id"]).count(), 0)
         self.assertEqual(session.query(models.SkillRun).filter_by(skill_id=skill["id"]).count(), 0)
+        self.assertFalse(artifact_path.exists())
 
     def test_queued_run_cancellation_is_idempotent(self):
         skill = self._create()["skill"]

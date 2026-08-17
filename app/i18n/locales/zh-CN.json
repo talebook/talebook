@@ -1407,6 +1407,7 @@
     "packageFiles": "文件包",
     "portablePackage": "Agent Skills 文件包",
     "packageHint": "当前已保存 v{version}；ZIP 内含同名根目录、SKILL.md 与按需加载的 references/。",
+    "storagePath": "AI 产物目录内路径",
     "packageLoading": "正在生成文件预览",
     "downloadZip": "下载 ZIP",
     "deleteSkill": "删除 SKILL",

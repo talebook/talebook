@@ -3,19 +3,22 @@
 
 import datetime
 import json
+import logging
 import uuid
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import AITask, Skill, SkillRun, SkillVersion
+from webserver.services.ai_artifacts import AIArtifactError
 from webserver.services.skill_library import (
     SensitiveContentError,
     SkillRunService,
     SkillValidationError,
-    build_skill_package,
-    build_skill_zip,
     content_hash,
     default_manifest,
+    delete_skill_artifacts,
+    materialize_skill_package,
+    read_skill_package_zip,
     run_dict,
     run_items,
     skill_dict,
@@ -27,6 +30,7 @@ from webserver.services.skill_library import (
 
 
 CONF = loader.get_settings()
+LOG = logging.getLogger(__name__)
 
 
 def _json_body(handler):
@@ -48,6 +52,11 @@ def _error(exc):
             "hard_block": exc.hard_block,
         }
     return {"err": "params.invalid", "msg": str(exc)}
+
+
+def _storage_error(exc):
+    LOG.error("SKILL artifact storage failed: %s", exc)
+    return {"err": "skill.storage_failed", "msg": "SKILL 本地产物读写失败，请检查 AI 产物目录"}
 
 
 def _default_markdown(manifest):
@@ -82,6 +91,9 @@ def _source_from_task(handler, task_id):
 
 
 class _SkillBase(BaseHandler):
+    def _artifact_root(self):
+        return CONF.get("AI_ARTIFACT_ROOT", "/data/books/ai")
+
     def _own_skill(self, skill_id):
         return self.session.query(Skill).filter(Skill.id == skill_id, Skill.owner_id == self.user_id()).first()
 
@@ -190,7 +202,19 @@ class SkillCollection(_SkillBase):
         )
         self.session.add(skill)
         self.session.add(version)
-        self.session.commit()
+        try:
+            self.session.flush()
+            materialize_skill_package(version, skill.owner_id, self._artifact_root())
+            self.session.commit()
+        except (SkillValidationError, AIArtifactError) as exc:
+            self.session.rollback()
+            if isinstance(exc, SkillValidationError):
+                return _error(exc)
+            try:
+                delete_skill_artifacts(skill.owner_id, skill.id, self._artifact_root())
+            except AIArtifactError:
+                pass
+            return _storage_error(exc)
         return {"err": "ok", "skill": skill_dict(skill, version), "findings": checked["findings"]}
 
 
@@ -246,7 +270,15 @@ class SkillItem(_SkillBase):
         skill.status = "draft"
         skill.update_time = now
         self.session.add(version)
-        self.session.commit()
+        try:
+            self.session.flush()
+            materialize_skill_package(version, skill.owner_id, self._artifact_root())
+            self.session.commit()
+        except (SkillValidationError, AIArtifactError) as exc:
+            self.session.rollback()
+            if isinstance(exc, SkillValidationError):
+                return _error(exc)
+            return _storage_error(exc)
         return {"err": "ok", "skill": skill_dict(skill, version), "findings": checked["findings"]}
 
     @js
@@ -262,6 +294,10 @@ class SkillItem(_SkillBase):
         )
         if active:
             return {"err": "skill.active_runs", "msg": "请先取消正在运行的任务"}
+        try:
+            delete_skill_artifacts(skill.owner_id, skill.id, self._artifact_root())
+        except AIArtifactError as exc:
+            return _storage_error(exc)
         self.session.delete(skill)
         self.session.commit()
         return {"err": "ok", "msg": "SKILL 已删除"}
@@ -282,8 +318,10 @@ class SkillPackage(_SkillBase):
         if not version:
             return {"err": "skill.version_not_found", "msg": "SKILL 版本不存在"}
         try:
-            package = build_skill_package(version)
-        except SkillValidationError as exc:
+            package = materialize_skill_package(version, skill.owner_id, self._artifact_root())
+        except (SkillValidationError, AIArtifactError) as exc:
+            if isinstance(exc, AIArtifactError):
+                return _storage_error(exc)
             return _error(exc)
         package["download_url"] = f"/api/ai/skills/{skill.id}/download?version={version.version}"
         return {"err": "ok", "package": package}
@@ -304,9 +342,10 @@ class SkillDownload(_SkillBase):
         if not version:
             return {"err": "skill.version_not_found", "msg": "SKILL 版本不存在"}
         try:
-            package = build_skill_package(version)
-            payload = build_skill_zip(package)
-        except SkillValidationError as exc:
+            package, payload = read_skill_package_zip(version, skill.owner_id, self._artifact_root())
+        except (SkillValidationError, AIArtifactError) as exc:
+            if isinstance(exc, AIArtifactError):
+                return _storage_error(exc)
             return _error(exc)
         self.set_header("Content-Type", "application/zip")
         self.set_header("Content-Disposition", f'attachment; filename="{package["filename"]}"')
@@ -365,7 +404,15 @@ class SkillRollback(_SkillBase):
         skill.status = "draft"
         skill.update_time = now
         self.session.add(version)
-        self.session.commit()
+        try:
+            self.session.flush()
+            materialize_skill_package(version, skill.owner_id, self._artifact_root())
+            self.session.commit()
+        except (SkillValidationError, AIArtifactError) as exc:
+            self.session.rollback()
+            if isinstance(exc, SkillValidationError):
+                return _error(exc)
+            return _storage_error(exc)
         return {"err": "ok", "skill": skill_dict(skill, version)}
 
 

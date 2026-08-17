@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Talebook 创建者私有、可生成 Agent Skills ZIP、可查看下载删除、可版本化试运行的 SKILL 方案。" />
+    <meta name="description" content="Talebook 创建者私有、可持久化生成 Agent Skills ZIP、可查看下载删除、可版本化试运行的 SKILL 方案。" />
     <link rel="icon" href="data:," />
     <title>可版本化、可试运行的 SKILL 沉淀 · ACTIVE</title>
     <style>
@@ -68,6 +68,7 @@
       <section>
         <h2>5. manifest 与 API</h2>
         <p>manifest 必含显示名、符合 <code>^[a-z0-9]+(?:-[a-z0-9]+)*$</code> 且不超过 64 位的包名、描述、适用范围、前提、触发说明、输入 schema、步骤、术语/例子、失败条件、输出 schema、来源与自测；只接受 JSON Schema 的安全子集。物化后的 ZIP 以包名作为唯一根目录；<code>SKILL.md</code> frontmatter 只写同名 <code>name</code> 与同时说明用途和触发时机的 <code>description</code>，正文限制 500 行，并明确何时读取 <code>references/contract.json</code>。</p>
+        <p>所有 AI 产物统一落在可配置根目录 <code>AI_ARTIFACT_ROOT</code>，默认 <code>/data/books/ai</code>。SKILL 每个不可变版本的源目录为 <code>skills/{owner_id}/{skill_id}/v{version}/{package_name}/</code>，同级 ZIP 为 <code>{package_name}-v{version}.zip</code>；API 只返回根目录内相对路径。写入使用同一文件系统内的 staging 与原子 rename，目录/文件权限分别为 <code>0700</code>/<code>0600</code>；查看或下载发现文件缺失、额外或损坏时，从数据库不可变版本原子重建。删除 SKILL 时同步清理该 owner 下的全部本地产物版本。</p>
         <p>API 在原有创建、详情、版本、回滚、状态与运行端点外，增加 <code>/api/ai/skills/:id/package</code> 查看精确保存版本的文件列表与内容，以及 <code>/api/ai/skills/:id/download</code> 下载确定性 ZIP；删除继续使用详情端点的 <code>DELETE</code>。所有入口均需登录并以当前 owner 过滤。</p>
       </section>
       <section>
@@ -100,13 +101,14 @@
         <table>
           <thead><tr><th>检查</th><th>结果</th></tr></thead>
           <tbody>
-            <tr><td><code>python3 -m unittest tests.test_skill_library -v</code>（生产镜像挂载当前代码）</td><td>14 项通过；新增覆盖包名规则、500 行渐进披露限制、文件查看、ZIP 目录/frontmatter/引用内容、下载响应与确定性字节；原有 owner 隔离、版本、试运行、运行终态和删除级联继续通过。</td></tr>
+            <tr><td><code>python3 -m unittest tests.test_skill_library -v</code>（生产镜像挂载当前代码）</td><td>15 项通过；新增覆盖包名规则、500 行渐进披露限制、本地版本目录与 ZIP、存储失败回滚、文件查看、下载响应、自愈与删除级联；原有 owner 隔离、版本、试运行和运行终态继续通过。</td></tr>
+            <tr><td><code>python3 -m unittest tests.test_ai_artifacts -v</code></td><td>2 项通过；覆盖 <code>books/ai/{feature}</code> 分层、确定性目录/ZIP、损坏重建、整项删除，以及 feature、owner、artifact、version 和相对文件路径的越界校验。</td></tr>
             <tr><td><code>python3 -m unittest tests.test_summary_duck -v</code>（生产镜像挂载当前代码）</td><td>16 项通过；统一 Runtime 与 Codex 协议回归通过。</td></tr>
             <tr><td><code>npx vitest run test/components/SkillLibraryPage.spec.ts test/components/AppHeader.spec.ts</code></td><td>2 个文件、11 项通过：SKILL 组件 6 项覆盖 locale 结构、查看文件、下载链接和删除确认；AppHeader 5 项回归通过。为 Nuxt 4 下未落盘的 i18n 虚拟模板增加 Vitest 夹具，避免收集阶段缓存竞态。</td></tr>
             <tr><td><code>skill-creator/scripts/quick_validate.py &lt;generated-skill&gt;</code></td><td>使用生产生成函数物化真实目录后返回 <code>Skill is valid!</code>；非手写替代样例。</td></tr>
             <tr><td><code>npx playwright test test/e2e/skill-library.spec.ts --update-snapshots</code></td><td>2 项通过；验证新版生成器、文件查看、亮色桌面与暗色 390px 移动端，两张截图基线已更新并人工复核。</td></tr>
             <tr><td><code>npm run lint</code>；<code>npm run build</code></td><td>均通过；lint 为 0 error、193 个仓库既有 warning，完整 Nuxt 客户端与 Nitro 服务端构建成功。</td></tr>
-            <tr><td><code>ruff check …</code>；<code>python3 -m py_compile …</code>；<code>git diff --check</code></td><td>均通过。</td></tr>
+            <tr><td><code>make lint-py</code>；<code>make check-design</code>；<code>git diff --check</code></td><td>均通过。</td></tr>
           </tbody>
         </table>
         <p>完整 <code>python3 -m unittest discover tests -v</code> 在基线生产镜像中运行 616 项，因镜像/套件既有环境问题结束为 4 failures、17 errors：缺少 <code>pytest</code>、Calibre 测试库列不匹配、全量执行中的临时数据库缺少 <code>ai_tasks</code>/<code>skills</code> 表等；上述相关模块已用独立新进程定向运行并全部通过。</p>
@@ -127,11 +129,11 @@
             <tr><td>MEDIUM：生成/创建术语不一致，移动端包名提示会被浮动操作区遮挡。</td><td>核心流程统一为“生成”，缩短提示并为窄屏增加安全右侧留白；修正 i18n 命名空间并加 locale 结构测试。</td></tr>
           </tbody>
         </table>
-        <p><strong>最终结论：Approve。</strong>完整复审与真实 Chromium 双视口渲染后无遗留 HIGH 或 MEDIUM 问题；Chrome DevTools MCP 不可用的工具限制已在测试结果中单独记录。</p>
+        <p><strong>最终结论：Approve。</strong>加入共享 AI 产物根目录、原子重建与删除语义后再次复审，并完成真实 Chromium 双视口渲染；无新增或遗留 HIGH、MEDIUM 问题。Chrome DevTools MCP 不可用的工具限制已在测试结果中单独记录。</p>
       </section>
       <section>
         <h2>12. 决策记录</h2>
-        <p>Issue 已明确产品边界，未再阻塞等待选择：首版采用通用但受限的 JSON Schema 子集；启用前要求至少一次当前版本试运行成功；“从成果生成”只提取本人成功任务的类型、版本和结果结构摘要，避免复制正文；回滚产生新版本以保留完整审计链。评审反馈后纠正产品本体：数据库 manifest 是编辑、版本与运行的权威来源，但用户交付物是符合 Agent Skills 规则的自包含 ZIP；查看、下载和删除成为核心动作，试运行与启停是附加能力。</p>
+        <p>Issue 已明确产品边界，未再阻塞等待选择：首版采用通用但受限的 JSON Schema 子集；启用前要求至少一次当前版本试运行成功；“从成果生成”只提取本人成功任务的类型、版本和结果结构摘要，避免复制正文；回滚产生新版本以保留完整审计链。评审反馈后纠正产品本体：数据库 manifest 是编辑、版本与运行的权威来源，但用户交付物是符合 Agent Skills 规则的自包含 ZIP；查看、下载和删除成为核心动作，试运行与启停是附加能力。所有文件型产物统一置于 <code>books/ai/{feature}</code>，本功能默认物化到 <code>/data/books/ai/skills</code>。</p>
       </section>
     </main>
   </body>

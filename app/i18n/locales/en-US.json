@@ -1391,6 +1391,7 @@
     "packageFiles": "Package Files",
     "portablePackage": "Agent Skills Package",
     "packageHint": "Saved v{version}; the ZIP contains a matching root folder, SKILL.md, and progressively loaded references/.",
+    "storagePath": "Path inside the AI artifact root",
     "packageLoading": "Generating file preview",
     "downloadZip": "Download ZIP",
     "deleteSkill": "Delete SKILL",
