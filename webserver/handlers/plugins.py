@@ -286,7 +286,7 @@ class AdminPluginRunDetail(BaseHandler):
         if run is None:
             return {"err": "plugin.run_missing", "msg": "Plugin run was not found"}
         items = self.session.query(PluginRunItem).filter(PluginRunItem.run_id == run.id).order_by(PluginRunItem.id).all()
-        return {"err": "ok", "run": run.to_public_dict(), "items": [item.to_public_dict() for item in items]}
+        return {"err": "ok", "run": run.to_public_dict(), "items": [item.to_public_dict(include_data=True) for item in items]}
 
 
 class UserPluginAction(BaseHandler):

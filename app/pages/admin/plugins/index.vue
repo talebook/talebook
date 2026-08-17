@@ -274,6 +274,82 @@
 
                     <div class="d-flex flex-wrap ga-2 mt-3">
                         <v-btn
+                            v-if="selectedPlugin.ui.manage_kind === 'book_source'"
+                            variant="outlined"
+                            prepend-icon="mdi-cog-outline"
+                            @click="openConnectionForm"
+                        >
+                            {{ selectedConnection ? t('pluginManagement.editConnection') : t('pluginManagement.configureConnection') }}
+                        </v-btn>
+                    </div>
+
+                    <v-form
+                        v-if="connectionFormOpen"
+                        class="connection-form mt-4"
+                        @submit.prevent="saveConnection"
+                    >
+                        <v-text-field
+                            v-model="connectionName"
+                            :label="t('pluginManagement.connectionName')"
+                            name="connection_name"
+                            autocomplete="off"
+                            density="compact"
+                            variant="outlined"
+                        />
+                        <template
+                            v-for="field in configFields"
+                            :key="`config-${field.key}`"
+                        >
+                            <v-checkbox
+                                v-if="field.schema.type === 'boolean'"
+                                v-model="connectionConfig[field.key]"
+                                :label="connectionFieldLabel(field.key)"
+                                density="compact"
+                                hide-details
+                            />
+                            <v-text-field
+                                v-else
+                                v-model="connectionConfig[field.key]"
+                                :label="connectionFieldLabel(field.key)"
+                                :required="field.required"
+                                :name="field.key"
+                                :type="field.schema.format === 'uri' ? 'url' : 'text'"
+                                density="compact"
+                                variant="outlined"
+                            />
+                        </template>
+                        <v-text-field
+                            v-for="field in credentialFields"
+                            :key="`credential-${field.key}`"
+                            v-model="connectionCredentials[field.key]"
+                            :label="connectionFieldLabel(field.key)"
+                            :required="field.required && !selectedConnection"
+                            :name="field.key"
+                            :type="credentialType(field.key)"
+                            :autocomplete="credentialAutocomplete(field.key)"
+                            spellcheck="false"
+                            density="compact"
+                            variant="outlined"
+                        />
+                        <div class="d-flex ga-2">
+                            <v-btn
+                                color="primary"
+                                type="submit"
+                                :loading="connectionSaving"
+                            >
+                                {{ t('common.save') }}
+                            </v-btn>
+                            <v-btn
+                                variant="text"
+                                @click="connectionFormOpen = false"
+                            >
+                                {{ t('common.cancel') }}
+                            </v-btn>
+                        </div>
+                    </v-form>
+
+                    <div class="d-flex flex-wrap ga-2 mt-3">
+                        <v-btn
                             v-if="selectedConnection"
                             variant="outlined"
                             prepend-icon="mdi-connection"
@@ -282,6 +358,27 @@
                             @click="runAction(selectedConnection, 'test')"
                         >
                             {{ t('pluginManagement.testConnection') }}
+                        </v-btn>
+                        <v-btn
+                            v-if="selectedConnection && selectedPlugin.actions.includes('preview')"
+                            variant="outlined"
+                            prepend-icon="mdi-eye-outline"
+                            :loading="actionLoading"
+                            :disabled="!selectedPlugin.installation?.enabled || !selectedConnection.enabled"
+                            @click="runAction(selectedConnection, 'preview')"
+                        >
+                            {{ t('pluginManagement.previewSource') }}
+                        </v-btn>
+                        <v-btn
+                            v-if="selectedConnection && selectedPlugin.actions.includes('run')"
+                            color="primary"
+                            variant="tonal"
+                            prepend-icon="mdi-inbox-arrow-down-outline"
+                            :loading="actionLoading"
+                            :disabled="!selectedPlugin.installation?.enabled || !selectedConnection.enabled"
+                            @click="runAction(selectedConnection, 'run')"
+                        >
+                            {{ t('pluginManagement.stageForReview') }}
                         </v-btn>
                         <v-btn
                             v-if="selectedPlugin.installation"
@@ -370,6 +467,11 @@ const search = ref(typeof route.query.q === 'string' ? route.query.q : '');
 const statusFilter = ref(typeof route.query.status === 'string' ? route.query.status : 'all');
 const actionLoading = ref(false);
 const toggleLoading = ref(false);
+const connectionSaving = ref(false);
+const connectionFormOpen = ref(false);
+const connectionName = ref('default');
+const connectionConfig = ref({});
+const connectionCredentials = ref({});
 const showLegado = ref(false);
 const legadoPanel = ref(null);
 const opdsDialog = ref(null);
@@ -398,7 +500,7 @@ const filteredPlugins = computed(() => {
             .join(' ').toLowerCase().includes(needle);
         const status = statusInfo(plugin).key;
         const matchesStatus = statusFilter.value === 'all'
-            || (statusFilter.value === 'attention' && ['uninstalled', 'disabled', 'unhealthy'].includes(status))
+            || (statusFilter.value === 'attention' && ['uninstalled', 'unconfigured', 'disabled', 'unhealthy'].includes(status))
             || status === statusFilter.value;
         return matchesText && matchesStatus;
     });
@@ -412,11 +514,18 @@ const selectedConnection = computed(() => {
     const installationId = selectedPlugin.value?.installation?.id;
     return connections.value.find(item => item.installation_id === installationId) || null;
 });
+const configFields = computed(() => schemaFields(selectedPlugin.value?.config_schema));
+const credentialFields = computed(() => schemaFields(selectedPlugin.value?.auth_schema));
+
+function connectionFor(plugin) {
+    return connections.value.find(item => item.installation_id === plugin.installation?.id) || null;
+}
 
 function statusInfo(plugin) {
     if (!plugin.installation) return { key: 'uninstalled', text: t('pluginManagement.uninstalled'), color: 'grey', icon: 'mdi-download-outline' };
     if (!plugin.installation.enabled) return { key: 'disabled', text: t('pluginManagement.disabled'), color: 'grey', icon: 'mdi-pause-circle-outline' };
-    const connection = connections.value.find(item => item.installation_id === plugin.installation.id);
+    const connection = connectionFor(plugin);
+    if (plugin.ui.manage_kind === 'book_source' && !connection) return { key: 'unconfigured', text: t('pluginManagement.unconfigured'), color: 'warning', icon: 'mdi-cog-alert-outline' };
     if (connection?.health === 'unauthorized') return { key: 'unhealthy', text: t('pluginManagement.unauthorized'), color: 'error', icon: 'mdi-key-alert-outline' };
     if (connection?.health === 'degraded') return { key: 'unhealthy', text: t('pluginManagement.unhealthy'), color: 'warning', icon: 'mdi-alert-outline' };
     return { key: 'enabled', text: t('pluginManagement.enabled'), color: 'success', icon: 'mdi-check-circle-outline' };
@@ -452,6 +561,7 @@ function attentionCount(tab) {
 function primaryActionLabel(plugin) {
     if (!plugin.installation) return t('pluginManagement.install');
     if (!plugin.installation.enabled) return t('pluginManagement.enable');
+    if (plugin.ui.manage_kind === 'book_source' && !connectionFor(plugin)) return t('pluginManagement.configure');
     if (plugin.ui.manage_kind === 'opds') return t('pluginManagement.browse');
     if (plugin.ui.manage_kind === 'legado') return t('pluginManagement.manage');
     if (plugin.ui.manage_kind === 'metadata') return t('pluginManagement.configure');
@@ -464,6 +574,12 @@ async function primaryAction(plugin) {
     if (plugin.ui.manage_kind === 'opds') return opdsDialog.value?.open();
     if (plugin.ui.manage_kind === 'legado') return openLegado();
     if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/settings#metadata');
+    if (plugin.ui.manage_kind === 'book_source' && !connectionFor(plugin)) {
+        openDetails(plugin);
+        await nextTick();
+        openConnectionForm();
+        return;
+    }
     openDetails(plugin);
 }
 
@@ -499,10 +615,75 @@ async function runAction(connection, action) {
         });
         if (rsp.err === 'ok') {
             $alert?.('success', t('pluginManagement.actionStarted'));
-            await load();
+            if (action === 'test') await load();
+            else navigateTo(`/admin/plugins/runs/${rsp.run.id}`);
         } else $alert?.('error', rsp.msg || rsp.err);
     } finally {
         actionLoading.value = false;
+    }
+}
+
+function schemaFields(schema) {
+    const required = new Set(schema?.required || []);
+    return Object.entries(schema?.properties || {}).map(([key, value]) => ({ key, schema: value, required: required.has(key) }));
+}
+
+function connectionFieldLabel(key) {
+    const translationKey = `pluginManagement.field_${key}`;
+    const translated = t(translationKey);
+    return translated === translationKey ? key : translated;
+}
+
+function credentialAutocomplete(key) {
+    if (key === 'username') return 'username';
+    if (key === 'password') return 'current-password';
+    return 'off';
+}
+
+function credentialType(key) {
+    return key === 'username' ? 'text' : 'password';
+}
+
+function openConnectionForm() {
+    const existing = selectedConnection.value;
+    connectionName.value = existing?.name || 'default';
+    const config = {};
+    for (const field of configFields.value) {
+        const value = existing?.config?.[field.key] ?? field.schema.default ?? (field.schema.type === 'boolean' ? false : '');
+        config[field.key] = Array.isArray(value) ? value.join(', ') : value;
+    }
+    connectionConfig.value = config;
+    connectionCredentials.value = Object.fromEntries(credentialFields.value.map(field => [field.key, '']));
+    connectionFormOpen.value = true;
+}
+
+async function saveConnection() {
+    connectionSaving.value = true;
+    try {
+        const config = {};
+        for (const field of configFields.value) {
+            const value = connectionConfig.value[field.key];
+            config[field.key] = field.schema.type === 'array'
+                ? String(value || '').split(',').map(item => item.trim()).filter(Boolean)
+                : value;
+        }
+        const credentials = Object.fromEntries(Object.entries(connectionCredentials.value).filter(([, value]) => value));
+        const rsp = await $backend('/admin/plugins/connections', {
+            method: 'POST',
+            body: JSON.stringify({
+                installation_id: selectedPlugin.value.installation.id,
+                name: connectionName.value || 'default',
+                config,
+                credentials,
+            }),
+        });
+        if (rsp.err === 'ok') {
+            connectionFormOpen.value = false;
+            $alert?.('success', t('pluginManagement.connectionSaved'));
+            await load();
+        } else $alert?.('error', rsp.msg || rsp.err);
+    } finally {
+        connectionSaving.value = false;
     }
 }
 
@@ -529,6 +710,7 @@ function openDetails(plugin) {
 }
 
 function closeDetails() {
+    connectionFormOpen.value = false;
     selectedPluginKey.value = '';
     const query = { ...route.query };
     delete query.plugin;
@@ -618,5 +800,10 @@ useHead(() => ({ title: t('pluginManagement.title') }));
     max-height: 100%;
     margin: 0 0 0 auto;
 }
+:deep(.plugin-drawer-dialog .v-card) {
+    background: rgb(var(--v-theme-surface));
+    overscroll-behavior: contain;
+}
 :deep(.plugin-drawer-dialog .text-caption) { overflow-wrap: anywhere; }
+.connection-form { padding: 14px; border: 1px solid rgb(var(--v-theme-outline-variant)); border-radius: 10px; }
 </style>

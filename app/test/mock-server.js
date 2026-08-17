@@ -170,6 +170,9 @@ router.post('/_test/reset', eventHandler(async (event) => {
   booksourceCheckPolls = 0;
   pluginRuns = [];
   pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
+  pluginConnections = pluginInstallations
+    .filter(item => item.id <= 3)
+    .map(installation => mockPluginConnection(installation));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
   annotationsByBookId = new Map([[1, mockAnnotations(1)]]);
@@ -1478,6 +1481,30 @@ const pluginDefinitions = [
     permissions: ['books.read', 'books.write', 'network.read'],
     ui: { icon: 'mdi-book-cog-outline', manage_kind: 'legado', primary_action: 'manage' },
   },
+  {
+    id: 4,
+    plugin_key: 'talebook.book-source.watch-folder',
+    name: 'Watch Folder',
+    description: '扫描白名单内的本地目录，以内容 hash 增量发现待审电子书。',
+    version: '1.0.0',
+    runtime_kind: 'file',
+    categories: ['book_sources'],
+    capabilities: ['book_sources.browse', 'book_sources.acquire'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    permissions: ['books.read', 'books.write'],
+    config_schema: {
+      type: 'object',
+      required: ['path'],
+      properties: {
+        target_library: { type: 'string', default: 'main' },
+        formats: { type: 'array', default: ['epub', 'pdf'] },
+        path: { type: 'string' },
+        recursive: { type: 'boolean', default: true },
+      },
+    },
+    auth_schema: { type: 'object', properties: {} },
+    ui: { icon: 'mdi-folder-eye-outline', manage_kind: 'book_source', primary_action: 'configure' },
+  },
 ];
 let pluginInstallations = pluginDefinitions.map((definition, index) => ({
   id: index + 1,
@@ -1487,7 +1514,7 @@ let pluginInstallations = pluginDefinitions.map((definition, index) => ({
   status: 'active',
   definition,
 }));
-const pluginConnections = pluginInstallations.map(installation => ({
+const mockPluginConnection = installation => ({
   id: installation.id,
   installation_id: installation.id,
   owner_type: 'instance',
@@ -1497,7 +1524,11 @@ const pluginConnections = pluginInstallations.map(installation => ({
   health: 'unknown',
   health_message: '',
   secret: { configured: false, mask: '' },
-}));
+  config: {},
+});
+let pluginConnections = pluginInstallations
+  .filter(installation => installation.id <= 3)
+  .map(installation => mockPluginConnection(installation));
 
 router.get('/api/admin/plugins', eventHandler(() => ({
   err: 'ok',
@@ -1514,6 +1545,20 @@ router.get('/api/admin/plugins/connections', eventHandler(() => ({
   err: 'ok', connections: pluginConnections, user_connection_health: [],
 })));
 
+router.post('/api/admin/plugins/connections', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const installation = pluginInstallations.find(item => item.id === Number(body.installation_id));
+  const existing = pluginConnections.find(item => item.installation_id === installation.id && item.name === body.name);
+  const connection = {
+    ...(existing || mockPluginConnection(installation)),
+    id: existing?.id || Math.max(0, ...pluginConnections.map(item => item.id)) + 1,
+    name: body.name,
+    config: body.config || {},
+  };
+  pluginConnections = [...pluginConnections.filter(item => item.id !== connection.id), connection];
+  return { err: 'ok', connection };
+}));
+
 router.post('/api/admin/plugins/installations/:id/state', eventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'));
   const body = await readBody(event);
@@ -1526,7 +1571,25 @@ router.get('/api/admin/plugins/runs', eventHandler(() => ({ err: 'ok', runs: plu
 router.get('/api/admin/plugins/runs/:id', eventHandler((event) => {
   const id = Number(getRouterParam(event, 'id'));
   const run = pluginRuns.find(item => item.id === id);
-  return run ? { err: 'ok', run, items: [] } : { err: 'plugin.run_missing', msg: 'Run not found' };
+  const items = run?.action === 'preview'
+    ? [{
+        id: 1,
+        run_id: run.id,
+        external_id: 'watch-folder-book',
+        entity_type: 'book_source',
+        status: 'previewed',
+        operation: 'preview',
+        error_code: '',
+        data: {
+          format: 'epub',
+          source: 'Watch Folder',
+          access: 'download',
+          license: '本地文件；许可由管理员确认',
+          target_library: 'main',
+        },
+      }]
+    : [];
+  return run ? { err: 'ok', run, items } : { err: 'plugin.run_missing', msg: 'Run not found' };
 }));
 
 router.post('/api/admin/plugins/connections/:id/:action', eventHandler((event) => {
