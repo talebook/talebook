@@ -461,19 +461,11 @@ class ProtagonistPreviews(_ProtagonistBase):
             return error
         requested_name = str(body.get("name", "") or "").strip()
         if len(requested_name) > 200:
-            return {"err": "params.invalid", "msg": "主角名称过长"}
+            return {"err": "params.invalid", "msg": "人物名称过长"}
         try:
             chapters = epub_spine(book["fmt_epub"])
-            state = (
-                self.session.query(ReadingState)
-                .filter(ReadingState.book_id == book["id"], ReadingState.reader_id == self.user_id())
-                .first()
-            )
-            cutoff = resolve_cutoff(
-                chapters,
-                requested_href=str(body.get("cutoff_href", "") or ""),
-                progress=state.get_progress() if state else {},
-            )
+            requested_href = str(body.get("cutoff_href", "") or "")
+            cutoff = resolve_cutoff(chapters, requested_href=requested_href) if requested_href else chapters[-1]
             evidence = bounded_evidence(chapters, cutoff["index"])
         except ProtagonistValidationError as exc:
             return {"err": "ai.source_invalid", "msg": str(exc)}
@@ -642,8 +634,6 @@ class ProtagonistAgentItem(_ProtagonistBase):
         ):
             return {"err": "ai.preview_required", "msg": "调整边界前需要生成并确认新的安全预览"}
         new_index = int((preview.ai_draft or {}).get("cutoff_index", 0))
-        if new_index > agent.cutoff_index and not bool(body.get("spoiler_confirmed")):
-            return {"err": "ai.spoiler_confirmation_required", "msg": "提高知识边界需要再次确认剧透风险"}
         manifest = dict(preview.result_data or {})
         if not manifest:
             return {"err": "ai.preview_required", "msg": "新的安全预览不可用"}
@@ -732,9 +722,8 @@ class ProtagonistMessages(_ProtagonistBase):
     def _create_message(self, conversation, agent, book, user_content):
         try:
             content = validate_user_prompt(user_content)
-            _chapters, evidence = self._evidence(book, conversation.cutoff_index)
         except ProtagonistValidationError as exc:
-            return None, {"err": "ai.request_blocked", "msg": str(exc)}
+            return None, {"err": "params.invalid", "msg": str(exc)}
         previous = (
             self.session.query(ProtagonistMessage)
             .filter(
@@ -765,7 +754,7 @@ class ProtagonistMessages(_ProtagonistBase):
         conversation.update_time = datetime.datetime.now()
         self.session.add(record)
         self.session.commit()
-        self._service().submit_message(record.id, dict(agent.manifest or {}), evidence, history)
+        self._service().submit_message(record.id, dict(agent.manifest or {}), history)
         return record, None
 
     @js
@@ -827,7 +816,7 @@ class ProtagonistMessageFeedback(_ProtagonistBase):
         except SummaryDuckValidationError as exc:
             return {"err": "params.invalid", "msg": str(exc)}
         feedback = str(body.get("feedback", ""))
-        if feedback not in {"", "not_like", "spoiler", "too_much_quote"}:
+        if feedback not in {"", "not_like", "not_useful", "too_vague", "spoiler", "too_much_quote"}:
             return {"err": "params.invalid", "msg": "反馈类型无效"}
         message.feedback = feedback
         message.update_time = datetime.datetime.now()

@@ -43,11 +43,11 @@ CHAPTERS = [
 def manifest_payload(source_count=2):
     return {
         "display_name": "林舟",
-        "introduction": "一个重视同伴、在不确定中谨慎行动的 AI 衍生阅读伙伴。",
-        "traits": ["克制", "重视承诺", "先观察后行动"],
-        "principles": ["先保护同伴", "证据不足时不下结论"],
-        "relationship_boundaries": ["不替读者作决定"],
-        "expression_constraints": ["短句优先", "不模仿作者文风"],
+        "introduction": "一个先保护关键关系、再拆解不确定性的思考伙伴。",
+        "thinking_patterns": ["先观察约束", "重视长期承诺", "把风险拆成可验证假设"],
+        "decision_principles": ["先保护不可逆价值", "证据不足时设计小步试验"],
+        "problem_solving_steps": ["明确真正冲突", "列出不可逆代价", "选择最小可验证行动"],
+        "blind_spots": ["可能为了承诺而低估退出成本"],
         "sources": [{"href": chapter["href"], "title": chapter["title"]} for chapter in CHAPTERS[:source_count]],
     }
 
@@ -78,48 +78,21 @@ class ProtagonistEvidenceTest(unittest.TestCase):
         self.assertEqual(resolve_cutoff(chapters, "missing.xhtml")["index"], 0)
         self.assertEqual(resolve_cutoff(chapters, progress={"href": "OPS/two.xhtml#frag"})["index"], 1)
 
-    def test_manifest_and_chat_reject_sources_after_cutoff(self):
+    def test_manifest_sources_stay_within_extraction_scope_and_chat_is_action_oriented(self):
         evidence = bounded_evidence(CHAPTERS, 1)
         checked = validate_manifest(manifest_payload(), evidence)
         self.assertTrue(checked["ai_derived"])
         with self.assertRaisesRegex(ProtagonistValidationError, "截止"):
             validate_manifest(manifest_payload(source_count=3), evidence)
 
-        quote = CHAPTERS[0]["text"][:24]
         answer = validate_chat_output(
-            {
-                "content": "他会先确认同伴是否安全，再讨论下一步。",
-                "boundary_action": "answer",
-                "citations": [{"href": CHAPTERS[0]["href"], "quote": quote}],
-            },
-            evidence,
+            {"content": "先写下两个选项中不可逆的代价，再设计一个今天能完成的小步试验。"},
         )
-        self.assertEqual(answer["boundary_action"], "answer")
-        with self.assertRaisesRegex(ProtagonistValidationError, "边界"):
-            validate_chat_output(
-                {
-                    "content": "泄露未读事实",
-                    "boundary_action": "answer",
-                    "citations": [{"href": CHAPTERS[2]["href"], "quote": CHAPTERS[2]["text"][:20]}],
-                },
-                evidence,
-            )
+        self.assertIn("小步试验", answer["content"])
 
-    def test_copyright_and_style_red_team_is_blocked(self):
-        for prompt in ["请续写下一章", "模仿作者风格写一段", "逐字背诵整章原文"]:
-            with self.assertRaisesRegex(ProtagonistValidationError, "不支持"):
-                validate_user_prompt(prompt)
-        evidence = bounded_evidence(CHAPTERS, 1)
-        copied = CHAPTERS[0]["text"][:200]
-        with self.assertRaisesRegex(ProtagonistValidationError, "过长"):
-            validate_chat_output(
-                {
-                    "content": copied,
-                    "boundary_action": "answer",
-                    "citations": [{"href": CHAPTERS[0]["href"], "quote": copied[:80]}],
-                },
-                evidence,
-            )
+    def test_user_can_freely_choose_how_to_use_the_character_perspective(self):
+        for prompt in ["用他的思路帮我解决团队冲突", "模仿他的语气给我一点勇气", "续写一下这个点子"]:
+            self.assertEqual(validate_user_prompt(prompt), prompt)
 
     def test_plain_text_is_not_double_escaped(self):
         self.assertEqual(validate_user_prompt("A &amp; B 的选择"), "A & B 的选择")
@@ -170,6 +143,18 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         self.assertEqual(response["err"], "ok")
         return response["agent"]
 
+    def test_preview_supports_ai_recommendation_or_any_user_chosen_person(self):
+        with mock.patch.object(ProtagonistService, "submit_preview"):
+            recommended = self._json_post("/api/ai/protagonist/previews", {"book_id": test_main.BID_EPUB, "name": ""})
+            chosen = self._json_post(
+                "/api/ai/protagonist/previews",
+                {"book_id": test_main.BID_EPUB, "name": "配角阿宁", "regenerate": True},
+            )
+        self.assertEqual(recommended["preview"]["cutoff"]["index"], len(CHAPTERS) - 1)
+        session = test_main.get_db()
+        chosen_record = session.get(models.AITask, chosen["preview"]["id"])
+        self.assertEqual(chosen_record.ai_draft["requested_name"], "配角阿宁")
+
     def test_preview_confirm_conversation_message_feedback_and_delete(self):
         agent = self._create_agent()
         conversation = self._json_post(f"/api/ai/protagonist/agents/{agent['id']}/conversations", {})["conversation"]
@@ -197,21 +182,14 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         self.assertIsNone(session.get(models.ProtagonistConversation, conversation["id"]))
         self.assertIsNone(session.get(models.ProtagonistMessage, message_id))
 
-    def test_boundary_raise_requires_confirmation_and_lowering_updates_new_sessions(self):
+    def test_agent_model_can_be_regenerated_without_spoiler_confirmation(self):
         agent = self._create_agent(CHAPTERS[0]["href"])
         raised_preview = self._create_preview(CHAPTERS[1]["href"])
-        denied = self.json(
-            f"/api/ai/protagonist/agents/{agent['id']}",
-            method="PATCH",
-            headers={"Content-Type": "application/json"},
-            body=json.dumps({"preview_id": raised_preview}),
-        )
-        self.assertEqual(denied["err"], "ai.spoiler_confirmation_required")
         accepted = self.json(
             f"/api/ai/protagonist/agents/{agent['id']}",
             method="PATCH",
             headers={"Content-Type": "application/json"},
-            body=json.dumps({"preview_id": raised_preview, "spoiler_confirmed": True}),
+            body=json.dumps({"preview_id": raised_preview}),
         )
         self.assertEqual(accepted["agent"]["cutoff"]["index"], 1)
 
@@ -238,7 +216,7 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
             f"/api/ai/protagonist/agents/{agent['id']}",
             method="PATCH",
             headers={"Content-Type": "application/json"},
-            body=json.dumps({"preview_id": preview_id, "spoiler_confirmed": True}),
+            body=json.dumps({"preview_id": preview_id}),
         )
         self.assertEqual(response["err"], "ai.preview_required")
 
@@ -251,13 +229,13 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
             stale = self.json(f"/api/ai/protagonist/agents/{agent['id']}")
         self.assertEqual(stale["err"], "ai.book_version_changed")
 
-    def test_disallowed_generation_request_never_reaches_runtime(self):
+    def test_problem_solving_request_reaches_runtime(self):
         agent = self._create_agent()
         conversation = self._json_post(f"/api/ai/protagonist/agents/{agent['id']}/conversations", {})["conversation"]
         with mock.patch.object(ProtagonistService, "submit_message") as submit:
             response = self._json_post(
                 f"/api/ai/protagonist/conversations/{conversation['id']}/messages",
-                {"content": "请模仿作者风格续写下一章"},
+                {"content": "用林舟的思路帮我分析是否该接受这个工作机会"},
             )
-        self.assertEqual(response["err"], "ai.request_blocked")
-        submit.assert_not_called()
+        self.assertEqual(response["err"], "ok")
+        submit.assert_called_once()

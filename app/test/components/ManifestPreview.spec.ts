@@ -15,15 +15,15 @@ vi.mock('vue-i18n', () => ({
 const vuetify = createVuetify({ components, directives });
 const manifest = {
     introduction: '基于有限证据的 AI 衍生简介',
-    traits: ['克制', '重视承诺', '先观察后行动'],
-    principles: ['先保护同伴', '证据不足时不下结论'],
-    relationship_boundaries: ['不替读者作决定'],
-    expression_constraints: ['短句优先', '不模仿作者文风'],
+    thinking_patterns: ['克制', '重视承诺', '先观察后行动'],
+    decision_principles: ['先保护同伴', '证据不足时先试验'],
+    problem_solving_steps: ['明确冲突', '识别不可逆代价', '选择最小行动'],
+    blind_spots: ['可能为了关系而延迟退出'],
     sources: [{ href: 'OPS/chapter-1.xhtml', title: '第一章' }],
 };
 
 describe('ManifestPreview', () => {
-    it('visually separates abstract traits, constraints, and source scope', () => {
+    it('separates thinking patterns, problem-solving steps, blind spots, and sources', () => {
         const wrapper = mount(ManifestPreview, {
             props: { manifest },
             global: {
@@ -33,7 +33,8 @@ describe('ManifestPreview', () => {
         });
         expect(wrapper.text()).toContain('基于有限证据');
         expect(wrapper.text()).toContain('克制');
-        expect(wrapper.text()).toContain('不模仿作者文风');
+        expect(wrapper.text()).toContain('选择最小行动');
+        expect(wrapper.text()).toContain('延迟退出');
         expect(wrapper.text()).toContain('第一章');
         expect(wrapper.findAll('section')).toHaveLength(4);
     });

@@ -8,13 +8,16 @@ const zh = JSON.parse(readFileSync(resolve(process.cwd(), 'i18n/locales/zh-CN.js
 const en = JSON.parse(readFileSync(resolve(process.cwd(), 'i18n/locales/en-US.json'), 'utf8'));
 
 describe('protagonist agent UI contract', () => {
-    it('shows the disclosure, persistent cutoff, streaming terminal state, and safety feedback', () => {
+    it('supports a recommended or user-chosen person and focuses chat on problem solving', () => {
         expect(page).toContain("$backend_stream(`/ai/protagonist/messages/${message.id}/stream`)");
         expect(page).toContain("['succeeded', 'failed', 'cancelled']");
         expect(page).toContain('protagonist.aiDerived');
-        expect(page).toContain('protagonist.chatBoundary');
-        expect(page).toContain('too_much_quote');
-        expect(page).toContain('spoiler_confirmed');
+        expect(page).toContain("targetMode === 'custom'");
+        expect(page).toContain('protagonist.recommendTarget');
+        expect(page).toContain(':error-messages="customNameError"');
+        expect(page).toContain("sendFeedback(message, 'not_useful')");
+        expect(page).not.toContain('spoiler_confirmed');
+        expect(page).not.toContain('too_much_quote');
         expect(page).toContain('deleteAgent');
     });
 
