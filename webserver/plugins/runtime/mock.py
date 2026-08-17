@@ -33,6 +33,7 @@ class MockMultiTabProvider:
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": "https://github.com/talebook/talebook",
         "license": "GPL-3.0",
+        "ui": {"hidden": True},
     }
 
     def execute(self, context):

@@ -986,7 +986,7 @@ class PluginDefinition(Base, SQLAlchemyMixin):
     create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
 
     def to_public_dict(self):
-        return {
+        value = {
             "id": self.id,
             "plugin_key": self.plugin_key,
             "version": self.version,
@@ -1004,6 +1004,10 @@ class PluginDefinition(Base, SQLAlchemyMixin):
             "homepage": self.homepage or "",
             "license": self.license or "",
         }
+        manifest = dict(self.manifest or {})
+        value["description"] = manifest.get("description", "")
+        value["ui"] = dict(manifest.get("ui") or {})
+        return value
 
 
 class PluginInstallation(Base, SQLAlchemyMixin):
