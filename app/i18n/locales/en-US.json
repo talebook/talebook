@@ -1381,6 +1381,7 @@
     "currentValue": "Current",
     "suggestedValue": "Candidate",
     "modelInference": "Model inference",
+    "openingExcerptSource": "First {count} characters of the book",
     "librarySource": "Existing library {field}",
     "sourceFallback": "Provided metadata source",
     "selectFieldLabel": "Select {field} suggestion for {book} (book #{id})",

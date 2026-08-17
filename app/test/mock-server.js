@@ -965,6 +965,70 @@ router.post('/api/admin/book/delete', eventHandler(() => ({
   msg: 'Books deleted'
 })));
 
+const metadataReviewTask = () => ({
+  id: 'metadata-review-screenshot',
+  feature: 'metadata',
+  status: 'succeeded',
+  progress_message: '分析完成：成功 1 本，失败 0 本',
+  editable: true,
+  counts: { total: 1, queued: 0, running: 0, succeeded: 1, failed: 0, cancelled: 0 },
+  items: [{
+    book_id: 1,
+    status: 'succeeded',
+    original: {
+      title: '百年孤独',
+      authors: ['加西亚·马尔克斯'],
+      publisher: '旧版出版社',
+      pubdate: '2011-06-01',
+      isbn: '',
+      language: 'zho',
+      comments: '魔幻现实主义文学代表作。',
+    },
+    suggestions: [{
+      field: 'publisher',
+      old_value: '旧版出版社',
+      value: '南海出版公司',
+      confidence: 0.93,
+      reason: '书籍开头的版权页明确标注了出版社。',
+      evidence: [{
+        source_id: 'book:opening_excerpt',
+        source_label: '书籍开头 1000 字',
+        quote: '南海出版公司 2011 年 6 月第 1 版',
+      }],
+      has_evidence: true,
+      conflict: true,
+      default_selected: true,
+    }, {
+      field: 'isbn',
+      old_value: '',
+      value: '9787544253994',
+      confidence: 0.89,
+      reason: '版权页包含完整 ISBN。',
+      evidence: [{
+        source_id: 'book:opening_excerpt',
+        source_label: '书籍开头 1000 字',
+        quote: 'ISBN 978-7-5442-5399-4',
+      }],
+      has_evidence: true,
+      conflict: false,
+      default_selected: true,
+    }],
+    error: null,
+  }],
+  application: null,
+});
+
+router.post('/api/ai/metadata/tasks', eventHandler(() => ({
+  err: 'ok',
+  task: metadataReviewTask(),
+  idempotent: false,
+})));
+
+router.get('/api/ai/metadata/tasks/:id', eventHandler(() => ({
+  err: 'ok',
+  task: metadataReviewTask(),
+})));
+
 router.post('/api/book/:id/delete', eventHandler(() => ({
   err: 'ok',
   msg: 'Book deleted'

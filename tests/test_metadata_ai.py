@@ -1,6 +1,8 @@
 import datetime
 import json
+import tempfile
 import unittest
+import zipfile
 from copy import deepcopy
 from types import SimpleNamespace
 from unittest import mock
@@ -11,6 +13,7 @@ from webserver.services.metadata_ai import (
     MetadataAIService,
     MetadataValidationError,
     apply_task,
+    extract_epub_excerpt,
     metadata_version,
     selection_revision,
     undo_task,
@@ -110,6 +113,25 @@ class MetadataValidationTest(unittest.TestCase):
         record = SimpleNamespace(ai_draft={"items": [{"book_id": 8, "suggestions": [{"field": "title"}]}]})
         with self.assertRaisesRegex(MetadataValidationError, "至少选择"):
             validate_selection(record, [])
+
+    def test_epub_excerpt_stops_at_first_thousand_visible_characters(self):
+        with tempfile.NamedTemporaryFile(suffix=".epub") as target:
+            with zipfile.ZipFile(target.name, "w") as archive:
+                archive.writestr(
+                    "META-INF/container.xml",
+                    '<?xml version="1.0"?><container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>',
+                )
+                archive.writestr(
+                    "OEBPS/content.opf",
+                    '<package><manifest><item id="one" href="one.xhtml"/><item id="two" href="two.xhtml"/></manifest>'
+                    '<spine><itemref idref="one"/><itemref idref="two"/></spine></package>',
+                )
+                archive.writestr("OEBPS/one.xhtml", f"<html><body><h1>开头</h1><p>{'甲' * 1200}</p></body></html>")
+                archive.writestr("OEBPS/two.xhtml", "<html><body>不应读取的后续正文</body></html>")
+            excerpt = extract_epub_excerpt(target.name)
+        self.assertEqual(len(excerpt), 1000)
+        self.assertTrue(excerpt.startswith("开头"))
+        self.assertNotIn("不应读取", excerpt)
 
 
 class _FakeMI:

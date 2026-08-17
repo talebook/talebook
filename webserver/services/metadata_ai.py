@@ -6,10 +6,17 @@ import datetime
 import hashlib
 import json
 import logging
+import os
+import posixpath
 import re
 import threading
+import zipfile
 from copy import deepcopy
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from urllib.parse import unquote, urlsplit
+from xml.etree import ElementTree
+
+from bs4 import BeautifulSoup
 
 from webserver.models import AITask
 from webserver.services.agent_runtime import AgentRuntimeError, RuntimeEvent, RuntimeRequest
@@ -20,9 +27,12 @@ from webserver.services.external_index import set_metadata_preserving_external_p
 LOG = logging.getLogger(__name__)
 FEATURE_KEY = "metadata"
 SCHEMA_VERSION = "metadata.v2"
-PROMPT_VERSION = "metadata.zh.v2"
+PROMPT_VERSION = "metadata.zh.v3"
 MAX_BATCH_SIZE = 50
 HIGH_CONFIDENCE = 0.85
+EXCERPT_CHAR_LIMIT = 1000
+EXCERPT_MEMBER_BYTE_LIMIT = 128 * 1024
+EXCERPT_TOTAL_BYTE_LIMIT = 512 * 1024
 FIELD_LIMITS = {
     "title": 500,
     "authors": 20,
@@ -143,7 +153,110 @@ def metadata_version(snapshot: Dict[str, Any]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
 
 
-def metadata_sources(snapshot: Dict[str, Any]) -> List[Dict[str, str]]:
+def _normalize_excerpt(value: str, limit: int = EXCERPT_CHAR_LIMIT) -> str:
+    return re.sub(r"\s+", " ", value or "").strip()[:limit]
+
+
+def _visible_html_text(value: bytes) -> str:
+    soup = BeautifulSoup(value, "html.parser")
+    for element in soup(["script", "style", "noscript", "nav"]):
+        element.decompose()
+    return " ".join(soup.stripped_strings)
+
+
+def _zip_member(archive: zipfile.ZipFile, name: str, limit: int) -> bytes:
+    with archive.open(name) as stream:
+        return stream.read(limit)
+
+
+def _epub_spine_members(archive: zipfile.ZipFile) -> List[str]:
+    container = ElementTree.fromstring(_zip_member(archive, "META-INF/container.xml", 64 * 1024))
+    rootfile = next((node for node in container.iter() if node.tag.rsplit("}", 1)[-1] == "rootfile"), None)
+    if rootfile is None or not rootfile.attrib.get("full-path"):
+        return []
+    opf_path = rootfile.attrib["full-path"]
+    package = ElementTree.fromstring(_zip_member(archive, opf_path, 256 * 1024))
+    manifest = {
+        node.attrib.get("id"): node.attrib.get("href")
+        for node in package.iter()
+        if node.tag.rsplit("}", 1)[-1] == "item" and node.attrib.get("id") and node.attrib.get("href")
+    }
+    base = posixpath.dirname(opf_path)
+    members = []
+    for node in package.iter():
+        if node.tag.rsplit("}", 1)[-1] != "itemref":
+            continue
+        href = manifest.get(node.attrib.get("idref"))
+        if not href:
+            continue
+        path = unquote(urlsplit(href).path)
+        member = posixpath.normpath(posixpath.join(base, path))
+        if member.startswith("../") or member == "..":
+            continue
+        members.append(member)
+    return members
+
+
+def extract_epub_excerpt(path: str, limit: int = EXCERPT_CHAR_LIMIT) -> str:
+    with zipfile.ZipFile(path) as archive:
+        try:
+            members = _epub_spine_members(archive)
+        except (KeyError, ElementTree.ParseError, zipfile.BadZipFile):
+            members = []
+        if not members:
+            members = [
+                value.filename for value in archive.infolist() if value.filename.lower().endswith((".xhtml", ".html", ".htm"))
+            ]
+        parts = []
+        bytes_read = 0
+        for member in members:
+            if bytes_read >= EXCERPT_TOTAL_BYTE_LIMIT:
+                break
+            try:
+                allowed = min(EXCERPT_MEMBER_BYTE_LIMIT, EXCERPT_TOTAL_BYTE_LIMIT - bytes_read)
+                raw = _zip_member(archive, member, allowed)
+            except KeyError:
+                continue
+            bytes_read += len(raw)
+            text = _visible_html_text(raw)
+            if text:
+                parts.append(text)
+            excerpt = _normalize_excerpt(" ".join(parts), limit)
+            if len(excerpt) >= limit:
+                return excerpt
+        return _normalize_excerpt(" ".join(parts), limit)
+
+
+def extract_txt_excerpt(path: str, limit: int = EXCERPT_CHAR_LIMIT) -> str:
+    with open(path, "rb") as stream:
+        raw = stream.read(EXCERPT_MEMBER_BYTE_LIMIT)
+    for encoding in ("utf-8-sig", "gb18030"):
+        try:
+            return _normalize_excerpt(raw.decode(encoding), limit)
+        except UnicodeDecodeError:
+            continue
+    return _normalize_excerpt(raw.decode("utf-8", errors="replace"), limit)
+
+
+def book_opening_excerpt(db, book_id: int, limit: int = EXCERPT_CHAR_LIMIT) -> str:
+    try:
+        formats = {str(value).upper() for value in (db.new_api.formats(int(book_id)) or [])}
+    except Exception:
+        LOG.warning("Unable to list formats for AI metadata excerpt book=%s", book_id)
+        return ""
+    for format_name, extractor in (("EPUB", extract_epub_excerpt), ("TXT", extract_txt_excerpt)):
+        if format_name not in formats:
+            continue
+        try:
+            path = db.format_abspath(int(book_id), format_name, index_is_id=True)
+            if path and os.path.isfile(path):
+                return extractor(path, limit)
+        except Exception as exc:
+            LOG.warning("Unable to extract AI metadata excerpt book=%s format=%s: %s", book_id, format_name, exc)
+    return ""
+
+
+def metadata_sources(snapshot: Dict[str, Any], excerpt: str = "") -> List[Dict[str, str]]:
     sources = []
     for field, value in snapshot.items():
         if value not in (None, "", []):
@@ -156,16 +269,27 @@ def metadata_sources(snapshot: Dict[str, Any]) -> List[Dict[str, str]]:
                     "value": text[:10_000],
                 }
             )
+    if excerpt:
+        sources.append(
+            {
+                "id": "book:opening_excerpt",
+                "kind": "book_excerpt",
+                "label": f"书籍开头 {EXCERPT_CHAR_LIMIT} 字",
+                "value": excerpt[:EXCERPT_CHAR_LIMIT],
+            }
+        )
     return sources
 
 
 def build_book_input(db, book_id: int) -> Dict[str, Any]:
     snapshot = metadata_snapshot(db, book_id)
+    excerpt = book_opening_excerpt(db, book_id)
     return {
         "book_id": int(book_id),
         "version": metadata_version(snapshot),
         "original": snapshot,
-        "sources": metadata_sources(snapshot),
+        "sources": metadata_sources(snapshot, excerpt),
+        "source_digest": hashlib.sha256(excerpt.encode("utf-8")).hexdigest()[:32] if excerpt else "",
     }
 
 
@@ -255,7 +379,7 @@ def validate_metadata_output(payload: Any, book_input: Dict[str, Any]) -> List[D
 
 
 def task_request_key(creator_id: int, inputs: Iterable[Dict[str, Any]]) -> str:
-    versions = [(item["book_id"], item["version"]) for item in inputs]
+    versions = [(item["book_id"], item["version"], item.get("source_digest", "")) for item in inputs]
     raw = json.dumps([FEATURE_KEY, creator_id, versions, SCHEMA_VERSION, PROMPT_VERSION], separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 

@@ -37,7 +37,7 @@ const task = {
             value: '新书名',
             confidence: 0.92,
             reason: '来源明确',
-            evidence: [{ source_id: 'library:comments', source_label: '书库现有简介', quote: '新书名' }],
+            evidence: [{ source_id: 'book:opening_excerpt', source_label: '书籍开头 1000 字', quote: '新书名' }],
             has_evidence: true,
             conflict: true,
             default_selected: true,
@@ -69,8 +69,8 @@ describe('AIMetadataReviewDialog.vue', () => {
         expect(text).toContain('旧书名');
         expect(text).toContain('新书名');
         expect(text).toContain('92%');
-        expect(text).toContain('aiMetadata.librarySource');
-        expect(text).not.toContain('library:comments');
+        expect(text).toContain('aiMetadata.openingExcerptSource');
+        expect(text).not.toContain('book:opening_excerpt');
         expect(text).toContain('aiMetadata.conflict');
         expect(document.body.querySelector('[role="status"]')?.textContent).toContain('分析完成');
         expect(document.body.querySelector('input[type="checkbox"]')?.getAttribute('aria-label')).toContain('旧书名');
@@ -85,6 +85,22 @@ describe('AIMetadataReviewDialog.vue', () => {
         expect(checkboxes[0].checked).toBe(true);
         expect(checkboxes[1].checked).toBe(false);
         expect(document.body.textContent).toContain('aiMetadata.noVerifiableEvidence');
+        wrapper.unmount();
+    });
+
+    it('uses backend-relative task paths without duplicating the API prefix', async () => {
+        const requester = vi.fn().mockResolvedValue({ err: 'ok', task });
+        const wrapper = mount(AIMetadataReviewDialog, {
+            global: { plugins: [vuetify] },
+            props: { modelValue: true, bookIds: [1], requester },
+            attachTo: document.body,
+        });
+
+        await vi.waitFor(() => expect(requester).toHaveBeenCalled());
+        expect(requester).toHaveBeenCalledWith('/ai/metadata/tasks', {
+            method: 'POST',
+            body: JSON.stringify({ book_ids: [1] }),
+        });
         wrapper.unmount();
     });
 });

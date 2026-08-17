@@ -1397,6 +1397,7 @@
     "currentValue": "当前值",
     "suggestedValue": "候选值",
     "modelInference": "模型推断",
+    "openingExcerptSource": "书籍开头 {count} 字",
     "librarySource": "书库现有{field}",
     "sourceFallback": "已提供的元数据来源",
     "selectFieldLabel": "选中《{book}》（书籍 #{id}）的{field}建议",

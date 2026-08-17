@@ -435,6 +435,7 @@ const selectionLabel = (item: MetadataTask, field: string) => t('aiMetadata.sele
 });
 const sourceLabel = (evidence: MetadataTask) => {
     if (evidence.source_id === 'model_inference') return t('aiMetadata.modelInference');
+    if (evidence.source_id === 'book:opening_excerpt') return t('aiMetadata.openingExcerptSource', { count: 1000 });
     if (evidence.source_id?.startsWith('library:')) {
         const field = evidence.source_id.slice('library:'.length);
         return t('aiMetadata.librarySource', { field: fieldLabel(field) });
@@ -475,7 +476,7 @@ const schedulePoll = () => {
 const refreshTask = async () => {
     if (!task.value) return;
     try {
-        const response = await request(`/api/ai/metadata/tasks/${task.value.id}`);
+        const response = await request(`/ai/metadata/tasks/${task.value.id}`);
         task.value = response.task;
         initializeSelection();
     } catch (error: any) {
@@ -495,7 +496,7 @@ const start = async () => {
     if (!props.bookIds.length) return;
     busy.value = true;
     try {
-        const response = await request('/api/ai/metadata/tasks', {
+        const response = await request('/ai/metadata/tasks', {
             method: 'POST',
             body: JSON.stringify({ book_ids: props.bookIds }),
         });
@@ -525,7 +526,7 @@ const selectedPayload = () => (task.value?.items || []).map((item: MetadataTask)
 const prepareConfirmation = async () => {
     busy.value = true;
     try {
-        const response = await request(`/api/ai/metadata/tasks/${task.value?.id}`, {
+        const response = await request(`/ai/metadata/tasks/${task.value?.id}`, {
             method: 'PATCH',
             body: JSON.stringify({ items: selectedPayload() }),
         });
@@ -542,7 +543,7 @@ const prepareConfirmation = async () => {
 const apply = async () => {
     busy.value = true;
     try {
-        const response = await request(`/api/ai/metadata/tasks/${task.value?.id}/apply`, {
+        const response = await request(`/ai/metadata/tasks/${task.value?.id}/apply`, {
             method: 'POST',
             body: JSON.stringify({
                 selection_revision: confirmation.value?.selection_revision,
@@ -563,7 +564,7 @@ const apply = async () => {
 const postAction = async (action: string) => {
     busy.value = true;
     try {
-        const response = await request(`/api/ai/metadata/tasks/${task.value?.id}/${action}`, {
+        const response = await request(`/ai/metadata/tasks/${task.value?.id}/${action}`, {
             method: 'POST',
             body: '{}',
         });
@@ -583,7 +584,7 @@ const undo = async () => {
 const cancelTask = async () => {
     busy.value = true;
     try {
-        const response = await request(`/api/ai/metadata/tasks/${task.value?.id}/cancel`, { method: 'POST', body: '{}' });
+        const response = await request(`/ai/metadata/tasks/${task.value?.id}/cancel`, { method: 'POST', body: '{}' });
         task.value = response.task;
         schedulePoll();
     } catch (error: any) {

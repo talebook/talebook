@@ -3,43 +3,45 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 元数据 2.0 预览、确认与撤销 · ACTIVE</title>
+<title>AI 元数据 2.0 预览、确认与撤销</title>
 <style>
 body{font:15px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif;max-width:980px;margin:auto;padding:28px;color:#172033}h1{line-height:1.25}h2{margin-top:2rem;border-bottom:1px solid #ccd4e0;padding-bottom:.35rem}code{background:#eef2f7;padding:.1rem .35rem;border-radius:4px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccd4e0;padding:.55rem;text-align:left;vertical-align:top}th{background:#eef2f7}.meta{display:flex;gap:1rem;flex-wrap:wrap;color:#526070}.wip{color:#8a4b00;font-weight:700}.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem}.flow div{padding:.65rem;background:#eaf2ff;border-radius:8px;text-align:center}@media(max-width:700px){.flow{grid-template-columns:1fr}body{padding:18px}}
 </style>
 </head>
 <body>
 <h1>AI 元数据 2.0：可审阅、可确认、可撤销</h1>
-<div class="meta"><span class="wip">ACTIVE · 已验证</span><span>创建日期：2026-08-16</span><span>所属模块：webserver（含 app 消费端）</span><span>需求来源：TB-57</span></div>
+<div class="meta"><span>已完成 · 评审反馈已验证</span><span>创建日期：2026-08-16</span><span>所属模块：webserver（含 app 消费端）</span><span>需求来源：TB-57</span></div>
 <h2>原始诉求</h2>
 <p>单本或批量分析书籍元数据，逐字段展示候选值、来源或推断、置信度与冲突；AI 不得直接覆盖书库。用户复核后才能写入，并支持取消、失败项重试、幂等确认和任务级撤销。</p>
 <h2>目标与边界</h2>
-<ul><li>复用 <code>/api/ai/&lt;feature&gt;/tasks</code> 与统一 <code>AgentRuntime</code>，首适配器保持 Codex app-server。</li><li>分析与写入分离；最多 50 本、每本最多 7 个白名单字段。</li><li>只使用当前书库元数据与明确传给运行时的最小来源；不新增未经授权的公共数据源。</li><li>无编辑权可看本人创建且仍可访问的建议，但不能应用或撤销。</li><li>不生成封面、不改正文、不转换文件。</li></ul>
+<ul><li>复用 <code>/api/ai/&lt;feature&gt;/tasks</code> 与统一 <code>AgentRuntime</code>，首适配器保持 Codex app-server。</li><li>分析与写入分离；最多 50 本、每本最多 7 个白名单字段。</li><li>每本书只按 EPUB spine 或 TXT 文件顺序提取开头最多 1000 个可见字符；不读取整本书，不把后续正文传给模型。</li><li>只使用当前书库元数据、上述有界片段与明确授权的来源；不新增未经授权的公共数据源。</li><li>无编辑权可看本人创建且仍可访问的建议，但不能应用或撤销。</li><li>不生成封面、不改正文、不转换文件。</li></ul>
 <h2>交互与状态</h2>
 <div class="flow"><div>创建分析任务</div><div>逐本生成建议</div><div>选择字段并保存复核版本</div><div>确认摘要后幂等写入</div><div>按任务撤销未被人工再改的字段</div></div>
 <p>批次允许部分失败；失败项可单独重试。取消只影响尚未完成的项目。无可核验证据的候选默认不勾选，高置信批量接受仅选择有证据且置信度达到阈值的候选。</p>
 <h2>接口契约</h2>
 <table><thead><tr><th>接口</th><th>作用</th><th>关键约束</th></tr></thead><tbody>
-<tr><td><code>POST /api/ai/metadata/tasks</code></td><td>创建 1–50 本分析任务</td><td>幂等键包含用户、书目版本和 schema/prompt 版本</td></tr>
+<tr><td><code>POST /api/ai/metadata/tasks</code></td><td>创建 1–50 本分析任务</td><td>幂等键包含用户、书目版本、1000 字片段摘要和 schema/prompt 版本</td></tr>
 <tr><td><code>PATCH /api/ai/metadata/tasks/:id</code></td><td>保存字段选择</td><td>返回不可猜测的选择摘要哈希，供最终确认</td></tr>
 <tr><td><code>POST .../:id/apply</code></td><td>应用已保存选择</td><td>重查 ACL、书目版本、白名单和复核哈希；要求幂等键</td></tr>
 <tr><td><code>POST .../:id/undo</code></td><td>撤销任务改动</td><td>仅当前值仍等于本任务写入值时恢复快照</td></tr>
 <tr><td><code>POST .../:id/retry</code></td><td>重试失败项</td><td>成功项不重复生成</td></tr>
 </tbody></table>
 <h2>持久化与安全</h2>
-<p>复用 <code>AITask</code> 的 JSON 草稿、用户复核与结果字段保存批次项目、来源、快照和应用结果，不新增数据库迁移。运行时输出先经严格 schema、字段类型、长度、来源引用和白名单校验，只有协议终态可进入预览。写入调用现有普通元数据服务；日志不保存正文、完整提示词或凭据。</p>
+<p>复用 <code>AITask</code> 的 JSON 草稿、用户复核与结果字段保存批次项目、来源、快照和应用结果，不新增数据库迁移。EPUB 只沿 spine 顺序按成员最多读取 128 KiB、全局最多 512 KiB 并在获取 1000 个可见字符后停止；TXT 最多读取开头 128 KiB 后截断为 1000 字。运行时输出先经严格 schema、字段类型、长度、来源引用和白名单校验，只有协议终态可进入预览。写入调用现有普通元数据服务；日志不保存正文、完整提示词或凭据。</p>
 <h2>兼容性与回滚</h2>
 <p>新能力由 <code>AI_METADATA_ENABLED</code> 独立开关控制。关闭后不再创建任务，既有书库编辑、导入、检索和 Summary Duck 路由不变。代码回滚不会删除书籍快照；已写入内容可在回滚前通过任务撤销，或使用结果中的逐字段 before/after 记录人工恢复。</p>
 <h2>测试结果</h2>
+<p>评审反馈迭代已验证：EPUB/TXT 开头 1000 字边界、来源摘要幂等、前端来源文案、真实后端接口路径、Chromium 渲染和截图均通过。</p>
 <ul>
 <li><code>make lint-py</code>：通过，107 个 Python 文件符合 Ruff 检查与格式。</li>
 <li><code>npm run lint</code>：通过（0 error）；仅有本次改动之外的仓库既有 warning。</li>
-<li><code>npx vitest run test/components/AIMetadataReviewDialog.spec.ts</code>：2/2 通过，覆盖变更对比、可读证据来源、置信度、冲突、默认选择和辅助技术标签。</li>
+<li><code>npx vitest run test/components/AIMetadataReviewDialog.spec.ts</code>：3/3 通过，覆盖变更对比、可读证据来源、置信度、冲突、默认选择、辅助技术标签和不重复拼接 <code>/api</code> 的真实接口路径。</li>
 <li><code>npm run build</code>：通过，Nuxt 生产构建完成。</li>
-<li>后端用例已补齐 schema/来源、幂等应用、部分失败、版本冲突与并发安全撤销；本地环境缺少 Tornado 依赖，Docker 共享 builder 又阻塞在下载锁定的 GitHub <code>voicebook</code> 依赖，因此未完成运行态后端用例，已作为 PR 限制明确记录。</li>
+<li><code>pytest -q tests/test_metadata_ai.py</code>：在现有 Talebook 测试镜像中 10/10 通过，包含 EPUB spine 顺序、恰好 1000 个可见字符及不继续读取后续正文的回归用例。</li>
+<li><code>npx playwright test test/e2e/ai-metadata.spec.ts --project=chromium</code>：1/1 通过；Chromium 150.0.7871.100 通过 Chrome DevTools Protocol 在 1440×1000 管理页完成真实接口、来源展示与截图验收。</li>
 </ul>
 <h2>界面审查</h2>
 <p>按默认分支 <code>master</code> 的完整界面差异重新审查了 Summary Duck 与 AI 元数据管理页的直接消费端。审查发现的批量上限说明、只读权限提示、动态状态播报、进度条名称、逐书选择标签、长证据换行、来源友好名称、逐项写入失败、撤销二次确认及 reduced-motion 问题均已修复；重新审查无剩余 HIGH/MEDIUM 问题。</p>
-<p>Chrome DevTools MCP 未在本次运行环境中提供，因此无法产出真实浏览器截图；以 happy-dom 组件测试、无错误 lint 与生产构建作为本地可用的替代证据，不将其表述为真实浏览器验证。</p>
+<p>Chromium 150.0.7871.100 / Chrome DevTools Protocol 的 1440×1000 管理页验收已通过，截图清晰显示两个候选字段均引用“书籍开头 1000 字”。真实浏览器验证同时发现并修复了客户端重复拼接 <code>/api/api</code> 的接口问题；重新审查无剩余 HIGH/MEDIUM 问题。</p>
 </body>
 </html>
