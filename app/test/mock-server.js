@@ -853,22 +853,32 @@ router.patch('/api/ai/tag_organizer/tasks/:id', eventHandler(async (event) => {
 }));
 
 router.post('/api/ai/tag_organizer/tasks/:id/preview', eventHandler(() => {
+  const suggestion = tagOrganizerTask.suggestions.find(item => item.selected && item.source === 'sci-fi');
+  const excluded = new Set(suggestion?.excluded_book_ids || []);
+  const changes = suggestion
+    ? tagOrganizerTask.books
+      .filter(book => book.tags.includes(suggestion.source) && !excluded.has(book.id))
+      .map(book => ({
+        book_id: book.id,
+        title: book.title,
+        before_tags: book.tags,
+        after_tags: book.tags.map(tag => tag === suggestion.source ? suggestion.target : tag),
+      }))
+    : [];
   tagOrganizerTask.status = 'previewed';
   tagOrganizerTask.preview = {
     token: 'preview-token',
-    summary: { changed_books: 2, conflicts: 0 },
+    summary: { changed_books: changes.length, conflicts: 0 },
     conflicts: [],
-    changes: [
-      { book_id: 1, title: '星海纪事', before_tags: ['sci-fi', '太空歌剧'], after_tags: ['科幻', '太空歌剧'] },
-      { book_id: 2, title: '未来简史', before_tags: ['sci-fi', '历史'], after_tags: ['科幻', '历史'] },
-    ],
+    changes,
   };
   return { err: 'ok', task: tagOrganizerTask };
 }));
 
 router.post('/api/ai/tag_organizer/tasks/:id/execute', eventHandler(() => {
+  const succeeded = tagOrganizerTask.preview?.changes?.length || 0;
   tagOrganizerTask.status = 'executed';
-  tagOrganizerTask.result = { succeeded: 2, skipped: 0, failed: 0, undone: 0 };
+  tagOrganizerTask.result = { succeeded, skipped: 0, failed: 0, undone: 0 };
   return { err: 'ok', task: tagOrganizerTask, idempotent: false };
 }));
 
@@ -877,7 +887,11 @@ router.post('/api/ai/tag_organizer/tasks/:id/retry', eventHandler(() => ({
 })));
 
 router.post('/api/ai/tag_organizer/tasks/:id/undo', eventHandler(() => {
-  tagOrganizerTask.result = { ...tagOrganizerTask.result, undone: 2, undo_conflicts: 0 };
+  tagOrganizerTask.result = {
+    ...tagOrganizerTask.result,
+    undone: tagOrganizerTask.result?.succeeded || 0,
+    undo_conflicts: 0,
+  };
   return { err: 'ok', task: tagOrganizerTask, idempotent: false };
 }));
 

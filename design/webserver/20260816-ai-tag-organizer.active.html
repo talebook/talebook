@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="TB-59 AI 标签整理、预览确认、幂等执行和安全撤销方案。" />
     <link rel="icon" href="data:," />
-    <title>AI 标签整理：先建议、后预览、可安全撤销 · ACTIVE</title>
+    <title>AI 标签整理：高效表格审阅、预览与安全撤销 · ACTIVE</title>
     <style>
       :root { color-scheme: light dark; --bg:#f4f1ea; --panel:#fffdf8; --ink:#222b2b; --muted:#66706f; --line:#d9d4c8; --accent:#9a4a2a; --soft:#f5e7dc; --ok:#236247; --warn:#8a5b13; --danger:#9b3434; }
       * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; color:var(--ink); background:linear-gradient(135deg,#f9f6ef,var(--bg)); font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
@@ -26,10 +26,10 @@
   <body>
     <div class="page">
       <header>
-        <h1>AI 标签整理：先建议、后预览、可安全撤销</h1>
-        <p class="sub">为长期书库提供可解释、可修改、可排除书籍的标签整理任务；任何写入都必须经过预览和二次确认。</p>
+        <h1>AI 标签整理：高效表格审阅、预览与安全撤销</h1>
+        <p class="sub">为长期书库提供高密度、可批量操作、可解释的标签整理工作台；任何写入仍必须经过精确预览和二次确认。</p>
         <div class="chips" aria-label="方案元信息">
-          <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-16</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：webserver、app、tests</span><span class="chip">需求来源：TB-59</span>
+          <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-16</span><span class="chip">本轮迭代：2026-08-17</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：webserver、app、tests</span><span class="chip">需求来源：TB-59</span>
         </div>
       </header>
 
@@ -37,6 +37,8 @@
         <section id="request">
           <h2>1. 原始诉求</h2>
           <div class="box warn">长期书库存在同义、繁简、大小写、全半角、错别字、低使用率和粒度不一致标签。系统应先用确定性规则归一格式，再通过统一 AgentRuntime 提供语义建议；用户可修改目标、排除书籍、预览、确认、部分重试和整体撤销，且不得越权、跨库或覆盖后续人工修改。</div>
+          <h3>2026-08-17 交互反馈</h3>
+          <div class="box">原卡片式建议审阅和逐书预览信息密度低，多条建议下需频繁滚动，也缺少搜索、批量选择和集中确认。本轮改为以表格为主的紧凑工作台，将高频操作固定在工具栏，单书排除收进行内弹窗，预览按书籍行对比。</div>
         </section>
 
         <section id="goals">
@@ -55,6 +57,15 @@
             <article class="step"><b>调整</b><span>用户接受、忽略、改目标或排除单书，不产生写入。</span></article>
             <article class="step"><b>预览/执行</b><span>服务端重查权限和版本，展示后再使用幂等键确认。</span></article>
             <article class="step"><b>撤销</b><span>按任务快照恢复；检测后续人工修改并跳过冲突。</span></article>
+          </div>
+          <h3>高效交互布局</h3>
+          <div class="table-wrap" tabindex="0" role="region" aria-label="表格交互规则">
+            <table><thead><tr><th>阶段</th><th>主界面</th><th>高频操作</th><th>保护措施</th></tr></thead><tbody>
+              <tr><td>建议审阅</td><td>固定表头的高密度表格</td><td>搜索、全选、仅选高置信、清空；行内直接改目标</td><td>选中数持续可见；低置信不默认选中</td></tr>
+              <tr><td>单书排除</td><td>从“影响书籍”单元格打开紧凑对话框</td><td>搜索受影响书籍、勾选排除、一次保存</td><td>取消不修改行数据；显示排除/总数</td></tr>
+              <tr><td>变更预览</td><td>逐书对比表</td><td>按书名/标签搜索，分页快速核对</td><td>冲突单独警示；确认勾选与执行按钮置于统一确认栏</td></tr>
+              <tr><td>执行结果</td><td>紧凑统计行</td><td>重试未完成项、安全撤销</td><td>撤销仍使用独立确认对话框</td></tr>
+            </tbody></table>
           </div>
           <h3>持久化</h3>
           <div class="table-wrap" tabindex="0" role="region" aria-label="持久化字段">
@@ -89,13 +100,13 @@
 
         <section id="tests">
           <h2>5. 测试结果</h2>
-          <p><strong>验证通过。</strong> 功能、权限/冲突语义、安全撤销和响应式交互均已在本分支验证。</p>
+          <p><strong>本轮验证完成。</strong> 表格工作台、批量选择、单书排除、逐书预览和确认栏均已通过真实 Chromium 交互与视觉复核。</p>
           <ul>
             <li><code>pytest -q tests/test_tag_organizer.py</code> 在 Calibre 测试镜像中 8/8 通过：包含确定性规则、闭合 schema、低置信默认不选、排除/去重、预览与幂等执行、安全撤销、ACL 变化、Runtime 协议失败不写入及部分重试总数。宿主环境未安装 Calibre，因此使用仓库 Docker test target 运行集成测试。</li>
             <li><code>make lint-py</code> 通过；<code>npm run lint</code> 0 errors（仅有仓库已有警告）；<code>npm run build</code> 通过。</li>
             <li>Playwright Chromium 3/3 通过：完整建议→预览→确认→执行→撤销流程、320px 窄屏，以及英文深色模式；评审态视觉快照已固化。</li>
             <li>Chrome DevTools MCP 在当前环境不可用；使用真实 Playwright Chromium 渲染作为等价可视化验证。</li>
-            <li>interface-review full 结论：<strong>Approve</strong>。评审中发现的重复 <code>main</code> landmark、状态更新未稳定播报和流程当前步骤未标记问题已修复；无剩余中/高严重度问题。</li>
+            <li>interface-review full 结论：<strong>Approve</strong>。已完整复核可访问性、布局、文案、排版、颜色与 UI 细节；桌面评审态、320px 窄屏表格滚动和英文深色态均已验证，无剩余可操作问题。</li>
           </ul>
         </section>
 

@@ -17,9 +17,20 @@ test.describe('AI tag organizer', () => {
 
         await page.getByRole('button', { name: '开始分析' }).click();
         await expect(page.getByRole('heading', { name: '审阅并调整建议' })).toBeVisible();
+        await expect(page.locator('.suggestion-table')).toBeVisible();
         await expect(page.getByText('sci-fi').first()).toBeVisible();
-        await expect(page.getByText('置信度 93%')).toBeVisible();
-        await expect(page.getByText('影响 2 本书')).toBeVisible();
+        await expect(page.getByText('93%')).toBeVisible();
+        await expect(page.getByText('已选 1 项', { exact: true })).toBeVisible();
+
+        await page.getByRole('button', { name: '清空匹配项' }).click();
+        await expect(page.getByRole('button', { name: '生成变更预览' })).toBeDisabled();
+        await page.getByRole('button', { name: '仅选高置信' }).click();
+
+        await page.getByRole('button', { name: '2 本 · 排除 0' }).click();
+        await expect(page.getByRole('heading', { name: '从 sci-fi 建议中排除书籍' })).toBeVisible();
+        await page.getByLabel('从当前建议中排除 星海纪事').check();
+        await page.getByRole('button', { name: '保存排除项' }).click();
+        await expect(page.getByRole('button', { name: '2 本 · 排除 1' })).toBeVisible();
         await expect(page).toHaveScreenshot('tag-organizer-review.png', {
             fullPage: true,
             animations: 'disabled',
@@ -28,27 +39,35 @@ test.describe('AI tag organizer', () => {
 
         await page.getByRole('button', { name: '生成变更预览' }).click();
         await expect(page.getByRole('heading', { name: '逐书变更预览' })).toBeVisible();
-        await expect(page.getByText('星海纪事')).toBeVisible();
         await expect(page.getByText('未来简史')).toBeVisible();
+        await expect(page.getByText('变更 1 本')).toBeVisible();
 
         await page.getByLabel('我已核对影响书籍和标签变化，确认执行上述变更。').check();
         await page.getByRole('button', { name: '确认并执行' }).click();
         await expect(page.getByRole('heading', { name: '执行结果' })).toBeVisible();
-        await expect(page.locator('.result-grid .success strong')).toHaveText('2');
+        await expect(page.locator('.result-values .success')).toHaveText('1');
 
         await page.getByRole('button', { name: '撤销本任务' }).click();
         await expect(page.getByText('撤销整次标签整理？')).toBeVisible();
         await page.getByRole('button', { name: '确认安全撤销' }).click();
-        await expect(page.locator('.result-grid > div').nth(3).locator('strong')).toHaveText('2');
+        await expect(page.locator('.result-values strong').nth(3)).toHaveText('1');
     });
 
     test('keeps the workflow readable on a narrow viewport', async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 844 });
         await page.goto('/admin/tags');
         await expect(page.getByRole('heading', { name: '标签整理台' })).toBeVisible();
-        const hero = await page.locator('.organizer-hero').boundingBox();
-        expect(hero?.width).toBeLessThanOrEqual(320);
-        await expect(page.getByRole('button', { name: '开始分析' })).toBeVisible();
+        const header = await page.locator('.workbench-header').boundingBox();
+        expect(header?.width).toBeLessThanOrEqual(320);
+        await page.getByRole('button', { name: '开始分析' }).click();
+        await expect(page.getByRole('heading', { name: '审阅并调整建议' })).toBeVisible();
+        await expect(page.locator('.suggestion-table')).toBeVisible();
+        const tableViewport = page.locator('.data-table-wrap').first();
+        await expect(tableViewport).toBeVisible();
+        const tableViewportSize = await tableViewport.boundingBox();
+        expect(tableViewportSize?.width).toBeLessThanOrEqual(320);
+        expect(await tableViewport.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+        await expect(page.getByRole('button', { name: '生成变更预览' })).toBeVisible();
     });
 
     test('renders the English copy in dark mode', async ({ context, page }) => {
