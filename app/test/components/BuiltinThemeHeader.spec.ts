@@ -144,6 +144,18 @@ describe('BuiltinThemeHeader.vue navigation', () => {
         wrapper.unmount();
     });
 
+    it.each(['light-gray', 'minimal', 'graphite', 'brass', 'warm-red'] as const)(
+        'shows the AI assistant entry to signed-in users in the %s theme',
+        (variant) => {
+            storeState.user.is_login = true;
+            const wrapper = mountHeader(variant);
+            const link = wrapper.findAllComponents({ name: 'VListItem' })
+                .find(item => item.text().includes('navigation.aiAssistant'));
+            expect(link?.props('to')).toBe('/ai-assistant');
+            wrapper.unmount();
+        },
+    );
+
     it('shows the network library link by default', () => {
         const wrapper = mountHeader('minimal');
 

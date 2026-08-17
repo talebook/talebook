@@ -1535,6 +1535,56 @@ router.get('/api/network/save/status', eventHandler(() => {
   return { err: 'ok', found: true, status: 'completed', progress: 100, done: 100, total: 100, book_id: 1, error: '' };
 }));
 
+router.get('/api/ai/hub/capabilities', eventHandler(() => ({
+  err: 'ok',
+  capabilities: [
+    {
+      id: 'summary_duck',
+      name: '总结鸭 TOP5',
+      description: '提炼当前章节最值得记住的五组问答，并附上可核对的原文引用。',
+      icon: 'mdi-duck',
+      scope: 'chapter',
+      entry: '/library',
+      permissions: ['login', 'book.read'],
+      feature_flag: 'AI_SUMMARY_DUCK_ENABLED',
+      available: true,
+      reason: '',
+    },
+  ],
+  partial_errors: [],
+})));
+
+router.get('/api/ai/hub/tasks', eventHandler((event) => {
+  const query = getQuery(event);
+  const allTasks = [
+    {
+      id: '11111111-1111-1111-1111-111111111111', feature: 'summary_duck', category: 'running', status: 'running',
+      progress: null, progress_message: '正在提炼章节重点', created_at: '2026-08-16T08:00:00', updated_at: '2026-08-16T08:03:00',
+      detail_url: '/read/1?ai_task=11111111-1111-1111-1111-111111111111', allowed_actions: { cancel: true, retry: false }, safe_error: null,
+      object: { library: 'local', book_id: 1, book_title: '百年孤独', chapter_title: '第一章 多年以后' },
+    },
+    {
+      id: '22222222-2222-2222-2222-222222222222', feature: 'summary_duck', category: 'completed', status: 'succeeded',
+      progress: null, progress_message: '生成完成', created_at: '2026-08-15T08:00:00', updated_at: '2026-08-15T08:04:00',
+      detail_url: '/read/2?ai_task=22222222-2222-2222-2222-222222222222', allowed_actions: { cancel: false, retry: false }, safe_error: null,
+      object: { library: 'local', book_id: 2, book_title: '小王子', chapter_title: '第二章 星球来客' },
+    },
+  ];
+  const filtered = query.category && query.category !== 'all'
+    ? allTasks.filter(task => task.category === query.category)
+    : allTasks;
+  return {
+    err: 'ok', tasks: filtered,
+    category_counts: { running: 1, pending_confirmation: 0, failed: 0, completed: 1 },
+    libraries: [{ id: 'local', name: '本地书库' }],
+    pagination: { page: 1, page_size: 12, total: filtered.length, pages: filtered.length ? 1 : 0 },
+    partial_errors: [],
+  };
+}));
+
+router.post('/api/ai/hub/events', eventHandler(() => ({ err: 'ok' })));
+router.post('/api/ai/hub/tasks/:feature/:taskId/:action', eventHandler(() => ({ err: 'ok' })));
+
 // Theme API — return empty state so layout doesn't open an error dialog
 router.get('/api/themes/active', eventHandler(() => accessControlEnvelope() || ({
   err: 'ok',

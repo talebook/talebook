@@ -475,71 +475,74 @@ const allLocales = computed(() => {
 const items = computed(() => {
     var home_links = [
         // home
-        { icon: 'mdi-home', href: '/', text: $t('navigation.home') },
+        { icon: 'mdi-home', href: '/', text: t('navigation.home') },
     ];
     var library_links = [
-        { icon: 'mdi-book', href: '/library', text: $t('navigation.localLibrary') },
+        { icon: 'mdi-book', href: '/library', text: t('navigation.localLibrary') },
         ...(store.sys.show_network_library !== false
-            ? [{ icon: 'mdi-cloud-search', href: '/network', text: $t('navigation.networkLibrary') }]
+            ? [{ icon: 'mdi-cloud-search', href: '/network', text: t('navigation.networkLibrary') }]
             : []),
-        { icon: 'mdi-book-music', href: '/audios', text: $t('navigation.audiobooks'), badge: $t('audiobook.beta') },
+        { icon: 'mdi-book-music', href: '/audios', text: t('navigation.audiobooks'), badge: t('audiobook.beta') },
+        ...(store.user.is_login
+            ? [{ icon: 'mdi-broom', href: '/ai-assistant', text: t('navigation.aiAssistant') }]
+            : []),
     ];
     var shelf_links = store.user.is_login
-        ? [{ icon: 'mdi-bookshelf', href: '/user/shelf', text: $t('navigation.myShelf') }]
+        ? [{ icon: 'mdi-bookshelf', href: '/user/shelf', text: t('navigation.myShelf') }]
         : [];
     var admin_links = [
         {
             icon: 'mdi-cog',
-            text: $t('navigation.admin'),
+            text: t('navigation.admin'),
             // expand: route.path.indexOf("/admin/") == 0, // V3 list group handles expand differently (via value/opened)
             groups: [
-                { icon: 'mdi-cog', href: '/admin/settings', text: $t('navigation.settings') },
-                { icon: 'mdi-human-greeting', href: '/admin/users', text: $t('navigation.users') },
-                { icon: 'mdi-library-shelves', href: '/admin/books', text: $t('navigation.books') },
-                { icon: 'mdi-playlist-music', href: '/audio-jobs', text: $t('navigation.audiobookJobs') },
-                { icon: 'mdi-import', href: '/admin/imports', text: $t('navigation.import') },
-                { icon: 'mdi-book-cog', href: '/admin/booksources', text: $t('navigation.bookSources') },
-                { icon: 'mdi-palette', href: '/admin/themes', text: $t('navigation.themes') },
-                { icon: 'mdi-text-box-outline', href: '/admin/logs', text: $t('navigation.systemLogs') },
+                { icon: 'mdi-cog', href: '/admin/settings', text: t('navigation.settings') },
+                { icon: 'mdi-human-greeting', href: '/admin/users', text: t('navigation.users') },
+                { icon: 'mdi-library-shelves', href: '/admin/books', text: t('navigation.books') },
+                { icon: 'mdi-playlist-music', href: '/audio-jobs', text: t('navigation.audiobookJobs') },
+                { icon: 'mdi-import', href: '/admin/imports', text: t('navigation.import') },
+                { icon: 'mdi-book-cog', href: '/admin/booksources', text: t('navigation.bookSources') },
+                { icon: 'mdi-palette', href: '/admin/themes', text: t('navigation.themes') },
+                { icon: 'mdi-text-box-outline', href: '/admin/logs', text: t('navigation.systemLogs') },
             ],
         },
     ];
     var nav_links = [
-        { heading: $t('navigation.categories') },
+        { heading: t('navigation.categories') },
         ...(store.user.is_login
             ? [{
                 icon: 'mdi-check-circle',
                 href: '/user/history?tab=finished',
-                text: $t('navigation.readBooks'),
+                text: t('navigation.readBooks'),
                 count: readDoneCount.value,
             }]
             : []),
-        { icon: 'mdi-widgets', href: '/nav', text: $t('navigation.browse'), count: store.sys.books },
-        { icon: 'mdi-home-group', href: '/publisher', text: $t('navigation.publishers'), count: store.sys.publishers },
-        { icon: 'mdi-human-greeting', href: '/author', text: $t('navigation.authors'), count: store.sys.authors },
-        { icon: 'mdi-tag-heart', href: '/tag', text: $t('navigation.tags'), count: store.sys.tags },
-        { icon: 'mdi-file', href: '/format', text: $t('navigation.formats'), count: store.sys.formats },
+        { icon: 'mdi-widgets', href: '/nav', text: t('navigation.browse'), count: store.sys.books },
+        { icon: 'mdi-home-group', href: '/publisher', text: t('navigation.publishers'), count: store.sys.publishers },
+        { icon: 'mdi-human-greeting', href: '/author', text: t('navigation.authors'), count: store.sys.authors },
+        { icon: 'mdi-tag-heart', href: '/tag', text: t('navigation.tags'), count: store.sys.tags },
+        { icon: 'mdi-file', href: '/format', text: t('navigation.formats'), count: store.sys.formats },
         {
             target: '',
             links: [
-                { icon: 'mdi-library-shelves', href: '/series', text: $t('navigation.series'), count: store.sys.series },
-                { icon: 'mdi-star-half', href: '/rating', text: $t('navigation.ratings') },
-                { icon: 'mdi-trending-up', href: '/hot', text: $t('navigation.hot') },
-                { icon: 'mdi-history', href: '/recent', text: $t('navigation.recent') },
+                { icon: 'mdi-library-shelves', href: '/series', text: t('navigation.series'), count: store.sys.series },
+                { icon: 'mdi-star-half', href: '/rating', text: t('navigation.ratings') },
+                { icon: 'mdi-trending-up', href: '/hot', text: t('navigation.hot') },
+                { icon: 'mdi-history', href: '/recent', text: t('navigation.recent') },
             ],
         },
     ];
     var friend_links = [
         // links
-        { heading: $t('messages.friendshipLinks') },
+        { heading: t('messages.friendshipLinks') },
         { links: store.sys.friends, target: '_blank' },
     ];
     var sys_links = [
-        { heading: $t('messages.system') },
-        { icon: 'mdi-history', text: $t('messages.systemVersion'), href: '', count: store.sys.version },
-        { icon: 'mdi-human', text: $t('messages.userCount'), href: '', count: store.sys.users },
-        { icon: 'mdi-cellphone', text: $t('messages.opdsIntroduction'), href: '/opds-readme', count: 'OPDS', target: '_blank' },
-        { icon: 'mdi-cloud-sync', text: $t('messages.webdavIntroduction'), href: '/webdav-readme', count: 'WebDAV', target: '_blank' },
+        { heading: t('messages.system') },
+        { icon: 'mdi-history', text: t('messages.systemVersion'), href: '', count: store.sys.version },
+        { icon: 'mdi-human', text: t('messages.userCount'), href: '', count: store.sys.users },
+        { icon: 'mdi-cellphone', text: t('messages.opdsIntroduction'), href: '/opds-readme', count: 'OPDS', target: '_blank' },
+        { icon: 'mdi-cloud-sync', text: t('messages.webdavIntroduction'), href: '/webdav-readme', count: 'WebDAV', target: '_blank' },
     ];
 
     return home_links

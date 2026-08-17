@@ -3,7 +3,7 @@
 
   const TASKS_API = "/api/ai/summary_duck/tasks";
   const state = {
-    bookId: null, artifact: null, chapter: null, pollTimer: null, editing: false,
+    bookId: null, taskId: null, artifact: null, chapter: null, pollTimer: null, editing: false,
     editorDraft: null, previousFocus: null, inertElements: []
   };
   const el = {};
@@ -217,8 +217,10 @@
       return;
     }
     try {
-      const payload = await request(`${TASKS_API}?book_id=${encodeURIComponent(state.bookId)}`);
-      state.artifact = payload.tasks[0] || null;
+      const payload = state.taskId
+        ? await request(`${TASKS_API}/${encodeURIComponent(state.taskId)}`)
+        : await request(`${TASKS_API}?book_id=${encodeURIComponent(state.bookId)}`);
+      state.artifact = state.taskId ? payload.task : (payload.tasks[0] || null);
       if (state.artifact) renderArtifact();
       else renderReady();
     } catch (error) {
@@ -254,6 +256,7 @@
         })
       });
       state.artifact = payload.task;
+      state.taskId = payload.task.id;
       renderArtifact();
     } catch (error) {
       renderStatus(error.message, true);
@@ -378,6 +381,7 @@
     try {
       await request(`${TASKS_API}/${state.artifact.id}`, { method: "DELETE" });
       state.artifact = null;
+      state.taskId = null;
       renderReady();
     } catch (error) { renderStatus(error.message, true); }
   }
@@ -432,8 +436,10 @@
 
   function initialize(options) {
     state.bookId = options && options.bookId;
+    state.taskId = new URLSearchParams(window.location.search).get("ai_task");
     buildShell();
     window.TalebookSummaryDuck = { open: open, collectChapter: collectChapter };
+    if (state.taskId) open();
   }
 
   window.TalebookSummaryDuckInit = initialize;

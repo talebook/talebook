@@ -229,7 +229,85 @@
     "myShelf": "我的书架",
     "recommendations": "猜你喜欢",
     "audiobooks": "有声书",
-    "readBooks": "已读书目"
+    "readBooks": "已读书目",
+    "aiAssistant": "辅助整理"
+  },
+  "aiAssistant": {
+    "eyebrow": "AI 工作台",
+    "title": "辅助整理，一处看清",
+    "description": "发现适合当前书库的智能能力，跟进运行中、待确认和失败的任务。每次写入仍由具体功能预览并确认。",
+    "capabilityEyebrow": "能力目录",
+    "capabilities": "可用的整理能力",
+    "capabilitiesDescription": "能力由各功能自行注册；某项暂不可用时，其他能力和任务仍可正常查看。",
+    "available": "可用",
+    "unavailable": "暂不可用",
+    "noDescription": "该能力暂未提供说明。",
+    "privateByDefault": "仅展示有权访问的内容",
+    "openCapability": "开始使用",
+    "noCapabilities": "还没有已注册能力",
+    "noCapabilitiesDescription": "功能上线后会自动出现在这里。",
+    "taskEyebrow": "任务中心",
+    "tasks": "我的整理任务",
+    "tasksDescription": "只汇总你的任务和最小必要信息；正文、生成结果与内部错误不会出现在列表中。",
+    "taskFilters": "任务筛选",
+    "statusAll": "全部",
+    "statusRunning": "运行中",
+    "statusPending": "待确认",
+    "statusFailed": "失败",
+    "statusCompleted": "近期完成",
+    "libraryFilter": "书库",
+    "allLibraries": "全部书库",
+    "partialError": "部分功能的任务暂时无法读取，其余结果不受影响。",
+    "partialCapabilityError": "部分能力状态探测失败；已显示其余可用能力。",
+    "loadCapabilitiesFailed": "能力目录加载失败，请稍后重试。",
+    "loadTasksFailed": "任务列表加载失败，请稍后重试。",
+    "noTasks": "当前筛选下没有任务",
+    "noTasksDescription": "开始使用一项整理能力后，进度会出现在这里。",
+    "deletedBook": "已不可访问的书籍",
+    "openTask": "查看详情",
+    "pagination": "任务分页",
+    "cancelTitle": "取消这项任务？",
+    "cancelDescription": "将请求取消《{title}》的当前任务。已经产生的业务写入不会由此入口处理。",
+    "confirmCancel": "确认取消任务",
+    "cancelRequested": "已提交取消请求",
+    "retryRequested": "已提交重试请求",
+    "actionFailed": "操作失败，请刷新后重试。",
+    "unknownTime": "时间未知",
+    "scope": {
+      "chapter": "适用于当前章节",
+      "book": "适用于单本书",
+      "library": "适用于书库",
+      "unknown": "适用范围待说明"
+    },
+    "availability": {
+      "ai_disabled": "站点已暂停 AI 功能。历史任务仍可在下方查看。",
+      "feature_disabled": "管理员尚未启用这项能力。",
+      "capability_probe_failed": "能力状态探测失败，请稍后刷新。",
+      "runtime": {
+        "not_installed": "AI 运行时尚未安装。",
+        "not_authenticated": "AI 运行时尚未完成登录。",
+        "version_unsupported": "AI 运行时版本暂不兼容。",
+        "unavailable": "AI 运行时暂时不可用。"
+      }
+    },
+    "message": {
+      "running": "任务正在处理",
+      "pending_confirmation": "结果等待你确认",
+      "failed": "任务未完成",
+      "completed": "任务已完成"
+    },
+    "error": {
+      "generic": "任务未完成，请进入详情查看可用的下一步。",
+      "runtime": {
+        "internal": "AI 运行时暂时失败，请进入详情后重试。",
+        "unavailable": "AI 运行时暂时不可用。",
+        "not_authenticated": "AI 运行时尚未完成登录。",
+        "usage_limit": "AI 使用额度暂时不可用。"
+      },
+      "result": {
+        "invalid": "生成结果未通过校验。"
+      }
+    }
   },
   "network": {
     "title": "网络书库",
