@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import yaml
@@ -141,10 +142,19 @@ def test_docker_root_context_is_a_runtime_input_allowlist():
 def test_test_sources_are_available_to_test_and_dev_but_not_production():
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-    production = dockerfile.split("FROM server AS production", 1)[1].split("\nFROM ", 1)[0]
+    stage_parents = {
+        stage.lower(): parent.lower()
+        for parent, stage in re.findall(
+            r"^FROM\s+(\S+)\s+AS\s+(\S+)\s*$",
+            dockerfile,
+            re.MULTILINE | re.IGNORECASE,
+        )
+    }
 
-    assert "FROM server AS test" in dockerfile
+    assert stage_parents["test"] == "server"
+    assert stage_parents["dev"] == "test"
+    assert stage_parents["production"] == "server"
+    assert stage_parents["production-ssr"] == "production"
+    assert stage_parents["production-spa"] == "production"
     assert "COPY tests/ /var/www/talebook/tests/" in dockerfile
-    assert "FROM test AS dev" in dockerfile
-    assert "COPY tests/" not in production
     assert "--build-context" not in makefile
