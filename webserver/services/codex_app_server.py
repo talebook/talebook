@@ -293,7 +293,7 @@ class CodexAppServerRuntime(AgentRuntime):
                     "cwd": str(workdir),
                     "approvalPolicy": "never",
                     "sandbox": "readOnly",
-                    "serviceName": "talebook_summary_duck",
+                    "serviceName": "talebook_ai",
                 }
                 if request.model or self.model:
                     thread_params["model"] = request.model or self.model
