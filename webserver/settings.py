@@ -100,6 +100,7 @@ settings = {
 
     "AUDIOBOOK_ENABLED": True,
     "AUDIOBOOK_PATH": "/data/books/audiobooks",
+    "AI_ARTIFACT_ROOT": "/data/books/ai",
     "AUDIOBOOK_OWNER_GENERATE": False,
     "AUDIOBOOK_WORKERS": 1,
     "AUDIOBOOK_MIN_FREE_GB": 5,

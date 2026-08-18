@@ -1025,6 +1025,7 @@ class BookDelete(BaseHandler):
             ProtagonistMessage,
             ScanFile,
         )
+        from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore
         from webserver.services.protagonist_agent import FEATURE_KEY as PROTAGONIST_FEATURE_KEY
         from webserver.services.protagonist_agent import ProtagonistService
 
@@ -1041,8 +1042,18 @@ class BookDelete(BaseHandler):
         ]
         for preview_id in active_preview_ids:
             protagonist_runtime.cancel(preview_id)
+        preview_artifacts = []
+        for preview in self.session.query(AITask).filter(
+            AITask.book_id == bid,
+            AITask.feature == PROTAGONIST_FEATURE_KEY,
+        ):
+            ref = preview.result_data or {}
+            if ref.get("artifact_path"):
+                preview_artifacts.append((preview.creator_id, ref["artifact_path"]))
         self.session.query(AITask).filter(AITask.book_id == bid).delete()
-        agent_ids = [row[0] for row in self.session.query(ProtagonistAgent.id).filter(ProtagonistAgent.book_id == bid)]
+        agents = self.session.query(ProtagonistAgent).filter(ProtagonistAgent.book_id == bid).all()
+        agent_ids = [agent.id for agent in agents]
+        agent_artifacts = [(agent.creator_id, agent.manifest_path) for agent in agents]
         if agent_ids:
             conversation_ids = [
                 row[0]
@@ -1070,7 +1081,17 @@ class BookDelete(BaseHandler):
         if external_indexed:
             self.session.query(Item).filter(Item.book_id == bid).delete()
         self.session.commit()
+        artifacts = AIArtifactStore.from_config(CONF, "agents")
+        cleanup_failed = False
+        for owner_id, relative_path in preview_artifacts + agent_artifacts:
+            try:
+                artifacts.delete(owner_id, relative_path)
+            except AIArtifactError:
+                cleanup_failed = True
+                logging.exception("Failed to clean AI artifact for deleted book bid=%s", bid)
         self.add_msg("success", _("删除书籍《%s》") % book["title"])
+        if cleanup_failed:
+            return {"err": "ai.artifact_cleanup_failed", "msg": _("书籍已删除，但部分 AI 产物目录清理失败")}
         return {"err": "ok", "msg": _("删除成功")}
 
 

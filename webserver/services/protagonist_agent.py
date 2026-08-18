@@ -20,6 +20,7 @@ from xml.etree import ElementTree
 
 from webserver.models import AITask, ProtagonistAgent, ProtagonistConversation, ProtagonistMessage
 from webserver.services.agent_runtime import AgentRuntimeError, RuntimeEvent, RuntimeRequest
+from webserver.services.ai_artifacts import AIArtifactStore
 from webserver.services.codex_app_server import CodexAppServerRuntime
 
 
@@ -349,13 +350,13 @@ def build_chat_prompt(
     )
 
 
-def preview_dict(record: AITask) -> Dict[str, Any]:
+def preview_dict(record: AITask, manifest: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     context = record.ai_draft or {}
     return {
         "id": record.id,
         "status": record.status,
         "progress_message": record.progress_message,
-        "manifest": record.result_data or {},
+        "manifest": manifest or {},
         "book_id": record.book_id,
         "cutoff": {
             "href": record.chapter_href,
@@ -369,12 +370,13 @@ def preview_dict(record: AITask) -> Dict[str, Any]:
     }
 
 
-def agent_dict(record: ProtagonistAgent) -> Dict[str, Any]:
+def agent_dict(record: ProtagonistAgent, manifest: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": record.id,
         "book_id": record.book_id,
         "display_name": record.display_name,
-        "manifest": record.manifest or {},
+        "manifest": manifest,
+        "artifact_status": record.artifact_status,
         "cutoff": {"href": record.cutoff_href, "title": record.cutoff_title, "index": record.cutoff_index},
         "schema_version": record.schema_version,
         "prompt_version": record.prompt_version,
@@ -431,6 +433,7 @@ class ProtagonistService:
     def setup(self, session_maker, config: Dict[str, Any], runtime=None) -> None:
         self.session_maker = session_maker
         self.config = config
+        self.artifacts = AIArtifactStore.from_config(config, "agents")
         if runtime is not None:
             self.runtime = runtime
         elif not self._configured:
@@ -507,18 +510,25 @@ class ProtagonistService:
             )
             checked = validate_manifest(result.output, evidence)
             session = self.session_maker()
+            write = None
             try:
                 record = session.get(AITask, task_id)
                 if record:
                     record.status = "cancelled" if record.cancel_requested else "succeeded"
                     if not record.cancel_requested:
-                        record.result_data = checked
+                        write = self.artifacts.replace_json(record.creator_id, record.id, checked, preview=True)
+                        record.result_data = write.ref.to_dict()
                         record.progress_message = "预览已就绪"
                         record.usage = result.usage or {}
                         record.runtime_session_id = (result.session_id or "")[:128]
                     record.finished_at = datetime.datetime.now()
                     record.update_time = record.finished_at
                     session.commit()
+            except Exception:
+                session.rollback()
+                if write is not None:
+                    self.artifacts.restore(record.creator_id, write)
+                raise
             finally:
                 session.close()
         except (AgentRuntimeError, ProtagonistValidationError) as exc:

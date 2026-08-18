@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="TB-62 人物思维 Agent manifest 目录化存储后续方案。" />
+  <link rel="icon" href="data:," />
+  <title>Agent manifest 目录化存储 · ACTIVE</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#eef2f6; --paper:#fff; --ink:#172033; --muted:#5e6878; --line:#d7dee8; --accent:#155e75; --soft:#e6f4f7; --warn:#8a4b12; --good:#17643f; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { width:min(1080px,calc(100% - 28px)); margin:28px auto 64px; } header,section { margin-bottom:18px; padding:26px 30px; border:1px solid var(--line); border-radius:18px; background:var(--paper); }
+    h1 { margin:0 0 8px; font-size:clamp(30px,5vw,46px); line-height:1.15; } h2 { margin:0 0 12px; font-size:22px; } h3 { margin:20px 0 8px; font-size:17px; }
+    p,ul,ol { margin:8px 0; } code { padding:2px 5px; border-radius:5px; background:var(--soft); overflow-wrap:anywhere; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; color:var(--muted); } .meta span { padding:4px 9px; border-radius:999px; background:var(--soft); }
+    .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; } .flow div { padding:13px; border:1px solid var(--line); border-radius:12px; } .flow b { display:block; color:var(--accent); }
+    table { width:100%; border-collapse:collapse; } th,td { padding:9px; border:1px solid var(--line); text-align:left; vertical-align:top; } th { background:var(--soft); }
+    .pending { color:var(--warn); font-weight:700; } .verified { color:var(--good); font-weight:700; }
+    @media (max-width:760px) { header,section { padding:20px; } .flow { grid-template-columns:1fr; } table { display:block; overflow:auto; } }
+    @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+    @media print { body { background:#fff; } main { width:100%; margin:0; } header,section { break-inside:avoid; } }
+  </style>
+</head>
+<body><main>
+  <header>
+    <h1>Agent manifest 目录化存储</h1>
+    <p>让人物思维 Agent 的 manifest 以目录文件作为唯一内容来源，数据库只保存检索索引、相对路径、摘要与状态。</p>
+    <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-18</span><span>所属模块：webserver</span><span>影响范围：AI 产物存储、删除与迁移</span><span>需求来源：TB-52 / TB-62</span></div>
+  </header>
+  <section id="request"><h2>1. 原始诉求</h2><p>TB-52 统一规范要求：“实体产物优先保存在目录中”，“统一目录为 <code>books/ai/{user-workspace}/{feature}</code>”，“数据库仅承担管理与检索”，并要求临时文件校验后原子替换、删除同步清理，且备份与迁移同时覆盖数据库和 <code>books/ai</code>。成员随后要求相关子任务按新规范修改代码。</p><p>TB-62 当前草稿 PR 仍把完整 manifest 存在 <code>protagonist_agents.manifest</code>，因此需要独立后续方案替换该持久化边界。本方案生效后覆盖原人物 Agent ACTIVE 方案的数据存储章节，其余产品与交互设计继续有效。</p></section>
+  <section id="goals"><h2>2. 目标与边界</h2><table><tr><th>目标</th><th>非目标</th></tr><tr><td><ul><li>单一当前版 <code>manifest.json</code> 位于 <code>/data/books/ai/{opaque-workspace}/agents</code>。</li><li>数据库只保留相对路径、SHA-256、状态及展示/关联索引。</li><li>每次读取先做创建者、书籍 ACL 与版本检查，再校验路径和摘要。</li><li>创建、重新生成使用同目录临时文件和原子替换；删除 Agent 或书籍同步清理产物。</li><li>默认根目录位于既有 <code>/data/books</code> 数据卷，数据库迁移保持相对路径不变。</li></ul></td><td><ul><li>不建设版本表、版本列表、回滚接口或 <code>v{version}</code> 目录。</li><li>不改变人物思维 Agent 的产品交互和运行时协议。</li><li>不为其他 AI 功能迁移数据；共享存储工具保持可复用。</li></ul></td></tr></table></section>
+  <section id="design"><h2>3. 方案</h2><div class="flow"><div><b>1. 生成</b>运行时输出经 schema 校验后序列化为稳定 JSON。</div><div><b>2. 原子落盘</b>同目录临时文件 fsync 后以 <code>os.replace</code> 替换当前文件。</div><div><b>3. 索引提交</b>数据库写入相对路径、SHA-256 和 ready 状态；不写正文。</div><div><b>4. 受控读取</b>ACL 与书籍版本通过后，限制路径前缀并校验摘要再加载。</div></div><h3>目录与数据</h3><pre><code>/data/books/ai/
+  {workspace-id}/
+    agents/
+      {agent-id}/manifest.json
+      previews/{task-id}/manifest.json</code></pre><p><code>workspace-id</code> 由安装级密钥和内部 reader id 通过 HMAC-SHA-256 确定性生成；不暴露邮箱或用户名。预览同样不把完整内容写入任务表，任务表只保存相对路径、摘要和状态引用；用户删除预览或书籍时同步清理目录。</p><h3>一致性与失败</h3><ul><li>新建先写文件再提交索引；数据库提交失败时删除新文件。</li><li>重新生成先保存旧文件字节，原子替换后提交新摘要；提交失败时原子恢复旧文件。</li><li>缺失、路径越界、SHA 不符或 JSON 结构错误统一返回产物不可用，不把部署绝对路径暴露给客户端。</li><li>删除先提交数据库级联，再清理受控目录；清理失败记录服务端日志并向调用方返回明确错误，目录不能被其他用户读取。</li></ul></section>
+  <section id="impact"><h2>4. 影响与风险</h2><table><tr><th>风险</th><th>控制</th><th>剩余风险</th></tr><tr><td>路径穿越或跨用户读取</td><td>只接受受控相对路径；解析后校验根目录、workspace 与 feature 前缀。</td><td>管理员直接修改文件系统仍属于部署级权限。</td></tr><tr><td>数据库与文件不一致</td><td>原子写、SHA 校验、提交失败补偿、缺失失败关闭。</td><td>进程在文件替换与数据库提交之间被强杀时可能留下可检测的不一致。</td></tr><tr><td>备份漏文件</td><td>默认根目录固定在现有 <code>/data/books</code> 数据卷；方案和测试验证该约束。</td><td>自定义根目录的部署者必须把该目录加入外部备份。</td></tr><tr><td>旧列残留</td><td>ORM 删除正文列且不再读写；当前 PR 尚未合并，无生产内联 manifest 需要迁移。</td><td>曾试跑草稿分支的非生产数据库可由非破坏迁移保留未使用旧列。</td></tr></table></section>
+  <section id="tests"><h2>5. 测试结果</h2><p class="verified">实现与回归验证通过。</p><ul><li>存储与 Agent 定向测试：在 Talebook 测试镜像内执行 <code>pytest -q tests/test_protagonist_agent.py</code>，<strong>14 passed</strong>；覆盖当前版目录布局、安装密钥派生 workspace、原子替换与恢复、相对路径、SHA 校验、跨用户/路径越界拒绝、预览与 Agent 数据库无正文、创建/读取/重新生成、ACL 先行、损坏文件失败关闭，以及删除预览、Agent、书籍时清理。</li><li>关联回归：<code>pytest -q tests/test_protagonist_agent.py tests/test_summary_duck.py tests/test_book_write_permissions.py</code>，<strong>35 passed</strong>。</li><li>完整后端：<code>pytest -q tests</code>，<strong>870 passed, 20 skipped</strong>；25 条既有弃用或 SQLAlchemy warning，无失败。</li><li>格式与静态检查：<code>make lint-py-fix</code>、<code>make lint-py</code>、<code>python3 -m compileall</code> 与 <code>git diff --check</code> 均通过。直接在宿主机运行 pytest 因缺少 Calibre 依赖失败，随后按项目约定在 <code>talebook/test</code> 镜像中完成上述验证，不把宿主机结果记为功能失败。</li><li>纯后端持久化变更，不改变页面、交互或前端响应字段，因此免 full interface review；现有用户界面继续消费相同 manifest JSON 契约。</li></ul></section>
+</main></body></html>

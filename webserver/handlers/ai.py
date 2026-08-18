@@ -5,6 +5,7 @@ import asyncio
 import datetime
 import hashlib
 import json
+import logging
 import os
 import uuid
 
@@ -13,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import AITask, ProtagonistAgent, ProtagonistConversation, ProtagonistMessage, ReadingState
+from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore
 from webserver.services.protagonist_agent import (
     CHAT_PROMPT_VERSION,
     CHAT_SCHEMA_VERSION,
@@ -346,10 +348,39 @@ class AITaskExport(_AITaskBase):
 
 
 class _ProtagonistBase(BaseHandler):
+    def _artifacts(self):
+        return AIArtifactStore.from_config(CONF, "agents")
+
     def _service(self):
         service = ProtagonistService()
         service.setup(self.settings["SessionMaker"], CONF)
         return service
+
+    @staticmethod
+    def _artifact_error():
+        return {"err": "ai.artifact_unavailable", "msg": "Agent 产物缺失或未通过完整性校验"}
+
+    def _preview_manifest(self, record):
+        ref = record.result_data or {}
+        if ref.get("artifact_status") != "ready":
+            raise AIArtifactError("preview artifact is not ready")
+        return self._artifacts().read_json(
+            record.creator_id,
+            ref.get("artifact_path", ""),
+            ref.get("artifact_sha256", ""),
+        )
+
+    def _agent_manifest(self, record):
+        if record.artifact_status != "ready":
+            raise AIArtifactError("agent artifact is not ready")
+        return self._artifacts().read_json(record.creator_id, record.manifest_path, record.manifest_sha256)
+
+    def _preview_dict(self, record):
+        manifest = self._preview_manifest(record) if record.status == "succeeded" else {}
+        return preview_dict(record, manifest)
+
+    def _agent_dict(self, record):
+        return agent_dict(record, self._agent_manifest(record))
 
     def _book(self, book_id, expected_version=""):
         try:
@@ -488,7 +519,11 @@ class ProtagonistPreviews(_ProtagonistBase):
             request_key_value = hashlib.sha256((request_key_value + uuid.uuid4().hex).encode("utf-8")).hexdigest()
         existing = self.session.query(AITask).filter(AITask.request_key == request_key_value).first()
         if existing:
-            return {"err": "ok", "preview": preview_dict(existing), "idempotent": True}
+            try:
+                payload = self._preview_dict(existing)
+            except AIArtifactError:
+                return self._artifact_error()
+            return {"err": "ok", "preview": payload, "idempotent": True}
         record = AITask(
             id=new_id(),
             request_key=request_key_value,
@@ -509,7 +544,7 @@ class ProtagonistPreviews(_ProtagonistBase):
         self.session.add(record)
         self.session.commit()
         self._service().submit_preview(record.id, evidence, requested_name)
-        return {"err": "ok", "preview": preview_dict(record), "idempotent": False}
+        return {"err": "ok", "preview": self._preview_dict(record), "idempotent": False}
 
 
 class ProtagonistPreviewItem(_ProtagonistBase):
@@ -520,7 +555,12 @@ class ProtagonistPreviewItem(_ProtagonistBase):
         if not record:
             return {"err": "ai.not_found", "msg": "预览不存在"}
         _book, error = self._book(record.book_id, record.book_version)
-        return error or {"err": "ok", "preview": preview_dict(record)}
+        if error:
+            return error
+        try:
+            return {"err": "ok", "preview": self._preview_dict(record)}
+        except AIArtifactError:
+            return self._artifact_error()
 
     @js
     @auth
@@ -528,10 +568,18 @@ class ProtagonistPreviewItem(_ProtagonistBase):
         record = self._own_preview(preview_id)
         if not record:
             return {"err": "ai.not_found", "msg": "预览不存在"}
+        artifact_ref = dict(record.result_data or {})
+        owner_id = record.creator_id
         if record.status in {"queued", "running"}:
             self._service().cancel(record.id)
         self.session.delete(record)
         self.session.commit()
+        if artifact_ref.get("artifact_path"):
+            try:
+                self._artifacts().delete(owner_id, artifact_ref["artifact_path"])
+            except AIArtifactError:
+                logging.exception("Failed to clean protagonist preview artifact preview_id=%s", preview_id)
+                return {"err": "ai.artifact_cleanup_failed", "msg": "预览已删除，但产物目录清理失败"}
         return {"err": "ok"}
 
 
@@ -543,7 +591,11 @@ class ProtagonistPreviewCancel(_ProtagonistBase):
         if not record:
             return {"err": "ai.not_found", "msg": "预览不存在"}
         if record.status not in {"queued", "running"}:
-            return {"err": "ok", "preview": preview_dict(record), "idempotent": True}
+            try:
+                payload = self._preview_dict(record)
+            except AIArtifactError:
+                return self._artifact_error()
+            return {"err": "ok", "preview": payload, "idempotent": True}
         record.cancel_requested = True
         record.progress_message = "正在取消"
         self.session.commit()
@@ -552,7 +604,7 @@ class ProtagonistPreviewCancel(_ProtagonistBase):
             record.status = "cancelled"
             record.finished_at = datetime.datetime.now()
             self.session.commit()
-        return {"err": "ok", "preview": preview_dict(record), "idempotent": False}
+        return {"err": "ok", "preview": self._preview_dict(record), "idempotent": False}
 
 
 class ProtagonistAgents(_ProtagonistBase):
@@ -571,7 +623,12 @@ class ProtagonistAgents(_ProtagonistBase):
         for record in records:
             _book, error = self._book(record.book_id, record.book_version)
             if not error:
-                visible.append(agent_dict(record))
+                try:
+                    visible.append(self._agent_dict(record))
+                except AIArtifactError:
+                    unavailable = agent_dict(record, {})
+                    unavailable["artifact_status"] = "unavailable"
+                    visible.append(unavailable)
         return {"err": "ok", "agents": visible}
 
     @js
@@ -587,24 +644,36 @@ class ProtagonistAgents(_ProtagonistBase):
         _book, error = self._book(preview.book_id, preview.book_version)
         if error:
             return error
-        manifest = dict(preview.result_data)
+        try:
+            manifest = self._preview_manifest(preview)
+        except AIArtifactError:
+            return self._artifact_error()
         context = preview.ai_draft or {}
+        agent_id = new_id()
+        write = self._artifacts().replace_json(self.user_id(), agent_id, manifest)
         record = ProtagonistAgent(
-            id=new_id(),
+            id=agent_id,
             creator_id=self.user_id(),
             book_id=preview.book_id,
             book_version=preview.book_version,
             display_name=manifest["display_name"],
-            manifest=manifest,
+            manifest_path=write.ref.relative_path,
+            manifest_sha256=write.ref.sha256,
+            artifact_status=write.ref.status,
             cutoff_href=preview.chapter_href,
             cutoff_title=preview.chapter_title,
             cutoff_index=int(context.get("cutoff_index", 0)),
             schema_version=preview.schema_version,
             prompt_version=preview.prompt_version,
         )
-        self.session.add(record)
-        self.session.commit()
-        return {"err": "ok", "agent": agent_dict(record)}
+        try:
+            self.session.add(record)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            self._artifacts().restore(self.user_id(), write)
+            raise
+        return {"err": "ok", "agent": agent_dict(record, manifest)}
 
 
 class ProtagonistAgentItem(_ProtagonistBase):
@@ -612,7 +681,12 @@ class ProtagonistAgentItem(_ProtagonistBase):
     @auth
     def get(self, agent_id):
         agent, _book, error = self._agent_access(agent_id)
-        return error or {"err": "ok", "agent": agent_dict(agent)}
+        if error:
+            return error
+        try:
+            return {"err": "ok", "agent": self._agent_dict(agent)}
+        except AIArtifactError:
+            return self._artifact_error()
 
     @js
     @auth
@@ -634,19 +708,28 @@ class ProtagonistAgentItem(_ProtagonistBase):
         ):
             return {"err": "ai.preview_required", "msg": "调整边界前需要生成并确认新的安全预览"}
         new_index = int((preview.ai_draft or {}).get("cutoff_index", 0))
-        manifest = dict(preview.result_data or {})
-        if not manifest:
-            return {"err": "ai.preview_required", "msg": "新的安全预览不可用"}
+        try:
+            manifest = self._preview_manifest(preview)
+        except AIArtifactError:
+            return self._artifact_error()
+        write = self._artifacts().replace_json(agent.creator_id, agent.id, manifest)
         agent.display_name = manifest["display_name"]
-        agent.manifest = manifest
+        agent.manifest_path = write.ref.relative_path
+        agent.manifest_sha256 = write.ref.sha256
+        agent.artifact_status = write.ref.status
         agent.cutoff_href = preview.chapter_href
         agent.cutoff_title = preview.chapter_title
         agent.cutoff_index = new_index
         agent.schema_version = preview.schema_version
         agent.prompt_version = preview.prompt_version
         agent.update_time = datetime.datetime.now()
-        self.session.commit()
-        return {"err": "ok", "agent": agent_dict(agent)}
+        try:
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            self._artifacts().restore(agent.creator_id, write)
+            raise
+        return {"err": "ok", "agent": agent_dict(agent, manifest)}
 
     @js
     @auth
@@ -654,6 +737,8 @@ class ProtagonistAgentItem(_ProtagonistBase):
         agent = self._own_agent(agent_id)
         if not agent:
             return {"err": "ai.not_found", "msg": "Agent 不存在"}
+        artifact_path = agent.manifest_path
+        owner_id = agent.creator_id
         conversation_ids = [row[0] for row in self.session.query(ProtagonistConversation.id).filter_by(agent_id=agent.id)]
         if conversation_ids:
             messages = self.session.query(ProtagonistMessage).filter(ProtagonistMessage.conversation_id.in_(conversation_ids))
@@ -665,6 +750,11 @@ class ProtagonistAgentItem(_ProtagonistBase):
             )
         self.session.delete(agent)
         self.session.commit()
+        try:
+            self._artifacts().delete(owner_id, artifact_path)
+        except AIArtifactError:
+            logging.exception("Failed to clean protagonist artifact agent_id=%s", agent_id)
+            return {"err": "ai.artifact_cleanup_failed", "msg": "Agent 已删除，但产物目录清理失败"}
         return {"err": "ok", "msg": "Agent、私有会话与反馈已删除"}
 
 
@@ -724,6 +814,10 @@ class ProtagonistMessages(_ProtagonistBase):
             content = validate_user_prompt(user_content)
         except ProtagonistValidationError as exc:
             return None, {"err": "params.invalid", "msg": str(exc)}
+        try:
+            manifest = self._agent_manifest(agent)
+        except AIArtifactError:
+            return None, self._artifact_error()
         previous = (
             self.session.query(ProtagonistMessage)
             .filter(
@@ -754,7 +848,7 @@ class ProtagonistMessages(_ProtagonistBase):
         conversation.update_time = datetime.datetime.now()
         self.session.add(record)
         self.session.commit()
-        self._service().submit_message(record.id, dict(agent.manifest or {}), history)
+        self._service().submit_message(record.id, manifest, history)
         return record, None
 
     @js

@@ -573,7 +573,7 @@ class AITask(Base, SQLAlchemyMixin):
 
 
 class ProtagonistAgent(Base, SQLAlchemyMixin):
-    """A creator-private, spoiler-bounded derived character manifest."""
+    """A creator-private index for a directory-backed person manifest."""
 
     __tablename__ = "protagonist_agents"
 
@@ -582,7 +582,9 @@ class ProtagonistAgent(Base, SQLAlchemyMixin):
     book_id = Column(Integer, nullable=False, index=True)
     book_version = Column(String(128), nullable=False)
     display_name = Column(String(200), nullable=False)
-    manifest = Column(MutableDict.as_mutable(JSONType), default={})
+    manifest_path = Column(String(1024), nullable=False)
+    manifest_sha256 = Column(String(64), nullable=False)
+    artifact_status = Column(String(24), default="ready", nullable=False, index=True)
     cutoff_href = Column(String(1024), nullable=False)
     cutoff_title = Column(String(512), default="")
     cutoff_index = Column(Integer, nullable=False)

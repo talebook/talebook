@@ -1,4 +1,5 @@
 import json
+import shutil
 import tempfile
 import unittest
 import zipfile
@@ -7,6 +8,8 @@ from unittest import mock
 
 from tests import test_main
 from webserver import models
+from webserver.handlers import ai as ai_handlers
+from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore, workspace_id
 from webserver.services.protagonist_agent import (
     CHAT_SCHEMA_VERSION,
     ProtagonistService,
@@ -98,9 +101,60 @@ class ProtagonistEvidenceTest(unittest.TestCase):
         self.assertEqual(validate_user_prompt("A &amp; B 的选择"), "A & B 的选择")
 
 
+class AIArtifactStoreTest(unittest.TestCase):
+    def test_current_manifest_is_atomic_private_and_integrity_checked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = AIArtifactStore(directory, "agents")
+            first = store.replace_json(7, "agent-1", {"display_name": "林舟"})
+            second = store.replace_json(7, "agent-1", {"display_name": "阿宁"})
+
+            self.assertEqual(first.ref.relative_path, second.ref.relative_path)
+            self.assertEqual(first.ref.relative_path, f"{workspace_id(7)}/agents/agent-1/manifest.json")
+            self.assertNotIn("v1", first.ref.relative_path)
+            self.assertEqual(store.read_json(7, second.ref.relative_path, second.ref.sha256)["display_name"], "阿宁")
+            with self.assertRaises(AIArtifactError):
+                store.read_json(8, second.ref.relative_path, second.ref.sha256)
+            with self.assertRaises(AIArtifactError):
+                store.read_json(7, "../agents/agent-1/manifest.json", second.ref.sha256)
+
+            path = Path(directory, second.ref.relative_path)
+            path.write_text('{"display_name":"tampered"}\n', encoding="utf-8")
+            with self.assertRaisesRegex(AIArtifactError, "integrity"):
+                store.read_json(7, second.ref.relative_path, second.ref.sha256)
+
+    def test_restore_and_delete_keep_database_relative_paths_portable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = AIArtifactStore(directory, "agents")
+            first = store.replace_json(7, "agent-1", {"display_name": "林舟"})
+            replacement = store.replace_json(7, "agent-1", {"display_name": "阿宁"})
+            store.restore(7, replacement)
+            self.assertEqual(store.read_json(7, first.ref.relative_path, first.ref.sha256)["display_name"], "林舟")
+            with tempfile.TemporaryDirectory() as migrated_directory:
+                shutil.copytree(directory, migrated_directory, dirs_exist_ok=True)
+                migrated = AIArtifactStore(migrated_directory, "agents")
+                self.assertEqual(
+                    migrated.read_json(7, first.ref.relative_path, first.ref.sha256)["display_name"],
+                    "林舟",
+                )
+            store.delete(7, first.ref.relative_path)
+            self.assertFalse(Path(directory, first.ref.relative_path).exists())
+
+
 class ProtagonistAPITest(test_main.TestWithUserLogin):
     def setUp(self):
         super().setUp()
+        self.artifact_directory = tempfile.TemporaryDirectory()
+        self.artifact_config = mock.patch.dict(
+            ai_handlers.CONF,
+            {"AI_ARTIFACT_ROOT": self.artifact_directory.name},
+        )
+        self.artifact_config.start()
+        self.workspace_secret = ai_handlers.CONF.get("cookie_secret") or "cookie_secret"
+        self.artifacts = AIArtifactStore(
+            self.artifact_directory.name,
+            "agents",
+            workspace_secret=self.workspace_secret,
+        )
         session = test_main.get_db()
         session.query(models.ProtagonistMessage).delete()
         session.query(models.ProtagonistConversation).delete()
@@ -118,6 +172,8 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         session.query(models.ProtagonistAgent).delete()
         session.query(models.AITask).filter(models.AITask.feature == "protagonist_manifest").delete()
         session.commit()
+        self.artifact_config.stop()
+        self.artifact_directory.cleanup()
         super().tearDown()
 
     def _json_post(self, url, body):
@@ -133,8 +189,11 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         session = test_main.get_db()
         preview = session.get(models.AITask, response["preview"]["id"])
         preview.status = "succeeded"
-        preview.result_data = manifest_payload(1 if cutoff == CHAPTERS[0]["href"] else 2)
+        manifest = manifest_payload(1 if cutoff == CHAPTERS[0]["href"] else 2)
+        write = self.artifacts.replace_json(preview.creator_id, preview.id, manifest, preview=True)
+        preview.result_data = write.ref.to_dict()
         session.commit()
+        self.assertEqual(set(preview.result_data), {"artifact_path", "artifact_sha256", "artifact_status"})
         return preview.id
 
     def _create_agent(self, cutoff=CHAPTERS[1]["href"]):
@@ -157,6 +216,17 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
 
     def test_preview_confirm_conversation_message_feedback_and_delete(self):
         agent = self._create_agent()
+        session = test_main.get_db()
+        agent_record = session.get(models.ProtagonistAgent, agent["id"])
+        artifact_path = agent_record.manifest_path
+        persisted_manifest = self.artifacts.read_json(
+            agent_record.creator_id,
+            artifact_path,
+            agent_record.manifest_sha256,
+        )
+        self.assertEqual(persisted_manifest["display_name"], agent["display_name"])
+        self.assertNotIn("manifest", agent_record.__table__.columns)
+        self.assertTrue(artifact_path.startswith(f"{workspace_id(agent_record.creator_id, self.workspace_secret)}/agents/"))
         conversation = self._json_post(f"/api/ai/protagonist/agents/{agent['id']}/conversations", {})["conversation"]
         with mock.patch.object(ProtagonistService, "submit_message"):
             response = self._json_post(
@@ -177,10 +247,46 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         self.assertEqual(feedback["message"]["feedback"], "not_like")
         removed = self.json(f"/api/ai/protagonist/agents/{agent['id']}", method="DELETE")
         self.assertEqual(removed["err"], "ok")
-        session = test_main.get_db()
+        self.assertFalse(Path(self.artifact_directory.name, artifact_path).exists())
+        session.expire_all()
         self.assertIsNone(session.get(models.ProtagonistAgent, agent["id"]))
         self.assertIsNone(session.get(models.ProtagonistConversation, conversation["id"]))
         self.assertIsNone(session.get(models.ProtagonistMessage, message_id))
+
+    def test_corrupt_manifest_fails_closed_after_acl_checks(self):
+        agent = self._create_agent()
+        session = test_main.get_db()
+        record = session.get(models.ProtagonistAgent, agent["id"])
+        Path(self.artifact_directory.name, record.manifest_path).write_text("{}\n", encoding="utf-8")
+
+        response = self.json(f"/api/ai/protagonist/agents/{agent['id']}")
+        self.assertEqual(response["err"], "ai.artifact_unavailable")
+        with mock.patch("webserver.handlers.ai._ProtagonistBase.can_view_book", return_value=False):
+            hidden = self.json(f"/api/ai/protagonist/agents/{agent['id']}")
+        self.assertEqual(hidden["err"], "book.not_found")
+
+    def test_book_delete_cleans_agent_and_preview_artifacts(self):
+        self._create_preview()
+        agent = self._create_agent()
+        session = test_main.get_db()
+        artifact_paths = [
+            row.result_data["artifact_path"]
+            for row in session.query(models.AITask).filter(
+                models.AITask.book_id == test_main.BID_EPUB,
+                models.AITask.feature == "protagonist_manifest",
+            )
+            if (row.result_data or {}).get("artifact_path")
+        ]
+        agent_record = session.get(models.ProtagonistAgent, agent["id"])
+        artifact_paths.append(agent_record.manifest_path)
+
+        with mock.patch.object(self._app.settings["legacy"], "delete_book"):
+            with test_main.mock_permission():
+                response = self.json(f"/api/book/{test_main.BID_EPUB}/delete", method="POST", body="")
+
+        self.assertEqual(response["err"], "ok")
+        for relative_path in artifact_paths:
+            self.assertFalse(Path(self.artifact_directory.name, relative_path).exists())
 
     def test_agent_model_can_be_regenerated_without_spoiler_confirmation(self):
         agent = self._create_agent(CHAPTERS[0]["href"])
