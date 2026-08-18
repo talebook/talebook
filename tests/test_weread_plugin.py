@@ -1,6 +1,7 @@
+import json
 from types import SimpleNamespace
-import zipfile
 import urllib.error
+import zipfile
 
 import pytest
 from sqlalchemy import create_engine
@@ -18,10 +19,12 @@ from webserver.models import (
 from webserver.plugins.runtime import (
     WEREAD_PLUGIN_KEY,
     ProviderAuthError,
+    ProviderError,
     ProviderRateLimitError,
     WereadProvider,
     parse_weread_export,
 )
+from webserver.plugins.runtime.weread import validate_weread_query
 from webserver.services.plugin_runtime import PluginRuntime, install_builtin, save_connection
 from webserver.services.weread_annotations import confirm_match, locate_epub_quote, normalize_text
 
@@ -159,6 +162,101 @@ def test_gateway_maps_auth_and_rate_limit_errors_without_leaking_key(status, err
     with pytest.raises(error_type) as exc:
         provider._gateway("wrk-do-not-leak", "/user/notebooks", count=1)
     assert "wrk-do-not-leak" not in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    ("operation", "params", "api_name"),
+    [
+        ("search", {"keyword": "三体", "scope": 10, "count": 20, "maxIdx": 0}, "/store/search"),
+        ("book_info", {"bookId": "book-1"}, "/book/info"),
+        ("chapters", {"bookId": "book-1"}, "/book/chapterinfo"),
+        ("progress", {"bookId": "book-1"}, "/book/getprogress"),
+        ("shelf", {}, "/shelf/sync"),
+        ("statistics", {"mode": "monthly", "baseTime": 0}, "/readdata/detail"),
+        ("notebooks", {"count": 20, "lastSort": 0}, "/user/notebooks"),
+        ("highlights", {"bookId": "book-1"}, "/book/bookmarklist"),
+        ("my_reviews", {"bookid": "book-1", "synckey": 0, "count": 20}, "/review/list/mine"),
+        (
+            "popular_highlights",
+            {"bookId": "book-1", "chapterUid": 1, "synckey": 0},
+            "/book/bestbookmarks",
+        ),
+        ("underline_stats", {"bookId": "book-1", "chapterUid": 1, "synckey": 0}, "/book/underlines"),
+        (
+            "highlight_reviews",
+            {"bookId": "book-1", "chapterUid": 1, "reviews": [{"range": "10-20", "count": 20}]},
+            "/book/readreviews",
+        ),
+        (
+            "review_detail",
+            {
+                "reviewId": "review-1",
+                "commentsCount": 20,
+                "commentsDirection": 0,
+                "likesCount": 20,
+                "likesDirection": 1,
+                "synckey": 0,
+            },
+            "/review/single",
+        ),
+        (
+            "public_reviews",
+            {"bookId": "book-1", "reviewListType": 0, "count": 20, "maxIdx": 0, "synckey": 0},
+            "/review/list",
+        ),
+        ("recommendations", {"count": 20, "maxIdx": 0}, "/book/recommend"),
+        ("similar", {"bookId": "book-1", "count": 20, "maxIdx": 0, "sessionId": "session-1"}, "/book/similar"),
+        ("friends_reading", {"count": 20, "maxIdx": 0, "synckey": 0}, "/discover/interact/type3"),
+    ],
+)
+def test_query_allowlist_forwards_all_documented_read_operations_without_serializing_key(operation, params, api_name):
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"errcode":0,"items":[]}'
+
+    def opener(request, timeout):
+        captured["body"] = json.loads(request.data)
+        captured["authorization"] = request.get_header("Authorization")
+        captured["timeout"] = timeout
+        return Response()
+
+    result = WereadProvider(opener=opener).query("wrk-unit-test-secret", operation, params)
+
+    assert result["errcode"] == 0
+    assert captured["body"] == {"api_name": api_name, "skill_version": "1.0.4", **params}
+    assert "wrk-unit-test-secret" not in json.dumps(captured["body"])
+    assert captured["authorization"] == "Bearer wrk-unit-test-secret"
+    assert captured["timeout"] == 30
+
+
+@pytest.mark.parametrize(
+    ("operation", "params"),
+    [
+        ("write_note", {}),
+        ("search", {}),
+        ("shelf", []),
+        ("search", {"keyword": "x", "unexpected": 1}),
+        ("search", {"keyword": "x", "scope": 99}),
+        ("recommendations", {"count": 101}),
+        ("review_detail", {"reviewId": "r1", "commentsCount": 21}),
+        ("highlight_reviews", {"bookId": "b1", "chapterUid": 1, "reviews": []}),
+        (
+            "highlight_reviews",
+            {"bookId": "b1", "chapterUid": 1, "reviews": [{"range": "1-2", "unknown": 1}]},
+        ),
+    ],
+)
+def test_query_validation_rejects_writes_unknown_parameters_and_out_of_range_values(operation, params):
+    with pytest.raises(ProviderError):
+        validate_weread_query(operation, params)
 
 
 def test_normalization_handles_fullwidth_case_and_spacing():

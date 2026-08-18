@@ -7,18 +7,27 @@ test.describe('Plugin management', () => {
         await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
     });
 
-    test('shows four business tabs and reuses one installation across capabilities', async ({ page }) => {
+    test('shows five business tabs and opens the WeRead integration workbench', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
         const catalogPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/plugins'));
         await page.goto('/admin/plugins');
         await catalogPromise;
 
+        await expect(page.getByRole('tab', { name: '综合服务' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '元数据' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '笔记（含章评）' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '评价' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '书源' })).toBeVisible();
         await expect(page.getByText('Talebook 元数据')).toBeVisible();
 
+        await page.getByRole('tab', { name: '综合服务' }).click();
+        const weread = page.locator('.plugin-card').filter({ hasText: '微信读书' });
+        await expect(weread).toBeVisible();
+        await weread.getByRole('button', { name: '打开工作台' }).click();
+        await expect(page).toHaveURL(/\/plugins\/weread/);
+        await expect(page.getByRole('heading', { name: '微信读书工作台' })).toBeVisible();
+
+        await page.goto('/admin/plugins?tab=book_sources');
         await page.getByRole('tab', { name: '书源' }).click();
         await expect(page.getByText('Generic OPDS')).toBeVisible();
         await expect(page.getByText('Legado 在线书源')).toBeVisible();

@@ -10,10 +10,14 @@
                 <span v-if="!loading" class="annotation-panel__count">{{ filteredAnnotations.length }}</span>
             </h2>
             <div class="d-flex align-center ga-1">
-                <WeReadImportDialog
-                    :backend="backend"
-                    @imported="loadAnnotations"
-                />
+                <v-btn
+                    size="small"
+                    variant="tonal"
+                    prepend-icon="mdi-book-open-page-variant"
+                    to="/plugins/weread?tab=notes"
+                >
+                    {{ t('weread.open') }}
+                </v-btn>
                 <v-btn
                     icon="mdi-refresh"
                     size="small"
@@ -199,7 +203,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import WeReadImportDialog from '~/components/WeReadImportDialog.vue';
 
 const props = defineProps({
     bookId: { type: [Number, String], required: true },

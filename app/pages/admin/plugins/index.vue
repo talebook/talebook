@@ -350,6 +350,7 @@ const store = useMainStore();
 store.setNavbar(true);
 
 const tabs = computed(() => [
+    { value: 'integrations', label: t('pluginManagement.tabIntegrations') },
     { value: 'metadata', label: t('pluginManagement.tabMetadata') },
     { value: 'annotations', label: t('pluginManagement.tabAnnotations') },
     { value: 'reviews', label: t('pluginManagement.tabReviews') },
@@ -429,6 +430,13 @@ function healthLabel(value) {
 function capabilityLabel(value) {
     const labels = {
         'metadata.lookup': t('pluginManagement.capMetadata'),
+        'integrations.search': t('pluginManagement.capSearch'),
+        'integrations.books': t('pluginManagement.capBooks'),
+        'integrations.shelf': t('pluginManagement.capShelf'),
+        'integrations.statistics': t('pluginManagement.capStatistics'),
+        'integrations.community': t('pluginManagement.capCommunity'),
+        'integrations.recommendations': t('pluginManagement.capRecommendations'),
+        'annotations.import': t('pluginManagement.capAnnotationsImport'),
         'book_sources.browse': t('pluginManagement.capBrowse'),
         'book_sources.search': t('pluginManagement.capSearch'),
         'book_sources.acquire': t('pluginManagement.capAcquire'),
@@ -455,6 +463,7 @@ function primaryActionLabel(plugin) {
     if (plugin.ui.manage_kind === 'opds') return t('pluginManagement.browse');
     if (plugin.ui.manage_kind === 'legado') return t('pluginManagement.manage');
     if (plugin.ui.manage_kind === 'metadata') return t('pluginManagement.configure');
+    if (plugin.ui.manage_kind === 'weread') return t('pluginManagement.openWorkbench');
     return t('pluginManagement.details');
 }
 
@@ -464,6 +473,7 @@ async function primaryAction(plugin) {
     if (plugin.ui.manage_kind === 'opds') return opdsDialog.value?.open();
     if (plugin.ui.manage_kind === 'legado') return openLegado();
     if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/settings#metadata');
+    if (plugin.ui.manage_kind === 'weread') return navigateTo('/plugins/weread');
     openDetails(plugin);
 }
 

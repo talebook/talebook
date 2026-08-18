@@ -14,6 +14,8 @@ test.describe('WeRead annotation import', () => {
         await page.goto('/book/1/annotations');
         await expect(page.getByText('这是从微信读书导入的章节级笔记。')).toBeVisible();
 
+        await page.getByRole('link', { name: '微信读书' }).click();
+        await expect(page).toHaveURL(/\/plugins\/weread\?tab=notes/);
         await page.getByRole('button', { name: '导入微信读书' }).click();
         const dialog = page.getByRole('dialog');
         await expect(dialog.getByText('微信读书官方目前只提供书签数量')).toBeVisible();
@@ -35,6 +37,7 @@ test.describe('WeRead annotation import', () => {
         await page.screenshot({ path: testInfo.outputPath('weread-import.png'), fullPage: true });
 
         await dialog.getByRole('button', { name: '关闭' }).click();
+        await page.goto('/book/1/annotations');
         await expect(page.getByText('人是为活着本身而活着的')).toBeVisible();
         await expect(page.getByText('仅章节定位').last()).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);

@@ -14,9 +14,156 @@ from .protocol import (
 )
 
 
-WEREAD_PLUGIN_KEY = "talebook.annotations.weread"
+WEREAD_PLUGIN_KEY = "talebook.weread"
 WEREAD_GATEWAY = "https://i.weread.qq.com/api/agent/gateway"
 WEREAD_SKILL_VERSION = "1.0.4"
+
+WEREAD_QUERY_OPERATIONS = {
+    "search": {
+        "api_name": "/store/search",
+        "required": {"keyword"},
+        "params": {"keyword": "text", "scope": "scope", "maxIdx": "index", "count": "count"},
+    },
+    "book_info": {"api_name": "/book/info", "required": {"bookId"}, "params": {"bookId": "id"}},
+    "chapters": {"api_name": "/book/chapterinfo", "required": {"bookId"}, "params": {"bookId": "id"}},
+    "progress": {"api_name": "/book/getprogress", "required": {"bookId"}, "params": {"bookId": "id"}},
+    "shelf": {"api_name": "/shelf/sync", "required": set(), "params": {}},
+    "statistics": {
+        "api_name": "/readdata/detail",
+        "required": set(),
+        "params": {"mode": "mode", "baseTime": "timestamp"},
+    },
+    "notebooks": {
+        "api_name": "/user/notebooks",
+        "required": set(),
+        "params": {"count": "count", "lastSort": "timestamp"},
+    },
+    "highlights": {"api_name": "/book/bookmarklist", "required": {"bookId"}, "params": {"bookId": "id"}},
+    "my_reviews": {
+        "api_name": "/review/list/mine",
+        "required": {"bookid"},
+        "params": {"bookid": "id", "synckey": "index", "count": "count"},
+    },
+    "popular_highlights": {
+        "api_name": "/book/bestbookmarks",
+        "required": {"bookId"},
+        "params": {"bookId": "id", "chapterUid": "index", "synckey": "index"},
+    },
+    "underline_stats": {
+        "api_name": "/book/underlines",
+        "required": {"bookId", "chapterUid"},
+        "params": {"bookId": "id", "chapterUid": "index", "synckey": "index"},
+    },
+    "highlight_reviews": {
+        "api_name": "/book/readreviews",
+        "required": {"bookId", "chapterUid", "reviews"},
+        "params": {"bookId": "id", "chapterUid": "index", "reviews": "reviews"},
+    },
+    "review_detail": {
+        "api_name": "/review/single",
+        "required": {"reviewId"},
+        "params": {
+            "reviewId": "id",
+            "commentsCount": "small_count",
+            "commentsDirection": "direction",
+            "likesCount": "small_count",
+            "likesDirection": "direction",
+            "synckey": "index",
+        },
+    },
+    "public_reviews": {
+        "api_name": "/review/list",
+        "required": {"bookId"},
+        "params": {
+            "bookId": "id",
+            "reviewListType": "review_type",
+            "count": "count",
+            "maxIdx": "index",
+            "synckey": "index",
+        },
+    },
+    "recommendations": {
+        "api_name": "/book/recommend",
+        "required": set(),
+        "params": {"count": "count", "maxIdx": "index"},
+    },
+    "similar": {
+        "api_name": "/book/similar",
+        "required": {"bookId"},
+        "params": {"bookId": "id", "count": "count", "maxIdx": "index", "sessionId": "id"},
+    },
+    "friends_reading": {
+        "api_name": "/discover/interact/type3",
+        "required": set(),
+        "params": {"count": "count", "maxIdx": "index", "synckey": "index"},
+    },
+}
+
+
+def _validate_query_value(name, value, kind):
+    if kind in {"text", "id"}:
+        if not isinstance(value, str) or not value.strip():
+            raise ProviderError("WeRead query parameter %s must be a non-empty string" % name)
+        limit = 200 if kind == "text" else 128
+        if len(value) > limit:
+            raise ProviderError("WeRead query parameter %s is too long" % name)
+        return value.strip()
+    if kind == "reviews":
+        if not isinstance(value, list) or not 1 <= len(value) <= 20:
+            raise ProviderError("WeRead reviews must contain between 1 and 20 ranges")
+        result = []
+        for item in value:
+            if not isinstance(item, dict) or not isinstance(item.get("range"), str) or not item["range"].strip():
+                raise ProviderError("Each WeRead review range must be a non-empty string")
+            unknown = set(item) - {"range", "maxIdx", "count", "synckey"}
+            if unknown:
+                raise ProviderError("Unknown WeRead review range parameters: %s" % ", ".join(sorted(unknown)))
+            if len(item["range"]) > 100:
+                raise ProviderError("WeRead review range is too long")
+            safe = {"range": item["range"].strip()}
+            for key in ("maxIdx", "count", "synckey"):
+                if key in item:
+                    safe[key] = _validate_query_value(key, item[key], "small_count" if key == "count" else "index")
+            result.append(safe)
+        return result
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ProviderError("WeRead query parameter %s must be an integer" % name)
+    if kind == "scope" and value not in {0, 2, 4, 6, 10, 12, 13, 14, 16}:
+        raise ProviderError("Unsupported WeRead search scope")
+    if kind == "mode":
+        raise ProviderError("WeRead statistics mode must be a string")
+    if kind == "direction" and value not in {0, 1}:
+        raise ProviderError("Unsupported WeRead sort direction")
+    if kind == "review_type" and value not in {0, 1, 2, 3, 4}:
+        raise ProviderError("Unsupported WeRead review type")
+    maximum = 20 if kind == "small_count" else 100 if kind == "count" else 2**63 - 1
+    if value < 0 or value > maximum:
+        raise ProviderError("WeRead query parameter %s is outside the allowed range" % name)
+    return value
+
+
+def validate_weread_query(operation, params):
+    spec = WEREAD_QUERY_OPERATIONS.get(operation)
+    if spec is None:
+        raise ProviderError("Unsupported WeRead read operation")
+    if not isinstance(params, dict):
+        raise ProviderError("WeRead query parameters must be an object")
+    unknown = set(params) - set(spec["params"])
+    missing = spec["required"] - set(params)
+    if unknown:
+        raise ProviderError("Unknown WeRead query parameters: %s" % ", ".join(sorted(unknown)))
+    if missing:
+        raise ProviderError("Missing WeRead query parameters: %s" % ", ".join(sorted(missing)))
+    safe = {}
+    for name, value in params.items():
+        kind = spec["params"][name]
+        if kind == "mode":
+            if value not in {"weekly", "monthly", "annually", "overall"}:
+                raise ProviderError("Unsupported WeRead statistics mode")
+            safe[name] = value
+        else:
+            safe[name] = _validate_query_value(name, value, kind)
+    return spec["api_name"], safe
 
 
 def _as_list(value):
@@ -176,10 +323,18 @@ class WereadProvider:
     manifest = {
         "protocol_version": PROTOCOL_VERSION,
         "id": WEREAD_PLUGIN_KEY,
-        "name": "微信读书笔记",
-        "version": "1.0.0",
-        "categories": ["annotations", "reviews"],
-        "capabilities": ["annotations.import", "reviews.import"],
+        "name": "微信读书",
+        "version": "1.1.0",
+        "categories": ["integrations", "annotations"],
+        "capabilities": [
+            "integrations.search",
+            "integrations.books",
+            "integrations.shelf",
+            "integrations.statistics",
+            "integrations.community",
+            "integrations.recommendations",
+            "annotations.import",
+        ],
         "runtime_kind": "builtin",
         "actions": ["test", "preview", "run", "retry", "rollback"],
         "auth_schema": {
@@ -193,13 +348,13 @@ class WereadProvider:
                 "backoff_seconds": {"type": "number", "minimum": 0},
             },
         },
-        "permissions": ["books.read", "annotations.write"],
+        "permissions": ["books.read", "profile.read", "annotations.write"],
         "data_policy": {"stores_full_text": True, "retention": "user_controlled"},
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": "https://github.com/Tencent/WeChatReading",
         "license": "GPL-3.0",
-        "description": "从官方 API Key 或导出 JSON 导入个人划线、想法和书评。",
-        "ui": {"manage_kind": "weread"},
+        "description": "搜索微信读书内容，浏览书架、阅读统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。",
+        "ui": {"manage_kind": "weread", "icon": "mdi-book-open-page-variant"},
     }
 
     def __init__(self, gateway=WEREAD_GATEWAY, opener=None):
@@ -228,6 +383,12 @@ class WereadProvider:
         timestamps = [item.remote_updated_at for item in items if item.remote_updated_at]
         cursor = {"last_sync_at": max(timestamps)} if timestamps else dict(context.get("cursor") or {})
         return ProviderResult(items=items, next_cursor=cursor, health_message=health)
+
+    def query(self, api_key, operation, params=None):
+        if not api_key:
+            raise ProviderAuthError("WeRead API key is required")
+        api_name, safe_params = validate_weread_query(operation, {} if params is None else params)
+        return self._gateway(api_key, api_name, **safe_params)
 
     def _fetch_all(self, api_key):
         notebooks = []

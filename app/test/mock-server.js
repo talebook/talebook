@@ -28,6 +28,7 @@ let annotationsByBookId = new Map();
 let annotationPermissionDenied = false;
 let annotationPartialRollback = false;
 let wereadRunId = 500;
+let wereadConfigured = false;
 let activeThemeName = '';
 let audiobookPublishedEdition = null;
 let audiobookJobs = [];
@@ -177,6 +178,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   annotationPermissionDenied = !!body?.annotationPermissionDenied;
   annotationPartialRollback = !!body?.annotationPartialRollback;
   wereadRunId = 500;
+  wereadConfigured = false;
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
@@ -1425,9 +1427,50 @@ router.delete('/api/annotations', eventHandler((event) => {
   return { err: 'ok', sources_deleted: deleted, annotations_deleted: 0 };
 }));
 
+router.get('/api/plugins/weread', eventHandler(() => ({
+  err: 'ok',
+  connection: wereadConfigured ? { id: 88, secret: { configured: true, mask: '••••test' } } : null,
+  operations: ['search', 'book_info', 'chapters', 'progress', 'shelf', 'statistics', 'notebooks', 'highlights', 'my_reviews', 'popular_highlights', 'underline_stats', 'highlight_reviews', 'review_detail', 'public_reviews', 'recommendations', 'similar', 'friends_reading'],
+  read_only: true,
+  skill_version: '1.0.4',
+})));
+
+router.post('/api/plugins/weread/query', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body?.api_key) wereadConfigured = true;
+  const connection = { id: 88, secret: { configured: true, mask: '••••test' } };
+  const data = {
+    search: {
+      hasMore: 0,
+      results: [{ title: '电子书', books: [{ bookInfo: { bookId: '3300045871', title: '活着', author: '余华', newRating: 92, deepLink: 'weread://bookDetail?bookId=3300045871' } }] }],
+    },
+    shelf: {
+      books: [{ bookId: '3300045871', title: '活着', author: '余华', finishReading: 1, secret: 0 }],
+      albums: [{ albumInfo: { albumId: 'audio-1', name: '三体广播剧', authorName: '刘慈欣', finishStatus: '已完结' }, albumInfoExtra: { secret: 1 } }],
+      mp: { show: 1 },
+    },
+    statistics: { totalReadTime: 7260, readDays: 4, dayAverageReadTime: 1815, readStat: [{ stat: '读过', counts: '3本' }] },
+    notebooks: { totalBookCount: 1, totalNoteCount: 3, books: [{ bookId: '3300045871', book: { title: '活着', author: '余华' }, noteCount: 1, reviewCount: 1, bookmarkCount: 1 }] },
+    book_info: { bookId: '3300045871', title: '活着', author: '余华', publisher: '作家出版社', intro: '关于活着本身的故事。' },
+    chapters: { chapters: [{ chapterUid: 12, title: '第一章' }] },
+    progress: { book: { progress: 68, recordReadingTime: 3600 } },
+    highlights: { updated: [{ bookmarkId: 'b1', markText: '人是为活着本身而活着的' }] },
+    my_reviews: { reviews: [{ reviewId: 'r1', review: { content: '这句话值得反复读' } }] },
+    popular_highlights: { items: [{ bookmarkId: 'p1', chapterUid: 12, range: '10-20', markText: '最初我们来到这个世界', totalCount: 128 }] },
+    underline_stats: { underlines: [{ range: '10-20', count: 128, score: 99 }] },
+    highlight_reviews: { reviews: [{ range: '10-20', pageReviews: [{ reviewId: 'thought-1', review: { content: '这句话很有力量', author: { name: '读者乙' } } }] }] },
+    review_detail: { reviewId: 'thought-1', review: { content: '这句话很有力量', author: { name: '读者乙' } } },
+    public_reviews: { reviews: [{ review: { reviewId: 'pr1', review: { content: '很有力量的一本书', author: { name: '读者甲' } } } }] },
+    recommendations: { books: [{ bookId: 'book-2', title: '许三观卖血记', author: '余华', reason: '相似主题' }] },
+    similar: { booksimilar: { books: [{ book: { bookInfo: { bookId: 'book-3', title: '兄弟', author: '余华' } } }] } },
+    friends_reading: { items: [{ book: { bookId: 'book-4', title: '三体', author: '刘慈欣' } }] },
+  }[body?.operation] || {};
+  return { err: 'ok', connection, data };
+}));
+
 router.get('/api/plugins/weread/import', eventHandler(() => ({
   err: 'ok',
-  connection: null,
+  connection: wereadConfigured ? { id: 88, secret: { configured: true, mask: '••••test' } } : null,
   runs: [],
 })));
 
@@ -1435,6 +1478,7 @@ router.post('/api/plugins/weread/import', eventHandler(async (event) => {
   const body = await readBody(event);
   wereadRunId += 1;
   if (body?.action === 'test') {
+    wereadConfigured = true;
     return {
       err: 'ok',
       connection: { id: 88, secret: { configured: true, mask: '••••test' } },
@@ -1537,6 +1581,19 @@ const pluginDefinitions = [
     actions: ['test'],
     permissions: ['books.read', 'books.write', 'network.read'],
     ui: { icon: 'mdi-book-cog-outline', manage_kind: 'legado', primary_action: 'manage' },
+  },
+  {
+    id: 4,
+    plugin_key: 'talebook.weread',
+    name: '微信读书',
+    description: '搜索、书架、统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。',
+    version: '1.1.0',
+    runtime_kind: 'builtin',
+    categories: ['integrations', 'annotations'],
+    capabilities: ['integrations.search', 'integrations.books', 'integrations.shelf', 'integrations.statistics', 'integrations.community', 'integrations.recommendations', 'annotations.import'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    permissions: ['books.read', 'profile.read', 'annotations.write'],
+    ui: { icon: 'mdi-book-open-page-variant', manage_kind: 'weread' },
   },
 ];
 let pluginInstallations = pluginDefinitions.map((definition, index) => ({
