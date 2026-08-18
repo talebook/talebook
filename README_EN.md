@@ -49,7 +49,7 @@ Docker is the recommended deployment method. Images are published to both [Docke
 It is recommended to use `docker-compose`, download the configuration file [docker-compose.yml](docker-compose.yml) from the repository, and then execute the command to start.
 If you want to modify the mounted directories or ports, please modify the docker-compose.yml file.
 
-By default, the Compose file keeps Talebook settings, the user database, and the library together in `data/` next to `docker-compose.yml`. Rebuilding or replacing the container does not remove those files. Back up this directory regularly, and do not keep long-lived data under `/tmp`, which the host may clean. To use another location, set an absolute path in a colocated `.env` file:
+By default, the Compose file keeps Talebook settings, the user database, the library, and AI artifacts under `data/books/ai/` together in `data/` next to `docker-compose.yml`. Back up or migrate that directory as one unit; copying only the database leaves AI artifact indexes without their files. Rebuilding or replacing the container does not remove these files. Do not keep long-lived data under `/tmp`, which the host may clean. To use another location, set an absolute path in a colocated `.env` file:
 
 ```dotenv
 TALEBOOK_DATA_DIR=/path/to/talebook-data

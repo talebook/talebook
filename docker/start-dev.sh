@@ -40,7 +40,7 @@ find . \( -path ./library -o -name '*.pyc' \) -prune -o -type f -print | while r
 done
 
 
-mkdir -p /root/.npm /run/talebook /data/books/ssl
+mkdir -p /root/.npm /run/talebook /data/books/ssl /data/books/ai
 
 # 设置PUID/GUID权限
 permission_file=/data/.permission
@@ -52,7 +52,7 @@ if [ "x$permission" != "x$PUID:$PGID" ]; then
     echo "$PUID:$PGID" > $permission_file
 else
     # settings 目录体积很小；标记命中时仍定向修复，避免宿主目录重建或预置文件复制后属主失真。
-    chown -R talebook:talebook /data/books/settings || exit 1
+    chown -R talebook:talebook /data/books/settings /data/books/ai || exit 1
 fi
 
 # 设置系统文件的权限
@@ -60,6 +60,7 @@ fi
 chown talebook:talebook /var/www/talebook/app
 chown -R talebook:talebook \
   /run/talebook \
+  /data/books/ai \
   /data/books/ssl \
   /data/log/ \
   /var/lib/nginx \
@@ -97,7 +98,7 @@ check_atomic_write() {
     ' talebook-write-check "$directory"
 }
 
-for directory in /data/books/library /data/books/settings; do
+for directory in /data/books/library /data/books/settings /data/books/ai; do
     if ! check_atomic_write "$directory"; then
         echo "目录权限异常，无法以 PUID/PGID 原子写入 $directory"
         exit 1

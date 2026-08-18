@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="TB-55 知识图谱目录产物存储跟进方案" />
+    <link rel="icon" href="data:," />
+    <title>知识图谱改用目录产物存储 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#f4f7f5; --panel:#fff; --ink:#17312d; --muted:#526762; --line:#cbd9d5; --accent:#b84d28; --soft:#fff0e9; --ok:#176b4c; --code:#132722; }
+      * { box-sizing: border-box; }
+      body { margin:0; color:var(--ink); background:linear-gradient(145deg,#edf5f1,var(--bg)); font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif; }
+      main { width:min(1040px,calc(100vw - 28px)); margin:24px auto 56px; }
+      header,section { margin-bottom:16px; padding:24px 28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 10px 28px rgba(23,49,45,.07); }
+      h1 { margin:0 0 8px; font-size:clamp(30px,5vw,48px); line-height:1.1; }
+      h2 { margin:0 0 12px; font-size:22px; }
+      h3 { margin:18px 0 8px; font-size:17px; }
+      p { margin:8px 0; }
+      ul,ol { margin:8px 0 0 22px; padding:0; }
+      li + li { margin-top:5px; }
+      code { padding:.12em .35em; border-radius:5px; color:#fff; background:var(--code); overflow-wrap:anywhere; }
+      pre { overflow:auto; padding:16px; border-radius:13px; color:#eef8f4; background:var(--code); }
+      pre code { padding:0; background:transparent; }
+      .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      .meta span { padding:5px 10px; border-radius:999px; background:#e7efec; font-size:12px; font-weight:700; }
+      .meta .wip { color:#8e391e; background:var(--soft); }
+      .meta .active { color:var(--ok); background:#e5f6ee; }
+      .quote { padding:14px 16px; border-left:4px solid var(--accent); background:var(--soft); }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .box { padding:16px; border:1px solid var(--line); border-radius:13px; }
+      .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+      .flow div { padding:14px; border:1px solid var(--line); border-radius:12px; background:#f8fbfa; }
+      .flow b { display:block; color:var(--accent); }
+      table { width:100%; border-collapse:collapse; }
+      th,td { padding:10px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { background:#edf3f1; }
+      .pending { color:#9a5c09; font-weight:800; }
+      .verified { color:var(--ok); font-weight:800; }
+      @media (max-width:720px) { header,section { padding:20px; } .grid,.flow { grid-template-columns:1fr; } }
+      @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+      @media (prefers-color-scheme:dark) { :root { --bg:#0d1916; --panel:#14231f; --ink:#ecf7f3; --muted:#b8c9c4; --line:#36514a; --soft:#3b211b; --code:#09120f; } .meta span,.flow div,th { background:#20332e; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>知识图谱改用目录产物存储</h1>
+        <p>将已合并的 TB-55 完整图谱与恢复检查点移出数据库，以 <code>books/ai/{workspace}/knowledge-graphs</code> 下的当前文件作为唯一内容来源，同时保持现有 API、ACL、重试和引用回跳行为。</p>
+        <div class="meta"><span class="active">状态：ACTIVE</span><span>创建日期：2026-08-18</span><span>所属模块：webserver</span><span>需求来源：TB-52 / TB-55</span><span>影响：存储、迁移、删除、备份</span></div>
+      </header>
+
+      <section>
+        <h2>1. 原始诉求</h2>
+        <p class="quote">“实体产物优先保存在目录中……统一目录结构：<code>books/ai/{user-workspace}/{feature}/...</code>；数据库仅承担管理与检索；写入采用临时文件/目录校验后原子替换；删除业务对象时同步清理目录；Talebook 的备份与迁移必须同时覆盖数据库和 <code>books/ai</code>。”</p>
+        <p>PR #994 已把知识图谱完整结果和分章检查点写入 <code>ai_tasks.result_data</code> / <code>ai_tasks.ai_draft</code>。该实现已合并至 <code>feat/ai_1.0</code>，因此本工作以独立跟进 PR 修正持久化契约，并兼容已生成的旧记录。</p>
+      </section>
+
+      <section>
+        <h2>2. 目标与边界</h2>
+        <div class="grid">
+          <div class="box"><h3>目标</h3><ul><li>正式图谱和恢复检查点只保存在目录文件中，数据库仅留范围、相对路径、SHA-256、状态和统计索引。</li><li>每次读取仍先校验创建者、原书 ACL 与文件版本，再读取并校验文件摘要。</li><li>写入同目录临时文件，完成 JSON 校验和落盘后原子替换；任务、书籍或用户删除时清理对应目录。</li><li>旧数据库内联结果可安全迁移，迁移成功后移除数据库正文。</li></ul></div>
+          <div class="box"><h3>非目标</h3><ul><li>不新增版本表、版本列表、回滚 UI 或 <code>v{version}</code> 目录。</li><li>不改变图谱提取 schema、前端画布、引用 locator 或 AgentRuntime。</li><li>不跨书聚合图谱，不提供公开文件 URL。</li><li>不把运行日志、提示词或 EPUB 正文写入产物目录。</li></ul></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>3. 数据布局与提交协议</h2>
+        <pre><code>/data/books/ai/
+└── {opaque-workspace}/
+    └── knowledge-graphs/
+        └── {task-uuid}/
+            ├── checkpoint.json  # 运行中当前检查点，成功后删除
+            └── graph.json       # 当前正式成果，无版本子目录</code></pre>
+        <p>数据库保存相对于 <code>/data/books/ai</code> 的路径，且路径必须由服务端构造并限制在同一 workspace、feature 与 task 目录内。每个索引同时保存 SHA-256 与字节数；读取时摘要不一致、越界路径、缺失文件或非法 JSON 均按“产物不可用”失败关闭。</p>
+        <div class="flow" aria-label="原子发布流程"><div><b>1 校验</b>结构化模型输出与每条引用先通过现有 schema/locator 校验。</div><div><b>2 暂存</b>在目标目录创建仅当前进程可写的同目录临时文件。</div><div><b>3 发布</b>写入、刷新、解析复核并计算 SHA 后使用 <code>os.replace</code> 原子替换。</div><div><b>4 索引</b>最后提交数据库相对路径和摘要；只有该终态才对 API 可见。</div></div>
+      </section>
+
+      <section>
+        <h2>4. 权限、迁移与生命周期</h2>
+        <table>
+          <thead><tr><th>场景</th><th>处理</th><th>不变量</th></tr></thead>
+          <tbody>
+            <tr><td>列表、详情、导出</td><td>先按 creator 查询，再复核书 ACL 和 book_version，最后按受限相对路径读取并核验 SHA。</td><td>知道任务 ID 或路径不能绕过 ACL；不返回物理绝对路径。</td></tr>
+            <tr><td>崩溃恢复</td><td>从 <code>checkpoint.json</code> 读取已校验分章结果；数据库只保存范围与检查点索引。</td><td>流式文本和未校验段不落库、不发布。</td></tr>
+            <tr><td>旧记录迁移</td><td>在已授权访问或恢复前，将旧内联 graph/segments 原子写文件；文件和摘要成功后再清空内联正文。</td><td>任何写入失败都保留旧记录，不做有损半迁移。</td></tr>
+            <tr><td>删除</td><td>删除任务、书籍或用户时按已验证的 task 目录递归清理，再删除数据库索引。</td><td>清理函数拒绝根目录、workspace 目录、越界路径与符号链接目标。</td></tr>
+            <tr><td>备份/数据迁移</td><td>默认产物根位于持久化的 <code>/data/books/ai</code>；启动自检创建并验证原子写，文档明确与整个 data 目录一起备份/迁移。</td><td>数据库与目录必须视为同一备份单元。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>5. 风险与降级</h2>
+        <ul><li>数据库提交失败可能留下未索引文件；task UUID 目录隔离使其不会被其他用户读取，后续同任务写入会原子覆盖，删除路径可回收。</li><li>跨设备只迁移数据库会导致摘要索引指向缺失文件；API 将失败关闭并提示重新生成，备份文档与自检强调必须同步迁移 <code>books/ai</code>。</li><li>旧内联数据可能很大；迁移按单任务进行，不把所有图谱一次性载入内存，且只在 ACL 通过后的任务访问或恢复路径触发。</li><li>本次纯后端存储修正不改变 UI DOM、样式、交互或文案，因此 follow-up 不重复执行大型界面审查；保留 PR #994 已完成的 full interface-review 结论。</li></ul>
+      </section>
+
+      <section>
+        <h2>6. 测试计划与结果</h2>
+        <p class="verified">验证通过</p>
+        <ul><li><code>docker run … talebook/test pytest tests/test_runtime_identity_config.py tests/test_knowledge_graph.py tests/test_self_check.py tests/test_main.py::TestBook::test_delete_cleans_knowledge_graph_artifact_directory tests/test_admin.py::TestAdminUserArtifactCleanup -q</code>：45 passed；覆盖路径与摘要校验、并发安全的稳定 workspace、原子替换、旧记录迁移、ACL 顺序、导出、三类删除及持久化目录自检。</li><li><code>docker run … talebook/test pytest tests -q</code>：881 passed、20 skipped、25 个既有 warning。第一次全量运行发现启动脚本契约测试仍只断言 library/settings 两个目录（880 passed、1 failed）；更新为同时覆盖 AI 目录后重新全量通过。</li><li><code>make lint-py-fix</code>：Ruff 自动修正与格式化通过；<code>make lint-py</code>：110 个后端文件检查及格式 diff 通过。</li><li><code>make check-design</code>：112 份设计文档全部通过路径、状态、HTML 结构与单文件资源校验。</li><li>本次没有修改前端资源、HTTP 响应结构中的图谱字段、交互、样式或文案；因此按项目规则豁免 full interface-review，沿用 PR #994 对现有画布的已通过审查。</li></ul>
+      </section>
+
+      <section>
+        <h2>7. 决策记录</h2>
+        <ul><li>feature 目录使用产品固定 slug <code>knowledge-graphs</code>，HTTP/API feature key 继续使用 <code>knowledge_graph</code>。</li><li>workspace 使用由稳定用户主键和创建时间生成、并持久化到用户 <code>extra</code> 的 UUIDv5 不透明 ID；不使用用户名、邮箱或可变展示名，同一用户首次并发创建也得到同一目录。</li><li>不新增图谱专用版本模型；task 本身是管理索引，<code>graph.json</code> 是该 task 当前且唯一的正式成果。</li><li>实现与上述契约一致；验证完成后仅保留本 ACTIVE 文件，不保留中间 WIP。</li></ul>
+      </section>
+    </main>
+  </body>
+</html>

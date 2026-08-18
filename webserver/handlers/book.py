@@ -1017,8 +1017,21 @@ class BookDelete(BaseHandler):
             delete_external_index_book_record(self.db, bid)
         else:
             self.db.delete_book(bid)
-        # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
+        # 同步清理该书籍对应的 AI 目录产物和 ScanFile 记录，避免遗留私有内容或重复导入误判。
         from webserver.models import AITask, ScanFile
+        from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStorage
+        from webserver.services.knowledge_graph import FEATURE_KEY as KNOWLEDGE_GRAPH_FEATURE_KEY
+        from webserver.services.knowledge_graph import cleanup_record_artifacts
+
+        ai_tasks = self.session.query(AITask).filter(AITask.book_id == bid).all()
+        try:
+            storage = AIArtifactStorage(CONF)
+            for task in ai_tasks:
+                if task.feature == KNOWLEDGE_GRAPH_FEATURE_KEY:
+                    cleanup_record_artifacts(task, storage)
+        except AIArtifactError:
+            logging.exception("failed to clean AI artifacts for deleted book_id=%s", bid)
+            return {"err": "ai.artifact_cleanup_failed", "msg": _("书籍已删除，但 AI 产物清理失败，请联系管理员")}
 
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
         self.session.query(AITask).filter(AITask.book_id == bid).delete()

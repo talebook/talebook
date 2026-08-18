@@ -18,7 +18,8 @@ from webserver.base.trash_manager import TrashManager
 from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.i18n import _
-from webserver.models import Item, Reader, ScanFile
+from webserver.models import AITask, Item, Reader, ScanFile
+from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStorage, workspace_id_from_reader
 from webserver.services.autofill import AutoFillService
 from webserver.services.batch_convert import BatchConvertService
 from webserver.services.external_index import delete_external_index_book_record, is_external_index_book
@@ -216,6 +217,14 @@ class AdminUsers(BaseHandler):
             if self.user_id() == user.id:
                 return {"err": "params.user.invalid", "msg": _("不允许删除自己")}
 
+            workspace = workspace_id_from_reader(user)
+            if workspace:
+                try:
+                    AIArtifactStorage(CONF).delete_workspace(workspace)
+                except AIArtifactError:
+                    logging.exception("failed to clean AI workspace for reader_id=%s", user.id)
+                    return {"err": "ai.artifact_cleanup_failed", "msg": _("AI 产物清理失败，请重试")}
+            self.session.query(AITask).filter(AITask.creator_id == user.id).delete()
             self.session.query(Reader).filter(Reader.id == user.id).delete()
             self.session.commit()
             return {"err": "ok", "msg": _("删除成功")}

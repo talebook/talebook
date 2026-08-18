@@ -96,6 +96,9 @@ settings = {
     "AI_CODEX_MIN_VERSION": "0.147.0",
     "AI_CODEX_MAX_VERSION": "0.148.0",
     "AI_TASK_ROOT": "/data/books/progress",
+    # AI 实体产物的唯一内容来源；数据库仅保存相对于此目录的路径、摘要和管理索引。
+    "AI_ARTIFACT_ROOT": "/data/books/ai",
+    "AI_ARTIFACT_MAX_BYTES": 128 * 1024 * 1024,
     "AI_HANDSHAKE_TIMEOUT_SECONDS": 10,
     "AI_FIRST_PROGRESS_TIMEOUT_SECONDS": 30,
     "AI_SILENCE_TIMEOUT_SECONDS": 45,
