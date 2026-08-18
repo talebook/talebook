@@ -21,6 +21,7 @@ from webserver.models import (
 )
 from webserver.plugins.runtime import (
     ACTIONS,
+    BOOK_SOURCE_PROVIDERS,
     BUILTIN_CAPABILITY_PROVIDERS,
     EXTERNAL_CONNECTOR_PROVIDERS,
     MockMultiTabProvider,
@@ -68,6 +69,8 @@ REGISTRY = PluginRegistry()
 REGISTRY.register(MockMultiTabProvider())
 for _builtin_provider in BUILTIN_CAPABILITY_PROVIDERS:
     REGISTRY.register(_builtin_provider)
+for _book_source_provider in BOOK_SOURCE_PROVIDERS:
+    REGISTRY.register(_book_source_provider)
 for _connector_provider in EXTERNAL_CONNECTOR_PROVIDERS:
     REGISTRY.register(_connector_provider)
 
@@ -241,9 +244,7 @@ def save_connection(
     if requested_scopes - approved:
         raise PluginRuntimeError("plugin.scope_not_approved", "Connection requests permissions that were not approved")
 
-    auth_schema = definition.auth_schema or {}
-    stores_credentials = bool(auth_schema.get("properties") or auth_schema.get("required"))
-    cipher = SecretCipher(settings) if stores_credentials else None
+    cipher = SecretCipher(settings) if credentials else None
     connection = (
         session.query(PluginConnection)
         .filter(
@@ -265,24 +266,24 @@ def save_connection(
         )
         session.add(connection)
         session.flush()
-    if stores_credentials:
-        secret = session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
-        if secret is None:
-            secret = PluginSecret(
-                owner_type=owner_type,
-                owner_id=owner_id,
-                kind="credentials",
-                ciphertext="pending",
-                key_id=cipher.key_id,
-                create_time=now,
-                last_rotated_at=now,
-            )
-            session.add(secret)
-            session.flush()
-            connection.secret_id = secret.id
-        else:
-            secret.version = int(secret.version or 0) + 1
-            secret.last_rotated_at = now
+    secret = session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
+    if credentials and secret is None:
+        secret = PluginSecret(
+            owner_type=owner_type,
+            owner_id=owner_id,
+            kind="credentials",
+            ciphertext="pending",
+            key_id=cipher.key_id,
+            create_time=now,
+            last_rotated_at=now,
+        )
+        session.add(secret)
+        session.flush()
+        connection.secret_id = secret.id
+    elif credentials and secret is not None:
+        secret.version = int(secret.version or 0) + 1
+        secret.last_rotated_at = now
+    if credentials:
         secret.ciphertext = cipher.encrypt(credentials)
         secret.key_id = cipher.key_id
         secret.mask_hint = secret_mask_hint(credentials)
@@ -482,6 +483,12 @@ class PluginRuntime:
                 "scopes": list(connection.scopes or []),
                 "target_external_ids": target_ids,
                 "deadline": (datetime.datetime.now() + datetime.timedelta(seconds=timeout)).isoformat(),
+                "platform": {
+                    "import_allowed_roots": list(
+                        self.settings.get("import_allowed_roots")
+                        or [self.settings.get("scan_upload_path", "/data/books/imports/")]
+                    )
+                },
             }
             try:
                 result = self._call_with_timeout(provider, context, timeout)
@@ -518,6 +525,7 @@ class PluginRuntime:
     def _apply_result(self, run, connection, result, secrets):
         counts = dict(DEFAULT_COUNTS)
         counts["fetched"] = len(result.items)
+        batch_book_identities = set()
         for item in result.items:
             safe_data = redact(dict(item.data or {}), secrets)
             if item.entity_type not in ENTITY_TYPES or not item.external_id:
@@ -549,6 +557,26 @@ class PluginRuntime:
             payload_hash = hashlib.sha256(
                 json.dumps(safe_data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
             ).hexdigest()
+            duplicate_reason = ""
+            if item.entity_type == "book_source":
+                duplicate_reason = self._book_source_duplicate_reason(
+                    connection, item.external_id, safe_data, batch_book_identities
+                )
+            if duplicate_reason:
+                safe_data["duplicate_reason"] = duplicate_reason
+                self._add_item(
+                    run,
+                    item.external_id,
+                    item.entity_type,
+                    "skipped",
+                    "duplicate",
+                    "",
+                    "",
+                    safe_data,
+                    payload_hash,
+                )
+                counts["skipped"] += 1
+                continue
             if run.action in {"preview", "test"}:
                 self._add_item(
                     run, item.external_id, item.entity_type, "previewed", "preview", "", "", safe_data, payload_hash
@@ -580,6 +608,38 @@ class PluginRuntime:
         connection.health_message = str(redact(result.health_message or "", secrets))[:500]
         self._finish_timing(run)
         self.session.commit()
+
+    def _book_source_duplicate_reason(self, connection, external_id, data, batch_identities):
+        format_name = str(data.get("format") or "").lower()
+        content_hash = str(data.get("content_hash") or "").lower()
+        isbn = "".join(char for char in str(data.get("isbn") or "").upper() if char.isdigit() or char == "X")
+        identities = set()
+        if format_name and content_hash:
+            identities.add(("content_hash", content_hash, format_name))
+        if format_name and isbn:
+            identities.add(("isbn", isbn, format_name))
+        repeated = identities & batch_identities
+        if repeated:
+            return sorted(repeated)[0][0]
+        batch_identities.update(identities)
+
+        records = (
+            self.session.query(PluginSourceRecord)
+            .filter(PluginSourceRecord.entity_type == "book_source", PluginSourceRecord.status == "active")
+            .all()
+        )
+        for record in records:
+            if record.connection_id == connection.id and record.external_id == external_id:
+                return "source_identity"
+            existing = dict(record.data or {})
+            if format_name != str(existing.get("format") or "").lower():
+                continue
+            if content_hash and content_hash == str(existing.get("content_hash") or "").lower():
+                return "content_hash"
+            existing_isbn = "".join(char for char in str(existing.get("isbn") or "").upper() if char.isdigit() or char == "X")
+            if isbn and isbn == existing_isbn:
+                return "isbn"
+        return ""
 
     def _upsert_source_record(self, run, connection, item, safe_data, payload_hash):
         record = (

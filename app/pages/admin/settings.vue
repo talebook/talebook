@@ -906,18 +906,6 @@ const cards = computed(() => [
         ],
     },
     {
-        key: 'opdsSettings',
-        title: t('admin.settings.section.opdsSettings'),
-        fields: [
-            { icon: 'mdi-book-open-variant', key: 'OPDS_ENABLED', label: t('admin.settings.label.opdsEnabled'), type: 'checkbox' },
-        ],
-        tips: [
-            {
-                text: t('admin.settings.message.opdsInfo'),
-            }
-        ],
-    },
-    {
         key: 'audiobookSettings',
         title: t('admin.settings.section.audiobookSettings'),
         subtitle: t('admin.settings.message.audiobookSettingsInfo'),
@@ -1046,7 +1034,7 @@ const cards = computed(() => [
 const navGroupDefs = [
     { key: 'site', titleKey: 'admin.settings.group.site', keys: ['basicInfo', 'bookCategories', 'friendshipLinks'] },
     { key: 'access', titleKey: 'admin.settings.group.access', keys: ['userSettings', 'socialLogin', 'captchaSettings'] },
-    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'deviceManagement', 'bookInfoSources', 'audiobookSettings', 'opdsSettings', 'webdavSettings'] },
+    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'deviceManagement', 'bookInfoSources', 'audiobookSettings', 'webdavSettings'] },
     { key: 'system', titleKey: 'admin.settings.group.system', keys: ['advancedSettings', 'databaseManagement', 'sslManagement', 'trashManagement', 'updateCheck'] },
 ];
 

@@ -22,8 +22,47 @@ test.describe('Plugin management', () => {
         await page.getByRole('tab', { name: '书源' }).click();
         await expect(page.getByText('Generic OPDS')).toBeVisible();
         await expect(page.getByText('Legado 在线书源')).toBeVisible();
+        await expect(page.getByText('Watch Folder')).toBeVisible();
         await expect(page.getByText('Calibre Content Server')).toHaveCount(0);
         await expect(page.getByText('Calibre-Web')).toHaveCount(0);
+    });
+
+    test('configures a source, previews candidates, and shows compliance columns', async ({ page }) => {
+        await page.goto('/admin/plugins?tab=book_sources');
+        const card = page.locator('.plugin-card').filter({ hasText: 'Watch Folder' });
+        await expect(card.getByText('待配置')).toBeVisible();
+        await card.getByRole('button', { name: '配置' }).click();
+
+        const dialog = page.getByRole('dialog');
+        await dialog.getByRole('textbox', { name: '监听目录' }).fill('/data/books/imports');
+        await dialog.getByRole('button', { name: '保存' }).click();
+        await expect(dialog.getByRole('button', { name: '预览候选' })).toBeVisible();
+        await dialog.getByRole('button', { name: '预览候选' }).click();
+
+        await expect(page).toHaveURL(/\/admin\/plugins\/runs\/\d+/);
+        await expect(page.getByRole('columnheader', { name: '格式' })).toBeVisible();
+        await expect(page.getByRole('columnheader', { name: '来源' })).toBeVisible();
+        await expect(page.getByRole('columnheader', { name: '访问条件' })).toBeVisible();
+        await expect(page.getByRole('columnheader', { name: '许可 / 条件' })).toBeVisible();
+        await expect(page.getByRole('columnheader', { name: '目标书库' })).toBeVisible();
+        await expect(page.getByRole('cell', { name: 'EPUB' })).toBeVisible();
+        await expect(page.getByRole('cell', { name: '可下载' })).toBeVisible();
+        await expect(page.getByRole('cell', { name: '本地文件；许可由管理员确认' })).toBeVisible();
+    });
+
+    test('keeps the source connection form reachable at 320px', async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
+        await page.goto('/admin/plugins?tab=book_sources');
+        const card = page.locator('.plugin-card').filter({ hasText: 'Watch Folder' });
+        await card.getByRole('button', { name: '配置' }).click();
+
+        const dialog = page.getByRole('dialog');
+        const save = dialog.getByRole('button', { name: '保存' });
+        await save.scrollIntoViewIfNeeded();
+        await expect(save).toBeVisible();
+        const dialogBox = await dialog.boundingBox();
+        expect(dialogBox.width).toBeLessThanOrEqual(320);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
     });
 
     test('opens details, tests a connection, and exposes the shared run log', async ({ page }) => {
@@ -67,6 +106,25 @@ test.describe('Plugin management', () => {
         await expect(page.getByText('default · 尚未测试')).toBeVisible();
         await page.getByRole('button', { name: '预览' }).click();
         await expect(page.getByText(/上次执行：成功/)).toBeVisible();
+    });
+
+    test('moves the Talebook OPDS service setting from Settings into the OPDS plugin', async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
+        await page.goto('/admin/settings');
+        await expect(page.getByRole('heading', { name: 'OPDS 设置' })).toHaveCount(0);
+
+        await page.goto('/admin/plugins?tab=book_sources');
+        const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
+        await card.getByRole('button', { name: '详情' }).click();
+
+        const dialog = page.getByRole('dialog');
+        await expect(dialog.getByRole('heading', { name: 'Talebook OPDS 服务' })).toBeVisible();
+        const serviceSwitch = dialog.getByLabel('启用 OPDS 服务');
+        await expect(serviceSwitch).toBeChecked();
+        await serviceSwitch.focus();
+        await page.keyboard.press('Space');
+        await expect(serviceSwitch).not.toBeChecked();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
     });
 
     test('old book source URL redirects into the plugin source tab', async ({ page }) => {
