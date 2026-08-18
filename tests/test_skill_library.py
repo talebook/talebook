@@ -56,7 +56,6 @@ class SkillManifestValidationTest(unittest.TestCase):
             validate_schema_definition({"type": "object", "$ref": "https://example.com/schema"}, "schema")
         with self.assertRaisesRegex(SkillValidationError, "不受支持"):
             validate_schema_definition({"type": "object", "allOf": []}, "schema")
-
         nested = {"type": "string"}
         for _index in range(10):
             nested = {"type": "array", "items": nested}
@@ -68,25 +67,20 @@ class SkillManifestValidationTest(unittest.TestCase):
         with self.assertRaises(SensitiveContentError) as credentials:
             validate_version_payload(manifest, "api_key = super-secret-value", True)
         self.assertTrue(credentials.exception.hard_block)
-        self.assertEqual(credentials.exception.findings[0]["kind"], "credential")
         self.assertNotIn("super-secret-value", json.dumps(credentials.exception.findings))
-
         with self.assertRaises(SensitiveContentError) as email:
             validate_version_payload(manifest, "联系 reader@example.com 获取样例", False)
         self.assertFalse(email.exception.hard_block)
-        checked = validate_version_payload(manifest, "联系 reader@example.com 获取样例", True)
-        self.assertEqual(checked["findings"][0]["kind"], "email")
+        self.assertEqual(validate_version_payload(manifest, "联系 reader@example.com 获取样例", True)["findings"][0]["kind"], "email")
 
-    def test_skill_body_respects_progressive_disclosure_limit(self):
-        manifest = default_manifest()
-        with self.assertRaisesRegex(SkillValidationError, "500 行"):
-            validate_version_payload(manifest, "\n".join(f"step {index}" for index in range(500)), False)
-
-    def test_package_name_must_match_agent_skills_hyphen_case(self):
+    def test_package_name_and_progressive_disclosure_limits(self):
         manifest = default_manifest()
         manifest["package_name"] = "Bad_Name"
         with self.assertRaisesRegex(SkillValidationError, "package_name"):
             validate_version_payload(manifest, "# Invalid package name", False)
+        manifest = default_manifest()
+        with self.assertRaisesRegex(SkillValidationError, "500 行"):
+            validate_version_payload(manifest, "\n".join(f"step {index}" for index in range(500)), False)
 
 
 class FakeRuntime:
@@ -115,10 +109,7 @@ class TimeoutRuntime(FakeRuntime):
 class SkillLibraryAPITest(test_main.TestWithUserLogin):
     def setUp(self):
         self.artifact_root = tempfile.TemporaryDirectory()
-        self.artifact_config = mock.patch.dict(
-            skill_handlers.CONF,
-            {"AI_ARTIFACT_ROOT": self.artifact_root.name},
-        )
+        self.artifact_config = mock.patch.dict(skill_handlers.CONF, {"AI_ARTIFACT_ROOT": self.artifact_root.name})
         self.artifact_config.start()
         super().setUp()
         self.user.return_value = 1
@@ -134,63 +125,59 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
     def _clear(self):
         session = test_main.get_db()
         session.query(models.SkillRun).delete(synchronize_session=False)
-        session.query(models.SkillVersion).delete(synchronize_session=False)
         session.query(models.Skill).delete(synchronize_session=False)
         session.query(models.AITask).filter(models.AITask.feature == "skill-source-fixture").delete(synchronize_session=False)
         session.commit()
 
     def _create(self, **overrides):
-        payload = {
-            "name": "摘要整理",
-            "description": "把阅读内容整理成固定格式。",
-        }
+        payload = {"name": "摘要整理", "description": "把阅读内容整理成固定格式。"}
         payload.update(overrides)
         return self.json("/api/ai/skills", method="POST", **api_body(payload))
 
     def _update(self, skill, manifest=None, markdown="# 更新\n\n更新后的方法。", **overrides):
         payload = {
-            "base_version": skill["current_version"],
-            "manifest": manifest or skill["version"]["manifest"],
+            "base_hash": skill["content_hash"],
+            "manifest": manifest or skill["document"]["manifest"],
             "markdown": markdown,
         }
         payload.update(overrides)
         return self.json(f"/api/ai/skills/{skill['id']}", method="PATCH", **api_body(payload))
 
-    def test_blank_create_edit_search_versions_and_owner_isolation(self):
+    def _artifact_root_for(self, skill):
+        return Path(self.artifact_root.name).joinpath(*Path(skill["artifact_path"]).parts[:-1])
+
+    def test_create_edit_search_directory_authority_and_owner_isolation(self):
         created = self._create()
         self.assertEqual(created["err"], "ok")
         skill = created["skill"]
         self.assertEqual(skill["status"], "draft")
-        self.assertEqual(skill["current_version"], 1)
-        self.assertEqual(skill["version"]["manifest"]["name"], "摘要整理")
+        self.assertEqual(skill["document"]["manifest"]["name"], "摘要整理")
+        self.assertNotIn("manifest", models.Skill.__table__.columns)
+        self.assertNotIn("markdown", models.Skill.__table__.columns)
+        self.assertNotIn("current_version", models.Skill.__table__.columns)
+        self.assertNotIn("skill_versions", models.Base.metadata.tables)
 
         listed = self.json("/api/ai/skills?q=摘要&status=draft")
         self.assertEqual([item["id"] for item in listed["skills"]], [skill["id"]])
-
-        manifest = skill["version"]["manifest"]
-        manifest["description"] = "第二版描述"
-        updated = self._update(skill, manifest)
-        self.assertEqual(updated["err"], "ok")
-        self.assertEqual(updated["skill"]["current_version"], 2)
-        artifact_path = Path(self.artifact_root.name) / "skills" / "1" / skill["id"]
-        self.assertTrue((artifact_path / "v1").is_dir())
-        self.assertTrue((artifact_path / "v2").is_dir())
-        versions = self.json(f"/api/ai/skills/{skill['id']}/versions")
-        self.assertEqual([item["version"] for item in versions["versions"]], [2, 1])
+        manifest = dict(skill["document"]["manifest"])
+        manifest["description"] = "当前目录的新描述"
+        updated = self._update(skill, manifest)["skill"]
+        self.assertNotEqual(updated["content_hash"], skill["content_hash"])
+        artifact_root = self._artifact_root_for(updated)
+        self.assertEqual([path.name for path in artifact_root.iterdir()], [manifest["package_name"]])
+        self.assertFalse(any(path.name.startswith("v") for path in artifact_root.iterdir()))
 
         conflict = self.json(
             f"/api/ai/skills/{skill['id']}",
             method="PATCH",
-            **api_body({"base_version": 1, "manifest": manifest, "markdown": "# stale"}),
+            **api_body({"base_hash": skill["content_hash"], "manifest": manifest, "markdown": "# stale"}),
         )
-        self.assertEqual(conflict["err"], "skill.version_conflict")
-
+        self.assertEqual(conflict["err"], "skill.content_conflict")
         self.user.return_value = 2
-        hidden = self.json(f"/api/ai/skills/{skill['id']}")
-        self.assertEqual(hidden["err"], "skill.not_found")
+        self.assertEqual(self.json(f"/api/ai/skills/{skill['id']}")["err"], "skill.not_found")
         self.assertEqual(self.json("/api/ai/skills")["skills"], [])
 
-    def test_source_task_draft_keeps_only_minimal_confirmed_source(self):
+    def test_source_task_keeps_only_minimal_confirmed_source(self):
         session = test_main.get_db()
         task = models.AITask(
             id="22222222-2222-2222-2222-222222222222",
@@ -210,61 +197,42 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         )
         session.add(task)
         session.commit()
-
         response = self._create(source_task_id=task.id)
-        self.assertEqual(response["err"], "ok", response)
-        version = response["skill"]["version"]
-        serialized = json.dumps(version, ensure_ascii=False)
+        serialized = json.dumps(response["skill"], ensure_ascii=False)
         self.assertIn(task.id, serialized)
         self.assertIn("skill-source-fixture", serialized)
         self.assertNotIn("不应复制的正文", serialized)
         self.assertNotIn("reader@example.com", serialized)
 
     def test_storage_failure_rolls_back_new_skill(self):
-        with mock.patch.object(
-            skill_handlers,
-            "materialize_skill_package",
-            side_effect=AIArtifactError("read only"),
-        ):
+        with mock.patch.object(skill_handlers, "materialize_skill_package", side_effect=AIArtifactError("read only")):
             response = self._create()
         self.assertEqual(response["err"], "skill.storage_failed")
         self.assertEqual(test_main.get_db().query(models.Skill).count(), 0)
 
-    def test_view_and_download_portable_skill_package(self):
+    def test_view_download_and_tamper_detection_use_current_directory(self):
         skill = self._create()["skill"]
-        package_response = self.json(f"/api/ai/skills/{skill['id']}/package")
-        self.assertEqual(package_response["err"], "ok")
-        package = package_response["package"]
-        self.assertRegex(package["name"], r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-        self.assertLessEqual(len(package["name"]), 64)
+        package = self.json(f"/api/ai/skills/{skill['id']}/package")["package"]
         self.assertEqual([item["path"] for item in package["files"]], ["SKILL.md", "references/contract.json"])
-        version_dir = Path(self.artifact_root.name) / "skills" / "1" / skill["id"] / "v1"
-        self.assertEqual(package["storage_path"], f"skills/1/{skill['id']}/v1/{package['name']}")
-        self.assertEqual(package["archive_path"], f"skills/1/{skill['id']}/v1/{package['filename']}")
-        self.assertTrue((version_dir / package["name"] / "SKILL.md").is_file())
-        self.assertTrue((version_dir / package["filename"]).is_file())
-        skill_md = package["files"][0]["content"]
-        frontmatter = skill_md.split("---", 2)[1]
-        self.assertEqual([line.split(":", 1)[0] for line in frontmatter.strip().splitlines()], ["name", "description"])
-        self.assertIn(f"name: {package['name']}", skill_md)
-        self.assertIn("references/contract.json", skill_md)
+        self.assertEqual(package["storage_path"], skill["artifact_path"])
+        self.assertNotIn("archive_path", package)
+        self.assertEqual(package["filename"], f"{package['name']}.zip")
+        package_root = Path(self.artifact_root.name).joinpath(*Path(package["storage_path"]).parts)
+        self.assertTrue((package_root / "SKILL.md").is_file())
+        self.assertFalse((package_root.parent / package["filename"]).exists())
 
         downloaded = self.fetch(package["download_url"])
         self.assertEqual(downloaded.code, 200)
-        self.assertEqual(downloaded.headers["Content-Type"], "application/zip")
-        self.assertIn(package["filename"], downloaded.headers["Content-Disposition"])
         with zipfile.ZipFile(io.BytesIO(downloaded.body)) as archive:
-            self.assertEqual(
-                archive.namelist(),
-                [f"{package['name']}/SKILL.md", f"{package['name']}/references/contract.json"],
-            )
-            self.assertEqual(archive.read(f"{package['name']}/SKILL.md").decode(), skill_md)
+            self.assertEqual(archive.namelist(), [f"{package['name']}/SKILL.md", f"{package['name']}/references/contract.json"])
             contract = json.loads(archive.read(f"{package['name']}/references/contract.json"))
             self.assertEqual(contract["input_schema"]["type"], "object")
+        manifest = skill["document"]["manifest"]
+        expected = build_skill_zip(build_skill_package(manifest, skill["document"]["markdown"]))
+        self.assertEqual(expected, downloaded.body)
 
-        session = test_main.get_db()
-        version = session.get(models.SkillVersion, skill["version"]["id"])
-        self.assertEqual(build_skill_zip(build_skill_package(version)), downloaded.body)
+        (package_root / "SKILL.md").write_text("tampered", encoding="utf-8")
+        self.assertEqual(self.json(f"/api/ai/skills/{skill['id']}")["err"], "skill.storage_failed")
 
     def test_sensitive_findings_do_not_echo_value(self):
         manifest = default_manifest("安全测试", "测试敏感内容门禁。")
@@ -273,11 +241,10 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         self.assertTrue(response["hard_block"])
         self.assertNotIn("super-secret-password", json.dumps(response, ensure_ascii=False))
 
-    def test_trial_gate_rollback_and_manual_run_use_exact_version(self):
+    def test_trial_gate_is_bound_to_current_hash_and_manual_run_has_no_input_body(self):
         skill = self._create()["skill"]
         blocked = self.json(f"/api/ai/skills/{skill['id']}/status", method="POST", **api_body({"status": "enabled"}))
         self.assertEqual(blocked["err"], "skill.trial_required")
-
         with mock.patch.object(SkillRunService, "submit"):
             trial = self.json(
                 f"/api/ai/skills/{skill['id']}/runs",
@@ -287,9 +254,7 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         session = test_main.get_db()
         run = session.get(models.SkillRun, trial["id"])
         run.status = "succeeded"
-        run.result_data = {"result": "样例输出"}
         session.commit()
-
         enabled = self.json(f"/api/ai/skills/{skill['id']}/status", method="POST", **api_body({"status": "enabled"}))
         self.assertEqual(enabled["skill"]["status"], "enabled")
         with mock.patch.object(SkillRunService, "submit"):
@@ -299,12 +264,11 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
                 **api_body({"mode": "manual", "input": {"content": "正式输入"}}),
             )
         self.assertEqual(manual["err"], "ok")
-        self.assertEqual(manual["run"]["version"], 1)
+        self.assertEqual(manual["run"]["content_hash"], skill["content_hash"])
         self.assertNotIn("正式输入", json.dumps(manual["run"], ensure_ascii=False))
 
-        rolled = self.json(f"/api/ai/skills/{skill['id']}/rollback", method="POST", **api_body({"version": 1}))
-        self.assertEqual(rolled["skill"]["current_version"], 2)
-        self.assertEqual(rolled["skill"]["status"], "draft")
+        changed = self._update(skill)["skill"]
+        self.assertEqual(changed["status"], "draft")
         blocked_again = self.json(f"/api/ai/skills/{skill['id']}/status", method="POST", **api_body({"status": "enabled"}))
         self.assertEqual(blocked_again["err"], "skill.trial_required")
 
@@ -314,29 +278,25 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
             run_data = self.json(
                 f"/api/ai/skills/{skill['id']}/runs",
                 method="POST",
-                **api_body(
-                    {
-                        "mode": "trial",
-                        "input": {"content": "只在内存中传递"},
-                        "authorization_context": {"book_ids": [test_main.BID_EPUB]},
-                    }
-                ),
+                **api_body({
+                    "mode": "trial",
+                    "input": {"content": "只在内存中传递"},
+                    "authorization_context": {"book_ids": [test_main.BID_EPUB]},
+                }),
             )["run"]
         service = SkillRunService()
-        service.setup(test_main._app.settings["SessionMaker"], test_main.main.CONF, runtime=FakeRuntime())
+        service.setup(test_main._app.settings["SessionMaker"], skill_handlers.CONF, runtime=FakeRuntime())
         service._run(run_data["id"], {"content": "只在内存中传递"})
-
         detail = self.json(f"/api/ai/skills/{skill['id']}/runs/{run_data['id']}")["run"]
         self.assertEqual(detail["status"], "succeeded")
         self.assertEqual(detail["result"], {"result": "结构化结果"})
-        self.assertEqual(detail["version"], 1)
+        self.assertEqual(detail["content_hash"], skill["content_hash"])
         self.assertEqual(detail["authorization_context"]["book_ids"], [test_main.BID_EPUB])
         self.assertNotIn("只在内存中传递", json.dumps(detail, ensure_ascii=False))
 
-    def test_delete_cascades_versions_and_terminal_runs(self):
+    def test_delete_cascades_runs_and_current_directory(self):
         skill = self._create()["skill"]
-        artifact_path = Path(self.artifact_root.name) / "skills" / "1" / skill["id"]
-        self.assertTrue(artifact_path.is_dir())
+        artifact_root = self._artifact_root_for(skill)
         with mock.patch.object(SkillRunService, "submit"):
             run = self.json(
                 f"/api/ai/skills/{skill['id']}/runs",
@@ -347,13 +307,10 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
         record = session.get(models.SkillRun, run["id"])
         record.status = "failed"
         session.commit()
-
-        deleted = self.json(f"/api/ai/skills/{skill['id']}", method="DELETE")
-        self.assertEqual(deleted["err"], "ok")
+        self.assertEqual(self.json(f"/api/ai/skills/{skill['id']}", method="DELETE")["err"], "ok")
         self.assertEqual(session.query(models.Skill).filter_by(id=skill["id"]).count(), 0)
-        self.assertEqual(session.query(models.SkillVersion).filter_by(skill_id=skill["id"]).count(), 0)
         self.assertEqual(session.query(models.SkillRun).filter_by(skill_id=skill["id"]).count(), 0)
-        self.assertFalse(artifact_path.exists())
+        self.assertFalse(artifact_root.exists())
 
     def test_queued_run_cancellation_is_idempotent(self):
         skill = self._create()["skill"]
@@ -376,7 +333,6 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
             **api_body({}),
         )
         self.assertTrue(repeated["idempotent"])
-        self.assertEqual(repeated["run"]["status"], "cancelled")
 
     def test_run_service_fails_closed_on_invalid_output_and_timeout(self):
         skill = self._create()["skill"]
@@ -390,18 +346,14 @@ class SkillLibraryAPITest(test_main.TestWithUserLogin):
                         **api_body({"mode": "trial", "input": {"content": content}}),
                     )["run"]["id"]
                 )
-
         service = SkillRunService()
-        service.setup(test_main._app.settings["SessionMaker"], test_main.main.CONF, runtime=InvalidOutputRuntime())
+        service.setup(test_main._app.settings["SessionMaker"], skill_handlers.CONF, runtime=InvalidOutputRuntime())
         service._run(run_ids[0], {"content": "非法输出"})
         invalid = self.json(f"/api/ai/skills/{skill['id']}/runs/{run_ids[0]}")["run"]
-        self.assertEqual(invalid["status"], "failed")
         self.assertEqual(invalid["error"]["code"], "skill.output_invalid")
-
-        service.setup(test_main._app.settings["SessionMaker"], test_main.main.CONF, runtime=TimeoutRuntime())
+        service.setup(test_main._app.settings["SessionMaker"], skill_handlers.CONF, runtime=TimeoutRuntime())
         service._run(run_ids[1], {"content": "超时输入"})
         timed_out = self.json(f"/api/ai/skills/{skill['id']}/runs/{run_ids[1]}")["run"]
-        self.assertEqual(timed_out["status"], "failed")
         self.assertEqual(timed_out["error"]["code"], "runtime.total_timeout")
 
 

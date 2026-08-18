@@ -87,7 +87,7 @@
                         >
                             {{ statusLabel(skill.status) }}
                         </v-chip>
-                        <span>v{{ skill.current_version }}</span>
+                        <span>{{ skill.content_hash.slice(0, 8) }}</span>
                     </span>
                 </button>
                 <v-empty-state
@@ -121,18 +121,10 @@
                                     variant="tonal"
                                     size="small"
                                 >
-                                    {{ statusLabel(selected.status) }} · v{{ selected.current_version }}
+                                    {{ statusLabel(selected.status) }}
                                 </v-chip>
                                 <v-chip
-                                    v-if="!editorMatchesCurrentVersion"
-                                    color="info"
-                                    variant="tonal"
-                                    size="small"
-                                >
-                                    {{ t('skills.inspectingVersion', { version: editorVersion }) }}
-                                </v-chip>
-                                <v-chip
-                                    v-else-if="hasUnsavedChanges"
+                                    v-if="hasUnsavedChanges"
                                     color="warning"
                                     variant="tonal"
                                     size="small"
@@ -140,7 +132,7 @@
                                     {{ t('skills.unsavedChanges') }}
                                 </v-chip>
                             </div>
-                            <p>{{ t('skills.versionHint') }}</p>
+                            <p>{{ t('skills.currentDirectoryHint') }}</p>
                         </div>
                         <div class="editor-actions">
                             <v-btn
@@ -186,10 +178,10 @@
                             <v-btn
                                 color="primary"
                                 :loading="saving"
-                                data-testid="save-skill-version"
-                                @click="saveVersion"
+                                data-testid="save-skill"
+                                @click="saveCurrent"
                             >
-                                {{ t('skills.saveNewVersion') }}
+                                {{ t('skills.saveCurrent') }}
                             </v-btn>
                         </div>
                     </div>
@@ -207,9 +199,6 @@
                         </v-tab>
                         <v-tab value="package">
                             {{ t('skills.packageFiles') }}
-                        </v-tab>
-                        <v-tab value="versions">
-                            {{ t('skills.versions') }}
                         </v-tab>
                         <v-tab value="runs">
                             {{ t('skills.runs') }}
@@ -346,7 +335,7 @@
                                 data-testid="skill-preview"
                             >
                                 <p class="eyebrow">
-                                    SKILL v{{ selected.current_version }}
+                                    SKILL · {{ selected.content_hash.slice(0, 10) }}
                                 </p>
                                 <h2>{{ editor.name }}</h2>
                                 <p class="preview-description">
@@ -392,7 +381,7 @@
                                             {{ t('skills.portablePackage') }}
                                         </p>
                                         <h3>{{ packageInfo.filename }}</h3>
-                                        <p>{{ t('skills.packageHint', { version: packageInfo.version }) }}</p>
+                                        <p>{{ t('skills.packageHint') }}</p>
                                         <p class="storage-path">
                                             {{ t('skills.storagePath') }}：<code>{{ packageInfo.storage_path }}</code>
                                         </p>
@@ -430,36 +419,6 @@
                             </section>
                         </v-window-item>
 
-                        <v-window-item value="versions">
-                            <div class="version-list">
-                                <v-card
-                                    v-for="version in versions"
-                                    :key="version.id"
-                                    variant="outlined"
-                                >
-                                    <v-card-title>v{{ version.version }}</v-card-title>
-                                    <v-card-subtitle>{{ formatDate(version.created_at) }} · {{ version.content_hash.slice(0, 10) }}</v-card-subtitle>
-                                    <v-card-text>{{ sourceLabel(version.source) }}</v-card-text>
-                                    <v-card-actions>
-                                        <v-btn
-                                            variant="text"
-                                            @click="requestLoadVersion(version)"
-                                        >
-                                            {{ t('skills.inspectVersion') }}
-                                        </v-btn>
-                                        <v-btn
-                                            v-if="version.version !== selected.current_version"
-                                            color="warning"
-                                            variant="text"
-                                            @click="requestRollback(version.version)"
-                                        >
-                                            {{ t('skills.rollback') }}
-                                        </v-btn>
-                                    </v-card-actions>
-                                </v-card>
-                            </div>
-                        </v-window-item>
-
                         <v-window-item value="runs">
                             <v-alert
                                 v-if="!editorReadyToRun"
@@ -472,7 +431,7 @@
                             <section class="run-console">
                                 <div class="run-console-heading">
                                     <div>
-                                        <h3>{{ t('skills.runCurrentVersion', { version: selected.current_version }) }}</h3>
+                                        <h3>{{ t('skills.runCurrentContent') }}</h3>
                                         <p>{{ t('skills.runPrivacy') }}</p>
                                     </div>
                                     <div class="run-actions">
@@ -509,7 +468,7 @@
                                     :data-testid="`skill-run-${run.status}`"
                                 >
                                     <v-card-title class="run-title">
-                                        <span>{{ run.mode === 'trial' ? t('skills.trialRun') : t('skills.manualRun') }} · v{{ run.version }}</span>
+                                        <span>{{ run.mode === 'trial' ? t('skills.trialRun') : t('skills.manualRun') }} · {{ run.content_hash.slice(0, 10) }}</span>
                                         <v-chip
                                             size="small"
                                             :color="runColor(run.status)"
@@ -582,28 +541,6 @@
         </v-dialog>
 
         <v-dialog
-            v-model="rollbackDialog"
-            max-width="520"
-        >
-            <v-card>
-                <v-card-title>{{ t('skills.rollbackTitle', { version: rollbackTarget }) }}</v-card-title>
-                <v-card-text>{{ t('skills.rollbackHint') }}</v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn @click="rollbackDialog = false">
-                        {{ t('common.cancel') }}
-                    </v-btn>
-                    <v-btn
-                        color="warning"
-                        @click="confirmRollback"
-                    >
-                        {{ t('skills.rollback') }}
-                    </v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-        <v-dialog
             v-model="discardDialog"
             max-width="520"
         >
@@ -660,27 +597,27 @@ interface SkillSummary {
     name: string;
     description: string;
     status: string;
-    current_version: number;
-}
-
-interface SkillVersion {
-    id: number;
-    version: number;
+    artifact_path: string;
     content_hash: string;
     source: Record<string, unknown>;
+}
+
+interface SkillDocument {
+    content_hash: string;
     manifest: Record<string, any>;
     markdown: string;
-    created_at: string;
+    sensitive_acknowledged: boolean;
 }
 
 interface SkillDetail extends SkillSummary {
-    version: SkillVersion;
+    document: SkillDocument;
 }
 
 interface SkillRun {
     id: string;
     mode: string;
-    version: number;
+    content_hash: string;
+    artifact_path: string;
     status: string;
     progress_message: string;
     input_summary: Record<string, any>;
@@ -700,11 +637,9 @@ interface SkillPackage {
     name: string;
     folder: string;
     filename: string;
-    version: number;
     format: string;
     download_url: string;
     storage_path: string;
-    archive_path: string;
     files: SkillPackageFile[];
 }
 
@@ -712,7 +647,6 @@ const { t } = useI18n();
 const { $backend } = useNuxtApp();
 const skills = ref<SkillSummary[]>([]);
 const selected = ref<SkillDetail | null>(null);
-const versions = ref<SkillVersion[]>([]);
 const runs = ref<SkillRun[]>([]);
 const packageInfo = ref<SkillPackage | null>(null);
 const activePackagePath = ref('SKILL.md');
@@ -726,12 +660,9 @@ const tab = ref('edit');
 const errorMessage = ref('');
 const sourceDialog = ref(false);
 const sourceTaskId = ref('');
-const rollbackDialog = ref(false);
-const rollbackTarget = ref(0);
 const discardDialog = ref(false);
 const deleteDialog = ref(false);
 const editorBaseline = ref('');
-const editorVersion = ref(0);
 let pendingDiscardAction: null | (() => Promise<void> | void) = null;
 const findings = ref<Array<{ kind: string; field: string; hard_block: boolean }>>([]);
 const sensitiveAcknowledged = ref(false);
@@ -751,10 +682,7 @@ const statusOptions = computed(() => [
 ]);
 const hardSensitiveBlock = computed(() => findings.value.some(item => item.hard_block));
 const hasUnsavedChanges = computed(() => Boolean(selected.value) && editorSnapshot() !== editorBaseline.value);
-const editorMatchesCurrentVersion = computed(
-    () => Boolean(selected.value) && editorVersion.value === selected.value?.current_version,
-);
-const editorReadyToRun = computed(() => editorMatchesCurrentVersion.value && !hasUnsavedChanges.value);
+const editorReadyToRun = computed(() => Boolean(selected.value) && !hasUnsavedChanges.value);
 const packageDownloadUrl = computed(() => packageInfo.value?.download_url || '#');
 const activePackageFile = computed(
     () => packageInfo.value?.files.find(file => file.path === activePackagePath.value) || packageInfo.value?.files[0],
@@ -801,8 +729,8 @@ async function selectSkill(id: string) {
     try {
         const response = await request(`/ai/skills/${id}`);
         selected.value = response.skill;
-        loadVersionIntoEditor(response.skill.version);
-        await Promise.all([loadVersions(), loadRuns(), loadPackage()]);
+        loadDocumentIntoEditor(response.skill.document);
+        await Promise.all([loadRuns(), loadPackage()]);
     } catch (error) {
         errorMessage.value = messageOf(error);
     }
@@ -853,7 +781,7 @@ function buildManifest() {
     };
 }
 
-async function saveVersion() {
+async function saveCurrent() {
     if (!selected.value) return;
     saving.value = true;
     errorMessage.value = '';
@@ -862,15 +790,15 @@ async function saveVersion() {
         const response = await request(
             `/ai/skills/${selected.value.id}`,
             jsonOptions('PATCH', {
-                base_version: selected.value.current_version,
+                base_hash: selected.value.content_hash,
                 manifest: buildManifest(),
                 markdown: editor.markdown,
                 sensitive_acknowledged: sensitiveAcknowledged.value,
             }),
         );
         selected.value = response.skill;
-        loadVersionIntoEditor(response.skill.version);
-        await Promise.all([loadSkills(), loadVersions(), loadRuns(), loadPackage()]);
+        loadDocumentIntoEditor(response.skill.document);
+        await Promise.all([loadSkills(), loadRuns(), loadPackage()]);
     } catch (error) {
         errorMessage.value = messageOf(error);
     } finally {
@@ -878,8 +806,8 @@ async function saveVersion() {
     }
 }
 
-function loadVersionIntoEditor(version: SkillVersion) {
-    const manifest = version.manifest;
+function loadDocumentIntoEditor(document: SkillDocument) {
+    const manifest = document.manifest;
     editor.name = manifest.name || '';
     editor.packageName = manifest.package_name || '';
     editor.description = manifest.description || '';
@@ -893,15 +821,10 @@ function loadVersionIntoEditor(version: SkillVersion) {
     editor.outputSchema = pretty(manifest.output_schema || {});
     editor.sources = pretty(manifest.sources || []);
     editor.selfTests = pretty(manifest.self_tests || []);
-    editor.markdown = version.markdown || '';
-    sensitiveAcknowledged.value = false;
+    editor.markdown = document.markdown || '';
+    sensitiveAcknowledged.value = document.sensitive_acknowledged;
     findings.value = [];
-    editorVersion.value = version.version;
     editorBaseline.value = editorSnapshot();
-}
-
-function requestLoadVersion(version: SkillVersion) {
-    runWithUnsavedGuard(() => loadVersionIntoEditor(version));
 }
 
 function editorSnapshot() {
@@ -929,12 +852,6 @@ function confirmDiscard() {
     if (action) void action();
 }
 
-async function loadVersions() {
-    if (!selected.value) return;
-    const response = await request(`/ai/skills/${selected.value.id}/versions`);
-    versions.value = response.versions;
-}
-
 async function loadRuns() {
     if (!selected.value) return;
     const response = await request(`/ai/skills/${selected.value.id}/runs`);
@@ -946,7 +863,7 @@ async function loadPackage() {
     if (!selected.value) return;
     packageLoading.value = true;
     try {
-        const response = await request(`/ai/skills/${selected.value.id}/package?version=${selected.value.current_version}`);
+        const response = await request(`/ai/skills/${selected.value.id}/package`);
         packageInfo.value = response.package;
         activePackagePath.value = response.package.files[0]?.path || '';
     } finally {
@@ -967,31 +884,6 @@ async function changeStatus(status: string) {
     }
 }
 
-function openRollback(version: number) {
-    rollbackTarget.value = version;
-    rollbackDialog.value = true;
-}
-
-function requestRollback(version: number) {
-    runWithUnsavedGuard(() => openRollback(version));
-}
-
-async function confirmRollback() {
-    if (!selected.value) return;
-    try {
-        const response = await request(
-            `/ai/skills/${selected.value.id}/rollback`,
-            jsonOptions('POST', { version: rollbackTarget.value }),
-        );
-        selected.value = response.skill;
-        loadVersionIntoEditor(response.skill.version);
-        rollbackDialog.value = false;
-        await Promise.all([loadSkills(), loadVersions(), loadRuns(), loadPackage()]);
-    } catch (error) {
-        errorMessage.value = messageOf(error);
-    }
-}
-
 async function startRun(mode: string) {
     if (!selected.value) return;
     errorMessage.value = '';
@@ -999,7 +891,7 @@ async function startRun(mode: string) {
         const input = JSON.parse(runInput.value);
         const response = await request(
             `/ai/skills/${selected.value.id}/runs`,
-            jsonOptions('POST', { mode, version: selected.value.current_version, input, authorization_context: { book_ids: [] } }),
+            jsonOptions('POST', { mode, input, authorization_context: { book_ids: [] } }),
         );
         runs.value.unshift(response.run);
         startPolling(response.run);
@@ -1049,7 +941,6 @@ async function confirmDelete() {
         pollTimers.clear();
         selected.value = null;
         packageInfo.value = null;
-        versions.value = [];
         runs.value = [];
         deleteDialog.value = false;
         await loadSkills();
@@ -1090,17 +981,6 @@ function runStatusLabel(status: string) {
 
 function runColor(status: string) {
     return ({ succeeded: 'success', failed: 'error', cancelled: 'grey', running: 'primary', queued: 'warning' } as Record<string, string>)[status] || 'grey';
-}
-
-function formatDate(value: string) {
-    return value ? new Date(value).toLocaleString() : '';
-}
-
-function sourceLabel(source: Record<string, unknown>) {
-    if (source.kind === 'rollback') return t('skills.sourceRollback', { version: source.target_version });
-    if (source.kind === 'ai_task') return t('skills.sourceTask');
-    if (source.kind === 'edit') return t('skills.sourceEdit');
-    return t('skills.sourceBlank');
 }
 
 function inputSummary(summary: Record<string, any>) {
@@ -1160,7 +1040,7 @@ function authorizationSummary(context: Record<string, any>) {
 .package-layout article { min-width: 0; padding: 18px; }
 .package-file-title { margin-bottom: 10px; font-weight: 750; }
 pre { max-width: 100%; padding: 16px; overflow: auto; border-radius: 12px; background: rgba(var(--v-theme-on-surface), .07); font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
-.version-list,.run-list { display: grid; gap: 12px; }
+.run-list { display: grid; gap: 12px; }
 .run-console { margin-bottom: 18px; padding: 18px; border: 1px solid rgb(var(--v-theme-surface-variant)); border-radius: 16px; background: rgba(var(--v-theme-primary), .05); }
 .run-console-heading { margin-bottom: 14px; }
 .run-console-heading h3 { margin: 0; }

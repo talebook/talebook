@@ -573,55 +573,38 @@ class AITask(Base, SQLAlchemyMixin):
 
 
 class Skill(Base, SQLAlchemyMixin):
-    """Creator-private reusable AI workflow."""
+    """Creator-private index for a directory-authoritative Agent Skill."""
 
     __tablename__ = "skills"
 
     id = Column(String(36), primary_key=True)
     owner_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    workspace_key = Column(String(64), nullable=False, index=True)
     name = Column(String(120), nullable=False, index=True)
     description = Column(String(500), default="")
     status = Column(String(24), default="draft", nullable=False, index=True)
-    current_version = Column(Integer, default=1, nullable=False)
+    artifact_path = Column(String(512), nullable=False)
+    content_hash = Column(String(64), nullable=False, index=True)
+    source = Column(MutableDict.as_mutable(JSONType), default={})
+    sensitive_acknowledged = Column(Boolean, default=False, nullable=False)
     create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
     update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
     last_run_at = Column(DateTime)
 
     owner = relationship(Reader, backref="skills")
-    versions = relationship("SkillVersion", back_populates="skill", cascade="all, delete-orphan")
     runs = relationship("SkillRun", back_populates="skill", cascade="all, delete-orphan")
 
 
-class SkillVersion(Base, SQLAlchemyMixin):
-    """Immutable manifest and Markdown snapshot for a Skill."""
-
-    __tablename__ = "skill_versions"
-    __table_args__ = (UniqueConstraint("skill_id", "version", name="uq_skill_version"),)
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    skill_id = Column(String(36), ForeignKey("skills.id"), nullable=False, index=True)
-    version = Column(Integer, nullable=False)
-    manifest = Column(MutableDict.as_mutable(JSONType), default={})
-    markdown = Column(Text, default="")
-    source = Column(MutableDict.as_mutable(JSONType), default={})
-    content_hash = Column(String(64), nullable=False, index=True)
-    sensitive_acknowledged = Column(Boolean, default=False, nullable=False)
-    created_by = Column(Integer, ForeignKey("readers.id"), nullable=False)
-    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
-
-    skill = relationship(Skill, back_populates="versions")
-
-
 class SkillRun(Base, SQLAlchemyMixin):
-    """One isolated trial or manual execution of an immutable Skill version."""
+    """One isolated execution pinned to the directory path and SHA read at submission."""
 
     __tablename__ = "skill_runs"
 
     id = Column(String(36), primary_key=True)
     skill_id = Column(String(36), ForeignKey("skills.id"), nullable=False, index=True)
-    version_id = Column(Integer, ForeignKey("skill_versions.id"), nullable=False, index=True)
-    version = Column(Integer, nullable=False)
     owner_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    artifact_path = Column(String(512), nullable=False)
+    content_hash = Column(String(64), nullable=False, index=True)
     mode = Column(String(24), nullable=False)
     status = Column(String(24), default="queued", nullable=False, index=True)
     progress_message = Column(String(256), default="")
@@ -640,7 +623,6 @@ class SkillRun(Base, SQLAlchemyMixin):
     finished_at = Column(DateTime)
 
     skill = relationship(Skill, back_populates="runs")
-    skill_version = relationship(SkillVersion)
 
 
 class RecommendationPreference(Base, SQLAlchemyMixin):

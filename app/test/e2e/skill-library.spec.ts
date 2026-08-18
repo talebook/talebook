@@ -2,11 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 const skillId = '11111111-1111-1111-1111-111111111111';
 const mockApiUrl = process.env.SKILL_MOCK_API_URL || 'http://127.0.0.1:8080';
-const version = {
-    id: 11,
-    version: 3,
+const skillDocument = {
     content_hash: '2a5e0a9c43f6e47b574dd649737ed59f20fef704c67cd2f7b0bd1b684f204aaa',
-    source: { kind: 'edit', from_version: 2 },
     sensitive_acknowledged: false,
     created_at: '2026-08-16T08:30:00',
     markdown: '# 阅读摘要整理\n\n聚焦中心判断、关键机制、证据、边界与含义。',
@@ -39,18 +36,20 @@ const version = {
 
 const skill = {
     id: skillId,
-    name: version.manifest.name,
-    description: version.manifest.description,
+    name: skillDocument.manifest.name,
+    description: skillDocument.manifest.description,
     status: 'enabled',
-    current_version: 3,
-    version,
+    artifact_path: `bdc8f86b56413ba12c5b7ab0/skills/${skillId}/reading-summary`,
+    content_hash: skillDocument.content_hash,
+    source: { kind: 'ai_task' },
+    document: skillDocument,
 };
 
 const run = {
     id: '22222222-2222-2222-2222-222222222222',
     skill_id: skillId,
-    version_id: 11,
-    version: 3,
+    artifact_path: skill.artifact_path,
+    content_hash: skill.content_hash,
     mode: 'trial',
     status: 'succeeded',
     progress_message: '运行完成',
@@ -69,13 +68,11 @@ const run = {
 const packageInfo = {
     name: 'reading-summary',
     folder: 'reading-summary',
-    filename: 'reading-summary-v3.zip',
-    version: 3,
-    content_hash: version.content_hash,
+    filename: 'reading-summary.zip',
+    content_hash: skillDocument.content_hash,
     format: 'agent-skills.v1',
-    download_url: `/api/ai/skills/${skillId}/download?version=3`,
-    storage_path: `skills/1/${skillId}/v3/reading-summary`,
-    archive_path: `skills/1/${skillId}/v3/reading-summary-v3.zip`,
+    download_url: `/api/ai/skills/${skillId}/download`,
+    storage_path: skill.artifact_path,
     files: [
         {
             path: 'SKILL.md',
@@ -99,7 +96,6 @@ async function routeSkills(page: Page) {
         let body;
         if (path === '/api/ai/skills') body = { err: 'ok', skills: [skill] };
         else if (path.endsWith('/package')) body = { err: 'ok', package: packageInfo };
-        else if (path.endsWith('/versions')) body = { err: 'ok', versions: [version] };
         else if (path.endsWith('/runs')) body = { err: 'ok', runs: [run] };
         else if (path === `/api/ai/skills/${skillId}`) body = { err: 'ok', skill };
         else body = { err: 'skill.not_found', msg: 'fixture route missing' };
@@ -112,7 +108,7 @@ test.beforeEach(async ({ page, request }) => {
     await routeSkills(page);
 });
 
-test('renders the versioned SKILL editor and complete run contract in light theme', async ({ page }) => {
+test('renders the directory-authoritative SKILL editor and complete run contract in light theme', async ({ page }) => {
     await page.goto('/ai/skills');
     await expect(page.getByRole('heading', { name: 'SKILL 生成器' })).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: /阅读摘要整理/ }).click();
@@ -126,7 +122,7 @@ test('renders the versioned SKILL editor and complete run contract in light them
 
     await page.getByRole('tab', { name: '运行' }).click();
     const runCard = page.getByTestId('skill-run-succeeded');
-    await expect(runCard).toContainText('v3');
+    await expect(runCard).toContainText(skill.content_hash.slice(0, 10));
     await expect(runCard).toContainText('content:str(1860)');
     await expect(runCard).toContainText('没有附加资源授权');
     await expect(runCard).toContainText('运行完成');
@@ -140,5 +136,5 @@ test('keeps the workbench readable in dark theme and at mobile width', async ({ 
     await expect(page.locator('.skill-workbench')).toHaveScreenshot('skill-library-dark-mobile.png', {
         animations: 'disabled',
     });
-    await expect(page.getByRole('button', { name: '保存并生成新版 ZIP' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '保存并替换当前 SKILL' })).toBeVisible();
 });

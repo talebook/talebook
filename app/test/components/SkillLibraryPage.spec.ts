@@ -28,12 +28,9 @@ const vuetify = createVuetify({ components, directives });
 
 import SkillLibraryPage from '@/components/SkillLibraryPage.vue';
 
-const version = {
-    id: 11,
-    version: 1,
+const skillDocument = {
     content_hash: 'abcdef0123456789',
-    source: { kind: 'blank' },
-    created_at: '2026-08-16T08:00:00',
+    sensitive_acknowledged: false,
     markdown: '# 摘要整理\n\n只处理提供的内容。',
     manifest: {
         name: '摘要整理',
@@ -67,14 +64,17 @@ const skill = {
     name: '摘要整理',
     description: '把输入整理成固定格式。',
     status: 'enabled',
-    current_version: 1,
-    version,
+    artifact_path: `f21fcb8b08e80be151a30eb4/skills/11111111-1111-1111-1111-111111111111/reading-summary`,
+    content_hash: 'abcdef0123456789',
+    source: { kind: 'blank' },
+    document: skillDocument,
 };
 
 const succeededRun = {
     id: '22222222-2222-2222-2222-222222222222',
     mode: 'trial',
-    version: 1,
+    content_hash: 'abcdef0123456789',
+    artifact_path: skill.artifact_path,
     status: 'succeeded',
     progress_message: '运行完成',
     input_summary: { fields: [{ name: 'content', type: 'str', size: 12 }] },
@@ -86,12 +86,10 @@ const succeededRun = {
 const packageInfo = {
     name: 'reading-summary',
     folder: 'reading-summary',
-    filename: 'reading-summary-v1.zip',
-    version: 1,
+    filename: 'reading-summary.zip',
     format: 'agent-skills.v1',
-    download_url: `/api/ai/skills/${skill.id}/download?version=1`,
-    storage_path: `skills/1/${skill.id}/v1/reading-summary`,
-    archive_path: `skills/1/${skill.id}/v1/reading-summary-v1.zip`,
+    download_url: `/api/ai/skills/${skill.id}/download`,
+    storage_path: skill.artifact_path,
     files: [
         {
             path: 'SKILL.md',
@@ -113,9 +111,9 @@ function installBackend() {
         if (url.startsWith('/ai/skills?')) return { err: 'ok', skills: [skill] };
         if (url === '/ai/skills' && options?.method === 'POST') return { err: 'ok', skill };
         if (url === `/ai/skills/${skill.id}` && options?.method === 'DELETE') return { err: 'ok' };
+        if (url === `/ai/skills/${skill.id}` && options?.method === 'PATCH') return { err: 'ok', skill };
         if (url === `/ai/skills/${skill.id}`) return { err: 'ok', skill };
-        if (url.startsWith(`/ai/skills/${skill.id}/package?`)) return { err: 'ok', package: packageInfo };
-        if (url.endsWith('/versions')) return { err: 'ok', versions: [version] };
+        if (url === `/ai/skills/${skill.id}/package`) return { err: 'ok', package: packageInfo };
         if (url.endsWith('/runs')) return { err: 'ok', runs: [succeededRun] };
         throw new Error(`unexpected request ${url}`);
     });
@@ -185,7 +183,7 @@ describe('SkillLibraryPage.vue', () => {
         await packageTab?.trigger('click');
         await flushPromises();
         const browser = wrapper.find('[data-testid="skill-package-browser"]');
-        expect(browser.text()).toContain('reading-summary-v1.zip');
+        expect(browser.text()).toContain('reading-summary.zip');
         expect(browser.text()).toContain(packageInfo.storage_path);
         expect(browser.text()).toContain('SKILL.md');
         expect(browser.text()).toContain('name: reading-summary');
@@ -203,7 +201,7 @@ describe('SkillLibraryPage.vue', () => {
         wrapper.unmount();
     });
 
-    it('shows version, input summary, authorization context, and one terminal state for each run', async () => {
+    it('shows the pinned content hash, input summary, authorization context, and one terminal state for each run', async () => {
         const wrapper = mountPage();
         await flushPromises();
         await wrapper.find('button.skill-list-item').trigger('click');
@@ -213,7 +211,7 @@ describe('SkillLibraryPage.vue', () => {
         await runsTab?.trigger('click');
         await flushPromises();
         const card = wrapper.find('[data-testid="skill-run-succeeded"]');
-        expect(card.text()).toContain('v1');
+        expect(card.text()).toContain('abcdef0123');
         expect(card.text()).toContain('content:str(12)');
         expect(card.text()).toContain('skills.noResourceAuthorization');
         expect(card.text()).toContain('运行完成');
@@ -238,11 +236,7 @@ describe('SkillLibraryPage.vue', () => {
         expect(wrapper.text()).toContain('skills.syncBeforeRun');
         const trialButton = wrapper.findAll('button').find(button => button.text() === 'skills.trialRun');
         expect(trialButton?.attributes('disabled')).toBeDefined();
-        const versionsTab = wrapper.findAll('button').find(button => button.text() === 'skills.versions');
-        await versionsTab?.trigger('click');
-        await flushPromises();
-        const inspectButton = wrapper.findAll('button').find(button => button.text() === 'skills.inspectVersion');
-        await inspectButton?.trigger('click');
+        await wrapper.find('[data-testid="create-blank-skill"]').trigger('click');
         await flushPromises();
 
         expect(document.body.textContent).toContain('skills.unsavedTitle');
@@ -251,7 +245,20 @@ describe('SkillLibraryPage.vue', () => {
             .find(button => button.textContent?.trim() === 'skills.discardChanges');
         discardButton?.click();
         await flushPromises();
-        expect(nameInput?.element.value).toBe('摘要整理');
+        expect(backendMock).toHaveBeenCalledWith('/ai/skills', expect.objectContaining({ method: 'POST' }));
+        wrapper.unmount();
+    });
+
+    it('saves by the current content hash without version endpoints', async () => {
+        const wrapper = mountPage();
+        await flushPromises();
+        await wrapper.find('button.skill-list-item').trigger('click');
+        await flushPromises();
+        await wrapper.find('[data-testid="save-skill"]').trigger('click');
+        await flushPromises();
+        const patchCall = backendMock.mock.calls.find(([url, options]) => url === `/ai/skills/${skill.id}` && options?.method === 'PATCH');
+        expect(JSON.parse(patchCall?.[1].body)).toMatchObject({ base_hash: skill.content_hash });
+        expect(backendMock.mock.calls.some(([url]) => String(url).includes('/versions'))).toBe(false);
         wrapper.unmount();
     });
 });

@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Talebook 创建者私有、可持久化生成 Agent Skills ZIP、可查看下载删除、可版本化试运行的 SKILL 方案。" />
+    <meta name="description" content="Talebook 以 books/ai 用户工作空间目录为权威来源的私有 Agent Skills 生成、查看、下载、删除与试运行方案。" />
     <link rel="icon" href="data:," />
-    <title>可版本化、可试运行的 SKILL 沉淀 · ACTIVE</title>
+    <title>目录权威的 SKILL 沉淀 · ACTIVE</title>
     <style>
       :root { color-scheme:light dark; --bg:#f3f5f3; --panel:#fff; --ink:#20251f; --muted:#5e695d; --line:#d7ddd5; --accent:#356b43; --soft:#e8f3e9; --warn:#8a5612; }
       * { box-sizing:border-box; }
@@ -30,8 +30,8 @@
   </head>
   <body>
     <header>
-      <h1>可版本化、可试运行的 SKILL 沉淀</h1>
-      <p>把一次有效的 AI 工作方法变成符合 Agent Skills 目录规范、可查看与下载 ZIP、可删除，并可审阅回滚和隔离试运行的创建者私有资产。</p>
+      <h1>目录权威的 SKILL 沉淀</h1>
+      <p>把一次有效的 AI 工作方法保存为符合 Agent Skills 规范的当前目录；目录是内容唯一来源，数据库只承担私有索引、状态与运行审计。</p>
       <div class="meta">
         <span>状态：ACTIVE</span><span>创建日期：2026-08-16</span><span>所属模块：webserver / app</span>
         <span>需求来源：TB-56</span><span>基线：feat/ai_1.0</span>
@@ -42,39 +42,40 @@
         <h2>1. 原始诉求</h2>
         <p>“支持从已完成的 AI 成果/任务生成 SKILL 草稿，也支持空白模板创建；提供结构化字段与 Markdown 编辑、预览、样例试运行、草稿/启用/停用、版本记录和回滚；AI 中心提供创建者私有的列表、搜索、版本和手动运行，并展示版本、输入摘要、授权上下文、进度与唯一终态。”</p>
         <p><strong>评审反馈：</strong>初版把数据库 manifest 当作产品本体，不符合 Agent Skills 的自包含目录规则。核心流程必须是生成 SKILL ZIP、查看包内文件、下载与删除；每个 ZIP 必须有单一同名根目录、必需的 <code>SKILL.md</code>，以及真正需要时才加载的 <code>scripts/</code>、<code>references/</code>、<code>assets/</code>。</p>
+        <p><strong>统一存储规范：</strong>TB-52 要求所有 AI 产物采用 <code>books/ai/{user-workspace}/{feature}/...</code>，目录为权威内容来源；应用层不做默认版本化，不保存完整正文副本，不提供版本列表、回滚或 <code>v{version}</code> 目录。</p>
       </section>
       <section>
         <h2>2. 目标与边界</h2>
         <table>
           <thead><tr><th>首版交付</th><th>明确不做</th></tr></thead>
-          <tbody><tr><td>以 Agent Skills 文件夹为交付本体；生成、查看、下载 ZIP、删除；严格 hyphen-case 包名；<code>SKILL.md</code> 仅含 <code>name</code>/<code>description</code> frontmatter；按需引用 <code>references/contract.json</code>。数据库继续承担私有版本、启停/回滚、敏感信息门禁、schema 校验、试运行和运行记录。</td><td>公开市场、团队共享、远程导入、上传任意 ZIP、后台静默触发、自我修改、任意脚本/依赖安装、MCP、任意系统写入。</td></tr></tbody>
+          <tbody><tr><td>以当前 Agent Skills 文件夹为交付本体；生成、编辑、查看、下载 ZIP、删除；严格 hyphen-case 包名；<code>SKILL.md</code> 仅含 <code>name</code>/<code>description</code> frontmatter；按需引用 <code>references/contract.json</code>。数据库只承担 owner/workspace、名称、相对路径、SHA-256、状态和运行审计。</td><td>应用层版本列表、不可变版本表、回滚、<code>v{version}</code> 目录；公开市场、团队共享、远程导入、上传任意 ZIP、后台静默触发、自我修改、任意脚本/依赖安装、MCP、任意系统写入。</td></tr></tbody>
         </table>
       </section>
       <section>
         <h2>3. 产品流程</h2>
         <div class="flow">
-          <article><strong>生成</strong><br />从空白模板或本人已成功 AI 任务提取最小来源摘要，生成可下载的 Agent Skills 文件夹版本，不复制整段正文或会话。</article>
-          <article><strong>查看与保存</strong><br />编辑显示名、hyphen-case 包名、结构字段与 Markdown；查看 <code>SKILL.md</code> 和引用文件，保存即生成不可变新版 ZIP。</article>
-          <article><strong>下载或删除</strong><br />下载精确保存版本的 ZIP；删除前明确确认，删除 SKILL、版本和终态运行记录，活跃运行必须先取消。</article>
-          <article><strong>试运行</strong><br />指定不可变版本和样例输入；运行前重验 owner、状态、schema 与授权上下文。</article>
-          <article><strong>启用复用</strong><br />试运行成功后才能启用；每次保存产生新版本，可停用或回滚为新的当前版本。</article>
+          <article><strong>生成</strong><br />从空白模板或本人已成功 AI 任务提取最小来源摘要，原子写入当前 Agent Skills 文件夹，不复制整段正文或会话。</article>
+          <article><strong>查看与保存</strong><br />服务端在 ACL 通过后从当前目录读取 <code>SKILL.md</code> 和 <code>references/contract.json</code>；保存校验后原子替换当前目录并更新索引 SHA。</article>
+          <article><strong>下载或删除</strong><br />按当前目录即时生成确定性 ZIP；删除前明确确认，同步删除索引、目录和终态运行记录，活跃运行必须先取消。</article>
+          <article><strong>试运行</strong><br />运行开始时从当前目录读取、校验并记录相对路径与 SHA；同时重验 owner、schema 与授权上下文。</article>
+          <article><strong>启用复用</strong><br />当前 SHA 试运行成功后才能启用；内容修改后回到草稿并要求新 SHA 重新试运行，可停用但不提供应用层历史回滚。</article>
         </div>
       </section>
       <section>
         <h2>4. 数据与状态</h2>
-        <p><code>skills</code> 保存 owner、名称、描述、状态与当前版本；<code>skill_versions</code> 保存版本号、manifest、Markdown、来源摘要和内容哈希；<code>skill_runs</code> 固定绑定 owner、skill/version、运行模式、输入摘要、授权上下文、进度、唯一终态、输出或脱敏错误。</p>
-        <p>版本不可原地改写：编辑保存、回滚都创建新的单调递增版本。状态为 <code>draft</code>、<code>enabled</code>、<code>disabled</code>；运行终态为 <code>succeeded</code>、<code>failed</code> 或 <code>cancelled</code>。</p>
+        <p><code>skills</code> 保存 owner、稳定工作空间 key、名称、描述、状态、相对目录、当前 SHA、来源摘要和敏感信息确认；不保存 manifest 或 Markdown。删除 <code>skill_versions</code>。<code>skill_runs</code> 绑定 owner、skill、运行时读取的相对路径和 SHA、运行模式、输入摘要、授权上下文、进度、唯一终态、输出或脱敏错误。</p>
+        <p>状态为 <code>draft</code>、<code>enabled</code>、<code>disabled</code>；运行终态为 <code>succeeded</code>、<code>failed</code> 或 <code>cancelled</code>。内容 SHA 改变即撤销旧试运行门禁，不把运行审计误当作产物版本。</p>
       </section>
       <section>
         <h2>5. manifest 与 API</h2>
         <p>manifest 必含显示名、符合 <code>^[a-z0-9]+(?:-[a-z0-9]+)*$</code> 且不超过 64 位的包名、描述、适用范围、前提、触发说明、输入 schema、步骤、术语/例子、失败条件、输出 schema、来源与自测；只接受 JSON Schema 的安全子集。物化后的 ZIP 以包名作为唯一根目录；<code>SKILL.md</code> frontmatter 只写同名 <code>name</code> 与同时说明用途和触发时机的 <code>description</code>，正文限制 500 行，并明确何时读取 <code>references/contract.json</code>。</p>
-        <p>所有 AI 产物统一落在可配置根目录 <code>AI_ARTIFACT_ROOT</code>，默认 <code>/data/books/ai</code>。SKILL 每个不可变版本的源目录为 <code>skills/{owner_id}/{skill_id}/v{version}/{package_name}/</code>，同级 ZIP 为 <code>{package_name}-v{version}.zip</code>；API 只返回根目录内相对路径。写入使用同一文件系统内的 staging 与原子 rename，目录/文件权限分别为 <code>0700</code>/<code>0600</code>；查看或下载发现文件缺失、额外或损坏时，从数据库不可变版本原子重建。删除 SKILL 时同步清理该 owner 下的全部本地产物版本。</p>
-        <p>API 在原有创建、详情、版本、回滚、状态与运行端点外，增加 <code>/api/ai/skills/:id/package</code> 查看精确保存版本的文件列表与内容，以及 <code>/api/ai/skills/:id/download</code> 下载确定性 ZIP；删除继续使用详情端点的 <code>DELETE</code>。所有入口均需登录并以当前 owner 过滤。</p>
+        <p>所有 AI 产物统一落在可配置根目录 <code>AI_ARTIFACT_ROOT</code>，默认 <code>/data/books/ai</code>。当前 SKILL 目录为 <code>{workspace_key}/skills/{skill_id}/{package_name}/</code>，业务只保存相对目录；ZIP 不持久化，下载时从目录生成。写入使用同一文件系统的 staging 与原子 replace，目录/文件权限分别为 <code>0700</code>/<code>0600</code>；读取拒绝符号链接、路径越界、缺文件、额外文件或 SHA 不匹配，不从数据库重建正文。删除对象同步清理当前目录和空父目录。</p>
+        <p>API 保留创建、详情、状态、运行、文件包、下载和删除；移除 <code>/versions</code> 与 <code>/rollback</code>。所有入口均需登录并按当前 owner 过滤；文件内容必须在 ACL 通过后再读取。备份只需覆盖既有 <code>/data/books</code> 卷即可同时包含 DB 与 <code>books/ai</code>，数据库迁移不会伪装成文件迁移，缺失目录显式失败并可诊断。</p>
       </section>
       <section>
         <h2>6. 运行时与权限</h2>
-        <p>继续使用统一 <code>AgentRuntime</code> 与 Codex app-server；每次把指定版本物化为提示中的数据块，不写入用户全局技能目录。运行目录为空、只读、无 readable roots、审批关闭、无 MCP；限制输入体积、schema 深度、总时长与并发。成功必须同时满足 app-server 完成终态、输出 JSON 解析、输出 schema 和任务仍归当前 owner。</p>
-        <p>创建来源、读取版本、启停、回滚、运行、轮询和取消都重验 owner。运行保存授权上下文摘要而非长期权限；涉及书籍的上下文只记录当次重新验证后的资源标识。</p>
+        <p>继续使用统一 <code>AgentRuntime</code> 与 Codex app-server；每次读取当前目录并把校验后的内容作为提示数据块，不写入用户全局技能目录。运行目录为空、只读、无 readable roots、审批关闭、无 MCP；限制输入体积、schema 深度、总时长与并发。成功必须同时满足 app-server 完成终态、输出 JSON 解析、输出 schema、任务仍归当前 owner，且运行记录绑定启动时的目录 SHA。</p>
+        <p>创建来源、目录读取、启停、运行、轮询和取消都重验 owner。运行保存授权上下文摘要而非长期权限；涉及书籍的上下文只记录当次重新验证后的资源标识。</p>
       </section>
       <section>
         <h2>7. 安全策略</h2>
@@ -86,14 +87,14 @@
       </section>
       <section>
         <h2>8. 界面</h2>
-        <p>登录用户可从导航进入“SKILL 生成器”：搜索和状态筛选在左侧列表，右侧把“下载 ZIP”“删除 SKILL”设为直接动作，并提供“文件包”标签查看 <code>SKILL.md</code> 与 <code>references/contract.json</code>。编辑器分离显示名和包名，保存动作明确为“保存并生成新版 ZIP”；版本、预览、试运行、启停与回滚作为扩展能力保留。亮暗主题、390px 重排、键盘路径、删除确认、错误与空态纳入验证。</p>
+        <p>登录用户可从导航进入“SKILL 生成器”：搜索和状态筛选在左侧列表，右侧把“下载 ZIP”“删除 SKILL”设为直接动作，并提供“文件包”标签查看当前 <code>SKILL.md</code> 与 <code>references/contract.json</code>。编辑器分离显示名和包名，保存动作明确为“保存并替换当前 SKILL”；移除版本标签、版本号、历史载入和回滚。预览、试运行与启停保留。亮暗主题、390px 重排、键盘路径、删除确认、错误与空态纳入验证。</p>
       </section>
       <section>
         <h2>9. 风险与兼容性</h2>
         <ul>
-          <li>旧数据库：新增表由现有 <code>create_all</code> 建表，不修改已有列。</li>
+          <li>未合并旧实现：直接移除版本模型与版本 API；新表由现有 <code>create_all</code> 创建。若评审环境已有旧目录，显式迁移脚本只接受 owner ACL 与 SHA 都可验证的数据，否则报告并停止，不静默复制。</li>
           <li>schema 复杂度：首版拒绝引用、组合关键字和远程 schema，只实现 object/array/string/number/integer/boolean/null 及基础约束。</li>
-          <li>运行时不可用或中断：任务失败关闭并保留可重试版本，不把草稿误标为启用。</li>
+          <li>运行时不可用或中断：任务失败关闭并保留可重试的运行记录，不把草稿误标为启用。</li>
         </ul>
       </section>
       <section>
@@ -101,18 +102,16 @@
         <table>
           <thead><tr><th>检查</th><th>结果</th></tr></thead>
           <tbody>
-            <tr><td><code>python3 -m unittest tests.test_skill_library -v</code>（生产镜像挂载当前代码）</td><td>15 项通过；新增覆盖包名规则、500 行渐进披露限制、本地版本目录与 ZIP、存储失败回滚、文件查看、下载响应、自愈与删除级联；原有 owner 隔离、版本、试运行和运行终态继续通过。</td></tr>
-            <tr><td><code>python3 -m unittest tests.test_ai_artifacts -v</code></td><td>2 项通过；覆盖 <code>books/ai/{feature}</code> 分层、确定性目录/ZIP、损坏重建、整项删除，以及 feature、owner、artifact、version 和相对文件路径的越界校验。</td></tr>
-            <tr><td><code>python3 -m unittest tests.test_summary_duck -v</code>（生产镜像挂载当前代码）</td><td>16 项通过；统一 Runtime 与 Codex 协议回归通过。</td></tr>
-            <tr><td><code>npx vitest run test/components/SkillLibraryPage.spec.ts test/components/AppHeader.spec.ts</code></td><td>2 个文件、11 项通过：SKILL 组件 6 项覆盖 locale 结构、查看文件、下载链接和删除确认；AppHeader 5 项回归通过。为 Nuxt 4 下未落盘的 i18n 虚拟模板增加 Vitest 夹具，避免收集阶段缓存竞态。</td></tr>
-            <tr><td><code>skill-creator/scripts/quick_validate.py &lt;generated-skill&gt;</code></td><td>使用生产生成函数物化真实目录后返回 <code>Skill is valid!</code>；非手写替代样例。</td></tr>
-            <tr><td><code>npx playwright test test/e2e/skill-library.spec.ts --update-snapshots</code></td><td>2 项通过；验证新版生成器、文件查看、亮色桌面与暗色 390px 移动端，两张截图基线已更新并人工复核。</td></tr>
-            <tr><td><code>npm run lint</code>；<code>npm run build</code></td><td>均通过；lint 为 0 error、193 个仓库既有 warning，完整 Nuxt 客户端与 Nitro 服务端构建成功。</td></tr>
-            <tr><td><code>make lint-py</code>；<code>make check-design</code>；<code>git diff --check</code></td><td>均通过。</td></tr>
+            <tr><td><code>python3 -m unittest tests.test_ai_artifacts tests.test_skill_library -v</code></td><td>Calibre 测试镜像内 17/17 通过：目录权威 CRUD、owner ACL、SHA 门禁、原子替换、父目录/内部符号链接拒绝、删除清理、备份卷覆盖与 DB 无正文副本。</td></tr>
+            <tr><td><code>python3 -m unittest tests.test_summary_duck -v</code></td><td>16/16 通过；统一 Runtime 与 Codex 协议无回归。</td></tr>
+            <tr><td><code>npx vitest run test/components/SkillLibraryPage.spec.ts test/components/AppHeader.spec.ts</code></td><td>12/12 通过；当前 SHA 保存、查看、下载和运行体验通过，且无 <code>/versions</code> 请求。</td></tr>
+            <tr><td><code>skill-creator/scripts/quick_validate.py &lt;generated-skill&gt;</code></td><td>使用生产 <code>materialize_skill_package</code> 生成真实目录，校验结果 <code>Skill is valid!</code>。</td></tr>
+            <tr><td><code>npx playwright test test/e2e/skill-library.spec.ts --update-snapshots</code></td><td>Chromium 2/2 通过；更新并人工检查亮色桌面与暗色 390px 移动端截图。</td></tr>
+            <tr><td><code>npm run lint</code>；<code>npm run build</code></td><td>lint 0 errors（仅 193 个基线 warning）；Nuxt 生产构建成功。</td></tr>
+            <tr><td><code>make lint-py</code>；<code>make check-design</code>；<code>git diff --check</code></td><td>Python lint/format、设计文档状态校验与空白错误检查全部通过。</td></tr>
           </tbody>
         </table>
-        <p>完整 <code>python3 -m unittest discover tests -v</code> 在基线生产镜像中运行 616 项，因镜像/套件既有环境问题结束为 4 failures、17 errors：缺少 <code>pytest</code>、Calibre 测试库列不匹配、全量执行中的临时数据库缺少 <code>ai_tasks</code>/<code>skills</code> 表等；上述相关模块已用独立新进程定向运行并全部通过。</p>
-        <p>Chrome DevTools MCP 在当前运行环境不可用，因此无法执行仓库要求的该工具检查；使用真实 Chromium Playwright、桌面/移动端双主题截图与人工视觉检查作为替代，未把 mock API 结果视为真实数据验收。</p>
+        <p>测试中后端用例因 Calibre 依赖在项目测试镜像内执行；其余检查在当前工作树执行。</p>
       </section>
       <section>
         <h2>11. interface-review full</h2>
@@ -129,11 +128,12 @@
             <tr><td>MEDIUM：生成/创建术语不一致，移动端包名提示会被浮动操作区遮挡。</td><td>核心流程统一为“生成”，缩短提示并为窄屏增加安全右侧留白；修正 i18n 命名空间并加 locale 结构测试。</td></tr>
           </tbody>
         </table>
-        <p><strong>最终结论：Approve。</strong>加入共享 AI 产物根目录、原子重建与删除语义后再次复审，并完成真实 Chromium 双视口渲染；无新增或遗留 HIGH、MEDIUM 问题。Chrome DevTools MCP 不可用的工具限制已在测试结果中单独记录。</p>
+        <p><strong>本轮 full 审查：</strong>项目要求的 <code>interface-review</code> skill 未出现在本运行环境（<code>.agent_context/skills</code> 为空），因此以同等范围人工审查 <code>origin/feat/ai_1.0</code> 到最终工作树的完整差异。发现 HIGH：文件根下的 workspace/feature 父目录若被置换为符号链接，读取或删除可被重定向到根目录外。已在读取与删除前校验全部父级路径分量，增加防越界删除回归，并复跑 17 个后端用例。</p>
+        <p><strong>最终结论：通过。</strong>版本标签、历史载入、回滚动作与相关 API 均已移除；保存、下载、运行与启用均指向当前目录/SHA，人工复审后无未解决 HIGH 或 MEDIUM 问题。</p>
       </section>
       <section>
         <h2>12. 决策记录</h2>
-        <p>Issue 已明确产品边界，未再阻塞等待选择：首版采用通用但受限的 JSON Schema 子集；启用前要求至少一次当前版本试运行成功；“从成果生成”只提取本人成功任务的类型、版本和结果结构摘要，避免复制正文；回滚产生新版本以保留完整审计链。评审反馈后纠正产品本体：数据库 manifest 是编辑、版本与运行的权威来源，但用户交付物是符合 Agent Skills 规则的自包含 ZIP；查看、下载和删除成为核心动作，试运行与启停是附加能力。所有文件型产物统一置于 <code>books/ai/{feature}</code>，本功能默认物化到 <code>/data/books/ai/skills</code>。</p>
+        <p>首版采用通用但受限的 JSON Schema 子集；启用前要求当前 SHA 至少一次试运行成功；“从成果生成”只提取本人成功任务的类型、协议版本和结果结构摘要，避免复制正文。TB-52 的统一规范取代旧版本化决定：Agent Skills 当前目录是唯一内容来源，数据库不保存正文副本；所有文件型产物置于 <code>books/ai/{user-workspace}/skills</code>，运行记录只钉住相对路径与 SHA，不提供应用层回滚。</p>
       </section>
     </main>
   </body>

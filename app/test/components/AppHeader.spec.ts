@@ -14,7 +14,8 @@ vi.mock('vue-i18n', () => ({
     }),
 }));
 
-const { pushMock, storeState } = vi.hoisted(() => ({
+const { backendMock, pushMock, storeState } = vi.hoisted(() => ({
+    backendMock: vi.fn().mockResolvedValue({ err: 'ok', total: 0 }),
     pushMock: vi.fn(),
     storeState: {
         theme: 'light',
@@ -48,6 +49,10 @@ mockNuxtImport('useRoute', () => {
     return () => ({ path: '/' });
 });
 
+mockNuxtImport('useNuxtApp', () => {
+    return () => ({ $backend: backendMock });
+});
+
 const vuetify = createVuetify({ components, directives });
 global.ResizeObserver = require('resize-observer-polyfill');
 
@@ -56,7 +61,7 @@ import AppHeader from '@/components/AppHeader.vue';
 function mountHeader() {
     return mount(
         { components: { AppHeader }, template: '<v-app><AppHeader /></v-app>' },
-        { global: { plugins: [vuetify] } },
+        { global: { plugins: [vuetify], mocks: { $t: (key: string) => key } } },
     );
 }
 
