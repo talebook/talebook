@@ -38,6 +38,7 @@ class RuntimeRequest:
     prompt: str
     output_schema: Dict[str, Any]
     model: Optional[str] = None
+    service_name: str = "talebook_ai"
 
 
 @dataclasses.dataclass(frozen=True)
