@@ -33,6 +33,11 @@ test.describe('WeRead workbench', () => {
         await expect(page.getByText('2 小时 1 分钟')).toBeVisible();
 
         await page.getByRole('tab', { name: '笔记' }).click();
+        const importButton = page.getByRole('button', { name: '从已连接的微信读书导入笔记' });
+        await expect(importButton).toBeVisible();
+        await importButton.click();
+        await expect(page.getByText(/将使用已保存的密钥/)).toBeVisible();
+        await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
         await page.getByRole('button', { name: '读取笔记本' }).click();
         await expect(page.getByText(/1 本书有笔记，共 3 条/)).toBeVisible();
 

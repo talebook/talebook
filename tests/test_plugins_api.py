@@ -3,7 +3,7 @@ from unittest import mock
 
 from tests.test_main import TestWithAdminUser, get_db, setUpModule as init
 from webserver.models import PluginConnection, PluginInstallation, PluginSecret
-from webserver.plugins.runtime import ProviderAuthError, ProviderRateLimitError
+from webserver.plugins.runtime import ProviderAuthError, ProviderRateLimitError, WereadProvider
 
 
 def setUpModule():
@@ -120,6 +120,11 @@ class TestWereadIntegrationApi(TestWithAdminUser):
             },
         )
 
+        catalog = self.json("/api/admin/plugins")
+        definition = next(item for item in catalog["definitions"] if item["plugin_key"] == "talebook.weread")
+        self.assertIn("metadata", definition["categories"])
+        self.assertIn("metadata.lookup", definition["capabilities"])
+
     @mock.patch("webserver.handlers.plugins.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
     @mock.patch("webserver.handlers.plugins.WereadProvider")
     def test_query_stores_key_for_owner_but_redacts_it_from_response(self, provider_class, _settings):
@@ -162,3 +167,25 @@ class TestWereadIntegrationApi(TestWithAdminUser):
             )
             self.assertEqual(data["err"], code)
             self.assertNotIn(self.api_key, json.dumps(data, ensure_ascii=False))
+
+    @mock.patch("webserver.handlers.plugins.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
+    @mock.patch.object(WereadProvider, "_fetch_all", return_value=[])
+    @mock.patch("webserver.handlers.plugins.WereadProvider")
+    def test_import_preview_reuses_saved_connection_without_api_key(self, query_provider, fetch_all, _settings):
+        query_provider.return_value.query.return_value = {"results": []}
+        connected = self.json(
+            "/api/plugins/weread/query",
+            method="POST",
+            body=json.dumps({"api_key": self.api_key, "operation": "search", "params": {"keyword": "活着"}}),
+        )
+        self.assertEqual(connected["err"], "ok")
+
+        preview = self.json(
+            "/api/plugins/weread/import",
+            method="POST",
+            body=json.dumps({"action": "preview"}),
+        )
+
+        self.assertEqual(preview["err"], "ok")
+        self.assertEqual(preview["run"]["status"], "succeeded")
+        fetch_all.assert_called_once_with(self.api_key)

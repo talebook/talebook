@@ -1424,8 +1424,10 @@
     }
   },
   "wereadImport": {
-    "open": "Import WeRead",
+    "open": "Import WeRead notes",
+    "openConnected": "Import notes from connected WeRead",
     "title": "Import WeRead notes",
+    "connectedHint": "The saved credential {mask} will fetch your personal highlights and thoughts. No API key is needed here; select Preview to continue.",
     "bookmarkNotice": "WeRead currently exports bookmark counts, not bookmark text. Highlights, thoughts, chapter comments, and whole-book reviews will be imported.",
     "exportFile": "Official export JSON",
     "exportHint": "Single-book and batch exports are supported. The contents remain private to this import.",
@@ -1484,6 +1486,8 @@
     "readDays": "Active reading days",
     "dailyAverage": "Calendar-day average",
     "loadNotebooks": "Load notebooks",
+    "importNotesTitle": "Import WeRead notes into Talebook",
+    "importNotesDescription": "Fetch personal highlights, thoughts, chapter comments, and whole-book reviews from the connected account, or use an official JSON export.",
     "notebookSummary": "{books} books have {notes} notes (bookmarks are counted but their text cannot be exported).",
     "noteCounts": "Highlights {highlights} · thoughts/reviews {reviews} · bookmarks {bookmarks}",
     "viewNotes": "View content",

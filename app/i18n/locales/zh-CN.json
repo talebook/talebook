@@ -1440,8 +1440,10 @@
     }
   },
   "wereadImport": {
-    "open": "导入微信读书",
+    "open": "导入微信读书笔记",
+    "openConnected": "从已连接的微信读书导入笔记",
     "title": "导入微信读书笔记",
+    "connectedHint": "将使用已保存的密钥 {mask} 直接拉取个人划线和想法；无需再次输入 API Key，点击“预览”即可。",
     "bookmarkNotice": "微信读书官方目前只提供书签数量，不能导出书签正文。本功能会导入划线、想法、章节点评和整本书评。",
     "exportFile": "官方导出 JSON",
     "exportHint": "支持单本书或多本书批量导出；文件内容只用于本次私有导入。",
@@ -1500,6 +1502,8 @@
     "readDays": "有效阅读天数",
     "dailyAverage": "自然日均时长",
     "loadNotebooks": "读取笔记本",
+    "importNotesTitle": "把微信读书笔记导入 Talebook",
+    "importNotesDescription": "从已连接账号拉取个人划线、想法、章节点评和整本书评；也可改用官方 JSON 文件。",
     "notebookSummary": "{books} 本书有笔记，共 {notes} 条（书签只统计数量，不能导出正文）。",
     "noteCounts": "划线 {highlights} · 想法/点评 {reviews} · 书签 {bookmarks}",
     "viewNotes": "查看内容",

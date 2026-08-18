@@ -242,6 +242,27 @@
 
             <v-window-item value="notes">
                 <section class="pa-4">
+                    <v-card
+                        color="primary"
+                        variant="tonal"
+                        class="mb-4"
+                    >
+                        <v-card-text class="d-flex flex-wrap ga-4 align-center">
+                            <div class="flex-grow-1">
+                                <div class="text-subtitle-1 font-weight-bold">
+                                    {{ t('weread.importNotesTitle') }}
+                                </div>
+                                <div class="text-body-2 text-medium-emphasis">
+                                    {{ t('weread.importNotesDescription') }}
+                                </div>
+                            </div>
+                            <WeReadImportDialog
+                                :backend="$backend"
+                                :saved-connection="connection"
+                                @imported="loadNotebooks"
+                            />
+                        </v-card-text>
+                    </v-card>
                     <div class="d-flex flex-wrap ga-2 align-center">
                         <v-btn
                             color="primary"
@@ -251,10 +272,6 @@
                         >
                             {{ t('weread.loadNotebooks') }}
                         </v-btn>
-                        <WeReadImportDialog
-                            :backend="$backend"
-                            @imported="loadNotebooks"
-                        />
                     </div>
                     <v-alert
                         v-if="notebooks"

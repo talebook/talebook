@@ -8,11 +8,10 @@
         <template #activator="{ props: activatorProps }">
             <v-btn
                 v-bind="activatorProps"
-                size="small"
-                variant="tonal"
+                color="primary"
                 prepend-icon="mdi-import"
             >
-                {{ t('wereadImport.open') }}
+                {{ connection?.secret?.configured ? t('wereadImport.openConnected') : t('wereadImport.open') }}
             </v-btn>
         </template>
         <v-card>
@@ -35,6 +34,15 @@
                     class="mb-4"
                 >
                     {{ t('wereadImport.bookmarkNotice') }}
+                </v-alert>
+                <v-alert
+                    v-if="connection?.secret?.configured"
+                    type="success"
+                    variant="tonal"
+                    density="compact"
+                    class="mb-4"
+                >
+                    {{ t('wereadImport.connectedHint', { mask: connection.secret.mask }) }}
                 </v-alert>
                 <v-file-input
                     v-model="file"
@@ -179,10 +187,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
-const props = defineProps({ backend: { type: Function, default: null } });
+const props = defineProps({
+    backend: { type: Function, default: null },
+    savedConnection: { type: Object, default: null },
+});
 const emit = defineEmits(['imported']);
 const { t } = useI18n();
 const backend = props.backend || useNuxtApp().$backend;
@@ -190,7 +201,7 @@ const dialog = ref(false);
 const file = ref(null);
 const apiKey = ref('');
 const parsedExport = ref(null);
-const connection = ref(null);
+const connection = ref(props.savedConnection);
 const previewRun = ref(null);
 const previewItems = ref([]);
 const resultRun = ref(null);
@@ -296,6 +307,10 @@ onMounted(async () => {
     } catch {
         // Setup remains available; a load failure is reported on the first action.
     }
+});
+
+watch(() => props.savedConnection, value => {
+    if (value) connection.value = value;
 });
 
 defineExpose({ open, preview, runImport, setApiKey });
