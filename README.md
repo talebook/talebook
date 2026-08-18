@@ -113,7 +113,7 @@ Skill 会在写入前确认目标与权限，对管理员写入、删除和批�
 推荐使用`docker-compose`，下载仓库中的配置文件[docker-compose.yml](docker-compose.yml)，然后执行命令启动即可。
 若希望修改挂载的目录或端口，请修改docker-compose.yml文件。
 
-默认配置会把 Talebook 的配置、用户数据库和书库统一保存在 `docker-compose.yml` 同目录的 `data/` 中；重新构建或替换容器不会删除这些文件。请定期备份该目录，不要把长期数据放在可能被系统清理的 `/tmp` 下。需要使用其他位置时，可在同目录的 `.env` 中设置绝对路径：
+默认配置会把 Talebook 的配置、用户数据库、书库和 `data/books/ai/` 下的 AI 产物统一保存在 `docker-compose.yml` 同目录的 `data/` 中；重新构建或替换容器不会删除这些文件。备份或迁移时必须完整处理该目录，不能只复制数据库，否则 AI 产物索引将失去对应文件。不要把长期数据放在可能被系统清理的 `/tmp` 下。需要使用其他位置时，可在同目录的 `.env` 中设置绝对路径：
 
 ```dotenv
 TALEBOOK_DATA_DIR=/path/to/talebook-data

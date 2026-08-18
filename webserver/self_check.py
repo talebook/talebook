@@ -76,11 +76,13 @@ def check_atomic_write(directory):
 
 
 def check_permission():
-    """修复 /data/books 的属主，并校验书库与配置目录的原子写入能力。"""
+    """修复 /data/books 的属主，并校验持久化目录的原子写入能力。"""
     permission_file = os.path.join(DATA_DIR, ".permission")
     current = "%s:%s" % (os.environ.get("PUID", "0"), os.environ.get("PGID", "0"))
     books_dir = os.path.join(DATA_DIR, "books")
     settings_dir = os.path.join(books_dir, "settings")
+    ai_dir = os.path.join(books_dir, "ai")
+    os.makedirs(ai_dir, exist_ok=True)
     previous = None
     if os.path.exists(permission_file):
         with open(permission_file) as f:
@@ -91,11 +93,11 @@ def check_permission():
             return False, "permission_denied"
         with open(permission_file, "w") as f:
             f.write(current)
-    elif not run(["chown", "-R", "%s:%s" % (RUN_USER, RUN_USER), settings_dir]):
-        # settings 很小，标记命中时仍定向修复，避免宿主目录重建或预置文件复制后属主失真。
+    elif not run(["chown", "-R", "%s:%s" % (RUN_USER, RUN_USER), settings_dir, ai_dir]):
+        # 小型可写目录在标记命中时仍定向修复，避免宿主目录重建后属主失真。
         return False, "permission_denied"
 
-    for directory in (os.path.join(books_dir, "library"), settings_dir):
+    for directory in (os.path.join(books_dir, "library"), settings_dir, ai_dir):
         if not check_atomic_write(directory):
             return False, "permission_denied"
 

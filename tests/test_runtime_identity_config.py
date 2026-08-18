@@ -56,11 +56,11 @@ def test_start_scripts_grant_atomic_nuxt_config_parent_without_recursive_app_cho
         assert "  /var/www/talebook/app \\" not in recursive_chown
 
 
-def test_ssr_start_repairs_settings_and_probes_both_mounts_as_application_user():
+def test_ssr_start_repairs_and_probes_all_persistent_writable_mounts_as_application_user():
     script = read("docker/start-dev.sh")
 
-    assert "chown -R talebook:talebook /data/books/settings || exit 1" in script
+    assert "chown -R talebook:talebook /data/books/settings /data/books/ai || exit 1" in script
     assert "gosu talebook:talebook sh -c" in script
-    assert "for directory in /data/books/library /data/books/settings" in script
+    assert "for directory in /data/books/library /data/books/settings /data/books/ai" in script
     assert "mktemp" in script
     assert 'mv "$tmp" "$moved"' in script

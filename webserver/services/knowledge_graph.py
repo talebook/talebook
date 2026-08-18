@@ -20,11 +20,13 @@ from xml.etree import ElementTree
 
 from webserver.models import AITask
 from webserver.services.agent_runtime import AgentRuntimeError, RuntimeEvent, RuntimeRequest
+from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStorage, ensure_workspace_id
 from webserver.services.codex_app_server import CodexAppServerRuntime
 
 
 LOG = logging.getLogger(__name__)
 FEATURE_KEY = "knowledge_graph"
+ARTIFACT_FEATURE_SLUG = "knowledge-graphs"
 SCHEMA_VERSION = "knowledge_graph.v1"
 PROMPT_VERSION = "knowledge_graph.zh.v1"
 ENTITY_TYPES = ("person", "place", "organization", "event", "concept", "claim", "evidence")
@@ -595,10 +597,171 @@ def merge_segments(segments: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def task_dict(record: AITask) -> Dict[str, Any]:
-    data = record.result_data or {}
+def _artifact_payload(record: AITask, data: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "task_id": record.id,
+        "owner_id": record.creator_id,
+        "book_id": record.book_id,
+        "book_version": record.book_version,
+        "schema_version": record.schema_version,
+        "prompt_version": record.prompt_version,
+        "scope": dict(data.get("scope") or {}),
+        "graph": data.get("graph", {"nodes": [], "relations": []}),
+        "review": data.get("review", {"low_confidence": [], "alias_conflicts": []}),
+        "stats": data.get("stats", {}),
+    }
+
+
+def _checkpoint_payload(record: AITask, draft: Dict[str, Any], segments: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "task_id": record.id,
+        "owner_id": record.creator_id,
+        "book_id": record.book_id,
+        "book_version": record.book_version,
+        "schema_version": record.schema_version,
+        "prompt_version": record.prompt_version,
+        "scope": dict(draft.get("scope") or {}),
+        "segments": segments,
+    }
+
+
+def _record_workspace(record: AITask) -> str:
+    for container in (record.result_data or {}, record.ai_draft or {}):
+        workspace = str(container.get("workspace", ""))
+        if len(workspace) == 32 and all(character in "0123456789abcdef" for character in workspace):
+            return workspace
+        metadata = container.get("artifact") or container.get("checkpoint") or {}
+        workspace = str(metadata.get("workspace", "")) if isinstance(metadata, dict) else ""
+        if len(workspace) == 32 and all(character in "0123456789abcdef" for character in workspace):
+            return workspace
+    return ""
+
+
+def migrate_legacy_artifacts(session, record: AITask, storage: AIArtifactStorage) -> bool:
+    """Move old inline graph/checkpoint content to files before clearing it from the DB."""
+    workspace = ensure_workspace_id(session, record.creator_id)
+    existing_workspace = _record_workspace(record)
+    if existing_workspace and existing_workspace != workspace:
+        raise AIArtifactError("AI 产物 workspace 与所属用户不匹配")
+    draft = dict(record.ai_draft or {})
+    data = dict(record.result_data or {})
+    changed = draft.get("workspace") != workspace or data.get("workspace") != workspace
+
+    inline_segments = draft.pop("segments", None)
+    if isinstance(inline_segments, dict) and inline_segments and record.status != "succeeded":
+        checkpoint = storage.write_json(
+            workspace,
+            ARTIFACT_FEATURE_SLUG,
+            record.id,
+            "checkpoint.json",
+            _checkpoint_payload(record, draft, inline_segments),
+        )
+        draft["checkpoint"] = checkpoint
+        draft["completed_segments"] = len(inline_segments)
+        changed = True
+    elif inline_segments is not None:
+        draft.pop("checkpoint", None)
+        draft["completed_segments"] = len(inline_segments) if record.status != "succeeded" else 0
+        changed = True
+
+    if "graph" in data:
+        payload = _artifact_payload(record, data)
+        artifact = storage.write_json(
+            workspace,
+            ARTIFACT_FEATURE_SLUG,
+            record.id,
+            "graph.json",
+            payload,
+        )
+        data = {
+            "workspace": workspace,
+            "scope": payload["scope"],
+            "stats": payload["stats"],
+            "artifact": artifact,
+        }
+        draft.pop("checkpoint", None)
+        draft["completed_segments"] = 0
+        changed = True
+
+    if changed:
+        draft["workspace"] = workspace
+        data["workspace"] = workspace
+        record.ai_draft = draft
+        record.result_data = data
+        record.update_time = datetime.datetime.now()
+    return changed
+
+
+def load_graph_artifact(record: AITask, storage: AIArtifactStorage) -> Dict[str, Any]:
+    data = dict(record.result_data or {})
+    metadata = data.get("artifact")
+    workspace = _record_workspace(record)
+    payload = storage.read_json(
+        metadata,
+        workspace,
+        ARTIFACT_FEATURE_SLUG,
+        record.id,
+        {"graph.json"},
+    )
+    expected = {
+        "task_id": record.id,
+        "owner_id": record.creator_id,
+        "book_id": record.book_id,
+        "book_version": record.book_version,
+        "schema_version": record.schema_version,
+        "prompt_version": record.prompt_version,
+    }
+    if any(payload.get(key) != value for key, value in expected.items()):
+        raise AIArtifactError("AI 图谱产物与任务索引不匹配")
+    if not isinstance(payload.get("graph"), dict) or not isinstance(payload.get("review"), dict):
+        raise AIArtifactError("AI 图谱产物结构无效")
+    return payload
+
+
+def load_checkpoint(record: AITask, storage: AIArtifactStorage) -> Dict[str, Any]:
+    draft = dict(record.ai_draft or {})
+    metadata = draft.get("checkpoint")
+    if not metadata:
+        return {}
+    workspace = _record_workspace(record)
+    payload = storage.read_json(
+        metadata,
+        workspace,
+        ARTIFACT_FEATURE_SLUG,
+        record.id,
+        {"checkpoint.json"},
+    )
+    if (
+        payload.get("task_id") != record.id
+        or payload.get("owner_id") != record.creator_id
+        or payload.get("book_id") != record.book_id
+        or payload.get("book_version") != record.book_version
+        or payload.get("schema_version") != record.schema_version
+        or payload.get("prompt_version") != record.prompt_version
+        or not isinstance(payload.get("segments"), dict)
+    ):
+        raise AIArtifactError("AI 检查点与任务索引不匹配")
+    return dict(payload["segments"])
+
+
+def cleanup_record_artifacts(record: AITask, storage: AIArtifactStorage) -> None:
+    workspace = _record_workspace(record)
+    if workspace:
+        storage.delete_task(workspace, ARTIFACT_FEATURE_SLUG, record.id)
+
+
+def task_dict(record: AITask, storage: Optional[AIArtifactStorage] = None) -> Dict[str, Any]:
+    index = record.result_data or {}
     draft = record.ai_draft or {}
-    scope = data.get("scope") or draft.get("scope") or {}
+    scope = index.get("scope") or draft.get("scope") or {}
+    data = index
+    artifact_error = None
+    if storage is not None and index.get("artifact"):
+        try:
+            data = load_graph_artifact(record, storage)
+        except AIArtifactError:
+            data = {}
+            artifact_error = {"code": "artifact.unavailable", "message": "知识图谱产物不可用，请重新生成"}
     return {
         "id": record.id,
         "feature": record.feature,
@@ -607,7 +770,7 @@ def task_dict(record: AITask) -> Dict[str, Any]:
         "scope": scope,
         "status": record.status,
         "progress_message": record.progress_message,
-        "completed_segments": len((draft.get("segments") or {})),
+        "completed_segments": int(draft.get("completed_segments", 0) or 0),
         "total_segments": int(scope.get("chapter_count", 0) or 0),
         "graph": data.get("graph", {"nodes": [], "relations": []}),
         "review": data.get("review", {"low_confidence": [], "alias_conflicts": []}),
@@ -616,7 +779,8 @@ def task_dict(record: AITask) -> Dict[str, Any]:
         "prompt_version": record.prompt_version,
         "runtime": record.runtime_name,
         "usage": record.usage or {},
-        "error": {"code": record.error_code, "message": record.error_message} if record.error_code else None,
+        "error": artifact_error
+        or ({"code": record.error_code, "message": record.error_message} if record.error_code else None),
         "created_at": record.create_time.isoformat() if record.create_time else None,
         "updated_at": record.update_time.isoformat() if record.update_time else None,
     }
@@ -638,6 +802,7 @@ class KnowledgeGraphService:
     def setup(self, session_maker, config: Dict[str, Any], runtime=None) -> None:
         self.session_maker = session_maker
         self.config = config
+        self.storage = AIArtifactStorage(config)
         if runtime is not None:
             self.runtime = runtime
         elif not self._configured:
@@ -682,8 +847,8 @@ class KnowledgeGraphService:
         finally:
             session.close()
 
-    def _save_segment(
-        self, record_id: str, chapter: Dict[str, str], segment: Dict[str, Any], usage: Dict[str, Any], index: int, total: int
+    def _save_checkpoint(
+        self, record_id: str, segments: Dict[str, Any], usage: Dict[str, Any], index: int, total: int
     ) -> None:
         session = self.session_maker()
         try:
@@ -691,9 +856,17 @@ class KnowledgeGraphService:
             if not record:
                 return
             draft = dict(record.ai_draft or {})
-            segments = dict(draft.get("segments") or {})
-            segments[chapter["href"]] = segment
-            draft["segments"] = segments
+            workspace = ensure_workspace_id(session, record.creator_id)
+            checkpoint = self.storage.write_json(
+                workspace,
+                ARTIFACT_FEATURE_SLUG,
+                record.id,
+                "checkpoint.json",
+                _checkpoint_payload(record, draft, segments),
+            )
+            draft["workspace"] = workspace
+            draft["checkpoint"] = checkpoint
+            draft["completed_segments"] = len(segments)
             record.ai_draft = draft
             aggregate = dict(record.usage or {})
             for key, value in (usage or {}).items():
@@ -707,26 +880,28 @@ class KnowledgeGraphService:
             session.close()
 
     def _run(self, record_id: str, epub_path: str, chapter_hrefs: Sequence[str]) -> None:
-        session = self.session_maker()
         try:
-            record = session.get(AITask, record_id)
-            if not record or record.status not in {"queued", "running", "failed", "cancelled"}:
-                return
-            if record.cancel_requested:
-                record.status = "cancelled"
-                record.finished_at = datetime.datetime.now()
+            session = self.session_maker()
+            try:
+                record = session.get(AITask, record_id)
+                if not record or record.status not in {"queued", "running", "failed", "cancelled"}:
+                    return
+                migrate_legacy_artifacts(session, record, self.storage)
+                if record.cancel_requested:
+                    record.status = "cancelled"
+                    record.finished_at = datetime.datetime.now()
+                    session.commit()
+                    return
+                completed = load_checkpoint(record, self.storage)
+                record.status = "running"
+                record.runtime_name = self.runtime.name
+                record.error_code = ""
+                record.error_message = ""
+                record.started_at = datetime.datetime.now()
+                record.update_time = record.started_at
                 session.commit()
-                return
-            record.status = "running"
-            record.runtime_name = self.runtime.name
-            record.error_code = ""
-            record.error_message = ""
-            record.started_at = datetime.datetime.now()
-            record.update_time = record.started_at
-            session.commit()
-        finally:
-            session.close()
-        try:
+            finally:
+                session.close()
             chapters = extract_epub_chapters(
                 epub_path,
                 chapter_hrefs,
@@ -734,12 +909,6 @@ class KnowledgeGraphService:
                 int(self.config.get("AI_KNOWLEDGE_GRAPH_MAX_CHAPTER_CHARACTERS", 16_000)),
                 int(self.config.get("AI_KNOWLEDGE_GRAPH_MAX_TOTAL_CHARACTERS", 400_000)),
             )
-            session = self.session_maker()
-            try:
-                record = session.get(AITask, record_id)
-                completed = dict((record.ai_draft or {}).get("segments") or {}) if record else {}
-            finally:
-                session.close()
             for index, chapter in enumerate(chapters, 1):
                 if self._is_cancelled(record_id):
                     raise _cancel_error()
@@ -756,34 +925,70 @@ class KnowledgeGraphService:
                 )
                 checked = validate_segment(result.output, chapter)
                 completed[chapter["href"]] = checked
-                self._save_segment(record_id, chapter, checked, result.usage or {}, index, len(chapters))
+                self._save_checkpoint(record_id, completed, result.usage or {}, index, len(chapters))
             result_data = merge_segments(completed[href] for href in chapter_hrefs if href in completed)
             session = self.session_maker()
             try:
                 record = session.get(AITask, record_id)
                 if not record:
                     return
+                checkpoint = None
+                workspace = ""
                 if record.cancel_requested:
                     record.status = "cancelled"
                 else:
-                    result_data["scope"] = dict((record.ai_draft or {}).get("scope") or {})
+                    draft = dict(record.ai_draft or {})
+                    workspace = ensure_workspace_id(session, record.creator_id)
+                    result_data["scope"] = dict(draft.get("scope") or {})
+                    payload = _artifact_payload(record, result_data)
+                    artifact = self.storage.write_json(
+                        workspace,
+                        ARTIFACT_FEATURE_SLUG,
+                        record.id,
+                        "graph.json",
+                        payload,
+                    )
                     record.status = "succeeded"
-                    record.result_data = result_data
+                    record.result_data = {
+                        "workspace": workspace,
+                        "scope": payload["scope"],
+                        "stats": payload["stats"],
+                        "artifact": artifact,
+                    }
+                    checkpoint = draft.get("checkpoint")
+                    record.ai_draft = {
+                        "workspace": workspace,
+                        "scope": payload["scope"],
+                        "completed_segments": 0,
+                    }
                     record.progress_message = "知识图谱生成完成"
                 record.finished_at = datetime.datetime.now()
                 record.update_time = record.finished_at
                 session.commit()
+                if not record.cancel_requested and checkpoint:
+                    try:
+                        self.storage.delete_file(
+                            checkpoint,
+                            workspace,
+                            ARTIFACT_FEATURE_SLUG,
+                            record.id,
+                            {"checkpoint.json"},
+                        )
+                    except AIArtifactError:
+                        LOG.warning("Failed to remove knowledge graph checkpoint record_id=%s", record_id)
             finally:
                 session.close()
-        except (AgentRuntimeError, KnowledgeGraphValidationError) as exc:
+        except (AgentRuntimeError, KnowledgeGraphValidationError, AIArtifactError) as exc:
             session = self.session_maker()
             try:
                 record = session.get(AITask, record_id)
                 if record:
                     cancelled = isinstance(exc, AgentRuntimeError) and getattr(exc.code, "value", "") == "runtime.cancelled"
                     record.status = "cancelled" if cancelled or record.cancel_requested else "failed"
-                    record.error_code = getattr(getattr(exc, "code", None), "value", "result.invalid")
-                    record.error_message = str(getattr(exc, "safe_message", str(exc)))[:500]
+                    fallback_code = "artifact.invalid" if isinstance(exc, AIArtifactError) else "result.invalid"
+                    record.error_code = getattr(getattr(exc, "code", None), "value", fallback_code)
+                    safe_message = "知识图谱产物存储失败，请重试" if isinstance(exc, AIArtifactError) else str(exc)
+                    record.error_message = str(getattr(exc, "safe_message", safe_message))[:500]
                     record.progress_message = record.error_message
                     record.finished_at = datetime.datetime.now()
                     record.update_time = record.finished_at

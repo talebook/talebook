@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 import urllib.parse
+from pathlib import Path
 from unittest import mock
 
 from tests.test_main import (
@@ -693,6 +694,69 @@ class TestAdminUsersBatch(TestWithAdminUser):
         finally:
             user.admin = original_admin
             session.commit()
+
+
+class TestAdminUserArtifactCleanup(TestWithAdminUser):
+    def test_delete_user_removes_ai_workspace_and_task_indexes(self):
+        from webserver import models
+        from webserver.services.ai_artifacts import AIArtifactStorage
+
+        username = "artifactcleanup"
+        temporary = tempfile.TemporaryDirectory()
+        session = get_db()
+        session.query(models.Reader).filter(models.Reader.username == username).delete(synchronize_session=False)
+        session.commit()
+        user = models.Reader(
+            username=username,
+            name=username,
+            email=f"{username}@example.com",
+            admin=False,
+            active=True,
+            create_time=datetime.datetime.now(),
+            update_time=datetime.datetime.now(),
+            access_time=datetime.datetime.now(),
+            extra={"kindle_email": "", "ai_workspace_id": "c" * 32},
+        )
+        user.set_secure_password("Passw0rd!")
+        session.add(user)
+        session.commit()
+        task_id = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+        task = models.AITask(
+            id=task_id,
+            request_key="c" * 64,
+            feature="knowledge_graph",
+            creator_id=user.id,
+            book_id=BID_EPUB,
+            book_version="fixture",
+            chapter_href="graph:fixture",
+            chapter_title="fixture",
+            chapter_text_hash="d" * 64,
+            chapter_length=1,
+            status="succeeded",
+        )
+        session.add(task)
+        session.commit()
+        storage = AIArtifactStorage({"AI_ARTIFACT_ROOT": temporary.name})
+        metadata = storage.write_json("c" * 32, "knowledge-graphs", task_id, "graph.json", {"graph": {}})
+        workspace_path = Path(temporary.name, metadata["relative_path"]).parents[2]
+        self.assertTrue(workspace_path.is_dir())
+
+        try:
+            with mock.patch.dict("webserver.handlers.admin.CONF", {"AI_ARTIFACT_ROOT": temporary.name}, clear=False):
+                response = self.json(
+                    "/api/admin/users",
+                    method="POST",
+                    body=json.dumps({"id": user.id, "delete": username}),
+                )
+            self.assertEqual(response["err"], "ok", response)
+            self.assertFalse(workspace_path.exists())
+            self.assertIsNone(get_db().get(models.AITask, task_id))
+        finally:
+            session = get_db()
+            session.query(models.AITask).filter(models.AITask.id == task_id).delete(synchronize_session=False)
+            session.query(models.Reader).filter(models.Reader.username == username).delete(synchronize_session=False)
+            session.commit()
+            temporary.cleanup()
 
 
 class TestAdminDefaultUserPermission(TestWithAdminUser):

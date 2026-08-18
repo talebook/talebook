@@ -9,6 +9,7 @@ import logging
 import os
 import shutil
 import sys
+import tempfile
 import time
 import unittest
 import urllib
@@ -654,6 +655,50 @@ class TestBook(TestWithUserLogin):
                 d = self.json("/api/book/1/delete", method="POST", body="")
                 self.assertEqual(d["err"], "ok")
                 self.assertEqual(m.call_count, 2)
+
+    def test_delete_cleans_knowledge_graph_artifact_directory(self):
+        from webserver.services.ai_artifacts import AIArtifactStorage
+
+        task_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        temporary = tempfile.TemporaryDirectory()
+        session = get_db()
+        reader = session.get(models.Reader, 1)
+        original_extra = dict(reader.extra or {})
+        reader.extra = {**original_extra, "ai_workspace_id": "b" * 32}
+        storage = AIArtifactStorage({"AI_ARTIFACT_ROOT": temporary.name})
+        metadata = storage.write_json("b" * 32, "knowledge-graphs", task_id, "graph.json", {"graph": {}})
+        task = models.AITask(
+            id=task_id,
+            request_key="b" * 64,
+            feature="knowledge_graph",
+            creator_id=1,
+            book_id=1,
+            book_version="fixture",
+            chapter_href="graph:fixture",
+            chapter_title="fixture",
+            chapter_text_hash="b" * 64,
+            chapter_length=1,
+            status="succeeded",
+            result_data={"workspace": "b" * 32, "artifact": metadata},
+        )
+        session.add(task)
+        session.commit()
+        task_directory = os.path.dirname(os.path.join(temporary.name, metadata["relative_path"]))
+        try:
+            with mock.patch.dict(
+                "webserver.handlers.book.CONF", {"AI_ARTIFACT_ROOT": temporary.name}, clear=False
+            ), mock.patch.object(_app.settings["legacy"], "delete_book", return_value="Yo"):
+                with mock_permission():
+                    response = self.json("/api/book/1/delete", method="POST", body="")
+            self.assertEqual(response["err"], "ok", response)
+            self.assertFalse(os.path.exists(task_directory))
+            self.assertIsNone(get_db().get(models.AITask, task_id))
+        finally:
+            session = get_db()
+            session.query(models.AITask).filter(models.AITask.id == task_id).delete(synchronize_session=False)
+            session.get(models.Reader, 1).extra = original_extra
+            session.commit()
+            temporary.cleanup()
 
     def test_read(self):
         with mock.patch("webserver.services.convert.ConvertService.convert_and_save", return_value="Yo"):
