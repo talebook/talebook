@@ -14,9 +14,11 @@
   <link rel="preload" as="style" onload="this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap">
   <link rel="stylesheet" crossorigin href="style.css?v=v1.1.0">
   <link rel="stylesheet" href="{{RES}}/static/js/summary-duck.css?v=summary-duck.v1">
+  <link rel="stylesheet" href="{{RES}}/static/js/knowledge-graph.css?v=knowledge-graph.v1">
 
   <script src="js/epub-v0.3.88.js"></script>
   <script defer src="{{RES}}/static/js/summary-duck.js?v=summary-duck.v1"></script>
+  <script defer src="{{RES}}/static/js/knowledge-graph.js?v=knowledge-graph.v1"></script>
   <script  type="module">
     import { Reader } from "./candle-reader.es.js?v=v1.1.0"
 
@@ -33,6 +35,7 @@
         audiobook_manifest_url: {% if audiobook_edition_id %}"{{RES}}/api/audio/{{audiobook_edition_id}}"{% else %}""{% endif %},
       })
       window.TalebookSummaryDuckInit?.({ bookId: {{book.id}} })
+      window.TalebookKnowledgeGraphInit?.({ bookId: {{book.id}} })
     }
 
     {% if is_ready %}

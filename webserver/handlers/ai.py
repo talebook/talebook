@@ -15,6 +15,27 @@ from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import AITask, ProtagonistAgent, ProtagonistConversation, ProtagonistMessage, ReadingState
 from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore
+from webserver.services.knowledge_graph import (
+    FEATURE_KEY as KNOWLEDGE_GRAPH_FEATURE_KEY,
+)
+from webserver.services.knowledge_graph import (
+    PROMPT_VERSION as KNOWLEDGE_GRAPH_PROMPT_VERSION,
+)
+from webserver.services.knowledge_graph import (
+    SCHEMA_VERSION as KNOWLEDGE_GRAPH_SCHEMA_VERSION,
+)
+from webserver.services.knowledge_graph import (
+    KnowledgeGraphService,
+    KnowledgeGraphValidationError,
+    extract_epub_chapters,
+    scope_fingerprint,
+)
+from webserver.services.knowledge_graph import (
+    request_key as knowledge_graph_request_key,
+)
+from webserver.services.knowledge_graph import (
+    task_dict as knowledge_graph_task_dict,
+)
 from webserver.services.protagonist_agent import (
     CHAT_PROMPT_VERSION,
     CHAT_SCHEMA_VERSION,
@@ -79,6 +100,7 @@ class SummaryDuckFeature:
     """Summary Duck behavior plugged into the stable AI task HTTP surface."""
 
     key = FEATURE_KEY
+    task_dict = staticmethod(task_dict)
 
     @staticmethod
     def enabled():
@@ -227,7 +249,190 @@ class SummaryDuckFeature:
         handler.write(export_markdown(record))
 
 
-AI_FEATURES = {SummaryDuckFeature.key: SummaryDuckFeature}
+class KnowledgeGraphFeature:
+    """Grounded single-book graph behavior on the shared AI task surface."""
+
+    key = KNOWLEDGE_GRAPH_FEATURE_KEY
+    task_dict = staticmethod(knowledge_graph_task_dict)
+
+    @staticmethod
+    def enabled():
+        return CONF.get("AI_ENABLED", True) and CONF.get("AI_KNOWLEDGE_GRAPH_ENABLED", True)
+
+    @staticmethod
+    def service(handler):
+        service = KnowledgeGraphService()
+        service.setup(handler.settings["SessionMaker"], CONF)
+        return service
+
+    @staticmethod
+    def can_access(handler, record):
+        if not handler.can_view_book(record.book_id):
+            return False, {"err": "ai.not_found", "msg": "AI 结果不存在"}
+        book = handler.get_book(record.book_id, raise_exception=False)
+        if not book:
+            return False, {"err": "ai.not_found", "msg": "AI 结果不存在"}
+        if _book_version(book) != record.book_version:
+            return False, {"err": "ai.book_version_changed", "msg": "书籍版本已变化，请重新生成"}
+        if record.status in {"queued", "running"}:
+            scope = (record.ai_draft or {}).get("scope") or {}
+            hrefs = scope.get("chapter_hrefs") or []
+            if book.get("fmt_epub") and hrefs:
+                KnowledgeGraphFeature.service(handler).submit(record.id, book["fmt_epub"], hrefs)
+        return True, None
+
+    @classmethod
+    def list(cls, handler):
+        try:
+            book_id = int(handler.get_argument("book_id", "0") or 0)
+        except (TypeError, ValueError):
+            book_id = 0
+        if not book_id or not handler.can_view_book(book_id):
+            return {"err": "book.not_found", "msg": "书籍不存在"}
+        book = handler.get_book(book_id, raise_exception=False)
+        if not book:
+            return {"err": "book.not_found", "msg": "书籍不存在"}
+        records = (
+            handler.session.query(AITask)
+            .filter(
+                AITask.feature == cls.key,
+                AITask.creator_id == handler.user_id(),
+                AITask.book_id == book_id,
+                AITask.book_version == _book_version(book),
+            )
+            .order_by(AITask.create_time.desc())
+            .all()
+        )
+        return {"err": "ok", "tasks": [cls.task_dict(record) for record in records]}
+
+    @staticmethod
+    def _requested_hrefs(body):
+        scope = str(body.get("scope", "book") or "book")
+        if scope == "book":
+            return scope, None
+        if scope == "chapter":
+            href = body.get("chapter_href")
+            if not isinstance(href, str) or not href.strip():
+                raise KnowledgeGraphValidationError("请选择当前章节")
+            return scope, [href.strip()]
+        if scope == "chapters":
+            hrefs = body.get("chapter_hrefs")
+            if not isinstance(hrefs, list) or not hrefs or not all(isinstance(href, str) and href.strip() for href in hrefs):
+                raise KnowledgeGraphValidationError("请选择章节范围")
+            return scope, [href.strip() for href in hrefs]
+        raise KnowledgeGraphValidationError("生成范围无效")
+
+    @classmethod
+    def create(cls, handler, body):
+        if not cls.enabled():
+            return {"err": "ai.disabled", "msg": "知识图谱未启用"}
+        try:
+            book_id = int(body.get("book_id", 0))
+            scope_kind, requested_hrefs = cls._requested_hrefs(body)
+        except (TypeError, ValueError, KnowledgeGraphValidationError) as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        book = handler.get_book(book_id, raise_exception=False)
+        epub_path = book.get("fmt_epub") if book else None
+        if not book or not epub_path or not os.path.isfile(epub_path) or not handler.can_view_book(book_id):
+            return {"err": "book.not_found", "msg": "仅支持可访问的 EPUB 书籍"}
+        try:
+            chapters = extract_epub_chapters(
+                epub_path,
+                requested_hrefs,
+                int(CONF.get("AI_KNOWLEDGE_GRAPH_MAX_CHAPTERS", 80)),
+                int(CONF.get("AI_KNOWLEDGE_GRAPH_MAX_CHAPTER_CHARACTERS", 16_000)),
+                int(CONF.get("AI_KNOWLEDGE_GRAPH_MAX_TOTAL_CHARACTERS", 400_000)),
+            )
+        except KnowledgeGraphValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        character_count = sum(len(chapter["text"]) for chapter in chapters)
+        scope_hash = scope_fingerprint(chapters)
+        scope = {
+            "kind": scope_kind,
+            "label": "全书"
+            if scope_kind == "book"
+            else (chapters[0]["title"] if len(chapters) == 1 else f"{len(chapters)} 个章节"),
+            "chapter_hrefs": [chapter["href"] for chapter in chapters],
+            "chapter_count": len(chapters),
+            "character_count": character_count,
+        }
+        estimate = {
+            "chapter_count": len(chapters),
+            "character_count": character_count,
+            "runtime_calls": len(chapters),
+        }
+        if bool(body.get("preview_only")):
+            return {"err": "ok", "scope": scope, "estimate": estimate}
+        version = _book_version(book)
+        key = knowledge_graph_request_key(handler.user_id(), book_id, version, scope_hash)
+        if bool(body.get("regenerate")):
+            key = hashlib.sha256((key + ":" + uuid.uuid4().hex).encode("utf-8")).hexdigest()
+        existing = handler.session.query(AITask).filter(AITask.request_key == key).first()
+        if existing:
+            if existing.creator_id != handler.user_id() or existing.feature != cls.key:
+                return {"err": "ai.conflict", "msg": "无法创建知识图谱"}
+            if existing.status in {"failed", "cancelled"}:
+                draft = dict(existing.ai_draft or {})
+                draft["scope"] = scope
+                draft.setdefault("segments", {})
+                existing.ai_draft = draft
+                existing.status = "queued"
+                existing.cancel_requested = False
+                existing.error_code = ""
+                existing.error_message = ""
+                existing.progress_message = "等待提取"
+                existing.update_time = datetime.datetime.now()
+                handler.session.commit()
+                cls.service(handler).submit(existing.id, epub_path, scope["chapter_hrefs"])
+            return {"err": "ok", "task": cls.task_dict(existing), "idempotent": True, "estimate": estimate}
+        record = AITask(
+            id=str(uuid.uuid4()),
+            request_key=key,
+            feature=cls.key,
+            creator_id=handler.user_id(),
+            book_id=book_id,
+            book_version=version,
+            chapter_href=f"graph:{scope_hash[:24]}",
+            chapter_title=scope["label"],
+            chapter_text_hash=scope_hash,
+            chapter_length=character_count,
+            status="queued",
+            progress_message="等待提取",
+            ai_draft={"scope": scope, "segments": {}},
+            schema_version=KNOWLEDGE_GRAPH_SCHEMA_VERSION,
+            prompt_version=KNOWLEDGE_GRAPH_PROMPT_VERSION,
+        )
+        handler.session.add(record)
+        try:
+            handler.session.commit()
+        except IntegrityError:
+            handler.session.rollback()
+            record = handler.session.query(AITask).filter(AITask.request_key == key).first()
+            if not record or record.creator_id != handler.user_id() or record.feature != cls.key:
+                return {"err": "ai.conflict", "msg": "无法创建知识图谱"}
+        cls.service(handler).submit(record.id, epub_path, scope["chapter_hrefs"])
+        return {"err": "ok", "task": cls.task_dict(record), "idempotent": False, "estimate": estimate}
+
+    @staticmethod
+    def update(handler, record, body):
+        return {"err": "ai.not_editable", "msg": "知识图谱首版不支持手工编辑"}
+
+    @staticmethod
+    def export(handler, record):
+        if record.status != "succeeded":
+            handler.set_header("Content-Type", "application/json; charset=UTF-8")
+            handler.write({"err": "ai.not_ready", "msg": "知识图谱尚未完成"})
+            return
+        filename = f"knowledge-graph-{record.book_id}-{record.id[:8]}.json"
+        handler.set_header("Content-Type", "application/json; charset=UTF-8")
+        handler.set_header("Content-Disposition", f'attachment; filename="{filename}"')
+        handler.write(json.dumps(record.result_data or {}, ensure_ascii=False, separators=(",", ":")))
+
+
+AI_FEATURES = {
+    SummaryDuckFeature.key: SummaryDuckFeature,
+    KnowledgeGraphFeature.key: KnowledgeGraphFeature,
+}
 
 
 def _feature(name):
@@ -287,8 +492,8 @@ class AITaskItem(_AITaskBase):
     @js
     @auth
     def get(self, feature_name, task_id):
-        record, _feature_adapter, error = self._visible_task(feature_name, task_id)
-        return error or {"err": "ok", "task": task_dict(record)}
+        record, feature, error = self._visible_task(feature_name, task_id)
+        return error or {"err": "ok", "task": feature.task_dict(record)}
 
     @js
     @auth
@@ -323,7 +528,7 @@ class AITaskCancel(_AITaskBase):
         if error:
             return error
         if record.status not in {"queued", "running"}:
-            return {"err": "ok", "task": task_dict(record), "idempotent": True}
+            return {"err": "ok", "task": feature.task_dict(record), "idempotent": True}
         record.cancel_requested = True
         record.progress_message = "正在取消"
         record.update_time = datetime.datetime.now()
@@ -333,7 +538,7 @@ class AITaskCancel(_AITaskBase):
             record.status = "cancelled"
             record.finished_at = datetime.datetime.now()
             self.session.commit()
-        return {"err": "ok", "task": task_dict(record), "idempotent": False}
+        return {"err": "ok", "task": feature.task_dict(record), "idempotent": False}
 
 
 class AITaskExport(_AITaskBase):
