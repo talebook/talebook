@@ -40,7 +40,7 @@ find . \( -path ./library -o -name '*.pyc' \) -prune -o -type f -print | while r
 done
 
 
-mkdir -p /root/.npm /run/talebook /data/books/ssl
+mkdir -p /root/.npm /run/talebook /data/books/ssl /data/books/ai
 
 # 设置PUID/GUID权限
 permission_file=/data/.permission
