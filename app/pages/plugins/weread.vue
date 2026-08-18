@@ -645,7 +645,12 @@ async function loadSimilar() {
     loaded.value.discover = true;
 }
 function duration(seconds) { const value = Number(seconds || 0); return t('weread.duration', { hours: Math.floor(value / 3600), minutes: Math.floor((value % 3600) / 60) }); }
-function rating(value) { return value ? t('weread.rating', { value }) : ''; }
+function rating(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return '';
+    const normalized = numeric > 100 ? Number((numeric / 10).toFixed(1)) : numeric;
+    return t('weread.rating', { value: normalized });
+}
 
 onMounted(async () => {
     try {

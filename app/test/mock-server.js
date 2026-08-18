@@ -1442,7 +1442,7 @@ router.post('/api/plugins/weread/query', eventHandler(async (event) => {
   const data = {
     search: {
       hasMore: 0,
-      results: [{ title: '电子书', books: [{ bookInfo: { bookId: '3300045871', title: '活着', author: '余华', newRating: 92, deepLink: 'weread://bookDetail?bookId=3300045871' } }] }],
+      results: [{ title: '电子书', books: [{ bookInfo: { bookId: '3300045871', title: '活着', author: '余华', newRating: 920, deepLink: 'weread://bookDetail?bookId=3300045871' } }] }],
     },
     shelf: {
       books: [{ bookId: '3300045871', title: '活着', author: '余华', finishReading: 1, secret: 0 }],
