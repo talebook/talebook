@@ -128,7 +128,7 @@ RUN --mount=from=python-wheel-build,source=/opt/wheels,target=/tmp/talebook-whee
 
 
 # ----------------------------------------
-# 测试阶段
+# 测试阶段；dev 在此基础上扩展，production/SSR 不继承本阶段。
 FROM server AS test
 COPY requirements-test.txt /tmp/
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r /tmp/requirements-test.txt
