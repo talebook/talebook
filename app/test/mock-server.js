@@ -169,6 +169,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   booksourceCheckRunning = false;
   booksourceCheckPolls = 0;
   pluginRuns = [];
+  opdsServiceEnabled = true;
   pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
   pluginConnections = pluginInstallations
     .filter(item => item.id <= 3)
@@ -1529,6 +1530,7 @@ const mockPluginConnection = installation => ({
 let pluginConnections = pluginInstallations
   .filter(installation => installation.id <= 3)
   .map(installation => mockPluginConnection(installation));
+let opdsServiceEnabled = true;
 
 router.get('/api/admin/plugins', eventHandler(() => ({
   err: 'ok',
@@ -1536,7 +1538,7 @@ router.get('/api/admin/plugins', eventHandler(() => ({
   installations: pluginInstallations,
   builtin_state: {
     'talebook.metadata.builtin': { configured: 3, enabled: 3, sources: ['douban', 'baidu', 'neodb'] },
-    'talebook.book-source.opds': { configured: 1, enabled: 1 },
+    'talebook.book-source.opds': { configured: 1, enabled: 1, service_enabled: opdsServiceEnabled },
     'talebook.book-source.legado': { configured: 1, enabled: 1 },
   },
 })));
@@ -1564,6 +1566,12 @@ router.post('/api/admin/plugins/installations/:id/state', eventHandler(async (ev
   const body = await readBody(event);
   pluginInstallations = pluginInstallations.map(item => item.id === id ? { ...item, enabled: Boolean(body.enabled) } : item);
   return { err: 'ok', installation: pluginInstallations.find(item => item.id === id) };
+}));
+
+router.post('/api/admin/plugins/opds-service', eventHandler(async (event) => {
+  const body = await readBody(event);
+  opdsServiceEnabled = Boolean(body.enabled);
+  return { err: 'ok', enabled: opdsServiceEnabled };
 }));
 
 router.get('/api/admin/plugins/runs', eventHandler(() => ({ err: 'ok', runs: pluginRuns })));

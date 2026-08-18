@@ -246,6 +246,38 @@
                     <p class="text-body-2">
                         {{ selectedPlugin.description }}
                     </p>
+                    <section
+                        v-if="selectedPlugin.ui.manage_kind === 'opds'"
+                        class="opds-service-settings mt-5"
+                    >
+                        <h3 class="text-subtitle-1 mb-1">
+                            {{ t('pluginManagement.opdsService') }}
+                        </h3>
+                        <p class="text-body-2 text-medium-emphasis mb-2">
+                            {{ t('pluginManagement.opdsServiceDescription') }}
+                        </p>
+                        <v-switch
+                            :model-value="opdsServiceEnabled"
+                            :label="t('pluginManagement.opdsServiceEnabled')"
+                            :loading="opdsServiceSaving"
+                            :disabled="opdsServiceSaving"
+                            color="primary"
+                            inset
+                            hide-details
+                            @update:model-value="saveOpdsService"
+                        />
+                        <v-btn
+                            class="mt-2"
+                            variant="text"
+                            size="small"
+                            prepend-icon="mdi-open-in-new"
+                            to="/opds-readme"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            {{ t('pluginManagement.opdsServiceGuide') }}
+                        </v-btn>
+                    </section>
                     <h3 class="text-subtitle-1 mt-5 mb-2">
                         {{ t('pluginManagement.connection') }}
                     </h3>
@@ -467,6 +499,7 @@ const search = ref(typeof route.query.q === 'string' ? route.query.q : '');
 const statusFilter = ref(typeof route.query.status === 'string' ? route.query.status : 'all');
 const actionLoading = ref(false);
 const toggleLoading = ref(false);
+const opdsServiceSaving = ref(false);
 const connectionSaving = ref(false);
 const connectionFormOpen = ref(false);
 const connectionName = ref('default');
@@ -516,6 +549,9 @@ const selectedConnection = computed(() => {
 });
 const configFields = computed(() => schemaFields(selectedPlugin.value?.config_schema));
 const credentialFields = computed(() => schemaFields(selectedPlugin.value?.auth_schema));
+const opdsServiceEnabled = computed(() => Boolean(
+    builtinState.value['talebook.book-source.opds']?.service_enabled
+));
 
 function connectionFor(plugin) {
     return connections.value.find(item => item.installation_id === plugin.installation?.id) || null;
@@ -604,6 +640,27 @@ async function toggleInstallation(plugin) {
         else $alert?.('error', rsp.msg || rsp.err);
     } finally {
         toggleLoading.value = false;
+    }
+}
+
+async function saveOpdsService(enabled) {
+    opdsServiceSaving.value = true;
+    try {
+        const rsp = await $backend('/admin/plugins/opds-service', {
+            method: 'POST', body: JSON.stringify({ enabled }),
+        });
+        if (rsp.err === 'ok') {
+            builtinState.value = {
+                ...builtinState.value,
+                'talebook.book-source.opds': {
+                    ...builtinState.value['talebook.book-source.opds'],
+                    service_enabled: rsp.enabled,
+                },
+            };
+            $alert?.('success', t('pluginManagement.opdsServiceSaved'));
+        } else $alert?.('error', rsp.msg || rsp.err);
+    } finally {
+        opdsServiceSaving.value = false;
     }
 }
 
@@ -806,4 +863,5 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 }
 :deep(.plugin-drawer-dialog .text-caption) { overflow-wrap: anywhere; }
 .connection-form { padding: 14px; border: 1px solid rgb(var(--v-theme-outline-variant)); border-radius: 10px; }
+.opds-service-settings { padding: 14px; border: 1px solid rgb(var(--v-theme-outline-variant)); border-radius: 10px; }
 </style>

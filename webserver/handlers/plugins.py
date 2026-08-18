@@ -66,6 +66,7 @@ class AdminPlugins(BaseHandler):
                     "talebook.book-source.opds": {
                         "configured": len(opds_sources),
                         "enabled": sum(1 for item in opds_sources if item.active),
+                        "service_enabled": bool(loader.get_settings().get("OPDS_ENABLED", True)),
                     },
                     "talebook.book-source.legado": {
                         "configured": len(legado_sources),
@@ -111,6 +112,29 @@ class AdminPluginInstallationState(BaseHandler):
             self.session.commit()
             definition = self.session.get(PluginDefinition, installation.definition_id)
             return {"err": "ok", "installation": installation.to_public_dict(definition)}
+        except (PluginRuntimeError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
+class AdminPluginOpdsService(BaseHandler):
+    @js
+    @is_admin
+    def post(self):
+        try:
+            req = _body(self)
+            if not isinstance(req.get("enabled"), bool):
+                raise PluginRuntimeError("plugin.request_invalid", "enabled must be a boolean")
+
+            args = loader.SettingsLoader()
+            args.update(loader.get_settings())
+            args["OPDS_ENABLED"] = req["enabled"]
+
+            from webserver.handlers.admin import SettingsSaverLogic
+
+            result = SettingsSaverLogic().save_extra_settings(args)
+            if result.get("err") != "ok":
+                return result
+            return {"err": "ok", "enabled": req["enabled"]}
         except (PluginRuntimeError, TypeError, ValueError) as exc:
             return _error(exc)
 
@@ -336,6 +360,7 @@ def routes():
     return [
         (r"/api/admin/plugins", AdminPlugins),
         (r"/api/admin/plugins/install", AdminPluginInstall),
+        (r"/api/admin/plugins/opds-service", AdminPluginOpdsService),
         (r"/api/admin/plugins/installations/([0-9]+)/state", AdminPluginInstallationState),
         (r"/api/admin/plugins/connections", AdminPluginConnections),
         (r"/api/admin/plugins/connections/([0-9]+)/state", AdminPluginConnectionState),

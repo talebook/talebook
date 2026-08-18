@@ -78,6 +78,25 @@ test.describe('Plugin management', () => {
         await expect(page.getByText('成功').first()).toBeVisible();
     });
 
+    test('moves the Talebook OPDS service setting from Settings into the OPDS plugin', async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
+        await page.goto('/admin/settings');
+        await expect(page.getByRole('heading', { name: 'OPDS 设置' })).toHaveCount(0);
+
+        await page.goto('/admin/plugins?tab=book_sources');
+        const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
+        await card.getByRole('button', { name: '详情' }).click();
+
+        const dialog = page.getByRole('dialog');
+        await expect(dialog.getByRole('heading', { name: 'Talebook OPDS 服务' })).toBeVisible();
+        const serviceSwitch = dialog.getByLabel('启用 OPDS 服务');
+        await expect(serviceSwitch).toBeChecked();
+        await serviceSwitch.focus();
+        await page.keyboard.press('Space');
+        await expect(serviceSwitch).not.toBeChecked();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+    });
+
     test('old book source URL redirects into the plugin source tab', async ({ page }) => {
         await page.goto('/admin/booksources');
         await expect(page).toHaveURL(/\/admin\/plugins\?.*tab=book_sources/);
