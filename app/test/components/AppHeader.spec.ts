@@ -5,6 +5,8 @@ import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.stubGlobal('$t', (key: string) => key);
+
 vi.mock('vue-i18n', () => ({
     useI18n: () => ({
         locale: { value: 'zh-CN' },

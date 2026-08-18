@@ -86,6 +86,10 @@ settings = {
     "AI_SKILL_MAX_ACTIVE_RUNS": 2,
     "AI_SKILL_MAX_MARKDOWN_CHARACTERS": 40_000,
     "AI_SKILL_MAX_INPUT_CHARACTERS": 32_000,
+    "AI_KNOWLEDGE_GRAPH_ENABLED": True,
+    "AI_KNOWLEDGE_GRAPH_MAX_CHAPTERS": 80,
+    "AI_KNOWLEDGE_GRAPH_MAX_CHAPTER_CHARACTERS": 16000,
+    "AI_KNOWLEDGE_GRAPH_MAX_TOTAL_CHARACTERS": 400000,
     "AI_RECOMMENDATIONS_ENABLED": True,
     "AI_RECOMMENDATIONS_CACHE_SECONDS": 900,
     "AI_CODEX_COMMAND": "codex",
@@ -95,7 +99,7 @@ settings = {
     "AI_CODEX_MODEL": "",
     "AI_CODEX_MIN_VERSION": "0.147.0",
     "AI_CODEX_MAX_VERSION": "0.148.0",
-    # AI 功能的持久化产物统一存放在 <root>/<feature>/...，例如 /data/books/ai/skills/...
+    # AI 功能的持久化产物统一存放在 <root>/<user-workspace>/<feature>/...
     "AI_ARTIFACT_ROOT": "/data/books/ai",
     "AI_TASK_ROOT": "/data/books/progress",
     "AI_HANDSHAKE_TIMEOUT_SECONDS": 10,
