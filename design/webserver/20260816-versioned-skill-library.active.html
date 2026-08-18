@@ -104,7 +104,7 @@
           <tbody>
             <tr><td><code>python3 -m unittest tests.test_ai_artifacts tests.test_skill_library -v</code></td><td>Calibre 测试镜像内 17/17 通过：目录权威 CRUD、owner ACL、SHA 门禁、原子替换、父目录/内部符号链接拒绝、删除清理、备份卷覆盖与 DB 无正文副本。</td></tr>
             <tr><td><code>python3 -m unittest tests.test_summary_duck -v</code></td><td>16/16 通过；统一 Runtime 与 Codex 协议无回归。</td></tr>
-            <tr><td><code>npx vitest run test/components/SkillLibraryPage.spec.ts test/components/AppHeader.spec.ts</code></td><td>12/12 通过；当前 SHA 保存、查看、下载和运行体验通过，且无 <code>/versions</code> 请求。</td></tr>
+            <tr><td><code>npx vitest run test/components/SkillLibraryPage.spec.ts test/components/AppHeader.spec.ts test/utils/knowledge-graph-runtime.spec.ts</code></td><td>合并最新基线后 15/15 通过；当前 SHA 保存、查看、下载和运行体验通过，且无 <code>/versions</code> 请求。</td></tr>
             <tr><td><code>skill-creator/scripts/quick_validate.py &lt;generated-skill&gt;</code></td><td>使用生产 <code>materialize_skill_package</code> 生成真实目录，校验结果 <code>Skill is valid!</code>。</td></tr>
             <tr><td><code>npx playwright test test/e2e/skill-library.spec.ts --update-snapshots</code></td><td>Chromium 2/2 通过；更新并人工检查亮色桌面与暗色 390px 移动端截图。</td></tr>
             <tr><td><code>npm run lint</code>；<code>npm run build</code></td><td>lint 0 errors（仅 193 个基线 warning）；Nuxt 生产构建成功。</td></tr>
@@ -115,7 +115,7 @@
       </section>
       <section>
         <h2>11. interface-review full</h2>
-        <p>完整审查范围为 <code>origin/feat/ai_1.0</code>（merge base：<code>7207cf49ddf5b2a4b6dd5bc6fb1230b61c62a08f</code>）到当前工作树的全部实现差异，排除截图二进制和测试生成物。</p>
+        <p>完整审查范围为 <code>origin/feat/ai_1.0</code>（merge base：<code>b86cbc7e4d6f5d6fca27e781204db3ec7508c025</code>）到当前工作树的全部实现差异，排除截图二进制和测试生成物。</p>
         <table>
           <thead><tr><th>初次发现</th><th>处理</th></tr></thead>
           <tbody>
