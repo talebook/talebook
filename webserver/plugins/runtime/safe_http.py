@@ -55,7 +55,7 @@ class SafeHttpClient:
         self.max_redirects = max_redirects
         self.max_bytes = max_bytes
 
-    def request(self, method, url, *, allowed_hosts=(), headers=None, timeout=30, data=None):
+    def request(self, method, url, *, allowed_hosts=(), headers=None, timeout=30, data=None, params=None, json=None):
         current = url
         origin = self._origin(url)
         for redirect_count in range(self.max_redirects + 1):
@@ -67,6 +67,8 @@ class SafeHttpClient:
                 current,
                 headers=dict(headers or {}),
                 data=data,
+                params=params,
+                json=json,
                 timeout=timeout,
                 allow_redirects=False,
             )
@@ -78,7 +80,7 @@ class SafeHttpClient:
                     raise EndpointPolicyError("Endpoint returned a redirect without a location")
                 current = urllib.parse.urljoin(current, location)
                 if response.status_code == 303:
-                    method, data = "GET", None
+                    method, data, json = "GET", None, None
                 continue
             if response.status_code in {401, 403}:
                 raise ProviderAuthError("Book source rejected the configured credentials")

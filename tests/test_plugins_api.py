@@ -1,9 +1,10 @@
 import json
 from unittest import mock
 
+from tests.test_main import TestWithAdminUser, get_db
+from tests.test_main import setUpModule as init
 from webserver import loader
-from tests.test_main import TestWithAdminUser, get_db, setUpModule as init
-from webserver.models import PluginConnection, PluginInstallation, PluginSecret
+from webserver.models import PluginConnection, PluginInstallation, PluginRun, PluginRunItem, PluginSecret
 from webserver.plugins.runtime import ProviderAuthError, ProviderRateLimitError, WereadProvider
 
 
@@ -12,6 +13,13 @@ def setUpModule():
 
 
 class TestPluginsApi(TestWithAdminUser):
+    def _delete_private_run(self, connection_id, run_id):
+        session = get_db()
+        session.query(PluginRunItem).filter(PluginRunItem.run_id == run_id).delete()
+        session.query(PluginRun).filter(PluginRun.id == run_id).delete()
+        session.query(PluginConnection).filter(PluginConnection.id == connection_id).delete()
+        session.commit()
+
     def test_catalog_bootstraps_builtin_capabilities_without_excluded_sources(self):
         data = self.json("/api/admin/plugins")
 
@@ -85,6 +93,59 @@ class TestPluginsApi(TestWithAdminUser):
         data = self.json("/api/admin/plugins/runs/999999")
         self.assertEqual(data["err"], "plugin.run_missing")
         self.assertNotIn("traceback", json.dumps(data).lower())
+
+    def test_admin_cannot_execute_list_or_read_user_owned_plugin_runs(self):
+        self.json("/api/admin/plugins")
+        session = get_db()
+        installation = session.query(PluginInstallation).filter_by(plugin_key="talebook.book-source.opds").one()
+        connection = PluginConnection(
+            installation_id=installation.id,
+            owner_type="user",
+            owner_id=2,
+            name="qa-private-run",
+            config={},
+            scopes=[],
+            cursor={},
+        )
+        session.add(connection)
+        session.flush()
+        run = PluginRun(
+            connection_id=connection.id,
+            action="run",
+            status="succeeded",
+            requested_by=2,
+            counts={},
+            cursor_before={},
+            cursor_after={},
+            input_data={},
+        )
+        session.add(run)
+        session.flush()
+        session.add(
+            PluginRunItem(
+                run_id=run.id,
+                external_id="private-note",
+                entity_type="annotation",
+                status="succeeded",
+                data={"content": "user two private highlight"},
+            )
+        )
+        session.commit()
+        self.addCleanup(self._delete_private_run, connection.id, run.id)
+
+        action = self.json(
+            "/api/admin/plugins/connections/%d/run" % connection.id,
+            method="POST",
+            body="{}",
+        )
+        listed = self.json("/api/admin/plugins/runs?include_items=true")
+        detail = self.json("/api/admin/plugins/runs/%d" % run.id)
+
+        self.assertEqual(action["err"], "plugin.connection_forbidden")
+        self.assertNotIn(run.id, [item["id"] for item in listed["runs"]])
+        self.assertNotIn("user two private highlight", json.dumps(listed, ensure_ascii=False))
+        self.assertEqual(detail["err"], "plugin.run_missing")
+        self.assertNotIn("user two private highlight", json.dumps(detail, ensure_ascii=False))
 
     def tearDown(self):
         session = get_db()

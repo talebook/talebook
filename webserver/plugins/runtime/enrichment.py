@@ -6,19 +6,16 @@ import re
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from urllib.parse import quote, urlparse
+from urllib.parse import quote
 from xml.etree import ElementTree
-
-import requests
 
 from .protocol import (
     PROTOCOL_VERSION,
-    ProviderAuthError,
     ProviderError,
     ProviderItem,
-    ProviderRateLimitError,
     ProviderResult,
 )
+from .safe_http import SafeHttpClient
 
 
 SUMMARY_LIMIT = 500
@@ -65,22 +62,15 @@ def _manifest(
 
 
 def _http_json(method, url, headers=None, params=None, body=None, timeout=30):
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
-        raise ProviderError("Connector endpoint must be an HTTP(S) URL without embedded credentials")
     headers = {"Accept": "application/json", "User-Agent": USER_AGENT, **dict(headers or {})}
-    response = requests.request(method, url, headers=headers, params=params, json=body, timeout=timeout)
-    if response.status_code in {401, 403}:
-        raise ProviderAuthError("Provider rejected the configured credentials")
-    if response.status_code == 429:
-        retry_after = response.headers.get("Retry-After")
-        try:
-            retry_after = float(retry_after) if retry_after else None
-        except ValueError:
-            retry_after = None
-        raise ProviderRateLimitError("Provider rate limit exceeded", retry_after=retry_after)
-    if response.status_code >= 400:
-        raise ProviderError("Provider returned HTTP %d" % response.status_code)
+    response = SafeHttpClient().request(
+        method,
+        url,
+        headers=headers,
+        params=params,
+        json=body,
+        timeout=timeout,
+    )
     try:
         return response.json()
     except ValueError as exc:

@@ -715,7 +715,14 @@ class PluginRuntime:
             self.session.add(record)
             self.session.flush()
             return "created", "succeeded", record
-        if record.local_modified and record.raw_hash != payload_hash:
+        if item.entity_type == "annotation":
+            from webserver.services.weread_annotations import materialized_annotation_is_locally_modified
+
+            if materialized_annotation_is_locally_modified(self.session, record):
+                record.local_modified = True
+        if record.local_modified:
+            if record.status == "active" and record.raw_hash == payload_hash:
+                return "skipped", "succeeded", record
             return "protected", "conflict", record
         if record.status == "active" and record.raw_hash == payload_hash:
             return "skipped", "succeeded", record
@@ -741,6 +748,11 @@ class PluginRuntime:
         counts["fetched"] = len(records)
         now = datetime.datetime.now()
         for record in records:
+            if record.entity_type == "annotation":
+                from webserver.services.weread_annotations import materialized_annotation_is_locally_modified
+
+                if materialized_annotation_is_locally_modified(self.session, record):
+                    record.local_modified = True
             if record.local_modified:
                 counts["conflicts"] += 1
                 self._add_item(

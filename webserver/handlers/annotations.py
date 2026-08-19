@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.i18n import _
-from webserver.models import Annotation, AnnotationSource
+from webserver.models import Annotation, AnnotationSource, PluginSourceRecord
 from webserver.services.annotation_sync import AnnotationSyncService
 
 
@@ -31,6 +31,16 @@ SOURCE_FIELD_LIMITS = {
 }
 SOURCE_INPUT_FIELDS = set(SOURCE_FIELD_LIMITS) | {"source_position", "source_updated_at"}
 LEGACY_SOURCE_FIELDS = {"source", "external_id", "connection_id", "run_id", "raw_hash", "remote_updated_at"}
+
+
+def _mark_plugin_records_locally_modified(session, annotation_id, now):
+    session.query(PluginSourceRecord).filter(
+        PluginSourceRecord.entity_type == "annotation",
+        PluginSourceRecord.entity_id == str(annotation_id),
+    ).update(
+        {PluginSourceRecord.local_modified: True, PluginSourceRecord.update_time: now},
+        synchronize_session="fetch",
+    )
 
 
 def _parse_datetime(value):
@@ -350,6 +360,7 @@ class BookAnnotationItem(AnnotationHandlerMixin, BaseHandler):
             now = datetime.datetime.now()
             annotation.user_modified_at = now
             annotation.update_time = now
+            _mark_plugin_records_locally_modified(self.session, annotation.id, now)
             self.session.commit()
             if not annotation.is_private:
                 AnnotationSyncService().sync_annotation(annotation.id)
@@ -367,6 +378,7 @@ class BookAnnotationItem(AnnotationHandlerMixin, BaseHandler):
         annotation = self._owned(book_id, annotation_id)
         if not annotation:
             return {"err": "annotation.not_found", "msg": _("笔记不存在")}
+        _mark_plugin_records_locally_modified(self.session, annotation.id, datetime.datetime.now())
         self.session.delete(annotation)
         self.session.commit()
         return {"err": "ok", "deleted": 1}
