@@ -805,8 +805,10 @@ class BookRefer(BaseHandler):
         cover_fallback = False
         if only_cover == "yes":
             # 仅设置封面，检查封面数据是否有效
-            if refer_mi.cover_data and len(refer_mi.cover_data) > 0:
-                mi.cover_data = refer_mi.cover_data
+            refer_cover_data = getattr(refer_mi, "cover_data", None)
+            if refer_cover_data and len(refer_cover_data) > 1 and refer_cover_data[1]:
+                mi.cover_data = refer_cover_data
+                mi.timestamp = datetime.datetime.now(datetime.timezone.utc)
             else:
                 return {"err": "cover.empty", "msg": _("获取到的封面数据为空")}
         else:
