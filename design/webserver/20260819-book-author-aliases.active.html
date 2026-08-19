@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 书籍别名、作者别名和作者合并方案。" />
+    <link rel="icon" href="data:," />
+    <title>用独立别名索引聚合书籍与作者 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f4f6f8; --panel:#fff; --ink:#17202a; --muted:#596573; --line:#d8dee6; --accent:#9a4d0c; --soft:#fff3e7; --good:#176443; --good-soft:#e7f5ee; --warn:#8a4d00; --shadow:0 12px 30px rgba(23,32,42,.08); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+      * { box-sizing:border-box; }
+      html { scroll-behavior:smooth; }
+      body { margin:0; color:var(--ink); background:linear-gradient(145deg,#fff 0%,var(--bg) 45%,#f8efe7 100%); line-height:1.65; }
+      .skip { position:absolute; left:-9999px; }
+      .skip:focus { left:12px; top:12px; z-index:2; padding:8px 12px; color:#fff; background:var(--ink); }
+      .page { width:min(1080px,calc(100vw - 28px)); margin:auto; padding:24px 0 52px; }
+      header,section { margin-bottom:18px; padding:26px 28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:var(--shadow); }
+      header { background:linear-gradient(130deg,#fff 0%,#fff7ef 100%); }
+      h1 { margin:0 0 8px; font-size:clamp(29px,5vw,46px); line-height:1.15; }
+      h2 { margin:0 0 12px; font-size:22px; }
+      h3 { margin:18px 0 8px; font-size:17px; }
+      p,li,td,th { font-size:14px; }
+      p { margin:0 0 12px; }
+      ul,ol { margin:8px 0 0 20px; padding:0; }
+      .sub { color:var(--muted); font-size:17px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      .chip { padding:5px 10px; border-radius:999px; color:#485768; background:#edf1f5; font-size:12px; font-weight:700; }
+      .chip.active { color:var(--good); background:var(--good-soft); }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .box,.callout { padding:15px 17px; border:1px solid var(--line); border-radius:14px; }
+      .callout { background:#f8fafc; }
+      .callout.good { border-color:#b9dccb; background:var(--good-soft); }
+      .callout.warn { border-color:#e8ccaa; background:#fff8eb; }
+      .table { margin-top:12px; overflow-x:auto; border:1px solid var(--line); border-radius:13px; }
+      table { width:100%; min-width:700px; border-collapse:collapse; }
+      th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { color:#4f5d6c; background:#f7f9fb; }
+      th:last-child,td:last-child { border-right:0; }
+      tr:last-child td { border-bottom:0; }
+      code { padding:.1em .35em; border-radius:4px; background:#eef1f5; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+      .pending { color:var(--warn); font-weight:700; }
+      footer { color:var(--muted); font-size:12px; text-align:center; }
+      @media (max-width:720px) { .page{width:calc(100vw - 18px);padding-top:9px} header,section{padding:21px 18px;border-radius:15px}.grid{grid-template-columns:1fr} }
+      @media (prefers-reduced-motion:reduce) { html{scroll-behavior:auto} }
+      @media print { body{background:#fff}.page{width:100%}header,section{box-shadow:none;break-inside:avoid} }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header>
+        <h1>用独立别名索引聚合书籍与作者</h1>
+        <p class="sub">在保留 Calibre 主书名与作者字段兼容性的前提下，让中英文名、译名和标点变体可以被维护、检索与聚合，并提供显式的作者合并操作。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-19</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：webserver、app、tests</span><span class="chip">需求来源：TB-67 / GitHub #1002</span>
+        </div>
+      </header>
+      <main id="main">
+        <section>
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“每本书可维护多个别名并在详情页展示；每位作者可维护多个中英文、译名或标点别名，将别名下的书聚合到同一主页，并支持合并作者。”</div>
+          <p>现有全文搜索和作者分类只读取 Calibre 主字段。同一实体使用不同写法时，搜索结果与作者主页都会分裂。</p>
+        </section>
+        <section>
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="box"><h3>目标</h3><ul><li>编辑书籍时批量维护标题别名，详情页可见。</li><li>书名别名和作者任一别名都能命中完整书目。</li><li>作者列表与主页按规范作者聚合。</li><li>管理员可预览并显式执行作者合并。</li></ul></article>
+            <article class="box"><h3>非目标</h3><ul><li>不改变 EPUB/OPF 内嵌元数据格式。</li><li>不自动猜测翻译名或联网补齐别名。</li><li>不自动合并同书不同版本或文件格式。</li><li>不把别名写入 Calibre 自定义列。</li></ul></article>
+          </div>
+        </section>
+        <section>
+          <h2>3. 产品与权限矩阵</h2>
+          <div class="table" role="region" aria-label="功能权限矩阵" tabindex="0"><table>
+            <thead><tr><th>任务</th><th>游客</th><th>登录用户</th><th>管理员</th><th>验收</th></tr></thead>
+            <tbody>
+              <tr><td>按别名搜索和浏览聚合作者页</td><td>支持公开书</td><td>支持有权书籍</td><td>支持全部可见书籍</td><td>别名与规范名返回同一集合，继续遵守私有书过滤。</td></tr>
+              <tr><td>维护书籍别名</td><td>不支持</td><td>仅有编辑权限且为书主</td><td>支持</td><td>沿用现有书籍编辑权限，空值删除。</td></tr>
+              <tr><td>维护作者别名、合并作者</td><td>不支持</td><td>不支持</td><td>支持</td><td>全局操作仅管理员可执行；合并前显示将修改的书籍数量。</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <section>
+          <h2>4. 现状与根因</h2>
+          <div class="table" role="region" aria-label="现状证据" tabindex="0"><table>
+            <thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead>
+            <tbody>
+              <tr><td>搜索只使用 Calibre 缓存</td><td><code>webserver/handlers/book.py</code> 的 <code>SearchBook.get</code></td><td>Talebook 扩展字段必须在搜索结果上做并集。</td></tr>
+              <tr><td>作者页按单个 category name 查书</td><td><code>webserver/handlers/meta.py</code> 的 <code>MetaBooks.get</code></td><td>需要把输入名解析为规范名并扩展完整别名组。</td></tr>
+              <tr><td>Calibre 数据不由 SQLAlchemy 管理</td><td><code>webserver/CLAUDE.md</code></td><td>别名归 Talebook 业务库，显式合并才更新 Calibre。</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <section>
+          <h2>5. 方案</h2>
+          <div class="callout good"><strong>结论：</strong>新增 <code>book_aliases</code> 和 <code>author_aliases</code> 两张 Talebook 表；统一服务负责规范化、分组和查找。读取路径只做扩展，写入路径沿用现有权限。作者合并先保存别名组，再逐书把精确匹配的作者名替换为规范名。</div>
+          <h3>数据与接口</h3>
+          <div class="table" role="region" aria-label="数据与接口" tabindex="0"><table>
+            <thead><tr><th>对象</th><th>契约</th><th>兼容策略</th></tr></thead>
+            <tbody>
+              <tr><td>书籍别名</td><td><code>book_id + normalized_name</code> 唯一，保留展示名。</td><td>旧书默认空数组；删除书籍时清理记录。</td></tr>
+              <tr><td>作者别名</td><td><code>normalized_name</code> 全局唯一并指向规范展示名。</td><td>规范名自身也入组；冲突返回参数错误，不静默搬组。</td></tr>
+              <tr><td>书籍详情/编辑</td><td><code>book.aliases: string[]</code>，现有编辑接口接受同名字段。</td><td>旧客户端忽略新增响应字段；未传 aliases 时保持不变。</td></tr>
+              <tr><td>作者管理</td><td><code>GET/POST /api/author-aliases/&lt;name&gt;</code>；POST 可选 <code>merge</code>。</td><td>读取公开；写入需登录、编辑权限和管理员身份。</td></tr>
+            </tbody>
+          </table></div>
+          <h3>处理顺序</h3>
+          <ol><li>输入统一去首尾空白、过滤空值并按 Unicode casefold 去重。</li><li>搜索先取 Calibre 结果，再并入书籍别名命中的 ID 与作者别名组对应的 ID。</li><li>作者分类把组成员折叠到规范名；作者详情查询组内所有名称并去重书籍。</li><li>合并时仅替换作者数组中的精确组成员，保留合著者与顺序，并复用现有 Calibre 元数据写入函数。</li></ol>
+        </section>
+        <section>
+          <h2>6. 影响、风险与回滚</h2>
+          <div class="grid"><article class="box"><h3>影响范围</h3><p>新增业务库表、两个 JSON 接口字段、搜索/作者分类读路径，以及书籍编辑、详情、作者页三处界面。</p></article><article class="box"><h3>保持不变</h3><p>Calibre 主字段、下载/阅读协议、现有 URL、私有书权限和未传新字段的客户端行为保持不变。</p></article></div>
+          <div class="callout warn"><strong>主要风险：</strong>全局作者合并会触发 Calibre 路径与元数据更新；因此限制管理员显式确认，逐书写入并在失败时返回已完成/失败数量。别名表提交与 Calibre 不具备跨库事务，测试覆盖部分失败的可观察结果。</div>
+          <div class="callout"><strong>回滚：</strong>代码回滚后新增表不会影响旧版本；只删除别名记录即可撤销索引。作者合并属于显式元数据变更，回滚需用保存的别名组反向编辑，界面在确认前提示不可自动撤销。</div>
+        </section>
+        <section>
+          <h2>7. 测试计划与结果</h2>
+          <div class="table" role="region" aria-label="测试计划" tabindex="0"><table>
+            <thead><tr><th>验证层</th><th>实际命令或页面</th><th>关键断言</th><th>结果</th></tr></thead>
+            <tbody>
+              <tr><td>后端集成</td><td><code>pytest tests/test_aliases.py -v</code>；完整后端测试</td><td>持久化、搜索并集、作者聚合、权限、合并及既有行为。</td><td>8 passed；完整套件 835 passed、20 skipped</td></tr>
+              <tr><td>前端组件</td><td><code>cd app &amp;&amp; npx vitest run test/components/AuthorAliasPanel.nuxt.spec.ts</code></td><td>别名展示、管理权限、保存/合并确认。</td><td>3 passed</td></tr>
+              <tr><td>前端构建</td><td><code>cd app &amp;&amp; npm run build</code></td><td>客户端、SSR 与 Nitro 产物可生成。</td><td>通过</td></tr>
+              <tr><td>界面审查</td><td>静态界面审查；书籍编辑、书籍详情、作者详情</td><td>加载失败可重试、空规范名有字段错误、别名 chip、合并警告与键盘操作。</td><td>无剩余可执行问题；环境缺少 Chrome DevTools MCP，未完成实际浏览器渲染检查</td></tr>
+              <tr><td>质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、<code>make check-design</code></td><td>格式、静态检查与方案门禁通过。</td><td>通过；前端 lint 仅有 193 个仓库既有 warning</td></tr>
+              <tr><td>前端广泛测试</td><td><code>cd app &amp;&amp; npx vitest run</code></td><td>确认新增组件之外的回归。</td><td class="pending">受仓库既有配置阻塞：Vitest 收集 Playwright E2E；另有 3 个既有未注册图标</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <section>
+          <h2>8. 决策记录</h2>
+          <ol><li><strong>2026-08-19：</strong>别名属于 Talebook 增强索引，不塞入 Calibre 主字段或自定义列，以保证现有书库可直接升级。</li><li><strong>2026-08-19：</strong>别名聚合与作者合并拆为两个动作；聚合无损且即时生效，合并为管理员显式确认的写操作。</li><li><strong>2026-08-19：</strong>作者别名全局唯一；普通保存遇到跨组冲突时拒绝写入，管理员显式合并时才吸收完整冲突组，避免同一输入不确定地路由到多个作者。</li></ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-08-19</footer>
+    </div>
+  </body>
+</html>

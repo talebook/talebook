@@ -343,6 +343,29 @@ class Item(Base, SQLAlchemyMixin):
         self.src_path = ""
 
 
+class BookAlias(Base, SQLAlchemyMixin):
+    """Talebook-owned alternate titles for a Calibre book."""
+
+    __tablename__ = "book_aliases"
+    __table_args__ = (UniqueConstraint("book_id", "normalized_name", name="uq_book_alias_name"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    name = Column(String(500), nullable=False)
+    normalized_name = Column(String(500), nullable=False, index=True)
+
+
+class AuthorAlias(Base, SQLAlchemyMixin):
+    """One alternate author spelling mapped to a canonical display name."""
+
+    __tablename__ = "author_aliases"
+
+    normalized_name = Column(String(500), primary_key=True)
+    name = Column(String(500), nullable=False)
+    canonical_name = Column(String(500), nullable=False)
+    canonical_normalized_name = Column(String(500), nullable=False, index=True)
+
+
 class ScanFile(Base, SQLAlchemyMixin):
     __tablename__ = "scanfiles"
     id = Column(Integer, primary_key=True)
