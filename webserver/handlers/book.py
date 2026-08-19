@@ -1012,22 +1012,32 @@ class BookDelete(BaseHandler):
         if not can_manage or not (self.is_admin() or self.is_book_owner(bid, self.user_id())):
             return {"err": "permission", "msg": _("无权操作")}
 
+        from webserver.models import AITask, ScanFile, TaleAgent, TaleAgentConversation
+        from webserver.services.ai_artifacts import (
+            SUMMARY_DUCK_FEATURE,
+            AIArtifactError,
+            AIArtifactStore,
+            TaleAgentArtifactError,
+            TaleAgentArtifactStore,
+        )
+        from webserver.services.tale_agent import FEATURE_KEY as TALE_AGENT_FEATURE_KEY
+        from webserver.services.tale_agent import TaleAgentService, conversation_messages
+
+        artifact_store = AIArtifactStore(CONF)
+        ai_tasks = self.session.query(AITask).filter(AITask.book_id == bid).all()
+        try:
+            for task in ai_tasks:
+                if task.feature == SUMMARY_DUCK_FEATURE:
+                    artifact_store.delete_summary_duck(task)
+        except AIArtifactError as exc:
+            return {"err": exc.code, "msg": exc.safe_message}
+
         external_indexed = is_external_index_book(self.session, bid)
         if external_indexed:
             delete_external_index_book_record(self.db, bid)
         else:
             self.db.delete_book(bid)
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
-        from webserver.models import (
-            AITask,
-            ScanFile,
-            TaleAgent,
-            TaleAgentConversation,
-        )
-        from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore
-        from webserver.services.tale_agent import FEATURE_KEY as TALE_AGENT_FEATURE_KEY
-        from webserver.services.tale_agent import TaleAgentService, conversation_messages
-
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
         tale_agent_runtime = TaleAgentService()
         tale_agent_runtime.setup(self.settings["SessionMaker"], CONF)
@@ -1066,12 +1076,12 @@ class BookDelete(BaseHandler):
         if external_indexed:
             self.session.query(Item).filter(Item.book_id == bid).delete()
         self.session.commit()
-        artifacts = AIArtifactStore.from_config(CONF, "agents")
+        artifacts = TaleAgentArtifactStore.from_config(CONF, "agents")
         cleanup_failed = False
         for owner_id, relative_path in preview_artifacts + agent_artifacts:
             try:
                 artifacts.delete(owner_id, relative_path)
-            except AIArtifactError:
+            except TaleAgentArtifactError:
                 cleanup_failed = True
                 logging.exception("Failed to clean AI artifact for deleted book bid=%s", bid)
         self.add_msg("success", _("删除书籍《%s》") % book["title"])

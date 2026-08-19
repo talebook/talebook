@@ -9,7 +9,7 @@ from unittest import mock
 from tests import test_main
 from webserver import models
 from webserver.handlers import ai as ai_handlers
-from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore, workspace_id
+from webserver.services.ai_artifacts import TaleAgentArtifactError, TaleAgentArtifactStore, workspace_id
 from webserver.services.tale_agent import (
     CHAT_SCHEMA_VERSION,
     TaleAgentService,
@@ -101,10 +101,10 @@ class TaleAgentEvidenceTest(unittest.TestCase):
         self.assertEqual(validate_user_prompt("A &amp; B 的选择"), "A & B 的选择")
 
 
-class AIArtifactStoreTest(unittest.TestCase):
+class TaleAgentArtifactStoreTest(unittest.TestCase):
     def test_current_manifest_is_atomic_private_and_integrity_checked(self):
         with tempfile.TemporaryDirectory() as directory:
-            store = AIArtifactStore(directory, "agents")
+            store = TaleAgentArtifactStore(directory, "agents")
             first = store.replace_json(7, "agent-1", {"display_name": "林舟"})
             second = store.replace_json(7, "agent-1", {"display_name": "阿宁"})
 
@@ -112,26 +112,26 @@ class AIArtifactStoreTest(unittest.TestCase):
             self.assertEqual(first.ref.relative_path, f"{workspace_id(7)}/agents/agent-1/manifest.json")
             self.assertNotIn("v1", first.ref.relative_path)
             self.assertEqual(store.read_json(7, second.ref.relative_path, second.ref.sha256)["display_name"], "阿宁")
-            with self.assertRaises(AIArtifactError):
+            with self.assertRaises(TaleAgentArtifactError):
                 store.read_json(8, second.ref.relative_path, second.ref.sha256)
-            with self.assertRaises(AIArtifactError):
+            with self.assertRaises(TaleAgentArtifactError):
                 store.read_json(7, "../agents/agent-1/manifest.json", second.ref.sha256)
 
             path = Path(directory, second.ref.relative_path)
             path.write_text('{"display_name":"tampered"}\n', encoding="utf-8")
-            with self.assertRaisesRegex(AIArtifactError, "integrity"):
+            with self.assertRaisesRegex(TaleAgentArtifactError, "integrity"):
                 store.read_json(7, second.ref.relative_path, second.ref.sha256)
 
     def test_restore_and_delete_keep_database_relative_paths_portable(self):
         with tempfile.TemporaryDirectory() as directory:
-            store = AIArtifactStore(directory, "agents")
+            store = TaleAgentArtifactStore(directory, "agents")
             first = store.replace_json(7, "agent-1", {"display_name": "林舟"})
             replacement = store.replace_json(7, "agent-1", {"display_name": "阿宁"})
             store.restore(7, replacement)
             self.assertEqual(store.read_json(7, first.ref.relative_path, first.ref.sha256)["display_name"], "林舟")
             with tempfile.TemporaryDirectory() as migrated_directory:
                 shutil.copytree(directory, migrated_directory, dirs_exist_ok=True)
-                migrated = AIArtifactStore(migrated_directory, "agents")
+                migrated = TaleAgentArtifactStore(migrated_directory, "agents")
                 self.assertEqual(
                     migrated.read_json(7, first.ref.relative_path, first.ref.sha256)["display_name"],
                     "林舟",
@@ -150,7 +150,7 @@ class TaleAgentAPITest(test_main.TestWithUserLogin):
         )
         self.artifact_config.start()
         self.workspace_secret = ai_handlers.CONF.get("cookie_secret") or "cookie_secret"
-        self.artifacts = AIArtifactStore(
+        self.artifacts = TaleAgentArtifactStore(
             self.artifact_directory.name,
             "agents",
             workspace_secret=self.workspace_secret,

@@ -20,7 +20,7 @@ from xml.etree import ElementTree
 
 from webserver.models import AITask, TaleAgent, TaleAgentConversation
 from webserver.services.agent_runtime import AgentRuntimeError, RuntimeEvent, RuntimeRequest
-from webserver.services.ai_artifacts import AIArtifactStore
+from webserver.services.ai_artifacts import TaleAgentArtifactStore
 from webserver.services.codex_app_server import CodexAppServerRuntime
 
 
@@ -493,7 +493,7 @@ class TaleAgentService:
     def setup(self, session_maker, config: Dict[str, Any], runtime=None) -> None:
         self.session_maker = session_maker
         self.config = config
-        self.artifacts = AIArtifactStore.from_config(config, "agents")
+        self.artifacts = TaleAgentArtifactStore.from_config(config, "agents")
         if runtime is not None:
             self.runtime = runtime
         elif not self._configured:

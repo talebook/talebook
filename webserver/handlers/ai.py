@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.models import AITask, ReadingState, TaleAgent, TaleAgentConversation
-from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore
+from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore, TaleAgentArtifactError, TaleAgentArtifactStore
 from webserver.services.knowledge_graph import (
     FEATURE_KEY as KNOWLEDGE_GRAPH_FEATURE_KEY,
 )
@@ -42,12 +42,12 @@ from webserver.services.summary_duck import (
     SCHEMA_VERSION,
     SummaryDuckService,
     SummaryDuckValidationError,
+    artifact_payload,
     chapter_hash,
     clean_markdown,
     export_markdown,
     request_key,
     task_dict,
-    task_items,
     validate_chapter_input,
 )
 from webserver.services.tale_agent import (
@@ -103,7 +103,14 @@ class SummaryDuckFeature:
     """Summary Duck behavior plugged into the stable AI task HTTP surface."""
 
     key = FEATURE_KEY
-    task_dict = staticmethod(task_dict)
+
+    @staticmethod
+    def task_dict(record):
+        return task_dict(record, CONF)
+
+    @staticmethod
+    def artifacts():
+        return AIArtifactStore(CONF)
 
     @staticmethod
     def enabled():
@@ -124,6 +131,12 @@ class SummaryDuckFeature:
             return False, {"err": "ai.not_found", "msg": "AI 结果不存在"}
         if _book_version(book) != record.book_version:
             return False, {"err": "ai.book_version_changed", "msg": "书籍版本已变化，请重新生成"}
+        if record.status == "succeeded":
+            try:
+                SummaryDuckFeature.artifacts().migrate_summary_duck_record(handler.session, record)
+                SummaryDuckFeature.artifacts().read_summary_duck(record)
+            except AIArtifactError as exc:
+                return False, {"err": exc.code, "msg": exc.safe_message}
         return True, None
 
     @classmethod
@@ -148,7 +161,13 @@ class SummaryDuckFeature:
             .order_by(AITask.create_time.desc())
             .all()
         )
-        return {"err": "ok", "tasks": task_items(records)}
+        for record in records:
+            if record.status == "succeeded" and not record.artifact_sha256:
+                try:
+                    cls.artifacts().migrate_summary_duck_record(handler.session, record)
+                except AIArtifactError as exc:
+                    logging.warning("Summary Duck legacy artifact migration failed task_id=%s code=%s", record.id, exc.code)
+        return {"err": "ok", "tasks": [cls.task_dict(record) for record in records]}
 
     @classmethod
     def create(cls, handler, body):
@@ -180,7 +199,7 @@ class SummaryDuckFeature:
                 existing.update_time = datetime.datetime.now()
                 handler.session.commit()
                 cls.service(handler).submit(existing.id, chapter)
-            return {"err": "ok", "task": task_dict(existing), "idempotent": True}
+            return {"err": "ok", "task": cls.task_dict(existing), "idempotent": True}
         record = AITask(
             id=str(uuid.uuid4()),
             request_key=key,
@@ -197,6 +216,7 @@ class SummaryDuckFeature:
             schema_version=SCHEMA_VERSION,
             prompt_version=PROMPT_VERSION,
         )
+        cls.artifacts().prepare_summary_duck_record(record)
         handler.session.add(record)
         try:
             handler.session.commit()
@@ -206,15 +226,17 @@ class SummaryDuckFeature:
             if not record or record.creator_id != handler.user_id() or record.feature != cls.key:
                 return {"err": "ai.conflict", "msg": "无法创建总结"}
         cls.service(handler).submit(record.id, chapter)
-        return {"err": "ok", "task": task_dict(record), "idempotent": False}
+        return {"err": "ok", "task": cls.task_dict(record), "idempotent": False}
 
     @staticmethod
     def update(handler, record, body):
         if record.status != "succeeded":
             return {"err": "ai.not_editable", "msg": "仅成功结果可编辑"}
         try:
+            document = SummaryDuckFeature.artifacts().read_summary_duck(record)
             items = body.get("items")
-            original = (record.ai_draft or {}).get("items", [])
+            original_payload = document.get("ai_draft") or {}
+            original = original_payload.get("items", [])
             if not isinstance(items, list) or len(items) != 5 or len(original) != 5:
                 raise SummaryDuckValidationError("结果必须恰好包含五组问答")
             revision = []
@@ -234,11 +256,28 @@ class SummaryDuckFeature:
                 )
         except SummaryDuckValidationError as exc:
             return {"err": "params.invalid", "msg": str(exc)}
-        record.user_revision = {"items": revision}
-        record.result_data = {"items": revision}
+        except AIArtifactError as exc:
+            return {"err": exc.code, "msg": exc.safe_message}
         record.update_time = datetime.datetime.now()
+        try:
+            SummaryDuckFeature.artifacts().write_summary_duck(
+                record,
+                original_payload,
+                {"items": revision},
+                status="succeeded",
+                updated_at=record.update_time,
+            )
+        except AIArtifactError as exc:
+            return {"err": exc.code, "msg": exc.safe_message}
+        record.user_revision = {}
+        record.result_data = {}
+        record.ai_draft = {}
         handler.session.commit()
-        return {"err": "ok", "task": task_dict(record)}
+        return {"err": "ok", "task": SummaryDuckFeature.task_dict(record)}
+
+    @staticmethod
+    def delete(handler, record):
+        SummaryDuckFeature.artifacts().delete_summary_duck(record)
 
     @staticmethod
     def export(handler, record):
@@ -246,10 +285,16 @@ class SummaryDuckFeature:
             handler.set_header("Content-Type", "application/json; charset=UTF-8")
             handler.write({"err": "ai.not_ready", "msg": "总结尚未完成"})
             return
+        try:
+            markdown = export_markdown(record, artifact_payload(record, CONF))
+        except AIArtifactError as exc:
+            handler.set_header("Content-Type", "application/json; charset=UTF-8")
+            handler.write({"err": exc.code, "msg": exc.safe_message})
+            return
         filename = f"summary-duck-{record.book_id}-{record.id[:8]}.md"
         handler.set_header("Content-Type", "text/markdown; charset=UTF-8")
         handler.set_header("Content-Disposition", f'attachment; filename="{filename}"')
-        handler.write(export_markdown(record))
+        handler.write(markdown)
 
 
 class KnowledgeGraphFeature:
@@ -513,11 +558,24 @@ class AITaskItem(_AITaskBase):
     @js
     @auth
     def delete(self, feature_name, task_id):
-        record, feature, error = self._visible_task(feature_name, task_id)
-        if error:
+        feature = _feature(feature_name)
+        if not feature:
+            return {"err": "ai.feature_not_found", "msg": "不支持的 AI 功能"}
+        record = self._own_task(feature.key, task_id)
+        if not record:
+            return {"err": "ai.not_found", "msg": "AI 任务不存在"}
+        visible, error = feature.can_access(self, record)
+        removable_artifact_errors = {"artifact.unavailable", "artifact.digest_mismatch", "artifact.invalid"}
+        if not visible and error.get("err") not in removable_artifact_errors:
             return error
         if record.status in {"queued", "running"}:
             feature.service(self).cancel(record.id)
+        try:
+            delete = getattr(feature, "delete", None)
+            if delete:
+                delete(self, record)
+        except AIArtifactError as exc:
+            return {"err": exc.code, "msg": exc.safe_message}
         self.session.delete(record)
         self.session.commit()
         return {"err": "ok", "msg": "AI 任务已删除"}
@@ -557,7 +615,7 @@ class AITaskExport(_AITaskBase):
 
 class _TaleAgentBase(BaseHandler):
     def _artifacts(self):
-        return AIArtifactStore.from_config(CONF, "agents")
+        return TaleAgentArtifactStore.from_config(CONF, "agents")
 
     def _service(self):
         service = TaleAgentService()
@@ -571,7 +629,7 @@ class _TaleAgentBase(BaseHandler):
     def _preview_manifest(self, record):
         ref = record.result_data or {}
         if ref.get("artifact_status") != "ready":
-            raise AIArtifactError("preview artifact is not ready")
+            raise TaleAgentArtifactError("preview artifact is not ready")
         return self._artifacts().read_json(
             record.creator_id,
             ref.get("artifact_path", ""),
@@ -580,7 +638,7 @@ class _TaleAgentBase(BaseHandler):
 
     def _agent_manifest(self, record):
         if record.artifact_status != "ready":
-            raise AIArtifactError("agent artifact is not ready")
+            raise TaleAgentArtifactError("agent artifact is not ready")
         return self._artifacts().read_json(record.creator_id, record.manifest_path, record.manifest_sha256)
 
     def _preview_dict(self, record):
@@ -723,7 +781,7 @@ class TaleAgentPreviews(_TaleAgentBase):
         if existing:
             try:
                 payload = self._preview_dict(existing)
-            except AIArtifactError:
+            except TaleAgentArtifactError:
                 return self._artifact_error()
             return {"err": "ok", "preview": payload, "idempotent": True}
         record = AITask(
@@ -761,7 +819,7 @@ class TaleAgentPreviewItem(_TaleAgentBase):
             return error
         try:
             return {"err": "ok", "preview": self._preview_dict(record)}
-        except AIArtifactError:
+        except TaleAgentArtifactError:
             return self._artifact_error()
 
     @js
@@ -779,7 +837,7 @@ class TaleAgentPreviewItem(_TaleAgentBase):
         if artifact_ref.get("artifact_path"):
             try:
                 self._artifacts().delete(owner_id, artifact_ref["artifact_path"])
-            except AIArtifactError:
+            except TaleAgentArtifactError:
                 logging.exception("Failed to clean TaleAgent preview artifact preview_id=%s", preview_id)
                 return {"err": "ai.artifact_cleanup_failed", "msg": "预览已删除，但产物目录清理失败"}
         return {"err": "ok"}
@@ -795,7 +853,7 @@ class TaleAgentPreviewCancel(_TaleAgentBase):
         if record.status not in {"queued", "running"}:
             try:
                 payload = self._preview_dict(record)
-            except AIArtifactError:
+            except TaleAgentArtifactError:
                 return self._artifact_error()
             return {"err": "ok", "preview": payload, "idempotent": True}
         record.cancel_requested = True
@@ -827,7 +885,7 @@ class TaleAgents(_TaleAgentBase):
             if not error:
                 try:
                     visible.append(self._agent_dict(record))
-                except AIArtifactError:
+                except TaleAgentArtifactError:
                     unavailable = agent_dict(record, {})
                     unavailable["artifact_status"] = "unavailable"
                     visible.append(unavailable)
@@ -848,7 +906,7 @@ class TaleAgents(_TaleAgentBase):
             return error
         try:
             manifest = self._preview_manifest(preview)
-        except AIArtifactError:
+        except TaleAgentArtifactError:
             return self._artifact_error()
         context = preview.ai_draft or {}
         agent_id = new_id()
@@ -887,7 +945,7 @@ class TaleAgentItem(_TaleAgentBase):
             return error
         try:
             return {"err": "ok", "agent": self._agent_dict(agent)}
-        except AIArtifactError:
+        except TaleAgentArtifactError:
             return self._artifact_error()
 
     @js
@@ -912,7 +970,7 @@ class TaleAgentItem(_TaleAgentBase):
         new_index = int((preview.ai_draft or {}).get("cutoff_index", 0))
         try:
             manifest = self._preview_manifest(preview)
-        except AIArtifactError:
+        except TaleAgentArtifactError:
             return self._artifact_error()
         write = self._artifacts().replace_json(agent.creator_id, agent.id, manifest)
         agent.display_name = manifest["display_name"]
@@ -951,7 +1009,7 @@ class TaleAgentItem(_TaleAgentBase):
         self.session.commit()
         try:
             self._artifacts().delete(owner_id, artifact_path)
-        except AIArtifactError:
+        except TaleAgentArtifactError:
             logging.exception("Failed to clean TaleAgent artifact agent_id=%s", agent_id)
             return {"err": "ai.artifact_cleanup_failed", "msg": "Agent 已删除，但产物目录清理失败"}
         return {"err": "ok", "msg": "Agent、私有会话与反馈已删除"}
@@ -1009,7 +1067,7 @@ class TaleAgentMessages(_TaleAgentBase):
             return None, {"err": "params.invalid", "msg": str(exc)}
         try:
             manifest = self._agent_manifest(agent)
-        except AIArtifactError:
+        except TaleAgentArtifactError:
             return None, self._artifact_error()
         messages = conversation_messages(conversation)
         if any(message.get("status") in {"queued", "running"} for message in messages):
