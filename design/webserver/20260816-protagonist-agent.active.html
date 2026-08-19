@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="TB-62 人物思维 Agent 的产品、数据与验证方案。" />
+  <link rel="icon" href="data:," />
+  <title>人物思维 Agent · ACTIVE</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f4f1ea; --paper:#fffdf8; --ink:#25231f; --muted:#6e675e; --line:#d9d0c2; --accent:#8b3f2f; --soft:#f5e6df; --good:#23664b; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { width:min(1080px,calc(100% - 28px)); margin:28px auto 64px; } header,section { margin-bottom:18px; padding:26px 30px; border:1px solid var(--line); border-radius:18px; background:var(--paper); }
+    h1 { margin:0 0 8px; font:700 clamp(30px,5vw,48px)/1.15 Georgia,"Noto Serif SC",serif; } h2 { margin:0 0 12px; font-size:22px; } h3 { margin:20px 0 8px; font-size:17px; }
+    p,ul,ol { margin:8px 0; } code { padding:2px 5px; border-radius:5px; background:var(--soft); overflow-wrap:anywhere; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; color:var(--muted); } .meta span { padding:4px 9px; border-radius:999px; background:var(--soft); }
+    .flow { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-top:14px; } .flow div { padding:13px; border:1px solid var(--line); border-radius:12px; } .flow b { display:block; color:var(--accent); }
+    table { width:100%; border-collapse:collapse; } th,td { padding:9px; border:1px solid var(--line); text-align:left; vertical-align:top; } th { background:var(--soft); }
+    .pending { color:#9b5b13; font-weight:700; } .verified { color:var(--good); font-weight:700; }
+    @media (max-width:760px) { header,section { padding:20px; } .flow { grid-template-columns:1fr; } table { display:block; overflow:auto; } }
+    @media print { body { background:#fff; } main { width:100%; margin:0; } header,section { break-inside:avoid; } }
+  </style>
+</head>
+<body><main>
+  <header>
+    <h1>人物同款思维 Agent</h1>
+    <p>从书中任意角色或真实人物的证据中提炼思维模式、决策原则、解题步骤和盲区，创建一个帮助用户分析现实问题的私有思考伙伴。</p>
+    <div class="meta"><span>状态：ACTIVE</span><span>创建：2026-08-16</span><span>修订：2026-08-17</span><span>模块：webserver / app</span><span>来源：TB-62</span></div>
+  </header>
+  <section id="request"><h2>原始诉求与反馈修订</h2><p>初版按“防剧透主角陪伴”实现。2026-08-17 用户明确纠偏：不要让防剧透、版权引用和角色范围成为额外限制；核心是帮助用户借用人物的思维方式解决问题，而且创建对象不限主角，必须支持系统推荐或用户自由输入。修订版据此移除截止章节、剧透确认、续写/仿写阻断、短引预算和引用反馈，保留私有 ACL、运行时脱敏与删除清理。</p></section>
+  <section id="goals"><h2>目标与边界</h2><ul><li>创建时可选择“AI 推荐”或“自己指定”，目标人物可以是主角、配角、历史人物或非虚构作品中的真实人物。</li><li>manifest 聚焦思维模式、决策原则、解题步骤与思维盲区；对话先理解用户问题，再给出可执行的分析和下一步。</li><li>书籍证据只在创建思维模型时进入运行时；聊天只使用抽象 manifest 与会话历史，不反复注入整本正文。</li><li>manifest、会话、消息、反馈均按创建者私有；每次读写重新检查书籍权限和版本。</li><li>不做公共分享或对外知识库；不承诺人物思维模型绝对准确，也不把单一人物视角包装成唯一答案。</li></ul></section>
+  <section id="design"><h2>方案</h2>
+    <div class="flow"><div><b>1. 选择</b>用户选择 AI 推荐或自由输入任意人物。</div><div><b>2. 提炼</b>服务端解析 EPUB，异步生成版本化思维 manifest。</div><div><b>3. 预览</b>展示思维模式、决策原则、解题步骤、盲区与证据范围。</div><div><b>4. 解题</b>聊天只带 manifest 与历史，用人物视角拆解用户的现实问题。</div><div><b>5. 清理</b>删除、撤权或书籍版本变化时拒绝访问并清理派生数据。</div></div>
+    <h3>数据模型</h3><table><tr><th>实体</th><th>保留内容</th><th>隐私/生命周期</th></tr><tr><td><code>ProtagonistAgent</code></td><td>书籍版本、思维 manifest、schema/prompt 版本</td><td>创建者私有；删除时级联会话与反馈</td></tr><tr><td><code>ProtagonistConversation</code></td><td>Agent 关联与创建时间</td><td>创建者私有；不保存证据正文</td></tr><tr><td><code>ProtagonistMessage</code></td><td>用户问题、AI 分析、终态、反馈</td><td>不记录运行时 prompt、书籍证据或原始进程输出</td></tr></table>
+    <h3>HTTP 契约</h3><p><code>/api/ai/protagonist/previews</code> 创建/轮询预览；<code>/api/ai/protagonist/agents</code> 确认、列表、改边界和删除；<code>/api/ai/protagonist/conversations</code> 创建/读取会话；消息子资源提供生成、取消、重试和反馈。所有接口使用 <code>@js</code> + <code>@auth</code>，终态为 succeeded / failed / cancelled。</p>
+    <h3>约束策略</h3><ul><li>移除续写/仿写意图拦截、剧透边界、短引预算和逐字引用验证，避免限制用户如何使用人物视角。</li><li>保留创建输入长度、结构化 schema 与运行时终态，防止协议错误破坏产品状态。</li><li>创建提示把正文标成不可信数据且不给工具；聊天阶段不携带书籍正文，只携带抽象 manifest。</li><li>运行时异常、超时、取消和协议错误只落安全错误码与脱敏消息。</li></ul>
+  </section>
+  <section id="impact"><h2>影响与风险</h2><table><tr><th>风险</th><th>控制</th><th>剩余风险</th></tr><tr><td>越权访问</td><td>检索前 ACL、每次访问复核、书籍版本校验</td><td>管理员主动撤权时依赖下一次请求触发拒绝</td></tr><tr><td>人物思维失真</td><td>展示证据范围和盲区，提供“不像他的思路”反馈</td><td>模型提炼仍是主观解释，不承诺完全复刻</td></tr><tr><td>建议不可用</td><td>提示要求具体下一步和适用性反思，提供“不够实用/太空泛”反馈</td><td>用户仍需自行判断建议是否适合真实情境</td></tr><tr><td>并发/取消</td><td>消息级 UUID、幂等终态、AgentRuntime.cancel</td><td>进程被强杀时依赖超时和下次访问恢复失败态</td></tr></table></section>
+  <section id="tests"><h2>测试结果</h2><p class="verified">自动化验证通过；full interface review 复查无剩余 HIGH / MEDIUM，结论为 Approve。</p>
+    <ul>
+      <li>后端定向测试：在 Talebook 测试镜像内执行 <code>pytest -q tests/test_protagonist_agent.py tests/test_summary_duck.py</code>，<strong>26 passed</strong>；覆盖全书默认提取、指定人物/AI 推荐、v2 manifest/chat schema、聊天不注入 EPUB 证据、私有 ACL、书籍权限和版本复核、兼容性模型重生成、删除级联、取消与运行时终态。</li>
+      <li>前端定向测试：<code>npx vitest run test/components/ManifestPreview.spec.ts test/utils/protagonist-agent-runtime.spec.ts test/utils/summary-duck-runtime.spec.ts --run</code>，<strong>3 files / 6 tests passed</strong>。</li>
+      <li>后端格式与 lint：<code>make lint-py-fix</code>、<code>make lint-py</code> 均通过，107 个 Python 文件已格式化且无 Ruff 错误。</li>
+      <li>前端 lint：<code>npm run lint</code> 为 0 errors；仓库仍有 193 个既有 warnings，本次新增文件未产生 warning。<code>npm run build</code> 的 Nuxt client、SSR 与 Nitro 生产构建完整通过。</li>
+      <li><code>npx nuxi typecheck</code> 在进入项目类型检查前因临时解析到的 <code>vue-tsc@3.3.10</code> 与锁定 TypeScript export map 不兼容而失败（<code>ERR_PACKAGE_PATH_NOT_EXPORTED: ./lib/tsc</code>）；风险由完整生产构建和目标 Vitest 通过覆盖，未将其记为功能通过。</li>
+    </ul>
+    <h3>Full interface review</h3>
+    <p>按项目要求以 full 模式审查当前分支相对默认分支 <code>origin/master@1f0a4bd</code> 的全部已提交与未提交变化，并在目标分支更新合入后再次复核冲突区域；排除运行时 <code>.venv</code>。界面范围覆盖 Summary Duck 阅读器入口/弹层、猜你喜欢页面，以及本功能的书籍详情入口、推荐/自选创建、预览、空态、聊天、加载、失败、取消、反馈、删除、窄屏和亮暗主题代码。直接消费者展开到 <code>creader.html</code>、书籍详情页和 <code>ManifestPreview</code> 的唯一页面调用方。</p>
+    <p>Accessibility、Layout、Writing、Typography、Colors、UI 六个领域均已审阅。初版审查修复了聊天标签、pressed 状态、键盘焦点、取消入口、英文来源标点、辅助文字对比度、RTL 缩进和聊天滚动等问题；本轮产品转向后重新审查，进一步把英文标题由仅暗示虚构角色的 “Character-inspired” 改为 “Person-inspired”，将自定义人物空值错误放到输入框旁并由 Vuetify 建立可访问关联，同时在 420px 以下纵向排列模式选项。复查未发现可操作的 HIGH / MEDIUM。</p>
+    <p>刻意保留的设计：AI 衍生标识、思维盲区与删除风险继续使用明确文字表达；Vuetify 原生输入、单选和对话框负责键盘语义、错误关联、焦点陷阱和恢复；原有 Summary Duck 使用已经验证的静态阅读器注入方式，而不在本功能中重写为第二套组件。</p>
+    <p>验证缺口：当前智能体运行环境未提供 Chrome DevTools MCP，且已占用的真实 Docker 实例不是本 checkout，未冒险替换现有服务，因此本功能没有新增真实后端浏览器截图；界面视觉判断以源码、组件测试、已有 Summary Duck Chromium 亮暗/320px 快照和完整 Nuxt 生产构建为替代。合并前仍建议在可用的 Chrome DevTools MCP 环境下补一次真实 EPUB、登录态、亮暗主题与 320px 人工验收。</p>
+  </section>
+</main></body></html>
