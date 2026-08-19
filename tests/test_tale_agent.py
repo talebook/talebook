@@ -113,12 +113,21 @@ class TaleAgentArtifactStoreTest(unittest.TestCase):
             self.assertEqual(first.ref.relative_path, f"{workspace_id(7)}/agents/agent-1/AGENTS.md")
             self.assertNotIn("v1", first.ref.relative_path)
             entry = Path(directory, second.ref.relative_path)
-            reference = entry.parent / "references" / "doc.md"
+            references = entry.parent / "references"
+            profile = references / "profile.md"
+            thinking = references / "thinking.md"
+            sources = references / "sources.md"
             self.assertTrue(entry.is_file())
-            self.assertTrue(reference.is_file())
+            self.assertEqual({path.name for path in references.iterdir()}, {"profile.md", "thinking.md", "sources.md"})
             self.assertLessEqual(len(entry.read_text(encoding="utf-8").splitlines()), 80)
-            self.assertIn("`references/doc.md`", entry.read_text(encoding="utf-8"))
-            self.assertIn("## Thinking Patterns", reference.read_text(encoding="utf-8"))
+            agents = entry.read_text(encoding="utf-8")
+            self.assertIn("`references/profile.md`", agents)
+            self.assertIn("`references/thinking.md`", agents)
+            self.assertIn("`references/sources.md`", agents)
+            self.assertIn("## Display Name", profile.read_text(encoding="utf-8"))
+            self.assertIn("## Thinking Patterns", thinking.read_text(encoding="utf-8"))
+            self.assertIn("# TaleAgent Sources", sources.read_text(encoding="utf-8"))
+            self.assertFalse((references / "doc.md").exists())
             self.assertFalse((entry.parent / "manifest.json").exists())
             self.assertEqual(store.read_agent(7, second.ref.relative_path, second.ref.sha256)["display_name"], "阿宁")
             with self.assertRaises(TaleAgentArtifactError):
@@ -126,11 +135,17 @@ class TaleAgentArtifactStoreTest(unittest.TestCase):
             with self.assertRaises(TaleAgentArtifactError):
                 store.read_agent(7, "../agents/agent-1/AGENTS.md", second.ref.sha256)
 
-            reference.write_text(reference.read_text(encoding="utf-8") + "tampered\n", encoding="utf-8")
+            unexpected = references / "untracked.md"
+            unexpected.write_text("# Untracked\n", encoding="utf-8")
+            with self.assertRaisesRegex(TaleAgentArtifactError, "integrity"):
+                store.read_agent(7, second.ref.relative_path, second.ref.sha256)
+            unexpected.unlink()
+
+            thinking.write_text(thinking.read_text(encoding="utf-8") + "tampered\n", encoding="utf-8")
             with self.assertRaisesRegex(TaleAgentArtifactError, "integrity"):
                 store.read_agent(7, second.ref.relative_path, second.ref.sha256)
 
-            reference.unlink()
+            sources.unlink()
             with self.assertRaisesRegex(TaleAgentArtifactError, "unavailable"):
                 store.read_agent(7, second.ref.relative_path, second.ref.sha256)
 

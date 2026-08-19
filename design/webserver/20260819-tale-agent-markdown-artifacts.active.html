@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="TaleAgent 使用标准 AGENTS.md 与 references/doc.md 作为目录权威产物。" />
+  <meta name="description" content="TaleAgent 使用标准 AGENTS.md 与 references 多文档作为目录权威产物。" />
   <link rel="icon" href="data:," />
   <title>TaleAgent Markdown Agent 产物 · ACTIVE</title>
   <style>
@@ -11,17 +11,22 @@
   </style>
 </head>
 <body><main>
-  <header><h1>TaleAgent Markdown Agent 产物</h1><p>把 TaleAgent 的目录权威产物从实现专用 JSON 改为标准、可读、可复用的 Agent 文档目录，同时保留数据库索引、完整性校验和原子替换。</p><div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-19</span><span>所属模块：webserver</span><span>影响范围：产物格式 / 目录存储 / 测试</span><span>需求来源：TB-62 评论 13321407</span></div></header>
-  <section><h2>1. 原始诉求</h2><p>成员要求：“实际存储的文件应该是 AGENTS.md 这种非常标准的 ai agent 文件，并且控制 agents.md 文件长度尽量不要超过 80 行，复杂的内容可以使用 references/ 目录来额外存储 doc.md。”</p><p><code>opaque workspace</code> 仅表示目录名不暴露邮箱、用户名或连续 reader id；本方案保留隐私目录名，但不再让它暗示产物内容不可读。</p></section>
-  <section><h2>2. 目标与边界</h2><table><tr><th>目标</th><th>边界</th></tr><tr><td><ul><li>每个预览或正式 Agent 目录都有 <code>AGENTS.md</code> 。</li><li><code>AGENTS.md</code> 是短入口，硬限制不超过 80 行。</li><li>完整人物思维资料放入 <code>references/doc.md</code> 。</li><li>运行时从 Markdown 文档恢复经验证的 manifest，不依赖数据库正文。</li><li>数据库仍只保存相对入口路径、目录摘要和状态。</li></ul></td><td><ul><li>不改变 TaleAgent 页面、API 或会话 JSON 模型。</li><li>不保存 EPUB 正文、运行时 prompt 或对话内容到 Agent 文件。</li><li>不保留 <code>manifest.json</code> 兼容副本；草稿 PR 尚未生产落地。</li><li>不引入版本目录、回滚接口或额外库表。</li></ul></td></tr></table></section>
+  <header><h1>TaleAgent Markdown Agent 产物</h1><p>把 TaleAgent 的目录权威产物从实现专用 JSON 改为标准、可读、可复用的 Agent 文档目录，同时保留数据库索引、完整性校验和原子替换。</p><div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-19</span><span>所属模块：webserver</span><span>影响范围：产物格式 / 目录存储 / 测试</span><span>需求来源：TB-62 评论 13321407 / fbf01e19</span></div></header>
+  <section><h2>1. 原始诉求</h2><p>成员要求：“实际存储的文件应该是 AGENTS.md 这种非常标准的 ai agent 文件，并且控制 agents.md 文件长度尽量不要超过 80 行，复杂的内容可以使用 references/ 目录来额外存储 doc.md。”后续补充：“references/ 里可以放多个文档。”</p><p><code>opaque workspace</code> 仅表示目录名不暴露邮箱、用户名或连续 reader id；本方案保留隐私目录名，但不再让它暗示产物内容不可读。</p></section>
+  <section><h2>2. 目标与边界</h2><table><tr><th>目标</th><th>边界</th></tr><tr><td><ul><li>每个预览或正式 Agent 目录都有 <code>AGENTS.md</code> 。</li><li><code>AGENTS.md</code> 是短入口，硬限制不超过 80 行。</li><li>完整资料按职责拆分为 <code>references/</code> 下的多个 Markdown 文档。</li><li>运行时从 Markdown 文档恢复经验证的 manifest，不依赖数据库正文。</li><li>数据库仍只保存相对入口路径、目录摘要和状态。</li></ul></td><td><ul><li>不改变 TaleAgent 页面、API 或会话 JSON 模型。</li><li>不保存 EPUB 正文、运行时 prompt 或对话内容到 Agent 文件。</li><li>不保留 <code>manifest.json</code> 兼容副本；草稿 PR 尚未生产落地。</li><li>不引入版本目录、回滚接口或额外库表。</li></ul></td></tr></table></section>
   <section><h2>3. 目录与文档契约</h2><pre><code>books/ai/{workspace}/agents/
   {agent-id}/
     AGENTS.md                 # 标准入口，≤ 80 行
     references/
-      doc.md                  # 完整思维模型与来源
+      profile.md              # 名称与介绍
+      thinking.md             # 思维、决策、步骤与盲点
+      sources.md              # 证据来源
   previews/{task-id}/
     AGENTS.md
-    references/doc.md</code></pre><h3><code>AGENTS.md</code></h3><p>包含 TaleAgent 身份、必须先读取 <code>references/doc.md</code> 的指令、使用思维模式帮助用户解决问题的核心行为，以及不得虚构来源/不得声称是原人物等简短边界。</p><h3><code>references/doc.md</code></h3><p>使用固定 Markdown 章节保存 display name、introduction、thinking patterns、decision principles、problem-solving steps、blind spots 与 sources。写入时把列表项规范为单行；读取时严格检查章节、数量和来源结构。</p></section>
-  <section><h2>4. 一致性、安全与兼容</h2><ul><li>摘要覆盖 <code>AGENTS.md</code> 与 <code>references/doc.md</code> 两个文件，任一文件缺失或被篡改即失败关闭。</li><li>替换前保存旧目录字节；新文件在受控临时目录内写入、fsync 后切换，数据库提交失败时恢复旧目录。</li><li>只接受当前创建者 workspace、固定 feature、固定文件名和受控目录深度，拒绝绝对路径与 <code>..</code>。</li><li>删除入口路径时删除整个 Agent 目录及 references；预览、Agent、书籍删除流程保持一致。</li><li>旧 <code>manifest.json</code> 不兼容。本实现只存在于未合并草稿 PR，无生产迁移对象。</li></ul></section>
-  <section><h2>5. 测试结果</h2><p class="verified">实现与回归验证通过。</p><ul><li>目录契约与 TaleAgent 定向：<code>pytest -q tests/test_tale_agent.py</code>，<strong>15 passed</strong>；覆盖文件名、<code>AGENTS.md</code> 80 行上限、无 <code>manifest.json</code>、Markdown 往返、双文件摘要、篡改/缺失/越界拒绝、替换恢复、迁移可携带与目录删除。</li><li>关联回归：<code>pytest -q tests/test_tale_agent.py tests/test_ai_artifacts.py tests/test_summary_duck.py tests/test_book_write_permissions.py</code>，<strong>43 passed</strong>。</li><li>完整后端：<code>pytest -q tests</code>，<strong>894 passed, 20 skipped</strong>；25 条既有弃用或 SQLAlchemy warning，无失败。</li><li><code>make lint-py-fix</code>、<code>make lint-py</code> 与 <code>git diff --check</code> 均通过；设计文档转 ACTIVE 后执行 <code>make check-design</code>。</li><li>纯后端产物格式变化，不改变页面、交互、文案或前端响应字段；无需界面审查。</li></ul></section>
+    references/
+      profile.md
+      thinking.md
+      sources.md</code></pre><h3><code>AGENTS.md</code></h3><p>包含 TaleAgent 身份、必须先读取三个 references 文档的指令、使用思维模式帮助用户解决问题的核心行为，以及不得虚构来源/不得声称是原人物等简短边界。</p><h3><code>references/</code></h3><p><code>profile.md</code> 保存 display name 和 introduction，<code>thinking.md</code> 保存 thinking patterns、decision principles、problem-solving steps 与 blind spots，<code>sources.md</code> 保存来源。写入时把列表项规范为单行；读取时严格检查每份文档的章节、数量和结构。后续可在不增长 <code>AGENTS.md</code> 主体的前提下继续扩展受约束的 references 文档。</p></section>
+  <section><h2>4. 一致性、安全与兼容</h2><ul><li>摘要覆盖 <code>AGENTS.md</code> 与 <code>references/</code> 下的全部受控文档，任一文件缺失、多出或被篡改即失败关闭。</li><li>替换前保存旧目录字节；新文件在受控临时目录内写入、fsync 后切换，数据库提交失败时恢复旧目录。</li><li>只接受当前创建者 workspace、固定 feature、固定文件名和受控目录深度，拒绝绝对路径与 <code>..</code>。</li><li>删除入口路径时删除整个 Agent 目录及 references；预览、Agent、书籍删除流程保持一致。</li><li>旧 <code>manifest.json</code> 不兼容。本实现只存在于未合并草稿 PR，无生产迁移对象。</li></ul></section>
+  <section><h2>5. 测试结果</h2><p class="verified">实现与回归验证通过。</p><ul><li>目录契约与 TaleAgent 定向：<code>pytest -q tests/test_tale_agent.py</code>，<strong>15 passed</strong>；覆盖文件名、<code>AGENTS.md</code> 80 行上限、无 <code>manifest.json</code>、多 references 文档往返、全目录摘要、篡改/缺失/多出/越界拒绝、替换恢复、迁移可携带与目录删除。</li><li>关联回归：<code>pytest -q tests/test_tale_agent.py tests/test_ai_artifacts.py tests/test_summary_duck.py tests/test_book_write_permissions.py</code>，<strong>43 passed</strong>。</li><li>完整后端：<code>pytest -q tests</code>，<strong>894 passed, 20 skipped</strong>；24 条既有弃用或 SQLAlchemy warning，无失败。</li><li><code>make lint-py-fix</code>、<code>make lint-py</code> 与 <code>git diff --check</code> 均通过；设计文档转 ACTIVE 后执行 <code>make check-design</code>。</li><li>纯后端产物格式变化，不改变页面、交互、文案或前端响应字段；无需界面审查。</li></ul></section>
 </main></body></html>

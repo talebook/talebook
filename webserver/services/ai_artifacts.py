@@ -21,7 +21,11 @@ DEFAULT_AI_ARTIFACT_ROOT = "/data/books/ai"
 DEFAULT_WORKSPACE_SECRET = "cookie_secret"
 SAFE_SEGMENT_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$")
 AGENT_ENTRY_FILENAME = "AGENTS.md"
-AGENT_REFERENCE_PATH = PurePosixPath("references", "doc.md")
+AGENT_PROFILE_PATH = PurePosixPath("references", "profile.md")
+AGENT_THINKING_PATH = PurePosixPath("references", "thinking.md")
+AGENT_SOURCES_PATH = PurePosixPath("references", "sources.md")
+AGENT_REFERENCE_PATHS = (AGENT_PROFILE_PATH, AGENT_THINKING_PATH, AGENT_SOURCES_PATH)
+AGENT_BUNDLE_PATHS = (AGENT_ENTRY_FILENAME, *(path.as_posix() for path in AGENT_REFERENCE_PATHS))
 AGENT_MAX_LINES = 80
 
 
@@ -102,7 +106,9 @@ class TaleAgentArtifactStore:
         previous = self._read_existing_bundle(entry.parent)
         bundle = {
             AGENT_ENTRY_FILENAME: self._render_agents(checked).encode("utf-8"),
-            AGENT_REFERENCE_PATH.as_posix(): self._render_reference(checked).encode("utf-8"),
+            AGENT_PROFILE_PATH.as_posix(): self._render_profile(checked).encode("utf-8"),
+            AGENT_THINKING_PATH.as_posix(): self._render_thinking(checked).encode("utf-8"),
+            AGENT_SOURCES_PATH.as_posix(): self._render_sources(checked).encode("utf-8"),
         }
         self._replace_bundle(entry.parent, bundle)
         return ArtifactWrite(
@@ -120,24 +126,27 @@ class TaleAgentArtifactStore:
     def read_agent(self, owner_id: int, relative_path: str, expected_sha256: str) -> Dict[str, Any]:
         entry = self._resolve_entry(owner_id, relative_path)
         try:
-            bundle = {
-                AGENT_ENTRY_FILENAME: entry.read_bytes(),
-                AGENT_REFERENCE_PATH.as_posix(): entry.parent.joinpath(*AGENT_REFERENCE_PATH.parts).read_bytes(),
-            }
+            bundle = {path: entry.parent.joinpath(*PurePosixPath(path).parts).read_bytes() for path in AGENT_BUNDLE_PATHS}
         except OSError as exc:
             raise TaleAgentArtifactError("artifact is unavailable") from exc
+        actual_paths = {path.relative_to(entry.parent).as_posix() for path in entry.parent.rglob("*") if path.is_file()}
+        if actual_paths != set(AGENT_BUNDLE_PATHS):
+            raise TaleAgentArtifactError("artifact integrity check failed")
         if not expected_sha256 or not hmac.compare_digest(self._bundle_digest(bundle), expected_sha256):
             raise TaleAgentArtifactError("artifact integrity check failed")
         try:
             agents_text = bundle[AGENT_ENTRY_FILENAME].decode("utf-8")
-            reference_text = bundle[AGENT_REFERENCE_PATH.as_posix()].decode("utf-8")
+            profile_text = bundle[AGENT_PROFILE_PATH.as_posix()].decode("utf-8")
+            thinking_text = bundle[AGENT_THINKING_PATH.as_posix()].decode("utf-8")
+            sources_text = bundle[AGENT_SOURCES_PATH.as_posix()].decode("utf-8")
         except UnicodeDecodeError as exc:
             raise TaleAgentArtifactError("artifact content is invalid") from exc
         if len(agents_text.splitlines()) > AGENT_MAX_LINES:
             raise TaleAgentArtifactError("AGENTS.md exceeds 80 lines")
-        payload = self._parse_reference(reference_text)
+        payload = self._parse_references(profile_text, thinking_text, sources_text)
         expected_title = f"# TaleAgent: {payload['display_name']}"
-        if not agents_text.startswith(expected_title + "\n") or "`references/doc.md`" not in agents_text:
+        referenced_paths = {f"`{path.as_posix()}`" for path in AGENT_REFERENCE_PATHS}
+        if not agents_text.startswith(expected_title + "\n") or any(path not in agents_text for path in referenced_paths):
             raise TaleAgentArtifactError("artifact content is invalid")
         return payload
 
@@ -183,10 +192,9 @@ class TaleAgentArtifactStore:
         if not artifact_root.exists():
             return None
         previous: Dict[str, bytes] = {}
-        for relative_path in (AGENT_ENTRY_FILENAME, AGENT_REFERENCE_PATH.as_posix()):
-            path = artifact_root.joinpath(*PurePosixPath(relative_path).parts)
+        for path in artifact_root.rglob("*"):
             if path.is_file():
-                previous[relative_path] = path.read_bytes()
+                previous[path.relative_to(artifact_root).as_posix()] = path.read_bytes()
         return previous
 
     @staticmethod
@@ -289,7 +297,11 @@ You are a TaleAgent derived from a person described in a book.
 
 ## Required context
 
-Read `references/doc.md` before answering. It is the authoritative thinking model and evidence scope.
+Read all of these authoritative context documents before answering:
+
+- `references/profile.md`
+- `references/thinking.md`
+- `references/sources.md`
 
 ## Working method
 
@@ -304,9 +316,9 @@ Read `references/doc.md` before answering. It is the authoritative thinking mode
         return content
 
     @staticmethod
-    def _render_reference(payload: Dict[str, Any]) -> str:
+    def _render_profile(payload: Dict[str, Any]) -> str:
         lines = [
-            "# TaleAgent Reference",
+            "# TaleAgent Profile",
             "",
             "## Display Name",
             payload["display_name"],
@@ -315,6 +327,11 @@ Read `references/doc.md` before answering. It is the authoritative thinking mode
             payload["introduction"],
             "",
         ]
+        return "\n".join(lines)
+
+    @staticmethod
+    def _render_thinking(payload: Dict[str, Any]) -> str:
+        lines = ["# TaleAgent Thinking Model", ""]
         sections = (
             ("Thinking Patterns", payload["thinking_patterns"]),
             ("Decision Principles", payload["decision_principles"]),
@@ -323,16 +340,20 @@ Read `references/doc.md` before answering. It is the authoritative thinking mode
         )
         for heading, values in sections:
             lines.extend([f"## {heading}", *[f"- {value}" for value in values], ""])
-        lines.append("## Sources")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _render_sources(payload: Dict[str, Any]) -> str:
+        lines = ["# TaleAgent Sources", ""]
         for source in payload["sources"]:
             href = urllib.parse.quote(source["href"], safe="/._-~")
             lines.extend([f"- href: `{href}`", f"  title: {source['title']}"])
         return "\n".join(lines) + "\n"
 
     @classmethod
-    def _parse_reference(cls, content: str) -> Dict[str, Any]:
+    def _parse_sections(cls, content: str, title: str, expected: set[str]) -> Dict[str, list[str]]:
         lines = content.splitlines()
-        if not lines or lines[0] != "# TaleAgent Reference":
+        if not lines or lines[0] != title:
             raise TaleAgentArtifactError("artifact content is invalid")
         sections: Dict[str, list[str]] = {}
         current = ""
@@ -344,31 +365,39 @@ Read `references/doc.md` before answering. It is the authoritative thinking mode
                 sections[current] = []
             elif current and line:
                 sections[current].append(line)
-        expected = {
-            "Display Name",
-            "Introduction",
-            "Thinking Patterns",
-            "Decision Principles",
-            "Problem-Solving Steps",
-            "Blind Spots",
-            "Sources",
-        }
         if set(sections) != expected:
             raise TaleAgentArtifactError("artifact content is invalid")
+        return sections
 
-        def scalar(name: str) -> str:
+    @classmethod
+    def _parse_references(cls, profile: str, thinking: str, sources_content: str) -> Dict[str, Any]:
+        profile_sections = cls._parse_sections(
+            profile,
+            "# TaleAgent Profile",
+            {"Display Name", "Introduction"},
+        )
+        thinking_sections = cls._parse_sections(
+            thinking,
+            "# TaleAgent Thinking Model",
+            {"Thinking Patterns", "Decision Principles", "Problem-Solving Steps", "Blind Spots"},
+        )
+
+        def scalar(sections: Dict[str, list[str]], name: str) -> str:
             values = sections[name]
             if len(values) != 1:
                 raise TaleAgentArtifactError("artifact content is invalid")
             return cls._one_line(values[0], name)
 
         def bullets(name: str) -> list[str]:
-            values = sections[name]
+            values = thinking_sections[name]
             if not values or any(not value.startswith("- ") for value in values):
                 raise TaleAgentArtifactError("artifact content is invalid")
             return [cls._one_line(value[2:], name) for value in values]
 
-        source_lines = sections["Sources"]
+        source_lines = sources_content.splitlines()
+        if len(source_lines) < 3 or source_lines[:2] != ["# TaleAgent Sources", ""]:
+            raise TaleAgentArtifactError("artifact content is invalid")
+        source_lines = source_lines[2:]
         if not source_lines or len(source_lines) % 2:
             raise TaleAgentArtifactError("artifact content is invalid")
         sources = []
@@ -383,8 +412,8 @@ Read `references/doc.md` before answering. It is the authoritative thinking mode
                 }
             )
         payload = {
-            "display_name": scalar("Display Name"),
-            "introduction": scalar("Introduction"),
+            "display_name": scalar(profile_sections, "Display Name"),
+            "introduction": scalar(profile_sections, "Introduction"),
             "thinking_patterns": bullets("Thinking Patterns"),
             "decision_principles": bullets("Decision Principles"),
             "problem_solving_steps": bullets("Problem-Solving Steps"),
