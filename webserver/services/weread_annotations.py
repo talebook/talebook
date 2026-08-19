@@ -335,6 +335,25 @@ def materialize_annotation(session, run, connection, record, data, payload_hash,
     return annotation
 
 
+def materialized_annotation_is_locally_modified(session, record):
+    """Detect local edits/deletes even if an older caller missed the record flag."""
+    try:
+        annotation_id = int(record.entity_id)
+    except (TypeError, ValueError):
+        return False
+    annotation = session.get(Annotation, annotation_id)
+    if annotation is None:
+        return True
+    if record.local_modified:
+        return True
+    sources = [source for source in annotation.sources if source.source_connection_id == str(record.connection_id)]
+    if not sources:
+        return True
+    if annotation.user_modified_at is None:
+        return False
+    return all(source.source_updated_at != annotation.user_modified_at for source in sources)
+
+
 def rollback_materialized_annotation(session, record):
     try:
         annotation_id = int(record.entity_id)

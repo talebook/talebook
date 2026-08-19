@@ -266,9 +266,12 @@ class AdminPluginAction(BaseHandler):
     @is_admin
     def post(self, connection_id, action):
         try:
+            connection = self.session.get(PluginConnection, int(connection_id))
+            if connection is None or connection.owner_type != "instance":
+                raise PluginRuntimeError("plugin.connection_forbidden", "Plugin connection is not available")
             req = _body(self)
             run = PluginRuntime(self.session, loader.get_settings()).prepare_run(
-                int(connection_id),
+                connection.id,
                 action,
                 self.user_id(),
                 trigger=req.get("trigger", "manual"),
@@ -285,7 +288,11 @@ class AdminPluginRuns(BaseHandler):
     @js
     @is_admin
     def get(self):
-        query = self.session.query(PluginRun)
+        query = (
+            self.session.query(PluginRun)
+            .join(PluginConnection, PluginConnection.id == PluginRun.connection_id)
+            .filter(PluginConnection.owner_type == "instance")
+        )
         connection_id = self.get_argument("connection_id", "")
         if connection_id:
             try:
@@ -316,7 +323,8 @@ class AdminPluginRunDetail(BaseHandler):
             run = self.session.get(PluginRun, int(run_id))
         except (TypeError, ValueError):
             run = None
-        if run is None:
+        connection = self.session.get(PluginConnection, run.connection_id) if run is not None else None
+        if connection is None or connection.owner_type != "instance":
             return {"err": "plugin.run_missing", "msg": "Plugin run was not found"}
         items = self.session.query(PluginRunItem).filter(PluginRunItem.run_id == run.id).order_by(PluginRunItem.id).all()
         return {"err": "ok", "run": run.to_public_dict(), "items": [item.to_public_dict(include_data=True) for item in items]}

@@ -2,34 +2,37 @@ import base64
 import io
 import json
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Annotation, Base, PluginConnection, PluginDefinition, PluginRunItem, PluginSourceRecord
+from webserver.plugins.runtime import enrichment
 from webserver.plugins.runtime.enrichment import (
+    REVIEW_SPECS,
     BRSProvider,
     CalibreProviderBridge,
     CatalogReviewProvider,
     EmbeddedMetadataProvider,
     OpenLibraryProvider,
-    REVIEW_SPECS,
     ReviewFileProvider,
     build_field_decisions,
     extract_epub_metadata,
     parse_review_file,
 )
 from webserver.plugins.runtime.protocol import PluginManifest, ProviderRateLimitError
+from webserver.plugins.runtime.safe_http import EndpointPolicyError, EndpointResponseTooLarge, SafeHttpClient
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,
+    PluginRuntimeError,
     ensure_builtin_definitions,
     install_builtin,
     rotate_connection_secret,
     save_connection,
 )
-from webserver.services.plugin_runtime import PluginRuntimeError
 
 
 SETTINGS = {"PLUGIN_SECRET_KEY": "enrichment-test-key", "cookie_secret": "unused-cookie-secret"}
@@ -138,6 +141,56 @@ def test_network_connectors_reject_user_owned_connections(db_session):
             config={"endpoint": "http://127.0.0.1/internal"},
         )
     assert exc.value.code == "plugin.owner_forbidden"
+
+
+@pytest.mark.parametrize("endpoint", ["http://127.0.0.1", "http://169.254.169.254", "http://10.0.0.8"])
+def test_brs_rejects_local_link_local_and_private_endpoints(monkeypatch, endpoint):
+    request = SimpleNamespace(request=lambda *args, **kwargs: pytest.fail("blocked endpoint was requested"))
+
+    def resolver(host, port, **kwargs):
+        return [(2, 1, 6, "", (host, port))]
+
+    monkeypatch.setattr(enrichment, "SafeHttpClient", lambda: SafeHttpClient(session=request, resolver=resolver))
+
+    with pytest.raises(EndpointPolicyError):
+        BRSProvider().execute({"action": "test", "config": {"endpoint": endpoint}, "secrets": {"token": "x"}, "cursor": {}})
+
+
+def test_brs_revalidates_redirects_and_limits_response_size(monkeypatch):
+    public = [(2, 1, 6, "", ("93.184.216.34", 443))]
+    private = [(2, 1, 6, "", ("127.0.0.1", 80))]
+    redirect = SimpleNamespace(
+        status_code=302,
+        headers={"Location": "http://127.0.0.1/private"},
+        content=b"",
+    )
+    redirect_session = SimpleNamespace(request=lambda *args, **kwargs: redirect)
+    def resolver(host, *args, **kwargs):
+        return private if host == "127.0.0.1" else public
+
+    monkeypatch.setattr(
+        enrichment,
+        "SafeHttpClient",
+        lambda: SafeHttpClient(session=redirect_session, resolver=resolver),
+    )
+    context = {
+        "action": "test",
+        "config": {"endpoint": "https://brs.example"},
+        "secrets": {"token": "x"},
+        "cursor": {},
+    }
+    with pytest.raises(EndpointPolicyError):
+        BRSProvider().execute(context)
+
+    oversized = SimpleNamespace(status_code=200, headers={}, content=b"0123456789")
+    oversized_session = SimpleNamespace(request=lambda *args, **kwargs: oversized)
+    monkeypatch.setattr(
+        enrichment,
+        "SafeHttpClient",
+        lambda: SafeHttpClient(session=oversized_session, resolver=lambda *args, **kwargs: public, max_bytes=4),
+    )
+    with pytest.raises(EndpointResponseTooLarge):
+        BRSProvider().execute(context)
 
 
 def test_field_decisions_never_silently_replace_locked_or_nonempty_values():
