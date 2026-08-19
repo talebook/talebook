@@ -1,12 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
+import logging
 import math
 import sys
 from functools import cmp_to_key
 
+import tornado.escape
+
 from webserver import utils
-from webserver.handlers.base import ListHandler, js
+from webserver.handlers.base import ListHandler, auth, js
 from webserver.i18n import _
+from webserver.services.aliases import AliasConflictError, AliasService, clean_alias_name, normalize_alias
+from webserver.services.external_index import set_metadata_preserving_external_paths
+
+
+def get_author_book_ids(handler, names):
+    ids = set()
+    for author_name in names:
+        author_id = handler.cache.get_item_id("authors", author_name)
+        if author_id:
+            ids.update(handler.db.get_books_for_category("authors", author_id))
+    return ids
 
 
 class AuthorBooksUpdate(ListHandler):
@@ -62,6 +76,22 @@ class MetaList(ListHandler):
             items = [{"id": fmt, "name": fmt, "count": count} for fmt, count in format_count.items()]
         else:
             items = self.get_category_with_count(meta)
+            if meta == "author":
+                alias_service = AliasService(self.session)
+                author_mapping = alias_service.author_mapping()
+                grouped = {}
+                for item in items:
+                    canonical = author_mapping.get(normalize_alias(item["name"]), item["name"])
+                    key = normalize_alias(canonical)
+                    if key not in grouped:
+                        grouped[key] = {"id": item["id"], "name": canonical, "count": 0, "members": []}
+                    grouped[key]["count"] += item["count"]
+                    grouped[key]["members"].append(item["name"])
+                for item in grouped.values():
+                    if len(item["members"]) > 1:
+                        item["count"] = len(get_author_book_ids(self, item["members"]))
+                    item.pop("members")
+                items = list(grouped.values())
         count = len(items)
         if items:
             if meta == "rating":
@@ -97,7 +127,14 @@ class MetaBooks(ListHandler):
             books = self.db.get_data_as_dict(ids=matching_ids)
         else:
             category = meta + "s" if meta in ["tag", "author"] else meta
-            if meta in ["rating"]:
+            if meta == "author":
+                alias_service = AliasService(self.session)
+                author_group = alias_service.get_author_group(name)
+                name = author_group["canonical"]
+                title = titles[meta] % vars()
+                ids = get_author_book_ids(self, author_group["names"])
+                books = self.db.get_data_as_dict(ids=ids)
+            elif meta in ["rating"]:
                 # rating 字段需要使用 rating 值查找对应的 item_id
                 rating_value = int(name)
                 # 使用 get_item_name_map 获取 rating 映射，如果方法不存在则使用替代方案
@@ -118,11 +155,82 @@ class MetaBooks(ListHandler):
                 books = self.get_item_books(category, name)
 
         books.sort(key=cmp_to_key(utils.compare_books_by_rating_or_id), reverse=True)
-        return self.render_book_list(books, title=title)
+        response = self.render_book_list(books, title=title)
+        if meta == "author":
+            response["canonical_author"] = author_group["canonical"]
+            response["author_aliases"] = author_group["aliases"]
+        return response
+
+
+class AuthorAliases(ListHandler):
+    @js
+    def get(self, name):
+        alias_service = AliasService(self.session)
+        group = alias_service.get_author_group(name)
+        group["book_count"] = len(get_author_book_ids(self, group["names"]))
+        group["can_edit"] = bool(self.current_user and self.current_user.can_edit() and self.is_admin())
+        return {"err": "ok", "author": group}
+
+    @js
+    @auth
+    def post(self, name):
+        if not self.current_user.can_edit() or not self.is_admin():
+            return {"err": "permission", "msg": _("无权操作")}
+
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+            canonical = clean_alias_name(data.get("canonical") or name)
+            aliases = data.get("aliases", [])
+            merge = data.get("merge") is True
+        except (AttributeError, TypeError, ValueError):
+            return {"err": "params.aliases.invalid", "msg": _("别名参数无效")}
+
+        alias_service = AliasService(self.session)
+        source_names = alias_service.author_names(name)
+        try:
+            group = alias_service.replace_author_group(name, canonical, aliases, absorb_conflicts=merge)
+        except AliasConflictError as error:
+            return {"err": "author.alias.conflict", "msg": str(error)}
+        except ValueError:
+            return {"err": "params.aliases.invalid", "msg": _("别名参数无效")}
+
+        merge_result = {"updated": 0, "failed": []}
+        if merge:
+            member_names = source_names + group["names"]
+            member_normalized = {normalize_alias(value) for value in member_names}
+            for book_id in sorted(get_author_book_ids(self, member_names)):
+                try:
+                    mi = self.db.get_metadata(book_id, index_is_id=True)
+                    authors = []
+                    seen_authors = set()
+                    changed = False
+                    for author in mi.authors or []:
+                        replacement = group["canonical"] if normalize_alias(author) in member_normalized else author
+                        changed = changed or replacement != author
+                        normalized_replacement = normalize_alias(replacement)
+                        if normalized_replacement not in seen_authors:
+                            authors.append(replacement)
+                            seen_authors.add(normalized_replacement)
+                    if changed:
+                        mi.authors = authors
+                        mi.author_sort = authors[0] if authors else ""
+                        set_metadata_preserving_external_paths(self.db, self.session, book_id, mi)
+                        merge_result["updated"] += 1
+                except Exception:
+                    logging.exception("Failed to merge author aliases for book %s", book_id)
+                    merge_result["failed"].append(book_id)
+        group["book_count"] = len(get_author_book_ids(self, group["names"]))
+        return {
+            "err": "ok",
+            "author": group,
+            "merge": merge_result,
+            "msg": _("作者别名更新成功"),
+        }
 
 
 def routes():
     return [
+        (r"/api/author-aliases/(.*)", AuthorAliases),
         (r"/api/(author|publisher|tag|rating|series|format)", MetaList),
         (r"/api/(author|publisher|tag|rating|series|format)/(.*)", MetaBooks),
         (r"/api/author/(.*)/update", AuthorBooksUpdate),

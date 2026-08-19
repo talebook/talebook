@@ -96,6 +96,20 @@
                                 <v-col
                                     class="py-0"
                                     cols="12"
+                                >
+                                    <v-combobox
+                                        v-model="book.aliases"
+                                        :label="t('book.aliases')"
+                                        :hint="t('book.aliasesHint')"
+                                        multiple
+                                        chips
+                                        closable-chips
+                                        persistent-hint
+                                    />
+                                </v-col>
+                                <v-col
+                                    class="py-0"
+                                    cols="12"
                                     sm="6"
                                 >
                                     <!-- AUTHORS -->
@@ -288,7 +302,7 @@ const { $backend, $alert } = useNuxtApp();
 const { t } = useI18n();
 
 const bookid = route.params.bid;
-const book = ref({'id': 0, 'files': [], 'tags': [], 'pubdate': ''});
+const book = ref({'id': 0, 'files': [], 'tags': [], 'aliases': [], 'pubdate': ''});
 const author_input = ref(null);
 const tag_input = ref(null);
 const coverFile = ref(null);
@@ -316,6 +330,7 @@ const { data, refresh } = useAsyncData(`book-edit-${bookid}`, async () => {
 watch(data, (newData) => {
     if (newData && newData.err === 'ok') {
         book.value = newData.book;
+        book.value.aliases = book.value.aliases || [];
     } else if (newData && newData.err !== 'ok') {
         if ($alert) $alert('error', newData.msg || '获取书籍信息失败');
     }
