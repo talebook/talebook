@@ -593,7 +593,7 @@ class TaleAgentService:
                 if record:
                     record.status = "cancelled" if record.cancel_requested else "succeeded"
                     if not record.cancel_requested:
-                        write = self.artifacts.replace_json(record.creator_id, record.id, checked, preview=True)
+                        write = self.artifacts.replace_agent(record.creator_id, record.id, checked, preview=True)
                         record.result_data = write.ref.to_dict()
                         record.progress_message = "预览已就绪"
                         record.usage = result.usage or {}

@@ -630,7 +630,7 @@ class _TaleAgentBase(BaseHandler):
         ref = record.result_data or {}
         if ref.get("artifact_status") != "ready":
             raise TaleAgentArtifactError("preview artifact is not ready")
-        return self._artifacts().read_json(
+        return self._artifacts().read_agent(
             record.creator_id,
             ref.get("artifact_path", ""),
             ref.get("artifact_sha256", ""),
@@ -639,7 +639,7 @@ class _TaleAgentBase(BaseHandler):
     def _agent_manifest(self, record):
         if record.artifact_status != "ready":
             raise TaleAgentArtifactError("agent artifact is not ready")
-        return self._artifacts().read_json(record.creator_id, record.manifest_path, record.manifest_sha256)
+        return self._artifacts().read_agent(record.creator_id, record.manifest_path, record.manifest_sha256)
 
     def _preview_dict(self, record):
         manifest = self._preview_manifest(record) if record.status == "succeeded" else {}
@@ -910,7 +910,7 @@ class TaleAgents(_TaleAgentBase):
             return self._artifact_error()
         context = preview.ai_draft or {}
         agent_id = new_id()
-        write = self._artifacts().replace_json(self.user_id(), agent_id, manifest)
+        write = self._artifacts().replace_agent(self.user_id(), agent_id, manifest)
         record = TaleAgent(
             id=agent_id,
             creator_id=self.user_id(),
@@ -972,7 +972,7 @@ class TaleAgentItem(_TaleAgentBase):
             manifest = self._preview_manifest(preview)
         except TaleAgentArtifactError:
             return self._artifact_error()
-        write = self._artifacts().replace_json(agent.creator_id, agent.id, manifest)
+        write = self._artifacts().replace_agent(agent.creator_id, agent.id, manifest)
         agent.display_name = manifest["display_name"]
         agent.manifest_path = write.ref.relative_path
         agent.manifest_sha256 = write.ref.sha256

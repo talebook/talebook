@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="TB-62 人物思维 Agent manifest 目录化存储后续方案。" />
   <link rel="icon" href="data:," />
-  <title>Agent manifest 目录化存储 · ACTIVE</title>
+  <title>Agent manifest 目录化存储 · SUPERSEDED</title>
   <style>
     :root { color-scheme: light dark; --bg:#eef2f6; --paper:#fff; --ink:#172033; --muted:#5e6878; --line:#d7dee8; --accent:#155e75; --soft:#e6f4f7; --warn:#8a4b12; --good:#17643f; }
     * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif; }
@@ -25,8 +25,9 @@
   <header>
     <h1>Agent manifest 目录化存储</h1>
     <p>让人物思维 Agent 的 manifest 以目录文件作为唯一内容来源，数据库只保存检索索引、相对路径、摘要与状态。</p>
-    <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-18</span><span>所属模块：webserver</span><span>影响范围：AI 产物存储、删除与迁移</span><span>需求来源：TB-52 / TB-62</span></div>
+    <div class="meta"><span>状态：SUPERSEDED</span><span>创建日期：2026-08-18</span><span>所属模块：webserver</span><span>影响范围：AI 产物存储、删除与迁移</span><span>需求来源：TB-52 / TB-62</span></div>
   </header>
+  <section><h2>已被取代</h2><p>本文档保留为历史记录；其 <code>manifest.json</code> 产物方案已由 <a href="20260819-tale-agent-markdown-artifacts.active.html">TaleAgent Markdown Agent 产物</a> 取代。</p></section>
   <section id="request"><h2>1. 原始诉求</h2><p>TB-52 统一规范要求：“实体产物优先保存在目录中”，“统一目录为 <code>books/ai/{user-workspace}/{feature}</code>”，“数据库仅承担管理与检索”，并要求临时文件校验后原子替换、删除同步清理，且备份与迁移同时覆盖数据库和 <code>books/ai</code>。成员随后要求相关子任务按新规范修改代码。</p><p>TB-62 当前草稿 PR 仍把完整 manifest 存在 <code>protagonist_agents.manifest</code>，因此需要独立后续方案替换该持久化边界。本方案生效后覆盖原人物 Agent ACTIVE 方案的数据存储章节，其余产品与交互设计继续有效。</p></section>
   <section id="goals"><h2>2. 目标与边界</h2><table><tr><th>目标</th><th>非目标</th></tr><tr><td><ul><li>单一当前版 <code>manifest.json</code> 位于 <code>/data/books/ai/{opaque-workspace}/agents</code>。</li><li>数据库只保留相对路径、SHA-256、状态及展示/关联索引。</li><li>每次读取先做创建者、书籍 ACL 与版本检查，再校验路径和摘要。</li><li>创建、重新生成使用同目录临时文件和原子替换；删除 Agent 或书籍同步清理产物。</li><li>默认根目录位于既有 <code>/data/books</code> 数据卷，数据库迁移保持相对路径不变。</li></ul></td><td><ul><li>不建设版本表、版本列表、回滚接口或 <code>v{version}</code> 目录。</li><li>不改变人物思维 Agent 的产品交互和运行时协议。</li><li>不为其他 AI 功能迁移数据；共享存储工具保持可复用。</li></ul></td></tr></table></section>
   <section id="design"><h2>3. 方案</h2><div class="flow"><div><b>1. 生成</b>运行时输出经 schema 校验后序列化为稳定 JSON。</div><div><b>2. 原子落盘</b>同目录临时文件 fsync 后以 <code>os.replace</code> 替换当前文件。</div><div><b>3. 索引提交</b>数据库写入相对路径、SHA-256 和 ready 状态；不写正文。</div><div><b>4. 受控读取</b>ACL 与书籍版本通过后，限制路径前缀并校验摘要再加载。</div></div><h3>目录与数据</h3><pre><code>/data/books/ai/

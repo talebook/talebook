@@ -102,42 +102,54 @@ class TaleAgentEvidenceTest(unittest.TestCase):
 
 
 class TaleAgentArtifactStoreTest(unittest.TestCase):
-    def test_current_manifest_is_atomic_private_and_integrity_checked(self):
+    def test_standard_agent_directory_is_private_readable_and_integrity_checked(self):
         with tempfile.TemporaryDirectory() as directory:
             store = TaleAgentArtifactStore(directory, "agents")
-            first = store.replace_json(7, "agent-1", {"display_name": "林舟"})
-            second = store.replace_json(7, "agent-1", {"display_name": "阿宁"})
+            first = store.replace_agent(7, "agent-1", manifest_payload())
+            second_manifest = {**manifest_payload(), "display_name": "阿宁"}
+            second = store.replace_agent(7, "agent-1", second_manifest)
 
             self.assertEqual(first.ref.relative_path, second.ref.relative_path)
-            self.assertEqual(first.ref.relative_path, f"{workspace_id(7)}/agents/agent-1/manifest.json")
+            self.assertEqual(first.ref.relative_path, f"{workspace_id(7)}/agents/agent-1/AGENTS.md")
             self.assertNotIn("v1", first.ref.relative_path)
-            self.assertEqual(store.read_json(7, second.ref.relative_path, second.ref.sha256)["display_name"], "阿宁")
+            entry = Path(directory, second.ref.relative_path)
+            reference = entry.parent / "references" / "doc.md"
+            self.assertTrue(entry.is_file())
+            self.assertTrue(reference.is_file())
+            self.assertLessEqual(len(entry.read_text(encoding="utf-8").splitlines()), 80)
+            self.assertIn("`references/doc.md`", entry.read_text(encoding="utf-8"))
+            self.assertIn("## Thinking Patterns", reference.read_text(encoding="utf-8"))
+            self.assertFalse((entry.parent / "manifest.json").exists())
+            self.assertEqual(store.read_agent(7, second.ref.relative_path, second.ref.sha256)["display_name"], "阿宁")
             with self.assertRaises(TaleAgentArtifactError):
-                store.read_json(8, second.ref.relative_path, second.ref.sha256)
+                store.read_agent(8, second.ref.relative_path, second.ref.sha256)
             with self.assertRaises(TaleAgentArtifactError):
-                store.read_json(7, "../agents/agent-1/manifest.json", second.ref.sha256)
+                store.read_agent(7, "../agents/agent-1/AGENTS.md", second.ref.sha256)
 
-            path = Path(directory, second.ref.relative_path)
-            path.write_text('{"display_name":"tampered"}\n', encoding="utf-8")
+            reference.write_text(reference.read_text(encoding="utf-8") + "tampered\n", encoding="utf-8")
             with self.assertRaisesRegex(TaleAgentArtifactError, "integrity"):
-                store.read_json(7, second.ref.relative_path, second.ref.sha256)
+                store.read_agent(7, second.ref.relative_path, second.ref.sha256)
+
+            reference.unlink()
+            with self.assertRaisesRegex(TaleAgentArtifactError, "unavailable"):
+                store.read_agent(7, second.ref.relative_path, second.ref.sha256)
 
     def test_restore_and_delete_keep_database_relative_paths_portable(self):
         with tempfile.TemporaryDirectory() as directory:
             store = TaleAgentArtifactStore(directory, "agents")
-            first = store.replace_json(7, "agent-1", {"display_name": "林舟"})
-            replacement = store.replace_json(7, "agent-1", {"display_name": "阿宁"})
+            first = store.replace_agent(7, "agent-1", manifest_payload())
+            replacement = store.replace_agent(7, "agent-1", {**manifest_payload(), "display_name": "阿宁"})
             store.restore(7, replacement)
-            self.assertEqual(store.read_json(7, first.ref.relative_path, first.ref.sha256)["display_name"], "林舟")
+            self.assertEqual(store.read_agent(7, first.ref.relative_path, first.ref.sha256)["display_name"], "林舟")
             with tempfile.TemporaryDirectory() as migrated_directory:
                 shutil.copytree(directory, migrated_directory, dirs_exist_ok=True)
                 migrated = TaleAgentArtifactStore(migrated_directory, "agents")
                 self.assertEqual(
-                    migrated.read_json(7, first.ref.relative_path, first.ref.sha256)["display_name"],
+                    migrated.read_agent(7, first.ref.relative_path, first.ref.sha256)["display_name"],
                     "林舟",
                 )
             store.delete(7, first.ref.relative_path)
-            self.assertFalse(Path(directory, first.ref.relative_path).exists())
+            self.assertFalse(Path(directory, first.ref.relative_path).parent.exists())
 
 
 class TaleAgentAPITest(test_main.TestWithUserLogin):
@@ -188,7 +200,7 @@ class TaleAgentAPITest(test_main.TestWithUserLogin):
         preview = session.get(models.AITask, response["preview"]["id"])
         preview.status = "succeeded"
         manifest = manifest_payload(1 if cutoff == CHAPTERS[0]["href"] else 2)
-        write = self.artifacts.replace_json(preview.creator_id, preview.id, manifest, preview=True)
+        write = self.artifacts.replace_agent(preview.creator_id, preview.id, manifest, preview=True)
         preview.result_data = write.ref.to_dict()
         session.commit()
         self.assertEqual(set(preview.result_data), {"artifact_path", "artifact_sha256", "artifact_status"})
@@ -220,7 +232,7 @@ class TaleAgentAPITest(test_main.TestWithUserLogin):
         session = test_main.get_db()
         agent_record = session.get(models.TaleAgent, agent["id"])
         artifact_path = agent_record.manifest_path
-        persisted_manifest = self.artifacts.read_json(
+        persisted_manifest = self.artifacts.read_agent(
             agent_record.creator_id,
             artifact_path,
             agent_record.manifest_sha256,
