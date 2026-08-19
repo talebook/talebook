@@ -96,6 +96,9 @@ settings = {
     "AI_CODEX_MIN_VERSION": "0.147.0",
     "AI_CODEX_MAX_VERSION": "0.148.0",
     "AI_TASK_ROOT": "/data/books/progress",
+    # Durable AI artifacts are part of the /data/books backup boundary. The DB
+    # stores only paths relative to this books/ai root plus SHA-256 indexes.
+    "AI_ARTIFACT_ROOT": "/data/books/ai",
     "AI_HANDSHAKE_TIMEOUT_SECONDS": 10,
     "AI_FIRST_PROGRESS_TIMEOUT_SECONDS": 30,
     "AI_SILENCE_TIMEOUT_SECONDS": 45,

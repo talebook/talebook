@@ -40,7 +40,7 @@ find . \( -path ./library -o -name '*.pyc' \) -prune -o -type f -print | while r
 done
 
 
-mkdir -p /root/.npm /run/talebook /data/books/ssl
+mkdir -p /root/.npm /run/talebook /data/books/ssl /data/books/ai
 
 # 设置系统文件的权限（数量较少，且 nginx/诊断页在自检完成前就需要可用，必须先于 supervisord 启动前就绪）
 mkdir -p /data/log/nginx /var/www/talebook/status

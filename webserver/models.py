@@ -553,6 +553,11 @@ class AITask(Base, SQLAlchemyMixin):
     chapter_length = Column(Integer, nullable=False)
     status = Column(String(24), default="queued", nullable=False, index=True)
     progress_message = Column(String(256), default="")
+    # Durable payloads live below books/ai/{workspace}/{feature}; these fields
+    # are the database index needed to locate and verify the current artifact.
+    workspace_id = Column(String(64), default="", nullable=False, index=True)
+    artifact_path = Column(String(1024), default="", nullable=False)
+    artifact_sha256 = Column(String(64), default="", nullable=False)
     result_data = Column(MutableDict.as_mutable(JSONType), default={})
     ai_draft = Column(MutableDict.as_mutable(JSONType), default={})
     user_revision = Column(MutableDict.as_mutable(JSONType), default={})
