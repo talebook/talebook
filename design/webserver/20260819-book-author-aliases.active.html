@@ -117,7 +117,7 @@
           <div class="table" role="region" aria-label="测试计划" tabindex="0"><table>
             <thead><tr><th>验证层</th><th>实际命令或页面</th><th>关键断言</th><th>结果</th></tr></thead>
             <tbody>
-              <tr><td>后端集成</td><td><code>pytest tests/test_aliases.py -v</code>；完整后端测试</td><td>持久化、搜索并集、作者聚合、权限、合并及既有行为。</td><td>8 passed；完整套件 835 passed、20 skipped</td></tr>
+              <tr><td>后端集成</td><td><code>pytest tests/test_aliases.py -v</code>；完整后端测试</td><td>持久化、搜索并集、作者聚合、权限、合并、批量删除清理及既有行为。</td><td>9 passed；完整套件 836 passed、20 skipped</td></tr>
               <tr><td>前端组件</td><td><code>cd app &amp;&amp; npx vitest run test/components/AuthorAliasPanel.nuxt.spec.ts</code></td><td>别名展示、管理权限、保存/合并确认。</td><td>3 passed</td></tr>
               <tr><td>前端构建</td><td><code>cd app &amp;&amp; npm run build</code></td><td>客户端、SSR 与 Nitro 产物可生成。</td><td>通过</td></tr>
               <tr><td>界面审查</td><td>静态界面审查；书籍编辑、书籍详情、作者详情</td><td>加载失败可重试、空规范名有字段错误、别名 chip、合并警告与键盘操作。</td><td>无剩余可执行问题；环境缺少 Chrome DevTools MCP，未完成实际浏览器渲染检查</td></tr>

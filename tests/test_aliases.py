@@ -114,6 +114,30 @@ class TestAliasService(TestWithUserLogin):
             ["One Hundred Years of Solitude"],
         )
 
+    def test_admin_batch_delete_cleans_book_aliases(self):
+        regular_book_id = 987650
+        external_book_id = 987651
+        service = AliasService(self.session)
+        service.replace_book_aliases(regular_book_id, ["One Hundred Years of Solitude"])
+        service.replace_book_aliases(external_book_id, ["Andersen Fairy Tales"])
+
+        with (
+            mock.patch("webserver.handlers.admin.is_external_index_book", side_effect=[False, True]),
+            mock.patch("webserver.handlers.admin.delete_external_index_book_record") as delete_external,
+            mock.patch.object(self._app.settings["legacy"], "delete_book") as delete_book,
+        ):
+            result = self.json(
+                "/api/admin/book/delete",
+                method="POST",
+                body=json.dumps({"idlist": [regular_book_id, external_book_id]}),
+            )
+
+        self.assertEqual(result["err"], "ok")
+        delete_book.assert_called_once_with(regular_book_id)
+        delete_external.assert_called_once_with(self._app.settings["legacy"], external_book_id)
+        self.assertEqual(service.get_book_aliases(regular_book_id), [])
+        self.assertEqual(service.get_book_aliases(external_book_id), [])
+
     def test_admin_can_merge_author_metadata(self):
         with mock.patch("webserver.handlers.meta.set_metadata_preserving_external_paths") as set_metadata:
             result = self.json(
