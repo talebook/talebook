@@ -1020,64 +1020,49 @@ class BookDelete(BaseHandler):
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
         from webserver.models import (
             AITask,
-            ProtagonistAgent,
-            ProtagonistConversation,
-            ProtagonistMessage,
             ScanFile,
+            TaleAgent,
+            TaleAgentConversation,
         )
         from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore
-        from webserver.services.protagonist_agent import FEATURE_KEY as PROTAGONIST_FEATURE_KEY
-        from webserver.services.protagonist_agent import ProtagonistService
+        from webserver.services.tale_agent import FEATURE_KEY as TALE_AGENT_FEATURE_KEY
+        from webserver.services.tale_agent import TaleAgentService, conversation_messages
 
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
-        protagonist_runtime = ProtagonistService()
-        protagonist_runtime.setup(self.settings["SessionMaker"], CONF)
+        tale_agent_runtime = TaleAgentService()
+        tale_agent_runtime.setup(self.settings["SessionMaker"], CONF)
         active_preview_ids = [
             row[0]
             for row in self.session.query(AITask.id).filter(
                 AITask.book_id == bid,
-                AITask.feature == PROTAGONIST_FEATURE_KEY,
+                AITask.feature == TALE_AGENT_FEATURE_KEY,
                 AITask.status.in_(["queued", "running"]),
             )
         ]
         for preview_id in active_preview_ids:
-            protagonist_runtime.cancel(preview_id)
+            tale_agent_runtime.cancel(preview_id)
         preview_artifacts = []
         for preview in self.session.query(AITask).filter(
             AITask.book_id == bid,
-            AITask.feature == PROTAGONIST_FEATURE_KEY,
+            AITask.feature == TALE_AGENT_FEATURE_KEY,
         ):
             ref = preview.result_data or {}
             if ref.get("artifact_path"):
                 preview_artifacts.append((preview.creator_id, ref["artifact_path"]))
         self.session.query(AITask).filter(AITask.book_id == bid).delete()
-        agents = self.session.query(ProtagonistAgent).filter(ProtagonistAgent.book_id == bid).all()
+        agents = self.session.query(TaleAgent).filter(TaleAgent.book_id == bid).all()
         agent_ids = [agent.id for agent in agents]
         agent_artifacts = [(agent.creator_id, agent.manifest_path) for agent in agents]
         if agent_ids:
-            conversation_ids = [
-                row[0]
-                for row in self.session.query(ProtagonistConversation.id).filter(
-                    ProtagonistConversation.agent_id.in_(agent_ids)
-                )
-            ]
-            if conversation_ids:
-                active_message_ids = [
-                    row[0]
-                    for row in self.session.query(ProtagonistMessage.id).filter(
-                        ProtagonistMessage.conversation_id.in_(conversation_ids),
-                        ProtagonistMessage.status.in_(["queued", "running"]),
-                    )
-                ]
-                for message_id in active_message_ids:
-                    protagonist_runtime.cancel(message_id)
-                self.session.query(ProtagonistMessage).filter(ProtagonistMessage.conversation_id.in_(conversation_ids)).delete(
-                    synchronize_session=False
-                )
-                self.session.query(ProtagonistConversation).filter(ProtagonistConversation.id.in_(conversation_ids)).delete(
-                    synchronize_session=False
-                )
-            self.session.query(ProtagonistAgent).filter(ProtagonistAgent.id.in_(agent_ids)).delete(synchronize_session=False)
+            conversations = self.session.query(TaleAgentConversation).filter(
+                TaleAgentConversation.tale_agent_id.in_(agent_ids)
+            )
+            for conversation in conversations:
+                for message in conversation_messages(conversation):
+                    if message.get("status") in {"queued", "running"}:
+                        tale_agent_runtime.cancel(message["id"])
+            conversations.delete(synchronize_session=False)
+            self.session.query(TaleAgent).filter(TaleAgent.id.in_(agent_ids)).delete(synchronize_session=False)
         if external_indexed:
             self.session.query(Item).filter(Item.book_id == bid).delete()
         self.session.commit()

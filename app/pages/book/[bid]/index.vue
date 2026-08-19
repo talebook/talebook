@@ -540,13 +540,13 @@
                             color="deep-orange-darken-2"
                             variant="elevated"
                             class="mx-2"
-                            :to="'/book/' + book.id + '/protagonist-agent'"
-                            data-testid="open-protagonist-agent"
+                            :to="'/book/' + book.id + '/tale-agent'"
+                            data-testid="open-tale-agent"
                         >
                             <v-icon start>
                                 mdi-account-star-outline
                             </v-icon>
-                            {{ t('protagonist.title') }}
+                            {{ t('taleAgent.title') }}
                         </v-btn>
 
                         <v-btn

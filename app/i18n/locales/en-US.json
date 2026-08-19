@@ -1366,9 +1366,9 @@
     "male": "Male",
     "female": "Female"
   },
-  "protagonist": {
+  "taleAgent": {
     "eyebrow": "Think with another mind",
-    "title": "Person-inspired Agent",
+    "title": "TaleAgent",
     "subtitle": "Turn a person from “{book}” into a thinking partner for decisions, problems, and new ideas.",
     "thisBook": "this book",
     "aiDerived": "AI-derived",

@@ -1,5 +1,5 @@
 <template>
-    <v-container class="protagonist-page py-8">
+    <v-container class="tale-agent-page py-8">
         <v-row justify="center">
             <v-col
                 cols="12"
@@ -9,17 +9,17 @@
                 <header class="page-hero mb-6">
                     <div>
                         <div class="eyebrow">
-                            {{ t('protagonist.eyebrow') }}
+                            {{ t('taleAgent.eyebrow') }}
                         </div>
-                        <h1>{{ t('protagonist.title') }}</h1>
-                        <p>{{ t('protagonist.subtitle', { book: book.title || t('protagonist.thisBook') }) }}</p>
+                        <h1>{{ t('taleAgent.title') }}</h1>
+                        <p>{{ t('taleAgent.subtitle', { book: book.title || t('taleAgent.thisBook') }) }}</p>
                     </div>
                     <v-chip
                         color="deep-orange-darken-2"
                         variant="tonal"
                         prepend-icon="mdi-creation-outline"
                     >
-                        {{ t('protagonist.aiDerived') }}
+                        {{ t('taleAgent.aiDerived') }}
                     </v-chip>
                 </header>
 
@@ -46,7 +46,7 @@
                     rounded="xl"
                     variant="outlined"
                 >
-                    <v-card-title>{{ t('protagonist.myAgents') }}</v-card-title>
+                    <v-card-title>{{ t('taleAgent.myAgents') }}</v-card-title>
                     <v-card-text class="agent-grid">
                         <button
                             v-for="item in agents"
@@ -58,14 +58,14 @@
                             @click="openAgent(item)"
                         >
                             <span class="agent-avatar">{{ item.display_name.slice(0, 1) }}</span>
-                            <span><strong>{{ item.display_name }}</strong><small>{{ t('protagonist.thinkingAgent') }}</small></span>
+                            <span><strong>{{ item.display_name }}</strong><small>{{ t('taleAgent.thinkingAgent') }}</small></span>
                         </button>
                         <button
                             class="agent-tile create-tile"
                             type="button"
                             @click="showCreator = true; activeAgent = null; conversation = null"
                         >
-                            <v-icon>mdi-plus</v-icon><span>{{ t('protagonist.createAnother') }}</span>
+                            <v-icon>mdi-plus</v-icon><span>{{ t('taleAgent.createAnother') }}</span>
                         </button>
                     </v-card-text>
                 </v-card>
@@ -81,7 +81,7 @@
                                 mdi-account-star-outline
                             </v-icon>
                         </v-avatar>
-                        <div><div>{{ t('protagonist.createTitle') }}</div><small>{{ t('protagonist.createHint') }}</small></div>
+                        <div><div>{{ t('taleAgent.createTitle') }}</div><small>{{ t('taleAgent.createHint') }}</small></div>
                     </v-card-title>
                     <v-card-text>
                         <v-row>
@@ -90,22 +90,22 @@
                                     v-model="targetMode"
                                     inline
                                     class="target-mode-group"
-                                    :label="t('protagonist.targetModeLabel')"
+                                    :label="t('taleAgent.targetModeLabel')"
                                 >
                                     <v-radio
-                                        :label="t('protagonist.recommendTarget')"
+                                        :label="t('taleAgent.recommendTarget')"
                                         value="recommend"
                                     />
                                     <v-radio
-                                        :label="t('protagonist.customTarget')"
+                                        :label="t('taleAgent.customTarget')"
                                         value="custom"
                                     />
                                 </v-radio-group>
                                 <v-text-field
                                     v-if="targetMode === 'custom'"
                                     v-model="characterName"
-                                    :label="t('protagonist.nameLabel')"
-                                    :hint="t('protagonist.nameHint')"
+                                    :label="t('taleAgent.nameLabel')"
+                                    :hint="t('taleAgent.nameHint')"
                                     :error-messages="customNameError"
                                     persistent-hint
                                     maxlength="200"
@@ -119,7 +119,7 @@
                             density="compact"
                             class="mb-4"
                         >
-                            {{ t('protagonist.sourceScope') }}
+                            {{ t('taleAgent.sourceScope') }}
                         </v-alert>
                         <div class="d-flex flex-wrap ga-3">
                             <v-btn
@@ -128,7 +128,7 @@
                                 prepend-icon="mdi-eye-outline"
                                 @click="startPreview()"
                             >
-                                {{ t('protagonist.generatePreview') }}
+                                {{ t('taleAgent.generatePreview') }}
                             </v-btn>
                             <v-btn
                                 v-if="previewBusy"
@@ -136,7 +136,7 @@
                                 prepend-icon="mdi-stop-circle-outline"
                                 @click="cancelPreview"
                             >
-                                {{ t('protagonist.stop') }}
+                                {{ t('taleAgent.stop') }}
                             </v-btn>
                         </div>
                     </v-card-text>
@@ -154,7 +154,7 @@
                             color="deep-orange-darken-2"
                             variant="tonal"
                         >
-                            {{ t('protagonist.previewOnly') }}
+                            {{ t('taleAgent.previewOnly') }}
                         </v-chip>
                     </v-card-title>
                     <v-card-text>
@@ -163,7 +163,7 @@
                             variant="tonal"
                             class="mt-5"
                         >
-                            {{ t('protagonist.disclosure') }}
+                            {{ t('taleAgent.disclosure') }}
                         </v-alert>
                     </v-card-text>
                     <v-card-actions class="px-6 pb-6">
@@ -172,13 +172,13 @@
                             prepend-icon="mdi-check-circle-outline"
                             @click="confirmCreate"
                         >
-                            {{ t('protagonist.confirmCreate') }}
+                            {{ t('taleAgent.confirmCreate') }}
                         </v-btn>
                         <v-btn
                             variant="text"
                             @click="startPreview(true)"
                         >
-                            {{ t('protagonist.regenerate') }}
+                            {{ t('taleAgent.regenerate') }}
                         </v-btn>
                     </v-card-actions>
                 </v-card>
@@ -193,7 +193,7 @@
                                 <span class="agent-avatar large">{{ activeAgent.display_name.slice(0, 1) }}</span>
                                 <div>
                                     <div class="eyebrow">
-                                        {{ t('protagonist.aiCompanion') }}
+                                        {{ t('taleAgent.aiCompanion') }}
                                     </div><h2>{{ activeAgent.display_name }}</h2><p>{{ activeAgent.manifest.introduction }}</p>
                                 </div>
                             </div>
@@ -203,7 +203,7 @@
                                     variant="text"
                                     color="error"
                                     icon="mdi-delete-outline"
-                                    :aria-label="t('protagonist.deleteAgent')"
+                                    :aria-label="t('taleAgent.deleteAgent')"
                                     @click="deleteDialog = true"
                                 />
                             </div>
@@ -223,15 +223,15 @@
                             mdi-message-text-outline
                         </v-icon>
                         <h2 class="mt-3">
-                            {{ t('protagonist.startConversation') }}
+                            {{ t('taleAgent.startConversation') }}
                         </h2>
-                        <p>{{ t('protagonist.startConversationHint') }}</p>
+                        <p>{{ t('taleAgent.startConversationHint') }}</p>
                         <v-btn
                             color="deep-orange-darken-2"
                             class="mt-3"
                             @click="newConversation"
                         >
-                            {{ t('protagonist.newConversation') }}
+                            {{ t('taleAgent.newConversation') }}
                         </v-btn>
                     </v-card>
 
@@ -249,7 +249,7 @@
                                 v-if="!conversation.messages.length"
                                 class="chat-empty"
                             >
-                                {{ t('protagonist.promptIdea') }}
+                                {{ t('taleAgent.promptIdea') }}
                             </div>
                             <article
                                 v-for="message in conversation.messages"
@@ -276,7 +276,7 @@
                                                 variant="text"
                                                 @click="stopMessage(message)"
                                             >
-                                                {{ t('protagonist.stop') }}
+                                                {{ t('taleAgent.stop') }}
                                             </v-btn>
                                         </div>
                                         <template v-else-if="message.status === 'succeeded'">
@@ -284,7 +284,7 @@
                                                 {{ message.assistant_content }}
                                             </p>
                                             <div class="feedback-row">
-                                                <span>{{ t('protagonist.feedbackPrompt') }}</span>
+                                                <span>{{ t('taleAgent.feedbackPrompt') }}</span>
                                                 <v-btn
                                                     size="x-small"
                                                     variant="text"
@@ -292,7 +292,7 @@
                                                     :aria-pressed="message.feedback === 'not_like'"
                                                     @click="sendFeedback(message, 'not_like')"
                                                 >
-                                                    {{ t('protagonist.notLike') }}
+                                                    {{ t('taleAgent.notLike') }}
                                                 </v-btn>
                                                 <v-btn
                                                     size="x-small"
@@ -301,7 +301,7 @@
                                                     :aria-pressed="message.feedback === 'not_useful'"
                                                     @click="sendFeedback(message, 'not_useful')"
                                                 >
-                                                    {{ t('protagonist.notUseful') }}
+                                                    {{ t('taleAgent.notUseful') }}
                                                 </v-btn>
                                                 <v-btn
                                                     size="x-small"
@@ -310,7 +310,7 @@
                                                     :aria-pressed="message.feedback === 'too_vague'"
                                                     @click="sendFeedback(message, 'too_vague')"
                                                 >
-                                                    {{ t('protagonist.tooVague') }}
+                                                    {{ t('taleAgent.tooVague') }}
                                                 </v-btn>
                                             </div>
                                         </template>
@@ -318,13 +318,13 @@
                                             v-else
                                             class="message-error"
                                         >
-                                            {{ message.error?.message || t('protagonist.generationFailed') }}
+                                            {{ message.error?.message || t('taleAgent.generationFailed') }}
                                             <v-btn
                                                 size="x-small"
                                                 variant="text"
                                                 @click="retryMessage(message)"
                                             >
-                                                {{ t('protagonist.retry') }}
+                                                {{ t('taleAgent.retry') }}
                                             </v-btn>
                                         </div>
                                     </div>
@@ -337,8 +337,8 @@
                         >
                             <v-textarea
                                 v-model="draft"
-                                :label="t('protagonist.messageLabel')"
-                                :placeholder="t('protagonist.messagePlaceholder')"
+                                :label="t('taleAgent.messageLabel')"
+                                :placeholder="t('taleAgent.messagePlaceholder')"
                                 rows="2"
                                 auto-grow
                                 maxlength="2000"
@@ -349,12 +349,12 @@
                                 type="submit"
                                 color="deep-orange-darken-2"
                                 icon="mdi-send"
-                                :aria-label="t('protagonist.send')"
+                                :aria-label="t('taleAgent.send')"
                                 :disabled="!draft.trim() || hasPendingMessage"
                             />
                         </form>
                         <div class="composer-note">
-                            {{ t('protagonist.composerNote') }}
+                            {{ t('taleAgent.composerNote') }}
                         </div>
                     </v-card>
                 </template>
@@ -366,7 +366,7 @@
             max-width="480"
         >
             <v-card rounded="xl">
-                <v-card-title>{{ t('protagonist.deleteAgent') }}</v-card-title><v-card-text>{{ t('protagonist.deleteWarning') }}</v-card-text><v-card-actions>
+                <v-card-title>{{ t('taleAgent.deleteAgent') }}</v-card-title><v-card-text>{{ t('taleAgent.deleteWarning') }}</v-card-text><v-card-actions>
                     <v-spacer /><v-btn
                         variant="text"
                         @click="deleteDialog = false"
@@ -423,7 +423,7 @@ async function loadPage() {
     try {
         const [bookResponse, agentResponse] = await Promise.all([
             $backend(`/book/${bookId}`),
-            $backend(`/ai/protagonist/agents?book_id=${bookId}`),
+            $backend(`/ai/tale-agent/agents?book_id=${bookId}`),
         ]);
         if (bookResponse.err !== 'ok') throw new Error(bookResponse.msg);
         book.value = bookResponse.book;
@@ -438,13 +438,13 @@ async function loadPage() {
 
 async function pollPreview(id: string) {
     for (let attempt = 0; attempt < 240 && !disposed; attempt += 1) {
-        const response = await $backend(`/ai/protagonist/previews/${id}`);
+        const response = await $backend(`/ai/tale-agent/previews/${id}`);
         if (response.err !== 'ok') throw new Error(response.msg);
         preview.value = response.preview;
         if (['succeeded', 'failed', 'cancelled'].includes(preview.value.status)) return;
         await wait(500);
     }
-    if (!disposed && previewBusy.value) throw new Error(t('protagonist.previewTimeout'));
+    if (!disposed && previewBusy.value) throw new Error(t('taleAgent.previewTimeout'));
 }
 
 async function startPreview(regenerate = false) {
@@ -452,15 +452,15 @@ async function startPreview(regenerate = false) {
     preview.value = null;
     const name = targetMode.value === 'custom' ? characterName.value.trim() : '';
     if (targetMode.value === 'custom' && !name) {
-        customNameError.value = t('protagonist.nameRequired');
+        customNameError.value = t('taleAgent.nameRequired');
         return;
     }
     try {
-        const response = await $backend('/ai/protagonist/previews', jsonOptions('POST', { book_id: bookId, name, regenerate }));
+        const response = await $backend('/ai/tale-agent/previews', jsonOptions('POST', { book_id: bookId, name, regenerate }));
         if (response.err !== 'ok') throw new Error(response.msg);
         preview.value = response.preview;
         await pollPreview(response.preview.id);
-        if (preview.value.status === 'failed') throw new Error(preview.value.error?.message || t('protagonist.generationFailed'));
+        if (preview.value.status === 'failed') throw new Error(preview.value.error?.message || t('taleAgent.generationFailed'));
     } catch (error: any) {
         errorMessage.value = error.message || String(error);
     }
@@ -468,11 +468,11 @@ async function startPreview(regenerate = false) {
 
 async function cancelPreview() {
     if (!preview.value?.id) return;
-    await $backend(`/ai/protagonist/previews/${preview.value.id}/cancel`, { method: 'POST' });
+    await $backend(`/ai/tale-agent/previews/${preview.value.id}/cancel`, { method: 'POST' });
 }
 
 async function confirmCreate() {
-    const response = await $backend('/ai/protagonist/agents', jsonOptions('POST', { preview_id: preview.value.id }));
+    const response = await $backend('/ai/tale-agent/agents', jsonOptions('POST', { preview_id: preview.value.id }));
     if (response.err !== 'ok') { errorMessage.value = response.msg; return; }
     agents.value.unshift(response.agent);
     openAgent(response.agent);
@@ -487,7 +487,7 @@ function openAgent(agent: any) {
 }
 
 async function newConversation() {
-    const response = await $backend(`/ai/protagonist/agents/${activeAgent.value.id}/conversations`, { method: 'POST' });
+    const response = await $backend(`/ai/tale-agent/agents/${activeAgent.value.id}/conversations`, { method: 'POST' });
     if (response.err !== 'ok') { errorMessage.value = response.msg; return; }
     conversation.value = response.conversation;
 }
@@ -507,12 +507,12 @@ function upsertMessage(message: any) {
 
 async function streamMessage(message: any) {
     try {
-        for await (const event of $backend_stream(`/ai/protagonist/messages/${message.id}/stream`)) {
+        for await (const event of $backend_stream(`/ai/tale-agent/messages/${message.id}/stream`)) {
             if (event.type === 'message') upsertMessage(event.message);
         }
     } catch (error: any) {
         errorMessage.value = error.message || String(error);
-        const response = await $backend(`/ai/protagonist/conversations/${conversation.value.id}`);
+        const response = await $backend(`/ai/tale-agent/conversations/${conversation.value.id}`);
         if (response.err === 'ok') conversation.value = response.conversation;
     }
 }
@@ -521,19 +521,19 @@ async function sendMessage() {
     const content = draft.value.trim();
     if (!content) return;
     draft.value = '';
-    const response = await $backend(`/ai/protagonist/conversations/${conversation.value.id}/messages`, jsonOptions('POST', { content }));
+    const response = await $backend(`/ai/tale-agent/conversations/${conversation.value.id}/messages`, jsonOptions('POST', { content }));
     if (response.err !== 'ok') { errorMessage.value = response.msg; return; }
     upsertMessage(response.message);
     await streamMessage(response.message);
 }
 
 async function stopMessage(message: any) {
-    const response = await $backend(`/ai/protagonist/messages/${message.id}/cancel`, { method: 'POST' });
+    const response = await $backend(`/ai/tale-agent/messages/${message.id}/cancel`, { method: 'POST' });
     if (response.err === 'ok') upsertMessage(response.message);
 }
 
 async function retryMessage(message: any) {
-    const response = await $backend(`/ai/protagonist/messages/${message.id}/retry`, { method: 'POST' });
+    const response = await $backend(`/ai/tale-agent/messages/${message.id}/retry`, { method: 'POST' });
     if (response.err !== 'ok') { errorMessage.value = response.msg; return; }
     upsertMessage(response.message);
     await streamMessage(response.message);
@@ -541,12 +541,12 @@ async function retryMessage(message: any) {
 
 async function sendFeedback(message: any, feedback: string) {
     const next = message.feedback === feedback ? '' : feedback;
-    const response = await $backend(`/ai/protagonist/messages/${message.id}/feedback`, jsonOptions('PATCH', { feedback: next }));
+    const response = await $backend(`/ai/tale-agent/messages/${message.id}/feedback`, jsonOptions('PATCH', { feedback: next }));
     if (response.err === 'ok') upsertMessage(response.message);
 }
 
 async function deleteAgent() {
-    const response = await $backend(`/ai/protagonist/agents/${activeAgent.value.id}`, { method: 'DELETE' });
+    const response = await $backend(`/ai/tale-agent/agents/${activeAgent.value.id}`, { method: 'DELETE' });
     if (response.err !== 'ok') { errorMessage.value = response.msg; return; }
     agents.value = agents.value.filter(item => item.id !== activeAgent.value.id);
     activeAgent.value = null;
@@ -560,7 +560,7 @@ onBeforeUnmount(() => { disposed = true; });
 </script>
 
 <style scoped>
-.protagonist-page { --agent-accent: #9a4d38; --agent-paper: rgb(var(--v-theme-surface)); }
+.tale-agent-page { --agent-accent: #9a4d38; --agent-paper: rgb(var(--v-theme-surface)); }
 .page-hero { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding:30px; border:1px solid rgba(var(--v-border-color),.18); border-radius:24px; background:linear-gradient(135deg,rgba(154,77,56,.11),rgba(232,168,83,.07)); }
 .page-hero h1,.agent-console h2,.empty-chat h2 { margin:2px 0 6px; font-family:Georgia,"Noto Serif SC",serif; line-height:1.2; }
 .page-hero p,.agent-console p,.empty-chat p { margin:0; color:rgba(var(--v-theme-on-surface),.68); }

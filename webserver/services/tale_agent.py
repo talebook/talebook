@@ -1,4 +1,4 @@
-"""Spoiler-bounded protagonist agent extraction, validation, and generation."""
+"""TaleAgent extraction, validation, conversation JSON, and generation."""
 
 from __future__ import annotations
 
@@ -18,18 +18,18 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 from xml.etree import ElementTree
 
-from webserver.models import AITask, ProtagonistAgent, ProtagonistConversation, ProtagonistMessage
+from webserver.models import AITask, TaleAgent, TaleAgentConversation
 from webserver.services.agent_runtime import AgentRuntimeError, RuntimeEvent, RuntimeRequest
 from webserver.services.ai_artifacts import AIArtifactStore
 from webserver.services.codex_app_server import CodexAppServerRuntime
 
 
 LOG = logging.getLogger(__name__)
-FEATURE_KEY = "protagonist_manifest"
-MANIFEST_SCHEMA_VERSION = "protagonist_manifest.v2"
-MANIFEST_PROMPT_VERSION = "protagonist_manifest.zh.v2"
-CHAT_SCHEMA_VERSION = "protagonist_chat.v2"
-CHAT_PROMPT_VERSION = "protagonist_chat.zh.v2"
+FEATURE_KEY = "tale_agent_manifest"
+MANIFEST_SCHEMA_VERSION = "tale_agent_manifest.v2"
+MANIFEST_PROMPT_VERSION = "tale_agent_manifest.zh.v2"
+CHAT_SCHEMA_VERSION = "tale_agent_chat.v2"
+CHAT_PROMPT_VERSION = "tale_agent_chat.zh.v2"
 MAX_EVIDENCE_CHARACTERS = 60_000
 MAX_CHAPTER_CHARACTERS = 12_000
 MAX_USER_CHARACTERS = 2_000
@@ -88,7 +88,7 @@ CHAT_OUTPUT_SCHEMA: Dict[str, Any] = {
 }
 
 
-class ProtagonistValidationError(ValueError):
+class TaleAgentValidationError(ValueError):
     pass
 
 
@@ -138,14 +138,14 @@ def epub_spine(epub_path: str) -> List[Dict[str, Any]]:
 
     path = Path(epub_path)
     if not path.is_file():
-        raise ProtagonistValidationError("EPUB 文件不存在")
+        raise TaleAgentValidationError("EPUB 文件不存在")
     try:
         with zipfile.ZipFile(path, "r") as archive:
             container = ElementTree.fromstring(archive.read("META-INF/container.xml"))
             rootfile = next((node for node in container.iter() if _local_name(node.tag) == "rootfile"), None)
             opf_path = rootfile.get("full-path", "") if rootfile is not None else ""
             if not opf_path:
-                raise ProtagonistValidationError("EPUB 缺少 OPF")
+                raise TaleAgentValidationError("EPUB 缺少 OPF")
             package = ElementTree.fromstring(archive.read(opf_path))
             manifest = {
                 node.get("id"): node
@@ -185,9 +185,9 @@ def epub_spine(epub_path: str) -> List[Dict[str, Any]]:
                     }
                 )
     except (KeyError, OSError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
-        raise ProtagonistValidationError("无法安全解析 EPUB") from exc
+        raise TaleAgentValidationError("无法安全解析 EPUB") from exc
     if not chapters:
-        raise ProtagonistValidationError("EPUB 没有可用正文")
+        raise TaleAgentValidationError("EPUB 没有可用正文")
     return chapters
 
 
@@ -217,7 +217,7 @@ def resolve_cutoff(chapters: List[Dict[str, Any]], requested_href: str = "", pro
 
 def bounded_evidence(chapters: List[Dict[str, Any]], cutoff_index: int) -> List[Dict[str, str]]:
     if cutoff_index < 0 or cutoff_index >= len(chapters):
-        raise ProtagonistValidationError("知识截止位置无效")
+        raise TaleAgentValidationError("知识截止位置无效")
     evidence: List[Dict[str, str]] = []
     remaining = MAX_EVIDENCE_CHARACTERS
     for chapter in chapters[: cutoff_index + 1]:
@@ -228,7 +228,7 @@ def bounded_evidence(chapters: List[Dict[str, Any]], cutoff_index: int) -> List[
             evidence.append({"href": chapter["href"], "title": chapter["title"], "text": text})
             remaining -= len(text)
     if not evidence:
-        raise ProtagonistValidationError("截止位置之前没有可用证据")
+        raise TaleAgentValidationError("截止位置之前没有可用证据")
     return evidence
 
 
@@ -243,39 +243,39 @@ def evidence_hash(evidence: List[Dict[str, str]]) -> str:
 
 def _clean_text(value: Any, limit: int, label: str) -> str:
     if not isinstance(value, str):
-        raise ProtagonistValidationError(f"{label}必须是文本")
+        raise TaleAgentValidationError(f"{label}必须是文本")
     cleaned = CONTROL_RE.sub("", value).replace("\r\n", "\n").replace("\r", "\n").strip()
     # JSON clients render these values as text. Escaping here would make
     # harmless input such as "A & B" appear as "A &amp; B" after the client
     # performs its own output escaping.
     cleaned = html.unescape(cleaned)
     if not cleaned or len(cleaned) > limit:
-        raise ProtagonistValidationError(f"{label}为空或过长")
+        raise TaleAgentValidationError(f"{label}为空或过长")
     return cleaned
 
 
 def _clean_list(value: Any, minimum: int, maximum: int, label: str) -> List[str]:
     if not isinstance(value, list) or not minimum <= len(value) <= maximum:
-        raise ProtagonistValidationError(f"{label}数量无效")
+        raise TaleAgentValidationError(f"{label}数量无效")
     return [_clean_text(item, 240, label) for item in value]
 
 
 def validate_manifest(payload: Any, evidence: List[Dict[str, str]]) -> Dict[str, Any]:
     expected = set(MANIFEST_OUTPUT_SCHEMA["required"])
     if not isinstance(payload, dict) or set(payload) != expected:
-        raise ProtagonistValidationError("manifest 结构无效")
+        raise TaleAgentValidationError("manifest 结构无效")
     allowed = {chapter["href"]: chapter["title"] for chapter in evidence}
     sources = payload.get("sources")
     if not isinstance(sources, list) or not sources:
-        raise ProtagonistValidationError("manifest 缺少来源")
+        raise TaleAgentValidationError("manifest 缺少来源")
     checked_sources = []
     seen = set()
     for source in sources:
         if not isinstance(source, dict) or set(source) != {"href", "title"}:
-            raise ProtagonistValidationError("manifest 来源结构无效")
+            raise TaleAgentValidationError("manifest 来源结构无效")
         href = str(source.get("href", ""))
         if href not in allowed:
-            raise ProtagonistValidationError("manifest 来源越过知识截止位置")
+            raise TaleAgentValidationError("manifest 来源越过知识截止位置")
         if href not in seen:
             checked_sources.append({"href": href, "title": allowed[href]})
             seen.add(href)
@@ -319,7 +319,7 @@ def validate_user_prompt(value: Any) -> str:
 
 def validate_chat_output(payload: Any) -> Dict[str, Any]:
     if not isinstance(payload, dict) or set(payload) != {"content"}:
-        raise ProtagonistValidationError("对话结果结构无效")
+        raise TaleAgentValidationError("对话结果结构无效")
     content = _clean_text(payload.get("content"), MAX_RESPONSE_CHARACTERS, "回答")
     return {"content": content}
 
@@ -370,7 +370,7 @@ def preview_dict(record: AITask, manifest: Optional[Dict[str, Any]] = None) -> D
     }
 
 
-def agent_dict(record: ProtagonistAgent, manifest: Dict[str, Any]) -> Dict[str, Any]:
+def agent_dict(record: TaleAgent, manifest: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": record.id,
         "book_id": record.book_id,
@@ -386,39 +386,99 @@ def agent_dict(record: ProtagonistAgent, manifest: Dict[str, Any]) -> Dict[str, 
     }
 
 
-def message_dict(record: ProtagonistMessage) -> Dict[str, Any]:
+def conversation_messages(record: TaleAgentConversation) -> List[Dict[str, Any]]:
+    value = (record.messages or {}).get("items", [])
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, dict)]
+
+
+def store_conversation_messages(record: TaleAgentConversation, messages: List[Dict[str, Any]]) -> None:
+    record.messages = {"items": [dict(message) for message in messages]}
+    record.update_time = datetime.datetime.now()
+
+
+def find_conversation_message(record: TaleAgentConversation, message_id: str) -> tuple[Optional[Dict[str, Any]], int]:
+    for index, message in enumerate(conversation_messages(record)):
+        if message.get("id") == message_id:
+            return message, index
+    return None, -1
+
+
+def update_conversation_message(
+    record: TaleAgentConversation, message_id: str, updates: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    messages = conversation_messages(record)
+    for index, message in enumerate(messages):
+        if message.get("id") == message_id:
+            updated = {**message, **updates, "updated_at": datetime.datetime.now().isoformat()}
+            messages[index] = updated
+            store_conversation_messages(record, messages)
+            return updated
+    return None
+
+
+def new_message(user_content: str) -> Dict[str, Any]:
+    now = datetime.datetime.now().isoformat()
     return {
-        "id": record.id,
-        "user_content": record.user_content,
-        "assistant_content": record.assistant_content,
-        "citations": (record.citations or {}).get("items", []),
-        "boundary_action": record.boundary_action,
-        "status": record.status,
-        "progress_message": record.progress_message,
-        "feedback": record.feedback,
-        "schema_version": record.schema_version,
-        "prompt_version": record.prompt_version,
-        "error": {"code": record.error_code, "message": record.error_message} if record.error_code else None,
-        "ai_derived": True,
-        "created_at": record.create_time.isoformat() if record.create_time else None,
+        "id": new_id(),
+        "user_content": user_content,
+        "assistant_content": "",
+        "citations": [],
+        "boundary_action": "answer",
+        "status": "queued",
+        "progress_message": "等待生成",
+        "feedback": "",
+        "error_code": "",
+        "error_message": "",
+        "cancel_requested": False,
+        "runtime_name": "",
+        "runtime_session_id": "",
+        "usage": {},
+        "schema_version": CHAT_SCHEMA_VERSION,
+        "prompt_version": CHAT_PROMPT_VERSION,
+        "created_at": now,
+        "updated_at": now,
+        "started_at": None,
+        "finished_at": None,
     }
 
 
-def conversation_dict(
-    record: ProtagonistConversation, messages: Optional[Iterable[ProtagonistMessage]] = None
-) -> Dict[str, Any]:
+def message_dict(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "id": record.get("id"),
+        "user_content": record.get("user_content", ""),
+        "assistant_content": record.get("assistant_content", ""),
+        "citations": record.get("citations", []),
+        "boundary_action": record.get("boundary_action", "answer"),
+        "status": record.get("status", "queued"),
+        "progress_message": record.get("progress_message", ""),
+        "feedback": record.get("feedback", ""),
+        "schema_version": record.get("schema_version", CHAT_SCHEMA_VERSION),
+        "prompt_version": record.get("prompt_version", CHAT_PROMPT_VERSION),
+        "error": (
+            {"code": record.get("error_code", ""), "message": record.get("error_message", "")}
+            if record.get("error_code")
+            else None
+        ),
+        "ai_derived": True,
+        "created_at": record.get("created_at"),
+    }
+
+
+def conversation_dict(record: TaleAgentConversation) -> Dict[str, Any]:
     return {
         "id": record.id,
-        "agent_id": record.agent_id,
+        "tale_agent_id": record.tale_agent_id,
         "cutoff": {"href": record.cutoff_href, "title": record.cutoff_title, "index": record.cutoff_index},
-        "messages": [message_dict(message) for message in (messages or [])],
+        "messages": [message_dict(message) for message in conversation_messages(record)],
         "ai_derived": True,
         "created_at": record.create_time.isoformat() if record.create_time else None,
     }
 
 
-class ProtagonistService:
-    _instance: Optional["ProtagonistService"] = None
+class TaleAgentService:
+    _instance: Optional["TaleAgentService"] = None
     _instance_lock = threading.Lock()
 
     def __new__(cls):
@@ -442,12 +502,12 @@ class ProtagonistService:
 
     def _submit(self, task_id: str, target, *args) -> None:
         if not self._configured:
-            raise RuntimeError("ProtagonistService is not configured")
+            raise RuntimeError("TaleAgentService is not configured")
         with self._threads_lock:
             current = self._threads.get(task_id)
             if current and current.is_alive():
                 return
-            thread = threading.Thread(target=target, args=(task_id, *args), name=f"protagonist-{task_id[:8]}", daemon=True)
+            thread = threading.Thread(target=target, args=(task_id, *args), name=f"tale-agent-{task_id[:8]}", daemon=True)
             self._threads[task_id] = thread
             thread.start()
 
@@ -456,16 +516,17 @@ class ProtagonistService:
 
     def submit_message(
         self,
+        conversation_id: str,
         message_id: str,
         manifest: Dict[str, Any],
         history: List[Dict[str, str]],
     ) -> None:
-        self._submit(message_id, self._run_message, manifest, history)
+        self._submit(message_id, self._run_message, conversation_id, manifest, history)
 
-    def _event(self, model, record_id: str, event: RuntimeEvent) -> None:
+    def _task_event(self, record_id: str, event: RuntimeEvent) -> None:
         session = self.session_maker()
         try:
-            record = session.get(model, record_id)
+            record = session.get(AITask, record_id)
             if record:
                 record.progress_message = event.message[:256]
                 if event.session_id:
@@ -473,6 +534,22 @@ class ProtagonistService:
                 if event.usage:
                     record.usage = event.usage
                 record.update_time = datetime.datetime.now()
+                session.commit()
+        finally:
+            session.close()
+
+    def _message_event(self, conversation_id: str, message_id: str, event: RuntimeEvent) -> None:
+        session = self.session_maker()
+        try:
+            conversation = session.get(TaleAgentConversation, conversation_id)
+            if not conversation:
+                return
+            updates: Dict[str, Any] = {"progress_message": event.message[:256]}
+            if event.session_id:
+                updates["runtime_session_id"] = event.session_id[:128]
+            if event.usage:
+                updates["usage"] = event.usage
+            if update_conversation_message(conversation, message_id, updates):
                 session.commit()
         finally:
             session.close()
@@ -502,11 +579,11 @@ class ProtagonistService:
                     build_manifest_prompt(evidence, requested_name),
                     MANIFEST_OUTPUT_SCHEMA,
                     self.config.get("AI_CODEX_MODEL", "") or None,
-                    service_name="talebook_protagonist_manifest",
+                    service_name="talebook_tale_agent_manifest",
                     started_message="正在分析已读范围",
                     progress_message="正在生成角色预览",
                 ),
-                lambda event: self._event(AITask, task_id, event),
+                lambda event: self._task_event(task_id, event),
             )
             checked = validate_manifest(result.output, evidence)
             session = self.session_maker()
@@ -531,11 +608,11 @@ class ProtagonistService:
                 raise
             finally:
                 session.close()
-        except (AgentRuntimeError, ProtagonistValidationError) as exc:
-            self._fail(AITask, task_id, exc)
+        except (AgentRuntimeError, TaleAgentValidationError) as exc:
+            self._fail_task(task_id, exc)
         except Exception:
-            LOG.exception("Protagonist preview failed task_id=%s", task_id)
-            self._fail(AITask, task_id, None)
+            LOG.exception("TaleAgent preview failed task_id=%s", task_id)
+            self._fail_task(task_id, None)
         finally:
             with self._threads_lock:
                 self._threads.pop(task_id, None)
@@ -543,24 +620,34 @@ class ProtagonistService:
     def _run_message(
         self,
         message_id: str,
+        conversation_id: str,
         manifest: Dict[str, Any],
         history: List[Dict[str, str]],
     ) -> None:
         session = self.session_maker()
         try:
-            record = session.get(ProtagonistMessage, message_id)
-            if not record or record.status != "queued":
+            conversation = session.get(TaleAgentConversation, conversation_id)
+            message, _index = find_conversation_message(conversation, message_id) if conversation else (None, -1)
+            if not conversation or not message or message.get("status") != "queued":
                 return
-            if record.cancel_requested:
-                record.status = "cancelled"
-                record.finished_at = datetime.datetime.now()
+            if message.get("cancel_requested"):
+                update_conversation_message(
+                    conversation,
+                    message_id,
+                    {"status": "cancelled", "finished_at": datetime.datetime.now().isoformat()},
+                )
                 session.commit()
                 return
-            user_content = record.user_content
-            record.status = "running"
-            record.runtime_name = self.runtime.name
-            record.started_at = datetime.datetime.now()
-            record.update_time = record.started_at
+            user_content = message.get("user_content", "")
+            update_conversation_message(
+                conversation,
+                message_id,
+                {
+                    "status": "running",
+                    "runtime_name": self.runtime.name,
+                    "started_at": datetime.datetime.now().isoformat(),
+                },
+            )
             session.commit()
         finally:
             session.close()
@@ -571,52 +658,90 @@ class ProtagonistService:
                     build_chat_prompt(manifest, history, user_content),
                     CHAT_OUTPUT_SCHEMA,
                     self.config.get("AI_CODEX_MODEL", "") or None,
-                    service_name="talebook_protagonist_chat",
+                    service_name="talebook_tale_agent_chat",
                     started_message="正在核对已读边界",
                     progress_message="正在用人物思维拆解问题",
                 ),
-                lambda event: self._event(ProtagonistMessage, message_id, event),
+                lambda event: self._message_event(conversation_id, message_id, event),
             )
             checked = validate_chat_output(result.output)
             session = self.session_maker()
             try:
-                record = session.get(ProtagonistMessage, message_id)
-                if record:
-                    record.status = "cancelled" if record.cancel_requested else "succeeded"
-                    if not record.cancel_requested:
-                        record.assistant_content = checked["content"]
-                        record.boundary_action = "answer"
-                        record.citations = {"items": []}
-                        record.progress_message = "回答完成"
-                        record.usage = result.usage or {}
-                        record.runtime_session_id = (result.session_id or "")[:128]
-                    record.finished_at = datetime.datetime.now()
-                    record.update_time = record.finished_at
+                conversation = session.get(TaleAgentConversation, conversation_id)
+                message, _index = find_conversation_message(conversation, message_id) if conversation else (None, -1)
+                if conversation and message:
+                    cancelled = bool(message.get("cancel_requested"))
+                    updates = {
+                        "status": "cancelled" if cancelled else "succeeded",
+                        "finished_at": datetime.datetime.now().isoformat(),
+                    }
+                    if not cancelled:
+                        updates.update(
+                            {
+                                "assistant_content": checked["content"],
+                                "boundary_action": "answer",
+                                "citations": [],
+                                "progress_message": "回答完成",
+                                "usage": result.usage or {},
+                                "runtime_session_id": (result.session_id or "")[:128],
+                            }
+                        )
+                    update_conversation_message(conversation, message_id, updates)
                     session.commit()
             finally:
                 session.close()
-        except (AgentRuntimeError, ProtagonistValidationError) as exc:
-            self._fail(ProtagonistMessage, message_id, exc)
+        except (AgentRuntimeError, TaleAgentValidationError) as exc:
+            self._fail_message(conversation_id, message_id, exc)
         except Exception:
-            LOG.exception("Protagonist chat failed message_id=%s", message_id)
-            self._fail(ProtagonistMessage, message_id, None)
+            LOG.exception("TaleAgent chat failed message_id=%s", message_id)
+            self._fail_message(conversation_id, message_id, None)
         finally:
             with self._threads_lock:
                 self._threads.pop(message_id, None)
 
-    def _fail(self, model, record_id: str, exc: Optional[Exception]) -> None:
+    @staticmethod
+    def _error_values(exc: Optional[Exception]) -> tuple[str, str, bool]:
+        cancelled = isinstance(exc, AgentRuntimeError) and exc.code.value == "runtime.cancelled"
+        code = getattr(getattr(exc, "code", None), "value", "result.invalid" if exc else "runtime.internal")
+        message = str(getattr(exc, "safe_message", "AI 返回结果未通过安全校验"))[:500]
+        return code, message, cancelled
+
+    def _fail_task(self, record_id: str, exc: Optional[Exception]) -> None:
         session = self.session_maker()
         try:
-            record = session.get(model, record_id)
+            record = session.get(AITask, record_id)
             if not record:
                 return
-            cancelled = isinstance(exc, AgentRuntimeError) and exc.code.value == "runtime.cancelled"
+            code, message, cancelled = self._error_values(exc)
             record.status = "cancelled" if cancelled or record.cancel_requested else "failed"
-            record.error_code = getattr(getattr(exc, "code", None), "value", "result.invalid" if exc else "runtime.internal")
-            record.error_message = str(getattr(exc, "safe_message", "AI 返回结果未通过安全校验"))[:500]
+            record.error_code = code
+            record.error_message = message
             record.progress_message = record.error_message
             record.finished_at = datetime.datetime.now()
             record.update_time = record.finished_at
+            session.commit()
+        finally:
+            session.close()
+
+    def _fail_message(self, conversation_id: str, message_id: str, exc: Optional[Exception]) -> None:
+        session = self.session_maker()
+        try:
+            conversation = session.get(TaleAgentConversation, conversation_id)
+            message, _index = find_conversation_message(conversation, message_id) if conversation else (None, -1)
+            if not conversation or not message:
+                return
+            code, safe_message, cancelled = self._error_values(exc)
+            update_conversation_message(
+                conversation,
+                message_id,
+                {
+                    "status": "cancelled" if cancelled or message.get("cancel_requested") else "failed",
+                    "error_code": code,
+                    "error_message": safe_message,
+                    "progress_message": safe_message,
+                    "finished_at": datetime.datetime.now().isoformat(),
+                },
+            )
             session.commit()
         finally:
             session.close()

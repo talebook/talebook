@@ -1382,9 +1382,9 @@
     "male": "男",
     "female": "女"
   },
-  "protagonist": {
+  "taleAgent": {
     "eyebrow": "借一种思维，解自己的问题",
-    "title": "人物同款 Agent",
+    "title": "TaleAgent",
     "subtitle": "从《{book}》中提炼一个人的思考方式，陪你做决策、解问题、找新思路。",
     "thisBook": "本书",
     "aiDerived": "AI 衍生",

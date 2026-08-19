@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
-from webserver.models import AITask, ProtagonistAgent, ProtagonistConversation, ProtagonistMessage, ReadingState
+from webserver.models import AITask, ReadingState, TaleAgent, TaleAgentConversation
 from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore
 from webserver.services.knowledge_graph import (
     FEATURE_KEY as KNOWLEDGE_GRAPH_FEATURE_KEY,
@@ -36,27 +36,6 @@ from webserver.services.knowledge_graph import (
 from webserver.services.knowledge_graph import (
     task_dict as knowledge_graph_task_dict,
 )
-from webserver.services.protagonist_agent import (
-    CHAT_PROMPT_VERSION,
-    CHAT_SCHEMA_VERSION,
-    MANIFEST_PROMPT_VERSION,
-    MANIFEST_SCHEMA_VERSION,
-    ProtagonistService,
-    ProtagonistValidationError,
-    agent_dict,
-    bounded_evidence,
-    conversation_dict,
-    epub_spine,
-    evidence_hash,
-    message_dict,
-    new_id,
-    preview_dict,
-    resolve_cutoff,
-    validate_user_prompt,
-)
-from webserver.services.protagonist_agent import (
-    FEATURE_KEY as PROTAGONIST_FEATURE_KEY,
-)
 from webserver.services.summary_duck import (
     FEATURE_KEY,
     PROMPT_VERSION,
@@ -70,6 +49,30 @@ from webserver.services.summary_duck import (
     task_dict,
     task_items,
     validate_chapter_input,
+)
+from webserver.services.tale_agent import (
+    FEATURE_KEY as TALE_AGENT_FEATURE_KEY,
+)
+from webserver.services.tale_agent import (
+    MANIFEST_PROMPT_VERSION,
+    MANIFEST_SCHEMA_VERSION,
+    TaleAgentService,
+    TaleAgentValidationError,
+    agent_dict,
+    bounded_evidence,
+    conversation_dict,
+    conversation_messages,
+    epub_spine,
+    evidence_hash,
+    find_conversation_message,
+    message_dict,
+    new_id,
+    new_message,
+    preview_dict,
+    resolve_cutoff,
+    store_conversation_messages,
+    update_conversation_message,
+    validate_user_prompt,
 )
 
 
@@ -552,12 +555,12 @@ class AITaskExport(_AITaskBase):
         feature.export(self, record)
 
 
-class _ProtagonistBase(BaseHandler):
+class _TaleAgentBase(BaseHandler):
     def _artifacts(self):
         return AIArtifactStore.from_config(CONF, "agents")
 
     def _service(self):
-        service = ProtagonistService()
+        service = TaleAgentService()
         service.setup(self.settings["SessionMaker"], CONF)
         return service
 
@@ -606,18 +609,14 @@ class _ProtagonistBase(BaseHandler):
             self.session.query(AITask)
             .filter(
                 AITask.id == preview_id,
-                AITask.feature == PROTAGONIST_FEATURE_KEY,
+                AITask.feature == TALE_AGENT_FEATURE_KEY,
                 AITask.creator_id == self.user_id(),
             )
             .first()
         )
 
     def _own_agent(self, agent_id):
-        return (
-            self.session.query(ProtagonistAgent)
-            .filter(ProtagonistAgent.id == agent_id, ProtagonistAgent.creator_id == self.user_id())
-            .first()
-        )
+        return self.session.query(TaleAgent).filter(TaleAgent.id == agent_id, TaleAgent.creator_id == self.user_id()).first()
 
     def _agent_access(self, agent_id):
         agent = self._own_agent(agent_id)
@@ -630,35 +629,33 @@ class _ProtagonistBase(BaseHandler):
 
     def _conversation_access(self, conversation_id):
         conversation = (
-            self.session.query(ProtagonistConversation)
+            self.session.query(TaleAgentConversation)
             .filter(
-                ProtagonistConversation.id == conversation_id,
-                ProtagonistConversation.creator_id == self.user_id(),
+                TaleAgentConversation.id == conversation_id,
+                TaleAgentConversation.creator_id == self.user_id(),
             )
             .first()
         )
         if not conversation:
             return None, None, None, {"err": "ai.not_found", "msg": "会话不存在"}
-        agent, book, error = self._agent_access(conversation.agent_id)
+        agent, book, error = self._agent_access(conversation.tale_agent_id)
         return conversation, agent, book, error
 
     def _message_access(self, message_id):
-        message = (
-            self.session.query(ProtagonistMessage)
-            .filter(ProtagonistMessage.id == message_id, ProtagonistMessage.creator_id == self.user_id())
-            .first()
-        )
-        if not message:
-            return None, None, None, None, {"err": "ai.not_found", "msg": "消息不存在"}
-        conversation, agent, book, error = self._conversation_access(message.conversation_id)
-        return message, conversation, agent, book, error
+        conversations = self.session.query(TaleAgentConversation).filter(TaleAgentConversation.creator_id == self.user_id())
+        for conversation in conversations:
+            message, _index = find_conversation_message(conversation, message_id)
+            if message:
+                accessed, agent, book, error = self._conversation_access(conversation.id)
+                return message, accessed, agent, book, error
+        return None, None, None, None, {"err": "ai.not_found", "msg": "消息不存在"}
 
     def _evidence(self, book, cutoff_index):
         chapters = epub_spine(book["fmt_epub"])
         return chapters, bounded_evidence(chapters, cutoff_index)
 
 
-class ProtagonistSpine(_ProtagonistBase):
+class TaleAgentSpine(_TaleAgentBase):
     @js
     @auth
     def get(self):
@@ -673,7 +670,7 @@ class ProtagonistSpine(_ProtagonistBase):
                 .first()
             )
             cutoff = resolve_cutoff(chapters, progress=state.get_progress() if state else {})
-        except ProtagonistValidationError as exc:
+        except TaleAgentValidationError as exc:
             return {"err": "ai.source_invalid", "msg": str(exc)}
         return {
             "err": "ok",
@@ -682,7 +679,7 @@ class ProtagonistSpine(_ProtagonistBase):
         }
 
 
-class ProtagonistPreviews(_ProtagonistBase):
+class TaleAgentPreviews(_TaleAgentBase):
     @js
     @auth
     def post(self):
@@ -703,12 +700,12 @@ class ProtagonistPreviews(_ProtagonistBase):
             requested_href = str(body.get("cutoff_href", "") or "")
             cutoff = resolve_cutoff(chapters, requested_href=requested_href) if requested_href else chapters[-1]
             evidence = bounded_evidence(chapters, cutoff["index"])
-        except ProtagonistValidationError as exc:
+        except TaleAgentValidationError as exc:
             return {"err": "ai.source_invalid", "msg": str(exc)}
         version = _book_version(book)
         raw_key = ":".join(
             [
-                PROTAGONIST_FEATURE_KEY,
+                TALE_AGENT_FEATURE_KEY,
                 str(self.user_id()),
                 str(book["id"]),
                 version,
@@ -732,7 +729,7 @@ class ProtagonistPreviews(_ProtagonistBase):
         record = AITask(
             id=new_id(),
             request_key=request_key_value,
-            feature=PROTAGONIST_FEATURE_KEY,
+            feature=TALE_AGENT_FEATURE_KEY,
             creator_id=self.user_id(),
             book_id=book["id"],
             book_version=version,
@@ -752,7 +749,7 @@ class ProtagonistPreviews(_ProtagonistBase):
         return {"err": "ok", "preview": self._preview_dict(record), "idempotent": False}
 
 
-class ProtagonistPreviewItem(_ProtagonistBase):
+class TaleAgentPreviewItem(_TaleAgentBase):
     @js
     @auth
     def get(self, preview_id):
@@ -783,12 +780,12 @@ class ProtagonistPreviewItem(_ProtagonistBase):
             try:
                 self._artifacts().delete(owner_id, artifact_ref["artifact_path"])
             except AIArtifactError:
-                logging.exception("Failed to clean protagonist preview artifact preview_id=%s", preview_id)
+                logging.exception("Failed to clean TaleAgent preview artifact preview_id=%s", preview_id)
                 return {"err": "ai.artifact_cleanup_failed", "msg": "预览已删除，但产物目录清理失败"}
         return {"err": "ok"}
 
 
-class ProtagonistPreviewCancel(_ProtagonistBase):
+class TaleAgentPreviewCancel(_TaleAgentBase):
     @js
     @auth
     def post(self, preview_id):
@@ -812,18 +809,18 @@ class ProtagonistPreviewCancel(_ProtagonistBase):
         return {"err": "ok", "preview": self._preview_dict(record), "idempotent": False}
 
 
-class ProtagonistAgents(_ProtagonistBase):
+class TaleAgents(_TaleAgentBase):
     @js
     @auth
     def get(self):
-        query = self.session.query(ProtagonistAgent).filter(ProtagonistAgent.creator_id == self.user_id())
+        query = self.session.query(TaleAgent).filter(TaleAgent.creator_id == self.user_id())
         book_id = self.get_argument("book_id", "")
         if book_id:
             try:
-                query = query.filter(ProtagonistAgent.book_id == int(book_id))
+                query = query.filter(TaleAgent.book_id == int(book_id))
             except ValueError:
                 return {"err": "params.invalid", "msg": "书籍参数无效"}
-        records = query.order_by(ProtagonistAgent.update_time.desc()).all()
+        records = query.order_by(TaleAgent.update_time.desc()).all()
         visible = []
         for record in records:
             _book, error = self._book(record.book_id, record.book_version)
@@ -856,7 +853,7 @@ class ProtagonistAgents(_ProtagonistBase):
         context = preview.ai_draft or {}
         agent_id = new_id()
         write = self._artifacts().replace_json(self.user_id(), agent_id, manifest)
-        record = ProtagonistAgent(
+        record = TaleAgent(
             id=agent_id,
             creator_id=self.user_id(),
             book_id=preview.book_id,
@@ -881,7 +878,7 @@ class ProtagonistAgents(_ProtagonistBase):
         return {"err": "ok", "agent": agent_dict(record, manifest)}
 
 
-class ProtagonistAgentItem(_ProtagonistBase):
+class TaleAgentItem(_TaleAgentBase):
     @js
     @auth
     def get(self, agent_id):
@@ -944,59 +941,51 @@ class ProtagonistAgentItem(_ProtagonistBase):
             return {"err": "ai.not_found", "msg": "Agent 不存在"}
         artifact_path = agent.manifest_path
         owner_id = agent.creator_id
-        conversation_ids = [row[0] for row in self.session.query(ProtagonistConversation.id).filter_by(agent_id=agent.id)]
-        if conversation_ids:
-            messages = self.session.query(ProtagonistMessage).filter(ProtagonistMessage.conversation_id.in_(conversation_ids))
-            for message in messages.filter(ProtagonistMessage.status.in_(["queued", "running"])):
-                self._service().cancel(message.id)
-            messages.delete(synchronize_session=False)
-            self.session.query(ProtagonistConversation).filter(ProtagonistConversation.id.in_(conversation_ids)).delete(
-                synchronize_session=False
-            )
+        conversations = self.session.query(TaleAgentConversation).filter_by(tale_agent_id=agent.id).all()
+        for conversation in conversations:
+            for message in conversation_messages(conversation):
+                if message.get("status") in {"queued", "running"}:
+                    self._service().cancel(message["id"])
+        self.session.query(TaleAgentConversation).filter_by(tale_agent_id=agent.id).delete(synchronize_session=False)
         self.session.delete(agent)
         self.session.commit()
         try:
             self._artifacts().delete(owner_id, artifact_path)
         except AIArtifactError:
-            logging.exception("Failed to clean protagonist artifact agent_id=%s", agent_id)
+            logging.exception("Failed to clean TaleAgent artifact agent_id=%s", agent_id)
             return {"err": "ai.artifact_cleanup_failed", "msg": "Agent 已删除，但产物目录清理失败"}
         return {"err": "ok", "msg": "Agent、私有会话与反馈已删除"}
 
 
-class ProtagonistConversations(_ProtagonistBase):
+class TaleAgentConversations(_TaleAgentBase):
     @js
     @auth
     def post(self, agent_id):
         agent, _book, error = self._agent_access(agent_id)
         if error:
             return error
-        record = ProtagonistConversation(
+        record = TaleAgentConversation(
             id=new_id(),
-            agent_id=agent.id,
+            tale_agent_id=agent.id,
             creator_id=self.user_id(),
             cutoff_href=agent.cutoff_href,
             cutoff_title=agent.cutoff_title,
             cutoff_index=agent.cutoff_index,
+            messages={"items": []},
         )
         self.session.add(record)
         self.session.commit()
         return {"err": "ok", "conversation": conversation_dict(record)}
 
 
-class ProtagonistConversationItem(_ProtagonistBase):
+class TaleAgentConversationItem(_TaleAgentBase):
     @js
     @auth
     def get(self, conversation_id):
         conversation, _agent, _book, error = self._conversation_access(conversation_id)
         if error:
             return error
-        messages = (
-            self.session.query(ProtagonistMessage)
-            .filter(ProtagonistMessage.conversation_id == conversation.id)
-            .order_by(ProtagonistMessage.create_time.asc(), ProtagonistMessage.id.asc())
-            .all()
-        )
-        return {"err": "ok", "conversation": conversation_dict(conversation, messages)}
+        return {"err": "ok", "conversation": conversation_dict(conversation)}
 
     @js
     @auth
@@ -1004,110 +993,101 @@ class ProtagonistConversationItem(_ProtagonistBase):
         conversation, _agent, _book, error = self._conversation_access(conversation_id)
         if error:
             return error
-        messages = self.session.query(ProtagonistMessage).filter(ProtagonistMessage.conversation_id == conversation.id)
-        for message in messages.filter(ProtagonistMessage.status.in_(["queued", "running"])):
-            self._service().cancel(message.id)
-        messages.delete(synchronize_session=False)
+        for message in conversation_messages(conversation):
+            if message.get("status") in {"queued", "running"}:
+                self._service().cancel(message["id"])
         self.session.delete(conversation)
         self.session.commit()
         return {"err": "ok"}
 
 
-class ProtagonistMessages(_ProtagonistBase):
-    def _create_message(self, conversation, agent, book, user_content):
+class TaleAgentMessages(_TaleAgentBase):
+    def _create_message(self, conversation, agent, user_content):
         try:
             content = validate_user_prompt(user_content)
-        except ProtagonistValidationError as exc:
+        except TaleAgentValidationError as exc:
             return None, {"err": "params.invalid", "msg": str(exc)}
         try:
             manifest = self._agent_manifest(agent)
         except AIArtifactError:
             return None, self._artifact_error()
-        previous = (
-            self.session.query(ProtagonistMessage)
-            .filter(
-                ProtagonistMessage.conversation_id == conversation.id,
-                ProtagonistMessage.status == "succeeded",
-            )
-            .order_by(ProtagonistMessage.create_time.asc())
-            .all()
-        )
+        messages = conversation_messages(conversation)
+        if any(message.get("status") in {"queued", "running"} for message in messages):
+            return None, {"err": "ai.busy", "msg": "当前会话仍有消息在生成"}
+        previous = [message for message in messages if message.get("status") == "succeeded"]
         history = []
         for message in previous[-6:]:
             history.extend(
                 [
-                    {"role": "user", "content": message.user_content},
-                    {"role": "assistant", "content": message.assistant_content},
+                    {"role": "user", "content": message.get("user_content", "")},
+                    {"role": "assistant", "content": message.get("assistant_content", "")},
                 ]
             )
-        record = ProtagonistMessage(
-            id=new_id(),
-            conversation_id=conversation.id,
-            creator_id=self.user_id(),
-            user_content=content,
-            status="queued",
-            progress_message="等待生成",
-            schema_version=CHAT_SCHEMA_VERSION,
-            prompt_version=CHAT_PROMPT_VERSION,
-        )
-        conversation.update_time = datetime.datetime.now()
-        self.session.add(record)
+        record = new_message(content)
+        store_conversation_messages(conversation, [*messages, record])
         self.session.commit()
-        self._service().submit_message(record.id, manifest, history)
+        self._service().submit_message(conversation.id, record["id"], manifest, history)
         return record, None
 
     @js
     @auth
     def post(self, conversation_id):
-        conversation, agent, book, error = self._conversation_access(conversation_id)
+        conversation, agent, _book, error = self._conversation_access(conversation_id)
         if error:
             return error
         try:
             body = _json_body(self)
         except SummaryDuckValidationError as exc:
             return {"err": "params.invalid", "msg": str(exc)}
-        record, error = self._create_message(conversation, agent, book, body.get("content"))
+        record, error = self._create_message(conversation, agent, body.get("content"))
         return error or {"err": "ok", "message": message_dict(record)}
 
 
-class ProtagonistMessageCancel(_ProtagonistBase):
+class TaleAgentMessageCancel(_TaleAgentBase):
     @js
     @auth
     def post(self, message_id):
-        message, _conversation, _agent, _book, error = self._message_access(message_id)
+        message, conversation, _agent, _book, error = self._message_access(message_id)
         if error:
             return error
-        if message.status not in {"queued", "running"}:
+        if message.get("status") not in {"queued", "running"}:
             return {"err": "ok", "message": message_dict(message), "idempotent": True}
-        message.cancel_requested = True
-        message.progress_message = "正在取消"
+        original_status = message.get("status")
+        updated = update_conversation_message(
+            conversation,
+            message_id,
+            {"cancel_requested": True, "progress_message": "正在取消"},
+        )
         self.session.commit()
-        active = self._service().cancel(message.id)
-        if not active and message.status == "queued":
-            message.status = "cancelled"
-            message.finished_at = datetime.datetime.now()
+        active = self._service().cancel(message_id)
+        if not active and original_status == "queued":
+            updated = update_conversation_message(
+                conversation,
+                message_id,
+                {"status": "cancelled", "finished_at": datetime.datetime.now().isoformat()},
+            )
             self.session.commit()
-        return {"err": "ok", "message": message_dict(message), "idempotent": False}
+        return {"err": "ok", "message": message_dict(updated or message), "idempotent": False}
 
 
-class ProtagonistMessageRetry(ProtagonistMessages):
+class TaleAgentMessageRetry(TaleAgentMessages):
     @js
     @auth
     def post(self, message_id):
-        message, conversation, agent, book, error = self._message_access(message_id)
+        message, conversation, agent, _book, error = self._message_access(message_id)
         if error:
             return error
-        if message.status in {"queued", "running"}:
+        if message.get("status") in {"queued", "running"}:
             return {"err": "ai.busy", "msg": "消息仍在生成"}
-        record, error = self._create_message(conversation, agent, book, message.user_content)
+        record, error = self._create_message(conversation, agent, message.get("user_content", ""))
         return error or {"err": "ok", "message": message_dict(record)}
 
 
-class ProtagonistMessageFeedback(_ProtagonistBase):
+class TaleAgentMessageFeedback(_TaleAgentBase):
     @js
     @auth
     def patch(self, message_id):
-        message, _conversation, _agent, _book, error = self._message_access(message_id)
+        message, conversation, _agent, _book, error = self._message_access(message_id)
         if error:
             return error
         try:
@@ -1117,16 +1097,15 @@ class ProtagonistMessageFeedback(_ProtagonistBase):
         feedback = str(body.get("feedback", ""))
         if feedback not in {"", "not_like", "not_useful", "too_vague", "spoiler", "too_much_quote"}:
             return {"err": "params.invalid", "msg": "反馈类型无效"}
-        message.feedback = feedback
-        message.update_time = datetime.datetime.now()
+        message = update_conversation_message(conversation, message_id, {"feedback": feedback})
         self.session.commit()
         return {"err": "ok", "message": message_dict(message)}
 
 
-class ProtagonistMessageStream(_ProtagonistBase):
+class TaleAgentMessageStream(_TaleAgentBase):
     @auth
     async def get(self, message_id):
-        message, _conversation, _agent, _book, error = self._message_access(message_id)
+        message, conversation, _agent, _book, error = self._message_access(message_id)
         if error:
             self.set_header("Content-Type", "application/json; charset=UTF-8")
             self.write(error)
@@ -1137,8 +1116,9 @@ class ProtagonistMessageStream(_ProtagonistBase):
         last_snapshot = None
         for _attempt in range(240):
             self.session.expire_all()
-            message = self.session.get(ProtagonistMessage, message_id)
-            if not message:
+            conversation = self.session.get(TaleAgentConversation, conversation.id)
+            message, _index = find_conversation_message(conversation, message_id) if conversation else (None, -1)
+            if not conversation or not message:
                 break
             snapshot = message_dict(message)
             serialized = json.dumps({"type": "message", "message": snapshot}, ensure_ascii=False)
@@ -1149,7 +1129,7 @@ class ProtagonistMessageStream(_ProtagonistBase):
                 except Exception:
                     return
                 last_snapshot = serialized
-            if message.status in {"succeeded", "failed", "cancelled"}:
+            if message.get("status") in {"succeeded", "failed", "cancelled"}:
                 break
             await asyncio.sleep(0.5)
 
@@ -1160,17 +1140,17 @@ def routes():
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)", AITaskItem),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)/cancel", AITaskCancel),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)/export", AITaskExport),
-        (r"/api/ai/protagonist/spine", ProtagonistSpine),
-        (r"/api/ai/protagonist/previews", ProtagonistPreviews),
-        (r"/api/ai/protagonist/previews/([0-9a-f-]+)", ProtagonistPreviewItem),
-        (r"/api/ai/protagonist/previews/([0-9a-f-]+)/cancel", ProtagonistPreviewCancel),
-        (r"/api/ai/protagonist/agents", ProtagonistAgents),
-        (r"/api/ai/protagonist/agents/([0-9a-f-]+)", ProtagonistAgentItem),
-        (r"/api/ai/protagonist/agents/([0-9a-f-]+)/conversations", ProtagonistConversations),
-        (r"/api/ai/protagonist/conversations/([0-9a-f-]+)", ProtagonistConversationItem),
-        (r"/api/ai/protagonist/conversations/([0-9a-f-]+)/messages", ProtagonistMessages),
-        (r"/api/ai/protagonist/messages/([0-9a-f-]+)/stream", ProtagonistMessageStream),
-        (r"/api/ai/protagonist/messages/([0-9a-f-]+)/cancel", ProtagonistMessageCancel),
-        (r"/api/ai/protagonist/messages/([0-9a-f-]+)/retry", ProtagonistMessageRetry),
-        (r"/api/ai/protagonist/messages/([0-9a-f-]+)/feedback", ProtagonistMessageFeedback),
+        (r"/api/ai/tale-agent/spine", TaleAgentSpine),
+        (r"/api/ai/tale-agent/previews", TaleAgentPreviews),
+        (r"/api/ai/tale-agent/previews/([0-9a-f-]+)", TaleAgentPreviewItem),
+        (r"/api/ai/tale-agent/previews/([0-9a-f-]+)/cancel", TaleAgentPreviewCancel),
+        (r"/api/ai/tale-agent/agents", TaleAgents),
+        (r"/api/ai/tale-agent/agents/([0-9a-f-]+)", TaleAgentItem),
+        (r"/api/ai/tale-agent/agents/([0-9a-f-]+)/conversations", TaleAgentConversations),
+        (r"/api/ai/tale-agent/conversations/([0-9a-f-]+)", TaleAgentConversationItem),
+        (r"/api/ai/tale-agent/conversations/([0-9a-f-]+)/messages", TaleAgentMessages),
+        (r"/api/ai/tale-agent/messages/([0-9a-f-]+)/stream", TaleAgentMessageStream),
+        (r"/api/ai/tale-agent/messages/([0-9a-f-]+)/cancel", TaleAgentMessageCancel),
+        (r"/api/ai/tale-agent/messages/([0-9a-f-]+)/retry", TaleAgentMessageRetry),
+        (r"/api/ai/tale-agent/messages/([0-9a-f-]+)/feedback", TaleAgentMessageFeedback),
     ]

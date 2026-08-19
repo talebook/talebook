@@ -572,10 +572,10 @@ class AITask(Base, SQLAlchemyMixin):
     creator = relationship(Reader, backref="ai_tasks")
 
 
-class ProtagonistAgent(Base, SQLAlchemyMixin):
+class TaleAgent(Base, SQLAlchemyMixin):
     """A creator-private index for a directory-backed person manifest."""
 
-    __tablename__ = "protagonist_agents"
+    __tablename__ = "tale_agents"
 
     id = Column(String(36), primary_key=True)
     creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
@@ -588,62 +588,31 @@ class ProtagonistAgent(Base, SQLAlchemyMixin):
     cutoff_href = Column(String(1024), nullable=False)
     cutoff_title = Column(String(512), default="")
     cutoff_index = Column(Integer, nullable=False)
-    schema_version = Column(String(32), default="protagonist_manifest.v2", nullable=False)
-    prompt_version = Column(String(32), default="protagonist_manifest.zh.v2", nullable=False)
+    schema_version = Column(String(32), default="tale_agent_manifest.v2", nullable=False)
+    prompt_version = Column(String(32), default="tale_agent_manifest.zh.v2", nullable=False)
     create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
     update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
 
-    creator = relationship(Reader, backref="protagonist_agents")
+    creator = relationship(Reader, backref="tale_agents")
 
 
-class ProtagonistConversation(Base, SQLAlchemyMixin):
-    """A private conversation that snapshots the agent boundary at creation."""
+class TaleAgentConversation(Base, SQLAlchemyMixin):
+    """One private TaleAgent conversation with all message state in one JSON field."""
 
-    __tablename__ = "protagonist_conversations"
+    __tablename__ = "tale_agent_conversations"
 
     id = Column(String(36), primary_key=True)
-    agent_id = Column(String(36), ForeignKey("protagonist_agents.id"), nullable=False, index=True)
+    tale_agent_id = Column(String(36), ForeignKey("tale_agents.id"), nullable=False, index=True)
     creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
     cutoff_href = Column(String(1024), nullable=False)
     cutoff_title = Column(String(512), default="")
     cutoff_index = Column(Integer, nullable=False)
+    messages = Column(MutableDict.as_mutable(JSONType), default={}, nullable=False)
     create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
     update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
 
-    agent = relationship(ProtagonistAgent, backref="conversations")
-    creator = relationship(Reader, backref="protagonist_conversations")
-
-
-class ProtagonistMessage(Base, SQLAlchemyMixin):
-    """One user turn and its validated assistant response."""
-
-    __tablename__ = "protagonist_messages"
-
-    id = Column(String(36), primary_key=True)
-    conversation_id = Column(String(36), ForeignKey("protagonist_conversations.id"), nullable=False, index=True)
-    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
-    user_content = Column(Text, nullable=False)
-    assistant_content = Column(Text, default="")
-    citations = Column(MutableDict.as_mutable(JSONType), default={})
-    boundary_action = Column(String(24), default="answer")
-    status = Column(String(24), default="queued", nullable=False, index=True)
-    progress_message = Column(String(256), default="")
-    feedback = Column(String(32), default="")
-    error_code = Column(String(128), default="")
-    error_message = Column(String(500), default="")
-    cancel_requested = Column(Boolean, default=False, nullable=False)
-    runtime_name = Column(String(64), default="")
-    runtime_session_id = Column(String(128), default="")
-    usage = Column(MutableDict.as_mutable(JSONType), default={})
-    schema_version = Column(String(32), default="protagonist_chat.v2", nullable=False)
-    prompt_version = Column(String(32), default="protagonist_chat.zh.v2", nullable=False)
-    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
-    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
-    started_at = Column(DateTime)
-    finished_at = Column(DateTime)
-
-    conversation = relationship(ProtagonistConversation, backref="messages")
-    creator = relationship(Reader, backref="protagonist_messages")
+    tale_agent = relationship(TaleAgent, backref="conversations")
+    creator = relationship(Reader, backref="tale_agent_conversations")
 
 
 class RecommendationPreference(Base, SQLAlchemyMixin):

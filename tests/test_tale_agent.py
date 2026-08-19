@@ -10,10 +10,10 @@ from tests import test_main
 from webserver import models
 from webserver.handlers import ai as ai_handlers
 from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore, workspace_id
-from webserver.services.protagonist_agent import (
+from webserver.services.tale_agent import (
     CHAT_SCHEMA_VERSION,
-    ProtagonistService,
-    ProtagonistValidationError,
+    TaleAgentService,
+    TaleAgentValidationError,
     bounded_evidence,
     epub_spine,
     resolve_cutoff,
@@ -55,7 +55,7 @@ def manifest_payload(source_count=2):
     }
 
 
-class ProtagonistEvidenceTest(unittest.TestCase):
+class TaleAgentEvidenceTest(unittest.TestCase):
     def test_epub_spine_is_ordered_and_cutoff_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "book.epub"
@@ -85,7 +85,7 @@ class ProtagonistEvidenceTest(unittest.TestCase):
         evidence = bounded_evidence(CHAPTERS, 1)
         checked = validate_manifest(manifest_payload(), evidence)
         self.assertTrue(checked["ai_derived"])
-        with self.assertRaisesRegex(ProtagonistValidationError, "截止"):
+        with self.assertRaisesRegex(TaleAgentValidationError, "截止"):
             validate_manifest(manifest_payload(source_count=3), evidence)
 
         answer = validate_chat_output(
@@ -140,7 +140,7 @@ class AIArtifactStoreTest(unittest.TestCase):
             self.assertFalse(Path(directory, first.ref.relative_path).exists())
 
 
-class ProtagonistAPITest(test_main.TestWithUserLogin):
+class TaleAgentAPITest(test_main.TestWithUserLogin):
     def setUp(self):
         super().setUp()
         self.artifact_directory = tempfile.TemporaryDirectory()
@@ -156,10 +156,9 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
             workspace_secret=self.workspace_secret,
         )
         session = test_main.get_db()
-        session.query(models.ProtagonistMessage).delete()
-        session.query(models.ProtagonistConversation).delete()
-        session.query(models.ProtagonistAgent).delete()
-        session.query(models.AITask).filter(models.AITask.feature == "protagonist_manifest").delete()
+        session.query(models.TaleAgentConversation).delete()
+        session.query(models.TaleAgent).delete()
+        session.query(models.AITask).filter(models.AITask.feature == "tale_agent_manifest").delete()
         session.commit()
         self.spine = mock.patch("webserver.handlers.ai.epub_spine", return_value=CHAPTERS)
         self.spine.start()
@@ -167,10 +166,9 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
     def tearDown(self):
         self.spine.stop()
         session = test_main.get_db()
-        session.query(models.ProtagonistMessage).delete()
-        session.query(models.ProtagonistConversation).delete()
-        session.query(models.ProtagonistAgent).delete()
-        session.query(models.AITask).filter(models.AITask.feature == "protagonist_manifest").delete()
+        session.query(models.TaleAgentConversation).delete()
+        session.query(models.TaleAgent).delete()
+        session.query(models.AITask).filter(models.AITask.feature == "tale_agent_manifest").delete()
         session.commit()
         self.artifact_config.stop()
         self.artifact_directory.cleanup()
@@ -180,9 +178,9 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         return self.json(url, method="POST", headers={"Content-Type": "application/json"}, body=json.dumps(body))
 
     def _create_preview(self, cutoff=CHAPTERS[1]["href"]):
-        with mock.patch.object(ProtagonistService, "submit_preview"):
+        with mock.patch.object(TaleAgentService, "submit_preview"):
             response = self._json_post(
-                "/api/ai/protagonist/previews",
+                "/api/ai/tale-agent/previews",
                 {"book_id": test_main.BID_EPUB, "name": "林舟", "cutoff_href": cutoff},
             )
         self.assertEqual(response["err"], "ok")
@@ -198,15 +196,15 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
 
     def _create_agent(self, cutoff=CHAPTERS[1]["href"]):
         preview_id = self._create_preview(cutoff)
-        response = self._json_post("/api/ai/protagonist/agents", {"preview_id": preview_id})
+        response = self._json_post("/api/ai/tale-agent/agents", {"preview_id": preview_id})
         self.assertEqual(response["err"], "ok")
         return response["agent"]
 
     def test_preview_supports_ai_recommendation_or_any_user_chosen_person(self):
-        with mock.patch.object(ProtagonistService, "submit_preview"):
-            recommended = self._json_post("/api/ai/protagonist/previews", {"book_id": test_main.BID_EPUB, "name": ""})
+        with mock.patch.object(TaleAgentService, "submit_preview"):
+            recommended = self._json_post("/api/ai/tale-agent/previews", {"book_id": test_main.BID_EPUB, "name": ""})
             chosen = self._json_post(
-                "/api/ai/protagonist/previews",
+                "/api/ai/tale-agent/previews",
                 {"book_id": test_main.BID_EPUB, "name": "配角阿宁", "regenerate": True},
             )
         self.assertEqual(recommended["preview"]["cutoff"]["index"], len(CHAPTERS) - 1)
@@ -215,9 +213,12 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         self.assertEqual(chosen_record.ai_draft["requested_name"], "配角阿宁")
 
     def test_preview_confirm_conversation_message_feedback_and_delete(self):
+        self.assertFalse(hasattr(models, "TaleAgentMessage"))
+        self.assertEqual(models.TaleAgent.__tablename__, "tale_agents")
+        self.assertEqual(models.TaleAgentConversation.__tablename__, "tale_agent_conversations")
         agent = self._create_agent()
         session = test_main.get_db()
-        agent_record = session.get(models.ProtagonistAgent, agent["id"])
+        agent_record = session.get(models.TaleAgent, agent["id"])
         artifact_path = agent_record.manifest_path
         persisted_manifest = self.artifacts.read_json(
             agent_record.creator_id,
@@ -227,10 +228,10 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         self.assertEqual(persisted_manifest["display_name"], agent["display_name"])
         self.assertNotIn("manifest", agent_record.__table__.columns)
         self.assertTrue(artifact_path.startswith(f"{workspace_id(agent_record.creator_id, self.workspace_secret)}/agents/"))
-        conversation = self._json_post(f"/api/ai/protagonist/agents/{agent['id']}/conversations", {})["conversation"]
-        with mock.patch.object(ProtagonistService, "submit_message"):
+        conversation = self._json_post(f"/api/ai/tale-agent/agents/{agent['id']}/conversations", {})["conversation"]
+        with mock.patch.object(TaleAgentService, "submit_message"):
             response = self._json_post(
-                f"/api/ai/protagonist/conversations/{conversation['id']}/messages",
+                f"/api/ai/tale-agent/conversations/{conversation['id']}/messages",
                 {"content": "在已读范围里，他会如何看待这个选择？"},
             )
         self.assertEqual(
@@ -238,31 +239,46 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
             CHAT_SCHEMA_VERSION,
         )
         message_id = response["message"]["id"]
+        session.expire_all()
+        conversation_record = session.get(models.TaleAgentConversation, conversation["id"])
+        self.assertEqual(conversation_record.tale_agent_id, agent["id"])
+        self.assertEqual(conversation_record.messages["items"][0]["id"], message_id)
+        self.assertEqual(conversation_record.messages["items"][0]["user_content"], "在已读范围里，他会如何看待这个选择？")
+
+        with mock.patch.object(TaleAgentService, "submit_message"):
+            busy = self._json_post(
+                f"/api/ai/tale-agent/conversations/{conversation['id']}/messages",
+                {"content": "同一会话不能并发写入第二条消息"},
+            )
+        self.assertEqual(busy["err"], "ai.busy")
+
         feedback = self.json(
-            f"/api/ai/protagonist/messages/{message_id}/feedback",
+            f"/api/ai/tale-agent/messages/{message_id}/feedback",
             method="PATCH",
             headers={"Content-Type": "application/json"},
             body=json.dumps({"feedback": "not_like"}),
         )
         self.assertEqual(feedback["message"]["feedback"], "not_like")
-        removed = self.json(f"/api/ai/protagonist/agents/{agent['id']}", method="DELETE")
+        session.expire_all()
+        conversation_record = session.get(models.TaleAgentConversation, conversation["id"])
+        self.assertEqual(conversation_record.messages["items"][0]["feedback"], "not_like")
+        removed = self.json(f"/api/ai/tale-agent/agents/{agent['id']}", method="DELETE")
         self.assertEqual(removed["err"], "ok")
         self.assertFalse(Path(self.artifact_directory.name, artifact_path).exists())
         session.expire_all()
-        self.assertIsNone(session.get(models.ProtagonistAgent, agent["id"]))
-        self.assertIsNone(session.get(models.ProtagonistConversation, conversation["id"]))
-        self.assertIsNone(session.get(models.ProtagonistMessage, message_id))
+        self.assertIsNone(session.get(models.TaleAgent, agent["id"]))
+        self.assertIsNone(session.get(models.TaleAgentConversation, conversation["id"]))
 
     def test_corrupt_manifest_fails_closed_after_acl_checks(self):
         agent = self._create_agent()
         session = test_main.get_db()
-        record = session.get(models.ProtagonistAgent, agent["id"])
+        record = session.get(models.TaleAgent, agent["id"])
         Path(self.artifact_directory.name, record.manifest_path).write_text("{}\n", encoding="utf-8")
 
-        response = self.json(f"/api/ai/protagonist/agents/{agent['id']}")
+        response = self.json(f"/api/ai/tale-agent/agents/{agent['id']}")
         self.assertEqual(response["err"], "ai.artifact_unavailable")
-        with mock.patch("webserver.handlers.ai._ProtagonistBase.can_view_book", return_value=False):
-            hidden = self.json(f"/api/ai/protagonist/agents/{agent['id']}")
+        with mock.patch("webserver.handlers.ai._TaleAgentBase.can_view_book", return_value=False):
+            hidden = self.json(f"/api/ai/tale-agent/agents/{agent['id']}")
         self.assertEqual(hidden["err"], "book.not_found")
 
     def test_book_delete_cleans_agent_and_preview_artifacts(self):
@@ -273,11 +289,11 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
             row.result_data["artifact_path"]
             for row in session.query(models.AITask).filter(
                 models.AITask.book_id == test_main.BID_EPUB,
-                models.AITask.feature == "protagonist_manifest",
+                models.AITask.feature == "tale_agent_manifest",
             )
             if (row.result_data or {}).get("artifact_path")
         ]
-        agent_record = session.get(models.ProtagonistAgent, agent["id"])
+        agent_record = session.get(models.TaleAgent, agent["id"])
         artifact_paths.append(agent_record.manifest_path)
 
         with mock.patch.object(self._app.settings["legacy"], "delete_book"):
@@ -292,7 +308,7 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         agent = self._create_agent(CHAPTERS[0]["href"])
         raised_preview = self._create_preview(CHAPTERS[1]["href"])
         accepted = self.json(
-            f"/api/ai/protagonist/agents/{agent['id']}",
+            f"/api/ai/tale-agent/agents/{agent['id']}",
             method="PATCH",
             headers={"Content-Type": "application/json"},
             body=json.dumps({"preview_id": raised_preview}),
@@ -301,12 +317,12 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
 
         lower_preview = self._create_preview(CHAPTERS[0]["href"])
         lowered = self.json(
-            f"/api/ai/protagonist/agents/{agent['id']}",
+            f"/api/ai/tale-agent/agents/{agent['id']}",
             method="PATCH",
             headers={"Content-Type": "application/json"},
             body=json.dumps({"preview_id": lower_preview}),
         )
-        conversation = self._json_post(f"/api/ai/protagonist/agents/{agent['id']}/conversations", {})["conversation"]
+        conversation = self._json_post(f"/api/ai/tale-agent/agents/{agent['id']}/conversations", {})["conversation"]
         self.assertEqual(lowered["agent"]["cutoff"]["index"], 0)
         self.assertEqual(conversation["cutoff"]["index"], 0)
 
@@ -319,7 +335,7 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
         session.commit()
 
         response = self.json(
-            f"/api/ai/protagonist/agents/{agent['id']}",
+            f"/api/ai/tale-agent/agents/{agent['id']}",
             method="PATCH",
             headers={"Content-Type": "application/json"},
             body=json.dumps({"preview_id": preview_id}),
@@ -328,20 +344,41 @@ class ProtagonistAPITest(test_main.TestWithUserLogin):
 
     def test_permissions_and_book_version_are_rechecked(self):
         agent = self._create_agent()
-        with mock.patch("webserver.handlers.ai._ProtagonistBase.can_view_book", return_value=False):
-            hidden = self.json(f"/api/ai/protagonist/agents/{agent['id']}")
+        with mock.patch("webserver.handlers.ai._TaleAgentBase.can_view_book", return_value=False):
+            hidden = self.json(f"/api/ai/tale-agent/agents/{agent['id']}")
         self.assertEqual(hidden["err"], "book.not_found")
         with mock.patch("webserver.handlers.ai._book_version", return_value="changed"):
-            stale = self.json(f"/api/ai/protagonist/agents/{agent['id']}")
+            stale = self.json(f"/api/ai/tale-agent/agents/{agent['id']}")
         self.assertEqual(stale["err"], "ai.book_version_changed")
 
     def test_problem_solving_request_reaches_runtime(self):
         agent = self._create_agent()
-        conversation = self._json_post(f"/api/ai/protagonist/agents/{agent['id']}/conversations", {})["conversation"]
-        with mock.patch.object(ProtagonistService, "submit_message") as submit:
+        conversation = self._json_post(f"/api/ai/tale-agent/agents/{agent['id']}/conversations", {})["conversation"]
+        with mock.patch.object(TaleAgentService, "submit_message") as submit:
             response = self._json_post(
-                f"/api/ai/protagonist/conversations/{conversation['id']}/messages",
+                f"/api/ai/tale-agent/conversations/{conversation['id']}/messages",
                 {"content": "用林舟的思路帮我分析是否该接受这个工作机会"},
             )
         self.assertEqual(response["err"], "ok")
         submit.assert_called_once()
+
+    def test_cancel_and_retry_stay_in_the_conversation_json(self):
+        agent = self._create_agent()
+        conversation = self._json_post(f"/api/ai/tale-agent/agents/{agent['id']}/conversations", {})["conversation"]
+        with mock.patch.object(TaleAgentService, "submit_message"):
+            first = self._json_post(
+                f"/api/ai/tale-agent/conversations/{conversation['id']}/messages",
+                {"content": "先分析这个选择"},
+            )["message"]
+        with mock.patch.object(TaleAgentService, "cancel", return_value=False):
+            cancelled = self._json_post(f"/api/ai/tale-agent/messages/{first['id']}/cancel", {})
+        self.assertEqual(cancelled["message"]["status"], "cancelled")
+
+        with mock.patch.object(TaleAgentService, "submit_message"):
+            retried = self._json_post(f"/api/ai/tale-agent/messages/{first['id']}/retry", {})
+        self.assertEqual(retried["message"]["status"], "queued")
+
+        session = test_main.get_db()
+        session.expire_all()
+        record = session.get(models.TaleAgentConversation, conversation["id"])
+        self.assertEqual([item["status"] for item in record.messages["items"]], ["cancelled", "queued"])

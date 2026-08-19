@@ -5,7 +5,7 @@
         </p>
         <div class="manifest-grid">
             <section>
-                <h3>{{ t('protagonist.thinkingPatterns') }}</h3><v-chip
+                <h3>{{ t('taleAgent.thinkingPatterns') }}</h3><v-chip
                     v-for="item in manifest.thinking_patterns"
                     :key="item"
                     size="small"
@@ -17,7 +17,7 @@
                 </v-chip>
             </section>
             <section>
-                <h3>{{ t('protagonist.decisionPrinciples') }}</h3><ul>
+                <h3>{{ t('taleAgent.decisionPrinciples') }}</h3><ul>
                     <li
                         v-for="item in manifest.decision_principles"
                         :key="item"
@@ -27,7 +27,7 @@
                 </ul>
             </section>
             <section>
-                <h3>{{ t('protagonist.problemSolvingSteps') }}</h3><ol>
+                <h3>{{ t('taleAgent.problemSolvingSteps') }}</h3><ol>
                     <li
                         v-for="item in manifest.problem_solving_steps"
                         :key="item"
@@ -37,7 +37,7 @@
                 </ol>
             </section>
             <section>
-                <h3>{{ t('protagonist.blindSpots') }}</h3><ul>
+                <h3>{{ t('taleAgent.blindSpots') }}</h3><ul>
                     <li
                         v-for="item in manifest.blind_spots"
                         :key="item"
@@ -50,7 +50,7 @@
         <div class="source-list">
             <v-icon size="18">
                 mdi-source-branch
-            </v-icon><span>{{ t('protagonist.sourcesLine', { sources: formattedSources }) }}</span>
+            </v-icon><span>{{ t('taleAgent.sourcesLine', { sources: formattedSources }) }}</span>
         </div>
     </div>
 </template>
