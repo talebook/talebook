@@ -1,6 +1,7 @@
 import json
 from unittest import mock
 
+from webserver import loader
 from tests.test_main import TestWithAdminUser, get_db, setUpModule as init
 from webserver.models import PluginConnection, PluginInstallation, PluginSecret
 from webserver.plugins.runtime import ProviderAuthError, ProviderRateLimitError, WereadProvider
@@ -48,6 +49,37 @@ class TestPluginsApi(TestWithAdminUser):
         )
         self.assertEqual(enabled["err"], "ok")
         self.assertTrue(enabled["installation"]["enabled"])
+
+    def test_opds_service_setting_is_managed_by_the_plugin_api_without_resetting_legacy_value(self):
+        settings = loader.get_settings()
+        original = settings.get("OPDS_ENABLED", True)
+        self.addCleanup(settings.__setitem__, "OPDS_ENABLED", original)
+        settings["OPDS_ENABLED"] = False
+
+        catalog = self.json("/api/admin/plugins")
+        state = catalog["builtin_state"]["talebook.book-source.opds"]
+        self.assertFalse(state["service_enabled"])
+
+        with mock.patch("webserver.handlers.admin.SettingsSaverLogic.save_extra_settings") as save:
+            save.return_value = {"err": "ok"}
+            result = self.json(
+                "/api/admin/plugins/opds-service",
+                method="POST",
+                body=json.dumps({"enabled": True}),
+            )
+
+        self.assertEqual(result["err"], "ok")
+        self.assertTrue(result["enabled"])
+        self.assertTrue(save.call_args.args[0]["OPDS_ENABLED"])
+
+    def test_opds_service_setting_rejects_non_boolean_values(self):
+        result = self.json(
+            "/api/admin/plugins/opds-service",
+            method="POST",
+            body=json.dumps({"enabled": "false"}),
+        )
+
+        self.assertEqual(result["err"], "plugin.request_invalid")
 
     def test_run_detail_returns_not_found_without_leaking_internal_data(self):
         data = self.json("/api/admin/plugins/runs/999999")

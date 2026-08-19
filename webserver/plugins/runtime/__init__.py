@@ -1,4 +1,6 @@
 from .builtin_capabilities import BUILTIN_CAPABILITY_PROVIDERS, BuiltinCapabilityProvider
+from .book_sources import BOOK_SOURCE_PROVIDERS
+from .enrichment import EXTERNAL_CONNECTOR_PROVIDERS
 from .mock import MockMultiTabProvider
 from .protocol import (
     ACTIONS,
@@ -23,6 +25,8 @@ __all__ = [
     "MockMultiTabProvider",
     "BuiltinCapabilityProvider",
     "BUILTIN_CAPABILITY_PROVIDERS",
+    "BOOK_SOURCE_PROVIDERS",
+    "EXTERNAL_CONNECTOR_PROVIDERS",
     "PluginManifest",
     "ProviderAuthError",
     "ProviderError",

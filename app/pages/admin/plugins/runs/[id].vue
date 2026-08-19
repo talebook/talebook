@@ -85,8 +85,9 @@
                     </v-btn>
                 </div>
                 <v-data-table
+                    class="compliance-table"
                     :headers="headers"
-                    :items="items"
+                    :items="displayItems"
                     density="compact"
                     :items-per-page="25"
                 >
@@ -98,6 +99,9 @@
                         >
                             {{ itemStatusLabel(item.status) }}
                         </v-chip>
+                    </template>
+                    <template #item.data="{ item }">
+                        <PluginRunItemPreview :data="item.data" />
                     </template>
                     <template #no-data>
                         <div class="text-medium-emphasis pa-6">
@@ -124,11 +128,25 @@ const acting = ref(false);
 const error = ref('');
 const run = ref(null);
 const items = ref([]);
+const displayItems = computed(() => items.value.map(item => ({
+    ...item,
+    display_format: item.data?.format ? item.data.format.toUpperCase() : '—',
+    display_source: item.data?.source || '—',
+    display_access: item.data?.access ? t(`pluginManagement.access_${item.data.access}`) : '—',
+    display_license: item.data?.license || '—',
+    display_target_library: item.data?.target_library || '—',
+})));
 const headers = computed(() => [
     { title: t('pluginManagement.externalId'), key: 'external_id' },
     { title: t('pluginManagement.entityType'), key: 'entity_type' },
     { title: t('pluginManagement.status'), key: 'status' },
     { title: t('pluginManagement.operation'), key: 'operation' },
+    { title: t('pluginManagement.format'), key: 'display_format' },
+    { title: t('pluginManagement.source'), key: 'display_source' },
+    { title: t('pluginManagement.access'), key: 'display_access' },
+    { title: t('pluginManagement.license'), key: 'display_license' },
+    { title: t('pluginManagement.targetLibrary'), key: 'display_target_library' },
+    { title: t('pluginManagement.previewData'), key: 'data', sortable: false },
     { title: t('pluginManagement.errorCode'), key: 'error_code' },
 ]);
 const metrics = computed(() => [
@@ -172,4 +190,5 @@ useHead(() => ({ title: t('pluginManagement.runDetail', { id: route.params.id })
 
 <style scoped>
 .metric-value { font-variant-numeric: tabular-nums; }
+.compliance-table :deep(td) { max-width: 22rem; overflow-wrap: anywhere; }
 </style>
