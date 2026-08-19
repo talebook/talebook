@@ -313,6 +313,15 @@
                         >
                             {{ selectedConnection ? t('pluginManagement.editConnection') : t('pluginManagement.configureConnection') }}
                         </v-btn>
+                        <v-btn
+                            v-if="selectedPlugin.installation && selectedPlugin.ui.manage_kind !== 'book_source' && !selectedConnection"
+                            color="primary"
+                            variant="tonal"
+                            prepend-icon="mdi-connection"
+                            @click="openConnectionDialog"
+                        >
+                            {{ t('pluginManagement.createConnection') }}
+                        </v-btn>
                     </div>
 
                     <v-form
@@ -399,18 +408,18 @@
                             :disabled="!selectedPlugin.installation?.enabled || !selectedConnection.enabled"
                             @click="runAction(selectedConnection, 'preview')"
                         >
-                            {{ t('pluginManagement.previewSource') }}
+                            {{ selectedPlugin.ui.manage_kind === 'book_source' ? t('pluginManagement.previewSource') : t('pluginManagement.preview') }}
                         </v-btn>
                         <v-btn
                             v-if="selectedConnection && selectedPlugin.actions.includes('run')"
                             color="primary"
                             variant="tonal"
-                            prepend-icon="mdi-inbox-arrow-down-outline"
+                            :prepend-icon="selectedPlugin.ui.manage_kind === 'book_source' ? 'mdi-inbox-arrow-down-outline' : 'mdi-play-outline'"
                             :loading="actionLoading"
                             :disabled="!selectedPlugin.installation?.enabled || !selectedConnection.enabled"
                             @click="runAction(selectedConnection, 'run')"
                         >
-                            {{ t('pluginManagement.stageForReview') }}
+                            {{ selectedPlugin.ui.manage_kind === 'book_source' ? t('pluginManagement.stageForReview') : t('pluginManagement.runNow') }}
                         </v-btn>
                         <v-btn
                             v-if="selectedPlugin.installation"
@@ -460,6 +469,99 @@
             </v-card>
         </v-dialog>
 
+        <v-dialog
+            v-model="connectionDialogOpen"
+            max-width="680"
+            persistent
+            aria-labelledby="plugin-connection-dialog-title"
+            @after-leave="restoreConnectionFocus"
+        >
+            <v-card v-if="connectionPlugin">
+                <v-card-title id="plugin-connection-dialog-title">
+                    {{ t('pluginManagement.createConnectionFor', { name: connectionPlugin.name }) }}
+                </v-card-title>
+                <v-card-text>
+                    <v-text-field
+                        v-model="dialogConnectionName"
+                        :label="t('pluginManagement.connectionName')"
+                        variant="outlined"
+                        autocomplete="off"
+                    />
+                    <template
+                        v-for="field in dialogCredentialFields"
+                        :key="field.key"
+                    >
+                        <v-textarea
+                            v-if="field.key === 'content' || field.key === 'archive_base64'"
+                            :id="credentialInputId(field.key)"
+                            v-model="credentialValues[field.key]"
+                            :label="field.schema.title || connectionFieldLabel(field.key)"
+                            variant="outlined"
+                            rows="5"
+                            :required="field.required"
+                            :error-messages="credentialFieldErrors[field.key] || []"
+                            :aria-invalid="Boolean(credentialFieldErrors[field.key])"
+                            autocomplete="off"
+                        />
+                        <v-text-field
+                            v-else
+                            :id="credentialInputId(field.key)"
+                            v-model="credentialValues[field.key]"
+                            :label="field.schema.title || connectionFieldLabel(field.key)"
+                            variant="outlined"
+                            type="password"
+                            :required="field.required"
+                            :error-messages="credentialFieldErrors[field.key] || []"
+                            :aria-invalid="Boolean(credentialFieldErrors[field.key])"
+                            autocomplete="new-password"
+                        />
+                    </template>
+                    <v-textarea
+                        id="plugin-public-config"
+                        v-model="connectionConfigText"
+                        :label="t('pluginManagement.publicConfigJson')"
+                        :hint="t('pluginManagement.publicConfigHint')"
+                        persistent-hint
+                        :error-messages="connectionConfigError ? [connectionConfigError] : []"
+                        :aria-invalid="Boolean(connectionConfigError)"
+                        variant="outlined"
+                        rows="8"
+                        spellcheck="false"
+                        class="connection-config-json"
+                    />
+                    <v-alert
+                        v-if="connectionFormError"
+                        ref="connectionErrorAlert"
+                        type="error"
+                        variant="tonal"
+                        density="compact"
+                        role="alert"
+                        tabindex="-1"
+                    >
+                        {{ connectionFormError }}
+                    </v-alert>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn
+                        variant="text"
+                        :disabled="connectionSaving"
+                        @click="connectionDialogOpen = false"
+                    >
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                    <v-btn
+                        color="primary"
+                        variant="tonal"
+                        :loading="connectionSaving"
+                        @click="savePluginConnection"
+                    >
+                        {{ t('common.save') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <OpdsImportDialog ref="opdsDialog" />
     </v-card>
 </template>
@@ -505,12 +607,22 @@ const connectionFormOpen = ref(false);
 const connectionName = ref('default');
 const connectionConfig = ref({});
 const connectionCredentials = ref({});
+const connectionDialogOpen = ref(false);
+const connectionPlugin = ref(null);
+const dialogConnectionName = ref('default');
+const connectionConfigText = ref('{}');
+const connectionFormError = ref('');
+const connectionConfigError = ref('');
+const credentialFieldErrors = ref({});
+const credentialValues = ref({});
+const connectionErrorAlert = ref(null);
 const showLegado = ref(false);
 const legadoPanel = ref(null);
 const opdsDialog = ref(null);
 const selectedPluginKey = ref(typeof route.query.plugin === 'string' ? route.query.plugin : '');
 let filterTimer = null;
 let detailTrigger = null;
+let connectionTrigger = null;
 
 const statusOptions = computed(() => [
     { title: t('pluginManagement.statusAll'), value: 'all' },
@@ -549,6 +661,7 @@ const selectedConnection = computed(() => {
 });
 const configFields = computed(() => schemaFields(selectedPlugin.value?.config_schema));
 const credentialFields = computed(() => schemaFields(selectedPlugin.value?.auth_schema));
+const dialogCredentialFields = computed(() => schemaFields(connectionPlugin.value?.auth_schema));
 const opdsServiceEnabled = computed(() => Boolean(
     builtinState.value['talebook.book-source.opds']?.service_enabled
 ));
@@ -561,7 +674,9 @@ function statusInfo(plugin) {
     if (!plugin.installation) return { key: 'uninstalled', text: t('pluginManagement.uninstalled'), color: 'grey', icon: 'mdi-download-outline' };
     if (!plugin.installation.enabled) return { key: 'disabled', text: t('pluginManagement.disabled'), color: 'grey', icon: 'mdi-pause-circle-outline' };
     const connection = connectionFor(plugin);
-    if (plugin.ui.manage_kind === 'book_source' && !connection) return { key: 'unconfigured', text: t('pluginManagement.unconfigured'), color: 'warning', icon: 'mdi-cog-alert-outline' };
+    if (!connection && plugin.ui.primary_action === 'configure' && plugin.ui.manage_kind !== 'metadata') {
+        return { key: 'unconfigured', text: t('pluginManagement.unconfigured'), color: 'warning', icon: 'mdi-cog-outline' };
+    }
     if (connection?.health === 'unauthorized') return { key: 'unhealthy', text: t('pluginManagement.unauthorized'), color: 'error', icon: 'mdi-key-alert-outline' };
     if (connection?.health === 'degraded') return { key: 'unhealthy', text: t('pluginManagement.unhealthy'), color: 'warning', icon: 'mdi-alert-outline' };
     return { key: 'enabled', text: t('pluginManagement.enabled'), color: 'success', icon: 'mdi-check-circle-outline' };
@@ -597,7 +712,7 @@ function attentionCount(tab) {
 function primaryActionLabel(plugin) {
     if (!plugin.installation) return t('pluginManagement.install');
     if (!plugin.installation.enabled) return t('pluginManagement.enable');
-    if (plugin.ui.manage_kind === 'book_source' && !connectionFor(plugin)) return t('pluginManagement.configure');
+    if (!connectionFor(plugin)) return t('pluginManagement.configure');
     if (plugin.ui.manage_kind === 'opds') return t('pluginManagement.browse');
     if (plugin.ui.manage_kind === 'legado') return t('pluginManagement.manage');
     if (plugin.ui.manage_kind === 'metadata') return t('pluginManagement.configure');
@@ -610,10 +725,12 @@ async function primaryAction(plugin) {
     if (plugin.ui.manage_kind === 'opds') return opdsDialog.value?.open();
     if (plugin.ui.manage_kind === 'legado') return openLegado();
     if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/settings#metadata');
-    if (plugin.ui.manage_kind === 'book_source' && !connectionFor(plugin)) {
-        openDetails(plugin);
-        await nextTick();
-        openConnectionForm();
+    if (!connectionFor(plugin)) {
+        if (plugin.ui.manage_kind === 'book_source') {
+            openDetails(plugin);
+            await nextTick();
+            openConnectionForm();
+        } else openConnectionDialog(plugin);
         return;
     }
     openDetails(plugin);
@@ -672,7 +789,7 @@ async function runAction(connection, action) {
         });
         if (rsp.err === 'ok') {
             $alert?.('success', t('pluginManagement.actionStarted'));
-            if (action === 'test') await load();
+            if (action === 'test' || selectedPlugin.value?.ui.manage_kind !== 'book_source') await load();
             else navigateTo(`/admin/plugins/runs/${rsp.run.id}`);
         } else $alert?.('error', rsp.msg || rsp.err);
     } finally {
@@ -742,6 +859,87 @@ async function saveConnection() {
     } finally {
         connectionSaving.value = false;
     }
+}
+
+function openConnectionDialog(plugin = selectedPlugin.value) {
+    connectionTrigger = document.activeElement;
+    connectionPlugin.value = plugin;
+    dialogConnectionName.value = 'default';
+    connectionConfigText.value = '{}';
+    credentialValues.value = Object.fromEntries(dialogCredentialFields.value.map(field => [field.key, '']));
+    credentialFieldErrors.value = {};
+    connectionConfigError.value = '';
+    connectionFormError.value = '';
+    connectionDialogOpen.value = true;
+}
+
+async function savePluginConnection() {
+    connectionFormError.value = '';
+    connectionConfigError.value = '';
+    credentialFieldErrors.value = {};
+    let config;
+    try {
+        config = JSON.parse(connectionConfigText.value || '{}');
+        if (!config || Array.isArray(config) || typeof config !== 'object') throw new Error();
+    } catch {
+        connectionConfigError.value = t('pluginManagement.publicConfigInvalid');
+        await nextTick();
+        document.getElementById('plugin-public-config')?.focus();
+        return;
+    }
+    const credentials = Object.fromEntries(
+        Object.entries(credentialValues.value).filter(([, value]) => typeof value === 'string' && value.length),
+    );
+    const missing = dialogCredentialFields.value.find(field => field.required && !credentials[field.key]);
+    if (missing) {
+        credentialFieldErrors.value = {
+            [missing.key]: [t('pluginManagement.credentialRequired', {
+                field: missing.schema.title || connectionFieldLabel(missing.key),
+            })],
+        };
+        await nextTick();
+        document.getElementById(credentialInputId(missing.key))?.focus();
+        return;
+    }
+    connectionSaving.value = true;
+    try {
+        const plugin = connectionPlugin.value;
+        const rsp = await $backend('/admin/plugins/connections', {
+            method: 'POST',
+            body: JSON.stringify({
+                installation_id: plugin.installation.id,
+                owner_type: 'instance',
+                name: dialogConnectionName.value || 'default',
+                credentials,
+                config,
+                scopes: plugin.permissions,
+            }),
+        });
+        if (rsp.err === 'ok') {
+            connectionDialogOpen.value = false;
+            $alert?.('success', t('pluginManagement.connectionSaved'));
+            await load();
+            detailTrigger = connectionTrigger;
+            selectedPluginKey.value = plugin.plugin_key;
+            router.replace({ query: { ...route.query, plugin: plugin.plugin_key } });
+        } else {
+            connectionFormError.value = rsp.msg || rsp.err;
+            await nextTick();
+            connectionErrorAlert.value?.$el?.focus?.();
+        }
+    } finally {
+        connectionSaving.value = false;
+    }
+}
+
+function credentialInputId(key) {
+    return `plugin-credential-${String(key).replace(/[^a-z0-9_-]/gi, '-')}`;
+}
+
+function restoreConnectionFocus() {
+    connectionTrigger?.focus();
+    connectionTrigger = null;
+    connectionPlugin.value = null;
 }
 
 function pluginRuns(plugin) {

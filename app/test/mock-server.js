@@ -1506,6 +1506,21 @@ const pluginDefinitions = [
     auth_schema: { type: 'object', properties: {} },
     ui: { icon: 'mdi-folder-eye-outline', manage_kind: 'book_source', primary_action: 'configure' },
   },
+  {
+    id: 5,
+    plugin_key: 'talebook.metadata.open-library',
+    name: 'Open Library',
+    description: '按 ISBN 获取元数据与可用评分，并生成逐字段安全候选。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['metadata', 'reviews'],
+    capabilities: ['metadata.lookup', 'reviews.lookup'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: { queries: { type: 'array' } } },
+    permissions: ['books.read', 'plugin_records.write', 'network.read'],
+    ui: { icon: 'mdi-library-outline', primary_action: 'configure' },
+  },
 ];
 let pluginInstallations = pluginDefinitions.map((definition, index) => ({
   id: index + 1,
@@ -1554,8 +1569,10 @@ router.post('/api/admin/plugins/connections', eventHandler(async (event) => {
   const connection = {
     ...(existing || mockPluginConnection(installation)),
     id: existing?.id || Math.max(0, ...pluginConnections.map(item => item.id)) + 1,
-    name: body.name,
+    name: body.name || 'default',
     config: body.config || {},
+    scopes: body.scopes || [],
+    secret: { configured: Object.keys(body.credentials || {}).length > 0, mask: '' },
   };
   pluginConnections = [...pluginConnections.filter(item => item.id !== connection.id), connection];
   return { err: 'ok', connection };

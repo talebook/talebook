@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 元数据、外部评价、章评与文件评价连接器方案。" />
+    <link rel="icon" href="data:," />
+    <title>元数据、评价与章评连接器 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#172033; --muted:#536176; --line:#d8e0eb; --accent:#315f91; --soft:#edf5ff; --good:#176443; --warn:#8a5209; --mono:Consolas,monospace; }
+      * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; line-height:1.65; }
+      .page { width:min(1120px,calc(100vw - 28px)); margin:auto; padding:24px 0 54px; } .hero,.card { margin-bottom:18px; padding:26px 30px; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
+      h1 { margin:0 0 8px; font-size:clamp(30px,4vw,46px); line-height:1.16; } h2 { margin:0 0 14px; font-size:23px; } h3 { margin:20px 0 8px; font-size:17px; } p,li { color:#2d3a4d; font-size:14px; }
+      .sub { color:var(--muted); font-size:17px; } .chips,.grid,.flow { display:grid; gap:12px; } .chips { display:flex; flex-wrap:wrap; margin-top:16px; } .chip { padding:5px 10px; border-radius:999px; color:var(--warn); background:#fff4db; font-size:12px; font-weight:700; }
+      .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .flow { grid-template-columns:repeat(4,minmax(0,1fr)); } .panel { padding:15px 17px; border:1px solid var(--line); border-radius:14px; background:#fafcff; }
+      .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:14px; } table { width:100%; min-width:760px; border-collapse:collapse; font-size:13px; } th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f4f7fb; } tr:last-child td { border-bottom:0; }
+      code { padding:.12em .34em; border-radius:4px; background:#eef2f7; font-family:var(--mono); overflow-wrap:anywhere; } .good { border-color:#badac9; background:#edf9f3; } .skip-link { position:absolute; left:-9999px; } .skip-link:focus { left:8px; top:8px; padding:8px; color:#fff; background:#172033; }
+      @media (max-width:720px) { .page { width:calc(100vw - 18px); padding-top:9px; } .hero,.card { padding:21px 18px; } .grid,.flow { grid-template-columns:1fr; } } @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } } @media print { body { background:#fff; } .page { width:100%; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>元数据、评价与章评连接器</h1>
+        <p class="sub">在现有插件运行时之上增加可追溯的数据适配层，用统一预览契约保护人工元数据，并让评分、章评与文件导入保持来源边界。</p>
+        <div class="chips"><span class="chip">状态：ACTIVE</span><span class="chip">创建日期：2026-08-17</span><span class="chip">所属模块：webserver</span><span class="chip">需求来源：TB-47</span></div>
+      </header>
+      <main id="main-content">
+        <section class="card"><h2>1. 原始诉求</h2><p>“实现 Open Library、嵌入文件元数据、Calibre Provider Bridge、Hardcover/NeoDB 等评分、talebook-brs、多种评价文件与漫画领域评价；只补空或生成候选，锁定字段不被覆盖，评分保持原始尺度，章评与私密 annotation 分域。”</p></section>
+        <section class="card"><h2>2. 目标与边界</h2><div class="grid"><div class="panel"><h3>目标</h3><ul><li>连接器共用 test、preview、run、retry、rollback 和来源记录。</li><li>元数据逐字段输出当前值、候选值、锁定状态与决策。</li><li>评分保留来源、原尺度、样本数、来源时间和原链接。</li><li>BRS 多连接实例独立保存 endpoint/token 与游标。</li></ul></div><div class="panel"><h3>非目标</h3><ul><li>不跨来源计算综合评分。</li><li>不批量保存外部评论全文，只保存短摘要和链接。</li><li>不把外部章评写入个人 Annotation 表。</li><li>不在 Provider 内直接覆盖 Calibre 人工字段。</li></ul></div></div></section>
+        <section class="card"><h2>3. 方案</h2><div class="flow"><div class="panel"><strong>输入</strong><p>连接配置声明查询书籍、字段锁、文件内容或 BRS 映射。</p></div><div class="panel"><strong>适配</strong><p>来源解析器转换为稳定 metadata/review 数据契约。</p></div><div class="panel"><strong>治理</strong><p>运行时脱敏、重试、幂等 upsert、游标与回滚。</p></div><div class="panel"><strong>呈现</strong><p>运行详情显示逐字段差异或来源评分，不暴露 token。</p></div></div>
+          <h3>字段决策</h3><div class="table-wrap"><table><thead><tr><th>条件</th><th>决策</th><th>行为</th></tr></thead><tbody><tr><td>字段被人工锁定</td><td><code>locked</code></td><td>只展示候选，绝不自动应用。</td></tr><tr><td>当前值为空</td><td><code>fill_empty</code></td><td>标记为可补空候选。</td></tr><tr><td>当前值与来源相同</td><td><code>unchanged</code></td><td>不生成写入。</td></tr><tr><td>当前值非空且不同</td><td><code>candidate</code></td><td>等待人工选择，不静默覆盖。</td></tr></tbody></table></div>
+          <h3>来源契约</h3><div class="table-wrap"><table><thead><tr><th>领域</th><th>来源</th><th>持久化边界</th></tr></thead><tbody><tr><td>元数据</td><td>Open Library、EPUB、Calibre Provider Bridge</td><td><code>entity_type=metadata</code>，保存字段决策和合法来源链接。</td></tr><tr><td>评价</td><td>Hardcover、NeoDB、Google/Open Library、Goodreads、StoryGraph、Bangumi、AniList</td><td><code>entity_type=review</code>，每个 connection/source 独立，不平均。</td></tr><tr><td>章评</td><td>talebook-brs</td><td><code>entity_type=review</code> 且 <code>review_kind=chapter_comment</code>；禁止 Annotation 写入。</td></tr></tbody></table></div>
+        </section>
+        <section class="card"><h2>4. 影响范围、风险与回滚</h2><ul><li>新增内置 Provider 与纯解析器，不新增数据库表；复用现有 source record 和 run 状态机。</li><li>Provider 网络响应差异通过结构化逐项错误保留，不因单条坏数据推进失败游标。</li><li>文件正文不写 run item；评论只保留受限摘要。回滚把本 run 的 source record 标记为 rolled_back，并保护 local_modified。</li><li>前端只扩展运行详情的安全预览列；窄屏使用可换行 definition list。</li></ul></section>
+        <section class="card"><h2>5. 测试结果</h2>
+          <div class="grid">
+            <div class="panel good"><h3>后端</h3><ul><li><code>python3 -m pytest tests/test_plugin_runtime.py tests/test_enrichment_connectors.py -q</code>：38 passed。</li><li>Calibre 测试镜像内执行 <code>pytest -q tests/test_plugins_api.py tests/test_plugin_runtime.py tests/test_enrichment_connectors.py</code>：41 passed；覆盖 API 脱敏、连接器解析、字段锁、原始评分尺度、BRS 分域、CSV/JSON、幂等、429、失败重试与来源回滚。</li><li><code>make lint-py-fix</code> 与 <code>make lint-py</code>：通过。</li></ul></div>
+            <div class="panel good"><h3>前端与浏览器</h3><ul><li><code>npx vitest run test/components/PluginRunItemPreview.spec.ts test/components/LocalMdiIcons.spec.ts</code>：6 passed。</li><li><code>npx playwright test test/e2e/plugins.spec.ts</code>：6 passed；Chromium 实际渲染验证桌面流程、375 px 移动端重排、对话框焦点约束与回焦、字段错误关联和首错聚焦。</li><li><code>npm run lint</code>：0 errors；仓库现有 235 warnings 未扩大为错误。</li></ul></div>
+          </div>
+          <h3>完整界面审查</h3>
+          <div class="panel good"><p><strong>范围：</strong>full 模式；当前分支相对默认分支 <code>origin/master</code> 的 13 个提交，加 16 个未提交文件；排除 <code>uv.lock</code>、截图与 <code>app/test-results</code> 等生成或二进制输入。重点展开插件管理页、运行详情页、连接表单、<code>PluginRunItemPreview</code> 及其直接消费者。</p><p><strong>问题处理：</strong>发现并修复三项 MEDIUM（均为本次引入）：连接表单校验未将错误绑定到字段并聚焦首错；程序化连接对话框关闭后未显式回焦触发按钮；新连接器和动作图标未注册到本地 MDI 集合而退化为问号。修复后重新执行组件、图标完整性和 6 条浏览器用例，未发现剩余 HIGH/MEDIUM。</p><p><strong>结论：</strong>Approve。可访问性、布局、文案、排版、颜色与 UI 状态均完成审查；移动端、错误态、焦点约束与回焦已在 Chromium 验证。</p></div>
+          <h3>方案与补充检查</h3>
+          <div class="panel good"><p><code>make check-design</code>：113 份方案通过；<code>git diff --check</code>：通过。现有风险限于真实第三方服务的响应结构、限流和可用性变化；连接器通过逐项失败、受控重试、来源记录和不推进失败游标进行隔离。</p></div>
+        </section>
+        <section class="card"><h2>6. 决策记录</h2><div class="panel good"><strong>最小完整实现：</strong>真实域写入继续由后续确认动作负责；本次把所有外部值变成可审计 source record 和 preview 候选，避免连接器绕过人工锁与现有插件治理。</div></section>
+      </main>
+    </div>
+  </body>
+</html>

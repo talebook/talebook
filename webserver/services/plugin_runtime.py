@@ -23,6 +23,7 @@ from webserver.plugins.runtime import (
     ACTIONS,
     BOOK_SOURCE_PROVIDERS,
     BUILTIN_CAPABILITY_PROVIDERS,
+    EXTERNAL_CONNECTOR_PROVIDERS,
     MockMultiTabProvider,
     PluginManifest,
     ProviderAuthError,
@@ -70,6 +71,8 @@ for _builtin_provider in BUILTIN_CAPABILITY_PROVIDERS:
     REGISTRY.register(_builtin_provider)
 for _book_source_provider in BOOK_SOURCE_PROVIDERS:
     REGISTRY.register(_book_source_provider)
+for _connector_provider in EXTERNAL_CONNECTOR_PROVIDERS:
+    REGISTRY.register(_connector_provider)
 
 
 def ensure_builtin_definitions(session, registry=REGISTRY):
@@ -226,6 +229,9 @@ def save_connection(
     if installation is None or installation.status != "active":
         raise PluginRuntimeError("plugin.installation_missing", "Plugin installation is not active")
     definition = session.get(PluginDefinition, installation.definition_id)
+    allowed_owners = set((definition.manifest or {}).get("connection_owners") or ["instance", "user"])
+    if owner_type not in allowed_owners:
+        raise PluginRuntimeError("plugin.owner_forbidden", "This plugin does not support this connection owner")
     _validate_credentials(definition, credentials)
     _validate_public_config(config or {}, credentials)
     approved = {
