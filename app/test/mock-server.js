@@ -27,6 +27,8 @@ let readingStateByBookId = new Map();
 let annotationsByBookId = new Map();
 let annotationPermissionDenied = false;
 let annotationPartialRollback = false;
+let wereadRunId = 500;
+let wereadConfigured = false;
 let activeThemeName = '';
 let audiobookPublishedEdition = null;
 let audiobookJobs = [];
@@ -179,6 +181,8 @@ router.post('/_test/reset', eventHandler(async (event) => {
   annotationsByBookId = new Map([[1, mockAnnotations(1)]]);
   annotationPermissionDenied = !!body?.annotationPermissionDenied;
   annotationPartialRollback = !!body?.annotationPartialRollback;
+  wereadRunId = 500;
+  wereadConfigured = false;
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
@@ -1427,6 +1431,106 @@ router.delete('/api/annotations', eventHandler((event) => {
   return { err: 'ok', sources_deleted: deleted, annotations_deleted: 0 };
 }));
 
+router.get('/api/plugins/weread', eventHandler(() => ({
+  err: 'ok',
+  connection: wereadConfigured ? { id: 88, secret: { configured: true, mask: '••••test' } } : null,
+  operations: ['search', 'book_info', 'chapters', 'progress', 'shelf', 'statistics', 'notebooks', 'highlights', 'my_reviews', 'popular_highlights', 'underline_stats', 'highlight_reviews', 'review_detail', 'public_reviews', 'recommendations', 'similar', 'friends_reading'],
+  read_only: true,
+  skill_version: '1.0.4',
+})));
+
+router.post('/api/plugins/weread/query', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body?.api_key) wereadConfigured = true;
+  const connection = { id: 88, secret: { configured: true, mask: '••••test' } };
+  const data = {
+    search: {
+      hasMore: 0,
+      results: [{ title: '电子书', books: [{ bookInfo: { bookId: '3300045871', title: '活着', author: '余华', newRating: 920, deepLink: 'weread://bookDetail?bookId=3300045871' } }] }],
+    },
+    shelf: {
+      books: [{ bookId: '3300045871', title: '活着', author: '余华', finishReading: 1, secret: 0 }],
+      albums: [{ albumInfo: { albumId: 'audio-1', name: '三体广播剧', authorName: '刘慈欣', finishStatus: '已完结' }, albumInfoExtra: { secret: 1 } }],
+      mp: { show: 1 },
+    },
+    statistics: { totalReadTime: 7260, readDays: 4, dayAverageReadTime: 1815, readStat: [{ stat: '读过', counts: '3本' }] },
+    notebooks: { totalBookCount: 1, totalNoteCount: 3, books: [{ bookId: '3300045871', book: { title: '活着', author: '余华' }, noteCount: 1, reviewCount: 1, bookmarkCount: 1 }] },
+    book_info: { bookId: '3300045871', title: '活着', author: '余华', publisher: '作家出版社', intro: '关于活着本身的故事。' },
+    chapters: { chapters: [{ chapterUid: 12, title: '第一章' }] },
+    progress: { book: { progress: 68, recordReadingTime: 3600 } },
+    highlights: { updated: [{ bookmarkId: 'b1', markText: '人是为活着本身而活着的' }] },
+    my_reviews: { reviews: [{ reviewId: 'r1', review: { content: '这句话值得反复读' } }] },
+    popular_highlights: { items: [{ bookmarkId: 'p1', chapterUid: 12, range: '10-20', markText: '最初我们来到这个世界', totalCount: 128 }] },
+    underline_stats: { underlines: [{ range: '10-20', count: 128, score: 99 }] },
+    highlight_reviews: { reviews: [{ range: '10-20', pageReviews: [{ reviewId: 'thought-1', review: { content: '这句话很有力量', author: { name: '读者乙' } } }] }] },
+    review_detail: { reviewId: 'thought-1', review: { content: '这句话很有力量', author: { name: '读者乙' } } },
+    public_reviews: { reviews: [{ review: { reviewId: 'pr1', review: { content: '很有力量的一本书', author: { name: '读者甲' } } } }] },
+    recommendations: { books: [{ bookId: 'book-2', title: '许三观卖血记', author: '余华', reason: '相似主题' }] },
+    similar: { booksimilar: { books: [{ book: { bookInfo: { bookId: 'book-3', title: '兄弟', author: '余华' } } }] } },
+    friends_reading: { items: [{ book: { bookId: 'book-4', title: '三体', author: '刘慈欣' } }] },
+  }[body?.operation] || {};
+  return { err: 'ok', connection, data };
+}));
+
+router.get('/api/plugins/weread/import', eventHandler(() => ({
+  err: 'ok',
+  connection: wereadConfigured ? { id: 88, secret: { configured: true, mask: '••••test' } } : null,
+  runs: [],
+})));
+
+router.post('/api/plugins/weread/import', eventHandler(async (event) => {
+  const body = await readBody(event);
+  wereadRunId += 1;
+  if (body?.action === 'test') {
+    wereadConfigured = true;
+    return {
+      err: 'ok',
+      connection: { id: 88, secret: { configured: true, mask: '••••test' } },
+      run: { id: wereadRunId, status: 'succeeded', counts: { fetched: 0 } },
+      items: [],
+    };
+  }
+  if (body?.action === 'preview') {
+    return {
+      err: 'ok',
+      connection: { id: 88, secret: { configured: false, mask: '' } },
+      run: { id: wereadRunId, status: 'failed', counts: { fetched: 2, conflicts: 2 } },
+      items: [{
+        external_id: 'weread:3300045871:bookmark:b1',
+        entity_type: 'annotation',
+        status: 'conflict',
+        data: {
+          source_book_id: '3300045871',
+          book: { provider_id: '3300045871', title: '活着', author: '余华' },
+          match_status: 'confirmation_required',
+          candidates: [{ book_id: 1, title: '活着', author: '余华', confidence: 0.94 }],
+        },
+      }],
+    };
+  }
+  const imported = {
+    id: 102,
+    book_id: 1,
+    annotation_type: 'highlight',
+    is_private: true,
+    can_edit: true,
+    cfi: null,
+    chapter: '第一章',
+    quote_text: '人是为活着本身而活着的',
+    content: '',
+    created_at: '2026-08-17T12:00:00',
+    updated_at: '2026-08-17T12:00:00',
+    sources: [{ source_name: 'weread', source_connection_id: '88', source_run_id: String(wereadRunId) }],
+  };
+  annotationsByBookId.set(1, [...(annotationsByBookId.get(1) || []).filter(item => item.id !== 102), imported]);
+  return {
+    err: 'ok',
+    connection: { id: 88, secret: { configured: false, mask: '' } },
+    run: { id: wereadRunId, status: 'succeeded', counts: { fetched: 2, written: 2, updated: 0, skipped: 0, failed: 0, conflicts: 0 } },
+    items: [],
+  };
+}));
+
 // Book Detail
 router.get('/api/book/:id', eventHandler((event) => {
   const id = getRouterParam(event, 'id');
@@ -1520,6 +1624,19 @@ const pluginDefinitions = [
     config_schema: { type: 'object', properties: { queries: { type: 'array' } } },
     permissions: ['books.read', 'plugin_records.write', 'network.read'],
     ui: { icon: 'mdi-library-outline', primary_action: 'configure' },
+  },
+  {
+    id: 6,
+    plugin_key: 'talebook.weread',
+    name: '微信读书',
+    description: '搜索、书架、统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。',
+    version: '1.2.0',
+    runtime_kind: 'builtin',
+    categories: ['integrations', 'metadata', 'annotations'],
+    capabilities: ['integrations.search', 'integrations.books', 'integrations.shelf', 'integrations.statistics', 'integrations.community', 'integrations.recommendations', 'metadata.lookup', 'annotations.import'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    permissions: ['books.read', 'books.write', 'profile.read', 'annotations.write'],
+    ui: { icon: 'mdi-book-open-page-variant', manage_kind: 'weread' },
   },
 ];
 let pluginInstallations = pluginDefinitions.map((definition, index) => ({

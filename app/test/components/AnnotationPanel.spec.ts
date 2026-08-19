@@ -79,6 +79,7 @@ describe('AnnotationPanel', () => {
         expect(wrapper.findAll('.annotation-card__topline .annotation-card__chapter')).toHaveLength(2);
         expect(wrapper.findAll('.annotation-card__footer button')).toHaveLength(1);
         expect(wrapper.findAll('button[aria-label="annotations.actionsFor"]')).toHaveLength(1);
+        expect(wrapper.get('a').text()).toContain('weread.open');
         wrapper.unmount();
     });
 

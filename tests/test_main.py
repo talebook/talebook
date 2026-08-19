@@ -841,6 +841,110 @@ class TestReferFailureSummary(TestWithUserLogin):
         self.assertNotIn("<script>", response.body.decode("utf-8"))
 
 
+class TestWereadRefer(TestWithUserLogin):
+    api_key = "wrk-metadata-test-only"
+
+    def _clear_connection(self):
+        session = get_db()
+        connections = (
+            session.query(models.PluginConnection)
+            .filter(
+                models.PluginConnection.owner_type == "user",
+                models.PluginConnection.owner_id == 1,
+                models.PluginConnection.name == "微信读书",
+            )
+            .all()
+        )
+        secret_ids = [connection.secret_id for connection in connections if connection.secret_id]
+        for connection in connections:
+            session.delete(connection)
+        session.commit()
+        if secret_ids:
+            session.query(models.PluginSecret).filter(models.PluginSecret.id.in_(secret_ids)).delete(
+                synchronize_session=False
+            )
+            session.commit()
+
+    def setUp(self):
+        super().setUp()
+        self._clear_connection()
+        self.previous_secret_key = webserver.handlers.book.CONF.get("PLUGIN_SECRET_KEY")
+        webserver.handlers.book.CONF["PLUGIN_SECRET_KEY"] = "weread-metadata-test-key"
+        from webserver.plugins.runtime import WEREAD_PLUGIN_KEY
+        from webserver.services.plugin_runtime import install_builtin, save_connection
+
+        session = get_db()
+        installation = install_builtin(session, WEREAD_PLUGIN_KEY, installed_by=1)
+        save_connection(
+            session,
+            webserver.handlers.book.CONF,
+            installation.id,
+            "user",
+            1,
+            {"api_key": self.api_key},
+            name="微信读书",
+        )
+
+    def tearDown(self):
+        self._clear_connection()
+        if self.previous_secret_key is None:
+            webserver.handlers.book.CONF.pop("PLUGIN_SECRET_KEY", None)
+        else:
+            webserver.handlers.book.CONF["PLUGIN_SECRET_KEY"] = self.previous_secret_key
+        super().tearDown()
+
+    @mock.patch("webserver.plugins.meta.weread.api.WereadProvider.query")
+    def test_configured_connection_joins_existing_metadata_search_and_applies_selection(self, query):
+        query.return_value = {
+            "results": [
+                {
+                    "title": "电子书",
+                    "books": [
+                        {
+                            "newRating": 920,
+                            "bookInfo": {
+                                "bookId": "weread-book-1",
+                                "title": "微信读书结果",
+                                "author": "测试作者",
+                                "publisher": "测试出版社",
+                                "intro": "搜索简介",
+                                "deepLink": "weread://bookDetail?bookId=weread-book-1",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        with mock.patch.dict(webserver.handlers.book.CONF, {"META_SELECTED_SOURCES": []}):
+            data = self.json("/api/book/1/refer")
+
+        self.assertEqual(data["err"], "ok")
+        self.assertEqual([book["source"] for book in data["books"]], ["微信读书"])
+        self.assertEqual(data["books"][0]["provider_key"], "weread")
+        args = query.call_args.args
+        self.assertEqual(args[0], self.api_key)
+        self.assertEqual(args[1], "search")
+        self.assertEqual(args[2]["scope"], 10)
+
+        query.reset_mock()
+        query.return_value = {
+            "bookId": "weread-book-1",
+            "title": "微信读书详情",
+            "author": "测试作者",
+            "publisher": "测试出版社",
+            "intro": "完整简介",
+        }
+        with mock.patch.object(_app.settings["legacy"], "set_metadata", return_value="ok"):
+            result = self.json(
+                "/api/book/1/refer",
+                method="POST",
+                body="provider_key=weread&provider_value=weread-book-1&only_meta=yes",
+            )
+
+        self.assertEqual(result["err"], "ok")
+        query.assert_called_once_with(self.api_key, "book_info", {"bookId": "weread-book-1"})
+
+
 class TestUserSignUp(TestWithUserLogin):
     @classmethod
     def setUpClass(self):

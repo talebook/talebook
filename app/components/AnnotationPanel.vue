@@ -9,14 +9,24 @@
                 {{ t('annotations.title') }}
                 <span v-if="!loading" class="annotation-panel__count">{{ filteredAnnotations.length }}</span>
             </h2>
-            <v-btn
-                icon="mdi-refresh"
-                size="small"
-                variant="text"
-                :aria-label="t('annotations.refresh')"
-                :loading="loading"
-                @click="loadAnnotations"
-            />
+            <div class="d-flex align-center ga-1">
+                <v-btn
+                    size="small"
+                    variant="tonal"
+                    prepend-icon="mdi-book-open-page-variant"
+                    to="/plugins/weread?tab=notes"
+                >
+                    {{ t('weread.open') }}
+                </v-btn>
+                <v-btn
+                    icon="mdi-refresh"
+                    size="small"
+                    variant="text"
+                    :aria-label="t('annotations.refresh')"
+                    :loading="loading"
+                    @click="loadAnnotations"
+                />
+            </div>
         </header>
 
         <div v-if="!loading && annotations.length" class="annotation-panel__controls">

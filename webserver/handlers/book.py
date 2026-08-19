@@ -35,11 +35,21 @@ from webserver.constants import (
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
-from webserver.models import AudiobookEdition, Item, ReadingState
+from webserver.models import (
+    AudiobookEdition,
+    Item,
+    PluginConnection,
+    PluginInstallation,
+    PluginSecret,
+    ReadingState,
+)
 from webserver.plugins.meta import baike, biquge, calibre, douban, douban_v2, neodb, qimao, tomato, xhsd, youshu
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
+from webserver.plugins.meta.weread import KEY as WEREAD_META_KEY
+from webserver.plugins.meta.weread import WereadMetadataApi
 from webserver.plugins.parser.txt import get_content_encoding
+from webserver.plugins.runtime import WEREAD_PLUGIN_KEY
 from webserver.services.autofill import AutoFillService
 from webserver.services.booksource.metadata import (
     KEY as BOOKSOURCE_KEY,
@@ -60,6 +70,7 @@ from webserver.services.external_index import (
 )
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
+from webserver.services.plugin_secrets import SecretCipher, SecretCipherError
 
 
 CONF = loader.get_settings()
@@ -366,8 +377,7 @@ class BookRefer(BaseHandler):
     def _build_search_tasks(self, mi):
         sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
         logging.info("META_SELECTED_SOURCES 配置：%s", sources)
-        if not sources:
-            return {}
+        sources = sources or []
 
         title = re.sub("[(（].*", "", mi.title)
         author = mi.authors[0] if getattr(mi, "authors", None) else None
@@ -521,7 +531,48 @@ class BookRefer(BaseHandler):
 
             tasks["ai"] = _ai
 
+        weread = self._weread_metadata_api()
+        if weread is not None:
+
+            def _weread():
+                return weread.search(title)
+
+            tasks[WEREAD_META_KEY] = _weread
+
         return tasks
+
+    def _weread_metadata_api(self):
+        installation = (
+            self.session.query(PluginInstallation)
+            .filter(
+                PluginInstallation.plugin_key == WEREAD_PLUGIN_KEY,
+                PluginInstallation.status == "active",
+                PluginInstallation.enabled.is_(True),
+            )
+            .first()
+        )
+        if installation is None:
+            return None
+        connection = (
+            self.session.query(PluginConnection)
+            .filter(
+                PluginConnection.installation_id == installation.id,
+                PluginConnection.owner_type == "user",
+                PluginConnection.owner_id == self.user_id(),
+                PluginConnection.name == "微信读书",
+                PluginConnection.enabled.is_(True),
+            )
+            .first()
+        )
+        secret = self.session.get(PluginSecret, connection.secret_id) if connection and connection.secret_id else None
+        if secret is None:
+            return None
+        try:
+            api_key = str(SecretCipher(CONF).decrypt(secret.ciphertext).get("api_key") or "")
+        except SecretCipherError as exc:
+            logging.warning("无法读取当前用户的微信读书连接: %s", exc)
+            return None
+        return WereadMetadataApi(api_key) if api_key else None
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
         refer_mi = None
@@ -590,6 +641,15 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("NeoDB query failed: %s", e)
                 raise RuntimeError({"err": "httprequest.neodb.failed", "msg": _("NeoDB查询失败")})
+        elif provider_key == WEREAD_META_KEY:
+            api = self._weread_metadata_api()
+            if api is None:
+                raise RuntimeError({"err": "plugin.connection_missing", "msg": _("请先配置微信读书 API Key")})
+            try:
+                refer_mi = api.get_metadata_by_provider(provider_value)
+            except Exception as e:
+                logging.error("微信读书元数据查询失败: %s", e)
+                raise RuntimeError({"err": "httprequest.weread.failed", "msg": _("微信读书查询失败")})
         elif provider_key == biquge.KEY:
             raise RuntimeError({"err": "source.replaced", "msg": _("该固定来源已替换为在线书源，请重新搜索")})
         elif provider_key == BOOKSOURCE_KEY:

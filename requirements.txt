@@ -6,6 +6,7 @@ tornado==6.5
 bs4
 chardet
 lxml
+zhconv>=1.4.3
 jsonpath-ng
 quickjs
 
