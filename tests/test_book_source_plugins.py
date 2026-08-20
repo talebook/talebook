@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 from types import SimpleNamespace
@@ -9,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from webserver.models import Base, PluginRunItem, PluginSourceRecord
 from webserver.plugins.runtime.book_sources import (
     BOOK_SOURCE_PROVIDERS,
+    GutenbergProvider,
     InternetArchiveProvider,
     OPDSProvider,
     WatchFolderProvider,
@@ -155,6 +157,33 @@ def test_opds2_keeps_download_and_external_link_distinct():
     assert all(item.data["review_status"] == "pending" for item in result.items)
 
 
+def test_fixed_public_sources_trust_only_their_builtin_hosts():
+    standard_endpoint = "https://standardebooks.org/feeds/opds/all"
+    standard_http = FakeHttp({standard_endpoint: response({"publications": []})})
+    standard = OPDSProvider(
+        "test.standard-ebooks",
+        "Standard Ebooks",
+        "test",
+        "https://standardebooks.org/",
+        endpoint=standard_endpoint,
+        http=standard_http,
+    )
+    standard.discover(context())
+
+    gutenberg_http = FakeHttp({GutenbergProvider.endpoint: response({"results": []})})
+    GutenbergProvider(http=gutenberg_http).discover(context())
+
+    assert standard_http.calls[0][2]["allowed_hosts"] == ["standardebooks.org"]
+    assert gutenberg_http.calls[0][2]["allowed_hosts"] == ("gutendex.com",)
+
+
+def test_opds_basic_auth_supports_username_with_an_empty_password():
+    headers = OPDSProvider._headers({"secrets": {"username": "patron@example.com"}})
+    encoded = headers["Authorization"].removeprefix("Basic ")
+
+    assert base64.b64decode(encoded).decode() == "patron@example.com:"
+
+
 def test_internet_archive_never_exposes_restricted_file_as_download():
     search_url = InternetArchiveProvider.endpoint
     restricted_meta = "https://archive.org/metadata/loaned"
@@ -192,6 +221,7 @@ def test_internet_archive_never_exposes_restricted_file_as_download():
     assert values["Loaned"]["acquisition_url"] == ""
     assert values["Open"]["access"] == "download"
     assert values["Open"]["acquisition_url"].endswith("/open/open.epub")
+    assert all(call[2]["allowed_hosts"] == ("archive.org",) for call in http.calls)
 
 
 def test_webdav_filters_extensions_and_uses_etag_cursor():

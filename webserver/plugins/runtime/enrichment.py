@@ -38,6 +38,7 @@ def _manifest(
     icon,
     homepage,
     connection_owners=("instance",),
+    ui=None,
 ):
     return {
         "protocol_version": PROTOCOL_VERSION,
@@ -59,7 +60,7 @@ def _manifest(
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": homepage,
         "license": "GPL-3.0",
-        "ui": {"icon": icon, "primary_action": "configure"},
+        "ui": {"icon": icon, "primary_action": "configure", **dict(ui or {})},
         "connection_owners": list(connection_owners),
     }
 
@@ -179,7 +180,7 @@ class OpenLibraryProvider:
         {
             "type": "object",
             "properties": {
-                "queries": {"type": "array"},
+                "queries": {"type": "array", "title": "要查询的 ISBN"},
             },
         },
         ["books.read", "plugin_records.write", "network.read"],
@@ -309,6 +310,7 @@ class EmbeddedMetadataProvider:
         "mdi-file-document-outline",
         "https://www.w3.org/publishing/epub3/",
         ("instance", "user"),
+        {"hidden": True, "system_capability": True},
     )
 
     def execute(self, context):
@@ -360,6 +362,7 @@ class CalibreProviderBridge:
         ["books.read", "plugin_records.write"],
         "mdi-connection",
         "https://manual.calibre-ebook.com/plugins.html",
+        ui={"hidden": True, "system_capability": True},
     )
 
     def __init__(self, discover=discover_calibre_providers):
@@ -419,7 +422,7 @@ class CatalogReviewProvider:
             ["reviews"],
             ["reviews.lookup"],
             auth,
-            {"type": "object", "properties": {"queries": {"type": "array"}}},
+            {"type": "object", "properties": {"queries": {"type": "array", "title": "要查询的书籍标识"}}},
             ["books.read", "plugin_records.write", "network.read"],
             spec.icon,
             spec.homepage,
@@ -543,17 +546,28 @@ class BRSProvider:
         ["annotations.chapter_reviews"],
         {
             "type": "object",
-            "properties": {"token": {"type": "string", "writeOnly": True}},
-            "required": ["token"],
+            "properties": {
+                "token": {"type": "string", "writeOnly": True, "ui_hidden": True},
+                "email": {"type": "string", "format": "email", "writeOnly": True, "title": "邮箱"},
+                "password": {"type": "string", "writeOnly": True, "title": "密码"},
+                "nickname": {"type": "string", "writeOnly": True, "title": "昵称（快速注册时填写）"},
+            },
         },
         {
             "type": "object",
             "properties": {
-                "endpoint": {"type": "string"},
-                "book_map": {"type": "object"},
-                "chapter_map": {"type": "object"},
-                "segment_map": {"type": "object"},
+                "endpoint": {"type": "string", "format": "uri", "title": "BRS 服务地址"},
+                "account_mode": {
+                    "type": "string",
+                    "enum": ["login", "register"],
+                    "title": "账号方式",
+                    "default": "login",
+                },
+                "book_map": {"type": "object", "title": "书籍映射"},
+                "chapter_map": {"type": "object", "title": "章节映射"},
+                "segment_map": {"type": "object", "title": "段落映射"},
             },
+            "required": ["endpoint"],
         },
         ["books.read", "plugin_records.write", "network.read"],
         "mdi-comment-text-multiple-outline",
@@ -568,8 +582,11 @@ class BRSProvider:
         endpoint = str(config.get("endpoint") or "").rstrip("/")
         if not endpoint:
             raise ProviderError("BRS endpoint is required")
-        token = (context.get("secrets") or {}).get("token", "")
-        headers = {"Authorization": "Bearer %s" % token}
+        secrets = context.get("secrets") or {}
+        token = secrets.get("token", "")
+        headers = {"Authorization": "Bearer %s" % token} if token else {}
+        if not token and secrets.get("email"):
+            headers.update(self._authenticate(endpoint, config.get("account_mode"), secrets))
         cursor = (context.get("cursor") or {}).get("cursor", "")
         payload = self.transport("GET", endpoint + "/api/v1/comments", headers=headers, params={"cursor": cursor})
         if context["action"] == "test":
@@ -626,6 +643,48 @@ class BRSProvider:
             next_cursor={"cursor": next_cursor} if next_cursor else dict(context.get("cursor") or {}),
             health_message="BRS sync complete",
         )
+
+    @staticmethod
+    def _authenticate(endpoint, account_mode, secrets):
+        session = requests.Session()
+        session.headers.update({"Accept": "application/json", "User-Agent": USER_AGENT})
+        if account_mode == "register":
+            response = session.post(
+                endpoint + "/api/user/sign_up",
+                data={"email": secrets.get("email", ""), "nickname": secrets.get("nickname", "")},
+                timeout=30,
+            )
+            try:
+                payload = response.json()
+            except ValueError as exc:
+                raise ProviderError("BRS registration returned invalid data") from exc
+            if response.status_code >= 400 or payload.get("err") != "ok":
+                raise ProviderAuthError(str(payload.get("msg") or "BRS registration failed"))
+        password = secrets.get("password", "")
+        if not password:
+            if account_mode == "register":
+                raise ProviderAuthError(
+                    "BRS registration completed; check email for the generated password, then switch to login"
+                )
+            raise ProviderAuthError("BRS password is required")
+        response = session.post(
+            endpoint + "/api/user/sign_in",
+            data={"email": secrets.get("email", ""), "password": password},
+            timeout=30,
+        )
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise ProviderError("BRS login returned invalid data") from exc
+        if response.status_code >= 400 or payload.get("err") != "ok":
+            raise ProviderAuthError(str(payload.get("msg") or "BRS login failed"))
+        token = str(payload.get("token") or payload.get("access_token") or "")
+        if token:
+            return {"Authorization": "Bearer %s" % token}
+        cookies = session.cookies.get_dict()
+        if cookies:
+            return {"Cookie": "; ".join("%s=%s" % item for item in cookies.items())}
+        raise ProviderAuthError("BRS login succeeded but returned no reusable session")
 
 
 GOODREADS_ALIASES = {
@@ -712,9 +771,14 @@ class ReviewFileProvider:
         {
             "type": "object",
             "properties": {
-                "source": {"type": "string", "enum": ["goodreads", "storygraph", "generic"]},
-                "format": {"type": "string", "enum": ["csv", "json"]},
-                "mapping": {"type": "object"},
+                "source": {
+                    "type": "string",
+                    "enum": ["goodreads", "storygraph", "generic"],
+                    "title": "文件来源",
+                    "default": "goodreads",
+                },
+                "format": {"type": "string", "enum": ["csv", "json"], "title": "文件格式", "default": "csv"},
+                "mapping": {"type": "object", "title": "字段映射（可选）"},
             },
         },
         ["plugin_records.write"],

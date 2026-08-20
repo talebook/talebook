@@ -878,34 +878,6 @@ const cards = computed(() => [
     },
 
     {
-        key: 'bookInfoSources',
-        title: t('admin.settings.section.bookInfoSources'),
-        subtitle: t('admin.settings.message.bookInfoSourcesInfo'),
-        fields: [
-            { icon: '', key: 'auto_fill_meta', label: t('admin.settings.label.autoFillMeta'), type: 'checkbox' },
-            { icon: '', key: 'auto_fill_keep_cover', label: t('admin.settings.label.autoFillKeepCover'), type: 'checkbox' },
-            {
-                icon: 'mdi-source-branch',
-                key: 'META_SELECTED_SOURCES',
-                label: t('admin.settings.label.metaSelectedSource'),
-                type: 'meta_sources'
-            },
-            { icon: 'mdi-information', key: 'douban_baseurl', label: t('admin.settings.label.doubanBaseurl') },
-            { icon: 'mdi-key', key: 'douban_apikey', label: t('admin.settings.label.doubanApiKey') },
-            { icon: 'mdi-information', key: 'douban_max_count', label: t('admin.settings.label.doubanMaxCount') },
-            { icon: 'mdi-information', key: 'ai_api_url', label: 'AI API 地址' },
-            { icon: 'mdi-key', key: 'ai_api_key', label: 'AI API Key' },
-            { icon: 'mdi-information', key: 'ai_model', label: 'AI 模型' },
-            { key: 'ai_use_thinking', label: '启用思考模式', type: 'checkbox' },
-        ],
-        tips: [
-            {
-                text: t('admin.settings.message.doubanPluginInfo'),
-                link: 'https://github.com/talebook/talebook/blob/master/document/README.zh_CN.md#%E5%A6%82%E6%9E%9C%E9%85%8D%E7%BD%AE%E8%B1%86%E7%93%A3%E6%8F%92%E4%BB%B6',
-            }
-        ],
-    },
-    {
         key: 'audiobookSettings',
         title: t('admin.settings.section.audiobookSettings'),
         subtitle: t('admin.settings.message.audiobookSettingsInfo'),
@@ -1034,7 +1006,7 @@ const cards = computed(() => [
 const navGroupDefs = [
     { key: 'site', titleKey: 'admin.settings.group.site', keys: ['basicInfo', 'bookCategories', 'friendshipLinks'] },
     { key: 'access', titleKey: 'admin.settings.group.access', keys: ['userSettings', 'socialLogin', 'captchaSettings'] },
-    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'deviceManagement', 'bookInfoSources', 'audiobookSettings', 'webdavSettings'] },
+    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'deviceManagement', 'audiobookSettings', 'webdavSettings'] },
     { key: 'system', titleKey: 'admin.settings.group.system', keys: ['advancedSettings', 'databaseManagement', 'sslManagement', 'trashManagement', 'updateCheck'] },
 ];
 
@@ -1129,27 +1101,6 @@ watch(activeKey, (key) => {
         if (br.bottom > nr.bottom) nav.scrollTop += br.bottom - nr.bottom + 8;
         else if (br.top < nr.top) nav.scrollTop -= nr.top - br.top + 8;
     });
-});
-
-// 元数据源选项
-const metaSourceItems = computed(() => {
-    const allSources = settings.value['META_ALL_SOURCES'] || [
-        'douban',
-        'douban_v2',
-        'baidu',
-        'google',
-        'amazon',
-        'xinhua',
-        'tomato',
-        'qimao',
-        'booksource',
-        'ai',
-        'neodb',
-    ];
-    return allSources.map((source) => ({
-        text: source === 'ai' ? 'AI' : t('admin.settings.meta_source.' + source),
-        value: source,
-    }));
 });
 
 onMounted(() => {

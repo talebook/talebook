@@ -135,8 +135,8 @@ class BookSourceProvider:
         headers = {"Accept": "application/opds+json, application/atom+xml, application/json, application/xml"}
         if secrets.get("api_key"):
             headers["X-Api-Key"] = secrets["api_key"]
-        elif secrets.get("username") and secrets.get("password"):
-            token = base64.b64encode((secrets["username"] + ":" + secrets["password"]).encode()).decode()
+        elif secrets.get("username"):
+            token = base64.b64encode((secrets["username"] + ":" + secrets.get("password", "")).encode()).decode()
             headers["Authorization"] = "Basic " + token
         return headers
 
@@ -177,10 +177,13 @@ class OPDSProvider(BookSourceProvider):
         endpoint = self.endpoint or str(config.get("endpoint") or "")
         if not endpoint:
             raise ProviderError("OPDS endpoint is required")
+        allowed_hosts = list(config.get("allowed_hosts") or ())
+        if self.endpoint:
+            allowed_hosts.append(urllib.parse.urlsplit(self.endpoint).hostname)
         response = self.http.request(
             "GET",
             endpoint,
-            allowed_hosts=config.get("allowed_hosts") or (),
+            allowed_hosts=allowed_hosts,
             headers=self._headers(context),
             timeout=float(config.get("timeout_seconds", 30)),
         )
@@ -295,7 +298,12 @@ class GutenbergProvider(BookSourceProvider):
     )
 
     def discover(self, context):
-        response = self.http.request("GET", self.endpoint, headers={"Accept": "application/json"})
+        response = self.http.request(
+            "GET",
+            self.endpoint,
+            allowed_hosts=("gutendex.com",),
+            headers={"Accept": "application/json"},
+        )
         payload = response.json()
         entries = []
         for book in payload.get("results", [])[:200]:
@@ -331,14 +339,24 @@ class InternetArchiveProvider(BookSourceProvider):
     )
 
     def discover(self, context):
-        search = self.http.request("GET", self.endpoint, headers={"Accept": "application/json"}).json()
+        search = self.http.request(
+            "GET",
+            self.endpoint,
+            allowed_hosts=("archive.org",),
+            headers={"Accept": "application/json"},
+        ).json()
         entries = []
         for doc in search.get("response", {}).get("docs", [])[:25]:
             identifier = doc.get("identifier")
             if not identifier:
                 continue
             metadata_url = "https://archive.org/metadata/%s" % urllib.parse.quote(str(identifier), safe="")
-            metadata = self.http.request("GET", metadata_url, headers={"Accept": "application/json"}).json()
+            metadata = self.http.request(
+                "GET",
+                metadata_url,
+                allowed_hosts=("archive.org",),
+                headers={"Accept": "application/json"},
+            ).json()
             item_meta = metadata.get("metadata") or {}
             restricted = str(item_meta.get("access-restricted-item", "false")).lower() == "true"
             downloadable = [] if restricted else self._open_files(metadata.get("files") or [], context)
@@ -562,7 +580,7 @@ BOOK_SOURCE_PROVIDERS = (
     OPDSProvider(
         "talebook.book-source.standard-ebooks",
         "Standard Ebooks",
-        "浏览 Standard Ebooks 官方开放 OPDS 目录。",
+        "浏览 Standard Ebooks 官方 OPDS 目录；当前需填写 Patrons Circle 邮箱。",
         "https://standardebooks.org/",
         endpoint="https://standardebooks.org/feeds/opds/all",
         license_name="Public domain / CC0",

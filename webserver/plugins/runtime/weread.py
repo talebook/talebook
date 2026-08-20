@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 import json
+import socket
 import urllib.error
 import urllib.request
 
@@ -458,8 +459,14 @@ class WereadProvider:
                 retry_after = exc.headers.get("Retry-After") if exc.headers else None
                 raise ProviderRateLimitError("WeRead rate limit exceeded", retry_after=retry_after) from exc
             raise ProviderError("WeRead gateway HTTP %s" % exc.code) from exc
-        except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
-            raise ProviderError("WeRead gateway request failed") from exc
+        except (TimeoutError, socket.timeout) as exc:
+            raise ProviderError("微信读书服务连接超时，请检查服务器的外网访问或代理配置") from exc
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, (TimeoutError, socket.timeout)):
+                raise ProviderError("微信读书服务连接超时，请检查服务器的外网访问或代理配置") from exc
+            raise ProviderError("无法连接微信读书服务，请检查服务器的 DNS、外网或代理配置") from exc
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise ProviderError("微信读书服务返回了无法解析的数据") from exc
         if not isinstance(data, dict):
             raise ProviderError("WeRead gateway returned an invalid response")
         if data.get("upgrade_info"):
