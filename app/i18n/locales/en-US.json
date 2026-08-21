@@ -1567,6 +1567,7 @@
     "browse": "Browse",
     "manage": "Manage",
     "configure": "Configure",
+    "test": "Test",
     "openWorkbench": "Open workbench",
     "legadoManager": "Legado Source Management",
     "connection": "Connection",

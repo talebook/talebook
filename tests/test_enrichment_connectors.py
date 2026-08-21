@@ -140,6 +140,10 @@ def test_system_metadata_capabilities_are_hidden_from_the_plugin_catalog():
     }
 
 
+def test_open_library_uses_test_as_its_zero_configuration_primary_action():
+    assert OpenLibraryProvider.manifest["ui"]["primary_action"] == "test"
+
+
 def test_network_connectors_reject_user_owned_connections(db_session):
     provider = BRSProvider(transport=lambda *args, **kwargs: {"comments": []})
     registry = PluginRegistry()

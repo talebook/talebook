@@ -82,6 +82,9 @@ def test_catalog_declares_real_capabilities_and_keeps_excluded_servers_out():
         "book_sources.browse",
         "book_sources.acquire",
     ]
+    assert manifests["talebook.book-source.gutenberg"]["ui"]["primary_action"] == "test"
+    assert manifests["talebook.book-source.internet-archive"]["ui"]["primary_action"] == "test"
+    assert manifests["talebook.book-source.standard-ebooks"]["ui"]["primary_action"] == "configure"
     catalog = json.dumps(list(manifests.values()), ensure_ascii=False).lower()
     assert "calibre content server" not in catalog
     assert "calibre-web" not in catalog

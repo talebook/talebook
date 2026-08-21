@@ -97,18 +97,17 @@ test.describe('Plugin management', () => {
         await expect(page.getByText('成功').first()).toBeVisible();
     });
 
-    test('configures Open Library with guided ISBN fields and no raw JSON', async ({ page }) => {
+    test('tests Open Library without configuration and keeps optional ISBN fields in details', async ({ page }) => {
         await page.goto('/admin/plugins?tab=metadata');
         const card = page.locator('.plugin-card').filter({ hasText: 'Open Library' });
-        const configureButton = card.getByRole('button', { name: '配置' });
-        await configureButton.click();
+        const testButton = card.getByRole('button', { name: '测试', exact: true });
+        await testButton.click();
+        await expect(card.getByText(/上次执行：成功/)).toBeVisible();
 
-        let form = page.getByRole('dialog', { name: /配置 Open Library 连接/ });
-        await form.getByRole('button', { name: '取消' }).click();
-        await expect(configureButton).toBeFocused();
-        await configureButton.click();
+        await card.getByRole('button', { name: '详情' }).click();
+        await page.getByRole('button', { name: '编辑连接' }).click();
 
-        form = page.getByRole('dialog', { name: /配置 Open Library 连接/ });
+        const form = page.getByRole('dialog', { name: /配置 Open Library 连接/ });
         await expect(form.getByText('无需寻找或粘贴 Open Library JSON')).toBeVisible();
         await expect(form.getByRole('textbox', { name: '公开配置（JSON）' })).toHaveCount(0);
         const isbnInput = form.getByRole('combobox', { name: '要查询的 ISBN' });
@@ -116,9 +115,20 @@ test.describe('Plugin management', () => {
         await isbnInput.press('Enter');
         await form.getByRole('button', { name: '保存' }).click();
 
-        await expect(page.getByText('default · 尚未测试')).toBeVisible();
+        await expect(page.getByText('default · 连接正常')).toBeVisible();
         await page.getByRole('button', { name: '预览' }).click();
         await expect(page.getByText(/上次执行：成功/)).toBeVisible();
+    });
+
+    test('keeps plugin card actions at the upper right on iPad mini portrait', async ({ page }) => {
+        await page.setViewportSize({ width: 744, height: 1133 });
+        await page.goto('/admin/plugins?tab=metadata');
+        const card = page.locator('.plugin-card').filter({ hasText: 'Open Library' });
+        const titleBox = await card.getByText('Open Library', { exact: true }).boundingBox();
+        const actionBox = await card.getByRole('button', { name: '测试', exact: true }).boundingBox();
+        const cardBox = await card.boundingBox();
+        expect(actionBox.y).toBeLessThan(titleBox.y + 36);
+        expect(actionBox.x + actionBox.width).toBeGreaterThan(cardBox.x + cardBox.width - 100);
     });
 
     test('moves Talebook metadata to a dedicated configuration page', async ({ page }) => {
@@ -171,7 +181,7 @@ test.describe('Plugin management', () => {
             const card = page.locator('.plugin-card').filter({ hasText: name });
             await expect(card).toBeVisible();
             await expect(card.getByText('免费公开')).toBeVisible();
-            await expect(card.getByRole('button', { name: '配置' })).toBeVisible();
+            await expect(card.getByRole('button', { name: '测试', exact: true })).toBeVisible();
         }
         await expect(page.locator('.plugin-card').filter({ hasText: 'Standard Ebooks' }).getByText('免费公开')).toHaveCount(0);
     });

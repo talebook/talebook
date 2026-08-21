@@ -159,6 +159,7 @@
                                         color="primary"
                                         variant="tonal"
                                         size="small"
+                                        :loading="primaryActionLoading === plugin.plugin_key"
                                         @click="primaryAction(plugin)"
                                     >
                                         {{ primaryActionLabel(plugin) }}
@@ -658,6 +659,7 @@ const error = ref(false);
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '');
 const statusFilter = ref(typeof route.query.status === 'string' ? route.query.status : 'all');
 const actionLoading = ref(false);
+const primaryActionLoading = ref('');
 const toggleLoading = ref(false);
 const opdsServiceSaving = ref(false);
 const connectionSaving = ref(false);
@@ -827,21 +829,28 @@ function attentionCount(tab) {
 function primaryActionLabel(plugin) {
     if (!plugin.installation) return t('pluginManagement.install');
     if (!plugin.installation.enabled) return t('pluginManagement.enable');
-    if (plugin.ui.manage_kind === 'opds') return t('pluginManagement.browse');
-    if (plugin.ui.manage_kind === 'legado') return t('pluginManagement.manage');
-    if (plugin.ui.manage_kind === 'metadata') return t('pluginManagement.configure');
-    if (plugin.ui.manage_kind === 'weread') return t('pluginManagement.openWorkbench');
-    if (!connectionFor(plugin)) return t('pluginManagement.configure');
-    return t('pluginManagement.configure');
+    const action = plugin.ui.primary_action || plugin.ui.manage_kind;
+    const labels = {
+        browse: 'browse',
+        manage: 'manage',
+        metadata: 'configure',
+        configure: 'configure',
+        test: 'test',
+        workbench: 'openWorkbench',
+        weread: 'openWorkbench',
+    };
+    return t(`pluginManagement.${labels[action] || 'configure'}`);
 }
 
 async function primaryAction(plugin) {
     if (!plugin.installation) return install(plugin);
     if (!plugin.installation.enabled) return toggleInstallation(plugin);
-    if (plugin.ui.manage_kind === 'opds') return opdsDialog.value?.open();
-    if (plugin.ui.manage_kind === 'legado') return openLegado();
+    const action = plugin.ui.primary_action || plugin.ui.manage_kind;
     if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/plugins/metadata');
-    if (plugin.ui.manage_kind === 'weread') return navigateTo('/plugins/weread');
+    if (action === 'workbench' || plugin.ui.manage_kind === 'weread') return navigateTo('/plugins/weread');
+    if (action === 'browse') return opdsDialog.value?.open();
+    if (action === 'manage') return openLegado();
+    if (action === 'test') return testPlugin(plugin);
     if (!connectionFor(plugin)) {
         if (plugin.ui.manage_kind === 'book_source') {
             openDetails(plugin);
@@ -852,6 +861,34 @@ async function primaryAction(plugin) {
     }
     if (plugin.ui.manage_kind === 'book_source') openDetails(plugin);
     else openConnectionDialog(plugin);
+}
+
+async function testPlugin(plugin) {
+    primaryActionLoading.value = plugin.plugin_key;
+    try {
+        let connection = connectionFor(plugin);
+        if (!connection) {
+            const rsp = await $backend('/admin/plugins/connections', {
+                method: 'POST',
+                body: JSON.stringify({
+                    installation_id: plugin.installation.id,
+                    owner_type: 'instance',
+                    name: 'default',
+                    credentials: {},
+                    config: {},
+                    scopes: plugin.permissions,
+                }),
+            });
+            if (rsp.err !== 'ok') {
+                $alert?.('error', rsp.msg || rsp.err);
+                return;
+            }
+            connection = rsp.connection;
+        }
+        await runAction(connection, 'test');
+    } finally {
+        primaryActionLoading.value = '';
+    }
 }
 
 async function install(plugin) {
@@ -1224,11 +1261,13 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 .plugin-page-header { white-space: normal; }
 .plugin-page-header__copy { flex: 1 1 320px; min-width: 0; }
 .plugin-card { display: flex; flex-direction: column; }
+.plugin-card :deep(.v-card-item) { align-items: start; }
+.plugin-card :deep(.v-card-item__append) { align-self: start; }
 .plugin-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; overflow: visible; white-space: normal; }
 .plugin-card-tags { opacity: 1; }
 .plugin-card-actions { align-self: flex-start; }
 .plugin-description { min-height: 2.8em; }
-@media (max-width: 767px) {
+@media (max-width: 599px) {
     .plugin-search, .plugin-filter { max-width: none; flex-basis: 100%; }
     .plugin-card :deep(.v-card-item) {
         grid-template-areas: 'prepend content' '. append';

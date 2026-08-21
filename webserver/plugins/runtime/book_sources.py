@@ -41,7 +41,16 @@ def _external_id(source, value):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _manifest(plugin_id, name, description, capabilities, config_schema, auth_schema=None, homepage=""):
+def _manifest(
+    plugin_id,
+    name,
+    description,
+    capabilities,
+    config_schema,
+    auth_schema=None,
+    homepage="",
+    primary_action="configure",
+):
     return {
         "protocol_version": PROTOCOL_VERSION,
         "id": plugin_id,
@@ -60,7 +69,7 @@ def _manifest(plugin_id, name, description, capabilities, config_schema, auth_sc
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": homepage,
         "license": "GPL-3.0",
-        "ui": {"icon": "mdi-bookshelf", "manage_kind": "book_source", "primary_action": "configure"},
+        "ui": {"icon": "mdi-bookshelf", "manage_kind": "book_source", "primary_action": primary_action},
     }
 
 
@@ -295,6 +304,7 @@ class GutenbergProvider(BookSourceProvider):
         ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
         {"type": "object", "properties": COMMON_CONFIG_PROPERTIES},
         homepage="https://www.gutenberg.org/",
+        primary_action="test",
     )
 
     def discover(self, context):
@@ -336,6 +346,7 @@ class InternetArchiveProvider(BookSourceProvider):
         ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
         {"type": "object", "properties": COMMON_CONFIG_PROPERTIES},
         homepage="https://archive.org/details/texts",
+        primary_action="test",
     )
 
     def discover(self, context):

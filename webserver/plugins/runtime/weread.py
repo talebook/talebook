@@ -356,7 +356,11 @@ class WereadProvider:
         "homepage": "https://github.com/Tencent/WeChatReading",
         "license": "GPL-3.0",
         "description": "搜索微信读书内容，浏览书架、阅读统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。",
-        "ui": {"manage_kind": "weread", "icon": "mdi-book-open-page-variant"},
+        "ui": {
+            "manage_kind": "weread",
+            "icon": "mdi-book-open-page-variant",
+            "primary_action": "workbench",
+        },
     }
 
     def __init__(self, gateway=WEREAD_GATEWAY, opener=None):

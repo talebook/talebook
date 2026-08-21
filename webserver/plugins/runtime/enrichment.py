@@ -186,6 +186,7 @@ class OpenLibraryProvider:
         ["books.read", "plugin_records.write", "network.read"],
         "mdi-library-outline",
         "https://openlibrary.org/developers/api",
+        ui={"primary_action": "test"},
     )
 
     def __init__(self, transport=_http_json):

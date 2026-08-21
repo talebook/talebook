@@ -1623,7 +1623,7 @@ const pluginDefinitions = [
     auth_schema: { type: 'object', properties: {} },
     config_schema: { type: 'object', properties: { queries: { type: 'array' } } },
     permissions: ['books.read', 'plugin_records.write', 'network.read'],
-    ui: { icon: 'mdi-library-outline', primary_action: 'configure' },
+    ui: { icon: 'mdi-library-outline', primary_action: 'test' },
   },
   {
     id: 6,
@@ -1636,7 +1636,7 @@ const pluginDefinitions = [
     capabilities: ['integrations.search', 'integrations.books', 'integrations.shelf', 'integrations.statistics', 'integrations.community', 'integrations.recommendations', 'metadata.lookup', 'annotations.import'],
     actions: ['test', 'preview', 'run', 'retry', 'rollback'],
     permissions: ['books.read', 'books.write', 'profile.read', 'annotations.write'],
-    ui: { icon: 'mdi-book-open-page-variant', manage_kind: 'weread' },
+    ui: { icon: 'mdi-book-open-page-variant', manage_kind: 'weread', primary_action: 'workbench' },
   },
   {
     id: 7,
@@ -1732,7 +1732,11 @@ const pluginDefinitions = [
         formats: { type: 'array', default: ['epub', 'pdf'] },
       },
     },
-    ui: { icon: 'mdi-bookshelf', manage_kind: 'book_source', primary_action: 'configure' },
+    ui: {
+      icon: 'mdi-bookshelf',
+      manage_kind: 'book_source',
+      primary_action: ['gutenberg', 'internet-archive'].includes(key) ? 'test' : 'configure',
+    },
   })),
 ];
 let pluginInstallations = pluginDefinitions.map((definition, index) => ({
@@ -1833,6 +1837,11 @@ router.get('/api/admin/plugins/runs/:id', eventHandler((event) => {
 router.post('/api/admin/plugins/connections/:id/:action', eventHandler((event) => {
   const id = Number(getRouterParam(event, 'id'));
   const action = getRouterParam(event, 'action');
+  if (action === 'test') {
+    pluginConnections = pluginConnections.map(connection => connection.id === id
+      ? { ...connection, health: 'healthy', health_message: 'Connection healthy' }
+      : connection);
+  }
   const run = {
     id: pluginRuns.length + 1,
     connection_id: id,
