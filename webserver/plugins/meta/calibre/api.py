@@ -17,6 +17,10 @@ _SOURCE_TO_PLUGIN = {
     "google": "Google",
     "amazon": "Amazon.com",
 }
+_SOURCE_LABELS = {
+    "google": "Google Books",
+    "amazon": "Amazon",
+}
 _PLUGIN_INIT_LOCK = threading.Lock()
 
 
@@ -138,25 +142,60 @@ class CalibreMetadataApi:
         return ("jpg", img)
 
     @classmethod
+    def search(cls, source, title="", authors=None, isbn="", timeout=25, limit=5):
+        """Query one configured Calibre source and return at most ``limit`` candidates."""
+
+        plugin_name = _SOURCE_TO_PLUGIN.get(source)
+        if not plugin_name:
+            raise CalibreMetadataSourceUnavailable({source}, "未知来源")
+
+        title = str(title or "").strip()
+        authors = [authors] if isinstance(authors, str) else list(authors or [])
+        isbn = str(isbn or "").strip()
+        isbn_digits = "".join(char for char in isbn.upper() if char.isdigit() or char == "X")
+        isbn = isbn if len(isbn_digits) in {10, 13} and len(set(isbn_digits)) > 1 else ""
+        limit = max(0, int(limit))
+        if not limit or not title and not isbn:
+            return []
+
+        queries = []
+        if source == META_SOURCE_GOOGLE and isbn:
+            queries.append({"identifiers": {"isbn": isbn}})
+        if title:
+            query = {"title": title}
+            if authors:
+                query["authors"] = authors
+            queries.append(query)
+        elif isbn:
+            queries.append({"identifiers": {"isbn": isbn}})
+
+        per_query_timeout = max(1, int(timeout) // max(1, len(queries)))
+        results = []
+        for query in queries:
+            results = cls._identify(source=plugin_name, timeout=per_query_timeout, **query) or []
+            if results:
+                break
+
+        amazon_plugin = cls._get_amazon_plugin() if source == META_SOURCE_AMAZON else None
+        normalized = []
+        for result in results[:limit]:
+            result.provider_key = KEY
+            result.provider_value = source
+            result.source = _SOURCE_LABELS[source]
+            result.author_sort = result.authors[0] if result.authors else ""
+            result.rating = int(result.rating) * 2 if result.rating is not None else 0
+            if amazon_plugin and amazon_plugin.cached_cover_url_is_reliable:
+                result.cover_url = amazon_plugin.get_cached_cover_url(result.identifiers)
+            normalized.append(result)
+        return normalized
+
+    @classmethod
     def get_book_by_isbn(cls, isbn, sources=None, timeout=30):
         """按 ISBN 查询书籍信息，成功时返回含封面的 Metadata 对象，否则返回 None"""
         if not sources or META_SOURCE_GOOGLE not in sources:
             return None
-
-        if not isbn:
-            return None
         try:
-            results = cls._identify(identifiers={"isbn": isbn}, timeout=timeout, source="Google")
-            if not results:
-                return None
-            if results:
-                for result in results[:1]:
-                    result.provider_key = result.source = "google"
-                    result.provider_value = isbn
-                    result.author_sort = result.authors[0] if result.authors else ""
-                    # Calibre Google 插件的评分是 0-5，乘以 2 转换为 0-10
-                    result.rating = int(result.rating) * 2 if result.rating is not None else 0
-            return results[:1]
+            return cls.search(META_SOURCE_GOOGLE, isbn=isbn, timeout=timeout, limit=1) or None
         except CalibreMetadataSourceUnavailable:
             raise
         except Exception as e:
@@ -167,29 +206,23 @@ class CalibreMetadataApi:
     @classmethod
     def get_book_by_title(cls, title, authors=None, sources=None, timeout=30):
         """按书名（及可选作者）查询书籍信息，成功时返回含封面的 Metadata 对象，否则返回 None"""
-        if not sources or META_SOURCE_AMAZON not in sources:
-            return None
-
-        if not title:
+        enabled = [source for source in (sources or []) if source in _SOURCE_TO_PLUGIN]
+        if not enabled:
             return None
         try:
-            kwargs = {"title": title}
-            if authors:
-                kwargs["authors"] = authors if isinstance(authors, list) else [authors]
-            results = cls._identify(timeout=timeout, source="Amazon.com", **kwargs)
-            if not results:
-                return None
-            if results:
-                amazon_plugin = cls._get_amazon_plugin()
-                for result in results[:3]:
-                    result.provider_key = result.source = "amazon"
-                    result.provider_value = result.isbn if result.isbn else title
-                    result.author_sort = result.authors[0] if result.authors else ""
-                    # Calibre Google 插件的评分是 0-5，乘以 2 转换为 0-10
-                    result.rating = int(result.rating) * 2 if result.rating is not None else 0
-                    if amazon_plugin and amazon_plugin.cached_cover_url_is_reliable:
-                        result.cover_url = amazon_plugin.get_cached_cover_url(result.identifiers)
-            return results[:3]
+            results = []
+            per_source_timeout = max(1, int(timeout) // len(enabled))
+            for source in enabled:
+                results.extend(
+                    cls.search(
+                        source,
+                        title=title,
+                        authors=authors,
+                        timeout=per_source_timeout,
+                        limit=5,
+                    )
+                )
+            return results or None
         except CalibreMetadataSourceUnavailable:
             raise
         except Exception as e:

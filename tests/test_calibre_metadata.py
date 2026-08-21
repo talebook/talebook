@@ -77,3 +77,39 @@ def test_missing_metadata_source_raises_diagnostic_error(monkeypatch, caplog):
         )
 
     assert "Google" in caplog.text
+
+
+def test_google_search_falls_back_from_isbn_to_title_and_marks_provider(monkeypatch):
+    calls = []
+    expected = Metadata("西游记", ["吴承恩"])
+
+    def identify(**kwargs):
+        calls.append(kwargs)
+        return [] if "identifiers" in kwargs else [expected]
+
+    monkeypatch.setattr(CalibreMetadataApi, "_identify", identify)
+
+    results = CalibreMetadataApi.search(
+        "google",
+        title="西游记",
+        authors=["吴承恩"],
+        isbn="9780000000002",
+        timeout=10,
+    )
+
+    assert [call["source"] for call in calls] == ["Google", "Google"]
+    assert calls[0]["identifiers"] == {"isbn": "9780000000002"}
+    assert calls[1]["title"] == "西游记"
+    assert results == [expected]
+    assert expected.source == "Google Books"
+    assert expected.provider_key == "Calibre"
+    assert expected.provider_value == "google"
+
+
+def test_calibre_search_limits_one_source_to_five_candidates(monkeypatch):
+    candidates = [Metadata("候选%d" % index, ["作者"]) for index in range(8)]
+    monkeypatch.setattr(CalibreMetadataApi, "_identify", lambda **kwargs: candidates)
+
+    results = CalibreMetadataApi.search("google", title="西游记", limit=5)
+
+    assert len(results) == 5

@@ -203,26 +203,23 @@ class AutoFillService(AsyncService):
             except Exception:
                 logging.error(_("douban_v2 接口查询 %s 失败"), title)
 
-        # 3 & 4. 使用 Google Books 和 Amazon.com 查询
+        # 3 & 4. 按配置顺序独立查询 Google Books 和 Amazon.com。
         calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
-        if calibre_sources:
+        for source in calibre_sources:
             try:
-                if META_SOURCE_AMAZON not in calibre_sources:
-                    # 只有在没有 amazon 时才使用 google 查询
-                    try:
-                        results = CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
-                        if results:
-                            return results[0]
-                    except Exception:
-                        logging.error(_("calibre 插件 ISBN 查询 %s 失败"), title)
-
-                results = CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
+                results = CalibreMetadataApi.search(
+                    source,
+                    title=title,
+                    authors=mi.authors,
+                    isbn=mi.isbn,
+                    limit=1,
+                )
                 if results:
                     result = results[0]
                     result.cover_data = CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
                     return result
             except Exception as e:
-                logging.error(_("calibre 插件书名查询 %s 失败：%s"), title, e)
+                logging.error(_("calibre 插件 %s 查询 %s 失败：%s"), source, title, e)
                 logging.error(traceback.format_exc())
 
         # 5. 百度百科查询
