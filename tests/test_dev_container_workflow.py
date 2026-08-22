@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import yaml
@@ -114,3 +115,46 @@ def test_build_workflow_filters_docker_jobs_to_image_inputs():
         "DOCKER_CHANGED": "${{ steps.filter.outputs.docker }}",
     }
     assert '[[ "$REF_TYPE" == "tag" || "$DOCKER_CHANGED" == "true" ]]' in decide["run"]
+
+
+def test_docker_root_context_is_a_runtime_input_allowlist():
+    rules = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+
+    assert rules[1] == "**"
+    for path in (
+        "!Dockerfile",
+        "!requirements.txt",
+        "!requirements-test.txt",
+        "!server.py",
+        "!app/**",
+        "!conf/**",
+        "!docker/**",
+        "!webserver/**",
+        "!tests/**",
+    ):
+        assert path in rules
+
+    assert "!design/**" not in rules
+    assert "!document/**" not in rules
+    assert "app/test" in rules
+
+
+def test_test_sources_are_available_to_test_and_dev_but_not_production():
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    stage_parents = {
+        stage.lower(): parent.lower()
+        for parent, stage in re.findall(
+            r"^FROM\s+(\S+)\s+AS\s+(\S+)\s*$",
+            dockerfile,
+            re.MULTILINE | re.IGNORECASE,
+        )
+    }
+
+    assert stage_parents["test"] == "server"
+    assert stage_parents["dev"] == "test"
+    assert stage_parents["production"] == "server"
+    assert stage_parents["production-ssr"] == "production"
+    assert stage_parents["production-spa"] == "production"
+    assert "COPY tests/ /var/www/talebook/tests/" in dockerfile
+    assert "--build-context" not in makefile

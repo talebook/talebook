@@ -1,5 +1,36 @@
-.git
+# Keep the root build context limited to files consumed by Dockerfile.
+**
+!Dockerfile
+!requirements.txt
+!requirements-test.txt
+!server.py
+!app/
+!app/**
+!conf/
+!conf/**
+!docker/
+!docker/**
+!webserver/
+!webserver/**
+!tests/
+!tests/**
+
+# Frontend development and test material is not needed by image builds.
 app/.env
-app/dist
 app/.nuxt
 app/node_modules
+app/dist
+app/test
+app/test-results
+app/playwright-report
+app/AGENTS.md
+app/CLAUDE.md
+app/README.md
+app/Makefile
+app/eslint.config.js
+app/playwright.config.ts
+app/vitest.config.ts
+
+# Never send local interpreter artifacts from allowed source trees.
+**/__pycache__
+**/*.py[cod]
