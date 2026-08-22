@@ -700,6 +700,9 @@ function capabilityLabel(value) {
         'book_sources.browse': t('pluginManagement.capBrowse'),
         'book_sources.search': t('pluginManagement.capSearch'),
         'book_sources.acquire': t('pluginManagement.capAcquire'),
+        'integrations.content_edit': t('pluginManagement.capContentEdit'),
+        'integrations.content_convert': t('pluginManagement.capContentConvert'),
+        'integrations.encoding_fix': t('pluginManagement.capEncodingFix'),
     };
     return labels[value] || value;
 }
@@ -725,6 +728,7 @@ function primaryActionLabel(plugin) {
     if (plugin.ui.manage_kind === 'legado') return t('pluginManagement.manage');
     if (plugin.ui.manage_kind === 'metadata') return t('pluginManagement.configure');
     if (plugin.ui.manage_kind === 'weread') return t('pluginManagement.openWorkbench');
+    if (['text_replace', 'zh_converter', 'txt_fixer'].includes(plugin.ui.manage_kind)) return t('pluginManagement.openTool');
     return t('pluginManagement.details');
 }
 
@@ -735,6 +739,9 @@ async function primaryAction(plugin) {
     if (plugin.ui.manage_kind === 'legado') return openLegado();
     if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/settings#metadata');
     if (plugin.ui.manage_kind === 'weread') return navigateTo('/plugins/weread');
+    if (plugin.ui.manage_kind === 'text_replace') return navigateTo('/plugins/text-replace');
+    if (plugin.ui.manage_kind === 'zh_converter') return navigateTo('/plugins/zh-converter');
+    if (plugin.ui.manage_kind === 'txt_fixer') return navigateTo('/plugins/txt-fixer');
     if (!connectionFor(plugin)) {
         if (plugin.ui.manage_kind === 'book_source') {
             openDetails(plugin);
