@@ -1,7 +1,9 @@
 import io
+import json
 import os
 import tempfile
 import zipfile
+from unittest import mock
 
 from webserver.plugins.texttools.chinese_epub import convert_txt_file, detect_encoding as zh_detect
 from webserver.plugins.texttools.encoding_detect import decode_with_report, detect_encoding, fix_to_utf8
@@ -10,6 +12,14 @@ from webserver.plugins.texttools.opencc_engine import OpenCC
 from webserver.plugins.texttools.text_replace import compile_rule, preview, replace_epub_file, replace_txt_file, scan_samples
 from webserver.plugins.texttools.txt_fixer import analyze_bytes, fix_bytes
 from webserver.plugins.runtime.builtin_capabilities import BUILTIN_CAPABILITY_PROVIDERS
+from webserver.handlers.base import BaseHandler
+
+from tests.test_main import BID_EPUB, BID_TXT, TestApp, temporary_book_scope
+from tests.test_main import setUpModule as init_main
+
+
+def setUpModule():
+    init_main()
 
 
 def _tmp_epub(text_map):
@@ -172,3 +182,124 @@ def test_builtin_capability_providers_registered():
     for p in BUILTIN_CAPABILITY_PROVIDERS:
         if p.manifest["id"].startswith("talebook.tool."):
             assert "integrations" in p.manifest["categories"]
+
+
+# ---------------------------------------------------------------------------
+# HTTP 层测试：/api/plugins/tools/* 6 个端点
+#
+# 覆盖此前 review 发现的两个高危问题：
+# - zh-converter run 因缺少 DIRECTION_LABELS 导入而 NameError；
+# - preview/analyze 仅要求 @auth，未校验私有书籍归属，导致越权读取。
+# 落盘的重操作（import_as_new_book / overwrite_format）用 mock 隔离，避免真实写入共享的
+# 测试书库（见 webserver/CLAUDE.md 的测试规范）。
+
+
+class TestBookToolsBooksList(TestApp):
+    def test_books_list_ok(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json("/api/plugins/tools/books")
+            self.assertEqual(d["err"], "ok")
+            ids = [b["id"] for b in d["books"]]
+            self.assertIn(BID_EPUB, ids)
+            self.assertIn(BID_TXT, ids)
+
+
+class TestTextReplacePreview(TestApp):
+    def test_preview_ok(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            body = json.dumps({"book_id": BID_TXT, "pattern": "a", "replacement": "b", "use_regex": False})
+            d = self.json("/api/plugins/tools/text-replace/preview", method="POST", body=body)
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual(d["book_id"], BID_TXT)
+
+    def test_preview_rejects_other_users_private_book(self):
+        with temporary_book_scope(BID_TXT, "private", collector_id=1):
+            with mock.patch.object(BaseHandler, "user_id", return_value=2):
+                body = json.dumps({"book_id": BID_TXT, "pattern": "a", "replacement": "b", "use_regex": False})
+                d = self.json("/api/plugins/tools/text-replace/preview", method="POST", body=body)
+                self.assertEqual(d["err"], "booktools.failed")
+
+    def test_preview_allows_owner_on_private_book(self):
+        with temporary_book_scope(BID_TXT, "private", collector_id=1):
+            with mock.patch.object(BaseHandler, "user_id", return_value=1):
+                body = json.dumps({"book_id": BID_TXT, "pattern": "a", "replacement": "b", "use_regex": False})
+                d = self.json("/api/plugins/tools/text-replace/preview", method="POST", body=body)
+                self.assertEqual(d["err"], "ok")
+
+    def test_preview_allows_admin_on_other_users_private_book(self):
+        with temporary_book_scope(BID_TXT, "private", collector_id=2):
+            with mock.patch.object(BaseHandler, "user_id", return_value=1):
+                body = json.dumps({"book_id": BID_TXT, "pattern": "a", "replacement": "b", "use_regex": False})
+                d = self.json("/api/plugins/tools/text-replace/preview", method="POST", body=body)
+                self.assertEqual(d["err"], "ok")
+
+
+class TestTxtFixerAnalyze(TestApp):
+    def test_analyze_ok(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            body = json.dumps({"book_id": BID_TXT})
+            d = self.json("/api/plugins/tools/txt-fixer/analyze", method="POST", body=body)
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual(d["book_id"], BID_TXT)
+
+    def test_analyze_rejects_other_users_private_book(self):
+        with temporary_book_scope(BID_TXT, "private", collector_id=1):
+            with mock.patch.object(BaseHandler, "user_id", return_value=2):
+                body = json.dumps({"book_id": BID_TXT})
+                d = self.json("/api/plugins/tools/txt-fixer/analyze", method="POST", body=body)
+                self.assertEqual(d["err"], "booktools.failed")
+
+
+class TestTextReplaceRun(TestApp):
+    def test_run_requires_admin(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=2):
+            body = json.dumps({"book_id": BID_TXT, "pattern": "a", "replacement": "b", "use_regex": False})
+            d = self.json("/api/plugins/tools/text-replace/run", method="POST", body=body)
+            self.assertEqual(d["err"], "permission.not_admin")
+
+    @mock.patch("webserver.handlers.plugins.import_as_new_book")
+    def test_run_new_mode_ok(self, m_import):
+        m_import.return_value = 9001
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            body = json.dumps({"book_id": BID_TXT, "pattern": "a", "replacement": "b", "use_regex": False})
+            d = self.json("/api/plugins/tools/text-replace/run", method="POST", body=body)
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual(d["book_id"], 9001)
+            self.assertTrue(m_import.called)
+
+
+class TestTxtFixerRun(TestApp):
+    @mock.patch("webserver.handlers.plugins.import_as_new_book")
+    @mock.patch("webserver.handlers.plugins.fix_bytes")
+    def test_run_new_mode_ok(self, m_fix, m_import):
+        m_fix.return_value = ("fixed text", {"encoding": "utf-8", "mojibake": False, "garbage": False, "unrecoverable": False})
+        m_import.return_value = 9002
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            body = json.dumps({"book_id": BID_TXT})
+            d = self.json("/api/plugins/tools/txt-fixer/run", method="POST", body=body)
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual(d["book_id"], 9002)
+            self.assertTrue(m_import.called)
+
+
+class TestZhConverterRun(TestApp):
+    """回归测试：run 接口此前因缺少 DIRECTION_LABELS 导入而必然 NameError。"""
+
+    def test_run_requires_admin(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=2):
+            body = json.dumps({"book_id": BID_TXT, "direction": "t2s"})
+            d = self.json("/api/plugins/tools/zh-converter/run", method="POST", body=body)
+            self.assertEqual(d["err"], "permission.not_admin")
+
+    @mock.patch("webserver.handlers.plugins.import_as_new_book")
+    @mock.patch("webserver.handlers.plugins.convert_txt_file")
+    def test_run_new_mode_ok(self, m_convert, m_import):
+        m_convert.return_value = "utf-8"
+        m_import.return_value = 9003
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            body = json.dumps({"book_id": BID_TXT, "direction": "t2s", "output_mode": "new"})
+            d = self.json("/api/plugins/tools/zh-converter/run", method="POST", body=body)
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual(d["book_id"], 9003)
+            self.assertEqual(d["direction_label"], "繁体→简体")
+            self.assertTrue(m_import.called)
