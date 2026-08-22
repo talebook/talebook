@@ -1669,7 +1669,11 @@
     "item_succeeded": "Succeeded",
     "item_previewed": "Previewed",
     "item_skipped": "Skipped",
-    "item_rolled_back": "Rolled Back"
+    "item_rolled_back": "Rolled Back",
+    "capContentEdit": "Content edit",
+    "capContentConvert": "Chinese convert",
+    "capEncodingFix": "Encoding fix",
+    "openTool": "Open"
   },
   "theme": {
     "title": "Theme Management",
@@ -1688,5 +1692,56 @@
     "deleteConfirm": "Delete this theme?",
     "defaultTheme": "Default Theme",
     "defaultThemeDescription": "TaleBook native UI"
+  },
+  "bookTools": {
+    "common": {
+      "bookSelect": "Select a book",
+      "bookHint": "Available formats: {formats}",
+      "bookSearchHint": "Type to search (only books with EPUB / TXT are listed)",
+      "typeToSearch": "Type to search",
+      "noBooks": "No matching books",
+      "preview": "Preview",
+      "analyze": "Analyze",
+      "run": "Run",
+      "newBook": "Save as new book",
+      "overwrite": "Overwrite original",
+      "suffix": "New book title suffix"
+    },
+    "textReplace": {
+      "title": "Find and Replace",
+      "description": "Find and replace text in EPUB / TXT book bodies (regex supported).",
+      "readOnly": "Choose to overwrite the original or save as a new book.",
+      "pattern": "Find",
+      "replacement": "Replace with",
+      "useRegex": "Use regular expression",
+      "matched": "{count} matches{truncated}",
+      "truncated": " (first 200k chars only)",
+      "samples": "Samples (up to 5)",
+      "successNew": "Replaced {count} hits, saved as new book #{id}",
+      "successOverwrite": "Replaced {count} hits, overwrote book #{id}"
+    },
+    "txtFixer": {
+      "title": "TXT Encoding Fix",
+      "description": "Detect TXT encoding (with mojibake recovery) and fix to UTF-8.",
+      "readOnly": "Only TXT books are eligible. Choose to overwrite or save as a new book.",
+      "mojibake": "Mojibake recovery applied",
+      "garbage": "Likely non-text",
+      "unrecoverable": "Multi-layer mojibake, cannot recover",
+      "preview": "Preview after fix (first 500 chars)",
+      "successNew": "Fixed (encoding: {encoding}), saved as new book #{id}",
+      "successOverwrite": "Fixed (encoding: {encoding}), overwrote book #{id}"
+    },
+    "zhConverter": {
+      "title": "Chinese Converter",
+      "description": "Convert between Simplified and Traditional Chinese (EPUB / TXT).",
+      "readOnly": "8 directions available; optional enhanced dictionary and title conversion.",
+      "direction": "Direction",
+      "useA5": "Use enhanced dictionary (only for t2s / tw2s)",
+      "a5Hint": "Only t2s / tw2s support this",
+      "convertTitle": "Also convert title and authors",
+      "backup": "Back up original before overwriting",
+      "successNew": "Converted to {direction}, saved as new book #{id}",
+      "successOverwrite": "Converted to {direction}, overwrote book #{id}"
+    }
   }
 }

@@ -1,0 +1,23 @@
+{
+  "name": "Traditional Chinese (OpenCC Standard) to Simplified Chinese",
+  "segmentation": {
+    "type": "mmseg",
+    "dict": { "type": "txt", "file": "TSPhrases.txt" }
+  },
+  "conversion_chain": [
+    {
+      "dict": {
+        "type": "group",
+        "dicts": [
+          { "type": "txt", "file": "TSPhrases.txt" },
+          {
+            "type": "txt",
+            "file": "TSCharactersExt.txt",
+            "may_output_tofu": true
+          },
+          { "type": "txt", "file": "TSCharacters.txt" }
+        ]
+      }
+    }
+  ]
+}
