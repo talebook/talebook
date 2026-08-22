@@ -237,6 +237,8 @@ runtime.execute(run.id)  # 同步阻塞，handler 内直接调用
 
 > 轮询：运行历史统一经 `GET /api/{admin/plugins,plugins}/runs` 拉取，无独立“任务”轮询接口；重操作的前端以按钮 `loading` 态 + 成功提示收口。
 
+> **权限边界（review 修正）**：以上按 `book_id` 取书的端点统一经 `_tool_resolve_book(handler, book_id)` 解析，内部先调 `handler.can_view_book(book_id)`，无权查看时返回与「书籍不存在」一致的错误——防止任意登录用户用列表外的 `book_id` 探测他人**私有书籍**（`Item.scope == "private"`）。这是 `AGENTS.md` 的硬性规则：只读 JSON 也必须逐资源做权限校验，仅靠书籍选择接口的 `get_books()` 过滤是不够的。
+
 ---
 ## 8 前端 `app/`
 
@@ -287,6 +289,8 @@ app/src/pages/toolbox/*.vue       # Vuetify 2（item-text / outlined / dense）
 - `permissions` 必须为 `capabilities` 风格的点分标识，且 `save_connection scopes` 必须为已批准权限的子集。
 - `entity_type` 写错会得 `plugin.item_invalid` 且 `counts.failed` 自增；`book_source` 的 `format` 不在 `ALLOWED_FORMATS` 会 `ProviderError`。
 - `OPDS_ENABLED` 等开关虽注册为插件，但仍走 `SettingsSaverLogic.save_extra_settings`，勿重复写表。
+- **逐资源权限校验**：凡按 `book_id` 取书的只读端点（preview/analyze 类），必须经 `handler.can_view_book(book_id)` 校验后再取数——本项目曾因此被打回：仅 `@auth` + 书籍列表过滤挡不住客户端直传任意 `book_id` 读他人私藏（`Item.scope == "private"`）。统一封装 `_tool_resolve_book(handler, book_id)` 一类的辅助函数最稳妥。
+- **新增内置能力会破坏既有计数断言**：`BUILTIN_CAPABILITY_PROVIDERS` 每加一项，`tests/test_plugin_runtime.py` 中硬编码的安装数量断言要同步 +1，否则全量 pytest 直接回归。
 
 ### 10.3 提交前
 
@@ -372,3 +376,4 @@ BUILTIN_CAPABILITY_PROVIDERS = (*BUILTIN_CAPABILITY_PROVIDERS, MyDemoProvider())
 - **设计稿**：`design/webserver/20260817-weread-annotation-import.active.html`（17 项能力与只读边界的范式）
 
 > 文档版本：2026-08-22，基于 `feat/plugins@51177f3`。后续若 `CATEGORIES` 新增 `tools` 或运行时改为异步任务池，§4/§9 的决策需同步修订。
+
