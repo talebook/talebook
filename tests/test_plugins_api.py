@@ -1,8 +1,9 @@
 import json
 from unittest import mock
 
+from tests.test_main import TestWithAdminUser, get_db
+from tests.test_main import setUpModule as init
 from webserver import loader
-from tests.test_main import TestWithAdminUser, get_db, setUpModule as init
 from webserver.models import PluginConnection, PluginInstallation, PluginSecret
 from webserver.plugins.runtime import ProviderAuthError, ProviderRateLimitError, WereadProvider
 
@@ -18,6 +19,8 @@ class TestPluginsApi(TestWithAdminUser):
         self.assertEqual(data["err"], "ok")
         definitions = {item["plugin_key"]: item for item in data["definitions"]}
         self.assertIn("talebook.metadata.builtin", definitions)
+        self.assertIn("talebook.metadata.source.qimao", definitions)
+        self.assertIn("talebook.metadata.source.google", definitions)
         self.assertIn("talebook.book-source.opds", definitions)
         self.assertIn("talebook.book-source.legado", definitions)
         payload = json.dumps(data, ensure_ascii=False).lower()
@@ -25,12 +28,57 @@ class TestPluginsApi(TestWithAdminUser):
         self.assertNotIn("calibre-web", payload)
         self.assertNotIn('"ai"', payload)
         self.assertIn("builtin_state", data)
+        self.assertTrue(definitions["talebook.metadata.builtin"]["ui"]["hidden"])
+
+    def test_metadata_source_toggle_persists_the_selected_source(self):
+        catalog = self.json("/api/admin/plugins")
+        installation = next(
+            item for item in catalog["installations"] if item["plugin_key"] == "talebook.metadata.source.qimao"
+        )
+
+        with mock.patch("webserver.handlers.admin.SettingsSaverLogic.save_extra_settings") as save:
+            save.return_value = {"err": "ok"}
+            result = self.json(
+                "/api/admin/plugins/installations/%d/state" % installation["id"],
+                method="POST",
+                body=json.dumps({"enabled": True}),
+            )
+
+        self.assertEqual(result["err"], "ok")
+        self.assertIn("qimao", save.call_args.args[0]["META_SELECTED_SOURCES"])
+
+    @mock.patch("webserver.handlers.plugins.search_metadata_plugin")
+    def test_metadata_source_test_search_is_limited_to_five_results(self, search):
+        search.return_value = [{"title": "西游记 %d" % index} for index in range(7)]
+
+        result = self.json(
+            "/api/admin/plugins/metadata-search",
+            method="POST",
+            body=json.dumps({"source": "qimao", "keyword": "西游记"}),
+        )
+
+        self.assertEqual(result["err"], "ok")
+        self.assertEqual(len(result["books"]), 5)
+        search.assert_called_once()
+
+    def test_metadata_source_test_search_rejects_missing_keyword_and_unknown_source(self):
+        missing = self.json(
+            "/api/admin/plugins/metadata-search",
+            method="POST",
+            body=json.dumps({"source": "qimao", "keyword": ""}),
+        )
+        unknown = self.json(
+            "/api/admin/plugins/metadata-search",
+            method="POST",
+            body=json.dumps({"source": "unknown", "keyword": "西游记"}),
+        )
+
+        self.assertEqual(missing["err"], "plugin.keyword_required")
+        self.assertEqual(unknown["err"], "plugin.metadata_source_invalid")
 
     def test_installation_state_can_be_disabled_and_reenabled_without_deleting_connection(self):
         catalog = self.json("/api/admin/plugins")
-        installation = next(
-            item for item in catalog["installations"] if item["plugin_key"] == "talebook.book-source.opds"
-        )
+        installation = next(item for item in catalog["installations"] if item["plugin_key"] == "talebook.book-source.opds")
         connections_before = self.json("/api/admin/plugins/connections")["connections"]
 
         disabled = self.json(

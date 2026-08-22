@@ -172,9 +172,12 @@ router.post('/_test/reset', eventHandler(async (event) => {
   booksourceCheckPolls = 0;
   pluginRuns = [];
   opdsServiceEnabled = true;
-  pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
+  pluginInstallations = pluginInstallations.map(item => ({
+    ...item,
+    enabled: item.plugin_key !== 'talebook.metadata.source.qimao',
+  }));
   pluginConnections = pluginInstallations
-    .filter(item => item.id <= 3)
+    .filter(item => ['talebook.metadata.builtin', 'talebook.book-source.opds', 'talebook.book-source.legado'].includes(item.plugin_key))
     .map(installation => mockPluginConnection(installation));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
@@ -1546,6 +1549,19 @@ router.get('/api/book/:id', eventHandler((event) => {
   return { err: 'ok', msg: 'mock action' };
 }));
 
+const metadataPluginSpecs = [
+  ['douban', '豆瓣', '从豆瓣查询图书简介、作者、出版社和封面。', 'mdi-alpha-d-circle-outline'],
+  ['douban_v2', '豆瓣 V2', '通过豆瓣新版接口查询图书元数据。', 'mdi-alpha-d-box-outline'],
+  ['baidu', '百度百科', '从百度百科匹配图书条目和简介。', 'mdi-alpha-b-circle-outline'],
+  ['google', 'Google Books', '从 Google Books 查询图书元数据。', 'mdi-google'],
+  ['amazon', 'Amazon', '通过 Calibre Amazon Provider 查询图书元数据。', 'mdi-amazon'],
+  ['xinhua', '新华书店', '从新华书店查询图书出版信息。', 'mdi-storefront-outline'],
+  ['tomato', '番茄小说', '从番茄小说查询网络文学元数据。', 'mdi-fruit-cherries'],
+  ['qimao', '七猫小说', '从七猫小说查询网络文学元数据。', 'mdi-cat'],
+  ['neodb', 'NeoDB', '从 NeoDB 查询开放图书元数据。', 'mdi-database-search-outline'],
+  ['booksource', '在线书源', '从已启用的 Legado 在线书源查询图书元数据。', 'mdi-book-search-outline'],
+];
+
 const pluginDefinitions = [
   {
     id: 1,
@@ -1558,8 +1574,23 @@ const pluginDefinitions = [
     capabilities: ['metadata.lookup'],
     actions: ['test'],
     permissions: ['books.read', 'books.write'],
-    ui: { icon: 'mdi-book-search-outline', manage_kind: 'metadata', primary_action: 'configure' },
+    ui: { icon: 'mdi-book-search-outline', manage_kind: 'metadata', primary_action: 'configure', hidden: true },
   },
+  ...metadataPluginSpecs.map(([source, name, description, icon], index) => ({
+    id: 100 + index,
+    plugin_key: `talebook.metadata.source.${source.replace('_', '-')}`,
+    name,
+    description,
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['metadata'],
+    capabilities: ['metadata.lookup'],
+    actions: ['test'],
+    permissions: ['books.read', 'network.read'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    ui: { icon, manage_kind: 'metadata_source', metadata_source: source, primary_action: 'test' },
+  })),
   {
     id: 2,
     plugin_key: 'talebook.book-source.opds',
@@ -1623,7 +1654,7 @@ const pluginDefinitions = [
     auth_schema: { type: 'object', properties: {} },
     config_schema: { type: 'object', properties: { queries: { type: 'array' } } },
     permissions: ['books.read', 'plugin_records.write', 'network.read'],
-    ui: { icon: 'mdi-library-outline', primary_action: 'configure' },
+    ui: { icon: 'mdi-library-outline', primary_action: 'test' },
   },
   {
     id: 6,
@@ -1636,8 +1667,108 @@ const pluginDefinitions = [
     capabilities: ['integrations.search', 'integrations.books', 'integrations.shelf', 'integrations.statistics', 'integrations.community', 'integrations.recommendations', 'metadata.lookup', 'annotations.import'],
     actions: ['test', 'preview', 'run', 'retry', 'rollback'],
     permissions: ['books.read', 'books.write', 'profile.read', 'annotations.write'],
-    ui: { icon: 'mdi-book-open-page-variant', manage_kind: 'weread' },
+    ui: { icon: 'mdi-book-open-page-variant', manage_kind: 'weread', primary_action: 'workbench' },
   },
+  {
+    id: 7,
+    plugin_key: 'talebook.metadata.embedded-file',
+    name: '嵌入文件元数据',
+    description: '系统自动读取 EPUB 嵌入元数据。',
+    version: '1.0.0', runtime_kind: 'builtin', categories: ['metadata'],
+    capabilities: ['metadata.extract'], actions: ['test'], permissions: ['books.read'],
+    auth_schema: { type: 'object', properties: {} }, config_schema: { type: 'object', properties: {} },
+    ui: { icon: 'mdi-file-document-outline', hidden: true, system_capability: true },
+  },
+  {
+    id: 8,
+    plugin_key: 'talebook.metadata.calibre-provider-bridge',
+    name: 'Calibre Provider Bridge',
+    description: '系统自动发现 Calibre 元数据 Provider。',
+    version: '1.0.0', runtime_kind: 'builtin', categories: ['metadata'],
+    capabilities: ['metadata.discover'], actions: ['test'], permissions: ['books.read'],
+    auth_schema: { type: 'object', properties: {} }, config_schema: { type: 'object', properties: {} },
+    ui: { icon: 'mdi-connection', hidden: true, system_capability: true },
+  },
+  {
+    id: 9,
+    plugin_key: 'talebook.annotations.brs',
+    name: 'talebook-brs 章评',
+    description: '连接 talebook-brs 账号并导入公开章评摘要。',
+    version: '1.0.0', runtime_kind: 'builtin', categories: ['annotations'],
+    capabilities: ['annotations.chapter_reviews'], actions: ['test', 'preview', 'run'], permissions: ['books.read', 'network.read'],
+    auth_schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', writeOnly: true, title: '邮箱' },
+        password: { type: 'string', writeOnly: true, title: '密码' },
+        nickname: { type: 'string', writeOnly: true, title: '昵称（快速注册时填写）' },
+      },
+    },
+    config_schema: {
+      type: 'object', required: ['endpoint'],
+      properties: {
+        endpoint: { type: 'string', format: 'uri', title: 'BRS 服务地址' },
+        account_mode: { type: 'string', enum: ['login', 'register'], title: '账号方式', default: 'login' },
+        book_map: { type: 'object', title: '书籍映射' },
+      },
+    },
+    ui: { icon: 'mdi-comment-text-multiple-outline', primary_action: 'configure' },
+  },
+  {
+    id: 10,
+    plugin_key: 'talebook.reviews.neodb',
+    name: 'NeoDB 评价',
+    description: '保留 NeoDB 原始评分尺度、样本数和来源链接。',
+    version: '1.0.0', runtime_kind: 'builtin', categories: ['reviews'],
+    capabilities: ['reviews.lookup'], actions: ['test', 'preview', 'run'], permissions: ['books.read', 'network.read'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: { queries: { type: 'array', title: '要查询的书籍标识' } } },
+    ui: { icon: 'mdi-star-circle-outline', primary_action: 'configure' },
+  },
+  {
+    id: 11,
+    plugin_key: 'talebook.reviews.file-import',
+    name: '评价文件导入',
+    description: '导入 Goodreads、StoryGraph 或通用 CSV / JSON 文件。',
+    version: '1.0.0', runtime_kind: 'builtin', categories: ['reviews'],
+    capabilities: ['reviews.import'], actions: ['test', 'preview', 'run'], permissions: ['plugin_records.write'],
+    auth_schema: { type: 'object', required: ['content'], properties: { content: { type: 'string', writeOnly: true, title: '文件内容' } } },
+    config_schema: {
+      type: 'object',
+      properties: {
+        source: { type: 'string', enum: ['goodreads', 'storygraph', 'generic'], title: '文件来源', default: 'goodreads' },
+        format: { type: 'string', enum: ['csv', 'json'], title: '文件格式', default: 'csv' },
+        mapping: { type: 'object', title: '字段映射（可选）' },
+      },
+    },
+    ui: { icon: 'mdi-file-delimited-outline', primary_action: 'configure' },
+  },
+  ...[
+    ['standard-ebooks', 'Standard Ebooks', '浏览 Standard Ebooks 官方开放 OPDS 目录。'],
+    ['gutenberg', 'Project Gutenberg', '检索 Project Gutenberg 的合法开放电子书。'],
+    ['internet-archive', 'Internet Archive', '检索 Internet Archive 的开放文件。'],
+  ].map(([key, name, description], index) => ({
+    id: 12 + index,
+    plugin_key: `talebook.book-source.${key}`,
+    name,
+    description,
+    version: '1.0.0', runtime_kind: 'http', categories: ['book_sources'],
+    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    actions: ['test', 'preview', 'run'], permissions: ['books.read', 'books.write', 'network.read'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: {
+      type: 'object',
+      properties: {
+        target_library: { type: 'string', title: '目标书库', default: 'main' },
+        formats: { type: 'array', default: ['epub', 'pdf'] },
+      },
+    },
+    ui: {
+      icon: 'mdi-bookshelf',
+      manage_kind: 'book_source',
+      primary_action: ['gutenberg', 'internet-archive'].includes(key) ? 'test' : 'configure',
+    },
+  })),
 ];
 let pluginInstallations = pluginDefinitions.map((definition, index) => ({
   id: index + 1,
@@ -1660,7 +1791,7 @@ const mockPluginConnection = installation => ({
   config: {},
 });
 let pluginConnections = pluginInstallations
-  .filter(installation => installation.id <= 3)
+  .filter(installation => ['talebook.metadata.builtin', 'talebook.book-source.opds', 'talebook.book-source.legado'].includes(installation.plugin_key))
   .map(installation => mockPluginConnection(installation));
 let opdsServiceEnabled = true;
 
@@ -1708,6 +1839,22 @@ router.post('/api/admin/plugins/opds-service', eventHandler(async (event) => {
   return { err: 'ok', enabled: opdsServiceEnabled };
 }));
 
+router.post('/api/admin/plugins/metadata-search', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (!body?.keyword) return { err: 'plugin.keyword_required', msg: '请输入搜索关键字' };
+  return {
+    err: 'ok',
+    source: body.source,
+    books: Array.from({ length: 5 }, (_, index) => ({
+      title: index === 0 ? '西游记' : `西游记（版本 ${index + 1}）`,
+      author: '吴承恩',
+      publisher: index === 0 ? '人民文学出版社' : '',
+      source: metadataPluginSpecs.find(item => item[0] === body.source)?.[1] || body.source,
+      cover_url: '',
+    })),
+  };
+}));
+
 router.get('/api/admin/plugins/runs', eventHandler(() => ({ err: 'ok', runs: pluginRuns })));
 
 router.get('/api/admin/plugins/runs/:id', eventHandler((event) => {
@@ -1737,6 +1884,11 @@ router.get('/api/admin/plugins/runs/:id', eventHandler((event) => {
 router.post('/api/admin/plugins/connections/:id/:action', eventHandler((event) => {
   const id = Number(getRouterParam(event, 'id'));
   const action = getRouterParam(event, 'action');
+  if (action === 'test') {
+    pluginConnections = pluginConnections.map(connection => connection.id === id
+      ? { ...connection, health: 'healthy', health_message: 'Connection healthy' }
+      : connection);
+  }
   const run = {
     id: pluginRuns.length + 1,
     connection_id: id,

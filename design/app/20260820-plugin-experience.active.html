@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="TB-66 插件目录、连接配置、元数据设置、开放书源与微信读书体验优化方案。" />
+    <link rel="icon" href="data:," />
+    <title>插件体验优化 · ACTIVE</title>
+    <style>
+      :root { color-scheme:light; --bg:#f5f6fa; --panel:#fff; --ink:#172033; --muted:#596579; --line:#d9dfeb; --brand:#315f91; --soft:#eef5ff; --good:#176443; --warn:#8a5209; --mono:Consolas,monospace; }
+      * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; line-height:1.65; }
+      .page { width:min(1120px,calc(100vw - 28px)); margin:auto; padding:24px 0 54px; } .hero,.card { margin-bottom:18px; padding:26px 30px; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
+      h1 { margin:0 0 8px; font-size:clamp(30px,4vw,46px); line-height:1.16; } h2 { margin:0 0 14px; font-size:23px; } h3 { margin:18px 0 8px; font-size:17px; } p,li,td,th { color:#2d3a4d; font-size:14px; }
+      .sub { color:var(--muted); font-size:17px; } .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; } .chip { padding:5px 10px; border-radius:999px; color:var(--warn); background:#fff4db; font-size:12px; font-weight:700; }
+      .grid,.flow { display:grid; gap:12px; } .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .flow { grid-template-columns:repeat(4,minmax(0,1fr)); } .panel { padding:15px 17px; border:1px solid var(--line); border-radius:14px; background:#fafcff; }
+      .table { overflow:auto; border:1px solid var(--line); border-radius:14px; } table { width:100%; min-width:760px; border-collapse:collapse; } th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f2f5f9; } tr:last-child td { border-bottom:0; }
+      code { padding:.12em .34em; border-radius:4px; background:#edf1f6; font-family:var(--mono); overflow-wrap:anywhere; } .good { border-color:#badac9; background:#edf9f3; } .skip { position:absolute; left:-9999px; } .skip:focus { left:8px; top:8px; padding:8px; color:#fff; background:#172033; }
+      @media (max-width:720px) { .page { width:calc(100vw - 18px); padding-top:9px; } .hero,.card { padding:21px 18px; } .grid,.flow { grid-template-columns:1fr; } } @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>插件体验优化</h1>
+        <p class="sub">把面向运行时开发者的目录和 JSON 配置，收敛为普通管理员能识别、配置和验证的产品界面。</p>
+        <div class="chips"><span class="chip">状态：ACTIVE</span><span class="chip">创建日期：2026-08-20</span><span class="chip">所属模块：app</span><span class="chip">需求来源：TB-66</span></div>
+      </header>
+      <main id="main">
+        <section class="card"><h2>1. 原始诉求</h2><p>优化插件卡片层级与操作位置；为 Talebook 元数据建立独立配置页；补充 Open Library 指导；隐藏嵌入文件元数据和 Calibre Bridge 等系统内部能力；按 candle-reader 方案提供 BRS 登录注册；把评价连接器从原始 JSON 改成表单；提供可直接体验的免费开放书源；修复微信读书 API Key 配置后网关请求失败。</p></section>
+        <section class="card"><h2>2. 目标与边界</h2><div class="grid"><div class="panel"><h3>目标</h3><ul><li>卡片首屏即可理解名称、状态、能力标签和主操作。</li><li>所有目录内连接器无需填写整段公开配置 JSON。</li><li>系统内建解析和发现桥接不伪装成第三方插件。</li><li>体验环境内的开放书源与微信读书可以真实访问外部服务。</li></ul></div><div class="panel"><h3>边界</h3><ul><li>保留统一插件运行时、连接记录、权限、预览与回滚协议。</li><li>评价连接器仍只生成来源候选，不自动覆盖书籍数据。</li><li>公共书源遵守来源权利声明，不把“可下载”泛化为全球公版。</li><li>不在日志、运行记录或界面回显 API Key、密码和文件正文。</li></ul></div></div></section>
+        <section class="card"><h2>3. 交互方案</h2><div class="flow"><div class="panel"><strong>识别</strong><p>名称旁显示状态；名称下方显示业务标签。</p></div><div class="panel"><strong>行动</strong><p>启用、配置、打开工作台等主操作固定在右上。</p></div><div class="panel"><strong>配置</strong><p>按字段类型渲染输入、选择、标签列表和映射行。</p></div><div class="panel"><strong>验证</strong><p>详情页集中测试、预览、执行、停用和查看历史。</p></div></div>
+          <h3>连接器呈现决策</h3><div class="table"><table><thead><tr><th>对象</th><th>目录行为</th><th>配置体验</th></tr></thead><tbody>
+            <tr><td>Talebook 元数据</td><td>保留为可管理系统能力</td><td>进入独立页面选择来源、自动补全、封面保留与来源参数。</td></tr>
+            <tr><td>Open Library / 评价来源</td><td>展示业务能力标签</td><td>查询项使用逐项输入/标签列表；来源 ID 有明确提示，不再暴露整段 JSON。</td></tr>
+            <tr><td>嵌入文件元数据</td><td>隐藏</td><td>继续由上传/导入流程自动调用。</td></tr>
+            <tr><td>Calibre Provider Bridge</td><td>隐藏</td><td>在元数据页解释为“自动发现 Calibre Provider 的内部桥接层”。</td></tr>
+            <tr><td>talebook-brs</td><td>展示章评连接</td><td>服务地址 + 邮箱登录/快速注册；映射使用每行“远端=本地”格式。</td></tr>
+            <tr><td>文件评价</td><td>展示导入能力</td><td>来源、格式选择 + 文件内容输入；字段映射折叠为可选高级项。</td></tr>
+          </tbody></table></div>
+        </section>
+        <section class="card"><h2>4. 微信读书故障与修复</h2><p>在体验容器复现到请求耗时约 30 秒后失败；宿主机同一地址立即返回认证响应，根因是 Mihomo TUN 接管自定义 Docker bridge 后，容器无法到达宿主机代理。部署现通过仅监听 <code>172.23.0.1:35146</code> 的 systemd socket 转发到本机代理，并仅放行 <code>172.23.0.0/16</code>；容器内真实网关请求已在 1 秒内返回预期的未认证 <code>HTTP 401</code>，证明链路恢复。代码同时把超时、DNS/连接异常与认证失败拆分为可操作提示，避免统一显示 <code>WeRead gateway request failed</code>。</p></section>
+        <section class="card"><h2>5. 数据与兼容性</h2><ul><li>不新增数据库表；继续使用现有 definition、installation、connection、secret 和 run 数据。</li><li>manifest 的 <code>ui.hidden</code> 仅改变目录呈现，不删除既有定义、连接或运行记录。</li><li>schema 表单提交的仍是现有 <code>config</code> / <code>credentials</code> 对象；旧连接可继续读取并被表单编辑。</li><li>系统设置保存接口支持部分字段更新；独立元数据页只提交元数据字段，不覆盖其他设置。</li></ul></section>
+        <section class="card"><h2>6. 验证结果</h2><div class="grid"><div class="panel good"><h3>自动化</h3><ul><li>后端定向回归 <code>69 passed</code>：书源安全策略、隐藏系统能力、BRS 登录注册、微信读书网络错误。</li><li>插件 Playwright E2E <code>12 passed</code>：卡片、独立元数据页、schema 表单、Open Library 指导、BRS、公开书源、焦点与 320 px 回流。</li><li>变更 Vue 文件 ESLint 通过；Nuxt SPA 生产构建通过。</li><li>中英文新增命名空间键一致。</li></ul></div><div class="panel good"><h3>实际渲染与外部服务</h3><ul><li>Chromium 1280×900、375×812、320×640 均检查；修复了窄屏插件名截断和操作挤压。</li><li>Project Gutenberg 真实发现 32 个 EPUB 条目；Internet Archive 真实发现 25 个候选。</li><li>Standard Ebooks OPDS 当前要求 Patrons Circle 邮箱，因此不标记为“免费公开”。</li><li>微信读书容器链路恢复并返回预期认证响应。</li></ul></div></div>
+          <h3>Interface review（full）</h3><p>范围为基于 <code>origin/feat/plugins@882fff2f</code> 的 14 个工作区变更文件（排除 Playwright 产物）。覆盖 accessibility、layout、writing、typography、colors、UI；检查了删除侧信号、桌面/移动实际渲染、键盘切换 BRS 登录注册和焦点恢复。初审发现的两个 MEDIUM（窄屏标题截断、BRS 登录/注册字段混杂）已修复并复验，最终 verdict：<strong>Approve</strong>。</p>
+        </section>
+        <section class="card"><h2>7. 风险与回滚</h2><ul><li>远端服务可用性和 schema 会变化；测试连接保留明确错误并不推进游标。</li><li>BRS 服务版本可能不支持注册；界面将错误原样收敛为表单提示，不把失败当成功。</li><li>回滚前端和 manifest 改动即可恢复旧目录；隐藏不删除数据，独立设置页复用原保存逻辑，无迁移回滚。</li></ul></section>
+      </main>
+    </div>
+  </body>
+</html>

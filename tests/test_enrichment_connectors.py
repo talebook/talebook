@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
@@ -9,27 +10,27 @@ from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Annotation, Base, PluginConnection, PluginDefinition, PluginRunItem, PluginSourceRecord
 from webserver.plugins.runtime.enrichment import (
+    REVIEW_SPECS,
     BRSProvider,
     CalibreProviderBridge,
     CatalogReviewProvider,
     EmbeddedMetadataProvider,
     OpenLibraryProvider,
-    REVIEW_SPECS,
     ReviewFileProvider,
     build_field_decisions,
     extract_epub_metadata,
     parse_review_file,
 )
-from webserver.plugins.runtime.protocol import PluginManifest, ProviderRateLimitError
+from webserver.plugins.runtime.protocol import PluginManifest, ProviderAuthError, ProviderRateLimitError
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,
+    PluginRuntimeError,
     ensure_builtin_definitions,
     install_builtin,
     rotate_connection_secret,
     save_connection,
 )
-from webserver.services.plugin_runtime import PluginRuntimeError
 
 
 SETTINGS = {"PLUGIN_SECRET_KEY": "enrichment-test-key", "cookie_secret": "unused-cookie-secret"}
@@ -119,6 +120,28 @@ def test_connector_manifests_are_valid_and_registered_as_installable_definitions
         "talebook.reviews.anilist",
     }
     assert db_session.query(PluginConnection).count() == 0
+
+
+def test_system_metadata_capabilities_are_hidden_from_the_plugin_catalog():
+    embedded = EmbeddedMetadataProvider().manifest
+    bridge = CalibreProviderBridge(discover=lambda: []).manifest
+
+    assert embedded["ui"] == {
+        "icon": "mdi-file-document-outline",
+        "primary_action": "configure",
+        "hidden": True,
+        "system_capability": True,
+    }
+    assert bridge["ui"] == {
+        "icon": "mdi-connection",
+        "primary_action": "configure",
+        "hidden": True,
+        "system_capability": True,
+    }
+
+
+def test_open_library_uses_test_as_its_zero_configuration_primary_action():
+    assert OpenLibraryProvider.manifest["ui"]["primary_action"] == "test"
 
 
 def test_network_connectors_reject_user_owned_connections(db_session):
@@ -360,6 +383,87 @@ def test_brs_uses_separate_review_domain_supports_mapping_and_runtime_rate_limit
     assert len(record.data["summary"]) == 500
     assert db_session.query(Annotation).count() == 0
     assert "brs-private-token" not in json.dumps(record.data)
+
+
+def test_brs_email_login_reuses_the_candle_reader_session_cookie(db_session, monkeypatch):
+    calls = []
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"err": "ok"}
+
+    class Session:
+        def __init__(self):
+            self.headers = {}
+            self.cookies = SimpleNamespace(get_dict=lambda: {"sid": "signed-in"})
+
+        def post(self, url, data, timeout):
+            calls.append((url, data, timeout))
+            return Response()
+
+    monkeypatch.setattr("webserver.plugins.runtime.enrichment.requests.Session", Session)
+
+    def transport(method, url, **kwargs):
+        assert kwargs["headers"] == {"Cookie": "sid=signed-in"}
+        return {"comments": []}
+
+    provider = BRSProvider(transport=transport)
+    registry, connection = connection_for(
+        db_session,
+        provider,
+        credentials={"email": "reader@example.com", "password": "secret"},
+        config={"endpoint": "https://brs.example", "account_mode": "login"},
+    )
+
+    run = execute(db_session, registry, connection, action="test")
+
+    assert run.status == "succeeded"
+    assert calls == [
+        (
+            "https://brs.example/api/user/sign_in",
+            {"email": "reader@example.com", "password": "secret"},
+            30,
+        )
+    ]
+
+
+def test_brs_quick_registration_stops_for_the_emailed_password(monkeypatch):
+    calls = []
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"err": "ok"}
+
+    class Session:
+        def __init__(self):
+            self.headers = {}
+
+        def post(self, url, data, timeout):
+            calls.append((url, data, timeout))
+            return Response()
+
+    monkeypatch.setattr("webserver.plugins.runtime.enrichment.requests.Session", Session)
+
+    with pytest.raises(ProviderAuthError, match="check email"):
+        BRSProvider._authenticate(
+            "https://brs.example",
+            "register",
+            {"email": "reader@example.com", "nickname": "Reader"},
+        )
+
+    assert calls == [
+        (
+            "https://brs.example/api/user/sign_up",
+            {"email": "reader@example.com", "nickname": "Reader"},
+            30,
+        )
+    ]
 
 
 @pytest.mark.parametrize(

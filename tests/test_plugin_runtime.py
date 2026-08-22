@@ -107,24 +107,35 @@ def test_builtin_capabilities_are_registered_without_ai_or_calibre_server(db_ses
     builtins = {item.plugin_key: item for item in definitions if item.plugin_key.startswith("talebook.")}
 
     assert "talebook.metadata.builtin" in builtins
+    assert "talebook.metadata.source.qimao" in builtins
+    assert "talebook.metadata.source.google" in builtins
+    assert "talebook.metadata.source.amazon" in builtins
     assert "talebook.book-source.opds" in builtins
     assert "talebook.book-source.legado" in builtins
     catalog = json.dumps([item.to_public_dict() for item in builtins.values()], ensure_ascii=False).lower()
     assert "calibre content server" not in catalog
     assert "calibre-web" not in catalog
     assert '"ai"' not in catalog
+    assert builtins["talebook.metadata.builtin"].to_public_dict()["ui"]["hidden"] is True
+    assert builtins["talebook.metadata.source.qimao"].to_public_dict()["ui"]["metadata_source"] == "qimao"
     assert builtins["talebook.book-source.opds"].to_public_dict()["ui"]["manage_kind"] == "opds"
 
 
 def test_builtin_capability_bootstrap_is_idempotent_and_keeps_empty_auth_local(db_session):
-    settings = {**SETTINGS, "auto_fill_meta": False}
+    settings = {**SETTINGS, "auto_fill_meta": False, "META_SELECTED_SOURCES": ["google", "qimao"]}
     first = ensure_builtin_capability_installations(db_session, installed_by=1, settings=settings)
     second = ensure_builtin_capability_installations(db_session, installed_by=1, settings=settings)
 
-    assert len(first) == len(second) == 3
-    assert db_session.query(PluginConnection).count() == 3
+    assert len(first) == len(second) == 13
+    assert db_session.query(PluginConnection).count() == 13
     metadata = next(item for item in first if item.plugin_key == "talebook.metadata.builtin")
     assert metadata.enabled is False
+    qimao = next(item for item in first if item.plugin_key == "talebook.metadata.source.qimao")
+    google = next(item for item in first if item.plugin_key == "talebook.metadata.source.google")
+    amazon = next(item for item in first if item.plugin_key == "talebook.metadata.source.amazon")
+    assert qimao.enabled is True
+    assert google.enabled is True
+    assert amazon.enabled is False
     opds = next(item for item in first if item.plugin_key == "talebook.book-source.opds")
     connection = db_session.query(PluginConnection).filter(PluginConnection.installation_id == opds.id).one()
     assert connection.secret_id is None

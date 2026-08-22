@@ -58,7 +58,6 @@ from webserver.services.booksource.metadata import (
     BookSourceMetadataService,
     MetadataSearchResult,
     collect_metadata_sources,
-    load_builtin_sources,
     metadata_to_evidence,
 )
 from webserver.services.convert import CONVERSION_TARGETS, ConvertService
@@ -242,6 +241,8 @@ class BookToPDF(BaseHandler):
 
 
 class BookRefer(BaseHandler):
+    REFER_SOURCE_LIMIT = 5
+
     def has_proper_book(self, books, mi):
         if not books or not mi.isbn or mi.isbn == baike.BAIKE_ISBN:
             return False
@@ -354,7 +355,7 @@ class BookRefer(BaseHandler):
             books = list(result.books or [])
             failures = list(result.failures or [])
         else:
-            books = list(result or [])
+            books = list(result or [])[: self.REFER_SOURCE_LIMIT]
             failures = []
         if not books and not failures:
             failures.append(self._refer_failure(name, "no_result", "未找到匹配图书"))
@@ -390,8 +391,8 @@ class BookRefer(BaseHandler):
             try:
                 metadata_sources = collect_metadata_sources(self.session, CONF.get("BOOKSOURCE_METADATA_TOP_K", 10))
             except Exception as err:
-                logging.warning("读取在线书源失败，将只尝试内置快照：%s", err)
-                metadata_sources = load_builtin_sources()
+                logging.warning("读取在线书源失败：%s", err)
+                metadata_sources = []
             metadata_service = BookSourceMetadataService(
                 metadata_sources,
                 CONF.get("cookie_secret", "talebook"),
@@ -449,19 +450,20 @@ class BookRefer(BaseHandler):
 
             tasks["baidu"] = _baidu
 
-        calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
-        if calibre_sources:
+        for calibre_source in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON):
+            if calibre_source not in sources:
+                continue
 
-            def _calibre():
-                results = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
-                if not results:
-                    results = calibre.CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
-                for r in results or []:
-                    r.cover_data = calibre.CalibreMetadataApi.get_cover(r.cover_url) if getattr(r, "cover_url", None) else None
-                    r.provider_key = calibre.KEY
-                return list(results) if results else []
+            def _calibre(source=calibre_source):
+                return calibre.CalibreMetadataApi.search(
+                    source,
+                    title=title,
+                    authors=mi.authors,
+                    isbn=mi.isbn,
+                    limit=self.REFER_SOURCE_LIMIT,
+                )
 
-            tasks["calibre"] = _calibre
+            tasks[calibre_source] = _calibre
 
         if META_SOURCE_XHSD in sources:
 
@@ -665,25 +667,29 @@ class BookRefer(BaseHandler):
                 logging.error("获取在线书源书籍信息失败：%s", e)
                 raise RuntimeError({"err": "httprequest.booksource.failed", "msg": _("在线书源查询失败")})
         elif provider_key == calibre.KEY:
-            if mi.isbn:
-                try:
-                    refer_mi = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn)
-                except Exception as e:
-                    logging.error("获取 Calibre 书籍信息失败（ISBN）：%s", e)
-                    refer_mi = None
-                if refer_mi:
-                    cover_url = getattr(refer_mi, "cover_url", None)
-                    if cover_url:
-                        try:
-                            refer_mi.cover_data = calibre.CalibreMetadataApi.get_cover(cover_url)
-                        except Exception as e:
-                            logging.error("获取 Calibre 封面失败：%s", e)
-            if not refer_mi:
-                try:
-                    refer_mi = calibre.CalibreMetadataApi.get_book_by_title(mi.title, authors=mi.authors)
-                except Exception as e:
-                    logging.error("获取 Calibre 书籍信息失败（书名）：%s", e)
-                    raise RuntimeError({"err": "httprequest.calibre.failed", "msg": _("Calibre 查询失败")})
+            configured = [
+                source
+                for source in CONF.get(META_SELECTED_SOURCES, [])
+                if source in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)
+            ]
+            source = provider_value if provider_value in configured else (configured[0] if configured else "")
+            if not source:
+                raise RuntimeError({"err": "source.disabled", "msg": _("该元数据来源未启用")})
+            try:
+                results = calibre.CalibreMetadataApi.search(
+                    source,
+                    title=mi.title,
+                    authors=mi.authors,
+                    isbn=mi.isbn,
+                    limit=1,
+                )
+                refer_mi = results[0] if results else None
+                cover_url = getattr(refer_mi, "cover_url", None) if refer_mi else None
+                if cover_url:
+                    refer_mi.cover_data = calibre.CalibreMetadataApi.get_cover(cover_url)
+            except Exception as e:
+                logging.error("获取 %s 书籍信息失败：%s", source, e)
+                raise RuntimeError({"err": "httprequest.calibre.failed", "msg": _("Calibre 查询失败")})
         elif provider_key == xhsd.KEY:
             api = xhsd.XhsdBookApi(copy_image=True)
             try:

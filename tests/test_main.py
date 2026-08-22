@@ -747,11 +747,10 @@ class TestRefer(TestWithUserLogin):
     @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi._baike")
     @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi.get_cover")
     @mock.patch("webserver.plugins.meta.youshu.YoushuApi._youshu")
-    @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_isbn")
-    @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_title")
+    @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.search")
     @mock.patch("webserver.plugins.meta.tomato.TomatoNovelApi.get_book")
     @mock.patch("webserver.plugins.meta.xhsd.XhsdBookApi.get_book")
-    def test_refer(self, m_xhsd, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
+    def test_refer(self, m_xhsd, m_tomato, m_calibre, m7, m6, m5, m4, m3, m2, m1):
         from tests.test_baike import BAIKE_PAGE
         from tests.test_douban import DOUBAN_BOOK, DOUBAN_SEARCH
         from tests.test_youshu import YOUSHU_PAGE
@@ -765,8 +764,7 @@ class TestRefer(TestWithUserLogin):
         m6.return_value = ("jpg", b"image-body")
 
         m7.return_value = YOUSHU_PAGE
-        m_calibre_isbn.return_value = []
-        m_calibre_title.return_value = []
+        m_calibre.return_value = []
         m_tomato.return_value = None
         m_xhsd.return_value = None
 
@@ -774,6 +772,8 @@ class TestRefer(TestWithUserLogin):
         # main.CONF["douban_baseurl"] = self.douban_url
         d = self.json("/api/book/1/refer")
         self.assertEqual(d["err"], "ok")
+        self.assertEqual({call.args[0] for call in m_calibre.call_args_list}, {"google", "amazon"})
+        self.assertTrue(all(call.kwargs["limit"] == 5 for call in m_calibre.call_args_list))
 
         global _app
         with mock.patch.object(_app.settings["legacy"], "set_metadata", return_value="Yo"):
@@ -828,6 +828,14 @@ class TestReferFailureSummary(TestWithUserLogin):
         )
         self.assertIn(self.escaped_failure, data["summary"]["failures"])
         self.assertNotIn("details", next(f for f in data["summary"]["failures"] if f == self.escaped_failure))
+
+    def test_each_metadata_task_is_limited_to_five_candidates(self):
+        handler = object.__new__(webserver.handlers.book.BookRefer)
+
+        books, failures = handler._unpack_search_result("google", list(range(8)))
+
+        self.assertEqual(books, [0, 1, 2, 3, 4])
+        self.assertEqual(failures, [])
 
     def test_stream_ends_with_summary_control_frame(self):
         with mock.patch.object(webserver.handlers.book.BookRefer, "_build_search_tasks", return_value=self._tasks()):

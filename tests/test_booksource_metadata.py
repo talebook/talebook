@@ -8,6 +8,7 @@ from webserver.services.booksource.engine import BookDetail, BookSummary
 from webserver.services.booksource.metadata import (
     BookSourceMetadataService,
     MetadataSource,
+    collect_metadata_sources,
     decode_provider_value,
     encode_provider_value,
     load_builtin_sources,
@@ -37,6 +38,13 @@ class TestBookSourceProviderToken(TestCase):
 
 
 class TestBookSourceMetadataSearch(TestCase):
+    def test_collect_uses_only_explicitly_enabled_sources(self):
+        session = mock.Mock()
+        query = session.query.return_value.filter.return_value.order_by.return_value.limit.return_value
+        query.all.return_value = []
+
+        self.assertEqual(collect_metadata_sources(session), [])
+
     def test_builtin_snapshot_is_metadata_only(self):
         source = load_builtin_sources()[0]
 
@@ -69,6 +77,22 @@ class TestBookSourceMetadataSearch(TestCase):
         self.assertEqual(result.books, ["metadata"])
         self.assertEqual(result.failures[0]["source"], "故障源")
         self.assertEqual(result.failures[0]["code"], "fetch_failed")
+
+    @mock.patch("webserver.services.booksource.metadata.BookSourceEngine")
+    def test_each_source_returns_at_most_five_candidates(self, engine_cls):
+        sources = [
+            MetadataSource("db:1", "测试源一", {"bookSourceUrl": "https://one.example"}),
+            MetadataSource("db:2", "测试源二", {"bookSourceUrl": "https://two.example"}),
+        ]
+        engine_cls.return_value.search.return_value = [
+            BookSummary(name="候选%d" % index, author="作者", book_url="https://books.example/%d" % index)
+            for index in range(8)
+        ]
+        service = BookSourceMetadataService(sources, "secret")
+
+        result = service.search("候选")
+
+        self.assertEqual(len(result.books), 10)
 
     @mock.patch("webserver.services.booksource.metadata.BookSourceEngine")
     def test_applies_signed_builtin_result(self, engine_cls):

@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 import json
+import socket
 import urllib.error
 import urllib.request
 
@@ -355,7 +356,11 @@ class WereadProvider:
         "homepage": "https://github.com/Tencent/WeChatReading",
         "license": "GPL-3.0",
         "description": "搜索微信读书内容，浏览书架、阅读统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。",
-        "ui": {"manage_kind": "weread", "icon": "mdi-book-open-page-variant"},
+        "ui": {
+            "manage_kind": "weread",
+            "icon": "mdi-book-open-page-variant",
+            "primary_action": "workbench",
+        },
     }
 
     def __init__(self, gateway=WEREAD_GATEWAY, opener=None):
@@ -458,8 +463,14 @@ class WereadProvider:
                 retry_after = exc.headers.get("Retry-After") if exc.headers else None
                 raise ProviderRateLimitError("WeRead rate limit exceeded", retry_after=retry_after) from exc
             raise ProviderError("WeRead gateway HTTP %s" % exc.code) from exc
-        except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
-            raise ProviderError("WeRead gateway request failed") from exc
+        except (TimeoutError, socket.timeout) as exc:
+            raise ProviderError("微信读书服务连接超时，请检查服务器的外网访问或代理配置") from exc
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, (TimeoutError, socket.timeout)):
+                raise ProviderError("微信读书服务连接超时，请检查服务器的外网访问或代理配置") from exc
+            raise ProviderError("无法连接微信读书服务，请检查服务器的 DNS、外网或代理配置") from exc
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise ProviderError("微信读书服务返回了无法解析的数据") from exc
         if not isinstance(data, dict):
             raise ProviderError("WeRead gateway returned an invalid response")
         if data.get("upgrade_info"):

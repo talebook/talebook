@@ -1,7 +1,7 @@
 import json
-from types import SimpleNamespace
 import urllib.error
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
@@ -235,6 +235,26 @@ def test_query_allowlist_forwards_all_documented_read_operations_without_seriali
     assert "wrk-unit-test-secret" not in json.dumps(captured["body"])
     assert captured["authorization"] == "Bearer wrk-unit-test-secret"
     assert captured["timeout"] == 30
+
+
+@pytest.mark.parametrize(
+    ("error", "message"),
+    [
+        (TimeoutError("timed out"), "微信读书服务连接超时，请检查服务器的外网访问或代理配置"),
+        (urllib.error.URLError("network unreachable"), "无法连接微信读书服务，请检查服务器的 DNS、外网或代理配置"),
+        (
+            urllib.error.URLError(TimeoutError("timed out")),
+            "微信读书服务连接超时，请检查服务器的外网访问或代理配置",
+        ),
+    ],
+)
+def test_gateway_reports_actionable_network_errors(error, message):
+    def opener(_request, timeout):
+        assert timeout == 30
+        raise error
+
+    with pytest.raises(ProviderError, match=message):
+        WereadProvider(opener=opener).query("wrk-unit-test-secret", "search", {"keyword": "活着"})
 
 
 @pytest.mark.parametrize(

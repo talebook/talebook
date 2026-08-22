@@ -51,7 +51,7 @@ def load_builtin_sources():
 
 
 def collect_metadata_sources(session, top_k=10):
-    """先取用户启用的文本书源，再补充未重复的内置快照。"""
+    """只取用户明确启用的文本书源。内置快照仅用于兼容旧候选令牌。"""
     models = (
         session.query(BookSourceModel)
         .filter(BookSourceModel.enabled.is_(True), BookSourceModel.source_type == 0)
@@ -59,12 +59,7 @@ def collect_metadata_sources(session, top_k=10):
         .limit(max(0, int(top_k)))
         .all()
     )
-    sources = [MetadataSource(key="db:%s" % model.id, name=model.name, raw=copy.deepcopy(model.raw)) for model in models]
-    seen_urls = {source.raw.get("bookSourceUrl") for source in sources}
-    for source in load_builtin_sources():
-        if source.raw.get("bookSourceUrl") not in seen_urls:
-            sources.append(source)
-    return sources
+    return [MetadataSource(key="db:%s" % model.id, name=model.name, raw=copy.deepcopy(model.raw)) for model in models]
 
 
 def encode_provider_value(secret, source_key, book_url):
@@ -99,6 +94,8 @@ def _is_http_url(value):
 
 
 class BookSourceMetadataService:
+    SOURCE_RESULT_LIMIT = 5
+
     def __init__(self, sources, secret, config=None):
         self.sources = list(sources)
         self.secret = secret
@@ -134,6 +131,8 @@ class BookSourceMetadataService:
             metadata = self._metadata_from_summary(summary, source)
             if metadata:
                 books.append(metadata)
+            if len(books) >= self.SOURCE_RESULT_LIMIT:
+                break
         return books
 
     @staticmethod

@@ -126,6 +126,7 @@
                         <v-card-item>
                             <template #prepend>
                                 <v-avatar
+                                    class="plugin-card-avatar"
                                     color="primary"
                                     variant="tonal"
                                     size="40"
@@ -133,62 +134,55 @@
                                     <v-icon>{{ plugin.ui.icon || 'mdi-power-plug-outline' }}</v-icon>
                                 </v-avatar>
                             </template>
-                            <v-card-title class="text-subtitle-1">
-                                {{ plugin.name }}
-                            </v-card-title>
-                            <v-card-subtitle>
-                                {{ plugin.runtime_kind === 'builtin' ? t('pluginManagement.builtin') : plugin.runtime_kind }}
-                            </v-card-subtitle>
-                            <template #append>
+                            <v-card-title class="plugin-card-title text-subtitle-1">
+                                <span>{{ plugin.name }}</span>
                                 <v-chip
                                     size="small"
                                     :color="statusInfo(plugin).color"
                                     variant="tonal"
                                 >
-                                    <v-icon
-                                        start
-                                        size="small"
-                                    >
-                                        {{ statusInfo(plugin).icon }}
-                                    </v-icon>
                                     {{ statusInfo(plugin).text }}
                                 </v-chip>
+                            </v-card-title>
+                            <v-card-subtitle class="plugin-card-tags d-flex flex-wrap ga-1 mt-1">
+                                <v-chip
+                                    v-for="tag in pluginTags(plugin)"
+                                    :key="tag"
+                                    size="x-small"
+                                    variant="outlined"
+                                >
+                                    {{ tag }}
+                                </v-chip>
+                            </v-card-subtitle>
+                            <template #append>
+                                <div class="plugin-card-actions d-flex align-center ga-1">
+                                    <v-btn
+                                        color="primary"
+                                        variant="tonal"
+                                        size="small"
+                                        :loading="primaryActionLoading === plugin.plugin_key"
+                                        @click="primaryAction(plugin)"
+                                    >
+                                        {{ primaryActionLabel(plugin) }}
+                                    </v-btn>
+                                    <v-btn
+                                        icon="mdi-dots-horizontal"
+                                        variant="text"
+                                        size="small"
+                                        :aria-label="t('pluginManagement.details')"
+                                        @click="openDetails(plugin)"
+                                    />
+                                </div>
                             </template>
                         </v-card-item>
                         <v-card-text class="pt-1">
                             <p class="plugin-description text-body-2">
                                 {{ plugin.description }}
                             </p>
-                            <div class="d-flex flex-wrap ga-2 mt-3">
-                                <v-chip
-                                    v-for="capability in plugin.capabilities"
-                                    :key="capability"
-                                    size="x-small"
-                                    variant="outlined"
-                                >
-                                    {{ capabilityLabel(capability) }}
-                                </v-chip>
-                            </div>
                             <div class="text-caption text-medium-emphasis mt-3">
                                 {{ summary(plugin) }}
                             </div>
                         </v-card-text>
-                        <v-card-actions>
-                            <v-btn
-                                color="primary"
-                                variant="tonal"
-                                @click="primaryAction(plugin)"
-                            >
-                                {{ primaryActionLabel(plugin) }}
-                            </v-btn>
-                            <v-spacer />
-                            <v-btn
-                                variant="text"
-                                @click="openDetails(plugin)"
-                            >
-                                {{ t('pluginManagement.details') }}
-                            </v-btn>
-                        </v-card-actions>
                     </v-card>
                 </v-col>
             </v-row>
@@ -234,6 +228,16 @@
                         </div>
                     </div>
                     <v-spacer />
+                    <v-btn
+                        v-if="selectedPlugin.installation"
+                        :color="selectedPlugin.installation.enabled ? 'warning' : 'primary'"
+                        variant="text"
+                        size="small"
+                        :loading="toggleLoading"
+                        @click="toggleInstallation(selectedPlugin)"
+                    >
+                        {{ selectedPlugin.installation.enabled ? t('pluginManagement.disable') : t('pluginManagement.enable') }}
+                    </v-btn>
                     <v-btn
                         icon="mdi-close"
                         variant="text"
@@ -314,13 +318,13 @@
                             {{ selectedConnection ? t('pluginManagement.editConnection') : t('pluginManagement.configureConnection') }}
                         </v-btn>
                         <v-btn
-                            v-if="selectedPlugin.installation && selectedPlugin.ui.manage_kind !== 'book_source' && !selectedConnection"
+                            v-if="selectedPlugin.installation && selectedPlugin.ui.manage_kind !== 'book_source' && selectedPlugin.ui.manage_kind !== 'metadata' && selectedPlugin.ui.manage_kind !== 'weread'"
                             color="primary"
                             variant="tonal"
                             prepend-icon="mdi-connection"
-                            @click="openConnectionDialog"
+                            @click="openConnectionDialog(selectedPlugin)"
                         >
-                            {{ t('pluginManagement.createConnection') }}
+                            {{ selectedConnection ? t('pluginManagement.editConnection') : t('pluginManagement.createConnection') }}
                         </v-btn>
                     </div>
 
@@ -421,15 +425,6 @@
                         >
                             {{ selectedPlugin.ui.manage_kind === 'book_source' ? t('pluginManagement.stageForReview') : t('pluginManagement.runNow') }}
                         </v-btn>
-                        <v-btn
-                            v-if="selectedPlugin.installation"
-                            :color="selectedPlugin.installation.enabled ? 'warning' : 'primary'"
-                            variant="text"
-                            :loading="toggleLoading"
-                            @click="toggleInstallation(selectedPlugin)"
-                        >
-                            {{ selectedPlugin.installation.enabled ? t('pluginManagement.disable') : t('pluginManagement.enable') }}
-                        </v-btn>
                     </div>
 
                     <h3 class="text-subtitle-1 mt-6 mb-2">
@@ -481,6 +476,27 @@
                     {{ t('pluginManagement.createConnectionFor', { name: connectionPlugin.name }) }}
                 </v-card-title>
                 <v-card-text>
+                    <v-alert
+                        v-if="connectionGuide"
+                        type="info"
+                        variant="tonal"
+                        density="compact"
+                        class="mb-4"
+                    >
+                        <div class="font-weight-medium">
+                            {{ connectionGuide.title }}
+                        </div>
+                        <div class="text-body-2 mt-1">
+                            {{ connectionGuide.body }}
+                        </div>
+                        <a
+                            v-if="connectionGuide.url"
+                            :href="connectionGuide.url"
+                            target="_blank"
+                            rel="noopener"
+                            class="text-body-2 d-inline-block mt-2"
+                        >{{ t('pluginManagement.viewOfficialGuide') }}</a>
+                    </v-alert>
                     <v-text-field
                         v-model="dialogConnectionName"
                         :label="t('pluginManagement.connectionName')"
@@ -495,7 +511,7 @@
                             v-if="field.key === 'content' || field.key === 'archive_base64'"
                             :id="credentialInputId(field.key)"
                             v-model="credentialValues[field.key]"
-                            :label="field.schema.title || connectionFieldLabel(field.key)"
+                            :label="dialogFieldLabel(field)"
                             variant="outlined"
                             rows="5"
                             :required="field.required"
@@ -507,28 +523,71 @@
                             v-else
                             :id="credentialInputId(field.key)"
                             v-model="credentialValues[field.key]"
-                            :label="field.schema.title || connectionFieldLabel(field.key)"
+                            :label="dialogFieldLabel(field)"
                             variant="outlined"
-                            type="password"
+                            :type="credentialType(field.key)"
                             :required="field.required"
                             :error-messages="credentialFieldErrors[field.key] || []"
                             :aria-invalid="Boolean(credentialFieldErrors[field.key])"
-                            autocomplete="new-password"
+                            :autocomplete="credentialAutocomplete(field.key)"
                         />
                     </template>
-                    <v-textarea
-                        id="plugin-public-config"
-                        v-model="connectionConfigText"
-                        :label="t('pluginManagement.publicConfigJson')"
-                        :hint="t('pluginManagement.publicConfigHint')"
-                        persistent-hint
-                        :error-messages="connectionConfigError ? [connectionConfigError] : []"
-                        :aria-invalid="Boolean(connectionConfigError)"
-                        variant="outlined"
-                        rows="8"
-                        spellcheck="false"
-                        class="connection-config-json"
+                    <v-divider
+                        v-if="dialogConfigFields.length"
+                        class="mb-4"
                     />
+                    <template
+                        v-for="field in dialogConfigFields"
+                        :key="`dialog-config-${field.key}`"
+                    >
+                        <v-checkbox
+                            v-if="field.schema.type === 'boolean'"
+                            v-model="dialogConfigValues[field.key]"
+                            :label="dialogFieldLabel(field)"
+                            color="primary"
+                            density="compact"
+                        />
+                        <v-select
+                            v-else-if="field.schema.enum"
+                            v-model="dialogConfigValues[field.key]"
+                            :items="fieldItems(field)"
+                            :label="dialogFieldLabel(field)"
+                            variant="outlined"
+                            density="compact"
+                        />
+                        <v-combobox
+                            v-else-if="field.schema.type === 'array'"
+                            v-model="dialogConfigValues[field.key]"
+                            :items="fieldOptions(field)"
+                            :label="dialogFieldLabel(field)"
+                            :hint="dialogFieldHint(field)"
+                            persistent-hint
+                            multiple
+                            chips
+                            closable-chips
+                            variant="outlined"
+                            density="compact"
+                        />
+                        <v-textarea
+                            v-else-if="field.schema.type === 'object'"
+                            v-model="dialogConfigValues[field.key]"
+                            :label="dialogFieldLabel(field)"
+                            :hint="t('pluginManagement.mappingHint')"
+                            persistent-hint
+                            variant="outlined"
+                            rows="3"
+                        />
+                        <v-text-field
+                            v-else
+                            v-model="dialogConfigValues[field.key]"
+                            :label="dialogFieldLabel(field)"
+                            :hint="dialogFieldHint(field)"
+                            :persistent-hint="Boolean(dialogFieldHint(field))"
+                            :type="['integer', 'number'].includes(field.schema.type) ? 'number' : field.schema.format === 'uri' ? 'url' : 'text'"
+                            :required="field.required"
+                            variant="outlined"
+                        />
+                    </template>
                     <v-alert
                         v-if="connectionFormError"
                         ref="connectionErrorAlert"
@@ -559,6 +618,98 @@
                         {{ t('common.save') }}
                     </v-btn>
                 </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog
+            v-model="metadataSearchOpen"
+            max-width="720"
+            scrollable
+        >
+            <v-card>
+                <v-card-title class="d-flex align-center">
+                    <span>{{ t('pluginManagement.metadataSearchTitle', { name: metadataSearchPlugin?.name || '' }) }}</span>
+                    <v-spacer />
+                    <v-btn
+                        icon="mdi-close"
+                        variant="text"
+                        :aria-label="t('common.close')"
+                        @click="metadataSearchOpen = false"
+                    />
+                </v-card-title>
+                <v-divider />
+                <v-card-text>
+                    <v-form @submit.prevent="searchMetadataPlugin">
+                        <div class="d-flex align-start ga-2">
+                            <v-text-field
+                                v-model="metadataKeyword"
+                                :label="t('pluginManagement.metadataKeyword')"
+                                :placeholder="t('pluginManagement.metadataKeywordPlaceholder')"
+                                prepend-inner-icon="mdi-magnify"
+                                variant="outlined"
+                                density="compact"
+                                autofocus
+                                clearable
+                                hide-details
+                            />
+                            <v-btn
+                                color="primary"
+                                type="submit"
+                                :loading="metadataSearchLoading"
+                                :disabled="!metadataKeyword.trim()"
+                            >
+                                {{ t('pluginManagement.searchAction') }}
+                            </v-btn>
+                        </div>
+                    </v-form>
+                    <v-alert
+                        v-if="metadataSearchError"
+                        type="error"
+                        variant="tonal"
+                        density="compact"
+                        class="mt-4"
+                    >
+                        {{ metadataSearchError }}
+                    </v-alert>
+                    <v-alert
+                        v-else-if="metadataSearchDone && metadataSearchResults.length === 0"
+                        type="info"
+                        variant="tonal"
+                        density="compact"
+                        class="mt-4"
+                    >
+                        {{ t('pluginManagement.metadataNoResults') }}
+                    </v-alert>
+                    <v-list
+                        v-else-if="metadataSearchResults.length"
+                        class="metadata-search-results mt-3"
+                        lines="three"
+                    >
+                        <v-list-item
+                            v-for="(book, index) in metadataSearchResults"
+                            :key="`${book.title}-${index}`"
+                            :title="book.title"
+                            :subtitle="[book.author, book.publisher, book.source].filter(Boolean).join(' · ')"
+                        >
+                            <template #prepend>
+                                <v-avatar
+                                    rounded="sm"
+                                    size="48"
+                                    color="surface-variant"
+                                >
+                                    <v-img
+                                        v-if="book.cover_url"
+                                        :src="book.cover_url"
+                                        cover
+                                    />
+                                    <v-icon v-else>
+                                        mdi-book-outline
+                                    </v-icon>
+                                </v-avatar>
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                </v-card-text>
             </v-card>
         </v-dialog>
 
@@ -601,6 +752,14 @@ const error = ref(false);
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '');
 const statusFilter = ref(typeof route.query.status === 'string' ? route.query.status : 'all');
 const actionLoading = ref(false);
+const primaryActionLoading = ref('');
+const metadataSearchOpen = ref(false);
+const metadataSearchPlugin = ref(null);
+const metadataKeyword = ref('');
+const metadataSearchResults = ref([]);
+const metadataSearchLoading = ref(false);
+const metadataSearchError = ref('');
+const metadataSearchDone = ref(false);
 const toggleLoading = ref(false);
 const opdsServiceSaving = ref(false);
 const connectionSaving = ref(false);
@@ -611,11 +770,10 @@ const connectionCredentials = ref({});
 const connectionDialogOpen = ref(false);
 const connectionPlugin = ref(null);
 const dialogConnectionName = ref('default');
-const connectionConfigText = ref('{}');
 const connectionFormError = ref('');
-const connectionConfigError = ref('');
 const credentialFieldErrors = ref({});
 const credentialValues = ref({});
+const dialogConfigValues = ref({});
 const connectionErrorAlert = ref(null);
 const showLegado = ref(false);
 const legadoPanel = ref(null);
@@ -662,7 +820,37 @@ const selectedConnection = computed(() => {
 });
 const configFields = computed(() => schemaFields(selectedPlugin.value?.config_schema));
 const credentialFields = computed(() => schemaFields(selectedPlugin.value?.auth_schema));
-const dialogCredentialFields = computed(() => schemaFields(connectionPlugin.value?.auth_schema));
+const dialogCredentialFields = computed(() => {
+    const fields = schemaFields(connectionPlugin.value?.auth_schema);
+    if (connectionPlugin.value?.plugin_key !== 'talebook.annotations.brs') return fields;
+    const mode = dialogConfigValues.value.account_mode || 'login';
+    return fields.filter(field => mode === 'register' ? field.key !== 'password' : field.key !== 'nickname');
+});
+const dialogConfigFields = computed(() => schemaFields(connectionPlugin.value?.config_schema));
+const connectionGuide = computed(() => {
+    const key = connectionPlugin.value?.plugin_key;
+    if (key === 'talebook.metadata.open-library') {
+        return {
+            title: t('pluginManagement.openLibraryGuideTitle'),
+            body: t('pluginManagement.openLibraryGuideBody'),
+            url: 'https://openlibrary.org/developers/api',
+        };
+    }
+    if (key === 'talebook.annotations.brs') {
+        return {
+            title: t('pluginManagement.brsGuideTitle'),
+            body: t('pluginManagement.brsGuideBody'),
+            url: 'https://github.com/talebook/candle-reader',
+        };
+    }
+    if (key?.startsWith('talebook.reviews.')) {
+        return {
+            title: t('pluginManagement.reviewGuideTitle'),
+            body: t('pluginManagement.reviewGuideBody'),
+        };
+    }
+    return null;
+});
 const opdsServiceEnabled = computed(() => Boolean(
     builtinState.value['talebook.book-source.opds']?.service_enabled
 ));
@@ -697,11 +885,32 @@ function capabilityLabel(value) {
         'integrations.community': t('pluginManagement.capCommunity'),
         'integrations.recommendations': t('pluginManagement.capRecommendations'),
         'annotations.import': t('pluginManagement.capAnnotationsImport'),
+        'annotations.chapter_reviews': t('pluginManagement.capChapterReviews'),
+        'reviews.lookup': t('pluginManagement.capReviews'),
         'book_sources.browse': t('pluginManagement.capBrowse'),
         'book_sources.search': t('pluginManagement.capSearch'),
         'book_sources.acquire': t('pluginManagement.capAcquire'),
     };
     return labels[value] || value;
+}
+
+function pluginTags(plugin) {
+    const categoryLabels = {
+        integrations: t('pluginManagement.tagIntegration'),
+        metadata: t('pluginManagement.tagMetadata'),
+        annotations: t('pluginManagement.tagAnnotations'),
+        reviews: t('pluginManagement.tagReviews'),
+        book_sources: t('pluginManagement.tagBookSources'),
+    };
+    const publicSources = new Set([
+        'talebook.book-source.gutenberg',
+        'talebook.book-source.internet-archive',
+    ]);
+    return [...new Set([
+        ...(publicSources.has(plugin.plugin_key) ? [t('pluginManagement.tagPublicFree')] : []),
+        ...plugin.categories.map(category => categoryLabels[category] || category),
+        ...plugin.capabilities.slice(0, 2).map(capabilityLabel),
+    ])].slice(0, 4);
 }
 
 function summary(plugin) {
@@ -720,21 +929,29 @@ function attentionCount(tab) {
 function primaryActionLabel(plugin) {
     if (!plugin.installation) return t('pluginManagement.install');
     if (!plugin.installation.enabled) return t('pluginManagement.enable');
-    if (!connectionFor(plugin)) return t('pluginManagement.configure');
-    if (plugin.ui.manage_kind === 'opds') return t('pluginManagement.browse');
-    if (plugin.ui.manage_kind === 'legado') return t('pluginManagement.manage');
-    if (plugin.ui.manage_kind === 'metadata') return t('pluginManagement.configure');
-    if (plugin.ui.manage_kind === 'weread') return t('pluginManagement.openWorkbench');
-    return t('pluginManagement.details');
+    const action = plugin.ui.primary_action || plugin.ui.manage_kind;
+    const labels = {
+        browse: 'browse',
+        manage: 'manage',
+        metadata: 'configure',
+        configure: 'configure',
+        test: 'test',
+        workbench: 'openWorkbench',
+        weread: 'openWorkbench',
+    };
+    return t(`pluginManagement.${labels[action] || 'configure'}`);
 }
 
 async function primaryAction(plugin) {
     if (!plugin.installation) return install(plugin);
     if (!plugin.installation.enabled) return toggleInstallation(plugin);
-    if (plugin.ui.manage_kind === 'opds') return opdsDialog.value?.open();
-    if (plugin.ui.manage_kind === 'legado') return openLegado();
-    if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/settings#metadata');
-    if (plugin.ui.manage_kind === 'weread') return navigateTo('/plugins/weread');
+    const action = plugin.ui.primary_action || plugin.ui.manage_kind;
+    if (plugin.ui.manage_kind === 'metadata_source') return openMetadataSearch(plugin);
+    if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/plugins/metadata');
+    if (action === 'workbench' || plugin.ui.manage_kind === 'weread') return navigateTo('/plugins/weread');
+    if (action === 'browse') return opdsDialog.value?.open();
+    if (action === 'manage') return openLegado();
+    if (action === 'test') return testPlugin(plugin);
     if (!connectionFor(plugin)) {
         if (plugin.ui.manage_kind === 'book_source') {
             openDetails(plugin);
@@ -743,7 +960,72 @@ async function primaryAction(plugin) {
         } else openConnectionDialog(plugin);
         return;
     }
-    openDetails(plugin);
+    if (plugin.ui.manage_kind === 'book_source') openDetails(plugin);
+    else openConnectionDialog(plugin);
+}
+
+function openMetadataSearch(plugin) {
+    metadataSearchPlugin.value = plugin;
+    metadataKeyword.value = '';
+    metadataSearchResults.value = [];
+    metadataSearchError.value = '';
+    metadataSearchDone.value = false;
+    metadataSearchOpen.value = true;
+}
+
+async function searchMetadataPlugin() {
+    const keyword = metadataKeyword.value.trim();
+    const source = metadataSearchPlugin.value?.ui.metadata_source;
+    if (!keyword || !source) return;
+    metadataSearchLoading.value = true;
+    metadataSearchError.value = '';
+    metadataSearchDone.value = false;
+    try {
+        const rsp = await $backend('/admin/plugins/metadata-search', {
+            method: 'POST',
+            body: JSON.stringify({ source, keyword }),
+        });
+        if (rsp.err !== 'ok') {
+            metadataSearchError.value = rsp.msg || rsp.err;
+            metadataSearchResults.value = [];
+            return;
+        }
+        metadataSearchResults.value = (rsp.books || []).slice(0, 5);
+    } catch {
+        metadataSearchError.value = t('pluginManagement.metadataSearchFailed');
+        metadataSearchResults.value = [];
+    } finally {
+        metadataSearchDone.value = true;
+        metadataSearchLoading.value = false;
+    }
+}
+
+async function testPlugin(plugin) {
+    primaryActionLoading.value = plugin.plugin_key;
+    try {
+        let connection = connectionFor(plugin);
+        if (!connection) {
+            const rsp = await $backend('/admin/plugins/connections', {
+                method: 'POST',
+                body: JSON.stringify({
+                    installation_id: plugin.installation.id,
+                    owner_type: 'instance',
+                    name: 'default',
+                    credentials: {},
+                    config: {},
+                    scopes: plugin.permissions,
+                }),
+            });
+            if (rsp.err !== 'ok') {
+                $alert?.('error', rsp.msg || rsp.err);
+                return;
+            }
+            connection = rsp.connection;
+        }
+        await runAction(connection, 'test');
+    } finally {
+        primaryActionLoading.value = '';
+    }
 }
 
 async function install(plugin) {
@@ -809,7 +1091,9 @@ async function runAction(connection, action) {
 
 function schemaFields(schema) {
     const required = new Set(schema?.required || []);
-    return Object.entries(schema?.properties || {}).map(([key, value]) => ({ key, schema: value, required: required.has(key) }));
+    return Object.entries(schema?.properties || {})
+        .filter(([, value]) => !value.ui_hidden)
+        .map(([key, value]) => ({ key, schema: value, required: required.has(key) }));
 }
 
 function connectionFieldLabel(key) {
@@ -818,14 +1102,52 @@ function connectionFieldLabel(key) {
     return translated === translationKey ? key : translated;
 }
 
+function dialogFieldLabel(field) {
+    if (field.key === 'queries' && connectionPlugin.value?.plugin_key === 'talebook.metadata.open-library') {
+        return t('pluginManagement.fieldIsbnQueries');
+    }
+    if (field.key === 'endpoint' && connectionPlugin.value?.plugin_key === 'talebook.annotations.brs') {
+        return t('pluginManagement.fieldBrsEndpoint');
+    }
+    const translated = connectionFieldLabel(field.key);
+    return translated === field.key ? (field.schema.title || field.key) : translated;
+}
+
+function dialogFieldHint(field) {
+    if (field.key === 'queries') {
+        if (connectionPlugin.value?.plugin_key?.includes('bangumi')) return t('pluginManagement.queryDomainIdHint');
+        if (connectionPlugin.value?.plugin_key?.includes('anilist')) return t('pluginManagement.queryDomainIdHint');
+        return t('pluginManagement.queryIsbnHint');
+    }
+    if (field.key === 'formats') return t('pluginManagement.formatsHint');
+    if (field.key === 'allowed_hosts') return t('pluginManagement.allowedHostsHint');
+    return field.schema.description || '';
+}
+
+function fieldOptions(field) {
+    if (field.key === 'formats') return ['epub', 'pdf', 'mobi', 'azw3', 'txt', 'cbz'];
+    return [];
+}
+
+function fieldItems(field) {
+    if (field.key === 'account_mode') {
+        return [
+            { title: t('pluginManagement.accountModeLogin'), value: 'login' },
+            { title: t('pluginManagement.accountModeRegister'), value: 'register' },
+        ];
+    }
+    return field.schema.enum;
+}
+
 function credentialAutocomplete(key) {
+    if (key === 'email') return 'email';
     if (key === 'username') return 'username';
     if (key === 'password') return 'current-password';
     return 'off';
 }
 
 function credentialType(key) {
-    return key === 'username' ? 'text' : 'password';
+    return ['username', 'email', 'nickname'].includes(key) ? 'text' : 'password';
 }
 
 function openConnectionForm() {
@@ -874,29 +1196,24 @@ async function saveConnection() {
 function openConnectionDialog(plugin = selectedPlugin.value) {
     connectionTrigger = document.activeElement;
     connectionPlugin.value = plugin;
-    dialogConnectionName.value = 'default';
-    connectionConfigText.value = '{}';
+    const existing = connectionFor(plugin);
+    dialogConnectionName.value = existing?.name || 'default';
+    dialogConfigValues.value = Object.fromEntries(schemaFields(plugin.config_schema).map((field) => {
+        let value = existing?.config?.[field.key] ?? field.schema.default ?? (field.schema.type === 'array' ? [] : field.schema.type === 'boolean' ? false : '');
+        if (field.key === 'queries') value = (value || []).map(query => query.isbn || query.title || query.domain_id || '').filter(Boolean);
+        else if (field.schema.type === 'object') value = objectToMappingLines(value);
+        return [field.key, value];
+    }));
     credentialValues.value = Object.fromEntries(dialogCredentialFields.value.map(field => [field.key, '']));
     credentialFieldErrors.value = {};
-    connectionConfigError.value = '';
     connectionFormError.value = '';
     connectionDialogOpen.value = true;
 }
 
 async function savePluginConnection() {
     connectionFormError.value = '';
-    connectionConfigError.value = '';
     credentialFieldErrors.value = {};
-    let config;
-    try {
-        config = JSON.parse(connectionConfigText.value || '{}');
-        if (!config || Array.isArray(config) || typeof config !== 'object') throw new Error();
-    } catch {
-        connectionConfigError.value = t('pluginManagement.publicConfigInvalid');
-        await nextTick();
-        document.getElementById('plugin-public-config')?.focus();
-        return;
-    }
+    const config = serializeDialogConfig();
     const credentials = Object.fromEntries(
         Object.entries(credentialValues.value).filter(([, value]) => typeof value === 'string' && value.length),
     );
@@ -940,6 +1257,32 @@ async function savePluginConnection() {
     } finally {
         connectionSaving.value = false;
     }
+}
+
+function objectToMappingLines(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+    return Object.entries(value).map(([key, item]) => `${key}=${item}`).join('\n');
+}
+
+function mappingLinesToObject(value) {
+    return Object.fromEntries(String(value || '').split('\n').map((line) => {
+        const index = line.indexOf('=');
+        return index < 0 ? [] : [line.slice(0, index).trim(), line.slice(index + 1).trim()];
+    }).filter(pair => pair.length === 2 && pair[0]));
+}
+
+function serializeDialogConfig() {
+    return Object.fromEntries(dialogConfigFields.value.map((field) => {
+        let value = dialogConfigValues.value[field.key];
+        if (field.key === 'queries') {
+            const useDomainId = ['talebook.reviews.bangumi', 'talebook.reviews.anilist'].includes(connectionPlugin.value?.plugin_key);
+            value = (value || []).map(item => useDomainId ? { domain_id: String(item).trim() } : { isbn: String(item).trim() }).filter(item => Object.values(item)[0]);
+        } else if (field.schema.type === 'object') value = mappingLinesToObject(value);
+        else if (field.schema.type === 'array') value = (value || []).map(item => String(item).trim()).filter(Boolean);
+        else if (field.schema.type === 'integer') value = value === '' ? undefined : Number.parseInt(value, 10);
+        else if (field.schema.type === 'number') value = value === '' ? undefined : Number(value);
+        return [field.key, value];
+    }).filter(([, value]) => value !== undefined && value !== ''));
 }
 
 function credentialInputId(key) {
@@ -1055,10 +1398,33 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 .plugin-page-header { white-space: normal; }
 .plugin-page-header__copy { flex: 1 1 320px; min-width: 0; }
 .plugin-card { display: flex; flex-direction: column; }
-.plugin-card :deep(.v-card-actions) { margin-top: auto; }
+.plugin-card :deep(.v-card-item) { align-items: start; }
+.plugin-card :deep(.v-card-item__append) { align-self: start; }
+.plugin-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; overflow: visible; white-space: normal; }
+.plugin-card-tags { opacity: 1; }
+.plugin-card-actions { align-self: flex-start; }
 .plugin-description { min-height: 2.8em; }
-@media (max-width: 767px) {
+@media (max-width: 599px) {
     .plugin-search, .plugin-filter { max-width: none; flex-basis: 100%; }
+    .plugin-card :deep(.v-card-item) {
+        grid-template-areas: 'prepend content append';
+        grid-template-columns: max-content minmax(0, 1fr) max-content;
+        column-gap: 6px;
+    }
+    .plugin-card :deep(.v-card-item__prepend) { grid-area: prepend; align-self: start; }
+    .plugin-card :deep(.v-card-item__content) { grid-area: content; min-width: 0; }
+    .plugin-card :deep(.v-card-item__append) {
+        grid-area: append;
+        align-self: start;
+        margin-inline-start: 0;
+    }
+    .plugin-card-avatar { width: 32px !important; height: 32px !important; font-size: 18px; }
+    .plugin-card-title { flex-wrap: nowrap; gap: 4px; font-size: .82rem !important; line-height: 1.25; }
+    .plugin-card-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .plugin-card-title :deep(.v-chip) { --v-chip-height: 22px; flex: 0 0 auto; font-size: .68rem; padding-inline: 6px; }
+    .plugin-card-actions { gap: 0 !important; }
+    .plugin-card-actions :deep(.v-btn) { min-width: 42px; padding-inline: 7px; font-size: .72rem; }
+    .plugin-card-actions :deep(.v-btn--icon) { width: 30px; min-width: 30px; height: 30px; padding: 0; }
 }
 :deep(.plugin-drawer-dialog .v-overlay__content) {
     height: 100%;
