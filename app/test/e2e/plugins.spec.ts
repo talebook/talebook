@@ -15,20 +15,21 @@ test.describe('Plugin management', () => {
 
         await expect(page.getByRole('tab', { name: '综合服务' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '元数据' })).toBeVisible();
-        await expect(page.getByRole('tab', { name: '笔记（含章评）' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: '划线笔记' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '评价' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '书源' })).toBeVisible();
         await page.getByRole('tab', { name: '元数据' }).click();
-        await expect(page.getByText('Talebook 元数据')).toBeVisible();
+        await expect(page.getByText('Talebook 元数据')).toHaveCount(0);
+        await expect(page.getByText('七猫小说', { exact: true })).toBeVisible();
+        await expect(page.getByText('Google Books', { exact: true })).toBeVisible();
+        await expect(page.getByText('Amazon', { exact: true })).toBeVisible();
         await expect(page.getByText('嵌入文件元数据')).toHaveCount(0);
         await expect(page.getByText('Calibre Provider Bridge')).toHaveCount(0);
 
-        const metadataCard = page.locator('.plugin-card').filter({ hasText: 'Talebook 元数据' });
+        const metadataCard = page.locator('.plugin-card').filter({ hasText: 'Google Books' });
         await expect(metadataCard.locator('.plugin-card-title')).toContainText('正常');
         await expect(metadataCard.getByText('元数据', { exact: true })).toBeVisible();
-        const nameBox = await metadataCard.getByText('Talebook 元数据', { exact: true }).boundingBox();
-        const configureBox = await metadataCard.getByRole('button', { name: '配置' }).boundingBox();
-        expect(configureBox.y).toBeLessThan(nameBox.y + 36);
+        await expect(metadataCard.getByRole('button', { name: '测试', exact: true })).toBeVisible();
 
         await page.getByRole('tab', { name: '综合服务' }).click();
         const weread = page.locator('.plugin-card').filter({ hasText: '微信读书' });
@@ -131,18 +132,34 @@ test.describe('Plugin management', () => {
         expect(actionBox.x + actionBox.width).toBeGreaterThan(cardBox.x + cardBox.width - 100);
     });
 
-    test('moves Talebook metadata to a dedicated configuration page', async ({ page }) => {
-        await page.goto('/admin/settings');
-        await expect(page.getByRole('heading', { name: '书籍信息来源' })).toHaveCount(0);
-
+    test('shows each metadata source as a plugin and searches from its test dialog', async ({ page }) => {
         await page.goto('/admin/plugins?tab=metadata');
-        const card = page.locator('.plugin-card').filter({ hasText: 'Talebook 元数据' });
-        await card.getByRole('button', { name: '配置' }).click();
-        await expect(page).toHaveURL(/\/admin\/plugins\/metadata/);
-        await expect(page.getByRole('heading', { name: 'Talebook 元数据' })).toBeVisible();
-        await expect(page.getByText('嵌入文件元数据由 EPUB 上传和导入流程自动读取')).toBeVisible();
-        await expect(page.getByText('Calibre Provider Bridge 是 Talebook 自动发现')).toBeVisible();
-        await page.getByRole('button', { name: '保存' }).click();
+        await expect(page.getByRole('heading', { name: '插件' })).toBeVisible({ timeout: 20000 });
+        const qimao = page.locator('.plugin-card').filter({ has: page.getByText('七猫小说', { exact: true }) });
+        await expect(qimao).toBeVisible();
+        await expect(qimao.getByRole('button', { name: '启用' })).toBeVisible();
+        await qimao.getByRole('button', { name: '启用' }).click();
+        await qimao.getByRole('button', { name: '测试', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: /测试 七猫小说/ });
+        await dialog.getByRole('textbox', { name: '搜索关键字' }).fill('西游记');
+        await dialog.getByRole('button', { name: '搜索', exact: true }).click();
+        await expect(dialog.getByText('西游记', { exact: true })).toBeVisible();
+        await expect(dialog.locator('.v-list-item')).toHaveCount(5);
+    });
+
+    test('keeps icon, title, status and actions on one row on a phone', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/admin/plugins?tab=metadata');
+        const card = page.locator('.plugin-card').filter({ hasText: 'Google Books' });
+        const avatar = await card.locator('.plugin-card-avatar').boundingBox();
+        const title = await card.getByText('Google Books', { exact: true }).boundingBox();
+        const status = await card.getByText('正常', { exact: true }).boundingBox();
+        const action = await card.getByRole('button', { name: '测试', exact: true }).boundingBox();
+        const boxes = [avatar, title, status, action];
+        expect(Math.max(...boxes.map(box => box.y))).toBeLessThan(
+            Math.min(...boxes.map(box => box.y + box.height)),
+        );
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     });
 
     test('uses readable forms for BRS and review connectors', async ({ page }) => {

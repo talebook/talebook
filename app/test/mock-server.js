@@ -172,9 +172,12 @@ router.post('/_test/reset', eventHandler(async (event) => {
   booksourceCheckPolls = 0;
   pluginRuns = [];
   opdsServiceEnabled = true;
-  pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
+  pluginInstallations = pluginInstallations.map(item => ({
+    ...item,
+    enabled: item.plugin_key !== 'talebook.metadata.source.qimao',
+  }));
   pluginConnections = pluginInstallations
-    .filter(item => item.id <= 3)
+    .filter(item => ['talebook.metadata.builtin', 'talebook.book-source.opds', 'talebook.book-source.legado'].includes(item.plugin_key))
     .map(installation => mockPluginConnection(installation));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
@@ -1546,6 +1549,19 @@ router.get('/api/book/:id', eventHandler((event) => {
   return { err: 'ok', msg: 'mock action' };
 }));
 
+const metadataPluginSpecs = [
+  ['douban', '豆瓣', '从豆瓣查询图书简介、作者、出版社和封面。', 'mdi-alpha-d-circle-outline'],
+  ['douban_v2', '豆瓣 V2', '通过豆瓣新版接口查询图书元数据。', 'mdi-alpha-d-box-outline'],
+  ['baidu', '百度百科', '从百度百科匹配图书条目和简介。', 'mdi-alpha-b-circle-outline'],
+  ['google', 'Google Books', '从 Google Books 查询图书元数据。', 'mdi-google'],
+  ['amazon', 'Amazon', '通过 Calibre Amazon Provider 查询图书元数据。', 'mdi-amazon'],
+  ['xinhua', '新华书店', '从新华书店查询图书出版信息。', 'mdi-storefront-outline'],
+  ['tomato', '番茄小说', '从番茄小说查询网络文学元数据。', 'mdi-fruit-cherries'],
+  ['qimao', '七猫小说', '从七猫小说查询网络文学元数据。', 'mdi-cat'],
+  ['neodb', 'NeoDB', '从 NeoDB 查询开放图书元数据。', 'mdi-database-search-outline'],
+  ['booksource', '在线书源', '从已启用的 Legado 在线书源查询图书元数据。', 'mdi-book-search-outline'],
+];
+
 const pluginDefinitions = [
   {
     id: 1,
@@ -1558,8 +1574,23 @@ const pluginDefinitions = [
     capabilities: ['metadata.lookup'],
     actions: ['test'],
     permissions: ['books.read', 'books.write'],
-    ui: { icon: 'mdi-book-search-outline', manage_kind: 'metadata', primary_action: 'configure' },
+    ui: { icon: 'mdi-book-search-outline', manage_kind: 'metadata', primary_action: 'configure', hidden: true },
   },
+  ...metadataPluginSpecs.map(([source, name, description, icon], index) => ({
+    id: 100 + index,
+    plugin_key: `talebook.metadata.source.${source.replace('_', '-')}`,
+    name,
+    description,
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['metadata'],
+    capabilities: ['metadata.lookup'],
+    actions: ['test'],
+    permissions: ['books.read', 'network.read'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    ui: { icon, manage_kind: 'metadata_source', metadata_source: source, primary_action: 'test' },
+  })),
   {
     id: 2,
     plugin_key: 'talebook.book-source.opds',
@@ -1760,7 +1791,7 @@ const mockPluginConnection = installation => ({
   config: {},
 });
 let pluginConnections = pluginInstallations
-  .filter(installation => installation.id <= 3)
+  .filter(installation => ['talebook.metadata.builtin', 'talebook.book-source.opds', 'talebook.book-source.legado'].includes(installation.plugin_key))
   .map(installation => mockPluginConnection(installation));
 let opdsServiceEnabled = true;
 
@@ -1806,6 +1837,22 @@ router.post('/api/admin/plugins/opds-service', eventHandler(async (event) => {
   const body = await readBody(event);
   opdsServiceEnabled = Boolean(body.enabled);
   return { err: 'ok', enabled: opdsServiceEnabled };
+}));
+
+router.post('/api/admin/plugins/metadata-search', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (!body?.keyword) return { err: 'plugin.keyword_required', msg: '请输入搜索关键字' };
+  return {
+    err: 'ok',
+    source: body.source,
+    books: Array.from({ length: 5 }, (_, index) => ({
+      title: index === 0 ? '西游记' : `西游记（版本 ${index + 1}）`,
+      author: '吴承恩',
+      publisher: index === 0 ? '人民文学出版社' : '',
+      source: metadataPluginSpecs.find(item => item[0] === body.source)?.[1] || body.source,
+      cover_url: '',
+    })),
+  };
 }));
 
 router.get('/api/admin/plugins/runs', eventHandler(() => ({ err: 'ok', runs: pluginRuns })));

@@ -51,8 +51,40 @@ BUILTIN_CAPABILITY_PROVIDERS = (
                 "icon": "mdi-book-search-outline",
                 "manage_kind": "metadata",
                 "primary_action": "configure",
+                "hidden": True,
                 "healthy_message": "内置元数据来源可用",
             },
+        )
+    ),
+    *(
+        BuiltinCapabilityProvider(
+            _manifest(
+                "talebook.metadata.source.%s" % source.replace("_", "-"),
+                name,
+                description,
+                ["metadata"],
+                ["metadata.lookup"],
+                ["books.read", "network.read"],
+                {
+                    "icon": icon,
+                    "manage_kind": "metadata_source",
+                    "metadata_source": source,
+                    "primary_action": "test",
+                    "healthy_message": "%s 元数据查询可用" % name,
+                },
+            )
+        )
+        for source, name, description, icon in (
+            ("douban", "豆瓣", "从豆瓣查询图书简介、作者、出版社和封面。", "mdi-alpha-d-circle-outline"),
+            ("douban_v2", "豆瓣 V2", "通过豆瓣新版接口查询图书元数据。", "mdi-alpha-d-box-outline"),
+            ("baidu", "百度百科", "从百度百科匹配图书条目和简介。", "mdi-alpha-b-circle-outline"),
+            ("google", "Google Books", "从 Google Books 查询图书元数据。", "mdi-google"),
+            ("amazon", "Amazon", "通过 Calibre Amazon Provider 查询图书元数据。", "mdi-amazon"),
+            ("xinhua", "新华书店", "从新华书店查询图书出版信息。", "mdi-storefront-outline"),
+            ("tomato", "番茄小说", "从番茄小说查询网络文学元数据。", "mdi-fruit-cherries"),
+            ("qimao", "七猫小说", "从七猫小说查询网络文学元数据。", "mdi-cat"),
+            ("neodb", "NeoDB", "从 NeoDB 查询开放图书元数据。", "mdi-database-search-outline"),
+            ("booksource", "在线书源", "从已启用的 Legado 在线书源查询图书元数据。", "mdi-book-search-outline"),
         )
     ),
     BuiltinCapabilityProvider(

@@ -8,7 +8,7 @@ from concurrent.futures import TimeoutError as FutureTimeoutError
 
 from sqlalchemy import or_
 
-from webserver.constants import AUTO_FILL_META
+from webserver.constants import AUTO_FILL_META, META_SELECTED_SOURCES
 from webserver.models import (
     PluginConnection,
     PluginDefinition,
@@ -115,11 +115,15 @@ def ensure_builtin_capability_installations(session, installed_by, settings, reg
     for provider in BUILTIN_CAPABILITY_PROVIDERS:
         plugin_key = provider.manifest["id"]
         installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
+        metadata_source = provider.manifest.get("ui", {}).get("metadata_source")
+        enabled = None
+        if plugin_key == "talebook.metadata.builtin":
+            enabled = bool(settings.get(AUTO_FILL_META, False))
+        elif metadata_source:
+            enabled = metadata_source in (settings.get(META_SELECTED_SOURCES, []) or [])
         if installation is None:
-            enabled = True
-            if plugin_key == "talebook.metadata.builtin":
-                enabled = bool(settings.get(AUTO_FILL_META, False))
             installation = install_builtin(session, plugin_key, installed_by)
+        if enabled is not None and installation.enabled != enabled:
             installation.enabled = enabled
             session.commit()
         connection = (

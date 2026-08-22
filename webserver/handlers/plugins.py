@@ -22,6 +22,7 @@ from webserver.plugins.runtime import (
     WereadProvider,
 )
 from webserver.services.async_service import AsyncService
+from webserver.services.metadata_plugin_search import METADATA_PLUGIN_SOURCES, search_metadata_plugin
 from webserver.services.plugin_jobs import execute_plugin_run
 from webserver.services.plugin_runtime import (
     PluginRuntime,
@@ -117,12 +118,47 @@ class AdminPluginInstallationState(BaseHandler):
             installation = self.session.get(PluginInstallation, int(installation_id))
             if installation is None:
                 raise PluginRuntimeError("plugin.installation_missing", "Plugin installation was not found")
+            definition = self.session.get(PluginDefinition, installation.definition_id)
+            metadata_source = (definition.manifest or {}).get("ui", {}).get("metadata_source")
+            if metadata_source:
+                args = loader.SettingsLoader()
+                args.update(loader.get_settings())
+                selected = list(args.get(META_SELECTED_SOURCES, []) or [])
+                selected = [item for item in selected if item != metadata_source]
+                if req["enabled"]:
+                    selected.append(metadata_source)
+                args[META_SELECTED_SOURCES] = selected
+
+                from webserver.handlers.admin import SettingsSaverLogic
+
+                result = SettingsSaverLogic().save_extra_settings(args)
+                if result.get("err") != "ok":
+                    return result
             installation.enabled = req["enabled"]
             self.session.commit()
-            definition = self.session.get(PluginDefinition, installation.definition_id)
             return {"err": "ok", "installation": installation.to_public_dict(definition)}
         except (PluginRuntimeError, TypeError, ValueError) as exc:
             return _error(exc)
+
+
+class AdminPluginMetadataSearch(BaseHandler):
+    @js
+    @is_admin
+    def post(self):
+        try:
+            req = _body(self)
+            source = str(req.get("source") or "").strip()
+            keyword = str(req.get("keyword") or "").strip()
+            if source not in METADATA_PLUGIN_SOURCES:
+                raise PluginRuntimeError("plugin.metadata_source_invalid", "Unknown metadata source")
+            if not keyword:
+                raise PluginRuntimeError("plugin.keyword_required", "请输入搜索关键字")
+            books = search_metadata_plugin(self.session, loader.get_settings(), source, keyword)
+            return {"err": "ok", "source": source, "books": books[:5]}
+        except PluginRuntimeError as exc:
+            return _error(exc)
+        except Exception:
+            return {"err": "plugin.metadata_search_failed", "msg": "元数据查询失败，请稍后重试"}
 
 
 class AdminPluginOpdsService(BaseHandler):
@@ -594,6 +630,7 @@ def routes():
         (r"/api/admin/plugins", AdminPlugins),
         (r"/api/admin/plugins/install", AdminPluginInstall),
         (r"/api/admin/plugins/opds-service", AdminPluginOpdsService),
+        (r"/api/admin/plugins/metadata-search", AdminPluginMetadataSearch),
         (r"/api/admin/plugins/installations/([0-9]+)/state", AdminPluginInstallationState),
         (r"/api/admin/plugins/connections", AdminPluginConnections),
         (r"/api/admin/plugins/connections/([0-9]+)/state", AdminPluginConnectionState),

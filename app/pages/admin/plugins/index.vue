@@ -126,6 +126,7 @@
                         <v-card-item>
                             <template #prepend>
                                 <v-avatar
+                                    class="plugin-card-avatar"
                                     color="primary"
                                     variant="tonal"
                                     size="40"
@@ -620,6 +621,98 @@
             </v-card>
         </v-dialog>
 
+        <v-dialog
+            v-model="metadataSearchOpen"
+            max-width="720"
+            scrollable
+        >
+            <v-card>
+                <v-card-title class="d-flex align-center">
+                    <span>{{ t('pluginManagement.metadataSearchTitle', { name: metadataSearchPlugin?.name || '' }) }}</span>
+                    <v-spacer />
+                    <v-btn
+                        icon="mdi-close"
+                        variant="text"
+                        :aria-label="t('common.close')"
+                        @click="metadataSearchOpen = false"
+                    />
+                </v-card-title>
+                <v-divider />
+                <v-card-text>
+                    <v-form @submit.prevent="searchMetadataPlugin">
+                        <div class="d-flex align-start ga-2">
+                            <v-text-field
+                                v-model="metadataKeyword"
+                                :label="t('pluginManagement.metadataKeyword')"
+                                :placeholder="t('pluginManagement.metadataKeywordPlaceholder')"
+                                prepend-inner-icon="mdi-magnify"
+                                variant="outlined"
+                                density="compact"
+                                autofocus
+                                clearable
+                                hide-details
+                            />
+                            <v-btn
+                                color="primary"
+                                type="submit"
+                                :loading="metadataSearchLoading"
+                                :disabled="!metadataKeyword.trim()"
+                            >
+                                {{ t('pluginManagement.searchAction') }}
+                            </v-btn>
+                        </div>
+                    </v-form>
+                    <v-alert
+                        v-if="metadataSearchError"
+                        type="error"
+                        variant="tonal"
+                        density="compact"
+                        class="mt-4"
+                    >
+                        {{ metadataSearchError }}
+                    </v-alert>
+                    <v-alert
+                        v-else-if="metadataSearchDone && metadataSearchResults.length === 0"
+                        type="info"
+                        variant="tonal"
+                        density="compact"
+                        class="mt-4"
+                    >
+                        {{ t('pluginManagement.metadataNoResults') }}
+                    </v-alert>
+                    <v-list
+                        v-else-if="metadataSearchResults.length"
+                        class="metadata-search-results mt-3"
+                        lines="three"
+                    >
+                        <v-list-item
+                            v-for="(book, index) in metadataSearchResults"
+                            :key="`${book.title}-${index}`"
+                            :title="book.title"
+                            :subtitle="[book.author, book.publisher, book.source].filter(Boolean).join(' · ')"
+                        >
+                            <template #prepend>
+                                <v-avatar
+                                    rounded="sm"
+                                    size="48"
+                                    color="surface-variant"
+                                >
+                                    <v-img
+                                        v-if="book.cover_url"
+                                        :src="book.cover_url"
+                                        cover
+                                    />
+                                    <v-icon v-else>
+                                        mdi-book-outline
+                                    </v-icon>
+                                </v-avatar>
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                </v-card-text>
+            </v-card>
+        </v-dialog>
+
         <OpdsImportDialog ref="opdsDialog" />
     </v-card>
 </template>
@@ -660,6 +753,13 @@ const search = ref(typeof route.query.q === 'string' ? route.query.q : '');
 const statusFilter = ref(typeof route.query.status === 'string' ? route.query.status : 'all');
 const actionLoading = ref(false);
 const primaryActionLoading = ref('');
+const metadataSearchOpen = ref(false);
+const metadataSearchPlugin = ref(null);
+const metadataKeyword = ref('');
+const metadataSearchResults = ref([]);
+const metadataSearchLoading = ref(false);
+const metadataSearchError = ref('');
+const metadataSearchDone = ref(false);
 const toggleLoading = ref(false);
 const opdsServiceSaving = ref(false);
 const connectionSaving = ref(false);
@@ -846,6 +946,7 @@ async function primaryAction(plugin) {
     if (!plugin.installation) return install(plugin);
     if (!plugin.installation.enabled) return toggleInstallation(plugin);
     const action = plugin.ui.primary_action || plugin.ui.manage_kind;
+    if (plugin.ui.manage_kind === 'metadata_source') return openMetadataSearch(plugin);
     if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/plugins/metadata');
     if (action === 'workbench' || plugin.ui.manage_kind === 'weread') return navigateTo('/plugins/weread');
     if (action === 'browse') return opdsDialog.value?.open();
@@ -861,6 +962,42 @@ async function primaryAction(plugin) {
     }
     if (plugin.ui.manage_kind === 'book_source') openDetails(plugin);
     else openConnectionDialog(plugin);
+}
+
+function openMetadataSearch(plugin) {
+    metadataSearchPlugin.value = plugin;
+    metadataKeyword.value = '';
+    metadataSearchResults.value = [];
+    metadataSearchError.value = '';
+    metadataSearchDone.value = false;
+    metadataSearchOpen.value = true;
+}
+
+async function searchMetadataPlugin() {
+    const keyword = metadataKeyword.value.trim();
+    const source = metadataSearchPlugin.value?.ui.metadata_source;
+    if (!keyword || !source) return;
+    metadataSearchLoading.value = true;
+    metadataSearchError.value = '';
+    metadataSearchDone.value = false;
+    try {
+        const rsp = await $backend('/admin/plugins/metadata-search', {
+            method: 'POST',
+            body: JSON.stringify({ source, keyword }),
+        });
+        if (rsp.err !== 'ok') {
+            metadataSearchError.value = rsp.msg || rsp.err;
+            metadataSearchResults.value = [];
+            return;
+        }
+        metadataSearchResults.value = (rsp.books || []).slice(0, 5);
+    } catch {
+        metadataSearchError.value = t('pluginManagement.metadataSearchFailed');
+        metadataSearchResults.value = [];
+    } finally {
+        metadataSearchDone.value = true;
+        metadataSearchLoading.value = false;
+    }
 }
 
 async function testPlugin(plugin) {
@@ -1270,17 +1407,24 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 @media (max-width: 599px) {
     .plugin-search, .plugin-filter { max-width: none; flex-basis: 100%; }
     .plugin-card :deep(.v-card-item) {
-        grid-template-areas: 'prepend content' '. append';
-        grid-template-columns: max-content minmax(0, 1fr);
+        grid-template-areas: 'prepend content append';
+        grid-template-columns: max-content minmax(0, 1fr) max-content;
+        column-gap: 6px;
     }
-    .plugin-card :deep(.v-card-item__prepend) { grid-area: prepend; align-self: flex-start; }
+    .plugin-card :deep(.v-card-item__prepend) { grid-area: prepend; align-self: start; }
     .plugin-card :deep(.v-card-item__content) { grid-area: content; min-width: 0; }
     .plugin-card :deep(.v-card-item__append) {
         grid-area: append;
-        justify-self: end;
-        margin-block-start: 8px;
+        align-self: start;
         margin-inline-start: 0;
     }
+    .plugin-card-avatar { width: 32px !important; height: 32px !important; font-size: 18px; }
+    .plugin-card-title { flex-wrap: nowrap; gap: 4px; font-size: .82rem !important; line-height: 1.25; }
+    .plugin-card-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .plugin-card-title :deep(.v-chip) { --v-chip-height: 22px; flex: 0 0 auto; font-size: .68rem; padding-inline: 6px; }
+    .plugin-card-actions { gap: 0 !important; }
+    .plugin-card-actions :deep(.v-btn) { min-width: 42px; padding-inline: 7px; font-size: .72rem; }
+    .plugin-card-actions :deep(.v-btn--icon) { width: 30px; min-width: 30px; height: 30px; padding: 0; }
 }
 :deep(.plugin-drawer-dialog .v-overlay__content) {
     height: 100%;
