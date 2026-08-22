@@ -82,9 +82,7 @@ def convert_epub(epub_path, out_path, converter, convert_metadata=True, progress
         # mimetype 必须保持原始字节（EPUB 规范：第一项、不压缩）
         mimetype_data = entries.get("mimetype", b"application/epub+zip")
 
-    total_docs = sum(
-        1 for name in entries if name.lower().endswith(HTML_EXTS) or name.lower().endswith(XML_EXTS)
-    )
+    total_docs = sum(1 for name in entries if name.lower().endswith(HTML_EXTS) or name.lower().endswith(XML_EXTS))
     done_docs = 0
 
     for name, data in entries.items():

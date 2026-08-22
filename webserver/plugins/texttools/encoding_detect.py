@@ -37,23 +37,19 @@ _BOM_TABLE = (
 # 可读性显著提升时采纳。常见场景：原编码字节被程序误读（如 BIG5 被按 GB18030 读）
 # 后以另一种编码（多为 UTF-8）写盘。
 _MOJIBAKE_PAIRS = (
-    ("gb18030", "big5"),    # BIG5 字节被按 GBK/GB18030 误读
-    ("gb18030", "utf-8"),   # UTF-8 字节被按 GBK/GB18030 误读
-    ("big5", "utf-8"),      # UTF-8 字节被按 BIG5 误读
-    ("big5", "gb18030"),    # GBK 字节被按 BIG5 误读
-    ("utf-8", "gb18030"),   # GBK 字节被按 UTF-8 误读（存为乱码 UTF-8）
-    ("utf-8", "big5"),      # BIG5 字节被按 UTF-8 误读
+    ("gb18030", "big5"),  # BIG5 字节被按 GBK/GB18030 误读
+    ("gb18030", "utf-8"),  # UTF-8 字节被按 GBK/GB18030 误读
+    ("big5", "utf-8"),  # UTF-8 字节被按 BIG5 误读
+    ("big5", "gb18030"),  # GBK 字节被按 BIG5 误读
+    ("utf-8", "gb18030"),  # GBK 字节被按 UTF-8 误读（存为乱码 UTF-8）
+    ("utf-8", "big5"),  # BIG5 字节被按 UTF-8 误读
 )
 
 # 不可读字符（替换符 / 私用区 / 代理区）
-_UNREADABLE_RE = re.compile(
-    "[\ufffd\ufffe\uffff\ue000-\uf8ff\ud800-\udfff\ud7b0-\ud7ff]"
-)
+_UNREADABLE_RE = re.compile("[\ufffd\ufffe\uffff\ue000-\uf8ff\ud800-\udfff\ud7b0-\ud7ff]")
 # 常见乱码字形区（GBK 误读 UTF-8 常落入拉丁-1 补充区等；
 # 不含全角标点区 \uff00-\uffef——那是正常中文标点，不能当作乱码扣分）
-_MOJIBAKE_CHAR_RE = re.compile(
-    "[\u0080-\u00ff\u0100-\u017f\u2000-\u206f]"
-)
+_MOJIBAKE_CHAR_RE = re.compile("[\u0080-\u00ff\u0100-\u017f\u2000-\u206f]")
 # 控制字符（保留 \n \r \t）
 _CONTROL_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _CJK_RE = re.compile("[\u3400-\u4dbf\u4e00-\u9fff]")
@@ -90,7 +86,6 @@ def _readability_score(text):
     """0~100 可读性评分：中文书籍文本得分应显著高于乱码结果。"""
     if not text:
         return 0.0
-    length = len(text)
     sample = text[:2000]
     n = len(sample)
     if n == 0:
@@ -130,7 +125,7 @@ def _sample_segments(data, size=2048, count=3):
         return [data]
     segs = [data[:size]]
     mid = len(data) // 2
-    segs.append(data[mid:mid + size])
+    segs.append(data[mid : mid + size])
     segs.append(data[-size:])
     return segs
 
@@ -243,18 +238,30 @@ def _analyze(data):
         data = data.encode("utf-8")
 
     if not data:
-        return "", {"encoding": "utf-8", "confidence": 0.0, "mojibake": False,
-                    "garbage": False, "unrecoverable": False,
-                    "sample": "", "reasons": ["空文件"]}
+        return "", {
+            "encoding": "utf-8",
+            "confidence": 0.0,
+            "mojibake": False,
+            "garbage": False,
+            "unrecoverable": False,
+            "sample": "",
+            "reasons": ["空文件"],
+        }
 
     # 1. BOM 优先（文件头字节，全量数据上判定）
     for bom, enc in _BOM_TABLE:
         if data.startswith(bom):
             text = data.decode(enc, errors="replace").lstrip("\ufeff")
             reasons.append("检测到 BOM，编码确定为 %s" % enc)
-            return text, {"encoding": enc, "confidence": 1.0, "mojibake": False,
-                          "garbage": False, "unrecoverable": False,
-                          "sample": text[:SAMPLE_CHARS], "reasons": reasons}
+            return text, {
+                "encoding": enc,
+                "confidence": 1.0,
+                "mojibake": False,
+                "garbage": False,
+                "unrecoverable": False,
+                "sample": text[:SAMPLE_CHARS],
+                "reasons": reasons,
+            }
 
     sample = data[:SAMPLE_LIMIT]
 
@@ -263,9 +270,14 @@ def _analyze(data):
     if not candidates:
         reasons.append("所有候选编码均无法严格解码，疑似二进制或混用编码")
         return data.decode("utf-8", errors="replace"), {
-            "encoding": "utf-8", "confidence": 0.0, "mojibake": False,
-            "garbage": True, "unrecoverable": False,
-            "sample": "", "reasons": reasons}
+            "encoding": "utf-8",
+            "confidence": 0.0,
+            "mojibake": False,
+            "garbage": True,
+            "unrecoverable": False,
+            "sample": "",
+            "reasons": reasons,
+        }
 
     # 3. chardet 投票（作为参考依据，不覆盖 strict 打分）
     chardet_guess = _chardet_vote(sample)
@@ -303,16 +315,15 @@ def _analyze(data):
             # 非 UTF-8 方案：总分未显著超过 UTF-8 直解（+10）即视为无效
             return t if t >= floor else -1.0
 
-        enc, text, mojibake, mid_enc, real_enc, cand_enc = max(
-            options, key=lambda o: (_eff(o), 1 if not o[2] else 0))
+        enc, text, mojibake, mid_enc, real_enc, cand_enc = max(options, key=lambda o: (_eff(o), 1 if not o[2] else 0))
     else:
         enc, text, mojibake, mid_enc, real_enc, cand_enc = max(
-            options, key=lambda o: (_score_total(o[1]), 1 if not o[2] else 0))
+            options, key=lambda o: (_score_total(o[1]), 1 if not o[2] else 0)
+        )
     score = _readability_score(text)
     reasons.append("候选解码：%s（可读性 %.0f/100）" % (cand_enc, score))
     if mojibake:
-        reasons.append("乱码反转恢复：按 %s 重读后为 %s（可读性 %.0f/100）"
-                       % (mid_enc, real_enc, score))
+        reasons.append("乱码反转恢复：按 %s 重读后为 %s（可读性 %.0f/100）" % (mid_enc, real_enc, score))
     elif cycle_any:
         # 反转候选可达但构成循环（A→B→A）且无可信出口：深度误读
         reasons.append("检测到乱码反转循环，疑似多重误读，无法自动恢复")
@@ -332,9 +343,14 @@ def _analyze(data):
         # 按 UTF-8 替换解码输出并标记垃圾，拒绝修复而非崩溃
         reasons.append("全量解码失败，疑似尾部截断或混用编码")
         return data.decode("utf-8", errors="replace"), {
-            "encoding": "utf-8", "confidence": 0.0, "mojibake": False,
-            "garbage": True, "unrecoverable": False,
-            "sample": "", "reasons": reasons}
+            "encoding": "utf-8",
+            "confidence": 0.0,
+            "mojibake": False,
+            "garbage": True,
+            "unrecoverable": False,
+            "sample": "",
+            "reasons": reasons,
+        }
 
     confidence = min(1.0, score / 100.0)
     return full_text, {

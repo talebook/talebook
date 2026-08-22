@@ -38,8 +38,24 @@ CONFIG_DIR = os.path.join(_PKG_DIR, "config")
 DICT_DIR = os.path.join(_PKG_DIR, "dictionary")
 
 # 支持的全部转换方向（与 config/ 下 json 文件名一致）
-DIRECTIONS = ("hk2s", "hk2sp", "hk2t", "jp2t", "s2hk", "s2hkp", "s2t", "s2tw",
-              "s2twp", "t2hk", "t2jp", "t2s", "t2tw", "tw2s", "tw2sp", "tw2t")
+DIRECTIONS = (
+    "hk2s",
+    "hk2sp",
+    "hk2t",
+    "jp2t",
+    "s2hk",
+    "s2hkp",
+    "s2t",
+    "s2tw",
+    "s2twp",
+    "t2hk",
+    "t2jp",
+    "t2s",
+    "t2tw",
+    "tw2s",
+    "tw2sp",
+    "tw2t",
+)
 # 本工具实际内置的字典/配置（仅中文繁简相关）
 BUILTIN_DIRECTIONS = ("t2s", "tw2s", "tw2sp", "s2t", "s2tw", "s2twp", "t2tw", "tw2t")
 
@@ -79,7 +95,8 @@ class OpenCC:
         # List of sentence separators from OpenCC PhraseExtract.cpp. None of
         # these separators are allowed as part of a dictionary entry
         self.split_chars_re = re.compile(
-            r'(\s+|-|,|\.|\?|!|\*|　|，|。|、|；|：|？|！|…|“|”|‘|’|『|』|「|」|﹁|﹂|—|－|（|）|《|》|〈|〉|～|．|／|＼|︒|︑|︔|︓|︿|﹀|︹|︺|︙|︐|［|﹇|］|﹈|︕|︖|︰|︳|︴|︽|︾|︵|︶|｛|︷|｝|︸|﹃|﹄|【|︻|】|︼|—|， |： |︲|～)')
+            r"(\s+|-|,|\.|\?|!|\*|　|，|。|、|；|：|？|！|…|“|”|‘|’|『|』|「|」|﹁|﹂|—|－|（|）|《|》|〈|〉|～|．|／|＼|︒|︑|︔|︓|︿|﹀|︹|︺|︙|︐|［|﹇|］|﹈|︕|︖|︰|︳|︴|︽|︾|︵|︶|｛|︷|｝|︸|﹃|﹄|【|︻|】|︼|—|， |： |︲|～)"
+        )
         if self.conversion is not None:
             self._init_dict()
 
@@ -227,14 +244,14 @@ class StringTree:
             test_len = min(self.string_len, test_dict[0])
             while test_len != 0:
                 for i in range(0, self.string_len - test_len + 1):
-                    if self.string[i:i + test_len] in test_dict[1]:
+                    if self.string[i : i + test_len] in test_dict[1]:
                         if i > 0:
                             self.left = StringTree(self.string[:i])
                             self.left.convert_tree(test_dict)
                         if (i + test_len) < self.string_len:
-                            self.right = StringTree(self.string[i + test_len:])
+                            self.right = StringTree(self.string[i + test_len :])
                             self.right.convert_tree(test_dict)
-                        value = test_dict[1][self.string[i:i + test_len]]
+                        value = test_dict[1][self.string[i : i + test_len]]
                         if len(value.split(" ")) > 1:
                             # multiple mapping, use the first one for now
                             value = value.split(" ")[0]

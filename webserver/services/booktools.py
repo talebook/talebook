@@ -105,7 +105,6 @@ def import_as_new_book(
     :param collector_id:  可选，操作用户 ID（创建 Item 收藏记录）。
     :return: 新书 Calibre book_id。
     """
-    from calibre.ebooks.metadata.book.base import Metadata
     from webserver.models import Item
 
     # get_metadata 每次返回全新对象，可直接原地修改（勿 deepcopy，

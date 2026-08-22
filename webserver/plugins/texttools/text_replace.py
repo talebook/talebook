@@ -17,7 +17,7 @@
 """
 
 import re
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Tuple
 
 from webserver.plugins.texttools.encoding_detect import decode_with_report
 from webserver.plugins.texttools.epub_utils import (

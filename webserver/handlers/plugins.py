@@ -29,6 +29,7 @@ from webserver.plugins.runtime import (
 )
 from webserver.plugins.texttools import (
     ANALYZE_LIMIT,
+    DIRECTION_LABELS,
     OpenCC,
     analyze_bytes,
     compile_rule,
@@ -431,6 +432,13 @@ def _tool_book_id(req):
     return book_id
 
 
+def _tool_resolve_book(handler, book_id):
+    """按当前访问者权限解析书籍；无权查看时抛出与「不存在」一致的错误，避免探测私有书籍。"""
+    if not handler.can_view_book(book_id):
+        raise BookToolsError("书籍不存在：ID=%d" % book_id)
+    return resolve_book(handler.db, book_id)
+
+
 def _tool_workdir():
     return tempfile.mkdtemp(prefix="talebook-texttools-")
 
@@ -481,7 +489,7 @@ class UserTextReplacePreview(BaseHandler):
             pattern = str(req.get("pattern") or "")
             replacement = str(req.get("replacement") or "")
             use_regex = bool(req.get("use_regex"))
-            book = resolve_book(self.db, book_id)
+            book = _tool_resolve_book(self, book_id)
             fmt = pick_format(book, candidates=("TXT", "EPUB"))
             if fmt is None:
                 raise BookToolsError("该书籍没有 TXT 或 EPUB 格式，无法执行替换")
@@ -515,7 +523,7 @@ class UserTextReplaceRun(BaseHandler):
             if apply_fn is None:
                 raise BookToolsError(rule_error)
 
-            book = resolve_book(self.db, book_id)
+            book = _tool_resolve_book(self, book_id)
             title = book.get("title") or "Unknown"
             fmt = pick_format(book, candidates=("TXT", "EPUB"))
             if fmt is None:
@@ -561,7 +569,7 @@ class UserTxtFixerAnalyze(BaseHandler):
         req = _body(self)
         try:
             book_id = _tool_book_id(req)
-            book = resolve_book(self.db, book_id)
+            book = _tool_resolve_book(self, book_id)
             fmts = [f.upper() for f in (book.get("available_formats") or [])]
             if "TXT" not in fmts:
                 raise BookToolsError("该书籍没有 TXT 格式，无法执行检测")
@@ -587,7 +595,7 @@ class UserTxtFixerRun(BaseHandler):
             output_mode = req.get("output_mode") or "new"
             if output_mode not in ("new", "overwrite"):
                 raise BookToolsError("参数错误：output_mode 必须为 new 或 overwrite")
-            book = resolve_book(self.db, book_id)
+            book = _tool_resolve_book(self, book_id)
             title = book.get("title") or "Unknown"
             fmts = [f.upper() for f in (book.get("available_formats") or [])]
             if "TXT" not in fmts:
@@ -650,7 +658,9 @@ ZH_DIRECTION_LANG = {
 }
 # 增强词表仅对繁体→简体方向生效
 ZH_A5_DIRECTIONS = ("t2s", "tw2s")
-A5_PHRASES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plugins", "texttools", "a5_phrases.txt")
+A5_PHRASES_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plugins", "texttools", "a5_phrases.txt"
+)
 # 另存为新书时的标题后缀
 ZH_NEW_BOOK_SUFFIX = {"zh": "（简体版）", "zht": "（繁體版）"}
 
@@ -696,7 +706,7 @@ class UserZhConverterRun(BaseHandler):
             extra_dicts = [A5_PHRASES_FILE] if (use_a5 and direction in ZH_A5_DIRECTIONS) else []
             engine = OpenCC(direction, extra_dicts=extra_dicts)
 
-            book = resolve_book(self.db, book_id)
+            book = _tool_resolve_book(self, book_id)
             title = book.get("title") or "Unknown"
             # 繁简转换优先处理 EPUB（保留目录结构），无 EPUB 时退回 TXT
             fmt = pick_format(book, candidates=("EPUB", "TXT"))
@@ -732,9 +742,7 @@ class UserZhConverterRun(BaseHandler):
                     out_path,
                     backup_dir=_tool_backup_dir() if backup else None,
                 )
-                _zh_sync_book_meta(
-                    self.db, book_id, lang, engine.convert if convert_title else None
-                )
+                _zh_sync_book_meta(self.db, book_id, lang, engine.convert if convert_title else None)
                 rsp["book_id"] = book_id
             else:
                 suffix_engine = engine.convert if convert_title else None
