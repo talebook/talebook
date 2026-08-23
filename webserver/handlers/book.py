@@ -352,7 +352,7 @@ class BookRefer(BaseHandler):
 
     def _unpack_search_result(self, name, result):
         if isinstance(result, MetadataSearchResult):
-            books = list(result.books or [])
+            books = list(result.books or [])[: self.REFER_SOURCE_LIMIT]
             failures = list(result.failures or [])
         else:
             books = list(result or [])[: self.REFER_SOURCE_LIMIT]

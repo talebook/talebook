@@ -740,6 +740,17 @@ class TestReferDouban(TestWithUserLogin):
 
 
 class TestRefer(TestWithUserLogin):
+    @mock.patch("webserver.plugins.meta.qimao.QimaoNovelApi.get_book")
+    @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.search", return_value=[])
+    def test_disabled_qimao_source_is_not_queried(self, calibre_search, qimao_get_book):
+        with mock.patch.dict(webserver.handlers.book.CONF, {"META_SELECTED_SOURCES": ["google"]}):
+            data = self.json("/api/book/1/refer")
+
+        self.assertEqual(data["err"], "ok")
+        self.assertEqual(data["summary"]["total"], 1)
+        calibre_search.assert_called_once()
+        qimao_get_book.assert_not_called()
+
     @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.search_books")
     @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.get_book_by_isbn")
     @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.get_book_by_id")
@@ -833,9 +844,15 @@ class TestReferFailureSummary(TestWithUserLogin):
         handler = object.__new__(webserver.handlers.book.BookRefer)
 
         books, failures = handler._unpack_search_result("google", list(range(8)))
+        wrapped, wrapped_failures = handler._unpack_search_result(
+            "booksource",
+            webserver.handlers.book.MetadataSearchResult(books=list(range(8))),
+        )
 
         self.assertEqual(books, [0, 1, 2, 3, 4])
         self.assertEqual(failures, [])
+        self.assertEqual(wrapped, [0, 1, 2, 3, 4])
+        self.assertEqual(wrapped_failures, [])
 
     def test_stream_ends_with_summary_control_frame(self):
         with mock.patch.object(webserver.handlers.book.BookRefer, "_build_search_tasks", return_value=self._tasks()):
