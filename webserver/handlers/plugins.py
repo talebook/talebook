@@ -68,6 +68,31 @@ def _error(exc):
     return {"err": getattr(exc, "code", "plugin.error"), "msg": str(exc)}
 
 
+# 这些键由服务端计算并注入，客户端传入的同名值一律丢弃，避免越权访问私有书籍。
+SERVER_OWNED_INPUT_KEYS = frozenset({"allowed_book_ids"})
+# 声明了这些能力的插件会做书籍匹配，需要平台注入可见书籍白名单。
+BOOK_SCOPED_CAPABILITIES = frozenset({"annotations.import"})
+
+
+def _plugin_input_data(handler, connection):
+    """构造插件运行输入：客户端参数经过滤后，与服务端计算的受控字段合并。"""
+    req = _body(handler)
+    supplied = req.get("input_data") or {}
+    if not isinstance(supplied, dict):
+        raise PluginRuntimeError("plugin.request_invalid", "input_data must be an object")
+
+    input_data = {key: value for key, value in supplied.items() if key not in SERVER_OWNED_INPUT_KEYS}
+
+    installation = handler.session.get(PluginInstallation, connection.installation_id)
+    definition = handler.session.get(PluginDefinition, installation.definition_id) if installation else None
+    capabilities = set((definition.capabilities if definition else None) or [])
+    if capabilities & BOOK_SCOPED_CAPABILITIES:
+        input_data["allowed_book_ids"] = [
+            book_id for book_id in all_book_ids(handler.db) if handler.get_book(book_id, raise_exception=False) is not None
+        ]
+    return req, input_data
+
+
 class AdminPlugins(BaseHandler):
     @js
     @is_admin
@@ -286,13 +311,17 @@ class AdminPluginAction(BaseHandler):
     @is_admin
     def post(self, connection_id, action):
         try:
-            req = _body(self)
+            connection = self.session.get(PluginConnection, int(connection_id))
+            if connection is None:
+                raise PluginRuntimeError("plugin.connection_missing", "Plugin connection is not available")
+            req, input_data = _plugin_input_data(self, connection)
             run = PluginRuntime(self.session, loader.get_settings()).prepare_run(
-                int(connection_id),
+                connection.id,
                 action,
                 self.user_id(),
                 trigger=req.get("trigger", "manual"),
                 parent_run_id=req.get("parent_run_id"),
+                input_data=input_data,
             )
             execute_plugin_run(AsyncService(), run.id)
             self.session.refresh(run)
@@ -350,19 +379,14 @@ class UserPluginAction(BaseHandler):
             connection = self.session.get(PluginConnection, int(connection_id))
             if connection is None or connection.owner_type != "user" or connection.owner_id != self.user_id():
                 raise PluginRuntimeError("plugin.connection_forbidden", "Plugin connection is not available")
-            installation = self.session.get(PluginInstallation, connection.installation_id)
-            if installation.plugin_key == WEREAD_PLUGIN_KEY and action in {"test", "preview", "run"}:
-                raise PluginRuntimeError(
-                    "plugin.action_requires_import_endpoint",
-                    "WeRead actions must use the private import endpoint",
-                )
-            req = _body(self)
+            req, input_data = _plugin_input_data(self, connection)
             run = PluginRuntime(self.session, loader.get_settings()).prepare_run(
                 connection.id,
                 action,
                 self.user_id(),
                 trigger=req.get("trigger", "manual"),
                 parent_run_id=req.get("parent_run_id"),
+                input_data=input_data,
             )
             execute_plugin_run(AsyncService(), run.id)
             self.session.refresh(run)

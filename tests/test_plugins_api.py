@@ -221,3 +221,80 @@ class TestWereadIntegrationApi(TestWithAdminUser):
         self.assertEqual(preview["err"], "ok")
         self.assertEqual(preview["run"]["status"], "succeeded")
         fetch_all.assert_called_once_with(self.api_key)
+
+
+class TestGenericActionInputData(TestWithAdminUser):
+    """通用动作端点透传 input_data：weread 不再需要私有端点，且服务端受控字段不可被伪造。"""
+
+    def _weread_connection(self):
+        session = get_db()
+        installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == "talebook.weread").first()
+        return (
+            session.query(PluginConnection)
+            .filter(
+                PluginConnection.installation_id == installation.id,
+                PluginConnection.owner_type == "user",
+                PluginConnection.owner_id == 1,
+            )
+            .first()
+        )
+
+    @mock.patch("webserver.handlers.plugins.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
+    def test_weread_no_longer_rejected_by_generic_action_endpoint(self, mocked):
+        with mock.patch.object(WereadProvider, "_gateway", return_value={"books": []}):
+            self.json(
+                "/api/plugins/weread/query",
+                method="POST",
+                body=json.dumps({"api_key": "unit-test-key", "operation": "shelf", "params": {}}),
+            )
+        connection = self._weread_connection()
+        self.assertIsNotNone(connection, "微信读书连接应已建立")
+
+        with mock.patch.object(WereadProvider, "_gateway", return_value={"books": [], "hasMore": False}):
+            data = self.json(
+                "/api/plugins/connections/%d/preview" % connection.id,
+                method="POST",
+                body=json.dumps({"input_data": {}}),
+            )
+
+        self.assertNotEqual(data.get("err"), "plugin.action_requires_import_endpoint")
+        self.assertEqual(data["err"], "ok")
+        self.assertEqual(data["run"]["action"], "preview")
+
+    @mock.patch("webserver.handlers.plugins.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
+    def test_client_supplied_allowed_book_ids_is_discarded(self, mocked):
+        with mock.patch.object(WereadProvider, "_gateway", return_value={"books": []}):
+            self.json(
+                "/api/plugins/weread/query",
+                method="POST",
+                body=json.dumps({"api_key": "unit-test-key", "operation": "shelf", "params": {}}),
+            )
+        connection = self._weread_connection()
+
+        with mock.patch.object(WereadProvider, "_gateway", return_value={"books": [], "hasMore": False}):
+            data = self.json(
+                "/api/plugins/connections/%d/preview" % connection.id,
+                method="POST",
+                body=json.dumps({"input_data": {"allowed_book_ids": [999999], "keep": "me"}}),
+            )
+        self.assertEqual(data["err"], "ok")
+
+        session = get_db()
+        from webserver.models import PluginRun
+
+        run = session.get(PluginRun, data["run"]["id"])
+        self.assertEqual(run.input_data.get("keep"), "me", "非受控字段应原样透传")
+        self.assertNotIn(999999, run.input_data.get("allowed_book_ids") or [], "客户端伪造的可见书籍白名单必须被丢弃")
+
+    def test_input_data_must_be_an_object(self):
+        catalog = self.json("/api/admin/plugins")
+        installation = next(item for item in catalog["installations"] if item["plugin_key"] == "talebook.book-source.opds")
+        connections = self.json("/api/admin/plugins/connections")["connections"]
+        connection = next(item for item in connections if item["installation_id"] == installation["id"])
+
+        data = self.json(
+            "/api/admin/plugins/connections/%d/test" % connection["id"],
+            method="POST",
+            body=json.dumps({"input_data": "not-an-object"}),
+        )
+        self.assertEqual(data["err"], "plugin.request_invalid")
