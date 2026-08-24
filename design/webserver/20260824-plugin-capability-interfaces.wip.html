@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 插件系统能力接口重构方案：以类型化能力接口取代单一 execute，解耦通用运行时与具体插件。" />
+    <link rel="icon" href="data:," />
+    <title>插件能力接口重构 · WIP</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#evidence"><span class="rail-index">03</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">04</span><span class="rail-title">接口设计</span></a>
+      <a href="#booksource"><span class="rail-index">05</span><span class="rail-title">书源接口</span></a>
+      <a href="#runtime"><span class="rail-index">06</span><span class="rail-title">运行时与模式</span></a>
+      <a href="#callers"><span class="rail-index">07</span><span class="rail-title">上层调用形态</span></a>
+      <a href="#migration"><span class="rail-index">08</span><span class="rail-title">迁移路径</span></a>
+      <a href="#impact"><span class="rail-index">09</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">10</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">11</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">接口设计</a>
+        <a href="#booksource">书源接口</a>
+        <a href="#runtime">运行时与模式</a>
+        <a href="#callers">上层调用形态</a>
+        <a href="#migration">迁移路径</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <header class="hero">
+        <h1>用类型化能力接口取代单一 execute</h1>
+        <p class="sub">插件不再只暴露一个 <code>execute(context)</code>，而是按元数据、笔记、评价、书源、格式转换等能力实现各自的类型化接口；业务流按能力遍历插件，通用运行时不再认识任何具体插件。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip wip">状态：WIP</span>
+          <span class="chip">创建日期：2026-08-24</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：webserver/plugins/ · webserver/services/ · webserver/handlers/ · app/pages/admin/plugins/ · app/pages/plugins/</span>
+          <span class="chip">需求来源：feat/plugins 分支架构审查（会话内提出）</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <div class="main-column" id="main-content">
+
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">
+              <p>“当前分支对比 master，实现了插件中心的功能。我需要你审查一下代码架构设计，尤其是 plugin 的协议、hook 是否合理，单个插件是否足够内聚。我感觉是大量 plugin 名称 hardcode 到了各个地方。”</p>
+              <p>“PluginProvider 的设计太有问题了！元数据、划线笔记、评分、评价、书籍列表，这些都应该明确定义在 PluginProvider 里面，然后在业务流里调用。比如，拉取 meta 信息时，就 <code>for p in plugins.filter(has_meta_hook): p.search_books ...</code>”</p>
+            </div>
+            <h3>会话内已确认的决策</h3>
+            <div class="table-wrap" role="region" aria-label="会话内确认的决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>命名分层</td><td>能力接口 <code>XxxProvider</code>（Protocol）／共享实现基类 <code>XxxBase</code>／具体插件 <code>XxxPlugin</code></td></tr>
+                  <tr><td>调用模式命名</td><td>用 <code>read</code> / <code>write</code>，不用 <code>query</code> / <code>sync</code></td></tr>
+                  <tr><td>格式转换接口名</td><td><code>TransformProvider</code>，不用 <code>BookTransformProvider</code></td></tr>
+                  <tr><td>插件专属功能</td><td><code>ExtraFeatureProvider.execute(action, params)</code>，不用 <code>RawQueryProvider</code></td></tr>
+                  <tr><td>书源接口组织</td><td>单一胖接口 + 可选方法，不拆多个 Protocol</td></tr>
+                  <tr><td>取书方式声明</td><td>manifest 声明 <code>download_mode</code>（<code>single_book</code> / <code>by_chapters</code> / <code>none</code>），外层按模式分派</td></tr>
+                  <tr><td>取书方法名</td><td><code>download</code> / <code>get_toc</code> / <code>get_chapter</code>，不用 <code>acquire</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended">
+                <h3>目标</h3>
+                <ul>
+                  <li>通用运行时不再出现任何具体插件的名称、模块或实体分支。</li>
+                  <li>业务流按能力遍历插件获取数据，不再按 <code>plugin_key</code> 硬编码查安装与连接。</li>
+                  <li><code>capabilities</code> 与 <code>download_mode</code> 成为承重声明，与实现不一致时在进程启动期报错。</li>
+                  <li>凭据解密只发生在运行时调用边界内，业务 handler 不再接触密文或明文凭据。</li>
+                  <li>保留现有底座能力：连接租约、退避重试、逐项失败、来源记录幂等、带本地修改保护的回滚。</li>
+                </ul>
+              </article>
+              <article class="choice">
+                <h3>非目标</h3>
+                <ul>
+                  <li>不实现插件市场、签名分发或 Web 进程动态 import 用户代码。</li>
+                  <li>不实现 <code>runtime_kind</code> 的 <code>http</code> / <code>managed_process</code> 进程外执行。</li>
+                  <li>不迁移 <code>plugins/captcha/</code> 与 <code>plugins/parser/</code>，二者不属于用户可安装的扩展能力。</li>
+                  <li>不改动 Calibre 主库结构，也不改动已有的书籍、笔记业务表结构。</li>
+                  <li><code>plugins/sending/</code> 的 6 个设备推送器是否纳入，本方案只记录判断，不在本次实现（见决策 D-7）。</li>
+                </ul>
+              </article>
+            </div>
+            <div class="callout">
+              <strong>验收目标：</strong>在 <code>webserver/services/plugin_runtime.py</code> 与 <code>webserver/handlers/book.py</code> 中，
+              <code>grep -c "talebook\.\|weread"</code> 结果为 0；新增一个 annotations 插件无需修改运行时任何一行代码即可正确落库。
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>3. 现状、根因与证据</h2>
+
+            <h3>3.1 根因：契约无类型，所以泛化无从谈起</h3>
+            <p><code>ProviderItem.data</code> 是无类型 dict，运行时拿到它无法解释，只能靠 <code>entity_type</code> 字符串猜；而“怎么解释”的知识只存在于唯一的生产者里，于是通用运行时直接 import 了那个插件的模块。</p>
+            <div class="table-wrap" role="region" aria-label="隐式 schema 证据" tabindex="0">
+              <table>
+                <thead><tr><th>领域</th><th>schema 实际存在形式</th><th>位置</th></tr></thead>
+                <tbody>
+                  <tr><td>书评</td><td><code>normalized_review()</code>，14 个关键字参数的 dict 构造器</td><td><code>plugins/runtime/enrichment.py:140</code></td></tr>
+                  <tr><td>书源条目</td><td><code>_normalize()</code>，13 个关键字参数，含格式白名单与 ISBN 清洗</td><td><code>plugins/runtime/book_sources.py:87</code></td></tr>
+                  <tr><td>笔记</td><td><strong>无构造器</strong>，仅靠两个文件里互相匹配的 9 个字符串字面量</td><td>生产 <code>runtime/weread.py:271</code> ／ 消费 <code>services/weread_annotations.py:316</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout good"><strong>关键判断：</strong>前两个已经是写成 dict 构造器的 dataclass，字段名、默认值与校验逻辑都在，唯独没有类型。本方案主要工作是把它们原地升格，而非新造抽象。</div>
+
+            <h3>3.2 由此产生的具体缺陷</h3>
+            <div class="table-wrap" role="region" aria-label="现状缺陷证据" tabindex="0">
+              <table>
+                <thead><tr><th>编号</th><th>现象</th><th>证据位置</th></tr></thead>
+                <tbody>
+                  <tr><td>F-1</td><td>通用写入与回滚路径在函数体内 import weread 专属模块；任何 annotations 插件落库都会被打上 <code>source_name="weread"</code>、<code>source_type="weread_book"</code>、client id 前缀 <code>"weread:"</code></td><td><code>plugin_runtime.py:535,732</code>；<code>weread_annotations.py:24,99,201</code></td></tr>
+                  <tr><td>F-2</td><td><code>SafeHttpClient</code>（私网段拦截、逐跳重定向校验、响应限长）只被 book_sources 使用；<code>enrichment._http_json</code> 仅校验 scheme，而 BRS 的 <code>endpoint</code> 由管理员自由填写</td><td><code>enrichment.py:67,552,568</code></td></tr>
+                  <tr><td>F-3</td><td>通用动作端点硬编码拒绝某个具体插件，根因是不透传 <code>input_data</code></td><td><code>handlers/plugins.py:354-358</code></td></tr>
+                  <tr><td>F-4</td><td>三个文本工具改写用户书库文件，但不产生任何 <code>PluginRun</code>；备份目录不在任何 UI 中</td><td><code>handlers/plugins.py:508,587,688</code></td></tr>
+                  <tr><td>F-5</td><td><code>capabilities</code> 全仓库零派发；<code>book.py</code> 只能硬编码 plugin_key 与中文连接名，并在 handler 内手动解密凭据</td><td><code>handlers/book.py:544-576</code></td></tr>
+                  <tr><td>F-6</td><td>中文显示名 <code>"微信读书"</code> / <code>"内置连接"</code> 被当作连接查询键，已抄写三处</td><td><code>plugins.py:782</code>；<code>book.py:562</code>；<code>plugin_runtime.py:135</code></td></tr>
+                  <tr><td>F-7</td><td><code>ui</code> 与 <code>connection_owners</code> 已被消费却不在必填集、不校验；后者缺失时安全判定 fail-open 到 <code>["instance","user"]</code></td><td><code>protocol.py:16</code>；<code>plugin_runtime.py:234</code></td></tr>
+                  <tr><td>F-8</td><td>无任何 ABC / Protocol；<code>register()</code> 不检查 <code>execute</code> 是否存在，契约违反被降级为运行时 <code>AttributeError</code> 并被兜底成通用错误码</td><td><code>plugin_runtime.py:54-57,438</code></td></tr>
+                  <tr><td>F-9</td><td><code>config_schema</code> 后端零校验，仅供前端渲染表单；任意键值可进入 <code>connection.config</code> 并流入 <code>context["config"]</code></td><td><code>plugin_runtime.py:333-350</code></td></tr>
+                  <tr><td>F-10</td><td>六个壳插件名称写死在四层；<code>handlers/plugins.py</code> 1002 行混装通用 CRUD、weread 专属与 booktools 专属</td><td><code>index.vue:727-744</code>；<code>plugins.py:88-102</code></td></tr>
+                  <tr><td>F-11</td><td><code>next_cursor</code> 混用两种语义：增量水位与分页位置。运行时无续拉循环，插件必须自行在内部把所有页抓完</td><td><code>plugin_runtime.py:646</code>；<code>weread.py:394</code>；<code>mock.py:84</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>3.3 能力声明与实现的分裂</h3>
+            <p>两个功能最完整的插件，其能力都声明在插件目录里、实现在另一个系统里、走专属路由：</p>
+            <div class="table-wrap" role="region" aria-label="能力分裂证据" tabindex="0">
+              <table>
+                <thead><tr><th>插件</th><th>manifest 声明</th><th><code>execute()</code> 实际实现</th><th>其余能力实现在</th></tr></thead>
+                <tbody>
+                  <tr><td>微信读书</td><td>8 个 capability，3 个 category</td><td><strong>仅 <code>annotations.import</code></strong></td><td>6 个 <code>integrations.*</code> 在 <code>query()</code>（协议外）；<code>metadata.lookup</code> 在 <code>plugins/meta/weread/</code>（另一套系统）</td></tr>
+                  <tr><td>Legado 书源</td><td>browse / search / acquire</td><td><strong>仅返回一句健康信息</strong></td><td><code>services/booksource/</code> 10 个文件 + <code>/api/network/*</code> 12 条路由</td></tr>
+                  <tr><td>3 个文本工具</td><td>3 个 <code>integrations.*</code></td><td><strong>仅返回一句健康信息</strong></td><td><code>/api/plugins/tools/*</code> 5 条路由，无 run 记录</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>事实与推断：</strong>以上全部为读代码确认的事实。尚未验证的假设是“把 <code>_fetch_all</code> 的内部分页改为平台续拉后，微信读书大账号的导入不会超时”——实现阶段需用真实账号或构造的多页 mock 验证，见测试计划 T-7。</div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>4. 接口设计</h2>
+            <div class="callout good"><strong>方案结论：</strong>所有权按“谁懂这个数据谁定义它”划分——领域类型由平台定义，取数由插件实现，落库由平台按类型派发。插件不再决定数据如何进入 Talebook 的表，平台不再需要知道数据来自哪个插件。</div>
+
+            <h3>4.1 三层命名</h3>
+            <div class="table-wrap" role="region" aria-label="命名分层" tabindex="0">
+              <table>
+                <thead><tr><th>层</th><th>后缀</th><th>是什么</th><th>示例</th></tr></thead>
+                <tbody>
+                  <tr><td>能力接口</td><td><code>XxxProvider</code></td><td><code>typing.Protocol</code>，只声明签名</td><td><code>MetadataProvider</code></td></tr>
+                  <tr><td>共享实现基类</td><td><code>XxxBase</code></td><td>具体类，供同族插件复用逻辑</td><td><code>SourceBase</code>（现 <code>SourceProvider</code>）</td></tr>
+                  <tr><td>具体插件</td><td><code>XxxPlugin</code></td><td>注册进 REGISTRY 的实例</td><td><code>WereadPlugin</code>、<code>OPDSPlugin</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>用 <code>Protocol</code> 而非 ABC：现有 26 个 provider 均不继承任何基类，<code>Protocol</code> 可零改动加上类型检查。</p>
+
+            <h3>4.2 领域类型</h3>
+            <pre><code>@dataclass(frozen=True)
+class ItemFailure:
+    external_id: str
+    error_code: str
+    error_message: str
+
+@dataclass(frozen=True)
+class Page(Generic[T]):
+    items: list[T]
+    failures: list[ItemFailure] = field(default_factory=list)   # 逐项失败内联，保留 partial 语义
+    has_more: bool = False                                      # True：next_cursor 是分页位置
+    next_cursor: dict = field(default_factory=dict)             # False：是增量水位
+    health_message: str = ""
+
+# 由现有 dict 构造器原地升格
+class BookMetadata:   ...   # 来自 plugins/meta/* 与 enrichment 的元数据形状
+class Annotation:     ...   # 来自 weread.py:271 与 weread_annotations.py:316 的 9 个键
+class Review:         ...   # 来自 normalized_review() 的 14 个参数
+class SourceBook:     ...   # 来自 _normalize() 的 13 个参数（列表条目）
+class SourceBookDetail: ... # 详情，含 toc_id / acquisition_url / downloadable
+class SourceChapter:  ...   # 来自 engine.Chapter
+class SourceContent:  ...   # 来自 engine.ChapterContent</code></pre>
+            <div class="callout"><strong>保留原设计最正确的决定：</strong>逐项失败内联（<code>failures</code>）必须保住。它让“10 条成功 2 条失败”形成 <code>partial</code>，成功项照常落库、失败项可单独 retry；若改用抛异常表达逐项失败，就只能全盘回退。</div>
+
+            <h3>4.3 七个能力接口</h3>
+            <div class="table-wrap" role="region" aria-label="能力接口清单" tabindex="0">
+              <table>
+                <thead><tr><th>接口</th><th>方法</th><th>模式</th><th>现有实现数</th></tr></thead>
+                <tbody>
+                  <tr><td><code>MetadataProvider</code></td><td><code>search_books</code> / <code>get_metadata</code></td><td>read</td><td>3 + 13 legacy + weread</td></tr>
+                  <tr><td><code>AnnotationProvider</code></td><td><code>list_annotations</code> / <code>push_annotation</code></td><td>read / <strong>sync</strong></td><td>2</td></tr>
+                  <tr><td><code>ReviewProvider</code></td><td><code>get_reviews</code></td><td>read</td><td>7</td></tr>
+                  <tr><td><code>SourceProvider</code></td><td>见第 5 节</td><td>全部 read</td><td>8 + Legado + weread 书架</td></tr>
+                  <tr><td><code>TransformProvider</code></td><td><code>preview</code> / <code>apply</code></td><td>read / <strong>write</strong>（唯一真 write）</td><td>3</td></tr>
+                  <tr><td><code>ExtraFeatureProvider</code></td><td><code>execute(action, params)</code></td><td>按 action 声明</td><td>1（weread）</td></tr>
+                  <tr><td><code>PushProvider</code></td><td><code>push</code></td><td>sync</td><td>6，本次不实现</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>4.3.1 TransformProvider 签名与触发配置</h3>
+            <pre><code>class TransformProvider(Protocol):
+    supported_formats: frozenset[str]           # {"EPUB", "TXT"}
+    supports_auto_trigger: bool = False         # 仅客观可判定的处理（如编码修复）可为 True
+
+    def preview(self, src: ToolInput, ctx) -&gt; ToolReport: ...              # read，不改书
+    def apply(self, src: ToolInput, out_dir: str, ctx) -&gt; ToolOutput: ...  # write，改书
+
+# config_schema 中的动态触发选项，用户可随时切换
+"config_schema": {
+    "type": "object",
+    "properties": {
+        "trigger": {"type": "string", "enum": ["manual", "auto"], "default": "manual"},
+    },
+}</code></pre>
+            <p><code>supports_auto_trigger=False</code> 的插件，其 <code>config_schema</code> 不包含 <code>auto</code> 选项，前端也不渲染该开关——避免让用户配出一个平台会拒绝执行的组合。</p>
+
+            <h3>4.4 ExtraFeatureProvider 与它的约束</h3>
+            <p>通用 <code>execute(action, params)</code> 不是错的设计，错的是它当了唯一接口。现在它退回第 7 个接口，专门装标准化不了的东西——插件自带的、只有其工作台界面懂的功能。</p>
+            <pre><code>class ExtraFeatureProvider(Protocol):
+    def execute(self, action: str, params: dict, ctx: PluginContext) -&gt; dict: ...
+
+# manifest 声明白名单，平台按 schema 校验参数
+"extra_features": {
+    "statistics":         {"mode": "read", "schema": {...}},
+    "popular_highlights": {"mode": "read", "schema": {...}},
+    "underline_stats":    {"mode": "read", "schema": {...}},
+}
+
+# 单条通用路由取代所有插件专属查询路由
+POST /api/plugins/{plugin_key}/features/{action}</code></pre>
+            <div class="callout danger">
+              <strong>必须设的约束</strong>，否则逃生舱会变成绕过类型系统的万能后门：
+              <ol>
+                <li>返回裸 dict 只允许出现在这一个接口，其余六个必须返回领域类型。</li>
+                <li>能映射到标准接口的必须映射。评审判据：如果一个 action 返回的东西本质上是书、笔记、评分、书源条目之一，它就不该在 <code>extra_features</code> 里。</li>
+              </ol>
+              按此判据，微信读书 11 个 operation 中只有 3 个够格留在 extra。
+            </div>
+
+            <h3>4.5 capabilities 成为承重声明</h3>
+            <pre><code>CAPABILITY_INTERFACES = {
+    "metadata.lookup":     MetadataProvider,
+    "annotations.import":  AnnotationProvider,
+    "reviews.import":      ReviewProvider,
+    "book_sources.search": SourceProvider,
+    "book_sources.browse": SourceProvider,
+    "integrations.tool":   TransformProvider,      # 三个文本工具同属一个能力：都是对 book content 做处理
+    "push.device":         PushProvider,
+}
+
+def register(self, plugin):
+    manifest = PluginManifest.validate(plugin.manifest)
+    if not callable(getattr(plugin, "execute", None)) and not _implements_any(plugin):
+        raise TypeError("%r 未实现任何能力接口" % type(plugin).__name__)
+    for cap in manifest.raw["capabilities"]:
+        iface = CAPABILITY_INTERFACES.get(cap)
+        if iface and not isinstance(plugin, iface):
+            raise TypeError("%s 声明了 %s 但未实现 %s" % (plugin, cap, iface.__name__))</code></pre>
+            <p>声明了却没实现 → 进程启动即失败；实现了却没声明 → 平台不会调用它。<code>capabilities</code> 从装饰字段变为承重字段，同时解决 F-5 与 F-8。</p>
+            <div class="callout"><strong>capability 不做过度切分：</strong>原有 <code>integrations.content_edit</code> / <code>content_convert</code> / <code>encoding_fix</code> 三个能力串合并为一个 <code>integrations.tool</code>。三者都是对书籍正文做处理，形状相同、权限相同、UI 分组相同，切成三份只增加维护成本而不携带任何平台可用的信息。</div>
+          </section>
+
+          <section id="booksource" class="card">
+            <h2>5. 书源接口（按 Legado 与微信读书实测签名校准）</h2>
+            <p>书源是能力面最宽的一类。接口按功能最完整的 Legado 校准，再回套 OPDS，反向做一定会漏。</p>
+
+            <h3>5.1 实测链路</h3>
+            <pre><code># Legado：identity 是 URL，且 toc_url 与 book_url 是两个不同的 URL
+detail   = engine.book_info(book_url)      # → BookDetail（内含 toc_url）
+chapters = engine.toc(detail.toc_url)      # ← 必须用 toc_url
+body     = engine.content(ch.url, clean)   # ← chapter_url
+
+# 微信读书：两层嵌套分页，三种不同的分页键
+notebooks = loop(/user/notebooks, lastSort)       # 外层
+for book in notebooks:
+    marks   = /book/bookmarklist(bookId)
+    reviews = loop(/review/list/mine, synckey)    # 内层</code></pre>
+
+            <h3>5.2 接口</h3>
+            <pre><code>DownloadMode = Literal["single_book", "by_chapters", "none"]
+
+class SourceProvider(Protocol):
+    download_mode: DownloadMode      # 由 manifest 声明，register 期按模式校验方法
+
+    # 找书
+    def search(self, query: str, cursor: Cursor, ctx) -&gt; Page[SourceBook]: ...           # read
+    def browse(self, category_id: str, cursor: Cursor, ctx) -&gt; Page[SourceBook]: ...     # read
+    def get_categories(self, ctx) -&gt; list[Category]: ...                                 # read
+    # 详情（必需）
+    def get_book(self, external_id: str, ctx) -&gt; SourceBookDetail: ...                   # read
+    # download_mode == "single_book"
+    def download(self, book: SourceBookDetail, ctx) -&gt; BookFile: ...                     # read（只取回字节，入库由平台负责）
+    # download_mode == "by_chapters"
+    def get_toc(self, book: SourceBookDetail, ctx) -&gt; list[SourceChapter]: ...           # read
+    def get_chapter(self, chapter: SourceChapter, ctx) -&gt; SourceContent: ...             # read
+    # 运维
+    def self_check(self, ctx) -&gt; CheckReport: ...                                        # read</code></pre>
+            <div class="callout warn">
+              <strong>三处按实测修正：</strong>
+              <ul>
+                <li><code>get_toc</code> 收 <code>SourceBookDetail</code> 而非 <code>external_id</code>——否则插件内部要为拿 <code>toc_url</code> 再发一次 <code>book_info</code> 请求。平台在 <code>download_book</code> 中本就先调 <code>get_book()</code>，detail 顺传零成本。</li>
+                <li><code>get_chapter</code> 收 <code>SourceChapter</code> 而非 <code>chapter_id</code>——Legado 的 <code>content()</code> 吃的是 <code>ch.url</code>。</li>
+                <li><code>Category.id</code> 与 <code>external_id</code> 必须是<strong>完全不透明</strong>的字符串。Legado 用 URL 作 identity，平台不得解析、拼接或当整数使用。</li>
+              </ul>
+            </div>
+
+            <h3>5.3 取书由平台按模式编排</h3>
+            <pre><code>REQUIRED_BY_MODE = {
+    "single_book": ("download",),
+    "by_chapters": ("get_toc", "get_chapter"),
+    "none":        (),
+}
+
+def download_book(plugin, external_id, ctx):
+    book = plugin.get_book(external_id, ctx)            # 两种模式都先拿详情
+    if plugin.download_mode == "single_book":
+        return import_file(plugin.download(book, ctx))
+    if plugin.download_mode == "by_chapters":
+        return assemble_from_chapters(plugin, book, plugin.get_toc(book, ctx), ctx)
+    raise PluginRuntimeError("book_source.download_unsupported", "该书源不支持下载入库")</code></pre>
+            <p><code>assemble_from_chapters</code> 由现有 <code>SaveOnlineBookService._do_save()</code> 提为通用编排，承担 N 次 <code>get_chapter</code> 的限流、进度、断点、部分失败与组装入库；插件一行都不写。<code>get_toc</code> / <code>get_chapter</code> 是 read 模式无副作用，<strong>在线阅读直接复用它们</strong>，不经过 <code>download_book</code>。</p>
+
+            <h3>5.4 落位矩阵</h3>
+            <div class="matrix-legend">
+              <span class="matrix-yes">支持</span>
+              <span class="matrix-no">不支持</span>
+              <span class="matrix-note">weread 书架为“仅浏览”合法形态：两种取书方式都不支持，UI 不显示导入按钮。</span>
+            </div>
+            <div class="table-wrap" role="region" aria-label="书源方法落位矩阵" tabindex="0">
+              <table class="feature-matrix">
+                <thead><tr><th>方法</th><th>OPDS 族</th><th>Gutenberg</th><th>WebDAV</th><th>WatchFolder</th><th>Legado</th><th>weread 书架</th></tr></thead>
+                <tbody>
+                  <tr><td><code>search</code></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td></tr>
+                  <tr><td><code>browse</code> / <code>get_categories</code></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td></tr>
+                  <tr><td><code>get_book</code></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td></tr>
+                  <tr><td><code>download</code></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td></tr>
+                  <tr><td><code>get_toc</code> / <code>get_chapter</code></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">✓</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td></tr>
+                  <tr><td><code>download_mode</code></td><td class="matrix-cell">single_book</td><td class="matrix-cell">single_book</td><td class="matrix-cell">single_book</td><td class="matrix-cell">single_book</td><td class="matrix-cell"><strong>by_chapters</strong></td><td class="matrix-cell"><strong>none</strong></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p><code>download_mode</code> 随 <code>to_public_dict()</code> 到前端，UI 不再按 <code>manage_kind</code> 硬编码猜测：<code>by_chapters</code> 显示在线阅读入口，<code>none</code> 只显示跳转外链。</p>
+            <div class="callout"><strong>边界情况：</strong><code>download_mode</code> 是书源级静态声明，不随书变化。个别书取不到文件（如 Internet Archive 部分条目无 EPUB）由 <code>SourceBookDetail.downloadable</code> 表达，不得让 <code>download_mode</code> 动态化，否则 register 期校验与前端静态判断同时失效。</div>
+          </section>
+
+          <section id="runtime" class="card">
+            <h2>6. 运行时与调用模式</h2>
+
+            <h3>6.1 read / write / sync 三种模式</h3>
+            <p>判据是<strong>插件行为的副作用方向</strong>，不是平台拿到结果后做什么。平台把读来的数据落库，那是平台的编排，与插件方法的模式无关。</p>
+            <div class="table-wrap" role="region" aria-label="调用模式对比" tabindex="0">
+              <table>
+                <thead><tr><th>维度</th><th>read</th><th>write</th><th>sync</th></tr></thead>
+                <tbody>
+                  <tr><td>方向</td><td>外部 → 平台</td><td>平台内部（改书）</td><td>平台 → 外部</td></tr>
+                  <tr><td>插件做什么</td><td>取数并返回，无副作用</td><td>修改本地书籍正文</td><td>把本地数据写进外部服务</td></tr>
+                  <tr><td>典型方法</td><td><code>search_books</code> / <code>list_annotations</code> / <code>download</code> / <code>get_chapter</code></td><td><code>TransformProvider.apply</code></td><td><code>push_annotation</code> / <code>PushProvider.push</code></td></tr>
+                  <tr><td>所需 scope</td><td><code>*.read</code></td><td><code>books.write</code></td><td><code>*.sync</code></td></tr>
+                  <tr><td>必须审计 run</td><td>否（批量摄入的 run 由平台编排产生）</td><td>是</td><td>是</td></tr>
+                  <tr><td>幂等要求</td><td>无</td><td>按备份恢复</td><td><strong>必须</strong>，避免重复推送</td></tr>
+                  <tr><td>回滚</td><td>不适用</td><td>文件备份恢复</td><td><strong>可能不可用</strong>，外部服务未必支持删除</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout warn">
+              <strong>此处修正了先前的错误定义。</strong>早先把模式判据定为“是否修改 Talebook 的数据”，据此把 <code>list_annotations</code> 与 <code>download</code> 划为 write。这是错的：插件只是从远端<strong>读</strong>，写库的是平台。
+              按修正后的判据，<code>download</code> 只负责取回字节，取回之后如何入库是上层业务逻辑的事，与插件无关，因此是 <strong>read</strong>；
+              真正的 write 只有修改书籍正文这一类，目前仅 <code>TransformProvider.apply</code>。
+            </div>
+            <div class="callout good">
+              <strong>模式决定权限与安全约束，不决定平台编排。</strong>
+              平台调 <code>list_annotations</code>（read）后把结果落库，仍然会创建 <code>PluginRun</code> 与来源记录、推进游标——那是平台摄入流程的职责，不因方法是 read 而取消。
+              模式回答的是三个问题：需要哪种 scope、是否必须留审计、失败后能否回滚。
+            </div>
+            <div class="callout good"><strong>顺带收口的安全问题：</strong>三种模式与 <code>permissions</code> 已有的 <code>books.read</code> / <code>books.write</code> 词汇同轴，运行时可在派发前强制校验 scope。当前 <code>context["scopes"]</code> 只是传给插件、指望其自觉，执行期从不检查。</div>
+
+            <h3>6.1.1 sync 模式：外部回写</h3>
+            <p>协议此前只能单向摄入。新增 sync 后，插件可以把 Talebook 的数据写回外部服务，典型场景是把用户在 Talebook 里做的划线笔记回写到 BRS。</p>
+            <pre><code>class AnnotationProvider(Protocol):
+    def list_annotations(self, ctx) -&gt; Page[Annotation]: ...                       # read
+    def push_annotation(self, item: Annotation, state: SourceState, ctx) -&gt; PushReceipt: ...  # sync
+
+@dataclass(frozen=True)
+class PushReceipt:
+    source_annotation_id: str = ""
+    source_position: str = ""
+    source_raw_hash: str = ""
+    source_updated_at: str = ""</code></pre>
+            <div class="callout">
+              <strong>这不是从零设计：</strong><code>webserver/services/annotation_sync.py</code> 已经实现了完整的扇出机制——
+              <code>register_writer(source_name, writer, source_connection_id)</code> 注册钩子、
+              <code>AnnotationSource</code> 表记录每个来源的 <code>pending</code> / <code>synced</code> / <code>failed</code> 状态与错误、
+              <code>exclude_source_name</code> 防止回写给数据来源本身造成回环。
+              <strong>但生产代码中没有任何一处调用 <code>register_writer</code>，只有测试注册过</strong>（<code>tests/test_annotations.py:310-311</code>）——因为协议里没有 sync 接口，插件无从注册。
+            </div>
+            <p>本方案把这套机制接入协议：平台在连接启用时，自动为每个实现了 <code>push_annotation</code> 的插件连接注册 writer，<code>register_writer</code> 从公开 API 降为内部实现细节。现有 writer 签名 <code>writer(annotation_dict, source_dict) -&gt; dict</code> 正是 <code>push_annotation</code> 的弱类型版本，返回的四个字段直接对应 <code>PushReceipt</code>。</p>
+            <div class="callout danger">
+              <strong>sync 特有的风险：</strong>外部写入通常不可回滚。<code>rollback</code> 对 sync 只能做到“标记来源记录为已撤销并尝试调用插件的删除接口”，插件不支持删除时必须把该项记为 <code>conflict</code> 而非静默成功。回环防护必须保留：从某来源导入的笔记不得再回写给该来源。
+            </div>
+
+            <h3>6.2 运行时入口与实体落库</h3>
+            <pre><code>class PluginRuntime:
+    def read(self, connection, method, *args):
+        """解密凭据 + 超时 + 退避重试 + health 更新；不动游标、不写来源记录"""
+    def write(self, connection, method, input_data=None):
+        """完整 run 状态机 + 游标 + 来源记录 + 回滚"""
+
+# 落库改为按类型派发，if entity_type == "annotation" 与 weread import 一并消失
+WRITERS = {Annotation: AnnotationWriter(), Review: ReviewWriter(), SourceBook: SourceBookWriter()}
+writer = WRITERS[type(item)]</code></pre>
+            <p><code>weread_annotations.py</code> 拆为通用 <code>AnnotationWriter</code>（来源记录、偏移定位、去重、回滚）加微信读书特有的身份策略对象（<code>source_name</code>、external id 前缀、<code>identifiers</code> 匹配字段）。<code>source_name</code> 改为从 <code>connection</code> / <code>plugin_key</code> 推导，不再是模块常量。</p>
+
+            <h3>6.3 业务流调用形态</h3>
+            <pre><code># handlers/book.py —— 不再出现任何 plugin_key 或中文连接名
+for conn in runtime.connections_for("metadata.lookup", self.user_id()):
+    tasks[conn.plugin_key] = lambda c=conn: runtime.read(c, "search_books", query)</code></pre>
+            <p>凭据解密收回运行时边界内，handler 不再接触 <code>SecretCipher</code>；调用同时产生 health 更新与审计，管理页不会再出现“显示健康但实际一直 401”。</p>
+
+            <h3>6.4 协议字段收口</h3>
+            <div class="table-wrap" role="region" aria-label="协议字段处置" tabindex="0">
+              <table>
+                <thead><tr><th>字段</th><th>现状</th><th>处置</th></tr></thead>
+                <tbody>
+                  <tr><td><code>connection_owners</code></td><td>事实字段，缺失时 fail-open</td><td>提升为必填，取值限于 <code>{"instance","user"}</code>，<strong>取消默认值</strong></td></tr>
+                  <tr><td><code>ui</code> / <code>description</code></td><td>事实字段，不校验</td><td>声明为可选但类型受限；<code>manage_kind</code> 改为 <code>manage_route</code></td></tr>
+                  <tr><td><code>config_schema</code></td><td>后端零校验</td><td>落地校验：类型、必填、未知键拒绝</td></tr>
+                  <tr><td>未知键</td><td>完全放行</td><td>不在已知集合且不以 <code>x-</code> 开头即报 <code>manifest.unknown_field</code></td></tr>
+                  <tr><td><code>next_cursor</code></td><td>两种语义混用，运行时不续拉</td><td><code>Page.has_more</code> 显式区分分页位置与增量水位，续拉由平台统一编排</td></tr>
+                  <tr><td><code>schedule</code></td><td>存了、可设置，无调度器读取</td><td>本次不实现调度；前端隐藏该字段，避免用户误以为生效</td></tr>
+                  <tr><td><code>runtime_kind</code> 的 http / file</td><td>声明了但不改变调用方式</td><td>本次不实现进程外执行；在 <code>PluginGuide.md</code> 标注“v1 仅声明，不生效”</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="callers" class="card">
+            <h2>7. 上层调用形态</h2>
+            <p>接口设计是否成立，最终由调用方是否变简单来检验。以下四个场景取自当前真实入口，左列为现状，右列为按本方案改造后的形态。</p>
+
+            <h3>7.1 元数据查询 —— 编辑书籍时拉取候选</h3>
+            <p>入口：<code>GET /api/book/{id}/refer</code> → <code>BookRefer._build_search_tasks()</code>（<code>handlers/book.py:377</code>）</p>
+            <div class="grid">
+              <article class="choice">
+                <h3>现状</h3>
+                <pre><code>tasks = {}
+sources = CONF.get(META_SELECTED_SOURCES, [...])
+if "douban" in sources:
+    tasks["douban"] = lambda: DoubanBookApi(...).search_books(title)
+if "neodb" in sources:
+    tasks["neodb"] = ...
+# ...12 个 elif 分支...
+
+# 微信读书：额外 33 行硬编码
+weread = self._weread_metadata_api()   # 查 installation
+                                       # 查 connection（中文名匹配）
+                                       # 手动 SecretCipher.decrypt
+if weread is not None:
+    tasks[WEREAD_META_KEY] = lambda: weread.search(title)</code></pre>
+              </article>
+              <article class="choice recommended">
+                <h3>之后</h3>
+                <pre><code>conns = runtime.connections_for("metadata.lookup", self.user_id())
+results = runtime.read_many(conns, "search_books", query, timeout=self.REFER_TIMEOUT)
+# → dict[plugin_key, list[BookMetadata] | Failure]，内部并发</code></pre>
+                <p><strong>消掉：</strong>12 个 <code>elif</code> 分支、33 行 weread 硬编码、handler 内的凭据解密。</p>
+                <p><strong>得到：</strong>每次查询自动更新 <code>connection.health</code>；失败进审计，不再出现「管理页显示健康、实际一直 401」。</p>
+              </article>
+            </div>
+            <div class="callout danger">
+              <strong>并发约束（必须遵守）：</strong>元数据查询必须并发发起。现有 <code>plugin_search_books</code> 与 <code>plugin_search_books_stream</code> 已用 <code>ThreadPoolExecutor</code> 并发跑 <code>tasks</code>，改造后保持并发不变。
+              但现有 task 是纯 API 调用、不碰数据库，而 <code>runtime.read</code> 会更新 <code>connection.health</code>——<strong>多个工作线程共用一个 SQLAlchemy session 不是线程安全的</strong>。
+              因此运行时提供 <code>read_many(connections, method, *args, timeout=…)</code>：
+              <ol>
+                <li>在调用线程内预先解密全部连接的凭据，构造只读的 <code>PluginContext</code>；</li>
+                <li>线程池内只做网络 I/O，worker <strong>不得触碰 session</strong>；</li>
+                <li>join 后回到调用线程统一写 health、<code>last_tested_at</code> 与审计。</li>
+              </ol>
+              流式接口同理：worker 只回结果，session 写入发生在事件循环所在线程。
+            </div>
+            <div class="callout"><strong>兼容性：</strong><code>plugins/meta/</code> 下 13 个 legacy 源需要逐个包一层适配到 <code>MetadataProvider</code>。它们本就各有 <code>KEY</code> 常量与 <code>search()</code> 方法，适配层很薄；迁移期两条路径可并存，<code>connections_for</code> 返回空时回退到旧分支。</div>
+
+            <h3>7.2 发表笔记 —— 用户划线后回写外部服务</h3>
+            <p>入口：<code>POST /api/book/{id}/annotations</code> → <code>handlers/annotations.py:277</code></p>
+            <div class="grid">
+              <article class="choice">
+                <h3>现状</h3>
+                <pre><code>sync_enqueued = bool(not annotation.is_private and content_changed)
+if sync_enqueued:
+    AnnotationSyncService().sync_annotation(
+        annotation.id,
+        exclude_source_name=source_name,
+        exclude_source_connection_id=source_connection_id,
+    )
+
+# AnnotationSyncService._writers 是空的：
+# 生产代码没有任何一处调用 register_writer()</code></pre>
+                <p><strong>结果：</strong>扇出机制完整实现，但没有任何插件能注册进来，笔记实际哪儿也不去。</p>
+              </article>
+              <article class="choice recommended">
+                <h3>之后</h3>
+                <pre><code># handler 一行不改
+AnnotationSyncService().sync_annotation(annotation.id, exclude_source_name=...)
+
+# 平台在连接启用时自动注册，插件只实现 sync 方法
+class BRSPlugin(AnnotationProvider):
+    def list_annotations(self, ctx) -&gt; Page[Annotation]: ...      # read
+    def push_annotation(self, item, state, ctx) -&gt; PushReceipt:   # sync
+        ...</code></pre>
+                <p><strong>得到：</strong>划线回写 BRS 真正可用；<code>AnnotationSource</code> 表已有的 <code>pending/synced/failed</code> 状态与错误信息终于有数据。</p>
+              </article>
+            </div>
+            <div class="callout warn"><strong>回环防护必须保留：</strong>从微信读书导入的笔记不得再回写给微信读书。现有 <code>exclude_source_name</code> + <code>exclude_source_connection_id</code> 已经实现了这一点，接入插件后要确保平台注册的 writer key 与导入时写入的 <code>source_name</code> 一致，否则防护失效。</div>
+
+            <h3>7.3 上传书籍 —— 自动触发正文处理</h3>
+            <p>入口：<code>POST /api/book/upload</code> → <code>BookUpload</code>（<code>handlers/book.py:1463</code>）</p>
+            <div class="grid">
+              <article class="choice">
+                <h3>现状</h3>
+                <pre><code># 上传流程与三个文本工具完全无关。
+# 用户传了一本 GBK 编码的 TXT：
+#   1. 上传，入库，正文乱码
+#   2. 自己发现问题
+#   3. 手动去 /plugins/txt-fixer 页面
+#   4. 搜到这本书，点检测，点修复
+# 且第 4 步不产生任何 PluginRun 记录。</code></pre>
+              </article>
+              <article class="choice recommended">
+                <h3>之后</h3>
+                <pre><code>book_id = self.save_book(...)
+
+for conn in runtime.connections_for("integrations.tool", user_id):
+    plugin = runtime.plugin_of(conn)
+    if fmt not in plugin.supported_formats:
+        continue
+    if conn.config.get("trigger", "manual") != "auto":   # 动态配置，默认手动
+        continue
+    report = runtime.read(conn, "preview", tool_input)     # 先试算
+    if report.counts.get("changed"):
+        runtime.write(conn, "apply", tool_input, out_dir)  # 改书 → 建 run + 备份</code></pre>
+                <p><strong>得到：</strong>编码问题在入库时就修掉；每次自动处理都有 run 记录与备份，可回滚。</p>
+              </article>
+            </div>
+            <div class="callout danger">
+              <strong>这是新增行为，需要单独决策（见 D-11）。</strong>自动改写用户刚上传的文件风险不低：
+              <ul>
+                <li>必须<strong>默认手动</strong>。连接配置 <code>trigger</code> 取 <code>manual</code>（默认，仅工作台手动执行）或 <code>auto</code>（新书入库后自动处理），用户可在插件管理页随时切换，无需重启或重装。</li>
+                <li>必须<strong>先 preview 再 apply</strong>，无变更则不写，避免为没问题的书平白生成一份备份与 run。</li>
+                <li>只有 txt-fixer 适合自动触发（编码错误是客观事实）；text-replace 与 zh-converter 依赖用户意图，<strong>不应</strong>提供自动触发选项。</li>
+                <li>上传是同步请求，正文处理应进后台队列，不阻塞上传响应。</li>
+              </ul>
+            </div>
+
+            <h3>7.4 在线书库浏览 —— 搜索、翻阅与阅读</h3>
+            <p>入口：<code>/api/network/search</code> 等 12 条路由 → <code>handlers/network_library.py</code></p>
+            <div class="grid">
+              <article class="choice">
+                <h3>现状</h3>
+                <pre><code># 只认 Legado 一种书源，直接查表 + 造引擎
+query = self.session.query(BookSourceModel).filter(
+    BookSourceModel.enabled.is_(True))
+sources = query.order_by(*order).all()
+for src in sources:
+    engine = BookSourceEngine(BookSource(src.raw), config=...)
+    engine.search(key, page)
+
+# plugins/runtime/book_sources.py 里那 8 个真 provider
+# 在这个页面上一个都看不到。</code></pre>
+                <p><strong>结果：</strong>「在线书库」实为「Legado 书库」；OPDS / Gutenberg / IA 走的是完全不同的插件页面。</p>
+              </article>
+              <article class="choice recommended">
+                <h3>之后</h3>
+                <pre><code>for conn in runtime.connections_for("book_sources.search", user_id):
+    page = runtime.read(conn, "search", key, cursor)
+    # 结果统一为 Page[SourceBook]，前端不必区分来源类型
+
+# 打开一本书
+book = runtime.read(conn, "get_book", external_id)
+if plugin.download_mode == "by_chapters":
+    toc = runtime.read(conn, "get_toc", book)          # 在线阅读
+    body = runtime.read(conn, "get_chapter", chapter)
+runtime_download_book(conn, external_id)               # 导入入库</code></pre>
+                <p><strong>得到：</strong>在线书库变成真正的聚合搜索——Legado 与 8 个 OPDS 族书源同页出现，用户不需要知道它们后端形态不同。</p>
+              </article>
+            </div>
+            <div class="callout"><strong>并发与超时沿用现状：</strong><code>SearchTaskService</code> 的后台线程池并发、task_id 轮询、逐源超时与部分失败展示保持不变，只是把「遍历 <code>BookSourceModel</code> 造引擎」换成「遍历能力匹配的连接调 <code>runtime.read</code>」。</div>
+
+            <h3>7.5 四个场景共用的调用形态</h3>
+            <pre><code># 唯一需要记住的两行
+for conn in runtime.connections_for(capability, user_id):
+    result = runtime.read(conn, method, *args)     # 或 write / sync</code></pre>
+            <div class="table-wrap" role="region" aria-label="调用方对照" tabindex="0">
+              <table>
+                <thead><tr><th>场景</th><th>capability</th><th>方法</th><th>模式</th></tr></thead>
+                <tbody>
+                  <tr><td>元数据查询</td><td><code>metadata.lookup</code></td><td><code>search_books</code></td><td>read</td></tr>
+                  <tr><td>发表笔记回写</td><td><code>annotations.push</code></td><td><code>push_annotation</code></td><td>sync</td></tr>
+                  <tr><td>上传自动处理</td><td><code>integrations.tool</code></td><td><code>preview</code> → <code>apply</code></td><td>read → write（仅 <code>trigger=auto</code>）</td></tr>
+                  <tr><td>在线书库搜索</td><td><code>book_sources.search</code></td><td><code>search</code></td><td>read</td></tr>
+                  <tr><td>在线阅读</td><td><code>book_sources.search</code></td><td><code>get_toc</code> / <code>get_chapter</code></td><td>read</td></tr>
+                  <tr><td>书源导入入库</td><td><code>book_sources.search</code></td><td><code>download</code> 或 <code>get_toc</code>+<code>get_chapter</code></td><td>read（入库由平台 write）</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout good"><strong>检验标准：</strong>改造后，以上四个 handler 中不应出现任何 <code>plugin_key</code> 字面量、任何 <code>SecretCipher</code> 调用、任何具体插件的 import。这一条并入 T-11 作为可自动检查的验收项。</div>
+          </section>
+
+          <section id="migration" class="card">
+            <h2>8. 迁移路径</h2>
+            <p>按依赖关系排序，不按严重度。第 1 步为纯增量、无兼容性风险，且立即消掉三条路由。</p>
+            <div class="flow">
+              <div class="step"><b>S1 透传 input_data</b><p>通用动作端点补参数，删除 weread 特判与两条冗余路由。allowed_book_ids 仍由服务端按 user_id 重算。</p></div>
+              <div class="step"><b>S2 统一出网</b><p>enrichment 与 weread 改走 SafeHttpClient；公共 API 域名走 allowed_hosts 白名单避免额外 DNS 开销。</p></div>
+              <div class="step"><b>S3 补契约</b><p>领域类型 + 七个 Protocol + PluginContext dataclass + register 期校验。不改任何行为。</p></div>
+              <div class="step"><b>S4 协议收口</b><p>connection_owners 必填、config_schema 落地校验、未知键拒绝、Page.has_more。</p></div>
+            </div>
+            <div class="flow">
+              <div class="step"><b>S5 解耦落库</b><p>EntityWriter 按类型派发，运行时与 weread 解耦；weread_annotations 拆为通用 writer + 身份策略。</p></div>
+              <div class="step"><b>S6 能力查询</b><p>connections_for(capability)；book.py 与 UserWereadQuery 改走 runtime.read，删除手写 health 逻辑与重复解密。</p></div>
+              <div class="step"><b>S7 连接 role</b><p>PluginConnection 增 role 列，唯一约束改为 (installation, owner_type, owner_id, role)，按现有 name 回填。</p></div>
+              <div class="step"><b>S8 书源接口</b><p>先用 Legado 验证接口，再回套 OPDS 8 个；SaveOnlineBookService 提为 assemble_from_chapters。</p></div>
+            </div>
+            <div class="flow">
+              <div class="step"><b>S9 文本工具</b><p>TransformProvider 落地，5 条专属路由收敛；apply 走 write 模式补上审计（解决 F-4）。</p></div>
+              <div class="step"><b>S10 前端收口</b><p>manage_route + provider status() 钩子，消掉 index.vue 7 个 if 与三处写死的 plugin_key。</p></div>
+              <div class="step"><b>S11 拆 handler</b><p>plugins.py 拆为通用 / weread / booktools 三个文件。</p></div>
+              <div class="step"><b>S12 文档</b><p>回写 PluginGuide.md：七个接口、两种模式、异常语义、未生效字段说明。</p></div>
+            </div>
+
+            <h3>迁移成本评估</h3>
+            <div class="table-wrap" role="region" aria-label="迁移成本" tabindex="0">
+              <table>
+                <thead><tr><th>对象</th><th>数量</th><th>改动量</th><th>说明</th></tr></thead>
+                <tbody>
+                  <tr><td>book_sources 族</td><td>8</td><td class="verified">低</td><td><code>_normalize()</code> 已是 <code>SourceBook</code> 构造器，改返回类型即可</td></tr>
+                  <tr><td>enrichment 族</td><td>10</td><td class="verified">低</td><td>7 个由 <code>normalized_review()</code> 覆盖，近乎零改动</td></tr>
+                  <tr><td>weread</td><td>1</td><td class="pending">高</td><td>横跨 4 个接口；吸收 <code>plugins/meta/weread/</code> 后整包删除</td></tr>
+                  <tr><td>Legado</td><td>1</td><td class="pending">高</td><td>从 <code>services/booksource/</code> 接入插件系统，12 条路由收敛</td></tr>
+                  <tr><td>文本工具</td><td>3</td><td class="pending">中</td><td>纯处理核心已无依赖，主要是平台侧编排收回</td></tr>
+                  <tr><td>壳插件</td><td>6</td><td class="verified">低</td><td>本就未实现任何东西，随对应真实现落地而消解</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>9. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended">
+                <h3>影响范围</h3>
+                <ul>
+                  <li><strong>代码：</strong><code>webserver/plugins/runtime/</code>、<code>webserver/plugins/meta/weread/</code>（删除）、<code>webserver/services/plugin_runtime.py</code>、<code>weread_annotations.py</code>、<code>booksource/</code>、<code>webserver/handlers/{plugins,book,network_library}.py</code></li>
+                  <li><strong>API：</strong>删除 8 条单插件专属路由；新增 <code>/api/plugins/{key}/features/{action}</code>；通用动作端点新增 <code>input_data</code></li>
+                  <li><strong>数据：</strong><code>plugin_connections</code> 新增 <code>role</code> 列并改唯一约束</li>
+                  <li><strong>前端：</strong><code>app/pages/admin/plugins/index.vue</code>、<code>app/pages/plugins/*.vue</code>、<code>app/pages/book/[bid]/*</code></li>
+                  <li><strong>manifest：</strong>26 个 provider 全部需补 <code>connection_owners</code>；书源需补 <code>download_mode</code></li>
+                </ul>
+              </article>
+              <article class="choice">
+                <h3>保持不变</h3>
+                <ul>
+                  <li>连接租约、退避重试、逐项失败与 partial、来源记录幂等、带 <code>local_modified</code> 保护的回滚，全部保留。</li>
+                  <li><code>AnnotationSyncService</code> 的扇出流程、<code>AnnotationSource</code> 表结构与回环防护保持不变，仅把 writer 来源从手工注册改为按连接自动注册。</li>
+                  <li>三个异常类型的语义不变（仅更名为 <code>Upstream*</code> 以让出 <code>Provider</code> 词位）。</li>
+                  <li>凭据加密方式、密钥轮换与脱敏器不变。</li>
+                  <li>Calibre 主库与既有书籍 / 笔记业务表结构不变。</li>
+                  <li>已安装插件的 <code>connection.config</code> 与已加密凭据不需要用户重新录入。</li>
+                </ul>
+              </article>
+            </div>
+            <div class="callout danger">
+              <strong>主要风险</strong>
+              <ul>
+                <li><strong>R1 连接失联。</strong>触发：<code>role</code> 迁移回填遗漏，或回填规则与现有中文 name 不匹配 → 用户凭据成为孤儿。监控：迁移后断言每个 installation 下 user 连接数不变。缓解：迁移脚本先只增列并双写，确认无失配再切换查询键。</li>
+                <li><strong>R2 微信读书导入超时。</strong>触发：把 <code>_fetch_all</code> 的内部分页改为平台续拉后，大账号单次 run 超过 30 秒默认超时。监控：T-7 用多页 mock 与真实账号验证。缓解：<code>has_more</code> 续拉每页独立计时并落 run item，超时可断点续拉而非整体失败。</li>
+                <li><strong>R3 Legado 接口回归。</strong>触发：12 条 <code>/api/network/*</code> 路由收敛时改变了在线阅读行为。监控：先补 Legado 端到端测试再动接口。缓解：S8 拆成“先接入插件系统、保留旧路由”与“再删旧路由”两个 PR。</li>
+                <li><strong>R4 register 期新校验导致启动失败。</strong>触发：某个 manifest 缺 <code>connection_owners</code> 或声明与实现不符 → 整个服务起不来。缓解：S3、S4 分两步，S3 先只告警不抛错，确认 26 个 provider 全绿后再在 S4 改为抛错。</li>
+              </ul>
+            </div>
+            <div class="callout">
+              <strong>回滚：</strong>S1–S6、S8–S12 为纯代码改动，按 PR 粒度 revert 即可。
+              S7 涉及库表：<code>role</code> 为新增可空列，回滚只需还原代码，列可保留不删（不影响旧代码路径）；
+              唯一约束的切换必须与代码同 PR，回滚时一并还原。
+            </div>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>10. 测试计划与结果</h2>
+            <div class="callout warn"><strong>WIP 阶段说明：</strong>本方案尚未进入实现，下表全部为计划项，状态一律为待验证。完成后回写实际命令、结果、失败项与未执行原因，不得把未执行项写成已通过。</div>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>编号</th><th>验证项</th><th>方式</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>T-1</td><td>非 weread 的 annotations 插件写入后 <code>source_name</code> 不等于 <code>"weread"</code>，<code>source_type</code> 不等于 <code>"weread_book"</code></td><td>新增 <code>tests/test_plugin_entity_writers.py</code>，用 mock annotations 插件</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-2</td><td>BRS <code>endpoint</code> 指向私网地址被拒，错误码为 <code>book_source.endpoint_blocked</code></td><td>扩充 <code>tests/test_enrichment_connectors.py</code></td><td class="pending">待验证</td></tr>
+                  <tr><td>T-3</td><td>通用动作端点透传 <code>input_data</code> 时，<code>allowed_book_ids</code> 由服务端按 user_id 重算，客户端伪造无效</td><td>扩充 <code>tests/test_plugins_api.py</code>，含私有书越权用例</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-4</td><td>缺 <code>execute</code> 与能力接口的 provider 在 <code>register()</code> 阶段即失败</td><td>扩充 <code>tests/test_plugin_runtime.py</code></td><td class="pending">待验证</td></tr>
+                  <tr><td>T-5</td><td>manifest 缺 <code>connection_owners</code> 时校验失败而非默认放开；未知键被拒绝</td><td>扩充 <code>tests/test_plugin_runtime.py</code></td><td class="pending">待验证</td></tr>
+                  <tr><td>T-6</td><td>越权 scope 的 write 调用被运行时拒绝（当前既无实现也无测试）</td><td>新增用例</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-7</td><td><code>has_more</code> 续拉：多页 mock 下平台正确续拉且不重复落库；单页超时可断点续拉</td><td>新增用例 + 真实微信读书账号手工验证</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-8</td><td>连接改名后仍能按 <code>role</code> 查到；迁移后 user 连接数不变</td><td>新增迁移测试</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-9</td><td>Legado 端到端：search / browse / get_book / get_toc / get_chapter / 整本导入 / 在线阅读</td><td>扩充 <code>tests/test_book_source_plugins.py</code>，用本地 fixture 站点</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-10</td><td>三个文本工具的 <code>apply</code> 产生 <code>PluginRun</code> 与备份路径记录</td><td>扩充 <code>tests/test_texttools.py</code></td><td class="pending">待验证</td></tr>
+                  <tr><td>T-11</td><td><code>grep -c "talebook\.\|weread"</code> 在 <code>plugin_runtime.py</code> 与 <code>book.py</code> 中为 0</td><td>新增 <code>scripts/</code> 检查脚本并接入 CI</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-12</td><td><code>make lint-py</code> / <code>make pytest</code> / <code>make check-design</code> / <code>cd app &amp;&amp; npm run lint</code></td><td>提交前检查</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-13</td><td>界面审查：本分支相对默认分支的全部本地变更，<code>full</code> 模式</td><td><code>interface-review</code> skill；出现 HIGH / MEDIUM 不得转 ACTIVE</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-14</td><td>真实后端体验验证：插件管理页、微信读书工作台、在线书库、文本工具页</td><td>Docker 后端 + Chrome DevTools MCP，桌面与移动、明暗主题</td><td class="pending">待验证</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>界面影响判定：</strong>本方案属于跨模块的大型功能且影响前端消费者（插件管理页、工作台、在线书库、书籍详情），因此<strong>不适用</strong>“无界面影响”豁免，必须执行 T-13。</div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>11. 决策记录</h2>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>编号</th><th>决策</th><th>理由</th><th>被否方案</th></tr></thead>
+                <tbody>
+                  <tr><td>D-1</td><td>用 <code>Protocol</code> 而非 ABC 定义能力接口</td><td>现有 26 个 provider 均不继承任何基类，<code>Protocol</code> 可零改动加类型检查</td><td>ABC：需逐个改继承，改动面无谓扩大</td></tr>
+                  <tr><td>D-2</td><td>三种模式 <code>read</code> / <code>write</code> / <code>sync</code>，判据为<strong>插件行为的副作用方向</strong></td><td>read 是外部→平台、write 是改本地书籍正文、sync 是平台→外部，三者方向互斥且各自需要不同的权限与回滚语义</td><td>两模式且判据为“是否修改 Talebook 数据”——该判据把 <code>download</code> 与 <code>list_annotations</code> 错划为 write，实际写库的是平台不是插件</td></tr>
+                  <tr><td>D-3</td><td>书源用单一胖接口 + 可选方法</td><td>避免协议名组合爆炸；“声明不支持”比“未实现某 Protocol”更直白</td><td>拆 <code>FileAcquireProvider</code> / <code>ChapterReadProvider</code> 三协议</td></tr>
+                  <tr><td>D-4</td><td>取书方式用 <code>download_mode</code> 枚举声明</td><td>一个枚举替掉两个 capability 串加一张映射表；前端可直接据此决定 UI</td><td>用 <code>capabilities</code> 做方法粒度探测</td></tr>
+                  <tr><td>D-5</td><td><code>get_toc</code> / <code>get_chapter</code> / <code>download</code> 收领域对象而非 id</td><td>Legado 的 <code>toc_url</code> 只能从 <code>book_info()</code> 取得；收 id 会导致每次下载多一次 HTTP 请求</td><td>统一收 <code>external_id</code>（形式整齐但有实际性能代价）</td></tr>
+                  <tr><td>D-6</td><td>保留通用 <code>execute(action, params)</code> 作为 <code>ExtraFeatureProvider</code></td><td>通用 execute 不是错的设计，错的是它当了唯一接口；标准化不了的功能需要有合法去处</td><td>强行把阅读统计、社区划线塞进标准接口</td></tr>
+                  <tr><td>D-7</td><td><code>plugins/sending/</code> 的 6 个推送器本次不纳入</td><td>形态确实是插件（需每用户凭据、网络重试、health），但纳入与否取决于插件中心的产品定位，属产品决策</td><td>本次一并纳入（范围过大）；永久排除（形态明显契合，不应关死）</td></tr>
+                  <tr><td>D-8</td><td>文本工具纳入插件体系而非移出</td><td>F-4 的审计缺口必须补，而补审计最自然的锚点就是 <code>PluginRun</code>；走 <code>TransformProvider</code> 是顺手一起解决</td><td>移出插件目录做成“书库工具”（改动更小，但审计仍需另建机制）</td></tr>
+                  <tr><td>D-9</td><td>异常类改名为 <code>Upstream*</code></td><td><code>Provider</code> 已被指定为能力接口后缀，<code>ProviderAuthError</code> 会被误读为接口错误</td><td>保留 <code>Provider*</code>（原判断，因命名约定确定而改变）</td></tr>
+                  <tr><td>D-11</td><td>正文处理提供 <code>trigger</code> 动态配置（<code>manual</code> 默认 / <code>auto</code> 自动处理新书），仅 <code>supports_auto_trigger=True</code> 的插件可选 <code>auto</code></td><td>自动改写用户刚上传的文件不可逆；编码错误是客观事实可自动判定，查找替换与繁简转换依赖用户意图</td><td>全局默认开启；三个工具都提供自动触发</td></tr>
+                  <tr><td>D-13</td><td>提供 <code>runtime.read_many()</code>：凭据预解密、worker 不碰 session、join 后统一写 health</td><td>元数据查询必须并发，但 SQLAlchemy session 非线程安全；把 DB 访问约束在调用线程是唯一不引入 session 池的解法</td><td>每个 worker 各建 session（连接数放大、事务边界难控）；串行查询（首屏明显变慢）</td></tr>
+                  <tr><td>D-12</td><td><code>integrations</code> 下三个 capability 合并为一个 <code>integrations.tool</code></td><td>三者都是对书籍正文做处理，形状、权限、UI 分组完全相同，切分不携带任何平台可用信息</td><td>保留 content_edit / content_convert / encoding_fix 三串（“capability 描述意图”的说法不足以支撑维护成本）</td></tr>
+                  <tr><td>D-10</td><td>先用 Legado 验证书源接口，再回套 OPDS</td><td>Legado 能力面最宽（含分章读取、分类发现、规则体检）；先按 OPDS 定义必然漏项</td><td>先做 8 个 OPDS 族（快但会固化错误抽象）</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>待用户确认事项</h3>
+            <div class="callout warn">
+              <ol>
+                <li><strong>D-7：</strong><code>plugins/sending/</code> 的 6 个设备推送器是否纳入插件中心？影响 <code>PushProvider</code> 是否在本次落地。</li>
+                <li><strong>S 序列拆分粒度：</strong>12 步建议拆成 5 个 PR（S1+S2 / S3+S4 / S5+S6 / S7 / S8–S12），还是按更小粒度逐步合入？</li>
+                <li><strong>R3 缓解：</strong>Legado 的 12 条旧路由是否接受“先并存一个版本再删除”的过渡期？</li>
+              </ol>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>
