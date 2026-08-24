@@ -121,8 +121,8 @@ def test_builtin_capability_bootstrap_is_idempotent_and_keeps_empty_auth_local(d
     first = ensure_builtin_capability_installations(db_session, installed_by=1, settings=settings)
     second = ensure_builtin_capability_installations(db_session, installed_by=1, settings=settings)
 
-    assert len(first) == len(second) == 3
-    assert db_session.query(PluginConnection).count() == 3
+    assert len(first) == len(second) == 6
+    assert db_session.query(PluginConnection).count() == 6
     metadata = next(item for item in first if item.plugin_key == "talebook.metadata.builtin")
     assert metadata.enabled is False
     opds = next(item for item in first if item.plugin_key == "talebook.book-source.opds")

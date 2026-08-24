@@ -356,10 +356,10 @@
   "user": {
     "history": {
       "pageTitle": "阅读记录",
-      "noHistory": "暂无阅读历史。请尽情",
-      "exploreBooks": "畅游书籍的海洋",
-      "exploreBooksEnd": "吧~",
-      "noRecords": "无记录",
+      "noHistory": "暂无阅读历史。请尽情畅游书籍的海洋吧~",
+      "exploreBooks": "",
+      "exploreBooksEnd": "",
+      "noRecords": "暂无记录",
       "onlineReading": "在线阅读",
       "pushedBooks": "推送过的书",
       "browseHistory": "浏览记录"
@@ -390,16 +390,6 @@
     "basicInfo": "基本信息",
     "deviceMgt": "阅读设备",
     "deviceMgtDescription": "管理您的个人阅读设备，仅对您自己可见。全局设备由管理员统一配置，所有用户均可使用。",
-    "history": {
-      "pageTitle": "阅读记录",
-      "noHistory": "暂无阅读历史。请尽情畅游书籍的海洋吧~",
-      "exploreBooks": "",
-      "exploreBooksEnd": "",
-      "noRecords": "暂无记录",
-      "onlineReading": "在线阅读",
-      "pushedBooks": "推送过的书",
-      "browseHistory": "浏览记录"
-    },
     "readingRecord": {
       "pageTitle": "阅读记录",
       "currentlyReading": "在读",
@@ -1685,7 +1675,11 @@
     "item_succeeded": "成功",
     "item_previewed": "已预览",
     "item_skipped": "已跳过",
-    "item_rolled_back": "已回滚"
+    "item_rolled_back": "已回滚",
+    "capContentEdit": "正文编辑",
+    "capContentConvert": "繁简转换",
+    "capEncodingFix": "编码修复",
+    "openTool": "打开工具"
   },
   "theme": {
     "title": "主题管理",
@@ -1704,5 +1698,56 @@
     "deleteConfirm": "确认删除此主题？",
     "defaultTheme": "默认主题",
     "defaultThemeDescription": "TaleBook 原生界面风格"
+  },
+  "bookTools": {
+    "common": {
+      "bookSelect": "选择书籍",
+      "bookHint": "可用格式：{formats}",
+      "bookSearchHint": "输入关键词搜索书库（仅显示含 EPUB / TXT 的书籍）",
+      "typeToSearch": "输入关键词搜索",
+      "noBooks": "没有匹配的书籍",
+      "preview": "预览",
+      "analyze": "检测",
+      "run": "执行",
+      "newBook": "另存为新书",
+      "overwrite": "写回原书",
+      "suffix": "新书标题后缀"
+    },
+    "textReplace": {
+      "title": "正文查找替换",
+      "description": "对书籍的 EPUB / TXT 正文执行查找替换（支持正则）。",
+      "readOnly": "可选择写回原书或另存为新书；原书内容仅在写回模式下会被修改。",
+      "pattern": "查找内容",
+      "replacement": "替换为",
+      "useRegex": "按正则表达式查找",
+      "matched": "命中 {count} 处{truncated}",
+      "truncated": "（仅统计前 20 万字符）",
+      "samples": "命中样本（最多 5 条）",
+      "successNew": "替换完成，命中 {count} 处，已另存为新书 #{id}",
+      "successOverwrite": "替换完成，命中 {count} 处，已写回原书 #{id}"
+    },
+    "txtFixer": {
+      "title": "TXT 编码修复",
+      "description": "检测 TXT 电子书编码（含乱码反转恢复），修复为 UTF-8。",
+      "readOnly": "仅处理 TXT 格式；可选择写回原书或另存为新书。",
+      "mojibake": "已触发乱码反转恢复",
+      "garbage": "疑似非文本",
+      "unrecoverable": "多重误读无法自动恢复",
+      "preview": "修复后预览（前 500 字）",
+      "successNew": "修复完成（编码：{encoding}），已另存为新书 #{id}",
+      "successOverwrite": "修复完成（编码：{encoding}），已写回原书 #{id}"
+    },
+    "zhConverter": {
+      "title": "繁简转换",
+      "description": "对书库书籍执行简体↔繁体中文转换（EPUB / TXT）。",
+      "readOnly": "支持 8 种转换方向；可选增强词表与标题转换。",
+      "direction": "转换方向",
+      "useA5": "启用增强词表（仅繁→简方向生效）",
+      "a5Hint": "仅 t2s / tw2s 方向可用",
+      "convertTitle": "同时转换标题与作者",
+      "backup": "替换前备份原文件",
+      "successNew": "已转换为 {direction} 并另存为新书 #{id}",
+      "successOverwrite": "已转换为 {direction} 并替换原书 #{id}"
+    }
   }
 }

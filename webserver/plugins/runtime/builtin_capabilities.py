@@ -87,4 +87,52 @@ BUILTIN_CAPABILITY_PROVIDERS = (
             },
         )
     ),
+    BuiltinCapabilityProvider(
+        _manifest(
+            "talebook.tool.text-replace",
+            "正文查找替换",
+            "对书籍的 EPUB / TXT 正文执行查找替换（支持正则），可写回原书或另存为新书。",
+            ["integrations"],
+            ["integrations.content_edit"],
+            ["books.read", "books.write"],
+            {
+                "icon": "mdi-find-replace",
+                "manage_kind": "text_replace",
+                "primary_action": "open",
+                "healthy_message": "正文查找替换工具可用",
+            },
+        )
+    ),
+    BuiltinCapabilityProvider(
+        _manifest(
+            "talebook.tool.zh-converter",
+            "繁简转换",
+            "对书库书籍执行简体↔繁体中文转换（EPUB/TXT，8 种方向，可选增强词表）。",
+            ["integrations"],
+            ["integrations.content_convert"],
+            ["books.read", "books.write"],
+            {
+                "icon": "mdi-translate",
+                "manage_kind": "zh_converter",
+                "primary_action": "open",
+                "healthy_message": "繁简转换工具可用",
+            },
+        )
+    ),
+    BuiltinCapabilityProvider(
+        _manifest(
+            "talebook.tool.txt-fixer",
+            "TXT编码修复",
+            "检测 TXT 电子书编码（含乱码反转恢复），修复为 UTF-8 后写回或另存为新书。",
+            ["integrations"],
+            ["integrations.encoding_fix"],
+            ["books.read", "books.write"],
+            {
+                "icon": "mdi-file-restore-outline",
+                "manage_kind": "txt_fixer",
+                "primary_action": "open",
+                "healthy_message": "TXT 编码修复工具可用",
+            },
+        )
+    ),
 )
