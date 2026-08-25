@@ -8,7 +8,6 @@ from concurrent.futures import TimeoutError as FutureTimeoutError
 
 from sqlalchemy import or_
 
-from webserver.constants import AUTO_FILL_META
 from webserver.models import (
     PluginConnection,
     PluginDefinition,
@@ -21,21 +20,19 @@ from webserver.models import (
 )
 from webserver.plugins.runtime import (
     ACTIONS,
-    BOOK_SOURCE_PROVIDERS,
+    ALL_BUILTIN_PROVIDERS,
     BUILTIN_CAPABILITY_PROVIDERS,
-    EXTERNAL_CONNECTOR_PROVIDERS,
-    MockMultiTabProvider,
     PluginContext,
     PluginManifest,
     ProviderAuthError,
     ProviderError,
     ProviderRateLimitError,
     ProviderResult,
-    WereadProvider,
     contract_violations,
 )
 from webserver.plugins.runtime.protocol import ManifestError, validate_against_schema
 from webserver.services.plugin_secrets import SENSITIVE_KEY_RE, SecretCipher, SecretCipherError, redact, secret_mask_hint
+from webserver.services.plugin_writers import writer_for
 
 
 TERMINAL_STATUSES = frozenset({"succeeded", "failed", "partial", "rolled_back"})
@@ -87,14 +84,8 @@ class PluginRegistry:
 
 
 REGISTRY = PluginRegistry()
-REGISTRY.register(MockMultiTabProvider())
-REGISTRY.register(WereadProvider())
-for _builtin_provider in BUILTIN_CAPABILITY_PROVIDERS:
-    REGISTRY.register(_builtin_provider)
-for _book_source_provider in BOOK_SOURCE_PROVIDERS:
-    REGISTRY.register(_book_source_provider)
-for _connector_provider in EXTERNAL_CONNECTOR_PROVIDERS:
-    REGISTRY.register(_connector_provider)
+for _provider in ALL_BUILTIN_PROVIDERS:
+    REGISTRY.register(_provider)
 
 
 def ensure_builtin_definitions(session, registry=REGISTRY):
@@ -136,11 +127,9 @@ def ensure_builtin_capability_installations(session, installed_by, settings, reg
         plugin_key = provider.manifest["id"]
         installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
         if installation is None:
-            enabled = True
-            if plugin_key == "talebook.metadata.builtin":
-                enabled = bool(settings.get(AUTO_FILL_META, False))
             installation = install_builtin(session, plugin_key, installed_by)
-            installation.enabled = enabled
+            # 首次安装时的启用状态由 provider 自己决定，运行时不认识任何具体插件。
+            installation.enabled = provider.initial_enabled(settings)
             session.commit()
         connection = (
             session.query(PluginConnection)
@@ -571,8 +560,6 @@ class PluginRuntime:
             executor.shutdown(wait=False, cancel_futures=True)
 
     def _apply_result(self, run, connection, result, secrets):
-        from webserver.services.weread_annotations import materialize_annotation, prepare_annotation_item
-
         counts = dict(DEFAULT_COUNTS)
         counts["fetched"] = len(result.items)
         batch_book_identities = set()
@@ -604,9 +591,10 @@ class PluginRuntime:
                 )
                 counts["failed"] += 1
                 continue
-            if item.entity_type == "annotation":
+            writer = writer_for(item.entity_type)
+            if writer is not None:
                 allowed_book_ids = (run.input_data or {}).get("allowed_book_ids")
-                safe_data, matched = prepare_annotation_item(
+                safe_data, matched = writer.prepare(
                     self.session,
                     connection,
                     safe_data,
@@ -655,8 +643,8 @@ class PluginRuntime:
                 )
                 continue
             operation, status, record = self._upsert_source_record(run, connection, item, safe_data, payload_hash)
-            if item.entity_type == "annotation" and status != "conflict":
-                materialize_annotation(
+            if writer is not None and status != "conflict":
+                writer.materialize(
                     self.session,
                     run,
                     connection,
@@ -768,8 +756,6 @@ class PluginRuntime:
         return "updated", "succeeded", record
 
     def _rollback(self, run, connection):
-        from webserver.services.weread_annotations import rollback_materialized_annotation
-
         parent = self.session.get(PluginRun, run.parent_run_id)
         records = (
             self.session.query(PluginSourceRecord)
@@ -794,8 +780,9 @@ class PluginRuntime:
                     record.raw_hash,
                 )
                 continue
-            if record.entity_type == "annotation":
-                rollback_materialized_annotation(self.session, record)
+            record_writer = writer_for(record.entity_type)
+            if record_writer is not None:
+                record_writer.rollback(self.session, record)
             record.status = "rolled_back"
             record.rolled_back_at = now
             record.update_time = now

@@ -18,11 +18,18 @@ except ImportError:  # pragma: no cover - production dependencies install zhconv
         return value.translate(_COMMON_TRADITIONAL)
 
 
-from webserver.models import Annotation, AnnotationSource, PluginEntityMatch
+from webserver.models import Annotation, AnnotationSource, PluginConnection, PluginEntityMatch
+from webserver.services.plugin_writers import source_name_for
 
 
+# 微信读书是第一个 annotations 插件，历史数据以此为来源标识；新连接的标识
+# 由 plugin_key 推导（见 plugin_writers.source_name_for），此常量仅作缺省。
 SOURCE_NAME = "weread"
 STRONG_MATCH = 0.9
+
+
+def _book_match_type(source_name):
+    return "%s_book" % source_name
 
 
 def normalize_text(value):
@@ -89,6 +96,8 @@ def book_candidates(calibre_db, source_book, allowed_book_ids=None):
 
 
 def confirm_match(session, connection_id, source_book_id, book_id, user_id, calibre_db, allowed_book_ids):
+    connection = session.get(PluginConnection, connection_id)
+    source_name = source_name_for(session, connection) if connection is not None else SOURCE_NAME
     book_id = int(book_id)
     if book_id not in {int(value) for value in allowed_book_ids} or book_id not in all_book_ids(calibre_db):
         raise ValueError("Selected book is missing or not accessible")
@@ -96,7 +105,7 @@ def confirm_match(session, connection_id, source_book_id, book_id, user_id, cali
         session.query(PluginEntityMatch)
         .filter(
             PluginEntityMatch.connection_id == connection_id,
-            PluginEntityMatch.source_type == "weread_book",
+            PluginEntityMatch.source_type == _book_match_type(source_name),
             PluginEntityMatch.external_id == str(source_book_id),
         )
         .first()
@@ -105,7 +114,7 @@ def confirm_match(session, connection_id, source_book_id, book_id, user_id, cali
     if match is None:
         match = PluginEntityMatch(
             connection_id=connection_id,
-            source_type="weread_book",
+            source_type=_book_match_type(source_name),
             external_id=str(source_book_id),
             create_time=now,
         )
@@ -121,12 +130,13 @@ def confirm_match(session, connection_id, source_book_id, book_id, user_id, cali
 
 
 def resolve_book(session, connection, source_book, calibre_db, allowed_book_ids=None):
+    source_name = source_name_for(session, connection)
     source_book_id = str(source_book.get("provider_id") or "")
     match = (
         session.query(PluginEntityMatch)
         .filter(
             PluginEntityMatch.connection_id == connection.id,
-            PluginEntityMatch.source_type == "weread_book",
+            PluginEntityMatch.source_type == _book_match_type(source_name),
             PluginEntityMatch.external_id == source_book_id,
         )
         .first()
@@ -149,7 +159,7 @@ def resolve_book(session, connection, source_book, calibre_db, allowed_book_ids=
     now = datetime.datetime.now()
     match = PluginEntityMatch(
         connection_id=connection.id,
-        source_type="weread_book",
+        source_type=_book_match_type(source_name),
         external_id=source_book_id,
         book_id=selected["book_id"],
         method=selected["method"],
@@ -197,11 +207,12 @@ def _source_identity(external_id):
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _client_id(external_id):
-    value = "weread:" + str(external_id)
+def _client_id(external_id, source_name=SOURCE_NAME):
+    prefix = "%s:" % source_name
+    value = prefix + str(external_id)
     if len(value) <= 64:
         return value
-    return "weread:" + hashlib.sha256(value.encode("utf-8")).hexdigest()[:56]
+    return prefix + hashlib.sha256(value.encode("utf-8")).hexdigest()[:56]
 
 
 def _normalized_offsets(value):
@@ -281,11 +292,12 @@ def locate_epub_quote(calibre_db, book_id, quote):
 
 
 def materialize_annotation(session, run, connection, record, data, payload_hash, calibre_db):
+    source_name = source_name_for(session, connection)
     source_id = _source_identity(record.external_id)
     source = (
         session.query(AnnotationSource)
         .filter(
-            AnnotationSource.source_name == SOURCE_NAME,
+            AnnotationSource.source_name == source_name,
             AnnotationSource.source_connection_id == str(connection.id),
             AnnotationSource.source_annotation_id == source_id,
         )
@@ -297,7 +309,7 @@ def materialize_annotation(session, run, connection, record, data, payload_hash,
         annotation = Annotation(
             reader_id=run.requested_by,
             book_id=int(data["book_id"]),
-            client_id=_client_id(record.external_id),
+            client_id=_client_id(record.external_id, source_name),
             annotation_type=data.get("annotation_type") or "note",
             is_private=True,
             create_time=_parse_datetime(data.get("user_modified_at")) or now,
@@ -307,7 +319,7 @@ def materialize_annotation(session, run, connection, record, data, payload_hash,
         session.flush()
         source = AnnotationSource(
             annotation_id=annotation.id,
-            source_name=SOURCE_NAME,
+            source_name=source_name,
             source_connection_id=str(connection.id),
             source_annotation_id=source_id,
             create_time=now,
@@ -343,10 +355,12 @@ def rollback_materialized_annotation(session, record):
     annotation = session.get(Annotation, annotation_id)
     if annotation is None:
         return
+    connection = session.get(PluginConnection, record.connection_id)
+    source_name = source_name_for(session, connection) if connection is not None else SOURCE_NAME
     target_sources = [
         source
         for source in annotation.sources
-        if source.source_name == SOURCE_NAME
+        if source.source_name == source_name
         and source.source_connection_id == str(record.connection_id)
         and source.source_annotation_id == _source_identity(record.external_id)
     ]

@@ -26,7 +26,7 @@ from webserver.plugins.runtime import (
 from webserver.plugins.runtime.safe_http import SafeHttpClient
 from webserver.plugins.runtime.weread import validate_weread_query
 from webserver.services.plugin_runtime import PluginRuntime, install_builtin, save_connection
-from webserver.services.weread_annotations import confirm_match, locate_epub_quote, normalize_text
+from webserver.services.annotation_writer import confirm_match, locate_epub_quote, normalize_text
 
 
 SETTINGS = {"PLUGIN_SECRET_KEY": "weread-unit-test-key", "cookie_secret": "unused-cookie-secret"}

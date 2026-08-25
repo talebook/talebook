@@ -1,3 +1,5 @@
+from webserver.constants import AUTO_FILL_META
+
 from .protocol import PROTOCOL_VERSION, ProviderResult
 
 
@@ -9,8 +11,15 @@ class BuiltinCapabilityProvider:
     health checks and durable run history.
     """
 
-    def __init__(self, manifest):
+    def __init__(self, manifest, enabled_setting=None):
         self.manifest = manifest
+        # 首次安装时是否启用：默认启用；给定设置名时跟随该设置。
+        self.enabled_setting = enabled_setting
+
+    def initial_enabled(self, settings):
+        if self.enabled_setting is None:
+            return True
+        return bool(settings.get(self.enabled_setting, False))
 
     def execute(self, context):
         return ProviderResult(health_message=self.manifest["ui"]["healthy_message"])
@@ -55,7 +64,8 @@ BUILTIN_CAPABILITY_PROVIDERS = (
                 "primary_action": "configure",
                 "healthy_message": "内置元数据来源可用",
             },
-        )
+        ),
+        enabled_setting=AUTO_FILL_META,
     ),
     BuiltinCapabilityProvider(
         _manifest(

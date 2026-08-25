@@ -18,8 +18,19 @@ from .protocol import (
 from .weread import WEREAD_PLUGIN_KEY, WereadProvider, parse_weread_export
 
 
+# 内置插件清单。运行时只遍历这个元组，不认识其中任何一个具体插件。
+ALL_BUILTIN_PROVIDERS = (
+    MockMultiTabProvider(),
+    WereadProvider(),
+    *BUILTIN_CAPABILITY_PROVIDERS,
+    *BOOK_SOURCE_PROVIDERS,
+    *EXTERNAL_CONNECTOR_PROVIDERS,
+)
+
+
 __all__ = [
     "ACTIONS",
+    "ALL_BUILTIN_PROVIDERS",
     "CATEGORIES",
     "PROTOCOL_VERSION",
     "ManifestError",

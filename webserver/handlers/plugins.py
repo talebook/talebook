@@ -40,6 +40,7 @@ from webserver.plugins.texttools import (
     replace_preview,
     replace_txt_file,
 )
+from webserver.services.annotation_writer import all_book_ids, confirm_match
 from webserver.services.async_service import AsyncService
 from webserver.services.booktools import get_format_path, import_as_new_book, overwrite_format, pick_format, resolve_book
 from webserver.services.plugin_jobs import execute_plugin_run
@@ -51,7 +52,6 @@ from webserver.services.plugin_runtime import (
     save_connection,
 )
 from webserver.services.plugin_secrets import SecretCipher, SecretCipherError, redact
-from webserver.services.weread_annotations import all_book_ids, confirm_match
 
 
 def _body(handler):
