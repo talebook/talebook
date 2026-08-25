@@ -1,3 +1,4 @@
+import concurrent.futures
 import datetime
 import hashlib
 import json
@@ -537,7 +538,7 @@ class PluginRuntime:
             try:
                 secrets = self._load_secrets(connection)
             except (PluginRuntimeError, SecretCipherError) as exc:
-                failures[plugin_key] = exc
+                failures[connection.id] = exc
                 continue
             provider = self.registry.get(plugin_key)
             context = PluginContext(
@@ -551,6 +552,9 @@ class PluginRuntime:
             ).as_dict()
             prepared.append(
                 {
+                    # 结果以 connection.id 为键：同一插件可能同时存在实例级与用户级
+                    # 连接，用 plugin_key 作键会让其中一个结果被另一个覆盖。
+                    "key": connection.id,
                     "plugin_key": plugin_key,
                     "connection": connection,
                     "secrets": secrets,
@@ -562,7 +566,7 @@ class PluginRuntime:
     def finish_read(self, prepared, results):
         """回到调用线程统一写 health；worker 全程不触碰 session。"""
         for unit in prepared:
-            outcome = results.get(unit["plugin_key"])
+            outcome = results.get(unit["key"])
             failed = isinstance(outcome, Exception)
             if isinstance(outcome, ProviderAuthError):
                 unit["connection"].health = "unauthorized"
@@ -574,16 +578,31 @@ class PluginRuntime:
         return results
 
     def read_many(self, connections, method, *args, timeout=30):
-        """并发调用多个连接的只读方法，自带线程池。"""
+        """并发调用多个连接的只读方法，自带线程池。
+
+        超时是**整批**的墙钟预算，不是每个插件各给一份：逐个 ``future.result(timeout)``
+        会让总耗时累加成 N×timeout。挂死的插件不阻塞返回——线程池不等它退出。
+        """
         prepared, results = self.prepare_read(connections, timeout)
-        if prepared:
-            with ThreadPoolExecutor(max_workers=len(prepared)) as executor:
-                futures = {executor.submit(unit["call"], method, *args): unit for unit in prepared}
-                for future, unit in futures.items():
-                    try:
-                        results[unit["plugin_key"]] = future.result(timeout=timeout)
-                    except Exception as exc:  # 汇总失败，不让单个插件拖垮整批查询
-                        results[unit["plugin_key"]] = exc
+        if not prepared:
+            return self.finish_read(prepared, results)
+
+        executor = ThreadPoolExecutor(max_workers=len(prepared))
+        try:
+            futures = {executor.submit(unit["call"], method, *args): unit for unit in prepared}
+            done, not_done = concurrent.futures.wait(futures, timeout=timeout)
+            for future in done:
+                unit = futures[future]
+                try:
+                    results[unit["key"]] = future.result()
+                except Exception as exc:  # 汇总失败，不让单个插件拖垮整批查询
+                    results[unit["key"]] = exc
+            for future in not_done:
+                future.cancel()
+                results[futures[future]["key"]] = PluginRuntimeError("plugin.timeout", "Plugin read timed out")
+        finally:
+            # wait=False：不为已挂死的插件线程阻塞调用方，其结果不再被采纳。
+            executor.shutdown(wait=False, cancel_futures=True)
         return self.finish_read(prepared, results)
 
     def _load_secrets(self, connection):

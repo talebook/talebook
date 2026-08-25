@@ -298,3 +298,51 @@ class TestGenericActionInputData(TestWithAdminUser):
             body=json.dumps({"input_data": "not-an-object"}),
         )
         self.assertEqual(data["err"], "plugin.request_invalid")
+
+
+class TestConnectionRoleAtRealEntrypoints(TestWithAdminUser):
+    """连接创建入口必须传 role。
+
+    save_connection 有 `role = role or name` 的兼容兜底，因此入口只要漏传 role，
+    就会退回按展示名定位——正是 role 列要根除的失败。原先的测试只覆盖了显式
+    传 role 的路径，恰好绕开了这两个真实入口。
+    """
+
+    def _opds_installation(self):
+        catalog = self.json("/api/admin/plugins")
+        return next(item for item in catalog["installations"] if item["plugin_key"] == "talebook.book-source.opds")
+
+    def test_admin_created_connection_is_keyed_by_role_not_name(self):
+        installation = self._opds_installation()
+        created = self.json(
+            "/api/admin/plugins/connections",
+            method="POST",
+            body=json.dumps({"installation_id": installation["id"], "name": "我的 OPDS", "credentials": {}}),
+        )
+        self.assertEqual(created["err"], "ok")
+        self.assertEqual(created["connection"]["role"], "default", "入口必须传 role，不能退回按名字定位")
+
+        renamed = self.json(
+            "/api/admin/plugins/connections",
+            method="POST",
+            body=json.dumps({"installation_id": installation["id"], "name": "改了个名", "credentials": {}}),
+        )
+        self.assertEqual(renamed["err"], "ok")
+        self.assertEqual(renamed["connection"]["id"], created["connection"]["id"], "改名不得产生第二条连接")
+        self.assertEqual(renamed["connection"]["name"], "改了个名")
+
+    def test_explicit_role_still_allows_multiple_connections(self):
+        installation = self._opds_installation()
+        primary = self.json(
+            "/api/admin/plugins/connections",
+            method="POST",
+            body=json.dumps({"installation_id": installation["id"], "name": "主力", "role": "primary", "credentials": {}}),
+        )
+        backup = self.json(
+            "/api/admin/plugins/connections",
+            method="POST",
+            body=json.dumps({"installation_id": installation["id"], "name": "备用", "role": "backup", "credentials": {}}),
+        )
+        self.assertEqual(primary["err"], "ok")
+        self.assertEqual(backup["err"], "ok")
+        self.assertNotEqual(primary["connection"]["id"], backup["connection"]["id"])

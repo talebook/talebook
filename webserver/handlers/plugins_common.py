@@ -90,7 +90,8 @@ def audit_run(handler, plugin_key, params, owner_type="instance", error_code="pl
         handler.session.add(run)
         handler.session.commit()
 
-    outcome = {"counts": {}, "data": {}}
+    # connection 暴露给调用方：推送等场景需要读写连接配置（如记住设备地址）。
+    outcome = {"counts": {}, "data": {}, "connection": connection}
     try:
         yield outcome
     except Exception as exc:

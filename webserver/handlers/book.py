@@ -48,6 +48,7 @@ from webserver.plugins.parser.txt import get_content_encoding
 from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
 from webserver.plugins.runtime.interfaces import TRIGGER_AUTO, trigger_of
 from webserver.plugins.runtime.protocol import ProviderError
+from webserver.plugins.runtime.push import PUSH_CAPABILITY
 from webserver.services.async_service import AsyncService
 from webserver.services.autofill import AutoFillService
 from webserver.services.booksource.metadata import (
@@ -551,24 +552,37 @@ class BookRefer(BaseHandler):
         runtime = PluginRuntime(self.session, CONF)
         connections = runtime.connections_for(META_LOOKUP_CAPABILITY, self.user_id())
         self._plugin_runtime, self._plugin_units = runtime, []
+        # tasks 以来源名为键（面向用户展示），而 finish_read 需要按 connection.id
+        # 回写 health——同一插件可能同时有实例级与用户级连接，两者不能混用一个键。
+        self._plugin_task_keys = {}
         if connections:
             self._plugin_units, prepare_failures = runtime.prepare_read(connections, timeout=self.REFER_TIMEOUT)
-            for plugin_key, error in prepare_failures.items():
-                logging.warning("插件 %s 凭据不可用：%s", plugin_key, error)
+            for connection_id, error in prepare_failures.items():
+                logging.warning("插件连接 %s 凭据不可用：%s", connection_id, error)
             for unit in self._plugin_units:
+                task_name = unit["plugin_key"]
+                if task_name in tasks:  # 同一插件的多条连接：附连接号以区分
+                    task_name = "%s#%s" % (task_name, unit["key"])
+                self._plugin_task_keys[task_name] = unit["key"]
 
                 def _plugin_lookup(_unit=unit):
                     return _unit["call"]("search_books", title) or []
 
-                tasks[unit["plugin_key"]] = _plugin_lookup
+                tasks[task_name] = _plugin_lookup
 
         return tasks
 
     def _finish_plugin_lookup(self, results):
         """线程池 join 之后回写 health，worker 全程不触碰 session。"""
         units = getattr(self, "_plugin_units", None)
-        if units:
-            self._plugin_runtime.finish_read(units, results)
+        if not units:
+            return
+        by_connection = {
+            connection_id: results[task_name]
+            for task_name, connection_id in getattr(self, "_plugin_task_keys", {}).items()
+            if task_name in results
+        }
+        self._plugin_runtime.finish_read(units, by_connection)
 
     def _plugin_metadata_detail(self, plugin_key, provider_value):
         """按 plugin_key 取详情：连接与凭据都由运行时解析，handler 不接触密文。"""
@@ -580,7 +594,12 @@ class BookRefer(BaseHandler):
         ]
         if not connections:
             return None
-        outcome = runtime.read_many(connections, "get_metadata", provider_value, timeout=self.REFER_TIMEOUT).get(plugin_key)
+        results = runtime.read_many(connections, "get_metadata", provider_value, timeout=self.REFER_TIMEOUT)
+        # 结果以 connection.id 为键；取第一条能给出结果的连接。
+        outcome = next(
+            (results[item.id] for item in connections if results.get(item.id) is not None),
+            None,
+        )
         if isinstance(outcome, Exception):
             raise outcome
         return outcome
@@ -1885,7 +1904,11 @@ class BookSendToDevice(BaseHandler):
             if not mailbox:
                 return {"err": "params.missing", "msg": _("Kindle设备需要提供邮箱地址")}
         else:
-            if not device_type or not device_url:
+            if not device_type:
+                return {"err": "params.missing", "msg": _("设备类型和设备地址不能为空")}
+            # 地址可省略：回落到该用户上次保存在插件连接里的设备地址。
+            device_url = device_url or self._saved_device_url(device_type)
+            if not device_url:
                 return {"err": "params.missing", "msg": _("设备类型和设备地址不能为空")}
 
         # 支持的设备类型
@@ -1929,6 +1952,17 @@ class BookSendToDevice(BaseHandler):
 
         # 没有Kindle支持的格式
         return {"err": "format.not_supported", "msg": _("书籍没有Kindle支持的格式!")}
+
+    def _saved_device_url(self, device_type):
+        """取当前用户在该设备插件连接里保存过的地址。"""
+        provider = PUSH_PROVIDERS_BY_DEVICE.get(device_type)
+        if provider is None:
+            return ""
+        runtime = PluginRuntime(self.session, CONF)
+        for connection in runtime.connections_for(PUSH_CAPABILITY, self.user_id()):
+            if runtime.plugin_key_of(connection) == provider.manifest["id"]:
+                return str((connection.config or {}).get("device_url") or "")
+        return ""
 
     def _send_to_other_device(self, book, book_id, device_type, device_url):
         """通过WiFi上传发送书籍到其他设备"""
@@ -1975,8 +2009,16 @@ class BookSendToDevice(BaseHandler):
                 owner_type="user",
                 error_code="push.failed",
             ) as outcome:
-                provider.push({"path": file_path, "name": book_name}, device_url, {"config": {}})
+                # 连接配置是这些插件纳入插件中心的理由：请求没带地址时回落到
+                # 用户上次保存的设备地址；带了则用它并记住，下次不必重填。
+                connection = outcome["connection"]
+                config = dict(connection.config or {}) if connection is not None else {}
+                provider.push({"path": file_path, "name": book_name}, device_url, {"config": config})
+                # 记住这次用的地址，下次请求可以不带。
+                if connection is not None and config.get("device_url") != device_url:
+                    connection.config = {**config, "device_url": device_url}
                 outcome["counts"] = {"fetched": 1, "written": 1}
+                outcome["data"] = {"device_type": device_type}
             logging.info("[SEND_TO_DEVICE] success: %s -> %s", book_id, device_type)
             return {"err": "ok", "msg": _("书籍发送成功")}
         except ProviderError as exc:

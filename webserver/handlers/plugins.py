@@ -21,6 +21,7 @@ from webserver.services.annotation_writer import all_book_ids
 from webserver.services.async_service import AsyncService
 from webserver.services.plugin_jobs import execute_plugin_run
 from webserver.services.plugin_runtime import (
+    DEFAULT_CONNECTION_ROLE,
     REGISTRY,
     PluginRuntime,
     PluginRuntimeError,
@@ -188,6 +189,9 @@ class AdminPluginConnections(BaseHandler):
                 0,
                 req.get("credentials"),
                 name=req.get("name", "default"),
+                # role 是查询键，name 只是展示文案：不传 role 会退化回按名字定位，
+                # 用户改一次名就会多出一条连接。
+                role=req.get("role") or DEFAULT_CONNECTION_ROLE,
                 config=req.get("config"),
                 scopes=req.get("scopes"),
                 schedule=req.get("schedule", ""),
@@ -249,6 +253,9 @@ class UserPluginConnections(BaseHandler):
                 self.user_id(),
                 req.get("credentials"),
                 name=req.get("name", "default"),
+                # role 是查询键，name 只是展示文案：不传 role 会退化回按名字定位，
+                # 用户改一次名就会多出一条连接。
+                role=req.get("role") or DEFAULT_CONNECTION_ROLE,
                 config=req.get("config"),
                 scopes=req.get("scopes"),
                 schedule=req.get("schedule", ""),

@@ -635,6 +635,36 @@ class TestBook(TestWithUserLogin):
         self.assertEqual(after[-1].status, "succeeded")
         self.assertEqual(after[-1].input_data["device_type"], "boox")
 
+    def test_send_to_device_remembers_and_reuses_the_device_address(self):
+        """D-7 纳入插件中心的理由：设备地址存在每用户连接里，下次不必重填。"""
+        from webserver.models import PluginConnection, PluginInstallation
+        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        session = get_db()
+
+        with mock.patch.object(provider, "uploader_class") as MockBoox:
+            MockBoox.return_value.upload.return_value = {"success": True}
+            data = {"device_type": "boox", "device_url": "192.168.1.7:8085"}
+            self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        connection = (
+            session.query(PluginConnection)
+            .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+            .filter(PluginInstallation.plugin_key == provider.manifest["id"])
+            .first()
+        )
+        self.assertEqual(connection.config.get("device_url"), "192.168.1.7:8085", "设备地址必须记进连接")
+
+        # 第二次不带地址：应回落到连接里存的那个
+        with mock.patch.object(provider, "uploader_class") as MockBoox:
+            MockBoox.return_value.upload.return_value = {"success": True}
+            d = self.json(
+                "/api/book/1/send_to_device", method="POST", body=json.dumps({"device_type": "boox"})
+            )
+            self.assertEqual(d["err"], "ok")
+            self.assertIn("192.168.1.7:8085", MockBoox.return_value.upload.call_args.args[0])
+
     def test_send_to_device_wifi_failure_is_recorded(self):
         from webserver.models import PluginConnection, PluginInstallation, PluginRun
         from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE

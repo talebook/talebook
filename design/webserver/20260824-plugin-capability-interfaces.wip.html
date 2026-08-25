@@ -861,7 +861,7 @@ for conn in runtime.connections_for(capability, user_id):
               <strong>实际执行记录（2026-08-25）</strong>
               <p>本地无可用 Python 测试环境（缺 <code>calibre</code>），后端全部通过项目测试镜像执行：</p>
               <pre><code>docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test pytest tests -q
-  → 1015 passed, 20 skipped, 26 warnings
+  → 1021 passed, 20 skipped, 28 warnings
 
 docker run --rm ... ruff check ./webserver --fix --no-cache   → All checks passed!
 docker run --rm ... ruff format ./webserver --no-cache        → 134 files left unchanged
@@ -869,7 +869,7 @@ docker run --rm ... ruff format ./webserver --no-cache        → 134 files left
 cd app &amp;&amp; npm run lint   → 0 errors, 490 warnings（warnings 为存量，非本次引入）
 make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结构 / 单文件资源均通过</code></pre>
               <p>分支 <code>refactor/20260824-plugin-capability-interfaces</code>，基线 <code>origin/feat/plugins</code> @ 8c3601e8。</p>
-              <p>测试从基线的 966 增至 <strong>1015</strong>，新增 49 个用例，全程零回归。</p>
+              <p>测试从基线的 966 增至 <strong>1021</strong>，新增 55 个用例，全程零回归。</p>
             </div>
             <div class="callout warn">
               <strong>已完成 S1–S7、S9–S12 与 D-7（设备推送纳入）；S8（书源接口）未实施。</strong>
@@ -919,6 +919,7 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>T-9</td><td>Legado 端到端</td><td>随 S8 书源接口落地</td><td class="pending">未实现</td></tr>
                   <tr><td>T-10</td><td>改书产生 succeeded run（含 requested_by / input_data / 结果）；失败产生 failed run 并记录错误；zh-converter 备份路径写入 run</td><td><code>tests/test_texttools.py</code> 新增 3 个用例；自动触发另见 <code>tests/test_book_auto_transform.py</code> 9 个用例</td><td class="verified">已通过</td></tr>
                   <tr><td>T-11</td><td><code>plugin_runtime.py</code> 无任何插件名与模块；<code>book.py</code> 无 WEREAD / 中文连接名 / SecretCipher</td><td>以测试固化（<code>test_plugin_entity_writers.py</code>、<code>test_plugin_capability_lookup.py</code>），未另建 CI 脚本</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-16</td><td>代码评审发现的缺陷已修复：唯一约束迁移（升级库上生效、全新库不重复动）、两个连接入口传 role（改名不再产生第二条连接）、read_many 以 connection.id 为键且超时为整批预算、推送真正使用连接配置（记住并回落设备地址）、夹具完整性校验</td><td><code>tests/test_plugin_connection_role.py</code> +2、<code>tests/test_plugins_api.py</code> +2、<code>tests/test_main.py</code> +1、<code>tests/test_book_auto_transform.py</code> +1 与 setUp/tearDown 校验</td><td class="verified">已通过</td></tr>
                   <tr><td>T-15</td><td>设备推送走插件：成功产生 succeeded run 并记录 device_type，失败产生 failed run 并记录错误；上传器仍由插件持有，patch 其 <code>uploader_class</code> 即可隔离</td><td><code>tests/test_main.py</code> 新增 2 个用例</td><td class="verified">已通过</td></tr>
                   <tr><td>T-12</td><td>后端 1013 passed / 20 skipped；<code>ruff check</code> 与 <code>ruff format</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（490 warnings 为存量）；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见下方命令记录</td><td class="verified">已通过</td></tr>
                   <tr><td>T-13</td><td>界面审查（<code>full</code> 模式）</td><td>转 ACTIVE 前必须执行，S8 完成后一并进行</td><td class="pending">未执行</td></tr>

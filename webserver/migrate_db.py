@@ -229,6 +229,7 @@ def compare_and_migrate(engine):
 
     if error_count == 0:
         backfill_plugin_connection_roles(engine)
+        migrate_plugin_connection_unique_constraint(engine)
 
     return error_count == 0
 
@@ -265,6 +266,58 @@ def backfill_plugin_connection_roles(engine):
                 text("UPDATE plugin_connections SET role = :role WHERE id = :id"),
                 {"role": role, "id": row.id},
             )
+
+
+def migrate_plugin_connection_unique_constraint(engine):
+    """把插件连接的唯一约束从 name 切到 role。
+
+    `ALTER TABLE ADD COLUMN` 只加列，不动约束——升级上来的库会保留
+    `uq_plugin_connection_owner_name`，导致 role 唯一性不生效、同名连接照旧冲突。
+    模型（models.py）里已改为 `uq_plugin_connection_owner_role`，这里让存量库跟上。
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "plugin_connections" not in inspector.get_table_names():
+        return
+    # 唯一约束在 SQLite 上既可能是表定义的一部分，也可能是独立索引，两处都要看。
+    constraints = {item.get("name") for item in inspector.get_unique_constraints("plugin_connections")}
+    indexes = {item.get("name") for item in inspector.get_indexes("plugin_connections")}
+    existing = constraints | indexes
+    if "uq_plugin_connection_owner_role" in existing:
+        return
+    if "uq_plugin_connection_owner_name" not in existing:
+        # 全新建库由 create_all 直接建出正确约束，无需迁移。
+        return
+
+    logger.info("Migrating plugin_connections unique constraint: owner_name -> owner_role")
+    if engine.dialect.name == "sqlite":
+        # SQLite 不支持 DROP CONSTRAINT。独立索引可以直接换；写死在表定义里的
+        # 只能靠重建表，这里不做——留给应用层保证，重建库后自动生效。
+        if "uq_plugin_connection_owner_name" not in indexes:
+            logger.warning(
+                "plugin_connections 的唯一约束写在表定义里，SQLite 无法就地修改；role 唯一性将由应用层保证，重建库后自动生效"
+            )
+            return
+        with engine.begin() as conn:
+            conn.execute(text("DROP INDEX uq_plugin_connection_owner_name"))
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX uq_plugin_connection_owner_role "
+                    "ON plugin_connections (installation_id, owner_type, owner_id, role)"
+                )
+            )
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE plugin_connections DROP INDEX uq_plugin_connection_owner_name"))
+        conn.execute(
+            text(
+                "ALTER TABLE plugin_connections "
+                "ADD CONSTRAINT uq_plugin_connection_owner_role "
+                "UNIQUE (installation_id, owner_type, owner_id, role)"
+            )
+        )
 
 
 def add_column(engine, migration):

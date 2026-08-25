@@ -169,3 +169,45 @@ def test_backfill_is_idempotent(db_session):
     with engine.begin() as conn:
         role = conn.execute(text("SELECT role FROM plugin_connections WHERE id = 20")).scalar()
     assert role == BUILTIN_CONNECTION_ROLE
+
+
+def test_migration_switches_the_unique_constraint(db_session):
+    """ADD COLUMN 不动约束：升级上来的库必须由迁移把唯一键从 name 切到 role。"""
+    from sqlalchemy import inspect
+
+    from webserver.migrate_db import migrate_plugin_connection_unique_constraint
+
+    engine = create_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE plugin_connections ("
+                " id INTEGER PRIMARY KEY, installation_id INTEGER, owner_type VARCHAR(32),"
+                " owner_id INTEGER, name VARCHAR(200), role VARCHAR(64) DEFAULT '')"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX uq_plugin_connection_owner_name "
+                "ON plugin_connections (installation_id, owner_type, owner_id, name)"
+            )
+        )
+
+    migrate_plugin_connection_unique_constraint(engine)
+
+    names = {item["name"] for item in inspect(engine).get_indexes("plugin_connections")}
+    assert "uq_plugin_connection_owner_role" in names, "唯一约束必须切到 role"
+    assert "uq_plugin_connection_owner_name" not in names, "旧的按名字约束必须移除"
+
+
+def test_migration_is_a_noop_on_a_fresh_database(db_session):
+    """全新建库由 create_all 直接建出正确约束，迁移不应重复动它。"""
+    from sqlalchemy import inspect
+
+    from webserver.migrate_db import migrate_plugin_connection_unique_constraint
+
+    engine = db_session.get_bind()
+    before = {item["name"] for item in inspect(engine).get_indexes("plugin_connections")}
+    migrate_plugin_connection_unique_constraint(engine)
+    after = {item["name"] for item in inspect(engine).get_indexes("plugin_connections")}
+    assert before == after

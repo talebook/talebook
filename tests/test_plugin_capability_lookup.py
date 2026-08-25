@@ -120,9 +120,11 @@ def test_read_many_runs_concurrently_and_records_health(db_session):
     connections = runtime.connections_for("metadata.lookup")
     results = runtime.read_many(connections, "search_books", "三体")
 
-    assert results["talebook.test.ok"][0]["title"] == "三体"
-    assert isinstance(results["talebook.test.bad"], Exception)
-    assert isinstance(results["talebook.test.denied"], ProviderAuthError)
+    # 结果以 connection.id 为键：同一插件可能有多条连接，用 plugin_key 会互相覆盖。
+    by_plugin = {runtime.plugin_key_of(item): results[item.id] for item in connections}
+    assert by_plugin["talebook.test.ok"][0]["title"] == "三体"
+    assert isinstance(by_plugin["talebook.test.bad"], Exception)
+    assert isinstance(by_plugin["talebook.test.denied"], ProviderAuthError)
 
     health = {runtime.plugin_key_of(item): item.health for item in connections}
     assert health["talebook.test.ok"] == "healthy"
@@ -139,9 +141,11 @@ def test_one_failing_plugin_does_not_break_the_batch(db_session):
         _install(db_session, registry, plugin)
 
     runtime = PluginRuntime(db_session, SETTINGS, registry=registry)
-    results = runtime.read_many(runtime.connections_for("metadata.lookup"), "search_books", "书名")
+    connections = runtime.connections_for("metadata.lookup")
+    results = runtime.read_many(connections, "search_books", "书名")
 
-    assert results["talebook.test.survivor"][0]["from"] == "talebook.test.survivor"
+    by_plugin = {runtime.plugin_key_of(item): results[item.id] for item in connections}
+    assert by_plugin["talebook.test.survivor"][0]["from"] == "talebook.test.survivor"
 
 
 def test_prepare_read_returns_callables_that_never_touch_the_session(db_session):

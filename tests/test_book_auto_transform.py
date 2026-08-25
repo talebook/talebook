@@ -1,5 +1,6 @@
 """新书自动处理：默认手动，只有显式配成 auto 才执行，且必须留审计。"""
 
+import os
 from unittest import mock
 
 from webserver.handlers.base import BaseHandler
@@ -114,12 +115,53 @@ class TestUploadAutoTransform(TestWithAdminUser):
 
 
 class TestAutoFixEncodingService(TestWithAdminUser):
+    """注意：这些用例针对共享的 tests/library/ 真实书库运行。
+
+    自动处理会改写书籍文件，一旦漏 mock 就会把夹具改坏并混进提交
+    （已发生过一次：BID_TXT 被 GBK→UTF-8 重编码）。因此每个用例都必须
+    mock 掉写回路径，并由 setUp/tearDown 的校验兜底。
+    """
+
+    def _fixture_digest(self):
+        import hashlib
+
+        from webserver.services.booktools import get_format_path
+
+        path = get_format_path(AsyncService().db, BID_TXT, "TXT")
+        with open(path, "rb") as handle:
+            return hashlib.sha256(handle.read()).hexdigest()
+
+    def setUp(self):
+        super().setUp()
+        self._digest_before = self._fixture_digest()
+
+    def tearDown(self):
+        self.assertEqual(
+            self._fixture_digest(),
+            self._digest_before,
+            "测试改写了共享书库夹具：写回路径必须被 mock",
+        )
+        super().tearDown()
+
     def test_correct_encoding_is_skipped_without_writing(self):
-        """先试算：编码本就正确时不写回，也不产生备份。"""
+        """先试算：编码本就正确时不写回，也不产生备份。
+
+        用临时文件承载「已是 UTF-8」的场景，不依赖也不触碰共享夹具的真实编码。
+        """
+        import tempfile
+
         from webserver.services.book_transform import fix_encoding_for_book
 
         self.json("/api/admin/plugins")
-        with mock.patch("webserver.services.book_transform.overwrite_format") as m_write:
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as handle:
+            handle.write(("这本书本来就是 UTF-8 编码，正文内容完整可读，无需任何修复。" * 40).encode("utf-8"))
+            utf8_path = handle.name
+        self.addCleanup(os.unlink, utf8_path)
+
+        with (
+            mock.patch("webserver.services.book_transform.get_format_path", return_value=utf8_path),
+            mock.patch("webserver.services.book_transform.overwrite_format") as m_write,
+        ):
             run = fix_encoding_for_book(get_db(), AsyncService().db, BID_TXT, 1)
 
         self.assertIsNotNone(run)
@@ -127,6 +169,29 @@ class TestAutoFixEncodingService(TestWithAdminUser):
         self.assertEqual(run.counts["skipped"], 1)
         self.assertEqual(run.counts["updated"], 0)
         self.assertFalse(m_write.called, "无需修复时不得改写文件")
+
+    def test_wrong_encoding_is_fixed_and_backed_up(self):
+        """需要修复时才写回，且必须留下备份路径。"""
+        import tempfile
+
+        from webserver.services.book_transform import fix_encoding_for_book
+
+        self.json("/api/admin/plugins")
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as handle:
+            handle.write(("这是一段需要修复编码的中文正文，内容足够长以便编码检测稳定判定。" * 40).encode("gb18030"))
+            gbk_path = handle.name
+        self.addCleanup(os.unlink, gbk_path)
+
+        with (
+            mock.patch("webserver.services.book_transform.get_format_path", return_value=gbk_path),
+            mock.patch("webserver.services.book_transform.overwrite_format") as m_write,
+        ):
+            run = fix_encoding_for_book(get_db(), AsyncService().db, BID_TXT, 1)
+
+        self.assertEqual(run.status, "succeeded")
+        self.assertEqual(run.counts["updated"], 1)
+        self.assertTrue(m_write.called, "编码不正确时必须写回")
+        self.assertTrue(run.cursor_after["backup_dir"], "写回必须记录备份路径")
 
     def test_failure_is_recorded_and_does_not_raise(self):
         from webserver.services.book_transform import fix_encoding_for_book
