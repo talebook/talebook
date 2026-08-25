@@ -1558,7 +1558,7 @@ const pluginDefinitions = [
     capabilities: ['metadata.lookup'],
     actions: ['test'],
     permissions: ['books.read', 'books.write'],
-    ui: { icon: 'mdi-book-search-outline', manage_kind: 'metadata', primary_action: 'configure' },
+    ui: { icon: 'mdi-book-search-outline', manage_route: '/admin/settings#metadata', manage_label_key: 'pluginManagement.configure', primary_action: 'configure' },
   },
   {
     id: 2,
@@ -1571,7 +1571,7 @@ const pluginDefinitions = [
     capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
     actions: ['test'],
     permissions: ['books.read', 'books.write', 'network.read'],
-    ui: { icon: 'mdi-rss-box', manage_kind: 'opds', primary_action: 'browse' },
+    ui: { icon: 'mdi-rss-box', manage_dialog: 'opds', manage_label_key: 'pluginManagement.browse', primary_action: 'browse' },
   },
   {
     id: 3,
@@ -1584,7 +1584,7 @@ const pluginDefinitions = [
     capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
     actions: ['test'],
     permissions: ['books.read', 'books.write', 'network.read'],
-    ui: { icon: 'mdi-book-cog-outline', manage_kind: 'legado', primary_action: 'manage' },
+    ui: { icon: 'mdi-book-cog-outline', manage_dialog: 'legado', manage_label_key: 'pluginManagement.manage', primary_action: 'manage' },
   },
   {
     id: 4,
@@ -1636,7 +1636,7 @@ const pluginDefinitions = [
     capabilities: ['integrations.search', 'integrations.books', 'integrations.shelf', 'integrations.statistics', 'integrations.community', 'integrations.recommendations', 'metadata.lookup', 'annotations.import'],
     actions: ['test', 'preview', 'run', 'retry', 'rollback'],
     permissions: ['books.read', 'books.write', 'profile.read', 'annotations.write'],
-    ui: { icon: 'mdi-book-open-page-variant', manage_kind: 'weread' },
+    ui: { icon: 'mdi-book-open-page-variant', manage_route: '/plugins/weread', manage_label_key: 'pluginManagement.openWorkbench' },
   },
 ];
 let pluginInstallations = pluginDefinitions.map((definition, index) => ({

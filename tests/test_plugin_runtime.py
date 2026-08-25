@@ -113,7 +113,13 @@ def test_builtin_capabilities_are_registered_without_ai_or_calibre_server(db_ses
     assert "calibre content server" not in catalog
     assert "calibre-web" not in catalog
     assert '"ai"' not in catalog
-    assert builtins["talebook.book-source.opds"].to_public_dict()["ui"]["manage_kind"] == "opds"
+    # manage_kind 曾是与插件一一对应的闭合枚举，前端要为每个取值写一条分支；
+    # 现在改为声明式的管理入口，前端只做 navigateTo / 弹窗映射。
+    opds_ui = builtins["talebook.book-source.opds"].to_public_dict()["ui"]
+    assert opds_ui["manage_dialog"] == "opds"
+    assert "manage_kind" not in opds_ui
+    tool_ui = builtins["talebook.tool.text-replace"].to_public_dict()["ui"]
+    assert tool_ui["manage_route"] == "/plugins/text-replace"
 
 
 def test_builtin_capability_bootstrap_is_idempotent_and_keeps_empty_auth_local(db_session):

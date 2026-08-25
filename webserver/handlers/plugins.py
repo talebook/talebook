@@ -5,14 +5,11 @@ handlers/plugin_booktools.py。
 """
 
 from webserver import loader
-from webserver.constants import META_SELECTED_SOURCES, META_SOURCE_AI
 from webserver.handlers import plugin_booktools, plugin_weread
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.handlers.plugins_common import body as _body
 from webserver.handlers.plugins_common import error as _error
 from webserver.models import (
-    BookSourceModel,
-    OpdsSource,
     PluginConnection,
     PluginDefinition,
     PluginInstallation,
@@ -24,6 +21,7 @@ from webserver.services.annotation_writer import all_book_ids
 from webserver.services.async_service import AsyncService
 from webserver.services.plugin_jobs import execute_plugin_run
 from webserver.services.plugin_runtime import (
+    REGISTRY,
     PluginRuntime,
     PluginRuntimeError,
     ensure_builtin_capability_installations,
@@ -67,31 +65,21 @@ class AdminPlugins(BaseHandler):
             definitions = self.session.query(PluginDefinition).order_by(PluginDefinition.id).all()
             installations = self.session.query(PluginInstallation).order_by(PluginInstallation.id).all()
             definition_map = {item.id: item for item in definitions}
-            opds_sources = self.session.query(OpdsSource).all()
-            legado_sources = self.session.query(BookSourceModel).all()
-            configured_metadata = [
-                value for value in loader.get_settings().get(META_SELECTED_SOURCES, []) if value != META_SOURCE_AI
-            ]
+            settings = loader.get_settings()
+            # 各插件自报配置状态，此处不认识任何具体 plugin_key。
+            builtin_state = {}
+            for provider in REGISTRY.providers():
+                status = getattr(provider, "status", None)
+                if status is None:
+                    continue
+                value = status(self.session, settings)
+                if value:
+                    builtin_state[provider.manifest["id"]] = value
             return {
                 "err": "ok",
                 "definitions": [item.to_public_dict() for item in definitions],
                 "installations": [item.to_public_dict(definition_map.get(item.definition_id)) for item in installations],
-                "builtin_state": {
-                    "talebook.metadata.builtin": {
-                        "configured": len(configured_metadata),
-                        "enabled": len(configured_metadata),
-                        "sources": configured_metadata,
-                    },
-                    "talebook.book-source.opds": {
-                        "configured": len(opds_sources),
-                        "enabled": sum(1 for item in opds_sources if item.active),
-                        "service_enabled": bool(loader.get_settings().get("OPDS_ENABLED", True)),
-                    },
-                    "talebook.book-source.legado": {
-                        "configured": len(legado_sources),
-                        "enabled": sum(1 for item in legado_sources if item.enabled),
-                    },
-                },
+                "builtin_state": builtin_state,
             }
         except PluginRuntimeError as exc:
             return _error(exc)

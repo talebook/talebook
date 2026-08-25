@@ -247,7 +247,7 @@
                         {{ selectedPlugin.description }}
                     </p>
                     <section
-                        v-if="selectedPlugin.ui.manage_kind === 'opds'"
+                        v-if="hasServiceToggle(selectedPlugin)"
                         class="opds-service-settings mt-5"
                     >
                         <h3 class="text-subtitle-1 mb-1">
@@ -663,8 +663,12 @@ const selectedConnection = computed(() => {
 const configFields = computed(() => schemaFields(selectedPlugin.value?.config_schema));
 const credentialFields = computed(() => schemaFields(selectedPlugin.value?.auth_schema));
 const dialogCredentialFields = computed(() => schemaFields(connectionPlugin.value?.auth_schema));
+// 服务开关由插件自报状态里是否含 service_enabled 决定，前端不认识具体插件。
+function hasServiceToggle(plugin) {
+    return plugin ? 'service_enabled' in (builtinState.value[plugin.plugin_key] || {}) : false;
+}
 const opdsServiceEnabled = computed(() => Boolean(
-    builtinState.value['talebook.book-source.opds']?.service_enabled
+    builtinState.value[selectedPlugin.value?.plugin_key]?.service_enabled
 ));
 
 function connectionFor(plugin) {
@@ -675,7 +679,8 @@ function statusInfo(plugin) {
     if (!plugin.installation) return { key: 'uninstalled', text: t('pluginManagement.uninstalled'), color: 'grey', icon: 'mdi-download-outline' };
     if (!plugin.installation.enabled) return { key: 'disabled', text: t('pluginManagement.disabled'), color: 'grey', icon: 'mdi-pause-circle-outline' };
     const connection = connectionFor(plugin);
-    if (!connection && plugin.ui.primary_action === 'configure' && plugin.ui.manage_kind !== 'metadata') {
+    const selfReported = builtinState.value[plugin.plugin_key];
+    if (!connection && plugin.ui.primary_action === 'configure' && !selfReported) {
         return { key: 'unconfigured', text: t('pluginManagement.unconfigured'), color: 'warning', icon: 'mdi-cog-outline' };
     }
     if (connection?.health === 'unauthorized') return { key: 'unhealthy', text: t('pluginManagement.unauthorized'), color: 'error', icon: 'mdi-key-alert-outline' };
@@ -720,28 +725,25 @@ function attentionCount(tab) {
     return catalog.value.filter(plugin => plugin.categories.includes(tab) && statusInfo(plugin).key !== 'enabled').length;
 }
 
+// 插件自己声明管理入口，前端不再为每个插件写一条分支。
+const MANAGE_DIALOGS = {
+    opds: () => opdsDialog.value?.open(),
+    legado: () => openLegado(),
+};
+
 function primaryActionLabel(plugin) {
     if (!plugin.installation) return t('pluginManagement.install');
     if (!plugin.installation.enabled) return t('pluginManagement.enable');
     if (!connectionFor(plugin)) return t('pluginManagement.configure');
-    if (plugin.ui.manage_kind === 'opds') return t('pluginManagement.browse');
-    if (plugin.ui.manage_kind === 'legado') return t('pluginManagement.manage');
-    if (plugin.ui.manage_kind === 'metadata') return t('pluginManagement.configure');
-    if (plugin.ui.manage_kind === 'weread') return t('pluginManagement.openWorkbench');
-    if (['text_replace', 'zh_converter', 'txt_fixer'].includes(plugin.ui.manage_kind)) return t('pluginManagement.openTool');
+    if (plugin.ui.manage_label_key) return t(plugin.ui.manage_label_key);
     return t('pluginManagement.details');
 }
 
 async function primaryAction(plugin) {
     if (!plugin.installation) return install(plugin);
     if (!plugin.installation.enabled) return toggleInstallation(plugin);
-    if (plugin.ui.manage_kind === 'opds') return opdsDialog.value?.open();
-    if (plugin.ui.manage_kind === 'legado') return openLegado();
-    if (plugin.ui.manage_kind === 'metadata') return navigateTo('/admin/settings#metadata');
-    if (plugin.ui.manage_kind === 'weread') return navigateTo('/plugins/weread');
-    if (plugin.ui.manage_kind === 'text_replace') return navigateTo('/plugins/text-replace');
-    if (plugin.ui.manage_kind === 'zh_converter') return navigateTo('/plugins/zh-converter');
-    if (plugin.ui.manage_kind === 'txt_fixer') return navigateTo('/plugins/txt-fixer');
+    if (plugin.ui.manage_route) return navigateTo(plugin.ui.manage_route);
+    if (MANAGE_DIALOGS[plugin.ui.manage_dialog]) return MANAGE_DIALOGS[plugin.ui.manage_dialog]();
     if (!connectionFor(plugin)) {
         if (plugin.ui.manage_kind === 'book_source') {
             openDetails(plugin);
@@ -784,12 +786,10 @@ async function saveOpdsService(enabled) {
             method: 'POST', body: JSON.stringify({ enabled }),
         });
         if (rsp.err === 'ok') {
+            const key = selectedPlugin.value?.plugin_key;
             builtinState.value = {
                 ...builtinState.value,
-                'talebook.book-source.opds': {
-                    ...builtinState.value['talebook.book-source.opds'],
-                    service_enabled: rsp.enabled,
-                },
+                [key]: { ...builtinState.value[key], service_enabled: rsp.enabled },
             };
             $alert?.('success', t('pluginManagement.opdsServiceSaved'));
         } else $alert?.('error', rsp.msg || rsp.err);

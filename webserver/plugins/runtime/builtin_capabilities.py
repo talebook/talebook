@@ -1,7 +1,30 @@
-from webserver.constants import AUTO_FILL_META
+from webserver.constants import AUTO_FILL_META, META_SELECTED_SOURCES, META_SOURCE_AI
 
 from .interfaces import TRIGGER_SCHEMA
 from .protocol import PROTOCOL_VERSION, ProviderResult
+
+
+def _metadata_status(session, settings):
+    configured = [value for value in settings.get(META_SELECTED_SOURCES, []) if value != META_SOURCE_AI]
+    return {"configured": len(configured), "enabled": len(configured), "sources": configured}
+
+
+def _opds_status(session, settings):
+    from webserver.models import OpdsSource
+
+    sources = session.query(OpdsSource).all()
+    return {
+        "configured": len(sources),
+        "enabled": sum(1 for item in sources if item.active),
+        "service_enabled": bool(settings.get("OPDS_ENABLED", True)),
+    }
+
+
+def _legado_status(session, settings):
+    from webserver.models import BookSourceModel
+
+    sources = session.query(BookSourceModel).all()
+    return {"configured": len(sources), "enabled": sum(1 for item in sources if item.enabled)}
 
 
 class BuiltinCapabilityProvider:
@@ -12,10 +35,15 @@ class BuiltinCapabilityProvider:
     health checks and durable run history.
     """
 
-    def __init__(self, manifest, enabled_setting=None):
+    def __init__(self, manifest, enabled_setting=None, status_fn=None):
         self.manifest = manifest
         # 首次安装时是否启用：默认启用；给定设置名时跟随该设置。
         self.enabled_setting = enabled_setting
+        # 自报配置状态（已配置多少来源、启用多少），供管理页展示。
+        self.status_fn = status_fn
+
+    def status(self, session, settings):
+        return self.status_fn(session, settings) if self.status_fn else {}
 
     def initial_enabled(self, settings):
         if self.enabled_setting is None:
@@ -61,12 +89,14 @@ BUILTIN_CAPABILITY_PROVIDERS = (
             ["books.read", "books.write"],
             {
                 "icon": "mdi-book-search-outline",
-                "manage_kind": "metadata",
+                "manage_route": "/admin/settings#metadata",
+                "manage_label_key": "pluginManagement.configure",
                 "primary_action": "configure",
                 "healthy_message": "内置元数据来源可用",
             },
         ),
         enabled_setting=AUTO_FILL_META,
+        status_fn=_metadata_status,
     ),
     BuiltinCapabilityProvider(
         _manifest(
@@ -78,11 +108,13 @@ BUILTIN_CAPABILITY_PROVIDERS = (
             ["books.read", "books.write", "network.read"],
             {
                 "icon": "mdi-rss-box",
-                "manage_kind": "opds",
+                "manage_dialog": "opds",
+                "manage_label_key": "pluginManagement.browse",
                 "primary_action": "browse",
                 "healthy_message": "Generic OPDS 适配器可用",
             },
-        )
+        ),
+        status_fn=_opds_status,
     ),
     BuiltinCapabilityProvider(
         _manifest(
@@ -94,11 +126,13 @@ BUILTIN_CAPABILITY_PROVIDERS = (
             ["books.read", "books.write", "network.read"],
             {
                 "icon": "mdi-book-cog-outline",
-                "manage_kind": "legado",
+                "manage_dialog": "legado",
+                "manage_label_key": "pluginManagement.manage",
                 "primary_action": "manage",
                 "healthy_message": "Legado 书源适配器可用",
             },
-        )
+        ),
+        status_fn=_legado_status,
     ),
     BuiltinCapabilityProvider(
         _manifest(
@@ -110,7 +144,8 @@ BUILTIN_CAPABILITY_PROVIDERS = (
             ["books.read", "books.write"],
             {
                 "icon": "mdi-find-replace",
-                "manage_kind": "text_replace",
+                "manage_route": "/plugins/text-replace",
+                "manage_label_key": "pluginManagement.openTool",
                 "primary_action": "open",
                 "healthy_message": "正文查找替换工具可用",
             },
@@ -126,7 +161,8 @@ BUILTIN_CAPABILITY_PROVIDERS = (
             ["books.read", "books.write"],
             {
                 "icon": "mdi-translate",
-                "manage_kind": "zh_converter",
+                "manage_route": "/plugins/zh-converter",
+                "manage_label_key": "pluginManagement.openTool",
                 "primary_action": "open",
                 "healthy_message": "繁简转换工具可用",
             },
@@ -142,7 +178,8 @@ BUILTIN_CAPABILITY_PROVIDERS = (
             ["books.read", "books.write"],
             {
                 "icon": "mdi-file-restore-outline",
-                "manage_kind": "txt_fixer",
+                "manage_route": "/plugins/txt-fixer",
+                "manage_label_key": "pluginManagement.openTool",
                 "primary_action": "open",
                 "healthy_message": "TXT 编码修复工具可用",
                 "supports_auto_trigger": True,
