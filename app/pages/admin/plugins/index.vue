@@ -221,12 +221,16 @@
             max-width="520"
             scrollable
             class="plugin-drawer-dialog"
+            aria-labelledby="plugin-details-dialog-title"
             @after-leave="restoreDetailFocus"
         >
             <v-card v-if="selectedPlugin">
                 <div class="pa-4 d-flex align-center">
                     <div>
-                        <h2 class="text-h6">
+                        <h2
+                            id="plugin-details-dialog-title"
+                            class="text-h6"
+                        >
                             {{ selectedPlugin.name }}
                         </h2>
                         <div class="text-caption text-medium-emphasis">
@@ -391,7 +395,7 @@
 
                     <div class="d-flex flex-wrap ga-2 mt-3">
                         <v-btn
-                            v-if="selectedConnection"
+                            v-if="selectedConnection && selectedPlugin.actions.includes('test')"
                             variant="outlined"
                             prepend-icon="mdi-connection"
                             :loading="actionLoading"
@@ -663,9 +667,8 @@ const selectedConnection = computed(() => {
 const configFields = computed(() => schemaFields(selectedPlugin.value?.config_schema));
 const credentialFields = computed(() => schemaFields(selectedPlugin.value?.auth_schema));
 const dialogCredentialFields = computed(() => schemaFields(connectionPlugin.value?.auth_schema));
-// 服务开关由插件自报状态里是否含 service_enabled 决定，前端不认识具体插件。
 function hasServiceToggle(plugin) {
-    return plugin ? 'service_enabled' in (builtinState.value[plugin.plugin_key] || {}) : false;
+    return plugin?.ui?.service_toggle === 'opds';
 }
 const opdsServiceEnabled = computed(() => Boolean(
     builtinState.value[selectedPlugin.value?.plugin_key]?.service_enabled
@@ -702,12 +705,11 @@ function capabilityLabel(value) {
         'integrations.community': t('pluginManagement.capCommunity'),
         'integrations.recommendations': t('pluginManagement.capRecommendations'),
         'annotations.import': t('pluginManagement.capAnnotationsImport'),
+        'reviews.import': t('pluginManagement.capReviewsImport'),
         'book_sources.browse': t('pluginManagement.capBrowse'),
         'book_sources.search': t('pluginManagement.capSearch'),
         'book_sources.acquire': t('pluginManagement.capAcquire'),
-        'integrations.content_edit': t('pluginManagement.capContentEdit'),
-        'integrations.content_convert': t('pluginManagement.capContentConvert'),
-        'integrations.encoding_fix': t('pluginManagement.capEncodingFix'),
+        'integrations.tool': t('pluginManagement.capTool'),
     };
     return labels[value] || value;
 }
@@ -734,8 +736,8 @@ const MANAGE_DIALOGS = {
 function primaryActionLabel(plugin) {
     if (!plugin.installation) return t('pluginManagement.install');
     if (!plugin.installation.enabled) return t('pluginManagement.enable');
-    if (!connectionFor(plugin)) return t('pluginManagement.configure');
     if (plugin.ui.manage_label_key) return t(plugin.ui.manage_label_key);
+    if (!connectionFor(plugin)) return t('pluginManagement.configure');
     return t('pluginManagement.details');
 }
 

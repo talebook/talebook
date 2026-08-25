@@ -174,7 +174,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   opdsServiceEnabled = true;
   pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
   pluginConnections = pluginInstallations
-    .filter(item => item.id <= 3)
+    .filter(item => ['talebook.book-source.opds', 'talebook.book-source.legado'].includes(item.plugin_key))
     .map(installation => mockPluginConnection(installation));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
@@ -1439,6 +1439,11 @@ router.get('/api/plugins/weread', eventHandler(() => ({
   skill_version: '1.0.4',
 })));
 
+router.get('/api/plugins/tools/books', eventHandler(() => ({
+  err: 'ok',
+  books: [{ id: 1, title: '测试书', authors: ['测试作者'], formats: ['EPUB', 'TXT'] }],
+})));
+
 router.post('/api/plugins/weread/query', eventHandler(async (event) => {
   const body = await readBody(event);
   if (body?.api_key) wereadConfigured = true;
@@ -1470,6 +1475,23 @@ router.post('/api/plugins/weread/query', eventHandler(async (event) => {
     friends_reading: { items: [{ book: { bookId: 'book-4', title: '三体', author: '刘慈欣' } }] },
   }[body?.operation] || {};
   return { err: 'ok', connection, data };
+}));
+
+router.post('/api/plugins/:pluginKey/features/:action', eventHandler(async (event) => {
+  const pluginKey = getRouterParam(event, 'pluginKey');
+  const action = getRouterParam(event, 'action');
+  if (pluginKey !== 'talebook.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
+  const data = {
+    statistics: { totalReadTime: 7260, readDays: 4, dayAverageReadTime: 1815, readStat: [{ stat: '读过', counts: '3本' }] },
+    popular_highlights: { items: [{ bookmarkId: 'p1', chapterUid: 12, range: '10-20', markText: '最初我们来到这个世界', totalCount: 128 }] },
+    underline_stats: { underlines: [{ range: '10-20', count: 128, score: 99 }] },
+  }[action];
+  if (!data) return { err: 'feature.not_found', msg: 'feature not found' };
+  return {
+    err: 'ok',
+    connection: { id: 88, secret: { configured: true, mask: '••••test' } },
+    data,
+  };
 }));
 
 router.get('/api/plugins/weread/import', eventHandler(() => ({
@@ -1548,19 +1570,6 @@ router.get('/api/book/:id', eventHandler((event) => {
 
 const pluginDefinitions = [
   {
-    id: 1,
-    plugin_key: 'talebook.metadata.builtin',
-    name: 'Talebook 元数据',
-    description: '复用现有非 AI 元数据来源与自动补全流程。',
-    version: '1.0.0',
-    runtime_kind: 'builtin',
-    categories: ['metadata'],
-    capabilities: ['metadata.lookup'],
-    actions: ['test'],
-    permissions: ['books.read', 'books.write'],
-    ui: { icon: 'mdi-book-search-outline', manage_route: '/admin/settings#metadata', manage_label_key: 'pluginManagement.configure', primary_action: 'configure' },
-  },
-  {
     id: 2,
     plugin_key: 'talebook.book-source.opds',
     name: 'Generic OPDS',
@@ -1571,7 +1580,7 @@ const pluginDefinitions = [
     capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
     actions: ['test'],
     permissions: ['books.read', 'books.write', 'network.read'],
-    ui: { icon: 'mdi-rss-box', manage_dialog: 'opds', manage_label_key: 'pluginManagement.browse', primary_action: 'browse' },
+    ui: { icon: 'mdi-rss-box', manage_dialog: 'opds', manage_label_key: 'pluginManagement.browse', primary_action: 'browse', service_toggle: 'opds' },
   },
   {
     id: 3,
@@ -1660,7 +1669,7 @@ const mockPluginConnection = installation => ({
   config: {},
 });
 let pluginConnections = pluginInstallations
-  .filter(installation => installation.id <= 3)
+  .filter(installation => ['talebook.book-source.opds', 'talebook.book-source.legado'].includes(installation.plugin_key))
   .map(installation => mockPluginConnection(installation));
 let opdsServiceEnabled = true;
 
@@ -1669,7 +1678,6 @@ router.get('/api/admin/plugins', eventHandler(() => ({
   definitions: pluginDefinitions,
   installations: pluginInstallations,
   builtin_state: {
-    'talebook.metadata.builtin': { configured: 3, enabled: 3, sources: ['douban', 'baidu', 'neodb'] },
     'talebook.book-source.opds': { configured: 1, enabled: 1, service_enabled: opdsServiceEnabled },
     'talebook.book-source.legado': { configured: 1, enabled: 1 },
   },
@@ -1791,11 +1799,11 @@ router.get('/api/admin/booksource/check/status', eventHandler(() => {
 }));
 
 // Network library (book sources)
-router.get('/api/network/sources', eventHandler(() => {
-  return { err: 'ok', items: [{ id: 1, name: '测试书源', group: '测试' }] };
+router.get('/api/book-sources', eventHandler(() => {
+  return { err: 'ok', items: [{ id: 1, source_key: 'legado:1', name: '测试书源', group: '测试' }] };
 }));
 
-router.get('/api/network/categories', eventHandler(() => {
+router.get('/api/book-sources/categories', eventHandler(() => {
   return {
     err: 'ok',
     items: [
@@ -1807,13 +1815,13 @@ router.get('/api/network/categories', eventHandler(() => {
 
 // 网络书库搜索改为任务化：创建任务返回 task_id，前端轮询 status 拿结果
 let lastSearchKey = '';
-router.get('/api/network/search', eventHandler((event) => {
+router.get('/api/book-sources/search', eventHandler((event) => {
   const query = getQuery(event);
   lastSearchKey = query.key || '';
   return { err: 'ok', task_id: 'mock-task', total: 1 };
 }));
 
-router.get('/api/network/search/status', eventHandler(() => {
+router.get('/api/book-sources/search/status', eventHandler(() => {
   return {
     err: 'ok',
     task_id: 'mock-task',
@@ -1824,7 +1832,7 @@ router.get('/api/network/search/status', eventHandler(() => {
     partial: [],
     results: [
       {
-        source_id: 1,
+        source_id: 'legado:1',
         source_name: '测试书源',
         books: [
           {
@@ -1840,7 +1848,7 @@ router.get('/api/network/search/status', eventHandler(() => {
   };
 }));
 
-router.get('/api/network/book', eventHandler(() => {
+router.get('/api/book-sources/book', eventHandler(() => {
   return {
     err: 'ok',
     book: {
@@ -1851,12 +1859,14 @@ router.get('/api/network/book', eventHandler(() => {
       intro: '这是一本用于测试的网络小说。',
       cover_url: '',
       book_url: 'http://x.com/book/1',
+      downloadable: true,
     },
     toc_url: 'http://x.com/book/1/toc',
+    download_mode: 'by_chapters',
   };
 }));
 
-router.get('/api/network/toc', eventHandler(() => {
+router.get('/api/book-sources/toc', eventHandler(() => {
   return {
     err: 'ok',
     serialize_status: 'finished',
@@ -1868,18 +1878,18 @@ router.get('/api/network/toc', eventHandler(() => {
   };
 }));
 
-router.get('/api/network/content', eventHandler(() => {
+router.get('/api/book-sources/content', eventHandler(() => {
   return { err: 'ok', title: '第1章 惊蛰', content: '这是正文第一段。\n这是正文第二段。' };
 }));
 
 // 保存到本地：返回 tag，前端按 tag 轮询；状态先 running（含 done/total）后 completed
-router.post('/api/network/save', eventHandler(() => {
+router.post('/api/book-sources/save', eventHandler(() => {
   saveStarted = true;
   saveStatusPolls = 0;
   return { err: 'ok', tag: 'online_save:1:http://x.com/book/1', msg: '已开始后台保存，完成后将通知您' };
 }));
 
-router.get('/api/network/save/status', eventHandler(() => {
+router.get('/api/book-sources/save/status', eventHandler(() => {
   if (!saveStarted) {
     return { err: 'ok', found: false };
   }

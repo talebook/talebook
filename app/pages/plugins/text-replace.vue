@@ -54,7 +54,15 @@
             </v-radio-group>
             <v-text-field v-if="outputMode === 'new'" v-model="suffix" :label="t('bookTools.common.suffix')" variant="outlined" density="compact" class="booktool-field mt-2" />
 
-            <v-btn color="primary" class="mt-3" :loading="busy === 'run'" :disabled="!bookId || !pattern" @click="doRun">{{ t('bookTools.common.run') }}</v-btn>
+            <v-btn
+                :color="outputMode === 'overwrite' ? 'error' : 'primary'"
+                class="mt-3"
+                :loading="busy === 'run'"
+                :disabled="!bookId || !pattern"
+                @click="doRun"
+            >
+                {{ t(outputMode === 'overwrite' ? 'bookTools.common.overwriteAction' : 'bookTools.common.saveNewAction') }}
+            </v-btn>
 
             <v-alert v-if="error" type="error" variant="tonal" closable class="mt-4" @click:close="error = ''">{{ error }}</v-alert>
             <v-alert v-if="success" type="success" variant="tonal" closable class="mt-4" @click:close="success = ''">{{ success }}</v-alert>
@@ -66,6 +74,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
+import { confirmDestructiveBookWrite } from '@/utils/book-tools';
 
 const { t } = useI18n();
 const { $backend } = useNuxtApp();
@@ -147,6 +156,10 @@ async function doPreview() {
     }
 }
 async function doRun() {
+    if (!confirmDestructiveBookWrite(
+        outputMode.value === 'overwrite',
+        t('bookTools.common.overwriteConfirm', { title: selectedBook.value?.title || '' }),
+    )) return;
     error.value = '';
     success.value = '';
     busy.value = 'run';

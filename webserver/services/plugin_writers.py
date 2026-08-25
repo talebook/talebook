@@ -10,19 +10,35 @@ annotations 插件写库都会被打上微信读书身份（``source_name="werea
 由连接所属的 ``plugin_key`` 推导，而不是模块常量。
 """
 
+import hashlib
+
 from webserver.models import PluginInstallation
+
+
+SOURCE_ID_MAX_LENGTH = 64
+
+
+def bounded_source_id(value, suffix="", max_length=SOURCE_ID_MAX_LENGTH):
+    """Keep source namespaces stable and valid for their database columns."""
+    raw = "%s%s" % (str(value or "plugin"), suffix)
+    if len(raw) <= max_length:
+        return raw
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+    head_length = max(0, max_length - len(digest) - 1)
+    return "%s:%s" % (raw[:head_length], digest)
 
 
 def source_name_for(session, connection):
     """由连接所属插件推导来源标识。
 
-    取 ``plugin_key`` 的末段：``talebook.weread`` → ``weread``、
-    ``talebook.annotations.brs`` → ``brs``。这一映射与存量数据一致
-    （历史行的 ``source_name`` 正是 ``weread``），因此无需迁移。
+    微信读书保留历史 ``weread`` 标识；其他插件使用完整 ``plugin_key``，
+    防止不同厂商恰好使用同一个末段时共享来源命名空间。
     """
     installation = session.get(PluginInstallation, connection.installation_id)
     plugin_key = (installation.plugin_key if installation else "") or ""
-    return plugin_key.rsplit(".", 1)[-1] or "plugin"
+    if plugin_key == "talebook.weread":
+        return "weread"
+    return bounded_source_id(plugin_key or "plugin")
 
 
 class EntityWriter:

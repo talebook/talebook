@@ -10,28 +10,28 @@ from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Annotation, Base, PluginConnection, PluginDefinition, PluginRunItem, PluginSourceRecord
 from webserver.plugins.runtime.enrichment import (
+    REVIEW_SPECS,
     BRSProvider,
     CalibreProviderBridge,
     CatalogReviewProvider,
     EmbeddedMetadataProvider,
     OpenLibraryProvider,
-    REVIEW_SPECS,
     ReviewFileProvider,
     build_field_decisions,
     extract_epub_metadata,
     parse_review_file,
 )
-from webserver.plugins.runtime.protocol import PluginManifest, ProviderRateLimitError
+from webserver.plugins.runtime.protocol import PluginManifest, UpstreamRateLimitError
 from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,
+    PluginRuntimeError,
     ensure_builtin_definitions,
     install_builtin,
     rotate_connection_secret,
     save_connection,
 )
-from webserver.services.plugin_runtime import PluginRuntimeError
 
 
 SETTINGS = {"PLUGIN_SECRET_KEY": "enrichment-test-key", "cookie_secret": "unused-cookie-secret"}
@@ -316,7 +316,7 @@ def test_brs_uses_separate_review_domain_supports_mapping_and_runtime_rate_limit
     def transport(method, url, **kwargs):
         attempts["count"] += 1
         if attempts["count"] == 1:
-            raise ProviderRateLimitError("slow down", retry_after=0)
+            raise UpstreamRateLimitError("slow down", retry_after=0)
         return {
             "comments": [
                 {

@@ -1,10 +1,11 @@
 import json
 from unittest import mock
 
+from tests.test_main import TestWithAdminUser, get_db
+from tests.test_main import setUpModule as init
 from webserver import loader
-from tests.test_main import TestWithAdminUser, get_db, setUpModule as init
 from webserver.models import PluginConnection, PluginInstallation, PluginSecret
-from webserver.plugins.runtime import ProviderAuthError, ProviderRateLimitError, WereadProvider
+from webserver.plugins.runtime import UpstreamAuthError, UpstreamRateLimitError, WereadProvider
 
 
 def setUpModule():
@@ -17,7 +18,7 @@ class TestPluginsApi(TestWithAdminUser):
 
         self.assertEqual(data["err"], "ok")
         definitions = {item["plugin_key"]: item for item in data["definitions"]}
-        self.assertIn("talebook.metadata.builtin", definitions)
+        self.assertNotIn("talebook.metadata.builtin", definitions)
         self.assertIn("talebook.book-source.opds", definitions)
         self.assertIn("talebook.book-source.legado", definitions)
         payload = json.dumps(data, ensure_ascii=False).lower()
@@ -157,10 +158,49 @@ class TestWereadIntegrationApi(TestWithAdminUser):
         self.assertIn("metadata", definition["categories"])
         self.assertIn("metadata.lookup", definition["capabilities"])
 
+    @mock.patch(
+        "webserver.handlers.plugins.loader.get_settings",
+        return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key", "cookie_secret": "unused"},
+    )
+    @mock.patch.object(WereadProvider, "_gateway")
+    def test_declared_extra_feature_uses_generic_plugin_route(self, gateway, _settings):
+        gateway.return_value = {"readTime": 3600}
+
+        data = self.json(
+            "/api/plugins/talebook.weread/features/statistics",
+            method="POST",
+            body=json.dumps(
+                {
+                    "credentials": {"api_key": self.api_key},
+                    "params": {"mode": "weekly", "baseTime": 123},
+                }
+            ),
+        )
+
+        self.assertEqual(data["err"], "ok")
+        self.assertEqual(data["data"], {"readTime": 3600})
+        gateway.assert_called_once_with(self.api_key, "/readdata/detail", mode="weekly", baseTime=123)
+        self.assertNotIn(self.api_key, json.dumps(data, ensure_ascii=False))
+
+    def test_extra_feature_rejects_undeclared_action_and_unknown_params(self):
+        unsupported = self.json(
+            "/api/plugins/talebook.weread/features/search",
+            method="POST",
+            body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {}}),
+        )
+        self.assertEqual(unsupported["err"], "plugin.feature_not_supported")
+
+        invalid = self.json(
+            "/api/plugins/talebook.weread/features/statistics",
+            method="POST",
+            body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {"surprise": True}}),
+        )
+        self.assertEqual(invalid["err"], "feature.unknown_field")
+
     @mock.patch("webserver.handlers.plugin_weread.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
-    @mock.patch("webserver.handlers.plugin_weread.WereadProvider")
-    def test_query_stores_key_for_owner_but_redacts_it_from_response(self, provider_class, _settings):
-        provider_class.return_value.query.return_value = {
+    @mock.patch.object(WereadProvider, "_gateway")
+    def test_query_stores_key_for_owner_but_redacts_it_from_response(self, gateway, _settings):
+        gateway.return_value = {
             "api_key": self.api_key,
             "nested": "upstream echoed %s" % self.api_key,
             "title": "活着",
@@ -175,7 +215,7 @@ class TestWereadIntegrationApi(TestWithAdminUser):
         self.assertEqual(data["err"], "ok")
         self.assertEqual(data["data"]["api_key"], "[REDACTED]")
         self.assertNotIn(self.api_key, json.dumps(data, ensure_ascii=False))
-        provider_class.return_value.query.assert_called_once_with(self.api_key, "search", {"keyword": "活着"})
+        gateway.assert_called_once_with(self.api_key, "/store/search", keyword="活着")
         self.assertEqual(data["connection"]["owner_type"], "user")
         self.assertEqual(data["connection"]["owner_id"], 1)
         self.assertTrue(data["connection"]["secret"]["configured"])
@@ -185,13 +225,13 @@ class TestWereadIntegrationApi(TestWithAdminUser):
         self.assertNotIn(self.api_key, json.dumps(state, ensure_ascii=False))
 
     @mock.patch("webserver.handlers.plugin_weread.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
-    @mock.patch("webserver.handlers.plugin_weread.WereadProvider")
-    def test_query_maps_auth_and_rate_limit_errors_without_returning_key(self, provider_class, _settings):
+    @mock.patch.object(WereadProvider, "_gateway")
+    def test_query_maps_auth_and_rate_limit_errors_without_returning_key(self, gateway, _settings):
         for error, code in (
-            (ProviderAuthError("credential rejected"), "provider_unauthorized"),
-            (ProviderRateLimitError("too many requests"), "provider_rate_limited"),
+            (UpstreamAuthError("credential rejected"), "provider_unauthorized"),
+            (UpstreamRateLimitError("too many requests"), "provider_rate_limited"),
         ):
-            provider_class.return_value.query.side_effect = error
+            gateway.side_effect = error
             data = self.json(
                 "/api/plugins/weread/query",
                 method="POST",
@@ -202,9 +242,8 @@ class TestWereadIntegrationApi(TestWithAdminUser):
 
     @mock.patch("webserver.handlers.plugin_weread.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
     @mock.patch.object(WereadProvider, "_fetch_all", return_value=[])
-    @mock.patch("webserver.handlers.plugin_weread.WereadProvider")
-    def test_import_preview_reuses_saved_connection_without_api_key(self, query_provider, fetch_all, _settings):
-        query_provider.return_value.query.return_value = {"results": []}
+    @mock.patch.object(WereadProvider, "_gateway", return_value={"results": []})
+    def test_import_preview_reuses_saved_connection_without_api_key(self, gateway, fetch_all, _settings):
         connected = self.json(
             "/api/plugins/weread/query",
             method="POST",

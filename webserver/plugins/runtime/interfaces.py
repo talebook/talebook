@@ -1,31 +1,33 @@
-"""插件契约：运行时与插件之间的类型化边界。
-
-此前契约完全靠鸭子类型维持——``register()`` 只校验 manifest，从不检查 provider
-是否有 ``execute``，因此契约违反会被降级成运行期 ``AttributeError``，再被
-``PluginRuntime.execute`` 的兜底分支报成通用的 ``plugin.execution_failed``。
-
-本模块把事实契约显式化：
-
-- :class:`PluginContext` 收拢运行时传给插件的全部字段，键名写错在构造期即失败；
-- :class:`PluginProvider` 声明 provider 必须具备的成员，供注册期检查。
-
-用 ``Protocol`` 而非 ABC，是因为现有 provider 均不继承任何基类，
-``Protocol`` 可以零改动地把检查加上。
-"""
+"""插件能力接口：运行时与插件之间的类型化边界。"""
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
+
+from .domains import (
+    Annotation,
+    BookFile,
+    BookMetadata,
+    Category,
+    CheckReport,
+    Page,
+    PushReceipt,
+    Review,
+    SourceBook,
+    SourceBookDetail,
+    SourceChapter,
+    SourceContent,
+    SourceState,
+    ToolInput,
+    ToolOutput,
+    ToolReport,
+)
+
+
+DownloadMode = Literal["single_book", "by_chapters", "none"]
 
 
 @dataclass(frozen=True)
 class PluginContext:
-    """运行时传给插件 ``execute()`` 的只读上下文。
-
-    provider 仍然收到普通 dict（见 :meth:`as_dict`），本类的价值在于把键名
-    与默认值集中到一处：此前 context 是散在 ``_call_provider`` 里手写的字面量，
-    拼错键名要到插件运行时才暴露。
-    """
-
     action: str
     attempt: int
     deadline: str
@@ -38,7 +40,6 @@ class PluginContext:
     platform: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self):
-        """转为 provider 实际收到的 dict，保持既有插件无需改动。"""
         return {
             "action": self.action,
             "attempt": self.attempt,
@@ -54,71 +55,127 @@ class PluginContext:
 
 
 @runtime_checkable
-class PluginProvider(Protocol):
-    """所有插件必须具备的成员。
+class MetadataProvider(Protocol):
+    def search_books(self, query: str, context: dict[str, Any]) -> list[BookMetadata]: ...
 
-    ``execute`` 在独立线程中被调用，必须线程安全，且不得访问数据库会话——
-    平台不注入 session，落库由平台在调用线程内完成。
-    """
+    def get_metadata(self, external_id: str, context: dict[str, Any]) -> BookMetadata: ...
 
-    manifest: dict[str, Any]
 
-    def execute(self, context: dict[str, Any]): ...
+@runtime_checkable
+class AnnotationProvider(Protocol):
+    def list_annotations(self, context: dict[str, Any]) -> Page[Annotation]: ...
+
+    def push_annotation(self, item: Annotation, state: SourceState, context: dict[str, Any]) -> PushReceipt: ...
+
+
+@runtime_checkable
+class ReviewProvider(Protocol):
+    def get_reviews(self, query, context: dict[str, Any]) -> Page[Review]: ...
+
+
+@runtime_checkable
+class SourceProvider(Protocol):
+    download_mode: DownloadMode
+
+    def search(self, query: str, cursor: dict[str, Any], context: dict[str, Any]) -> Page[SourceBook]: ...
+
+    def browse(self, category_id: str, cursor: dict[str, Any], context: dict[str, Any]) -> Page[SourceBook]: ...
+
+    def get_categories(self, context: dict[str, Any]) -> list[Category]: ...
+
+    def get_book(self, external_id: str, context: dict[str, Any]) -> SourceBookDetail: ...
+
+    def download(self, book: SourceBookDetail, context: dict[str, Any]) -> BookFile: ...
+
+    def get_toc(self, book: SourceBookDetail, context: dict[str, Any]) -> list[SourceChapter]: ...
+
+    def get_chapter(self, chapter: SourceChapter, context: dict[str, Any]) -> SourceContent: ...
+
+    def self_check(self, context: dict[str, Any]) -> CheckReport: ...
 
 
 @runtime_checkable
 class TransformProvider(Protocol):
-    """对书籍正文做加工的插件：正文进、正文出。
-
-    ``preview`` 是 read（不改书），``apply`` 是 write（唯一真正修改书籍内容的
-    模式）。两者都由平台负责书籍定位、权限校验、临时文件与写回入库，插件只
-    实现纯变换。
-    """
-
     supported_formats: frozenset
-    # 仅客观可判定的处理（如编码修复）可以自动触发；查找替换与繁简转换
-    # 依赖用户意图，不提供自动选项。
     supports_auto_trigger: bool
 
-    def preview(self, src, context): ...
+    def preview(self, src: ToolInput, context: dict[str, Any]) -> ToolReport: ...
 
-    def apply(self, src, out_dir, context): ...
+    def apply(self, src: ToolInput, out_dir: str, context: dict[str, Any]) -> ToolOutput: ...
+
+
+@runtime_checkable
+class ExtraFeatureProvider(Protocol):
+    def execute_feature(self, action: str, params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]: ...
 
 
 @runtime_checkable
 class PushProvider(Protocol):
-    """把书籍推送到外部设备或服务。
-
-    sync 模式：方向是平台 → 外部。与 read（外部 → 平台）和 write（改本地书籍
-    正文）互斥。外部写入通常不可撤销，因此不提供回滚。
-    """
-
-    # 设备地址默认端口，用户只填 IP 时补全。
     default_port: int
 
     def push(self, book_file, target, context): ...
 
 
-# 触发方式：默认手动，用户可在插件管理页随时切换，无需重启或重装。
-TRIGGER_MANUAL = "manual"
-TRIGGER_AUTO = "auto"
-TRIGGER_SCHEMA = {"type": "string", "enum": [TRIGGER_MANUAL, TRIGGER_AUTO], "default": TRIGGER_MANUAL}
+CAPABILITY_INTERFACES = {
+    "metadata.lookup": MetadataProvider,
+    # 文件提取与运行时发现不是书籍检索，但仍属于第七类受控逃生舱，
+    # 不再用一个全局 PluginProvider.execute() 混装所有语义。
+    "metadata.extract": ExtraFeatureProvider,
+    "metadata.discover": ExtraFeatureProvider,
+    "annotations.import": AnnotationProvider,
+    "annotations.push": AnnotationProvider,
+    "annotations.chapter_reviews": ReviewProvider,
+    "reviews.lookup": ReviewProvider,
+    "reviews.import": ReviewProvider,
+    "book_sources.search": SourceProvider,
+    "book_sources.browse": SourceProvider,
+    "book_sources.acquire": SourceProvider,
+    "integrations.tool": TransformProvider,
+    "integrations.push": PushProvider,
+    "integrations.search": ExtraFeatureProvider,
+    "integrations.books": ExtraFeatureProvider,
+    "integrations.shelf": ExtraFeatureProvider,
+    "integrations.statistics": ExtraFeatureProvider,
+    "integrations.community": ExtraFeatureProvider,
+    "integrations.recommendations": ExtraFeatureProvider,
+}
 
 
-def trigger_of(config):
-    """读取连接配置里的触发方式，未配置时为手动。"""
-    return str((config or {}).get("trigger") or TRIGGER_MANUAL)
-
-
-def contract_violations(provider):
-    """返回 provider 违反契约之处；为空表示满足契约。
-
-    注册期调用。当前仅告警不拒绝（见方案风险 R4），待全部内置 provider
-    确认合规后再改为抛错。
-    """
+def contract_violations(provider, manifest=None):
+    """返回 provider 违反基础契约或 capability 接口之处。"""
     problems = []
     if not isinstance(getattr(provider, "manifest", None), dict):
         problems.append("manifest 必须是 dict")
-    if not callable(getattr(provider, "execute", None)):
-        problems.append("缺少可调用的 execute()")
+        return problems
+    if manifest is not None:
+        raw = manifest.raw
+        for capability in raw["capabilities"]:
+            interface = CAPABILITY_INTERFACES.get(capability)
+            if interface is None:
+                problems.append("声明了平台未知能力 %s" % capability)
+            elif not isinstance(provider, interface):
+                problems.append("声明了 %s 但未实现 %s" % (capability, interface.__name__))
+        if raw.get("extra_features") and not isinstance(provider, ExtraFeatureProvider):
+            problems.append("声明了 extra_features 但未实现 ExtraFeatureProvider")
+        if (
+            "test" in raw["actions"]
+            and not callable(getattr(provider, "self_check", None))
+            and not callable(getattr(provider, "execute", None))
+        ):
+            problems.append("声明了 test 但 typed-only provider 未实现 self_check")
+        if any(capability.startswith("book_sources.") for capability in raw["capabilities"]):
+            declared_mode = raw.get("download_mode")
+            actual_mode = getattr(provider, "download_mode", None)
+            if declared_mode is None:
+                problems.append("书源必须声明 download_mode")
+            elif actual_mode != declared_mode:
+                problems.append("manifest download_mode 与 SourceProvider.download_mode 不一致")
+            required = {
+                "single_book": ("download",),
+                "by_chapters": ("get_toc", "get_chapter"),
+                "none": (),
+            }.get(declared_mode, ())
+            missing = [name for name in required if not callable(getattr(provider, name, None))]
+            if missing:
+                problems.append("download_mode=%s 缺少方法：%s" % (declared_mode, ", ".join(missing)))
     return problems

@@ -80,6 +80,9 @@ describe('AnnotationPanel', () => {
         expect(wrapper.findAll('.annotation-card__footer button')).toHaveLength(1);
         expect(wrapper.findAll('button[aria-label="annotations.actionsFor"]')).toHaveLength(1);
         expect(wrapper.get('a').text()).toContain('weread.open');
+        const dialogs = wrapper.findAllComponents({ name: 'VDialog' });
+        expect(dialogs).toHaveLength(2);
+        expect(dialogs.every(dialog => dialog.attributes('aria-labelledby'))).toBe(true);
         wrapper.unmount();
     });
 

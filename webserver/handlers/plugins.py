@@ -17,6 +17,8 @@ from webserver.models import (
     PluginRunItem,
     PluginSecret,
 )
+from webserver.plugins.runtime.interfaces import ExtraFeatureProvider
+from webserver.plugins.runtime.protocol import PluginManifest, UpstreamError, validate_against_schema
 from webserver.services.annotation_writer import all_book_ids
 from webserver.services.async_service import AsyncService
 from webserver.services.plugin_jobs import execute_plugin_run
@@ -266,6 +268,72 @@ class UserPluginConnections(BaseHandler):
             return _error(exc)
 
 
+class UserPluginFeature(BaseHandler):
+    """插件自有、无法标准化的只读/写入动作的唯一逃生舱。"""
+
+    @js
+    @auth
+    def post(self, plugin_key, action):
+        try:
+            req = _body(self)
+            provider = REGISTRY.get(plugin_key)
+            manifest = PluginManifest.validate(provider.manifest)
+            feature = (manifest.raw.get("extra_features") or {}).get(action)
+            if feature is None or not isinstance(provider, ExtraFeatureProvider):
+                raise PluginRuntimeError("plugin.feature_not_supported", "Plugin feature is not supported")
+            params = req.get("params") or {}
+            if not isinstance(params, dict):
+                raise PluginRuntimeError("plugin.request_invalid", "Feature params must be an object")
+            try:
+                validate_against_schema(feature.get("schema") or {}, params, where="feature")
+            except ValueError as exc:
+                raise PluginRuntimeError(getattr(exc, "code", "plugin.request_invalid"), str(exc)) from exc
+
+            installation = self.session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
+            if installation is None:
+                installation = install_builtin(self.session, plugin_key, self.user_id())
+            credentials = req.get("credentials")
+            if credentials is not None:
+                if not isinstance(credentials, dict):
+                    raise PluginRuntimeError("plugin.credentials_invalid", "credentials must be an object")
+                connection = save_connection(
+                    self.session,
+                    loader.get_settings(),
+                    installation.id,
+                    "user",
+                    self.user_id(),
+                    credentials,
+                    role=DEFAULT_CONNECTION_ROLE,
+                    name=manifest.raw["name"],
+                )
+            else:
+                connection = (
+                    self.session.query(PluginConnection)
+                    .filter(
+                        PluginConnection.installation_id == installation.id,
+                        PluginConnection.owner_type == "user",
+                        PluginConnection.owner_id == self.user_id(),
+                        PluginConnection.role == DEFAULT_CONNECTION_ROLE,
+                    )
+                    .first()
+                )
+            if connection is None or not connection.enabled:
+                raise PluginRuntimeError("plugin.connection_missing", "Plugin connection is not enabled")
+            runtime = PluginRuntime(self.session, loader.get_settings())
+            dispatch = getattr(runtime, feature["mode"])
+            data = dispatch(
+                connection,
+                "execute_feature",
+                action,
+                params,
+                required_scopes=tuple(feature.get("required_scopes") or ()),
+            )
+            secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
+            return {"err": "ok", "connection": connection.to_public_dict(secret), "data": data}
+        except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
 class AdminPluginAction(BaseHandler):
     @js
     @is_admin
@@ -403,6 +471,7 @@ def routes():
             (r"/api/admin/plugins/runs", AdminPluginRuns),
             (r"/api/admin/plugins/runs/([0-9]+)", AdminPluginRunDetail),
             (r"/api/plugins/connections", UserPluginConnections),
+            (r"/api/plugins/([a-z0-9.-]+)/features/([a-z0-9_]+)", UserPluginFeature),
             (r"/api/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", UserPluginAction),
             (r"/api/plugins/runs", UserPluginRuns),
             (r"/api/plugins/runs/([0-9]+)", UserPluginRunDetail),

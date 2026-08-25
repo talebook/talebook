@@ -2,12 +2,13 @@ import datetime
 import hashlib
 import json
 
+from .domains import Annotation, Page
 from .protocol import (
     PROTOCOL_VERSION,
-    ProviderAuthError,
-    ProviderError,
+    UpstreamAuthError,
+    UpstreamError,
     ProviderItem,
-    ProviderRateLimitError,
+    UpstreamRateLimitError,
     ProviderResult,
 )
 from .safe_http import SafeHttpClient
@@ -102,23 +103,23 @@ WEREAD_QUERY_OPERATIONS = {
 def _validate_query_value(name, value, kind):
     if kind in {"text", "id"}:
         if not isinstance(value, str) or not value.strip():
-            raise ProviderError("WeRead query parameter %s must be a non-empty string" % name)
+            raise UpstreamError("WeRead query parameter %s must be a non-empty string" % name)
         limit = 200 if kind == "text" else 128
         if len(value) > limit:
-            raise ProviderError("WeRead query parameter %s is too long" % name)
+            raise UpstreamError("WeRead query parameter %s is too long" % name)
         return value.strip()
     if kind == "reviews":
         if not isinstance(value, list) or not 1 <= len(value) <= 20:
-            raise ProviderError("WeRead reviews must contain between 1 and 20 ranges")
+            raise UpstreamError("WeRead reviews must contain between 1 and 20 ranges")
         result = []
         for item in value:
             if not isinstance(item, dict) or not isinstance(item.get("range"), str) or not item["range"].strip():
-                raise ProviderError("Each WeRead review range must be a non-empty string")
+                raise UpstreamError("Each WeRead review range must be a non-empty string")
             unknown = set(item) - {"range", "maxIdx", "count", "synckey"}
             if unknown:
-                raise ProviderError("Unknown WeRead review range parameters: %s" % ", ".join(sorted(unknown)))
+                raise UpstreamError("Unknown WeRead review range parameters: %s" % ", ".join(sorted(unknown)))
             if len(item["range"]) > 100:
-                raise ProviderError("WeRead review range is too long")
+                raise UpstreamError("WeRead review range is too long")
             safe = {"range": item["range"].strip()}
             for key in ("maxIdx", "count", "synckey"):
                 if key in item:
@@ -126,39 +127,39 @@ def _validate_query_value(name, value, kind):
             result.append(safe)
         return result
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ProviderError("WeRead query parameter %s must be an integer" % name)
+        raise UpstreamError("WeRead query parameter %s must be an integer" % name)
     if kind == "scope" and value not in {0, 2, 4, 6, 10, 12, 13, 14, 16}:
-        raise ProviderError("Unsupported WeRead search scope")
+        raise UpstreamError("Unsupported WeRead search scope")
     if kind == "mode":
-        raise ProviderError("WeRead statistics mode must be a string")
+        raise UpstreamError("WeRead statistics mode must be a string")
     if kind == "direction" and value not in {0, 1}:
-        raise ProviderError("Unsupported WeRead sort direction")
+        raise UpstreamError("Unsupported WeRead sort direction")
     if kind == "review_type" and value not in {0, 1, 2, 3, 4}:
-        raise ProviderError("Unsupported WeRead review type")
+        raise UpstreamError("Unsupported WeRead review type")
     maximum = 20 if kind == "small_count" else 100 if kind == "count" else 2**63 - 1
     if value < 0 or value > maximum:
-        raise ProviderError("WeRead query parameter %s is outside the allowed range" % name)
+        raise UpstreamError("WeRead query parameter %s is outside the allowed range" % name)
     return value
 
 
 def validate_weread_query(operation, params):
     spec = WEREAD_QUERY_OPERATIONS.get(operation)
     if spec is None:
-        raise ProviderError("Unsupported WeRead read operation")
+        raise UpstreamError("Unsupported WeRead read operation")
     if not isinstance(params, dict):
-        raise ProviderError("WeRead query parameters must be an object")
+        raise UpstreamError("WeRead query parameters must be an object")
     unknown = set(params) - set(spec["params"])
     missing = spec["required"] - set(params)
     if unknown:
-        raise ProviderError("Unknown WeRead query parameters: %s" % ", ".join(sorted(unknown)))
+        raise UpstreamError("Unknown WeRead query parameters: %s" % ", ".join(sorted(unknown)))
     if missing:
-        raise ProviderError("Missing WeRead query parameters: %s" % ", ".join(sorted(missing)))
+        raise UpstreamError("Missing WeRead query parameters: %s" % ", ".join(sorted(missing)))
     safe = {}
     for name, value in params.items():
         kind = spec["params"][name]
         if kind == "mode":
             if value not in {"weekly", "monthly", "annually", "overall"}:
-                raise ProviderError("Unsupported WeRead statistics mode")
+                raise UpstreamError("Unsupported WeRead statistics mode")
             safe[name] = value
         else:
             safe[name] = _validate_query_value(name, value, kind)
@@ -234,7 +235,7 @@ def parse_weread_export(payload):
     if isinstance(payload, list):
         books = payload
     elif not isinstance(payload, dict):
-        raise ProviderError("WeRead export must be a JSON object or array")
+        raise UpstreamError("WeRead export must be a JSON object or array")
     elif isinstance(payload.get("books"), list):
         books = payload["books"]
     elif isinstance(payload.get("data"), list):
@@ -356,6 +357,42 @@ class WereadProvider:
         "homepage": "https://github.com/Tencent/WeChatReading",
         "license": "GPL-3.0",
         "description": "搜索微信读书内容，浏览书架、阅读统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。",
+        "extra_features": {
+            "statistics": {
+                "mode": "read",
+                "required_scopes": ["profile.read"],
+                "schema": {
+                    "type": "object",
+                    "properties": {"mode": {"type": "string"}, "baseTime": {"type": "integer"}},
+                },
+            },
+            "popular_highlights": {
+                "mode": "read",
+                "required_scopes": ["profile.read"],
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "bookId": {"type": "string"},
+                        "chapterUid": {"type": "integer"},
+                        "synckey": {"type": "integer"},
+                    },
+                    "required": ["bookId"],
+                },
+            },
+            "underline_stats": {
+                "mode": "read",
+                "required_scopes": ["profile.read"],
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "bookId": {"type": "string"},
+                        "chapterUid": {"type": "integer"},
+                        "synckey": {"type": "integer"},
+                    },
+                    "required": ["bookId", "chapterUid"],
+                },
+            },
+        },
         "ui": {
             "icon": "mdi-book-open-page-variant",
             "manage_route": "/plugins/weread",
@@ -376,7 +413,7 @@ class WereadProvider:
             health = "WeRead export parsed"
         else:
             if not api_key:
-                raise ProviderAuthError("WeRead API key is required when no export JSON is supplied")
+                raise UpstreamAuthError("WeRead API key is required when no export JSON is supplied")
             if context["action"] == "test":
                 self._gateway(api_key, "/user/notebooks", count=1)
                 return ProviderResult(health_message="WeRead API connection healthy")
@@ -398,7 +435,7 @@ class WereadProvider:
 
         api_key = str((context.get("secrets") or {}).get("api_key") or "")
         if not api_key:
-            raise ProviderAuthError("WeRead API key is required")
+            raise UpstreamAuthError("WeRead API key is required")
         return WereadMetadataApi(api_key, provider=self)
 
     def _tag(self, metadata):
@@ -413,60 +450,123 @@ class WereadProvider:
     def get_metadata(self, provider_value, context):
         return self._tag(self._metadata_api(context).get_metadata_by_provider(provider_value))
 
+    def list_annotations(self, context):
+        api_key = str((context.get("secrets") or {}).get("api_key") or "")
+        if not api_key:
+            raise UpstreamAuthError("WeRead API key is required")
+        provider_items, next_cursor, has_more = self._fetch_page(api_key, context.get("cursor") or {})
+        items = [
+            Annotation.from_dict(item.data)
+            for item in provider_items
+            if item.entity_type == "annotation" and not item.error_code
+        ]
+        return Page(
+            items=items,
+            has_more=has_more,
+            next_cursor=next_cursor,
+            health_message="WeRead annotations fetched",
+        )
+
+    def push_annotation(self, item, state, context):
+        raise UpstreamError("WeRead does not support writing annotations")
+
+    def execute_feature(self, action, params, context):
+        if action not in self.manifest["extra_features"]:
+            raise UpstreamError("Unsupported WeRead extra feature")
+        api_key = str((context.get("secrets") or {}).get("api_key") or "")
+        return self.query(api_key, action, params)
+
     def query(self, api_key, operation, params=None):
         if not api_key:
-            raise ProviderAuthError("WeRead API key is required")
+            raise UpstreamAuthError("WeRead API key is required")
         api_name, safe_params = validate_weread_query(operation, {} if params is None else params)
         return self._gateway(api_key, api_name, **safe_params)
 
-    def _fetch_all(self, api_key):
-        notebooks = []
-        last_sort = None
-        seen_sorts = set()
-        while True:
-            params = {"count": 100}
-            if last_sort is not None:
-                params["lastSort"] = last_sort
-            page = self._gateway(api_key, "/user/notebooks", **params)
-            notebooks.extend(_as_list(page.get("books")))
-            if not page.get("hasMore") or not notebooks:
-                break
-            last_sort = notebooks[-1].get("sort")
-            if last_sort in seen_sorts or last_sort is None:
-                break
-            seen_sorts.add(last_sort)
+    def query_with_context(self, operation, params, context):
+        """兼容工作台查询；凭据只从运行时注入的 context 读取。"""
+        api_key = str((context.get("secrets") or {}).get("api_key") or "")
+        return self.query(api_key, operation, params)
 
-        payloads = []
-        for notebook in notebooks:
-            if not isinstance(notebook, dict):
-                continue
+    def _fetch_all(self, api_key):
+        cursor = {}
+        items = []
+        seen = set()
+        while True:
+            page_items, next_cursor, has_more = self._fetch_page(api_key, cursor)
+            items.extend(page_items)
+            if not has_more:
+                return items
+            marker = json.dumps(next_cursor, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            if not next_cursor or marker in seen:
+                raise UpstreamError("WeRead pagination cursor did not advance")
+            seen.add(marker)
+            cursor = next_cursor
+
+    def _fetch_page(self, api_key, cursor):
+        """每次只拉一个 notebook 的一页 review，游标同时覆盖两层分页。"""
+        last_sort = cursor.get("last_sort")
+        notebook_index = max(0, int(cursor.get("notebook_index", 0)))
+        review_synckey = max(0, int(cursor.get("review_synckey", 0)))
+        params = {"count": 100}
+        if last_sort is not None:
+            params["lastSort"] = last_sort
+        notebook_page = self._gateway(api_key, "/user/notebooks", **params)
+        notebooks = [item for item in _as_list(notebook_page.get("books")) if isinstance(item, dict)]
+        while notebook_index < len(notebooks):
+            notebook = notebooks[notebook_index]
             book = notebook.get("book") if isinstance(notebook.get("book"), dict) else notebook
             book_id = str(_first(notebook.get("bookId"), book.get("bookId")))
-            if not book_id:
-                continue
-            marks = self._gateway(api_key, "/book/bookmarklist", bookId=book_id)
-            reviews = []
-            synckey = 0
-            seen_sync = set()
-            while True:
-                page = self._gateway(api_key, "/review/list/mine", bookid=book_id, synckey=synckey, count=100)
-                reviews.extend(_as_list(page.get("reviews")))
-                if not page.get("hasMore"):
-                    break
-                next_sync = page.get("synckey")
-                if next_sync in seen_sync or next_sync is None:
-                    break
-                seen_sync.add(next_sync)
-                synckey = next_sync
-            payloads.append(
+            if book_id:
+                break
+            notebook_index += 1
+            review_synckey = 0
+        if notebook_index >= len(notebooks):
+            return [], {}, False
+
+        marks = self._gateway(api_key, "/book/bookmarklist", bookId=book_id)
+        review_page = self._gateway(
+            api_key,
+            "/review/list/mine",
+            bookid=book_id,
+            synckey=review_synckey,
+            count=100,
+        )
+        payload = {
+            "book": marks.get("book") or book,
+            "chapters": marks.get("chapters") or [],
+            # 恢复同一本书的后续 review 页时不重复发出划线。
+            "bookmarks": (marks.get("updated") or []) if review_synckey == 0 else [],
+            "reviews": _as_list(review_page.get("reviews")),
+        }
+        items = parse_weread_export([payload])
+
+        next_sync = review_page.get("synckey")
+        if review_page.get("hasMore") and next_sync is not None and next_sync != review_synckey:
+            return (
+                items,
                 {
-                    "book": marks.get("book") or book,
-                    "chapters": marks.get("chapters") or [],
-                    "bookmarks": marks.get("updated") or [],
-                    "reviews": reviews,
-                }
+                    "last_sort": last_sort,
+                    "notebook_index": notebook_index,
+                    "review_synckey": next_sync,
+                },
+                True,
             )
-        return parse_weread_export(payloads)
+
+        if notebook_index + 1 < len(notebooks):
+            return (
+                items,
+                {
+                    "last_sort": last_sort,
+                    "notebook_index": notebook_index + 1,
+                    "review_synckey": 0,
+                },
+                True,
+            )
+
+        next_sort = notebooks[-1].get("sort")
+        if notebook_page.get("hasMore") and next_sort is not None and next_sort != last_sort:
+            return items, {"last_sort": next_sort, "notebook_index": 0, "review_synckey": 0}, True
+        return items, {}, False
 
     def _gateway(self, api_key, api_name, **params):
         body = {"api_name": api_name, "skill_version": WEREAD_SKILL_VERSION, **params}
@@ -479,17 +579,17 @@ class WereadProvider:
                 timeout=30,
             )
         except OSError as exc:
-            # requests 的连接与超时异常继承自 OSError；ProviderError 系列直接向上传递。
-            raise ProviderError("WeRead gateway request failed") from exc
+            # requests 的连接与超时异常继承自 OSError；UpstreamError 系列直接向上传递。
+            raise UpstreamError("WeRead gateway request failed") from exc
         if not isinstance(data, dict):
-            raise ProviderError("WeRead gateway returned an invalid response")
+            raise UpstreamError("WeRead gateway returned an invalid response")
         if data.get("upgrade_info"):
-            raise ProviderError(str(data["upgrade_info"].get("message") or "WeRead skill upgrade required"))
+            raise UpstreamError(str(data["upgrade_info"].get("message") or "WeRead skill upgrade required"))
         if data.get("errcode") not in (None, 0, "0"):
             message = str(data.get("errmsg") or data.get("message") or "WeRead request rejected")
             if data.get("errcode") in {401, 403, -2010} or "认证" in message or "登录" in message:
-                raise ProviderAuthError(message)
+                raise UpstreamAuthError(message)
             if data.get("errcode") in {429, -2009} or "频率" in message:
-                raise ProviderRateLimitError(message)
-            raise ProviderError(message)
+                raise UpstreamRateLimitError(message)
+            raise UpstreamError(message)
         return data

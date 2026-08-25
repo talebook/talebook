@@ -11,6 +11,7 @@ from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderItem, P
 from webserver.services.plugin_runtime import PluginRegistry, PluginRuntime, install_builtin, save_connection
 from webserver.services.plugin_writers import ENTITY_WRITERS, source_name_for, writer_for
 
+
 SETTINGS = {"PLUGIN_SECRET_KEY": "entity-writer-test-key", "cookie_secret": "unused-cookie-secret"}
 
 
@@ -86,6 +87,16 @@ def _annotation_plugin(plugin_id):
                 health_message="ok",
             )
 
+        def list_annotations(self, context):
+            from webserver.plugins.runtime.domains import Page
+
+            return Page()
+
+        def push_annotation(self, item, state, context):
+            from webserver.plugins.runtime.domains import PushReceipt
+
+            return PushReceipt(source_annotation_id="third-party-1")
+
     return Plugin()
 
 
@@ -110,15 +121,15 @@ def test_third_party_annotation_plugin_is_not_branded_as_weread(db_session):
     assert db_session.query(Annotation).count() == 1
 
     source = db_session.query(AnnotationSource).one()
-    assert source.source_name == "thirdparty"
+    assert source.source_name == "talebook.annotations.thirdparty"
     assert source.source_name != "weread"
 
     match = db_session.query(PluginEntityMatch).one()
-    assert match.source_type == "thirdparty_book"
+    assert match.source_type == "talebook.annotations.thirdparty_book"
     assert "weread" not in match.source_type
 
     annotation = db_session.query(Annotation).one()
-    assert annotation.client_id.startswith("thirdparty:")
+    assert annotation.client_id.startswith("talebook.annotations.thirdparty:%s:" % connection.id)
     assert "weread" not in annotation.client_id
 
 
@@ -134,7 +145,44 @@ def test_weread_identity_is_preserved_for_existing_data(db_session):
 
 def test_source_name_is_derived_from_the_plugin_key(db_session):
     _, connection = _run_import(db_session, "talebook.annotations.brs")
-    assert source_name_for(db_session, connection) == "brs"
+    assert source_name_for(db_session, connection) == "talebook.annotations.brs"
+
+
+def test_annotation_source_identity_respects_database_column_widths(db_session):
+    plugin_id = "vendor.%s.annotations" % ("verylongsegment" * 9)
+    run, connection = _run_import(db_session, plugin_id)
+
+    assert run.status == "succeeded", run.error_message
+    source = db_session.query(AnnotationSource).one()
+    match = db_session.query(PluginEntityMatch).one()
+    annotation = db_session.query(Annotation).one()
+    assert len(source.source_name) <= 64
+    assert len(match.source_type) <= 64
+    assert len(annotation.client_id) <= 64
+    assert source.source_name == source_name_for(db_session, connection)
+
+
+def test_same_plugin_external_id_is_namespaced_by_connection(db_session):
+    plugin_id = "talebook.annotations.multi-account"
+    plugin = _annotation_plugin(plugin_id)
+    registry = PluginRegistry()
+    registry.register(plugin)
+    installation = install_builtin(db_session, plugin_id, installed_by=1, registry=registry)
+    first = save_connection(db_session, SETTINGS, installation.id, "user", 1, {}, name="账户一", role="account-1")
+    second = save_connection(db_session, SETTINGS, installation.id, "user", 1, {}, name="账户二", role="account-2")
+    runtime = PluginRuntime(db_session, SETTINGS, registry=registry, calibre_db=FakeCalibre())
+
+    for connection in (first, second):
+        run = runtime.prepare_run(connection.id, "run", requested_by=1)
+        runtime.execute(run.id)
+        db_session.refresh(run)
+        assert run.status == "succeeded", run.error_message
+
+    annotations = db_session.query(Annotation).order_by(Annotation.id).all()
+    assert len(annotations) == 2
+    assert annotations[0].client_id != annotations[1].client_id
+    assert str(first.id) in annotations[0].client_id
+    assert str(second.id) in annotations[1].client_id
 
 
 def test_runtime_dispatches_by_entity_type_not_by_plugin_name():

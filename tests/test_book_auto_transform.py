@@ -3,14 +3,14 @@
 import os
 from unittest import mock
 
-from webserver.handlers.base import BaseHandler
-from webserver.plugins.runtime.interfaces import TRIGGER_AUTO, TRIGGER_MANUAL, trigger_of
+from tests.test_main import BID_TXT, TestWithAdminUser, get_db
+from tests.test_main import setUpModule as init_main
+from webserver.models import PluginRun
 from webserver.plugins.runtime.protocol import ManifestError, PluginManifest
+from webserver.plugins.runtime.triggers import TRIGGER_AUTO, TRIGGER_MANUAL, trigger_of
 from webserver.services.async_service import AsyncService
 from webserver.services.plugin_runtime import REGISTRY
 
-from tests.test_main import BID_TXT, TestWithAdminUser, get_db
-from tests.test_main import setUpModule as init_main
 
 TXT_FIXER = "talebook.tool.txt-fixer"
 ZH_CONVERTER = "talebook.tool.zh-converter"
@@ -131,6 +131,19 @@ class TestAutoFixEncodingService(TestWithAdminUser):
         with open(path, "rb") as handle:
             return hashlib.sha256(handle.read()).hexdigest()
 
+    def _connection_id(self):
+        from webserver.models import PluginConnection, PluginInstallation
+
+        self.json("/api/admin/plugins")
+        return (
+            get_db()
+            .query(PluginConnection)
+            .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+            .filter(PluginInstallation.plugin_key == TXT_FIXER, PluginConnection.owner_type == "instance")
+            .one()
+            .id
+        )
+
     def setUp(self):
         super().setUp()
         self._digest_before = self._fixture_digest()
@@ -152,7 +165,7 @@ class TestAutoFixEncodingService(TestWithAdminUser):
 
         from webserver.services.book_transform import fix_encoding_for_book
 
-        self.json("/api/admin/plugins")
+        connection_id = self._connection_id()
         with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as handle:
             handle.write(("这本书本来就是 UTF-8 编码，正文内容完整可读，无需任何修复。" * 40).encode("utf-8"))
             utf8_path = handle.name
@@ -162,7 +175,7 @@ class TestAutoFixEncodingService(TestWithAdminUser):
             mock.patch("webserver.services.book_transform.get_format_path", return_value=utf8_path),
             mock.patch("webserver.services.book_transform.overwrite_format") as m_write,
         ):
-            run = fix_encoding_for_book(get_db(), AsyncService().db, BID_TXT, 1)
+            run = fix_encoding_for_book(get_db(), AsyncService().db, BID_TXT, 1, connection_id)
 
         self.assertIsNotNone(run)
         self.assertEqual(run.status, "succeeded")
@@ -176,7 +189,7 @@ class TestAutoFixEncodingService(TestWithAdminUser):
 
         from webserver.services.book_transform import fix_encoding_for_book
 
-        self.json("/api/admin/plugins")
+        connection_id = self._connection_id()
         with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as handle:
             handle.write(("这是一段需要修复编码的中文正文，内容足够长以便编码检测稳定判定。" * 40).encode("gb18030"))
             gbk_path = handle.name
@@ -184,21 +197,67 @@ class TestAutoFixEncodingService(TestWithAdminUser):
 
         with (
             mock.patch("webserver.services.book_transform.get_format_path", return_value=gbk_path),
-            mock.patch("webserver.services.book_transform.overwrite_format") as m_write,
+            mock.patch(
+                "webserver.services.book_transform.overwrite_format", return_value="/tmp/talebook-auto-backup.txt"
+            ) as m_write,
         ):
-            run = fix_encoding_for_book(get_db(), AsyncService().db, BID_TXT, 1)
+            run = fix_encoding_for_book(get_db(), AsyncService().db, BID_TXT, 1, connection_id)
 
         self.assertEqual(run.status, "succeeded")
         self.assertEqual(run.counts["updated"], 1)
         self.assertTrue(m_write.called, "编码不正确时必须写回")
-        self.assertTrue(run.cursor_after["backup_dir"], "写回必须记录备份路径")
+        self.assertEqual(run.cursor_after["backup_path"], "/tmp/talebook-auto-backup.txt")
+        typed_run = (
+            get_db()
+            .query(PluginRun)
+            .filter(PluginRun.connection_id == connection_id, PluginRun.action == "write")
+            .order_by(PluginRun.id.desc())
+            .first()
+        )
+        self.assertEqual(typed_run.status, "succeeded")
+        self.assertEqual(typed_run.cursor_after["backup_path"], "/tmp/talebook-auto-backup.txt")
 
     def test_failure_is_recorded_and_does_not_raise(self):
         from webserver.services.book_transform import fix_encoding_for_book
 
-        self.json("/api/admin/plugins")
+        connection_id = self._connection_id()
         with mock.patch("webserver.services.book_transform.resolve_book", side_effect=RuntimeError("书不见了")):
-            run = fix_encoding_for_book(get_db(), AsyncService().db, BID_TXT, 1)
+            run = fix_encoding_for_book(get_db(), AsyncService().db, BID_TXT, 1, connection_id)
 
         self.assertEqual(run.status, "failed")
         self.assertIn("书不见了", run.error_message)
+
+    def test_writeback_failure_rolls_back_inside_typed_write_run(self):
+        import tempfile
+
+        from webserver.services.book_transform import fix_encoding_for_book
+
+        connection_id = self._connection_id()
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as handle:
+            handle.write(("这是一段需要修复编码的中文正文，内容足够长以便编码检测稳定判定。" * 40).encode("gb18030"))
+            gbk_path = handle.name
+        self.addCleanup(os.unlink, gbk_path)
+
+        def fail_after_backup(*_args, **kwargs):
+            kwargs["backup_state"]["backup_path"] = "/tmp/talebook-auto-backup.txt"
+            raise RuntimeError("写回失败")
+
+        with (
+            mock.patch("webserver.services.book_transform.get_format_path", return_value=gbk_path),
+            mock.patch("webserver.services.book_transform.overwrite_format", side_effect=fail_after_backup),
+            mock.patch("webserver.services.book_transform._restore_backup", return_value=True) as m_restore,
+        ):
+            run = fix_encoding_for_book(get_db(), AsyncService().db, BID_TXT, 1, connection_id)
+
+        self.assertEqual(run.status, "failed")
+        self.assertIn("写回失败", run.error_message)
+        m_restore.assert_called_once()
+        typed_run = (
+            get_db()
+            .query(PluginRun)
+            .filter(PluginRun.connection_id == connection_id, PluginRun.action == "write")
+            .order_by(PluginRun.id.desc())
+            .first()
+        )
+        self.assertEqual(typed_run.status, "rolled_back")
+        self.assertEqual(typed_run.cursor_after["backup_path"], "/tmp/talebook-auto-backup.txt")

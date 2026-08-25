@@ -88,7 +88,7 @@
       .matrix-yes { color: #176443; background: var(--green-soft); }
       .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
       .matrix-no { color: #526072; background: #eef2f7; }
-      .matrix-note { color: var(--muted); font-size: 12px; }
+      .matrix-legend .matrix-note { color: var(--muted); font-size: 12px; white-space: normal; }
 
       .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
       table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
@@ -133,7 +133,7 @@
         h1 { font-size: clamp(28px, 9vw, 40px); }
         .sub { font-size: 15px; }
         .card { padding: 21px 19px; }
-        .grid, .flow { grid-template-columns: 1fr; }
+        .grid, .flow { grid-template-columns: minmax(0, 1fr); }
         .step { min-height: 0; }
         .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
         .toc-fab { right: 10px; bottom: 10px; }
@@ -220,7 +220,8 @@
                   <tr><td>命名分层</td><td>能力接口 <code>XxxProvider</code>（Protocol）／共享实现基类 <code>XxxBase</code>／具体插件 <code>XxxPlugin</code></td></tr>
                   <tr><td>调用模式命名</td><td>用 <code>read</code> / <code>write</code>，不用 <code>query</code> / <code>sync</code></td></tr>
                   <tr><td>格式转换接口名</td><td><code>TransformProvider</code>，不用 <code>BookTransformProvider</code></td></tr>
-                  <tr><td>插件专属功能</td><td><code>ExtraFeatureProvider.execute(action, params)</code>，不用 <code>RawQueryProvider</code></td></tr>
+                  <tr><td>插件专属功能</td><td><code>ExtraFeatureProvider.execute_feature(action, params)</code>，不用 <code>RawQueryProvider</code></td></tr>
+                  <tr><td>通用 Provider</td><td>废弃 <code>PluginProvider</code>；插件只实现自己声明的能力接口，不能再以通用 <code>execute(context)</code> 作为注册兜底</td></tr>
                   <tr><td>书源接口组织</td><td>单一胖接口 + 可选方法，不拆多个 Protocol</td></tr>
                   <tr><td>取书方式声明</td><td>manifest 声明 <code>download_mode</code>（<code>single_book</code> / <code>by_chapters</code> / <code>none</code>），外层按模式分派</td></tr>
                   <tr><td>取书方法名</td><td><code>download</code> / <code>get_toc</code> / <code>get_chapter</code>，不用 <code>acquire</code></td></tr>
@@ -357,12 +358,12 @@ class SourceContent:  ...   # 来自 engine.ChapterContent</code></pre>
               <table>
                 <thead><tr><th>接口</th><th>方法</th><th>模式</th><th>现有实现数</th></tr></thead>
                 <tbody>
-                  <tr><td><code>MetadataProvider</code></td><td><code>search_books</code> / <code>get_metadata</code></td><td>read</td><td>3 + 13 legacy + weread</td></tr>
+                  <tr><td><code>MetadataProvider</code></td><td><code>search_books</code> / <code>get_metadata</code></td><td>read</td><td>4 个 typed provider（Open Library、嵌入文件、Calibre bridge、微信读书）；13 个 legacy 源待逐个适配</td></tr>
                   <tr><td><code>AnnotationProvider</code></td><td><code>list_annotations</code> / <code>push_annotation</code></td><td>read / <strong>sync</strong></td><td>2</td></tr>
                   <tr><td><code>ReviewProvider</code></td><td><code>get_reviews</code></td><td>read</td><td>7</td></tr>
                   <tr><td><code>SourceProvider</code></td><td>见第 5 节</td><td>全部 read</td><td>8 + Legado + weread 书架</td></tr>
                   <tr><td><code>TransformProvider</code></td><td><code>preview</code> / <code>apply</code></td><td>read / <strong>write</strong>（唯一真 write）</td><td>3</td></tr>
-                  <tr><td><code>ExtraFeatureProvider</code></td><td><code>execute(action, params)</code></td><td>按 action 声明</td><td>1（weread）</td></tr>
+                  <tr><td><code>ExtraFeatureProvider</code></td><td><code>execute_feature(action, params)</code></td><td>按 action 声明</td><td>1（weread）</td></tr>
                   <tr><td><code>PushProvider</code></td><td><code>push</code></td><td>sync</td><td>6（多看 / BOOX / 汉王 / 掌阅 / 当当 / PureLibro）</td></tr>
                 </tbody>
               </table>
@@ -386,9 +387,9 @@ class SourceContent:  ...   # 来自 engine.ChapterContent</code></pre>
             <p><code>supports_auto_trigger=False</code> 的插件，其 <code>config_schema</code> 不包含 <code>auto</code> 选项，前端也不渲染该开关——避免让用户配出一个平台会拒绝执行的组合。</p>
 
             <h3>4.4 ExtraFeatureProvider 与它的约束</h3>
-            <p>通用 <code>execute(action, params)</code> 不是错的设计，错的是它当了唯一接口。现在它退回第 7 个接口，专门装标准化不了的东西——插件自带的、只有其工作台界面懂的功能。</p>
+            <p>通用 action 入口不是错的设计，错的是它当了唯一接口。现在它退回第 7 个接口，专门装标准化不了的东西——插件自带的、只有其工作台界面懂的功能。方法名采用 <code>execute_feature</code>；旧的 <code>PluginProvider.execute(context)</code> 与 <code>PluginProvider</code> 类型整体废弃，不再作为注册或运行兜底。</p>
             <pre><code>class ExtraFeatureProvider(Protocol):
-    def execute(self, action: str, params: dict, ctx: PluginContext) -&gt; dict: ...
+    def execute_feature(self, action: str, params: dict, ctx: PluginContext) -&gt; dict: ...
 
 # manifest 声明白名单，平台按 schema 校验参数
 "extra_features": {
@@ -421,13 +422,13 @@ POST /api/plugins/{plugin_key}/features/{action}</code></pre>
 
 def register(self, plugin):
     manifest = PluginManifest.validate(plugin.manifest)
-    if not callable(getattr(plugin, "execute", None)) and not _implements_any(plugin):
-        raise TypeError("%r 未实现任何能力接口" % type(plugin).__name__)
     for cap in manifest.raw["capabilities"]:
         iface = CAPABILITY_INTERFACES.get(cap)
-        if iface and not isinstance(plugin, iface):
+        if iface is None:
+            raise TypeError("%s 声明了平台未知能力 %s" % (plugin, cap))
+        if not isinstance(plugin, iface):
             raise TypeError("%s 声明了 %s 但未实现 %s" % (plugin, cap, iface.__name__))</code></pre>
-            <p>声明了却没实现 → 进程启动即失败；实现了却没声明 → 平台不会调用它。<code>capabilities</code> 从装饰字段变为承重字段，同时解决 F-5 与 F-8。</p>
+            <p>声明了却没实现、声明了平台未知能力，或声明 <code>extra_features</code> 却未实现 <code>ExtraFeatureProvider</code> → 进程启动即失败；实现了却没声明 → 平台不会调用它。<code>capabilities</code> 从装饰字段变为承重字段，同时解决 F-5 与 F-8。</p>
             <div class="callout"><strong>capability 不做过度切分：</strong>原有 <code>integrations.content_edit</code> / <code>content_convert</code> / <code>encoding_fix</code> 三个能力串合并为一个 <code>integrations.tool</code>。三者都是对书籍正文做处理，形状相同、权限相同、UI 分组相同，切成三份只增加维护成本而不携带任何平台可用的信息。</div>
           </section>
 
@@ -512,6 +513,11 @@ def download_book(plugin, external_id, ctx):
             </div>
             <p><code>download_mode</code> 随 <code>to_public_dict()</code> 到前端，UI 不再按 <code>manage_kind</code> 硬编码猜测：<code>by_chapters</code> 显示在线阅读入口，<code>none</code> 只显示跳转外链。</p>
             <div class="callout"><strong>边界情况：</strong><code>download_mode</code> 是书源级静态声明，不随书变化。个别书取不到文件（如 Internet Archive 部分条目无 EPUB）由 <code>SourceBookDetail.downloadable</code> 表达，不得让 <code>download_mode</code> 动态化，否则 register 期校验与前端静态判断同时失效。</div>
+            <div class="callout good">
+              <strong>存量事实表的绑定方式：</strong>既有 ACTIVE 方案要求 <code>BookSourceModel</code> 与 <code>OpdsSource</code> 继续作为唯一业务事实，不能为了接口整齐把每条来源复制成一条 <code>PluginConnection</code>。
+              平台因此增加书源绑定层：插件连接承担 capability、scope、凭据、health 与审计；绑定层把一条 Legado 内置连接展开为多条现有 <code>BookSourceModel</code>，并把所选记录的只读快照放进本次调用的 <code>PluginContext</code>。
+              对外统一暴露不透明 <code>source_key</code>，handler 与前端不得解析其组成。八个独立书源插件仍是一条连接对应一条绑定，不复制配置。
+            </div>
           </section>
 
           <section id="runtime" class="card">
@@ -527,7 +533,7 @@ def download_book(plugin, external_id, ctx):
                   <tr><td>插件做什么</td><td>取数并返回，无副作用</td><td>修改本地书籍正文</td><td>把本地数据写进外部服务</td></tr>
                   <tr><td>典型方法</td><td><code>search_books</code> / <code>list_annotations</code> / <code>download</code> / <code>get_chapter</code></td><td><code>TransformProvider.apply</code></td><td><code>push_annotation</code> / <code>PushProvider.push</code></td></tr>
                   <tr><td>所需 scope</td><td><code>*.read</code></td><td><code>books.write</code></td><td><code>*.sync</code></td></tr>
-                  <tr><td>必须审计 run</td><td>否（批量摄入的 run 由平台编排产生）</td><td>是</td><td>是</td></tr>
+                  <tr><td>必须审计 run</td><td>是</td><td>是</td><td>是</td></tr>
                   <tr><td>幂等要求</td><td>无</td><td>按备份恢复</td><td><strong>必须</strong>，避免重复推送</td></tr>
                   <tr><td>回滚</td><td>不适用</td><td>文件备份恢复</td><td><strong>可能不可用</strong>，外部服务未必支持删除</td></tr>
                 </tbody>
@@ -540,7 +546,7 @@ def download_book(plugin, external_id, ctx):
             </div>
             <div class="callout good">
               <strong>模式决定权限与安全约束，不决定平台编排。</strong>
-              平台调 <code>list_annotations</code>（read）后把结果落库，仍然会创建 <code>PluginRun</code> 与来源记录、推进游标——那是平台摄入流程的职责，不因方法是 read 而取消。
+              平台调 <code>list_annotations</code>（read）时由 typed runtime 创建能力调用 <code>PluginRun</code>；把结果落库时再由平台摄入流程维护来源记录与游标，两层职责互不替代。
               模式回答的是三个问题：需要哪种 scope、是否必须留审计、失败后能否回滚。
             </div>
             <div class="callout good"><strong>顺带收口的安全问题：</strong>三种模式与 <code>permissions</code> 已有的 <code>books.read</code> / <code>books.write</code> 词汇同轴，运行时可在派发前强制校验 scope。当前 <code>context["scopes"]</code> 只是传给插件、指望其自觉，执行期从不检查。</div>
@@ -572,14 +578,16 @@ class PushReceipt:
             <h3>6.2 运行时入口与实体落库</h3>
             <pre><code>class PluginRuntime:
     def read(self, connection, method, *args):
-        """解密凭据 + 超时 + 退避重试 + health 更新；不动游标、不写来源记录"""
-    def write(self, connection, method, input_data=None):
-        """完整 run 状态机 + 游标 + 来源记录 + 回滚"""
+        """连接租约 + 解密凭据 + 超时/退避重试 + run 审计 + health"""
+    def write(self, connection, method, *args, finalize=None, rollback=None):
+        """同一 run 内执行插件变换、平台落库 finalizer 与失败回滚"""
+    def sync(self, connection, method, *args):
+        """同一套租约/重试/run 状态机完成外部回写"""
 
 # 落库改为按类型派发，if entity_type == "annotation" 与 weread import 一并消失
 WRITERS = {Annotation: AnnotationWriter(), Review: ReviewWriter(), SourceBook: SourceBookWriter()}
 writer = WRITERS[type(item)]</code></pre>
-            <p><code>weread_annotations.py</code> 拆为通用 <code>AnnotationWriter</code>（来源记录、偏移定位、去重、回滚）加微信读书特有的身份策略对象（<code>source_name</code>、external id 前缀、<code>identifiers</code> 匹配字段）。<code>source_name</code> 改为从 <code>connection</code> / <code>plugin_key</code> 推导，不再是模块常量。</p>
+            <p>原 <code>weread_annotations.py</code> 已拆为通用 <code>annotation_writer.py</code>（来源记录、偏移定位、去重、回滚）和连接身份策略。微信读书保留历史 <code>weread</code> 标识以兼容存量数据；其他来源使用完整 <code>plugin_key</code>，client id 再加入 <code>connection.id</code>，避免同后缀厂商与同插件多账户的 external id 冲突。</p>
 
             <h3>6.3 业务流调用形态</h3>
             <pre><code># handlers/book.py —— 不再出现任何 plugin_key 或中文连接名
@@ -638,7 +646,7 @@ results = runtime.read_many(conns, "search_books", query, timeout=self.REFER_TIM
               </article>
             </div>
             <div class="callout danger">
-              <strong>并发约束（必须遵守）：</strong>元数据查询必须并发发起。现有 <code>plugin_search_books</code> 与 <code>plugin_search_books_stream</code> 已用 <code>ThreadPoolExecutor</code> 并发跑 <code>tasks</code>，改造后保持并发不变。
+              <strong>并发约束（必须遵守）：</strong>元数据查询必须并发发起。<code>plugin_search_books</code> 与 <code>plugin_search_books_stream</code> 共享进程级固定 16 线程执行器，保持并发的同时避免每请求新建线程池；超时任务即使底层不可取消，也不会无限增生工作线程。
               但现有 task 是纯 API 调用、不碰数据库，而 <code>runtime.read</code> 会更新 <code>connection.health</code>——<strong>多个工作线程共用一个 SQLAlchemy session 不是线程安全的</strong>。
               因此运行时提供 <code>read_many(connections, method, *args, timeout=…)</code>：
               <ol>
@@ -648,7 +656,7 @@ results = runtime.read_many(conns, "search_books", query, timeout=self.REFER_TIM
               </ol>
               流式接口同理：worker 只回结果，session 写入发生在事件循环所在线程。
             </div>
-            <div class="callout"><strong>兼容性：</strong><code>plugins/meta/</code> 下 13 个 legacy 源需要逐个包一层适配到 <code>MetadataProvider</code>。它们本就各有 <code>KEY</code> 常量与 <code>search()</code> 方法，适配层很薄；迁移期两条路径可并存，<code>connections_for</code> 返回空时回退到旧分支。</div>
+            <div class="callout"><strong>兼容性：</strong><code>plugins/meta/</code> 下 13 个 legacy 源继续由现有设置路径提供服务，待后续逐个适配到 <code>MetadataProvider</code>；本版不为它们注册一个永远返回空结果的聚合壳插件，也不把该壳宣称为真实能力。typed 连接与 legacy 来源在查询任务中并存，互不作为对方的静默 fallback。</div>
 
             <h3>7.2 发表笔记 —— 用户划线后回写外部服务</h3>
             <p>入口：<code>POST /api/book/{id}/annotations</code> → <code>handlers/annotations.py:277</code></p>
@@ -753,7 +761,7 @@ runtime_download_book(conn, external_id)               # 导入入库</code></pr
                 <p><strong>得到：</strong>在线书库变成真正的聚合搜索——Legado 与 8 个 OPDS 族书源同页出现，用户不需要知道它们后端形态不同。</p>
               </article>
             </div>
-            <div class="callout"><strong>并发与超时沿用现状：</strong><code>SearchTaskService</code> 的后台线程池并发、task_id 轮询、逐源超时与部分失败展示保持不变，只是把「遍历 <code>BookSourceModel</code> 造引擎」换成「遍历能力匹配的连接调 <code>runtime.read</code>」。</div>
+            <div class="callout"><strong>并发与超时统一进 typed runtime：</strong><code>SearchTaskService</code> 仍保留后台有界线程池、task_id 轮询与部分失败展示；但 provider 调用不再是裸 closure。<code>SourceCatalogService</code> 按 connection 分组，一组 binding 共用一个 <code>begin_read_batch</code> lease/run，每个 binding 维持自己的 context、deadline 与重试状态；worker 仅做经进程级有界 I/O 池执行的脱敏网络调用。最后一个 binding 结束时由预绑定的独立 session 立即调 <code>finish_read_batch</code>，不依赖客户端继续轮询；status 请求与 TTL cleanup 仅作持久化失败时的重试，并且只在 durable run 持久化成功后标记 settled。</div>
 
             <h3>7.5 四个场景共用的调用形态</h3>
             <pre><code># 唯一需要记住的两行
@@ -779,19 +787,19 @@ for conn in runtime.connections_for(capability, user_id):
             <h2>8. 迁移路径</h2>
             <p>按依赖关系排序，不按严重度。第 1 步为纯增量、无兼容性风险，且立即消掉三条路由。</p>
             <div class="flow">
-              <div class="step"><b>S1 透传 input_data</b><p>通用动作端点补参数，删除 weread 特判与两条冗余路由。allowed_book_ids 仍由服务端按 user_id 重算。</p></div>
+              <div class="step"><b>S1 透传 input_data</b><p>通用动作端点补参数，删除运行时 weread 特判；<code>allowed_book_ids</code> 仍由服务端按 user_id 重算。工作台查询与导入入口按 D-16 暂留兼容。</p></div>
               <div class="step"><b>S2 统一出网</b><p>enrichment 与 weread 改走 SafeHttpClient；公共 API 域名走 allowed_hosts 白名单避免额外 DNS 开销。</p></div>
               <div class="step"><b>S3 补契约</b><p>领域类型 + 七个 Protocol + PluginContext dataclass + register 期校验。不改任何行为。</p></div>
               <div class="step"><b>S4 协议收口</b><p>connection_owners 必填、config_schema 落地校验、未知键拒绝、Page.has_more。</p></div>
             </div>
             <div class="flow">
-              <div class="step"><b>S5 解耦落库</b><p>EntityWriter 按类型派发，运行时与 weread 解耦；weread_annotations 拆为通用 writer + 身份策略。</p></div>
+              <div class="step"><b>S5 解耦落库</b><p>EntityWriter 按类型派发，运行时与 weread 解耦；<code>annotation_writer.py</code> 提供通用 writer + 连接身份策略。</p></div>
               <div class="step"><b>S6 能力查询</b><p>connections_for(capability)；book.py 与 UserWereadQuery 改走 runtime.read，删除手写 health 逻辑与重复解密。</p></div>
               <div class="step"><b>S7 连接 role</b><p>PluginConnection 增 role 列，唯一约束改为 (installation, owner_type, owner_id, role)，按现有 name 回填。</p></div>
               <div class="step"><b>S8 书源接口</b><p>先用 Legado 验证接口，再回套 OPDS 8 个；SaveOnlineBookService 提为 assemble_from_chapters。</p></div>
             </div>
             <div class="flow">
-              <div class="step"><b>S9 文本工具</b><p>TransformProvider 落地，5 条专属路由收敛；apply 走 write 模式补上审计（解决 F-4）。</p></div>
+              <div class="step"><b>S9 文本工具</b><p>三个 <code>TransformProvider</code> 直接持有查找替换、繁简转换与 TXT 编码修复实现；handler 只按声明式管理路由发现连接并调用 <code>runtime.read/write</code>，覆写/另存、备份与回滚纳入同一 run。</p></div>
               <div class="step"><b>S10 前端收口</b><p>manage_route + provider status() 钩子，消掉 index.vue 7 个 if 与三处写死的 plugin_key。</p></div>
               <div class="step"><b>S11 拆 handler</b><p>plugins.py 拆为通用 / weread / booktools 三个文件。</p></div>
               <div class="step"><b>S12 文档</b><p>回写 PluginGuide.md：七个接口、两种模式、异常语义、未生效字段说明。</p></div>
@@ -805,7 +813,7 @@ for conn in runtime.connections_for(capability, user_id):
                   <tr><td>book_sources 族</td><td>8</td><td class="verified">低</td><td><code>_normalize()</code> 已是 <code>SourceBook</code> 构造器，改返回类型即可</td></tr>
                   <tr><td>enrichment 族</td><td>10</td><td class="verified">低</td><td>7 个由 <code>normalized_review()</code> 覆盖，近乎零改动</td></tr>
                   <tr><td>weread</td><td>1</td><td class="pending">高</td><td>横跨 4 个接口；吸收 <code>plugins/meta/weread/</code> 后整包删除</td></tr>
-                  <tr><td>Legado</td><td>1</td><td class="pending">高</td><td>从 <code>services/booksource/</code> 接入插件系统，12 条路由收敛</td></tr>
+                  <tr><td>Legado</td><td>1</td><td class="pending">高</td><td>从 <code>services/booksource/</code> 接入插件系统，前端切至通用入口；12 条旧路由按 D-14 暂留兼容</td></tr>
                   <tr><td>文本工具</td><td>3</td><td class="pending">中</td><td>纯处理核心已无依赖，主要是平台侧编排收回</td></tr>
                   <tr><td>壳插件</td><td>6</td><td class="verified">低</td><td>本就未实现任何东西，随对应真实现落地而消解</td></tr>
                 </tbody>
@@ -819,8 +827,8 @@ for conn in runtime.connections_for(capability, user_id):
               <article class="choice recommended">
                 <h3>影响范围</h3>
                 <ul>
-                  <li><strong>代码：</strong><code>webserver/plugins/runtime/</code>、<code>webserver/plugins/sending/</code> → <code>webserver/plugins/push/</code>（更名）、<code>webserver/plugins/meta/weread/</code>（删除）、<code>webserver/services/plugin_runtime.py</code>、<code>weread_annotations.py</code>、<code>booksource/</code>、<code>webserver/handlers/{plugins,book,network_library}.py</code></li>
-                  <li><strong>API：</strong>删除 8 条单插件专属路由；新增 <code>/api/plugins/{key}/features/{action}</code>；通用动作端点新增 <code>input_data</code></li>
+                  <li><strong>代码：</strong><code>webserver/plugins/runtime/</code>、<code>webserver/plugins/sending/</code> → <code>webserver/plugins/push/</code>（更名）、<code>webserver/plugins/meta/weread/</code>（删除）、<code>webserver/services/plugin_runtime.py</code>、<code>annotation_writer.py</code>、<code>booksource/</code>、<code>webserver/handlers/{plugins,book,network_library}.py</code></li>
+                  <li><strong>API：</strong>新增 <code>/api/plugins/{key}/features/{action}</code> 与 <code>/api/book-sources/*</code>；通用动作端点新增 <code>input_data</code>；旧 weread、文本工具与 <code>/api/network/*</code> 路由本版作为兼容／平台编排入口保留</li>
                   <li><strong>数据：</strong><code>plugin_connections</code> 新增 <code>role</code> 列并改唯一约束</li>
                   <li><strong>前端：</strong><code>app/pages/admin/plugins/index.vue</code>、<code>app/pages/plugins/*.vue</code>、<code>app/pages/book/[bid]/*</code></li>
                   <li><strong>manifest：</strong>26 个 provider 全部需补 <code>connection_owners</code>；书源需补 <code>download_mode</code></li>
@@ -856,78 +864,101 @@ for conn in runtime.connections_for(capability, user_id):
 
           <section id="tests" class="card">
             <h2>10. 测试计划与结果</h2>
-            <div class="callout warn"><strong>WIP 阶段说明：</strong>S1、S2 已实现并验证，对应行已回写实际结果；其余仍为计划项。未执行项一律保留“待验证”，不得写成已通过。</div>
+            <div class="callout good">
+              <strong>2026-08-25 Spec 复审跟进：</strong>复审发现五项规格缺口，用户进一步确认废弃 <code>PluginProvider</code>。
+              本轮按已确认的五个公共接缝执行 TDD：注册契约、typed runtime 调用、笔记外部回写、真实旧版 SQLite 迁移与开发指南。
+              五项均已完成：公共 <code>PluginProvider</code> 已删除；标准业务只经 <code>read/write/sync</code>；批注写回按 <code>annotations.push</code> 自动发现连接并保留来源排除；SQLite 会重建真实旧表约束；开发指南只教授 typed provider。
+              随后的双路复审继续补齐：typed-only provider 声明 test 时注册期强制 <code>self_check</code>；三种调用统一租约、单一 deadline 重试、审计、异常脱敏和有界线程池，已运行的超时 future 不再发起重叠 attempt 且保留 lease 至宽限结束，<code>read_many</code> 用每连接 <code>next_retry_at</code> 非阻塞调度；metadata 同步/流式入口也不再每请求创建线程池，外层超时或流式提前关闭均以 <code>plugin.timeout</code> 保留不可取消 provider 的 grace lease；在线书源按 connection 分组进入 audited batch bridge，不再裸调 provider，后台持久化失败仍可由 status 或 TTL cleanup 重试；认证用户的设备推送由声明式路由建立个人连接并调 <code>runtime.sync</code>，游客只保留无连接/无 run 的明示兼容桥，且已有安装的禁用状态优先于游客兼容开关；删除空结果 metadata 壳；三个文本工具承载真实处理逻辑，自动 TXT 写回、实际备份路径与失败恢复也进入同一 typed write run；Legado 统一走 <code>SafeHttpClient</code> 且不自动信任封面域名；非微信来源以完整插件键与连接 id 计算 64 字符内稳定身份。相关回归已并入下方最新结果。
+            </div>
+            <div class="callout warn"><strong>当前仍为 WIP：</strong>S1–S12 均已实现，自动化测试与 <code>interface-review full</code> 已通过；但当前会话未提供项目强制要求的 Chrome DevTools MCP，T-14 只能完成真实后端 + Chromium 替代检查，不能计作门禁通过，因此不得转 ACTIVE。</div>
             <div class="callout good">
               <strong>实际执行记录（2026-08-25）</strong>
-              <p>本地无可用 Python 测试环境（缺 <code>calibre</code>），后端全部通过项目测试镜像执行：</p>
+              <p>宿主 Python 环境缺 <code>calibre</code>；不依赖 Calibre 的运行时单测使用仓库 venv，完整后端套件与 HTTP 端到端回归通过项目测试镜像执行：</p>
               <pre><code>docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test pytest tests -q
-  → 1021 passed, 20 skipped, 28 warnings
+  → 1066 passed, 20 skipped, 28 warnings
 
-docker run --rm ... ruff check ./webserver --fix --no-cache   → All checks passed!
-docker run --rm ... ruff format ./webserver --no-cache        → 134 files left unchanged
+docker run ... pytest tests/test_plugin_capability_lookup.py tests/test_plugin_runtime.py \
+  tests/test_texttools.py tests/test_book_source_plugins.py tests/test_annotations.py \
+  tests/test_main.py -q
+  → 182 passed, 1 skipped
 
-cd app &amp;&amp; npm run lint   → 0 errors, 490 warnings（warnings 为存量，非本次引入）
+pytest -q tests/test_plugin_contract.py tests/test_plugin_protocol_tightening.py \
+  tests/test_plugin_capability_lookup.py tests/test_plugin_entity_writers.py \
+  tests/test_plugin_runtime.py tests/test_book_source_plugins.py
+  → 85 passed
+
+docker run ... pytest -q &lt;5 条设备推送用例&gt; &lt;1 条游客推送用例&gt; \
+  tests/test_network_library.py::TestNetworkLibrary::test_search \
+  tests/test_network_library.py::TestNetworkLibrary::test_search_groups_multiple_bindings_into_one_runtime_run
+  → 8 passed
+
+docker run ... pytest -q &lt;后台 finalizer 成功/失败重试 2 条&gt; \
+  &lt;游客未安装兼容/禁用安装不可绕过 2 条&gt;
+  → 4 passed
+
+docker run ... pytest -q &lt;元数据同步外层超时 / 流式提前关闭租约 2 条&gt;
+  → 2 passed
+
+make lint-py-fix          → All checks passed；138 files formatted/unchanged
+make lint-py              → All checks passed；138 files already formatted
+cd app &amp;&amp; npx vitest run test/utils/book-tools.spec.ts \
+  test/components/AnnotationPanel.spec.ts test/components/WeReadImportDialog.spec.ts \
+  test/components/SaveOnlineDialog.spec.ts → 4 files / 11 passed
+cd app &amp;&amp; npx playwright test test/e2e/auth-themes.spec.ts \
+  test/e2e/network.spec.ts test/e2e/plugins.spec.ts \
+  test/e2e/weread-import.spec.ts test/e2e/weread-workbench.spec.ts
+  → 首轮 30 passed / 1 个测试状态夹具失败；修正夹具后失败项单独复跑通过，合计 31/31
+
+cd app &amp;&amp; npm run lint   → 0 errors, 468 warnings（warnings 为存量，非本次引入）
+cd app &amp;&amp; npx vitest run test/components test/composables test/plugins test/stores test/utils
+  → 92 passed；另 4 个非改动套件因测试环境无法解析 #build/i18n-options.mjs 失败
+make pytest               → 宿主机无 pytest 可执行文件；以上 Docker 全量结果为等价替代
+make build-dev            → talebook/talebook:dev 构建成功
 make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结构 / 单文件资源均通过</code></pre>
               <p>分支 <code>refactor/20260824-plugin-capability-interfaces</code>，基线 <code>origin/feat/plugins</code> @ 8c3601e8。</p>
-              <p>测试从基线的 966 增至 <strong>1021</strong>，新增 55 个用例，全程零回归。</p>
+              <p>后端测试从基线的 966 增至 <strong>1066</strong>；最终全量测试零回归。</p>
             </div>
-            <div class="callout warn">
-              <strong>已完成 S1–S7、S9–S12 与 D-7（设备推送纳入）；S8（书源接口）未实施。</strong>
-              <p>
-                S8 需要把 Legado 从 <code>services/booksource/</code> 接入插件系统、回套 8 个 OPDS 族书源、
-                把 <code>SaveOnlineBookService</code> 提为通用 <code>assemble_from_chapters</code>，并收敛
-                <code>/api/network/*</code> 12 条路由与对应前端。方案第 9 节风险 R3 已建议将其拆成
-                「先接入、保留旧路由」与「再删旧路由」两个独立 PR，不适合与本批改动合并推进。
-              </p>
-              <p>T-6、T-7、T-9 依赖 S8，随之未实现，表中如实标注，未计为通过。</p>
+            <div class="callout good">
+              <strong>S1–S12 已全部完成。</strong>
+              <p>S8 已将 Legado 与 8 个 OPDS 族接入 <code>SourceProvider</code>，以 <code>SourceCatalogService</code> 复用存量事实表并提供 opaque <code>source_key</code>；<code>assemble_from_chapters</code> 支持逐章失败时保留成功内容，前端统一使用 <code>/api/book-sources/*</code>。旧 <code>/api/network/*</code> 按 D-14 保留一版兼容别名。</p>
+              <p>T-6、T-7、T-9 均已有自动化回归，结果见下表。</p>
             </div>
-            <div class="callout danger">
-              <strong>未执行项：</strong>
-              <p>
-                <strong>T-13 界面审查与 T-14 真实后端体验</strong>：本方案属跨模块大型功能且影响前端消费者，
-                按 <code>AGENTS.md</code> 必须在转 ACTIVE 前执行 <code>interface-review</code> 的 <code>full</code> 模式；
-                S8 尚未完成，前端变更未收敛，故与 S8 一并进行。<strong>在此之前本方案不得转为 ACTIVE。</strong>
-              </p>
-              <p>
-                <strong>方案 HTML 的浏览器渲染核对</strong>：Chrome DevTools MCP 报
-                <code>browser is already running</code>，已有实例无法接入，<code>--isolated</code> 亦被同一 profile 拦下。
-                样式为逐字复用 <code>design/TEMPLATE.html</code>，视觉风险低，但确未实际看过渲染结果。
-              </p>
-              <p>
-                <strong>插件页 E2E（<code>test/e2e/plugins.spec.ts</code>）9 个用例失败</strong>：
-                已用 <code>git stash</code> 回退到本次改动前对比，基线上同样 9 个全部失败，
-                确认为<strong>预先存在的失败</strong>，非本次引入。修复不在本方案范围内。
-              </p>
+            <div class="callout good">
+              <strong>T-13 interface-review（full）结论：Approve。</strong>
+              <p>默认分支 <code>origin/master</code>，merge base <code>a135ccbbdb969dcae3a663f3809e0c45f706536d</code>；审查当前分支相对默认分支的已提交与未提交变更，共 141 个文件，排除 7 张历史截图与 <code>uv.lock</code>，实际覆盖 133 个文件、22 个界面源文件和 5 个直接消费者。</p>
+              <p>首轮发现并修复 1 个 HIGH（正文工具覆写原书缺少确认与危险语义）和 1 组 MEDIUM（新增对话框缺少可访问名称）；同时修复真实 E2E 暴露的微信读书主动作标签、OPDS declarative service toggle 与 generic feature mock。复审无 HIGH / MEDIUM，结论 <strong>Approve</strong>。预先存在的图标按钮标签与阅读页链接问题不影响本次 verdict，留给独立清理。</p>
             </div>
             <div class="callout danger">
-              <strong>未执行项：</strong>本方案 HTML 的浏览器渲染核对始终未完成——Chrome DevTools MCP 报
-              <code>browser is already running</code>，已有实例无法接入，<code>--isolated</code> 亦被同一 profile 拦下。
-              样式为逐字复用 <code>design/TEMPLATE.html</code>（8 份 ACTIVE 方案在用），视觉风险低，但确未实际看过渲染结果，不计为已通过。
+              <strong>T-14 尚未满足指定工具门禁。</strong>
+              <p>已用本 worktree 构建 <code>talebook/talebook:dev</code>，以独立 <code>/tmp/talebook-dev</code> 数据目录启动 Docker Tornado/nginx，并确认 <code>GET /api/welcome → {"err":"free"}</code>；宿主 Nuxt 通过 <code>API_URL=http://127.0.0.1:8080</code> 启动于 <code>http://127.0.0.1:3000/</code>，未启用 Chokidar polling。</p>
+              <p>替代验证使用本机 Chromium 检查了插件管理页、Generic OPDS 详情、微信读书工作台、在线书库与正文查找替换页，覆盖 1280×900 / 390×844 和明暗主题；移动端 <code>scrollWidth = clientWidth = 390</code>，页面无 console / page error，Generic OPDS 对话框存在 <code>aria-labelledby</code>。仅外部头像请求因测试结束出现 <code>ERR_ABORTED</code>，不影响产品行为。</p>
+              <p>但工具发现结果中既无 Chrome DevTools MCP，也无 Browser 技能所需的 <code>node_repl js</code> 运行时，因此以上 Chromium 证据只能作为替代回归，不能冒充项目要求的 Chrome DevTools MCP。待提供该 MCP 后需重跑桌面／移动、明／暗主题并回写结果，才可转 ACTIVE。</p>
             </div>
             <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
               <table>
                 <thead><tr><th>编号</th><th>验证项</th><th>方式</th><th>结果</th></tr></thead>
                 <tbody>
-                  <tr><td>T-1</td><td>第三方 annotations 插件落库后 <code>source_name=thirdparty</code>、<code>source_type=thirdparty_book</code>、client id 前缀 <code>thirdparty:</code>；微信读书身份保持不变，无需数据迁移；回滚亦经写入器</td><td><code>tests/test_plugin_entity_writers.py</code> 7 个用例</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-2</td><td>BRS <code>endpoint</code> 指向私网地址被拒（127.0.0.1 / 169.254.169.254 / 192.168.x / 10.x 四类），白名单显式放行后可用；内嵌凭据的 URL 被拒</td><td><code>tests/test_enrichment_connectors.py</code> 新增 3 个用例</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-1</td><td>第三方 annotations 来源以完整 <code>plugin_key</code> 计算身份；client id 同时纳入 <code>connection.id</code>，同插件多账户导入相同 external id 不冲突；超长 plugin id 经稳定摘要编码后 source_name/source_type/client_id 均不超过 64；微信读书身份保持不变</td><td><code>tests/test_plugin_entity_writers.py</code> 与 <code>tests/test_annotations.py</code>，含多账户碰撞与列宽回归</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-2</td><td>BRS 与 Legado 出网统一拒绝私网、链路本地、内嵌凭据及未授权目标；只有管理员显式白名单可放行，书籍封面域名不再被代码自动加入白名单</td><td><code>tests/test_enrichment_connectors.py</code>、<code>tests/test_book_source_plugins.py</code> 与 <code>tests/test_booksource_engine.py</code></td><td class="verified">已通过</td></tr>
                   <tr><td>T-3</td><td>通用动作端点透传 <code>input_data</code>，微信读书不再被特判拒绝；客户端伪造的 <code>allowed_book_ids</code> 被丢弃、非受控字段原样透传；<code>input_data</code> 非对象时报 <code>plugin.request_invalid</code></td><td><code>tests/test_plugins_api.py</code> 新增 <code>TestGenericActionInputData</code> 3 个用例</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-4</td><td>缺 <code>execute</code> 或 <code>manifest</code> 的 provider 在 <code>register()</code> 抛 <code>TypeError</code>；26 个内置 provider 全部合规</td><td><code>tests/test_plugin_contract.py</code> 6 个用例</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-4</td><td>废弃并删除 <code>PluginProvider</code>；插件无需通用 <code>execute</code>，每个 capability 必须映射且实现对应 Protocol；typed-only provider 声明 test 时注册期强制 <code>self_check</code>；<code>extra_features</code> 必须实现 <code>ExtraFeatureProvider</code></td><td><code>tests/test_plugin_contract.py</code> 与 <code>tests/test_plugin_runtime.py</code>；覆盖未知能力、缺接口、缺 self_check、typed-only 体检及内置工具无 <code>execute</code></td><td class="verified">已通过</td></tr>
                   <tr><td>T-5</td><td>manifest 缺 <code>connection_owners</code> 报 <code>manifest.missing_fields</code>；取值越界报 <code>connection_owner_invalid</code>；未知键报 <code>unknown_field</code> 而 <code>x-</code> 前缀放行；<code>config_schema</code> 类型/范围/枚举/必填全部生效</td><td><code>tests/test_plugin_protocol_tightening.py</code> 8 个用例</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-6</td><td>越权 scope 的 write 调用被运行时拒绝</td><td>依赖执行期 scope 强制，属 S8 之后的工作</td><td class="pending">未实现</td></tr>
-                  <tr><td>T-7</td><td><code>has_more</code> 续拉</td><td>随 <code>Page[T]</code> 落地，属 S8 范围</td><td class="pending">未实现</td></tr>
-                  <tr><td>T-8</td><td>改名后命中同一条连接且展示名更新；迁移按旧中文名推导 role，冲突以 id 后缀区分，可重复执行</td><td><code>tests/test_plugin_connection_role.py</code> 6 个用例</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-9</td><td>Legado 端到端</td><td>随 S8 书源接口落地</td><td class="pending">未实现</td></tr>
-                  <tr><td>T-10</td><td>改书产生 succeeded run（含 requested_by / input_data / 结果）；失败产生 failed run 并记录错误；zh-converter 备份路径写入 run</td><td><code>tests/test_texttools.py</code> 新增 3 个用例；自动触发另见 <code>tests/test_book_auto_transform.py</code> 9 个用例</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-6</td><td>缺少所需 scope 时在 provider dispatch 前拒绝调用</td><td><code>tests/test_plugin_capability_lookup.py::test_read_rejects_missing_mode_scope_before_dispatch</code> 等执行期 scope 用例</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-7</td><td><code>Page[T].has_more</code> 与 <code>next_cursor</code> 续拉</td><td><code>tests/test_weread_plugin.py</code> 三页续拉；<code>tests/test_plugin_capability_lookup.py</code> 分页归一化</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-8</td><td>改名后命中同一条连接且展示名更新；迁移按旧中文名推导 role，冲突以 id 后缀区分，可重复执行；真实旧 SQLite 表内 UNIQUE 会重建为 role 约束并保留数据、索引与触发器</td><td><code>tests/test_plugin_connection_role.py</code>，含 <code>compare_and_migrate()</code> 真实旧 DDL 垂直回归</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-9</td><td>Legado 仅通过 <code>SourceProvider</code> 与通用入口完成搜索、详情、目录和正文；旧入口保持兼容；所有规则请求使用平台安全传输，目标与封面均无隐式放行；同 connection 的多个 binding 在搜索中只创建一个 read run/lease，完成后由独立 session 自动收口；后台持久化失败会清除 settling 并由 status 或 TTL cleanup 重试，只有成功才 settled，客户端不轮询与 TTL 过期都不会丢审计</td><td><code>tests/test_network_library.py</code>、<code>tests/test_book_source_plugins.py</code> 与 <code>tests/test_booksource_engine.py</code></td><td class="verified">已通过</td></tr>
+                  <tr><td>T-10</td><td>三个 TransformProvider 执行真实正文处理；手动及自动改书都在 <code>runtime.write</code> 同一 run 内执行 finalizer，记录实际 backup_path，失败从备份恢复并标记 rolled_back；handler 不再持有处理函数或插件键</td><td><code>tests/test_texttools.py</code>、<code>tests/test_book_auto_transform.py</code> 与架构断言</td><td class="verified">已通过</td></tr>
                   <tr><td>T-11</td><td><code>plugin_runtime.py</code> 无任何插件名与模块；<code>book.py</code> 无 WEREAD / 中文连接名 / SecretCipher</td><td>以测试固化（<code>test_plugin_entity_writers.py</code>、<code>test_plugin_capability_lookup.py</code>），未另建 CI 脚本</td><td class="verified">已通过</td></tr>
                   <tr><td>T-16</td><td>代码评审发现的缺陷已修复：唯一约束迁移（升级库上生效、全新库不重复动）、两个连接入口传 role（改名不再产生第二条连接）、read_many 以 connection.id 为键且超时为整批预算、推送真正使用连接配置（记住并回落设备地址）、夹具完整性校验</td><td><code>tests/test_plugin_connection_role.py</code> +2、<code>tests/test_plugins_api.py</code> +2、<code>tests/test_main.py</code> +1、<code>tests/test_book_auto_transform.py</code> +1 与 setUp/tearDown 校验</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-15</td><td>设备推送走插件：成功产生 succeeded run 并记录 device_type，失败产生 failed run 并记录错误；上传器仍由插件持有，patch 其 <code>uploader_class</code> 即可隔离</td><td><code>tests/test_main.py</code> 新增 2 个用例</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-12</td><td>后端 1013 passed / 20 skipped；<code>ruff check</code> 与 <code>ruff format</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（490 warnings 为存量）；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见下方命令记录</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-13</td><td>界面审查（<code>full</code> 模式）</td><td>转 ACTIVE 前必须执行，S8 完成后一并进行</td><td class="pending">未执行</td></tr>
-                  <tr><td>T-14</td><td>真实后端体验验证</td><td>Docker 后端 + Chrome DevTools MCP；与 T-13 一并进行</td><td class="pending">未执行</td></tr>
+                  <tr><td>T-17</td><td>Spec 五项与双路复审缺口：运行时边界外无具体插件/凭据/正文函数硬编码；typed 调用有租约、连接级单一 deadline、非阻塞 backoff、不重叠的超时 attempt、审计、出站异常脱敏和进程级有界线程池；元数据同步外层超时与流式提前关闭都保留不可取消 provider 的 grace lease；批注同步自动发现 typed writer 且防回环；空壳 metadata provider 已删除；开发指南不再推广旧通用契约或专属 handler</td><td><code>tests/test_plugin_capability_lookup.py</code> 架构/超时/脱敏/并发断言（含同步、流式租约）、<code>tests/test_plugin_runtime.py</code> 状态机、<code>tests/test_annotations.py</code> 回环与身份测试、<code>tests/test_plugin_contract.py</code> 注册清单；指南人工契约复核</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-15</td><td>设备推送走插件：认证用户按 manifest <code>ui.device_type</code> 解析 provider，handler 无设备白名单，创建/复用个人连接后调 <code>runtime.sync</code>；成功产生 action=sync 的 succeeded run 并释放 lease，失败产生 failed run 并记录脱敏错误；专用 <code>PUSH_TIMEOUT</code> 与 context deadline 限制底层 requests；游客仅保留无连接/无 run 的 runtime 桥。双开关优先级明确：全局开关先决，未安装内置 provider 保持历史兼容，已有安装的 disabled / 非 active 状态优先且不可绕过</td><td><code>tests/test_main.py</code> 与 <code>tests/test_plugin_capability_lookup.py</code>，含声明式新设备、成功、失败、超时预算、租约、配置复用、未安装游客兼容与禁用安装不可绕过</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-12</td><td>后端 1066 passed / 20 skipped；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（468 warnings 为存量）；相关 Vitest 11 passed；相关 Playwright 31/31；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见上方命令记录；全量 Vitest 的 4 个 Nuxt i18n 虚拟模块环境失败单独记录，非本次回归</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-13</td><td>界面审查（<code>full</code> 模式）</td><td>相对 <code>origin/master</code> 审查 133 个纳入范围文件；修复 HIGH / MEDIUM 后复审</td><td class="verified">Approve</td></tr>
+                  <tr><td>T-14</td><td>真实后端体验验证</td><td>Docker 后端已就绪，Chromium 替代回归已完成；当前会话无 Chrome DevTools MCP</td><td class="pending">待 MCP 重跑</td></tr>
                 </tbody>
               </table>
             </div>
-            <div class="callout"><strong>界面影响判定：</strong>本方案属于跨模块的大型功能且影响前端消费者（插件管理页、工作台、在线书库、书籍详情），因此<strong>不适用</strong>“无界面影响”豁免，必须执行 T-13。</div>
+            <div class="callout"><strong>界面影响判定：</strong>本方案属于跨模块的大型功能且影响前端消费者（插件管理页、工作台、在线书库、书籍详情），因此<strong>不适用</strong>“无界面影响”豁免；T-13 已完成，仍须补齐 T-14 指定的 Chrome DevTools MCP 验收。</div>
           </section>
 
           <section id="decisions" class="card">
@@ -941,14 +972,19 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>D-3</td><td>书源用单一胖接口 + 可选方法</td><td>避免协议名组合爆炸；“声明不支持”比“未实现某 Protocol”更直白</td><td>拆 <code>FileAcquireProvider</code> / <code>ChapterReadProvider</code> 三协议</td></tr>
                   <tr><td>D-4</td><td>取书方式用 <code>download_mode</code> 枚举声明</td><td>一个枚举替掉两个 capability 串加一张映射表；前端可直接据此决定 UI</td><td>用 <code>capabilities</code> 做方法粒度探测</td></tr>
                   <tr><td>D-5</td><td><code>get_toc</code> / <code>get_chapter</code> / <code>download</code> 收领域对象而非 id</td><td>Legado 的 <code>toc_url</code> 只能从 <code>book_info()</code> 取得；收 id 会导致每次下载多一次 HTTP 请求</td><td>统一收 <code>external_id</code>（形式整齐但有实际性能代价）</td></tr>
-                  <tr><td>D-6</td><td>保留通用 <code>execute(action, params)</code> 作为 <code>ExtraFeatureProvider</code></td><td>通用 execute 不是错的设计，错的是它当了唯一接口；标准化不了的功能需要有合法去处</td><td>强行把阅读统计、社区划线塞进标准接口</td></tr>
-                  <tr><td>D-7</td><td><strong>纳入</strong>：<code>plugins/sending/</code> 更名为 <code>plugins/push/</code>，6 个设备推送器包装为 <code>talebook.push.*</code> 插件</td><td>用户决定。形态本就是插件：需每用户配置（设备地址）、发网络请求、会失败、需留痕；此前由 handler 用一张 dict 直接实例化，无连接、无 health、无审计</td><td>不纳入（形态明显契合，无理由排除）</td></tr>
+                  <tr><td>D-6</td><td>保留通用 action 形态作为 <code>ExtraFeatureProvider</code></td><td>通用 action 不是错的设计，错的是它当了唯一接口；标准化不了的功能需要有合法去处</td><td>强行把阅读统计、社区划线塞进标准接口</td></tr>
+                  <tr><td>D-7</td><td><strong>纳入</strong>：<code>plugins/sending/</code> 更名为 <code>plugins/push/</code>，6 个设备推送器包装为 <code>talebook.push.*</code> 插件；认证用户必须经个人连接与 <code>runtime.sync</code>，<code>ALLOW_GUEST_PUSH</code> 仅保留无连接/无 run 的明示兼容桥。游客桥先受全局开关约束；未安装内置 provider 维持历史默认，已有安装则以 enabled / active 状态为准</td><td>用户决定。形态本就是插件：需每用户配置（设备地址）、发网络请求、会失败、需留痕；游客不得伪造 <code>requested_by</code> 或把地址写成共享配置，管理员禁用已有安装也不得被游客调用绕过</td><td>不纳入（形态明显契合，无理由排除）</td></tr>
                   <tr><td>D-8</td><td>文本工具纳入插件体系而非移出</td><td>F-4 的审计缺口必须补，而补审计最自然的锚点就是 <code>PluginRun</code>；走 <code>TransformProvider</code> 是顺手一起解决</td><td>移出插件目录做成“书库工具”（改动更小，但审计仍需另建机制）</td></tr>
                   <tr><td>D-9</td><td>异常类改名为 <code>Upstream*</code></td><td><code>Provider</code> 已被指定为能力接口后缀，<code>ProviderAuthError</code> 会被误读为接口错误</td><td>保留 <code>Provider*</code>（原判断，因命名约定确定而改变）</td></tr>
                   <tr><td>D-11</td><td>正文处理提供 <code>trigger</code> 动态配置（<code>manual</code> 默认 / <code>auto</code> 自动处理新书），仅 <code>supports_auto_trigger=True</code> 的插件可选 <code>auto</code></td><td>自动改写用户刚上传的文件不可逆；编码错误是客观事实可自动判定，查找替换与繁简转换依赖用户意图</td><td>全局默认开启；三个工具都提供自动触发</td></tr>
-                  <tr><td>D-13</td><td>提供 <code>runtime.read_many()</code>：凭据预解密、worker 不碰 session、join 后统一写 health</td><td>元数据查询必须并发，但 SQLAlchemy session 非线程安全；把 DB 访问约束在调用线程是唯一不引入 session 池的解法</td><td>每个 worker 各建 session（连接数放大、事务边界难控）；串行查询（首屏明显变慢）</td></tr>
+                  <tr><td>D-13</td><td>提供 <code>runtime.read_many()</code>：每连接独立租约、重试与 run；凭据在调用线程预解密，worker 只进共享有界 I/O 池，join 后统一写 health 与审计</td><td>元数据查询必须并发，但 SQLAlchemy session 非线程安全；把 DB 访问约束在调用线程既保留并发，又避免每次超时遗留一组新线程</td><td>每个 worker 各建 session（连接数放大、事务边界难控）；每次调用新建线程池（挂死请求会持续泄漏线程）；串行查询（首屏明显变慢）</td></tr>
                   <tr><td>D-12</td><td><code>integrations</code> 下三个 capability 合并为一个 <code>integrations.tool</code></td><td>三者都是对书籍正文做处理，形状、权限、UI 分组完全相同，切分不携带任何平台可用信息</td><td>保留 content_edit / content_convert / encoding_fix 三串（“capability 描述意图”的说法不足以支撑维护成本）</td></tr>
                   <tr><td>D-10</td><td>先用 Legado 验证书源接口，再回套 OPDS</td><td>Legado 能力面最宽（含分章读取、分类发现、规则体检）；先按 OPDS 定义必然漏项</td><td>先做 8 个 OPDS 族（快但会固化错误抽象）</td></tr>
+                  <tr><td>D-14</td><td>书源绑定层复用存量事实表；新通用入口上线时，旧 <code>/api/network/*</code> 保留一版兼容别名</td><td>不复制 <code>BookSourceModel</code> / <code>OpdsSource</code> 配置；先让旧消费者与已保存链接继续工作，再在独立后续版本删除别名，降低 R3 回归与回滚成本</td><td>每条 Legado 书源迁成插件连接（违反单一事实）；同版直接删旧路由（回滚面过大）</td></tr>
+                  <tr><td>D-15</td><td><code>ExtraFeatureProvider</code> 使用 <code>execute_feature</code>，不复用存量摄入适配器的 <code>execute</code> 方法名</td><td>存量内置摄入实现仍需兼容持久化 run，但它不再是公开 provider 契约；Python 无法按签名重载，同名会让标准接口与兼容实现产生歧义</td><td>继续使用 <code>execute(action, params)</code>，以运行时参数个数区分两种语义</td></tr>
+                  <tr><td>D-16</td><td>本版不删除 weread 查询／导入与文本工具 handler 路由</td><td>typed provider 已接管业务契约，generic feature 路由接管 3 个非标准只读动作；存量路由仍承载工作台多步编排或既有消费者兼容，同版删除会把架构重构扩大为破坏性 API 迁移。后续需在消费者全部切换并给出弃用窗口后独立删除</td><td>为满足“删除 8 条”数字在本版直接移除，导致现有工作台与外部调用无迁移期</td></tr>
+                  <tr><td>D-17</td><td>废弃并删除 <code>PluginProvider</code>；注册表只接受完整实现其声明能力接口的插件</td><td>所有插件强制实现 <code>execute(context)</code> 会把七类类型化能力重新收缩成单一旧协议，并允许 capability 声明与实际调用分裂；非标准动作已有 <code>ExtraFeatureProvider</code> 作为唯一逃生舱</td><td>保留 <code>PluginProvider</code> 作为兼容兜底（继续制造双契约与绕过路径）</td></tr>
+                  <tr><td>D-18</td><td>删除 <code>talebook.metadata.builtin</code> 空壳，不为尚未适配的 legacy 元数据源伪造 typed provider</td><td>永远返回空结果的注册项会让管理页、能力发现与测试都误认为已有真实实现；存量来源继续走原设置路径，待每个真实适配器具备行为与测试后再注册</td><td>保留聚合壳并用文档解释其暂不可用（公开契约与实际行为仍不一致）</td></tr>
                 </tbody>
               </table>
             </div>
@@ -957,7 +993,7 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
             <div class="callout warn">
               <ol>
                 <li><strong>S 序列拆分粒度：</strong>12 步建议拆成 5 个 PR（S1+S2 / S3+S4 / S5+S6 / S7 / S8–S12），还是按更小粒度逐步合入？</li>
-                <li><strong>R3 缓解：</strong>Legado 的 12 条旧路由是否接受“先并存一个版本再删除”的过渡期？</li>
+                <li><strong>R3 缓解：</strong>执行期采用“新通用入口上线、旧路由保留一版兼容别名”的保守策略，见 D-14；删除别名留给独立后续版本。</li>
               </ol>
             </div>
           </section>

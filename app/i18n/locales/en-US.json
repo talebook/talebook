@@ -237,6 +237,7 @@
     "tabBrowse": "Browse",
     "readOnline": "Read online",
     "saveToLocal": "Save to library",
+    "openExternal": "Open source page",
     "noResult": "No results found",
     "partialFailed": "Some sources returned no result",
     "searching": "Searching...",
@@ -1608,6 +1609,7 @@
     "capCommunity": "Community content",
     "capRecommendations": "Recommendations",
     "capAnnotationsImport": "Note import",
+    "capReviewsImport": "Review import",
     "capAcquire": "Acquire and import",
     "health_unknown": "Not tested",
     "health_healthy": "Connected",
@@ -1673,6 +1675,7 @@
     "capContentEdit": "Content edit",
     "capContentConvert": "Chinese convert",
     "capEncodingFix": "Encoding fix",
+    "capTool": "Book tool",
     "openTool": "Open"
   },
   "theme": {
@@ -1705,6 +1708,9 @@
       "run": "Run",
       "newBook": "Save as new book",
       "overwrite": "Overwrite original",
+      "saveNewAction": "Save as new book",
+      "overwriteAction": "Overwrite original",
+      "overwriteConfirm": "Overwriting will replace the existing file for “{title}” and cannot be undone. Continue?",
       "suffix": "New book title suffix"
     },
     "textReplace": {

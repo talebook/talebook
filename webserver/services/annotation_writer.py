@@ -19,7 +19,7 @@ except ImportError:  # pragma: no cover - production dependencies install zhconv
 
 
 from webserver.models import Annotation, AnnotationSource, PluginConnection, PluginEntityMatch
-from webserver.services.plugin_writers import source_name_for
+from webserver.services.plugin_writers import bounded_source_id, source_name_for
 
 
 # 微信读书是第一个 annotations 插件，历史数据以此为来源标识；新连接的标识
@@ -29,7 +29,7 @@ STRONG_MATCH = 0.9
 
 
 def _book_match_type(source_name):
-    return "%s_book" % source_name
+    return bounded_source_id(source_name, suffix="_book")
 
 
 def normalize_text(value):
@@ -207,12 +207,19 @@ def _source_identity(external_id):
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _client_id(external_id, source_name=SOURCE_NAME):
+def _client_id(external_id, source_name=SOURCE_NAME, source_connection_id=""):
+    # 微信读书历史 client_id 已被客户端持久化，保持旧前缀；其他插件把
+    # connection id 纳入命名空间，允许同插件的多账户导入相同 external id。
     prefix = "%s:" % source_name
+    if source_name != SOURCE_NAME:
+        prefix += "%s:" % source_connection_id
     value = prefix + str(external_id)
     if len(value) <= 64:
         return value
-    return prefix + hashlib.sha256(value.encode("utf-8")).hexdigest()[:56]
+    if len(prefix) > 40:
+        prefix = "plugin:%s:" % hashlib.sha256(prefix.encode("utf-8")).hexdigest()[:16]
+    remaining = 64 - len(prefix)
+    return prefix + hashlib.sha256(value.encode("utf-8")).hexdigest()[:remaining]
 
 
 def _normalized_offsets(value):
@@ -309,7 +316,7 @@ def materialize_annotation(session, run, connection, record, data, payload_hash,
         annotation = Annotation(
             reader_id=run.requested_by,
             book_id=int(data["book_id"]),
-            client_id=_client_id(record.external_id, source_name),
+            client_id=_client_id(record.external_id, source_name, str(connection.id)),
             annotation_type=data.get("annotation_type") or "note",
             is_private=True,
             create_time=_parse_datetime(data.get("user_modified_at")) or now,

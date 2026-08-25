@@ -2,6 +2,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from .domains import DomainRecord, SourceBook, coerce_entity
+
 
 PROTOCOL_VERSION = "talebook.plugin/v1"
 CATEGORIES = frozenset({"metadata", "annotations", "reviews", "book_sources", "integrations"})
@@ -28,7 +30,7 @@ REQUIRED_MANIFEST_FIELDS = frozenset(
     }
 )
 # 可选但受类型约束；其余未知键一律拒绝，避免协议被悄悄扩写。
-OPTIONAL_MANIFEST_FIELDS = frozenset({"description", "ui"})
+OPTIONAL_MANIFEST_FIELDS = frozenset({"description", "ui", "download_mode", "extra_features"})
 CONNECTION_OWNERS = frozenset({"instance", "user"})
 PLUGIN_ID_RE = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)+$")
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$")
@@ -41,23 +43,25 @@ class ManifestError(ValueError):
         super().__init__(message)
 
 
-class ProviderError(RuntimeError):
+class UpstreamError(RuntimeError):
     code = "provider_error"
     retryable = False
 
-    def __init__(self, message="Provider request failed"):
+    def __init__(self, message="Upstream request failed", *, error_type="other", status_code=None):
+        self.error_type = error_type
+        self.status_code = status_code
         super().__init__(message)
 
 
-class ProviderAuthError(ProviderError):
+class UpstreamAuthError(UpstreamError):
     code = "provider_unauthorized"
 
 
-class ProviderRateLimitError(ProviderError):
+class UpstreamRateLimitError(UpstreamError):
     code = "provider_rate_limited"
     retryable = True
 
-    def __init__(self, message="Provider rate limit exceeded", retry_after=None):
+    def __init__(self, message="Upstream rate limit exceeded", retry_after=None):
         self.retry_after = retry_after
         super().__init__(message)
 
@@ -66,10 +70,16 @@ class ProviderRateLimitError(ProviderError):
 class ProviderItem:
     external_id: str
     entity_type: str
-    data: dict[str, Any]
+    data: DomainRecord | SourceBook
     remote_updated_at: str | None = None
     error_code: str = ""
     error_message: str = ""
+
+    def __post_init__(self):
+        value = self.data
+        if self.entity_type == "book_source" and isinstance(value, dict) and "external_id" not in value:
+            value = {"external_id": self.external_id, **value}
+        object.__setattr__(self, "data", coerce_entity(self.entity_type, value))
 
 
 @dataclass(frozen=True)
@@ -93,8 +103,10 @@ class PluginManifest:
         if raw["protocol_version"] != PROTOCOL_VERSION:
             raise ManifestError("manifest.protocol_unsupported", "unsupported plugin protocol version")
         plugin_id = raw["id"]
-        if not isinstance(plugin_id, str) or not PLUGIN_ID_RE.fullmatch(plugin_id):
-            raise ManifestError("manifest.id_invalid", "plugin id must be a dotted lowercase identifier")
+        if not isinstance(plugin_id, str) or len(plugin_id) > 200 or not PLUGIN_ID_RE.fullmatch(plugin_id):
+            raise ManifestError(
+                "manifest.id_invalid", "plugin id must be a dotted lowercase identifier of at most 200 characters"
+            )
         if not isinstance(raw["version"], str) or not VERSION_RE.fullmatch(raw["version"]):
             raise ManifestError("manifest.version_invalid", "plugin version must be semantic versioning")
         if not isinstance(raw["name"], str) or not raw["name"].strip():
@@ -132,6 +144,27 @@ class PluginManifest:
             raise ManifestError("manifest.ui_invalid", "ui must be an object")
         if not isinstance(raw.get("description", ""), str):
             raise ManifestError("manifest.description_invalid", "description must be a string")
+        download_mode = raw.get("download_mode")
+        if download_mode is not None and download_mode not in {"single_book", "by_chapters", "none"}:
+            raise ManifestError("manifest.download_mode_invalid", "download_mode is invalid")
+        extra_features = raw.get("extra_features", {})
+        if not isinstance(extra_features, dict):
+            raise ManifestError("manifest.extra_features_invalid", "extra_features must be an object")
+        for action, feature in extra_features.items():
+            if not isinstance(action, str) or not action or not isinstance(feature, dict):
+                raise ManifestError("manifest.extra_features_invalid", "extra feature declarations are invalid")
+            if feature.get("mode") not in {"read", "write", "sync"} or not isinstance(feature.get("schema", {}), dict):
+                raise ManifestError("manifest.extra_features_invalid", "extra feature mode and schema are required")
+            required_scopes = feature.get("required_scopes", [])
+            if (
+                not isinstance(required_scopes, list)
+                or any(not isinstance(scope, str) or not scope for scope in required_scopes)
+                or set(required_scopes) - permissions
+            ):
+                raise ManifestError(
+                    "manifest.extra_features_invalid",
+                    "extra feature scopes must be declared plugin permissions",
+                )
 
         unknown = {
             key
@@ -210,26 +243,27 @@ def validate_against_schema(schema, value, where="config"):
 
 
 def _validate_field(schema, value, path):
+    where = path.split(".", 1)[0]
     expected = schema.get("type")
     python_type = _JSON_TYPES.get(expected)
     if python_type is not None:
         # JSON 里 bool 是 int 的子类，但 {"type": "integer"} 不应接受 True。
         if expected in {"integer", "number"} and isinstance(value, bool):
-            raise ManifestError("config.type_invalid", "%s must be %s" % (path, expected))
+            raise ManifestError("%s.type_invalid" % where, "%s must be %s" % (path, expected))
         if not isinstance(value, python_type):
-            raise ManifestError("config.type_invalid", "%s must be %s" % (path, expected))
+            raise ManifestError("%s.type_invalid" % where, "%s must be %s" % (path, expected))
 
     choices = schema.get("enum")
     if choices and value not in choices:
-        raise ManifestError("config.enum_invalid", "%s must be one of %s" % (path, ", ".join(map(str, choices))))
+        raise ManifestError("%s.enum_invalid" % where, "%s must be one of %s" % (path, ", ".join(map(str, choices))))
 
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         minimum, maximum = schema.get("minimum"), schema.get("maximum")
         if minimum is not None and value < minimum:
-            raise ManifestError("config.range_invalid", "%s must be >= %s" % (path, minimum))
+            raise ManifestError("%s.range_invalid" % where, "%s must be >= %s" % (path, minimum))
         if maximum is not None and value > maximum:
-            raise ManifestError("config.range_invalid", "%s must be <= %s" % (path, maximum))
+            raise ManifestError("%s.range_invalid" % where, "%s must be <= %s" % (path, maximum))
 
     item_type = _JSON_TYPES.get((schema.get("items") or {}).get("type")) if isinstance(value, list) else None
     if item_type is not None and any(not isinstance(item, item_type) for item in value):
-        raise ManifestError("config.item_invalid", "%s items have an unexpected type" % path)
+        raise ManifestError("%s.item_invalid" % where, "%s items have an unexpected type" % path)

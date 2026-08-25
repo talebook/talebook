@@ -169,9 +169,15 @@
             </li>
         </ol>
 
-        <v-dialog v-model="deleteDialog" max-width="460">
+        <v-dialog
+            v-model="deleteDialog"
+            max-width="460"
+            :aria-labelledby="`${headingId}-delete-title`"
+        >
             <v-card>
-                <v-card-title>{{ t('annotations.deleteTitle') }}</v-card-title>
+                <v-card-title :id="`${headingId}-delete-title`">
+                    {{ t('annotations.deleteTitle') }}
+                </v-card-title>
                 <v-card-text>{{ t('annotations.deleteConfirm') }}</v-card-text>
                 <v-card-actions>
                     <v-spacer />
@@ -181,9 +187,15 @@
             </v-card>
         </v-dialog>
 
-        <v-dialog v-model="rollbackDialog" max-width="520">
+        <v-dialog
+            v-model="rollbackDialog"
+            max-width="520"
+            :aria-labelledby="`${headingId}-rollback-title`"
+        >
             <v-card>
-                <v-card-title>{{ t('annotations.rollbackTitle') }}</v-card-title>
+                <v-card-title :id="`${headingId}-rollback-title`">
+                    {{ t('annotations.rollbackTitle') }}
+                </v-card-title>
                 <v-card-text>
                     {{ t('annotations.rollbackConfirm', { target: selectedRollback?.title || '' }) }}
                     <v-alert class="mt-3" type="info" variant="tonal">

@@ -242,6 +242,7 @@
     "tabBrowse": "浏览",
     "readOnline": "在线阅读",
     "saveToLocal": "保存到本地",
+    "openExternal": "打开来源页面",
     "noResult": "没有搜索到结果",
     "partialFailed": "部分书源未返回结果",
     "searching": "正在搜索…",
@@ -1614,6 +1615,7 @@
     "capCommunity": "社区内容",
     "capRecommendations": "推荐发现",
     "capAnnotationsImport": "笔记导入",
+    "capReviewsImport": "书评导入",
     "capAcquire": "取得与导入",
     "health_unknown": "尚未测试",
     "health_healthy": "连接正常",
@@ -1679,6 +1681,7 @@
     "capContentEdit": "正文编辑",
     "capContentConvert": "繁简转换",
     "capEncodingFix": "编码修复",
+    "capTool": "书籍工具",
     "openTool": "打开工具"
   },
   "theme": {
@@ -1711,6 +1714,9 @@
       "run": "执行",
       "newBook": "另存为新书",
       "overwrite": "写回原书",
+      "saveNewAction": "另存为新书",
+      "overwriteAction": "写回原书",
+      "overwriteConfirm": "写回原书将直接替换《{title}》的现有文件，且无法撤销。要继续吗？",
       "suffix": "新书标题后缀"
     },
     "textReplace": {

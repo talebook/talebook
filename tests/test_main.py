@@ -24,7 +24,7 @@ sys.path.append(projdir)
 
 import webserver.handlers.base
 import webserver.handlers.book
-from webserver import loader, main, models, plugins  # nosq: E402
+from webserver import loader, main, models  # nosq: E402
 from webserver.handlers.base import BaseHandler
 
 
@@ -290,6 +290,52 @@ class TestAppWithoutLogin(TestApp):
         data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
         d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
         self.assertEqual(d["err"], "user.need_login")
+
+    def test_guest_send_to_device_still_works_when_enabled(self):
+        """未安装时游客推送保持默认兼容，不能因缺少 user_id 而失败。"""
+        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        with mock.patch.dict(webserver.handlers.book.CONF, {"ALLOW_GUEST_PUSH": True}):
+            with mock.patch.object(provider, "uploader_class") as mock_boox:
+                mock_boox.return_value.upload.return_value = {"success": True}
+                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        self.assertEqual(result["err"], "ok")
+        mock_boox.assert_called_once()
+
+    def test_guest_send_to_device_cannot_bypass_disabled_installation(self):
+        """全局开关允许游客时，现有插件安装的禁用状态仍然优先。"""
+        from webserver.models import PluginInstallation
+        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.services.plugin_runtime import install_builtin
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        session = get_db()
+        installation = (
+            session.query(PluginInstallation).filter(PluginInstallation.plugin_key == provider.manifest["id"]).first()
+        )
+        if installation is None:
+            installation = install_builtin(session, provider.manifest["id"], 1)
+        original_enabled = installation.enabled
+        original_status = installation.status
+        installation.enabled = False
+        session.commit()
+
+        try:
+            with mock.patch.dict(webserver.handlers.book.CONF, {"ALLOW_GUEST_PUSH": True}):
+                with mock.patch.object(provider, "uploader_class") as mock_boox:
+                    data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                    result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+            self.assertEqual(result["err"], "upload.error")
+            mock_boox.assert_not_called()
+        finally:
+            session = get_db()
+            installation = session.get(PluginInstallation, installation.id)
+            installation.enabled = original_enabled
+            installation.status = original_status
+            session.commit()
 
     def test_user_devices_get(self):
         d = self.json("/api/user/devices")
@@ -607,6 +653,40 @@ class TestBook(TestWithUserLogin):
             self.assertEqual(d["err"], "ok")
             MockBoox.assert_called_once()
 
+    def test_send_to_device_discovers_manifest_declared_device_type(self):
+        """handler 不维护设备白名单，新 provider 只需声明 ui.device_type。"""
+        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.plugins.runtime.push import DevicePushProvider
+        from webserver.services.plugin_runtime import REGISTRY
+
+        base = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        manifest = {
+            **base.manifest,
+            "id": "talebook.push.dynamic-device",
+            "name": "Dynamic device",
+            "ui": {**base.manifest["ui"], "device_type": "dynamic"},
+        }
+
+        class DynamicUploader:
+            def __init__(self, file_path, file_name=None, timeout=60):
+                self.timeout = timeout
+
+            def upload(self, _url):
+                return {"success": True}
+
+            def default_port(self):
+                return 19191
+
+        provider = DevicePushProvider(manifest, DynamicUploader)
+        with mock.patch.dict(REGISTRY._providers, {manifest["id"]: provider}):
+            result = self.json(
+                "/api/book/1/send_to_device",
+                method="POST",
+                body=json.dumps({"device_type": "dynamic", "device_url": "192.168.1.9:19191"}),
+            )
+
+        self.assertEqual(result["err"], "ok")
+
     def test_send_to_device_wifi_records_a_run(self):
         """推送是 sync 模式：写向外部设备，必须留下审计。"""
         from webserver.models import PluginConnection, PluginInstallation, PluginRun
@@ -633,7 +713,11 @@ class TestBook(TestWithUserLogin):
         after = runs()
         self.assertEqual(len(after), before + 1, "推送必须留下 run 记录")
         self.assertEqual(after[-1].status, "succeeded")
+        self.assertEqual(after[-1].action, "sync")
         self.assertEqual(after[-1].input_data["device_type"], "boox")
+        connection = session.get(PluginConnection, after[-1].connection_id)
+        self.assertFalse(connection.lease_token)
+        self.assertIsNone(connection.lease_until)
 
     def test_send_to_device_remembers_and_reuses_the_device_address(self):
         """D-7 纳入插件中心的理由：设备地址存在每用户连接里，下次不必重填。"""
@@ -659,9 +743,7 @@ class TestBook(TestWithUserLogin):
         # 第二次不带地址：应回落到连接里存的那个
         with mock.patch.object(provider, "uploader_class") as MockBoox:
             MockBoox.return_value.upload.return_value = {"success": True}
-            d = self.json(
-                "/api/book/1/send_to_device", method="POST", body=json.dumps({"device_type": "boox"})
-            )
+            d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps({"device_type": "boox"}))
             self.assertEqual(d["err"], "ok")
             self.assertIn("192.168.1.7:8085", MockBoox.return_value.upload.call_args.args[0])
 
@@ -688,6 +770,22 @@ class TestBook(TestWithUserLogin):
         )
         self.assertEqual(run.status, "failed")
         self.assertIn("device refused", run.error_message)
+
+    def test_send_to_device_uses_structured_transport_error_not_message_sniffing(self):
+        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        with mock.patch.object(provider, "uploader_class") as MockBoox:
+            MockBoox.return_value.upload.return_value = {
+                "success": False,
+                "error_type": "timeout",
+                "status_code": None,
+                "message": "设备没有及时应答",
+            }
+            data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+            result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        self.assertEqual(result["err"], "upload.timeout")
 
     def test_send_to_device_missing_params(self):
         d = self.json("/api/book/1/send_to_device", method="POST", body="")
@@ -943,9 +1041,7 @@ class TestWereadRefer(TestWithUserLogin):
             session.delete(connection)
         session.commit()
         if secret_ids:
-            session.query(models.PluginSecret).filter(models.PluginSecret.id.in_(secret_ids)).delete(
-                synchronize_session=False
-            )
+            session.query(models.PluginSecret).filter(models.PluginSecret.id.in_(secret_ids)).delete(synchronize_session=False)
             session.commit()
 
     def setUp(self):

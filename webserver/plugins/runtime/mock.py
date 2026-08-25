@@ -1,6 +1,7 @@
 import time
 
-from .protocol import PROTOCOL_VERSION, ProviderAuthError, ProviderItem, ProviderRateLimitError, ProviderResult
+from .domains import BookMetadata, Page, Review
+from .protocol import PROTOCOL_VERSION, UpstreamAuthError, ProviderItem, UpstreamRateLimitError, ProviderResult
 
 
 class MockMultiTabProvider:
@@ -41,14 +42,14 @@ class MockMultiTabProvider:
     def execute(self, context):
         token = context["secrets"].get("token", "")
         if not token or token == "bad-token":
-            raise ProviderAuthError("Mock credential rejected")
+            raise UpstreamAuthError("Mock credential rejected")
         config = context.get("config", {})
         delay = float(config.get("delay_seconds", 0) or 0)
         if delay:
             time.sleep(delay)
         limited_attempts = int(config.get("rate_limit_attempts", 0) or 0)
         if context["attempt"] <= limited_attempts:
-            raise ProviderRateLimitError("Mock rate limit for token=%s" % token, retry_after=0)
+            raise UpstreamRateLimitError("Mock rate limit for token=%s" % token, retry_after=0)
         if context["action"] == "test":
             return ProviderResult(health_message="mock connection healthy")
 
@@ -85,3 +86,12 @@ class MockMultiTabProvider:
             items.append(item)
         offset = int((context.get("cursor") or {}).get("offset", 0))
         return ProviderResult(items=items, next_cursor={"offset": offset + 1}, health_message="mock request complete")
+
+    def search_books(self, query, context):
+        return [BookMetadata.from_dict({"title": query or "The Mock Book", "provider_key": self.manifest["id"]})]
+
+    def get_metadata(self, external_id, context):
+        return BookMetadata.from_dict({"title": "The Mock Book", "provider_value": external_id})
+
+    def get_reviews(self, query, context):
+        return Page(items=[Review.from_dict({"book_external_id": str(query), "rating": 4.5, "scale": 5})])

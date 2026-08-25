@@ -270,7 +270,7 @@ class TestTextReplaceRun(TestApp):
 
 class TestTxtFixerRun(TestApp):
     @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
-    @mock.patch("webserver.handlers.plugin_booktools.fix_bytes")
+    @mock.patch("webserver.plugins.runtime.builtin_capabilities.fix_bytes")
     def test_run_new_mode_ok(self, m_fix, m_import):
         m_fix.return_value = ("fixed text", {"encoding": "utf-8", "mojibake": False, "garbage": False, "unrecoverable": False})
         m_import.return_value = 9002
@@ -292,7 +292,7 @@ class TestZhConverterRun(TestApp):
             self.assertEqual(d["err"], "permission.not_admin")
 
     @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
-    @mock.patch("webserver.handlers.plugin_booktools.convert_txt_file")
+    @mock.patch("webserver.plugins.runtime.builtin_capabilities.convert_txt_file")
     def test_run_new_mode_ok(self, m_convert, m_import):
         m_convert.return_value = "utf-8"
         m_import.return_value = 9003
@@ -358,7 +358,7 @@ class TestBookToolAuditTrail(TestApp):
         self.assertIn("写回失败", runs[-1].error_message)
 
     @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
-    @mock.patch("webserver.handlers.plugin_booktools.fix_bytes")
+    @mock.patch("webserver.plugins.runtime.builtin_capabilities.fix_bytes")
     def test_txt_fixer_records_a_run(self, m_fix, m_import):
         m_fix.return_value = ("fixed", {"encoding": "gbk", "mojibake": False, "garbage": False, "unrecoverable": False})
         m_import.return_value = 9102

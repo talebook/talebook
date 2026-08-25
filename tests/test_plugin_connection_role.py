@@ -1,10 +1,11 @@
 """连接查询键：role 取代中文展示名，改文案不再丢连接。"""
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
-from webserver.migrate_db import backfill_plugin_connection_roles
+from webserver.migrate_db import backfill_plugin_connection_roles, compare_and_migrate
 from webserver.models import Base, PluginConnection
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION
 from webserver.services.plugin_runtime import (
@@ -14,6 +15,7 @@ from webserver.services.plugin_runtime import (
     install_builtin,
     save_connection,
 )
+
 
 SETTINGS = {"PLUGIN_SECRET_KEY": "connection-role-test-key", "cookie_secret": "unused-cookie-secret"}
 
@@ -53,6 +55,14 @@ def _plugin(plugin_id="talebook.test.role"):
 
         def execute(self, context):
             return None
+
+        def search_books(self, query, context):
+            return []
+
+        def get_metadata(self, external_id, context):
+            from webserver.plugins.runtime.domains import BookMetadata
+
+            return BookMetadata()
 
     return Plugin()
 
@@ -198,6 +208,63 @@ def test_migration_switches_the_unique_constraint(db_session):
     names = {item["name"] for item in inspect(engine).get_indexes("plugin_connections")}
     assert "uq_plugin_connection_owner_role" in names, "唯一约束必须切到 role"
     assert "uq_plugin_connection_owner_name" not in names, "旧的按名字约束必须移除"
+
+
+def test_compare_and_migrate_rebuilds_the_real_legacy_sqlite_table():
+    """真实旧 DDL 的表内 UNIQUE 必须重建，且数据、role 与新约束均保留。"""
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE plugin_connections"))
+        conn.execute(
+            text(
+                "CREATE TABLE plugin_connections ("
+                " id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
+                " installation_id INTEGER NOT NULL, owner_type VARCHAR(32) NOT NULL, owner_id INTEGER NOT NULL,"
+                " name VARCHAR(200) NOT NULL DEFAULT 'default', secret_id INTEGER, config TEXT,"
+                " scopes TEXT NOT NULL DEFAULT '[]', schedule VARCHAR(128) DEFAULT '', cursor TEXT,"
+                " health VARCHAR(32) NOT NULL DEFAULT 'unknown', health_message VARCHAR(500) DEFAULT '',"
+                " enabled BOOLEAN NOT NULL DEFAULT 1, lease_token VARCHAR(64) DEFAULT '', lease_until DATETIME,"
+                " create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+                " update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+                " CONSTRAINT uq_plugin_connection_owner_name"
+                " UNIQUE (installation_id, owner_type, owner_id, name))"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO plugin_connections "
+                "(id, installation_id, owner_type, owner_id, name) VALUES "
+                "(1, 9, 'user', 7, '主力'), (2, 9, 'user', 7, '备用')"
+            )
+        )
+
+    assert compare_and_migrate(engine)
+
+    constraints = {item["name"] for item in inspect(engine).get_unique_constraints("plugin_connections")}
+    assert "uq_plugin_connection_owner_role" in constraints
+    assert "uq_plugin_connection_owner_name" not in constraints
+    with engine.begin() as conn:
+        rows = conn.execute(text("SELECT id, name, role FROM plugin_connections ORDER BY id")).fetchall()
+        assert [(row.id, row.name, row.role) for row in rows] == [
+            (1, "主力", DEFAULT_CONNECTION_ROLE),
+            (2, "备用", "%s-2" % DEFAULT_CONNECTION_ROLE),
+        ]
+        conn.execute(
+            text(
+                "INSERT INTO plugin_connections "
+                "(installation_id, owner_type, owner_id, name, role) "
+                "VALUES (9, 'user', 7, '主力', 'third')"
+            )
+        )
+        with pytest.raises(IntegrityError):
+            conn.execute(
+                text(
+                    "INSERT INTO plugin_connections "
+                    "(installation_id, owner_type, owner_id, name, role) "
+                    "VALUES (9, 'user', 7, '另一个名字', 'third')"
+                )
+            )
 
 
 def test_migration_is_a_noop_on_a_fresh_database(db_session):

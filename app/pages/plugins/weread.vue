@@ -428,10 +428,17 @@
             </v-window-item>
         </v-window>
 
-        <v-dialog v-model="detailOpen" max-width="760" scrollable>
+        <v-dialog
+            v-model="detailOpen"
+            max-width="760"
+            scrollable
+            aria-labelledby="weread-detail-dialog-title"
+        >
             <v-card>
                 <v-card-title class="d-flex align-center">
-                    <span>{{ selectedBook?.title || selectedNotebook?.book?.title || t('weread.details') }}</span>
+                    <span id="weread-detail-dialog-title">
+                        {{ selectedBook?.title || selectedNotebook?.book?.title || t('weread.details') }}
+                    </span>
                     <v-spacer />
                     <v-btn icon="mdi-close" variant="text" :aria-label="t('common.close')" @click="detailOpen = false" />
                 </v-card-title>
@@ -567,14 +574,23 @@ const shelfPrivacySummary = computed(() => ({
         + (shelf.value?.mp ? 1 : 0),
 }));
 
+const EXTRA_FEATURE_OPERATIONS = new Set(['statistics', 'popular_highlights', 'underline_stats']);
+
 async function query(operation, params = {}, busyKey = operation) {
     busy.value = busyKey;
     busyCounts.set(busyKey, (busyCounts.get(busyKey) || 0) + 1);
     error.value = '';
     try {
-        const body = { operation, params };
-        if (apiKey.value.trim()) body.api_key = apiKey.value.trim();
-        const response = await $backend('/plugins/weread/query', { method: 'POST', body: JSON.stringify(body) });
+        const isExtraFeature = EXTRA_FEATURE_OPERATIONS.has(operation);
+        const body = isExtraFeature ? { params } : { operation, params };
+        if (apiKey.value.trim()) {
+            if (isExtraFeature) body.credentials = { api_key: apiKey.value.trim() };
+            else body.api_key = apiKey.value.trim();
+        }
+        const endpoint = isExtraFeature
+            ? `/plugins/talebook.weread/features/${operation}`
+            : '/plugins/weread/query';
+        const response = await $backend(endpoint, { method: 'POST', body: JSON.stringify(body) });
         if (response.err !== 'ok') throw new Error(response.msg || response.err);
         connection.value = response.connection || connection.value;
         apiKey.value = '';

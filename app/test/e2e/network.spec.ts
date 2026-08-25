@@ -35,7 +35,7 @@ test.describe('Network Library', () => {
     test('search results are cached and restored after navigating back', async ({ page }) => {
         let searchRequestCount = 0;
         page.on('request', (request) => {
-            if (new URL(request.url()).pathname === '/api/network/search') searchRequestCount += 1;
+            if (new URL(request.url()).pathname === '/api/book-sources/search') searchRequestCount += 1;
         });
 
         await page.goto('/network');

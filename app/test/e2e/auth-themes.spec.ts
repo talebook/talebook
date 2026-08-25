@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+
 const themeMatrix = [
     { name: 'light-gray', mode: 'light', primary: '85,92,100', onPrimary: '255,255,255' },
     { name: 'light-gray', mode: 'dark', primary: '116,123,132', onPrimary: '255,255,255' },
@@ -77,7 +79,7 @@ async function mockAccountApi(page: Page, themeName: string) {
             await route.fulfill({ json: { err: 'ok', books: [], total: 0 } });
             return;
         }
-        if (pathname === '/api/network/content') {
+        if (pathname === '/api/book-sources/content') {
             await route.fulfill({ json: { err: 'ok', title: '第一章', content: '正文' } });
             return;
         }
@@ -153,6 +155,13 @@ test('blank and headerless account pages keep the active semantic theme', async 
     }]);
 
     for (const path of ['/welcome', '/install', '/active/success']) {
+        await page.request.post(`${mockApi}/_test/reset`, {
+            data: {
+                installed: path !== '/install',
+                inviteMode: path === '/welcome',
+                invited: path !== '/welcome',
+            },
+        });
         await page.goto(path);
         await expect(page.locator('.loading-page')).toBeHidden();
         await expect(page.locator('body')).toHaveClass(/tb-current-builtin-theme-warm-red/);

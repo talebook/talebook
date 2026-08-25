@@ -4,14 +4,12 @@
 handlers/plugins.py。
 """
 
-import datetime
-
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.handlers.plugins_common import body as _body
 from webserver.handlers.plugins_common import error as _error
-from webserver.models import PluginConnection, PluginInstallation, PluginRun, PluginRunItem, PluginSecret
-from webserver.plugins.runtime import WEREAD_PLUGIN_KEY, ProviderAuthError, ProviderError, WereadProvider
+from webserver.models import PluginConnection, PluginInstallation, PluginRun, PluginRunItem
+from webserver.plugins.runtime import PluginManifest, UpstreamError
 from webserver.services.annotation_writer import all_book_ids, confirm_match
 from webserver.services.plugin_runtime import (
     DEFAULT_CONNECTION_ROLE,
@@ -20,11 +18,28 @@ from webserver.services.plugin_runtime import (
     install_builtin,
     save_connection,
 )
-from webserver.services.plugin_secrets import SecretCipher, SecretCipherError, redact
+
+
+WORKBENCH_ROUTE = "/plugins/weread"
+
+
+def _workbench_manifest(runtime):
+    matches = [
+        PluginManifest.validate(provider.manifest)
+        for provider in runtime.registry.providers()
+        if (provider.manifest.get("ui") or {}).get("manage_route") == WORKBENCH_ROUTE
+    ]
+    if len(matches) != 1:
+        raise PluginRuntimeError("plugin.provider_unavailable", "WeRead workbench provider is not available")
+    return matches[0]
 
 
 def _weread_connection(handler):
-    installation = handler.session.query(PluginInstallation).filter(PluginInstallation.plugin_key == WEREAD_PLUGIN_KEY).first()
+    runtime = PluginRuntime(handler.session, loader.get_settings())
+    manifest = _workbench_manifest(runtime)
+    installation = (
+        handler.session.query(PluginInstallation).filter(PluginInstallation.plugin_key == manifest.raw["id"]).first()
+    )
     if installation is None:
         return None, None
     connection = (
@@ -41,9 +56,11 @@ def _weread_connection(handler):
 
 
 def _ensure_weread_connection(handler, api_key=None):
+    runtime = PluginRuntime(handler.session, loader.get_settings())
+    manifest = _workbench_manifest(runtime)
     installation, connection = _weread_connection(handler)
     if installation is None:
-        installation = install_builtin(handler.session, WEREAD_PLUGIN_KEY, handler.user_id())
+        installation = install_builtin(handler.session, manifest.raw["id"], handler.user_id())
     if not installation.enabled:
         raise PluginRuntimeError("plugin.installation_disabled", "WeRead integration is disabled")
     if connection is None or api_key:
@@ -54,7 +71,7 @@ def _ensure_weread_connection(handler, api_key=None):
             "user",
             handler.user_id(),
             {"api_key": api_key.strip()} if api_key else {},
-            name="微信读书",
+            name=manifest.raw["name"],
             role=DEFAULT_CONNECTION_ROLE,
         )
     if not connection.enabled:
@@ -62,22 +79,11 @@ def _ensure_weread_connection(handler, api_key=None):
     return connection
 
 
-def _weread_api_key(handler, connection):
-    secret = handler.session.get(PluginSecret, connection.secret_id) if connection else None
-    if secret is None:
-        raise PluginRuntimeError("plugin.credentials_missing", "Provide a WeRead API key")
-    values = SecretCipher(loader.get_settings()).decrypt(secret.ciphertext)
-    api_key = str(values.get("api_key") or "")
-    if not api_key:
-        raise PluginRuntimeError("plugin.credentials_missing", "Provide a WeRead API key")
-    return api_key
-
-
 def _weread_state(handler):
     _, connection = _weread_connection(handler)
     if connection is None:
         return {"connection": None, "runs": []}
-    secret = handler.session.get(PluginSecret, connection.secret_id)
+    runtime = PluginRuntime(handler.session, loader.get_settings())
     runs = (
         handler.session.query(PluginRun)
         .filter(PluginRun.connection_id == connection.id)
@@ -85,7 +91,7 @@ def _weread_state(handler):
         .limit(20)
         .all()
     )
-    return {"connection": connection.to_public_dict(secret), "runs": [run.to_public_dict() for run in runs]}
+    return {"connection": runtime.connection_public_dict(connection), "runs": [run.to_public_dict() for run in runs]}
 
 
 class UserWeread(BaseHandler):
@@ -133,24 +139,14 @@ class UserWereadQuery(BaseHandler):
             if not isinstance(params, dict):
                 raise PluginRuntimeError("params.invalid", "WeRead query parameters must be an object")
             connection = _ensure_weread_connection(self, api_key)
-            stored_key = _weread_api_key(self, connection)
-            data = WereadProvider().query(stored_key, req.get("operation", ""), params)
-            connection.health = "healthy"
-            connection.health_message = "WeRead read-only API connected"
-            connection.last_tested_at = datetime.datetime.now()
-            self.session.commit()
-            secret = self.session.get(PluginSecret, connection.secret_id)
+            runtime = PluginRuntime(self.session, loader.get_settings())
+            data = runtime.read(connection, "query_with_context", req.get("operation", ""), params)
             return {
                 "err": "ok",
-                "connection": connection.to_public_dict(secret),
-                "data": redact(data, {"api_key": stored_key}),
+                "connection": runtime.connection_public_dict(connection),
+                "data": data,
             }
-        except (PluginRuntimeError, ProviderError, SecretCipherError, TypeError, ValueError) as exc:
-            if connection is not None and isinstance(exc, ProviderError):
-                connection.health = "unauthorized" if isinstance(exc, ProviderAuthError) else "degraded"
-                connection.health_message = str(exc)
-                connection.last_tested_at = datetime.datetime.now()
-                self.session.commit()
+        except (PluginRuntimeError, UpstreamError, TypeError, ValueError) as exc:
             return _error(exc)
 
 
@@ -178,8 +174,8 @@ class UserWereadImport(BaseHandler):
 
             connection = _ensure_weread_connection(self, api_key)
             if export_data is None and not api_key:
-                secret = self.session.get(PluginSecret, connection.secret_id) if connection else None
-                if secret is None or not secret.mask_hint:
+                runtime = PluginRuntime(self.session, loader.get_settings())
+                if not runtime.connection_has_credentials(connection):
                     raise PluginRuntimeError(
                         "plugin.credentials_missing",
                         "Provide a WeRead API key or official export JSON",
@@ -219,11 +215,11 @@ class UserWereadImport(BaseHandler):
             items = self.session.query(PluginRunItem).filter(PluginRunItem.run_id == run.id).order_by(PluginRunItem.id).all()
             return {
                 "err": "ok",
-                "connection": connection.to_public_dict(self.session.get(PluginSecret, connection.secret_id)),
+                "connection": runtime.connection_public_dict(connection),
                 "run": run.to_public_dict(),
                 "items": [item.to_public_dict(include_data=True) for item in items],
             }
-        except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
+        except (PluginRuntimeError, TypeError, ValueError) as exc:
             return _error(exc)
 
 

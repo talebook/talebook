@@ -19,8 +19,8 @@ from webserver.plugins.runtime.protocol import ManifestError
 from webserver.services.plugin_runtime import (
     PluginRuntime,
     PluginRuntimeError,
-    ensure_builtin_definitions,
     ensure_builtin_capability_installations,
+    ensure_builtin_definitions,
     install_builtin,
     rotate_connection_secret,
     save_connection,
@@ -106,7 +106,7 @@ def test_builtin_capabilities_are_registered_without_ai_or_calibre_server(db_ses
     definitions = ensure_builtin_definitions(db_session)
     builtins = {item.plugin_key: item for item in definitions if item.plugin_key.startswith("talebook.")}
 
-    assert "talebook.metadata.builtin" in builtins
+    assert "talebook.metadata.builtin" not in builtins
     assert "talebook.book-source.opds" in builtins
     assert "talebook.book-source.legado" in builtins
     catalog = json.dumps([item.to_public_dict() for item in builtins.values()], ensure_ascii=False).lower()
@@ -127,10 +127,8 @@ def test_builtin_capability_bootstrap_is_idempotent_and_keeps_empty_auth_local(d
     first = ensure_builtin_capability_installations(db_session, installed_by=1, settings=settings)
     second = ensure_builtin_capability_installations(db_session, installed_by=1, settings=settings)
 
-    assert len(first) == len(second) == 6
-    assert db_session.query(PluginConnection).count() == 6
-    metadata = next(item for item in first if item.plugin_key == "talebook.metadata.builtin")
-    assert metadata.enabled is False
+    assert len(first) == len(second) == 5
+    assert db_session.query(PluginConnection).count() == 5
     opds = next(item for item in first if item.plugin_key == "talebook.book-source.opds")
     connection = db_session.query(PluginConnection).filter(PluginConnection.installation_id == opds.id).one()
     assert connection.secret_id is None
@@ -359,7 +357,7 @@ def test_unauthorized_is_not_retried(db_session):
     assert "bad-token" not in run.error_message
 
 
-def test_timeout_is_retried_and_never_advances_cursor(db_session):
+def test_running_timeout_is_not_retried_and_never_advances_cursor(db_session):
     connection = build_connection(
         db_session,
         config={"delay_seconds": 0.08, "timeout_seconds": 0.01, "max_retries": 1, "backoff_seconds": 0},
@@ -367,7 +365,13 @@ def test_timeout_is_retried_and_never_advances_cursor(db_session):
     run = execute(db_session, connection)
     assert run.status == "failed"
     assert run.error_code == "plugin.timeout"
-    assert run.attempt == 2
+    # ThreadPoolExecutor cannot cancel an attempt that is already running. A
+    # second submission would overlap the first one after the lease expires.
+    assert run.attempt == 1
+    # A running future cannot be cancelled. Keep the lease through its grace
+    # window so a new request cannot immediately overlap the timed-out call.
+    assert connection.lease_token
+    assert connection.lease_until > datetime.datetime.now()
     assert connection.cursor == {}
     assert db_session.query(PluginSourceRecord).count() == 0
 

@@ -4,6 +4,7 @@
         max-width="760"
         scrollable
         eager
+        aria-labelledby="weread-import-dialog-title"
     >
         <template #activator="{ props: activatorProps }">
             <v-btn
@@ -16,7 +17,7 @@
         </template>
         <v-card>
             <v-card-title class="d-flex align-center">
-                <span>{{ t('wereadImport.title') }}</span>
+                <span id="weread-import-dialog-title">{{ t('wereadImport.title') }}</span>
                 <v-spacer />
                 <v-btn
                     icon="mdi-close"

@@ -63,6 +63,14 @@ def test_manifest_type_checks_optional_ui_and_description():
     assert exc.value.code == "manifest.description_invalid"
 
 
+def test_manifest_plugin_id_respects_storage_width():
+    raw = _valid_manifest()
+    raw["id"] = "vendor.%s.plugin" % ("segment" * 30)
+    with pytest.raises(ManifestError) as exc:
+        PluginManifest.validate(raw)
+    assert exc.value.code == "manifest.id_invalid"
+
+
 SCHEMA = {
     "type": "object",
     "properties": {

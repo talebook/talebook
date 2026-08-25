@@ -6,38 +6,26 @@ webserver/plugins/texttools/；本模块负责书籍定位、权限校验、临�
 写回入库与审计。
 """
 
-import functools
 import logging
 import os
 import shutil
 import tempfile
 
-from tornado.ioloop import IOLoop
-
-from webserver import loader, utils
+from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
-from webserver.handlers.plugins_common import audit_run
 from webserver.handlers.plugins_common import body as _body
-from webserver.plugins.texttools import (
-    ANALYZE_LIMIT,
-    DIRECTION_LABELS,
-    OpenCC,
-    analyze_bytes,
-    compile_rule,
-    convert_epub,
-    convert_txt_file,
-    fix_bytes,
-    replace_epub_file,
-    replace_preview,
-    replace_txt_file,
+from webserver.plugins.runtime import ToolInput
+from webserver.services.booktools import (
+    get_format_path,
+    import_as_new_book,
+    overwrite_format,
+    pick_format,
+    resolve_book,
 )
-from webserver.services.booktools import get_format_path, import_as_new_book, overwrite_format, pick_format, resolve_book
+from webserver.services.plugin_runtime import PluginRuntime, ensure_builtin_capability_installations
 
 
-# 内置文本工具：改书操作需落 PluginRun，审计锚点挂在各自的实例连接上。
-TEXT_REPLACE_PLUGIN_KEY = "talebook.tool.text-replace"
-ZH_CONVERTER_PLUGIN_KEY = "talebook.tool.zh-converter"
-TXT_FIXER_PLUGIN_KEY = "talebook.tool.txt-fixer"
+TRANSFORM_CAPABILITY = "integrations.tool"
 
 
 class BookToolsError(RuntimeError):
@@ -76,6 +64,27 @@ def _tool_backup_dir():
     return path
 
 
+def _tool_runtime(handler, manage_route):
+    """按声明式 UI 入口选择 typed transform，不在 handler 硬编码插件身份。"""
+    settings = loader.get_settings()
+    ensure_builtin_capability_installations(handler.session, handler.user_id(), settings)
+    runtime = PluginRuntime(handler.session, settings)
+    for connection in runtime.connections_for(TRANSFORM_CAPABILITY, handler.user_id()):
+        provider = runtime.registry.get(runtime.plugin_key_of(connection))
+        if (provider.manifest.get("ui") or {}).get("manage_route") == manage_route:
+            return runtime, connection
+    raise BookToolsError("正文工具未启用")
+
+
+def _restore_backup(db, book_id, fmt, state):
+    backup_path = state.get("backup_path")
+    if not backup_path or not os.path.isfile(backup_path):
+        return False
+    with open(backup_path, "rb") as handle:
+        db.add_format(book_id, fmt, handle, index_is_id=True)
+    return True
+
+
 class UserBookToolsBooks(BaseHandler):
     @js
     @auth
@@ -108,7 +117,7 @@ class UserBookToolsBooks(BaseHandler):
 class UserTextReplacePreview(BaseHandler):
     @js
     @auth
-    async def post(self):
+    def post(self):
         req = _body(self)
         try:
             book_id = _tool_book_id(req)
@@ -120,10 +129,22 @@ class UserTextReplacePreview(BaseHandler):
             if fmt is None:
                 raise BookToolsError("该书籍没有 TXT 或 EPUB 格式，无法执行替换")
             src = get_format_path(self.db, book_id, fmt)
-            result = await IOLoop.current().run_in_executor(
-                None,
-                functools.partial(replace_preview, fmt, src, pattern, replacement, use_regex),
-            )
+            runtime, connection = _tool_runtime(self, "/plugins/text-replace")
+            result = runtime.read(
+                connection,
+                "preview",
+                ToolInput.from_dict(
+                    {
+                        "path": src,
+                        "format": fmt,
+                        "pattern": pattern,
+                        "replacement": replacement,
+                        "use_regex": use_regex,
+                    }
+                ),
+                required_scopes=("books.read",),
+                requested_by=self.user_id(),
+            ).to_dict()
             result["err"] = "ok"
             result["book_id"] = book_id
             return result
@@ -134,7 +155,7 @@ class UserTextReplacePreview(BaseHandler):
 class UserTextReplaceRun(BaseHandler):
     @js
     @is_admin
-    async def post(self):
+    def post(self):
         req = _body(self)
         work_dir = None
         try:
@@ -145,10 +166,6 @@ class UserTextReplaceRun(BaseHandler):
             output_mode = req.get("output_mode") or "new"
             if output_mode not in ("new", "overwrite"):
                 raise BookToolsError("参数错误：output_mode 必须为 new 或 overwrite")
-            apply_fn, rule_error = compile_rule(pattern, replacement, use_regex)
-            if apply_fn is None:
-                raise BookToolsError(rule_error)
-
             book = _tool_resolve_book(self, book_id)
             title = book.get("title") or "Unknown"
             fmt = pick_format(book, candidates=("TXT", "EPUB"))
@@ -157,30 +174,54 @@ class UserTextReplaceRun(BaseHandler):
             src = get_format_path(self.db, book_id, fmt)
 
             work_dir = _tool_workdir()
-            out_path = os.path.join(work_dir, "replaced.%s" % fmt.lower())
-            audit = {"book_id": book_id, "format": fmt, "output_mode": output_mode, "pattern": pattern}
-            with audit_run(self, TEXT_REPLACE_PLUGIN_KEY, audit, error_code="booktools.failed") as outcome:
-                matches = await IOLoop.current().run_in_executor(
-                    None,
-                    functools.partial(replace_txt_file if fmt == "TXT" else replace_epub_file, src, out_path, apply_fn),
-                )
+            runtime, connection = _tool_runtime(self, "/plugins/text-replace")
+            rollback_state = {}
 
-                rsp = {"err": "ok", "format": fmt, "matches": matches, "output_mode": output_mode}
+            def finalize(output):
+                value = output.to_dict()
+                rsp = {"err": "ok", **value, "output_mode": output_mode}
                 if output_mode == "overwrite":
-                    overwrite_format(self.db, book_id, fmt, out_path)
+                    rollback_state["backup_path"] = overwrite_format(
+                        self.db,
+                        book_id,
+                        fmt,
+                        value["path"],
+                        backup_dir=_tool_backup_dir(),
+                        backup_state=rollback_state,
+                    )
                     rsp["book_id"] = book_id
                 else:
                     suffix = str(req.get("suffix") or "").strip() or "（正文替换版）"
                     rsp["book_id"] = import_as_new_book(
-                        self.db, self.session, book_id, out_path, title_suffix=suffix, collector_id=self.user_id()
+                        self.db, self.session, book_id, value["path"], title_suffix=suffix, collector_id=self.user_id()
                     )
-                outcome["counts"] = {"fetched": 1, "updated": matches}
-                outcome["data"] = {"book_id": rsp["book_id"], "matches": matches}
+                rsp["backup_path"] = rollback_state.get("backup_path") or ""
+                return rsp
+
+            rsp = runtime.write(
+                connection,
+                "apply",
+                ToolInput.from_dict(
+                    {
+                        "path": src,
+                        "format": fmt,
+                        "pattern": pattern,
+                        "replacement": replacement,
+                        "use_regex": use_regex,
+                    }
+                ),
+                work_dir,
+                required_scopes=("books.write",),
+                requested_by=self.user_id(),
+                finalize=finalize,
+                rollback=lambda: _restore_backup(self.db, book_id, fmt, rollback_state),
+                audit_data={"book_id": book_id, "format": fmt, "output_mode": output_mode, "pattern": pattern},
+            )
             logging.info(
                 "[booktools] text-replace done: %s book=%s hits=%d mode=%s [uid:%s]",
                 fmt,
                 title,
-                matches,
+                rsp["matches"],
                 output_mode,
                 self.user_id(),
             )
@@ -195,7 +236,7 @@ class UserTextReplaceRun(BaseHandler):
 class UserTxtFixerAnalyze(BaseHandler):
     @js
     @auth
-    async def post(self):
+    def post(self):
         req = _body(self)
         try:
             book_id = _tool_book_id(req)
@@ -204,9 +245,14 @@ class UserTxtFixerAnalyze(BaseHandler):
             if "TXT" not in fmts:
                 raise BookToolsError("该书籍没有 TXT 格式，无法执行检测")
             src = get_format_path(self.db, book_id, "TXT")
-            with open(src, "rb") as f:
-                data = f.read(ANALYZE_LIMIT)
-            report = await IOLoop.current().run_in_executor(None, functools.partial(analyze_bytes, data))
+            runtime, connection = _tool_runtime(self, "/plugins/txt-fixer")
+            report = runtime.read(
+                connection,
+                "preview",
+                ToolInput.from_dict({"path": src, "format": "TXT"}),
+                required_scopes=("books.read",),
+                requested_by=self.user_id(),
+            ).to_dict()
             report["err"] = "ok"
             report["book_id"] = book_id
             return report
@@ -217,7 +263,7 @@ class UserTxtFixerAnalyze(BaseHandler):
 class UserTxtFixerRun(BaseHandler):
     @js
     @is_admin
-    async def post(self):
+    def post(self):
         req = _body(self)
         work_dir = None
         try:
@@ -232,40 +278,50 @@ class UserTxtFixerRun(BaseHandler):
                 raise BookToolsError("该书籍没有 TXT 格式，无法执行修复")
             src = get_format_path(self.db, book_id, "TXT")
 
-            with open(src, "rb") as f:
-                data = f.read()
-            text, report = await IOLoop.current().run_in_executor(None, functools.partial(fix_bytes, data))
-            if report.get("unrecoverable"):
-                raise BookToolsError("文件疑似多重误读乱码（反转循环），无法自动修复")
-            if report.get("garbage") and not report.get("mojibake"):
-                raise BookToolsError("文件疑似二进制或混用编码，无法安全修复（编码：%s）" % report.get("encoding"))
-
             work_dir = _tool_workdir()
-            out_path = os.path.join(work_dir, "fixed.txt")
-            with open(out_path, "wb") as f:
-                f.write(text.encode("utf-8"))  # UTF-8 无 BOM
+            runtime, connection = _tool_runtime(self, "/plugins/txt-fixer")
+            rollback_state = {}
 
-            rsp = {
-                "err": "ok",
-                "encoding": report.get("encoding"),
-                "mojibake": report.get("mojibake", False),
-                "output_mode": output_mode,
-            }
-            audit = {"book_id": book_id, "output_mode": output_mode, "encoding": report.get("encoding")}
-            with audit_run(self, TXT_FIXER_PLUGIN_KEY, audit, error_code="booktools.failed") as outcome:
+            def finalize(output):
+                value = output.to_dict()
+                rsp = {"err": "ok", **value, "output_mode": output_mode}
                 if output_mode == "overwrite":
-                    overwrite_format(self.db, book_id, "TXT", out_path)
+                    rollback_state["backup_path"] = overwrite_format(
+                        self.db,
+                        book_id,
+                        "TXT",
+                        value["path"],
+                        backup_dir=_tool_backup_dir(),
+                        backup_state=rollback_state,
+                    )
                     rsp["book_id"] = book_id
                 else:
                     rsp["book_id"] = import_as_new_book(
-                        self.db, self.session, book_id, out_path, title_suffix="（编码修复版）", collector_id=self.user_id()
+                        self.db,
+                        self.session,
+                        book_id,
+                        value["path"],
+                        title_suffix="（编码修复版）",
+                        collector_id=self.user_id(),
                     )
-                outcome["counts"] = {"fetched": 1, "updated": 1}
-                outcome["data"] = {"book_id": rsp["book_id"], "encoding": report.get("encoding")}
+                rsp["backup_path"] = rollback_state.get("backup_path") or ""
+                return rsp
+
+            rsp = runtime.write(
+                connection,
+                "apply",
+                ToolInput.from_dict({"path": src, "format": "TXT"}),
+                work_dir,
+                required_scopes=("books.write",),
+                requested_by=self.user_id(),
+                finalize=finalize,
+                rollback=lambda: _restore_backup(self.db, book_id, "TXT", rollback_state),
+                audit_data={"book_id": book_id, "format": "TXT", "output_mode": output_mode},
+            )
             logging.info(
                 "[booktools] txt-fixer done: book=%s enc=%s mode=%s [uid:%s]",
                 title,
-                report.get("encoding"),
+                rsp.get("encoding"),
                 output_mode,
                 self.user_id(),
             )
@@ -277,42 +333,23 @@ class UserTxtFixerRun(BaseHandler):
                 shutil.rmtree(work_dir, ignore_errors=True)
 
 
-# 支持的转换方向（与 webserver/plugins/texttools/config/ 配置一致）
-ZH_DIRECTIONS = ("t2s", "tw2s", "tw2sp", "s2t", "s2tw", "s2twp", "t2tw", "tw2t")
-# 方向 → 目标语言代码（calibre 语言码：zh=简体，zht=繁体）
-ZH_DIRECTION_LANG = {
-    "t2s": "zh",
-    "tw2s": "zh",
-    "tw2sp": "zh",
-    "s2t": "zht",
-    "s2tw": "zht",
-    "s2twp": "zht",
-    "t2tw": "zht",
-    "tw2t": "zht",
-}
-# 增强词表仅对繁体→简体方向生效
-ZH_A5_DIRECTIONS = ("t2s", "tw2s")
-A5_PHRASES_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plugins", "texttools", "a5_phrases.txt"
-)
 # 另存为新书时的标题后缀
 ZH_NEW_BOOK_SUFFIX = {"zh": "（简体版）", "zht": "（繁體版）"}
 
 
-def _zh_sync_book_meta(db, book_id, lang, convert=None):
+def _zh_sync_book_meta(db, book_id, lang, title=None, authors=None):
     """替换模式下同步库内标题/作者/语言（不加后缀），保持与转换后文件一致。
 
     封面不受影响：set_metadata 只会更新提供的封面、从不删除现有封面。
     """
     try:
         mi = db.get_metadata(book_id, index_is_id=True)
-        if convert is not None:
-            if mi.title:
-                mi.title = convert(mi.title)
-                mi.title_sort = utils.get_title_sort(mi.title)
-            if mi.authors:
-                mi.authors = [convert(a) for a in mi.authors]
-                mi.author_sort = None  # 名字已转换，排序键由 calibre 按新名字重算
+        if title:
+            mi.title = title
+            mi.title_sort = None
+        if authors:
+            mi.authors = list(authors)
+            mi.author_sort = None
         mi.languages = [lang]
         db.set_metadata(book_id, mi, force_changes=True)
     except Exception as err:
@@ -322,23 +359,18 @@ def _zh_sync_book_meta(db, book_id, lang, convert=None):
 class UserZhConverterRun(BaseHandler):
     @js
     @is_admin
-    async def post(self):
+    def post(self):
         req = _body(self)
         work_dir = None
         try:
             book_id = _tool_book_id(req)
             direction = str(req.get("direction") or "")
-            if direction not in ZH_DIRECTIONS:
-                raise BookToolsError("不支持的转换方向：%s" % direction)
             use_a5 = bool(req.get("use_a5"))
             convert_title = bool(req.get("convert_title"))
             backup = bool(req.get("backup"))
             output_mode = req.get("output_mode") or "new"
             if output_mode not in ("new", "replace"):
                 raise BookToolsError("参数错误：output_mode 必须为 new 或 replace")
-
-            extra_dicts = [A5_PHRASES_FILE] if (use_a5 and direction in ZH_A5_DIRECTIONS) else []
-            engine = OpenCC(direction, extra_dicts=extra_dicts)
 
             book = _tool_resolve_book(self, book_id)
             title = book.get("title") or "Unknown"
@@ -349,47 +381,67 @@ class UserZhConverterRun(BaseHandler):
             src = get_format_path(self.db, book_id, fmt)
 
             work_dir = _tool_workdir()
-            out_path = os.path.join(work_dir, "converted.%s" % fmt.lower())
-            lang = ZH_DIRECTION_LANG[direction]
+            runtime, connection = _tool_runtime(self, "/plugins/zh-converter")
+            rollback_state = {}
 
-            def _convert_job():
-                if fmt == "EPUB":
-                    convert_epub(src, out_path, engine.convert, convert_metadata=convert_title)
-                    return ""
-                return convert_txt_file(src, out_path, engine.convert)
-
-            source_encoding = await IOLoop.current().run_in_executor(None, _convert_job)
-
-            rsp = {
-                "err": "ok",
-                "direction": direction,
-                "direction_label": DIRECTION_LABELS.get(direction, direction),
-                "format": fmt,
-                "source_encoding": source_encoding,
-                "output_mode": output_mode,
-            }
-            audit = {"book_id": book_id, "format": fmt, "direction": direction, "output_mode": output_mode}
-            with audit_run(self, ZH_CONVERTER_PLUGIN_KEY, audit, error_code="booktools.failed") as outcome:
+            def finalize(output):
+                value = output.to_dict()
+                lang = value["language"]
+                rsp = {"err": "ok", **value, "output_mode": output_mode}
                 backup_dir = _tool_backup_dir() if backup else None
                 if output_mode == "replace":
-                    overwrite_format(self.db, book_id, fmt, out_path, backup_dir=backup_dir)
-                    _zh_sync_book_meta(self.db, book_id, lang, engine.convert if convert_title else None)
+                    rollback_state["backup_path"] = overwrite_format(
+                        self.db,
+                        book_id,
+                        fmt,
+                        value["path"],
+                        backup_dir=backup_dir or _tool_backup_dir(),
+                        backup_state=rollback_state,
+                    )
+                    _zh_sync_book_meta(
+                        self.db,
+                        book_id,
+                        lang,
+                        value.get("converted_title"),
+                        value.get("converted_authors"),
+                    )
                     rsp["book_id"] = book_id
                 else:
-                    suffix_engine = engine.convert if convert_title else None
                     rsp["book_id"] = import_as_new_book(
                         self.db,
                         self.session,
                         book_id,
-                        out_path,
+                        value["path"],
                         title_suffix=ZH_NEW_BOOK_SUFFIX.get(lang, ""),
                         language=lang,
-                        convert_text=suffix_engine,
+                        title_override=value.get("converted_title"),
+                        authors_override=value.get("converted_authors"),
                         collector_id=self.user_id(),
                     )
-                outcome["counts"] = {"fetched": 1, "updated": 1}
-                # 备份路径此前不在任何界面里，写进 run 后可追溯。
-                outcome["data"] = {"book_id": rsp["book_id"], "backup_dir": backup_dir or ""}
+                rsp["backup_path"] = rollback_state.get("backup_path") or ""
+                return rsp
+
+            rsp = runtime.write(
+                connection,
+                "apply",
+                ToolInput.from_dict(
+                    {
+                        "path": src,
+                        "format": fmt,
+                        "direction": direction,
+                        "use_a5": use_a5,
+                        "convert_title": convert_title,
+                        "title": title,
+                        "authors": book.get("authors") or [],
+                    }
+                ),
+                work_dir,
+                required_scopes=("books.write",),
+                requested_by=self.user_id(),
+                finalize=finalize,
+                rollback=lambda: _restore_backup(self.db, book_id, fmt, rollback_state),
+                audit_data={"book_id": book_id, "format": fmt, "direction": direction, "output_mode": output_mode},
+            )
             logging.info(
                 "[booktools] zh-converter done: %s book=%s direction=%s mode=%s [uid:%s]",
                 fmt,

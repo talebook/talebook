@@ -9,9 +9,10 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 from xml.etree import ElementTree
 
+from .domains import BookMetadata, ItemFailure, Page, Review
 from .protocol import (
     PROTOCOL_VERSION,
-    ProviderError,
+    UpstreamError,
     ProviderItem,
     ProviderResult,
 )
@@ -256,6 +257,51 @@ class OpenLibraryProvider:
                 items.append(ProviderItem(external_id=external_id + ":rating", entity_type="review", data=review))
         return ProviderResult(items=items, next_cursor={"completed": True}, health_message="Open Library query complete")
 
+    def search_books(self, query, context):
+        value = str(query or "").strip()
+        if not value:
+            return []
+        payload = self.transport(
+            "GET",
+            "https://openlibrary.org/search.json",
+            params={"q": value, "limit": 20},
+        )
+        return [
+            BookMetadata.from_dict(
+                {
+                    "title": item.get("title") or "",
+                    "authors": item.get("author_name") or [],
+                    "isbn": (item.get("isbn") or [""])[0],
+                    "provider_key": self.manifest["id"],
+                    "provider_value": item.get("key") or "",
+                }
+            )
+            for item in payload.get("docs", [])
+        ]
+
+    def get_metadata(self, external_id, context):
+        return BookMetadata.from_dict({"provider_key": self.manifest["id"], "provider_value": external_id})
+
+    def get_reviews(self, query, context):
+        run_context = {
+            **context,
+            "action": "run",
+            "config": {**dict(context.get("config") or {}), "queries": [dict(query or {})]},
+        }
+        result = self.execute(run_context)
+        return Page(
+            items=[
+                Review.from_dict(item.data) for item in result.items if item.entity_type == "review" and not item.error_code
+            ],
+            failures=[
+                ItemFailure(item.external_id, item.error_code, item.error_message)
+                for item in result.items
+                if item.entity_type == "review" and item.error_code
+            ],
+            next_cursor=dict(result.next_cursor or {}),
+            health_message=result.health_message,
+        )
+
 
 def extract_epub_metadata(archive_bytes):
     try:
@@ -263,10 +309,10 @@ def extract_epub_metadata(archive_bytes):
             container = ElementTree.fromstring(archive.read("META-INF/container.xml"))
             rootfile = container.find(".//{*}rootfile")
             if rootfile is None or not rootfile.get("full-path"):
-                raise ProviderError("EPUB container has no package document")
+                raise UpstreamError("EPUB container has no package document")
             package = ElementTree.fromstring(archive.read(rootfile.get("full-path")))
     except (KeyError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
-        raise ProviderError("Invalid EPUB metadata container") from exc
+        raise UpstreamError("Invalid EPUB metadata container") from exc
 
     def texts(name):
         return [str(node.text or "").strip() for node in package.findall(".//{*}%s" % name) if str(node.text or "").strip()]
@@ -311,7 +357,7 @@ class EmbeddedMetadataProvider:
         try:
             archive = base64.b64decode(encoded, validate=True)
         except ValueError as exc:
-            raise ProviderError("EPUB upload is not valid base64") from exc
+            raise UpstreamError("EPUB upload is not valid base64") from exc
         candidate = extract_epub_metadata(archive)
         if context["action"] == "test":
             return ProviderResult(health_message="EPUB metadata parsed")
@@ -324,6 +370,12 @@ class EmbeddedMetadataProvider:
         }
         return ProviderResult(items=[ProviderItem(external_id=external_id, entity_type="metadata", data=data)])
 
+    def execute_feature(self, action, params, context):
+        if action != "extract":
+            raise UpstreamError("Unsupported embedded metadata feature")
+        result = self.execute({**context, "action": "run"})
+        return {"items": [item.data.to_dict() for item in result.items]}
+
 
 def discover_calibre_providers():
     try:
@@ -331,7 +383,7 @@ def discover_calibre_providers():
 
         plugins = metadata_plugins({"identify"})
     except Exception as exc:
-        raise ProviderError("Calibre metadata provider registry is unavailable") from exc
+        raise UpstreamError("Calibre metadata provider registry is unavailable") from exc
     return [
         {
             "name": plugin.name,
@@ -375,6 +427,11 @@ class CalibreProviderBridge:
             if not target_ids or "calibre-provider:%s" % provider["name"].lower().replace(" ", "-") in target_ids
         ]
         return ProviderResult(items=items, health_message="Calibre provider discovery complete")
+
+    def execute_feature(self, action, params, context):
+        if action != "discover":
+            raise UpstreamError("Unsupported Calibre provider feature")
+        return {"providers": self.discover()}
 
 
 @dataclass(frozen=True)
@@ -528,6 +585,24 @@ class CatalogReviewProvider:
             series_id=query.get("series_id", ""),
         )
 
+    def get_reviews(self, query, context):
+        query = dict(query or {})
+        try:
+            external_id, payload = self._fetch(context, query)
+            data = self._parse(query, external_id, payload)
+            return Page(items=[Review.from_dict(data)])
+        except (KeyError, TypeError, ValueError) as exc:
+            external_id = locals().get("external_id", "%s:unknown" % self.spec.key)
+            return Page(
+                failures=[
+                    ItemFailure(
+                        external_id,
+                        "%s.invalid_response" % self.spec.key,
+                        "Provider response has no usable rating: %s" % exc,
+                    )
+                ]
+            )
+
 
 class BRSProvider:
     manifest = _manifest(
@@ -563,7 +638,7 @@ class BRSProvider:
         config = context.get("config") or {}
         endpoint = str(config.get("endpoint") or "").rstrip("/")
         if not endpoint:
-            raise ProviderError("BRS endpoint is required")
+            raise UpstreamError("BRS endpoint is required")
         token = (context.get("secrets") or {}).get("token", "")
         headers = {"Authorization": "Bearer %s" % token}
         cursor = (context.get("cursor") or {}).get("cursor", "")
@@ -627,6 +702,18 @@ class BRSProvider:
             items=items,
             next_cursor={"cursor": next_cursor} if next_cursor else dict(context.get("cursor") or {}),
             health_message="BRS sync complete",
+        )
+
+    def get_reviews(self, query, context):
+        result = self.execute({**context, "action": "run"})
+        return Page(
+            items=[Review.from_dict(item.data) for item in result.items if not item.error_code],
+            failures=[
+                ItemFailure(item.external_id, item.error_code, item.error_message) for item in result.items if item.error_code
+            ],
+            has_more=bool((result.next_cursor or {}).get("cursor")),
+            next_cursor=dict(result.next_cursor or {}),
+            health_message=result.health_message,
         )
 
 
@@ -753,6 +840,11 @@ class ReviewFileProvider:
                 )
             )
         return ProviderResult(items=items, next_cursor={"completed": True}, health_message="Review file import complete")
+
+    def get_reviews(self, query, context):
+        result = self.execute({**context, "action": "run"})
+        items = [Review.from_dict(item.data) for item in result.items if not item.error_code]
+        return Page(items=items, health_message=result.health_message)
 
 
 EXTERNAL_CONNECTOR_PROVIDERS = (

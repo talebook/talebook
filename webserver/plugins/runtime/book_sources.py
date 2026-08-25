@@ -1,10 +1,12 @@
 import base64
 import hashlib
+import mimetypes
 import urllib.parse
 from pathlib import Path
 from xml.etree import ElementTree
 
-from .protocol import PROTOCOL_VERSION, ProviderError, ProviderItem, ProviderResult
+from .domains import BookFile, Category, CheckReport, Page, SourceBook, SourceBookDetail
+from .protocol import PROTOCOL_VERSION, UpstreamError, ProviderItem, ProviderResult
 from .safe_http import SafeHttpClient
 
 
@@ -60,6 +62,7 @@ def _manifest(plugin_id, name, description, capabilities, config_schema, auth_sc
         "compatibility": {"talebook": ">=0.1.0"},
         # 书源由管理员统一配置后供全站使用。
         "connection_owners": ["instance"],
+        "download_mode": "single_book",
         "homepage": homepage,
         "license": "GPL-3.0",
         "ui": {"icon": "mdi-bookshelf", "manage_kind": "book_source", "primary_action": "configure"},
@@ -72,9 +75,12 @@ COMMON_CONFIG_PROPERTIES = {
 }
 
 
-class BookSourceProvider:
+class SourceBase:
+    """单文件书源的共享实现；具体来源只负责 ``discover``。"""
+
     source_name = ""
     license_name = "由来源条目决定"
+    download_mode = "single_book"
 
     def __init__(self, http=None):
         self.http = http or SafeHttpClient()
@@ -85,6 +91,91 @@ class BookSourceProvider:
             return ProviderResult(health_message="%s 连接可用" % self.source_name)
         items = [ProviderItem(item["external_id"], "book_source", item, item.get("updated_at")) for item in entries]
         return ProviderResult(items=items, next_cursor=cursor, health_message="发现 %d 个待审条目" % len(items))
+
+    def search(self, query, cursor, context):
+        page = self.browse("", cursor, context)
+        needle = str(query or "").strip().casefold()
+        if not needle:
+            return page
+        items = [
+            item
+            for item in page.items
+            if needle in item.title.casefold() or any(needle in author.casefold() for author in item.authors)
+        ]
+        return Page(
+            items=items,
+            failures=page.failures,
+            has_more=page.has_more,
+            next_cursor=page.next_cursor,
+            health_message=page.health_message,
+        )
+
+    def browse(self, category_id, cursor, context):
+        call_context = {**context, "cursor": dict(cursor or {})}
+        entries, next_cursor = self.discover(call_context)
+        items = [SourceBook.from_dict(item) for item in entries]
+        return Page(
+            items=items,
+            has_more=bool(next_cursor.get("next")),
+            next_cursor=next_cursor,
+            health_message="发现 %d 本书" % len(items),
+        )
+
+    def get_categories(self, context):
+        return [Category(id="root", name=self.source_name)]
+
+    def get_book(self, external_id, context):
+        page = self.browse("", {}, context)
+        book = next((item for item in page.items if item.external_id == external_id), None)
+        if book is None:
+            raise UpstreamError("Book source item was not found")
+        return SourceBookDetail(
+            external_id=book.external_id,
+            title=book.title,
+            authors=book.authors,
+            description=book.description,
+            cover_url=book.cover_url,
+            categories=book.categories,
+            source_url=book.source_url,
+            acquisition_url=book.acquisition_url,
+            format=book.format,
+            downloadable=book.access == "download" and bool(book.acquisition_url),
+            source=book.source,
+        )
+
+    def download(self, book, context):
+        if not book.downloadable or not book.acquisition_url:
+            raise UpstreamError("Book source item is not downloadable")
+        config = context.get("config") or {}
+        response = self.http.request(
+            "GET",
+            book.acquisition_url,
+            allowed_hosts=config.get("allowed_hosts") or (),
+            headers=self._headers(context),
+            timeout=float(config.get("timeout_seconds", 30)),
+        )
+        format_name = book.format or _format_from(book.acquisition_url, response.headers.get("Content-Type", ""))
+        filename = Path(urllib.parse.urlsplit(book.acquisition_url).path).name or "%s.%s" % (
+            book.external_id,
+            format_name,
+        )
+        return BookFile(
+            filename=filename,
+            content=response.content,
+            format=format_name,
+            media_type=response.headers.get("Content-Type") or mimetypes.guess_type(filename)[0] or "application/octet-stream",
+            source_url=book.acquisition_url,
+        )
+
+    def get_toc(self, book, context):
+        raise UpstreamError("Book source does not provide chapters")
+
+    def get_chapter(self, chapter, context):
+        raise UpstreamError("Book source does not provide chapters")
+
+    def self_check(self, context):
+        page = self.browse("", {}, context)
+        return CheckReport(healthy=True, message=page.health_message)
 
     def _normalize(
         self,
@@ -105,26 +196,28 @@ class BookSourceProvider:
     ):
         fmt = str(format_name or "").lower()
         if fmt and fmt not in ALLOWED_FORMATS:
-            raise ProviderError("Book source returned an unsupported format")
+            raise UpstreamError("Book source returned an unsupported format")
         if access != "download":
             acquisition_url = ""
-        return {
-            "external_id": _external_id(self.source_name, identity),
-            "title": str(title or "未知标题")[:500],
-            "authors": [str(item) for item in (authors or []) if item],
-            "isbn": _isbn(isbn),
-            "format": fmt,
-            "source": self.source_name,
-            "source_url": source_url,
-            "acquisition_url": acquisition_url,
-            "access": access,
-            "license": license_name or self.license_name,
-            "target_library": str(context.get("config", {}).get("target_library") or "main"),
-            "review_status": "pending",
-            "content_hash": content_hash,
-            "remote_etag": remote_etag,
-            "updated_at": updated_at,
-        }
+        return SourceBook.from_dict(
+            {
+                "external_id": _external_id(self.source_name, identity),
+                "title": str(title or "未知标题")[:500],
+                "authors": [str(item) for item in (authors or []) if item],
+                "isbn": _isbn(isbn),
+                "format": fmt,
+                "source": self.source_name,
+                "source_url": source_url,
+                "acquisition_url": acquisition_url,
+                "access": access,
+                "license": license_name or self.license_name,
+                "target_library": str(context.get("config", {}).get("target_library") or "main"),
+                "review_status": "pending",
+                "content_hash": content_hash,
+                "remote_etag": remote_etag,
+                "updated_at": updated_at,
+            }
+        )
 
     @staticmethod
     def _formats(context):
@@ -143,7 +236,7 @@ class BookSourceProvider:
         return headers
 
 
-class OPDSProvider(BookSourceProvider):
+class OPDSProvider(SourceBase):
     def __init__(self, plugin_id, name, description, homepage, endpoint="", license_name="由来源条目决定", http=None):
         super().__init__(http)
         self.source_name = name
@@ -178,7 +271,7 @@ class OPDSProvider(BookSourceProvider):
         config = context.get("config") or {}
         endpoint = self.endpoint or str(config.get("endpoint") or "")
         if not endpoint:
-            raise ProviderError("OPDS endpoint is required")
+            raise UpstreamError("OPDS endpoint is required")
         response = self.http.request(
             "GET",
             endpoint,
@@ -241,7 +334,7 @@ class OPDSProvider(BookSourceProvider):
         try:
             root = ElementTree.fromstring(content)
         except ElementTree.ParseError as exc:
-            raise ProviderError("OPDS response is not valid XML") from exc
+            raise UpstreamError("OPDS response is not valid XML") from exc
         entries = []
         for entry in root.findall("atom:entry", ATOM_NS)[:200]:
             links = entry.findall("atom:link", ATOM_NS)
@@ -283,7 +376,7 @@ class OPDSProvider(BookSourceProvider):
         return entries
 
 
-class GutenbergProvider(BookSourceProvider):
+class GutenbergProvider(SourceBase):
     source_name = "Project Gutenberg"
     license_name = "Project Gutenberg License"
     endpoint = "https://gutendex.com/books/"
@@ -320,7 +413,7 @@ class GutenbergProvider(BookSourceProvider):
         return entries, {"next": payload.get("next") or "", "seen": len(entries)}
 
 
-class InternetArchiveProvider(BookSourceProvider):
+class InternetArchiveProvider(SourceBase):
     source_name = "Internet Archive"
     endpoint = "https://archive.org/advancedsearch.php?q=mediatype%3Atexts&fl%5B%5D=identifier,title,creator&rows=25&page=1&output=json"
     manifest = _manifest(
@@ -386,7 +479,7 @@ class InternetArchiveProvider(BookSourceProvider):
         return selected
 
 
-class WebDAVProvider(BookSourceProvider):
+class WebDAVProvider(SourceBase):
     source_name = "WebDAV"
     manifest = _manifest(
         "talebook.book-source.webdav",
@@ -415,7 +508,7 @@ class WebDAVProvider(BookSourceProvider):
         config = context.get("config") or {}
         endpoint = str(config.get("endpoint") or "")
         if not endpoint:
-            raise ProviderError("WebDAV endpoint is required")
+            raise UpstreamError("WebDAV endpoint is required")
         headers = self._headers(context)
         headers.update({"Depth": "1", "Content-Type": "application/xml"})
         response = self.http.request(
@@ -428,7 +521,7 @@ class WebDAVProvider(BookSourceProvider):
         try:
             root = ElementTree.fromstring(response.content)
         except ElementTree.ParseError as exc:
-            raise ProviderError("WebDAV response is not valid XML") from exc
+            raise UpstreamError("WebDAV response is not valid XML") from exc
         old = (context.get("cursor") or {}).get("etags", {})
         etags = {}
         entries = []
@@ -461,7 +554,7 @@ class WebDAVProvider(BookSourceProvider):
         return entries, {"etags": etags}
 
 
-class WatchFolderProvider(BookSourceProvider):
+class WatchFolderProvider(SourceBase):
     source_name = "Watch Folder"
     manifest = _manifest(
         "talebook.book-source.watch-folder",
@@ -521,7 +614,7 @@ class WatchFolderProvider(BookSourceProvider):
     @staticmethod
     def _allowed_path(value, roots):
         if not value:
-            raise ProviderError("Watch Folder path is required")
+            raise UpstreamError("Watch Folder path is required")
         path = Path(value).expanduser().resolve(strict=True)
         allowed = []
         for root in roots:
@@ -530,7 +623,7 @@ class WatchFolderProvider(BookSourceProvider):
             except OSError:
                 continue
         if not any(path == root or root in path.parents for root in allowed):
-            raise ProviderError("Watch Folder path is outside the configured allowlist")
+            raise UpstreamError("Watch Folder path is outside the configured allowlist")
         return path
 
     @staticmethod
