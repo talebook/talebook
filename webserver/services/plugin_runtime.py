@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 import json
+import logging
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -25,12 +26,14 @@ from webserver.plugins.runtime import (
     BUILTIN_CAPABILITY_PROVIDERS,
     EXTERNAL_CONNECTOR_PROVIDERS,
     MockMultiTabProvider,
+    PluginContext,
     PluginManifest,
     ProviderAuthError,
     ProviderError,
     ProviderRateLimitError,
     ProviderResult,
     WereadProvider,
+    contract_violations,
 )
 from webserver.services.plugin_secrets import SENSITIVE_KEY_RE, SecretCipher, SecretCipherError, redact, secret_mask_hint
 
@@ -52,9 +55,16 @@ class PluginRegistry:
         self._providers = {}
 
     def register(self, provider):
+        problems = contract_violations(provider)
+        if problems:
+            # 过渡期只告警：待全部内置 provider 确认合规后改为抛错（方案 S4 / 风险 R4）。
+            logging.warning("插件 %s 未满足契约：%s", type(provider).__name__, "；".join(problems))
         manifest = PluginManifest.validate(provider.manifest)
         self._providers[manifest.raw["id"]] = provider
         return manifest
+
+    def providers(self):
+        return list(self._providers.values())
 
     def get(self, plugin_key):
         provider = self._providers.get(plugin_key)
@@ -482,23 +492,23 @@ class PluginRuntime:
         for attempt in range(1, max_retries + 2):
             run.attempt = attempt
             self.session.commit()
-            context = {
-                "action": run.action,
-                "attempt": attempt,
-                "config": {**dict(installation.config or {}), **dict(connection.config or {})},
-                "cursor": dict(connection.cursor or {}),
-                "secrets": dict(secrets),
-                "scopes": list(connection.scopes or []),
-                "target_external_ids": target_ids,
-                "input_data": dict((parent_run.input_data if parent_run else run.input_data) or {}),
-                "deadline": (datetime.datetime.now() + datetime.timedelta(seconds=timeout)).isoformat(),
-                "platform": {
+            context = PluginContext(
+                action=run.action,
+                attempt=attempt,
+                config={**dict(installation.config or {}), **dict(connection.config or {})},
+                cursor=dict(connection.cursor or {}),
+                secrets=dict(secrets),
+                scopes=list(connection.scopes or []),
+                target_external_ids=target_ids,
+                input_data=dict((parent_run.input_data if parent_run else run.input_data) or {}),
+                deadline=(datetime.datetime.now() + datetime.timedelta(seconds=timeout)).isoformat(),
+                platform={
                     "import_allowed_roots": list(
                         self.settings.get("import_allowed_roots")
                         or [self.settings.get("scan_upload_path", "/data/books/imports/")]
                     )
                 },
-            }
+            ).as_dict()
             try:
                 result = self._call_with_timeout(provider, context, timeout)
                 if not isinstance(result, ProviderResult):

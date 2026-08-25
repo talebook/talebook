@@ -1,6 +1,7 @@
 from .builtin_capabilities import BUILTIN_CAPABILITY_PROVIDERS, BuiltinCapabilityProvider
 from .book_sources import BOOK_SOURCE_PROVIDERS
 from .enrichment import EXTERNAL_CONNECTOR_PROVIDERS
+from .interfaces import PluginContext, PluginProvider, contract_violations
 from .mock import MockMultiTabProvider
 from .protocol import (
     ACTIONS,
@@ -27,7 +28,9 @@ __all__ = [
     "BUILTIN_CAPABILITY_PROVIDERS",
     "BOOK_SOURCE_PROVIDERS",
     "EXTERNAL_CONNECTOR_PROVIDERS",
+    "PluginContext",
     "PluginManifest",
+    "PluginProvider",
     "ProviderAuthError",
     "ProviderError",
     "ProviderItem",
@@ -35,5 +38,6 @@ __all__ = [
     "ProviderResult",
     "WEREAD_PLUGIN_KEY",
     "WereadProvider",
+    "contract_violations",
     "parse_weread_export",
 ]
