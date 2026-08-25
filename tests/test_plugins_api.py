@@ -157,8 +157,8 @@ class TestWereadIntegrationApi(TestWithAdminUser):
         self.assertIn("metadata", definition["categories"])
         self.assertIn("metadata.lookup", definition["capabilities"])
 
-    @mock.patch("webserver.handlers.plugins.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
-    @mock.patch("webserver.handlers.plugins.WereadProvider")
+    @mock.patch("webserver.handlers.plugin_weread.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
+    @mock.patch("webserver.handlers.plugin_weread.WereadProvider")
     def test_query_stores_key_for_owner_but_redacts_it_from_response(self, provider_class, _settings):
         provider_class.return_value.query.return_value = {
             "api_key": self.api_key,
@@ -184,8 +184,8 @@ class TestWereadIntegrationApi(TestWithAdminUser):
         self.assertEqual(state["connection"]["owner_id"], 1)
         self.assertNotIn(self.api_key, json.dumps(state, ensure_ascii=False))
 
-    @mock.patch("webserver.handlers.plugins.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
-    @mock.patch("webserver.handlers.plugins.WereadProvider")
+    @mock.patch("webserver.handlers.plugin_weread.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
+    @mock.patch("webserver.handlers.plugin_weread.WereadProvider")
     def test_query_maps_auth_and_rate_limit_errors_without_returning_key(self, provider_class, _settings):
         for error, code in (
             (ProviderAuthError("credential rejected"), "provider_unauthorized"),
@@ -200,9 +200,9 @@ class TestWereadIntegrationApi(TestWithAdminUser):
             self.assertEqual(data["err"], code)
             self.assertNotIn(self.api_key, json.dumps(data, ensure_ascii=False))
 
-    @mock.patch("webserver.handlers.plugins.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
+    @mock.patch("webserver.handlers.plugin_weread.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
     @mock.patch.object(WereadProvider, "_fetch_all", return_value=[])
-    @mock.patch("webserver.handlers.plugins.WereadProvider")
+    @mock.patch("webserver.handlers.plugin_weread.WereadProvider")
     def test_import_preview_reuses_saved_connection_without_api_key(self, query_provider, fetch_all, _settings):
         query_provider.return_value.query.return_value = {"results": []}
         connected = self.json(
@@ -239,7 +239,7 @@ class TestGenericActionInputData(TestWithAdminUser):
             .first()
         )
 
-    @mock.patch("webserver.handlers.plugins.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
+    @mock.patch("webserver.handlers.plugin_weread.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
     def test_weread_no_longer_rejected_by_generic_action_endpoint(self, mocked):
         with mock.patch.object(WereadProvider, "_gateway", return_value={"books": []}):
             self.json(
@@ -261,7 +261,7 @@ class TestGenericActionInputData(TestWithAdminUser):
         self.assertEqual(data["err"], "ok")
         self.assertEqual(data["run"]["action"], "preview")
 
-    @mock.patch("webserver.handlers.plugins.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
+    @mock.patch("webserver.handlers.plugin_weread.loader.get_settings", return_value={"PLUGIN_SECRET_KEY": "weread-api-test-key"})
     def test_client_supplied_allowed_book_ids_is_discarded(self, mocked):
         with mock.patch.object(WereadProvider, "_gateway", return_value={"books": []}):
             self.json(

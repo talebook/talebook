@@ -257,7 +257,7 @@ class TestTextReplaceRun(TestApp):
             d = self.json("/api/plugins/tools/text-replace/run", method="POST", body=body)
             self.assertEqual(d["err"], "permission.not_admin")
 
-    @mock.patch("webserver.handlers.plugins.import_as_new_book")
+    @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
     def test_run_new_mode_ok(self, m_import):
         m_import.return_value = 9001
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
@@ -269,8 +269,8 @@ class TestTextReplaceRun(TestApp):
 
 
 class TestTxtFixerRun(TestApp):
-    @mock.patch("webserver.handlers.plugins.import_as_new_book")
-    @mock.patch("webserver.handlers.plugins.fix_bytes")
+    @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
+    @mock.patch("webserver.handlers.plugin_booktools.fix_bytes")
     def test_run_new_mode_ok(self, m_fix, m_import):
         m_fix.return_value = ("fixed text", {"encoding": "utf-8", "mojibake": False, "garbage": False, "unrecoverable": False})
         m_import.return_value = 9002
@@ -291,8 +291,8 @@ class TestZhConverterRun(TestApp):
             d = self.json("/api/plugins/tools/zh-converter/run", method="POST", body=body)
             self.assertEqual(d["err"], "permission.not_admin")
 
-    @mock.patch("webserver.handlers.plugins.import_as_new_book")
-    @mock.patch("webserver.handlers.plugins.convert_txt_file")
+    @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
+    @mock.patch("webserver.handlers.plugin_booktools.convert_txt_file")
     def test_run_new_mode_ok(self, m_convert, m_import):
         m_convert.return_value = "utf-8"
         m_import.return_value = 9003
@@ -322,7 +322,7 @@ class TestBookToolAuditTrail(TestApp):
             .all()
         )
 
-    @mock.patch("webserver.handlers.plugins.import_as_new_book")
+    @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
     def test_text_replace_records_a_run(self, m_import):
         m_import.return_value = 9101
         self.json("/api/admin/plugins")  # 确保内置连接已创建
@@ -342,7 +342,7 @@ class TestBookToolAuditTrail(TestApp):
         self.assertEqual(run.cursor_after["book_id"], 9101)
         self.assertIsNotNone(run.finished_at)
 
-    @mock.patch("webserver.handlers.plugins.import_as_new_book")
+    @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
     def test_failed_write_is_recorded_as_failed_run(self, m_import):
         m_import.side_effect = RuntimeError("写回失败")
         self.json("/api/admin/plugins")
@@ -357,8 +357,8 @@ class TestBookToolAuditTrail(TestApp):
         self.assertEqual(runs[-1].status, "failed")
         self.assertIn("写回失败", runs[-1].error_message)
 
-    @mock.patch("webserver.handlers.plugins.import_as_new_book")
-    @mock.patch("webserver.handlers.plugins.fix_bytes")
+    @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
+    @mock.patch("webserver.handlers.plugin_booktools.fix_bytes")
     def test_txt_fixer_records_a_run(self, m_fix, m_import):
         m_fix.return_value = ("fixed", {"encoding": "gbk", "mojibake": False, "garbage": False, "unrecoverable": False})
         m_import.return_value = 9102
