@@ -1,6 +1,5 @@
 import json
 from types import SimpleNamespace
-import urllib.error
 import zipfile
 
 import pytest
@@ -24,6 +23,7 @@ from webserver.plugins.runtime import (
     WereadProvider,
     parse_weread_export,
 )
+from webserver.plugins.runtime.safe_http import SafeHttpClient
 from webserver.plugins.runtime.weread import validate_weread_query
 from webserver.services.plugin_runtime import PluginRuntime, install_builtin, save_connection
 from webserver.services.weread_annotations import confirm_match, locate_epub_quote, normalize_text
@@ -155,10 +155,17 @@ def test_parser_covers_issue_943_and_does_not_invent_bookmark_content():
     [(401, ProviderAuthError), (403, ProviderAuthError), (429, ProviderRateLimitError)],
 )
 def test_gateway_maps_auth_and_rate_limit_errors_without_leaking_key(status, error_type):
-    def opener(*_args, **_kwargs):
-        raise urllib.error.HTTPError("https://example.invalid", status, "rejected", {"Retry-After": "0"}, None)
+    class FakeSession:
+        def request(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                status_code=status,
+                headers={"Retry-After": "0"},
+                content=b"",
+                json=lambda: {},
+            )
 
-    provider = WereadProvider(opener=opener)
+    public = lambda *args, **kwargs: [(2, 1, 6, "", ("93.184.216.34", 443))]
+    provider = WereadProvider(http=SafeHttpClient(session=FakeSession(), resolver=public))
     with pytest.raises(error_type) as exc:
         provider._gateway("wrk-do-not-leak", "/user/notebooks", count=1)
     assert "wrk-do-not-leak" not in str(exc.value)
@@ -212,23 +219,16 @@ def test_gateway_maps_auth_and_rate_limit_errors_without_leaking_key(status, err
 def test_query_allowlist_forwards_all_documented_read_operations_without_serializing_key(operation, params, api_name):
     captured = {}
 
-    class Response:
-        def __enter__(self):
-            return self
+    class FakeHttp:
+        def json(self, method, url, **kwargs):
+            captured["method"] = method
+            captured["url"] = url
+            captured["body"] = kwargs.get("json")
+            captured["authorization"] = (kwargs.get("headers") or {}).get("Authorization")
+            captured["timeout"] = kwargs.get("timeout")
+            return {"errcode": 0, "items": []}
 
-        def __exit__(self, *_args):
-            return False
-
-        def read(self):
-            return b'{"errcode":0,"items":[]}'
-
-    def opener(request, timeout):
-        captured["body"] = json.loads(request.data)
-        captured["authorization"] = request.get_header("Authorization")
-        captured["timeout"] = timeout
-        return Response()
-
-    result = WereadProvider(opener=opener).query("wrk-unit-test-secret", operation, params)
+    result = WereadProvider(http=FakeHttp()).query("wrk-unit-test-secret", operation, params)
 
     assert result["errcode"] == 0
     assert captured["body"] == {"api_name": api_name, "skill_version": "1.0.4", **params}

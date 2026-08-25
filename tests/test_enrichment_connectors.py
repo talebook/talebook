@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
@@ -21,6 +22,7 @@ from webserver.plugins.runtime.enrichment import (
     parse_review_file,
 )
 from webserver.plugins.runtime.protocol import PluginManifest, ProviderRateLimitError
+from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,
@@ -428,3 +430,51 @@ def test_calibre_provider_bridge_discovery_is_stable_and_idempotent(db_session):
     assert second.counts["skipped"] == 1
     assert db_session.query(PluginSourceRecord).count() == 1
     assert db_session.query(PluginDefinition).filter_by(plugin_key=provider.manifest["id"]).count() == 1
+
+
+def _resolver(address):
+    return lambda *args, **kwargs: [(2, 1, 6, "", (address, 443))]
+
+
+def _ok_session():
+    return SimpleNamespace(
+        request=lambda *args, **kwargs: SimpleNamespace(status_code=200, headers={}, content=b"{}", json=lambda: {})
+    )
+
+
+def test_brs_endpoint_pointing_at_private_network_is_blocked():
+    """BRS endpoint 由管理员自由填写，必须挡住指向内网与云元数据服务的地址。"""
+    for address in ("127.0.0.1", "169.254.169.254", "192.168.1.10", "10.0.0.5"):
+        client = SafeHttpClient(session=_ok_session(), resolver=_resolver(address))
+        with pytest.raises(EndpointPolicyError):
+            client.request("GET", "https://brs.internal/api/v1/comments")
+
+    # 管理员为自托管实例显式配置白名单后才放行
+    client = SafeHttpClient(session=_ok_session(), resolver=_resolver("192.168.1.10"))
+    client.request("GET", "https://brs.lan/api/v1/comments", allowed_hosts=["brs.lan"])
+
+
+def test_connector_http_layer_rejects_embedded_credentials():
+    client = SafeHttpClient(session=_ok_session(), resolver=_resolver("93.184.216.34"))
+    with pytest.raises(EndpointPolicyError):
+        client.request("GET", "https://user:pass@brs.example/api/v1/comments")
+
+
+def test_brs_provider_forwards_configured_allowlist_to_http_layer():
+    captured = {}
+
+    def transport(method, url, **kwargs):
+        captured.update(kwargs)
+        captured["url"] = url
+        return {"comments": []}
+
+    BRSProvider(transport=transport).execute(
+        {
+            "action": "test",
+            "config": {"endpoint": "https://brs.lan", "allowed_hosts": ["brs.lan"]},
+            "secrets": {"token": "unit-test-token"},
+            "cursor": {},
+        }
+    )
+    assert captured["url"] == "https://brs.lan/api/v1/comments"
+    assert captured["allowed_hosts"] == ["brs.lan"]

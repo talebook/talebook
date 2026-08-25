@@ -1,8 +1,6 @@
 import datetime
 import hashlib
 import json
-import urllib.error
-import urllib.request
 
 from .protocol import (
     PROTOCOL_VERSION,
@@ -12,6 +10,7 @@ from .protocol import (
     ProviderRateLimitError,
     ProviderResult,
 )
+from .safe_http import SafeHttpClient
 
 
 WEREAD_PLUGIN_KEY = "talebook.weread"
@@ -358,9 +357,9 @@ class WereadProvider:
         "ui": {"manage_kind": "weread", "icon": "mdi-book-open-page-variant"},
     }
 
-    def __init__(self, gateway=WEREAD_GATEWAY, opener=None):
+    def __init__(self, gateway=WEREAD_GATEWAY, http=None):
         self.gateway = gateway
-        self.opener = opener or urllib.request.urlopen
+        self.http = http or SafeHttpClient()
 
     def execute(self, context):
         input_data = context.get("input_data") or {}
@@ -442,23 +441,16 @@ class WereadProvider:
 
     def _gateway(self, api_key, api_name, **params):
         body = {"api_name": api_name, "skill_version": WEREAD_SKILL_VERSION, **params}
-        request = urllib.request.Request(
-            self.gateway,
-            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-            headers={"Authorization": "Bearer %s" % api_key, "Content-Type": "application/json"},
-            method="POST",
-        )
         try:
-            with self.opener(request, timeout=30) as response:
-                data = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            if exc.code in {401, 403}:
-                raise ProviderAuthError("WeRead credential rejected") from exc
-            if exc.code == 429:
-                retry_after = exc.headers.get("Retry-After") if exc.headers else None
-                raise ProviderRateLimitError("WeRead rate limit exceeded", retry_after=retry_after) from exc
-            raise ProviderError("WeRead gateway HTTP %s" % exc.code) from exc
-        except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+            data = self.http.json(
+                "POST",
+                self.gateway,
+                headers={"Authorization": "Bearer %s" % api_key, "Content-Type": "application/json"},
+                json=body,
+                timeout=30,
+            )
+        except OSError as exc:
+            # requests 的连接与超时异常继承自 OSError；ProviderError 系列直接向上传递。
             raise ProviderError("WeRead gateway request failed") from exc
         if not isinstance(data, dict):
             raise ProviderError("WeRead gateway returned an invalid response")

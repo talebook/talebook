@@ -6,19 +6,16 @@ import re
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from urllib.parse import quote, urlparse
+from urllib.parse import quote
 from xml.etree import ElementTree
-
-import requests
 
 from .protocol import (
     PROTOCOL_VERSION,
-    ProviderAuthError,
     ProviderError,
     ProviderItem,
-    ProviderRateLimitError,
     ProviderResult,
 )
+from .safe_http import SafeHttpClient
 
 
 SUMMARY_LIMIT = 500
@@ -64,27 +61,25 @@ def _manifest(
     }
 
 
-def _http_json(method, url, headers=None, params=None, body=None, timeout=30):
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
-        raise ProviderError("Connector endpoint must be an HTTP(S) URL without embedded credentials")
+_CLIENT = SafeHttpClient()
+
+
+def _http_json(method, url, headers=None, params=None, body=None, timeout=30, allowed_hosts=()):
+    """连接器统一出网入口：解析后校验 IP 段、逐跳校验重定向、限制响应体大小。
+
+    公共目录接口（OpenLibrary / Bangumi / AniList 等）走完整策略校验；
+    仅当管理员为自托管服务显式配置了私网主机白名单时才放行私有地址。
+    """
     headers = {"Accept": "application/json", "User-Agent": USER_AGENT, **dict(headers or {})}
-    response = requests.request(method, url, headers=headers, params=params, json=body, timeout=timeout)
-    if response.status_code in {401, 403}:
-        raise ProviderAuthError("Provider rejected the configured credentials")
-    if response.status_code == 429:
-        retry_after = response.headers.get("Retry-After")
-        try:
-            retry_after = float(retry_after) if retry_after else None
-        except ValueError:
-            retry_after = None
-        raise ProviderRateLimitError("Provider rate limit exceeded", retry_after=retry_after)
-    if response.status_code >= 400:
-        raise ProviderError("Provider returned HTTP %d" % response.status_code)
-    try:
-        return response.json()
-    except ValueError as exc:
-        raise ProviderError("Provider returned invalid JSON") from exc
+    return _CLIENT.json(
+        method,
+        url,
+        headers=headers,
+        params=params,
+        json=body,
+        timeout=timeout,
+        allowed_hosts=allowed_hosts,
+    )
 
 
 def _now():
@@ -550,6 +545,7 @@ class BRSProvider:
             "type": "object",
             "properties": {
                 "endpoint": {"type": "string"},
+                "allowed_hosts": {"type": "array", "items": {"type": "string"}, "title": "私网主机白名单"},
                 "book_map": {"type": "object"},
                 "chapter_map": {"type": "object"},
                 "segment_map": {"type": "object"},
@@ -571,7 +567,13 @@ class BRSProvider:
         token = (context.get("secrets") or {}).get("token", "")
         headers = {"Authorization": "Bearer %s" % token}
         cursor = (context.get("cursor") or {}).get("cursor", "")
-        payload = self.transport("GET", endpoint + "/api/v1/comments", headers=headers, params={"cursor": cursor})
+        payload = self.transport(
+            "GET",
+            endpoint + "/api/v1/comments",
+            headers=headers,
+            params={"cursor": cursor},
+            allowed_hosts=config.get("allowed_hosts") or (),
+        )
         if context["action"] == "test":
             return ProviderResult(health_message="BRS connection healthy")
         items = []
