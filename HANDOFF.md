@@ -29,7 +29,7 @@ design/webserver/20260824-plugin-capability-interfaces.wip.html
 
 需要改方案时**更新这一份**，不要新建。
 
-## 3. 已完成：S1–S7、S9–S12
+## 3. 已完成：S1–S7、S9–S12 与 D-7
 
 全部已提交并推送（截至 `7e4096db`）。测试从基线 966 增至 **1015**，新增 49 个用例，全程零回归。注册 provider 从 26 增至 32。
 
@@ -100,9 +100,10 @@ docker run --rm -v /Users/bytedance/github/talebook/.claude/worktrees/plugin-cap
 
 ## 8. 仍待用户拍板
 
-1. **D-7**：`webserver/plugins/sending/` 的 6 个设备推送器是否纳入插件中心（决定 `PushProvider` 是否落地）
-2. **PR 拆分粒度**：当前已推 10 个提交在一条分支上，是否需要拆成多个 PR
-3. **R3**：Legado 的 12 条旧路由能否接受「先并存一个版本再删」的过渡期
+1. **PR 拆分粒度**：当前已推 13 个提交在一条分支上，是否需要拆成多个 PR
+2. **R3**：Legado 的 12 条旧路由能否接受「先并存一个版本再删」的过渡期
+
+（D-7 已定：设备推送纳入插件中心，已实现。）
 
 ## 9. 建议调用的技能
 
