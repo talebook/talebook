@@ -38,18 +38,12 @@ from webserver.i18n import _
 from webserver.models import (
     AudiobookEdition,
     Item,
-    PluginConnection,
-    PluginInstallation,
-    PluginSecret,
     ReadingState,
 )
 from webserver.plugins.meta import baike, biquge, calibre, douban, douban_v2, neodb, qimao, tomato, xhsd, youshu
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
-from webserver.plugins.meta.weread import KEY as WEREAD_META_KEY
-from webserver.plugins.meta.weread import WereadMetadataApi
 from webserver.plugins.parser.txt import get_content_encoding
-from webserver.plugins.runtime import WEREAD_PLUGIN_KEY
 from webserver.services.autofill import AutoFillService
 from webserver.services.booksource.metadata import (
     KEY as BOOKSOURCE_KEY,
@@ -70,7 +64,11 @@ from webserver.services.external_index import (
 )
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
-from webserver.services.plugin_secrets import SecretCipher, SecretCipherError
+from webserver.services.plugin_runtime import PluginRuntime
+
+
+# 元数据查询能力：调用方按能力找插件，不认识任何具体 plugin_key。
+META_LOOKUP_CAPABILITY = "metadata.lookup"
 
 
 CONF = loader.get_settings()
@@ -265,6 +263,7 @@ class BookRefer(BaseHandler):
         books = []
         failures = []
         completed = 0
+        outcomes = {}
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
             future_map = {executor.submit(fn): name for name, fn in tasks.items()}
             done, not_done = concurrent.futures.wait(future_map, timeout=self.REFER_TIMEOUT)
@@ -272,19 +271,23 @@ class BookRefer(BaseHandler):
                 name = future_map[f]
                 logging.warning("查询 %s 超时，已跳过", name)
                 failures.append(self._refer_failure(name, "timeout", "查询超时"))
+                outcomes[name] = TimeoutError("查询超时")
             for f in done:
                 name = future_map[f]
                 completed += 1
                 try:
                     result = f.result()
+                    outcomes[name] = result
                     result_books, result_failures = self._unpack_search_result(name, result)
                     books.extend(result_books)
                     failures.extend(result_failures)
                     logging.info("%s 查询完成：%d 条", name, len(result_books))
                 except Exception as e:
                     logging.error("%s 查询失败：%s", name, e)
+                    outcomes[name] = e
                     failures.append(self._refer_failure(name, "fetch_failed", "查询失败"))
 
+        self._finish_plugin_lookup(outcomes)
         self._refer_summary = {
             "event": "summary",
             "failures": self._dedupe_failures(failures),
@@ -305,6 +308,7 @@ class BookRefer(BaseHandler):
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks))
         failures = []
         completed = 0
+        outcomes = {}
         try:
             pending_map = {loop.run_in_executor(executor, fn): name for name, fn in tasks.items()}
             deadline = time.time() + self.REFER_TIMEOUT
@@ -315,6 +319,7 @@ class BookRefer(BaseHandler):
                     for fut, name in pending_map.items():
                         logging.warning("查询 %s 超时，已跳过", name)
                         failures.append(self._refer_failure(name, "timeout", "查询超时"))
+                        outcomes[name] = TimeoutError("查询超时")
                     break
 
                 done_set, _ = await asyncio.wait(
@@ -328,6 +333,7 @@ class BookRefer(BaseHandler):
                     completed += 1
                     try:
                         result = fut.result()
+                        outcomes[name] = result
                         result_books, result_failures = self._unpack_search_result(name, result)
                         failures.extend(result_failures)
                         logging.info("%s 查询完成：%d 条", name, len(result_books))
@@ -335,9 +341,12 @@ class BookRefer(BaseHandler):
                             yield b
                     except Exception as e:
                         logging.error("%s 查询失败：%s", name, e)
+                        outcomes[name] = e
                         failures.append(self._refer_failure(name, "fetch_failed", "查询失败"))
         finally:
             executor.shutdown(wait=False)
+            # 事件循环所在线程写 health，worker 不触碰 session。
+            self._finish_plugin_lookup(outcomes)
         yield {
             "event": "summary",
             "failures": self._dedupe_failures(failures),
@@ -531,48 +540,44 @@ class BookRefer(BaseHandler):
 
             tasks["ai"] = _ai
 
-        weread = self._weread_metadata_api()
-        if weread is not None:
+        # 按能力查询插件，不出现任何具体 plugin_key。凭据在调用线程内解密，
+        # task 只做网络 I/O，交给既有线程池与其余来源一起并发。
+        runtime = PluginRuntime(self.session, CONF)
+        connections = runtime.connections_for(META_LOOKUP_CAPABILITY, self.user_id())
+        self._plugin_runtime, self._plugin_units = runtime, []
+        if connections:
+            self._plugin_units, prepare_failures = runtime.prepare_read(connections, timeout=self.REFER_TIMEOUT)
+            for plugin_key, error in prepare_failures.items():
+                logging.warning("插件 %s 凭据不可用：%s", plugin_key, error)
+            for unit in self._plugin_units:
 
-            def _weread():
-                return weread.search(title)
+                def _plugin_lookup(_unit=unit):
+                    return _unit["call"]("search_books", title) or []
 
-            tasks[WEREAD_META_KEY] = _weread
+                tasks[unit["plugin_key"]] = _plugin_lookup
 
         return tasks
 
-    def _weread_metadata_api(self):
-        installation = (
-            self.session.query(PluginInstallation)
-            .filter(
-                PluginInstallation.plugin_key == WEREAD_PLUGIN_KEY,
-                PluginInstallation.status == "active",
-                PluginInstallation.enabled.is_(True),
-            )
-            .first()
-        )
-        if installation is None:
+    def _finish_plugin_lookup(self, results):
+        """线程池 join 之后回写 health，worker 全程不触碰 session。"""
+        units = getattr(self, "_plugin_units", None)
+        if units:
+            self._plugin_runtime.finish_read(units, results)
+
+    def _plugin_metadata_detail(self, plugin_key, provider_value):
+        """按 plugin_key 取详情：连接与凭据都由运行时解析，handler 不接触密文。"""
+        runtime = PluginRuntime(self.session, CONF)
+        connections = [
+            connection
+            for connection in runtime.connections_for(META_LOOKUP_CAPABILITY, self.user_id())
+            if runtime.plugin_key_of(connection) == plugin_key
+        ]
+        if not connections:
             return None
-        connection = (
-            self.session.query(PluginConnection)
-            .filter(
-                PluginConnection.installation_id == installation.id,
-                PluginConnection.owner_type == "user",
-                PluginConnection.owner_id == self.user_id(),
-                PluginConnection.name == "微信读书",
-                PluginConnection.enabled.is_(True),
-            )
-            .first()
-        )
-        secret = self.session.get(PluginSecret, connection.secret_id) if connection and connection.secret_id else None
-        if secret is None:
-            return None
-        try:
-            api_key = str(SecretCipher(CONF).decrypt(secret.ciphertext).get("api_key") or "")
-        except SecretCipherError as exc:
-            logging.warning("无法读取当前用户的微信读书连接: %s", exc)
-            return None
-        return WereadMetadataApi(api_key) if api_key else None
+        outcome = runtime.read_many(connections, "get_metadata", provider_value, timeout=self.REFER_TIMEOUT).get(plugin_key)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
         refer_mi = None
@@ -641,15 +646,15 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("NeoDB query failed: %s", e)
                 raise RuntimeError({"err": "httprequest.neodb.failed", "msg": _("NeoDB查询失败")})
-        elif provider_key == WEREAD_META_KEY:
-            api = self._weread_metadata_api()
-            if api is None:
-                raise RuntimeError({"err": "plugin.connection_missing", "msg": _("请先配置微信读书 API Key")})
+        elif provider_key.startswith("talebook."):
+            # 插件来源：按 plugin_key 取详情，不为任何具体插件单开分支。
             try:
-                refer_mi = api.get_metadata_by_provider(provider_value)
+                refer_mi = self._plugin_metadata_detail(provider_key, provider_value)
             except Exception as e:
-                logging.error("微信读书元数据查询失败: %s", e)
-                raise RuntimeError({"err": "httprequest.weread.failed", "msg": _("微信读书查询失败")})
+                logging.error("插件 %s 元数据查询失败：%s", provider_key, e)
+                raise RuntimeError({"err": "httprequest.plugin.failed", "msg": _("插件查询失败")})
+            if refer_mi is None:
+                raise RuntimeError({"err": "plugin.connection_missing", "msg": _("请先配置该插件的连接")})
         elif provider_key == biquge.KEY:
             raise RuntimeError({"err": "source.replaced", "msg": _("该固定来源已替换为在线书源，请重新搜索")})
         elif provider_key == BOOKSOURCE_KEY:

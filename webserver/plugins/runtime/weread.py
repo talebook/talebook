@@ -386,6 +386,29 @@ class WereadProvider:
         cursor = {"last_sync_at": max(timestamps)} if timestamps else dict(context.get("cursor") or {})
         return ProviderResult(items=items, next_cursor=cursor, health_message=health)
 
+    # ---- MetadataProvider（read 模式）----
+    # 由 runtime.read_many 并发调用；context 内含已解密凭据，插件不接触 session。
+
+    def _metadata_api(self, context):
+        from webserver.plugins.meta.weread import WereadMetadataApi
+
+        api_key = str((context.get("secrets") or {}).get("api_key") or "")
+        if not api_key:
+            raise ProviderAuthError("WeRead API key is required")
+        return WereadMetadataApi(api_key, provider=self)
+
+    def _tag(self, metadata):
+        """插件来源的 provider_key 统一为 plugin_key，供详情查询按能力路由回来。"""
+        if metadata is not None:
+            metadata.provider_key = WEREAD_PLUGIN_KEY
+        return metadata
+
+    def search_books(self, title, context):
+        return [self._tag(item) for item in self._metadata_api(context).search(title)]
+
+    def get_metadata(self, provider_value, context):
+        return self._tag(self._metadata_api(context).get_metadata_by_provider(provider_value))
+
     def query(self, api_key, operation, params=None):
         if not api_key:
             raise ProviderAuthError("WeRead API key is required")

@@ -920,7 +920,7 @@ class TestWereadRefer(TestWithUserLogin):
 
         self.assertEqual(data["err"], "ok")
         self.assertEqual([book["source"] for book in data["books"]], ["微信读书"])
-        self.assertEqual(data["books"][0]["provider_key"], "weread")
+        self.assertEqual(data["books"][0]["provider_key"], "talebook.weread")
         args = query.call_args.args
         self.assertEqual(args[0], self.api_key)
         self.assertEqual(args[1], "search")
@@ -938,7 +938,7 @@ class TestWereadRefer(TestWithUserLogin):
             result = self.json(
                 "/api/book/1/refer",
                 method="POST",
-                body="provider_key=weread&provider_value=weread-book-1&only_meta=yes",
+                body="provider_key=talebook.weread&provider_value=weread-book-1&only_meta=yes",
             )
 
         self.assertEqual(result["err"], "ok")

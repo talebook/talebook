@@ -6,7 +6,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 
 from webserver.models import (
     PluginConnection,
@@ -473,6 +473,106 @@ class PluginRuntime:
             ).update({PluginConnection.lease_token: "", PluginConnection.lease_until: None}, synchronize_session=False)
             self.session.commit()
         return run
+
+    def connections_for(self, capability, user_id=None):
+        """按能力查询可用连接，调用方不必知道哪个插件提供该能力。
+
+        此前调用方（如 handlers/book.py）只能硬编码 plugin_key 与中文连接名去查
+        安装与连接，还得自己解密凭据——既绕过了 health 与审计，也把凭据解密
+        泄漏到了运行时边界之外。
+        """
+        query = (
+            self.session.query(PluginConnection)
+            .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+            .join(PluginDefinition, PluginDefinition.id == PluginInstallation.definition_id)
+            .filter(
+                PluginInstallation.enabled.is_(True),
+                PluginInstallation.status == "active",
+                PluginConnection.enabled.is_(True),
+            )
+        )
+        if user_id is None:
+            query = query.filter(PluginConnection.owner_type == "instance")
+        else:
+            query = query.filter(
+                or_(
+                    PluginConnection.owner_type == "instance",
+                    and_(PluginConnection.owner_type == "user", PluginConnection.owner_id == user_id),
+                )
+            )
+        return [
+            connection
+            for connection in query.order_by(PluginConnection.id).all()
+            if capability in (self._definition_of(connection).capabilities or [])
+        ]
+
+    def _definition_of(self, connection):
+        installation = self.session.get(PluginInstallation, connection.installation_id)
+        return self.session.get(PluginDefinition, installation.definition_id)
+
+    def plugin_key_of(self, connection):
+        return self._definition_of(connection).plugin_key
+
+    def prepare_read(self, connections, timeout=30):
+        """在调用线程内解密凭据并构造上下文，返回可安全并发执行的调用单元。
+
+        SQLAlchemy session 不是线程安全的，因此所有涉及 session 的工作都在这里
+        完成；返回的 ``call`` 只做网络 I/O，可放进任意线程池。
+        """
+        prepared, failures = [], {}
+        for connection in connections:
+            plugin_key = self.plugin_key_of(connection)
+            try:
+                secrets = self._load_secrets(connection)
+            except (PluginRuntimeError, SecretCipherError) as exc:
+                failures[plugin_key] = exc
+                continue
+            provider = self.registry.get(plugin_key)
+            context = PluginContext(
+                action="read",
+                attempt=1,
+                config=dict(connection.config or {}),
+                cursor=dict(connection.cursor or {}),
+                secrets=secrets,
+                scopes=list(connection.scopes or []),
+                deadline=(datetime.datetime.now() + datetime.timedelta(seconds=timeout)).isoformat(),
+            ).as_dict()
+            prepared.append(
+                {
+                    "plugin_key": plugin_key,
+                    "connection": connection,
+                    "secrets": secrets,
+                    "call": lambda method, *args, _p=provider, _c=context: getattr(_p, method)(*args, _c),
+                }
+            )
+        return prepared, failures
+
+    def finish_read(self, prepared, results):
+        """回到调用线程统一写 health；worker 全程不触碰 session。"""
+        for unit in prepared:
+            outcome = results.get(unit["plugin_key"])
+            failed = isinstance(outcome, Exception)
+            if isinstance(outcome, ProviderAuthError):
+                unit["connection"].health = "unauthorized"
+            else:
+                unit["connection"].health = "degraded" if failed else "healthy"
+            unit["connection"].health_message = str(redact(str(outcome), unit["secrets"]))[:500] if failed else ""
+            unit["connection"].update_time = datetime.datetime.now()
+        self.session.commit()
+        return results
+
+    def read_many(self, connections, method, *args, timeout=30):
+        """并发调用多个连接的只读方法，自带线程池。"""
+        prepared, results = self.prepare_read(connections, timeout)
+        if prepared:
+            with ThreadPoolExecutor(max_workers=len(prepared)) as executor:
+                futures = {executor.submit(unit["call"], method, *args): unit for unit in prepared}
+                for future, unit in futures.items():
+                    try:
+                        results[unit["plugin_key"]] = future.result(timeout=timeout)
+                    except Exception as exc:  # 汇总失败，不让单个插件拖垮整批查询
+                        results[unit["plugin_key"]] = exc
+        return self.finish_read(prepared, results)
 
     def _load_secrets(self, connection):
         secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
