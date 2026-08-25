@@ -32,6 +32,8 @@ def _manifest(plugin_id, name, description, categories, capabilities, permission
         "permissions": permissions,
         "data_policy": {"stores_full_text": False, "retention": "source_owned"},
         "compatibility": {"talebook": ">=0.1.0"},
+        # Talebook 自有能力由管理员在实例级配置，不存在每用户连接。
+        "connection_owners": ["instance"],
         "homepage": "https://github.com/talebook/talebook",
         "license": "GPL-3.0",
         "ui": ui,

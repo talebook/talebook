@@ -40,19 +40,19 @@ def test_contract_violations_detects_missing_manifest():
     assert any("manifest" in item for item in problems)
 
 
-def test_registry_warns_but_still_registers_during_transition(caplog):
-    """过渡期只告警不拒绝（方案风险 R4），避免新校验导致服务起不来。"""
+def test_registry_rejects_contract_violation_at_registration():
+    """契约违反在注册期失败，而不是等到用户点「运行」时报通用错误。"""
 
     class Broken:
         manifest = dict(REGISTRY.providers()[0].manifest)
 
     Broken.manifest["id"] = "talebook.test.broken-contract"
     registry = PluginRegistry()
-    with caplog.at_level("WARNING"):
+    with pytest.raises(TypeError) as exc:
         registry.register(Broken())
 
-    assert "未满足契约" in caplog.text
-    assert registry.get("talebook.test.broken-contract") is not None
+    assert "未满足契约" in str(exc.value)
+    assert "execute" in str(exc.value)
 
 
 def test_plugin_context_round_trips_every_documented_key():

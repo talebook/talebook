@@ -1,7 +1,6 @@
 import datetime
 import hashlib
 import json
-import logging
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -35,10 +34,20 @@ from webserver.plugins.runtime import (
     WereadProvider,
     contract_violations,
 )
+from webserver.plugins.runtime.protocol import ManifestError, validate_against_schema
 from webserver.services.plugin_secrets import SENSITIVE_KEY_RE, SecretCipher, SecretCipherError, redact, secret_mask_hint
 
 
 TERMINAL_STATUSES = frozenset({"succeeded", "failed", "partial", "rolled_back"})
+# 由运行时自身读取的连接配置，不属于任何插件的 config_schema，但对每个连接都合法。
+PLATFORM_CONFIG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "timeout_seconds": {"type": "number", "minimum": 0.01, "maximum": 3600},
+        "max_retries": {"type": "integer", "minimum": 0, "maximum": 5},
+        "backoff_seconds": {"type": "number", "minimum": 0, "maximum": 60},
+    },
+}
 ENTITY_TYPES = frozenset({"metadata", "annotation", "review", "book_source"})
 DEFAULT_COUNTS = {"fetched": 0, "written": 0, "updated": 0, "skipped": 0, "failed": 0, "conflicts": 0}
 
@@ -57,8 +66,9 @@ class PluginRegistry:
     def register(self, provider):
         problems = contract_violations(provider)
         if problems:
-            # 过渡期只告警：待全部内置 provider 确认合规后改为抛错（方案 S4 / 风险 R4）。
-            logging.warning("插件 %s 未满足契约：%s", type(provider).__name__, "；".join(problems))
+            # 契约违反在注册期即失败，而不是等到用户点「运行」时报通用的
+            # plugin.execution_failed。26 个内置 provider 已验证全部合规。
+            raise TypeError("插件 %s 未满足契约：%s" % (type(provider).__name__, "；".join(problems)))
         manifest = PluginManifest.validate(provider.manifest)
         self._providers[manifest.raw["id"]] = provider
         return manifest
@@ -166,7 +176,7 @@ def install_builtin(session, plugin_key, installed_by, config=None, approved_per
     provider = registry.get(plugin_key)
     manifest = PluginManifest.validate(provider.manifest)
     raw = manifest.raw
-    _validate_public_config(config or {})
+    _validate_public_config(config or {}, config_schema=raw["config_schema"])
     definition = (
         session.query(PluginDefinition)
         .filter(PluginDefinition.plugin_key == plugin_key, PluginDefinition.version == raw["version"])
@@ -241,11 +251,13 @@ def save_connection(
     if installation is None or installation.status != "active":
         raise PluginRuntimeError("plugin.installation_missing", "Plugin installation is not active")
     definition = session.get(PluginDefinition, installation.definition_id)
-    allowed_owners = set((definition.manifest or {}).get("connection_owners") or ["instance", "user"])
+    # connection_owners 是安全判定，manifest 必填且无默认值——缺失即视为不允许任何连接，
+    # 而不是此前的 fail-open 到 instance + user。
+    allowed_owners = set((definition.manifest or {}).get("connection_owners") or [])
     if owner_type not in allowed_owners:
         raise PluginRuntimeError("plugin.owner_forbidden", "This plugin does not support this connection owner")
     _validate_credentials(definition, credentials)
-    _validate_public_config(config or {}, credentials)
+    _validate_public_config(config or {}, credentials, config_schema=definition.config_schema)
     approved = {
         item.permission
         for item in session.query(PluginPermission)
@@ -340,7 +352,7 @@ def _validate_credentials(definition, credentials):
         raise PluginRuntimeError("plugin.credentials_invalid", "Credential values must be non-empty strings")
 
 
-def _validate_public_config(config, credentials=None):
+def _validate_public_config(config, credentials=None, config_schema=None):
     if not isinstance(config, dict):
         raise PluginRuntimeError("plugin.config_invalid", "Plugin config must be an object")
     secret_values = {str(value) for value in (credentials or {}).values() if value not in (None, "")}
@@ -357,7 +369,24 @@ def _validate_public_config(config, credentials=None):
         elif str(value) in secret_values:
             raise PluginRuntimeError("plugin.secret_in_config", "Credential values cannot be copied into plugin config")
 
+    # 先查凭据泄漏再查形状：泄漏是更严重且更有信息量的错误，不应被 unknown_field 掩盖。
     visit(config)
+
+    if config_schema:
+        # config_schema 此前只用于前端渲染表单，后端零校验，任意键值都能流入
+        # context["config"]。这里让声明真正生效；平台保留键并入允许集合。
+        merged = {
+            "type": "object",
+            "properties": {
+                **PLATFORM_CONFIG_SCHEMA["properties"],
+                **(config_schema.get("properties") or {}),
+            },
+            "required": config_schema.get("required") or [],
+        }
+        try:
+            validate_against_schema(merged, config, where="config")
+        except ManifestError as exc:
+            raise PluginRuntimeError(exc.code, str(exc)) from exc
 
 
 class PluginRuntime:

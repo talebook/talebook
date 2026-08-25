@@ -31,6 +31,8 @@ class MockMultiTabProvider:
         "permissions": ["books.read", "plugin_records.write"],
         "data_policy": {"stores_full_text": False, "retention": "source_record"},
         "compatibility": {"talebook": ">=0.1.0"},
+        # 用于验证同一 installation 下实例级与用户级连接可以共存。
+        "connection_owners": ["instance", "user"],
         "homepage": "https://github.com/talebook/talebook",
         "license": "GPL-3.0",
         "ui": {"hidden": True},

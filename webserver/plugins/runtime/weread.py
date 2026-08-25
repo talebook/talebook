@@ -351,6 +351,8 @@ class WereadProvider:
         "permissions": ["books.read", "books.write", "profile.read", "annotations.write"],
         "data_policy": {"stores_full_text": True, "retention": "user_controlled"},
         "compatibility": {"talebook": ">=0.1.0"},
+        # 每个用户使用自己的 API Key，不存在实例级共享连接。
+        "connection_owners": ["user"],
         "homepage": "https://github.com/Tencent/WeChatReading",
         "license": "GPL-3.0",
         "description": "搜索微信读书内容，浏览书架、阅读统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。",

@@ -58,6 +58,8 @@ def _manifest(plugin_id, name, description, capabilities, config_schema, auth_sc
         + ([] if plugin_id == "talebook.book-source.watch-folder" else ["network.read"]),
         "data_policy": {"stores_full_text": False, "retention": "pending_review"},
         "compatibility": {"talebook": ">=0.1.0"},
+        # 书源由管理员统一配置后供全站使用。
+        "connection_owners": ["instance"],
         "homepage": homepage,
         "license": "GPL-3.0",
         "ui": {"icon": "mdi-bookshelf", "manage_kind": "book_source", "primary_action": "configure"},

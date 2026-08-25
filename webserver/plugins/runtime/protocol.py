@@ -19,6 +19,7 @@ REQUIRED_MANIFEST_FIELDS = frozenset(
         "actions",
         "auth_schema",
         "config_schema",
+        "connection_owners",
         "permissions",
         "data_policy",
         "compatibility",
@@ -26,6 +27,9 @@ REQUIRED_MANIFEST_FIELDS = frozenset(
         "license",
     }
 )
+# 可选但受类型约束；其余未知键一律拒绝，避免协议被悄悄扩写。
+OPTIONAL_MANIFEST_FIELDS = frozenset({"description", "ui"})
+CONNECTION_OWNERS = frozenset({"instance", "user"})
 PLUGIN_ID_RE = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)+$")
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$")
 CAPABILITY_RE = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
@@ -119,8 +123,24 @@ class PluginManifest:
         for permission in permissions:
             if not CAPABILITY_RE.fullmatch(permission):
                 raise ManifestError("manifest.permission_invalid", "permissions must use dotted lowercase identifiers")
+        owners = cls._string_set(raw, "connection_owners")
+        if owners - CONNECTION_OWNERS:
+            raise ManifestError("manifest.connection_owner_invalid", "connection_owners must be instance and/or user")
         if not isinstance(raw["homepage"], str) or not isinstance(raw["license"], str):
             raise ManifestError("manifest.metadata_invalid", "homepage and license must be strings")
+        if not isinstance(raw.get("ui", {}), dict):
+            raise ManifestError("manifest.ui_invalid", "ui must be an object")
+        if not isinstance(raw.get("description", ""), str):
+            raise ManifestError("manifest.description_invalid", "description must be a string")
+
+        unknown = {
+            key
+            for key in raw
+            if key not in REQUIRED_MANIFEST_FIELDS and key not in OPTIONAL_MANIFEST_FIELDS and not key.startswith("x-")
+        }
+        if unknown:
+            raise ManifestError("manifest.unknown_field", "manifest contains unknown fields: %s" % ", ".join(sorted(unknown)))
+
         cls._reject_secret_defaults(raw["auth_schema"])
         return cls(dict(raw))
 
@@ -150,3 +170,66 @@ class PluginManifest:
 
     def to_dict(self):
         return dict(self.raw)
+
+
+_JSON_TYPES = {
+    "string": str,
+    "integer": int,
+    "number": (int, float),
+    "boolean": bool,
+    "array": list,
+    "object": dict,
+}
+
+
+def validate_against_schema(schema, value, where="config"):
+    """按 manifest 声明的 schema 校验配置值。
+
+    只覆盖现有 manifest 实际用到的子集：type、properties、required、enum、
+    minimum/maximum、items.type。仓库未引入 jsonschema 依赖，也无需引入——
+    未声明的键一律拒绝，能挡住的正是「任意键值流入 context["config"]」这一类问题。
+    """
+    if not isinstance(schema, dict) or not schema:
+        return
+    if not isinstance(value, dict):
+        raise ManifestError("%s.invalid" % where, "%s must be an object" % where)
+
+    properties = schema.get("properties") or {}
+    unknown = set(value) - set(properties)
+    if unknown:
+        raise ManifestError("%s.unknown_field" % where, "unknown %s fields: %s" % (where, ", ".join(sorted(unknown))))
+
+    missing = [name for name in (schema.get("required") or []) if name not in value]
+    if missing:
+        raise ManifestError("%s.missing_field" % where, "missing %s fields: %s" % (where, ", ".join(sorted(missing))))
+
+    for name, field_schema in properties.items():
+        if name not in value or not isinstance(field_schema, dict):
+            continue
+        _validate_field(field_schema, value[name], "%s.%s" % (where, name))
+
+
+def _validate_field(schema, value, path):
+    expected = schema.get("type")
+    python_type = _JSON_TYPES.get(expected)
+    if python_type is not None:
+        # JSON 里 bool 是 int 的子类，但 {"type": "integer"} 不应接受 True。
+        if expected in {"integer", "number"} and isinstance(value, bool):
+            raise ManifestError("config.type_invalid", "%s must be %s" % (path, expected))
+        if not isinstance(value, python_type):
+            raise ManifestError("config.type_invalid", "%s must be %s" % (path, expected))
+
+    choices = schema.get("enum")
+    if choices and value not in choices:
+        raise ManifestError("config.enum_invalid", "%s must be one of %s" % (path, ", ".join(map(str, choices))))
+
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        minimum, maximum = schema.get("minimum"), schema.get("maximum")
+        if minimum is not None and value < minimum:
+            raise ManifestError("config.range_invalid", "%s must be >= %s" % (path, minimum))
+        if maximum is not None and value > maximum:
+            raise ManifestError("config.range_invalid", "%s must be <= %s" % (path, maximum))
+
+    item_type = _JSON_TYPES.get((schema.get("items") or {}).get("type")) if isinstance(value, list) else None
+    if item_type is not None and any(not isinstance(item, item_type) for item in value):
+        raise ManifestError("config.item_invalid", "%s items have an unexpected type" % path)

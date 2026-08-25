@@ -259,6 +259,7 @@ class DuplicateProvider:
         "auth_schema": {"type": "object", "properties": {}},
         "config_schema": {"type": "object", "properties": {}},
         "permissions": ["books.read", "books.write"],
+        "connection_owners": ["instance"],
         "data_policy": {},
         "compatibility": {},
         "homepage": "",
