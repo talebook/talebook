@@ -1077,13 +1077,15 @@ class PluginConnection(Base, SQLAlchemyMixin):
 
     __tablename__ = "plugin_connections"
     __table_args__ = (
-        UniqueConstraint("installation_id", "owner_type", "owner_id", "name", name="uq_plugin_connection_owner_name"),
+        UniqueConstraint("installation_id", "owner_type", "owner_id", "role", name="uq_plugin_connection_owner_role"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     installation_id = Column(Integer, ForeignKey("plugin_installations.id"), nullable=False, index=True)
     owner_type = Column(String(32), nullable=False, index=True)
     owner_id = Column(Integer, nullable=False, index=True)
+    # 查询键。name 是展示文案，可随时改、可 i18n，绝不能拿来定位连接。
+    role = Column(String(64), default="default", nullable=False, index=True)
     name = Column(String(200), default="default", nullable=False)
     secret_id = Column(Integer, ForeignKey("plugin_secrets.id"), index=True)
     config = Column(MutableDict.as_mutable(JSONType), default={})
@@ -1104,6 +1106,7 @@ class PluginConnection(Base, SQLAlchemyMixin):
             "installation_id": self.installation_id,
             "owner_type": self.owner_type,
             "owner_id": self.owner_id,
+            "role": self.role or "default",
             "name": self.name,
             "config": dict(self.config or {}),
             "scopes": list(self.scopes or []),

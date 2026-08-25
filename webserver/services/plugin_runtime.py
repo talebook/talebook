@@ -46,6 +46,9 @@ PLATFORM_CONFIG_SCHEMA = {
     },
 }
 ENTITY_TYPES = frozenset({"metadata", "annotation", "review", "book_source"})
+# 连接的查询键。历史数据用中文展示名当键，改文案即丢连接且无法 i18n。
+BUILTIN_CONNECTION_ROLE = "builtin"
+DEFAULT_CONNECTION_ROLE = "default"
 DEFAULT_COUNTS = {"fetched": 0, "written": 0, "updated": 0, "skipped": 0, "failed": 0, "conflicts": 0}
 
 
@@ -137,7 +140,7 @@ def ensure_builtin_capability_installations(session, installed_by, settings, reg
                 PluginConnection.installation_id == installation.id,
                 PluginConnection.owner_type == "instance",
                 PluginConnection.owner_id == 0,
-                PluginConnection.name == "内置连接",
+                PluginConnection.role == BUILTIN_CONNECTION_ROLE,
             )
             .first()
         )
@@ -146,6 +149,7 @@ def ensure_builtin_capability_installations(session, installed_by, settings, reg
                 installation_id=installation.id,
                 owner_type="instance",
                 owner_id=0,
+                role=BUILTIN_CONNECTION_ROLE,
                 name="内置连接",
                 config={},
                 scopes=list(provider.manifest["permissions"]),
@@ -229,7 +233,11 @@ def save_connection(
     config=None,
     scopes=None,
     schedule="",
+    role=None,
 ):
+    # role 是查询键，name 只是展示文案。未显式给出时沿用 name，
+    # 以兼容既有调用；新代码应显式传 role。
+    role = str(role or name or "default")
     if owner_type not in {"instance", "user"}:
         raise PluginRuntimeError("plugin.owner_invalid", "Connection owner must be instance or user")
     if owner_type == "instance":
@@ -264,7 +272,7 @@ def save_connection(
             PluginConnection.installation_id == installation_id,
             PluginConnection.owner_type == owner_type,
             PluginConnection.owner_id == owner_id,
-            PluginConnection.name == name,
+            PluginConnection.role == role,
         )
         .first()
     )
@@ -274,11 +282,15 @@ def save_connection(
             installation_id=installation_id,
             owner_type=owner_type,
             owner_id=owner_id,
+            role=role,
             name=name,
             create_time=now,
         )
         session.add(connection)
         session.flush()
+    else:
+        # name 是展示文案，允许随时更新；连接由 role 定位，不会因改名而失联。
+        connection.name = name
     secret = session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
     if credentials and secret is None:
         secret = PluginSecret(

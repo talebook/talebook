@@ -45,6 +45,7 @@ from webserver.services.async_service import AsyncService
 from webserver.services.booktools import get_format_path, import_as_new_book, overwrite_format, pick_format, resolve_book
 from webserver.services.plugin_jobs import execute_plugin_run
 from webserver.services.plugin_runtime import (
+    DEFAULT_CONNECTION_ROLE,
     PluginRuntime,
     PluginRuntimeError,
     ensure_builtin_capability_installations,
@@ -806,7 +807,7 @@ def _weread_connection(handler):
             PluginConnection.installation_id == installation.id,
             PluginConnection.owner_type == "user",
             PluginConnection.owner_id == handler.user_id(),
-            PluginConnection.name == "微信读书",
+            PluginConnection.role == DEFAULT_CONNECTION_ROLE,
         )
         .first()
     )
@@ -828,6 +829,7 @@ def _ensure_weread_connection(handler, api_key=None):
             handler.user_id(),
             {"api_key": api_key.strip()} if api_key else {},
             name="微信读书",
+            role=DEFAULT_CONNECTION_ROLE,
         )
     if not connection.enabled:
         raise PluginRuntimeError("plugin.connection_disabled", "WeRead connection is disabled")

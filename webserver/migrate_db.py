@@ -227,7 +227,44 @@ def compare_and_migrate(engine):
     logger.info(f"Migration completed: {success_count} succeeded, {error_count} failed")
     logger.info("=" * 60)
 
+    if error_count == 0:
+        backfill_plugin_connection_roles(engine)
+
     return error_count == 0
+
+
+def backfill_plugin_connection_roles(engine):
+    """为存量插件连接回填 role。
+
+    role 取代 name 成为查询键。历史连接的 name 是中文展示文案
+    （「内置连接」「微信读书」），据此推导：实例级内置连接为 builtin，
+    其余为 default。同一 (installation, owner_type, owner_id) 下若有多条，
+    保留最早一条为主 role，其余以 id 后缀区分，避免撞唯一约束。
+    """
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT id, installation_id, owner_type, owner_id, name FROM plugin_connections "
+                "WHERE role IS NULL OR role = '' ORDER BY id"
+            )
+        ).fetchall()
+        if not rows:
+            return
+        logger.info("Backfilling role for %d plugin connections", len(rows))
+        seen = set()
+        for row in rows:
+            role = "builtin" if (row.owner_type == "instance" and row.name == "内置连接") else "default"
+            key = (row.installation_id, row.owner_type, row.owner_id, role)
+            if key in seen:
+                role = "%s-%d" % (role, row.id)
+                key = (row.installation_id, row.owner_type, row.owner_id, role)
+            seen.add(key)
+            conn.execute(
+                text("UPDATE plugin_connections SET role = :role WHERE id = :id"),
+                {"role": role, "id": row.id},
+            )
 
 
 def add_column(engine, migration):
