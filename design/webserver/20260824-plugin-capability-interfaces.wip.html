@@ -859,16 +859,46 @@ for conn in runtime.connections_for(capability, user_id):
             <h2>10. 测试计划与结果</h2>
             <div class="callout warn"><strong>WIP 阶段说明：</strong>S1、S2 已实现并验证，对应行已回写实际结果；其余仍为计划项。未执行项一律保留“待验证”，不得写成已通过。</div>
             <div class="callout good">
-              <strong>本轮实际执行（2026-08-25）</strong>
-              <p>本地无可用 Python 测试环境（缺 <code>calibre</code> 模块），全部通过项目测试镜像执行：</p>
+              <strong>实际执行记录（2026-08-25）</strong>
+              <p>本地无可用 Python 测试环境（缺 <code>calibre</code>），后端全部通过项目测试镜像执行：</p>
               <pre><code>docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test pytest tests -q
-  → 966 passed, 20 skipped, 26 warnings in 43.98s
+  → 1013 passed, 20 skipped, 26 warnings
 
-docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test ruff check ./webserver --fix --no-cache
-  → All checks passed!
-docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test ruff format ./webserver --no-cache
-  → 129 files left unchanged</code></pre>
+docker run --rm ... ruff check ./webserver --fix --no-cache   → All checks passed!
+docker run --rm ... ruff format ./webserver --no-cache        → 134 files left unchanged
+
+cd app &amp;&amp; npm run lint   → 0 errors, 490 warnings（warnings 为存量，非本次引入）
+make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结构 / 单文件资源均通过</code></pre>
               <p>分支 <code>refactor/20260824-plugin-capability-interfaces</code>，基线 <code>origin/feat/plugins</code> @ 8c3601e8。</p>
+              <p>测试从基线的 966 增至 <strong>1013</strong>，新增 47 个用例，全程零回归。</p>
+            </div>
+            <div class="callout warn">
+              <strong>已完成 S1–S7、S9–S12；S8（书源接口）未实施。</strong>
+              <p>
+                S8 需要把 Legado 从 <code>services/booksource/</code> 接入插件系统、回套 8 个 OPDS 族书源、
+                把 <code>SaveOnlineBookService</code> 提为通用 <code>assemble_from_chapters</code>，并收敛
+                <code>/api/network/*</code> 12 条路由与对应前端。方案第 9 节风险 R3 已建议将其拆成
+                「先接入、保留旧路由」与「再删旧路由」两个独立 PR，不适合与本批改动合并推进。
+              </p>
+              <p>T-6、T-7、T-9 依赖 S8，随之未实现，表中如实标注，未计为通过。</p>
+            </div>
+            <div class="callout danger">
+              <strong>未执行项：</strong>
+              <p>
+                <strong>T-13 界面审查与 T-14 真实后端体验</strong>：本方案属跨模块大型功能且影响前端消费者，
+                按 <code>AGENTS.md</code> 必须在转 ACTIVE 前执行 <code>interface-review</code> 的 <code>full</code> 模式；
+                S8 尚未完成，前端变更未收敛，故与 S8 一并进行。<strong>在此之前本方案不得转为 ACTIVE。</strong>
+              </p>
+              <p>
+                <strong>方案 HTML 的浏览器渲染核对</strong>：Chrome DevTools MCP 报
+                <code>browser is already running</code>，已有实例无法接入，<code>--isolated</code> 亦被同一 profile 拦下。
+                样式为逐字复用 <code>design/TEMPLATE.html</code>，视觉风险低，但确未实际看过渲染结果。
+              </p>
+              <p>
+                <strong>插件页 E2E（<code>test/e2e/plugins.spec.ts</code>）9 个用例失败</strong>：
+                已用 <code>git stash</code> 回退到本次改动前对比，基线上同样 9 个全部失败，
+                确认为<strong>预先存在的失败</strong>，非本次引入。修复不在本方案范围内。
+              </p>
             </div>
             <div class="callout danger">
               <strong>未执行项：</strong>本方案 HTML 的浏览器渲染核对始终未完成——Chrome DevTools MCP 报
@@ -879,20 +909,20 @@ docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test ruff format ./webserv
               <table>
                 <thead><tr><th>编号</th><th>验证项</th><th>方式</th><th>结果</th></tr></thead>
                 <tbody>
-                  <tr><td>T-1</td><td>非 weread 的 annotations 插件写入后 <code>source_name</code> 不等于 <code>"weread"</code>，<code>source_type</code> 不等于 <code>"weread_book"</code></td><td>新增 <code>tests/test_plugin_entity_writers.py</code>，用 mock annotations 插件</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-1</td><td>第三方 annotations 插件落库后 <code>source_name=thirdparty</code>、<code>source_type=thirdparty_book</code>、client id 前缀 <code>thirdparty:</code>；微信读书身份保持不变，无需数据迁移；回滚亦经写入器</td><td><code>tests/test_plugin_entity_writers.py</code> 7 个用例</td><td class="verified">已通过</td></tr>
                   <tr><td>T-2</td><td>BRS <code>endpoint</code> 指向私网地址被拒（127.0.0.1 / 169.254.169.254 / 192.168.x / 10.x 四类），白名单显式放行后可用；内嵌凭据的 URL 被拒</td><td><code>tests/test_enrichment_connectors.py</code> 新增 3 个用例</td><td class="verified">已通过</td></tr>
                   <tr><td>T-3</td><td>通用动作端点透传 <code>input_data</code>，微信读书不再被特判拒绝；客户端伪造的 <code>allowed_book_ids</code> 被丢弃、非受控字段原样透传；<code>input_data</code> 非对象时报 <code>plugin.request_invalid</code></td><td><code>tests/test_plugins_api.py</code> 新增 <code>TestGenericActionInputData</code> 3 个用例</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-4</td><td>缺 <code>execute</code> 与能力接口的 provider 在 <code>register()</code> 阶段即失败</td><td>扩充 <code>tests/test_plugin_runtime.py</code></td><td class="pending">待验证</td></tr>
-                  <tr><td>T-5</td><td>manifest 缺 <code>connection_owners</code> 时校验失败而非默认放开；未知键被拒绝</td><td>扩充 <code>tests/test_plugin_runtime.py</code></td><td class="pending">待验证</td></tr>
-                  <tr><td>T-6</td><td>越权 scope 的 write 调用被运行时拒绝（当前既无实现也无测试）</td><td>新增用例</td><td class="pending">待验证</td></tr>
-                  <tr><td>T-7</td><td><code>has_more</code> 续拉：多页 mock 下平台正确续拉且不重复落库；单页超时可断点续拉</td><td>新增用例 + 真实微信读书账号手工验证</td><td class="pending">待验证</td></tr>
-                  <tr><td>T-8</td><td>连接改名后仍能按 <code>role</code> 查到；迁移后 user 连接数不变</td><td>新增迁移测试</td><td class="pending">待验证</td></tr>
-                  <tr><td>T-9</td><td>Legado 端到端：search / browse / get_book / get_toc / get_chapter / 整本导入 / 在线阅读</td><td>扩充 <code>tests/test_book_source_plugins.py</code>，用本地 fixture 站点</td><td class="pending">待验证</td></tr>
-                  <tr><td>T-10</td><td>三个文本工具的 <code>apply</code> 产生 <code>PluginRun</code> 与备份路径记录</td><td>扩充 <code>tests/test_texttools.py</code></td><td class="pending">待验证</td></tr>
-                  <tr><td>T-11</td><td><code>grep -c "talebook\.\|weread"</code> 在 <code>plugin_runtime.py</code> 与 <code>book.py</code> 中为 0</td><td>新增 <code>scripts/</code> 检查脚本并接入 CI</td><td class="pending">待验证</td></tr>
-                  <tr><td>T-12</td><td><code>make lint-py</code> / <code>make pytest</code> / <code>make check-design</code> / <code>cd app &amp;&amp; npm run lint</code></td><td>提交前检查</td><td class="pending">待验证</td></tr>
-                  <tr><td>T-13</td><td>界面审查：本分支相对默认分支的全部本地变更，<code>full</code> 模式</td><td><code>interface-review</code> skill；出现 HIGH / MEDIUM 不得转 ACTIVE</td><td class="pending">待验证</td></tr>
-                  <tr><td>T-14</td><td>真实后端体验验证：插件管理页、微信读书工作台、在线书库、文本工具页</td><td>Docker 后端 + Chrome DevTools MCP，桌面与移动、明暗主题</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-4</td><td>缺 <code>execute</code> 或 <code>manifest</code> 的 provider 在 <code>register()</code> 抛 <code>TypeError</code>；26 个内置 provider 全部合规</td><td><code>tests/test_plugin_contract.py</code> 6 个用例</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-5</td><td>manifest 缺 <code>connection_owners</code> 报 <code>manifest.missing_fields</code>；取值越界报 <code>connection_owner_invalid</code>；未知键报 <code>unknown_field</code> 而 <code>x-</code> 前缀放行；<code>config_schema</code> 类型/范围/枚举/必填全部生效</td><td><code>tests/test_plugin_protocol_tightening.py</code> 8 个用例</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-6</td><td>越权 scope 的 write 调用被运行时拒绝</td><td>依赖执行期 scope 强制，属 S8 之后的工作</td><td class="pending">未实现</td></tr>
+                  <tr><td>T-7</td><td><code>has_more</code> 续拉</td><td>随 <code>Page[T]</code> 落地，属 S8 范围</td><td class="pending">未实现</td></tr>
+                  <tr><td>T-8</td><td>改名后命中同一条连接且展示名更新；迁移按旧中文名推导 role，冲突以 id 后缀区分，可重复执行</td><td><code>tests/test_plugin_connection_role.py</code> 6 个用例</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-9</td><td>Legado 端到端</td><td>随 S8 书源接口落地</td><td class="pending">未实现</td></tr>
+                  <tr><td>T-10</td><td>改书产生 succeeded run（含 requested_by / input_data / 结果）；失败产生 failed run 并记录错误；zh-converter 备份路径写入 run</td><td><code>tests/test_texttools.py</code> 新增 3 个用例；自动触发另见 <code>tests/test_book_auto_transform.py</code> 9 个用例</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-11</td><td><code>plugin_runtime.py</code> 无任何插件名与模块；<code>book.py</code> 无 WEREAD / 中文连接名 / SecretCipher</td><td>以测试固化（<code>test_plugin_entity_writers.py</code>、<code>test_plugin_capability_lookup.py</code>），未另建 CI 脚本</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-12</td><td>后端 1013 passed / 20 skipped；<code>ruff check</code> 与 <code>ruff format</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（490 warnings 为存量）；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见下方命令记录</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-13</td><td>界面审查（<code>full</code> 模式）</td><td>转 ACTIVE 前必须执行，S8 完成后一并进行</td><td class="pending">未执行</td></tr>
+                  <tr><td>T-14</td><td>真实后端体验验证</td><td>Docker 后端 + Chrome DevTools MCP；与 T-13 一并进行</td><td class="pending">未执行</td></tr>
                 </tbody>
               </table>
             </div>

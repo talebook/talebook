@@ -43,8 +43,15 @@ Talebook 插件系统与 **PoxenStudio/mybooks** 的 `BaseTool + ToolSet + @Asyn
 | `compatibility` | object | 如 `{talebook: ">=0.1.0"}` |
 | `homepage` | string |  |
 | `license` | string |  |
-| `ui` | object | 非协议校验字段，但管理页强依赖（见 2.3） |
-| `connection_owners` | string[] | 可选，默认 `["instance","user"]`，控制连接归属 |
+| `connection_owners` | string[] | **必填**，取值限于 `{instance, user}`，**无默认值**——缺失即不允许任何连接 |
+| `ui` | object | 可选，但类型受校验；管理页强依赖（见 2.3） |
+| `description` | string | 可选，类型受校验 |
+
+未在上表出现、且不以 `x-` 开头的字段一律被 `manifest.unknown_field` 拒绝。`x-` 前缀保留为扩展区，不受协议约束。
+
+`config_schema` 现在**后端生效**：连接配置会按它校验类型、必填、`enum`、`minimum/maximum` 与 `items.type`，未声明的键被 `config.unknown_field` 拒绝。三个平台保留键（`timeout_seconds` / `max_retries` / `backoff_seconds`）由运行时自身读取，对每个连接都合法，无需插件声明。
+
+以下字段目前**仅作声明、不影响运行时行为**，编写 manifest 时不要据此假设平台已在管这些事：`categories`（仅用于校验 capability 前缀）、`runtime_kind`（`http` / `file` 取值不改变调用方式，均为进程内调用）、`data_policy`、`compatibility`（不阻止不兼容版本安装）、`homepage`、`license`。
 
 ### 2.2 凭据约束
 
@@ -54,14 +61,26 @@ Talebook 插件系统与 **PoxenStudio/mybooks** 的 `BaseTool + ToolSet + @Asyn
 
 ```python
 "ui": {
-    "icon": "mdi-book-open-page-variant",  # 管理页卡片图标
-    "manage_kind": "weread",               # 决定 primaryAction 走向（admin 页 switch）
-    "primary_action": "configure",         # 为 configure 时，无连接会显示“待配置”状态
-    "hidden": True,                        # 为 True 时 catalog 计算会过滤（如 mock）
+    "icon": "mdi-book-open-page-variant",         # 管理页卡片图标
+    "manage_route": "/plugins/weread",            # 管理入口：站内路由，前端直接 navigateTo
+    "manage_dialog": "opds",                      # 或：由前端弹窗映射表处理（opds / legado）
+    "manage_label_key": "pluginManagement.openWorkbench",  # 主按钮文案的 i18n key
+    "primary_action": "configure",                # 为 configure 时，无连接会显示“待配置”状态
+    "hidden": True,                               # 为 True 时 catalog 计算会过滤（如 mock）
+    "supports_auto_trigger": True,                # 仅正文处理类：是否允许配置为自动执行
 }
 ```
 
-管理页 `app/pages/admin/plugins/index.vue:statusInfo()` 对 `primary_action === "configure" && manage_kind !== "metadata"` 的插件在无连接时置为 `unconfigured`。**内置工具**应设 `primary_action: "open"` 以避免“待配置”误判。
+`manage_route` 与 `manage_dialog` 二选一。早期的 `manage_kind` 是与插件一一对应的闭合枚举，前端需为每个取值写一条分支，已移除。
+
+管理页 `statusInfo()` 对 `primary_action === "configure"` 且既无连接、又未通过 `status()` 自报配置的插件置为 `unconfigured`。**内置工具**应设 `primary_action: "open"` 以避免「待配置」误判。
+
+内置能力插件可选实现两个钩子，平台据此展示状态、决定首次安装是否启用：
+
+```python
+def status(self, session, settings):      # 自报已配置 / 已启用数量，进 builtin_state
+def initial_enabled(self, settings):      # 首次安装时是否启用
+```
 
 ---
 ## 3 Provider 契约
@@ -85,6 +104,7 @@ class MyProvider:
         "permissions": ["books.read"],
         "data_policy": {"stores_full_text": False, "retention": "source_owned"},
         "compatibility": {"talebook": ">=0.1.0"},
+        "connection_owners": ["instance"],
         "homepage": "https://example.com",
         "license": "MIT",
     }
@@ -100,10 +120,49 @@ class MyProvider:
 ```
 
 - `ProviderItem.entity_type` 必须属于 `ENTITY_TYPES = {metadata, annotation, review, book_source}`，否则 `_apply_result` 会判 `plugin.item_invalid`。
-- `ProviderItem.error_code / error_message` 非空时，该条会被记为 `failed`，不进入幂等写入。
+- `ProviderItem.error_code / error_message` 非空时，该条会被记为 `failed`，不进入幂等写入。**逐项失败要用它表达，不要抛异常**——抛异常会让整批回退，而内联失败可以形成 `partial`：成功的照常落库，失败的可单独 retry。
 - `ProviderResult.next_cursor` 仅在 `run/retry` 成功时推进到 `connection.cursor`。
 
-异常：`ProviderAuthError`（401/403）、`ProviderRateLimitError(retry_after)`、`ProviderError`。前两者会触发运行时的退避与重试逻辑（见 §5）。
+异常：`ProviderAuthError`（401/403）、`ProviderRateLimitError(retry_after)`、`ProviderError`。前两者会触发运行时的退避与重试逻辑（见 §5）。**不要自己 sleep 重试**——退避策略、health 状态与游标推进都由运行时统一处理，插件抛对异常即可。
+
+### 3.1 契约检查与 `PluginContext`
+
+`webserver/plugins/runtime/interfaces.py` 把事实契约显式化：
+
+- `PluginProvider`（`typing.Protocol`）声明必须具备的成员：`manifest` 与 `execute`。
+- `PluginContext` 是冻结 dataclass，收拢运行时传给插件的 10 个字段；`as_dict()` 返回副本，插件收到的仍是普通 dict，改动不会回写平台状态。
+- `REGISTRY.register()` 在**注册期**检查契约，违反直接抛 `TypeError`——不再降级成运行期 `AttributeError` 后被兜底成通用的 `plugin.execution_failed`。
+
+用 `Protocol` 而非 ABC，是因为现有 provider 均不继承任何基类。
+
+### 3.2 三种调用模式
+
+判据是**插件行为的副作用方向**，不是平台拿到结果后做什么：
+
+| 模式 | 方向 | 插件做什么 | 典型方法 | 回滚 |
+|------|------|-----------|---------|------|
+| `read` | 外部 → 平台 | 取数并返回，无副作用 | `search_books` / `list_annotations` / `download` | 不适用 |
+| `write` | 平台内部 | 修改本地书籍正文 | `TransformProvider.apply` | 文件备份恢复 |
+| `sync` | 平台 → 外部 | 把本地数据写进外部服务 | `push_annotation` | 可能不可用 |
+
+注意 `download` 与 `list_annotations` 都是 **read**：插件只从远端读，写库的是平台。平台把读来的数据落库时仍会创建 `PluginRun`、写来源记录、推进游标——那是摄入流程的职责，不因方法是 read 而取消。模式回答的是三个问题：需要哪种 scope、是否必须留审计、失败后能否回滚。
+
+### 3.3 实体写入器
+
+`webserver/services/plugin_writers.py` 按 `entity_type` 注册写入器，提供 `prepare` / `materialize` / `rollback` 三个钩子。**通用运行时不认识任何具体插件**：来源身份由 `plugin_key` 末段推导（`talebook.weread` → `weread`），因此新增一个 annotations 插件无需改运行时一行代码，落库时也不会被打上其他插件的身份。
+
+### 3.4 按能力调用插件
+
+业务流不要按 `plugin_key` 查安装与连接，更不要自行解密凭据：
+
+```python
+runtime = PluginRuntime(session, CONF)
+for connection in runtime.connections_for("metadata.lookup", user_id):
+    ...
+results = runtime.read_many(connections, "search_books", title, timeout=30)
+```
+
+`read_many` 内部并发。若要接入既有线程池，用 `prepare_read()` / `finish_read()` 两段式：**凭据在调用线程内解密，worker 只做网络 I/O 不得触碰 session**，join 后回到调用线程统一写 health。SQLAlchemy session 不是线程安全的。
 
 ---
 ## 4 现有 Provider 形态（四类 + 两个特例）
@@ -243,7 +302,7 @@ runtime.execute(run.id)  # 同步阻塞，handler 内直接调用
 ## 8 前端 `app/`
 
 - **栈**：`nuxt@^4.3.0 + vue@^3.5 + vuetify-nuxt-module + pinia + @nuxtjs/i18n@^10`，与 `PoxenStudio/mybooks` 的 `Nuxt 2 + Vue 2 + Vuetify 2` 完全不同。`app/CLAUDE.md` 明确要求所有请求经 `plugins/talebook.js` 的 `backend(url, opts)` 发起，禁止裸 `fetch`。
-- **管理页** `app/pages/admin/plugins/index.vue`：`activeTab ∈ {integrations, metadata, annotations, reviews, book_sources}`，`filteredPlugins` 按 `tabPlugins + search + statusFilter` 计算；`capabilityLabel()` 为固定映射，未知能力回退 `value`；`primaryAction()` 按 `manage_kind` 分发（`opds/legado/metadata/weread` 各有专属弹窗，本次新增 `text_replace/zh_converter/txt_fixer -> /plugins/*` 直跳）。
+- **管理页** `app/pages/admin/plugins/index.vue`：`activeTab ∈ {integrations, metadata, annotations, reviews, book_sources}`，`filteredPlugins` 按 `tabPlugins + search + statusFilter` 计算；`capabilityLabel()` 为固定映射，未知能力回退 `value`；`primaryAction()` 优先按 manifest 的 `ui.manage_route` 直跳，其次查 `MANAGE_DIALOGS[ui.manage_dialog]` 弹窗映射（仅 opds / legado），不再为具体插件写分支。
 - **工作台** `app/pages/plugins/weread.vue`：`<script setup> + useI18n + $backend + useMainStore + useHead` 的典型范式，6 个 `v-window-item` + `v-autocomplete/v-select/v-alert/v-list`。本次三个工具页沿用同范式：`v-autocomplete` 选书（防抖 300ms 调 `GET /api/plugins/tools/books?query=`，仅展示 `EPUB/TXT`），`v-radio-group` 选输出模式，`v-alert` 分层展示 `error/success/report`。
 - **i18n**：`app/i18n/locales/{zh-CN,en-US}.json`。**致命坑**：文案中**禁止出现字面量 `@` 和 `<`**（`vue-i18n` 会把 `@` 当链接、` <` 当 HTML，致整个 locale 编译失败、`dev server 500`，而 `JSON.parse` 与 `eslint` 均不报错，仅 `unplugin-vue-i18n` 日志可见）。本 PR 的 `bookTools.*` 均已规避；新增 `pluginManagement.openTool / capContent*`。
 
@@ -264,7 +323,7 @@ app/src/pages/toolbox/*.vue       # Vuetify 2（item-text / outlined / dense）
 
 | 议题 | 选项 | 本 PR 决策 | 原因 |
 |------|------|------------|------|
-| 归属分类 | A 扩展 `CATEGORIES` 新增 `tools` / B 复用 `integrations` / C 不进目录 | **B** | 用户评审选择复用 `integrations`，避免改共享协议与管理页 tab；`primary_action=open` + `manage_kind∈{text_replace,zh_converter,txt_fixer}` 已满足“出现在插件目录且可打开” |
+| 归属分类 | A 扩展 `CATEGORIES` 新增 `tools` / B 复用 `integrations` / C 不进目录 | **B** | 用户评审选择复用 `integrations`，避免改共享协议与管理页 tab；`primary_action=open` + `ui.manage_route` 已满足“出现在插件目录且可打开” |
 | 输出形态 | 纯“写回原书” / 纯“另存新书” / 二选一 | **二选一** | 用户要求“选书后可选写回原书或入库为新书”；实现为 `output_mode ∈ {new, overwrite/replace}`，TXT 前者 `add_format`，后者 `import_as_new_book`（完整继承原书元数据与封面，参考 `epub_beautify / chinese_converter` 的 `Metadata` + `Item` 模式） |
 | PR 粒度 | 3 个独立 PR / 1 个 PR 3 工具 | **1 个 PR** | 按用户要求合并提交，提交信息与说明中保留上游归属 |
 | 执行模型 | `BackgroundService` 轮询 / `IOLoop.run_in_executor` 同步 | **同步 + 线程池** | 与 `WereadProvider.query` 一致，重操作经 `IOLoop.current().run_in_executor(None, functools.partial(...))` 避免卡 `Tornado` 事件循环；`BackgroundService` 需额外轮询页，同步模型对书库工具（数 MB 内）已足够；`@js` 装饰器已支持 `async def`（自动 `await`） |
@@ -339,7 +398,7 @@ class MyDemoProvider:
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": "https://github.com/talebook/talebook",
         "license": "MIT",
-        "ui": {"icon": "mdi-emoticon-outline", "manage_kind": "hello", "primary_action": "open"},
+        "ui": {"icon": "mdi-emoticon-outline", "manage_route": "/plugins/hello", "primary_action": "open"},
     }
     def execute(self, context):
         if context["action"] == "test":
