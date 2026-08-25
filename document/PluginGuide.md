@@ -147,6 +147,16 @@ class MyProvider:
 
 注意 `download` 与 `list_annotations` 都是 **read**：插件只从远端读，写库的是平台。平台把读来的数据落库时仍会创建 `PluginRun`、写来源记录、推进游标——那是摄入流程的职责，不因方法是 read 而取消。模式回答的是三个问题：需要哪种 scope、是否必须留审计、失败后能否回滚。
 
+### 3.2.1 设备推送（sync）
+
+`webserver/plugins/push/devices.py` 保留 6 个上传器的纯上传逻辑，
+`webserver/plugins/runtime/push.py` 把它们包装为 `talebook.push.*` 插件：
+每用户一条连接（`connection_owners: ["user"]`，设备属于个人），配置项为
+`device_url`，推送落 `PluginRun` 审计。`PUSH_PROVIDERS_BY_DEVICE` 供既有的
+`/api/book/{id}/send_to_device` 按 `device_type` 路由。
+
+外部写入不可撤销，因此 `PushProvider` 不提供回滚。
+
 ### 3.3 实体写入器
 
 `webserver/services/plugin_writers.py` 按 `entity_type` 注册写入器，提供 `prepare` / `materialize` / `rollback` 三个钩子。**通用运行时不认识任何具体插件**：来源身份由 `plugin_key` 末段推导（`talebook.weread` → `weread`），因此新增一个 annotations 插件无需改运行时一行代码，落库时也不会被打上其他插件的身份。

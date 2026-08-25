@@ -85,6 +85,20 @@ class TransformProvider(Protocol):
     def apply(self, src, out_dir, context): ...
 
 
+@runtime_checkable
+class PushProvider(Protocol):
+    """把书籍推送到外部设备或服务。
+
+    sync 模式：方向是平台 → 外部。与 read（外部 → 平台）和 write（改本地书籍
+    正文）互斥。外部写入通常不可撤销，因此不提供回滚。
+    """
+
+    # 设备地址默认端口，用户只填 IP 时补全。
+    default_port: int
+
+    def push(self, book_file, target, context): ...
+
+
 # 触发方式：默认手动，用户可在插件管理页随时切换，无需重启或重装。
 TRIGGER_MANUAL = "manual"
 TRIGGER_AUTO = "auto"

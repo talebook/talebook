@@ -3,6 +3,7 @@ from .book_sources import BOOK_SOURCE_PROVIDERS
 from .enrichment import EXTERNAL_CONNECTOR_PROVIDERS
 from .interfaces import PluginContext, PluginProvider, contract_violations
 from .mock import MockMultiTabProvider
+from .push import PUSH_PROVIDERS, PUSH_PROVIDERS_BY_DEVICE, DevicePushProvider
 from .protocol import (
     ACTIONS,
     CATEGORIES,
@@ -25,6 +26,7 @@ ALL_BUILTIN_PROVIDERS = (
     *BUILTIN_CAPABILITY_PROVIDERS,
     *BOOK_SOURCE_PROVIDERS,
     *EXTERNAL_CONNECTOR_PROVIDERS,
+    *PUSH_PROVIDERS,
 )
 
 
@@ -38,6 +40,9 @@ __all__ = [
     "BuiltinCapabilityProvider",
     "BUILTIN_CAPABILITY_PROVIDERS",
     "BOOK_SOURCE_PROVIDERS",
+    "DevicePushProvider",
+    "PUSH_PROVIDERS",
+    "PUSH_PROVIDERS_BY_DEVICE",
     "EXTERNAL_CONNECTOR_PROVIDERS",
     "PluginContext",
     "PluginManifest",

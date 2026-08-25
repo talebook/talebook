@@ -596,15 +596,68 @@ class TestBook(TestWithUserLogin):
             self.assertEqual(m.call_count, 1)
 
     def test_send_to_device_wifi(self):
-        with mock.patch("webserver.plugins.sending.uploader.BooxUploader") as MockBoox:
-            mock_instance = MockBoox.return_value
-            mock_instance.get_upload_url.return_value = "http://192.168.1.1:8080/upload"
-            mock_instance.upload.return_value = {"success": True}
+        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        with mock.patch.object(provider, "uploader_class") as MockBoox:
+            MockBoox.return_value.upload.return_value = {"success": True}
 
             data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
             d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
             self.assertEqual(d["err"], "ok")
             MockBoox.assert_called_once()
+
+    def test_send_to_device_wifi_records_a_run(self):
+        """推送是 sync 模式：写向外部设备，必须留下审计。"""
+        from webserver.models import PluginConnection, PluginInstallation, PluginRun
+        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        session = get_db()
+
+        def runs():
+            return (
+                session.query(PluginRun)
+                .join(PluginConnection, PluginConnection.id == PluginRun.connection_id)
+                .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+                .filter(PluginInstallation.plugin_key == provider.manifest["id"])
+                .all()
+            )
+
+        with mock.patch.object(provider, "uploader_class") as MockBoox:
+            MockBoox.return_value.upload.return_value = {"success": True}
+            before = len(runs())
+            data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+            self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        after = runs()
+        self.assertEqual(len(after), before + 1, "推送必须留下 run 记录")
+        self.assertEqual(after[-1].status, "succeeded")
+        self.assertEqual(after[-1].input_data["device_type"], "boox")
+
+    def test_send_to_device_wifi_failure_is_recorded(self):
+        from webserver.models import PluginConnection, PluginInstallation, PluginRun
+        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        session = get_db()
+
+        with mock.patch.object(provider, "uploader_class") as MockBoox:
+            MockBoox.return_value.upload.return_value = {"success": False, "message": "device refused"}
+            data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+            d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        self.assertEqual(d["err"], "upload.error")
+        run = (
+            session.query(PluginRun)
+            .join(PluginConnection, PluginConnection.id == PluginRun.connection_id)
+            .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+            .filter(PluginInstallation.plugin_key == provider.manifest["id"])
+            .order_by(PluginRun.id.desc())
+            .first()
+        )
+        self.assertEqual(run.status, "failed")
+        self.assertIn("device refused", run.error_message)
 
     def test_send_to_device_missing_params(self):
         d = self.json("/api/book/1/send_to_device", method="POST", body="")

@@ -249,8 +249,7 @@
                   <li>不实现 <code>runtime_kind</code> 的 <code>http</code> / <code>managed_process</code> 进程外执行。</li>
                   <li>不迁移 <code>plugins/captcha/</code> 与 <code>plugins/parser/</code>，二者不属于用户可安装的扩展能力。</li>
                   <li>不改动 Calibre 主库结构，也不改动已有的书籍、笔记业务表结构。</li>
-                  <li><code>plugins/sending/</code> 的 6 个设备推送器是否纳入，本方案只记录判断，不在本次实现（见决策 D-7）。</li>
-                </ul>
+                                  </ul>
               </article>
             </div>
             <div class="callout">
@@ -364,7 +363,7 @@ class SourceContent:  ...   # 来自 engine.ChapterContent</code></pre>
                   <tr><td><code>SourceProvider</code></td><td>见第 5 节</td><td>全部 read</td><td>8 + Legado + weread 书架</td></tr>
                   <tr><td><code>TransformProvider</code></td><td><code>preview</code> / <code>apply</code></td><td>read / <strong>write</strong>（唯一真 write）</td><td>3</td></tr>
                   <tr><td><code>ExtraFeatureProvider</code></td><td><code>execute(action, params)</code></td><td>按 action 声明</td><td>1（weread）</td></tr>
-                  <tr><td><code>PushProvider</code></td><td><code>push</code></td><td>sync</td><td>6，本次不实现</td></tr>
+                  <tr><td><code>PushProvider</code></td><td><code>push</code></td><td>sync</td><td>6（多看 / BOOX / 汉王 / 掌阅 / 当当 / PureLibro）</td></tr>
                 </tbody>
               </table>
             </div>
@@ -820,7 +819,7 @@ for conn in runtime.connections_for(capability, user_id):
               <article class="choice recommended">
                 <h3>影响范围</h3>
                 <ul>
-                  <li><strong>代码：</strong><code>webserver/plugins/runtime/</code>、<code>webserver/plugins/meta/weread/</code>（删除）、<code>webserver/services/plugin_runtime.py</code>、<code>weread_annotations.py</code>、<code>booksource/</code>、<code>webserver/handlers/{plugins,book,network_library}.py</code></li>
+                  <li><strong>代码：</strong><code>webserver/plugins/runtime/</code>、<code>webserver/plugins/sending/</code> → <code>webserver/plugins/push/</code>（更名）、<code>webserver/plugins/meta/weread/</code>（删除）、<code>webserver/services/plugin_runtime.py</code>、<code>weread_annotations.py</code>、<code>booksource/</code>、<code>webserver/handlers/{plugins,book,network_library}.py</code></li>
                   <li><strong>API：</strong>删除 8 条单插件专属路由；新增 <code>/api/plugins/{key}/features/{action}</code>；通用动作端点新增 <code>input_data</code></li>
                   <li><strong>数据：</strong><code>plugin_connections</code> 新增 <code>role</code> 列并改唯一约束</li>
                   <li><strong>前端：</strong><code>app/pages/admin/plugins/index.vue</code>、<code>app/pages/plugins/*.vue</code>、<code>app/pages/book/[bid]/*</code></li>
@@ -862,7 +861,7 @@ for conn in runtime.connections_for(capability, user_id):
               <strong>实际执行记录（2026-08-25）</strong>
               <p>本地无可用 Python 测试环境（缺 <code>calibre</code>），后端全部通过项目测试镜像执行：</p>
               <pre><code>docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test pytest tests -q
-  → 1013 passed, 20 skipped, 26 warnings
+  → 1015 passed, 20 skipped, 26 warnings
 
 docker run --rm ... ruff check ./webserver --fix --no-cache   → All checks passed!
 docker run --rm ... ruff format ./webserver --no-cache        → 134 files left unchanged
@@ -870,10 +869,10 @@ docker run --rm ... ruff format ./webserver --no-cache        → 134 files left
 cd app &amp;&amp; npm run lint   → 0 errors, 490 warnings（warnings 为存量，非本次引入）
 make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结构 / 单文件资源均通过</code></pre>
               <p>分支 <code>refactor/20260824-plugin-capability-interfaces</code>，基线 <code>origin/feat/plugins</code> @ 8c3601e8。</p>
-              <p>测试从基线的 966 增至 <strong>1013</strong>，新增 47 个用例，全程零回归。</p>
+              <p>测试从基线的 966 增至 <strong>1015</strong>，新增 49 个用例，全程零回归。</p>
             </div>
             <div class="callout warn">
-              <strong>已完成 S1–S7、S9–S12；S8（书源接口）未实施。</strong>
+              <strong>已完成 S1–S7、S9–S12 与 D-7（设备推送纳入）；S8（书源接口）未实施。</strong>
               <p>
                 S8 需要把 Legado 从 <code>services/booksource/</code> 接入插件系统、回套 8 个 OPDS 族书源、
                 把 <code>SaveOnlineBookService</code> 提为通用 <code>assemble_from_chapters</code>，并收敛
@@ -920,6 +919,7 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>T-9</td><td>Legado 端到端</td><td>随 S8 书源接口落地</td><td class="pending">未实现</td></tr>
                   <tr><td>T-10</td><td>改书产生 succeeded run（含 requested_by / input_data / 结果）；失败产生 failed run 并记录错误；zh-converter 备份路径写入 run</td><td><code>tests/test_texttools.py</code> 新增 3 个用例；自动触发另见 <code>tests/test_book_auto_transform.py</code> 9 个用例</td><td class="verified">已通过</td></tr>
                   <tr><td>T-11</td><td><code>plugin_runtime.py</code> 无任何插件名与模块；<code>book.py</code> 无 WEREAD / 中文连接名 / SecretCipher</td><td>以测试固化（<code>test_plugin_entity_writers.py</code>、<code>test_plugin_capability_lookup.py</code>），未另建 CI 脚本</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-15</td><td>设备推送走插件：成功产生 succeeded run 并记录 device_type，失败产生 failed run 并记录错误；上传器仍由插件持有，patch 其 <code>uploader_class</code> 即可隔离</td><td><code>tests/test_main.py</code> 新增 2 个用例</td><td class="verified">已通过</td></tr>
                   <tr><td>T-12</td><td>后端 1013 passed / 20 skipped；<code>ruff check</code> 与 <code>ruff format</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（490 warnings 为存量）；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见下方命令记录</td><td class="verified">已通过</td></tr>
                   <tr><td>T-13</td><td>界面审查（<code>full</code> 模式）</td><td>转 ACTIVE 前必须执行，S8 完成后一并进行</td><td class="pending">未执行</td></tr>
                   <tr><td>T-14</td><td>真实后端体验验证</td><td>Docker 后端 + Chrome DevTools MCP；与 T-13 一并进行</td><td class="pending">未执行</td></tr>
@@ -941,7 +941,7 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>D-4</td><td>取书方式用 <code>download_mode</code> 枚举声明</td><td>一个枚举替掉两个 capability 串加一张映射表；前端可直接据此决定 UI</td><td>用 <code>capabilities</code> 做方法粒度探测</td></tr>
                   <tr><td>D-5</td><td><code>get_toc</code> / <code>get_chapter</code> / <code>download</code> 收领域对象而非 id</td><td>Legado 的 <code>toc_url</code> 只能从 <code>book_info()</code> 取得；收 id 会导致每次下载多一次 HTTP 请求</td><td>统一收 <code>external_id</code>（形式整齐但有实际性能代价）</td></tr>
                   <tr><td>D-6</td><td>保留通用 <code>execute(action, params)</code> 作为 <code>ExtraFeatureProvider</code></td><td>通用 execute 不是错的设计，错的是它当了唯一接口；标准化不了的功能需要有合法去处</td><td>强行把阅读统计、社区划线塞进标准接口</td></tr>
-                  <tr><td>D-7</td><td><code>plugins/sending/</code> 的 6 个推送器本次不纳入</td><td>形态确实是插件（需每用户凭据、网络重试、health），但纳入与否取决于插件中心的产品定位，属产品决策</td><td>本次一并纳入（范围过大）；永久排除（形态明显契合，不应关死）</td></tr>
+                  <tr><td>D-7</td><td><strong>纳入</strong>：<code>plugins/sending/</code> 更名为 <code>plugins/push/</code>，6 个设备推送器包装为 <code>talebook.push.*</code> 插件</td><td>用户决定。形态本就是插件：需每用户配置（设备地址）、发网络请求、会失败、需留痕；此前由 handler 用一张 dict 直接实例化，无连接、无 health、无审计</td><td>不纳入（形态明显契合，无理由排除）</td></tr>
                   <tr><td>D-8</td><td>文本工具纳入插件体系而非移出</td><td>F-4 的审计缺口必须补，而补审计最自然的锚点就是 <code>PluginRun</code>；走 <code>TransformProvider</code> 是顺手一起解决</td><td>移出插件目录做成“书库工具”（改动更小，但审计仍需另建机制）</td></tr>
                   <tr><td>D-9</td><td>异常类改名为 <code>Upstream*</code></td><td><code>Provider</code> 已被指定为能力接口后缀，<code>ProviderAuthError</code> 会被误读为接口错误</td><td>保留 <code>Provider*</code>（原判断，因命名约定确定而改变）</td></tr>
                   <tr><td>D-11</td><td>正文处理提供 <code>trigger</code> 动态配置（<code>manual</code> 默认 / <code>auto</code> 自动处理新书），仅 <code>supports_auto_trigger=True</code> 的插件可选 <code>auto</code></td><td>自动改写用户刚上传的文件不可逆；编码错误是客观事实可自动判定，查找替换与繁简转换依赖用户意图</td><td>全局默认开启；三个工具都提供自动触发</td></tr>
@@ -955,7 +955,6 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
             <h3>待用户确认事项</h3>
             <div class="callout warn">
               <ol>
-                <li><strong>D-7：</strong><code>plugins/sending/</code> 的 6 个设备推送器是否纳入插件中心？影响 <code>PushProvider</code> 是否在本次落地。</li>
                 <li><strong>S 序列拆分粒度：</strong>12 步建议拆成 5 个 PR（S1+S2 / S3+S4 / S5+S6 / S7 / S8–S12），还是按更小粒度逐步合入？</li>
                 <li><strong>R3 缓解：</strong>Legado 的 12 条旧路由是否接受“先并存一个版本再删除”的过渡期？</li>
               </ol>

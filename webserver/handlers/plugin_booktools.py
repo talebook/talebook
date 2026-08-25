@@ -6,8 +6,6 @@ webserver/plugins/texttools/；本模块负责书籍定位、权限校验、临�
 写回入库与审计。
 """
 
-import contextlib
-import datetime
 import functools
 import logging
 import os
@@ -18,8 +16,8 @@ from tornado.ioloop import IOLoop
 
 from webserver import loader, utils
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
+from webserver.handlers.plugins_common import audit_run
 from webserver.handlers.plugins_common import body as _body
-from webserver.models import PluginConnection, PluginInstallation, PluginRun
 from webserver.plugins.texttools import (
     ANALYZE_LIMIT,
     DIRECTION_LABELS,
@@ -34,7 +32,6 @@ from webserver.plugins.texttools import (
     replace_txt_file,
 )
 from webserver.services.booktools import get_format_path, import_as_new_book, overwrite_format, pick_format, resolve_book
-from webserver.services.plugin_runtime import DEFAULT_COUNTS, ensure_builtin_capability_installations
 
 
 # 内置文本工具：改书操作需落 PluginRun，审计锚点挂在各自的实例连接上。
@@ -70,62 +67,6 @@ def _tool_resolve_book(handler, book_id):
 
 def _tool_workdir():
     return tempfile.mkdtemp(prefix="talebook-texttools-")
-
-
-@contextlib.contextmanager
-def _tool_run(handler, plugin_key, params):
-    """把一次改书操作记进 PluginRun。
-
-    三个文本工具会真实改写用户书库里的文件，此前却完全在运行时之外：
-    没有谁在什么时候对哪本书做了什么的记录，失败无从追溯，备份目录也不在
-    任何界面里。这里补上审计锚点。
-    """
-    # 审计锚点必须存在：连接缺失时按需创建，而不是静默跳过记录。
-    ensure_builtin_capability_installations(handler.session, handler.user_id(), loader.get_settings())
-    run = None
-    connection = (
-        handler.session.query(PluginConnection)
-        .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
-        .filter(
-            PluginInstallation.plugin_key == plugin_key,
-            PluginConnection.owner_type == "instance",
-        )
-        .first()
-    )
-    if connection is not None:
-        now = datetime.datetime.now()
-        run = PluginRun(
-            connection_id=connection.id,
-            action="run",
-            trigger=params.pop("trigger", "manual"),
-            status="running",
-            requested_by=handler.user_id(),
-            counts=dict(DEFAULT_COUNTS),
-            input_data=dict(params),
-            create_time=now,
-            started_at=now,
-        )
-        handler.session.add(run)
-        handler.session.commit()
-
-    outcome = {"counts": {}, "data": {}}
-    try:
-        yield outcome
-    except Exception as exc:
-        if run is not None:
-            run.status = "failed"
-            run.error_code = getattr(exc, "code", "booktools.failed")
-            run.error_message = str(exc)[:1000]
-            run.finished_at = datetime.datetime.now()
-            handler.session.commit()
-        raise
-    else:
-        if run is not None:
-            run.status = "succeeded"
-            run.counts = {**DEFAULT_COUNTS, **outcome["counts"]}
-            run.cursor_after = dict(outcome["data"])
-            run.finished_at = datetime.datetime.now()
-            handler.session.commit()
 
 
 def _tool_backup_dir():
@@ -218,7 +159,7 @@ class UserTextReplaceRun(BaseHandler):
             work_dir = _tool_workdir()
             out_path = os.path.join(work_dir, "replaced.%s" % fmt.lower())
             audit = {"book_id": book_id, "format": fmt, "output_mode": output_mode, "pattern": pattern}
-            with _tool_run(self, TEXT_REPLACE_PLUGIN_KEY, audit) as outcome:
+            with audit_run(self, TEXT_REPLACE_PLUGIN_KEY, audit, error_code="booktools.failed") as outcome:
                 matches = await IOLoop.current().run_in_executor(
                     None,
                     functools.partial(replace_txt_file if fmt == "TXT" else replace_epub_file, src, out_path, apply_fn),
@@ -311,7 +252,7 @@ class UserTxtFixerRun(BaseHandler):
                 "output_mode": output_mode,
             }
             audit = {"book_id": book_id, "output_mode": output_mode, "encoding": report.get("encoding")}
-            with _tool_run(self, TXT_FIXER_PLUGIN_KEY, audit) as outcome:
+            with audit_run(self, TXT_FIXER_PLUGIN_KEY, audit, error_code="booktools.failed") as outcome:
                 if output_mode == "overwrite":
                     overwrite_format(self.db, book_id, "TXT", out_path)
                     rsp["book_id"] = book_id
@@ -428,7 +369,7 @@ class UserZhConverterRun(BaseHandler):
                 "output_mode": output_mode,
             }
             audit = {"book_id": book_id, "format": fmt, "direction": direction, "output_mode": output_mode}
-            with _tool_run(self, ZH_CONVERTER_PLUGIN_KEY, audit) as outcome:
+            with audit_run(self, ZH_CONVERTER_PLUGIN_KEY, audit, error_code="booktools.failed") as outcome:
                 backup_dir = _tool_backup_dir() if backup else None
                 if output_mode == "replace":
                     overwrite_format(self.db, book_id, fmt, out_path, backup_dir=backup_dir)

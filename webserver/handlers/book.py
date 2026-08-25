@@ -34,6 +34,7 @@ from webserver.constants import (
     META_SOURCE_XHSD,
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
+from webserver.handlers.plugins_common import audit_run
 from webserver.i18n import _
 from webserver.models import (
     AudiobookEdition,
@@ -44,7 +45,9 @@ from webserver.plugins.meta import baike, biquge, calibre, douban, douban_v2, ne
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
+from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
 from webserver.plugins.runtime.interfaces import TRIGGER_AUTO, trigger_of
+from webserver.plugins.runtime.protocol import ProviderError
 from webserver.services.async_service import AsyncService
 from webserver.services.autofill import AutoFillService
 from webserver.services.booksource.metadata import (
@@ -1948,31 +1951,12 @@ class BookSendToDevice(BaseHandler):
         if not os.path.exists(file_path):
             return {"err": "file.missing", "msg": _("书籍文件不存在: %s") % file_path}
 
-        # 导入对应的上传器
+        # 走插件运行时：按设备类型取插件，推送落 PluginRun 审计。
         try:
-            from webserver.plugins.sending.uploader import (
-                BooxUploader,
-                DangdangUploader,
-                DuokanUploader,
-                HanwangUploader,
-                IReaderUploader,
-                PureLibroUploader,
-            )
-
-            uploader_map = {
-                "duokan": DuokanUploader,
-                "ireader": IReaderUploader,
-                "hanwang": HanwangUploader,
-                "boox": BooxUploader,
-                "dangdang": DangdangUploader,
-                "purelibro": PureLibroUploader,
-            }
-
-            uploader_class = uploader_map.get(device_type)
-            if not uploader_class:
+            provider = PUSH_PROVIDERS_BY_DEVICE.get(device_type)
+            if provider is None:
                 return {"err": "uploader.not_found", "msg": _("找不到对应的上传器: %s") % device_type}
 
-            # 创建上传器实例
             book_name = book.get("title", "")
             if len(book_name) > 120:
                 book_name = ""
@@ -1980,38 +1964,31 @@ class BookSendToDevice(BaseHandler):
                 book_name = None
             else:
                 book_name += os.path.splitext(file_path)[-1]
-            uploader = uploader_class(file_path, file_name=book_name)
 
-            # 构建设备上传URL
-            if not device_url.startswith(("http://", "https://")):
-                device_url = "http://" + device_url
-
-            # 执行上传
             logging.info(
                 "[SEND_TO_DEVICE] sending book %s (%s) to device %s: %s", book_id, file_format, device_type, device_url
             )
-            result = uploader.upload(device_url)
-
-            if result.get("success"):
-                logging.info("[SEND_TO_DEVICE] success: %s -> %s", book_id, device_type)
-                return {"err": "ok", "msg": _("书籍发送成功")}
-            else:
-                error_type = result.get("error_type", "unknown")
-                error_msg = result.get("message", _("发送失败"))
-
-                if error_type == "connection":
-                    return {"err": "connection.failed", "msg": _("无法连接到设备。请确认IP地址正确，且设备已开启WiFi上传功能")}
-                elif error_type == "timeout":
-                    return {"err": "upload.timeout", "msg": _("上传超时。请检查网络连接和设备状态")}
-                elif error_type == "http":
-                    status_code = result.get("status_code", 0)
-                    return {"err": "upload.failed", "msg": _("上传失败 (HTTP %d)。请查看日志获取详细信息") % status_code}
-                else:
-                    return {"err": "upload.error", "msg": _("上传过程出错: %s。请查看日志获取详细信息") % error_msg}
-
-        except ImportError as e:
-            logging.error("[SEND_TO_DEVICE] import uploader failed: %s", e)
-            return {"err": "uploader.import_error", "msg": _("设备上传功能不可用")}
+            with audit_run(
+                self,
+                provider.manifest["id"],
+                {"book_id": book_id, "format": file_format, "device_type": device_type},
+                owner_type="user",
+                error_code="push.failed",
+            ) as outcome:
+                provider.push({"path": file_path, "name": book_name}, device_url, {"config": {}})
+                outcome["counts"] = {"fetched": 1, "written": 1}
+            logging.info("[SEND_TO_DEVICE] success: %s -> %s", book_id, device_type)
+            return {"err": "ok", "msg": _("书籍发送成功")}
+        except ProviderError as exc:
+            # 上传器把连接、超时、HTTP 状态归一化后由 ProviderError 携带，
+            # 这里按消息给出可操作的提示。
+            message = str(exc)
+            logging.warning("[SEND_TO_DEVICE] failed: %s -> %s: %s", book_id, device_type, message)
+            if "connection" in message.lower():
+                return {"err": "connection.failed", "msg": _("无法连接到设备。请确认IP地址正确，且设备已开启WiFi上传功能")}
+            if "timeout" in message.lower():
+                return {"err": "upload.timeout", "msg": _("上传超时。请检查网络连接和设备状态")}
+            return {"err": "upload.error", "msg": _("上传过程出错: %s。请查看日志获取详细信息") % message}
         except Exception as e:
             logging.error("[SEND_TO_DEVICE] send failed: %s", e)
             return {"err": "upload.error", "msg": _("发送过程出错，请查看日志获取详细信息")}
