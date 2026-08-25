@@ -857,14 +857,31 @@ for conn in runtime.connections_for(capability, user_id):
 
           <section id="tests" class="card">
             <h2>10. 测试计划与结果</h2>
-            <div class="callout warn"><strong>WIP 阶段说明：</strong>本方案尚未进入实现，下表全部为计划项，状态一律为待验证。完成后回写实际命令、结果、失败项与未执行原因，不得把未执行项写成已通过。</div>
+            <div class="callout warn"><strong>WIP 阶段说明：</strong>S1、S2 已实现并验证，对应行已回写实际结果；其余仍为计划项。未执行项一律保留“待验证”，不得写成已通过。</div>
+            <div class="callout good">
+              <strong>本轮实际执行（2026-08-25）</strong>
+              <p>本地无可用 Python 测试环境（缺 <code>calibre</code> 模块），全部通过项目测试镜像执行：</p>
+              <pre><code>docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test pytest tests -q
+  → 966 passed, 20 skipped, 26 warnings in 43.98s
+
+docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test ruff check ./webserver --fix --no-cache
+  → All checks passed!
+docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test ruff format ./webserver --no-cache
+  → 129 files left unchanged</code></pre>
+              <p>分支 <code>refactor/20260824-plugin-capability-interfaces</code>，基线 <code>origin/feat/plugins</code> @ 8c3601e8。</p>
+            </div>
+            <div class="callout danger">
+              <strong>未执行项：</strong>本方案 HTML 的浏览器渲染核对始终未完成——Chrome DevTools MCP 报
+              <code>browser is already running</code>，已有实例无法接入，<code>--isolated</code> 亦被同一 profile 拦下。
+              样式为逐字复用 <code>design/TEMPLATE.html</code>（8 份 ACTIVE 方案在用），视觉风险低，但确未实际看过渲染结果，不计为已通过。
+            </div>
             <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
               <table>
                 <thead><tr><th>编号</th><th>验证项</th><th>方式</th><th>结果</th></tr></thead>
                 <tbody>
                   <tr><td>T-1</td><td>非 weread 的 annotations 插件写入后 <code>source_name</code> 不等于 <code>"weread"</code>，<code>source_type</code> 不等于 <code>"weread_book"</code></td><td>新增 <code>tests/test_plugin_entity_writers.py</code>，用 mock annotations 插件</td><td class="pending">待验证</td></tr>
-                  <tr><td>T-2</td><td>BRS <code>endpoint</code> 指向私网地址被拒，错误码为 <code>book_source.endpoint_blocked</code></td><td>扩充 <code>tests/test_enrichment_connectors.py</code></td><td class="pending">待验证</td></tr>
-                  <tr><td>T-3</td><td>通用动作端点透传 <code>input_data</code> 时，<code>allowed_book_ids</code> 由服务端按 user_id 重算，客户端伪造无效</td><td>扩充 <code>tests/test_plugins_api.py</code>，含私有书越权用例</td><td class="pending">待验证</td></tr>
+                  <tr><td>T-2</td><td>BRS <code>endpoint</code> 指向私网地址被拒（127.0.0.1 / 169.254.169.254 / 192.168.x / 10.x 四类），白名单显式放行后可用；内嵌凭据的 URL 被拒</td><td><code>tests/test_enrichment_connectors.py</code> 新增 3 个用例</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-3</td><td>通用动作端点透传 <code>input_data</code>，微信读书不再被特判拒绝；客户端伪造的 <code>allowed_book_ids</code> 被丢弃、非受控字段原样透传；<code>input_data</code> 非对象时报 <code>plugin.request_invalid</code></td><td><code>tests/test_plugins_api.py</code> 新增 <code>TestGenericActionInputData</code> 3 个用例</td><td class="verified">已通过</td></tr>
                   <tr><td>T-4</td><td>缺 <code>execute</code> 与能力接口的 provider 在 <code>register()</code> 阶段即失败</td><td>扩充 <code>tests/test_plugin_runtime.py</code></td><td class="pending">待验证</td></tr>
                   <tr><td>T-5</td><td>manifest 缺 <code>connection_owners</code> 时校验失败而非默认放开；未知键被拒绝</td><td>扩充 <code>tests/test_plugin_runtime.py</code></td><td class="pending">待验证</td></tr>
                   <tr><td>T-6</td><td>越权 scope 的 write 调用被运行时拒绝（当前既无实现也无测试）</td><td>新增用例</td><td class="pending">待验证</td></tr>
