@@ -44,6 +44,8 @@ from webserver.plugins.meta import baike, biquge, calibre, douban, douban_v2, ne
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
+from webserver.plugins.runtime.interfaces import TRIGGER_AUTO, trigger_of
+from webserver.services.async_service import AsyncService
 from webserver.services.autofill import AutoFillService
 from webserver.services.booksource.metadata import (
     KEY as BOOKSOURCE_KEY,
@@ -67,8 +69,9 @@ from webserver.services.mail import MailService
 from webserver.services.plugin_runtime import PluginRuntime
 
 
-# 元数据查询能力：调用方按能力找插件，不认识任何具体 plugin_key。
+# 调用方按能力找插件，不认识任何具体 plugin_key。
 META_LOOKUP_CAPABILITY = "metadata.lookup"
+TRANSFORM_CAPABILITY = "integrations.encoding_fix"
 
 
 CONF = loader.get_settings()
@@ -1462,7 +1465,32 @@ class BookUploadBase(BaseHandler):
             item.save()
         self.add_msg("success", _("导入书籍成功！"))
         AutoFillService().auto_fill(book_id)
+        self.run_auto_transforms(book_id, fmt)
         return {"err": "ok", "book_id": book_id}
+
+    def run_auto_transforms(self, book_id, fmt):
+        """新书入库后，按连接配置自动处理正文。
+
+        默认手动：只有把 trigger 显式配成 auto 的插件才会执行，且只有声明了
+        supports_auto_trigger 的插件才允许配置该选项。自动改写用户刚上传的
+        文件不可逆，因此宁可不做也不默认做。
+        """
+        if str(fmt or "").lower() != "txt":
+            return
+        try:
+            from webserver.services.book_transform import TXT_FIXER_PLUGIN_KEY, auto_fix_encoding
+
+            runtime = PluginRuntime(self.session, CONF)
+            for connection in runtime.connections_for(TRANSFORM_CAPABILITY):
+                plugin_key = runtime.plugin_key_of(connection)
+                if plugin_key != TXT_FIXER_PLUGIN_KEY or trigger_of(connection.config) != TRIGGER_AUTO:
+                    continue
+                provider = runtime.registry.get(plugin_key)
+                if not (provider.manifest.get("ui") or {}).get("supports_auto_trigger"):
+                    continue
+                auto_fix_encoding(AsyncService(), book_id, self.user_id())
+        except Exception as err:  # 自动处理失败不得影响上传本身
+            logging.warning("新书自动处理调度失败 book=%s: %s", book_id, err)
 
 
 class BookUpload(BookUploadBase):

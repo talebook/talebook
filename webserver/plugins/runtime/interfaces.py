@@ -66,6 +66,36 @@ class PluginProvider(Protocol):
     def execute(self, context: dict[str, Any]): ...
 
 
+@runtime_checkable
+class TransformProvider(Protocol):
+    """对书籍正文做加工的插件：正文进、正文出。
+
+    ``preview`` 是 read（不改书），``apply`` 是 write（唯一真正修改书籍内容的
+    模式）。两者都由平台负责书籍定位、权限校验、临时文件与写回入库，插件只
+    实现纯变换。
+    """
+
+    supported_formats: frozenset
+    # 仅客观可判定的处理（如编码修复）可以自动触发；查找替换与繁简转换
+    # 依赖用户意图，不提供自动选项。
+    supports_auto_trigger: bool
+
+    def preview(self, src, context): ...
+
+    def apply(self, src, out_dir, context): ...
+
+
+# 触发方式：默认手动，用户可在插件管理页随时切换，无需重启或重装。
+TRIGGER_MANUAL = "manual"
+TRIGGER_AUTO = "auto"
+TRIGGER_SCHEMA = {"type": "string", "enum": [TRIGGER_MANUAL, TRIGGER_AUTO], "default": TRIGGER_MANUAL}
+
+
+def trigger_of(config):
+    """读取连接配置里的触发方式，未配置时为手动。"""
+    return str((config or {}).get("trigger") or TRIGGER_MANUAL)
+
+
 def contract_violations(provider):
     """返回 provider 违反契约之处；为空表示满足契约。
 

@@ -1,3 +1,4 @@
+import contextlib
 import datetime
 import functools
 import logging
@@ -46,6 +47,7 @@ from webserver.services.booktools import get_format_path, import_as_new_book, ov
 from webserver.services.plugin_jobs import execute_plugin_run
 from webserver.services.plugin_runtime import (
     DEFAULT_CONNECTION_ROLE,
+    DEFAULT_COUNTS,
     PluginRuntime,
     PluginRuntimeError,
     ensure_builtin_capability_installations,
@@ -73,6 +75,10 @@ def _error(exc):
 SERVER_OWNED_INPUT_KEYS = frozenset({"allowed_book_ids"})
 # 声明了这些能力的插件会做书籍匹配，需要平台注入可见书籍白名单。
 BOOK_SCOPED_CAPABILITIES = frozenset({"annotations.import"})
+# 内置文本工具：改书操作需落 PluginRun，审计锚点挂在各自的实例连接上。
+TEXT_REPLACE_PLUGIN_KEY = "talebook.tool.text-replace"
+ZH_CONVERTER_PLUGIN_KEY = "talebook.tool.zh-converter"
+TXT_FIXER_PLUGIN_KEY = "talebook.tool.txt-fixer"
 
 
 def _plugin_input_data(handler, connection):
@@ -468,6 +474,62 @@ def _tool_workdir():
     return tempfile.mkdtemp(prefix="talebook-texttools-")
 
 
+@contextlib.contextmanager
+def _tool_run(handler, plugin_key, params):
+    """把一次改书操作记进 PluginRun。
+
+    三个文本工具会真实改写用户书库里的文件，此前却完全在运行时之外：
+    没有谁在什么时候对哪本书做了什么的记录，失败无从追溯，备份目录也不在
+    任何界面里。这里补上审计锚点。
+    """
+    # 审计锚点必须存在：连接缺失时按需创建，而不是静默跳过记录。
+    ensure_builtin_capability_installations(handler.session, handler.user_id(), loader.get_settings())
+    run = None
+    connection = (
+        handler.session.query(PluginConnection)
+        .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+        .filter(
+            PluginInstallation.plugin_key == plugin_key,
+            PluginConnection.owner_type == "instance",
+        )
+        .first()
+    )
+    if connection is not None:
+        now = datetime.datetime.now()
+        run = PluginRun(
+            connection_id=connection.id,
+            action="run",
+            trigger=params.pop("trigger", "manual"),
+            status="running",
+            requested_by=handler.user_id(),
+            counts=dict(DEFAULT_COUNTS),
+            input_data=dict(params),
+            create_time=now,
+            started_at=now,
+        )
+        handler.session.add(run)
+        handler.session.commit()
+
+    outcome = {"counts": {}, "data": {}}
+    try:
+        yield outcome
+    except Exception as exc:
+        if run is not None:
+            run.status = "failed"
+            run.error_code = getattr(exc, "code", "booktools.failed")
+            run.error_message = str(exc)[:1000]
+            run.finished_at = datetime.datetime.now()
+            handler.session.commit()
+        raise
+    else:
+        if run is not None:
+            run.status = "succeeded"
+            run.counts = {**DEFAULT_COUNTS, **outcome["counts"]}
+            run.cursor_after = dict(outcome["data"])
+            run.finished_at = datetime.datetime.now()
+            handler.session.commit()
+
+
 def _tool_backup_dir():
     convert_path = loader.get_settings().get("convert_path") or tempfile.gettempdir()
     path = os.path.join(str(convert_path), "texttools-backups")
@@ -557,20 +619,24 @@ class UserTextReplaceRun(BaseHandler):
 
             work_dir = _tool_workdir()
             out_path = os.path.join(work_dir, "replaced.%s" % fmt.lower())
-            matches = await IOLoop.current().run_in_executor(
-                None,
-                functools.partial(replace_txt_file if fmt == "TXT" else replace_epub_file, src, out_path, apply_fn),
-            )
-
-            rsp = {"err": "ok", "format": fmt, "matches": matches, "output_mode": output_mode}
-            if output_mode == "overwrite":
-                overwrite_format(self.db, book_id, fmt, out_path)
-                rsp["book_id"] = book_id
-            else:
-                suffix = str(req.get("suffix") or "").strip() or "（正文替换版）"
-                rsp["book_id"] = import_as_new_book(
-                    self.db, self.session, book_id, out_path, title_suffix=suffix, collector_id=self.user_id()
+            audit = {"book_id": book_id, "format": fmt, "output_mode": output_mode, "pattern": pattern}
+            with _tool_run(self, TEXT_REPLACE_PLUGIN_KEY, audit) as outcome:
+                matches = await IOLoop.current().run_in_executor(
+                    None,
+                    functools.partial(replace_txt_file if fmt == "TXT" else replace_epub_file, src, out_path, apply_fn),
                 )
+
+                rsp = {"err": "ok", "format": fmt, "matches": matches, "output_mode": output_mode}
+                if output_mode == "overwrite":
+                    overwrite_format(self.db, book_id, fmt, out_path)
+                    rsp["book_id"] = book_id
+                else:
+                    suffix = str(req.get("suffix") or "").strip() or "（正文替换版）"
+                    rsp["book_id"] = import_as_new_book(
+                        self.db, self.session, book_id, out_path, title_suffix=suffix, collector_id=self.user_id()
+                    )
+                outcome["counts"] = {"fetched": 1, "updated": matches}
+                outcome["data"] = {"book_id": rsp["book_id"], "matches": matches}
             logging.info(
                 "[booktools] text-replace done: %s book=%s hits=%d mode=%s [uid:%s]",
                 fmt,
@@ -646,13 +712,17 @@ class UserTxtFixerRun(BaseHandler):
                 "mojibake": report.get("mojibake", False),
                 "output_mode": output_mode,
             }
-            if output_mode == "overwrite":
-                overwrite_format(self.db, book_id, "TXT", out_path)
-                rsp["book_id"] = book_id
-            else:
-                rsp["book_id"] = import_as_new_book(
-                    self.db, self.session, book_id, out_path, title_suffix="（编码修复版）", collector_id=self.user_id()
-                )
+            audit = {"book_id": book_id, "output_mode": output_mode, "encoding": report.get("encoding")}
+            with _tool_run(self, TXT_FIXER_PLUGIN_KEY, audit) as outcome:
+                if output_mode == "overwrite":
+                    overwrite_format(self.db, book_id, "TXT", out_path)
+                    rsp["book_id"] = book_id
+                else:
+                    rsp["book_id"] = import_as_new_book(
+                        self.db, self.session, book_id, out_path, title_suffix="（编码修复版）", collector_id=self.user_id()
+                    )
+                outcome["counts"] = {"fetched": 1, "updated": 1}
+                outcome["data"] = {"book_id": rsp["book_id"], "encoding": report.get("encoding")}
             logging.info(
                 "[booktools] txt-fixer done: book=%s enc=%s mode=%s [uid:%s]",
                 title,
@@ -759,28 +829,28 @@ class UserZhConverterRun(BaseHandler):
                 "source_encoding": source_encoding,
                 "output_mode": output_mode,
             }
-            if output_mode == "replace":
-                overwrite_format(
-                    self.db,
-                    book_id,
-                    fmt,
-                    out_path,
-                    backup_dir=_tool_backup_dir() if backup else None,
-                )
-                _zh_sync_book_meta(self.db, book_id, lang, engine.convert if convert_title else None)
-                rsp["book_id"] = book_id
-            else:
-                suffix_engine = engine.convert if convert_title else None
-                rsp["book_id"] = import_as_new_book(
-                    self.db,
-                    self.session,
-                    book_id,
-                    out_path,
-                    title_suffix=ZH_NEW_BOOK_SUFFIX.get(lang, ""),
-                    language=lang,
-                    convert_text=suffix_engine,
-                    collector_id=self.user_id(),
-                )
+            audit = {"book_id": book_id, "format": fmt, "direction": direction, "output_mode": output_mode}
+            with _tool_run(self, ZH_CONVERTER_PLUGIN_KEY, audit) as outcome:
+                backup_dir = _tool_backup_dir() if backup else None
+                if output_mode == "replace":
+                    overwrite_format(self.db, book_id, fmt, out_path, backup_dir=backup_dir)
+                    _zh_sync_book_meta(self.db, book_id, lang, engine.convert if convert_title else None)
+                    rsp["book_id"] = book_id
+                else:
+                    suffix_engine = engine.convert if convert_title else None
+                    rsp["book_id"] = import_as_new_book(
+                        self.db,
+                        self.session,
+                        book_id,
+                        out_path,
+                        title_suffix=ZH_NEW_BOOK_SUFFIX.get(lang, ""),
+                        language=lang,
+                        convert_text=suffix_engine,
+                        collector_id=self.user_id(),
+                    )
+                outcome["counts"] = {"fetched": 1, "updated": 1}
+                # 备份路径此前不在任何界面里，写进 run 后可追溯。
+                outcome["data"] = {"book_id": rsp["book_id"], "backup_dir": backup_dir or ""}
             logging.info(
                 "[booktools] zh-converter done: %s book=%s direction=%s mode=%s [uid:%s]",
                 fmt,

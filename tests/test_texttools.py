@@ -303,3 +303,73 @@ class TestZhConverterRun(TestApp):
             self.assertEqual(d["book_id"], 9003)
             self.assertEqual(d["direction_label"], "繁体→简体")
             self.assertTrue(m_import.called)
+
+
+class TestBookToolAuditTrail(TestApp):
+    """F-4：三个文本工具会真实改写用户书库，必须留下 PluginRun 审计。"""
+
+    def _runs_for(self, plugin_key):
+        from tests.test_main import get_db
+        from webserver.models import PluginConnection, PluginInstallation, PluginRun
+
+        session = get_db()
+        return (
+            session.query(PluginRun)
+            .join(PluginConnection, PluginConnection.id == PluginRun.connection_id)
+            .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+            .filter(PluginInstallation.plugin_key == plugin_key)
+            .order_by(PluginRun.id)
+            .all()
+        )
+
+    @mock.patch("webserver.handlers.plugins.import_as_new_book")
+    def test_text_replace_records_a_run(self, m_import):
+        m_import.return_value = 9101
+        self.json("/api/admin/plugins")  # 确保内置连接已创建
+        before = len(self._runs_for("talebook.tool.text-replace"))
+
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            body = json.dumps({"book_id": BID_TXT, "pattern": "a", "replacement": "b", "use_regex": False})
+            d = self.json("/api/plugins/tools/text-replace/run", method="POST", body=body)
+        self.assertEqual(d["err"], "ok")
+
+        runs = self._runs_for("talebook.tool.text-replace")
+        self.assertEqual(len(runs), before + 1, "改书操作必须留下 run 记录")
+        run = runs[-1]
+        self.assertEqual(run.status, "succeeded")
+        self.assertEqual(run.requested_by, 1)
+        self.assertEqual(run.input_data["book_id"], BID_TXT)
+        self.assertEqual(run.cursor_after["book_id"], 9101)
+        self.assertIsNotNone(run.finished_at)
+
+    @mock.patch("webserver.handlers.plugins.import_as_new_book")
+    def test_failed_write_is_recorded_as_failed_run(self, m_import):
+        m_import.side_effect = RuntimeError("写回失败")
+        self.json("/api/admin/plugins")
+        before = len(self._runs_for("talebook.tool.text-replace"))
+
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            body = json.dumps({"book_id": BID_TXT, "pattern": "a", "replacement": "b", "use_regex": False})
+            self.json("/api/plugins/tools/text-replace/run", method="POST", body=body)
+
+        runs = self._runs_for("talebook.tool.text-replace")
+        self.assertEqual(len(runs), before + 1)
+        self.assertEqual(runs[-1].status, "failed")
+        self.assertIn("写回失败", runs[-1].error_message)
+
+    @mock.patch("webserver.handlers.plugins.import_as_new_book")
+    @mock.patch("webserver.handlers.plugins.fix_bytes")
+    def test_txt_fixer_records_a_run(self, m_fix, m_import):
+        m_fix.return_value = ("fixed", {"encoding": "gbk", "mojibake": False, "garbage": False, "unrecoverable": False})
+        m_import.return_value = 9102
+        self.json("/api/admin/plugins")
+        before = len(self._runs_for("talebook.tool.txt-fixer"))
+
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json("/api/plugins/tools/txt-fixer/run", method="POST", body=json.dumps({"book_id": BID_TXT}))
+        self.assertEqual(d["err"], "ok")
+
+        runs = self._runs_for("talebook.tool.txt-fixer")
+        self.assertEqual(len(runs), before + 1)
+        self.assertEqual(runs[-1].status, "succeeded")
+        self.assertEqual(runs[-1].cursor_after["encoding"], "gbk")

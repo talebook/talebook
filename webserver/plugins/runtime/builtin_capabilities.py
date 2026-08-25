@@ -1,5 +1,6 @@
 from webserver.constants import AUTO_FILL_META
 
+from .interfaces import TRIGGER_SCHEMA
 from .protocol import PROTOCOL_VERSION, ProviderResult
 
 
@@ -25,7 +26,7 @@ class BuiltinCapabilityProvider:
         return ProviderResult(health_message=self.manifest["ui"]["healthy_message"])
 
 
-def _manifest(plugin_id, name, description, categories, capabilities, permissions, ui):
+def _manifest(plugin_id, name, description, categories, capabilities, permissions, ui, config_schema=None):
     return {
         "protocol_version": PROTOCOL_VERSION,
         "id": plugin_id,
@@ -37,7 +38,7 @@ def _manifest(plugin_id, name, description, categories, capabilities, permission
         "runtime_kind": "builtin",
         "actions": ["test"],
         "auth_schema": {"type": "object", "properties": {}},
-        "config_schema": {"type": "object", "properties": {}},
+        "config_schema": config_schema or {"type": "object", "properties": {}},
         "permissions": permissions,
         "data_policy": {"stores_full_text": False, "retention": "source_owned"},
         "compatibility": {"talebook": ">=0.1.0"},
@@ -144,7 +145,11 @@ BUILTIN_CAPABILITY_PROVIDERS = (
                 "manage_kind": "txt_fixer",
                 "primary_action": "open",
                 "healthy_message": "TXT 编码修复工具可用",
+                "supports_auto_trigger": True,
             },
+            # 编码错误是客观事实、可自动判定，因此允许配置为新书入库后自动处理。
+            # 查找替换与繁简转换依赖用户意图，不提供该选项。
+            config_schema={"type": "object", "properties": {"trigger": dict(TRIGGER_SCHEMA)}},
         )
     ),
 )
