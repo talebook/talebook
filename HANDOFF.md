@@ -31,7 +31,7 @@ design/webserver/20260824-plugin-capability-interfaces.wip.html
 
 ## 3. 已完成：S1–S7、S9–S12
 
-全部已提交并推送（截至 `dff230c9`）。测试从基线 966 增至 **1013**，新增 47 个用例，全程零回归。
+全部已提交并推送（截至 `7e4096db`）。测试从基线 966 增至 **1015**，新增 49 个用例，全程零回归。注册 provider 从 26 增至 32。
 
 | 步骤 | 内容 | 关键提交 |
 |---|---|---|
@@ -45,7 +45,8 @@ design/webserver/20260824-plugin-capability-interfaces.wip.html
 | S9 | 改书审计 + `trigger` 动态配置 + 自动修复编码 | `ef8796f9` |
 | S11 | 拆分 handler（1002 行 → 417/235/476/25） | `18aa7a7e` |
 | S10 | `manage_route` + `status()` 钩子，前后端去硬编码 | `dff230c9` |
-| S12 | 回写 `document/PluginGuide.md` 与方案测试结果 | 待提交 |
+| S12 | 回写 `document/PluginGuide.md` 与方案测试结果 | `739cccd4` |
+| D-7 | 设备推送纳入插件中心，`plugins/sending/` → `plugins/push/` | `7e4096db` |
 
 ## 4. 未完成：S8（书源接口）
 
@@ -95,6 +96,7 @@ docker run --rm -v /Users/bytedance/github/talebook/.claude/worktrees/plugin-cap
 - `integrations` 下三个 capability 合并为 `integrations.tool`
 - `TransformProvider` 提供 `trigger` 动态配置（`manual` 默认 / `auto`）
 - 异常类改名 `ProviderError` → `UpstreamError` 系列（**尚未执行**，属 S8 之后的清理）
+- 设备推送：`plugins/push/`，插件 id 为 `talebook.push.<device>`，连接为 user 级
 
 ## 8. 仍待用户拍板
 
@@ -118,6 +120,8 @@ webserver/services/book_transform.py       新书入库后的自动编码修复
 webserver/handlers/plugins_common.py       共用请求体解析与错误封装
 webserver/handlers/plugin_weread.py        微信读书专属接口
 webserver/handlers/plugin_booktools.py     三个文本工具的 HTTP 编排
+webserver/plugins/push/devices.py          原 plugins/sending/uploader.py，6 个设备上传器
+webserver/plugins/runtime/push.py          6 个 talebook.push.* 插件与设备路由表
 
 tests/test_plugin_contract.py              契约检查
 tests/test_plugin_protocol_tightening.py   协议收口
