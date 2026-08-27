@@ -17,5 +17,3 @@ from .biquge.api import BiqugeApi, KEY as BIQUGE_KEY, BIQUGE_ISBN  # noqa: F401
 from .qimao.api import QimaoNovelApi, KEY as QIMAO_KEY, QIMAO_ISBN  # noqa: F401
 from .qimao.api import get_qimao_metadata  # noqa: F401
 
-# Douban metadata plugin
-from .douban.api import DoubanBookApi, KEY as DOUBAN_KEY, str2date  # noqa: F401

@@ -42,7 +42,7 @@ describe('WeReadImportDialog', () => {
         await vm.preview();
         await flushPromises();
 
-        expect(backend.mock.calls[0][0]).toBe('/plugins/talebook.weread');
+        expect(backend.mock.calls[0][0]).toBe('/plugins/talebook.combo.weread');
         expect(backend.mock.calls[1][0]).toBe('/plugins/connections/88/preview');
         expect(JSON.parse(backend.mock.calls[1][1].body)).toEqual({ input_data: {} });
         expect(backend.mock.calls[2][0]).toBe('/plugins/runs/1');
@@ -88,7 +88,7 @@ describe('WeReadImportDialog', () => {
 
         expect(backend.mock.calls[1][0]).toBe('/plugins/connections');
         expect(JSON.parse(backend.mock.calls[1][1].body)).toEqual({
-            plugin_key: 'talebook.weread', credentials: { api_key: 'wrk-secret-1234' },
+            plugin_key: 'talebook.combo.weread', credentials: { api_key: 'wrk-secret-1234' },
         });
         expect(backend.mock.calls[2][0]).toBe('/plugins/connections/88/preview');
         expect(JSON.parse(backend.mock.calls[2][1].body)).toEqual({ input_data: {} });

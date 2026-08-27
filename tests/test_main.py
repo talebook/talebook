@@ -14,7 +14,6 @@ import unittest
 import urllib
 from unittest import mock
 
-import requests
 from tornado import testing, web
 
 
@@ -897,34 +896,7 @@ class TestBook(TestWithUserLogin):
             self.assertEqual(r["err"], "ok")
 
 
-class TestReferDouban(TestWithUserLogin):
-    def setUp(self):
-        self.douban_url = "http://10.0.0.15:7001"
-        try:
-            requests.get(self.douban_url, timeout=2)
-        except:
-            self.skipTest("without douban plugin, skip refer test")
-        super().setUp()
-
-    def tttest_refer(self):
-        # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
-        main.CONF["douban_baseurl"] = self.douban_url
-        d = self.json("/api/book/1/refer")
-        self.assertEqual(d["err"], "ok")
-
-        global _app
-        with mock.patch.object(_app.settings["legacy"], "set_metadata", return_value="Yo"):
-            for book in d["books"]:
-                body = "provider_key=%(provider_key)s&provider_value=%(provider_value)s" % book
-                r = self.json("/api/book/1/refer", method="POST", raise_error=True, body=body)
-                self.assertEqual(r["err"], "ok")
-
-
 class TestRefer(TestWithUserLogin):
-    @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.search_books")
-    @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.get_book_by_isbn")
-    @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.get_book_by_id")
-    @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.get_cover")
     @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi._baike")
     @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi.get_cover")
     @mock.patch("webserver.plugins.meta.youshu.YoushuApi._youshu")
@@ -932,15 +904,9 @@ class TestRefer(TestWithUserLogin):
     @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_title")
     @mock.patch("webserver.plugins.meta.tomato.TomatoNovelApi.get_book")
     @mock.patch("webserver.plugins.meta.xhsd.XhsdBookApi.get_book")
-    def test_refer(self, m_xhsd, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
+    def test_refer(self, m_xhsd, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5):
         from tests.test_baike import BAIKE_PAGE
-        from tests.test_douban import DOUBAN_BOOK, DOUBAN_SEARCH
         from tests.test_youshu import YOUSHU_PAGE
-
-        m1.return_value = DOUBAN_SEARCH["books"]
-        m2.return_value = dict(DOUBAN_BOOK)
-        m3.return_value = dict(DOUBAN_BOOK)
-        m4.return_value = ("jpg", b"image-body")
 
         m5.return_value = BAIKE_PAGE
         m6.return_value = ("jpg", b"image-body")
@@ -952,7 +918,6 @@ class TestRefer(TestWithUserLogin):
         m_xhsd.return_value = None
 
         # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
-        # main.CONF["douban_baseurl"] = self.douban_url
         d = self.json("/api/book/1/refer")
         self.assertEqual(d["err"], "ok")
 
@@ -1099,7 +1064,7 @@ class TestWereadRefer(TestWithUserLogin):
 
         self.assertEqual(data["err"], "ok")
         self.assertEqual([book["source"] for book in data["books"]], ["微信读书"])
-        self.assertEqual(data["books"][0]["provider_key"], "talebook.weread")
+        self.assertEqual(data["books"][0]["provider_key"], "talebook.combo.weread")
         args = query.call_args.args
         self.assertEqual(args[0], self.api_key)
         self.assertEqual(args[1], "search")
@@ -1117,7 +1082,7 @@ class TestWereadRefer(TestWithUserLogin):
             result = self.json(
                 "/api/book/1/refer",
                 method="POST",
-                body="provider_key=talebook.weread&provider_value=weread-book-1&only_meta=yes",
+                body="provider_key=talebook.combo.weread&provider_value=weread-book-1&only_meta=yes",
             )
 
         self.assertEqual(result["err"], "ok")

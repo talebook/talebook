@@ -13,7 +13,7 @@ from webserver.plugins.runtime.safe_http import SafeHttpClient
 from .export import _as_list, _first, parse_weread_export
 
 
-WEREAD_PLUGIN_KEY = "talebook.weread"
+WEREAD_PLUGIN_KEY = "talebook.combo.weread"
 WEREAD_GATEWAY = "https://i.weread.qq.com/api/agent/gateway"
 WEREAD_SKILL_VERSION = "1.0.4"
 

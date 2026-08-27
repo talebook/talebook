@@ -66,7 +66,7 @@ def _field_decisions(current, candidate, locked_fields=()):
 class OpenLibraryProvider:
     manifest = {
         "protocol_version": PROTOCOL_VERSION,
-        "id": "talebook.metadata.open-library",
+        "id": "talebook.combo.open-library",
         "name": "Open Library",
         "description": "按 ISBN 获取 Open Library 元数据与可用评分，并生成逐字段安全候选。",
         "version": "1.0.0",

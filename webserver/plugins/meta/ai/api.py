@@ -6,7 +6,7 @@ import re
 
 import requests
 
-from webserver.plugins.meta.douban import str2date
+from webserver.plugins.meta.common import str2date
 
 
 KEY = "ai"

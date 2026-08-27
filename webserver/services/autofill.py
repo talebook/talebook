@@ -12,13 +12,12 @@ from webserver.constants import (
     META_SOURCE_AI,
     META_SOURCE_AMAZON,
     META_SOURCE_BAIDU,
-    META_SOURCE_DOUBAN,
     META_SOURCE_DOUBAN_V2,
     META_SOURCE_GOOGLE,
     META_SOURCE_NEODB,
 )
 from webserver.i18n import _
-from webserver.plugins.meta import baike, douban, douban_v2, neodb
+from webserver.plugins.meta import baike, douban_v2, neodb
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.meta.calibre.api import CalibreMetadataApi
 from webserver.services import AsyncService
@@ -154,46 +153,8 @@ class AutoFillService(AsyncService):
 
         title = re.sub("[(（].*", "", mi.title)
         book = None
-        books = []
 
-        # 1. 豆瓣查询 ISBN
-        if META_SOURCE_DOUBAN in sources:
-            try:
-                api = douban.DoubanBookApi(
-                    CONF["douban_apikey"],
-                    CONF["douban_baseurl"],
-                    copy_image=True,
-                    manual_select=False,
-                    maxCount=CONF["douban_max_count"],
-                )
-                book = api.get_book_by_isbn(mi.isbn)
-                if book:
-                    book_detail_mi = api.get_book_detail(book)
-                    if book_detail_mi:
-                        if not book_detail_mi.authors or book_detail_mi.authors[0] in ("佚名", ""):
-                            book_detail_mi.authors = mi.authors
-                            book_detail_mi.author_sort = mi.author_sort
-                    return book_detail_mi
-
-                # 2. 豆瓣查询 title
-                books = api.search_books(title)
-                if books:
-                    book_detail_mi = None
-                    for b in books:
-                        if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
-                            book_detail_mi = api.get_book_detail(b)
-                            break
-                    if not book_detail_mi:
-                        book_detail_mi = api.get_book_detail(books[0])
-                    if book_detail_mi:
-                        if not book_detail_mi.authors or book_detail_mi.authors[0] in ("佚名", ""):
-                            book_detail_mi.authors = mi.authors
-                            book_detail_mi.author_sort = mi.author_sort
-                    return book_detail_mi
-            except Exception:
-                logging.error(_("douban 接口查询 %s 失败"), title)
-
-        # 2.5. 豆瓣V2 查询
+        # 1. 豆瓣V2 查询
         if META_SOURCE_DOUBAN_V2 in sources:
             try:
                 plugin = douban_v2.DoubanV2MetaPlugin()

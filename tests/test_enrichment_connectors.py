@@ -11,9 +11,9 @@ from sqlalchemy.orm import sessionmaker
 from webserver.models import Annotation, Base, PluginConnection, PluginDefinition, PluginRunItem, PluginSourceRecord
 from webserver.plugins.annotation.brs import BRSProvider
 from webserver.plugins.combo.open_library import OpenLibraryProvider
-from webserver.plugins.metadata.base import build_field_decisions
-from webserver.plugins.metadata.calibre_provider_bridge import CalibreProviderBridge
-from webserver.plugins.metadata.embedded_file import EmbeddedMetadataProvider, extract_epub_metadata
+from webserver.plugins.meta.base import build_field_decisions
+from webserver.plugins.meta.calibre_provider_bridge import CalibreProviderBridge
+from webserver.plugins.meta.embedded_file import EmbeddedMetadataProvider, extract_epub_metadata
 from webserver.plugins.review.anilist import AniListReviewProvider
 from webserver.plugins.review.bangumi import BangumiReviewProvider
 from webserver.plugins.review.file_import import ReviewFileProvider, parse_review_file
@@ -113,7 +113,7 @@ def test_connector_manifests_are_valid_and_registered_as_installable_definitions
     definitions = ensure_builtin_definitions(db_session, registry)
     assert len(definitions) == 10
     assert {item.plugin_key for item in definitions} >= {
-        "talebook.metadata.open-library",
+        "talebook.combo.open-library",
         "talebook.annotation.brs",
         "talebook.review.file-import",
         "talebook.review.bangumi",

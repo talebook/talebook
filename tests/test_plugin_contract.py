@@ -15,7 +15,7 @@ from webserver.services.plugin_runtime import REGISTRY, PluginRegistry
 
 def _metadata_manifest(plugin_id):
     return {
-        **REGISTRY.get("talebook.metadata.open-library").manifest,
+        **REGISTRY.get("talebook.combo.open-library").manifest,
         "id": plugin_id,
         "categories": ["metadata"],
         "capabilities": ["metadata.lookup"],
@@ -106,7 +106,7 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
     }
     assert not (plugins_dir / "texttools").exists()
     assert not (plugins_dir / "meta" / "weread").exists()
-    assert not (plugins_dir / "metadata" / "open_library.py").exists()
+    assert not (plugins_dir / "meta" / "open_library.py").exists()
     for legacy_module in (
         "book_sources.py",
         "builtin_capabilities.py",
@@ -121,7 +121,7 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
 
     for relative_path, concrete_prefix in {
         "source/base.py": "talebook.source.",
-        "metadata/base.py": "talebook.metadata.",
+        "meta/base.py": "talebook.meta.",
         "review/base.py": "talebook.review.",
         "push/base.py": "talebook.push.",
         "tool/base.py": "talebook.tool.",
@@ -129,7 +129,7 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
     }.items():
         assert concrete_prefix not in (plugins_dir / relative_path).read_text(encoding="utf-8")
 
-    for type_name in ("source", "metadata", "review", "annotation", "tool", "push", "mock", "combo"):
+    for type_name in ("source", "meta", "review", "annotation", "tool", "push", "mock", "combo"):
         type_init = (plugins_dir / type_name / "__init__.py").read_text(encoding="utf-8")
         assert "PROVIDER" not in type_init, "%s/__init__.py 不应维护第二份装配表" % type_name
 
@@ -139,7 +139,7 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
 
     expected_modules = {
         "talebook.mock.multi-tab": "webserver.plugins.mock.multi_tab",
-        "talebook.weread": "webserver.plugins.combo.weread.provider",
+        "talebook.combo.weread": "webserver.plugins.combo.weread.provider",
         "talebook.source.opds": "webserver.plugins.source.opds",
         "talebook.source.legado": "webserver.plugins.source.legado",
         "talebook.source.kavita": "webserver.plugins.source.kavita",
@@ -150,9 +150,9 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
         "talebook.source.internet-archive": "webserver.plugins.source.internet_archive",
         "talebook.source.webdav": "webserver.plugins.source.webdav",
         "talebook.source.watch-folder": "webserver.plugins.source.watch_folder",
-        "talebook.metadata.open-library": "webserver.plugins.combo.open_library",
-        "talebook.metadata.embedded-file": "webserver.plugins.metadata.embedded_file",
-        "talebook.metadata.calibre-provider-bridge": "webserver.plugins.metadata.calibre_provider_bridge",
+        "talebook.combo.open-library": "webserver.plugins.combo.open_library",
+        "talebook.meta.embedded-file": "webserver.plugins.meta.embedded_file",
+        "talebook.meta.calibre-provider-bridge": "webserver.plugins.meta.calibre_provider_bridge",
         "talebook.review.hardcover": "webserver.plugins.review.hardcover",
         "talebook.review.neodb": "webserver.plugins.review.neodb",
         "talebook.review.google-books": "webserver.plugins.review.google_books",

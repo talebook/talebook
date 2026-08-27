@@ -23,7 +23,7 @@ def discover_calibre_providers():
 
 class CalibreProviderBridge:
     manifest = _manifest(
-        "talebook.metadata.calibre-provider-bridge",
+        "talebook.meta.calibre-provider-bridge",
         "Calibre Provider Bridge",
         "自动发现当前 Calibre 运行时已启用的 identify provider。",
         ["metadata"],

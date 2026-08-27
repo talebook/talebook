@@ -29,7 +29,7 @@ Talebook 插件系统与 **PoxenStudio/mybooks** 的 `BaseTool + ToolSet + @Asyn
 | 字段 | 类型 | 约束 |
 |------|------|------|
 | `protocol_version` | string | 必须为 `talebook.plugin/v1` |
-| `id` | string | `PLUGIN_ID_RE = ^[a-z0-9]+(?:[.-][a-z0-9]+)+$`，如 `talebook.weread` |
+| `id` | string | `PLUGIN_ID_RE = ^[a-z0-9]+(?:[.-][a-z0-9]+)+$`，如 `talebook.combo.weread` |
 | `name` | string | 非空 |
 | `version` | string | 语义化版本 `VERSION_RE` |
 | `categories` | string[] | 非空，子集于 `CATEGORIES = {metadata, annotations, reviews, book_sources, integrations}` |
@@ -99,7 +99,7 @@ from webserver.plugins.runtime.protocol import PROTOCOL_VERSION
 class MyMetadataProvider:
     manifest = {
         "protocol_version": PROTOCOL_VERSION,
-        "id": "talebook.metadata.example",
+        "id": "talebook.meta.example",
         "name": "Example Metadata",
         "version": "1.0.0",
         "categories": ["metadata"],
@@ -218,7 +218,7 @@ POST /api/plugins/{plugin_key}/features/{action}
 |------|----------|---------------|------|
 | **内置能力** | `source/{opds,legado}.py` 与 `tool/*/provider.py` | `builtin` | 自动安装并创建 `instance/0/builtin` 连接；OPDS 与 Legado 再由绑定层展开存量事实表 |
 | **书源** | `source/{kavita,komga,booklore,gutenberg,internet_archive,standard_ebooks,webdav,watch_folder}.py` | `http` / `file` | 每个文件只实现一个插件；统一返回领域对象，并由 `download_mode` 选择单文件或分章组装 |
-| **富化连接器** | `metadata/*.py`、`review/*.py` 与 `annotation/brs.py` | `builtin` | 经 `SafeHttpClient` 统一出网；插件 ID 使用单数类型前缀 `talebook.metadata.* / talebook.review.* / talebook.annotation.*` |
+| **富化连接器** | `meta/*.py`、`review/*.py` 与 `annotation/brs.py` | `builtin` | 经 `SafeHttpClient` 统一出网；插件 ID 使用单数类型前缀 `talebook.meta.* / talebook.review.* / talebook.annotation.*` |
 | **综合插件** | `combo/open_library.py`、`combo/weread/` | `builtin` / `http` | Open Library 同时实现 metadata/review；微信读书同时实现 metadata/annotation/extra feature，嵌套分页通过显式 cursor 逐页推进 |
 | **Mock** | `mock/multi_tab.py:MockMultiTabProvider` | `builtin` | `ui.hidden: true`，用于证明跨类别与重试/回滚行为，`token` 驱动的 `rate_limit / delay / fail_external_ids` |
 | **正文工具** | `tool/{text_replace,zh_converter,txt_fixer}/` | `builtin` | `TransformProvider.preview/apply` 执行真实正文处理；handler 仅解析 HTTP、定位书籍，并通过 `runtime.write` 的 finalize/rollback 钩子写回或另存 |
@@ -435,7 +435,7 @@ from webserver.plugins.runtime.protocol import PROTOCOL_VERSION
 class MyDemoMetadataProvider:
     manifest = {
         "protocol_version": PROTOCOL_VERSION,
-        "id": "talebook.metadata.hello",
+        "id": "talebook.meta.hello",
         "name": "Hello Demo",
         "version": "0.1.0",
         "categories": ["metadata"],
@@ -464,7 +464,7 @@ PROVIDER = MyDemoMetadataProvider()
 
 ```python
 # webserver/plugins/register.py
-from webserver.plugins.metadata.my_demo import PROVIDER as MY_DEMO_PROVIDER
+from webserver.plugins.meta.my_demo import PROVIDER as MY_DEMO_PROVIDER
 
 METADATA_PROVIDERS = (*METADATA_PROVIDERS, MY_DEMO_PROVIDER)
 ```

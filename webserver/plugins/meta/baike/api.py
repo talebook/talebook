@@ -8,7 +8,7 @@ import requests
 
 from webserver.constants import CHROME_MOBILE_HEADERS
 from webserver.i18n import _
-from webserver.plugins.meta.douban import str2date
+from webserver.plugins.meta.common import str2date
 
 BAIKE_ISBN = "0000000000001"
 KEY = "BaiduBaike"

@@ -25,7 +25,6 @@ from webserver.constants import (
     META_SOURCE_AMAZON,
     META_SOURCE_BAIDU,
     META_SOURCE_BOOKSOURCE,
-    META_SOURCE_DOUBAN,
     META_SOURCE_DOUBAN_V2,
     META_SOURCE_GOOGLE,
     META_SOURCE_NEODB,
@@ -40,7 +39,8 @@ from webserver.models import (
     Item,
     ReadingState,
 )
-from webserver.plugins.meta import baike, biquge, calibre, douban, douban_v2, neodb, qimao, tomato, xhsd, youshu
+from webserver.plugins.meta import baike, biquge, calibre, douban_v2, neodb, qimao, tomato, xhsd, youshu
+from webserver.plugins.meta import common as meta_common
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
@@ -402,7 +402,7 @@ class BookRefer(BaseHandler):
         return output
 
     def _build_search_tasks(self, mi):
-        sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
+        sources = CONF.get(META_SELECTED_SOURCES, ["douban_v2", "baidu"])
         logging.info("META_SELECTED_SOURCES 配置：%s", sources)
         sources = sources or []
 
@@ -431,29 +431,6 @@ class BookRefer(BaseHandler):
                     if metadata_result is None:
                         metadata_result = metadata_service.search(title, author)
                     return metadata_result
-
-        if META_SOURCE_DOUBAN in sources:
-
-            def _douban():
-                api = douban.DoubanBookApi(
-                    CONF["douban_apikey"],
-                    CONF["douban_baseurl"],
-                    copy_image=False,
-                    manual_select=False,
-                    maxCount=CONF["douban_max_count"],
-                )
-                try:
-                    result = api.search_books(title) or []
-                except Exception:
-                    logging.error(_("豆瓣接口查询 %s 失败" % title))
-                    result = []
-                if not self.has_proper_book(result, mi):
-                    book = api.get_book_by_isbn(mi.isbn)
-                    if book:
-                        result = [book] + list(result)
-                return [api._metadata(b) for b in result]
-
-            tasks["douban"] = _douban
 
         if META_SOURCE_DOUBAN_V2 in sources:
 
@@ -641,26 +618,9 @@ class BookRefer(BaseHandler):
                         "msg": _("百度百科查询失败"),
                     }
                 )
-        elif provider_key == douban.KEY:
-            mi.douban_id = provider_value
-            api = douban.DoubanBookApi(
-                CONF["douban_apikey"],
-                CONF["douban_baseurl"],
-                copy_image=True,
-                manual_select=False,
-                maxCount=1,
-            )
-            try:
-                refer_mi = api.get_book(mi)
-                # 检查豆瓣封面是否获取成功
-                if refer_mi and not refer_mi.cover_data:
-                    # 封面获取失败，保留本地原有的封面数据
-                    refer_mi.cover_data = mi.cover_data
-                    # 记录日志
-                    logging.info("豆瓣封面获取失败，保留本地原有封面")
-            except Exception as e:
-                logging.error("获取豆瓣书籍信息失败: %s", e)
-                raise RuntimeError({"err": "httprequest.douban.failed", "msg": _("豆瓣接口查询失败")})
+        elif provider_key == "douban":
+            # 豆瓣 V1 依赖已停止发放的官方 apikey，历史条目改由 V2 重新搜索。
+            raise RuntimeError({"err": "source.replaced", "msg": _("豆瓣来源已升级为 V2，请重新搜索")})
         elif provider_key == youshu.KEY:
             raise RuntimeError({"err": "source.replaced", "msg": _("该固定来源已替换为在线书源，请重新搜索")})
         elif provider_key == tomato.KEY:
@@ -1016,7 +976,7 @@ class BookEdit(BaseHandler):
             if data["pubdate"] == "__DELETE__":
                 mi.set("pubdate", None)
             else:
-                content = douban.str2date(data["pubdate"])
+                content = meta_common.str2date(data["pubdate"])
                 if content is None:
                     return {
                         "err": "params.pudate.invalid",

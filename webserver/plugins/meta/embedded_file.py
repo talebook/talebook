@@ -41,7 +41,7 @@ def extract_epub_metadata(archive_bytes):
 
 class EmbeddedMetadataProvider:
     manifest = _manifest(
-        "talebook.metadata.embedded-file",
+        "talebook.meta.embedded-file",
         "嵌入文件元数据",
         "从加密上传的 EPUB 文件读取嵌入元数据，只输出补空或人工候选。",
         ["metadata"],

@@ -38,7 +38,7 @@ class TestPluginsApi(TestWithAdminUser):
 
         self.assertEqual(data["err"], "ok")
         definitions = {item["plugin_key"]: item for item in data["definitions"]}
-        self.assertNotIn("talebook.metadata.builtin", definitions)
+        self.assertNotIn("talebook.meta.builtin", definitions)
         self.assertIn("talebook.source.opds", definitions)
         self.assertIn("talebook.source.legado", definitions)
         payload = json.dumps(data, ensure_ascii=False).lower()
@@ -144,7 +144,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         session.commit()
         if secret_ids:
             session.query(PluginSecret).filter(PluginSecret.id.in_(secret_ids)).delete(synchronize_session=False)
-        installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == "talebook.weread").first()
+        installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == "talebook.combo.weread").first()
         if installation is not None:
             installation.enabled = True
         session.commit()
@@ -158,7 +158,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         super().tearDown()
 
     def test_generic_state_advertises_every_declared_workbench_feature(self):
-        data = self.json("/api/plugins/talebook.weread")
+        data = self.json("/api/plugins/talebook.combo.weread")
 
         self.assertEqual(data["err"], "ok")
         self.assertEqual(
@@ -198,7 +198,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         gateway.return_value = {"results": []}
 
         data = self.json(
-            "/api/plugins/talebook.weread/features/search",
+            "/api/plugins/talebook.combo.weread/features/search",
             method="POST",
             body=json.dumps(
                 {
@@ -215,14 +215,14 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
 
     def test_extra_feature_rejects_undeclared_action_and_unknown_params(self):
         unsupported = self.json(
-            "/api/plugins/talebook.weread/features/delete_account",
+            "/api/plugins/talebook.combo.weread/features/delete_account",
             method="POST",
             body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {}}),
         )
         self.assertEqual(unsupported["err"], "plugin.feature_not_supported")
 
         invalid = self.json(
-            "/api/plugins/talebook.weread/features/statistics",
+            "/api/plugins/talebook.combo.weread/features/statistics",
             method="POST",
             body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {"surprise": True}}),
         )
@@ -238,7 +238,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         }
 
         data = self.json(
-            "/api/plugins/talebook.weread/features/search",
+            "/api/plugins/talebook.combo.weread/features/search",
             method="POST",
             body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {"keyword": "活着"}}),
         )
@@ -251,7 +251,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         self.assertEqual(data["connection"]["owner_id"], 1)
         self.assertTrue(data["connection"]["secret"]["configured"])
 
-        state = self.json("/api/plugins/talebook.weread")
+        state = self.json("/api/plugins/talebook.combo.weread")
         self.assertEqual(state["connections"][0]["owner_id"], 1)
         self.assertNotIn(self.api_key, json.dumps(state, ensure_ascii=False))
 
@@ -264,7 +264,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         ):
             gateway.side_effect = error
             data = self.json(
-                "/api/plugins/talebook.weread/features/notebooks",
+                "/api/plugins/talebook.combo.weread/features/notebooks",
                 method="POST",
                 body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {"count": 1}}),
             )
@@ -277,7 +277,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
     @mock.patch.object(WereadProvider, "_gateway", return_value={"results": []})
     def test_generic_import_preview_reuses_saved_connection_without_api_key(self, gateway, fetch_all, _settings, _async_mode):
         connected = self.json(
-            "/api/plugins/talebook.weread/features/search",
+            "/api/plugins/talebook.combo.weread/features/search",
             method="POST",
             body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {"keyword": "活着"}}),
         )
@@ -301,7 +301,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         data = self.json(
             "/api/plugins/connections",
             method="POST",
-            body=json.dumps({"plugin_key": "talebook.weread", "credentials": {"api_key": self.api_key}}),
+            body=json.dumps({"plugin_key": "talebook.combo.weread", "credentials": {"api_key": self.api_key}}),
         )
 
         self.assertEqual(data["err"], "ok")
@@ -315,7 +315,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         own = self.json(
             "/api/plugins/connections",
             method="POST",
-            body=json.dumps({"plugin_key": "talebook.weread", "credentials": {}}),
+            body=json.dumps({"plugin_key": "talebook.combo.weread", "credentials": {}}),
         )["connection"]
         session = get_db()
         foreign = PluginConnection(
@@ -338,7 +338,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         foreign_run_id = foreign_run.id
 
         try:
-            state = self.json("/api/plugins/talebook.weread")
+            state = self.json("/api/plugins/talebook.combo.weread")
             self.assertEqual([item["id"] for item in state["connections"]], [own["id"]])
             self.assertIn(own_run.id, [item["id"] for item in state["runs"]])
             self.assertNotIn(foreign_run_id, [item["id"] for item in state["runs"]])
@@ -355,7 +355,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
 
     def _weread_connection(self):
         session = get_db()
-        installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == "talebook.weread").first()
+        installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == "talebook.combo.weread").first()
         return (
             session.query(PluginConnection)
             .filter(
@@ -370,7 +370,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
     def test_weread_no_longer_rejected_by_generic_action_endpoint(self, mocked):
         with mock.patch.object(WereadProvider, "_gateway", return_value={"books": []}):
             self.json(
-                "/api/plugins/talebook.weread/features/shelf",
+                "/api/plugins/talebook.combo.weread/features/shelf",
                 method="POST",
                 body=json.dumps({"credentials": {"api_key": "unit-test-key"}, "params": {}}),
             )
@@ -392,7 +392,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
     def test_client_supplied_allowed_book_ids_is_discarded(self, mocked):
         with mock.patch.object(WereadProvider, "_gateway", return_value={"books": []}):
             self.json(
-                "/api/plugins/talebook.weread/features/shelf",
+                "/api/plugins/talebook.combo.weread/features/shelf",
                 method="POST",
                 body=json.dumps({"credentials": {"api_key": "unit-test-key"}, "params": {}}),
             )
@@ -416,7 +416,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
         created = self.json(
             "/api/plugins/connections",
             method="POST",
-            body=json.dumps({"plugin_key": "talebook.weread", "credentials": {}}),
+            body=json.dumps({"plugin_key": "talebook.combo.weread", "credentials": {}}),
         )
         self.assertEqual(created["err"], "ok")
 
@@ -441,7 +441,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
         created = self.json(
             "/api/plugins/connections",
             method="POST",
-            body=json.dumps({"plugin_key": "talebook.weread", "credentials": {}}),
+            body=json.dumps({"plugin_key": "talebook.combo.weread", "credentials": {}}),
         )
 
         rejected = self.json(
@@ -467,7 +467,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
         created = self.json(
             "/api/plugins/connections",
             method="POST",
-            body=json.dumps({"plugin_key": "talebook.weread", "credentials": {}}),
+            body=json.dumps({"plugin_key": "talebook.combo.weread", "credentials": {}}),
         )
         session = get_db()
         parent = PluginRun(
@@ -498,7 +498,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
         created = self.json(
             "/api/plugins/connections",
             method="POST",
-            body=json.dumps({"plugin_key": "talebook.weread", "credentials": {}}),
+            body=json.dumps({"plugin_key": "talebook.combo.weread", "credentials": {}}),
         )
 
         rejected = self.json(
@@ -525,7 +525,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
         created = self.json(
             "/api/plugins/connections",
             method="POST",
-            body=json.dumps({"plugin_key": "talebook.weread", "credentials": {}}),
+            body=json.dumps({"plugin_key": "talebook.combo.weread", "credentials": {}}),
         )
         response = self.json(
             "/api/plugins/connections/%d/preview" % created["connection"]["id"],

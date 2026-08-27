@@ -583,7 +583,7 @@ async function query(operation, params = {}, busyKey = operation) {
         if (apiKey.value.trim()) {
             body.credentials = { api_key: apiKey.value.trim() };
         }
-        const endpoint = `/plugins/talebook.weread/features/${operation}`;
+        const endpoint = `/plugins/talebook.combo.weread/features/${operation}`;
         const response = await $backend(endpoint, { method: 'POST', body: JSON.stringify(body) });
         if (response.err !== 'ok') throw new Error(response.msg || response.err);
         connection.value = response.connection || connection.value;
@@ -681,7 +681,7 @@ function rating(value) {
 
 onMounted(async () => {
     try {
-        const response = await $backend('/plugins/talebook.weread');
+        const response = await $backend('/plugins/talebook.combo.weread');
         if (response.err === 'ok') {
             connection.value = (response.connections || []).find(item => item.role === 'default') || null;
         }

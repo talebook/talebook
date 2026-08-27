@@ -134,12 +134,12 @@ def test_third_party_annotation_plugin_is_not_branded_as_weread(db_session):
 
 
 def test_weread_identity_uses_the_same_full_plugin_key_rule(db_session):
-    run, connection = _run_import(db_session, "talebook.weread")
+    run, connection = _run_import(db_session, "talebook.combo.weread")
 
     assert run.status == "succeeded", run.error_message
-    assert db_session.query(AnnotationSource).one().source_name == "talebook.weread"
-    assert db_session.query(PluginEntityMatch).one().source_type == "talebook.weread_book"
-    assert db_session.query(Annotation).one().client_id.startswith("talebook.weread:%s:" % connection.id)
+    assert db_session.query(AnnotationSource).one().source_name == "talebook.combo.weread"
+    assert db_session.query(PluginEntityMatch).one().source_type == "talebook.combo.weread_book"
+    assert db_session.query(Annotation).one().client_id.startswith("talebook.combo.weread:%s:" % connection.id)
 
 
 def test_source_name_is_derived_from_the_plugin_key(db_session):

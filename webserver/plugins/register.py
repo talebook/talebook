@@ -3,8 +3,8 @@
 from webserver.plugins.annotation.brs import PROVIDER as BRS_PROVIDER
 from webserver.plugins.combo.open_library import PROVIDER as OPEN_LIBRARY_PROVIDER
 from webserver.plugins.combo.weread.provider import PROVIDER as WEREAD_PROVIDER
-from webserver.plugins.metadata.calibre_provider_bridge import PROVIDER as CALIBRE_PROVIDER_BRIDGE
-from webserver.plugins.metadata.embedded_file import PROVIDER as EMBEDDED_FILE_PROVIDER
+from webserver.plugins.meta.calibre_provider_bridge import PROVIDER as CALIBRE_PROVIDER_BRIDGE
+from webserver.plugins.meta.embedded_file import PROVIDER as EMBEDDED_FILE_PROVIDER
 from webserver.plugins.mock.multi_tab import PROVIDER as MOCK_MULTI_TAB_PROVIDER
 from webserver.plugins.push.boox import PROVIDER as BOOX_PROVIDER
 from webserver.plugins.push.dangdang import PROVIDER as DANGDANG_PROVIDER
@@ -45,7 +45,7 @@ SOURCE_PROVIDERS = (
     WEBDAV_PROVIDER,
     WATCH_FOLDER_PROVIDER,
 )
-METADATA_PROVIDERS = (EMBEDDED_FILE_PROVIDER, CALIBRE_PROVIDER_BRIDGE)
+META_PROVIDERS = (EMBEDDED_FILE_PROVIDER, CALIBRE_PROVIDER_BRIDGE)
 REVIEW_PROVIDERS = (
     HARDCOVER_PROVIDER,
     NEODB_PROVIDER,
@@ -72,7 +72,7 @@ PROVIDER_GROUPS = {
     "mock": MOCK_PROVIDERS,
     "combo": COMBO_PROVIDERS,
     "source": SOURCE_PROVIDERS,
-    "metadata": METADATA_PROVIDERS,
+    "meta": META_PROVIDERS,
     "review": REVIEW_PROVIDERS,
     "annotation": ANNOTATION_PROVIDERS,
     "tool": TOOL_PROVIDERS,

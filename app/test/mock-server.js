@@ -912,8 +912,8 @@ router.get('/api/admin/settings', eventHandler(() => ({
     smtp_password: 'password',
     smtp_encryption: 'SSL',
     AUDIOBOOK_BACKUP_RETENTION: 3,
-    META_ALL_SOURCES: ['douban', 'baidu', 'xinhua', 'booksource', 'ai'],
-    META_SELECTED_SOURCES: ['douban', 'baidu', 'booksource']
+    META_ALL_SOURCES: ['douban_v2', 'baidu', 'xinhua', 'booksource', 'ai'],
+    META_SELECTED_SOURCES: ['douban_v2', 'baidu', 'booksource']
   }
 })));
 
@@ -1446,14 +1446,14 @@ const wereadConnection = () => ({
 
 router.post('/api/plugins/connections', eventHandler(async (event) => {
   const body = await readBody(event);
-  if (body?.plugin_key !== 'talebook.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
+  if (body?.plugin_key !== 'talebook.combo.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
   if (body?.credentials?.api_key) wereadConfigured = true;
   return { err: 'ok', connection: wereadConnection() };
 }));
 
-router.get('/api/plugins/talebook.weread', eventHandler(() => ({
+router.get('/api/plugins/talebook.combo.weread', eventHandler(() => ({
   err: 'ok',
-  plugin: { plugin_key: 'talebook.weread', extra_features: {} },
+  plugin: { plugin_key: 'talebook.combo.weread', extra_features: {} },
   connections: wereadConfigured ? [wereadConnection()] : [],
   runs: [...wereadRuns.values()].map(value => value.run),
 })));
@@ -1466,7 +1466,7 @@ router.get('/api/plugins/tools/books', eventHandler(() => ({
 router.post('/api/plugins/:pluginKey/features/:action', eventHandler(async (event) => {
   const pluginKey = getRouterParam(event, 'pluginKey');
   const action = getRouterParam(event, 'action');
-  if (pluginKey !== 'talebook.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
+  if (pluginKey !== 'talebook.combo.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
   const body = await readBody(event);
   if (body?.credentials?.api_key) wereadConfigured = true;
   const data = {
@@ -1617,7 +1617,7 @@ const pluginDefinitions = [
   },
   {
     id: 5,
-    plugin_key: 'talebook.metadata.open-library',
+    plugin_key: 'talebook.combo.open-library',
     name: 'Open Library',
     description: '按 ISBN 获取元数据与可用评分，并生成逐字段安全候选。',
     version: '1.0.0',
@@ -1632,7 +1632,7 @@ const pluginDefinitions = [
   },
   {
     id: 6,
-    plugin_key: 'talebook.weread',
+    plugin_key: 'talebook.combo.weread',
     name: '微信读书',
     description: '搜索、书架、统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。',
     version: '1.2.0',

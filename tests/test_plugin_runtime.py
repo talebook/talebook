@@ -107,7 +107,7 @@ def test_builtin_capabilities_are_registered_without_ai_or_calibre_server(db_ses
     definitions = ensure_builtin_definitions(db_session)
     builtins = {item.plugin_key: item for item in definitions if item.plugin_key.startswith("talebook.")}
 
-    assert "talebook.metadata.builtin" not in builtins
+    assert "talebook.meta.builtin" not in builtins
     assert "talebook.source.opds" in builtins
     assert "talebook.source.legado" in builtins
     catalog = json.dumps([item.to_public_dict() for item in builtins.values()], ensure_ascii=False).lower()

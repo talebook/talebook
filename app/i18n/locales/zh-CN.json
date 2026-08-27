@@ -822,9 +822,6 @@
         "autoFillMeta": "自动从互联网拉取新书的书籍信息",
         "autoFillKeepCover": "自动拉取书籍信息时，仅修改书籍信息",
         "metaSelectedSource": "选择启用的元数据源",
-        "doubanBaseurl": "豆瓣插件 API 地址 (例如 http://10.0.0.1:8080 )",
-        "doubanApiKey": "豆瓣 API Key",
-        "doubanMaxCount": "豆瓣插件 API 查询结果数量",
         "staticHost": "CDN 域名",
         "bookNamesFormat": "目录和文件名模式",
         "epubViewer": "EPUB 阅读器",
@@ -893,7 +890,6 @@
         "bookCategoriesInfo": "配置「分类导航」页面里预设的分类。添加书籍时，若书名或者作者名称出现以下分类，则自动添加对应的标签。",
         "bookInfoSourcesInfo": "配置从互联网获取书籍元数据的来源。支持多个信息源同时启用。",
         "audiobookSettingsInfo": "新版本成功发布后，原版本会转为历史备份。这里设置每本书默认保留的备份数量，实际删除由书籍页面的清理按钮触发。",
-        "doubanPluginInfo": "若需要启用豆瓣插件，请参阅安装文档的说明。若出现失败，可尝试更换镜像，例如 talebook/douban-api-rs ",
         "logoInfo": "若需要调整 Logo，请参阅安装文档的说明。",
         "opdsInfo": "OPDS（Open Publication Distribution System）是一种用于电子书分发的开放标准，关闭后将无法通过 OPDS 客户端访问书库。",
         "webdavInfo": "WebDAV 可通过支持该协议的客户端（如 Windows 文件资源管理器、macOS Finder、ES 文件浏览器）直接挂载书库，使用站点账号登录。开启同步目录后，每个用户拥有一个隔离的可写 reader 目录。",
@@ -919,7 +915,6 @@
         "dbForceWarning": "目标数据库中已存在 {count} 条记录，强制迁移将永久清空这些数据后再写入。操作不可逆，请确认已备份！"
       },
       "meta_source": {
-        "douban": "豆瓣",
         "baidu": "百度百科",
         "google": "Google Books",
         "amazon": "Amazon",
