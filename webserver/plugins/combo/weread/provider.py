@@ -99,6 +99,41 @@ WEREAD_QUERY_OPERATIONS = {
 }
 
 
+def _feature_field_schema(kind):
+    if kind in {"text", "id"}:
+        return {"type": "string"}
+    if kind == "reviews":
+        return {"type": "array", "items": {"type": "object"}}
+    if kind == "mode":
+        return {"type": "string", "enum": ["weekly", "monthly", "annually", "overall"]}
+    schema = {"type": "integer", "minimum": 0}
+    if kind == "scope":
+        schema["enum"] = [0, 2, 4, 6, 10, 12, 13, 14, 16]
+    elif kind == "direction":
+        schema["enum"] = [0, 1]
+    elif kind == "review_type":
+        schema["enum"] = [0, 1, 2, 3, 4]
+    elif kind == "small_count":
+        schema["maximum"] = 20
+    elif kind == "count":
+        schema["maximum"] = 100
+    return schema
+
+
+WEREAD_EXTRA_FEATURES = {
+    operation: {
+        "mode": "read",
+        "required_scopes": ["profile.read"],
+        "schema": {
+            "type": "object",
+            "properties": {name: _feature_field_schema(kind) for name, kind in spec["params"].items()},
+            "required": sorted(spec["required"]),
+        },
+    }
+    for operation, spec in WEREAD_QUERY_OPERATIONS.items()
+}
+
+
 def _validate_query_value(name, value, kind):
     if kind in {"text", "id"}:
         if not isinstance(value, str) or not value.strip():
@@ -203,42 +238,7 @@ class WereadProvider:
         "homepage": "https://github.com/Tencent/WeChatReading",
         "license": "GPL-3.0",
         "description": "搜索微信读书内容，浏览书架、阅读统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。",
-        "extra_features": {
-            "statistics": {
-                "mode": "read",
-                "required_scopes": ["profile.read"],
-                "schema": {
-                    "type": "object",
-                    "properties": {"mode": {"type": "string"}, "baseTime": {"type": "integer"}},
-                },
-            },
-            "popular_highlights": {
-                "mode": "read",
-                "required_scopes": ["profile.read"],
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "bookId": {"type": "string"},
-                        "chapterUid": {"type": "integer"},
-                        "synckey": {"type": "integer"},
-                    },
-                    "required": ["bookId"],
-                },
-            },
-            "underline_stats": {
-                "mode": "read",
-                "required_scopes": ["profile.read"],
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "bookId": {"type": "string"},
-                        "chapterUid": {"type": "integer"},
-                        "synckey": {"type": "integer"},
-                    },
-                    "required": ["bookId", "chapterUid"],
-                },
-            },
-        },
+        "extra_features": WEREAD_EXTRA_FEATURES,
         "ui": {
             "icon": "mdi-book-open-page-variant",
             "manage_route": "/plugins/weread",
@@ -327,11 +327,6 @@ class WereadProvider:
             raise UpstreamAuthError("WeRead API key is required")
         api_name, safe_params = validate_weread_query(operation, {} if params is None else params)
         return self._gateway(api_key, api_name, **safe_params)
-
-    def query_with_context(self, operation, params, context):
-        """兼容工作台查询；凭据只从运行时注入的 context 读取。"""
-        api_key = str((context.get("secrets") or {}).get("api_key") or "")
-        return self.query(api_key, operation, params)
 
     def _fetch_all(self, api_key):
         cursor = {}

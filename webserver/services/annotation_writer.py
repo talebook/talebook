@@ -95,7 +95,7 @@ def book_candidates(calibre_db, source_book, allowed_book_ids=None):
     return sorted(result, key=lambda value: (-value["confidence"], value["book_id"]))
 
 
-def confirm_match(session, connection_id, source_book_id, book_id, user_id, calibre_db, allowed_book_ids):
+def confirm_match(session, connection_id, source_book_id, book_id, user_id, calibre_db, allowed_book_ids, commit=True):
     connection = session.get(PluginConnection, connection_id)
     source_name = source_name_for(session, connection) if connection is not None else SOURCE_NAME
     book_id = int(book_id)
@@ -125,7 +125,10 @@ def confirm_match(session, connection_id, source_book_id, book_id, user_id, cali
     match.status = "confirmed"
     match.confirmed_by = user_id
     match.update_time = now
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        session.flush()
     return match
 
 

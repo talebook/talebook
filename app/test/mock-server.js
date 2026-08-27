@@ -29,6 +29,7 @@ let annotationPermissionDenied = false;
 let annotationPartialRollback = false;
 let wereadRunId = 500;
 let wereadConfigured = false;
+let wereadRuns = new Map();
 let activeThemeName = '';
 let audiobookPublishedEdition = null;
 let audiobookJobs = [];
@@ -183,6 +184,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   annotationPartialRollback = !!body?.annotationPartialRollback;
   wereadRunId = 500;
   wereadConfigured = false;
+  wereadRuns = new Map();
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
@@ -1431,12 +1433,29 @@ router.delete('/api/annotations', eventHandler((event) => {
   return { err: 'ok', sources_deleted: deleted, annotations_deleted: 0 };
 }));
 
-router.get('/api/plugins/weread', eventHandler(() => ({
+const wereadConnection = () => ({
+  id: 88,
+  installation_id: 6,
+  owner_type: 'user',
+  owner_id: 1,
+  role: 'default',
+  name: '微信读书',
+  enabled: true,
+  secret: { configured: wereadConfigured, mask: wereadConfigured ? '••••test' : '' },
+});
+
+router.post('/api/plugins/connections', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body?.plugin_key !== 'talebook.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
+  if (body?.credentials?.api_key) wereadConfigured = true;
+  return { err: 'ok', connection: wereadConnection() };
+}));
+
+router.get('/api/plugins/talebook.weread', eventHandler(() => ({
   err: 'ok',
-  connection: wereadConfigured ? { id: 88, secret: { configured: true, mask: '••••test' } } : null,
-  operations: ['search', 'book_info', 'chapters', 'progress', 'shelf', 'statistics', 'notebooks', 'highlights', 'my_reviews', 'popular_highlights', 'underline_stats', 'highlight_reviews', 'review_detail', 'public_reviews', 'recommendations', 'similar', 'friends_reading'],
-  read_only: true,
-  skill_version: '1.0.4',
+  plugin: { plugin_key: 'talebook.weread', extra_features: {} },
+  connections: wereadConfigured ? [wereadConnection()] : [],
+  runs: [...wereadRuns.values()].map(value => value.run),
 })));
 
 router.get('/api/plugins/tools/books', eventHandler(() => ({
@@ -1444,10 +1463,12 @@ router.get('/api/plugins/tools/books', eventHandler(() => ({
   books: [{ id: 1, title: '测试书', authors: ['测试作者'], formats: ['EPUB', 'TXT'] }],
 })));
 
-router.post('/api/plugins/weread/query', eventHandler(async (event) => {
+router.post('/api/plugins/:pluginKey/features/:action', eventHandler(async (event) => {
+  const pluginKey = getRouterParam(event, 'pluginKey');
+  const action = getRouterParam(event, 'action');
+  if (pluginKey !== 'talebook.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
   const body = await readBody(event);
-  if (body?.api_key) wereadConfigured = true;
-  const connection = { id: 88, secret: { configured: true, mask: '••••test' } };
+  if (body?.credentials?.api_key) wereadConfigured = true;
   const data = {
     search: {
       hasMore: 0,
@@ -1473,51 +1494,24 @@ router.post('/api/plugins/weread/query', eventHandler(async (event) => {
     recommendations: { books: [{ bookId: 'book-2', title: '许三观卖血记', author: '余华', reason: '相似主题' }] },
     similar: { booksimilar: { books: [{ book: { bookInfo: { bookId: 'book-3', title: '兄弟', author: '余华' } } }] } },
     friends_reading: { items: [{ book: { bookId: 'book-4', title: '三体', author: '刘慈欣' } }] },
-  }[body?.operation] || {};
-  return { err: 'ok', connection, data };
-}));
-
-router.post('/api/plugins/:pluginKey/features/:action', eventHandler(async (event) => {
-  const pluginKey = getRouterParam(event, 'pluginKey');
-  const action = getRouterParam(event, 'action');
-  if (pluginKey !== 'talebook.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
-  const data = {
-    statistics: { totalReadTime: 7260, readDays: 4, dayAverageReadTime: 1815, readStat: [{ stat: '读过', counts: '3本' }] },
-    popular_highlights: { items: [{ bookmarkId: 'p1', chapterUid: 12, range: '10-20', markText: '最初我们来到这个世界', totalCount: 128 }] },
-    underline_stats: { underlines: [{ range: '10-20', count: 128, score: 99 }] },
   }[action];
   if (!data) return { err: 'feature.not_found', msg: 'feature not found' };
   return {
     err: 'ok',
-    connection: { id: 88, secret: { configured: true, mask: '••••test' } },
+    connection: wereadConnection(),
     data,
   };
 }));
 
-router.get('/api/plugins/weread/import', eventHandler(() => ({
-  err: 'ok',
-  connection: wereadConfigured ? { id: 88, secret: { configured: true, mask: '••••test' } } : null,
-  runs: [],
-})));
-
-router.post('/api/plugins/weread/import', eventHandler(async (event) => {
+router.post('/api/plugins/connections/:id/:action', eventHandler(async (event) => {
   const body = await readBody(event);
+  const action = getRouterParam(event, 'action');
   wereadRunId += 1;
-  if (body?.action === 'test') {
-    wereadConfigured = true;
-    return {
-      err: 'ok',
-      connection: { id: 88, secret: { configured: true, mask: '••••test' } },
-      run: { id: wereadRunId, status: 'succeeded', counts: { fetched: 0 } },
-      items: [],
-    };
-  }
-  if (body?.action === 'preview') {
-    return {
-      err: 'ok',
-      connection: { id: 88, secret: { configured: false, mask: '' } },
-      run: { id: wereadRunId, status: 'failed', counts: { fetched: 2, conflicts: 2 } },
-      items: [{
+  let run = { id: wereadRunId, connection_id: 88, action, status: 'succeeded', counts: { fetched: 0 } };
+  let items = [];
+  if (action === 'preview') {
+    run = { ...run, status: 'failed', counts: { fetched: 2, conflicts: 2 } };
+    items = [{
         external_id: 'weread:3300045871:bookmark:b1',
         entity_type: 'annotation',
         status: 'conflict',
@@ -1527,30 +1521,32 @@ router.post('/api/plugins/weread/import', eventHandler(async (event) => {
           match_status: 'confirmation_required',
           candidates: [{ book_id: 1, title: '活着', author: '余华', confidence: 0.94 }],
         },
-      }],
+      }];
+  } else if (action === 'run') {
+    const imported = {
+      id: 102,
+      book_id: 1,
+      annotation_type: 'highlight',
+      is_private: true,
+      can_edit: true,
+      cfi: null,
+      chapter: '第一章',
+      quote_text: '人是为活着本身而活着的',
+      content: '',
+      created_at: '2026-08-17T12:00:00',
+      updated_at: '2026-08-17T12:00:00',
+      sources: [{ source_name: 'weread', source_connection_id: '88', source_run_id: String(wereadRunId) }],
     };
+    annotationsByBookId.set(1, [...(annotationsByBookId.get(1) || []).filter(item => item.id !== 102), imported]);
+    run = { ...run, counts: { fetched: 2, written: 2, updated: 0, skipped: 0, failed: 0, conflicts: 0 } };
   }
-  const imported = {
-    id: 102,
-    book_id: 1,
-    annotation_type: 'highlight',
-    is_private: true,
-    can_edit: true,
-    cfi: null,
-    chapter: '第一章',
-    quote_text: '人是为活着本身而活着的',
-    content: '',
-    created_at: '2026-08-17T12:00:00',
-    updated_at: '2026-08-17T12:00:00',
-    sources: [{ source_name: 'weread', source_connection_id: '88', source_run_id: String(wereadRunId) }],
-  };
-  annotationsByBookId.set(1, [...(annotationsByBookId.get(1) || []).filter(item => item.id !== 102), imported]);
-  return {
-    err: 'ok',
-    connection: { id: 88, secret: { configured: false, mask: '' } },
-    run: { id: wereadRunId, status: 'succeeded', counts: { fetched: 2, written: 2, updated: 0, skipped: 0, failed: 0, conflicts: 0 } },
-    items: [],
-  };
+  wereadRuns.set(run.id, { run, items, inputData: body?.input_data || {} });
+  return { err: 'ok', run };
+}));
+
+router.get('/api/plugins/runs/:id', eventHandler((event) => {
+  const value = wereadRuns.get(Number(getRouterParam(event, 'id')));
+  return value ? { err: 'ok', run: value.run, items: value.items } : { err: 'plugin.run_missing', msg: 'Run not found' };
 }));
 
 // Book Detail

@@ -574,22 +574,16 @@ const shelfPrivacySummary = computed(() => ({
         + (shelf.value?.mp ? 1 : 0),
 }));
 
-const EXTRA_FEATURE_OPERATIONS = new Set(['statistics', 'popular_highlights', 'underline_stats']);
-
 async function query(operation, params = {}, busyKey = operation) {
     busy.value = busyKey;
     busyCounts.set(busyKey, (busyCounts.get(busyKey) || 0) + 1);
     error.value = '';
     try {
-        const isExtraFeature = EXTRA_FEATURE_OPERATIONS.has(operation);
-        const body = isExtraFeature ? { params } : { operation, params };
+        const body = { params };
         if (apiKey.value.trim()) {
-            if (isExtraFeature) body.credentials = { api_key: apiKey.value.trim() };
-            else body.api_key = apiKey.value.trim();
+            body.credentials = { api_key: apiKey.value.trim() };
         }
-        const endpoint = isExtraFeature
-            ? `/plugins/talebook.weread/features/${operation}`
-            : '/plugins/weread/query';
+        const endpoint = `/plugins/talebook.weread/features/${operation}`;
         const response = await $backend(endpoint, { method: 'POST', body: JSON.stringify(body) });
         if (response.err !== 'ok') throw new Error(response.msg || response.err);
         connection.value = response.connection || connection.value;
@@ -687,8 +681,10 @@ function rating(value) {
 
 onMounted(async () => {
     try {
-        const response = await $backend('/plugins/weread');
-        if (response.err === 'ok') connection.value = response.connection;
+        const response = await $backend('/plugins/talebook.weread');
+        if (response.err === 'ok') {
+            connection.value = (response.connections || []).find(item => item.role === 'default') || null;
+        }
     } catch {
         error.value = t('weread.failed');
     }

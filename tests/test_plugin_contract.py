@@ -49,9 +49,7 @@ def test_all_book_source_plugins_use_the_source_namespace():
     }
 
     actual = {
-        provider.manifest["id"]
-        for provider in REGISTRY.providers()
-        if "book_sources" in provider.manifest["categories"]
+        provider.manifest["id"] for provider in REGISTRY.providers() if "book_sources" in provider.manifest["categories"]
     }
 
     assert actual == expected
@@ -61,6 +59,7 @@ def test_all_book_source_plugins_use_the_source_namespace():
 def test_concrete_plugins_live_outside_the_platform_runtime():
     runtime_dir = Path(plugin_contract.__file__).parent
     plugins_dir = runtime_dir.parent
+    assert not (plugins_dir.parent / "handlers" / "plugin_weread.py").exists()
     assert {path.name for path in runtime_dir.glob("*.py")} == {
         "__init__.py",
         "domains.py",
@@ -139,9 +138,7 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
     register_source = (plugins_dir / "register.py").read_text(encoding="utf-8")
 
     assert set(providers) == set(expected_modules)
-    assert {
-        plugin_id: provider.__class__.__module__ for plugin_id, provider in providers.items()
-    } == expected_modules
+    assert {plugin_id: provider.__class__.__module__ for plugin_id, provider in providers.items()} == expected_modules
     for module in expected_modules.values():
         assert "from %s import PROVIDER" % module in register_source
     assert not any(plugin_id.startswith(("talebook.reviews.", "talebook.annotations.")) for plugin_id in providers)

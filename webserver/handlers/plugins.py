@@ -1,11 +1,10 @@
-"""通用插件管理接口：目录、安装、连接、动作与运行历史。
+"""通用插件管理接口：目录、安装、连接、功能、动作与运行历史。
 
-微信读书专属接口见 handlers/plugin_weread.py，内置文本工具见
-handlers/plugin_booktools.py。
+内置文本工具的书籍选择与文件写入编排见 handlers/plugin_booktools.py。
 """
 
 from webserver import loader
-from webserver.handlers import plugin_booktools, plugin_weread
+from webserver.handlers import plugin_booktools
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.handlers.plugins_common import body as _body
 from webserver.handlers.plugins_common import error as _error
@@ -19,7 +18,7 @@ from webserver.models import (
 )
 from webserver.plugins.runtime.interfaces import ExtraFeatureProvider
 from webserver.plugins.runtime.protocol import PluginManifest, UpstreamError, validate_against_schema
-from webserver.services.annotation_writer import all_book_ids
+from webserver.services.annotation_writer import all_book_ids, confirm_match
 from webserver.services.async_service import AsyncService
 from webserver.services.plugin_jobs import execute_plugin_run
 from webserver.services.plugin_runtime import (
@@ -35,7 +34,7 @@ from webserver.services.plugin_secrets import SecretCipherError
 
 
 # 这些键由服务端计算并注入，客户端传入的同名值一律丢弃，避免越权访问私有书籍。
-SERVER_OWNED_INPUT_KEYS = frozenset({"allowed_book_ids"})
+SERVER_OWNED_INPUT_KEYS = frozenset({"allowed_book_ids", "matches"})
 # 声明了这些能力的插件会做书籍匹配，需要平台注入可见书籍白名单。
 BOOK_SCOPED_CAPABILITIES = frozenset({"annotations.import"})
 
@@ -43,7 +42,9 @@ BOOK_SCOPED_CAPABILITIES = frozenset({"annotations.import"})
 def _plugin_input_data(handler, connection):
     """构造插件运行输入：客户端参数经过滤后，与服务端计算的受控字段合并。"""
     req = _body(handler)
-    supplied = req.get("input_data") or {}
+    supplied = req.get("input_data", {})
+    if supplied is None:
+        supplied = {}
     if not isinstance(supplied, dict):
         raise PluginRuntimeError("plugin.request_invalid", "input_data must be an object")
 
@@ -52,11 +53,90 @@ def _plugin_input_data(handler, connection):
     installation = handler.session.get(PluginInstallation, connection.installation_id)
     definition = handler.session.get(PluginDefinition, installation.definition_id) if installation else None
     capabilities = set((definition.capabilities if definition else None) or [])
+    match_confirmations = []
     if capabilities & BOOK_SCOPED_CAPABILITIES:
-        input_data["allowed_book_ids"] = [
+        allowed_book_ids = [
             book_id for book_id in all_book_ids(handler.db) if handler.get_book(book_id, raise_exception=False) is not None
         ]
-    return req, input_data
+        input_data["allowed_book_ids"] = allowed_book_ids
+        matches = supplied.get("matches", {})
+        if matches is None:
+            matches = {}
+        if not isinstance(matches, dict):
+            raise PluginRuntimeError("plugin.request_invalid", "matches must be an object")
+        for source_book_id, book_id in matches.items():
+            match_confirmations.append((str(source_book_id), book_id, allowed_book_ids))
+    return req, input_data, match_confirmations
+
+
+def _prepare_action_run(handler, connection, action):
+    """先校验 run，再把匹配确认与 run 创建作为一个事务提交。"""
+    req, input_data, match_confirmations = _plugin_input_data(handler, connection)
+    runtime = PluginRuntime(handler.session, loader.get_settings())
+    try:
+        run = runtime.prepare_run(
+            connection.id,
+            action,
+            handler.user_id(),
+            trigger=req.get("trigger", "manual"),
+            parent_run_id=req.get("parent_run_id"),
+            input_data=input_data,
+            server_owned_input_keys=SERVER_OWNED_INPUT_KEYS,
+            commit=False,
+        )
+        for source_book_id, book_id, allowed_book_ids in match_confirmations:
+            try:
+                confirm_match(
+                    handler.session,
+                    connection.id,
+                    source_book_id,
+                    int(book_id),
+                    handler.user_id(),
+                    handler.db,
+                    allowed_book_ids,
+                    commit=False,
+                )
+            except (TypeError, ValueError) as exc:
+                raise PluginRuntimeError("plugin.match_book_forbidden", str(exc)) from exc
+        handler.session.commit()
+        return run
+    except Exception:
+        handler.session.rollback()
+        raise
+
+
+def _active_user_installation(session, plugin_key, user_id):
+    provider = REGISTRY.get(plugin_key)
+    manifest = PluginManifest.validate(provider.manifest)
+    if "user" not in manifest.raw["connection_owners"]:
+        raise PluginRuntimeError("plugin.owner_forbidden", "This plugin does not support user connections")
+    installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
+    if installation is None:
+        installation = install_builtin(session, plugin_key, user_id)
+    if not installation.enabled or installation.status != "active":
+        raise PluginRuntimeError("plugin.installation_disabled", "Plugin installation is disabled")
+    return manifest, installation
+
+
+def _public_manifest(manifest):
+    raw = manifest.raw
+    return {
+        "plugin_key": raw["id"],
+        "name": raw["name"],
+        "version": raw["version"],
+        "protocol_version": raw["protocol_version"],
+        "description": raw.get("description", ""),
+        "runtime_kind": raw["runtime_kind"],
+        "categories": list(raw["categories"]),
+        "capabilities": list(raw["capabilities"]),
+        "actions": list(raw["actions"]),
+        "auth_schema": dict(raw["auth_schema"]),
+        "config_schema": dict(raw["config_schema"]),
+        "connection_owners": list(raw["connection_owners"]),
+        "permissions": list(raw["permissions"]),
+        "extra_features": dict(raw.get("extra_features") or {}),
+        "ui": dict(raw.get("ui") or {}),
+    }
 
 
 class AdminPlugins(BaseHandler):
@@ -198,7 +278,7 @@ class AdminPluginConnections(BaseHandler):
                 scopes=req.get("scopes"),
                 schedule=req.get("schedule", ""),
             )
-            secret = self.session.get(PluginSecret, connection.secret_id)
+            secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
             return {"err": "ok", "connection": connection.to_public_dict(secret)}
         except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
             return _error(exc)
@@ -220,7 +300,7 @@ class AdminPluginConnectionState(BaseHandler):
                 raise PluginRuntimeError("plugin.installation_disabled", "Enable the plugin installation first")
             connection.enabled = req["enabled"]
             self.session.commit()
-            secret = self.session.get(PluginSecret, connection.secret_id)
+            secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
             return {"err": "ok", "connection": connection.to_public_dict(secret)}
         except (PluginRuntimeError, TypeError, ValueError) as exc:
             return _error(exc)
@@ -247,14 +327,29 @@ class UserPluginConnections(BaseHandler):
     def post(self):
         try:
             req = _body(self)
+            plugin_key = req.get("plugin_key")
+            installation_id = req.get("installation_id")
+            if plugin_key is not None:
+                if not isinstance(plugin_key, str) or not plugin_key or installation_id is not None:
+                    raise PluginRuntimeError("plugin.request_invalid", "Provide either plugin_key or installation_id")
+                manifest, installation = _active_user_installation(self.session, plugin_key, self.user_id())
+                installation_id = installation.id
+                default_name = manifest.raw["name"]
+            else:
+                installation_id = int(installation_id or 0)
+                installation = self.session.get(PluginInstallation, installation_id)
+                if installation is None or not installation.enabled or installation.status != "active":
+                    raise PluginRuntimeError("plugin.installation_missing", "Plugin installation is not active")
+                definition = self.session.get(PluginDefinition, installation.definition_id)
+                default_name = definition.name
             connection = save_connection(
                 self.session,
                 loader.get_settings(),
-                int(req.get("installation_id", 0)),
+                installation_id,
                 "user",
                 self.user_id(),
                 req.get("credentials"),
-                name=req.get("name", "default"),
+                name=req.get("name", default_name),
                 # role 是查询键，name 只是展示文案：不传 role 会退化回按名字定位，
                 # 用户改一次名就会多出一条连接。
                 role=req.get("role") or DEFAULT_CONNECTION_ROLE,
@@ -262,8 +357,60 @@ class UserPluginConnections(BaseHandler):
                 scopes=req.get("scopes"),
                 schedule=req.get("schedule", ""),
             )
-            secret = self.session.get(PluginSecret, connection.secret_id)
+            secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
             return {"err": "ok", "connection": connection.to_public_dict(secret)}
+        except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
+class UserPluginState(BaseHandler):
+    @js
+    @auth
+    def get(self, plugin_key):
+        try:
+            provider = REGISTRY.get(plugin_key)
+            manifest = PluginManifest.validate(provider.manifest)
+            installation = self.session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
+            connections = []
+            runs = []
+            if installation is not None:
+                connections = (
+                    self.session.query(PluginConnection)
+                    .filter(
+                        PluginConnection.installation_id == installation.id,
+                        PluginConnection.owner_type == "user",
+                        PluginConnection.owner_id == self.user_id(),
+                    )
+                    .order_by(PluginConnection.id)
+                    .all()
+                )
+            connection_ids = [connection.id for connection in connections]
+            if connection_ids:
+                runs = (
+                    self.session.query(PluginRun)
+                    .filter(PluginRun.connection_id.in_(connection_ids))
+                    .order_by(PluginRun.id.desc())
+                    .limit(100)
+                    .all()
+                )
+            runtime = PluginRuntime(self.session, loader.get_settings())
+            return {
+                "err": "ok",
+                "plugin": _public_manifest(manifest),
+                "installation": (
+                    {
+                        "id": installation.id,
+                        "plugin_key": installation.plugin_key,
+                        "version": installation.version,
+                        "enabled": bool(installation.enabled),
+                        "status": installation.status,
+                    }
+                    if installation is not None
+                    else None
+                ),
+                "connections": [runtime.connection_public_dict(connection) for connection in connections],
+                "runs": [run.to_public_dict() for run in runs],
+            }
         except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
             return _error(exc)
 
@@ -281,7 +428,9 @@ class UserPluginFeature(BaseHandler):
             feature = (manifest.raw.get("extra_features") or {}).get(action)
             if feature is None or not isinstance(provider, ExtraFeatureProvider):
                 raise PluginRuntimeError("plugin.feature_not_supported", "Plugin feature is not supported")
-            params = req.get("params") or {}
+            params = req.get("params", {})
+            if params is None:
+                params = {}
             if not isinstance(params, dict):
                 raise PluginRuntimeError("plugin.request_invalid", "Feature params must be an object")
             try:
@@ -289,9 +438,7 @@ class UserPluginFeature(BaseHandler):
             except ValueError as exc:
                 raise PluginRuntimeError(getattr(exc, "code", "plugin.request_invalid"), str(exc)) from exc
 
-            installation = self.session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
-            if installation is None:
-                installation = install_builtin(self.session, plugin_key, self.user_id())
+            _, installation = _active_user_installation(self.session, plugin_key, self.user_id())
             credentials = req.get("credentials")
             if credentials is not None:
                 if not isinstance(credentials, dict):
@@ -342,15 +489,7 @@ class AdminPluginAction(BaseHandler):
             connection = self.session.get(PluginConnection, int(connection_id))
             if connection is None:
                 raise PluginRuntimeError("plugin.connection_missing", "Plugin connection is not available")
-            req, input_data = _plugin_input_data(self, connection)
-            run = PluginRuntime(self.session, loader.get_settings()).prepare_run(
-                connection.id,
-                action,
-                self.user_id(),
-                trigger=req.get("trigger", "manual"),
-                parent_run_id=req.get("parent_run_id"),
-                input_data=input_data,
-            )
+            run = _prepare_action_run(self, connection, action)
             execute_plugin_run(AsyncService(), run.id)
             self.session.refresh(run)
             return {"err": "ok", "run": run.to_public_dict()}
@@ -407,15 +546,7 @@ class UserPluginAction(BaseHandler):
             connection = self.session.get(PluginConnection, int(connection_id))
             if connection is None or connection.owner_type != "user" or connection.owner_id != self.user_id():
                 raise PluginRuntimeError("plugin.connection_forbidden", "Plugin connection is not available")
-            req, input_data = _plugin_input_data(self, connection)
-            run = PluginRuntime(self.session, loader.get_settings()).prepare_run(
-                connection.id,
-                action,
-                self.user_id(),
-                trigger=req.get("trigger", "manual"),
-                parent_run_id=req.get("parent_run_id"),
-                input_data=input_data,
-            )
+            run = _prepare_action_run(self, connection, action)
             execute_plugin_run(AsyncService(), run.id)
             self.session.refresh(run)
             return {"err": "ok", "run": run.to_public_dict()}
@@ -459,23 +590,20 @@ class UserPluginRunDetail(BaseHandler):
 
 
 def routes():
-    return (
-        [
-            (r"/api/admin/plugins", AdminPlugins),
-            (r"/api/admin/plugins/install", AdminPluginInstall),
-            (r"/api/admin/plugins/opds-service", AdminPluginOpdsService),
-            (r"/api/admin/plugins/installations/([0-9]+)/state", AdminPluginInstallationState),
-            (r"/api/admin/plugins/connections", AdminPluginConnections),
-            (r"/api/admin/plugins/connections/([0-9]+)/state", AdminPluginConnectionState),
-            (r"/api/admin/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", AdminPluginAction),
-            (r"/api/admin/plugins/runs", AdminPluginRuns),
-            (r"/api/admin/plugins/runs/([0-9]+)", AdminPluginRunDetail),
-            (r"/api/plugins/connections", UserPluginConnections),
-            (r"/api/plugins/([a-z0-9.-]+)/features/([a-z0-9_]+)", UserPluginFeature),
-            (r"/api/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", UserPluginAction),
-            (r"/api/plugins/runs", UserPluginRuns),
-            (r"/api/plugins/runs/([0-9]+)", UserPluginRunDetail),
-        ]
-        + plugin_weread.routes()
-        + plugin_booktools.routes()
-    )
+    return [
+        (r"/api/admin/plugins", AdminPlugins),
+        (r"/api/admin/plugins/install", AdminPluginInstall),
+        (r"/api/admin/plugins/opds-service", AdminPluginOpdsService),
+        (r"/api/admin/plugins/installations/([0-9]+)/state", AdminPluginInstallationState),
+        (r"/api/admin/plugins/connections", AdminPluginConnections),
+        (r"/api/admin/plugins/connections/([0-9]+)/state", AdminPluginConnectionState),
+        (r"/api/admin/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", AdminPluginAction),
+        (r"/api/admin/plugins/runs", AdminPluginRuns),
+        (r"/api/admin/plugins/runs/([0-9]+)", AdminPluginRunDetail),
+        (r"/api/plugins/connections", UserPluginConnections),
+        (r"/api/plugins/([a-z0-9.-]+)/features/([a-z0-9_]+)", UserPluginFeature),
+        (r"/api/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", UserPluginAction),
+        (r"/api/plugins/runs", UserPluginRuns),
+        (r"/api/plugins/runs/([0-9]+)", UserPluginRunDetail),
+        (r"/api/plugins/([a-z0-9.-]+)", UserPluginState),
+    ] + plugin_booktools.routes()

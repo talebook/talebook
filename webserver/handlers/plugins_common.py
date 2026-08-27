@@ -1,7 +1,7 @@
 """插件相关 handler 的共用助手。
 
-拆分 handlers/plugins.py 时抽出，避免通用插件、微信读书、内置文本工具
-三块代码共用同一个命名空间。
+拆分 handlers/plugins.py 时抽出，避免通用插件与内置文本工具编排
+共用同一个命名空间。
 """
 
 import tornado.escape

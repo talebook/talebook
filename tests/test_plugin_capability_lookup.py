@@ -11,9 +11,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Base, PluginRun
+from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.plugins.runtime.domains import CheckReport, Page, Review
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, UpstreamAuthError, UpstreamRateLimitError
-from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,
@@ -610,14 +610,23 @@ def test_metadata_stream_close_keeps_lease_for_uncancellable_provider(db_session
         release.set()
 
 
-def test_weread_handler_keeps_credentials_and_provider_construction_inside_runtime():
-    """S6：兼容 handler 可以保留，但不能自行定位具体插件、解密或构造 provider。"""
-    from webserver.handlers import plugin_weread
+def test_weread_has_no_private_handler_or_runtime_bypass():
+    """S14：工作台只消费通用 API，具体插件不再向平台 handler 层泄漏。"""
+    from pathlib import Path
 
-    source = inspect.getsource(plugin_weread)
-    assert "WEREAD_PLUGIN_KEY" not in source
-    assert "SecretCipher" not in source
-    assert "WereadProvider" not in source
+    from webserver.handlers import plugins
+    from webserver.plugins.combo.weread import provider
+
+    root = Path(__file__).resolve().parents[1]
+    assert not (root / "webserver/handlers/plugin_weread.py").exists()
+    handler_source = inspect.getsource(plugins)
+    provider_source = inspect.getsource(provider)
+    assert "plugin_weread" not in handler_source
+    assert "query_with_context" not in provider_source
+    for relative in ("app/pages/plugins/weread.vue", "app/components/WeReadImportDialog.vue"):
+        source = (root / relative).read_text(encoding="utf-8")
+        assert "/plugins/weread/query" not in source
+        assert "/plugins/weread/import" not in source
 
 
 def test_auto_transform_service_only_dispatches_the_typed_transform_interface():

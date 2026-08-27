@@ -495,7 +495,17 @@ class PluginRuntime:
         self.sleeper = sleeper
         self.calibre_db = calibre_db
 
-    def prepare_run(self, connection_id, action, requested_by, trigger="manual", parent_run_id=None, input_data=None):
+    def prepare_run(
+        self,
+        connection_id,
+        action,
+        requested_by,
+        trigger="manual",
+        parent_run_id=None,
+        input_data=None,
+        server_owned_input_keys=(),
+        commit=True,
+    ):
         if action not in ACTIONS:
             raise PluginRuntimeError("plugin.action_invalid", "Unsupported plugin action")
         connection = self.session.get(PluginConnection, connection_id)
@@ -516,7 +526,16 @@ class PluginRuntime:
                 raise PluginRuntimeError("plugin.retry_not_allowed", "Only failed or partial runs can be retried")
             if action == "rollback" and parent.action not in {"run", "retry"}:
                 raise PluginRuntimeError("plugin.rollback_not_allowed", "Only write runs can be rolled back")
-        private_input = dict(parent.input_data or {}) if action == "retry" and parent is not None else dict(input_data or {})
+        current_input = dict(input_data or {})
+        if action == "retry" and parent is not None:
+            private_input = dict(parent.input_data or {})
+            for key in server_owned_input_keys:
+                if key in current_input:
+                    private_input[key] = current_input[key]
+                else:
+                    private_input.pop(key, None)
+        else:
+            private_input = current_input
         run = PluginRun(
             connection_id=connection_id,
             parent_run_id=parent.id if parent else None,
@@ -531,7 +550,10 @@ class PluginRuntime:
             create_time=datetime.datetime.now(),
         )
         self.session.add(run)
-        self.session.commit()
+        if commit:
+            self.session.commit()
+        else:
+            self.session.flush()
         return run
 
     def execute(self, run_id):

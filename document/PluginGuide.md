@@ -210,7 +210,7 @@ receipt = runtime.sync(annotation_connection, "push_annotation", annotation, sou
 POST /api/plugins/{plugin_key}/features/{action}
 ```
 
-当前微信读书仅将阅读统计、热门划线和划线热度保留在该入口；书、笔记、书评和书源结果不得借此绕过领域类型。
+微信读书工作台展示的是上游原生书架、进度、社区和推荐结构，因此其 17 个原始查询均逐项声明 schema 后走该入口；Talebook 内部的元数据查询和批注同步仍必须使用 `MetadataProvider` / `AnnotationProvider` 的领域类型，不能借工作台接口绕过标准契约。
 
 ## 4 现有 Provider 形态
 
@@ -323,14 +323,14 @@ runtime.execute(run.id)  # 同步阻塞，handler 内直接调用
 | 方法与路径 | 说明 |
 |------------|------|
 | `GET /api/plugins/connections` | 当前用户的连接 |
-| `POST /api/plugins/connections` | `save_connection(..., "user", self.user_id(), ...)` |
-| `POST /api/plugins/connections/:id/{test,preview,run,retry,rollback}` | 校验连接归属，服务端重算 `allowed_book_ids` 后执行通用流水线 |
+| `POST /api/plugins/connections` `{installation_id 或 plugin_key, credentials, name?, config?, scopes?}` | 按 installation 建连，或按 plugin key 安装内置插件后建连；两种形式最终都调用 `save_connection(..., "user", self.user_id(), ...)` 并执行 owner / 凭据 / scope 校验 |
+| `GET /api/plugins/:plugin_key` | 返回公开 manifest、安装状态、当前用户对此插件的 connections 与最近 100 条 runs；不返回其他用户连接或安装 config |
+| `POST /api/plugins/connections/:id/{test,preview,run,retry,rollback}` | 校验连接归属；批注导入由服务端重算 `allowed_book_ids`、确认可见书籍匹配并丢弃客户端同名受控字段后执行通用流水线 |
 | `POST /api/plugins/:plugin_key/features/:action` | 仅执行 manifest `extra_features` 白名单动作；校验 schema 与 `required_scopes` |
 | `GET /api/plugins/runs` | 当前用户 100 条 runs |
 | `GET /api/plugins/runs/:id` | 校验归属后返回 items |
-| `GET /api/plugins/weread` | `{connection, runs, operations[17], read_only: true, skill_version}` |
-| `POST /api/plugins/weread/query` `{api_key?, operation, params}` | 工作台兼容入口；标准业务调用应优先使用 typed provider，三个非标准动作已迁到 generic feature 路由 |
-| `GET/POST /api/plugins/weread/import` `{action=test/preview/run, export?, matches?, api_key?}` | 导入兼容入口；内部仍走 `PluginRuntime`，`allowed_book_ids` 注入 `input_data` |
+
+微信读书工作台只组合上表通用接口：查询走 `features`，导入依次使用 connections、action 与 run detail；不存在 provider 专属 HTTP handler 或兼容路由。
 
 ### 7.3 本次新增（文本工具，复用 `integrations` 分类，`@auth/@is_admin` 混合）
 
