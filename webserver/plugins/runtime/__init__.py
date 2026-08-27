@@ -1,5 +1,9 @@
-from .builtin_capabilities import BUILTIN_CAPABILITY_PROVIDERS, BuiltinCapabilityProvider
-from .book_sources import BOOK_SOURCE_PROVIDERS
+"""插件平台的公共能力、领域对象与协议。
+
+具体插件及其注册清单位于 ``webserver.plugins`` 的类型目录和
+``webserver.plugins.register``，不得从本模块导出。
+"""
+
 from .domains import (
     Annotation,
     BookFile,
@@ -19,7 +23,6 @@ from .domains import (
     ToolOutput,
     ToolReport,
 )
-from .enrichment import EXTERNAL_CONNECTOR_PROVIDERS
 from .interfaces import (
     AnnotationProvider,
     CAPABILITY_INTERFACES,
@@ -32,88 +35,51 @@ from .interfaces import (
     TransformProvider,
     contract_violations,
 )
-from .mock import MockMultiTabProvider
-from .push import PUSH_PROVIDERS, PUSH_PROVIDERS_BY_DEVICE, DevicePushProvider
 from .protocol import (
     ACTIONS,
     CATEGORIES,
     PROTOCOL_VERSION,
     ManifestError,
     PluginManifest,
+    ProviderItem,
+    ProviderResult,
     UpstreamAuthError,
     UpstreamError,
-    ProviderItem,
     UpstreamRateLimitError,
-    ProviderResult,
 )
-from .weread import WEREAD_PLUGIN_KEY, WereadProvider, parse_weread_export
 from .triggers import TRIGGER_AUTO, TRIGGER_MANUAL, TRIGGER_SCHEMA, trigger_of
-
-
-# Canonical IDs changed before this branch is merged, but users may already
-# have exercised it from an earlier build. Keep the identity migration beside
-# the provider catalog; the generic runtime only consumes this mapping.
-_SOURCE_PROVIDERS = (*BUILTIN_CAPABILITY_PROVIDERS, *BOOK_SOURCE_PROVIDERS)
-BUILTIN_PLUGIN_KEY_MIGRATIONS = {
-    provider.manifest["id"].replace("talebook.source.", "talebook.book-source.", 1): provider.manifest["id"]
-    for provider in _SOURCE_PROVIDERS
-    if provider.manifest["id"].startswith("talebook.source.")
-}
-
-# 内置插件清单。运行时只遍历这个元组，不认识其中任何一个具体插件。
-ALL_BUILTIN_PROVIDERS = (
-    MockMultiTabProvider(),
-    WereadProvider(),
-    *BUILTIN_CAPABILITY_PROVIDERS,
-    *BOOK_SOURCE_PROVIDERS,
-    *EXTERNAL_CONNECTOR_PROVIDERS,
-    *PUSH_PROVIDERS,
-)
 
 
 __all__ = [
     "ACTIONS",
-    "ALL_BUILTIN_PROVIDERS",
-    "CATEGORIES",
-    "PROTOCOL_VERSION",
-    "ManifestError",
-    "MockMultiTabProvider",
-    "BuiltinCapabilityProvider",
-    "BUILTIN_PLUGIN_KEY_MIGRATIONS",
-    "BUILTIN_CAPABILITY_PROVIDERS",
-    "BOOK_SOURCE_PROVIDERS",
     "Annotation",
     "AnnotationProvider",
     "BookFile",
     "BookMetadata",
     "CAPABILITY_INTERFACES",
+    "CATEGORIES",
     "Category",
     "CheckReport",
-    "DevicePushProvider",
-    "PUSH_PROVIDERS",
-    "PUSH_PROVIDERS_BY_DEVICE",
-    "EXTERNAL_CONNECTOR_PROVIDERS",
     "ExtraFeatureProvider",
     "ItemFailure",
+    "ManifestError",
     "MetadataProvider",
+    "PROTOCOL_VERSION",
     "Page",
     "PluginContext",
     "PluginManifest",
+    "ProviderItem",
+    "ProviderResult",
     "PushProvider",
     "PushReceipt",
-    "UpstreamAuthError",
-    "UpstreamError",
-    "ProviderItem",
-    "UpstreamRateLimitError",
-    "ProviderResult",
     "Review",
     "ReviewProvider",
     "SourceBook",
     "SourceBookDetail",
     "SourceChapter",
     "SourceContent",
-    "SourceState",
     "SourceProvider",
+    "SourceState",
     "TRIGGER_AUTO",
     "TRIGGER_MANUAL",
     "TRIGGER_SCHEMA",
@@ -121,9 +87,9 @@ __all__ = [
     "ToolOutput",
     "ToolReport",
     "TransformProvider",
-    "WEREAD_PLUGIN_KEY",
-    "WereadProvider",
+    "UpstreamAuthError",
+    "UpstreamError",
+    "UpstreamRateLimitError",
     "contract_violations",
-    "parse_weread_export",
     "trigger_of",
 ]

@@ -5,14 +5,14 @@ import tempfile
 import zipfile
 from unittest import mock
 
-from webserver.plugins.texttools.chinese_epub import convert_txt_file, detect_encoding as zh_detect
-from webserver.plugins.texttools.encoding_detect import decode_with_report, detect_encoding, fix_to_utf8
-from webserver.plugins.texttools.epub_utils import decode_entry, encode_entry, find_text_entries, read_text_entries, set_xml_encoding
-from webserver.plugins.texttools.opencc_engine import OpenCC
-from webserver.plugins.texttools.text_replace import compile_rule, preview, replace_epub_file, replace_txt_file, scan_samples
-from webserver.plugins.texttools.txt_fixer import analyze_bytes, fix_bytes
-from webserver.plugins.runtime.builtin_capabilities import BUILTIN_CAPABILITY_PROVIDERS
 from webserver.handlers.base import BaseHandler
+from webserver.plugins.register import BUILTIN_CAPABILITY_PROVIDERS
+from webserver.plugins.tool.common import decode_with_report, detect_encoding, fix_to_utf8
+from webserver.plugins.tool.epub import decode_entry, encode_entry, find_text_entries, read_text_entries, set_xml_encoding
+from webserver.plugins.tool.text_replace.transform import compile_rule, preview, replace_epub_file, replace_txt_file, scan_samples
+from webserver.plugins.tool.txt_fixer.transform import analyze_bytes, fix_bytes
+from webserver.plugins.tool.zh_converter.engine import OpenCC
+from webserver.plugins.tool.zh_converter.transform import convert_txt_file, detect_encoding as zh_detect
 
 from tests.test_main import BID_EPUB, BID_TXT, TestApp, temporary_book_scope
 from tests.test_main import setUpModule as init_main
@@ -270,7 +270,7 @@ class TestTextReplaceRun(TestApp):
 
 class TestTxtFixerRun(TestApp):
     @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
-    @mock.patch("webserver.plugins.runtime.builtin_capabilities.fix_bytes")
+    @mock.patch("webserver.plugins.tool.txt_fixer.provider.fix_bytes")
     def test_run_new_mode_ok(self, m_fix, m_import):
         m_fix.return_value = ("fixed text", {"encoding": "utf-8", "mojibake": False, "garbage": False, "unrecoverable": False})
         m_import.return_value = 9002
@@ -292,7 +292,7 @@ class TestZhConverterRun(TestApp):
             self.assertEqual(d["err"], "permission.not_admin")
 
     @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
-    @mock.patch("webserver.plugins.runtime.builtin_capabilities.convert_txt_file")
+    @mock.patch("webserver.plugins.tool.zh_converter.provider.convert_txt_file")
     def test_run_new_mode_ok(self, m_convert, m_import):
         m_convert.return_value = "utf-8"
         m_import.return_value = 9003
@@ -358,7 +358,7 @@ class TestBookToolAuditTrail(TestApp):
         self.assertIn("写回失败", runs[-1].error_message)
 
     @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
-    @mock.patch("webserver.plugins.runtime.builtin_capabilities.fix_bytes")
+    @mock.patch("webserver.plugins.tool.txt_fixer.provider.fix_bytes")
     def test_txt_fixer_records_a_run(self, m_fix, m_import):
         m_fix.return_value = ("fixed", {"encoding": "gbk", "mojibake": False, "garbage": False, "unrecoverable": False})
         m_import.return_value = 9102

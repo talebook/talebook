@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from webserver.models import Base, PluginRun
 from webserver.plugins.runtime.domains import CheckReport, Page, Review
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, UpstreamAuthError, UpstreamRateLimitError
-from webserver.plugins.runtime.push import PUSH_CAPABILITY
+from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,

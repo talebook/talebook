@@ -20,11 +20,13 @@ from webserver.models import (
     PluginSecret,
     PluginSourceRecord,
 )
-from webserver.plugins.runtime import (
-    ACTIONS,
+from webserver.plugins.register import (
     ALL_BUILTIN_PROVIDERS,
     BUILTIN_CAPABILITY_PROVIDERS,
     BUILTIN_PLUGIN_KEY_MIGRATIONS,
+)
+from webserver.plugins.runtime import (
+    ACTIONS,
     CheckReport,
     PluginContext,
     PluginManifest,

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """内置文本工具（正文查找替换 / 繁简转换 / TXT 编码修复）的书籍编排层。
 
-纯处理核心位于 :mod:`webserver.plugins.texttools`；本模块负责与 Calibre
+纯处理核心位于 :mod:`webserver.plugins.tool`；本模块负责与 Calibre
 书库交互：定位格式文件、写回原书格式、以新书身份入库（完整继承原书
 元数据与封面）。
 

@@ -1,5 +1,7 @@
 """插件契约检查：注册期就能发现契约违反，而不是等到运行时报通用错误。"""
 
+from pathlib import Path
+
 import pytest
 
 import webserver.plugins.runtime as plugin_contract
@@ -54,6 +56,95 @@ def test_all_book_source_plugins_use_the_source_namespace():
 
     assert actual == expected
     assert not any(plugin_id.startswith("talebook.book-source.") for plugin_id in actual)
+
+
+def test_concrete_plugins_live_outside_the_platform_runtime():
+    runtime_dir = Path(plugin_contract.__file__).parent
+    plugins_dir = runtime_dir.parent
+    assert {path.name for path in runtime_dir.glob("*.py")} == {
+        "__init__.py",
+        "domains.py",
+        "interfaces.py",
+        "protocol.py",
+        "safe_http.py",
+        "triggers.py",
+    }
+    assert not (plugins_dir / "texttools").exists()
+    assert not (plugins_dir / "meta" / "weread").exists()
+    assert not (plugins_dir / "metadata" / "open_library.py").exists()
+    for legacy_module in (
+        "book_sources.py",
+        "builtin_capabilities.py",
+        "enrichment.py",
+        "legado.py",
+        "mock.py",
+        "push.py",
+        "weread.py",
+    ):
+        assert not (runtime_dir / legacy_module).exists()
+    assert not (plugins_dir / "push" / "devices.py").exists()
+
+    for relative_path, concrete_prefix in {
+        "source/base.py": "talebook.source.",
+        "metadata/base.py": "talebook.metadata.",
+        "review/base.py": "talebook.review.",
+        "push/base.py": "talebook.push.",
+        "tool/base.py": "talebook.tool.",
+        "tool/common.py": "talebook.tool.",
+    }.items():
+        assert concrete_prefix not in (plugins_dir / relative_path).read_text(encoding="utf-8")
+
+    for type_name in ("source", "metadata", "review", "annotation", "tool", "push", "mock", "combo"):
+        type_init = (plugins_dir / type_name / "__init__.py").read_text(encoding="utf-8")
+        assert "PROVIDER" not in type_init, "%s/__init__.py 不应维护第二份装配表" % type_name
+
+    for relative_path in ("tool/epub.py", "tool/text_replace/transform.py", "tool/zh_converter/transform.py"):
+        source = (plugins_dir / relative_path).read_text(encoding="utf-8")
+        assert "plugins.tool.txt_fixer" not in source
+
+    expected_modules = {
+        "talebook.mock.multi-tab": "webserver.plugins.mock.multi_tab",
+        "talebook.weread": "webserver.plugins.combo.weread.provider",
+        "talebook.source.opds": "webserver.plugins.source.opds",
+        "talebook.source.legado": "webserver.plugins.source.legado",
+        "talebook.source.kavita": "webserver.plugins.source.kavita",
+        "talebook.source.komga": "webserver.plugins.source.komga",
+        "talebook.source.booklore": "webserver.plugins.source.booklore",
+        "talebook.source.standard-ebooks": "webserver.plugins.source.standard_ebooks",
+        "talebook.source.gutenberg": "webserver.plugins.source.gutenberg",
+        "talebook.source.internet-archive": "webserver.plugins.source.internet_archive",
+        "talebook.source.webdav": "webserver.plugins.source.webdav",
+        "talebook.source.watch-folder": "webserver.plugins.source.watch_folder",
+        "talebook.metadata.open-library": "webserver.plugins.combo.open_library",
+        "talebook.metadata.embedded-file": "webserver.plugins.metadata.embedded_file",
+        "talebook.metadata.calibre-provider-bridge": "webserver.plugins.metadata.calibre_provider_bridge",
+        "talebook.review.hardcover": "webserver.plugins.review.hardcover",
+        "talebook.review.neodb": "webserver.plugins.review.neodb",
+        "talebook.review.google-books": "webserver.plugins.review.google_books",
+        "talebook.review.bangumi": "webserver.plugins.review.bangumi",
+        "talebook.review.anilist": "webserver.plugins.review.anilist",
+        "talebook.review.file-import": "webserver.plugins.review.file_import",
+        "talebook.annotation.brs": "webserver.plugins.annotation.brs",
+        "talebook.tool.text-replace": "webserver.plugins.tool.text_replace.provider",
+        "talebook.tool.zh-converter": "webserver.plugins.tool.zh_converter.provider",
+        "talebook.tool.txt-fixer": "webserver.plugins.tool.txt_fixer.provider",
+        "talebook.push.duokan": "webserver.plugins.push.duokan",
+        "talebook.push.boox": "webserver.plugins.push.boox",
+        "talebook.push.hanwang": "webserver.plugins.push.hanwang",
+        "talebook.push.ireader": "webserver.plugins.push.ireader",
+        "talebook.push.dangdang": "webserver.plugins.push.dangdang",
+        "talebook.push.purelibro": "webserver.plugins.push.purelibro",
+    }
+    providers = {provider.manifest["id"]: provider for provider in REGISTRY.providers()}
+    register_source = (plugins_dir / "register.py").read_text(encoding="utf-8")
+
+    assert set(providers) == set(expected_modules)
+    assert {
+        plugin_id: provider.__class__.__module__ for plugin_id, provider in providers.items()
+    } == expected_modules
+    for module in expected_modules.values():
+        assert "from %s import PROVIDER" % module in register_source
+    assert not any(plugin_id.startswith(("talebook.reviews.", "talebook.annotations.")) for plugin_id in providers)
 
 
 def test_contract_violations_detects_missing_manifest():

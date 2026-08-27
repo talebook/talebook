@@ -15,16 +15,10 @@ from webserver.models import (
     PluginRunItem,
     PluginSourceRecord,
 )
-from webserver.plugins.runtime import (
-    WEREAD_PLUGIN_KEY,
-    UpstreamAuthError,
-    UpstreamError,
-    UpstreamRateLimitError,
-    WereadProvider,
-    parse_weread_export,
-)
+from webserver.plugins.combo.weread import WEREAD_PLUGIN_KEY, WereadProvider, parse_weread_export
+from webserver.plugins.combo.weread.provider import validate_weread_query
+from webserver.plugins.runtime import UpstreamAuthError, UpstreamError, UpstreamRateLimitError
 from webserver.plugins.runtime.safe_http import SafeHttpClient
-from webserver.plugins.runtime.weread import validate_weread_query
 from webserver.services.annotation_writer import confirm_match, locate_epub_quote, normalize_text
 from webserver.services.plugin_runtime import PluginRuntime, install_builtin, save_connection
 
@@ -148,6 +142,11 @@ def test_parser_covers_issue_943_and_does_not_invent_bookmark_content():
     assert items[2].data["chapter"] == "整本书评"
     assert all("bookmark-only" not in item.external_id for item in items)
     assert len(parse_weread_export([SAMPLE, SAMPLE])) == 3
+
+
+def test_parser_rejects_a_non_collection_export_payload():
+    with pytest.raises(UpstreamError, match="JSON object or array"):
+        parse_weread_export("invalid")
 
 
 def test_annotation_pages_advance_nested_notebook_and_review_cursors(monkeypatch):

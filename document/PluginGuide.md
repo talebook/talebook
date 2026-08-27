@@ -15,7 +15,7 @@
 | `feat/ai_1.0` | AI 功能 | 与插件无关 |
 | `dev/ai-tts` | 旧 TTS 实验（4 月停更） | 已废弃，勿选 |
 
-**结论：所有插件/内置能力 PR 应以 `feat/plugins` 为 base。** 该分支独有：`webserver/services/plugin_runtime.py`、`plugin_secrets.py`、`plugin_jobs.py`、`webserver/plugins/runtime/`、`webserver/plugins/texttools/`、`app/pages/admin/plugins/`、`/plugins/weread` 等。
+**结论：所有插件/内置能力 PR 应以 `feat/plugins` 为 base。** 该分支独有：`webserver/services/plugin_runtime.py`、`plugin_secrets.py`、`plugin_jobs.py`、`webserver/plugins/runtime/`、`webserver/plugins/register.py`、`webserver/plugins/{source,metadata,review,annotation,tool,push,combo,mock}/`、`app/pages/admin/plugins/`、`/plugins/weread` 等。
 
 Talebook 插件系统与 **PoxenStudio/mybooks** 的 `BaseTool + ToolSet + @AsyncService + BackgroundService + $backend + toolbox` 工具体系完全不同——前者是**数据同步型 Provider 运行时**，后者是**工具箱型**。直接复制 mybooks 工具代码需重写编排层（见 §9）。
 
@@ -157,8 +157,9 @@ class MyMetadataProvider:
 
 ### 3.2.1 设备推送（sync）
 
-`webserver/plugins/push/devices.py` 保留 6 个上传器的纯上传逻辑，
-`webserver/plugins/runtime/push.py` 把它们包装为 `talebook.push.*` 插件：
+`webserver/plugins/push/{duokan,boox,hanwang,ireader,dangdang,purelibro}.py` 分别保存
+单个设备的上传逻辑与 `talebook.push.*` provider；共用边界位于
+`webserver/plugins/push/base.py`，由 `webserver/plugins/register.py` 汇总注册：
 每用户一条连接（`connection_owners: ["user"]`，设备属于个人），配置项为
 `device_url`，manifest 的 `ui.device_type` 声明既有设备路由。handler 仅把
 `device_type` 交给 runtime 解析；认证用户由 runtime 创建/复用个人连接，
@@ -215,12 +216,12 @@ POST /api/plugins/{plugin_key}/features/{action}
 
 | 形态 | 典型实现 | `runtime_kind` | 特点 |
 |------|----------|---------------|------|
-| **内置能力** | `builtin_capabilities.py` 的 `talebook.source.{opds,legado}` 与三个正文工具 | `builtin` | 自动安装并创建 `instance/0/builtin` 连接；OPDS 与 Legado 再由绑定层展开存量事实表 |
-| **书源** | `book_sources.py` 的 `OPDSProvider / GutenbergProvider / InternetArchive / WebDAV / WatchFolder`，以及 `legado.py` | `http` / `file` / `builtin` | 全部实现 `SourceProvider`；统一返回领域对象，并由 `download_mode` 选择单文件或分章组装 |
-| **富化连接器** | `enrichment.py` 的 `OpenLibrary / EmbeddedMetadata / CatalogReview(BRS, Goodreads...)` | `builtin` | 经 `SafeHttpClient` 的 `_http_json()` 统一出网，`_manifest()` 统一声明 `talebook.metadata.* / talebook.reviews.*` |
-| **通用集成** | `weread.py:WereadProvider` | `http` | 实现 metadata/annotation/extra feature 接口；嵌套分页通过显式 cursor 逐页推进 |
-| **Mock** | `mock.py:MockMultiTabProvider` | `builtin` | `ui.hidden: true`，用于证明跨类别与重试/回滚行为，`token` 驱动的 `rate_limit / delay / fail_external_ids` |
-| **正文工具** | `texttools` 的 3 个 `talebook.tool.*` | `builtin` | `TransformProvider.preview/apply` 执行真实正文处理；handler 仅解析 HTTP、定位书籍，并通过 `runtime.write` 的 finalize/rollback 钩子写回或另存 |
+| **内置能力** | `source/{opds,legado}.py` 与 `tool/*/provider.py` | `builtin` | 自动安装并创建 `instance/0/builtin` 连接；OPDS 与 Legado 再由绑定层展开存量事实表 |
+| **书源** | `source/{kavita,komga,booklore,gutenberg,internet_archive,standard_ebooks,webdav,watch_folder}.py` | `http` / `file` | 每个文件只实现一个插件；统一返回领域对象，并由 `download_mode` 选择单文件或分章组装 |
+| **富化连接器** | `metadata/*.py`、`review/*.py` 与 `annotation/brs.py` | `builtin` | 经 `SafeHttpClient` 统一出网；插件 ID 使用单数类型前缀 `talebook.metadata.* / talebook.review.* / talebook.annotation.*` |
+| **综合插件** | `combo/open_library.py`、`combo/weread/` | `builtin` / `http` | Open Library 同时实现 metadata/review；微信读书同时实现 metadata/annotation/extra feature，嵌套分页通过显式 cursor 逐页推进 |
+| **Mock** | `mock/multi_tab.py:MockMultiTabProvider` | `builtin` | `ui.hidden: true`，用于证明跨类别与重试/回滚行为，`token` 驱动的 `rate_limit / delay / fail_external_ids` |
+| **正文工具** | `tool/{text_replace,zh_converter,txt_fixer}/` | `builtin` | `TransformProvider.preview/apply` 执行真实正文处理；handler 仅解析 HTTP、定位书籍，并通过 `runtime.write` 的 finalize/rollback 钩子写回或另存 |
 
 书源配置不复制：`BookSourceModel` 与 `OpdsSource` 继续是唯一事实，`SourceCatalogService` 用 opaque `source_key` 将它们绑定到插件连接。新入口为 `/api/book-sources/*`；`/api/network/*` 按 D-14 保留一版兼容别名。
 
@@ -230,15 +231,11 @@ POST /api/plugins/{plugin_key}/features/{action}
 ### 5.1 注册表
 
 ```python
-from webserver.services.plugin_runtime import REGISTRY
-from webserver.plugins.runtime import PLUGIN_ID_RE
+from webserver.plugins.register import ALL_BUILTIN_PROVIDERS
 
 REGISTRY = PluginRegistry()  # 启动时顺序注册
-REGISTRY.register(MockMultiTabProvider())
-REGISTRY.register(WereadProvider())
-for p in BUILTIN_CAPABILITY_PROVIDERS: REGISTRY.register(p)   # 含本次 3 个 tool
-for p in BOOK_SOURCE_PROVIDERS:  REGISTRY.register(p)
-for p in EXTERNAL_CONNECTOR_PROVIDERS: REGISTRY.register(p)
+for provider in ALL_BUILTIN_PROVIDERS:
+    REGISTRY.register(provider)
 ```
 
 `register()` 内做 `PluginManifest.validate()`，启动即失败优于运行时失败。
@@ -380,8 +377,8 @@ app/src/pages/toolbox/*.vue       # Vuetify 2（item-text / outlined / dense）
 | 输出形态 | 纯“写回原书” / 纯“另存新书” / 二选一 | **二选一** | 用户要求“选书后可选写回原书或入库为新书”；实现为 `output_mode ∈ {new, overwrite/replace}`，TXT 前者 `add_format`，后者 `import_as_new_book`（完整继承原书元数据与封面，参考 `epub_beautify / chinese_converter` 的 `Metadata` + `Item` 模式） |
 | PR 粒度 | 3 个独立 PR / 1 个 PR 3 工具 | **1 个 PR** | 按用户要求合并提交，提交信息与说明中保留上游归属 |
 | 执行模型 | `BackgroundService` 轮询 / typed runtime 同步调用 | **typed runtime + 共享有界线程池** | provider 的纯文件处理由运行时 I/O 池执行并受 timeout/重试/run 状态机约束；handler 只等待结果并执行平台 finalizer，不另建工具专属任务协议 |
-| 纯核心位置 | `services/booktools` / provider 内部 | **`builtin_capabilities` provider + `plugins/texttools` + `services/booktools`** | provider 持有 preview/apply 业务语义并调用纯文本/EPUB 处理模块；Calibre 定位、覆写、另存与备份属于平台 finalizer，放在 `services/booktools` |
-| 编码策略 | 沿用 `chardet` / 自研打分 | **沿用下游自研** | `encoding_detect.py` 的 `CANDIDATE_ENCODINGS(gb18030/big5/utf-8) + chardet 三段投票 + _MOJIBAKE_PAIRS 反转链 + COMMON_CHARS 语义校验` 在中文书籍上显著优于单 `chardet`；`requirements.txt` 已含 `chardet/bs4/lxml` |
+| 纯核心位置 | `services/booktools` / provider 内部 | **`plugins/tool/{name}/` + `services/booktools`** | 单个插件目录同时持有 provider 与纯处理核心；Calibre 定位、覆写、另存与备份属于平台 finalizer，放在 `services/booktools` |
+| 编码策略 | 沿用 `chardet` / 自研打分 | **沿用下游自研** | `tool/common.py` 的 `CANDIDATE_ENCODINGS(gb18030/big5/utf-8) + chardet 三段投票 + _MOJIBAKE_PAIRS 反转链 + COMMON_CHARS 语义校验` 在中文书籍上显著优于单 `chardet`；`requirements.txt` 已含 `chardet/bs4/lxml` |
 | EPUB 处理 | 全量 `read_zip_entries` / 仅正文 `read_text_entries` | **按场景区分** | 预览用 `read_text_entries`（仅 container/opf/正文 xhtml），执行用 `read_zip_entries`（全条目重写，`mimetype` ZIP_STORED 置首） |
 | 汉化词表 | 打包字典 | **一并打包** | `config/*.json + dictionary/*.txt + a5_phrases.txt` 约 1.4 MB，`opencc_engine._PKG_DIR` 相对定位，额外词表经 `extra_dicts` 注入各 group 首位 |
 
@@ -407,7 +404,7 @@ app/src/pages/toolbox/*.vue       # Vuetify 2（item-text / outlined / dense）
 ### 10.3 提交前
 
 ```bash
-python -m py_compile webserver/plugins/texttools/*.py webserver/services/booktools.py
+python -m compileall -q webserver/plugins/tool webserver/services/booktools.py
 python -c "import json; json.load(open('app/i18n/locales/zh-CN.json',encoding='utf-8'))"
 make lint-py-fix && make lint-py          # ruff（行宽 127，plugins/** 放宽 D/I）
 cd app && npm run lint
@@ -421,7 +418,7 @@ make check-design                          # 如新增设计稿
 
 1. **`webserver/plugins/runtime/safe_http.py:SafeHttpClient`** —— SSRF 防护的管理员白名单、逐跳重定向校验与响应体上限；`enrichment.py:_http_json` 和 Legado transport 都复用这条受限出网边界。
 2. **`webserver/services/annotation_writer.py`** —— EPUB 的 CFI 定位与 `prepare_annotation_item / materialize_annotation / rollback_materialized_annotation` 的三段式落库；可复用到“批注回写”类插件。
-3. **`webserver/services/booksource/`** —— `engine / rule_dispatch / js_runtime(quickjs) / cleaner` 构成的 Legado 书源执行链路；与 `plugins/texttools` 的纯函数式形成对比，适合做“规则引擎”类插件的脚手架。
+3. **`webserver/services/booksource/`** —— `engine / rule_dispatch / js_runtime(quickjs) / cleaner` 构成的 Legado 书源执行链路；与 `plugins/tool/` 的纯函数式形成对比，适合做“规则引擎”类插件的脚手架。
 4. **`webserver/services/convert.py:ConvertService`** —— `ebook-convert / txt2epub-next` 的 `BackgroundService + progress_path` 轮询模型；超大书籍的长任务可借鉴为 `BackgroundTask + /progress` 接口。
 5. **`app/test/mock-server.js`** —— 前端隔离自测的 mock 路由表（含 `weread` 的完整 mock）；新增插件时先在 mock 中定契约，可免起后端联调。
 6. **`tests/test_weread_plugin.py / test_enrichment_connectors.py`** —— `validate_weread_query` 的 allowlist 校验与 `build_field_decisions` 的“只补空”富化策略；可作為新 provider 的单测模板。
@@ -431,9 +428,9 @@ make check-design                          # 如新增设计稿
 ## 12 快速开始：最小可运行插件
 
 ```python
-# webserver/plugins/runtime/my_demo.py
-from .domains import BookMetadata
-from .protocol import PROTOCOL_VERSION
+# webserver/plugins/metadata/my_demo.py
+from webserver.plugins.runtime.domains import BookMetadata
+from webserver.plugins.runtime.protocol import PROTOCOL_VERSION
 
 class MyDemoMetadataProvider:
     manifest = {
@@ -461,15 +458,18 @@ class MyDemoMetadataProvider:
 
     def get_metadata(self, external_id, context):
         return BookMetadata.from_dict({"provider_value": external_id, "title": "Hello Talebook"})
+
+PROVIDER = MyDemoMetadataProvider()
 ```
 
 ```python
-# webserver/plugins/runtime/builtin_capabilities.py 末尾
-from .my_demo import MyDemoMetadataProvider
-BUILTIN_CAPABILITY_PROVIDERS = (*BUILTIN_CAPABILITY_PROVIDERS, MyDemoMetadataProvider())
+# webserver/plugins/register.py
+from webserver.plugins.metadata.my_demo import PROVIDER as MY_DEMO_PROVIDER
+
+METADATA_PROVIDERS = (*METADATA_PROVIDERS, MY_DEMO_PROVIDER)
 ```
 
-重启后访问 `GET /api/admin/plugins` 即可在 `metadata` 分类看到新卡片。已有 metadata 业务流会通过 `connections_for("metadata.lookup")` 自动发现它；不需要再新增一个 provider 专属 handler。只有插件确实需要自有工作台时才声明 `ui.manage_route`，该页面也必须通过 generic feature 路由调用 `ExtraFeatureProvider`。
+`webserver/plugins/register.py` 是唯一组合根，直接导入并列出每个具体 provider；类型包的 `__init__.py` 不维护第二份注册清单。重启后访问 `GET /api/admin/plugins` 即可在 `metadata` 分类看到新卡片。已有 metadata 业务流会通过 `connections_for("metadata.lookup")` 自动发现它；不需要再新增一个 provider 专属 handler。只有插件确实需要自有工作台时才声明 `ui.manage_route`，该页面也必须通过 generic feature 路由调用 `ExtraFeatureProvider`。
 
 ---
 

@@ -5,7 +5,8 @@ from tests.test_main import TestWithAdminUser, get_db
 from tests.test_main import setUpModule as init
 from webserver import loader
 from webserver.models import PluginConnection, PluginInstallation, PluginSecret
-from webserver.plugins.runtime import UpstreamAuthError, UpstreamRateLimitError, WereadProvider
+from webserver.plugins.combo.weread import WereadProvider
+from webserver.plugins.runtime import UpstreamAuthError, UpstreamRateLimitError
 
 
 def setUpModule():

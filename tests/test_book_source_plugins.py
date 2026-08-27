@@ -9,16 +9,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Base, PluginRunItem, PluginSourceRecord
-from webserver.plugins.runtime.book_sources import (
-    BOOK_SOURCE_PROVIDERS,
-    InternetArchiveProvider,
-    OPDSProvider,
-    WatchFolderProvider,
-    WebDAVProvider,
-)
-from webserver.plugins.runtime.builtin_capabilities import BUILTIN_CAPABILITY_PROVIDERS
+from webserver.plugins.register import BOOK_SOURCE_PROVIDERS, BUILTIN_CAPABILITY_PROVIDERS
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderItem, ProviderResult
 from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient, validate_remote_endpoint
+from webserver.plugins.source.base import OPDSProvider
+from webserver.plugins.source.internet_archive import InternetArchiveProvider
+from webserver.plugins.source.watch_folder import WatchFolderProvider
+from webserver.plugins.source.webdav import WebDAVProvider
 from webserver.services.booksource import SourceHttpError
 from webserver.services.booksource_search import TASK_TTL, SearchTaskService
 from webserver.services.plugin_runtime import PluginRegistry, PluginRuntime, install_builtin, save_connection

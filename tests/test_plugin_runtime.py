@@ -17,7 +17,8 @@ from webserver.models import (
     PluginSecret,
     PluginSourceRecord,
 )
-from webserver.plugins.runtime import MockMultiTabProvider, PluginManifest
+from webserver.plugins.mock.multi_tab import MockMultiTabProvider
+from webserver.plugins.runtime import PluginManifest
 from webserver.plugins.runtime.protocol import ManifestError
 from webserver.services.plugin_runtime import (
     REGISTRY,
@@ -126,7 +127,7 @@ def test_builtin_capabilities_are_registered_without_ai_or_calibre_server(db_ses
     assert tool_ui["manage_route"] == "/plugins/text-replace"
 
 
-def test_startup_migration_renames_every_legacy_book_source_identity_in_place(db_session):
+def test_startup_migration_renames_every_legacy_builtin_identity_in_place(db_session):
     legacy_to_current = {
         "talebook.book-source.opds": "talebook.source.opds",
         "talebook.book-source.legado": "talebook.source.legado",
@@ -138,6 +139,13 @@ def test_startup_migration_renames_every_legacy_book_source_identity_in_place(db
         "talebook.book-source.internet-archive": "talebook.source.internet-archive",
         "talebook.book-source.webdav": "talebook.source.webdav",
         "talebook.book-source.watch-folder": "talebook.source.watch-folder",
+        "talebook.reviews.hardcover": "talebook.review.hardcover",
+        "talebook.reviews.neodb": "talebook.review.neodb",
+        "talebook.reviews.google-books": "talebook.review.google-books",
+        "talebook.reviews.bangumi": "talebook.review.bangumi",
+        "talebook.reviews.anilist": "talebook.review.anilist",
+        "talebook.reviews.file-import": "talebook.review.file-import",
+        "talebook.annotations.brs": "talebook.annotation.brs",
     }
     providers = {provider.manifest["id"]: provider for provider in REGISTRY.providers()}
     installation_ids = {}

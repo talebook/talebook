@@ -64,6 +64,39 @@ class SourceState(DomainRecord):
 class Review(DomainRecord):
     """外部评分或评价。"""
 
+    @classmethod
+    def from_rating(
+        cls,
+        source,
+        external_id,
+        rating,
+        scale,
+        sample_count=None,
+        source_url="",
+        source_time="",
+        summary="",
+        book_id=None,
+        domain_id="",
+        series_id="",
+        review_kind="rating",
+        extra=None,
+    ):
+        """构造统一评分记录，避免各 provider 漂移字段或摘要上限。"""
+        value = {
+            "source": source,
+            "review_kind": review_kind,
+            "external_id": str(external_id),
+            "book_id": book_id,
+            "domain_id": str(domain_id or ""),
+            "series_id": str(series_id or ""),
+            "rating": {"value": rating, "scale": scale, "sample_count": sample_count},
+            "source_time": source_time or "",
+            "source_url": source_url or "",
+            "summary": " ".join(str(summary or "").split())[:500],
+        }
+        value.update(dict(extra or {}))
+        return cls.from_dict(value)
+
 
 @dataclass(frozen=True)
 class SourceBook(Mapping[str, Any]):

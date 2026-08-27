@@ -1,8 +1,8 @@
 """内置文本工具的 HTTP 编排（正文查找替换 / 繁简转换 / TXT 编码修复）。
 
-三个工具均为 builtin capability 插件（manifest 见
-webserver/plugins/runtime/builtin_capabilities.py），纯处理核心位于
-webserver/plugins/texttools/；本模块负责书籍定位、权限校验、临时文件编排、
+三个工具均为 builtin capability 插件（provider 与纯处理核心位于
+webserver/plugins/tool/{text_replace,zh_converter,txt_fixer}/），并由
+webserver/plugins/register.py 汇总注册；本模块负责书籍定位、权限校验、临时文件编排、
 写回入库与审计。
 """
 

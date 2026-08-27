@@ -293,7 +293,7 @@ class TestAppWithoutLogin(TestApp):
 
     def test_guest_send_to_device_still_works_when_enabled(self):
         """未安装时游客推送保持默认兼容，不能因缺少 user_id 而失败。"""
-        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
         with mock.patch.dict(webserver.handlers.book.CONF, {"ALLOW_GUEST_PUSH": True}):
@@ -308,7 +308,7 @@ class TestAppWithoutLogin(TestApp):
     def test_guest_send_to_device_cannot_bypass_disabled_installation(self):
         """全局开关允许游客时，现有插件安装的禁用状态仍然优先。"""
         from webserver.models import PluginInstallation
-        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
         from webserver.services.plugin_runtime import install_builtin
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
@@ -642,7 +642,7 @@ class TestBook(TestWithUserLogin):
             self.assertEqual(m.call_count, 1)
 
     def test_send_to_device_wifi(self):
-        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
         with mock.patch.object(provider, "uploader_class") as MockBoox:
@@ -655,8 +655,8 @@ class TestBook(TestWithUserLogin):
 
     def test_send_to_device_discovers_manifest_declared_device_type(self):
         """handler 不维护设备白名单，新 provider 只需声明 ui.device_type。"""
-        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
-        from webserver.plugins.runtime.push import DevicePushProvider
+        from webserver.plugins.push.base import DevicePushProvider
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
         from webserver.services.plugin_runtime import REGISTRY
 
         base = PUSH_PROVIDERS_BY_DEVICE["boox"]
@@ -690,7 +690,7 @@ class TestBook(TestWithUserLogin):
     def test_send_to_device_wifi_records_a_run(self):
         """推送是 sync 模式：写向外部设备，必须留下审计。"""
         from webserver.models import PluginConnection, PluginInstallation, PluginRun
-        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
         session = get_db()
@@ -722,7 +722,7 @@ class TestBook(TestWithUserLogin):
     def test_send_to_device_remembers_and_reuses_the_device_address(self):
         """D-7 纳入插件中心的理由：设备地址存在每用户连接里，下次不必重填。"""
         from webserver.models import PluginConnection, PluginInstallation
-        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
         session = get_db()
@@ -749,7 +749,7 @@ class TestBook(TestWithUserLogin):
 
     def test_send_to_device_wifi_failure_is_recorded(self):
         from webserver.models import PluginConnection, PluginInstallation, PluginRun
-        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
         session = get_db()
@@ -772,7 +772,7 @@ class TestBook(TestWithUserLogin):
         self.assertIn("device refused", run.error_message)
 
     def test_send_to_device_uses_structured_transport_error_not_message_sniffing(self):
-        from webserver.plugins.runtime import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
         with mock.patch.object(provider, "uploader_class") as MockBoox:
@@ -1049,7 +1049,7 @@ class TestWereadRefer(TestWithUserLogin):
         self._clear_connection()
         self.previous_secret_key = webserver.handlers.book.CONF.get("PLUGIN_SECRET_KEY")
         webserver.handlers.book.CONF["PLUGIN_SECRET_KEY"] = "weread-metadata-test-key"
-        from webserver.plugins.runtime import WEREAD_PLUGIN_KEY
+        from webserver.plugins.combo.weread import WEREAD_PLUGIN_KEY
         from webserver.services.plugin_runtime import install_builtin, save_connection
 
         session = get_db()
@@ -1072,7 +1072,7 @@ class TestWereadRefer(TestWithUserLogin):
             webserver.handlers.book.CONF["PLUGIN_SECRET_KEY"] = self.previous_secret_key
         super().tearDown()
 
-    @mock.patch("webserver.plugins.meta.weread.api.WereadProvider.query")
+    @mock.patch("webserver.plugins.combo.weread.metadata.WereadProvider.query")
     def test_configured_connection_joins_existing_metadata_search_and_applies_selection(self, query):
         query.return_value = {
             "results": [

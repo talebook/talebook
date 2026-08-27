@@ -9,18 +9,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Annotation, Base, PluginConnection, PluginDefinition, PluginRunItem, PluginSourceRecord
-from webserver.plugins.runtime.enrichment import (
-    REVIEW_SPECS,
-    BRSProvider,
-    CalibreProviderBridge,
-    CatalogReviewProvider,
-    EmbeddedMetadataProvider,
-    OpenLibraryProvider,
-    ReviewFileProvider,
-    build_field_decisions,
-    extract_epub_metadata,
-    parse_review_file,
-)
+from webserver.plugins.annotation.brs import BRSProvider
+from webserver.plugins.combo.open_library import OpenLibraryProvider
+from webserver.plugins.metadata.base import build_field_decisions
+from webserver.plugins.metadata.calibre_provider_bridge import CalibreProviderBridge
+from webserver.plugins.metadata.embedded_file import EmbeddedMetadataProvider, extract_epub_metadata
+from webserver.plugins.review.anilist import AniListReviewProvider
+from webserver.plugins.review.bangumi import BangumiReviewProvider
+from webserver.plugins.review.file_import import ReviewFileProvider, parse_review_file
+from webserver.plugins.review.google_books import GoogleBooksReviewProvider
+from webserver.plugins.review.hardcover import HardcoverProvider
+from webserver.plugins.review.neodb import NeoDBReviewProvider
 from webserver.plugins.runtime.protocol import PluginManifest, UpstreamRateLimitError
 from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient
 from webserver.services.plugin_runtime import (
@@ -98,11 +97,11 @@ def test_connector_manifests_are_valid_and_registered_as_installable_definitions
         OpenLibraryProvider(),
         EmbeddedMetadataProvider(),
         CalibreProviderBridge(discover=lambda: []),
-        CatalogReviewProvider(REVIEW_SPECS["hardcover"]),
-        CatalogReviewProvider(REVIEW_SPECS["neodb"]),
-        CatalogReviewProvider(REVIEW_SPECS["google_books"]),
-        CatalogReviewProvider(REVIEW_SPECS["bangumi"]),
-        CatalogReviewProvider(REVIEW_SPECS["anilist"]),
+        HardcoverProvider(),
+        NeoDBReviewProvider(),
+        GoogleBooksReviewProvider(),
+        BangumiReviewProvider(),
+        AniListReviewProvider(),
         BRSProvider(),
         ReviewFileProvider(),
     ]
@@ -115,10 +114,10 @@ def test_connector_manifests_are_valid_and_registered_as_installable_definitions
     assert len(definitions) == 10
     assert {item.plugin_key for item in definitions} >= {
         "talebook.metadata.open-library",
-        "talebook.annotations.brs",
-        "talebook.reviews.file-import",
-        "talebook.reviews.bangumi",
-        "talebook.reviews.anilist",
+        "talebook.annotation.brs",
+        "talebook.review.file-import",
+        "talebook.review.bangumi",
+        "talebook.review.anilist",
     }
     assert db_session.query(PluginConnection).count() == 0
 
@@ -400,7 +399,14 @@ def test_brs_uses_separate_review_domain_supports_mapping_and_runtime_rate_limit
     ],
 )
 def test_catalog_ratings_preserve_each_sources_raw_scale_and_samples(source, payload, query, expected):
-    provider = CatalogReviewProvider(REVIEW_SPECS[source], transport=lambda *args, **kwargs: payload)
+    providers = {
+        "hardcover": HardcoverProvider,
+        "neodb": NeoDBReviewProvider,
+        "google_books": GoogleBooksReviewProvider,
+        "bangumi": BangumiReviewProvider,
+        "anilist": AniListReviewProvider,
+    }
+    provider = providers[source](transport=lambda *args, **kwargs: payload)
     result = provider.execute(
         {
             "action": "preview",

@@ -44,8 +44,8 @@ from webserver.plugins.meta import baike, biquge, calibre, douban, douban_v2, ne
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.parser.txt import get_content_encoding
+from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.plugins.runtime.protocol import UpstreamError
-from webserver.plugins.runtime.push import PUSH_CAPABILITY
 from webserver.plugins.runtime.triggers import TRIGGER_AUTO, trigger_of
 from webserver.services.async_service import AsyncService
 from webserver.services.autofill import AutoFillService

@@ -1,6 +1,6 @@
 from unittest import mock
 
-from webserver.plugins.meta.weread import WereadMetadataApi
+from webserver.plugins.combo.weread import WereadMetadataApi
 
 
 SEARCH_RESULT = {

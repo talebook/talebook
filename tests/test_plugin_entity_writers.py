@@ -115,21 +115,21 @@ def _run_import(db_session, plugin_id):
 
 def test_third_party_annotation_plugin_is_not_branded_as_weread(db_session):
     """F-1 的回归护栏：换一个 annotations 插件，落库身份必须跟着换。"""
-    run, connection = _run_import(db_session, "talebook.annotations.thirdparty")
+    run, connection = _run_import(db_session, "talebook.annotation.thirdparty")
 
     assert run.status == "succeeded", run.error_message
     assert db_session.query(Annotation).count() == 1
 
     source = db_session.query(AnnotationSource).one()
-    assert source.source_name == "talebook.annotations.thirdparty"
+    assert source.source_name == "talebook.annotation.thirdparty"
     assert source.source_name != "weread"
 
     match = db_session.query(PluginEntityMatch).one()
-    assert match.source_type == "talebook.annotations.thirdparty_book"
+    assert match.source_type == "talebook.annotation.thirdparty_book"
     assert "weread" not in match.source_type
 
     annotation = db_session.query(Annotation).one()
-    assert annotation.client_id.startswith("talebook.annotations.thirdparty:%s:" % connection.id)
+    assert annotation.client_id.startswith("talebook.annotation.thirdparty:%s:" % connection.id)
     assert "weread" not in annotation.client_id
 
 
@@ -144,8 +144,8 @@ def test_weread_identity_is_preserved_for_existing_data(db_session):
 
 
 def test_source_name_is_derived_from_the_plugin_key(db_session):
-    _, connection = _run_import(db_session, "talebook.annotations.brs")
-    assert source_name_for(db_session, connection) == "talebook.annotations.brs"
+    _, connection = _run_import(db_session, "talebook.annotation.brs")
+    assert source_name_for(db_session, connection) == "talebook.annotation.brs"
 
 
 def test_annotation_source_identity_respects_database_column_widths(db_session):
@@ -163,7 +163,7 @@ def test_annotation_source_identity_respects_database_column_widths(db_session):
 
 
 def test_same_plugin_external_id_is_namespaced_by_connection(db_session):
-    plugin_id = "talebook.annotations.multi-account"
+    plugin_id = "talebook.annotation.multi-account"
     plugin = _annotation_plugin(plugin_id)
     registry = PluginRegistry()
     registry.register(plugin)
@@ -194,7 +194,7 @@ def test_runtime_dispatches_by_entity_type_not_by_plugin_name():
 
 
 def test_rollback_goes_through_the_writer(db_session):
-    run, connection = _run_import(db_session, "talebook.annotations.thirdparty")
+    run, connection = _run_import(db_session, "talebook.annotation.thirdparty")
     assert db_session.query(Annotation).count() == 1
 
     runtime = PluginRuntime(db_session, SETTINGS, calibre_db=FakeCalibre())

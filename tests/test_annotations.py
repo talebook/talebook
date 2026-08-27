@@ -339,7 +339,7 @@ class TestAnnotations(TestWithUserLogin):
         class WritableAnnotationPlugin:
             manifest = {
                 "protocol_version": PROTOCOL_VERSION,
-                "id": "talebook.annotations.sync-test",
+                "id": "talebook.annotation.sync-test",
                 "name": "Annotation sync test",
                 "version": "1.0.0",
                 "categories": ["annotations"],
@@ -404,7 +404,7 @@ class TestAnnotations(TestWithUserLogin):
         self.assertIsInstance(calls[0][0], PluginAnnotation)
         self.assertEqual(calls[0][2], "sync")
         source = session.query(models.AnnotationSource).filter_by(annotation_id=annotation.id).one()
-        self.assertEqual(source.source_name, "talebook.annotations.sync-test")
+        self.assertEqual(source.source_name, "talebook.annotation.sync-test")
         self.assertEqual(source.source_connection_id, str(connection.id))
         self.assertEqual(source.source_annotation_id, "remote-1")
         self.assertEqual(source.source_sync_status, "synced")
@@ -413,7 +413,7 @@ class TestAnnotations(TestWithUserLogin):
 
         service.sync_annotation(
             annotation.id,
-            exclude_source_name="talebook.annotations.sync-test",
+            exclude_source_name="talebook.annotation.sync-test",
             exclude_source_connection_id=str(connection.id),
             registry=registry,
             settings=PLUGIN_SETTINGS,
