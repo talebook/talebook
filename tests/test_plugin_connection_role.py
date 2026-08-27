@@ -64,6 +64,9 @@ def _plugin(plugin_id="talebook.test.role"):
 
             return BookMetadata()
 
+        def get_cover(self, cover_url, context):
+            return None
+
     return Plugin()
 
 

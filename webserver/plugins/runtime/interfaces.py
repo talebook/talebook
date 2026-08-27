@@ -9,6 +9,7 @@ from .domains import (
     BookMetadata,
     Category,
     CheckReport,
+    MetadataQuery,
     Page,
     PushReceipt,
     Review,
@@ -56,9 +57,20 @@ class PluginContext:
 
 @runtime_checkable
 class MetadataProvider(Protocol):
-    def search_books(self, query: str, context: dict[str, Any]) -> list[BookMetadata]: ...
+    def search_books(self, query: MetadataQuery, context: dict[str, Any]) -> list[BookMetadata]: ...
 
-    def get_metadata(self, external_id: str, context: dict[str, Any]) -> BookMetadata: ...
+    """返回按相关度降序排列的候选；无结果返回空列表而不是抛异常。"""
+
+    def get_metadata(self, external_id: str, context: dict[str, Any]) -> BookMetadata | None: ...
+
+    """按本源的 provider_value 取回单条；取不到返回 None。"""
+
+    def get_cover(self, cover_url: str, context: dict[str, Any]) -> tuple[str, bytes] | None: ...
+
+    """下载封面并返回 (扩展名, 字节)；无封面或失败返回 None。
+
+    元数据候选只携带 cover_url，实际下载由调用方在确认选用后才触发。
+    """
 
 
 @runtime_checkable

@@ -1,6 +1,6 @@
 import json
 
-from webserver.plugins.runtime.domains import Annotation, Page
+from webserver.plugins.runtime.domains import Annotation, MetadataQuery, Page
 from webserver.plugins.runtime.protocol import (
     PROTOCOL_VERSION,
     UpstreamAuthError,
@@ -290,11 +290,15 @@ class WereadProvider:
             metadata.provider_key = WEREAD_PLUGIN_KEY
         return metadata
 
-    def search_books(self, title, context):
-        return [self._tag(item) for item in self._metadata_api(context).search(title)]
+    def search_books(self, query, context):
+        query = MetadataQuery.from_value(query)
+        return [self._tag(item) for item in self._metadata_api(context).search(query.title or query.isbn)]
 
     def get_metadata(self, provider_value, context):
         return self._tag(self._metadata_api(context).get_metadata_by_provider(provider_value))
+
+    def get_cover(self, cover_url, context):
+        return self._metadata_api(context).get_cover(cover_url)
 
     def list_annotations(self, context):
         api_key = str((context.get("secrets") or {}).get("api_key") or "")

@@ -22,15 +22,7 @@ from webserver.constants import (
     CALIBRE_ERROR_FLAG,
     META_SELECTED_SOURCES,
     META_SOURCE_AI,
-    META_SOURCE_AMAZON,
-    META_SOURCE_BAIDU,
     META_SOURCE_BOOKSOURCE,
-    META_SOURCE_DOUBAN_V2,
-    META_SOURCE_GOOGLE,
-    META_SOURCE_NEODB,
-    META_SOURCE_QIMAO,
-    META_SOURCE_TOMATO,
-    META_SOURCE_XHSD,
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
@@ -43,8 +35,11 @@ from webserver.plugins.meta import baike, biquge, calibre, douban_v2, neodb, qim
 from webserver.plugins.meta import common as meta_common
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
+from webserver.plugins.meta.base import to_calibre_metadata
 from webserver.plugins.parser.txt import get_content_encoding
 from webserver.plugins.push.base import PUSH_CAPABILITY
+from webserver.plugins.register import plugin_ids_for_sources
+from webserver.plugins.runtime.domains import MetadataQuery
 from webserver.plugins.runtime.protocol import UpstreamError
 from webserver.plugins.runtime.triggers import TRIGGER_AUTO, trigger_of
 from webserver.services.async_service import AsyncService
@@ -68,7 +63,7 @@ from webserver.services.external_index import (
 )
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
-from webserver.services.plugin_runtime import PluginRuntime, PluginRuntimeError
+from webserver.services.plugin_runtime import REGISTRY, PluginRuntime, PluginRuntimeError
 
 
 # 调用方按能力找插件，不认识任何具体 plugin_key。
@@ -401,6 +396,38 @@ class BookRefer(BaseHandler):
                 output.append(safe_failure)
         return output
 
+    def _make_metadata_task(self, plugin_id, query, sources):
+        """把一个元数据插件包成搜索任务；单源失败不影响其余源。"""
+
+        def _task():
+            try:
+                provider = REGISTRY.provider(plugin_id)
+            except Exception:
+                logging.warning("元数据插件 %s 不可用", plugin_id)
+                return []
+            context = {"action": "search", "config": {"sources": list(sources)}, "secrets": {}}
+            try:
+                records = provider.search_books(query, context) or []
+            except Exception:
+                logging.error("元数据插件 %s 查询 %s 失败", plugin_id, query.title)
+                return []
+            results = []
+            for record in records:
+                candidate = to_calibre_metadata(record)
+                if candidate is None:
+                    continue
+                if not getattr(candidate, "provider_key", ""):
+                    candidate.provider_key = plugin_id
+                if not getattr(candidate, "cover_data", None) and getattr(candidate, "cover_url", ""):
+                    try:
+                        candidate.cover_data = provider.get_cover(candidate.cover_url, context)
+                    except Exception:
+                        candidate.cover_data = None
+                results.append(candidate)
+            return results
+
+        return _task
+
     def _build_search_tasks(self, mi):
         sources = CONF.get(META_SELECTED_SOURCES, ["douban_v2", "baidu"])
         logging.info("META_SELECTED_SOURCES 配置：%s", sources)
@@ -432,79 +459,16 @@ class BookRefer(BaseHandler):
                         metadata_result = metadata_service.search(title, author)
                     return metadata_result
 
-        if META_SOURCE_DOUBAN_V2 in sources:
-
-            def _douban_v2():
-                plugin = douban_v2.DoubanV2MetaPlugin()
-                try:
-                    return plugin.search(title=title, isbn=mi.isbn, publisher=mi.publisher)
-                except Exception:
-                    logging.error("DoubanV2 query %s failed" % title)
-                    return []
-
-            tasks["douban_v2"] = _douban_v2
-
-        if META_SOURCE_BAIDU in sources:
-
-            def _baidu():
-                api = baike.BaiduBaikeApi(copy_image=False)
-                book = api.get_book(title, author)
-                return [book] if book else []
-
-            tasks["baidu"] = _baidu
-
-        calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
-        if calibre_sources:
-
-            def _calibre():
-                results = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
-                if not results:
-                    results = calibre.CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
-                for r in results or []:
-                    r.cover_data = calibre.CalibreMetadataApi.get_cover(r.cover_url) if getattr(r, "cover_url", None) else None
-                    r.provider_key = calibre.KEY
-                return list(results) if results else []
-
-            tasks["calibre"] = _calibre
-
-        if META_SOURCE_XHSD in sources:
-
-            def _xhsd():
-                api = xhsd.XhsdBookApi(copy_image=False)
-                book = api.get_book(mi.isbn or title)
-                return [book] if book else []
-
-            tasks["xhsd"] = _xhsd
-
-        if META_SOURCE_TOMATO in sources:
-
-            def _tomato():
-                api = tomato.TomatoNovelApi(copy_image=False)
-                book = api.get_book(title, author)
-                return [book] if book else []
-
-            tasks["tomato"] = _tomato
-
-        if META_SOURCE_QIMAO in sources:
-
-            def _qimao():
-                api = qimao.QimaoNovelApi(copy_image=False)
-                book = api.get_book(title, author)
-                return [book] if book else []
-
-            tasks["qimao"] = _qimao
-
-        if META_SOURCE_NEODB in sources:
-
-            def _neodb():
-                plugin = neodb.NeodbMetaPlugin()
-                try:
-                    return plugin.search(title=title, isbn=mi.isbn, publisher=mi.publisher)
-                except Exception:
-                    logging.error("NeoDB query %s failed" % title)
-                    return []
-
-            tasks["neodb"] = _neodb
+        # 7 个元数据源统一按 registry 派发：provider 自行决定用 ISBN 还是标题查询，
+        # 并各自完成 provider_key 标注与封面补齐，这里只负责选源与并发编排。
+        query = MetadataQuery(
+            title=title,
+            isbn=mi.isbn or "",
+            publisher=getattr(mi, "publisher", "") or "",
+            authors=tuple(getattr(mi, "authors", None) or ()),
+        )
+        for plugin_id in plugin_ids_for_sources(sources):
+            tasks[plugin_id] = self._make_metadata_task(plugin_id, query, sources)
 
         if META_SOURCE_BOOKSOURCE in sources:
 

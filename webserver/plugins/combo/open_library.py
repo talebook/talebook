@@ -1,6 +1,6 @@
 import re
 
-from webserver.plugins.runtime.domains import BookMetadata, ItemFailure, Page, Review
+from webserver.plugins.runtime.domains import BookMetadata, ItemFailure, MetadataQuery, Page, Review
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderItem, ProviderResult
 from webserver.plugins.runtime.safe_http import SafeHttpClient
 
@@ -159,7 +159,8 @@ class OpenLibraryProvider:
         return ProviderResult(items=items, next_cursor={"completed": True}, health_message="Open Library query complete")
 
     def search_books(self, query, context):
-        value = str(query or "").strip()
+        query = MetadataQuery.from_value(query)
+        value = (query.isbn or query.title).strip()
         if not value:
             return []
         payload = self.transport("GET", "https://openlibrary.org/search.json", params={"q": value, "limit": 20})
@@ -178,6 +179,9 @@ class OpenLibraryProvider:
 
     def get_metadata(self, external_id, context):
         return BookMetadata.from_dict({"provider_key": self.manifest["id"], "provider_value": external_id})
+
+    def get_cover(self, cover_url, context):
+        return None
 
     def get_reviews(self, query, context):
         run_context = {

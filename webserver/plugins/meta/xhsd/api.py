@@ -9,6 +9,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
 
+from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+
 KEY = "xinhua"
 XHSD_ISBN = "0000000000002"
 
@@ -236,3 +238,32 @@ class XhsdBookApi:
         except Exception as e:
             logging.error(f"Get cover error: {e}")
             return None
+
+
+class XhsdProvider(MetaSourceMixin, XhsdBookApi):
+    """新华书店：仅支持 ISBN 精确查询，标题查询由上游其他源覆盖。"""
+
+    manifest = meta_manifest(
+        "talebook.meta.xhsd",
+        "新华书店",
+        "按 ISBN 从新华书店商品页抓取书名、作者、出版社与封面。",
+        "mdi-store",
+        "https://www.xhsd.com/",
+    )
+
+    def __init__(self):
+        super().__init__(copy_image=False)
+
+    def _search(self, query, context):
+        isbn = query.isbn or query.title
+        mi = self.get_book_by_isbn(isbn) if isbn else None
+        return [mi] if mi else []
+
+    def _fetch(self, external_id, context):
+        return self.get_book_by_isbn(external_id)
+
+    def get_cover(self, cover_url, context=None):
+        return XhsdBookApi(copy_image=True).get_cover(cover_url)
+
+
+PROVIDER = XhsdProvider()

@@ -66,12 +66,22 @@ def test_registration_has_one_primary_group_and_derived_auto_install_lifecycle()
     assert len(grouped) == len({id(provider) for provider in grouped})
     assert set(plugin_register.__all__) == {
         "ALL_BUILTIN_PROVIDERS",
+        "META_SOURCE_TO_PLUGIN",
         "PROVIDER_GROUPS",
         "PUSH_PROVIDERS",
         "PUSH_PROVIDERS_BY_DEVICE",
         "SOURCE_PROVIDERS",
         "TOOL_PROVIDERS",
+        "plugin_ids_for_sources",
     }
+    # 历史配置值到 plugin id 的映射只允许存在于装配入口，且必须指向真实注册的插件
+    registered = {provider.manifest["id"] for provider in grouped}
+    assert set(plugin_register.META_SOURCE_TO_PLUGIN.values()) <= registered
+    assert plugin_register.plugin_ids_for_sources(["google", "amazon", "baidu"]) == [
+        "talebook.meta.calibre",
+        "talebook.meta.baike",
+    ]
+    assert plugin_register.plugin_ids_for_sources(["booksource", "unknown"]) == []
     assert {
         provider.manifest["id"]
         for provider in grouped
@@ -151,6 +161,14 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
         "talebook.source.webdav": "webserver.plugins.source.webdav",
         "talebook.source.watch-folder": "webserver.plugins.source.watch_folder",
         "talebook.combo.open-library": "webserver.plugins.combo.open_library",
+        "talebook.meta.douban-v2": "webserver.plugins.meta.douban_v2.plugin",
+        "talebook.meta.baike": "webserver.plugins.meta.baike.api",
+        "talebook.meta.calibre": "webserver.plugins.meta.calibre.api",
+        "talebook.meta.xhsd": "webserver.plugins.meta.xhsd.api",
+        "talebook.meta.tomato": "webserver.plugins.meta.tomato.api",
+        "talebook.meta.qimao": "webserver.plugins.meta.qimao.api",
+        "talebook.meta.neodb": "webserver.plugins.meta.neodb.plugin",
+        "talebook.meta.ai": "webserver.plugins.meta.ai.api",
         "talebook.meta.embedded-file": "webserver.plugins.meta.embedded_file",
         "talebook.meta.calibre-provider-bridge": "webserver.plugins.meta.calibre_provider_bridge",
         "talebook.review.hardcover": "webserver.plugins.review.hardcover",
@@ -201,6 +219,9 @@ def test_registry_accepts_typed_provider_without_execute():
         def get_metadata(self, external_id, context):
             return None
 
+        def get_cover(self, cover_url, context):
+            return None
+
         def self_check(self, context):
             return CheckReport(healthy=True, message="ready")
 
@@ -221,6 +242,9 @@ def test_registry_rejects_typed_only_test_action_without_self_check():
             return []
 
         def get_metadata(self, external_id, context):
+            return None
+
+        def get_cover(self, cover_url, context):
             return None
 
     with pytest.raises(TypeError) as exc:
@@ -270,6 +294,9 @@ def test_registry_rejects_unknown_capability_instead_of_ignoring_it():
         def get_metadata(self, external_id, context):
             return None
 
+        def get_cover(self, cover_url, context):
+            return None
+
     with pytest.raises(TypeError) as exc:
         PluginRegistry().register(UnknownCapability())
 
@@ -290,6 +317,9 @@ def test_registry_requires_extra_feature_interface_when_features_are_declared():
             return []
 
         def get_metadata(self, external_id, context):
+            return None
+
+        def get_cover(self, cover_url, context):
             return None
 
     with pytest.raises(TypeError) as exc:

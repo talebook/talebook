@@ -3,8 +3,16 @@
 from webserver.plugins.annotation.brs import PROVIDER as BRS_PROVIDER
 from webserver.plugins.combo.open_library import PROVIDER as OPEN_LIBRARY_PROVIDER
 from webserver.plugins.combo.weread.provider import PROVIDER as WEREAD_PROVIDER
+from webserver.plugins.meta.ai.api import PROVIDER as AI_PROVIDER
+from webserver.plugins.meta.baike.api import PROVIDER as BAIKE_PROVIDER
+from webserver.plugins.meta.calibre.api import PROVIDER as CALIBRE_META_PROVIDER
 from webserver.plugins.meta.calibre_provider_bridge import PROVIDER as CALIBRE_PROVIDER_BRIDGE
+from webserver.plugins.meta.douban_v2.plugin import PROVIDER as DOUBAN_V2_PROVIDER
 from webserver.plugins.meta.embedded_file import PROVIDER as EMBEDDED_FILE_PROVIDER
+from webserver.plugins.meta.neodb.plugin import PROVIDER as NEODB_META_PROVIDER
+from webserver.plugins.meta.qimao.api import PROVIDER as QIMAO_PROVIDER
+from webserver.plugins.meta.tomato.api import PROVIDER as TOMATO_PROVIDER
+from webserver.plugins.meta.xhsd.api import PROVIDER as XHSD_PROVIDER
 from webserver.plugins.mock.multi_tab import PROVIDER as MOCK_MULTI_TAB_PROVIDER
 from webserver.plugins.push.boox import PROVIDER as BOOX_PROVIDER
 from webserver.plugins.push.dangdang import PROVIDER as DANGDANG_PROVIDER
@@ -45,7 +53,18 @@ SOURCE_PROVIDERS = (
     WEBDAV_PROVIDER,
     WATCH_FOLDER_PROVIDER,
 )
-META_PROVIDERS = (EMBEDDED_FILE_PROVIDER, CALIBRE_PROVIDER_BRIDGE)
+META_PROVIDERS = (
+    DOUBAN_V2_PROVIDER,
+    BAIKE_PROVIDER,
+    CALIBRE_META_PROVIDER,
+    XHSD_PROVIDER,
+    TOMATO_PROVIDER,
+    QIMAO_PROVIDER,
+    NEODB_META_PROVIDER,
+    AI_PROVIDER,
+    EMBEDDED_FILE_PROVIDER,
+    CALIBRE_PROVIDER_BRIDGE,
+)
 REVIEW_PROVIDERS = (
     HARDCOVER_PROVIDER,
     NEODB_PROVIDER,
@@ -82,11 +101,39 @@ ALL_BUILTIN_PROVIDERS = tuple(provider for providers in PROVIDER_GROUPS.values()
 PUSH_PROVIDERS_BY_DEVICE = {provider.manifest["ui"]["device_type"]: provider for provider in PUSH_PROVIDERS}
 
 
+# META_SELECTED_SOURCES 的取值是先于插件体系发布的第三套命名，与 plugin id 不
+# 一一对应：google/amazon 是同一个 Calibre 插件的两个 source，booksource 则根本
+# 不是元数据插件而是平台的在线书源服务。这里只映射真正的插件。
+META_SOURCE_TO_PLUGIN = {
+    "douban_v2": "talebook.meta.douban-v2",
+    "baidu": "talebook.meta.baike",
+    "google": "talebook.meta.calibre",
+    "amazon": "talebook.meta.calibre",
+    "xinhua": "talebook.meta.xhsd",
+    "tomato": "talebook.meta.tomato",
+    "qimao": "talebook.meta.qimao",
+    "neodb": "talebook.meta.neodb",
+    "ai": "talebook.meta.ai",
+}
+
+
+def plugin_ids_for_sources(sources):
+    """把 META_SELECTED_SOURCES 展开成去重且保序的 plugin id 列表。"""
+    ids = []
+    for source in sources or []:
+        plugin_id = META_SOURCE_TO_PLUGIN.get(source)
+        if plugin_id and plugin_id not in ids:
+            ids.append(plugin_id)
+    return ids
+
+
 __all__ = [
     "ALL_BUILTIN_PROVIDERS",
+    "META_SOURCE_TO_PLUGIN",
     "PROVIDER_GROUPS",
     "PUSH_PROVIDERS",
     "PUSH_PROVIDERS_BY_DEVICE",
+    "plugin_ids_for_sources",
     "SOURCE_PROVIDERS",
     "TOOL_PROVIDERS",
 ]

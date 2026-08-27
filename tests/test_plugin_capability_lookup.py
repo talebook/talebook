@@ -75,6 +75,9 @@ def _plugin(plugin_id, capability, behaviour=None):
         def get_metadata(self, external_id, context):
             return {"provider_value": external_id}
 
+        def get_cover(self, cover_url, context):
+            return None
+
         def get_reviews(self, query, context):
             if behaviour == "pages":
                 page = int((context.get("cursor") or {}).get("page", 1))
@@ -119,6 +122,9 @@ def test_typed_only_provider_tests_connection_without_legacy_execute(db_session)
             return []
 
         def get_metadata(self, external_id, context):
+            return None
+
+        def get_cover(self, cover_url, context):
             return None
 
         def self_check(self, context):

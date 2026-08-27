@@ -8,6 +8,7 @@ import traceback
 import requests
 
 from webserver.constants import CHROME_HEADERS, META_SOURCE_GOOGLE, META_SOURCE_AMAZON
+from webserver.plugins.meta.base import MetaSourceMixin, _setting, meta_manifest
 from webserver.i18n import _
 
 KEY = "Calibre"
@@ -195,3 +196,52 @@ class CalibreMetadataApi:
         except Exception as e:
             logging.error(_("CalibreMetadataApi 书名查询失败 title=%s: %s"), title, e)
             return None
+
+
+class CalibreProvider(MetaSourceMixin):
+    """Google Books / Amazon：二者是 Calibre 同一套元数据插件的两个 source。
+
+    历史配置把它们记为 META_SELECTED_SOURCES 中的两项，实际共用一个实现，
+    因此这里注册为单个插件，由 config.sources 决定启用哪几个上游。
+    """
+
+    manifest = meta_manifest(
+        "talebook.meta.calibre",
+        "Google Books / Amazon",
+        "通过 Calibre 内置元数据插件检索 Google Books 与 Amazon。",
+        "mdi-google",
+        "https://calibre-ebook.com/",
+        config_schema={
+            "type": "object",
+            "properties": {
+                "sources": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": [META_SOURCE_GOOGLE, META_SOURCE_AMAZON]},
+                }
+            },
+        },
+    )
+
+    def _sources(self, context):
+        configured = ((context or {}).get("config") or {}).get("sources")
+        if configured:
+            return [s for s in configured if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
+        selected = _setting({}, "sources", "META_SELECTED_SOURCES", []) or []
+        return [s for s in selected if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
+
+    def _search(self, query, context):
+        sources = self._sources(context)
+        if not sources:
+            return []
+        results = []
+        if query.isbn:
+            results = CalibreMetadataApi.get_book_by_isbn(query.isbn, sources=sources) or []
+        if not results and query.title:
+            results = CalibreMetadataApi.get_book_by_title(query.title, authors=list(query.authors), sources=sources) or []
+        return list(results)
+
+    def get_cover(self, cover_url, context=None):
+        return CalibreMetadataApi.get_cover(cover_url)
+
+
+PROVIDER = CalibreProvider()

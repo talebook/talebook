@@ -50,6 +50,37 @@ class BookMetadata(DomainRecord):
     """书籍元数据候选。字段集合由具体来源决定，身份由 ProviderItem 承担。"""
 
 
+@dataclass(frozen=True)
+class MetadataQuery:
+    """一次元数据检索的输入。
+
+    字段均可选，由 provider 自行决定用哪些：ISBN 可做精确匹配，publisher 用于
+    同名书消歧。压成单个字符串会让 provider 只能猜测查询意图，因此保留结构。
+    """
+
+    title: str = ""
+    isbn: str = ""
+    publisher: str = ""
+    authors: tuple[str, ...] = ()
+
+    @classmethod
+    def from_value(cls, value):
+        """兼容裸字符串调用。"""
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, Mapping):
+            return cls(
+                title=str(value.get("title") or ""),
+                isbn=str(value.get("isbn") or ""),
+                publisher=str(value.get("publisher") or ""),
+                authors=tuple(value.get("authors") or ()),
+            )
+        return cls(title=str(value or ""))
+
+    def is_empty(self):
+        return not (self.title or self.isbn)
+
+
 @dataclass(frozen=True, eq=False)
 class Annotation(DomainRecord):
     """划线、笔记或章评。"""

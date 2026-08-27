@@ -1,6 +1,6 @@
 import time
 
-from webserver.plugins.runtime.domains import BookMetadata, Page, Review
+from webserver.plugins.runtime.domains import BookMetadata, MetadataQuery, Page, Review
 from webserver.plugins.runtime.protocol import (
     PROTOCOL_VERSION,
     ProviderItem,
@@ -94,10 +94,14 @@ class MockMultiTabProvider:
         return ProviderResult(items=items, next_cursor={"offset": offset + 1}, health_message="mock request complete")
 
     def search_books(self, query, context):
-        return [BookMetadata.from_dict({"title": query or "The Mock Book", "provider_key": self.manifest["id"]})]
+        query = MetadataQuery.from_value(query)
+        return [BookMetadata.from_dict({"title": query.title or "The Mock Book", "provider_key": self.manifest["id"]})]
 
     def get_metadata(self, external_id, context):
         return BookMetadata.from_dict({"title": "The Mock Book", "provider_value": external_id})
+
+    def get_cover(self, cover_url, context):
+        return None
 
     def get_reviews(self, query, context):
         return Page(items=[Review.from_dict({"book_external_id": str(query), "rating": 4.5, "scale": 5})])

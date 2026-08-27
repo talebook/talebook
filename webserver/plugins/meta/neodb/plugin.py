@@ -5,6 +5,8 @@ import logging
 
 
 from . import api
+from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+
 from .api import KEY
 
 
@@ -63,3 +65,25 @@ class NeodbMetaPlugin:
 
     def get_cover(self, cover_url):
         return api.get_cover(cover_url)
+
+
+class NeodbProvider(MetaSourceMixin, NeodbMetaPlugin):
+    manifest = meta_manifest(
+        "talebook.meta.neodb",
+        "NeoDB",
+        "从 NeoDB 联邦书目检索书名、作者、出版与评分。",
+        "mdi-database-search",
+        "https://neodb.social/",
+    )
+
+    def _search(self, query, context):
+        return self.search(title=query.title, isbn=query.isbn, publisher=query.publisher) or []
+
+    def _fetch(self, external_id, context):
+        return self.get_metadata_by_provider(external_id)
+
+    def get_cover(self, cover_url, context=None):
+        return NeodbMetaPlugin.get_cover(self, cover_url)
+
+
+PROVIDER = NeodbProvider()

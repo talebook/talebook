@@ -16,4 +16,3 @@ from .biquge.api import BiqugeApi, KEY as BIQUGE_KEY, BIQUGE_ISBN  # noqa: F401
 # 七猫小说 metadata plugin
 from .qimao.api import QimaoNovelApi, KEY as QIMAO_KEY, QIMAO_ISBN  # noqa: F401
 from .qimao.api import get_qimao_metadata  # noqa: F401
-
