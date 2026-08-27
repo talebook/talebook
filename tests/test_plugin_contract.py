@@ -6,7 +6,6 @@ import pytest
 
 import webserver.plugins.register as plugin_register
 import webserver.plugins.runtime as plugin_contract
-from webserver.plugins.migrations import LEGACY_PLUGIN_KEY_MIGRATIONS
 from webserver.plugins.runtime import CheckReport, PluginContext, PluginManifest, contract_violations
 from webserver.plugins.source.legado import PLUGIN_ID as LEGADO_PLUGIN_ID
 from webserver.plugins.source.opds import PLUGIN_ID as OPDS_PLUGIN_ID
@@ -58,7 +57,6 @@ def test_all_book_source_plugins_use_the_source_namespace():
     }
 
     assert actual == expected
-    assert actual.isdisjoint(LEGACY_PLUGIN_KEY_MIGRATIONS)
 
 
 def test_registration_has_one_primary_group_and_derived_auto_install_lifecycle():

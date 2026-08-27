@@ -5,24 +5,19 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from webserver.migrate_db import compare_and_migrate
 from webserver.models import (
     Base,
     PluginConnection,
     PluginDefinition,
-    PluginInstallation,
     PluginPermission,
-    PluginRun,
     PluginRunItem,
     PluginSecret,
     PluginSourceRecord,
 )
 from webserver.plugins.mock.multi_tab import MockMultiTabProvider
-from webserver.plugins.migrations import LEGACY_PLUGIN_KEY_MIGRATIONS
 from webserver.plugins.runtime import PluginManifest
 from webserver.plugins.runtime.protocol import ManifestError
 from webserver.services.plugin_runtime import (
-    REGISTRY,
     PluginRuntime,
     PluginRuntimeError,
     ensure_auto_installations,
@@ -126,130 +121,6 @@ def test_builtin_capabilities_are_registered_without_ai_or_calibre_server(db_ses
     assert "manage_kind" not in opds_ui
     tool_ui = builtins["talebook.tool.text-replace"].to_public_dict()["ui"]
     assert tool_ui["manage_route"] == "/plugins/text-replace"
-
-
-def test_startup_migration_renames_every_legacy_builtin_identity_in_place(db_session):
-    legacy_to_current = {
-        "talebook.book-source.opds": "talebook.source.opds",
-        "talebook.book-source.legado": "talebook.source.legado",
-        "talebook.book-source.kavita": "talebook.source.kavita",
-        "talebook.book-source.komga": "talebook.source.komga",
-        "talebook.book-source.booklore": "talebook.source.booklore",
-        "talebook.book-source.standard-ebooks": "talebook.source.standard-ebooks",
-        "talebook.book-source.gutenberg": "talebook.source.gutenberg",
-        "talebook.book-source.internet-archive": "talebook.source.internet-archive",
-        "talebook.book-source.webdav": "talebook.source.webdav",
-        "talebook.book-source.watch-folder": "talebook.source.watch-folder",
-        "talebook.reviews.hardcover": "talebook.review.hardcover",
-        "talebook.reviews.neodb": "talebook.review.neodb",
-        "talebook.reviews.google-books": "talebook.review.google-books",
-        "talebook.reviews.bangumi": "talebook.review.bangumi",
-        "talebook.reviews.anilist": "talebook.review.anilist",
-        "talebook.reviews.file-import": "talebook.review.file-import",
-        "talebook.annotations.brs": "talebook.annotation.brs",
-    }
-    assert LEGACY_PLUGIN_KEY_MIGRATIONS == legacy_to_current
-    providers = {provider.manifest["id"]: provider for provider in REGISTRY.providers()}
-    installation_ids = {}
-
-    for legacy_key, current_key in legacy_to_current.items():
-        provider = providers.get(legacy_key) or providers[current_key]
-        raw = {**provider.manifest, "id": legacy_key}
-        definition = PluginDefinition(
-            plugin_key=legacy_key,
-            version=raw["version"],
-            protocol_version=raw["protocol_version"],
-            name=raw["name"],
-            runtime_kind=raw["runtime_kind"],
-            categories=list(raw["categories"]),
-            capabilities=list(raw["capabilities"]),
-            actions=list(raw["actions"]),
-            auth_schema=dict(raw["auth_schema"]),
-            config_schema=dict(raw["config_schema"]),
-            permissions=list(raw["permissions"]),
-            data_policy=dict(raw["data_policy"]),
-            compatibility=dict(raw["compatibility"]),
-            homepage=raw["homepage"],
-            license=raw["license"],
-            manifest=raw,
-        )
-        db_session.add(definition)
-        db_session.flush()
-        installation = PluginInstallation(
-            plugin_key=legacy_key,
-            definition_id=definition.id,
-            version=definition.version,
-            enabled=True,
-            scope="shared",
-            config={"preserved": legacy_key},
-            installed_from="builtin",
-            checksum="legacy-checksum",
-            status="active",
-            installed_by=1,
-        )
-        db_session.add(installation)
-        db_session.flush()
-        installation_ids[current_key] = installation.id
-
-    opds_installation_id = installation_ids["talebook.source.opds"]
-    permission = PluginPermission(
-        installation_id=opds_installation_id,
-        permission="books.read",
-        scope="instance",
-        approved_by=1,
-    )
-    connection = PluginConnection(
-        installation_id=opds_installation_id,
-        owner_type="instance",
-        owner_id=0,
-        role="builtin",
-        name="内置连接",
-        config={"endpoint": "https://example.test/opds"},
-        scopes=["books.read"],
-        health="healthy",
-        enabled=True,
-    )
-    db_session.add_all([permission, connection])
-    db_session.flush()
-    run = PluginRun(
-        connection_id=connection.id,
-        action="run",
-        status="succeeded",
-        requested_by=1,
-        counts={"fetched": 1},
-        cursor_before={},
-        cursor_after={},
-        input_data={},
-    )
-    db_session.add(run)
-    db_session.flush()
-    source_record = PluginSourceRecord(
-        connection_id=connection.id,
-        source="talebook.book-source.opds",
-        external_id="legacy-book",
-        entity_type="book_source",
-        entity_id="legacy-book",
-        run_id=run.id,
-        raw_hash="legacy-hash",
-        data={"title": "保留我"},
-    )
-    db_session.add(source_record)
-    db_session.commit()
-
-    assert compare_and_migrate(db_session.get_bind())
-    assert compare_and_migrate(db_session.get_bind())
-
-    for legacy_key, current_key in legacy_to_current.items():
-        installation = db_session.query(PluginInstallation).filter_by(plugin_key=current_key).one()
-        assert installation.id == installation_ids[current_key]
-        assert installation.config == {"preserved": legacy_key}
-        assert db_session.query(PluginInstallation).filter_by(plugin_key=legacy_key).count() == 0
-        assert db_session.query(PluginDefinition).filter_by(plugin_key=legacy_key).count() == 0
-        assert db_session.query(PluginDefinition).filter_by(plugin_key=current_key).count() == 1
-    assert db_session.get(PluginConnection, connection.id).installation_id == opds_installation_id
-    assert db_session.get(PluginPermission, permission.id).installation_id == opds_installation_id
-    assert db_session.get(PluginRun, run.id).connection_id == connection.id
-    assert db_session.get(PluginSourceRecord, source_record.id).source == "talebook.source.opds"
 
 
 def test_auto_installation_is_idempotent_and_keeps_empty_auth_local(db_session):

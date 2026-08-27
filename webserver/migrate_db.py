@@ -205,7 +205,6 @@ def compare_and_migrate(engine):
         logger.info("Database columns are up to date; checking data and constraints")
         backfill_plugin_connection_roles(engine)
         migrate_plugin_connection_unique_constraint(engine)
-        migrate_builtin_plugin_identities(engine)
         return True
 
     logger.info(f"Found {len(migrations_needed)} columns to migrate:")
@@ -237,28 +236,8 @@ def compare_and_migrate(engine):
         )
         backfill_plugin_connection_roles(engine, include_default=role_added)
         migrate_plugin_connection_unique_constraint(engine)
-        migrate_builtin_plugin_identities(engine)
 
     return error_count == 0
-
-
-def migrate_builtin_plugin_identities(engine):
-    """运行数据级 canonical plugin_key 迁移；schema 已就绪后调用。"""
-    from sqlalchemy.orm import sessionmaker
-
-    from webserver.services.plugin_runtime import migrate_builtin_plugin_keys
-
-    session = sessionmaker(bind=engine)()
-    try:
-        migrated = migrate_builtin_plugin_keys(session)
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-    if migrated:
-        logger.info("Migrated %d built-in plugin identities", len(migrated))
 
 
 def backfill_plugin_connection_roles(engine, include_default=False):

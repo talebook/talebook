@@ -20,7 +20,6 @@ from webserver.models import (
     PluginSecret,
     PluginSourceRecord,
 )
-from webserver.plugins.migrations import LEGACY_PLUGIN_KEY_MIGRATIONS
 from webserver.plugins.register import ALL_BUILTIN_PROVIDERS
 from webserver.plugins.runtime import (
     ACTIONS,
@@ -120,65 +119,7 @@ for _provider in ALL_BUILTIN_PROVIDERS:
     REGISTRY.register(_provider)
 
 
-def migrate_builtin_plugin_keys(session, migrations=LEGACY_PLUGIN_KEY_MIGRATIONS):
-    """原地迁移 canonical plugin_key，保留连接、权限、run 与来源记录。"""
-    migrated = {}
-    for legacy_key, current_key in migrations.items():
-        legacy_installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == legacy_key).first()
-        current_installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == current_key).first()
-        if legacy_installation is not None and current_installation is not None:
-            raise PluginRuntimeError(
-                "plugin.identity_migration_conflict",
-                "Both legacy and current plugin installations exist",
-            )
-
-        legacy_definitions = (
-            session.query(PluginDefinition)
-            .filter(PluginDefinition.plugin_key == legacy_key)
-            .order_by(PluginDefinition.id)
-            .all()
-        )
-        for legacy_definition in legacy_definitions:
-            current_definition = (
-                session.query(PluginDefinition)
-                .filter(
-                    PluginDefinition.plugin_key == current_key,
-                    PluginDefinition.version == legacy_definition.version,
-                )
-                .first()
-            )
-            if current_definition is None:
-                legacy_definition.plugin_key = current_key
-                manifest = dict(legacy_definition.manifest or {})
-                manifest["id"] = current_key
-                legacy_definition.manifest = manifest
-                current_definition = legacy_definition
-            else:
-                session.query(PluginInstallation).filter(PluginInstallation.definition_id == legacy_definition.id).update(
-                    {PluginInstallation.definition_id: current_definition.id},
-                    synchronize_session=False,
-                )
-                session.delete(legacy_definition)
-
-        if legacy_installation is not None:
-            legacy_installation.plugin_key = current_key
-            session.flush()
-            definition = session.get(PluginDefinition, legacy_installation.definition_id)
-            manifest = dict(definition.manifest or {}) if definition is not None else {}
-            legacy_installation.checksum = hashlib.sha256(
-                json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            ).hexdigest()
-            migrated[current_key] = legacy_installation
-        session.query(PluginSourceRecord).filter(PluginSourceRecord.source == legacy_key).update(
-            {PluginSourceRecord.source: current_key},
-            synchronize_session=False,
-        )
-        session.flush()
-    return migrated
-
-
 def ensure_builtin_definitions(session, registry=REGISTRY):
-    migrated_installations = migrate_builtin_plugin_keys(session)
     definitions = []
     for manifest in registry.manifests():
         raw = manifest.raw
@@ -205,13 +146,6 @@ def ensure_builtin_definitions(session, registry=REGISTRY):
         definition.license = raw["license"]
         definition.manifest = dict(raw)
         definitions.append(definition)
-        installation = migrated_installations.get(raw["id"])
-        if installation is not None:
-            installation.definition_id = definition.id
-            installation.version = definition.version
-            installation.checksum = hashlib.sha256(
-                json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            ).hexdigest()
     session.commit()
     return definitions
 
