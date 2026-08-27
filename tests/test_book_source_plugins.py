@@ -192,20 +192,20 @@ def test_catalog_declares_real_capabilities_and_keeps_excluded_servers_out():
     manifests = {provider.manifest["id"]: provider.manifest for provider in BOOK_SOURCE_PROVIDERS}
 
     assert set(manifests) == {
-        "talebook.book-source.kavita",
-        "talebook.book-source.komga",
-        "talebook.book-source.booklore",
-        "talebook.book-source.standard-ebooks",
-        "talebook.book-source.gutenberg",
-        "talebook.book-source.internet-archive",
-        "talebook.book-source.webdav",
-        "talebook.book-source.watch-folder",
+        "talebook.source.kavita",
+        "talebook.source.komga",
+        "talebook.source.booklore",
+        "talebook.source.standard-ebooks",
+        "talebook.source.gutenberg",
+        "talebook.source.internet-archive",
+        "talebook.source.webdav",
+        "talebook.source.watch-folder",
     }
-    assert manifests["talebook.book-source.webdav"]["capabilities"] == [
+    assert manifests["talebook.source.webdav"]["capabilities"] == [
         "book_sources.browse",
         "book_sources.acquire",
     ]
-    assert manifests["talebook.book-source.watch-folder"]["capabilities"] == [
+    assert manifests["talebook.source.watch-folder"]["capabilities"] == [
         "book_sources.browse",
         "book_sources.acquire",
     ]
@@ -236,7 +236,7 @@ def test_endpoint_policy_rejects_private_credentials_and_redirect_targets():
 
 
 def test_legado_provider_does_not_auto_allowlist_source_target():
-    provider = next(item for item in BUILTIN_CAPABILITY_PROVIDERS if item.manifest["id"] == "talebook.book-source.legado")
+    provider = next(item for item in BUILTIN_CAPABILITY_PROVIDERS if item.manifest["id"] == "talebook.source.legado")
     raw = {
         "bookSourceName": "private target",
         "bookSourceUrl": "http://127.0.0.1",

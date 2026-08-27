@@ -52,12 +52,12 @@ def _manifest(plugin_id, name, description, capabilities, config_schema, auth_sc
         "version": "1.0.0",
         "categories": ["book_sources"],
         "capabilities": capabilities,
-        "runtime_kind": "http" if plugin_id != "talebook.book-source.watch-folder" else "file",
+        "runtime_kind": "http" if plugin_id != "talebook.source.watch-folder" else "file",
         "actions": ["test", "preview", "run", "retry", "rollback"],
         "auth_schema": auth_schema or {"type": "object", "properties": {}},
         "config_schema": config_schema,
         "permissions": ["books.read", "books.write"]
-        + ([] if plugin_id == "talebook.book-source.watch-folder" else ["network.read"]),
+        + ([] if plugin_id == "talebook.source.watch-folder" else ["network.read"]),
         "data_policy": {"stores_full_text": False, "retention": "pending_review"},
         "compatibility": {"talebook": ">=0.1.0"},
         # 书源由管理员统一配置后供全站使用。
@@ -381,7 +381,7 @@ class GutenbergProvider(SourceBase):
     license_name = "Project Gutenberg License"
     endpoint = "https://gutendex.com/books/"
     manifest = _manifest(
-        "talebook.book-source.gutenberg",
+        "talebook.source.gutenberg",
         source_name,
         "检索 Project Gutenberg 的合法开放电子书。",
         ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
@@ -417,7 +417,7 @@ class InternetArchiveProvider(SourceBase):
     source_name = "Internet Archive"
     endpoint = "https://archive.org/advancedsearch.php?q=mediatype%3Atexts&fl%5B%5D=identifier,title,creator&rows=25&page=1&output=json"
     manifest = _manifest(
-        "talebook.book-source.internet-archive",
+        "talebook.source.internet-archive",
         source_name,
         "检索 Internet Archive；仅明确开放文件可进入待审取得。",
         ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
@@ -482,7 +482,7 @@ class InternetArchiveProvider(SourceBase):
 class WebDAVProvider(SourceBase):
     source_name = "WebDAV"
     manifest = _manifest(
-        "talebook.book-source.webdav",
+        "talebook.source.webdav",
         source_name,
         "浏览 WebDAV 目录并按扩展名增量发现待审电子书。",
         ["book_sources.browse", "book_sources.acquire"],
@@ -557,7 +557,7 @@ class WebDAVProvider(SourceBase):
 class WatchFolderProvider(SourceBase):
     source_name = "Watch Folder"
     manifest = _manifest(
-        "talebook.book-source.watch-folder",
+        "talebook.source.watch-folder",
         source_name,
         "扫描白名单内的本地目录，以内容 hash 增量发现待审电子书。",
         ["book_sources.browse", "book_sources.acquire"],
@@ -637,25 +637,25 @@ class WatchFolderProvider(SourceBase):
 
 BOOK_SOURCE_PROVIDERS = (
     OPDSProvider(
-        "talebook.book-source.kavita",
+        "talebook.source.kavita",
         "Kavita",
         "Kavita 自托管书库 OPDS 连接预设。",
         "https://www.kavitareader.com/",
     ),
     OPDSProvider(
-        "talebook.book-source.komga",
+        "talebook.source.komga",
         "Komga",
         "Komga 自托管书库 OPDS 连接预设。",
         "https://komga.org/",
     ),
     OPDSProvider(
-        "talebook.book-source.booklore",
+        "talebook.source.booklore",
         "BookLore",
         "BookLore 自托管书库 OPDS 连接预设。",
         "https://booklore.org/",
     ),
     OPDSProvider(
-        "talebook.book-source.standard-ebooks",
+        "talebook.source.standard-ebooks",
         "Standard Ebooks",
         "浏览 Standard Ebooks 官方开放 OPDS 目录。",
         "https://standardebooks.org/",

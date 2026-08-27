@@ -174,7 +174,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   opdsServiceEnabled = true;
   pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
   pluginConnections = pluginInstallations
-    .filter(item => ['talebook.book-source.opds', 'talebook.book-source.legado'].includes(item.plugin_key))
+    .filter(item => ['talebook.source.opds', 'talebook.source.legado'].includes(item.plugin_key))
     .map(installation => mockPluginConnection(installation));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
@@ -1571,7 +1571,7 @@ router.get('/api/book/:id', eventHandler((event) => {
 const pluginDefinitions = [
   {
     id: 2,
-    plugin_key: 'talebook.book-source.opds',
+    plugin_key: 'talebook.source.opds',
     name: 'Generic OPDS',
     description: '管理已保存的 OPDS 目录，并浏览、搜索与批量导入。',
     version: '1.0.0',
@@ -1584,7 +1584,7 @@ const pluginDefinitions = [
   },
   {
     id: 3,
-    plugin_key: 'talebook.book-source.legado',
+    plugin_key: 'talebook.source.legado',
     name: 'Legado 在线书源',
     description: '管理、导入、搜索、阅读与体检兼容 Legado 的在线书源。',
     version: '1.0.0',
@@ -1597,7 +1597,7 @@ const pluginDefinitions = [
   },
   {
     id: 4,
-    plugin_key: 'talebook.book-source.watch-folder',
+    plugin_key: 'talebook.source.watch-folder',
     name: 'Watch Folder',
     description: '扫描白名单内的本地目录，以内容 hash 增量发现待审电子书。',
     version: '1.0.0',
@@ -1669,7 +1669,7 @@ const mockPluginConnection = installation => ({
   config: {},
 });
 let pluginConnections = pluginInstallations
-  .filter(installation => ['talebook.book-source.opds', 'talebook.book-source.legado'].includes(installation.plugin_key))
+  .filter(installation => ['talebook.source.opds', 'talebook.source.legado'].includes(installation.plugin_key))
   .map(installation => mockPluginConnection(installation));
 let opdsServiceEnabled = true;
 
@@ -1678,8 +1678,8 @@ router.get('/api/admin/plugins', eventHandler(() => ({
   definitions: pluginDefinitions,
   installations: pluginInstallations,
   builtin_state: {
-    'talebook.book-source.opds': { configured: 1, enabled: 1, service_enabled: opdsServiceEnabled },
-    'talebook.book-source.legado': { configured: 1, enabled: 1 },
+    'talebook.source.opds': { configured: 1, enabled: 1, service_enabled: opdsServiceEnabled },
+    'talebook.source.legado': { configured: 1, enabled: 1 },
   },
 })));
 

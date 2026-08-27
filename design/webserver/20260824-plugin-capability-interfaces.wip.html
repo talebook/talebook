@@ -870,12 +870,23 @@ for conn in runtime.connections_for(capability, user_id):
               五项均已完成：公共 <code>PluginProvider</code> 已删除；标准业务只经 <code>read/write/sync</code>；批注写回按 <code>annotations.push</code> 自动发现连接并保留来源排除；SQLite 会重建真实旧表约束；开发指南只教授 typed provider。
               随后的双路复审继续补齐：typed-only provider 声明 test 时注册期强制 <code>self_check</code>；三种调用统一租约、单一 deadline 重试、审计、异常脱敏和有界线程池，已运行的超时 future 不再发起重叠 attempt 且保留 lease 至宽限结束，<code>read_many</code> 用每连接 <code>next_retry_at</code> 非阻塞调度；metadata 同步/流式入口也不再每请求创建线程池，外层超时或流式提前关闭均以 <code>plugin.timeout</code> 保留不可取消 provider 的 grace lease；在线书源按 connection 分组进入 audited batch bridge，不再裸调 provider，后台持久化失败仍可由 status 或 TTL cleanup 重试；认证用户的设备推送由声明式路由建立个人连接并调 <code>runtime.sync</code>，游客只保留无连接/无 run 的明示兼容桥，且已有安装的禁用状态优先于游客兼容开关；删除空结果 metadata 壳；三个文本工具承载真实处理逻辑，自动 TXT 写回、实际备份路径与失败恢复也进入同一 typed write run；Legado 统一走 <code>SafeHttpClient</code> 且不自动信任封面域名；非微信来源以完整插件键与连接 id 计算 64 字符内稳定身份。相关回归已并入下方最新结果。
             </div>
+            <div class="callout good">
+              <strong>2026-08-27 插件 ID 命名收口（已验证）：</strong>用户确认将整个书源命名空间从 <code>talebook.book-source.*</code> 统一迁移为 <code>talebook.source.*</code>，不是只修改 OPDS。注册表、目录与 API 现在只暴露 10 个新 ID；数据库启动迁移会原地改写旧 <code>PluginDefinition</code> / <code>PluginInstallation</code>，保留 installation id、connection、权限、run 与配置引用；不保留旧 ID 路由别名。T-18 先后观察到注册清单和生产启动迁移的预期红灯，再完成实现并通过重复执行回归。
+            </div>
             <div class="callout warn"><strong>当前仍为 WIP：</strong>S1–S12 均已实现，自动化测试与 <code>interface-review full</code> 已通过；但当前会话未提供项目强制要求的 Chrome DevTools MCP，T-14 只能完成真实后端 + Chromium 替代检查，不能计作门禁通过，因此不得转 ACTIVE。</div>
             <div class="callout good">
               <strong>实际执行记录（2026-08-25）</strong>
               <p>宿主 Python 环境缺 <code>calibre</code>；不依赖 Calibre 的运行时单测使用仓库 venv，完整后端套件与 HTTP 端到端回归通过项目测试镜像执行：</p>
               <pre><code>docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test pytest tests -q
-  → 1066 passed, 20 skipped, 28 warnings
+  → 1068 passed, 20 skipped, 28 warnings
+
+pytest -q tests/test_plugin_contract.py::test_all_book_source_plugins_use_the_source_namespace \
+  tests/test_plugin_runtime.py::test_startup_migration_renames_every_legacy_book_source_identity_in_place
+  → TDD 红灯后 2 passed
+
+pytest -q tests/test_plugin_contract.py tests/test_plugin_runtime.py tests/test_book_source_plugins.py \
+  tests/test_plugins_api.py tests/test_network_library.py
+  → 86 passed
 
 docker run ... pytest tests/test_plugin_capability_lookup.py tests/test_plugin_runtime.py \
   tests/test_texttools.py tests/test_book_source_plugins.py tests/test_annotations.py \
@@ -909,6 +920,10 @@ cd app &amp;&amp; npx playwright test test/e2e/auth-themes.spec.ts \
   test/e2e/weread-import.spec.ts test/e2e/weread-workbench.spec.ts
   → 首轮 30 passed / 1 个测试状态夹具失败；修正夹具后失败项单独复跑通过，合计 31/31
 
+MOCK_API_URL=http://127.0.0.1:18080 PLAYWRIGHT_BASE_URL=http://127.0.0.1:13000 \
+  npx playwright test test/e2e/plugins.spec.ts
+  → 10 passed（独立短生命周期 mock / Nuxt 端口，验证新插件 ID 夹具）
+
 cd app &amp;&amp; npm run lint   → 0 errors, 468 warnings（warnings 为存量，非本次引入）
 cd app &amp;&amp; npx vitest run test/components test/composables test/plugins test/stores test/utils
   → 92 passed；另 4 个非改动套件因测试环境无法解析 #build/i18n-options.mjs 失败
@@ -916,7 +931,7 @@ make pytest               → 宿主机无 pytest 可执行文件；以上 Docke
 make build-dev            → talebook/talebook:dev 构建成功
 make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结构 / 单文件资源均通过</code></pre>
               <p>分支 <code>refactor/20260824-plugin-capability-interfaces</code>，基线 <code>origin/feat/plugins</code> @ 8c3601e8。</p>
-              <p>后端测试从基线的 966 增至 <strong>1066</strong>；最终全量测试零回归。</p>
+              <p>后端测试从基线的 966 增至 <strong>1068</strong>；最终全量测试零回归。</p>
             </div>
             <div class="callout good">
               <strong>S1–S12 已全部完成。</strong>
@@ -951,14 +966,15 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>T-11</td><td><code>plugin_runtime.py</code> 无任何插件名与模块；<code>book.py</code> 无 WEREAD / 中文连接名 / SecretCipher</td><td>以测试固化（<code>test_plugin_entity_writers.py</code>、<code>test_plugin_capability_lookup.py</code>），未另建 CI 脚本</td><td class="verified">已通过</td></tr>
                   <tr><td>T-16</td><td>代码评审发现的缺陷已修复：唯一约束迁移（升级库上生效、全新库不重复动）、两个连接入口传 role（改名不再产生第二条连接）、read_many 以 connection.id 为键且超时为整批预算、推送真正使用连接配置（记住并回落设备地址）、夹具完整性校验</td><td><code>tests/test_plugin_connection_role.py</code> +2、<code>tests/test_plugins_api.py</code> +2、<code>tests/test_main.py</code> +1、<code>tests/test_book_auto_transform.py</code> +1 与 setUp/tearDown 校验</td><td class="verified">已通过</td></tr>
                   <tr><td>T-17</td><td>Spec 五项与双路复审缺口：运行时边界外无具体插件/凭据/正文函数硬编码；typed 调用有租约、连接级单一 deadline、非阻塞 backoff、不重叠的超时 attempt、审计、出站异常脱敏和进程级有界线程池；元数据同步外层超时与流式提前关闭都保留不可取消 provider 的 grace lease；批注同步自动发现 typed writer 且防回环；空壳 metadata provider 已删除；开发指南不再推广旧通用契约或专属 handler</td><td><code>tests/test_plugin_capability_lookup.py</code> 架构/超时/脱敏/并发断言（含同步、流式租约）、<code>tests/test_plugin_runtime.py</code> 状态机、<code>tests/test_annotations.py</code> 回环与身份测试、<code>tests/test_plugin_contract.py</code> 注册清单；指南人工契约复核</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-18</td><td>10 个书源插件 ID 从 <code>talebook.book-source.*</code> 统一迁移到 <code>talebook.source.*</code>；新注册表不再暴露旧前缀；旧库升级后 installation id、connection、权限、run 与配置保持原引用</td><td><code>tests/test_plugin_contract.py</code> 精确注册清单 + <code>tests/test_plugin_runtime.py</code> 经 <code>compare_and_migrate()</code> 的全量旧身份迁移与幂等回归；两个公共接缝均先观察失败再实现</td><td class="verified">已通过</td></tr>
                   <tr><td>T-15</td><td>设备推送走插件：认证用户按 manifest <code>ui.device_type</code> 解析 provider，handler 无设备白名单，创建/复用个人连接后调 <code>runtime.sync</code>；成功产生 action=sync 的 succeeded run 并释放 lease，失败产生 failed run 并记录脱敏错误；专用 <code>PUSH_TIMEOUT</code> 与 context deadline 限制底层 requests；游客仅保留无连接/无 run 的 runtime 桥。双开关优先级明确：全局开关先决，未安装内置 provider 保持历史兼容，已有安装的 disabled / 非 active 状态优先且不可绕过</td><td><code>tests/test_main.py</code> 与 <code>tests/test_plugin_capability_lookup.py</code>，含声明式新设备、成功、失败、超时预算、租约、配置复用、未安装游客兼容与禁用安装不可绕过</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-12</td><td>后端 1066 passed / 20 skipped；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（468 warnings 为存量）；相关 Vitest 11 passed；相关 Playwright 31/31；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见上方命令记录；全量 Vitest 的 4 个 Nuxt i18n 虚拟模块环境失败单独记录，非本次回归</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-12</td><td>后端 1068 passed / 20 skipped；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（468 warnings 为存量）；相关 Vitest 11 passed；相关 Playwright 31/31，插件管理页 ID 夹具另回归 10 passed；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见上方命令记录；全量 Vitest 的 4 个 Nuxt i18n 虚拟模块环境失败单独记录，非本次回归</td><td class="verified">已通过</td></tr>
                   <tr><td>T-13</td><td>界面审查（<code>full</code> 模式）</td><td>相对 <code>origin/master</code> 审查 133 个纳入范围文件；修复 HIGH / MEDIUM 后复审</td><td class="verified">Approve</td></tr>
                   <tr><td>T-14</td><td>真实后端体验验证</td><td>Docker 后端已就绪，Chromium 替代回归已完成；当前会话无 Chrome DevTools MCP</td><td class="pending">待 MCP 重跑</td></tr>
                 </tbody>
               </table>
             </div>
-            <div class="callout"><strong>界面影响判定：</strong>本方案属于跨模块的大型功能且影响前端消费者（插件管理页、工作台、在线书库、书籍详情），因此<strong>不适用</strong>“无界面影响”豁免；T-13 已完成，仍须补齐 T-14 指定的 Chrome DevTools MCP 验收。</div>
+            <div class="callout"><strong>界面影响判定：</strong>本方案属于跨模块的大型功能且影响前端消费者（插件管理页、工作台、在线书库、书籍详情），因此<strong>不适用</strong>“无界面影响”豁免；T-13 已完成，仍须补齐 T-14 指定的 Chrome DevTools MCP 验收。2026-08-27 的书源 ID 收口仅改变 canonical ID、数据库迁移与测试夹具，不改变页面布局、交互或文案；已用插件页 Playwright 回归确认消费者继续工作，不改变既有 full review 结论。</div>
           </section>
 
           <section id="decisions" class="card">
@@ -985,6 +1001,7 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>D-16</td><td>本版不删除 weread 查询／导入与文本工具 handler 路由</td><td>typed provider 已接管业务契约，generic feature 路由接管 3 个非标准只读动作；存量路由仍承载工作台多步编排或既有消费者兼容，同版删除会把架构重构扩大为破坏性 API 迁移。后续需在消费者全部切换并给出弃用窗口后独立删除</td><td>为满足“删除 8 条”数字在本版直接移除，导致现有工作台与外部调用无迁移期</td></tr>
                   <tr><td>D-17</td><td>废弃并删除 <code>PluginProvider</code>；注册表只接受完整实现其声明能力接口的插件</td><td>所有插件强制实现 <code>execute(context)</code> 会把七类类型化能力重新收缩成单一旧协议，并允许 capability 声明与实际调用分裂；非标准动作已有 <code>ExtraFeatureProvider</code> 作为唯一逃生舱</td><td>保留 <code>PluginProvider</code> 作为兼容兜底（继续制造双契约与绕过路径）</td></tr>
                   <tr><td>D-18</td><td>删除 <code>talebook.metadata.builtin</code> 空壳，不为尚未适配的 legacy 元数据源伪造 typed provider</td><td>永远返回空结果的注册项会让管理页、能力发现与测试都误认为已有真实实现；存量来源继续走原设置路径，待每个真实适配器具备行为与测试后再注册</td><td>保留聚合壳并用文档解释其暂不可用（公开契约与实际行为仍不一致）</td></tr>
+                  <tr><td>D-19</td><td>全部书源插件统一使用 <code>talebook.source.*</code>，并在启动期原地迁移旧 <code>talebook.book-source.*</code> 数据；不提供旧 ID API 别名</td><td><code>source</code> 已足以表达领域，去掉复合段可让 canonical ID 更短且与 <code>metadata</code>、<code>reviews</code>、<code>push</code> 同层；原地改 key/definition 引用可保留既有连接和审计身份</td><td>只改 OPDS（同类插件命名不一致）；同时保留两套注册 ID（目录重复、形成长期双身份）</td></tr>
                 </tbody>
               </table>
             </div>

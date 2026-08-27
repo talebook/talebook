@@ -9,8 +9,8 @@ from webserver.plugins.runtime.interfaces import SourceProvider
 from webserver.services.plugin_runtime import PluginRuntime, PluginRuntimeError, ensure_builtin_capability_installations
 
 
-LEGADO_PLUGIN_KEY = "talebook.book-source.legado"
-GENERIC_OPDS_PLUGIN_KEY = "talebook.book-source.opds"
+LEGADO_PLUGIN_KEY = "talebook.source.legado"
+GENERIC_OPDS_PLUGIN_KEY = "talebook.source.opds"
 SOURCE_CAPABILITIES = frozenset({"book_sources.search", "book_sources.browse", "book_sources.acquire"})
 
 

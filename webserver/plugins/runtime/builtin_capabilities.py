@@ -267,7 +267,7 @@ def _manifest(plugin_id, name, description, categories, capabilities, permission
 BUILTIN_CAPABILITY_PROVIDERS = (
     GenericOPDSSourcePlugin(
         _manifest(
-            "talebook.book-source.opds",
+            "talebook.source.opds",
             "Generic OPDS",
             "管理已保存的 OPDS 1/2 目录，并浏览、搜索与批量导入。",
             ["book_sources"],
@@ -287,7 +287,7 @@ BUILTIN_CAPABILITY_PROVIDERS = (
     LegadoSourcePlugin(
         {
             **_manifest(
-                "talebook.book-source.legado",
+                "talebook.source.legado",
                 "Legado 在线书源",
                 "管理、导入、搜索、阅读与体检兼容 Legado 的在线书源。",
                 ["book_sources"],

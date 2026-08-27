@@ -19,8 +19,8 @@ class TestPluginsApi(TestWithAdminUser):
         self.assertEqual(data["err"], "ok")
         definitions = {item["plugin_key"]: item for item in data["definitions"]}
         self.assertNotIn("talebook.metadata.builtin", definitions)
-        self.assertIn("talebook.book-source.opds", definitions)
-        self.assertIn("talebook.book-source.legado", definitions)
+        self.assertIn("talebook.source.opds", definitions)
+        self.assertIn("talebook.source.legado", definitions)
         payload = json.dumps(data, ensure_ascii=False).lower()
         self.assertNotIn("calibre content server", payload)
         self.assertNotIn("calibre-web", payload)
@@ -30,7 +30,7 @@ class TestPluginsApi(TestWithAdminUser):
     def test_installation_state_can_be_disabled_and_reenabled_without_deleting_connection(self):
         catalog = self.json("/api/admin/plugins")
         installation = next(
-            item for item in catalog["installations"] if item["plugin_key"] == "talebook.book-source.opds"
+            item for item in catalog["installations"] if item["plugin_key"] == "talebook.source.opds"
         )
         connections_before = self.json("/api/admin/plugins/connections")["connections"]
 
@@ -58,7 +58,7 @@ class TestPluginsApi(TestWithAdminUser):
         settings["OPDS_ENABLED"] = False
 
         catalog = self.json("/api/admin/plugins")
-        state = catalog["builtin_state"]["talebook.book-source.opds"]
+        state = catalog["builtin_state"]["talebook.source.opds"]
         self.assertFalse(state["service_enabled"])
 
         with mock.patch("webserver.handlers.admin.SettingsSaverLogic.save_extra_settings") as save:
@@ -89,7 +89,7 @@ class TestPluginsApi(TestWithAdminUser):
 
     def tearDown(self):
         session = get_db()
-        session.query(PluginInstallation).filter(PluginInstallation.plugin_key == "talebook.book-source.opds").update(
+        session.query(PluginInstallation).filter(PluginInstallation.plugin_key == "talebook.source.opds").update(
             {PluginInstallation.enabled: True}
         )
         session.commit()
@@ -327,7 +327,7 @@ class TestGenericActionInputData(TestWithAdminUser):
 
     def test_input_data_must_be_an_object(self):
         catalog = self.json("/api/admin/plugins")
-        installation = next(item for item in catalog["installations"] if item["plugin_key"] == "talebook.book-source.opds")
+        installation = next(item for item in catalog["installations"] if item["plugin_key"] == "talebook.source.opds")
         connections = self.json("/api/admin/plugins/connections")["connections"]
         connection = next(item for item in connections if item["installation_id"] == installation["id"])
 
@@ -349,7 +349,7 @@ class TestConnectionRoleAtRealEntrypoints(TestWithAdminUser):
 
     def _opds_installation(self):
         catalog = self.json("/api/admin/plugins")
-        return next(item for item in catalog["installations"] if item["plugin_key"] == "talebook.book-source.opds")
+        return next(item for item in catalog["installations"] if item["plugin_key"] == "talebook.source.opds")
 
     def test_admin_created_connection_is_keyed_by_role_not_name(self):
         installation = self._opds_installation()

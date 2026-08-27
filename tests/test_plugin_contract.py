@@ -32,6 +32,30 @@ def test_every_builtin_provider_satisfies_the_contract():
     assert not hasattr(plugin_contract, "PluginProvider"), "通用 PluginProvider 已被七类能力接口取代"
 
 
+def test_all_book_source_plugins_use_the_source_namespace():
+    expected = {
+        "talebook.source.opds",
+        "talebook.source.legado",
+        "talebook.source.kavita",
+        "talebook.source.komga",
+        "talebook.source.booklore",
+        "talebook.source.standard-ebooks",
+        "talebook.source.gutenberg",
+        "talebook.source.internet-archive",
+        "talebook.source.webdav",
+        "talebook.source.watch-folder",
+    }
+
+    actual = {
+        provider.manifest["id"]
+        for provider in REGISTRY.providers()
+        if "book_sources" in provider.manifest["categories"]
+    }
+
+    assert actual == expected
+    assert not any(plugin_id.startswith("talebook.book-source.") for plugin_id in actual)
+
+
 def test_contract_violations_detects_missing_manifest():
     class NoManifest:
         def search_books(self, query, context):
@@ -151,7 +175,7 @@ def test_registry_requires_extra_feature_interface_when_features_are_declared():
 
 
 def test_registry_rejects_book_source_download_mode_mismatch():
-    provider = REGISTRY.get("talebook.book-source.gutenberg")
+    provider = REGISTRY.get("talebook.source.gutenberg")
 
     class MismatchedSource:
         manifest = {**provider.manifest, "id": "talebook.test.mode-mismatch", "download_mode": "by_chapters"}

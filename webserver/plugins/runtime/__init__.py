@@ -50,6 +50,16 @@ from .weread import WEREAD_PLUGIN_KEY, WereadProvider, parse_weread_export
 from .triggers import TRIGGER_AUTO, TRIGGER_MANUAL, TRIGGER_SCHEMA, trigger_of
 
 
+# Canonical IDs changed before this branch is merged, but users may already
+# have exercised it from an earlier build. Keep the identity migration beside
+# the provider catalog; the generic runtime only consumes this mapping.
+_SOURCE_PROVIDERS = (*BUILTIN_CAPABILITY_PROVIDERS, *BOOK_SOURCE_PROVIDERS)
+BUILTIN_PLUGIN_KEY_MIGRATIONS = {
+    provider.manifest["id"].replace("talebook.source.", "talebook.book-source.", 1): provider.manifest["id"]
+    for provider in _SOURCE_PROVIDERS
+    if provider.manifest["id"].startswith("talebook.source.")
+}
+
 # 内置插件清单。运行时只遍历这个元组，不认识其中任何一个具体插件。
 ALL_BUILTIN_PROVIDERS = (
     MockMultiTabProvider(),
@@ -69,6 +79,7 @@ __all__ = [
     "ManifestError",
     "MockMultiTabProvider",
     "BuiltinCapabilityProvider",
+    "BUILTIN_PLUGIN_KEY_MIGRATIONS",
     "BUILTIN_CAPABILITY_PROVIDERS",
     "BOOK_SOURCE_PROVIDERS",
     "Annotation",

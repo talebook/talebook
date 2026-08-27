@@ -215,7 +215,7 @@ POST /api/plugins/{plugin_key}/features/{action}
 
 | 形态 | 典型实现 | `runtime_kind` | 特点 |
 |------|----------|---------------|------|
-| **内置能力** | `builtin_capabilities.py` 的 `talebook.book-source.{opds,legado}` 与三个正文工具 | `builtin` | 自动安装并创建 `instance/0/builtin` 连接；OPDS 与 Legado 再由绑定层展开存量事实表 |
+| **内置能力** | `builtin_capabilities.py` 的 `talebook.source.{opds,legado}` 与三个正文工具 | `builtin` | 自动安装并创建 `instance/0/builtin` 连接；OPDS 与 Legado 再由绑定层展开存量事实表 |
 | **书源** | `book_sources.py` 的 `OPDSProvider / GutenbergProvider / InternetArchive / WebDAV / WatchFolder`，以及 `legado.py` | `http` / `file` / `builtin` | 全部实现 `SourceProvider`；统一返回领域对象，并由 `download_mode` 选择单文件或分章组装 |
 | **富化连接器** | `enrichment.py` 的 `OpenLibrary / EmbeddedMetadata / CatalogReview(BRS, Goodreads...)` | `builtin` | 经 `SafeHttpClient` 的 `_http_json()` 统一出网，`_manifest()` 统一声明 `talebook.metadata.* / talebook.reviews.*` |
 | **通用集成** | `weread.py:WereadProvider` | `http` | 实现 metadata/annotation/extra feature 接口；嵌套分页通过显式 cursor 逐页推进 |
