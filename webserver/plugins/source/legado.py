@@ -18,6 +18,9 @@ from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderResult,
 from webserver.plugins.runtime.safe_http import SafeHttpClient
 
 
+PLUGIN_ID = "talebook.source.legado"
+
+
 def _status(session, settings):
     from webserver.models import BookSourceModel
 
@@ -167,11 +170,13 @@ class LegadoSourcePlugin:
 
 
 class LegadoProvider(LegadoSourcePlugin):
+    auto_install = True
+
     def __init__(self):
         super().__init__(
             {
                 "protocol_version": PROTOCOL_VERSION,
-                "id": "talebook.source.legado",
+                "id": PLUGIN_ID,
                 "name": "Legado 在线书源",
                 "description": "管理、导入、搜索、阅读与体检兼容 Legado 的在线书源。",
                 "version": "1.0.0",

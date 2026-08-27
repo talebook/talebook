@@ -9,11 +9,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Base, PluginRunItem, PluginSourceRecord
-from webserver.plugins.register import BOOK_SOURCE_PROVIDERS, BUILTIN_CAPABILITY_PROVIDERS
+from webserver.plugins.register import SOURCE_PROVIDERS
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderItem, ProviderResult
 from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient, validate_remote_endpoint
 from webserver.plugins.source.base import OPDSProvider
 from webserver.plugins.source.internet_archive import InternetArchiveProvider
+from webserver.plugins.source.legado import PROVIDER as LEGADO_PROVIDER
 from webserver.plugins.source.watch_folder import WatchFolderProvider
 from webserver.plugins.source.webdav import WebDAVProvider
 from webserver.services.booksource import SourceHttpError
@@ -21,7 +22,7 @@ from webserver.services.booksource_search import TASK_TTL, SearchTaskService
 from webserver.services.plugin_runtime import PluginRegistry, PluginRuntime, install_builtin, save_connection
 
 
-SETTINGS = {"PLUGIN_SECRET_KEY": "book-source-test-key", "cookie_secret": "unused"}
+SETTINGS = {"PLUGIN_SECRET_KEY": "source-test-key", "cookie_secret": "unused"}
 
 
 def response(payload, content_type="application/json", status=200, headers=None):
@@ -186,7 +187,11 @@ def test_expired_search_task_drains_runtime_batch_before_cleanup():
 
 
 def test_catalog_declares_real_capabilities_and_keeps_excluded_servers_out():
-    manifests = {provider.manifest["id"]: provider.manifest for provider in BOOK_SOURCE_PROVIDERS}
+    manifests = {
+        provider.manifest["id"]: provider.manifest
+        for provider in SOURCE_PROVIDERS
+        if provider.manifest["runtime_kind"] != "builtin"
+    }
 
     assert set(manifests) == {
         "talebook.source.kavita",
@@ -233,7 +238,6 @@ def test_endpoint_policy_rejects_private_credentials_and_redirect_targets():
 
 
 def test_legado_provider_does_not_auto_allowlist_source_target():
-    provider = next(item for item in BUILTIN_CAPABILITY_PROVIDERS if item.manifest["id"] == "talebook.source.legado")
     raw = {
         "bookSourceName": "private target",
         "bookSourceUrl": "http://127.0.0.1",
@@ -242,7 +246,7 @@ def test_legado_provider_does_not_auto_allowlist_source_target():
     }
 
     with pytest.raises(SourceHttpError) as exc:
-        provider.search("probe", {}, context(config={"source_raw": raw, "engine_config": {}}))
+        LEGADO_PROVIDER.search("probe", {}, context(config={"source_raw": raw, "engine_config": {}}))
 
     assert "non-public" in str(exc.value)
 
@@ -439,7 +443,7 @@ class DuplicateProvider:
     download_mode = "single_book"
     manifest = {
         "protocol_version": PROTOCOL_VERSION,
-        "id": "test.book-source.duplicates",
+        "id": "test.source.duplicates",
         "name": "Duplicate books",
         "version": "1.0.0",
         "categories": ["book_sources"],

@@ -45,7 +45,7 @@ SOURCE_PROVIDERS = (
     WEBDAV_PROVIDER,
     WATCH_FOLDER_PROVIDER,
 )
-METADATA_PROVIDERS = (OPEN_LIBRARY_PROVIDER, EMBEDDED_FILE_PROVIDER, CALIBRE_PROVIDER_BRIDGE)
+METADATA_PROVIDERS = (EMBEDDED_FILE_PROVIDER, CALIBRE_PROVIDER_BRIDGE)
 REVIEW_PROVIDERS = (
     HARDCOVER_PROVIDER,
     NEODB_PROVIDER,
@@ -64,57 +64,29 @@ PUSH_PROVIDERS = (
     DANGDANG_PROVIDER,
     PURELIBRO_PROVIDER,
 )
-PUSH_PROVIDERS_BY_DEVICE = {provider.manifest["ui"]["device_type"]: provider for provider in PUSH_PROVIDERS}
+COMBO_PROVIDERS = (WEREAD_PROVIDER, OPEN_LIBRARY_PROVIDER)
+MOCK_PROVIDERS = (MOCK_MULTI_TAB_PROVIDER,)
 
-
-BUILTIN_CAPABILITY_PROVIDERS = (OPDS_PROVIDER, LEGADO_PROVIDER, *TOOL_PROVIDERS)
-BOOK_SOURCE_PROVIDERS = (
-    KAVITA_PROVIDER,
-    KOMGA_PROVIDER,
-    BOOKLORE_PROVIDER,
-    STANDARD_EBOOKS_PROVIDER,
-    GUTENBERG_PROVIDER,
-    INTERNET_ARCHIVE_PROVIDER,
-    WEBDAV_PROVIDER,
-    WATCH_FOLDER_PROVIDER,
-)
-EXTERNAL_CONNECTOR_PROVIDERS = (*METADATA_PROVIDERS, *REVIEW_PROVIDERS, *ANNOTATION_PROVIDERS)
-
-ALL_BUILTIN_PROVIDERS = (
-    MOCK_MULTI_TAB_PROVIDER,
-    WEREAD_PROVIDER,
-    *SOURCE_PROVIDERS,
-    *METADATA_PROVIDERS,
-    *REVIEW_PROVIDERS,
-    *ANNOTATION_PROVIDERS,
-    *TOOL_PROVIDERS,
-    *PUSH_PROVIDERS,
-)
-
-
-def _legacy_plugin_key(plugin_key):
-    if plugin_key.startswith("talebook.source."):
-        return plugin_key.replace("talebook.source.", "talebook.book-source.", 1)
-    if plugin_key.startswith("talebook.review."):
-        return plugin_key.replace("talebook.review.", "talebook.reviews.", 1)
-    if plugin_key.startswith("talebook.annotation."):
-        return plugin_key.replace("talebook.annotation.", "talebook.annotations.", 1)
-    return ""
-
-
-BUILTIN_PLUGIN_KEY_MIGRATIONS = {
-    legacy_key: provider.manifest["id"]
-    for provider in ALL_BUILTIN_PROVIDERS
-    if (legacy_key := _legacy_plugin_key(provider.manifest["id"]))
+# 每个 provider 只进入一个与目录类型一致的主分组；其余视图均从这里派生。
+PROVIDER_GROUPS = {
+    "mock": MOCK_PROVIDERS,
+    "combo": COMBO_PROVIDERS,
+    "source": SOURCE_PROVIDERS,
+    "metadata": METADATA_PROVIDERS,
+    "review": REVIEW_PROVIDERS,
+    "annotation": ANNOTATION_PROVIDERS,
+    "tool": TOOL_PROVIDERS,
+    "push": PUSH_PROVIDERS,
 }
+ALL_BUILTIN_PROVIDERS = tuple(provider for providers in PROVIDER_GROUPS.values() for provider in providers)
+PUSH_PROVIDERS_BY_DEVICE = {provider.manifest["ui"]["device_type"]: provider for provider in PUSH_PROVIDERS}
 
 
 __all__ = [
     "ALL_BUILTIN_PROVIDERS",
-    "BOOK_SOURCE_PROVIDERS",
-    "BUILTIN_CAPABILITY_PROVIDERS",
-    "BUILTIN_PLUGIN_KEY_MIGRATIONS",
-    "EXTERNAL_CONNECTOR_PROVIDERS",
+    "PROVIDER_GROUPS",
     "PUSH_PROVIDERS",
     "PUSH_PROVIDERS_BY_DEVICE",
+    "SOURCE_PROVIDERS",
+    "TOOL_PROVIDERS",
 ]

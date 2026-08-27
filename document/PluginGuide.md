@@ -244,7 +244,7 @@ for provider in ALL_BUILTIN_PROVIDERS:
 
 - `ensure_builtin_definitions(session)`：按 `REGISTRY.manifests()` upsert `PluginDefinition`（`plugin_key + version` 唯一）。
 - `install_builtin(session, plugin_key, installed_by, config, approved_permissions)`：创建/更新 `PluginInstallation(status=active, scope=shared)` 与 `PluginPermission` 行；`permissions` 必须为 manifest 声明的子集。
-- `ensure_builtin_capability_installations(session, installed_by, settings)`：幂等地为每个 `BUILTIN_CAPABILITY_PROVIDERS` 安装并创建 `instance/0/内置连接`。存量 `plugins/meta/` 来源仍由元数据设置管理，不伪装成一个返回空结果的 provider；完成逐来源 typed 适配前不会出现在插件目录。
+- `ensure_auto_installations(session, installed_by, settings)`：遍历统一注册表，幂等地为声明 `auto_install = True` 的 provider 安装并创建 `instance/0/内置连接`。Provider 只在与目录类型一致的 `PROVIDER_GROUPS` 主分组出现一次；自动安装是由生命周期标记派生的视图，不维护第二份清单。存量 `plugins/meta/` 来源仍由元数据设置管理，不伪装成一个返回空结果的 provider；完成逐来源 typed 适配前不会出现在插件目录。
 
 ### 5.3 连接与凭据
 
@@ -307,7 +307,7 @@ runtime.execute(run.id)  # 同步阻塞，handler 内直接调用
 
 | 方法与路径 | 说明 |
 |------------|------|
-| `GET /api/admin/plugins` | 目录：`definitions/installations/builtin_state`，并触发 `ensure_builtin_capability_installations()` |
+| `GET /api/admin/plugins` | 目录：`definitions/installations/builtin_state`，并触发 `ensure_auto_installations()` |
 | `POST /api/admin/plugins/install` `{plugin_key, config?, permissions?}` | `install_builtin()` |
 | `POST /api/admin/plugins/installations/:id/state` `{enabled: bool}` | 启停安装 |
 | `POST /api/admin/plugins/opds-service` `{enabled: bool}` | 切换 `OPDS_ENABLED` 的 `SettingsSaverLogic` 入口（OPDS 能力虽注册为插件，开关仍走旧设置） |
@@ -399,7 +399,7 @@ app/src/pages/toolbox/*.vue       # Vuetify 2（item-text / outlined / dense）
 - `entity_type` 写错会得 `plugin.item_invalid` 且 `counts.failed` 自增；`book_source` 的 `format` 不在 `ALLOWED_FORMATS` 会 `UpstreamError`。
 - `OPDS_ENABLED` 等开关虽注册为插件，但仍走 `SettingsSaverLogic.save_extra_settings`，勿重复写表。
 - **逐资源权限校验**：凡按 `book_id` 取书的只读端点（preview/analyze 类），必须经 `handler.can_view_book(book_id)` 校验后再取数——本项目曾因此被打回：仅 `@auth` + 书籍列表过滤挡不住客户端直传任意 `book_id` 读他人私藏（`Item.scope == "private"`）。统一封装 `_tool_resolve_book(handler, book_id)` 一类的辅助函数最稳妥。
-- **新增内置能力会破坏既有计数断言**：`BUILTIN_CAPABILITY_PROVIDERS` 每加一项，`tests/test_plugin_runtime.py` 中硬编码的安装数量断言要同步 +1，否则全量 pytest 直接回归。
+- **自动安装数量是显式契约**：只有声明 `auto_install = True` 的 provider 会在启动期建立共享连接；增删该标记时必须同步更新 `tests/test_plugin_runtime.py` 的精确安装数量与 ID 断言。
 
 ### 10.3 提交前
 

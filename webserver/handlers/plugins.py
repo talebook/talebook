@@ -26,7 +26,7 @@ from webserver.services.plugin_runtime import (
     REGISTRY,
     PluginRuntime,
     PluginRuntimeError,
-    ensure_builtin_capability_installations,
+    ensure_auto_installations,
     install_builtin,
     save_connection,
 )
@@ -144,7 +144,7 @@ class AdminPlugins(BaseHandler):
     @is_admin
     def get(self):
         try:
-            ensure_builtin_capability_installations(self.session, self.user_id(), loader.get_settings())
+            ensure_auto_installations(self.session, self.user_id(), loader.get_settings())
             definitions = self.session.query(PluginDefinition).order_by(PluginDefinition.id).all()
             installations = self.session.query(PluginInstallation).order_by(PluginInstallation.id).all()
             definition_map = {item.id: item for item in definitions}

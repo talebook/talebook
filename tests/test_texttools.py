@@ -6,7 +6,7 @@ import zipfile
 from unittest import mock
 
 from webserver.handlers.base import BaseHandler
-from webserver.plugins.register import BUILTIN_CAPABILITY_PROVIDERS
+from webserver.plugins.register import TOOL_PROVIDERS
 from webserver.plugins.tool.common import decode_with_report, detect_encoding, fix_to_utf8
 from webserver.plugins.tool.epub import decode_entry, encode_entry, find_text_entries, read_text_entries, set_xml_encoding
 from webserver.plugins.tool.text_replace.transform import compile_rule, preview, replace_epub_file, replace_txt_file, scan_samples
@@ -173,15 +173,15 @@ def test_opencc_and_chinese_epub_txt():
                 pass
 
 
-def test_builtin_capability_providers_registered():
-    keys = {p.manifest["id"] for p in BUILTIN_CAPABILITY_PROVIDERS}
+def test_tool_providers_are_auto_installable():
+    keys = {p.manifest["id"] for p in TOOL_PROVIDERS}
     assert "talebook.tool.text-replace" in keys
     assert "talebook.tool.zh-converter" in keys
     assert "talebook.tool.txt-fixer" in keys
     # all three must be in integrations category
-    for p in BUILTIN_CAPABILITY_PROVIDERS:
-        if p.manifest["id"].startswith("talebook.tool."):
-            assert "integrations" in p.manifest["categories"]
+    for p in TOOL_PROVIDERS:
+        assert p.auto_install is True
+        assert "integrations" in p.manifest["categories"]
 
 
 # ---------------------------------------------------------------------------

@@ -12,6 +12,8 @@ class BuiltinCapabilityProvider:
     health checks and durable run history.
     """
 
+    auto_install = True
+
     def __init__(self, manifest, enabled_setting=None, status_fn=None):
         self.manifest = manifest
         # 首次安装时是否启用：默认启用；给定设置名时跟随该设置。

@@ -18,13 +18,14 @@ from webserver.models import (
     PluginSourceRecord,
 )
 from webserver.plugins.mock.multi_tab import MockMultiTabProvider
+from webserver.plugins.migrations import LEGACY_PLUGIN_KEY_MIGRATIONS
 from webserver.plugins.runtime import PluginManifest
 from webserver.plugins.runtime.protocol import ManifestError
 from webserver.services.plugin_runtime import (
     REGISTRY,
     PluginRuntime,
     PluginRuntimeError,
-    ensure_builtin_capability_installations,
+    ensure_auto_installations,
     ensure_builtin_definitions,
     install_builtin,
     rotate_connection_secret,
@@ -147,6 +148,7 @@ def test_startup_migration_renames_every_legacy_builtin_identity_in_place(db_ses
         "talebook.reviews.file-import": "talebook.review.file-import",
         "talebook.annotations.brs": "talebook.annotation.brs",
     }
+    assert LEGACY_PLUGIN_KEY_MIGRATIONS == legacy_to_current
     providers = {provider.manifest["id"]: provider for provider in REGISTRY.providers()}
     installation_ids = {}
 
@@ -250,10 +252,10 @@ def test_startup_migration_renames_every_legacy_builtin_identity_in_place(db_ses
     assert db_session.get(PluginSourceRecord, source_record.id).source == "talebook.source.opds"
 
 
-def test_builtin_capability_bootstrap_is_idempotent_and_keeps_empty_auth_local(db_session):
+def test_auto_installation_is_idempotent_and_keeps_empty_auth_local(db_session):
     settings = {**SETTINGS, "auto_fill_meta": False}
-    first = ensure_builtin_capability_installations(db_session, installed_by=1, settings=settings)
-    second = ensure_builtin_capability_installations(db_session, installed_by=1, settings=settings)
+    first = ensure_auto_installations(db_session, installed_by=1, settings=settings)
+    second = ensure_auto_installations(db_session, installed_by=1, settings=settings)
 
     assert len(first) == len(second) == 5
     assert db_session.query(PluginConnection).count() == 5

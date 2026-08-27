@@ -4,6 +4,9 @@ from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderResult
 from .base import OPDSProvider
 
 
+PLUGIN_ID = "talebook.source.opds"
+
+
 def _status(session, settings):
     from webserver.models import OpdsSource
 
@@ -18,16 +21,18 @@ def _status(session, settings):
 class GenericOPDSProvider(OPDSProvider):
     """把 OpdsSource 事实表绑定到标准 SourceProvider。"""
 
+    auto_install = True
+
     def __init__(self):
         super().__init__(
-            "talebook.source.opds",
+            PLUGIN_ID,
             "Generic OPDS",
             "管理已保存的 OPDS 1/2 目录，并浏览、搜索与批量导入。",
             "https://github.com/talebook/talebook",
         )
         self.manifest = {
             "protocol_version": PROTOCOL_VERSION,
-            "id": "talebook.source.opds",
+            "id": PLUGIN_ID,
             "name": "Generic OPDS",
             "description": "管理已保存的 OPDS 1/2 目录，并浏览、搜索与批量导入。",
             "version": "1.0.0",

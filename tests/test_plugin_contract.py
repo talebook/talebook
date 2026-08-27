@@ -4,8 +4,13 @@ from pathlib import Path
 
 import pytest
 
+import webserver.plugins.register as plugin_register
 import webserver.plugins.runtime as plugin_contract
+from webserver.plugins.migrations import LEGACY_PLUGIN_KEY_MIGRATIONS
 from webserver.plugins.runtime import CheckReport, PluginContext, PluginManifest, contract_violations
+from webserver.plugins.source.legado import PLUGIN_ID as LEGADO_PLUGIN_ID
+from webserver.plugins.source.opds import PLUGIN_ID as OPDS_PLUGIN_ID
+from webserver.services import source_catalog
 from webserver.services.plugin_runtime import REGISTRY, PluginRegistry
 
 
@@ -53,7 +58,40 @@ def test_all_book_source_plugins_use_the_source_namespace():
     }
 
     assert actual == expected
-    assert not any(plugin_id.startswith("talebook.book-source.") for plugin_id in actual)
+    assert actual.isdisjoint(LEGACY_PLUGIN_KEY_MIGRATIONS)
+
+
+def test_registration_has_one_primary_group_and_derived_auto_install_lifecycle():
+    grouped = [provider for providers in plugin_register.PROVIDER_GROUPS.values() for provider in providers]
+
+    assert grouped == list(plugin_register.ALL_BUILTIN_PROVIDERS)
+    assert len(grouped) == len({id(provider) for provider in grouped})
+    assert set(plugin_register.__all__) == {
+        "ALL_BUILTIN_PROVIDERS",
+        "PROVIDER_GROUPS",
+        "PUSH_PROVIDERS",
+        "PUSH_PROVIDERS_BY_DEVICE",
+        "SOURCE_PROVIDERS",
+        "TOOL_PROVIDERS",
+    }
+    assert {
+        provider.manifest["id"]
+        for provider in grouped
+        if getattr(provider, "auto_install", False)
+    } == {
+        "talebook.source.opds",
+        "talebook.source.legado",
+        "talebook.tool.text-replace",
+        "talebook.tool.zh-converter",
+        "talebook.tool.txt-fixer",
+    }
+
+
+def test_source_catalog_reuses_canonical_ids_from_concrete_plugins():
+    assert LEGADO_PLUGIN_ID == "talebook.source.legado"
+    assert OPDS_PLUGIN_ID == "talebook.source.opds"
+    assert source_catalog.LEGADO_PLUGIN_ID == LEGADO_PLUGIN_ID
+    assert source_catalog.OPDS_PLUGIN_ID == OPDS_PLUGIN_ID
 
 
 def test_concrete_plugins_live_outside_the_platform_runtime():

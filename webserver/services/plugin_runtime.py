@@ -20,11 +20,8 @@ from webserver.models import (
     PluginSecret,
     PluginSourceRecord,
 )
-from webserver.plugins.register import (
-    ALL_BUILTIN_PROVIDERS,
-    BUILTIN_CAPABILITY_PROVIDERS,
-    BUILTIN_PLUGIN_KEY_MIGRATIONS,
-)
+from webserver.plugins.migrations import LEGACY_PLUGIN_KEY_MIGRATIONS
+from webserver.plugins.register import ALL_BUILTIN_PROVIDERS
 from webserver.plugins.runtime import (
     ACTIONS,
     CheckReport,
@@ -123,7 +120,7 @@ for _provider in ALL_BUILTIN_PROVIDERS:
     REGISTRY.register(_provider)
 
 
-def migrate_builtin_plugin_keys(session, migrations=BUILTIN_PLUGIN_KEY_MIGRATIONS):
+def migrate_builtin_plugin_keys(session, migrations=LEGACY_PLUGIN_KEY_MIGRATIONS):
     """原地迁移 canonical plugin_key，保留连接、权限、run 与来源记录。"""
     migrated = {}
     for legacy_key, current_key in migrations.items():
@@ -219,11 +216,13 @@ def ensure_builtin_definitions(session, registry=REGISTRY):
     return definitions
 
 
-def ensure_builtin_capability_installations(session, installed_by, settings, registry=REGISTRY):
-    """Idempotently install Talebook-owned capabilities in the shared runtime."""
+def ensure_auto_installations(session, installed_by, settings, registry=REGISTRY):
+    """幂等安装声明了 auto_install 生命周期的内置 provider。"""
     ensure_builtin_definitions(session, registry)
     installations = []
-    for provider in BUILTIN_CAPABILITY_PROVIDERS:
+    for provider in registry.providers():
+        if not getattr(provider, "auto_install", False):
+            continue
         plugin_key = provider.manifest["id"]
         installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
         if installation is None:

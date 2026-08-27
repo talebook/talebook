@@ -6,11 +6,11 @@ from sqlalchemy.orm import sessionmaker
 
 from webserver.models import BookSourceModel, OpdsSource, PluginConnection
 from webserver.plugins.runtime.interfaces import SourceProvider
-from webserver.services.plugin_runtime import PluginRuntime, PluginRuntimeError, ensure_builtin_capability_installations
+from webserver.plugins.source.legado import PLUGIN_ID as LEGADO_PLUGIN_ID
+from webserver.plugins.source.opds import PLUGIN_ID as OPDS_PLUGIN_ID
+from webserver.services.plugin_runtime import PluginRuntime, PluginRuntimeError, ensure_auto_installations
 
 
-LEGADO_PLUGIN_KEY = "talebook.source.legado"
-GENERIC_OPDS_PLUGIN_KEY = "talebook.source.opds"
 SOURCE_CAPABILITIES = frozenset({"book_sources.search", "book_sources.browse", "book_sources.acquire"})
 
 
@@ -43,7 +43,7 @@ class SourceCatalogService:
         self.session = session
         self.settings = settings
         self.user_id = user_id
-        ensure_builtin_capability_installations(session, user_id, settings)
+        ensure_auto_installations(session, user_id, settings)
         self.runtime = runtime or PluginRuntime(session, settings)
 
     def _engine_config(self):
@@ -72,7 +72,7 @@ class SourceCatalogService:
             definition = self.runtime._definition_of(connection)
             capabilities = frozenset(definition.capabilities or []) & SOURCE_CAPABILITIES
             download_mode = str(provider.download_mode)
-            if plugin_key == LEGADO_PLUGIN_KEY:
+            if plugin_key == LEGADO_PLUGIN_ID:
                 sources = (
                     self.session.query(BookSourceModel)
                     .filter(BookSourceModel.enabled.is_(True))
@@ -98,7 +98,7 @@ class SourceCatalogService:
                     )
                     for source in sources
                 )
-            elif plugin_key == GENERIC_OPDS_PLUGIN_KEY:
+            elif plugin_key == OPDS_PLUGIN_ID:
                 sources = self.session.query(OpdsSource).filter(OpdsSource.active.is_(True)).order_by(OpdsSource.id).all()
                 output.extend(
                     SourceBinding(

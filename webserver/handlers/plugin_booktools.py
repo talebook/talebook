@@ -22,7 +22,7 @@ from webserver.services.booktools import (
     pick_format,
     resolve_book,
 )
-from webserver.services.plugin_runtime import PluginRuntime, ensure_builtin_capability_installations
+from webserver.services.plugin_runtime import PluginRuntime, ensure_auto_installations
 
 
 TRANSFORM_CAPABILITY = "integrations.tool"
@@ -67,7 +67,7 @@ def _tool_backup_dir():
 def _tool_runtime(handler, manage_route):
     """按声明式 UI 入口选择 typed transform，不在 handler 硬编码插件身份。"""
     settings = loader.get_settings()
-    ensure_builtin_capability_installations(handler.session, handler.user_id(), settings)
+    ensure_auto_installations(handler.session, handler.user_id(), settings)
     runtime = PluginRuntime(handler.session, settings)
     for connection in runtime.connections_for(TRANSFORM_CAPABILITY, handler.user_id()):
         provider = runtime.registry.get(runtime.plugin_key_of(connection))
