@@ -182,7 +182,7 @@ class MyMetadataProvider:
 
 ### 3.3 实体写入器
 
-`webserver/services/plugin_writers.py` 按 `entity_type` 注册写入器，提供 `prepare` / `materialize` / `rollback` 三个钩子。**通用运行时不认识任何具体插件**：微信读书保留历史 `weread` 标识，其他来源以完整 `plugin_key + connection_id` 计算命名空间；可读值超出目标列宽时使用“截断前缀 + SHA-256 摘要”稳定编码，`source_name`、`source_type`、`client_id` 均不超过 64 字符。不同厂商同后缀、同插件多账户导入相同 external id 都不会冲突。
+`webserver/services/plugin_writers.py` 按 `entity_type` 注册写入器，提供 `prepare` / `materialize` / `rollback` 三个钩子。**通用运行时和 writer 都不认识任何具体插件**：所有来源以完整 `plugin_key + connection_id` 计算命名空间；可读值超出目标列宽时使用“截断前缀 + SHA-256 摘要”稳定编码，`source_name`、`source_type`、`client_id` 均不超过 64 字符。不同厂商同后缀、同插件多账户导入相同 external id 都不会冲突。
 
 ### 3.4 按能力调用插件
 
@@ -295,7 +295,7 @@ runtime.execute(run.id)  # 同步阻塞，handler 内直接调用
 | `PluginRun` | `connection_id, parent_run_id, action, trigger, status, requested_by, counts(JSON), cursor_before/after, input_data(JSON), attempt, duration_ms` | `input_data` 不进 `to_public_dict()`，仅 retry 时回放 |
 | `PluginRunItem` | `run_id, external_id, entity_type, status(previewed/succeeded/failed/conflict/skipped/rolled_back), operation, error_code, payload_hash, data(JSON)` | `data` 已 `redact()` 脱敏 |
 | `PluginSourceRecord` | `connection_id, external_id, entity_type, status(active/rolled_back), data, raw_hash, remote_updated_at, local_modified` | 幂等锚点；`local_modified && raw_hash != new` 即 `conflict: protected` |
-| `PluginEntityMatch` | `connection_id, source_type(weread_book), source_id, book_id, status` | 仅 Weread 注释链路使用 |
+| `PluginEntityMatch` | `connection_id, source_type(<plugin_key>_book), source_id, book_id, status` | annotation provider 的来源书籍匹配 |
 
 ---
 

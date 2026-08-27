@@ -22,9 +22,6 @@ from webserver.models import Annotation, AnnotationSource, PluginConnection, Plu
 from webserver.services.plugin_writers import bounded_source_id, source_name_for
 
 
-# 微信读书是第一个 annotations 插件，历史数据以此为来源标识；新连接的标识
-# 由 plugin_key 推导（见 plugin_writers.source_name_for），此常量仅作缺省。
-SOURCE_NAME = "weread"
 STRONG_MATCH = 0.9
 
 
@@ -97,7 +94,7 @@ def book_candidates(calibre_db, source_book, allowed_book_ids=None):
 
 def confirm_match(session, connection_id, source_book_id, book_id, user_id, calibre_db, allowed_book_ids, commit=True):
     connection = session.get(PluginConnection, connection_id)
-    source_name = source_name_for(session, connection) if connection is not None else SOURCE_NAME
+    source_name = source_name_for(session, connection)
     book_id = int(book_id)
     if book_id not in {int(value) for value in allowed_book_ids} or book_id not in all_book_ids(calibre_db):
         raise ValueError("Selected book is missing or not accessible")
@@ -210,12 +207,9 @@ def _source_identity(external_id):
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _client_id(external_id, source_name=SOURCE_NAME, source_connection_id=""):
-    # 微信读书历史 client_id 已被客户端持久化，保持旧前缀；其他插件把
+def _client_id(external_id, source_name, source_connection_id):
     # connection id 纳入命名空间，允许同插件的多账户导入相同 external id。
-    prefix = "%s:" % source_name
-    if source_name != SOURCE_NAME:
-        prefix += "%s:" % source_connection_id
+    prefix = "%s:%s:" % (source_name, source_connection_id)
     value = prefix + str(external_id)
     if len(value) <= 64:
         return value
@@ -366,7 +360,7 @@ def rollback_materialized_annotation(session, record):
     if annotation is None:
         return
     connection = session.get(PluginConnection, record.connection_id)
-    source_name = source_name_for(session, connection) if connection is not None else SOURCE_NAME
+    source_name = source_name_for(session, connection)
     target_sources = [
         source
         for source in annotation.sources

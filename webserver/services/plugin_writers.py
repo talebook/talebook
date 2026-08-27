@@ -1,13 +1,7 @@
 """实体写入器：把「某类实体如何落进 Talebook 的表」从通用运行时里分离出来。
 
-此前 ``PluginRuntime._apply_result`` 与 ``_rollback`` 在函数体内 import 了
-微信读书专属模块，并以 ``if entity_type == "annotation"`` 分派。后果是任何
-annotations 插件写库都会被打上微信读书身份（``source_name="weread"``、
-``source_type="weread_book"``、client id 前缀 ``"weread:"``），协议的泛化能力
-形同虚设。
-
-现在运行时只按 ``entity_type`` 查注册表，具体怎么写由写入器负责；来源身份
-由连接所属的 ``plugin_key`` 推导，而不是模块常量。
+运行时只按 ``entity_type`` 查注册表，具体怎么写由写入器负责；来源身份统一
+由连接所属的完整 ``plugin_key`` 推导。
 """
 
 import hashlib
@@ -29,15 +23,10 @@ def bounded_source_id(value, suffix="", max_length=SOURCE_ID_MAX_LENGTH):
 
 
 def source_name_for(session, connection):
-    """由连接所属插件推导来源标识。
-
-    微信读书保留历史 ``weread`` 标识；其他插件使用完整 ``plugin_key``，
-    防止不同厂商恰好使用同一个末段时共享来源命名空间。
-    """
-    installation = session.get(PluginInstallation, connection.installation_id)
+    """由连接所属插件推导来源标识。"""
+    installation_id = getattr(connection, "installation_id", None)
+    installation = session.get(PluginInstallation, installation_id) if installation_id is not None else None
     plugin_key = (installation.plugin_key if installation else "") or ""
-    if plugin_key == "talebook.weread":
-        return "weread"
     return bounded_source_id(plugin_key or "plugin")
 
 

@@ -595,7 +595,7 @@ class PushReceipt:
 # 落库改为按类型派发，if entity_type == "annotation" 与 weread import 一并消失
 WRITERS = {Annotation: AnnotationWriter(), Review: ReviewWriter(), SourceBook: SourceBookWriter()}
 writer = WRITERS[type(item)]</code></pre>
-            <p>原 <code>weread_annotations.py</code> 已拆为通用 <code>annotation_writer.py</code>（来源记录、偏移定位、去重、回滚）和连接身份策略。微信读书保留历史 <code>weread</code> 标识以兼容存量数据；其他来源使用完整 <code>plugin_key</code>，client id 再加入 <code>connection.id</code>，避免同后缀厂商与同插件多账户的 external id 冲突。</p>
+            <p>原 <code>weread_annotations.py</code> 已拆为通用 <code>annotation_writer.py</code>（来源记录、偏移定位、去重、回滚）和连接身份策略。所有来源一律使用完整 <code>plugin_key</code>，client id 一律加入 <code>connection.id</code>；平台 writer 不为微信读书保留名称特判，避免具体插件身份重新泄漏到通用落库层。</p>
 
             <h3>6.3 业务流调用形态</h3>
             <pre><code># handlers/book.py —— 不再出现任何 plugin_key 或中文连接名
@@ -813,6 +813,7 @@ for conn in runtime.connections_for(capability, user_id):
               <div class="step"><b>S12 文档</b><p>回写 PluginGuide.md：七个接口、两种模式、异常语义、未生效字段说明。</p></div>
               <div class="step"><b>S14 删除 WeRead 专属 handler</b><p>补齐通用的用户插件状态、按 plugin key 创建连接、声明式 extra feature 与批注匹配确认编排；工作台和导入组件全部迁移到通用连接／功能／动作／运行接口，删除 <code>handlers/plugin_weread.py</code> 与 provider 的兼容查询方法，不保留旧路由转发。</p></div>
               <div class="step"><b>S15 注册语义收口</b><p>canonical ID 与具体 provider 同处定义，绑定层直接复用；旧 ID 仅保留在显式迁移表。每个 provider 只进入一个类型清单，自动安装集合由生命周期标记派生，删除 <code>BOOK_SOURCE_PROVIDERS</code> 与反向字符串改写。</p></div>
+              <div class="step"><b>S16 删除 Writer 插件特判</b><p><code>plugin_writers.py</code> 不再把 <code>talebook.weread</code> 改写成历史短名；所有 annotation provider 的来源、匹配与 client id 均由完整 plugin key 和 connection id 统一派生。</p></div>
             </div>
             <div class="flow">
               <div class="step"><b>S13 目录 seam 收口</b><p>31 个注册 provider 的完整实现按单插件迁移到 <code>plugins/{type}/</code>；建立 <code>plugins/register.py</code>，删除 runtime 具体模块与旧转发路径；push、tool、Weread 同步迁移专属实现和资源。</p></div>
@@ -913,7 +914,10 @@ for conn in runtime.connections_for(capability, user_id):
             <div class="callout good">
               <strong>2026-08-27 S15 用户反馈（已验证）：</strong><code>register.py</code> 原先通过字符串替换从当前 ID 反向生成旧 ID，<code>SourceCatalogService</code> 又独立写死 Legado／OPDS 当前 ID；同时 source、自动安装和测试目录使用重叠的手写 provider 清单，改名或新增来源时容易产生不同形态。现已按 D-23 删除反向生成与两份次级清单：旧 ID 只在 <code>plugins/migrations.py</code> 显式列举，当前 ID 由具体插件导出并供绑定层复用；31 个 provider 每个只进入一个与目录一致的 <code>PROVIDER_GROUPS</code> 分组，启动安装直接从统一 registry 按 <code>auto_install</code> 生命周期标记派生。T-21 先观察到缺少新接缝的收集期红灯，随后聚焦 77 条与完整 1079 条后端测试通过。
             </div>
-            <div class="callout warn"><strong>当前仍为 WIP：</strong>S1–S15 均已实现，T-21 已验证；自动化测试与最新 <code>interface-review full</code> 已通过。但当前会话未提供项目强制要求的 Chrome DevTools MCP，T-14 只能完成真实后端 + Chromium 替代检查，不能计作门禁通过，因此不得转 ACTIVE。</div>
+            <div class="callout good">
+              <strong>2026-08-27 S16 用户反馈（已验证）：</strong>用户要求删除 <code>plugin_writers.py</code> 对 <code>talebook.weread</code> 的 hardcode。现已按 D-24 撤销此前“保留历史短来源名”的决定：回归先观察到 2 个预期失败，随后删除 writer 分支和 annotation 默认短名；所有 provider 统一以完整 <code>plugin_key + connection.id</code> 生成来源与 client id。平台 writer 源码不再包含具体插件名，批注／插件 API／WeRead 聚焦回归 87 passed，完整后端 1080 passed。本 WIP 尚未合并，因而不为本分支生成的临时批注数据新增迁移或双读别名；已有开发库如需保留该临时数据，应在更新后重新导入。
+            </div>
+            <div class="callout warn"><strong>当前仍为 WIP：</strong>S1–S16 均已实现，T-22 已验证；自动化测试与最新 <code>interface-review full</code> 已通过。但当前会话未提供项目强制要求的 Chrome DevTools MCP，T-14 只能完成真实后端 + Chromium 替代检查，不能计作门禁通过，因此不得转 ACTIVE。</div>
             <div class="callout good">
               <strong>实际执行记录（2026-08-25—27）</strong>
               <p>宿主 Python 环境缺 <code>calibre</code>；不依赖 Calibre 的运行时单测使用仓库 venv，完整后端套件与 HTTP 端到端回归通过项目测试镜像执行：</p>
@@ -929,6 +933,17 @@ docker run ... pytest -q tests/test_plugin_contract.py tests/test_book_source_pl
 
 docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test pytest -q tests
   → S15 最终回归 1079 passed, 20 skipped, 25 warnings
+
+docker run ... pytest -q tests/test_plugin_entity_writers.py \
+  -k "weread_identity or platform_writer_policy"
+  → S16 实现前 2 failed（复现短来源名与平台源码具体插件名）；实现后实体 writer 10 passed
+
+docker run ... pytest -q tests/test_plugin_entity_writers.py tests/test_annotations.py \
+  tests/test_plugins_api.py tests/test_weread_plugin.py
+  → S16 聚焦回归 87 passed
+
+docker run --rm -v &lt;worktree&gt;:/w -w /w talebook/test pytest -q tests
+  → S16 最终回归 1080 passed, 20 skipped, 25 warnings
 
 docker run ... pytest -q tests/test_plugins_api.py -k "invalid_retry or match_batch"
   → 修复前 2 failed（分别复现 run 校验失败仍写库与批量匹配半提交）；修复后 2 passed
@@ -1008,7 +1023,7 @@ make pytest               → 宿主机无 pytest 可执行文件；以上 Docke
 make build-dev            → talebook/talebook:dev 构建成功
 make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结构 / 单文件资源均通过</code></pre>
               <p>分支 <code>refactor/20260824-plugin-capability-interfaces</code>，基线 <code>origin/feat/plugins</code> @ 8c3601e8。</p>
-              <p>后端测试从基线的 966 增至 <strong>1079</strong>；最终全量测试零回归。</p>
+              <p>后端测试从基线的 966 增至 <strong>1080</strong>；最终全量测试零回归。</p>
             </div>
             <div class="callout good">
               <strong>S1–S12 已全部完成。</strong>
@@ -1048,14 +1063,15 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>T-19</td><td><code>plugins/runtime/</code> 不含具体 provider、manifest、插件 ID 或具体插件导出；31 个注册 provider 的 module 均位于约定的单数类型目录；push 六个 uploader/provider、三个 tool 与 Weread 的实现和资源按单插件局部化；复数 review/annotation ID 不再注册且旧库可原地幂等迁移</td><td><code>tests/test_plugin_contract.py</code> 结构、旧路径删除、共享 base 无具体 ID 与精确注册断言 + <code>tests/test_plugin_runtime.py</code> 真实启动迁移 + 各插件行为回归；实现前观察预期失败</td><td class="verified">已通过</td></tr>
                   <tr><td>T-20</td><td>WeRead 工作台与导入仅使用通用插件 API；通用状态只返回当前用户的连接和运行，按 plugin key 创建连接仍执行 owner／凭据／scope 校验；17 个工作台查询均由 manifest 声明；通用批注动作丢弃伪造白名单并校验匹配目标可见性；匹配确认与 run 原子提交，retry 用当前服务端字段覆盖父 run 旧值；组件卸载停止轮询；专属 handler、路由、兼容方法及前端旧调用全部不存在</td><td><code>tests/test_plugins_api.py</code>、<code>tests/test_plugin_capability_lookup.py</code>、<code>tests/test_plugin_contract.py</code>、<code>app/test/components/WeReadImportDialog.spec.ts</code> 与 WeRead Playwright 回归；事务、权限变化与卸载轮询均先观察旧实现下预期失败</td><td class="verified">已通过</td></tr>
                   <tr><td>T-21</td><td>当前注册逻辑不含旧 ID 字符串改写；canonical Legado／OPDS ID 只在具体插件定义一次并被绑定层复用；每个 provider 只进入一个类型清单，自动安装来源由显式生命周期标记派生；旧 ID 只存在于隔离的兼容迁移与迁移测试</td><td><code>tests/test_plugin_contract.py</code> 的装配／单一事实源架构断言，<code>tests/test_plugin_runtime.py</code> 的精确迁移与自动安装回归，<code>tests/test_book_source_plugins.py</code> 的来源目录回归；聚焦 77 passed，完整后端 1079 passed</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-22</td><td>通用实体 writer 不含具体插件名或 plugin key；WeRead 与其他 annotation provider 都使用完整 plugin key 作为 source name，并把 connection id 纳入 client id；多账户 external id 不冲突</td><td><code>tests/test_plugin_entity_writers.py</code> 的平台源码架构断言、WeRead 身份与多账户回归；实体 writer 10 passed，相关聚焦 87 passed，完整后端 1080 passed</td><td class="verified">已通过</td></tr>
                   <tr><td>T-15</td><td>设备推送走插件：认证用户按 manifest <code>ui.device_type</code> 解析 provider，handler 无设备白名单，创建/复用个人连接后调 <code>runtime.sync</code>；成功产生 action=sync 的 succeeded run 并释放 lease，失败产生 failed run 并记录脱敏错误；专用 <code>PUSH_TIMEOUT</code> 与 context deadline 限制底层 requests；游客仅保留无连接/无 run 的 runtime 桥。双开关优先级明确：全局开关先决，未安装内置 provider 保持历史兼容，已有安装的 disabled / 非 active 状态优先且不可绕过</td><td><code>tests/test_main.py</code> 与 <code>tests/test_plugin_capability_lookup.py</code>，含声明式新设备、成功、失败、超时预算、租约、配置复用、未安装游客兼容与禁用安装不可绕过</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-12</td><td>后端 1079 passed / 20 skipped；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（468 warnings 为存量）；原相关 Vitest 11 passed，S14 组件回归 3 passed；相关 Playwright 31/31、插件管理页 ID 夹具 10 passed、S14 WeRead 回归 2 passed；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见上方命令记录；全量 Vitest 的 4 个 Nuxt i18n 虚拟模块环境失败单独记录，非本次回归</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-12</td><td>后端 1080 passed / 20 skipped；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（468 warnings 为存量）；原相关 Vitest 11 passed，S14 组件回归 3 passed；相关 Playwright 31/31、插件管理页 ID 夹具 10 passed、S14 WeRead 回归 2 passed；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见上方命令记录；全量 Vitest 的 4 个 Nuxt i18n 虚拟模块环境失败单独记录，非本次回归</td><td class="verified">已通过</td></tr>
                   <tr><td>T-13</td><td>界面审查（<code>full</code> 模式）</td><td>相对 <code>origin/master</code> 审查 177 个纳入范围文件、26 个生产界面源文件与 5 个消费者；最新 S14 增量无模板／样式／文案变化，六个 owner domain 复审无新增问题</td><td class="verified">Approve</td></tr>
                   <tr><td>T-14</td><td>真实后端体验验证</td><td>Docker 后端已就绪，Chromium 替代回归已完成；当前会话无 Chrome DevTools MCP</td><td class="pending">待 MCP 重跑</td></tr>
                 </tbody>
               </table>
             </div>
-            <div class="callout"><strong>界面影响判定：</strong>本方案属于跨模块的大型功能且影响前端消费者（插件管理页、工作台、在线书库、书籍详情），因此<strong>不适用</strong>“无界面影响”豁免；T-13 已完成，仍须补齐 T-14 指定的 Chrome DevTools MCP 验收。2026-08-27 的书源 ID 与目录 seam 收口仅改变 canonical ID、数据库迁移、Python 模块归属与测试夹具；S14 只替换 WeRead API transport、轮询与卸载清理，未修改模板、布局、样式或文案；S15 只调整后端注册装配、启动生命周期与兼容迁移，不改变 manifest、HTTP 结果或任何前端消费者。前端仍呈现相同 manifest/capability 和交互结果，<code>npm run lint</code> 0 errors，最新 full review 仍为 Approve。</div>
+            <div class="callout"><strong>界面影响判定：</strong>本方案属于跨模块的大型功能且影响前端消费者（插件管理页、工作台、在线书库、书籍详情），因此<strong>不适用</strong>“无界面影响”豁免；T-13 已完成，仍须补齐 T-14 指定的 Chrome DevTools MCP 验收。2026-08-27 的书源 ID 与目录 seam 收口仅改变 canonical ID、数据库迁移、Python 模块归属与测试夹具；S14 只替换 WeRead API transport、轮询与卸载清理，未修改模板、布局、样式或文案；S15 只调整后端注册装配、启动生命周期与兼容迁移；S16 只统一后端批注来源身份，不改变 manifest、HTTP 形状、模板或任何视觉结果。前端仍呈现相同 manifest/capability 和交互结果，<code>npm run lint</code> 0 errors，最新 full review 仍为 Approve。</div>
           </section>
 
           <section id="decisions" class="card">
@@ -1087,6 +1103,7 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>D-20</td><td><code>plugins/runtime/</code> 只放平台能力；具体插件使用 <code>plugins/{type}/{name}.py</code> 或包目录，唯一装配入口为 <code>plugins/register.py</code>，旧 runtime 具体模块直接删除</td><td>平台 interface 是稳定 seam，具体 adapter 必须在插件模块内保持 locality；转发模块会继续让调用者依赖错误目录并掩盖结构回退</td><td>只移动 Weread；只移动 provider 包装而保留专属实现；runtime 留兼容 re-export</td></tr>
                   <tr><td>D-21</td><td>插件类型目录统一为单数；综合型多能力插件归 <code>combo</code>；<code>talebook.reviews.*</code> / <code>talebook.annotations.*</code> 改为 <code>talebook.review.*</code> / <code>talebook.annotation.*</code> 并启动迁移</td><td>类型目录与 canonical ID 保持一致；<code>combo</code> 表达多个 capability 打包成一体，而不把实现复杂度写进分类</td><td>沿用复数历史 ID；按多个能力把 Weread 拆散；使用含义过重的 integrations/suite</td></tr>
                   <tr><td>D-23</td><td>具体插件模块是 canonical ID 的单一事实源；旧 ID 只在显式兼容迁移表中逐项映射。Provider 在 <code>register.py</code> 只进入一个类型清单，自动安装由 <code>auto_install</code> 生命周期标记派生</td><td>字符串规则会把未来新插件误判为拥有旧身份，跨模块写死当前 ID 会形成双真相；重叠手写清单让插件分类与启动行为耦合。显式迁移、共享常量和派生视图把变化集中在正确的 module seam</td><td>继续从当前 ID 反向生成旧 ID；在绑定层复制 ID；同时维护 source／book-source／builtin 三套 provider 元组</td></tr>
+                  <tr><td>D-24</td><td>Annotation 来源身份统一为完整 <code>plugin_key</code>，client id 统一包含 <code>connection.id</code>；删除平台 writer 对微信读书短名的特判</td><td>具体插件名称不属于通用 writer 接口；统一推导规则更小、更可预测，并天然隔离同插件多账户。当前 WIP 未合并，不为开发期临时身份增加永久迁移负担</td><td>保留 <code>talebook.weread → weread</code> hardcode（平台继续认识插件）；把 hardcode 搬到另一个平台文件（只转移技术债）；长期双读两套身份（扩大接口）</td></tr>
                 </tbody>
               </table>
             </div>
