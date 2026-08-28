@@ -201,6 +201,7 @@ def validate_weread_query(operation, params):
 
 
 class WereadProvider:
+    proxy_image_hosts = ("weread.qq.com",)
     manifest = {
         "protocol_version": PROTOCOL_VERSION,
         "id": WEREAD_PLUGIN_KEY,

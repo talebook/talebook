@@ -268,6 +268,7 @@ def get_qimao_metadata(mi):
 
 
 class QimaoProvider(MetaSourceMixin, QimaoNovelApi):
+    proxy_image_hosts = ("wtzw.com",)
     manifest = meta_manifest(
         "talebook.meta.qimao",
         "七猫小说",

@@ -208,6 +208,7 @@ if __name__ == "__main__":
 
 
 class BaiduBaikeProvider(MetaSourceMixin, BaiduBaikeApi):
+    proxy_image_hosts = ("bcebos.com", "bdstatic.com")
     manifest = meta_manifest(
         "talebook.meta.baike",
         "百度百科",

@@ -634,6 +634,14 @@ class TestProxyImageHandlerSSRF(TestApp):
 class TestProxyImageWhitelist(unittest.TestCase):
     """ProxyImageHandler.is_whitelist 修复验证（直接测试 files.py 中的实现）"""
 
+    PROVIDER_HOSTS = {
+        "talebook.meta.baike": {"bcebos.com", "bdstatic.com"},
+        "talebook.meta.douban-v2": {"doubanio.com"},
+        "talebook.meta.tomato": {"byteimg.com", "fanqienovel.com"},
+        "talebook.meta.qimao": {"wtzw.com"},
+        "talebook.combo.weread": {"weread.qq.com"},
+    }
+
     def setUp(self):
         from webserver.handlers.files import ProxyImageHandler
         self.handler = ProxyImageHandler.__new__(ProxyImageHandler)
@@ -668,3 +676,33 @@ class TestProxyImageWhitelist(unittest.TestCase):
 
     def test_empty_host_blocked(self):
         self.assertFalse(self.handler.is_whitelist(""))
+
+    def test_each_plugin_owns_its_proxy_image_hosts(self):
+        from webserver.services.plugin_runtime import REGISTRY
+
+        for plugin_key, expected_hosts in self.PROVIDER_HOSTS.items():
+            provider = REGISTRY.get(plugin_key)
+            self.assertEqual(set(provider.proxy_image_hosts), expected_hosts, plugin_key)
+
+    def test_registry_matches_provider_hosts_safely(self):
+        from webserver.services.plugin_runtime import REGISTRY
+
+        for hosts in self.PROVIDER_HOSTS.values():
+            for host in hosts:
+                self.assertTrue(REGISTRY.allows_image_proxy_host(host))
+                self.assertTrue(REGISTRY.allows_image_proxy_host("cdn." + host))
+                self.assertTrue(REGISTRY.allows_image_proxy_host(("CDN." + host + ".").upper()))
+                self.assertFalse(REGISTRY.allows_image_proxy_host("evil" + host))
+        self.assertFalse(REGISTRY.allows_image_proxy_host("evil.example"))
+        self.assertFalse(REGISTRY.allows_image_proxy_host(""))
+
+    def test_handler_does_not_hardcode_plugin_hosts(self):
+        import inspect
+
+        from webserver.handlers.files import ProxyImageHandler
+
+        source = inspect.getsource(ProxyImageHandler)
+        self.assertIn("REGISTRY.allows_image_proxy_host(host)", source)
+        for hosts in self.PROVIDER_HOSTS.values():
+            for host in hosts:
+                self.assertNotIn(host, source)

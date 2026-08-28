@@ -278,6 +278,7 @@ if __name__ == "__main__":
 
 
 class TomatoProvider(MetaSourceMixin, TomatoNovelApi):
+    proxy_image_hosts = ("byteimg.com", "fanqienovel.com")
     manifest = meta_manifest(
         "talebook.meta.tomato",
         "番茄小说",

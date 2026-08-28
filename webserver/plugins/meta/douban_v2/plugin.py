@@ -91,6 +91,7 @@ class DoubanV2MetaPlugin:
 
 
 class DoubanV2Provider(MetaSourceMixin, DoubanV2MetaPlugin):
+    proxy_image_hosts = ("doubanio.com",)
     manifest = meta_manifest(
         "talebook.meta.douban-v2",
         "豆瓣",

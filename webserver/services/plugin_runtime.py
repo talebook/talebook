@@ -113,6 +113,17 @@ class PluginRegistry:
     def manifests(self):
         return [PluginManifest.validate(provider.manifest) for provider in self._providers.values()]
 
+    def allows_image_proxy_host(self, host):
+        hostname = str(host or "").strip().lower().rstrip(".")
+        if not hostname:
+            return False
+        for provider in self._providers.values():
+            for declared_host in getattr(provider, "proxy_image_hosts", ()):
+                allowed_host = str(declared_host or "").strip().lower().rstrip(".")
+                if allowed_host and (hostname == allowed_host or hostname.endswith("." + allowed_host)):
+                    return True
+        return False
+
 
 REGISTRY = PluginRegistry()
 for _provider in ALL_BUILTIN_PROVIDERS:

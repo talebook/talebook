@@ -97,6 +97,8 @@ from webserver.plugins.runtime import BookMetadata
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION
 
 class MyMetadataProvider:
+    # 只有封面需要通过 /get/pcover 代理时才声明；不要把域名加到通用 handler。
+    proxy_image_hosts = ("images.example.com",)
     manifest = {
         "protocol_version": PROTOCOL_VERSION,
         "id": "talebook.meta.example",
@@ -126,6 +128,8 @@ class MyMetadataProvider:
         from webserver.plugins.runtime import CheckReport
         return CheckReport(healthy=True, message="Example API is reachable")
 ```
+
+`proxy_image_hosts` 是可选的 Provider 级声明，不属于 manifest。每个插件只声明自己实际需要代理的图片根域名；`PluginRegistry.allows_image_proxy_host()` 会统一做大小写与末尾点归一，并且只匹配该域名本身或它的子域名。`ProxyImageHandler` 不维护具体域名表，因此新增、替换或删除上游图片域名时只修改对应 Provider。不要声明 URL、路径、通配符或与插件无关的共享大域名。
 
 分页能力返回 `Page[T]`：逐项失败放进 `Page.failures`，分页位置放进 `next_cursor`，并显式设置 `has_more`。平台会拒绝游标不推进的循环。不要用一个无类型 `data` 字典混装 metadata、annotation、review 与 book source。
 
@@ -428,7 +432,7 @@ make check-design                          # 如新增设计稿
 ## 12 快速开始：最小可运行插件
 
 ```python
-# webserver/plugins/metadata/my_demo.py
+# webserver/plugins/meta/my_demo.py
 from webserver.plugins.runtime.domains import BookMetadata
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION
 
