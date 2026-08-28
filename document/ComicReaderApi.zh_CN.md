@@ -1,6 +1,17 @@
 # 漫画阅读器接入契约
 
-Talebook 的 `/read-comic/:bookId` 页面通过本契约驱动独立的 `@hehetoshang/komga-reader` 组件。组件只接触页面 manifest、同源图片 URL 和阅读进度；它不会读取 Calibre 路径、Talebook 数据库、可下载归档或归档条目名。
+Talebook 的 `/read-comic/:bookId` 页面通过本契约驱动独立的 `komga-reader`。Reader 只接触页面 manifest、同源图片 URL 和阅读进度；它不会读取 Calibre 路径、Talebook 数据库、可下载归档或归档条目名。
+
+## 前端分发
+
+Reader 沿用 Candle Reader 的静态 JavaScript 模式，不作为 Talebook 的 npm 依赖参与 Nuxt/Docker 安装：
+
+- 上游 `komga-reader` 构建自包含的 ESM、UMD 和 CSS；浏览器 bundle 内含隔离的 Vue runtime，不依赖全局 `Vue`、裸模块解析或 CDN；
+- Talebook 将不可变上游 commit 的产物、许可证和版本记录固定在 `app/public/static/komga-reader/`；
+- `/read-comic` 页面从同源版本 URL 动态加载 ESM，并在刷新或离页时调用 `destroy()`；
+- 当前固定版本见仓库根目录 `komga-reader-version.txt`，静态模块 URL 使用相同值完成缓存失效。
+
+这种分发变化不改变下述 API、安全预算或进度格式。首次上游 GitHub release 产生后，可再接入与 Candle Reader 相同的 release/dispatch 自动更新流程；本阶段不发布 npm 或 release。
 
 ## 权限和支持范围
 

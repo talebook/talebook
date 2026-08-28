@@ -1,8 +1,60 @@
-import type {
-    InitialReaderProgress,
-    PageManifest,
-    ReaderProgress,
-} from '@hehetoshang/komga-reader';
+export type ReaderPageId = string | number;
+
+export interface ReaderPage {
+    id: ReaderPageId;
+    src: string;
+    alt?: string;
+    width?: number;
+    height?: number;
+    mimeType?: string;
+}
+
+export interface PageManifest {
+    id?: ReaderPageId;
+    title?: string;
+    pages: readonly ReaderPage[];
+}
+
+export interface InitialReaderProgress {
+    pageId?: ReaderPageId;
+    pageIndex?: number;
+}
+
+export interface ReaderProgress {
+    pageId: ReaderPageId;
+    pageIndex: number;
+    pageNumber: number;
+    pagesCount: number;
+    percent: number;
+    completed: boolean;
+    timestamp: number;
+}
+
+export interface ReaderExit {
+    reason: 'button' | 'keyboard' | 'end';
+    progress: ReaderProgress;
+}
+
+export interface ReaderError {
+    code: 'empty-manifest' | 'invalid-manifest' | 'image-load' | 'fullscreen';
+    message: string;
+    page?: ReaderPage;
+    cause?: unknown;
+}
+
+export interface StandaloneComicReader {
+    destroy(): void;
+}
+
+export interface StandaloneComicReaderModule {
+    Reader: new (target: Element, options: {
+        manifest: PageManifest;
+        initialProgress?: InitialReaderProgress;
+        onProgress?: (progress: ReaderProgress) => void;
+        onExit?: (event: ReaderExit) => void;
+        onError?: (error: ReaderError) => void;
+    }) => StandaloneComicReader;
+}
 
 export interface TalebookComicPage {
     id: string;

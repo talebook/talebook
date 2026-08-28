@@ -39,6 +39,28 @@ test.describe('Comic reader', () => {
         await page.waitForURL('**/book/14');
     });
 
+    test('loads the pinned standalone module without mobile overflow', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        const moduleResponse = page.waitForResponse(response => response.url().includes('/static/komga-reader/komga-reader.es.js'));
+
+        await page.goto('/read-comic/14');
+
+        const response = await moduleResponse;
+        expect(response.ok()).toBe(true);
+        const moduleUrl = new URL(response.url());
+        expect(moduleUrl.pathname).toBe('/static/komga-reader/komga-reader.es.js');
+        expect(moduleUrl.searchParams.get('v')).toMatch(/^[0-9a-f]{40}$/);
+        await expect(page.locator('.kr-reader')).toBeVisible({ timeout: 15_000 });
+        const metrics = await page.evaluate(() => ({
+            width: document.documentElement.clientWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+            height: document.documentElement.clientHeight,
+            scrollHeight: document.documentElement.scrollHeight,
+        }));
+        expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.width);
+        expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.height);
+    });
+
     test('shows a recoverable state for an unsupported or missing book', async ({ page }) => {
         await page.goto('/read-comic/999');
 

@@ -45,14 +45,23 @@
         </section>
 
         <template v-else>
-            <ComicReader
-                :key="readerKey"
-                :manifest="readerManifest"
-                :initial-progress="initialProgress"
-                @progress="queueProgress"
-                @exit="handleExit"
-                @error="handleReaderError"
+            <div
+                ref="readerHost"
+                class="comic-reader-host"
+                data-testid="comic-reader-host"
             />
+            <section
+                v-if="readerLoading"
+                class="comic-reader-state comic-reader-state--module"
+                aria-live="polite"
+            >
+                <v-progress-circular
+                    indeterminate
+                    color="primary"
+                    size="48"
+                />
+                <p>{{ t('comicReader.loading') }}</p>
+            </section>
             <div
                 v-if="readerError"
                 class="comic-reader-notice"
@@ -78,16 +87,19 @@
 </template>
 
 <script setup lang="ts">
-import { ComicReader } from '@hehetoshang/komga-reader';
-import '@hehetoshang/komga-reader/style.css';
-import type { PageManifest, ReaderError, ReaderExit, ReaderProgress } from '@hehetoshang/komga-reader';
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 import {
     toInitialProgress,
     toReaderManifest,
     toStoredProgress,
+    type PageManifest,
+    type ReaderError,
+    type ReaderExit,
+    type ReaderProgress,
+    type StandaloneComicReader,
+    type StandaloneComicReaderModule,
     type TalebookComicManifest,
 } from '~/utils/comic-reader';
 
@@ -98,10 +110,17 @@ const store = useMainStore();
 const { $backend } = useNuxtApp();
 const { t } = useI18n();
 
+const READER_VERSION = 'd49a2e808601c7fc9b892a6c019a92eed017fd16';
+const READER_MODULE_URL = `/static/komga-reader/komga-reader.es.js?v=${READER_VERSION}`;
+const READER_STYLE_URL = `/static/komga-reader/style.css?v=${READER_VERSION}`;
+
 const bookId = computed(() => Number(route.params.bookId));
+const readerHost = ref<HTMLElement | null>(null);
+const readerLoading = ref(true);
 const readerError = ref('');
 const progressError = ref('');
-const readerKey = ref(0);
+let standaloneReader: StandaloneComicReader | undefined;
+let componentActive = false;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let queuedProgress: ReaderProgress | undefined;
 
@@ -134,6 +153,30 @@ const { data, pending, error, refresh } = await useAsyncData(
 const readerManifest = computed<PageManifest | null>(() => data.value?.manifest || null);
 const initialProgress = computed(() => data.value?.progress || { pageIndex: 0 });
 const errorMessage = computed(() => error.value?.message || t('comicReader.loadErrorDescription'));
+
+async function mountReader() {
+    standaloneReader?.destroy();
+    standaloneReader = undefined;
+    readerLoading.value = true;
+    await nextTick();
+    if (!componentActive || !readerHost.value || !readerManifest.value) return;
+
+    try {
+        const browserModule = await import(/* @vite-ignore */ READER_MODULE_URL) as StandaloneComicReaderModule;
+        if (!componentActive || !readerHost.value || !readerManifest.value) return;
+        standaloneReader = new browserModule.Reader(readerHost.value, {
+            manifest: readerManifest.value,
+            initialProgress: initialProgress.value,
+            onProgress: queueProgress,
+            onExit: handleExit,
+            onError: handleReaderError,
+        });
+        readerLoading.value = false;
+    } catch {
+        readerLoading.value = false;
+        readerError.value = t('comicReader.readerError');
+    }
+}
 
 async function saveProgress(progress: ReaderProgress) {
     const response = await $backend(`/book/${bookId.value}/comic/progress`, {
@@ -183,15 +226,24 @@ async function reload() {
     readerError.value = '';
     progressError.value = '';
     await refresh();
-    readerKey.value += 1;
+    await mountReader();
 }
 
 useHead({
     title: () => readerManifest.value?.title || t('comicReader.title'),
     bodyAttrs: { class: 'comic-reader-body' },
+    link: [{ rel: 'stylesheet', href: READER_STYLE_URL }],
+});
+
+onMounted(() => {
+    componentActive = true;
+    void mountReader();
 });
 
 onBeforeUnmount(() => {
+    componentActive = false;
+    standaloneReader?.destroy();
+    standaloneReader = undefined;
     if (saveTimer) clearTimeout(saveTimer);
     store.setNavbar(true);
 });
@@ -199,6 +251,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .comic-reader-page {
+    position: relative;
     width: 100%;
     height: 100dvh;
     min-height: 420px;
@@ -207,6 +260,7 @@ onBeforeUnmount(() => {
     overflow: hidden;
 }
 
+.comic-reader-host,
 .comic-reader-page :deep(.kr-reader) {
     width: 100%;
     height: 100%;
@@ -232,6 +286,14 @@ onBeforeUnmount(() => {
 .comic-reader-state p {
     max-width: 560px;
     color: #cbd5e1;
+}
+
+.comic-reader-state--module {
+    position: absolute;
+    z-index: 10;
+    inset: 0;
+    color: #f8fafc;
+    background: #111827;
 }
 
 .comic-reader-state__actions {
