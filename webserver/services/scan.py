@@ -17,10 +17,17 @@ from webserver.services.external_index import (
     EXTERNAL_INDEX_FLAG,
     add_external_index_record,
 )
+from webserver.services.media_analysis import (
+    COMIC_CONTAINER_FORMATS,
+    SUPPORTED_MEDIA_FORMATS,
+    InvalidMediaError,
+    analyze_media_file,
+    merge_media_type,
+)
 
 
 CONF = loader.get_settings()
-SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
+SCAN_EXT = sorted(SUPPORTED_MEDIA_FORMATS)
 IMPORT_MODE_INDEX = "index"
 IMPORT_MODE_COPY = "copy"
 IMPORT_MODE_MOVE = "move"
@@ -293,21 +300,36 @@ class ScanService(AsyncService):
             if not self.save_or_rollback(row):
                 continue
 
-            # 尝试解析metadata
+            # 在解析 metadata 前先验证签名、容器结构与资源预算，并持久化分析结果。
             fmt = fpath.split(".")[-1].lower()
-            mi = None
             try:
-                with open(fpath, "rb") as stream:
-                    try:
-                        mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-                    except Exception as err:
-                        logging.error("Failed to parse metadata for %s: %s", fpath, err)
-                        logging.exception("Error details:")
-            except FileNotFoundError:
-                logging.warning("解析元数据时文件已不存在，跳过: %s", fpath)
-                row.status = ScanFile.DROP
+                analysis = analyze_media_file(fpath, fmt)
+            except InvalidMediaError as err:
+                logging.warning("media analysis failed for %s: %s", fpath, err.message)
+                row.status = ScanFile.FAILED
+                self._set_row_data(row, analysis_error=err.message, analysis_error_code=err.code, declared_format=fmt)
                 self.save_or_rollback(row)
                 continue
+            self._set_row_data(row, **analysis.to_dict())
+
+            mi = None
+            if fmt in COMIC_CONTAINER_FORMATS:
+                from calibre.ebooks.metadata.book.base import Metadata
+
+                mi = Metadata(os.path.splitext(fname)[0], [_("佚名")])
+            else:
+                try:
+                    with open(fpath, "rb") as stream:
+                        try:
+                            mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                        except Exception as err:
+                            logging.error("Failed to parse metadata for %s: %s", fpath, err)
+                            logging.exception("Error details:")
+                except FileNotFoundError:
+                    logging.warning("解析元数据时文件已不存在，跳过: %s", fpath)
+                    row.status = ScanFile.DROP
+                    self.save_or_rollback(row)
+                    continue
 
             if not mi:
                 # 解析失败时构造与do_import()解析失败分支一致的兜底metadata（文件名+“佚名”），
@@ -400,8 +422,8 @@ class ScanService(AsyncService):
         if import_mode == IMPORT_MODE_MOVE and delete_source:
             self._delete_source_after_import(row, fpath, fmt)
 
-    def _ensure_indexed_item(self, book_id, user_id, fpath):
-        item = self.session.query(Item).filter(Item.book_id == book_id).first()
+    def _set_item_media_type(self, book_id, user_id, media_type, item=None):
+        item = item or self.session.query(Item).filter(Item.book_id == book_id).first()
         if not item:
             item = Item()
             item.book_id = book_id
@@ -411,10 +433,15 @@ class ScanService(AsyncService):
             except Exception:
                 pass
             self.session.add(item)
+        item.media_type = merge_media_type(item.media_type, media_type)
+        return item
+
+    def _ensure_indexed_item(self, book_id, user_id, fpath, media_type):
+        item = self._set_item_media_type(book_id, user_id, media_type)
         item.src_path = os.path.realpath(os.path.abspath(fpath))
         return item
 
-    def _mark_indexed(self, row, mi, fpath, fmt, import_id, user_id, same_author_book_id=None):
+    def _mark_indexed(self, row, mi, fpath, fmt, import_id, user_id, media_type, same_author_book_id=None):
         try:
             book_id, created = add_external_index_record(
                 self.db,
@@ -434,7 +461,7 @@ class ScanService(AsyncService):
         row.import_id = import_id
         row.book_id = book_id
         row.status = ScanFile.INDEXED
-        self._ensure_indexed_item(book_id, user_id, fpath)
+        self._ensure_indexed_item(book_id, user_id, fpath, media_type)
         self._set_row_data(
             row,
             import_mode=IMPORT_MODE_INDEX,
@@ -477,34 +504,49 @@ class ScanService(AsyncService):
             row.status = ScanFile.IMPORTING
             self._set_row_data(row, import_mode=import_mode)
             self.save_or_rollback(row)
-            mi = None
             try:
-                with open(fpath, "rb") as stream:
-                    try:
-                        mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-                    except Exception as err:
-                        logging.error("Failed to parse metadata for %s during import: %s", fpath, err)
-                        logging.exception("Error details:")
-                        # 创建一个简单的metadata对象，避免导入失败
-                        from calibre.ebooks.metadata.book.base import Metadata
-
-                        mi = Metadata()
-                        mi.title = fname.replace("." + fmt, "")
-                        mi.authors = [_("佚名")]
-                    else:
-                        # 处理metadata
-                        mi.title = utils.super_strip(mi.title)
-                        mi.authors = [utils.super_strip(s) for s in mi.authors]
-
-                        # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
-                        if fmt in ["txt", "pdf"]:
-                            mi.title = fname.replace("." + fmt, "")
-                            mi.authors = [_("佚名")]
-            except FileNotFoundError:
-                logging.warning("导入时文件已不存在，跳过: %s", fpath)
-                row.status = ScanFile.DROP
+                analysis = analyze_media_file(fpath, fmt)
+            except InvalidMediaError as err:
+                logging.warning("media analysis failed during import for %s: %s", fpath, err.message)
+                row.status = ScanFile.FAILED
+                self._set_row_data(row, analysis_error=err.message, analysis_error_code=err.code, declared_format=fmt)
                 self.save_or_rollback(row)
                 continue
+            self._set_row_data(row, **analysis.to_dict())
+
+            mi = None
+            if fmt in COMIC_CONTAINER_FORMATS:
+                from calibre.ebooks.metadata.book.base import Metadata
+
+                mi = Metadata(os.path.splitext(fname)[0], [_("佚名")])
+            else:
+                try:
+                    with open(fpath, "rb") as stream:
+                        try:
+                            mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                        except Exception as err:
+                            logging.error("Failed to parse metadata for %s during import: %s", fpath, err)
+                            logging.exception("Error details:")
+                            # 创建一个简单的metadata对象，避免导入失败
+                            from calibre.ebooks.metadata.book.base import Metadata
+
+                            mi = Metadata()
+                            mi.title = os.path.splitext(fname)[0]
+                            mi.authors = [_("佚名")]
+                        else:
+                            # 处理metadata
+                            mi.title = utils.super_strip(mi.title)
+                            mi.authors = [utils.super_strip(s) for s in mi.authors]
+
+                            # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
+                            if fmt in ["txt", "pdf"]:
+                                mi.title = os.path.splitext(fname)[0]
+                                mi.authors = [_("佚名")]
+                except FileNotFoundError:
+                    logging.warning("导入时文件已不存在，跳过: %s", fpath)
+                    row.status = ScanFile.DROP
+                    self.save_or_rollback(row)
+                    continue
 
             # 再次检查是否有重复书籍
             ids = self.db.books_with_same_title(mi)
@@ -528,18 +570,28 @@ class ScanService(AsyncService):
                 if same_author_book_id and row.status != ScanFile.EXIST:
                     if import_mode == IMPORT_MODE_INDEX:
                         logging.info("index [%s] from %s with existing book %s", repr(mi.title), fpath, same_author_book_id)
-                        self._mark_indexed(row, mi, fpath, fmt, import_id, user_id, same_author_book_id=same_author_book_id)
+                        self._mark_indexed(
+                            row,
+                            mi,
+                            fpath,
+                            fmt,
+                            import_id,
+                            user_id,
+                            analysis.media_type,
+                            same_author_book_id=same_author_book_id,
+                        )
                         continue
 
                     # 同名同作者，添加格式到现有书籍
                     row.book_id = same_author_book_id
                     logging.info("import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
                     self.db.add_format(row.book_id, fmt.upper(), fpath, True)
+                    self._set_item_media_type(row.book_id, user_id, analysis.media_type)
                     self._mark_imported(row, fpath, fmt, import_mode)
                 elif row.status != ScanFile.EXIST:
                     if import_mode == IMPORT_MODE_INDEX:
                         logging.info("index [%s] from %s as new external file", repr(mi.title), fpath)
-                        self._mark_indexed(row, mi, fpath, fmt, import_id, user_id)
+                        self._mark_indexed(row, mi, fpath, fmt, import_id, user_id, analysis.media_type)
                         continue
 
                     # 同名不同作者，导入为新书
@@ -551,6 +603,7 @@ class ScanService(AsyncService):
                     item = Item()
                     item.book_id = row.book_id
                     item.collector_id = user_id
+                    item.media_type = analysis.media_type
                     try:
                         item.create_time = self.db.new_api.field_for("timestamp", row.book_id)
                     except Exception:
@@ -564,7 +617,7 @@ class ScanService(AsyncService):
             else:
                 if import_mode == IMPORT_MODE_INDEX:
                     logging.info("index [%s] from %s", repr(mi.title), fpath)
-                    self._mark_indexed(row, mi, fpath, fmt, import_id, user_id)
+                    self._mark_indexed(row, mi, fpath, fmt, import_id, user_id, analysis.media_type)
                     continue
 
                 logging.info("import [%s] from %s", repr(mi.title), fpath)
@@ -575,6 +628,7 @@ class ScanService(AsyncService):
                 item = Item()
                 item.book_id = row.book_id
                 item.collector_id = user_id
+                item.media_type = analysis.media_type
                 try:
                     item.create_time = self.db.new_api.field_for("timestamp", row.book_id)
                 except Exception:

@@ -13,11 +13,12 @@ from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.i18n import _
 from webserver.models import ScanFile
+from webserver.services.media_analysis import SUPPORTED_MEDIA_FORMATS
 from webserver.services.scan import IMPORT_MODE_MOVE, ScanService, normalize_import_mode
 
 
 CONF = loader.get_settings()
-SCAN_EXT = ["azw", "azw3", "epub", "mobi", "pdf", "txt"]
+SCAN_EXT = sorted(SUPPORTED_MEDIA_FORMATS)
 SCAN_DIR_PREFIX = "/data/"  # 限定扫描必须在/data/目录下，以防黑客扫描到其他系统目录
 
 

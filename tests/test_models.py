@@ -236,6 +236,12 @@ class TestUser(unittest.TestCase):
         self.assertEqual(a.password, p2)
 
 
+class TestItemMediaType(unittest.TestCase):
+    def test_new_items_default_to_unknown_media_type(self):
+        item = models.Item()
+        self.assertEqual(item.media_type, "unknown")
+
+
 class TestReadingState(unittest.TestCase):
     def _make_state(self, book_id=1, reader_id=1):
         from webserver.models import ReadingState

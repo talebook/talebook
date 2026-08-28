@@ -60,6 +60,12 @@ from webserver.services.external_index import (
 )
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
+from webserver.services.media_analysis import (
+    COMIC_CONTAINER_FORMATS,
+    InvalidMediaError,
+    analyze_media_file,
+    merge_media_type,
+)
 
 
 CONF = loader.get_settings()
@@ -1260,6 +1266,10 @@ class BookUploadBase(BaseHandler):
     EBOOK_MAGIC = {
         "epub": b"PK\x03\x04",
         "pdf": b"%PDF",
+        "cbz": b"PK\x03\x04",
+        "zip": b"PK\x03\x04",
+        "cbr": b"Rar!\x1a\x07",
+        "rar": b"Rar!\x1a\x07",
     }
 
     def check_upload_permission(self):
@@ -1335,21 +1345,52 @@ class BookUploadBase(BaseHandler):
             except OSError:
                 continue
 
+    def _remove_rejected_upload(self, fpath):
+        upload_dir = os.path.realpath(CONF["upload_path"])
+        cleanup_path = os.path.realpath(fpath)
+        try:
+            if os.path.commonpath([upload_dir, cleanup_path]) == upload_dir and cleanup_path != upload_dir:
+                os.remove(cleanup_path)
+        except (OSError, ValueError):
+            pass
+
+    def _save_media_type(self, book_id, media_type, item=None):
+        item = item or self.session.query(Item).filter(Item.book_id == book_id).first()
+        if not item:
+            item = Item()
+            item.book_id = book_id
+            item.collector_id = self.user_id()
+        item.media_type = merge_media_type(item.media_type, media_type)
+        item.save()
+        return item
+
     def import_uploaded_book(self, fpath, fmt):
         from calibre.ebooks.metadata.meta import get_metadata
 
-        # read ebook meta
-        with open(fpath, "rb") as stream:
-            mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-            mi.title = utils.super_strip(mi.title)
-            # 保留所有作者信息，与批量导入逻辑保持一致
-            mi.authors = [utils.super_strip(s) for s in mi.authors]
+        try:
+            analysis = analyze_media_file(fpath, fmt)
+        except InvalidMediaError as err:
+            logging.warning("reject uploaded media %s: %s", fpath, err.message)
+            self._remove_rejected_upload(fpath)
+            return {"err": "params.format", "msg": _("文件校验失败：%s") % err.message}
+
+        # 漫画容器不解压读取元数据，使用文件名构造最小 Calibre metadata。
+        if fmt in COMIC_CONTAINER_FORMATS:
+            from calibre.ebooks.metadata.book.base import Metadata
+
+            mi = Metadata(os.path.splitext(os.path.basename(fpath))[0], [_("佚名")])
+        else:
+            with open(fpath, "rb") as stream:
+                mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                mi.title = utils.super_strip(mi.title)
+                # 保留所有作者信息，与批量导入逻辑保持一致
+                mi.authors = [utils.super_strip(s) for s in mi.authors]
 
         # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
         if fmt in ["txt", "pdf"]:
             # 使用文件名提取标题，与批量导入逻辑保持一致
             fname = os.path.basename(fpath)
-            mi.title = fname.replace("." + fmt, "")
+            mi.title = os.path.splitext(fname)[0]
             mi.authors = [_("佚名")]
             # 确保author_sort也被设置，与批量导入逻辑保持一致
             mi.author_sort = mi.authors[0] if mi.authors else ""
@@ -1357,7 +1398,6 @@ class BookUploadBase(BaseHandler):
         logging.info("upload mi.title = " + repr(mi.title))
         books = self.db.books_with_same_title(mi)
         same_author_book_id = None
-        different_author_books = []
 
         if books:
             # 区分同名同作者和同名不同作者的书籍
@@ -1368,21 +1408,21 @@ class BookUploadBase(BaseHandler):
                 # 检查作者是否相同
                 if set(book_authors) == set(mi_authors):
                     same_author_book_id = b.get("id")
-                    # 检查是否已存在相同格式
+                    # 检查是否已存在相同格式。重传也会回填旧记录的媒体分类。
                     if fmt.upper() in b.get("available_formats", ""):
+                        self._save_media_type(same_author_book_id, analysis.media_type)
                         return {
                             "err": "samebook",
                             "msg": _("同名同作者书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
                             "book_id": same_author_book_id,
                         }
-                else:
-                    different_author_books.append(b)
 
         # 如果存在同名同作者书籍，添加格式到该书籍
         if same_author_book_id:
             logging.info("import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
             self.db.add_format(same_author_book_id, fmt.upper(), fpath, True)
             book_id = same_author_book_id
+            self._save_media_type(book_id, analysis.media_type)
         else:
             fpaths = [fpath]
             book_id = self.db.import_book(mi, fpaths)
@@ -1390,6 +1430,7 @@ class BookUploadBase(BaseHandler):
             item = Item()
             item.book_id = book_id
             item.collector_id = self.user_id()
+            item.media_type = analysis.media_type
             try:
                 item.create_time = self.cache.field_for("timestamp", book_id)
             except Exception:
@@ -1590,23 +1631,12 @@ class BookUploadComplete(BookUploadBase):
 
         try:
             with open(fpath, "wb") as out:
-                for i, p in enumerate(chunk_paths):
+                for p in chunk_paths:
                     with open(p, "rb") as part:
-                        chunk_data = part.read()
-                        if i == 0 and fmt in self.EBOOK_MAGIC and not chunk_data.startswith(self.EBOOK_MAGIC[fmt]):
-                            raise ValueError("format mismatch")
-                        out.write(chunk_data)
-        except ValueError:
-            # fpath 已通过 realpath + startswith 守卫校验，属受控路径
-            upload_dir = os.path.realpath(CONF["upload_path"])
-            cleanup_path = os.path.realpath(fpath)
-            if cleanup_path.startswith(upload_dir + os.sep):
-                try:
-                    os.remove(cleanup_path)
-                except OSError:
-                    pass
-            shutil.rmtree(chunk_dir, ignore_errors=True)
-            return {"err": "params.format", "msg": _("文件内容与格式不匹配")}
+                        shutil.copyfileobj(part, out, length=1024 * 1024)
+        except OSError:
+            self._remove_rejected_upload(fpath)
+            raise
 
         # 合并成功后才清理分片目录；若合并过程中出现非预期异常（如磁盘写满），
         # 分片会保留在磁盘上以便用户重新调用/complete重试，而不是被静默丢弃
@@ -1644,6 +1674,14 @@ class BookRead(BaseHandler):
 
         book = self.get_book_or_404(id)
         book_id = book["id"]
+        readable_formats = [fmt for fmt in ("epub", "pdf", "txt", "mobi", "azw", "azw3") if book.get("fmt_%s" % fmt)]
+        if not readable_formats:
+            if book.get("media_type") == "comic":
+                reason = _("当前漫画格式暂不支持在线阅读，请下载后使用本地漫画阅读器")
+            else:
+                reason = _("抱歉，在线阅读器暂不支持该格式的书籍")
+            raise web.HTTPError(415, reason=reason)
+
         audiobook_edition = (
             self.session.query(AudiobookEdition)
             .filter(AudiobookEdition.book_id == book_id, AudiobookEdition.status == "published")

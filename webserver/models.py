@@ -14,7 +14,7 @@ from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Float, Forei
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import declarative_base, object_session, relationship
 
-from webserver.constants import BOOK_TYPE_EBOOK
+from webserver.constants import BOOK_TYPE_EBOOK, MEDIA_TYPE_UNKNOWN
 from webserver.i18n import _
 
 
@@ -329,6 +329,7 @@ class Item(Base, SQLAlchemyMixin):
     collector = relationship(Reader, backref="items")
     scope = Column(String(50), default="public", nullable=False)
     book_type = Column(String(20), default="ebook", nullable=False)
+    media_type = Column(String(20), default="unknown", nullable=False)
     create_time = Column(DateTime)
     src_path = Column(String(4096), default="", nullable=False)
 
@@ -340,6 +341,7 @@ class Item(Base, SQLAlchemyMixin):
         self.collector_id = 1
         self.scope = "public"
         self.book_type = BOOK_TYPE_EBOOK
+        self.media_type = MEDIA_TYPE_UNKNOWN
         self.src_path = ""
 
 

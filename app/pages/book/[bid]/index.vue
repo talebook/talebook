@@ -335,7 +335,7 @@
                                 variant="outlined"
                                 density="compact"
                                 show-size
-                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt"
+                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt,.cbz,.zip,.cbr,.rar"
                                 prepend-icon="mdi-file-document"
                             />
                             <v-alert
@@ -483,11 +483,13 @@
                     <v-toolbar
                         flat
                         density="compact"
+                        class="book-action-toolbar"
                         :color="store.theme === 'light' ? 'white' : 'grey-darken-4'"
                     >
                         <v-btn
                             icon
                             size="small"
+                            :aria-label="t('book.download')"
                             @click="dialog_download = true"
                         >
                             <v-icon>mdi-download</v-icon>
@@ -536,7 +538,7 @@
                         </v-btn>
 
                         <v-btn
-                            v-if="book.id > 0"
+                            v-if="book.id > 0 && hasCompatibleFormats"
                             color="primary"
                             variant="elevated"
                             class="mx-2"
@@ -547,6 +549,19 @@
                                 mdi-book-open-page-variant
                             </v-icon>
                             {{ t('common.read') }}
+                        </v-btn>
+                        <v-btn
+                            v-else-if="book.id > 0"
+                            color="grey"
+                            variant="tonal"
+                            class="mx-2"
+                            disabled
+                            data-testid="online-reading-unsupported"
+                        >
+                            <v-icon start>
+                                mdi-book-off-outline
+                            </v-icon>
+                            {{ book.media_type === 'comic' ? t('book.comicReadUnsupported') : t('book.onlineReadUnsupported') }}
                         </v-btn>
 
                         <template v-if="book.is_owner">
@@ -829,6 +844,19 @@
                                         </v-chip>
                                     </template>
                                     <v-chip
+                                        v-if="book.media_type && book.media_type !== 'unknown'"
+                                        class="ma-1"
+                                        size="small"
+                                        :color="book.media_type === 'comic' ? 'deep-orange' : 'blue-grey'"
+                                        variant="flat"
+                                        data-testid="media-type-chip"
+                                    >
+                                        <v-icon start>
+                                            {{ book.media_type === 'comic' ? 'mdi-image-multiple' : 'mdi-book-outline' }}
+                                        </v-icon>
+                                        {{ book.media_type === 'comic' ? t('book.mediaTypeComic') : t('book.mediaTypeEbook') }}
+                                    </v-chip>
+                                    <v-chip
                                         v-if="book.scope"
                                         class="ma-1"
                                         size="small"
@@ -841,6 +869,16 @@
                                         {{ book.scope === 'private' ? t('book.scopePrivate') : t('book.scopePublic') }}
                                     </v-chip>
                                 </div>
+                                <v-alert
+                                    v-if="book.media_type === 'comic' && !hasCompatibleFormats"
+                                    type="info"
+                                    variant="tonal"
+                                    density="compact"
+                                    class="mt-3"
+                                    data-testid="comic-reader-notice"
+                                >
+                                    {{ t('book.comicReadUnsupportedDescription') }}
+                                </v-alert>
                             </v-card-text>
                             <v-card-text>
                                 <p
@@ -1055,7 +1093,9 @@ const book = ref({
     collector: '',
     timestamp: '',
     is_owner: false,
-    series: ''
+    series: '',
+    media_type: 'unknown',
+    online_readable: null
 });
 
 // Dialogs
@@ -1159,6 +1199,7 @@ const pub_year = computed(() => {
 
 const hasCompatibleFormats = computed(() => {
     if (!book.value || !book.value.files) return false;
+    if (typeof book.value.online_readable === 'boolean') return book.value.online_readable;
     const formats = book.value.files.map(x => x.format.toLowerCase());
     const compatible = ['epub', 'azw3', 'pdf', 'txt', 'mobi', 'azw'];
     return formats.some(f => compatible.includes(f));
@@ -1745,6 +1786,29 @@ onMounted(async () => {
 .book-footer {
     padding-top: 0;
     padding-bottom: 3px;
+}
+
+@media (max-width: 600px) {
+    .book-action-toolbar {
+        height: auto !important;
+    }
+
+    .book-action-toolbar :deep(.v-toolbar__content) {
+        height: auto !important;
+        min-height: 48px;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .book-action-toolbar :deep(.v-spacer) {
+        display: none;
+    }
+
+    .book-action-toolbar :deep(.v-btn) {
+        margin-inline: 0 !important;
+    }
 }
 
 /* ponytail: pre-line 保留 \n 段落分隔、折叠多余空格、长行自动换行；不影响 v-html 中的 <br>/<p> 标签。 */

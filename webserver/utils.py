@@ -6,7 +6,9 @@ import datetime
 import logging
 import re
 
+from webserver.constants import MEDIA_TYPE_UNKNOWN
 from webserver.i18n import _
+from webserver.services.media_analysis import online_readable_formats
 
 
 # 匹配包含z-library的括号内容，例如 (z-library.sk, 1lib.sk, z-lib.sk)
@@ -109,6 +111,8 @@ class SimpleBookFormatter:
             "collector": self.get_collector(),
             "count_visit": self.val("count_visit", 0),
             "count_download": self.val("count_download", 0),
+            "media_type": self.val("media_type", MEDIA_TYPE_UNKNOWN),
+            "online_readable": online_readable_formats(b.get("available_formats", [])),
         }
 
 
@@ -133,6 +137,7 @@ class BookFormatter:
                 "format": fmt,
                 "size": filesize,
                 "href": resource_url + "/api/book/%s.%s" % (book_id, fmt),
+                "online_readable": online_readable_formats([fmt]),
             }
             files.append(item)
         return files
