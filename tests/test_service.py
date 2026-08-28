@@ -7,11 +7,12 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from txt2epub_next import Txt2Epub
+
 from tests.test_main import TestWithUserLogin, testdir
 from tests.test_main import setUpModule as init
 from webserver.services.convert import ConvertService, get_txt2epub_converter
 from webserver.services.extract import ExtractService
-from txt2epub_next import Txt2Epub
 
 
 def setUpModule():
@@ -104,6 +105,50 @@ class TestConvert(TestWithUserLogin):
         ok = ConvertService().do_ebook_convert(fin, fout, flog)
         self.assertEqual(ok, True)
 
+    def test_convert_and_save_rejects_unsafe_output_components(self):
+        service = ConvertService()
+        unsafe_inputs = (
+            ({"id": "../1", "title": "Unsafe"}, "epub"),
+            ({"id": 1, "title": "Unsafe"}, "../epub"),
+            ({"id": 1, "title": "Unsafe"}, "mobi"),
+        )
+
+        with mock.patch.object(service, "do_ebook_convert") as convert:
+            for book, output_format in unsafe_inputs:
+                with self.subTest(book=book, output_format=output_format):
+                    with self.assertRaises(ValueError):
+                        service.convert_and_save(1, book, "/tmp/source.epub", output_format)
+
+        convert.assert_not_called()
+
+    def test_convert_and_save_accepts_safe_output_path(self):
+        service = ConvertService()
+
+        def create_output(_source, output, _log, book=None):
+            Path(output).write_bytes(b"converted")
+            return True
+
+        with tempfile.TemporaryDirectory() as directory:
+            settings = {"convert_path": directory, "progress_path": directory}
+            with mock.patch.dict("webserver.services.convert.CONF", settings):
+                with mock.patch.object(service, "setup"):
+                    with mock.patch.object(service, "db") as database:
+                        with mock.patch.object(service, "do_ebook_convert", side_effect=create_output) as convert:
+                            with mock.patch.object(service, "add_msg"):
+                                with mock.patch("webserver.services.convert.BackgroundService") as background:
+                                    background.return_value.add_task.return_value = None
+                                    service.convert_and_save(
+                                        1,
+                                        {"id": 1, "title": "Safe"},
+                                        "/tmp/source.epub",
+                                        "EPUB",
+                                    )
+
+            output_path = convert.call_args.args[1]
+            self.assertEqual(database.add_format.call_args.args[:2], (1, "epub"))
+            self.assertEqual(os.path.commonpath([directory, output_path]), directory)
+            self.assertFalse(os.path.exists(output_path))
+
 
 class TestExtract(TestWithUserLogin):
     def setUp(self):
@@ -123,6 +168,29 @@ class TestExtract(TestWithUserLogin):
         fpath = testdir + "/cases/book.txt"
         ok = ExtractService().parse_txt_content(bid, fpath)
         self.assertEqual(ok, True)
+
+    def test_rejects_unsafe_book_id(self):
+        with mock.patch("webserver.services.extract.TxtParser") as parser:
+            with self.assertRaises(ValueError):
+                ExtractService().parse_txt_content("../666", testdir + "/cases/book.txt")
+
+        parser.assert_not_called()
+
+    def test_rejects_content_symlink_outside_extract_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            extract_root = os.path.join(directory, "extract")
+            book_dir = os.path.join(extract_root, "666")
+            outside_path = os.path.join(directory, "outside.json")
+            os.makedirs(book_dir)
+            os.symlink(outside_path, os.path.join(book_dir, "content.json"))
+
+            with mock.patch.dict("webserver.services.extract.CONF", {"extract_path": extract_root}):
+                with mock.patch("webserver.services.extract.TxtParser") as parser:
+                    with self.assertRaises(ValueError):
+                        ExtractService().parse_txt_content(666, testdir + "/cases/book.txt")
+
+        parser.assert_not_called()
+        self.assertFalse(os.path.exists(outside_path))
 
 
 class TestAsyncServiceSession(TestWithUserLogin):

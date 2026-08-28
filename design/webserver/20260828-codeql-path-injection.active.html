@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="修复 PR #977 中 CodeQL 报告的转换与 TXT 提取路径注入告警。" />
+    <link rel="icon" href="data:," />
+    <title>收紧转换与 TXT 提取的文件路径边界 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#172033; --muted:#5d687c; --line:#d9e1ec; --accent:#a84d16; --soft:#fff2e8; --good:#e7f6ee; --danger:#fff0f0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; }
+      * { box-sizing:border-box; }
+      html { scroll-behavior:smooth; }
+      body { margin:0; color:var(--ink); background:linear-gradient(145deg,#fff 0%,var(--bg) 45%,#edf3fa 100%); line-height:1.65; }
+      a { color:#315f91; text-underline-offset:3px; }
+      a:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+      code { padding:.12em .35em; border-radius:5px; background:#eef2f7; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+      .page { width:min(1040px,calc(100vw - 28px)); margin:auto; padding:24px 0 48px; }
+      header,.card { margin-bottom:18px; padding:28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 12px 32px rgba(23,32,51,.07); }
+      h1 { margin:0 0 8px; font-size:clamp(28px,5vw,44px); line-height:1.15; }
+      h2 { margin:0 0 12px; font-size:22px; }
+      p { margin:0 0 12px; }
+      ul,ol { margin:8px 0 0 20px; padding:0; }
+      li+li { margin-top:6px; }
+      .sub,.muted { color:var(--muted); }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      .chip { padding:5px 10px; border-radius:999px; background:#edf2f8; color:#4d5a70; font-size:12px; font-weight:700; }
+      .chip.status { color:#8b430f; background:var(--soft); }
+      .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+      .box,.callout { padding:15px 17px; border:1px solid var(--line); border-radius:14px; background:#fafcff; }
+      .box.good { background:var(--good); }
+      .callout.danger { background:var(--danger); }
+      .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; }
+      .step { padding:14px; border:1px solid var(--line); border-radius:13px; background:#fff; }
+      .step b { display:block; margin-bottom:5px; }
+      .step p { color:var(--muted); font-size:13px; }
+      .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:13px; }
+      table { width:100%; min-width:680px; border-collapse:collapse; font-size:13px; }
+      th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { background:#f6f9fc; color:#506079; }
+      tr:last-child td { border-bottom:0; }
+      th:last-child,td:last-child { border-right:0; }
+      .pending { color:#9a5c09; font-weight:800; }
+      .verified { color:#18724d; font-weight:800; }
+      footer { color:var(--muted); font-size:12px; text-align:center; }
+      @media(max-width:700px) { .page{width:calc(100vw - 18px);padding-top:10px}.card,header{padding:20px;border-radius:15px}.grid,.flow{grid-template-columns:1fr} }
+      @media(prefers-reduced-motion:reduce) { html{scroll-behavior:auto} }
+      @media print { body{background:#fff}.page{width:100%;padding:0}header,.card{box-shadow:none;break-inside:avoid} }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <h1>收紧转换与 TXT 提取的文件路径边界</h1>
+        <p class="sub">在不改变正常转换、提取流程的前提下，对进入文件系统路径的书籍 ID 和目标格式执行白名单校验，并验证解析后的路径仍位于配置根目录中。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip status">状态：ACTIVE</span><span class="chip">创建日期：2026-08-28</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：转换服务、TXT 提取服务、服务测试</span><span class="chip">需求来源：PR #977 CodeQL</span>
+        </div>
+      </header>
+      <main>
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout">“修复 https://github.com/talebook/talebook/pull/977 的 codeql 报错”</div>
+          <p>PR 的 CodeQL 安全门禁报告 6 个 high 级 <code>py/path-injection</code> 告警：<code>webserver/services/convert.py</code> 2 个，<code>webserver/services/extract.py</code> 4 个。虽然这两个文件与 PR 基线内容一致，但 PR 变更规模过大使既有开放告警进入本次门禁。</p>
+        </section>
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="box good"><b>目标</b><ul><li>阻断书籍 ID、目标格式造成的路径穿越。</li><li>阻断配置根目录内符号链接将输出导向根目录外。</li><li>覆盖恶意路径组件和正常提取行为的回归测试。</li></ul></article>
+            <article class="box"><b>非目标</b><ul><li>不调整 Readest 嵌入实现和静态资源。</li><li>不改变支持的转换格式及成功响应。</li><li>不处理 PR 门禁之外的其他既有 CodeQL 告警。</li></ul></article>
+          </div>
+        </section>
+        <section class="card">
+          <h2>3. 现状、根因与证据</h2>
+          <div class="table-wrap" role="region" aria-label="告警证据" tabindex="0">
+            <table><thead><tr><th>位置</th><th>现状</th><th>根因</th></tr></thead><tbody>
+              <tr><td><code>convert.py:214,247</code></td><td>由 <code>book["id"]</code>、<code>new_fmt</code> 拼出路径后执行打开和删除。</td><td>服务层依赖调用方约束，未在文件系统边界重新校验。</td></tr>
+              <tr><td><code>extract.py:23,27,28,33</code></td><td>由 <code>bid</code> 拼出目录和 JSON 路径后检查、创建及写入。</td><td>URL 参数跨越到服务层后仍保留污点，且没有根目录包含性检查。</td></tr>
+            </tbody></table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>4. 方案</h2>
+          <div class="callout"><b>方案结论：</b>在两个服务内靠近路径构造的位置执行正则 fullmatch 白名单、<code>realpath</code> 规范化和 <code>commonpath</code> 根目录包含性检查；非法输入在任何文件操作前抛出 <code>ValueError</code>，异步服务框架负责记录任务异常。</div>
+          <div class="flow" aria-label="路径处理流程">
+            <article class="step"><b>输入</b><p>书籍 ID、转换目标格式与配置根目录。</p></article>
+            <article class="step"><b>白名单</b><p>ID 仅允许十进制数字；格式仅允许 epub、azw3、pdf。</p></article>
+            <article class="step"><b>规范化</b><p>通过 realpath 解析根目录、候选目录及文件。</p></article>
+            <article class="step"><b>包含性检查</b><p>commonpath 不等于安全根时拒绝，正常路径继续原流程。</p></article>
+          </div>
+        </section>
+        <section class="card">
+          <h2>5. 影响范围、风险与回滚</h2>
+          <div class="grid"><article class="box good"><b>影响范围</b><p><code>ConvertService.convert_and_save</code> 与 <code>ExtractService.parse_txt_content</code> 的输入防御及路径生成。</p></article><article class="box"><b>保持不变</b><p>合法数字书籍 ID、既有三种输出格式、文件内容、数据库写入和消息语义不变。</p></article></div>
+          <div class="callout danger"><b>主要风险：</b>历史内部调用若传入非数字 ID 或未支持的扩展名将被拒绝；通过现有调用点检索和相关测试确认所有合法调用均符合白名单。</div>
+          <p><b>回滚：</b>单提交回滚服务校验、测试和本方案即可；不涉及数据迁移或配置清理。</p>
+        </section>
+        <section class="card">
+          <h2>6. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0"><table><thead><tr><th>验证层</th><th>命令</th><th>预期</th><th>结果</th></tr></thead><tbody>
+            <tr><td>服务回归</td><td><code>docker run … talebook/talebook:v26.08.11 … python3 -m pytest tests/test_service.py -v</code></td><td>正常转换/提取及恶意输入断言通过。</td><td class="verified">15 passed</td></tr>
+            <tr><td>Python 质量</td><td><code>make lint-py-fix &amp;&amp; make lint-py &amp;&amp; ruff check tests/test_service.py --no-cache</code></td><td>格式化和静态检查通过。</td><td class="verified">通过</td></tr>
+            <tr><td>方案门禁</td><td><code>make check-design</code></td><td>路径、状态和单文件 HTML 校验通过。</td><td class="verified">通过</td></tr>
+            <tr><td>CodeQL</td><td>PR #977 推送后由 GitHub CodeQL 扫描</td><td>6 个路径注入告警不再出现在 PR 门禁。</td><td class="pending">本地无 CodeQL CLI，推送后由 CI 验证</td></tr>
+          </tbody></table></div>
+        </section>
+        <section class="card">
+          <h2>7. 决策记录</h2>
+          <ol><li><strong>2026-08-28：</strong>不以忽略或 dismiss 方式绕过告警，直接补齐服务层安全边界。</li><li><strong>2026-08-28：</strong>使用 CodeQL 可识别的 fullmatch 净化，并保留 realpath + commonpath 作为运行时纵深防御。</li><li><strong>2026-08-28：</strong>宿主机测试缺少 Calibre；新建测试镜像又因 GitHub 依赖下载中断失败，改用已有 Talebook 生产镜像提供 Calibre，并只读挂载宿主机纯 Python pytest 模块完成等价服务测试。</li></ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-08-28</footer>
+    </div>
+  </body>
+</html>
