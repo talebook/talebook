@@ -255,8 +255,10 @@ class XhsdProvider(MetaSourceMixin, XhsdBookApi):
         super().__init__(copy_image=False)
 
     def _search(self, query, context):
-        isbn = query.isbn or query.title
-        mi = self.get_book_by_isbn(isbn) if isbn else None
+        # get_book 会先校验参数是否为 13 位 ISBN，非 ISBN 的标题直接跳过，
+        # 不要换成 get_book_by_isbn：那会把书名当 ISBN 发给搜索接口。
+        keyword = query.isbn or query.title
+        mi = self.get_book(keyword) if keyword else None
         return [mi] if mi else []
 
     def _fetch(self, external_id, context):

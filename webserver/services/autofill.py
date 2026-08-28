@@ -169,7 +169,7 @@ class AutoFillService(AsyncService):
             if plugin_id not in enabled:
                 continue
             try:
-                provider = REGISTRY.provider(plugin_id)
+                provider = REGISTRY.get(plugin_id)
                 records = provider.search_books(query, context) or []
             except Exception as err:
                 logging.error(_("元数据插件 %s 查询 %s 失败：%s"), plugin_id, title, err)

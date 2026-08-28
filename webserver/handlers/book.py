@@ -396,13 +396,20 @@ class BookRefer(BaseHandler):
                 output.append(safe_failure)
         return output
 
+    @staticmethod
+    def _meta_task_name(plugin_id):
+        try:
+            return REGISTRY.get(plugin_id).manifest.get("name") or plugin_id
+        except PluginRuntimeError:
+            return plugin_id
+
     def _make_metadata_task(self, plugin_id, query, sources):
         """把一个元数据插件包成搜索任务；单源失败不影响其余源。"""
 
         def _task():
             try:
-                provider = REGISTRY.provider(plugin_id)
-            except Exception:
+                provider = REGISTRY.get(plugin_id)
+            except PluginRuntimeError:
                 logging.warning("元数据插件 %s 不可用", plugin_id)
                 return []
             context = {"action": "search", "config": {"sources": list(sources)}, "secrets": {}}
@@ -468,7 +475,8 @@ class BookRefer(BaseHandler):
             authors=tuple(getattr(mi, "authors", None) or ()),
         )
         for plugin_id in plugin_ids_for_sources(sources):
-            tasks[plugin_id] = self._make_metadata_task(plugin_id, query, sources)
+            # 失败摘要里的 source 会原样显示给用户，用 manifest 名而不是 plugin id。
+            tasks[self._meta_task_name(plugin_id)] = self._make_metadata_task(plugin_id, query, sources)
 
         if META_SOURCE_BOOKSOURCE in sources:
 

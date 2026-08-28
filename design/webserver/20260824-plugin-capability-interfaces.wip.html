@@ -935,7 +935,7 @@ for conn in runtime.connections_for(capability, user_id):
             <div class="callout good">
               <strong>2026-08-28 S19 用户反馈（已验证）：</strong><code>ProxyImageHandler</code> 原先写死 7 个上游域名，导致平台 handler 认识百度百科、豆瓣、番茄、七猫与 WeRead 的具体部署细节。现已按 D-32 保持原访问范围不变，只移动所有权：百度百科声明 <code>bcebos.com</code>／<code>bdstatic.com</code>，豆瓣 V2 声明 <code>doubanio.com</code>，番茄声明 <code>byteimg.com</code>／<code>fanqienovel.com</code>，七猫声明 <code>wtzw.com</code>，WeRead 声明 <code>weread.qq.com</code>。Registry 是 handler 与具体 Provider 之间的唯一 seam，并集中处理大小写、尾点、精确域名与子域名匹配。T-25 在旧实现下先得到 3 个预期失败，完成实现后图片代理聚焦 20 passed、完整 <code>tests/test_upload.py</code> 70 passed；Docker 完整后端 <strong>1095 passed, 20 skipped</strong>，<code>make lint-py-fix</code> 与 <code>make lint-py</code> 均通过。
             </div>
-            <div class="callout warn"><strong>当前仍为 WIP：</strong>S1–S19 均已实现，T-22、T-23、T-24、T-25 已验证；自动化测试与最新 <code>interface-review full</code> 已通过。但当前会话未提供项目强制要求的 Chrome DevTools MCP，T-14 只能完成真实后端 + Chromium 替代检查，不能计作门禁通过，因此不得转 ACTIVE。</div>
+            <div class="callout warn"><strong>当前仍为 WIP：</strong>S1–S19 均已实现，T-22 至 T-26 已验证；T-14 已使用 Chrome DevTools MCP 在真实 Docker 后端上完成验收，并据此修复了 2 个 S18 引入的缺陷（registry 派发方法名写错导致元数据抓取整体静默失效、新华书店查询语义漂移）以及 1 处内部 plugin id 外泄到用户提示。完整后端 1108 passed, 20 skipped；<code>make lint-py</code> 通过。转 ACTIVE 前尚需在修复后重跑一次 <code>interface-review full</code>。</div>
             <div class="callout good">
               <strong>实际执行记录（2026-08-25—27）</strong>
               <p>宿主 Python 环境缺 <code>calibre</code>；不依赖 Calibre 的运行时单测使用仓库 venv，完整后端套件与 HTTP 端到端回归通过项目测试镜像执行：</p>
@@ -1061,11 +1061,13 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
               <p>首轮发现并修复 1 个 HIGH（正文工具覆写原书缺少确认与危险语义）和 1 组 MEDIUM（新增对话框缺少可访问名称）；同时修复真实 E2E 暴露的微信读书主动作标签、OPDS declarative service toggle 与 generic feature mock。复审无 HIGH / MEDIUM，结论 <strong>Approve</strong>。预先存在的图标按钮标签与阅读页链接问题不影响本次 verdict，留给独立清理。</p>
               <p>S14 增量只替换 API transport、运行轮询与卸载清理，不改模板、布局、样式、颜色或用户文案；删除侧信号扫描未发现可访问名称、焦点、语义、逻辑布局、排版或动效能力回退。六个 owner domain 均完成复核；候选的“为通用 API 迁移重做对话框外观”和“增加未由后端提供的进度百分比”会制造无依据的视觉／状态承诺，均不采纳。最新组件测试 3/3、移动端 Chromium E2E 2/2，结论仍为 <strong>Approve</strong>。</p>
             </div>
-            <div class="callout danger">
-              <strong>T-14 尚未满足指定工具门禁。</strong>
-              <p>已用本 worktree 构建 <code>talebook/talebook:dev</code>，以独立 <code>/tmp/talebook-dev</code> 数据目录启动 Docker Tornado/nginx，并确认 <code>GET /api/welcome → {"err":"free"}</code>；宿主 Nuxt 通过 <code>API_URL=http://127.0.0.1:8080</code> 启动于 <code>http://127.0.0.1:3000/</code>，未启用 Chokidar polling。</p>
-              <p>替代验证使用本机 Chromium 检查了插件管理页、Generic OPDS 详情、微信读书工作台、在线书库与正文查找替换页，覆盖 1280×900 / 390×844 和明暗主题；移动端 <code>scrollWidth = clientWidth = 390</code>，页面无 console / page error，Generic OPDS 对话框存在 <code>aria-labelledby</code>。仅外部头像请求因测试结束出现 <code>ERR_ABORTED</code>，不影响产品行为。</p>
-              <p>但工具发现结果中既无 Chrome DevTools MCP，也无 Browser 技能所需的 <code>node_repl js</code> 运行时，因此以上 Chromium 证据只能作为替代回归，不能冒充项目要求的 Chrome DevTools MCP。待提供该 MCP 后需重跑桌面／移动、明／暗主题并回写结果，才可转 ACTIVE。</p>
+            <div class="callout good">
+              <strong>T-14 Chrome DevTools MCP 真实后端验收：已完成，并暴露 2 个由 S18 引入的缺陷。</strong>
+              <p>Docker Tornado/nginx 使用独立 <code>/tmp/talebook-dev</code> 数据目录，完成安装向导后 <code>GET /api/user/info</code> 返回真实书库（10 本书、1 名管理员）；宿主 Nuxt 以 <code>API_URL=http://127.0.0.1:8080</code> 启动于 <code>http://127.0.0.1:3000/</code>，未启用 Chokidar polling。全程使用 Chrome DevTools MCP 操作真实浏览器，未使用任何 mock API。</p>
+              <p><strong>系统设置页：</strong>「互联网书籍信息源」卡片中 <code>douban_baseurl</code>／<code>douban_apikey</code>／<code>douban_max_count</code> 三行与 <code>doubanPluginInfo</code> 提示条均已消失，卡片直接由元数据源多选跳到 AI 配置；元数据源下拉共 10 项（豆瓣V2、百度百科、Google Books、Amazon、新华书店、番茄小说、七猫小说、AI、NeoDB、在线书源），无残留的旧「豆瓣」；<code>GET /api/admin/settings</code> 的 <code>META_ALL_SOURCES</code> 与之一致，且不再返回任何 <code>douban_*</code> 键。页面无 console error，i18n 编译正常。</p>
+              <p><strong>书籍详情「从互联网更新信息」：</strong>首次验收时全部来源返回 0 条。后端日志显示每个插件都打出「元数据插件 X 不可用」——<code>_make_metadata_task</code> 调用了并不存在的 <code>REGISTRY.provider()</code>（正确方法是 <code>REGISTRY.get()</code>），<code>except Exception</code> 把 <code>AttributeError</code> 一并吞掉，导致该功能整体静默失效。<code>autofill.py</code> 有同样的写法。修复后同一页面通过豆瓣V2 取回真实条目并正常渲染标题、简介、作者、出版社与年份。</p>
+              <p><strong>连带修复：</strong>(a) 打通派发后 <code>tests/test_main.py::TestRefer</code> 才真正走到 POST 应用分支并失败，暴露 <code>XhsdProvider._search</code> 把书名直接送进 <code>get_book_by_isbn</code>，与迁移前 <code>get_book</code> 先校验 13 位 ISBN 的语义不一致，且会绕过测试 mock 打真实网络；(b) 失败摘要的 <code>source</code> 会被前端原样拼进用户提示，迁移后泄漏出 <code>talebook.meta.calibre</code> 这类内部 id，改为取 manifest 的 <code>name</code>，现真实页面显示「有 4 个来源未完成：新华书店、百度百科、七猫小说（元数据快照）、Google Books / Amazon。」</p>
+              <p>三处修复均补了会失败的回归用例：把 <code>REGISTRY.get</code> 改回 <code>REGISTRY.provider</code> 后 <code>test_refer_task_reaches_the_provider_instead_of_swallowing_lookup_errors</code> 确实失败。</p>
             </div>
             <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
               <table>
@@ -1095,7 +1097,8 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>T-15</td><td>设备推送走插件：认证用户按 manifest <code>ui.device_type</code> 解析 provider，handler 无设备白名单，创建/复用个人连接后调 <code>runtime.sync</code>；成功产生 action=sync 的 succeeded run 并释放 lease，失败产生 failed run 并记录脱敏错误；专用 <code>PUSH_TIMEOUT</code> 与 context deadline 限制底层 requests；游客仅保留无连接/无 run 的 runtime 桥。双开关优先级明确：全局开关先决，未安装内置 provider 保持历史兼容，已有安装的 disabled / 非 active 状态优先且不可绕过</td><td><code>tests/test_main.py</code> 与 <code>tests/test_plugin_capability_lookup.py</code>，含声明式新设备、成功、失败、超时预算、租约、配置复用、未安装游客兼容与禁用安装不可绕过</td><td class="verified">已通过</td></tr>
                   <tr><td>T-12</td><td>后端最新 1095 passed / 20 skipped；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（468 warnings 为存量）；原相关 Vitest 11 passed，S14 组件回归 3 passed；相关 Playwright 31/31、插件管理页 ID 夹具 10 passed、S14 WeRead 回归 2 passed；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见上方命令记录；全量 Vitest 的 4 个 Nuxt i18n 虚拟模块环境失败单独记录，非本次回归</td><td class="verified">已通过</td></tr>
                   <tr><td>T-13</td><td>界面审查（<code>full</code> 模式）</td><td>相对 <code>origin/master</code> 审查 177 个纳入范围文件、26 个生产界面源文件与 5 个消费者；最新 S14 增量无模板／样式／文案变化，六个 owner domain 复审无新增问题</td><td class="verified">Approve</td></tr>
-                  <tr><td>T-14</td><td>真实后端体验验证</td><td>Docker 后端已就绪，Chromium 替代回归已完成；当前会话无 Chrome DevTools MCP</td><td class="pending">待 MCP 重跑</td></tr>
+                  <tr><td>T-26</td><td>registry 派发不得被静默吞掉：所有映射到的 <code>talebook.meta.*</code> 均可经共享 <code>REGISTRY</code> 解析；<code>_make_metadata_task</code> 真正调用到 provider，未注册插件才返回空；新华书店只对 13 位 ISBN 发起上游查询；失败摘要 source 使用 manifest 名而非 plugin id</td><td><code>tests/test_meta_providers.py</code> 新增 4 组用例（含 10 个 plugin id 的参数化解析）；完整后端 1108 passed, 20 skipped；<code>make lint-py</code> 通过</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-14</td><td>真实后端体验验证：系统设置页豆瓣配置行与提示条已移除、元数据源列表无旧 <code>douban</code>；书籍详情「从互联网更新信息」可取回真实元数据；失败摘要只显示来源展示名</td><td>Chrome DevTools MCP 操作真实浏览器（<code>http://127.0.0.1:3000/</code>）+ Docker 真实后端（10 本书真实书库），无 mock</td><td class="verified">已通过（修复 2 个缺陷后复验）</td></tr>
                 </tbody>
               </table>
             </div>

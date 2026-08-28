@@ -8,6 +8,7 @@ from webserver.plugins.meta.base import CALIBRE_MI_KEY, to_book_metadata, to_cal
 from webserver.plugins.register import META_SOURCE_TO_PLUGIN, PROVIDER_GROUPS, plugin_ids_for_sources
 from webserver.plugins.runtime import PluginManifest, contract_violations
 from webserver.plugins.runtime.domains import MetadataQuery
+from webserver.services.plugin_runtime import REGISTRY
 
 
 class _FakeMetadata:
@@ -127,3 +128,58 @@ def test_every_mapped_plugin_exposes_the_three_protocol_methods(plugin_id):
     provider = next(p for p in PROVIDER_GROUPS["meta"] if p.manifest["id"] == plugin_id)
     for name in ("search_books", "get_metadata", "get_cover"):
         assert callable(getattr(provider, name, None)), "%s 缺少 %s" % (plugin_id, name)
+
+
+@pytest.mark.parametrize("plugin_id", [pid for pid in META_SOURCE_TO_PLUGIN.values()])
+def test_every_mapped_plugin_is_resolvable_through_the_shared_registry(plugin_id):
+    assert REGISTRY.get(plugin_id) is not None
+
+
+def test_refer_task_reaches_the_provider_instead_of_swallowing_lookup_errors():
+    """派发任务必须真正拿到 provider：查不到时只能是插件缺失，不能是调用写错。"""
+    from webserver.handlers.book import BookRefer
+
+    handler = BookRefer.__new__(BookRefer)
+    plugin_id = "talebook.meta.douban-v2"
+    query = MetadataQuery(title="活着")
+    records = [to_book_metadata(_FakeMetadata(title="活着"), plugin_id)]
+
+    with mock.patch.object(type(REGISTRY.get(plugin_id)), "search_books", return_value=records) as m:
+        results = handler._make_metadata_task(plugin_id, query, ["douban_v2"])()
+
+    assert m.called, "provider 未被调用，说明 registry 查找被静默吞掉了"
+    assert [b.title for b in results] == ["活着"]
+    assert results[0].provider_key == plugin_id
+
+
+def test_refer_task_returns_empty_for_an_unregistered_plugin():
+    from webserver.handlers.book import BookRefer
+
+    handler = BookRefer.__new__(BookRefer)
+    task = handler._make_metadata_task("talebook.meta.does-not-exist", MetadataQuery(title="活着"), [])
+    assert task() == []
+
+
+def test_xhsd_only_queries_upstream_for_real_isbn():
+    """新华书店只支持 ISBN；书名必须被挡在 get_book 里，不能直接送进 ISBN 搜索。"""
+    provider = next(p for p in PROVIDER_GROUPS["meta"] if p.manifest["id"] == "talebook.meta.xhsd")
+
+    with mock.patch.object(type(provider), "get_book_by_isbn") as m:
+        assert provider._search(MetadataQuery(title="百年孤独"), {}) == []
+        assert not m.called
+
+        m.return_value = _FakeMetadata(title="百年孤独")
+        assert len(provider._search(MetadataQuery(isbn="9787544253994"), {})) == 1
+        m.assert_called_once_with("9787544253994")
+
+
+def test_failure_summary_uses_display_names_not_plugin_ids():
+    """失败摘要的 source 会直接渲染进用户提示，不能暴露 talebook.meta.* 这类内部 id。"""
+    from webserver.handlers.book import BookRefer
+
+    handler = BookRefer.__new__(BookRefer)
+    for plugin_id in set(META_SOURCE_TO_PLUGIN.values()):
+        name = handler._meta_task_name(plugin_id)
+        assert name == REGISTRY.get(plugin_id).manifest["name"]
+        assert not name.startswith("talebook.")
+    assert handler._meta_task_name("talebook.meta.does-not-exist") == "talebook.meta.does-not-exist"
