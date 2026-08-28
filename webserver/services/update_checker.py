@@ -157,8 +157,8 @@ class UpdateChecker:
             logging.error("Update check failed: %s", self.check_error)
 
     def _notify_admins(self):
-        """Send update notifications to all admin users (only called in background loop)"""
-        if not self._session_maker or not self.has_update:
+        """Reconcile update notifications for all admin users."""
+        if not self._session_maker:
             return
 
         session = self._session_maker()
@@ -179,6 +179,16 @@ class UpdateChecker:
 
                 if existing:
                     existing_version = existing.data.get(UPDATE_NOTIFY_VERSION_KEY, "")
+                    if not self.has_update:
+                        if existing.unread and not _has_newer_version(self.current_version, existing_version):
+                            existing.unread = False
+                            existing.update_time = datetime.datetime.now()
+                            logging.info(
+                                "Dismissed obsolete update notification for admin %s: version %s",
+                                admin.username,
+                                existing_version,
+                            )
+                        continue
                     if _same_version(existing_version, self.latest_version):
                         continue
                     if _compare_versions(existing_version, self.latest_version):
@@ -190,7 +200,7 @@ class UpdateChecker:
                         existing.unread = True
                         existing.save()
                         logging.info("Updated notification for admin %s: version %s", admin.username, self.latest_version)
-                else:
+                elif self.has_update:
                     msg = Message(
                         user_id=admin.id,
                         status=UPDATE_NOTIFY_STATUS,
