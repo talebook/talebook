@@ -23,6 +23,7 @@ let booksourceCheckRunning = false;
 let booksourceCheckPolls = 0;
 let shelfBookIds = new Set();
 let readingStateByBookId = new Map();
+let comicProgressByBookId = new Map();
 let activeThemeName = '';
 let audiobookPublishedEdition = null;
 let audiobookJobs = [];
@@ -166,6 +167,9 @@ router.post('/_test/reset', eventHandler(async (event) => {
   booksourceCheckPolls = 0;
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
+  comicProgressByBookId = new Map([
+    [14, { kind: 'comic', version: 1, pageId: 'mock-revision:1', pageIndex: 1, percent: 66.67, completed: false }]
+  ]);
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
@@ -1295,6 +1299,69 @@ router.post('/api/book/:id/readstate', eventHandler(async (event) => {
     err: 'ok',
     msg: 'Reading state updated',
   };
+}));
+
+router.get('/api/book/:id/comic/pages', eventHandler((event) => {
+  if (!isLoggedIn) return { err: 'user.need_login', msg: '请先登录' };
+  const id = Number(getRouterParam(event, 'id'));
+  if (id !== 14) return { err: 'comic.book_not_found', msg: '书籍不存在' };
+  return {
+    err: 'ok',
+    contract_version: 1,
+    book_id: id,
+    title: '图片漫画样例',
+    format: 'CBZ',
+    revision: 'mock-revision',
+    pages_count: 3,
+    pages: [0, 1, 2].map(index => ({
+      id: `mock-revision:${index}`,
+      index,
+      url: `/api/book/${id}/comic/pages/${index}?revision=mock-revision`,
+      width: index === 2 ? 1400 : 900,
+      height: index === 2 ? 900 : 1300,
+      mime_type: 'image/svg+xml'
+    }))
+  };
+}));
+
+router.get('/api/book/:id/comic/pages/:index', eventHandler((event) => {
+  if (!isLoggedIn) return new Response('请先登录', { status: 401 });
+  const id = Number(getRouterParam(event, 'id'));
+  const index = Number(getRouterParam(event, 'index'));
+  const revision = getQuery(event).revision;
+  if (id !== 14 || ![0, 1, 2].includes(index)) return new Response('漫画页码超出范围', { status: 404 });
+  if (revision !== 'mock-revision') return new Response('漫画页面列表已更新', { status: 409 });
+  const palettes = [
+    ['#1f2937', '#d97706'],
+    ['#172554', '#0ea5e9'],
+    ['#3f0d2c', '#ec4899']
+  ];
+  const [start, end] = palettes[index];
+  const width = index === 2 ? 1400 : 900;
+  const height = index === 2 ? 900 : 1300;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><circle cx="${width * .72}" cy="${height * .3}" r="${Math.min(width, height) * .18}" fill="#fff" opacity=".12"/><text x="50%" y="47%" text-anchor="middle" fill="#fff" font-family="sans-serif" font-size="96" font-weight="700">TALEBOOK</text><text x="50%" y="57%" text-anchor="middle" fill="#fff" font-family="sans-serif" font-size="48">漫画页 ${index + 1}</text></svg>`;
+  return new Response(svg, {
+    headers: {
+      'Content-Type': 'image/svg+xml',
+      'Cache-Control': 'private, max-age=3600, immutable',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}));
+
+router.get('/api/book/:id/comic/progress', eventHandler((event) => {
+  if (!isLoggedIn) return { err: 'user.need_login', msg: '请先登录' };
+  const id = Number(getRouterParam(event, 'id'));
+  return { err: 'ok', progress: comicProgressByBookId.get(id) || {}, update_time: null };
+}));
+
+router.post('/api/book/:id/comic/progress', eventHandler(async (event) => {
+  if (!isLoggedIn) return { err: 'user.need_login', msg: '请先登录' };
+  const id = Number(getRouterParam(event, 'id'));
+  const body = await readBody(event);
+  if (!body?.progress || body.progress.kind !== 'comic') return { err: 'comic.progress_invalid', msg: '漫画阅读进度参数错误' };
+  comicProgressByBookId.set(id, body.progress);
+  return { err: 'ok', progress: body.progress };
 }));
 
 router.get('/api/user/devices', eventHandler(() => ({

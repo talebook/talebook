@@ -29,11 +29,11 @@
         "format": "CBZ",
         "size": 2048,
         "href": "/api/book/14.CBZ",
-        "online_readable": false
+        "online_readable": true
       }
     ],
     "media_type": "comic",
-    "online_readable": false,
+    "online_readable": true,
     "scope": "public",
     "is_public": true,
     "is_owner": true

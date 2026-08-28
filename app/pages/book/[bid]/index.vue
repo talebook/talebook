@@ -542,8 +542,9 @@
                             color="primary"
                             variant="elevated"
                             class="mx-2"
-                            :href="'/read/' + book.id"
+                            :href="readerPath"
                             target="_blank"
+                            data-testid="open-online-reader"
                         >
                             <v-icon start>
                                 mdi-book-open-page-variant
@@ -916,7 +917,7 @@
                         >
                             <v-list density="compact">
                                 <v-list-item
-                                    :href="'/read/' + book.id"
+                                    :href="readerPath"
                                     target="_blank"
                                     class="w-100"
                                 >
@@ -1060,6 +1061,7 @@ import { useMainStore } from '@/stores/main';
 import BookCards_Small from '~/components/BookCards_Small.vue';
 import BookConvertDialog from '~/components/BookConvertDialog.vue';
 import { READING_STATE, useBookReadingState } from '~/composables/useBookReadingState';
+import { readerPathForBook } from '~/utils/comic-reader';
 
 const route = useRoute();
 const router = useRouter();
@@ -1197,13 +1199,8 @@ const pub_year = computed(() => {
     return book.value.pubdate.split('-')[0];
 });
 
-const hasCompatibleFormats = computed(() => {
-    if (!book.value || !book.value.files) return false;
-    if (typeof book.value.online_readable === 'boolean') return book.value.online_readable;
-    const formats = book.value.files.map(x => x.format.toLowerCase());
-    const compatible = ['epub', 'azw3', 'pdf', 'txt', 'mobi', 'azw'];
-    return formats.some(f => compatible.includes(f));
-});
+const readerPath = computed(() => readerPathForBook(book.value));
+const hasCompatibleFormats = computed(() => Boolean(readerPath.value));
 
 const selectedFormat = computed(() => {
     if (!book.value || !book.value.files) return 'N/A';

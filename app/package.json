@@ -15,6 +15,7 @@
     "lint:fix": "eslint --ext .js,.vue,.ts,.tsx . --fix"
   },
   "dependencies": {
+    "@hehetoshang/komga-reader": "git+https://github.com/hehetoshang/komga-reader.git#e978a9d4e3a75255e5a67df2c23c9698257a6bd6",
     "@mdi/js": "^7.4.47",
     "@nuxtjs/i18n": "^10.2.3",
     "@pinia/nuxt": "^0.11.3",

@@ -31,6 +31,18 @@
     "otherError": "其他错误",
     "pageNotFound": "页面未找到"
   },
+  "comicReader": {
+    "title": "漫画阅读器",
+    "loading": "正在安全加载漫画页面…",
+    "loadError": "无法打开漫画",
+    "loadErrorDescription": "漫画容器暂时无法读取，请返回书籍详情下载或稍后重试。",
+    "invalidBook": "书籍编号无效。",
+    "progressLoadError": "无法读取漫画进度。",
+    "progressSaveError": "阅读进度暂未保存，将在后续翻页时重试。",
+    "imageLoadError": "漫画页面无法显示，文件可能已损坏或登录状态已失效。",
+    "readerError": "漫画阅读器发生错误。",
+    "backToBook": "返回书籍详情"
+  },
   "book": {
     "publisher": "出版社",
     "download": "下载",
@@ -79,7 +91,7 @@
     "onlineRead": "在线阅读",
     "onlineReadUnsupported": "暂不支持在线阅读",
     "comicReadUnsupported": "漫画暂不支持在线阅读",
-    "comicReadUnsupportedDescription": "当前漫画容器可以下载和管理，但暂不支持在线阅读。漫画型 EPUB 仍可使用现有 EPUB 阅读器打开。",
+    "comicReadUnsupportedDescription": "此漫画没有可用于在线阅读的受支持容器；仍可下载和管理。漫画型 EPUB 会继续使用现有 EPUB 阅读器打开。",
     "mediaTypeComic": "漫画",
     "mediaTypeEbook": "电子书",
     "txtOnlineRead": "Txt 在线阅读",

@@ -21,7 +21,7 @@ COMIC_ZIP_FORMATS = frozenset(("cbz", "zip"))
 COMIC_RAR_FORMATS = frozenset(("cbr", "rar"))
 COMIC_CONTAINER_FORMATS = COMIC_ZIP_FORMATS | COMIC_RAR_FORMATS
 SUPPORTED_MEDIA_FORMATS = frozenset(("azw", "azw3", "epub", "mobi", "pdf", "txt")) | COMIC_CONTAINER_FORMATS
-ONLINE_READ_FORMATS = frozenset(("azw", "azw3", "epub", "mobi", "pdf", "txt"))
+ONLINE_READ_FORMATS = frozenset(("azw", "azw3", "epub", "mobi", "pdf", "txt")) | COMIC_CONTAINER_FORMATS
 
 MAX_ARCHIVE_ENTRIES = 10000
 MAX_ARCHIVE_FILE_BYTES = 1024 * 1024 * 1024

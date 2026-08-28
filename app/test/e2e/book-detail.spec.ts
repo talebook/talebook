@@ -111,19 +111,20 @@ test.describe('Book Detail Page', () => {
     test('uses the unified reader when EPUB and TXT both exist', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
 
-        const readLinks = page.getByRole('link').filter({ hasText: /^(阅读|在线阅读)$/ });
+        const readLinks = page.locator(`a[href="/read/${bookId}"]`);
         await expect(readLinks).toHaveCount(2);
-        await expect(readLinks.nth(0)).toHaveAttribute('href', `/read/${bookId}`);
-        await expect(readLinks.nth(1)).toHaveAttribute('href', `/read/${bookId}`);
+        await expect(readLinks.nth(0)).toContainText('阅读');
+        await expect(readLinks.nth(1)).toContainText('在线阅读');
     });
 
-    test('labels comic containers and keeps download available without a reader link', async ({ page }) => {
+    test('routes comic containers to read-comic and keeps download available', async ({ page }) => {
         await page.goto('/book/14');
 
         await expect(page.getByText('图片漫画样例').first()).toBeVisible({ timeout: 15_000 });
         await expect(page.getByTestId('media-type-chip')).toContainText('漫画');
-        await expect(page.getByTestId('online-reading-unsupported')).toBeDisabled();
-        await expect(page.getByTestId('comic-reader-notice')).toContainText('暂不支持在线阅读');
+        await expect(page.getByTestId('online-reading-unsupported')).toHaveCount(0);
+        await expect(page.getByTestId('comic-reader-notice')).toHaveCount(0);
+        await expect(page.getByTestId('open-online-reader')).toHaveAttribute('href', '/read-comic/14');
         await expect(page.locator('a[href="/read/14"]')).toHaveCount(0);
 
         await page.getByText('下载', { exact: true }).last().click();
