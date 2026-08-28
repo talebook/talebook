@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("logout", help="删除本地登录会话")
     subparsers.add_parser("books", help="列出可访问的已发布有声书")
+    subparsers.add_parser("mcp", help="以 stdio MCP server 模式运行，供 OpenXiaoAI Bridge 等客户端调用")
 
     chapters = subparsers.add_parser("chapters", help="列出有声版本章节")
     chapters.add_argument("edition_id", type=int, help="有声版本 ID（见 books 输出）")
@@ -114,6 +115,15 @@ def main(argv: Sequence[str] | None = None, *, paths: AppPaths | None = None) ->
         if args.command == "configure":
             save_config(Config(server=args.server, username=args.username), app_paths)
             print(f"配置已保存：{load_config(app_paths).server}（用户 {load_config(app_paths).username}）")
+            return 0
+        if args.command == "mcp":
+            from .mcp_server import McpServerError, run_mcp_server
+
+            try:
+                run_mcp_server()
+            except McpServerError as exc:
+                print(f"错误：{exc}", file=sys.stderr)
+                return 2
             return 0
 
         client = _client(app_paths)

@@ -80,6 +80,58 @@ OPENXIAOAI_API_TOKEN_FILE=/path/to/open-xiaoai-bridge/api-token \
 `OPENXIAOAI_TLS_CLIENT_KEY`。如确实处于可信内网且正在迁移，可显式设置
 `OPENXIAOAI_ALLOW_INSECURE_HTTP=1` 临时允许非本机 HTTP。
 
+### MCP server 模式
+
+安装可选 MCP 依赖后，CLI 可以像 neteasecli 一样作为 stdio MCP server 被
+OpenXiaoAI Bridge 常驻启动：
+
+```bash
+python3 -m pip install 'talebook-audio-cli[mcp]'
+talebook-audio mcp
+```
+
+MCP 工具包括：
+
+- `list_audiobooks`、`list_chapters`：浏览当前登录账号可访问的有声书和章节。
+- `play_audiobook`：按 edition ID、book ID 或书名/作者查询开始播放，可指定起始章节。
+- `next_chapter`、`previous_chapter`：切换当前章节队列。
+- `pause`、`resume`、`stop`、`status`：控制和查询播放。
+
+MCP 不提供登录工具，也不接收密码。管理员应先运行 `configure` 和 `login`，再把对应的
+XDG 配置目录挂载给 Bridge MCP 子进程。`play_audiobook` 和切章工具会返回
+OpenXiaoAI Bridge 的 `end_turn_silently / playback_started` 控制信号，避免音频开始后 AI
+继续播放一段 TTS。与 neteasecli 同时启用时，Bridge 会给重名的 `pause`、`resume`、
+`stop`、`status` 自动加 `talebook_audio_` 命名空间前缀。
+
+Bridge 容器需要两个挂载：CLI 源码只读，会话目录读写。例如：
+
+```yaml
+volumes:
+  - /opt/talebook-audio-cli:/opt/talebook-audio-cli:ro
+  - /opt/talebook-audio-cli-data:/root/.config/talebook-audio-cli
+```
+
+对应的 stdio 配置示例：
+
+```python
+"talebook_audio": {
+    "type": "stdio",
+    "command": "/app/.venv/bin/python",
+    "args": ["-m", "talebook_audio_cli.cli", "mcp"],
+    "env": {
+        "HOME": "/root",
+        "PATH": "/app/.venv/bin:/usr/local/bin:/usr/bin:/bin",
+        "PYTHONPATH": "/opt/talebook-audio-cli/src",
+        "XDG_CONFIG_HOME": "/root/.config/talebook-audio-cli",
+        "OPENXIAOAI_BASE_URL": "http://127.0.0.1:9092",
+        "OPENXIAOAI_API_TOKEN_FILE": "/root/.config/open-xiaoai-bridge/api-token",
+    },
+    "cwd": "/opt/talebook-audio-cli",
+    "enabled": True,
+    "timeout": 180,
+},
+```
+
 播放时可使用单键控制：
 
 - `Space` 或 `p`：暂停/继续

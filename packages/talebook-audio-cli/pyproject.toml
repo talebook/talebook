@@ -13,6 +13,7 @@ authors = [{name = "Talebook contributors"}]
 dependencies = []
 
 [project.optional-dependencies]
+mcp = ["mcp>=1.12,<2"]
 test = ["pytest>=7.4"]
 
 [project.scripts]
