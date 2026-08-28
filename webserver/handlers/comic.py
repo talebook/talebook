@@ -5,29 +5,44 @@
 
 import functools
 import math
+import urllib.parse
 
 import tornado.escape
 import tornado.ioloop
+import tornado.web
 
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.i18n import _
-from webserver.models import ReadingState
+from webserver.models import Item, Reader, ReadingState
 from webserver.services.comic_archive import ComicArchiveError, comic_archive_service, select_comic_container
 
 
 COMIC_PROGRESS_VERSION = 1
 MAX_COMIC_PROGRESS_BYTES = 2048
+COMIC_PAGE_TOKEN_NAME = "comic-page-v1"
+COMIC_PAGE_TOKEN_MAX_AGE_DAYS = 1
 
 
 class ComicHandlerMixin:
-    def get_authorized_comic(self, book_id):
+    def _can_user_view_book(self, book_id, user):
+        item = self.session.get(Item, int(book_id))
+        if not item or item.scope != "private":
+            return True
+        return bool(user and (user.is_admin() or item.collector_id == user.id))
+
+    def get_authorized_comic(self, book_id, authenticated_user=None):
         book_id = int(book_id)
-        if not self.can_view_book(book_id):
-            raise ComicArchiveError("comic.book_not_found", _("书籍不存在"), status=404)
+        if authenticated_user is None:
+            if not self.can_view_book(book_id):
+                raise ComicArchiveError("comic.book_not_found", _("书籍不存在"), status=404)
+            user = self.current_user
+        else:
+            user = authenticated_user
+            if not self._can_user_view_book(book_id, user):
+                raise ComicArchiveError("comic.book_not_found", _("书籍不存在"), status=404)
         book = self.get_book(book_id, raise_exception=False)
         if not book:
             raise ComicArchiveError("comic.book_not_found", _("书籍不存在"), status=404)
-        user = self.current_user
         if not user:
             raise ComicArchiveError("comic.login_required", _("请先登录"), status=401)
         if not user.can_read():
@@ -36,6 +51,53 @@ class ComicHandlerMixin:
             raise ComicArchiveError("comic.account_inactive", _("账号尚未激活，无法在线阅读"), status=403)
         archive_path, archive_format = select_comic_container(book)
         return book, archive_path, archive_format
+
+    def create_page_token(self, book_id, page_index, revision):
+        principal = self.admin_user or self.current_user
+        payload = tornado.escape.json_encode(
+            {
+                "book_id": int(book_id),
+                "page_index": int(page_index),
+                "revision": revision,
+                "user_id": principal.id,
+            }
+        )
+        token = tornado.web.create_signed_value(
+            str(self.settings["cookie_secret"]),
+            COMIC_PAGE_TOKEN_NAME,
+            payload,
+        )
+        return token.decode("ascii")
+
+    def page_token_user(self, book_id, page_index, revision):
+        token = self.get_argument("token", "")
+        raw = tornado.web.decode_signed_value(
+            str(self.settings["cookie_secret"]),
+            COMIC_PAGE_TOKEN_NAME,
+            token,
+            max_age_days=COMIC_PAGE_TOKEN_MAX_AGE_DAYS,
+        )
+        try:
+            payload = tornado.escape.json_decode(raw) if raw else {}
+            token_book_id = payload.get("book_id")
+            token_page_index = payload.get("page_index")
+            token_revision = payload.get("revision")
+            token_user_id = payload.get("user_id")
+            if (
+                isinstance(token_book_id, bool)
+                or int(token_book_id) != int(book_id)
+                or isinstance(token_page_index, bool)
+                or int(token_page_index) != int(page_index)
+                or token_revision != revision
+                or isinstance(token_user_id, bool)
+            ):
+                raise ValueError("page token scope mismatch")
+            user = self.session.get(Reader, int(token_user_id))
+        except (AttributeError, TypeError, ValueError):
+            user = None
+        if not user:
+            raise ComicArchiveError("comic.page_token", _("漫画页面访问凭证无效或已过期"), status=401)
+        return user
 
     async def load_comic_manifest(self, archive_path, archive_format):
         callback = functools.partial(comic_archive_service.get_manifest, archive_path, archive_format)
@@ -65,20 +127,35 @@ class ComicManifestHandler(ComicHandlerMixin, BaseHandler):
             "format": archive_format.upper(),
             "revision": manifest.revision,
             "pages_count": len(manifest.pages),
-            "pages": [page.to_public_dict(int(book_id), manifest.revision) for page in manifest.pages],
+            "pages": [self._public_page(int(book_id), manifest.revision, page) for page in manifest.pages],
         }
+
+    def _public_page(self, book_id, revision, page):
+        data = page.to_public_dict(book_id, revision)
+        token = self.create_page_token(book_id, page.index, revision)
+        data["url"] += "&token=" + urllib.parse.quote(token, safe="")
+        return data
 
 
 class ComicPageHandler(ComicHandlerMixin, BaseHandler):
+    def should_be_invited(self):
+        # A valid page-scoped signed token is checked in get(). Invalid tokens
+        # only reach this handler and cannot unlock any other application route.
+        if self.get_argument("token", ""):
+            return
+        return super().should_be_invited()
+
     async def get(self, book_id, page_index):
         try:
-            _book, archive_path, archive_format = self.get_authorized_comic(book_id)
+            page_index = int(page_index)
             revision = self.get_argument("revision", "")
+            token_user = None if self.current_user else self.page_token_user(book_id, page_index, revision)
+            _book, archive_path, archive_format = self.get_authorized_comic(book_id, token_user)
             callback = functools.partial(
                 comic_archive_service.read_page,
                 archive_path,
                 archive_format,
-                int(page_index),
+                page_index,
                 revision,
             )
             content = await tornado.ioloop.IOLoop.current().run_in_executor(None, callback)

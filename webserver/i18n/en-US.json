@@ -288,5 +288,6 @@
     "验证码验证失败": "Verification failed",
     "验证通过": "Verification passed",
     "默认用户": "Default User",
+    "漫画页面访问凭证无效或已过期": "The comic page access token is invalid or expired",
     "；失败：%s": "; Failed: %s"
 }

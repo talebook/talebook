@@ -15,7 +15,7 @@ Reader 沿用 Candle Reader 的静态 JavaScript 模式，不作为 Talebook 的
 
 ## 权限和支持范围
 
-所有接口都要求登录，且当前账号必须：
+manifest 与进度接口要求登录。页面图片通常也接受登录 Cookie/Basic Auth；此外，manifest 会为每一页签发一个限时、页级别的访问凭证，供无法给图片下载单独附加认证头的受信客户端使用。对应账号仍必须：
 
 1. 有在线阅读权限并已激活；
 2. 能查看目标书籍（私有书只允许所有者和管理员）；
@@ -45,7 +45,7 @@ GET /api/book/:bookId/comic/pages
     {
       "id": "9f6b69e617ec75d870c4:0",
       "index": 0,
-      "url": "/api/book/42/comic/pages/0?revision=9f6b69e617ec75d870c4",
+      "url": "/api/book/42/comic/pages/0?revision=9f6b69e617ec75d870c4&token=<signed-page-token>",
       "width": 1200,
       "height": 1800,
       "mime_type": "image/jpeg"
@@ -71,10 +71,12 @@ GET /api/book/:bookId/comic/pages
 ## 页面图片
 
 ```http
-GET /api/book/:bookId/comic/pages/:index?revision=:revision
+GET /api/book/:bookId/comic/pages/:index?revision=:revision&token=:signedPageToken
 ```
 
-客户端只能提交数字页序和 manifest 返回的不透明修订。服务端通过私有索引解析真实条目，并在每次响应前复核 MIME、字节数和图片完整性。
+客户端只能提交数字页序、manifest 返回的不透明修订和原样返回的 `token`。服务端通过私有索引解析真实条目，并在每次响应前复核 MIME、字节数和图片完整性。
+
+页面 token 由服务端 `cookie_secret` 签名，有效期 1 天，并同时绑定签发用户、书籍、页序和归档修订；不能换页、换书或修改修订后复用。请求若已携带有效登录态，可不依赖 token。token 过期、篡改、用户被删除，或用户后来失去阅读/私有书访问权限时，接口返回 401/403/404，不会继续输出图片。该机制用于 Rulia 等插件运行时：插件可以用用户配置中的账号密码获取 manifest，而图片加载器无需再次暴露账号密码。
 
 成功响应设置：
 
@@ -120,6 +122,7 @@ POST 请求：
 - 最多 10,000 个归档条目；
 - 归档展开后最多 512 MiB、单条目导入检查最多 128 MiB、压缩比最多 200；
 - 在线阅读单页最多 32 MiB；
+- 页面访问 token 最长有效 1 天，按用户、书籍、页序和归档修订隔离，不包含账号密码；
 - 图片单边最多 32,768 像素且最多 100,000,000 像素；
 - 最多 4 个并发归档读取，单归档串行读取，等待 5 秒后返回 503；
 - 拒绝路径穿越、重复路径、符号链接、加密、分卷、ZIP64、签名/扩展不匹配和损坏页面；

@@ -13,7 +13,7 @@ from PIL import Image
 from tests.test_main import BID_EPUB, TestApp, TestWithUserLogin, get_db, mock_permission, testdir
 from tests.test_main import setUpModule as init
 from webserver.handlers.base import BaseHandler
-from webserver.models import Item, ReadingState
+from webserver.models import Item, Reader, ReadingState
 from webserver.services.comic_archive import (
     ComicArchiveError,
     ComicArchiveService,
@@ -204,6 +204,7 @@ class TestComicReaderApi(TestWithUserLogin):
         assert manifest["format"] == "CBZ"
         assert "page1.png" not in json.dumps(manifest)
         assert [page["index"] for page in manifest["pages"]] == [0, 1, 2]
+        assert all("&token=" in page["url"] for page in manifest["pages"])
 
         image = self.fetch(manifest["pages"][0]["url"])
         assert image.code == 200
@@ -211,6 +212,32 @@ class TestComicReaderApi(TestWithUserLogin):
         assert image.headers["Cache-Control"] == "private, max-age=3600, immutable"
         assert image.headers["X-Content-Type-Options"] == "nosniff"
         assert image.body.startswith(b"\x89PNG")
+
+    def test_page_token_allows_cookie_free_image_but_is_page_scoped(self):
+        manifest = self.manifest()
+        page_url = manifest["pages"][0]["url"]
+        tampered_url = page_url.replace("/pages/0?", "/pages/1?")
+        try:
+            self.user.return_value = None
+            image = self.fetch(page_url)
+            tampered = self.fetch(tampered_url)
+        finally:
+            self.user.return_value = 1
+
+        assert image.code == 200
+        assert image.headers["Content-Type"].startswith("image/png")
+        assert image.body.startswith(b"\x89PNG")
+        assert tampered.code == 401
+        assert self.path.encode() not in tampered.body
+
+        with mock_permission() as user:
+            user.set_permission("R")
+            try:
+                self.user.return_value = None
+                revoked = self.fetch(page_url)
+            finally:
+                self.user.return_value = 1
+        assert revoked.code == 403
 
     def test_image_rejects_stale_revision_and_page_bounds(self):
         manifest = self.manifest()
@@ -277,6 +304,8 @@ class TestComicReaderApi(TestWithUserLogin):
             assert self.json("/api/book/1/comic/pages")["err"] == "comic.no_permission"
 
     def test_private_book_is_hidden_from_non_owner(self):
+        manifest = self.manifest()
+        page_url = manifest["pages"][0]["url"]
         session = get_db()
         item = session.query(Item).filter(Item.book_id == BID_EPUB).one()
         previous_scope = item.scope
@@ -289,6 +318,13 @@ class TestComicReaderApi(TestWithUserLogin):
                 assert self.json("/api/book/1/comic/pages")["err"] == "comic.book_not_found"
                 response = self.fetch("/api/book/1/comic/pages/0?revision=none")
                 assert response.code == 404
+                try:
+                    self.user.return_value = None
+                    with mock.patch.object(Reader, "is_admin", return_value=False):
+                        token_response = self.fetch(page_url)
+                finally:
+                    self.user.return_value = 1
+                assert token_response.code == 404
         finally:
             session = get_db()
             item = session.query(Item).filter(Item.book_id == BID_EPUB).one()
