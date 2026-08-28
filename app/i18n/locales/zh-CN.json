@@ -31,18 +31,6 @@
     "otherError": "其他错误",
     "pageNotFound": "页面未找到"
   },
-  "comicReader": {
-    "title": "漫画阅读器",
-    "loading": "正在安全加载漫画页面…",
-    "loadError": "无法打开漫画",
-    "loadErrorDescription": "漫画容器暂时无法读取，请返回书籍详情下载或稍后重试。",
-    "invalidBook": "书籍编号无效。",
-    "progressLoadError": "无法读取漫画进度。",
-    "progressSaveError": "阅读进度暂未保存，将在后续翻页时重试。",
-    "imageLoadError": "漫画页面无法显示，文件可能已损坏或登录状态已失效。",
-    "readerError": "漫画阅读器发生错误。",
-    "backToBook": "返回书籍详情"
-  },
   "book": {
     "publisher": "出版社",
     "download": "下载",

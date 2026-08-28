@@ -27,18 +27,6 @@
     "retry": "Retry",
     "kindle": "Kindle"
   },
-  "comicReader": {
-    "title": "Comic reader",
-    "loading": "Loading comic pages safely…",
-    "loadError": "Unable to open comic",
-    "loadErrorDescription": "The comic container cannot be read right now. Return to the book to download it or try again later.",
-    "invalidBook": "The book identifier is invalid.",
-    "progressLoadError": "Unable to load comic progress.",
-    "progressSaveError": "Progress was not saved. The reader will retry after another page turn.",
-    "imageLoadError": "The comic page cannot be displayed. The file may be damaged or your session may have expired.",
-    "readerError": "The comic reader encountered an error.",
-    "backToBook": "Back to book"
-  },
   "book": {
     "publisher": "Publisher",
     "download": "Download",

@@ -152,6 +152,12 @@ class TestComicArchiveService:
 
 
 class TestComicReaderNeedsLogin(TestApp):
+    def test_backend_host_redirects_to_login(self):
+        response = self.fetch("/read-comic/1", follow_redirects=False)
+
+        assert response.code == 302
+        assert response.headers["Location"] == "/login"
+
     def test_manifest_and_progress_require_login(self):
         assert self.json("/api/book/1/comic/pages")["err"] == "user.need_login"
         assert self.json("/api/book/1/comic/progress")["err"] == "user.need_login"
@@ -195,6 +201,21 @@ class TestComicReaderApi(TestWithUserLogin):
         response = self.json("/api/book/1/comic/pages")
         assert response["err"] == "ok"
         return response
+
+    def test_backend_host_renders_static_reader_without_archive_details(self):
+        response = self.fetch("/read-comic/1")
+        body = response.body.decode("utf-8")
+
+        assert response.code == 200
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["Referrer-Policy"] == "same-origin"
+        assert 'id="comic-reader-host"' in body
+        assert 'data-book-id="1"' in body
+        assert "/static/komga-reader/komga-reader.es.js" in body
+        assert "/api/book/${bookId}/comic/pages" in body
+        assert "/api/book/${bookId}/comic/progress" in body
+        assert self.path not in body
+        assert "page1.png" not in body
 
     def test_manifest_image_and_cache_headers(self):
         manifest = self.manifest()

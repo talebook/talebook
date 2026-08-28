@@ -12,7 +12,7 @@ import tornado.ioloop
 import tornado.web
 
 from webserver.handlers.base import BaseHandler, auth, js
-from webserver.i18n import _
+from webserver.i18n import _, get_language
 from webserver.models import Item, Reader, ReadingState
 from webserver.services.comic_archive import ComicArchiveError, comic_archive_service, select_comic_container
 
@@ -21,6 +21,7 @@ COMIC_PROGRESS_VERSION = 1
 MAX_COMIC_PROGRESS_BYTES = 2048
 COMIC_PAGE_TOKEN_NAME = "comic-page-v1"
 COMIC_PAGE_TOKEN_MAX_AGE_DAYS = 1
+KOMGA_READER_VERSION = "d49a2e808601c7fc9b892a6c019a92eed017fd16"
 
 
 class ComicHandlerMixin:
@@ -106,6 +107,43 @@ class ComicHandlerMixin:
     @staticmethod
     def error_envelope(error):
         return {"err": error.code, "msg": error.message}
+
+
+class ComicReaderHandler(ComicHandlerMixin, BaseHandler):
+    def get(self, book_id):
+        if not self.current_user:
+            return self.redirect("/login")
+        try:
+            book, _archive_path, _archive_format = self.get_authorized_comic(book_id)
+        except ComicArchiveError as error:
+            raise tornado.web.HTTPError(error.status, reason=error.message) from error
+
+        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header("Referrer-Policy", "same-origin")
+        messages = {
+            "loading": _("正在安全加载漫画页面…"),
+            "load_error": _("无法打开漫画"),
+            "default_error": _("漫画容器暂时无法读取，请稍后重试。"),
+            "retry": _("重试"),
+            "back": _("返回书籍详情"),
+            "close": _("关闭"),
+            "invalid_response": _("服务器返回了无法识别的响应。"),
+            "session_expired": _("登录状态已失效，请重新登录。"),
+            "request_failed": _("请求失败"),
+            "invalid_manifest": _("漫画页面列表无效。"),
+            "progress_unsaved": _("阅读进度暂未保存，将在后续翻页时重试。"),
+            "image_error": _("漫画页面无法显示，文件可能已损坏或登录状态已失效。"),
+            "reader_error": _("漫画阅读器发生错误。"),
+        }
+        return self.html_page(
+            "book/comic-reader.html",
+            {
+                "book": book,
+                "LANGUAGE": get_language(),
+                "messages": messages,
+                "READER_VERSION": KOMGA_READER_VERSION,
+            },
+        )
 
 
 class ComicManifestHandler(ComicHandlerMixin, BaseHandler):
@@ -271,6 +309,7 @@ class ComicProgressHandler(ComicHandlerMixin, BaseHandler):
 
 def routes():
     return [
+        (r"/read-comic/([0-9]+)", ComicReaderHandler),
         (r"/api/book/([0-9]+)/comic/pages", ComicManifestHandler),
         (r"/api/book/([0-9]+)/comic/pages/([0-9]+)", ComicPageHandler),
         (r"/api/book/([0-9]+)/comic/progress", ComicProgressHandler),
