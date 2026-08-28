@@ -1,11 +1,11 @@
 # Talebook Audio CLI
 
-`talebook-audio` 是一个独立安装的 Talebook 有声书终端客户端。它使用 Talebook 自带的账号密码登录接口，列出当前账号可访问的已发布有声书，并通过 `mpv` 播放章节。
+`talebook-audio` 是一个独立安装的 Talebook 有声书终端客户端。它使用 Talebook 自带的账号密码登录接口，列出当前账号可访问的已发布有声书，并可通过本机 `mpv` 或 OpenXiaoAI Bridge 在小爱音箱上播放章节。
 
 ## 依赖与安装
 
 - Python 3.11 或更高版本
-- `mpv`（需要在 `PATH` 中可执行）
+- 本机播放需要 `mpv`（需要在 `PATH` 中可执行）；小爱音箱播放不依赖 `mpv`
 - 支持有声书 API 的 Talebook 服务端
 
 从 Talebook 仓库安装：
@@ -62,6 +62,24 @@ talebook-audio play --book-id 42 --chapter 3
 talebook-audio play --edition-id 12 --chapter 3
 ```
 
+### 通过 OpenXiaoAI Bridge 播放
+
+Bridge 播放使用它的带鉴权 StreamPlayer API，支持进度、暂停/继续和切章。Bridge 默认地址是
+`http://127.0.0.1:9092`，token 默认从
+`$XDG_CONFIG_HOME/open-xiaoai-bridge/api-token`（未设置时为
+`~/.config/open-xiaoai-bridge/api-token`）读取；token 文件权限必须是 `0600`。
+
+```bash
+OPENXIAOAI_API_TOKEN_FILE=/path/to/open-xiaoai-bridge/api-token \
+  talebook-audio play --player xiaoai --edition-id 12 --chapter 3
+```
+
+也可以设置 `TALEBOOK_AUDIO_PLAYER=xiaoai` 作为默认播放后端。Bridge 位于其他主机时，通过
+`OPENXIAOAI_BASE_URL=https://speaker.example.com:9092` 指定地址；非本机明文 HTTP 默认拒绝。
+自签 CA 和 mTLS 可分别使用 `OPENXIAOAI_TLS_CA`、`OPENXIAOAI_TLS_CLIENT_CERT`、
+`OPENXIAOAI_TLS_CLIENT_KEY`。如确实处于可信内网且正在迁移，可显式设置
+`OPENXIAOAI_ALLOW_INSECURE_HTTP=1` 临时允许非本机 HTTP。
+
 播放时可使用单键控制：
 
 - `Space` 或 `p`：暂停/继续
@@ -70,7 +88,7 @@ talebook-audio play --edition-id 12 --chapter 3
 - `s`：立即刷新进度
 - `q`：退出
 
-客户端持续显示当前章节、播放状态和 `已播放/总时长`。到达章节结尾会自动播放下一章；最后一章结束后退出。正常退出、`Ctrl-C` 或异常都会要求 mpv 退出，超时后依次 terminate/kill，不遗留失控的播放器进程。
+客户端持续显示当前章节、播放状态和 `已播放/总时长`。到达章节结尾会自动播放下一章；最后一章结束后退出。正常退出、`Ctrl-C` 或异常都会停止当前后端；mpv 超时退出时会依次 terminate/kill，Bridge 后端会调用 `/api/stream/stop`，不遗留失控的播放。
 
 ## 常见错误
 
@@ -79,6 +97,7 @@ talebook-audio play --edition-id 12 --chapter 3
 - `无法连接 Talebook`：检查服务地址、TLS 证书和网络。
 - `没有可播放的有声书/章节`：需要先在 Talebook 中生成并发布有声版本。
 - `找不到 mpv`：安装 mpv 并确认 `mpv --version` 可运行。
+- `找不到 Bridge API token`：检查 Bridge 是否至少成功启动过一次，或设置 `OPENXIAOAI_API_TOKEN_FILE`。
 - `音频不可用`：登录态可能已过期，重新登录；也可能是书籍权限或服务端音频文件已变化。
 
 客户端不会在普通输出或异常信息中打印密码、Cookie 值或完整请求头。

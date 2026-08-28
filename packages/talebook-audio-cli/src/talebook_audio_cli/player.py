@@ -15,6 +15,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
+from .bridge import BridgeClient, BridgeError
 from .models import Chapter
 
 
@@ -253,3 +254,101 @@ class MpvPlayer:
             self._temporary.cleanup()
             self._temporary = None
         self.socket_path = None
+
+
+class XiaoAiPlayer:
+    """Play Talebook chapters through OpenXiaoAI Bridge's StreamPlayer API."""
+
+    def __init__(self, chapters: list[Chapter], client: BridgeClient | None = None):
+        if not chapters:
+            raise PlayerError("这本有声书没有可播放章节")
+        try:
+            self.client = client or BridgeClient()
+        except BridgeError as exc:
+            raise PlayerError(str(exc)) from exc
+        self.chapters = chapters
+        self.current_index = 0
+        self.started = False
+
+    def load(self, index: int) -> None:
+        if index < 0 or index >= len(self.chapters):
+            raise PlayerError("已经到达播放列表边界")
+        try:
+            self.client.play(self.chapters[index].audio_url)
+        except BridgeError as exc:
+            raise PlayerError(str(exc)) from exc
+        self.current_index = index
+        self.started = True
+
+    def toggle_pause(self) -> bool:
+        try:
+            status = self.client.status()
+            result = self.client.resume() if status.paused else self.client.pause()
+        except BridgeError as exc:
+            raise PlayerError(str(exc)) from exc
+        return result.paused
+
+    def status(self) -> tuple[float, float, bool, bool]:
+        try:
+            status = self.client.status()
+        except BridgeError as exc:
+            raise PlayerError(str(exc)) from exc
+        return status.position_ms / 1000, status.duration_ms / 1000, status.paused, not status.playing
+
+    def run(self, start_index: int = 0) -> None:
+        if not sys.stdin.isatty() or not sys.stdout.isatty():
+            raise PlayerError("交互播放需要终端；请在 TTY 中运行 talebook-audio play")
+        if start_index < 0 or start_index >= len(self.chapters):
+            raise PlayerError("起始章节超出范围")
+        self.load(start_index)
+        descriptor = sys.stdin.fileno()
+        original = termios.tcgetattr(descriptor)
+        last_render = 0.0
+        try:
+            tty.setcbreak(descriptor)
+            print("控制：空格或 p 暂停/继续，n 下一章，b 上一章，s 刷新状态，q 退出")
+            while True:
+                position, duration, paused, idle = self.status()
+                if idle:
+                    if self.current_index + 1 >= len(self.chapters):
+                        print("\n播放完成")
+                        return
+                    self.load(self.current_index + 1)
+                    continue
+                now = time.monotonic()
+                if now - last_render >= 0.5:
+                    chapter = self.chapters[self.current_index]
+                    icon = "⏸" if paused else "▶"
+                    line = (
+                        f"\r{icon} [{self.current_index + 1}/{len(self.chapters)}] "
+                        f"{chapter.title}  {format_time(position)}/{format_time(duration)}"
+                    )
+                    print(fit_terminal(line, shutil.get_terminal_size().columns - 1), end="", flush=True)
+                    last_render = now
+                ready, _, _ = select.select([sys.stdin], [], [], 0.2)
+                if not ready:
+                    continue
+                key = os.read(descriptor, 1).decode("utf-8", errors="ignore")
+                if key in {"q", "Q"}:
+                    print()
+                    return
+                if key in {" ", "p", "P"}:
+                    self.toggle_pause()
+                elif key in {"n", "N"} and self.current_index + 1 < len(self.chapters):
+                    self.load(self.current_index + 1)
+                elif key in {"b", "B"} and self.current_index > 0:
+                    self.load(self.current_index - 1)
+                elif key in {"s", "S"}:
+                    last_render = 0
+        finally:
+            termios.tcsetattr(descriptor, termios.TCSADRAIN, original)
+            self.close()
+
+    def close(self) -> None:
+        if not self.started:
+            return
+        try:
+            self.client.stop()
+        except BridgeError:
+            pass
+        self.started = False

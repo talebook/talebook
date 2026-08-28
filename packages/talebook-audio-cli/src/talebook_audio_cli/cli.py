@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import os
 import sys
 from collections.abc import Sequence
 
 from .client import TalebookClient, TalebookError
 from .config import AppPaths, Config, ConfigError, load_config, save_config
 from .models import Audiobook, Chapter
-from .player import MpvPlayer, PlayerError, format_time
+from .player import MpvPlayer, PlayerError, XiaoAiPlayer, format_time
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -33,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
     choice.add_argument("--book-id", type=int, help="直接选择书籍 ID")
     choice.add_argument("--edition-id", type=int, help="直接选择有声版本 ID")
     play.add_argument("--chapter", type=int, help="从章节编号开始")
+    play.add_argument(
+        "--player",
+        choices=("mpv", "xiaoai"),
+        help="播放后端；默认读取 TALEBOOK_AUDIO_PLAYER，未设置时使用 mpv",
+    )
     return parser
 
 
@@ -136,7 +142,13 @@ def main(argv: Sequence[str] | None = None, *, paths: AppPaths | None = None) ->
             if not chapters:
                 raise TalebookError("这个有声版本没有可播放章节；请在 Talebook 中检查生成和发布状态")
             start_index = _chapter_index(chapters, args.chapter)
-            MpvPlayer(chapters, app_paths.cookie_file).run(start_index)
+            player_backend = (args.player or os.environ.get("TALEBOOK_AUDIO_PLAYER") or "mpv").lower()
+            if player_backend == "mpv":
+                MpvPlayer(chapters, app_paths.cookie_file).run(start_index)
+            elif player_backend == "xiaoai":
+                XiaoAiPlayer(chapters).run(start_index)
+            else:
+                raise ConfigError("TALEBOOK_AUDIO_PLAYER 只支持 mpv 或 xiaoai")
             return 0
     except (ConfigError, TalebookError, PlayerError) as exc:
         print(f"错误：{exc}", file=sys.stderr)
