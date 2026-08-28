@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Talebook Audio CLI 独立客户端方案 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --ink: #172033; --muted: #5d6778; --line: #d9e0ea; --accent: #9a4d0c; --panel: #fff; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: #f5f7fb; font: 15px/1.65 system-ui, sans-serif; }
+      main { width: min(960px, calc(100vw - 32px)); margin: 32px auto; }
+      header, section { margin-bottom: 18px; padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+      h1, h2 { margin-top: 0; line-height: 1.25; }
+      .meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); }
+      .meta span { padding: 4px 10px; border-radius: 999px; background: #eef2f7; }
+      .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+      .flow div { padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+      code { padding: 2px 5px; border-radius: 4px; background: #eef2f7; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 9px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { background: #f6f8fb; }
+      .pending { color: var(--accent); font-weight: 700; }
+      @media (max-width: 720px) { main { width: calc(100vw - 20px); margin: 10px auto; } .flow { grid-template-columns: 1fr; } header, section { padding: 18px; } }
+      @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+      @media print { body { background: #fff; } main { width: 100%; } header, section { break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Talebook Audio CLI 独立客户端</h1>
+        <p>在 Talebook 仓库内新增可独立安装的 Python 命令行包，通过现有账号密码接口登录、浏览已发布有声书并以 mpv 播放。</p>
+        <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-28</span><span>所属模块：packages</span><span>需求来源：HOU-20</span></div>
+      </header>
+
+      <section>
+        <h2>1. 原始诉求</h2>
+        <p>实现独立可安装、可运行的 Talebook 有声书命令行客户端；用户配置服务地址和账号后，以密码登录，浏览账号可访问的已生成有声书，选择章节播放，并支持暂停、继续、上一段、下一段、进度和可靠退出。</p>
+      </section>
+
+      <section>
+        <h2>2. 目标与边界</h2>
+        <table>
+          <thead><tr><th>目标</th><th>非目标</th></tr></thead>
+          <tbody><tr><td>独立 Python 包；兼容现有 Talebook API；密码不落盘；会话文件权限为 0600；mpv 前台受控播放；错误信息可行动。</td><td>不修改服务端接口；不生成有声书；不提供 GUI；首版不实现跨设备播放进度回写和 Windows 命名管道。</td></tr></tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>3. 现状证据与接口</h2>
+        <ul>
+          <li><code>POST /api/user/sign_in</code> 接受表单 username/password 并设置安全 Cookie。</li>
+          <li><code>GET /api/audios</code> 返回当前访问者可见的 published edition。</li>
+          <li><code>GET /api/audio/{edition_id}</code> 返回有序章节、时长和相对音频 URL。</li>
+          <li><code>GET /media/audio/{edition_id}/chapter/{number}.mp3</code> 支持 Range，且私有书依赖同一登录 Cookie。</li>
+          <li><code>neteasecli</code> 使用 mpv IPC 实现播放、暂停、切换、进度与退出控制，本实现沿用这一边界但保持前台进程归属。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>4. 方案</h2>
+        <div class="flow">
+          <div><strong>配置</strong><br />仅保存规范化服务地址和用户名。</div>
+          <div><strong>登录</strong><br />getpass 或 stdin 读取密码，持久化 0600 CookieJar。</div>
+          <div><strong>浏览</strong><br />解析 books/edition/chapters，提供列表和交互选择。</div>
+          <div><strong>播放</strong><br />临时 mpv IPC socket；Cookie 文件供媒体请求；退出总是终止子进程。</div>
+        </div>
+        <p>包路径为 <code>packages/talebook-audio-cli</code>，命令名为 <code>talebook-audio</code>。CLI 子命令包括 <code>configure</code>、<code>login</code>、<code>logout</code>、<code>books</code>、<code>chapters</code> 和 <code>play</code>。未显式给出 book/chapter 时进入编号选择；播放循环支持暂停/继续、上一章、下一章、状态和退出。</p>
+      </section>
+
+      <section>
+        <h2>5. 安全、兼容性与风险</h2>
+        <ul>
+          <li>密码不进入命令行参数、日志、配置、Cookie 文件或异常文本；登录错误只展示服务端安全消息。</li>
+          <li>配置目录遵循 XDG，写入时使用原子替换和 0600 权限；服务 URL 拒绝凭据、查询和片段。</li>
+          <li>Cookie 通过 mpv 的 cookies-file 读取，进程参数不含 Cookie 值；临时 IPC 目录退出即清理。</li>
+          <li>风险：启用登录验证码的部署无法仅靠账号密码完成登录，CLI 会明确报告服务端 captcha 错误。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>6. 测试计划与结果</h2>
+        <ul>
+          <li><strong>通过：</strong><code>PYTHONPATH=packages/talebook-audio-cli/src python3 -m pytest -q packages/talebook-audio-cli/tests</code>，21 个配置、登录响应、列表/manifest 解析、URL、mpv 缺失、播放器清理和 CLI 测试通过。</li>
+          <li><strong>通过：</strong><code>ruff check packages/talebook-audio-cli</code> 与 <code>ruff format --check packages/talebook-audio-cli</code>。</li>
+          <li><strong>通过：</strong><code>make lint-py-fix</code> 和 <code>make lint-py</code>；既有 102 个服务端 Python 文件无需修改。</li>
+          <li><strong>通过：</strong>使用本机 setuptools 以 <code>pip wheel --no-build-isolation --no-deps</code> 构建 <code>talebook_audio_cli-0.1.0-py3-none-any.whl</code>，随后安装到隔离临时目录并执行 <code>python3 -m talebook_audio_cli.cli --help</code>。</li>
+          <li><strong>环境受限：</strong><code>make pytest</code> 在收集既有服务端测试时因本机缺少 Calibre 出现 6 个 import error；错误发生在与本包无关的测试模块，未伪报为通过。</li>
+          <li><strong>界面审查：</strong>按 <code>interface-review full</code> 审查相对 <code>origin/master</code> 的全部 13 个未跟踪文件。首轮发现中英文混用、空状态无下一步、非 TTY 选择无法退出和窄终端 CJK 进度截断；全部修复后复审结论为 Approve，无 HIGH 或 MEDIUM 问题。无颜色、动画或 Web 页面变更。</li>
+          <li><strong>未验证：</strong>运行环境没有 mpv，也没有可登录的目标 Talebook 实例，因此未做真实音频渲染；风险由缺失依赖测试、IPC/清理单测、API 形状测试和使用文档覆盖，仍建议合并前在真实部署上做一次播放冒烟测试。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>7. 决策记录</h2>
+        <ul>
+          <li>选择 Python 3.11 标准库，避免给 Talebook 服务端增加运行时依赖，包仍可独立发布安装。</li>
+          <li>不保存密码；“配置密码”由安全的交互式登录步骤承担，会话复用满足非浏览器 Cookie 导入要求。</li>
+          <li>不让 mpv detached/unref；客户端拥有播放器生命周期，SIGINT、正常退出和异常退出都回收进程。</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

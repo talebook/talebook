@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=66"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "talebook-audio-cli"
+version = "0.1.0"
+description = "A secure terminal client for Talebook audiobooks"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "GPL-3.0-or-later"}
+authors = [{name = "Talebook contributors"}]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.4"]
+
+[project.scripts]
+talebook-audio = "talebook_audio_cli.cli:entrypoint"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
