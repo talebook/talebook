@@ -180,11 +180,14 @@
                             <p class="plugin-description text-body-2">
                                 {{ plugin.description }}
                             </p>
-                            <div class="text-caption text-medium-emphasis mt-3">
-                                {{ summary(plugin) }}
-                            </div>
                         </v-card-text>
                         <v-card-actions class="plugin-card__footer">
+                            <div
+                                class="plugin-card__summary text-caption text-medium-emphasis"
+                                :title="summary(plugin)"
+                            >
+                                {{ summary(plugin) }}
+                            </div>
                             <v-spacer />
                             <v-btn
                                 size="small"
@@ -1153,7 +1156,9 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 .plugin-card__status { font-size: .6875rem; letter-spacing: .01em; }
 .plugin-card__tags { margin-top: 6px; }
 .plugin-card__actions { justify-content: flex-end; }
-.plugin-card__footer { margin-top: auto; }
+.plugin-card__footer { margin-top: auto; align-items: center; flex-wrap: nowrap; }
+.plugin-card__summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plugin-card__footer .v-btn { flex: 0 0 auto; }
 .plugin-card[data-status="enabled"] {
     border-color: rgba(var(--v-theme-success), .42);
     background-color: rgb(var(--v-theme-surface));

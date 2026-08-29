@@ -74,6 +74,8 @@ test.describe('Plugin management', () => {
         expect(actionsBox.y).toBeLessThan(descriptionBox.y);
         const detailsBox = await card.locator('.plugin-card__footer').getByRole('button', { name: '详情' }).boundingBox();
         expect(detailsBox.y).toBeGreaterThan(descriptionBox.y);
+        const summaryBox = await card.locator('.plugin-card__summary').boundingBox();
+        expect(Math.abs((summaryBox.y + summaryBox.height / 2) - (detailsBox.y + detailsBox.height / 2))).toBeLessThanOrEqual(1);
 
         await card.getByRole('button', { name: '详情' }).click();
         await expect(page.locator('.plugin-details__actions').getByRole('button', { name: '停用' })).toBeVisible();
