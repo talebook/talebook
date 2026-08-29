@@ -4,7 +4,9 @@
 import hashlib
 import json
 import logging
+import sqlite3
 import unittest
+from pathlib import Path
 
 from webserver import models
 
@@ -241,6 +243,14 @@ class TestItemMediaType(unittest.TestCase):
         item = models.Item()
         self.assertEqual(item.media_type, "unknown")
         self.assertFalse(item.media_type_locked)
+
+    def test_committed_user_database_fixture_matches_item_schema(self):
+        fixture = Path(__file__).parent / "cases" / "users.db"
+        with sqlite3.connect(fixture) as connection:
+            fixture_columns = {row[1] for row in connection.execute("PRAGMA table_info(items)")}
+
+        model_columns = {column.name for column in models.Item.__table__.columns}
+        self.assertEqual(model_columns - fixture_columns, set())
 
 
 class TestReadingState(unittest.TestCase):
