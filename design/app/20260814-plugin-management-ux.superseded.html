@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Talebook 管理 → 插件页面与既有元数据、Generic OPDS、Legado 迁移实现记录。" />
     <link rel="icon" href="data:," />
-    <title>插件管理与既有能力迁移 · ACTIVE</title>
+    <title>插件管理与既有能力迁移 · SUPERSEDED</title>
     <style>
       :root { color-scheme:light; --bg:#f3f6fa; --panel:#fff; --ink:#172234; --muted:#5c6878; --line:#d6dee9; --accent:#1867c0; --soft:#edf5ff; --good:#176c48; --good-bg:#ebf8f1; --warn:#8a5708; --warn-bg:#fff5dc; --mono:"SFMono-Regular",Consolas,monospace; }
       * { box-sizing:border-box; }
@@ -55,12 +55,13 @@
       <header class="hero">
         <h1>插件管理与既有能力迁移</h1>
         <p class="lead">以「管理 → 插件」统一四类业务入口；现有非 AI 元数据、Generic OPDS 与 Legado 继续使用原配置和数据表，同时获得统一目录、连接健康与执行记录。</p>
-        <div class="chips"><span class="chip">状态：ACTIVE</span><span class="chip">日期：2026-08-14</span><span class="chip">模块：app / webserver</span><span class="chip">需求：TB-43</span><span class="chip">依据：TB-41 定稿</span></div>
+        <div class="chips"><span class="chip">状态：SUPERSEDED</span><span class="chip">日期：2026-08-14</span><span class="chip">模块：app / webserver</span><span class="chip">需求：TB-43</span><span class="chip">依据：TB-41 定稿</span></div>
       </header>
       <nav aria-label="章节目录"><a href="#request">诉求</a><a href="#scope">边界</a><a href="#architecture">架构</a><a href="#experience">页面</a><a href="#migration">迁移</a><a href="#review">界面审查</a><a href="#tests">验证</a><a href="#risks">风险</a></nav>
       <main id="main-content">
         <section id="request" class="card">
           <h2>1. 原始诉求</h2>
+          <div class="callout warn"><strong>已于 2026-08-29 被替代：</strong>目录主分类、Tab 数量、个人/实例配置分流与启用态视觉规则以后续方案 <code>design/app/20260829-plugin-catalog-classification.active.html</code> 为准；本文件保留为初版迁移与四 Tab 设计的历史记录。</div>
           <div class="callout">在插件公共底座与 UX 定稿后，实现 <code>/admin/plugins</code> 的元数据、笔记（含章评）、评价、书源四个 Tab；提供目录、详情、搜索/筛选、启停、连接测试、执行记录、失败项重试与回滚入口；把 Talebook 既有非 AI 元数据、Generic OPDS 和 Legado 能力迁入，保留旧入口一版兼容跳转，并确保数据库只有一套事实。</div>
           <p>验收重点是升级后旧配置、启用状态和核心行为零回退，既有能力进入统一插件目录并共享底座运行治理。实现输入来自 TB-41 批准的交互稿 <code>20260814-plugin-management-ux.wip.html</code>。</p>
         </section>
