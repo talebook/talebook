@@ -179,6 +179,7 @@ const { $backend, $alert } = useNuxtApp();
 const { t } = useI18n();
 const loaded = ref(false);
 const loading = ref(false);
+const authorId = ref(null);
 const loadError = ref('');
 const saving = ref(false);
 const editorOpen = ref(false);
@@ -196,14 +197,22 @@ const author = reactive({
 
 const load = async () => {
     loading.value = true;
+    loaded.value = false;
     loadError.value = '';
     try {
-        const response = await $backend(`/author-aliases/${encodeURIComponent(props.name)}`);
+        const lookup = await $backend(`/authors?name=${encodeURIComponent(props.name)}`);
+        if (lookup.err !== 'ok') {
+            loadError.value = lookup.msg || t('authorAliases.loadFailed');
+            return;
+        }
+        authorId.value = lookup.author.id;
+        const response = await $backend(`/authors/${authorId.value}/aliases`);
         if (response.err !== 'ok') {
             loadError.value = response.msg || t('authorAliases.loadFailed');
             return;
         }
         Object.assign(author, response.author);
+        authorId.value = response.author.id;
         loaded.value = true;
     } catch {
         loadError.value = t('authorAliases.loadFailed');
@@ -230,16 +239,16 @@ const openMergeConfirmation = () => {
 };
 
 const save = async (merge) => {
-    if (!validateCanonical()) return;
+    if (!validateCanonical() || authorId.value === null) return;
     saving.value = true;
     try {
-        const response = await $backend(`/author-aliases/${encodeURIComponent(props.name)}`, {
-            method: 'POST',
+        const resource = merge ? 'merges' : 'aliases';
+        const response = await $backend(`/authors/${authorId.value}/${resource}`, {
+            method: merge ? 'POST' : 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 canonical: draftCanonical.value,
                 aliases: draftAliases.value,
-                merge,
             }),
         });
         if (response.err !== 'ok') {
@@ -247,6 +256,7 @@ const save = async (merge) => {
             return;
         }
         Object.assign(author, response.author);
+        authorId.value = response.author.id;
         editorOpen.value = false;
         confirmOpen.value = false;
         const failed = response.merge?.failed?.length || 0;
