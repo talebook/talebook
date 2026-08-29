@@ -330,6 +330,7 @@ class Item(Base, SQLAlchemyMixin):
     scope = Column(String(50), default="public", nullable=False)
     book_type = Column(String(20), default="ebook", nullable=False)
     media_type = Column(String(20), default="unknown", nullable=False)
+    media_type_locked = Column(Boolean, default=False, nullable=False)
     create_time = Column(DateTime)
     src_path = Column(String(4096), default="", nullable=False)
 
@@ -342,6 +343,7 @@ class Item(Base, SQLAlchemyMixin):
         self.scope = "public"
         self.book_type = BOOK_TYPE_EBOOK
         self.media_type = MEDIA_TYPE_UNKNOWN
+        self.media_type_locked = False
         self.src_path = ""
 
 

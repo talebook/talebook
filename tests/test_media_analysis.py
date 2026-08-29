@@ -9,7 +9,12 @@ import zipfile
 import pytest
 
 from webserver.constants import MEDIA_TYPE_COMIC, MEDIA_TYPE_EBOOK, MEDIA_TYPE_UNKNOWN
-from webserver.services.media_analysis import InvalidMediaError, analyze_media_file, merge_media_type
+from webserver.services.media_analysis import (
+    InvalidMediaError,
+    analyze_media_file,
+    has_mixed_media_formats,
+    merge_media_type,
+)
 
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"test-image"
@@ -163,6 +168,14 @@ def test_image_extension_must_match_inner_signature():
             archive.writestr("page.png", JPEG)
         with pytest.raises(InvalidMediaError, match="扩展名与内容不匹配"):
             analyze_media_file(path, "cbz")
+
+
+def test_only_ebook_and_comic_format_combinations_need_manual_classification():
+    assert has_mixed_media_formats(["EPUB", "CBZ"])
+    assert has_mixed_media_formats("TXT, RAR")
+    assert not has_mixed_media_formats(["EPUB", "PDF"])
+    assert not has_mixed_media_formats(["CBZ", "CBR"])
+    assert not has_mixed_media_formats(["EPUB", "MP3"])
 
 
 def test_pdf_remains_unknown_and_media_type_merge_never_downgrades_comic():

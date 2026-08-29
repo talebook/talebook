@@ -433,7 +433,8 @@ class ScanService(AsyncService):
             except Exception:
                 pass
             self.session.add(item)
-        item.media_type = merge_media_type(item.media_type, media_type)
+        if not item.media_type_locked:
+            item.media_type = merge_media_type(item.media_type, media_type)
         return item
 
     def _ensure_indexed_item(self, book_id, user_id, fpath, media_type):

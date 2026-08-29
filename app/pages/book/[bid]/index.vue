@@ -614,6 +614,46 @@
                                         </template>
                                         <v-list-item-title>{{ t('book.uploadNewFormat') }}</v-list-item-title>
                                     </v-list-item>
+                                    <template v-if="hasMixedMediaFormats">
+                                        <v-divider />
+                                        <v-list-subheader>{{ t('book.chooseMediaType') }}</v-list-subheader>
+                                        <v-list-item
+                                            data-testid="set-media-type-comic"
+                                            :disabled="setting_media_type"
+                                            @click="set_media_type('comic')"
+                                        >
+                                            <template #prepend>
+                                                <v-icon>mdi-image-multiple</v-icon>
+                                            </template>
+                                            <v-list-item-title>{{ t('book.setAsComic') }}</v-list-item-title>
+                                            <template #append>
+                                                <v-icon
+                                                    v-if="book.media_type === 'comic'"
+                                                    color="success"
+                                                >
+                                                    mdi-check-circle
+                                                </v-icon>
+                                            </template>
+                                        </v-list-item>
+                                        <v-list-item
+                                            data-testid="set-media-type-ebook"
+                                            :disabled="setting_media_type"
+                                            @click="set_media_type('ebook')"
+                                        >
+                                            <template #prepend>
+                                                <v-icon>mdi-book-outline</v-icon>
+                                            </template>
+                                            <v-list-item-title>{{ t('book.setAsEbook') }}</v-list-item-title>
+                                            <template #append>
+                                                <v-icon
+                                                    v-if="book.media_type === 'ebook'"
+                                                    color="success"
+                                                >
+                                                    mdi-check-circle
+                                                </v-icon>
+                                            </template>
+                                        </v-list-item>
+                                    </template>
                                 </v-list>
                             </v-menu>
 
@@ -1097,6 +1137,7 @@ const book = ref({
     is_owner: false,
     series: '',
     media_type: 'unknown',
+    media_type_locked: false,
     online_readable: null
 });
 
@@ -1135,6 +1176,7 @@ const refer_failed_sources = computed(() => {
 const dialog_upload_format = ref(false);
 const upload_format_file = ref(null);
 const uploading_format = ref(false);
+const setting_media_type = ref(false);
 
 // Separate format
 const dialog_separate = ref(false);
@@ -1201,6 +1243,12 @@ const pub_year = computed(() => {
 
 const readerPath = computed(() => readerPathForBook(book.value));
 const hasCompatibleFormats = computed(() => Boolean(readerPath.value));
+const hasMixedMediaFormats = computed(() => {
+    const formats = new Set((book.value.files || []).map(file => String(file.format || '').toLowerCase()));
+    const hasComic = ['cbz', 'zip', 'cbr', 'rar'].some(format => formats.has(format));
+    const hasEbook = ['epub', 'mobi', 'azw', 'azw3', 'pdf', 'txt'].some(format => formats.has(format));
+    return hasComic && hasEbook;
+});
 
 const selectedFormat = computed(() => {
     if (!book.value || !book.value.files) return 'N/A';
@@ -1499,6 +1547,29 @@ const save_meta_to_file = () => {
 const show_upload_format_dialog = () => {
     upload_format_file.value = null;
     dialog_upload_format.value = true;
+};
+
+const set_media_type = async (mediaType) => {
+    setting_media_type.value = true;
+    try {
+        const rsp = await $backend(`/book/${book.value.id}/media_type`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ media_type: mediaType }),
+        });
+        if (rsp.err === 'ok') {
+            book.value.media_type = rsp.media_type;
+            book.value.media_type_locked = rsp.media_type_locked === true;
+            $alert('success', rsp.msg || t('book.setMediaTypeSuccess'));
+        } else {
+            $alert('error', rsp.msg || t('book.setMediaTypeFailed'));
+        }
+    } catch (err) {
+        console.error('Set media type error:', err);
+        $alert('error', t('book.setMediaTypeFailed'));
+    } finally {
+        setting_media_type.value = false;
+    }
 };
 
 const confirmUploadFormat = async () => {

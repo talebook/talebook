@@ -25,6 +25,19 @@ manifest 与进度接口要求登录。页面图片通常也接受登录 Cookie/
 
 容器优先级为 CBZ、ZIP、CBR、RAR。漫画型 EPUB 不使用本契约，继续进入现有 EPUB 阅读器。
 
+## 混合格式手动分类
+
+当同一本书同时包含电子书格式（EPUB、MOBI、AZW、AZW3、PDF、TXT）和漫画容器（CBZ、ZIP、CBR、RAR）时，所有者或管理员可在详情页“文件处理”菜单中选择“设置为漫画”或“设置为电子书”。页面调用：
+
+```http
+POST /api/book/:bookId/media_type
+Content-Type: application/json
+
+{"media_type":"comic"}
+```
+
+`media_type` 只接受 `comic` 或 `ebook`，且目标书必须确实同时包含两类格式。成功后服务端设置 `media_type_locked=true`；后续目录扫描或上传新格式仍会执行文件安全分析，但不会覆盖这个人工选择。再次选择另一类型即可修改。单一类型书籍不显示该操作，直接调用也返回 `media_type.not_mixed`。
+
 ## 页面 manifest
 
 ```http

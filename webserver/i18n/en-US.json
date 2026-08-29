@@ -303,5 +303,10 @@
     "无法打开漫画": "Unable to open comic",
     "阅读进度暂未保存，将在后续翻页时重试。": "Progress was not saved. The reader will retry after another page turn.",
     "重试": "Retry",
+    "媒体类型只能设置为漫画或电子书": "Media type can only be set to comic or ebook",
+    "只有同时包含电子书和漫画格式的书籍才需要手动设置媒体类型": "Only books containing both ebook and comic formats need a manual media type",
+    "已将书籍设置为%s": "Book set as %s",
+    "漫画": "comic",
+    "电子书": "ebook",
     "；失败：%s": "; Failed: %s"
 }

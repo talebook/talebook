@@ -240,6 +240,7 @@ class TestItemMediaType(unittest.TestCase):
     def test_new_items_default_to_unknown_media_type(self):
         item = models.Item()
         self.assertEqual(item.media_type, "unknown")
+        self.assertFalse(item.media_type_locked)
 
 
 class TestReadingState(unittest.TestCase):

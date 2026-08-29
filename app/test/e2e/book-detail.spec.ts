@@ -92,6 +92,8 @@ test.describe('Book Detail Page', () => {
     test('shows EPUB conversion routes without unavailable routes', async ({ page }) => {
         await page.goto('/book/1');
         await page.getByText('文件处理').click();
+        await expect(page.getByTestId('set-media-type-comic')).toHaveCount(0);
+        await expect(page.getByTestId('set-media-type-ebook')).toHaveCount(0);
         await page.getByText('转换书籍').click();
 
         await expect(page.locator('.conversion-option')).toHaveCount(2);
@@ -130,6 +132,27 @@ test.describe('Book Detail Page', () => {
 
         await page.getByText('下载', { exact: true }).last().click();
         await expect(page.locator('a[href="/api/book/14.CBZ"]')).toBeVisible();
+    });
+
+    test('lets owners correct mixed ebook and comic media classification', async ({ page }) => {
+        await page.goto('/book/14');
+        await expect(page.getByText('图片漫画样例').first()).toBeVisible({ timeout: 15_000 });
+
+        await page.getByText('文件处理').click();
+        await expect(page.getByTestId('set-media-type-comic')).toBeVisible();
+        await expect(page.getByTestId('set-media-type-ebook')).toBeVisible();
+        await page.getByTestId('set-media-type-ebook').click();
+
+        await expect(page.getByTestId('media-type-chip')).toContainText('电子书');
+        await expect(page.getByTestId('open-online-reader')).toHaveAttribute('href', '/read/14');
+        await expect(page.getByTestId('open-audiobook')).toBeVisible();
+
+        await page.getByText('文件处理').click();
+        await page.getByTestId('set-media-type-comic').click();
+
+        await expect(page.getByTestId('media-type-chip')).toContainText('漫画');
+        await expect(page.getByTestId('open-online-reader')).toHaveAttribute('href', '/read-comic/14');
+        await expect(page.getByTestId('open-audiobook')).toHaveCount(0);
     });
 
     test('redirects a legacy TXT reader URL when EPUB exists', async ({ page }) => {

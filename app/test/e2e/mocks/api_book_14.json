@@ -23,16 +23,23 @@
     "collector": "admin",
     "count_visit": 0,
     "count_download": 0,
-    "available_formats": ["CBZ"],
+    "available_formats": ["CBZ", "EPUB"],
     "files": [
       {
         "format": "CBZ",
         "size": 2048,
         "href": "/api/book/14.CBZ",
         "online_readable": true
+      },
+      {
+        "format": "EPUB",
+        "size": 4096,
+        "href": "/api/book/14.EPUB",
+        "online_readable": true
       }
     ],
     "media_type": "comic",
+    "media_type_locked": false,
     "online_readable": true,
     "scope": "public",
     "is_public": true,

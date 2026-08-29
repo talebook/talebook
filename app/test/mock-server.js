@@ -24,6 +24,7 @@ let booksourceCheckPolls = 0;
 let shelfBookIds = new Set();
 let readingStateByBookId = new Map();
 let comicProgressByBookId = new Map();
+let mediaTypeOverrides = new Map();
 let activeThemeName = '';
 let audiobookPublishedEdition = null;
 let audiobookJobs = [];
@@ -170,6 +171,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   comicProgressByBookId = new Map([
     [14, { kind: 'comic', version: 1, pageId: 'mock-revision:1', pageIndex: 1, percent: 66.67, completed: false }]
   ]);
+  mediaTypeOverrides = new Map();
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
@@ -1385,6 +1387,21 @@ router.get('/api/book/txt/init', eventHandler(() => ({
 })));
 
 // Book Detail
+router.post('/api/book/:id/media_type', eventHandler(async (event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  const body = await readBody(event);
+  if (id !== 14 || !['comic', 'ebook'].includes(body?.media_type)) {
+    return { err: 'media_type.not_mixed', msg: '只有混合格式书籍可以手动设置类型' };
+  }
+  mediaTypeOverrides.set(id, body.media_type);
+  return {
+    err: 'ok',
+    msg: body.media_type === 'comic' ? '已将书籍设置为漫画' : '已将书籍设置为电子书',
+    media_type: body.media_type,
+    media_type_locked: true,
+  };
+}));
+
 router.get('/api/book/:id', eventHandler((event) => {
   const id = getRouterParam(event, 'id');
   console.log(`[Mock] Book request id: ${id}`);
@@ -1392,7 +1409,14 @@ router.get('/api/book/:id', eventHandler((event) => {
   // Check if it is a detail request (number)
   if (/^\d+$/.test(id)) {
     const data = readJson(`api_book_${id}.json`);
-    if (data) return data;
+    if (data) {
+      const override = mediaTypeOverrides.get(Number(id));
+      if (override) {
+        data.book.media_type = override;
+        data.book.media_type_locked = true;
+      }
+      return data;
+    }
     return { err: 'not_found', msg: 'Book not found' };
   }
     

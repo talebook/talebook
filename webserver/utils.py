@@ -112,6 +112,7 @@ class SimpleBookFormatter:
             "count_visit": self.val("count_visit", 0),
             "count_download": self.val("count_download", 0),
             "media_type": self.val("media_type", MEDIA_TYPE_UNKNOWN),
+            "media_type_locked": bool(b.get("media_type_locked", False)),
             "online_readable": online_readable_formats(b.get("available_formats", [])),
         }
 

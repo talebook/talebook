@@ -20,8 +20,9 @@ from webserver.constants import MEDIA_TYPE_COMIC, MEDIA_TYPE_EBOOK, MEDIA_TYPE_U
 COMIC_ZIP_FORMATS = frozenset(("cbz", "zip"))
 COMIC_RAR_FORMATS = frozenset(("cbr", "rar"))
 COMIC_CONTAINER_FORMATS = COMIC_ZIP_FORMATS | COMIC_RAR_FORMATS
-SUPPORTED_MEDIA_FORMATS = frozenset(("azw", "azw3", "epub", "mobi", "pdf", "txt")) | COMIC_CONTAINER_FORMATS
-ONLINE_READ_FORMATS = frozenset(("azw", "azw3", "epub", "mobi", "pdf", "txt")) | COMIC_CONTAINER_FORMATS
+EBOOK_MEDIA_FORMATS = frozenset(("azw", "azw3", "epub", "mobi", "pdf", "txt"))
+SUPPORTED_MEDIA_FORMATS = EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS
+ONLINE_READ_FORMATS = EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS
 
 MAX_ARCHIVE_ENTRIES = 10000
 MAX_ARCHIVE_FILE_BYTES = 1024 * 1024 * 1024
@@ -81,10 +82,19 @@ def merge_media_type(existing, incoming):
     return incoming if priority[incoming] > priority[existing] else existing
 
 
-def online_readable_formats(formats):
+def normalized_media_formats(formats):
     if isinstance(formats, str):
         formats = formats.replace(",", " ").split()
-    return any(str(fmt).lower() in ONLINE_READ_FORMATS for fmt in (formats or ()))
+    return {str(fmt).strip().lower() for fmt in (formats or ()) if str(fmt).strip()}
+
+
+def has_mixed_media_formats(formats):
+    formats = normalized_media_formats(formats)
+    return bool(formats.intersection(EBOOK_MEDIA_FORMATS)) and bool(formats.intersection(COMIC_CONTAINER_FORMATS))
+
+
+def online_readable_formats(formats):
+    return bool(normalized_media_formats(formats).intersection(ONLINE_READ_FORMATS))
 
 
 def _invalid(code, message):

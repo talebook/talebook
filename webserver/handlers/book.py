@@ -20,6 +20,8 @@ from tornado import web
 from webserver import demo_mode, loader, utils
 from webserver.constants import (
     CALIBRE_ERROR_FLAG,
+    MEDIA_TYPE_COMIC,
+    MEDIA_TYPE_EBOOK,
     META_SELECTED_SOURCES,
     META_SOURCE_AI,
     META_SOURCE_AMAZON,
@@ -64,6 +66,7 @@ from webserver.services.media_analysis import (
     COMIC_CONTAINER_FORMATS,
     InvalidMediaError,
     analyze_media_file,
+    has_mixed_media_formats,
     merge_media_type,
 )
 
@@ -1360,7 +1363,8 @@ class BookUploadBase(BaseHandler):
             item = Item()
             item.book_id = book_id
             item.collector_id = self.user_id()
-        item.media_type = merge_media_type(item.media_type, media_type)
+        if not item.media_type_locked:
+            item.media_type = merge_media_type(item.media_type, media_type)
         item.save()
         return item
 
@@ -2074,6 +2078,59 @@ class BookSetScope(BaseHandler):
             return {"err": "db.update.failed", "msg": _("更新失败，请稍后再试")}
 
 
+class BookSetMediaType(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        book = self.get_book(int(bid), raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+
+        book_id = book["id"]
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(book_id, self.user_id())):
+            return {"err": "permission", "msg": _("无权操作")}
+
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+        except (TypeError, ValueError):
+            return {"err": "params.invalid", "msg": _("请求参数格式错误")}
+        media_type = data.get("media_type") if isinstance(data, dict) else None
+        if media_type not in (MEDIA_TYPE_COMIC, MEDIA_TYPE_EBOOK):
+            return {"err": "params.media_type", "msg": _("媒体类型只能设置为漫画或电子书")}
+        if not has_mixed_media_formats(book.get("available_formats", [])):
+            return {
+                "err": "media_type.not_mixed",
+                "msg": _("只有同时包含电子书和漫画格式的书籍才需要手动设置媒体类型"),
+            }
+
+        try:
+            item = self.session.query(Item).filter(Item.book_id == book_id).first()
+            if not item:
+                item = Item()
+                item.book_id = book_id
+                item.collector_id = self.user_id()
+                try:
+                    item.create_time = self.cache.field_for("timestamp", book_id)
+                except Exception:
+                    item.create_time = datetime.datetime.now()
+                self.session.add(item)
+            item.media_type = media_type
+            item.media_type_locked = True
+            self.session.commit()
+        except Exception as err:
+            self.session.rollback()
+            logging.error("set book %d media type failed: %s", book_id, err)
+            return {"err": "db.update.failed", "msg": _("更新失败，请稍后再试")}
+
+        label = _("漫画") if media_type == MEDIA_TYPE_COMIC else _("电子书")
+        return {
+            "err": "ok",
+            "msg": _("已将书籍设置为%s") % label,
+            "media_type": media_type,
+            "media_type_locked": True,
+        }
+
+
 class BookDeleteFormat(BaseHandler):
     @js
     @auth
@@ -2621,6 +2678,7 @@ def routes():
         (r"/api/book/([0-9]+)/delete", BookDelete),
         (r"/api/book/([0-9]+)/edit", BookEdit),
         (r"/api/book/([0-9]+)/setscope", BookSetScope),
+        (r"/api/book/([0-9]+)/media_type", BookSetMediaType),
         (r"/api/book/([0-9]+\..+)", BookDownload),
         (r"/api/book/([0-9]+)/send_to_device", BookSendToDevice),
         (r"/api/book/([0-9]+)/mailto", BookSendToMail),
