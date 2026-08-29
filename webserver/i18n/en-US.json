@@ -288,6 +288,7 @@
     "验证码验证失败": "Verification failed",
     "验证通过": "Verification passed",
     "默认用户": "Default User",
+    "漫画不支持生成有声书": "Comics cannot be used to generate audiobooks",
     "漫画容器暂时无法读取，请稍后重试。": "The comic container cannot be read right now. Please try again later.",
     "漫画页面列表无效。": "The comic page manifest is invalid.",
     "漫画页面无法显示，文件可能已损坏或登录状态已失效。": "The comic page cannot be displayed. The file may be damaged or your session may have expired.",

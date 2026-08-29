@@ -125,6 +125,7 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByTestId('online-reading-unsupported')).toHaveCount(0);
         await expect(page.getByTestId('comic-reader-notice')).toHaveCount(0);
         await expect(page.getByTestId('open-online-reader')).toHaveAttribute('href', '/read-comic/14');
+        await expect(page.getByTestId('open-audiobook')).toHaveCount(0);
         await expect(page.locator('a[href="/read/14"]')).toHaveCount(0);
 
         await page.getByText('下载', { exact: true }).last().click();

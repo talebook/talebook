@@ -426,6 +426,9 @@ router.get('/api/audios/home', eventHandler(() => {
 router.get('/api/book/:bookId/audios', eventHandler((event) => {
   const bookId = Number(getRouterParam(event, 'bookId'));
   const book = audiobookBook(bookId);
+  if (book.media_type === 'comic') {
+    return { err: 'media_type.not_supported', msg: '漫画不支持生成有声书' };
+  }
   const compatible = ['EPUB', 'TXT'].some(format => audiobookBookFormats(book).has(format));
   const publishedEdition = audiobookPublishedEdition && Number(audiobookPublishedEdition.book_id) === bookId
     ? audiobookPublishedEdition
@@ -482,6 +485,9 @@ router.post('/api/book/:bookId/audio-jobs', eventHandler(async (event) => {
   const body = await readBody(event);
   const bookId = Number(getRouterParam(event, 'bookId'));
   const book = audiobookBook(bookId);
+  if (book.media_type === 'comic') {
+    return { err: 'media_type.not_supported', msg: '漫画不支持生成有声书' };
+  }
   if (!['EPUB', 'TXT'].some(format => audiobookBookFormats(book).has(format))) {
     return { err: 'format.not_supported', msg: '生成有声书需要 EPUB 或 TXT 格式' };
   }

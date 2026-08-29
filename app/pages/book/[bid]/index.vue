@@ -524,7 +524,7 @@
                         </v-btn>
 
                         <v-btn
-                            v-if="book.id > 0"
+                            v-if="book.id > 0 && book.media_type !== 'comic'"
                             color="amber-darken-2"
                             variant="elevated"
                             class="mx-2"
