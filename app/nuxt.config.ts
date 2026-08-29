@@ -45,6 +45,12 @@ export default defineNuxtConfig({
         }
     },
     routeRules: {
+        '/readest/sw.js': {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Service-Worker-Allowed': '/',
+            },
+        },
         '/readest/**': {
             headers: {
                 'Content-Security-Policy': "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline' blob:; font-src 'self' data:; object-src 'none'; frame-src blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",

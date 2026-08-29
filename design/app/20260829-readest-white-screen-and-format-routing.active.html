@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="修复 Talebook Readest 嵌入模式遗留 Service Worker 导致的白屏，并恢复 TXT 等格式的专用阅读器分流。" />
+  <link rel="icon" href="data:," />
+  <title>修复 Readest 白屏并恢复格式分流 · ACTIVE</title>
+  <style>
+    :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#1d2939; --muted:#596579; --line:#d9e2ec; --blue:#175cd3; --green:#067647; --warn:#b54708; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:linear-gradient(145deg,#edf4ff,var(--bg) 38%); font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC",sans-serif; }
+    main { width:min(980px,calc(100% - 28px)); margin:28px auto 56px; }
+    header,section { margin-bottom:16px; padding:24px 28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 10px 28px rgba(16,24,40,.06); }
+    h1 { margin:0 0 8px; font-size:clamp(28px,5vw,44px); line-height:1.15; }
+    h2 { margin:0 0 12px; font-size:21px; }
+    p { margin:8px 0; color:var(--muted); }
+    ul,ol { margin:8px 0 0 20px; padding:0; }
+    li + li { margin-top:6px; }
+    code { padding:.12em .35em; border-radius:5px; background:#eef2f6; font-family:ui-monospace,monospace; overflow-wrap:anywhere; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+    .tag { padding:5px 10px; border-radius:999px; color:#344054; background:#eef2f6; font-size:12px; font-weight:700; }
+    .active { color:var(--green); background:#ecfdf3; }
+    .quote { padding:14px 16px; border-left:4px solid var(--warn); border-radius:10px; color:#7a2e0e; background:#fffaeb; }
+    .flow { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .step { padding:15px; border:1px solid var(--line); border-radius:13px; background:#f8fafc; }
+    .step strong { display:block; margin-bottom:5px; color:var(--blue); }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:10px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f8fafc; }
+    .ok { color:var(--green); font-weight:700; }
+    .blocked { color:var(--warn); font-weight:700; }
+    @media (max-width:700px) { header,section { padding:20px; } .flow { grid-template-columns:1fr; } }
+    @media print { body { background:#fff; } header,section { box-shadow:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>修复 Readest 白屏并恢复格式分流</h1>
+    <p>停止 Talebook 嵌入版 Readest 对宿主站点注册根作用域 Service Worker，清理已安装的旧 Worker；同时确保 Readest 仅参与 EPUB 分流，TXT 继续进入 Talebook 专用阅读器。</p>
+    <div class="meta">
+      <span class="tag active">状态：ACTIVE</span><span class="tag">创建日期：2026-08-29</span><span class="tag">所属模块：app</span><span class="tag">影响范围：Readest 静态产物、Nginx、BookRead</span><span class="tag">需求来源：PR #977 体验反馈</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. 原始诉求</h2>
+    <p class="quote">“使用 Readest 点击阅读时白屏，控制台提示 Nuxt CSS 以 application/json 返回并有资源 404；另外阅读 TXT 时没有使用 TXT 阅读器。”</p>
+    <p>核查确认：旧嵌入产物会从 <code>/readest/sw.js</code> 注册作用域为 <code>/</code> 的 Worker，因而能拦截 Talebook 的 <code>/_nuxt/</code> 资源；后端又在 EPUB/PDF/TXT 格式判断之前应用 Readest 默认项，导致 TXT 被错误送入 Readest 的 EPUB 限制页。</p>
+  </section>
+
+  <section>
+    <h2>2. 目标与边界</h2>
+    <ul>
+      <li>Talebook 嵌入构建不再注册 Service Worker，不影响完整 Readest Web/PWA 和原生应用。</li>
+      <li>保留稳定的 <code>/readest/sw.js</code> 注销脚本，使旧浏览器能删除 Readest 的 Serwist 缓存并注销根作用域 Worker。</li>
+      <li>EPUB 仍按 Readest/Candle 设置选择；PDF、TXT 仍使用各自专用阅读器；MOBI/AZW/AZW3 继续先转 EPUB。</li>
+      <li>不扩大 Readest 嵌入模式支持格式，不改动阅读权限和下载权限。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>3. 实现流程</h2>
+    <div class="flow">
+      <article class="step"><strong>停止新增污染</strong>Talebook profile 禁用 Serwist，生成的主 bundle 不包含 <code>serviceWorker.register</code>。</article>
+      <article class="step"><strong>清理历史状态</strong>构建产物保留无缓存 tombstone；Nginx/Nuxt 允许旧根作用域注册更新到该脚本，随后注销并刷新受控页面。</article>
+      <article class="step"><strong>恢复格式路由</strong><code>BookRead</code> 先判定实际格式，仅在存在 EPUB 时应用 Readest 选择，TXT 直接跳转 <code>/book/:id/readtxt</code>。</article>
+    </div>
+  </section>
+
+  <section>
+    <h2>4. 风险与兼容</h2>
+    <table>
+      <thead><tr><th>风险</th><th>处理</th></tr></thead>
+      <tbody>
+        <tr><td>旧 Worker 继续控制已经打开的页面</td><td>Tombstone 使用 <code>skipWaiting</code>，删除仅以 <code>serwist-</code> 开头的缓存，注销后导航刷新窗口。</td></tr>
+        <tr><td>注销脚本被长期缓存</td><td>Nuxt route rule 与两套生产 Nginx 配置均对该 URL 设置 <code>no-store</code>。</td></tr>
+        <tr><td>影响独立 Readest PWA</td><td>禁用条件仅为 <code>talebookExport</code>；普通 Web 和其他平台配置不变。</td></tr>
+        <tr><td>Kindle 格式转换等待页找不到 Readest 模板</td><td>转换期间显式复用 Candle 等待页；转换后重新进入时按 EPUB 默认项打开 Readest。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>5. 测试结果</h2>
+    <ul>
+      <li class="ok">Readest <code>build:talebook-static</code>：通过，2 个 worker，产物 406 个文件；无残留 Next/PostCSS 子进程。</li>
+      <li class="ok">静态契约检查：31 个 Reader HTML 引用均存在；主 bundle 不含注册调用；无 <code>swe-worker</code>；tombstone 含注销逻辑。</li>
+      <li class="ok"><code>make lint-py</code>：通过；<code>ruff</code> 与 Python 语法检查通过。</li>
+      <li class="blocked">本机缺少 Calibre Python 模块，<code>tests/test_readest_embed.py</code> 无法启动；已补 TXT 分流和静态产物回归用例，交由 PR CI 的 Calibre 环境执行。</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

@@ -1663,8 +1663,9 @@ class BookRead(BaseHandler):
 
         requested_reader = self.get_argument("reader", "")
         use_readest = requested_reader == "readest" or (not requested_reader and CONF["EPUB_VIEWER"] == "readest")
-        if use_readest:
-            if book.get("fmt_epub"):
+
+        if book.get("fmt_epub"):
+            if use_readest:
                 revision = reader_resource_revision(book["fmt_epub"])
                 resource_url = self.site_url + "/read/resource/%d.epub?revision=%s" % (book_id, revision)
                 reader_query = urllib.parse.urlencode(
@@ -1676,20 +1677,6 @@ class BookRead(BaseHandler):
                     }
                 )
                 return self.redirect("/readest/reader.html?%s" % reader_query)
-            if ConvertService().is_book_converting(book):
-                self.set_status(409)
-                error = "reader.conversion_pending"
-                message = _("本书正在转换为 EPUB，请稍后重试")
-            else:
-                self.set_status(415)
-                error = "reader.format_unsupported"
-                message = _("Readest 支持多种格式，但 Talebook 当前仅接入 EPUB 格式")
-            return self.html_page(
-                "book/readest_error.html",
-                {"book": book, "error": error, "message": message},
-            )
-
-        if book.get("fmt_epub"):
             if requested_reader == "candle":
                 return self.render_epub(
                     book,
@@ -1712,9 +1699,20 @@ class BookRead(BaseHandler):
             return self.redirect(pdf_reader_url)
 
         if "fmt_txt" in book:
-            # TXT有专门的阅读器
+            # Readest 是 EPUB 阅读器选项，TXT 始终使用专用阅读器。
             txt_reader_url = f"/book/{book_id}/readtxt"
             return self.redirect(txt_reader_url)
+
+        if use_readest and ConvertService().is_book_converting(book):
+            self.set_status(409)
+            return self.html_page(
+                "book/readest_error.html",
+                {
+                    "book": book,
+                    "error": "reader.conversion_pending",
+                    "message": _("本书正在转换为 EPUB，请稍后重试"),
+                },
+            )
 
         # 其他格式，转换为EPUB进行在线阅读
         for fmt in ["mobi", "azw", "azw3"]:
@@ -1723,7 +1721,12 @@ class BookRead(BaseHandler):
                 continue
 
             ConvertService().convert_and_save(self.user_id(), book, fpath, "epub")
-            return self.render_epub(book, is_ready=False, audiobook_edition=audiobook_edition)
+            return self.render_epub(
+                book,
+                is_ready=False,
+                audiobook_edition=audiobook_edition,
+                viewer="creader.html" if use_readest else None,
+            )
         raise web.HTTPError(404, reason=_("抱歉，在线阅读器暂不支持该格式的书籍"))
 
 

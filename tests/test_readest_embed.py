@@ -3,16 +3,18 @@ import urllib.parse
 from pathlib import Path
 from unittest import mock
 
-from webserver.handlers.base import BaseHandler
-from webserver.handlers.book import CONF
-
 from tests.test_main import (
     BID_EPUB,
+    BID_TXT,
     TestWithUserLogin,
     mock_permission,
-    setUpModule as init,
     temporary_book_scope,
 )
+from tests.test_main import (
+    setUpModule as init,
+)
+from webserver.handlers.base import BaseHandler
+from webserver.handlers.book import CONF
 
 
 def setUpModule():
@@ -172,7 +174,7 @@ class TestReadestEmbed(TestWithUserLogin):
             changed = self.fetch(bootstrap["resource"]["url"])
         self.assertEqual(changed.code, 409)
 
-    def test_readest_entry_reports_conversion_and_unsupported_format(self):
+    def test_readest_entry_reports_conversion_pending(self):
         converting = {"id": 77, "title": "Converting", "fmt_mobi": "/tmp/book.mobi"}
         with mock.patch.object(BaseHandler, "get_book_or_404", return_value=converting):
             with mock.patch("webserver.handlers.book.ConvertService.is_book_converting", return_value=True):
@@ -181,23 +183,34 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertIn(b"reader.conversion_pending", response.body)
         self.assertIn(b"reader=candle", response.body)
 
-        unsupported = {"id": 78, "title": "Unsupported"}
-        with mock.patch.object(BaseHandler, "get_book_or_404", return_value=unsupported):
-            response = self.fetch("/read/78?reader=readest")
-        self.assertEqual(response.code, 415)
-        self.assertIn(b"reader.format_unsupported", response.body)
-        self.assertIn(
-            "Readest 支持多种格式，但 Talebook 当前仅接入 EPUB 格式".encode(),
-            response.body,
-        )
+    def test_readest_default_preserves_the_dedicated_txt_reader(self):
+        with mock.patch.dict(CONF, {"EPUB_VIEWER": "readest"}):
+            response = self.fetch("/read/%d" % BID_TXT, follow_redirects=False)
+        self.assertEqual(response.code, 302)
+        self.assertEqual(response.headers["Location"], "/book/%d/readtxt" % BID_TXT)
 
     def test_embed_static_deployment_contract_has_csp_and_cache_boundaries(self):
-        nginx = (Path(__file__).parents[1] / "conf" / "nginx" / "talebook.conf").read_text(encoding="utf-8")
-        nuxt = (Path(__file__).parents[1] / "app" / "nuxt.config.ts").read_text(encoding="utf-8")
-        self.assertIn("location = /readest/reader.html", nginx)
-        self.assertIn("Content-Security-Policy", nginx)
-        self.assertIn("immutable", nginx)
+        root = Path(__file__).parents[1]
+        nginx_configs = [
+            (root / "conf" / "nginx" / name).read_text(encoding="utf-8")
+            for name in ("talebook.conf", "server-side-render.conf")
+        ]
+        nuxt = (root / "app" / "nuxt.config.ts").read_text(encoding="utf-8")
+        reader = (root / "app" / "public" / "readest" / "reader.html").read_text(encoding="utf-8")
+        service_worker = root / "app" / "public" / "readest" / "sw.js"
+        for nginx in nginx_configs:
+            self.assertIn("location = /readest/reader.html", nginx)
+            self.assertIn("Content-Security-Policy", nginx)
+            self.assertIn("immutable", nginx)
+            self.assertIn('add_header Service-Worker-Allowed "/" always', nginx)
         self.assertIn("/readest/**", nuxt)
+        self.assertIn("'Service-Worker-Allowed': '/'", nuxt)
+        self.assertNotIn("swe-worker", reader)
+        self.assertIn("registration.unregister", service_worker.read_text(encoding="utf-8"))
+        self.assertFalse(any(service_worker.parent.glob("swe-worker*")))
+        main_bundles = list((service_worker.parent / "_next" / "static" / "chunks").glob("main-*.js"))
+        self.assertTrue(main_bundles)
+        self.assertTrue(all("serviceWorker.register" not in path.read_text(encoding="utf-8") for path in main_bundles))
 
     def test_missing_book_and_unsupported_engine(self):
         self.assertEqual(self.fetch("/read/resource/999999.epub").code, 404)
