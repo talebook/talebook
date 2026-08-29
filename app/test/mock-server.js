@@ -1309,6 +1309,17 @@ router.post('/api/book/:id/readstate', eventHandler(async (event) => {
   };
 }));
 
+router.get('/read-comic/:id', eventHandler((event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  if (!isLoggedIn) {
+    return new Response('', { status: 302, headers: { Location: '/login' } });
+  }
+  if (id !== 14) return new Response('书籍不存在', { status: 404 });
+  return new Response(`<!doctype html><html><body><main id="comic-reader-host" data-book-id="${id}">Mock comic reader</main></body></html>`, {
+    headers: { 'Content-Type': 'text/html; charset=UTF-8' },
+  });
+}));
+
 router.get('/api/book/:id/comic/pages', eventHandler((event) => {
   if (!isLoggedIn) return { err: 'user.need_login', msg: '请先登录' };
   const id = Number(getRouterParam(event, 'id'));

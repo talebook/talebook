@@ -20,7 +20,7 @@ talebook/
 推荐的本地开发方式：
 
 - **后端**：`make dev` —— 用 Docker 容器运行后端，同时将 `webserver/` 目录挂载进容器，修改 Python 代码后服务自动重启。
-- **前端**：`cd app && npm run dev` —— 本地启动 Nuxt 开发服务器（默认 `http://localhost:3000`），`nuxt.config.ts` 中的 `routeRules` 已配置将 `/api/**`、`/get/**`、`/read/**` 反向代理到后端容器（默认 `http://127.0.0.1:8080`）。
+- **前端**：`cd app && npm run dev` —— 本地启动 Nuxt 开发服务器（默认 `http://localhost:3000`），`nuxt.config.ts` 中的 `routeRules` 已配置将 `/api/**`、`/get/**`、`/read/**`、`/read-comic/**` 反向代理到后端容器（默认 `http://127.0.0.1:8080`）。
 
 这种组合：前端热重载、后端自动重启，无需手动配置 Nginx。
 

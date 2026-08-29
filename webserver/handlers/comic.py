@@ -310,10 +310,6 @@ class ComicProgressHandler(ComicHandlerMixin, BaseHandler):
 def routes():
     return [
         (r"/read-comic/([0-9]+)", ComicReaderHandler),
-        # Keep the API-prefixed URL compatible with deployments/callers that
-        # route every backend-owned page through /api. Both paths retain the
-        # same authentication, authorization, and media validation boundary.
-        (r"/api/read-comic/([0-9]+)", ComicReaderHandler),
         (r"/api/book/([0-9]+)/comic/pages", ComicManifestHandler),
         (r"/api/book/([0-9]+)/comic/pages/([0-9]+)", ComicPageHandler),
         (r"/api/book/([0-9]+)/comic/progress", ComicProgressHandler),

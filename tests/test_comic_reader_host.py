@@ -71,5 +71,5 @@ def test_backend_route_and_static_version_are_registered():
     route_map = dict(routes())
 
     assert route_map[r"/read-comic/([0-9]+)"] is ComicReaderHandler
-    assert route_map[r"/api/read-comic/([0-9]+)"] is ComicReaderHandler
+    assert r"/api/read-comic/([0-9]+)" not in route_map
     assert KOMGA_READER_VERSION == (ROOT / "komga-reader-version.txt").read_text().strip()

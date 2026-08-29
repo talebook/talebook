@@ -60,13 +60,15 @@ const loadData = async () => {
             total.value = rsp.total || 0;
             loaded.value = true;
         }
+        return rsp;
     } catch (e) {
         console.error(e);
+        return { err: 'book_list.load_failed' };
     }
 };
 
 // 使用 useAsyncData，它会自动处理异步数据
-const { data, refresh } = useAsyncData(
+useAsyncData(
     'book-list-' + route.fullPath,
     () => loadData(),
     {

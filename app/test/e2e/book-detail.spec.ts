@@ -51,10 +51,14 @@ test.describe('Book Detail Page', () => {
 
     test('does not request an undefined book when navigating to Recent', async ({ page }) => {
         const undefinedBookRequests: string[] = [];
+        const asyncDataWarnings: string[] = [];
         page.on('request', (request) => {
             if (new URL(request.url()).pathname === '/api/book/undefined') {
                 undefinedBookRequests.push(request.url());
             }
+        });
+        page.on('console', (message) => {
+            if (message.text().includes('must return a value')) asyncDataWarnings.push(message.text());
         });
 
         await page.goto(`/book/${bookId}`);
@@ -65,6 +69,7 @@ test.describe('Book Detail Page', () => {
         await expect(page).toHaveURL('/recent');
         await expect(page.getByRole('heading', { name: apiRecent.title })).toBeVisible();
         expect(undefinedBookRequests).toEqual([]);
+        expect(asyncDataWarnings).toEqual([]);
     });
 
     test('keeps successful metadata results when another source fails', async ({ page }) => {
@@ -119,7 +124,7 @@ test.describe('Book Detail Page', () => {
         await expect(readLinks.nth(1)).toContainText('在线阅读');
     });
 
-    test('routes comic containers to read-comic and keeps download available', async ({ page }) => {
+    test('routes comic containers to read-comic and keeps download available', async ({ page, context }) => {
         await page.goto('/book/14');
 
         await expect(page.getByText('图片漫画样例').first()).toBeVisible({ timeout: 15_000 });
@@ -129,6 +134,20 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByTestId('open-online-reader')).toHaveAttribute('href', '/read-comic/14');
         await expect(page.getByTestId('open-audiobook')).toHaveCount(0);
         await expect(page.locator('a[href="/read/14"]')).toHaveCount(0);
+
+        const apiReaderRequests: string[] = [];
+        context.on('request', (request) => {
+            if (new URL(request.url()).pathname === '/api/read-comic/14') apiReaderRequests.push(request.url());
+        });
+        const [readerPage] = await Promise.all([
+            context.waitForEvent('page'),
+            page.getByTestId('open-online-reader').click(),
+        ]);
+        await readerPage.waitForLoadState('domcontentloaded');
+        await expect(readerPage.locator('#comic-reader-host')).toHaveAttribute('data-book-id', '14');
+        expect(new URL(readerPage.url()).pathname).toBe('/read-comic/14');
+        expect(apiReaderRequests).toEqual([]);
+        await readerPage.close();
 
         await page.getByText('下载', { exact: true }).last().click();
         await expect(page.locator('a[href="/api/book/14.CBZ"]')).toBeVisible();

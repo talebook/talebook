@@ -19,11 +19,15 @@ describe('comic reader static distribution', () => {
         expect(existsSync(resolve(appRoot, 'pages/read-comic'))).toBe(false);
     });
 
-    it('routes read-comic through Tornado in every nginx runtime mode', () => {
+    it('routes read-comic through Tornado in production and local Nuxt development', () => {
         for (const name of ['dev.conf', 'talebook.conf', 'server-side-render.conf']) {
             const config = readFileSync(resolve(repositoryRoot, 'conf/nginx', name), 'utf8');
             expect(config).toMatch(/location ~ \^\/\([^\n]*read-comic[^\n]*\)\//);
         }
+
+        const nuxtConfig = readFileSync(resolve(appRoot, 'nuxt.config.ts'), 'utf8');
+        expect(nuxtConfig).toContain("'/read-comic/**': { proxy:");
+        expect(nuxtConfig).toContain("+ '/read-comic/**'");
     });
 
     it('ships a self-contained ESM facade, stylesheet, and license notices', () => {
