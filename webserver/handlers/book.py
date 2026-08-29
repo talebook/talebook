@@ -1683,7 +1683,7 @@ class BookRead(BaseHandler):
             else:
                 self.set_status(415)
                 error = "reader.format_unsupported"
-                message = _("Readest 当前仅支持 EPUB 格式")
+                message = _("Readest 支持多种格式，但 Talebook 当前仅接入 EPUB 格式")
             return self.html_page(
                 "book/readest_error.html",
                 {"book": book, "error": error, "message": message},

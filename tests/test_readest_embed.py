@@ -186,6 +186,10 @@ class TestReadestEmbed(TestWithUserLogin):
             response = self.fetch("/read/78?reader=readest")
         self.assertEqual(response.code, 415)
         self.assertIn(b"reader.format_unsupported", response.body)
+        self.assertIn(
+            "Readest 支持多种格式，但 Talebook 当前仅接入 EPUB 格式".encode(),
+            response.body,
+        )
 
     def test_embed_static_deployment_contract_has_csp_and_cache_boundaries(self):
         nginx = (Path(__file__).parents[1] / "conf" / "nginx" / "talebook.conf").read_text(encoding="utf-8")
