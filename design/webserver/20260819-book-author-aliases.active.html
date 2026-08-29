@@ -102,9 +102,7 @@
               <tr><td>书籍别名</td><td><code>book_id + normalized_name</code> 唯一，保留展示名。</td><td>旧书默认空数组；删除书籍时清理记录。</td></tr>
               <tr><td>作者别名</td><td><code>normalized_name</code> 全局唯一并指向规范展示名。</td><td>规范名自身也入组；冲突返回参数错误，不静默搬组。</td></tr>
               <tr><td>书籍详情/编辑</td><td><code>book.aliases: string[]</code>，现有编辑接口接受同名字段。</td><td>旧客户端忽略新增响应字段；未传 aliases 时保持不变。</td></tr>
-              <tr><td>作者定位</td><td><code>GET /api/authors?name=&lt;name&gt;</code> 返回 Calibre 数字作者 ID。</td><td>保留现有按名称访问的 <code>/author/&lt;name&gt;</code> 页面；只读解析层将可变名称转换为资源 ID。</td></tr>
-              <tr><td>作者别名集合</td><td><code>GET /api/authors/&lt;id&gt;/aliases</code>；<code>PUT /api/authors/&lt;id&gt;/aliases</code> 完整替换别名表示。</td><td>读取公开；PUT 需登录、编辑权限和管理员身份。</td></tr>
-              <tr><td>作者合并集合</td><td><code>POST /api/authors/&lt;id&gt;/merges</code> 创建一次显式合并并返回结果。</td><td>仅管理员；与别名更新分离，不再用请求体 <code>merge</code> 开关改变同一路由语义。</td></tr>
+              <tr><td>作者别名</td><td><code>GET /api/author/&lt;name&gt;/alias</code> 读取；<code>POST /api/author/&lt;name&gt;/alias</code> 保存，POST 可选 <code>merge</code>。</td><td>沿用 Talebook 既有单数 <code>/api/author/&lt;name&gt;</code> 层级和名称标识；读取公开，写入需登录、编辑权限和管理员身份。</td></tr>
             </tbody>
           </table></div>
           <h3>处理顺序</h3>
@@ -121,8 +119,8 @@
           <div class="table" role="region" aria-label="测试计划" tabindex="0"><table>
             <thead><tr><th>验证层</th><th>实际命令或页面</th><th>关键断言</th><th>结果</th></tr></thead>
             <tbody>
-              <tr><td>后端集成</td><td><code>pytest tests/test_aliases.py -v</code>；完整后端测试</td><td>持久化、搜索并集、作者聚合、数字 ID 资源路由与 HTTP 方法、权限、Calibre 原生作者 ID 合并、外部索引路径恢复、批量删除清理及既有行为。</td><td>13 passed；完整套件 840 passed、20 skipped；另以临时 Calibre 8.5.0 书库验证作者 ID 合并、关联书目与 <code>author_sort</code> 更新</td></tr>
-              <tr><td>前端组件</td><td><code>cd app &amp;&amp; npx vitest run test/components/AuthorAliasPanel.nuxt.spec.ts</code></td><td>名称解析为数字 ID、嵌套别名读取、PUT 替换、POST 合并、管理权限与失败重试。</td><td>5 passed</td></tr>
+              <tr><td>后端集成</td><td><code>pytest tests/test_aliases.py -v</code>；完整后端测试</td><td>持久化、搜索并集、作者聚合、单数 author/alias 路由、权限、Calibre 原生作者 ID 合并、外部索引路径恢复、批量删除清理及既有行为。</td><td>12 passed；完整套件 839 passed、20 skipped；另以临时 Calibre 8.5.0 书库验证作者 ID 合并、关联书目与 <code>author_sort</code> 更新</td></tr>
+              <tr><td>前端组件</td><td><code>cd app &amp;&amp; npx vitest run test/components/AuthorAliasPanel.nuxt.spec.ts</code></td><td>单数 author/alias 读取、普通保存、合并确认、管理权限和失败重试。</td><td>5 passed</td></tr>
               <tr><td>前端构建</td><td><code>cd app &amp;&amp; npm run build</code></td><td>客户端、SSR 与 Nitro 产物可生成。</td><td>通过</td></tr>
               <tr><td>界面审查</td><td>静态界面审查；书籍编辑、书籍详情、作者详情</td><td>加载失败可重试、空规范名有字段错误、别名 chip、合并警告与键盘操作。</td><td>无剩余可执行问题；环境缺少 Chrome DevTools MCP，未完成实际浏览器渲染检查</td></tr>
               <tr><td>质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、<code>make check-design</code></td><td>格式、静态检查与方案门禁通过。</td><td>通过；前端 lint 仅有 193 个仓库既有 warning</td></tr>
@@ -132,7 +130,7 @@
         </section>
         <section>
           <h2>8. 决策记录</h2>
-          <ol><li><strong>2026-08-19：</strong>别名属于 Talebook 增强索引，不塞入 Calibre 主字段或自定义列，以保证现有书库可直接升级。</li><li><strong>2026-08-19：</strong>别名聚合与作者合并拆为两个动作；聚合无损且即时生效，合并为管理员显式确认的写操作。</li><li><strong>2026-08-19：</strong>作者别名全局唯一；普通保存遇到跨组冲突时拒绝写入，管理员显式合并时才吸收完整冲突组，避免同一输入不确定地路由到多个作者。</li><li><strong>2026-08-29：</strong>复核 Calibre 8.5.0 数据模型与公开 DB API：原生没有作者别名字段，但已有作者 ID 重命名/合并能力；移除 Talebook 的逐书合并实现，改用 <code>author_data()</code> + <code>rename_items("authors", ...)</code>。</li><li><strong>2026-08-29：</strong>作者别名 API 改为复数资源与数字 ID 层级：查询名称只负责解析 ID，别名以 GET/PUT 表示，合并以独立 POST 子资源表示；删除未发布的 <code>/api/author-aliases/(.*)</code>，不保留动作开关兼容层。</li></ol>
+          <ol><li><strong>2026-08-19：</strong>别名属于 Talebook 增强索引，不塞入 Calibre 主字段或自定义列，以保证现有书库可直接升级。</li><li><strong>2026-08-19：</strong>别名聚合与作者合并拆为两个动作；聚合无损且即时生效，合并为管理员显式确认的写操作。</li><li><strong>2026-08-19：</strong>作者别名全局唯一；普通保存遇到跨组冲突时拒绝写入，管理员显式合并时才吸收完整冲突组，避免同一输入不确定地路由到多个作者。</li><li><strong>2026-08-29：</strong>复核 Calibre 8.5.0 数据模型与公开 DB API：原生没有作者别名字段，但已有作者 ID 重命名/合并能力；移除 Talebook 的逐书合并实现，改用 <code>author_data()</code> + <code>rename_items("authors", ...)</code>。</li><li><strong>2026-08-29：</strong>作者别名 API 遵循项目既有命名，使用 <code>/api/author/(.*)/alias</code>、原始名称标识与单数 <code>alias</code>；删除未发布的 <code>/api/author-aliases/(.*)</code>，不新增 <code>/api/authors</code> 或数字 ID 过渡层。</li></ol>
         </section>
       </main>
       <footer>Talebook internal design · webserver · ACTIVE · 2026-08-19</footer>

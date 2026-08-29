@@ -6,7 +6,6 @@ import sys
 from functools import cmp_to_key
 
 import tornado.escape
-import tornado.web
 
 from webserver import utils
 from webserver.handlers.base import ListHandler, auth, js
@@ -169,130 +168,59 @@ class MetaBooks(ListHandler):
         return response
 
 
-def get_calibre_author_name(cache, author_id):
-    try:
-        author_id = int(author_id)
-    except (TypeError, ValueError):
-        return None
-    return (cache.author_data([author_id]).get(author_id) or {}).get("name")
+class AuthorAliases(ListHandler):
+    @js
+    def get(self, name):
+        alias_service = AliasService(self.session)
+        group = alias_service.get_author_group(name)
+        group["book_count"] = len(get_author_book_ids(self, group["names"]))
+        group["can_edit"] = bool(self.current_user and self.current_user.can_edit() and self.is_admin())
+        return {"err": "ok", "author": group}
 
+    @js
+    @auth
+    def post(self, name):
+        if not self.current_user.can_edit() or not self.is_admin():
+            return {"err": "permission", "msg": _("无权操作")}
 
-def get_group_author_id(cache, names):
-    for name in names:
-        author_id = cache.get_item_id("authors", name)
-        if author_id is not None:
-            return int(author_id)
-    return None
-
-
-class AuthorResourceHandler(ListHandler):
-    def _can_edit_aliases(self):
-        return bool(self.current_user and self.current_user.can_edit() and self.is_admin())
-
-    def _serialize_group(self, group):
-        author = dict(group)
-        author["id"] = get_group_author_id(self.cache, group["names"])
-        author["book_count"] = len(get_author_book_ids(self, group["names"]))
-        author["can_edit"] = self._can_edit_aliases()
-        return author
-
-    def _replace_group(self, author_id, absorb_conflicts):
-        source_name = get_calibre_author_name(self.cache, author_id)
-        if source_name is None:
-            return None, {"err": "not_found", "msg": _("作者不存在")}
         try:
             data = tornado.escape.json_decode(self.request.body)
-            canonical = clean_alias_name(data.get("canonical") or source_name)
+            canonical = clean_alias_name(data.get("canonical") or name)
             aliases = data.get("aliases", [])
+            merge = data.get("merge") is True
         except (AttributeError, TypeError, ValueError):
-            return None, {"err": "params.aliases.invalid", "msg": _("别名参数无效")}
+            return {"err": "params.aliases.invalid", "msg": _("别名参数无效")}
 
         alias_service = AliasService(self.session)
-        source_names = alias_service.author_names(source_name)
+        source_names = alias_service.author_names(name)
         try:
-            group = alias_service.replace_author_group(
-                source_name,
-                canonical,
-                aliases,
-                absorb_conflicts=absorb_conflicts,
-            )
+            group = alias_service.replace_author_group(name, canonical, aliases, absorb_conflicts=merge)
         except AliasConflictError as error:
-            return None, {"err": "author.alias.conflict", "msg": str(error)}
+            return {"err": "author.alias.conflict", "msg": str(error)}
         except ValueError:
-            return None, {"err": "params.aliases.invalid", "msg": _("别名参数无效")}
-        return (source_names, group), None
-
-
-class AuthorCollection(AuthorResourceHandler):
-    @js
-    def get(self):
-        try:
-            name = clean_alias_name(self.get_argument("name"))
-        except (tornado.web.MissingArgumentError, TypeError, ValueError):
-            return {"err": "params.name.invalid", "msg": _("作者参数无效")}
-
-        group = AliasService(self.session).get_author_group(name)
-        author_id = get_group_author_id(self.cache, group["names"])
-        if author_id is None:
-            return {"err": "not_found", "msg": _("作者不存在")}
-        return {"err": "ok", "author": {"id": author_id, "name": group["canonical"]}}
-
-
-class AuthorAliases(AuthorResourceHandler):
-    @js
-    def get(self, author_id):
-        source_name = get_calibre_author_name(self.cache, author_id)
-        if source_name is None:
-            return {"err": "not_found", "msg": _("作者不存在")}
-        group = AliasService(self.session).get_author_group(source_name)
-        return {"err": "ok", "author": self._serialize_group(group)}
-
-    @js
-    @auth
-    def put(self, author_id):
-        if not self._can_edit_aliases():
-            return {"err": "permission", "msg": _("无权操作")}
-        result, error = self._replace_group(author_id, absorb_conflicts=False)
-        if error:
-            return error
-        _source_names, group = result
-        return {
-            "err": "ok",
-            "author": self._serialize_group(group),
-            "msg": _("作者别名更新成功"),
-        }
-
-
-class AuthorMerges(AuthorResourceHandler):
-    @js
-    @auth
-    def post(self, author_id):
-        if not self._can_edit_aliases():
-            return {"err": "permission", "msg": _("无权操作")}
-        result, error = self._replace_group(author_id, absorb_conflicts=True)
-        if error:
-            return error
-        source_names, group = result
+            return {"err": "params.aliases.invalid", "msg": _("别名参数无效")}
 
         merge_result = {"updated": 0, "failed": []}
-        member_names = source_names + group["names"]
-        rename_map, affected_books = calibre_author_merge_plan(self.cache, member_names, group["canonical"])
-        if rename_map:
-            try:
-                renamed_books, _id_map = rename_items_preserving_external_paths(
-                    self.db,
-                    self.session,
-                    "authors",
-                    rename_map,
-                    affected_books,
-                )
-                merge_result["updated"] = len(renamed_books)
-            except Exception:
-                logging.exception("Failed to merge Calibre authors %s", sorted(rename_map))
-                merge_result["failed"] = sorted(affected_books)
+        if merge:
+            member_names = source_names + group["names"]
+            rename_map, affected_books = calibre_author_merge_plan(self.cache, member_names, group["canonical"])
+            if rename_map:
+                try:
+                    renamed_books, _id_map = rename_items_preserving_external_paths(
+                        self.db,
+                        self.session,
+                        "authors",
+                        rename_map,
+                        affected_books,
+                    )
+                    merge_result["updated"] = len(renamed_books)
+                except Exception:
+                    logging.exception("Failed to merge Calibre authors %s", sorted(rename_map))
+                    merge_result["failed"] = sorted(affected_books)
+        group["book_count"] = len(get_author_book_ids(self, group["names"]))
         return {
             "err": "ok",
-            "author": self._serialize_group(group),
+            "author": group,
             "merge": merge_result,
             "msg": _("作者别名更新成功"),
         }
@@ -300,9 +228,7 @@ class AuthorMerges(AuthorResourceHandler):
 
 def routes():
     return [
-        (r"/api/authors", AuthorCollection),
-        (r"/api/authors/([0-9]+)/aliases", AuthorAliases),
-        (r"/api/authors/([0-9]+)/merges", AuthorMerges),
+        (r"/api/author/(.*)/alias", AuthorAliases),
         (r"/api/(author|publisher|tag|rating|series|format)", MetaList),
         (r"/api/(author|publisher|tag|rating|series|format)/(.*)", MetaBooks),
         (r"/api/author/(.*)/update", AuthorBooksUpdate),

@@ -41,7 +41,6 @@ function mountPanel() {
 
 function mockAuthorLoad(overrides = {}) {
     const author = {
-        id: 3,
         canonical: 'Hans Christian Andersen',
         aliases: ['安徒生'],
         names: ['Hans Christian Andersen', '安徒生'],
@@ -49,9 +48,7 @@ function mockAuthorLoad(overrides = {}) {
         can_edit: true,
         ...overrides,
     };
-    backendMock
-        .mockResolvedValueOnce({ err: 'ok', author: { id: author.id, name: author.canonical } })
-        .mockResolvedValueOnce({ err: 'ok', author });
+    backendMock.mockResolvedValueOnce({ err: 'ok', author });
     return author;
 }
 
@@ -68,7 +65,7 @@ describe('AuthorAliasPanel.vue', () => {
         backendMock.mockReset();
     });
 
-    it('resolves the author id and loads the nested alias resource', async () => {
+    it('loads aliases from the existing singular author hierarchy', async () => {
         mockAuthorLoad();
         const wrapper = mountPanel();
         await flushPromises();
@@ -76,8 +73,7 @@ describe('AuthorAliasPanel.vue', () => {
         expect(wrapper.text()).toContain('Hans Christian Andersen');
         expect(wrapper.text()).toContain('安徒生');
         expect(wrapper.text()).toContain('authorAliases.manage');
-        expect(backendMock).toHaveBeenNthCalledWith(1, '/authors?name=%E5%AE%89%E5%BE%92%E7%94%9F');
-        expect(backendMock).toHaveBeenNthCalledWith(2, '/authors/3/aliases');
+        expect(backendMock).toHaveBeenCalledWith('/author/%E5%AE%89%E5%BE%92%E7%94%9F/alias');
         wrapper.unmount();
     });
 
@@ -96,27 +92,28 @@ describe('AuthorAliasPanel.vue', () => {
         wrapper.unmount();
     });
 
-    it('replaces the nested alias collection with PUT', async () => {
+    it('saves aliases through POST on the singular alias resource', async () => {
         const author = mockAuthorLoad();
-        backendMock.mockResolvedValueOnce({ err: 'ok', author });
+        backendMock.mockResolvedValueOnce({ err: 'ok', author, merge: { updated: 0, failed: [] } });
         const wrapper = mountPanel();
         await flushPromises();
 
         await clickButton('authorAliases.manage');
         await clickButton('common.save');
 
-        expect(backendMock).toHaveBeenNthCalledWith(3, '/authors/3/aliases', {
-            method: 'PUT',
+        expect(backendMock).toHaveBeenNthCalledWith(2, '/author/%E5%AE%89%E5%BE%92%E7%94%9F/alias', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 canonical: 'Hans Christian Andersen',
                 aliases: ['安徒生'],
+                merge: false,
             }),
         });
         wrapper.unmount();
     });
 
-    it('creates an explicit nested merge resource with POST', async () => {
+    it('confirms a native merge through the same author alias resource', async () => {
         const author = mockAuthorLoad();
         backendMock.mockResolvedValueOnce({ err: 'ok', author, merge: { updated: 1, failed: [] } });
         const wrapper = mountPanel();
@@ -126,18 +123,19 @@ describe('AuthorAliasPanel.vue', () => {
         await clickButton('authorAliases.merge');
         await clickButton('authorAliases.confirmMerge');
 
-        expect(backendMock).toHaveBeenNthCalledWith(3, '/authors/3/merges', {
+        expect(backendMock).toHaveBeenNthCalledWith(2, '/author/%E5%AE%89%E5%BE%92%E7%94%9F/alias', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 canonical: 'Hans Christian Andersen',
                 aliases: ['安徒生'],
+                merge: true,
             }),
         });
         wrapper.unmount();
     });
 
-    it('shows a recoverable error state when author resolution fails', async () => {
+    it('shows a recoverable error state when aliases cannot be loaded', async () => {
         backendMock.mockRejectedValueOnce(new Error('offline'));
         const wrapper = mountPanel();
         await flushPromises();
