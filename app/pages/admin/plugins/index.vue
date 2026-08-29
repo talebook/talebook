@@ -122,6 +122,7 @@
                     <v-card
                         variant="outlined"
                         class="plugin-card h-100"
+                        :data-status="statusInfo(plugin).key"
                     >
                         <v-card-item>
                             <template #prepend>
@@ -143,7 +144,7 @@
                                 <v-chip
                                     size="small"
                                     :color="statusInfo(plugin).color"
-                                    variant="tonal"
+                                    :variant="statusInfo(plugin).key === 'enabled' ? 'flat' : 'tonal'"
                                 >
                                     <v-icon
                                         start
@@ -282,11 +283,34 @@
                             {{ t('pluginManagement.opdsServiceGuide') }}
                         </v-btn>
                     </section>
-                    <h3 class="text-subtitle-1 mt-5 mb-2">
+                    <section
+                        v-if="!supportsInstanceConnection(selectedPlugin)"
+                        class="personal-plugin-settings mt-5"
+                    >
+                        <h3 class="text-subtitle-1 mb-1">
+                            {{ t('pluginManagement.personalConfiguration') }}
+                        </h3>
+                        <p class="text-body-2 text-medium-emphasis mb-3">
+                            {{ t('pluginManagement.personalConfigurationDescription') }}
+                        </p>
+                        <v-btn
+                            v-if="selectedPlugin.ui.manage_route"
+                            color="primary"
+                            variant="tonal"
+                            prepend-icon="mdi-account-cog-outline"
+                            :to="selectedPlugin.ui.manage_route"
+                        >
+                            {{ selectedPlugin.ui.manage_label_key ? t(selectedPlugin.ui.manage_label_key) : t('pluginManagement.managePersonalConfiguration') }}
+                        </v-btn>
+                    </section>
+                    <h3
+                        v-if="supportsInstanceConnection(selectedPlugin)"
+                        class="text-subtitle-1 mt-5 mb-2"
+                    >
                         {{ t('pluginManagement.connection') }}
                     </h3>
                     <v-alert
-                        v-if="selectedConnection"
+                        v-if="supportsInstanceConnection(selectedPlugin) && selectedConnection"
                         :type="selectedConnection.health === 'unauthorized' ? 'error' : 'info'"
                         variant="tonal"
                         density="compact"
@@ -300,7 +324,7 @@
                         </div>
                     </v-alert>
                     <v-alert
-                        v-else
+                        v-else-if="supportsInstanceConnection(selectedPlugin)"
                         type="warning"
                         variant="tonal"
                         density="compact"
@@ -308,7 +332,10 @@
                         {{ t('pluginManagement.notConfigured') }}
                     </v-alert>
 
-                    <div class="d-flex flex-wrap ga-2 mt-3">
+                    <div
+                        v-if="supportsInstanceConnection(selectedPlugin)"
+                        class="d-flex flex-wrap ga-2 mt-3"
+                    >
                         <v-btn
                             v-if="selectedPlugin.ui.manage_kind === 'book_source'"
                             variant="outlined"
@@ -318,7 +345,7 @@
                             {{ selectedConnection ? t('pluginManagement.editConnection') : t('pluginManagement.configureConnection') }}
                         </v-btn>
                         <v-btn
-                            v-if="selectedPlugin.installation && selectedPlugin.ui.manage_kind !== 'book_source' && !selectedConnection"
+                            v-if="selectedPlugin.installation && supportsInstanceConnection(selectedPlugin) && selectedPlugin.ui.manage_kind !== 'book_source' && !selectedConnection"
                             color="primary"
                             variant="tonal"
                             prepend-icon="mdi-connection"
@@ -590,7 +617,18 @@ const tabs = computed(() => [
     { value: 'annotations', label: t('pluginManagement.tabAnnotations') },
     { value: 'reviews', label: t('pluginManagement.tabReviews') },
     { value: 'book_sources', label: t('pluginManagement.tabBookSources') },
+    { value: 'tools', label: t('pluginManagement.tabTools') },
+    { value: 'push', label: t('pluginManagement.tabPush') },
 ]);
+const PLUGIN_TYPE_TABS = Object.freeze({
+    combo: 'integrations',
+    meta: 'metadata',
+    annotation: 'annotations',
+    review: 'reviews',
+    source: 'book_sources',
+    tool: 'tools',
+    push: 'push',
+});
 const activeTab = computed({
     get: () => tabs.value.some(tab => tab.value === route.query.tab) ? route.query.tab : 'metadata',
     set: value => router.replace({ query: { ...route.query, tab: value } }),
@@ -642,7 +680,16 @@ const catalog = computed(() => definitions.value
         ui: definition.ui || {},
         installation: installations.value.find(item => item.plugin_key === definition.plugin_key) || null,
     })));
-const tabPlugins = computed(() => catalog.value.filter(plugin => plugin.categories.includes(activeTab.value)));
+function pluginType(plugin) {
+    const parts = String(plugin?.plugin_key || '').split('.');
+    return parts[0] === 'talebook' ? parts[1] || '' : '';
+}
+
+function pluginTab(plugin) {
+    return PLUGIN_TYPE_TABS[pluginType(plugin)] || '';
+}
+
+const tabPlugins = computed(() => catalog.value.filter(plugin => pluginTab(plugin) === activeTab.value));
 const filteredPlugins = computed(() => {
     const needle = (search.value || '').trim().toLowerCase();
     return tabPlugins.value.filter((plugin) => {
@@ -678,17 +725,21 @@ function connectionFor(plugin) {
     return connections.value.find(item => item.installation_id === plugin.installation?.id) || null;
 }
 
+function supportsInstanceConnection(plugin) {
+    return (plugin?.connection_owners || []).includes('instance');
+}
+
 function statusInfo(plugin) {
     if (!plugin.installation) return { key: 'uninstalled', text: t('pluginManagement.uninstalled'), color: 'grey', icon: 'mdi-download-outline' };
     if (!plugin.installation.enabled) return { key: 'disabled', text: t('pluginManagement.disabled'), color: 'grey', icon: 'mdi-pause-circle-outline' };
     const connection = connectionFor(plugin);
     const selfReported = builtinState.value[plugin.plugin_key];
-    if (!connection && plugin.ui.primary_action === 'configure' && !selfReported) {
+    if (!connection && supportsInstanceConnection(plugin) && plugin.ui.primary_action === 'configure' && !selfReported) {
         return { key: 'unconfigured', text: t('pluginManagement.unconfigured'), color: 'warning', icon: 'mdi-cog-outline' };
     }
     if (connection?.health === 'unauthorized') return { key: 'unhealthy', text: t('pluginManagement.unauthorized'), color: 'error', icon: 'mdi-key-alert-outline' };
     if (connection?.health === 'degraded') return { key: 'unhealthy', text: t('pluginManagement.unhealthy'), color: 'warning', icon: 'mdi-alert-outline' };
-    return { key: 'enabled', text: t('pluginManagement.enabled'), color: 'success', icon: 'mdi-check-circle-outline' };
+    return { key: 'enabled', text: t('pluginManagement.enabled'), color: 'green-darken-3', icon: 'mdi-check-circle-outline' };
 }
 
 function healthLabel(value) {
@@ -705,11 +756,15 @@ function capabilityLabel(value) {
         'integrations.community': t('pluginManagement.capCommunity'),
         'integrations.recommendations': t('pluginManagement.capRecommendations'),
         'annotations.import': t('pluginManagement.capAnnotationsImport'),
+        'annotations.push': t('pluginManagement.capAnnotationsPush'),
+        'annotations.chapter_reviews': t('pluginManagement.capChapterReviews'),
         'reviews.import': t('pluginManagement.capReviewsImport'),
+        'reviews.lookup': t('pluginManagement.capReviewsLookup'),
         'book_sources.browse': t('pluginManagement.capBrowse'),
         'book_sources.search': t('pluginManagement.capSearch'),
         'book_sources.acquire': t('pluginManagement.capAcquire'),
         'integrations.tool': t('pluginManagement.capTool'),
+        'integrations.push': t('pluginManagement.capPush'),
     };
     return labels[value] || value;
 }
@@ -724,7 +779,7 @@ function summary(plugin) {
 }
 
 function attentionCount(tab) {
-    return catalog.value.filter(plugin => plugin.categories.includes(tab) && statusInfo(plugin).key !== 'enabled').length;
+    return catalog.value.filter(plugin => pluginTab(plugin) === tab && statusInfo(plugin).key !== 'enabled').length;
 }
 
 // 插件自己声明管理入口，前端不再为每个插件写一条分支。
@@ -881,6 +936,7 @@ async function saveConnection() {
 }
 
 function openConnectionDialog(plugin = selectedPlugin.value) {
+    if (!supportsInstanceConnection(plugin)) return;
     connectionTrigger = document.activeElement;
     connectionPlugin.value = plugin;
     dialogConnectionName.value = 'default';
@@ -1064,6 +1120,11 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 .plugin-page-header { white-space: normal; }
 .plugin-page-header__copy { flex: 1 1 320px; min-width: 0; }
 .plugin-card { display: flex; flex-direction: column; }
+.plugin-card[data-status="enabled"] {
+    border-color: rgba(var(--v-theme-success), .42);
+    background-color: rgb(var(--v-theme-surface));
+    background-image: linear-gradient(rgba(var(--v-theme-success), .11), rgba(var(--v-theme-success), .11));
+}
 .plugin-card :deep(.v-card-actions) { margin-top: auto; }
 .plugin-description { min-height: 2.8em; }
 @media (max-width: 767px) {
@@ -1080,5 +1141,5 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 }
 :deep(.plugin-drawer-dialog .text-caption) { overflow-wrap: anywhere; }
 .connection-form { padding: 14px; border: 1px solid rgb(var(--v-theme-outline-variant)); border-radius: 10px; }
-.opds-service-settings { padding: 14px; border: 1px solid rgb(var(--v-theme-outline-variant)); border-radius: 10px; }
+.opds-service-settings, .personal-plugin-settings { padding: 14px; border: 1px solid rgb(var(--v-theme-outline-variant)); border-radius: 10px; }
 </style>

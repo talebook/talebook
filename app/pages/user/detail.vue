@@ -5,13 +5,17 @@
             v-model="activeTab"
             class="mb-4"
         >
-            <v-tab>{{ t('user.basicInfo') }}</v-tab>
-            <v-tab>{{ t('user.deviceMgt') }}</v-tab>
+            <v-tab value="profile">
+                {{ t('user.basicInfo') }}
+            </v-tab>
+            <v-tab value="devices">
+                {{ t('user.deviceMgt') }}
+            </v-tab>
         </v-tabs>
 
         <v-tabs-window v-model="activeTab">
             <!-- Tab 1: Basic Info -->
-            <v-tabs-window-item>
+            <v-tabs-window-item value="profile">
                 <v-form
                     ref="form"
                     @submit.prevent="save"
@@ -145,7 +149,7 @@
             </v-tabs-window-item>
 
             <!-- Tab 2: Reading Devices -->
-            <v-tabs-window-item>
+            <v-tabs-window-item value="devices">
                 <v-card
                     flat
                     class="pa-2"
@@ -304,17 +308,26 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
 import { useI18n } from 'vue-i18n';
 
 const { $backend, $alert } = useNuxtApp();
+const route = useRoute();
 const router = useRouter();
 const mainStore = useMainStore();
 const { t } = useI18n();
 
-const activeTab = ref(0);
+const activeTab = computed({
+    get: () => route.query.tab === 'devices' ? 'devices' : 'profile',
+    set: (value) => {
+        const query = { ...route.query };
+        if (value === 'devices') query.tab = 'devices';
+        else delete query.tab;
+        router.replace({ query });
+    },
+});
 const user = ref({});
 const show_pass = ref(false);
 const form = ref(null);

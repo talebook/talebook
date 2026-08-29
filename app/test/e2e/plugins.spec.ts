@@ -7,7 +7,8 @@ test.describe('Plugin management', () => {
         await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
     });
 
-    test('shows five business tabs and opens the WeRead integration workbench', async ({ page }) => {
+    test('classifies plugins by canonical id and routes personal configuration correctly', async ({ page }) => {
+        test.slow();
         await page.setViewportSize({ width: 1280, height: 900 });
         const catalogPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/plugins'));
         await page.goto('/admin/plugins');
@@ -15,25 +16,65 @@ test.describe('Plugin management', () => {
 
         await expect(page.getByRole('tab', { name: '综合服务' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '元数据' })).toBeVisible();
-        await expect(page.getByRole('tab', { name: '笔记（含章评）' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: '划线笔记' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '评价' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '书源' })).toBeVisible();
-        await expect(page.getByText('Open Library')).toBeVisible();
+        await expect(page.getByRole('tab', { name: '书籍工具' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: '推送设备' })).toBeVisible();
+        await expect(page.getByText('Google Books / Amazon')).toBeVisible();
+        await expect(page.getByText('Open Library')).toHaveCount(0);
 
         await page.getByRole('tab', { name: '综合服务' }).click();
+        await expect(page.getByText('Open Library')).toBeVisible();
+        await expect(page.getByText('Google Books / Amazon')).toHaveCount(0);
         const weread = page.locator('.plugin-card').filter({ hasText: '微信读书' });
-        await expect(weread).toBeVisible();
+        await weread.getByRole('button', { name: '详情' }).click();
+        const wereadDetails = page.getByRole('dialog', { name: '微信读书' });
+        await expect(wereadDetails.getByRole('heading', { name: '个人配置' })).toBeVisible();
+        await expect(wereadDetails.getByText('公开配置（JSON）')).toHaveCount(0);
+        await expect(wereadDetails.getByRole('button', { name: '创建连接' })).toHaveCount(0);
+        await wereadDetails.getByRole('button', { name: '关闭' }).click();
         await weread.getByRole('button', { name: '打开工作台' }).click();
         await expect(page).toHaveURL(/\/plugins\/weread/);
         await expect(page.getByRole('heading', { name: '微信读书工作台' })).toBeVisible();
 
+        await page.goto('/admin/plugins?tab=tools');
+        await expect(page.getByText('TXT 编码修复')).toBeVisible();
+        await page.goto('/admin/plugins?tab=push');
+        const boox = page.locator('.plugin-card').filter({ hasText: 'BOOX' });
+        await expect(boox).toHaveAttribute('data-status', 'enabled');
+        await boox.getByRole('button', { name: '管理设备' }).click();
+        await expect(page).toHaveURL(/\/user\/detail\?tab=devices/);
+        await expect(page.getByRole('tab', { name: '阅读设备' })).toHaveAttribute('aria-selected', 'true');
+
         await page.goto('/admin/plugins?tab=book_sources');
-        await page.getByRole('tab', { name: '书源' }).click();
         await expect(page.getByText('Generic OPDS')).toBeVisible();
         await expect(page.getByText('Legado 在线书源')).toBeVisible();
         await expect(page.getByText('Watch Folder')).toBeVisible();
         await expect(page.getByText('Calibre Content Server')).toHaveCount(0);
         await expect(page.getByText('Calibre-Web')).toHaveCount(0);
+    });
+
+    test('uses a green surface for enabled cards without removing the text status', async ({ page, request }) => {
+        await page.goto('/admin/plugins?tab=book_sources');
+        const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
+        await expect(card).toHaveAttribute('data-status', 'enabled');
+        await expect(card.getByText('正常')).toBeVisible();
+        expect(await card.evaluate(element => getComputedStyle(element).backgroundImage)).toContain('linear-gradient');
+
+        await request.post(`${mockApi}/api/admin/plugins/installations/1/state`, { data: { enabled: false } });
+        await page.reload();
+        await expect(card).toHaveAttribute('data-status', 'disabled');
+        await expect(card.getByText('已停用')).toBeVisible();
+        expect(await card.evaluate(element => getComputedStyle(element).backgroundImage)).toBe('none');
+    });
+
+    test('keeps the canonical tabs reachable on iPad portrait', async ({ page }) => {
+        await page.setViewportSize({ width: 744, height: 1133 });
+        await page.goto('/admin/plugins?tab=push');
+        await expect(page.getByRole('tab', { name: '推送设备' })).toHaveAttribute('aria-selected', 'true');
+        await expect(page.locator('.plugin-card').filter({ hasText: 'BOOX' })).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(744);
     });
 
     test('configures a source, previews candidates, and shows compliance columns', async ({ page }) => {
@@ -90,7 +131,7 @@ test.describe('Plugin management', () => {
     });
 
     test('creates a no-secret connector connection, previews it, and keeps config explicit', async ({ page }) => {
-        await page.goto('/admin/plugins?tab=metadata');
+        await page.goto('/admin/plugins?tab=integrations');
         const card = page.locator('.plugin-card').filter({ hasText: 'Open Library' });
         const configureButton = card.getByRole('button', { name: '配置' });
         await configureButton.click();
@@ -147,7 +188,9 @@ test.describe('Plugin management', () => {
 
     test('keeps filters in the URL and reflows the details panel on mobile', async ({ page }) => {
         await page.setViewportSize({ width: 375, height: 812 });
+        const catalogPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/plugins'));
         await page.goto('/admin/plugins?tab=book_sources');
+        await catalogPromise;
         const description = page.getByText('连接外部服务，补全书籍信息、导入笔记与评价，或添加书源。');
         await expect(description).toBeVisible();
         expect(await description.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);

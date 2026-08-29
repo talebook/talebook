@@ -59,6 +59,15 @@ def test_all_book_source_plugins_use_the_source_namespace():
     assert actual == expected
 
 
+def test_push_plugins_declare_personal_device_management_route():
+    for provider in plugin_register.PUSH_PROVIDERS:
+        manifest = provider.manifest
+        assert manifest["id"].startswith("talebook.push.")
+        assert manifest["connection_owners"] == ["user"]
+        assert manifest["ui"]["manage_route"] == "/user/detail?tab=devices"
+        assert manifest["ui"]["manage_label_key"] == "pluginManagement.manageDevices"
+
+
 def test_registration_has_one_primary_group_and_derived_auto_install_lifecycle():
     grouped = [provider for providers in plugin_register.PROVIDER_GROUPS.values() for provider in providers]
 
