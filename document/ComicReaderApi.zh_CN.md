@@ -8,7 +8,7 @@ Reader 沿用 Candle Reader 的静态 JavaScript 模式，不作为 Talebook 的
 
 - 上游 `komga-reader` 构建自包含的 ESM、UMD 和 CSS；浏览器 bundle 内含隔离的 Vue runtime，不依赖全局 `Vue`、裸模块解析或 CDN；
 - Talebook 将不可变上游 commit 的产物、许可证和版本记录固定在 `app/public/static/komga-reader/`；
-- `/read-comic/:bookId` 是 Tornado 路由，由后端先完成登录、权限、书籍媒体类型和容器选择校验，再渲染轻量 HTML host；Nginx 的 dev、SPA 和 SSR 配置均将该路径直接转发给 Tornado；
+- `/read-comic/:bookId` 是 Tornado 主路由，由后端先完成登录、权限、书籍媒体类型和容器选择校验，再渲染轻量 HTML host；Nginx 的 dev、SPA 和 SSR 配置均将该路径直接转发给 Tornado；为兼容统一将后端页面放在 `/api` 下的既有部署和调用方，`/api/read-comic/:bookId` 由同一 Handler 处理，执行完全相同的校验；
 - 后端模板从同源版本 URL 动态加载 ESM，并在刷新或离页时调用 `destroy()`；Nuxt 中不存在 `app/pages/read-comic` 页面，也不承担 Reader 生命周期或 API 适配；
 - 当前固定版本见仓库根目录 `komga-reader-version.txt`，后端版本常量与静态模块 URL 使用相同值完成缓存失效。
 
