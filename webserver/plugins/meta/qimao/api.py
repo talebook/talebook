@@ -16,6 +16,8 @@ import requests
 from webserver.i18n import _
 
 QIMAO_ISBN = "0000000000004"  # 七猫小说专用 ISBN 占位符
+from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+
 KEY = "QimaoNovel"
 
 # ============================================================
@@ -263,3 +265,30 @@ def get_qimao_metadata(mi):
     except Exception as e:
         logging.error("七猫小说接口异常：%s" % e)
         return None
+
+
+class QimaoProvider(MetaSourceMixin, QimaoNovelApi):
+    proxy_image_hosts = ("wtzw.com",)
+    manifest = meta_manifest(
+        "talebook.meta.qimao",
+        "七猫小说",
+        "从七猫小说检索网文书名、作者、简介与封面。",
+        "mdi-cat",
+        "https://www.qimao.com/",
+    )
+
+    def __init__(self):
+        super().__init__(copy_image=False)
+
+    def _search(self, query, context):
+        mi = self.get_book(query.title, query.authors[0] if query.authors else None)
+        return [mi] if mi else []
+
+    def _fetch(self, external_id, context):
+        return self.get_book_by_id(external_id)
+
+    def get_cover(self, cover_url, context=None):
+        return QimaoNovelApi(copy_image=True).get_cover(cover_url)
+
+
+PROVIDER = QimaoProvider()

@@ -11,7 +11,6 @@ import unittest
 
 from tests.test_admin import *
 from tests.test_baike import *
-from tests.test_douban import *
 from tests.test_main import *
 from tests.test_models import *
 from tests.test_scan import *

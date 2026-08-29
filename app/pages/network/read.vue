@@ -137,7 +137,7 @@ const getContent = (i) => {
     const ch = chapters.value[i];
     loading.value = true;
     $backend(
-        `/network/content?source_id=${sourceId.value}&chapter_url=${encodeURIComponent(ch.url)}`,
+        `/book-sources/content?source_id=${sourceId.value}&chapter_url=${encodeURIComponent(ch.url)}`,
     )
         .then((res) => {
             if (res.err !== 'ok') {

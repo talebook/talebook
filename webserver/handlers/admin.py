@@ -40,7 +40,6 @@ CONF = loader.get_settings()
 
 # 元数据源配置
 META_ALL_SOURCES = [
-    "douban",
     "douban_v2",
     "baidu",
     "google",
@@ -52,15 +51,15 @@ META_ALL_SOURCES = [
     "neodb",
     "booksource",
 ]
-DEFAULT_META_SOURCES = ["douban", "baidu", "xinhua", "booksource"]
+DEFAULT_META_SOURCES = ["douban_v2", "baidu", "xinhua", "booksource"]
 SOCIAL_AUTH_SETTING_RE = re.compile(r"^SOCIAL_AUTH_[A-Z0-9_]+_(KEY|SECRET)$")
 
 
 def normalize_meta_sources(value):
-    """把下线的固定站点选项迁移到通用在线书源，并保持百度百科独立。"""
+    """把下线的固定站点选项迁移到仍在维护的来源，并保持百度百科独立。"""
     if not isinstance(value, list):
         return list(DEFAULT_META_SOURCES)
-    aliases = {"biquge": "booksource", "youshu": "booksource"}
+    aliases = {"biquge": "booksource", "youshu": "booksource", "douban": "douban_v2"}
     normalized = []
     for source in value:
         source = aliases.get(source, source)
@@ -526,9 +525,6 @@ class AdminSettings(BaseHandler):
             "import_allowed_roots",
             "import_watch_interval_seconds",
             "import_scan_batch_size",
-            "douban_apikey",
-            "douban_baseurl",
-            "douban_max_count",
             "auto_fill_meta",
             "auto_fill_keep_cover",
             "META_SELECTED_SOURCES",

@@ -7,6 +7,8 @@ import logging
 from webserver.i18n import _
 
 from . import api
+from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+
 from .api import KEY
 
 
@@ -86,3 +88,26 @@ class DoubanV2MetaPlugin:
         except Exception:
             logging.error("豆瓣V2 ISBN查询 %s 失败", isbn)
             return None
+
+
+class DoubanV2Provider(MetaSourceMixin, DoubanV2MetaPlugin):
+    proxy_image_hosts = ("doubanio.com",)
+    manifest = meta_manifest(
+        "talebook.meta.douban-v2",
+        "豆瓣",
+        "解析豆瓣读书搜索页，提取书名、作者、出版信息、评分与简介。",
+        "mdi-book-search",
+        "https://book.douban.com/",
+    )
+
+    def _search(self, query, context):
+        return self.search(title=query.title, isbn=query.isbn, publisher=query.publisher) or []
+
+    def _fetch(self, external_id, context):
+        return self.get_metadata_by_provider(external_id)
+
+    def get_cover(self, cover_url, context=None):
+        return DoubanV2MetaPlugin.get_cover(self, cover_url)
+
+
+PROVIDER = DoubanV2Provider()

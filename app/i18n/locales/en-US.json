@@ -237,6 +237,7 @@
     "tabBrowse": "Browse",
     "readOnline": "Read online",
     "saveToLocal": "Save to library",
+    "openExternal": "Open source page",
     "noResult": "No results found",
     "partialFailed": "Some sources returned no result",
     "searching": "Searching...",
@@ -801,9 +802,6 @@
         "autoFillMeta": "Auto fill book info",
         "autoFillKeepCover": "Only update book info when auto-filling",
         "metaSelectedSource": "Select enabled metadata sources",
-        "doubanBaseurl": "Douban API URL",
-        "doubanApiKey": "Douban API Key",
-        "doubanMaxCount": "Douban API max results",
         "staticHost": "CDN domain",
         "bookNamesFormat": "Directory naming format",
         "epubViewer": "EPUB Reader",
@@ -872,7 +870,6 @@
         "bookCategoriesInfo": "Configure preset categories for the 'Categories' page. When adding books, if the book title or author name contains these categories, the corresponding tags will be automatically added.",
         "bookInfoSourcesInfo": "Configure sources for fetching book metadata from the internet. Multiple sources can be enabled simultaneously.",
         "audiobookSettingsInfo": "After a successful replacement, the previous edition becomes a backup. This sets the default number retained per book; deletion only runs from the cleanup button on that book.",
-        "doubanPluginInfo": "To enable Douban plugin, please refer to the installation documentation. If it fails, you can try changing the mirror, such as talebook/douban-api-rs",
         "logoInfo": "To adjust the logo, please refer to the installation documentation.",
         "opdsInfo": "OPDS (Open Publication Distribution System) is an open standard for ebook distribution. When disabled, OPDS clients will not be able to access the library.",
         "webdavInfo": "WebDAV lets clients that support the protocol (e.g. Windows File Explorer, macOS Finder, ES File Explorer) mount the library directly using the site account. When the sync folder is enabled, each user gets an isolated writable reader directory.",
@@ -898,7 +895,6 @@
         "dbForceWarning": "The target database already contains {count} records. A forced migration will permanently erase all existing data before writing. This cannot be undone — please back up first!"
       },
       "meta_source": {
-        "douban": "Douban",
         "baidu": "Baidu Baike",
         "google": "Google Books",
         "amazon": "Amazon",
@@ -1608,6 +1604,7 @@
     "capCommunity": "Community content",
     "capRecommendations": "Recommendations",
     "capAnnotationsImport": "Note import",
+    "capReviewsImport": "Review import",
     "capAcquire": "Acquire and import",
     "health_unknown": "Not tested",
     "health_healthy": "Connected",
@@ -1673,6 +1670,7 @@
     "capContentEdit": "Content edit",
     "capContentConvert": "Chinese convert",
     "capEncodingFix": "Encoding fix",
+    "capTool": "Book tool",
     "openTool": "Open"
   },
   "theme": {
@@ -1705,6 +1703,9 @@
       "run": "Run",
       "newBook": "Save as new book",
       "overwrite": "Overwrite original",
+      "saveNewAction": "Save as new book",
+      "overwriteAction": "Overwrite original",
+      "overwriteConfirm": "Overwriting will replace the existing file for “{title}” and cannot be undone. Continue?",
       "suffix": "New book title suffix"
     },
     "textReplace": {

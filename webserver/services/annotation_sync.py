@@ -3,9 +3,14 @@
 
 import datetime
 import logging
+from dataclasses import asdict
 
 from webserver.models import Annotation, AnnotationSource
+from webserver.plugins.runtime.domains import Annotation as PluginAnnotation
+from webserver.plugins.runtime.domains import PushReceipt, SourceState
 from webserver.services import AsyncService
+from webserver.services.plugin_runtime import REGISTRY, PluginRuntime
+from webserver.services.plugin_writers import source_name_for
 
 
 def _parse_source_datetime(value):
@@ -18,7 +23,7 @@ def _parse_source_datetime(value):
 
 
 class AnnotationSyncService(AsyncService):
-    """Fan public annotations out to source writers registered by plugins."""
+    """Fan public annotations out to typed plugin connections and legacy writers."""
 
     _writers = {}
 
@@ -58,14 +63,49 @@ class AnnotationSyncService(AsyncService):
             self.session.add(source)
         return source
 
+    def _typed_writers(self, annotation, registry, settings):
+        runtime = PluginRuntime(self.session, settings, registry=registry)
+        writers = {}
+        for connection in runtime.connections_for("annotations.push", user_id=annotation.reader_id):
+            source_name = source_name_for(self.session, connection)
+            source_connection_id = str(connection.id)
+
+            def writer(annotation_data, source_data, _connection=connection):
+                receipt = runtime.sync(
+                    _connection,
+                    "push_annotation",
+                    PluginAnnotation.from_dict(annotation_data),
+                    SourceState.from_dict(source_data),
+                    required_scopes=("annotations.write",),
+                )
+                if not isinstance(receipt, PushReceipt):
+                    raise TypeError("AnnotationProvider.push_annotation must return PushReceipt")
+                return asdict(receipt)
+
+            writers[(source_name, source_connection_id)] = writer
+        return writers
+
     @AsyncService.register_service
-    def sync_annotation(self, annotation_id, exclude_source_name=None, exclude_source_connection_id=""):
+    def sync_annotation(
+        self,
+        annotation_id,
+        exclude_source_name=None,
+        exclude_source_connection_id="",
+        registry=None,
+        settings=None,
+    ):
         annotation = self.session.get(Annotation, int(annotation_id))
         if annotation is None or annotation.is_private:
             return
 
+        if settings is None:
+            from webserver.loader import get_settings
+
+            settings = get_settings()
+        writers = dict(self._writers)
+        writers.update(self._typed_writers(annotation, registry or REGISTRY, settings))
         excluded = (exclude_source_name, str(exclude_source_connection_id or ""))
-        for (source_name, source_connection_id), writer in list(self._writers.items()):
+        for (source_name, source_connection_id), writer in list(writers.items()):
             if (source_name, source_connection_id) == excluded:
                 continue
             now = datetime.datetime.now()

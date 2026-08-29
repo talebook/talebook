@@ -1,5 +1,7 @@
 import hashlib
 import json
+import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -7,19 +9,20 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Base, PluginRunItem, PluginSourceRecord
-from webserver.plugins.runtime.book_sources import (
-    BOOK_SOURCE_PROVIDERS,
-    InternetArchiveProvider,
-    OPDSProvider,
-    WatchFolderProvider,
-    WebDAVProvider,
-)
+from webserver.plugins.register import SOURCE_PROVIDERS
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderItem, ProviderResult
 from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient, validate_remote_endpoint
+from webserver.plugins.source.base import OPDSProvider
+from webserver.plugins.source.internet_archive import InternetArchiveProvider
+from webserver.plugins.source.legado import PROVIDER as LEGADO_PROVIDER
+from webserver.plugins.source.watch_folder import WatchFolderProvider
+from webserver.plugins.source.webdav import WebDAVProvider
+from webserver.services.booksource import SourceHttpError
+from webserver.services.booksource_search import TASK_TTL, SearchTaskService
 from webserver.services.plugin_runtime import PluginRegistry, PluginRuntime, install_builtin, save_connection
 
 
-SETTINGS = {"PLUGIN_SECRET_KEY": "book-source-test-key", "cookie_secret": "unused"}
+SETTINGS = {"PLUGIN_SECRET_KEY": "source-test-key", "cookie_secret": "unused"}
 
 
 def response(payload, content_type="application/json", status=200, headers=None):
@@ -59,24 +62,152 @@ def context(action="preview", config=None, cursor=None, platform=None):
     }
 
 
+def test_shared_connection_health_aggregates_all_bound_sources():
+    service = SearchTaskService()
+    service._tasks["health-test"] = {
+        "done": 2,
+        "total": 2,
+        "sources": {
+            "legado:1": {"connection_id": 7, "state": "done", "error": ""},
+            "legado:2": {"connection_id": 7, "state": "failed", "error": "fetch_failed"},
+        },
+    }
+
+    assert service.pop_health_updates("health-test") == [{"connection_id": 7, "healthy": False, "message": "fetch_failed"}]
+    assert service.pop_health_updates("health-test") == []
+    service._tasks.pop("health-test", None)
+
+
+def test_search_runtime_batch_finalizes_without_status_polling():
+    service = SearchTaskService()
+    finalized = threading.Event()
+    observed = {}
+
+    def finish(batch, outcomes):
+        observed.update(outcomes)
+        finalized.set()
+
+    result = SimpleNamespace(items=[])
+    source = {
+        "source_id": "plugin:one",
+        "source_name": "One",
+        "connection_id": 7,
+        "legacy_id": None,
+        "call": lambda _key, _page: result,
+        "runtime_batch": {"run_id": 7001, "finalize": finish},
+    }
+    task = service.create_task("book", 1, [source])
+
+    assert finalized.wait(2), "batch finalizer must not depend on a status request"
+    deadline = time.time() + 2
+    settled = False
+    while time.time() < deadline:
+        with service._lock:
+            settled = 7001 in service._tasks[task["task_id"]]["settled_runtime_batches"]
+        if settled:
+            break
+        time.sleep(0.01)
+    assert settled is True
+    assert observed == {"plugin:one": result}
+    service._tasks.pop(task["task_id"], None)
+
+
+def test_search_runtime_batch_finalizer_failure_stays_retryable_until_persisted():
+    service = SearchTaskService()
+    first_attempt = threading.Event()
+    calls = []
+
+    def flaky_finish(_batch, outcomes):
+        calls.append(outcomes)
+        if len(calls) == 1:
+            first_attempt.set()
+            raise RuntimeError("temporary database failure")
+
+    result = SimpleNamespace(items=[])
+    source = {
+        "source_id": "plugin:retry",
+        "source_name": "Retry",
+        "connection_id": 8,
+        "legacy_id": None,
+        "call": lambda _key, _page: result,
+        "runtime_batch": {"run_id": 7003, "finalize": flaky_finish},
+    }
+    task = service.create_task("book", 1, [source])
+    task_id = task["task_id"]
+
+    assert first_attempt.wait(2)
+    deadline = time.time() + 2
+    while time.time() < deadline:
+        with service._lock:
+            state = service._tasks[task_id]
+            retryable = 7003 not in state["settling_runtime_batches"]
+            persisted = 7003 in state["settled_runtime_batches"]
+        if retryable:
+            break
+        time.sleep(0.01)
+    assert retryable is True
+    assert persisted is False
+    assert service.get_status(task_id)["finished"] is False
+
+    updates = service.pop_runtime_updates(task_id)
+    assert [update["run_id"] for update in updates] == [7003]
+    updates[0]["batch"]["finalize"](updates[0]["batch"], updates[0]["outcomes"])
+    service.settle_runtime_update(task_id, 7003, True)
+
+    assert service.get_status(task_id)["finished"] is True
+    assert service.pop_runtime_updates(task_id) == []
+    assert calls == [{"plugin:retry": result}, {"plugin:retry": result}]
+    service._tasks.pop(task_id, None)
+
+
+def test_expired_search_task_drains_runtime_batch_before_cleanup():
+    service = SearchTaskService()
+    finalized = []
+    service._tasks["expired-audit"] = {
+        "created_at": time.time() - TASK_TTL - 1,
+        "done": 1,
+        "total": 1,
+        "sources": {
+            "source:1": {
+                "source_id": "source:1",
+                "state": "done",
+                "runtime_batch_id": 7002,
+                "_outcome": "ok",
+            }
+        },
+        "runtime_batches": {7002: {"run_id": 7002, "finalize": lambda _batch, outcomes: finalized.append(outcomes)}},
+        "settled_runtime_batches": set(),
+        "settling_runtime_batches": set(),
+    }
+
+    service._cleanup()
+
+    assert finalized == [{"source:1": "ok"}]
+    assert "expired-audit" not in service._tasks
+
+
 def test_catalog_declares_real_capabilities_and_keeps_excluded_servers_out():
-    manifests = {provider.manifest["id"]: provider.manifest for provider in BOOK_SOURCE_PROVIDERS}
+    manifests = {
+        provider.manifest["id"]: provider.manifest
+        for provider in SOURCE_PROVIDERS
+        if provider.manifest["runtime_kind"] != "builtin"
+    }
 
     assert set(manifests) == {
-        "talebook.book-source.kavita",
-        "talebook.book-source.komga",
-        "talebook.book-source.booklore",
-        "talebook.book-source.standard-ebooks",
-        "talebook.book-source.gutenberg",
-        "talebook.book-source.internet-archive",
-        "talebook.book-source.webdav",
-        "talebook.book-source.watch-folder",
+        "talebook.source.kavita",
+        "talebook.source.komga",
+        "talebook.source.booklore",
+        "talebook.source.standard-ebooks",
+        "talebook.source.gutenberg",
+        "talebook.source.internet-archive",
+        "talebook.source.webdav",
+        "talebook.source.watch-folder",
     }
-    assert manifests["talebook.book-source.webdav"]["capabilities"] == [
+    assert manifests["talebook.source.webdav"]["capabilities"] == [
         "book_sources.browse",
         "book_sources.acquire",
     ]
-    assert manifests["talebook.book-source.watch-folder"]["capabilities"] == [
+    assert manifests["talebook.source.watch-folder"]["capabilities"] == [
         "book_sources.browse",
         "book_sources.acquire",
     ]
@@ -86,8 +217,11 @@ def test_catalog_declares_real_capabilities_and_keeps_excluded_servers_out():
 
 
 def test_endpoint_policy_rejects_private_credentials_and_redirect_targets():
-    public = lambda *args, **kwargs: [(2, 1, 6, "", ("93.184.216.34", 443))]
-    private = lambda *args, **kwargs: [(2, 1, 6, "", ("127.0.0.1", 80))]
+    def public(*args, **kwargs):
+        return [(2, 1, 6, "", ("93.184.216.34", 443))]
+
+    def private(*args, **kwargs):
+        return [(2, 1, 6, "", ("127.0.0.1", 80))]
 
     assert validate_remote_endpoint("https://books.example/opds", resolver=public).startswith("https://")
     with pytest.raises(EndpointPolicyError):
@@ -98,13 +232,29 @@ def test_endpoint_policy_rejects_private_credentials_and_redirect_targets():
     redirect = response(b"", status=302, headers={"Location": "http://127.0.0.1/private"})
     session = SimpleNamespace(request=lambda *args, **kwargs: redirect)
     with pytest.raises(EndpointPolicyError):
-        SafeHttpClient(session=session, resolver=lambda host, *args, **kwargs: public() if host != "127.0.0.1" else private()).request(
-            "GET", "https://books.example/opds"
-        )
+        SafeHttpClient(
+            session=session, resolver=lambda host, *args, **kwargs: public() if host != "127.0.0.1" else private()
+        ).request("GET", "https://books.example/opds")
+
+
+def test_legado_provider_does_not_auto_allowlist_source_target():
+    raw = {
+        "bookSourceName": "private target",
+        "bookSourceUrl": "http://127.0.0.1",
+        "searchUrl": "http://127.0.0.1/search?key={{key}}",
+        "ruleSearch": {},
+    }
+
+    with pytest.raises(SourceHttpError) as exc:
+        LEGADO_PROVIDER.search("probe", {}, context(config={"source_raw": raw, "engine_config": {}}))
+
+    assert "non-public" in str(exc.value)
 
 
 def test_private_self_hosted_endpoint_requires_exact_allowlist():
-    private = lambda *args, **kwargs: [(2, 1, 6, "", ("192.168.1.8", 443))]
+    def private(*args, **kwargs):
+        return [(2, 1, 6, "", ("192.168.1.8", 443))]
+
     with pytest.raises(EndpointPolicyError):
         validate_remote_endpoint("https://kavita.lan/opds", resolver=private)
     assert validate_remote_endpoint("https://kavita.lan/opds", allowed_hosts=["kavita.lan"], resolver=private)
@@ -155,6 +305,48 @@ def test_opds2_keeps_download_and_external_link_distinct():
     assert all(item.data["review_status"] == "pending" for item in result.items)
 
 
+def test_opds_source_provider_returns_typed_detail_and_download_file():
+    endpoint = "https://books.example/opds"
+    acquisition = "https://books.example/book.epub"
+    payload = {
+        "publications": [
+            {
+                "metadata": {"identifier": "urn:book:1", "title": "Typed Book", "author": [{"name": "Ada"}]},
+                "links": [
+                    {
+                        "rel": "http://opds-spec.org/acquisition/open-access",
+                        "href": acquisition,
+                        "type": "application/epub+zip",
+                    }
+                ],
+            }
+        ]
+    }
+    provider = OPDSProvider(
+        "test.books.typed-opds",
+        "Typed OPDS",
+        "test",
+        "https://example.com",
+        http=FakeHttp(
+            {
+                endpoint: response(payload),
+                acquisition: response(b"epub-bytes", "application/epub+zip"),
+            }
+        ),
+    )
+    ctx = context(config={"endpoint": endpoint, "formats": ["epub"]})
+
+    item = provider.browse("", {}, ctx).items[0]
+    detail = provider.get_book(item.external_id, ctx)
+    book_file = provider.download(detail, ctx)
+
+    assert detail.title == "Typed Book"
+    assert detail.downloadable is True
+    assert book_file.filename == "book.epub"
+    assert book_file.format == "epub"
+    assert book_file.content == b"epub-bytes"
+
+
 def test_internet_archive_never_exposes_restricted_file_as_download():
     search_url = InternetArchiveProvider.endpoint
     restricted_meta = "https://archive.org/metadata/loaned"
@@ -179,7 +371,10 @@ def test_internet_archive_never_exposes_restricted_file_as_download():
             ),
             open_meta: response(
                 {
-                    "metadata": {"access-restricted-item": "false", "licenseurl": "https://creativecommons.org/publicdomain/mark/1.0/"},
+                    "metadata": {
+                        "access-restricted-item": "false",
+                        "licenseurl": "https://creativecommons.org/publicdomain/mark/1.0/",
+                    },
                     "files": [{"name": "open.epub", "private": "false"}],
                 }
             ),
@@ -235,9 +430,7 @@ def test_watch_folder_enforces_root_hashes_content_and_discovers_incrementally(t
     outside = tmp_path / "outside"
     outside.mkdir()
     with pytest.raises(Exception, match="allowlist"):
-        provider.execute(
-            context(config={"path": str(outside)}, platform={"import_allowed_roots": [str(allowed)]})
-        )
+        provider.execute(context(config={"path": str(outside)}, platform={"import_allowed_roots": [str(allowed)]}))
 
     escaped = allowed / "escaped.epub"
     escaped.symlink_to(outside / "escaped.epub")
@@ -247,18 +440,21 @@ def test_watch_folder_enforces_root_hashes_content_and_discovers_incrementally(t
 
 
 class DuplicateProvider:
+    download_mode = "single_book"
     manifest = {
         "protocol_version": PROTOCOL_VERSION,
-        "id": "test.book-source.duplicates",
+        "id": "test.source.duplicates",
         "name": "Duplicate books",
         "version": "1.0.0",
         "categories": ["book_sources"],
         "capabilities": ["book_sources.browse", "book_sources.acquire"],
+        "download_mode": "single_book",
         "runtime_kind": "builtin",
         "actions": ["preview", "run"],
         "auth_schema": {"type": "object", "properties": {}},
         "config_schema": {"type": "object", "properties": {}},
         "permissions": ["books.read", "books.write"],
+        "connection_owners": ["instance"],
         "data_policy": {},
         "compatibility": {},
         "homepage": "",
@@ -282,6 +478,30 @@ class DuplicateProvider:
                 ProviderItem("two", "book_source", {**common, "title": "Two"}),
             ]
         )
+
+    def search(self, query, cursor, context):
+        raise NotImplementedError
+
+    def browse(self, category_id, cursor, context):
+        raise NotImplementedError
+
+    def get_categories(self, context):
+        return []
+
+    def get_book(self, external_id, context):
+        raise NotImplementedError
+
+    def download(self, book, context):
+        raise NotImplementedError
+
+    def get_toc(self, book, context):
+        return []
+
+    def get_chapter(self, chapter, context):
+        raise NotImplementedError
+
+    def self_check(self, context):
+        raise NotImplementedError
 
 
 def test_runtime_previews_and_skips_same_isbn_hash_format_before_pending_write():

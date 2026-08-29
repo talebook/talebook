@@ -13,6 +13,8 @@ from .tomato.tomato import Page, Search
 from .tomato.tomatoexception import VerifyError, PageError
 
 TOMATO_ISBN = "0000000000003"  # 番茄小说专用 ISBN 占位符
+from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+
 KEY = "TomatoNovel"
 
 CHROME_HEADERS = {
@@ -273,3 +275,30 @@ if __name__ == "__main__":
     results = api.search_book("吞噬星空", "我吃西红柿")
     for r in results:
         print(r)
+
+
+class TomatoProvider(MetaSourceMixin, TomatoNovelApi):
+    proxy_image_hosts = ("byteimg.com", "fanqienovel.com")
+    manifest = meta_manifest(
+        "talebook.meta.tomato",
+        "番茄小说",
+        "从番茄小说检索网文书名、作者、简介与封面。",
+        "mdi-book-open-page-variant",
+        "https://fanqienovel.com/",
+    )
+
+    def __init__(self):
+        super().__init__(copy_image=False)
+
+    def _search(self, query, context):
+        mi = self.get_book(query.title, query.authors[0] if query.authors else None)
+        return [mi] if mi else []
+
+    def _fetch(self, external_id, context):
+        return self.get_book_by_id(external_id)
+
+    def get_cover(self, cover_url, context=None):
+        return TomatoNovelApi(copy_image=True).get_cover(cover_url)
+
+
+PROVIDER = TomatoProvider()

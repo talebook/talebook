@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """内置文本工具（正文查找替换 / 繁简转换 / TXT 编码修复）的书籍编排层。
 
-纯处理核心位于 :mod:`webserver.plugins.texttools`；本模块负责与 Calibre
+纯处理核心位于 :mod:`webserver.plugins.tool`；本模块负责与 Calibre
 书库交互：定位格式文件、写回原书格式、以新书身份入库（完整继承原书
 元数据与封面）。
 
@@ -59,7 +59,14 @@ def get_format_path(db, book_id: int, fmt: str) -> str:
     return path
 
 
-def overwrite_format(db, book_id: int, fmt: str, out_path: str, backup_dir: Optional[str] = None) -> Optional[str]:
+def overwrite_format(
+    db,
+    book_id: int,
+    fmt: str,
+    out_path: str,
+    backup_dir: Optional[str] = None,
+    backup_state: Optional[dict] = None,
+) -> Optional[str]:
     """用处理后文件替换原书的指定格式；可选备份原文件，返回备份路径。
 
     备份保存在 ``backup_dir``（调用方提供持久目录），避免随临时目录清理误删。
@@ -76,6 +83,8 @@ def overwrite_format(db, book_id: int, fmt: str, out_path: str, backup_dir: Opti
                 "backup_%d_%s_%d.%s" % (book_id, fmt.lower(), int(time.time()), fmt.lower()),
             )
             shutil.copy2(src, backup_path)
+            if backup_state is not None:
+                backup_state["backup_path"] = backup_path
             logging.info("[booktools] Backed up %s of book %d to %s", fmt, book_id, backup_path)
     with open(out_path, "rb") as f:
         db.add_format(book_id, fmt, f, index_is_id=True)
@@ -91,6 +100,8 @@ def import_as_new_book(
     title_suffix: str = "",
     language: Optional[str] = None,
     convert_text: Optional[Callable[[str], str]] = None,
+    title_override: Optional[str] = None,
+    authors_override: Optional[List[str]] = None,
     collector_id: Optional[int] = None,
 ) -> int:
     """以新书身份入库：复用原书完整元数据 + 封面，标题追加后缀。
@@ -112,7 +123,7 @@ def import_as_new_book(
     mi = db.get_metadata(src_book_id, index_is_id=True, get_cover=True)
     cover_bytes = getattr(mi, "cover", None)
 
-    title = (mi.title or "Unknown").strip()
+    title = (title_override if title_override is not None else mi.title or "Unknown").strip()
     if convert_text:
         title = convert_text(title)
     if title_suffix:
@@ -120,7 +131,10 @@ def import_as_new_book(
     mi.title = utils.super_strip(title)
     mi.title_sort = utils.get_title_sort(mi.title)
 
-    authors = list(mi.authors) if mi.authors else []
+    authors = list(authors_override) if authors_override is not None else list(mi.authors) if mi.authors else []
+    if authors_override is not None:
+        mi.authors = authors
+        mi.author_sort = None
     if convert_text and authors:
         mi.authors = [convert_text(a) for a in authors]
         mi.author_sort = None  # 名字已转换，排序键由 calibre 按新名字重算

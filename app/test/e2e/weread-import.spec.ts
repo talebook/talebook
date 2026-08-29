@@ -17,7 +17,7 @@ test.describe('WeRead annotation import', () => {
         await page.getByRole('link', { name: '微信读书' }).click();
         await expect(page).toHaveURL(/\/plugins\/weread\?tab=notes/);
         await page.getByRole('button', { name: '导入微信读书' }).click();
-        const dialog = page.getByRole('dialog');
+        const dialog = page.getByRole('dialog', { name: '导入微信读书笔记' });
         await expect(dialog.getByText('微信读书官方目前只提供书签数量')).toBeVisible();
         await dialog.getByLabel('官方导出 JSON').setInputFiles({
             name: 'weread.json',

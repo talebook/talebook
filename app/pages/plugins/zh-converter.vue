@@ -39,7 +39,15 @@
                 <v-radio value="replace" :label="t('bookTools.common.overwrite')" />
             </v-radio-group>
 
-            <v-btn color="primary" class="mt-3" :loading="busy === 'run'" :disabled="!bookId || !direction" @click="doRun">{{ t('bookTools.common.run') }}</v-btn>
+            <v-btn
+                :color="outputMode === 'replace' ? 'error' : 'primary'"
+                class="mt-3"
+                :loading="busy === 'run'"
+                :disabled="!bookId || !direction"
+                @click="doRun"
+            >
+                {{ t(outputMode === 'replace' ? 'bookTools.common.overwriteAction' : 'bookTools.common.saveNewAction') }}
+            </v-btn>
 
             <v-alert v-if="error" type="error" variant="tonal" closable class="mt-4" @click:close="error = ''">{{ error }}</v-alert>
             <v-alert v-if="success" type="success" variant="tonal" closable class="mt-4" @click:close="success = ''">{{ success }}</v-alert>
@@ -51,6 +59,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
+import { confirmDestructiveBookWrite } from '@/utils/book-tools';
 
 const { t } = useI18n();
 const { $backend } = useNuxtApp();
@@ -104,6 +113,10 @@ async function loadBooks() {
 watch(bookId, () => { error.value = ''; success.value = ''; });
 
 async function doRun() {
+    if (!confirmDestructiveBookWrite(
+        outputMode.value === 'replace',
+        t('bookTools.common.overwriteConfirm', { title: selectedBook.value?.title || '' }),
+    )) return;
     error.value = '';
     success.value = '';
     busy.value = 'run';

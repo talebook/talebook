@@ -35,6 +35,7 @@ class FakeResponse:
         self.url = url
         self.encoding = encoding
         self.headers = {}
+        self.status_code = 200
 
     @property
     def text(self):
@@ -49,6 +50,10 @@ class FakeSession:
         self.calls = []
         self.headers = {}
 
+    @staticmethod
+    def resolver(host, port, **kwargs):
+        return [(2, 1, 6, "", ("93.184.216.34", port or 443))]
+
     def get(self, url, headers=None, timeout=None):
         self.calls.append(("GET", url))
         return self._respond(url)
@@ -56,6 +61,11 @@ class FakeSession:
     def post(self, url, data=None, headers=None, timeout=None):
         self.calls.append(("POST", url, data))
         return self._respond(url)
+
+    def request(self, method, url, data=None, headers=None, timeout=None, **kwargs):
+        if str(method).upper() == "POST":
+            return self.post(url, data=data, headers=headers, timeout=timeout)
+        return self.get(url, headers=headers, timeout=timeout)
 
     def _respond(self, url):
         for key, resp in self.mapping.items():

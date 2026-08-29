@@ -17,6 +17,7 @@ Features:
 import json
 import logging
 import os
+import re
 import sys
 
 
@@ -201,7 +202,9 @@ def compare_and_migrate(engine):
 
     # Perform migration
     if not migrations_needed:
-        logger.info("Database schema is up to date, no migration needed")
+        logger.info("Database columns are up to date; checking data and constraints")
+        backfill_plugin_connection_roles(engine)
+        migrate_plugin_connection_unique_constraint(engine)
         return True
 
     logger.info(f"Found {len(migrations_needed)} columns to migrate:")
@@ -227,7 +230,168 @@ def compare_and_migrate(engine):
     logger.info(f"Migration completed: {success_count} succeeded, {error_count} failed")
     logger.info("=" * 60)
 
+    if error_count == 0:
+        role_added = any(
+            migration["table"] == "plugin_connections" and migration["column"] == "role" for migration in migrations_needed
+        )
+        backfill_plugin_connection_roles(engine, include_default=role_added)
+        migrate_plugin_connection_unique_constraint(engine)
+
     return error_count == 0
+
+
+def backfill_plugin_connection_roles(engine, include_default=False):
+    """为存量插件连接回填 role。
+
+    role 取代 name 成为查询键。历史连接的 name 是中文展示文案
+    （「内置连接」「微信读书」），据此推导：实例级内置连接为 builtin，
+    其余为 default。同一 (installation, owner_type, owner_id) 下若有多条，
+    保留最早一条为主 role，其余以 id 后缀区分，避免撞唯一约束。
+    """
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        all_rows = conn.execute(
+            text("SELECT id, installation_id, owner_type, owner_id, name, role FROM plugin_connections ORDER BY id")
+        ).fetchall()
+        rows = [row for row in all_rows if row.role is None or row.role == "" or (include_default and row.role == "default")]
+        if not rows:
+            return
+        logger.info("Backfilling role for %d plugin connections", len(rows))
+        candidate_ids = {row.id for row in rows}
+        seen = {
+            (row.installation_id, row.owner_type, row.owner_id, row.role) for row in all_rows if row.id not in candidate_ids
+        }
+        for row in rows:
+            base_role = "builtin" if (row.owner_type == "instance" and row.name == "内置连接") else "default"
+            role = base_role
+            key = (row.installation_id, row.owner_type, row.owner_id, role)
+            if key in seen:
+                role = "%s-%d" % (base_role, row.id)
+                key = (row.installation_id, row.owner_type, row.owner_id, role)
+            suffix = 2
+            while key in seen:
+                role = "%s-%d-%d" % (base_role, row.id, suffix)
+                key = (row.installation_id, row.owner_type, row.owner_id, role)
+                suffix += 1
+            seen.add(key)
+            conn.execute(
+                text("UPDATE plugin_connections SET role = :role WHERE id = :id"),
+                {"role": role, "id": row.id},
+            )
+
+
+def _rebuild_sqlite_plugin_connections(engine):
+    """以当前数据重建旧 SQLite 表，替换写在 CREATE TABLE 里的唯一约束。"""
+    shadow = "plugin_connections__role_migration"
+    old_constraint = re.compile(
+        r'(?:CONSTRAINT\s+["`\[]?uq_plugin_connection_owner_name["`\]]?\s+)?'
+        r"UNIQUE\s*\(\s*installation_id\s*,\s*owner_type\s*,\s*owner_id\s*,\s*name\s*\)",
+        re.IGNORECASE,
+    )
+    with engine.connect() as conn:
+        foreign_keys = bool(conn.exec_driver_sql("PRAGMA foreign_keys").scalar())
+        conn.commit()
+        if foreign_keys:
+            conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            conn.commit()
+        try:
+            with conn.begin():
+                table_sql = conn.execute(
+                    text("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'plugin_connections'")
+                ).scalar_one()
+                body = table_sql[table_sql.index("(") :]
+                body, replaced = old_constraint.subn(
+                    "CONSTRAINT uq_plugin_connection_owner_role UNIQUE (installation_id, owner_type, owner_id, role)",
+                    body,
+                    count=1,
+                )
+                if replaced != 1:
+                    raise RuntimeError("无法定位 plugin_connections 的旧唯一约束")
+                schema_sql = [
+                    row.sql
+                    for row in conn.execute(
+                        text(
+                            "SELECT sql FROM sqlite_master WHERE type IN ('index', 'trigger') "
+                            "AND tbl_name = 'plugin_connections' AND sql IS NOT NULL"
+                        )
+                    ).fetchall()
+                    if row.sql and "uq_plugin_connection_owner_name" not in row.sql
+                ]
+                columns = [row.name for row in conn.execute(text("PRAGMA table_info(plugin_connections)"))]
+                quoted_columns = ", ".join('"%s"' % name.replace('"', '""') for name in columns)
+                shadow_exists = conn.execute(
+                    text("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name"),
+                    {"name": shadow},
+                ).scalar()
+                if shadow_exists:
+                    raise RuntimeError("检测到上次迁移留下的临时表，拒绝覆盖：%s" % shadow)
+                conn.execute(text("CREATE TABLE %s %s" % (shadow, body)))
+                conn.execute(
+                    text("INSERT INTO %s (%s) SELECT %s FROM plugin_connections" % (shadow, quoted_columns, quoted_columns))
+                )
+                conn.execute(text("DROP TABLE plugin_connections"))
+                conn.execute(text("ALTER TABLE %s RENAME TO plugin_connections" % shadow))
+                for sql in schema_sql:
+                    conn.execute(text(sql))
+                for index in models.PluginConnection.__table__.indexes:
+                    index.create(bind=conn, checkfirst=True)
+        finally:
+            if foreign_keys:
+                conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+                conn.commit()
+
+
+def migrate_plugin_connection_unique_constraint(engine):
+    """把插件连接的唯一约束从 name 切到 role。
+
+    `ALTER TABLE ADD COLUMN` 只加列，不动约束——升级上来的库会保留
+    `uq_plugin_connection_owner_name`，导致 role 唯一性不生效、同名连接照旧冲突。
+    模型（models.py）里已改为 `uq_plugin_connection_owner_role`，这里让存量库跟上。
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "plugin_connections" not in inspector.get_table_names():
+        return
+    # 唯一约束在 SQLite 上既可能是表定义的一部分，也可能是独立索引，两处都要看。
+    constraints = {item.get("name") for item in inspector.get_unique_constraints("plugin_connections")}
+    indexes = {item.get("name") for item in inspector.get_indexes("plugin_connections")}
+    existing = constraints | indexes
+    if "uq_plugin_connection_owner_role" in existing:
+        return
+    if "uq_plugin_connection_owner_name" not in existing:
+        # 全新建库由 create_all 直接建出正确约束，无需迁移。
+        return
+
+    logger.info("Migrating plugin_connections unique constraint: owner_name -> owner_role")
+    # 旧库通过 ADD COLUMN 得到 role 时，SQLite 会把已有行全部填成 default；
+    # 在建立新唯一键前必须按旧 name 语义重新推导并消解冲突。
+    backfill_plugin_connection_roles(engine, include_default=True)
+    if engine.dialect.name == "sqlite":
+        # 独立唯一索引可直接替换；CREATE TABLE 内的 UNIQUE 需要重建表。
+        if "uq_plugin_connection_owner_name" not in indexes:
+            _rebuild_sqlite_plugin_connections(engine)
+            return
+        with engine.begin() as conn:
+            conn.execute(text("DROP INDEX uq_plugin_connection_owner_name"))
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX uq_plugin_connection_owner_role "
+                    "ON plugin_connections (installation_id, owner_type, owner_id, role)"
+                )
+            )
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE plugin_connections DROP INDEX uq_plugin_connection_owner_name"))
+        conn.execute(
+            text(
+                "ALTER TABLE plugin_connections "
+                "ADD CONSTRAINT uq_plugin_connection_owner_role "
+                "UNIQUE (installation_id, owner_type, owner_id, role)"
+            )
+        )
 
 
 def add_column(engine, migration):

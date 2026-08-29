@@ -20,8 +20,9 @@ test.describe('WeRead workbench', () => {
         await page.getByRole('button', { name: '搜索', exact: true }).click();
         await expect(page.getByText('余华 · 评分 92')).toBeVisible();
         await page.getByRole('button', { name: '详情' }).first().click();
-        await expect(page.getByText('关于活着本身的故事。')).toBeVisible();
-        await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
+        const detailDialog = page.getByRole('dialog', { name: '活着' });
+        await expect(detailDialog.getByText('关于活着本身的故事。')).toBeVisible();
+        await detailDialog.getByRole('button', { name: '关闭' }).click();
 
         await page.getByRole('tab', { name: '书架' }).click();
         await page.getByRole('button', { name: '读取书架' }).click();
@@ -36,8 +37,9 @@ test.describe('WeRead workbench', () => {
         const importButton = page.getByRole('button', { name: '从已连接的微信读书导入笔记' });
         await expect(importButton).toBeVisible();
         await importButton.click();
-        await expect(page.getByText(/将使用已保存的密钥/)).toBeVisible();
-        await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
+        const importDialog = page.getByRole('dialog', { name: '导入微信读书笔记' });
+        await expect(importDialog.getByText(/将使用已保存的密钥/)).toBeVisible();
+        await importDialog.getByRole('button', { name: '取消' }).click();
         await page.getByRole('button', { name: '读取笔记本' }).click();
         await expect(page.getByText(/1 本书有笔记，共 3 条/)).toBeVisible();
 

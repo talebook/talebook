@@ -2,34 +2,35 @@ import base64
 import io
 import json
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Annotation, Base, PluginConnection, PluginDefinition, PluginRunItem, PluginSourceRecord
-from webserver.plugins.runtime.enrichment import (
-    BRSProvider,
-    CalibreProviderBridge,
-    CatalogReviewProvider,
-    EmbeddedMetadataProvider,
-    OpenLibraryProvider,
-    REVIEW_SPECS,
-    ReviewFileProvider,
-    build_field_decisions,
-    extract_epub_metadata,
-    parse_review_file,
-)
-from webserver.plugins.runtime.protocol import PluginManifest, ProviderRateLimitError
+from webserver.plugins.annotation.brs import BRSProvider
+from webserver.plugins.combo.open_library import OpenLibraryProvider
+from webserver.plugins.meta.base import build_field_decisions
+from webserver.plugins.meta.calibre_provider_bridge import CalibreProviderBridge
+from webserver.plugins.meta.embedded_file import EmbeddedMetadataProvider, extract_epub_metadata
+from webserver.plugins.review.anilist import AniListReviewProvider
+from webserver.plugins.review.bangumi import BangumiReviewProvider
+from webserver.plugins.review.file_import import ReviewFileProvider, parse_review_file
+from webserver.plugins.review.google_books import GoogleBooksReviewProvider
+from webserver.plugins.review.hardcover import HardcoverProvider
+from webserver.plugins.review.neodb import NeoDBReviewProvider
+from webserver.plugins.runtime.protocol import PluginManifest, UpstreamRateLimitError
+from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,
+    PluginRuntimeError,
     ensure_builtin_definitions,
     install_builtin,
     rotate_connection_secret,
     save_connection,
 )
-from webserver.services.plugin_runtime import PluginRuntimeError
 
 
 SETTINGS = {"PLUGIN_SECRET_KEY": "enrichment-test-key", "cookie_secret": "unused-cookie-secret"}
@@ -96,11 +97,11 @@ def test_connector_manifests_are_valid_and_registered_as_installable_definitions
         OpenLibraryProvider(),
         EmbeddedMetadataProvider(),
         CalibreProviderBridge(discover=lambda: []),
-        CatalogReviewProvider(REVIEW_SPECS["hardcover"]),
-        CatalogReviewProvider(REVIEW_SPECS["neodb"]),
-        CatalogReviewProvider(REVIEW_SPECS["google_books"]),
-        CatalogReviewProvider(REVIEW_SPECS["bangumi"]),
-        CatalogReviewProvider(REVIEW_SPECS["anilist"]),
+        HardcoverProvider(),
+        NeoDBReviewProvider(),
+        GoogleBooksReviewProvider(),
+        BangumiReviewProvider(),
+        AniListReviewProvider(),
         BRSProvider(),
         ReviewFileProvider(),
     ]
@@ -112,11 +113,11 @@ def test_connector_manifests_are_valid_and_registered_as_installable_definitions
     definitions = ensure_builtin_definitions(db_session, registry)
     assert len(definitions) == 10
     assert {item.plugin_key for item in definitions} >= {
-        "talebook.metadata.open-library",
-        "talebook.annotations.brs",
-        "talebook.reviews.file-import",
-        "talebook.reviews.bangumi",
-        "talebook.reviews.anilist",
+        "talebook.combo.open-library",
+        "talebook.annotation.brs",
+        "talebook.review.file-import",
+        "talebook.review.bangumi",
+        "talebook.review.anilist",
     }
     assert db_session.query(PluginConnection).count() == 0
 
@@ -314,7 +315,7 @@ def test_brs_uses_separate_review_domain_supports_mapping_and_runtime_rate_limit
     def transport(method, url, **kwargs):
         attempts["count"] += 1
         if attempts["count"] == 1:
-            raise ProviderRateLimitError("slow down", retry_after=0)
+            raise UpstreamRateLimitError("slow down", retry_after=0)
         return {
             "comments": [
                 {
@@ -398,7 +399,14 @@ def test_brs_uses_separate_review_domain_supports_mapping_and_runtime_rate_limit
     ],
 )
 def test_catalog_ratings_preserve_each_sources_raw_scale_and_samples(source, payload, query, expected):
-    provider = CatalogReviewProvider(REVIEW_SPECS[source], transport=lambda *args, **kwargs: payload)
+    providers = {
+        "hardcover": HardcoverProvider,
+        "neodb": NeoDBReviewProvider,
+        "google_books": GoogleBooksReviewProvider,
+        "bangumi": BangumiReviewProvider,
+        "anilist": AniListReviewProvider,
+    }
+    provider = providers[source](transport=lambda *args, **kwargs: payload)
     result = provider.execute(
         {
             "action": "preview",
@@ -428,3 +436,51 @@ def test_calibre_provider_bridge_discovery_is_stable_and_idempotent(db_session):
     assert second.counts["skipped"] == 1
     assert db_session.query(PluginSourceRecord).count() == 1
     assert db_session.query(PluginDefinition).filter_by(plugin_key=provider.manifest["id"]).count() == 1
+
+
+def _resolver(address):
+    return lambda *args, **kwargs: [(2, 1, 6, "", (address, 443))]
+
+
+def _ok_session():
+    return SimpleNamespace(
+        request=lambda *args, **kwargs: SimpleNamespace(status_code=200, headers={}, content=b"{}", json=lambda: {})
+    )
+
+
+def test_brs_endpoint_pointing_at_private_network_is_blocked():
+    """BRS endpoint 由管理员自由填写，必须挡住指向内网与云元数据服务的地址。"""
+    for address in ("127.0.0.1", "169.254.169.254", "192.168.1.10", "10.0.0.5"):
+        client = SafeHttpClient(session=_ok_session(), resolver=_resolver(address))
+        with pytest.raises(EndpointPolicyError):
+            client.request("GET", "https://brs.internal/api/v1/comments")
+
+    # 管理员为自托管实例显式配置白名单后才放行
+    client = SafeHttpClient(session=_ok_session(), resolver=_resolver("192.168.1.10"))
+    client.request("GET", "https://brs.lan/api/v1/comments", allowed_hosts=["brs.lan"])
+
+
+def test_connector_http_layer_rejects_embedded_credentials():
+    client = SafeHttpClient(session=_ok_session(), resolver=_resolver("93.184.216.34"))
+    with pytest.raises(EndpointPolicyError):
+        client.request("GET", "https://user:pass@brs.example/api/v1/comments")
+
+
+def test_brs_provider_forwards_configured_allowlist_to_http_layer():
+    captured = {}
+
+    def transport(method, url, **kwargs):
+        captured.update(kwargs)
+        captured["url"] = url
+        return {"comments": []}
+
+    BRSProvider(transport=transport).execute(
+        {
+            "action": "test",
+            "config": {"endpoint": "https://brs.lan", "allowed_hosts": ["brs.lan"]},
+            "secrets": {"token": "unit-test-token"},
+            "cursor": {},
+        }
+    )
+    assert captured["url"] == "https://brs.lan/api/v1/comments"
+    assert captured["allowed_hosts"] == ["brs.lan"]

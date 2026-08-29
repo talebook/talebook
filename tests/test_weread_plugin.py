@@ -1,7 +1,6 @@
 import json
-from types import SimpleNamespace
-import urllib.error
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
@@ -16,17 +15,12 @@ from webserver.models import (
     PluginRunItem,
     PluginSourceRecord,
 )
-from webserver.plugins.runtime import (
-    WEREAD_PLUGIN_KEY,
-    ProviderAuthError,
-    ProviderError,
-    ProviderRateLimitError,
-    WereadProvider,
-    parse_weread_export,
-)
-from webserver.plugins.runtime.weread import validate_weread_query
+from webserver.plugins.combo.weread import WEREAD_PLUGIN_KEY, WereadProvider, parse_weread_export
+from webserver.plugins.combo.weread.provider import validate_weread_query
+from webserver.plugins.runtime import UpstreamAuthError, UpstreamError, UpstreamRateLimitError
+from webserver.plugins.runtime.safe_http import SafeHttpClient
+from webserver.services.annotation_writer import confirm_match, locate_epub_quote, normalize_text
 from webserver.services.plugin_runtime import PluginRuntime, install_builtin, save_connection
-from webserver.services.weread_annotations import confirm_match, locate_epub_quote, normalize_text
 
 
 SETTINGS = {"PLUGIN_SECRET_KEY": "weread-unit-test-key", "cookie_secret": "unused-cookie-secret"}
@@ -150,15 +144,67 @@ def test_parser_covers_issue_943_and_does_not_invent_bookmark_content():
     assert len(parse_weread_export([SAMPLE, SAMPLE])) == 3
 
 
+def test_parser_rejects_a_non_collection_export_payload():
+    with pytest.raises(UpstreamError, match="JSON object or array"):
+        parse_weread_export("invalid")
+
+
+def test_annotation_pages_advance_nested_notebook_and_review_cursors(monkeypatch):
+    provider = WereadProvider()
+    review_calls = []
+
+    def gateway(_api_key, api_name, **params):
+        if api_name == "/user/notebooks":
+            if params.get("lastSort") == 10:
+                return {
+                    "books": [{"book": {"bookId": "book-2", "title": "第二本"}, "sort": 20}],
+                    "hasMore": False,
+                }
+            return {
+                "books": [{"book": {"bookId": "book-1", "title": "第一本"}, "sort": 10}],
+                "hasMore": True,
+            }
+        if api_name == "/book/bookmarklist":
+            return {"book": {"bookId": params["bookId"], "title": params["bookId"]}, "updated": []}
+        if api_name == "/review/list/mine":
+            review_calls.append((params["bookid"], params["synckey"]))
+            if params["bookid"] == "book-1" and params["synckey"] == 0:
+                return {"reviews": [], "hasMore": True, "synckey": 7}
+            return {"reviews": [], "hasMore": False}
+        raise AssertionError(api_name)
+
+    monkeypatch.setattr(provider, "_gateway", gateway)
+    context = {"secrets": {"api_key": "unit-test-key"}, "cursor": {}}
+
+    first = provider.list_annotations(context)
+    second = provider.list_annotations({**context, "cursor": first.next_cursor})
+    third = provider.list_annotations({**context, "cursor": second.next_cursor})
+
+    assert first.has_more is True
+    assert first.next_cursor == {"last_sort": None, "notebook_index": 0, "review_synckey": 7}
+    assert second.has_more is True
+    assert second.next_cursor == {"last_sort": 10, "notebook_index": 0, "review_synckey": 0}
+    assert third.has_more is False
+    assert review_calls == [("book-1", 0), ("book-1", 7), ("book-2", 0)]
+
+
 @pytest.mark.parametrize(
     ("status", "error_type"),
-    [(401, ProviderAuthError), (403, ProviderAuthError), (429, ProviderRateLimitError)],
+    [(401, UpstreamAuthError), (403, UpstreamAuthError), (429, UpstreamRateLimitError)],
 )
 def test_gateway_maps_auth_and_rate_limit_errors_without_leaking_key(status, error_type):
-    def opener(*_args, **_kwargs):
-        raise urllib.error.HTTPError("https://example.invalid", status, "rejected", {"Retry-After": "0"}, None)
+    class FakeSession:
+        def request(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                status_code=status,
+                headers={"Retry-After": "0"},
+                content=b"",
+                json=lambda: {},
+            )
 
-    provider = WereadProvider(opener=opener)
+    def public(*args, **kwargs):
+        return [(2, 1, 6, "", ("93.184.216.34", 443))]
+    provider = WereadProvider(http=SafeHttpClient(session=FakeSession(), resolver=public))
     with pytest.raises(error_type) as exc:
         provider._gateway("wrk-do-not-leak", "/user/notebooks", count=1)
     assert "wrk-do-not-leak" not in str(exc.value)
@@ -212,23 +258,16 @@ def test_gateway_maps_auth_and_rate_limit_errors_without_leaking_key(status, err
 def test_query_allowlist_forwards_all_documented_read_operations_without_serializing_key(operation, params, api_name):
     captured = {}
 
-    class Response:
-        def __enter__(self):
-            return self
+    class FakeHttp:
+        def json(self, method, url, **kwargs):
+            captured["method"] = method
+            captured["url"] = url
+            captured["body"] = kwargs.get("json")
+            captured["authorization"] = (kwargs.get("headers") or {}).get("Authorization")
+            captured["timeout"] = kwargs.get("timeout")
+            return {"errcode": 0, "items": []}
 
-        def __exit__(self, *_args):
-            return False
-
-        def read(self):
-            return b'{"errcode":0,"items":[]}'
-
-    def opener(request, timeout):
-        captured["body"] = json.loads(request.data)
-        captured["authorization"] = request.get_header("Authorization")
-        captured["timeout"] = timeout
-        return Response()
-
-    result = WereadProvider(opener=opener).query("wrk-unit-test-secret", operation, params)
+    result = WereadProvider(http=FakeHttp()).query("wrk-unit-test-secret", operation, params)
 
     assert result["errcode"] == 0
     assert captured["body"] == {"api_name": api_name, "skill_version": "1.0.4", **params}
@@ -255,7 +294,7 @@ def test_query_allowlist_forwards_all_documented_read_operations_without_seriali
     ],
 )
 def test_query_validation_rejects_writes_unknown_parameters_and_out_of_range_values(operation, params):
-    with pytest.raises(ProviderError):
+    with pytest.raises(UpstreamError):
         validate_weread_query(operation, params)
 
 

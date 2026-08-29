@@ -4,14 +4,14 @@ import urllib.parse
 
 import requests
 
-from .protocol import ProviderAuthError, ProviderError, ProviderRateLimitError
+from .protocol import UpstreamAuthError, UpstreamError, UpstreamRateLimitError
 
 
-class EndpointPolicyError(ProviderError):
+class EndpointPolicyError(UpstreamError):
     code = "book_source.endpoint_blocked"
 
 
-class EndpointResponseTooLarge(ProviderError):
+class EndpointResponseTooLarge(UpstreamError):
     code = "book_source.response_too_large"
 
 
@@ -49,15 +49,26 @@ def validate_remote_endpoint(url, allowed_hosts=(), resolver=socket.getaddrinfo)
 
 
 class SafeHttpClient:
-    def __init__(self, session=None, resolver=socket.getaddrinfo, max_redirects=5, max_bytes=8 * 1024 * 1024):
+    def __init__(
+        self,
+        session=None,
+        resolver=None,
+        max_redirects=5,
+        max_bytes=8 * 1024 * 1024,
+        allowed_hosts=(),
+    ):
         self.session = session or requests.Session()
-        self.resolver = resolver
+        self.resolver = resolver or getattr(self.session, "resolver", socket.getaddrinfo)
         self.max_redirects = max_redirects
         self.max_bytes = max_bytes
+        # Only platform/admin configuration may provide this allowlist. The
+        # request target itself must never auto-whitelist its host.
+        self.allowed_hosts = tuple(allowed_hosts or ())
 
-    def request(self, method, url, *, allowed_hosts=(), headers=None, timeout=30, data=None):
+    def request(self, method, url, *, allowed_hosts=None, headers=None, timeout=30, data=None, params=None, json=None):
         current = url
         origin = self._origin(url)
+        allowed_hosts = self.allowed_hosts if allowed_hosts is None else tuple(allowed_hosts or ())
         for redirect_count in range(self.max_redirects + 1):
             validate_remote_endpoint(current, allowed_hosts, self.resolver)
             if self._origin(current) != origin:
@@ -67,6 +78,8 @@ class SafeHttpClient:
                 current,
                 headers=dict(headers or {}),
                 data=data,
+                params=params,
+                json=json,
                 timeout=timeout,
                 allow_redirects=False,
             )
@@ -78,24 +91,40 @@ class SafeHttpClient:
                     raise EndpointPolicyError("Endpoint returned a redirect without a location")
                 current = urllib.parse.urljoin(current, location)
                 if response.status_code == 303:
-                    method, data = "GET", None
+                    method, data, json = "GET", None, None
                 continue
             if response.status_code in {401, 403}:
-                raise ProviderAuthError("Book source rejected the configured credentials")
+                raise UpstreamAuthError("Upstream rejected the configured credentials")
             if response.status_code == 429:
                 retry_after = response.headers.get("Retry-After")
                 try:
                     retry_after = float(retry_after) if retry_after else None
                 except ValueError:
                     retry_after = None
-                raise ProviderRateLimitError("Book source rate limit exceeded", retry_after=retry_after)
+                raise UpstreamRateLimitError("Upstream rate limit exceeded", retry_after=retry_after)
             if response.status_code >= 400:
-                raise ProviderError("Book source returned HTTP %d" % response.status_code)
+                raise UpstreamError("Upstream returned HTTP %d" % response.status_code)
             content = response.content
             if len(content) > self.max_bytes:
-                raise EndpointResponseTooLarge("Book source response exceeded the size limit")
+                raise EndpointResponseTooLarge("Upstream response exceeded the size limit")
             return response
         raise EndpointPolicyError("Endpoint exceeded the redirect limit")
+
+    # requests.Session-compatible surface used by the Legado parser. Every
+    # call still crosses the endpoint, redirect and response-size policy above.
+    def get(self, url, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def json(self, method, url, **kwargs):
+        """发起受策略约束的请求并解析 JSON 响应。"""
+        response = self.request(method, url, **kwargs)
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise UpstreamError("Upstream returned invalid JSON") from exc
 
     @staticmethod
     def _origin(url):

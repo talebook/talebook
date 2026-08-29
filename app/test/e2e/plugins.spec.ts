@@ -18,7 +18,7 @@ test.describe('Plugin management', () => {
         await expect(page.getByRole('tab', { name: '笔记（含章评）' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '评价' })).toBeVisible();
         await expect(page.getByRole('tab', { name: '书源' })).toBeVisible();
-        await expect(page.getByText('Talebook 元数据')).toBeVisible();
+        await expect(page.getByText('Open Library')).toBeVisible();
 
         await page.getByRole('tab', { name: '综合服务' }).click();
         const weread = page.locator('.plugin-card').filter({ hasText: '微信读书' });
@@ -78,7 +78,9 @@ test.describe('Plugin management', () => {
         await page.goto('/admin/plugins?tab=book_sources');
         const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
         await card.getByRole('button', { name: '详情' }).click();
-        await expect(page.getByText('权限与数据范围')).toBeVisible();
+        const detailsDialog = page.getByRole('dialog', { name: 'Generic OPDS' });
+        await expect(detailsDialog).toBeVisible();
+        await expect(detailsDialog.getByText('权限与数据范围')).toBeVisible();
 
         await page.getByRole('button', { name: '测试连接' }).click();
         await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
@@ -177,5 +179,21 @@ test.describe('Plugin management', () => {
         await page.keyboard.press('Escape');
         await expect(dialog).toBeHidden();
         await expect(details).toBeFocused();
+    });
+
+    test('requires confirmation before a text tool overwrites the original book', async ({ page }) => {
+        await page.goto('/plugins/text-replace');
+        const bookSelect = page.getByRole('combobox', { name: '选择书籍' });
+        await bookSelect.click();
+        await page.getByRole('option', { name: /测试书/ }).click();
+        await page.getByRole('textbox', { name: '查找内容' }).fill('测试');
+        await page.getByRole('radio', { name: '写回原书' }).check();
+
+        const confirmation = page.waitForEvent('dialog');
+        const overwrite = page.getByRole('button', { name: '写回原书' }).click();
+        const dialog = await confirmation;
+        expect(dialog.message()).toContain('《测试书》');
+        await dialog.dismiss();
+        await overwrite;
     });
 });

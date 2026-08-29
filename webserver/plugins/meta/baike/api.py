@@ -8,9 +8,11 @@ import requests
 
 from webserver.constants import CHROME_MOBILE_HEADERS
 from webserver.i18n import _
-from webserver.plugins.meta.douban import str2date
+from webserver.plugins.meta.common import str2date
 
 BAIKE_ISBN = "0000000000001"
+from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+
 KEY = "BaiduBaike"
 BAIKE_ENDPOINT = "https://baike.baidu.com/api/openapi/BaikeLemmaCardApi"
 BAIKE_TIMEOUT = 15
@@ -203,3 +205,30 @@ if __name__ == "__main__":
     api = BaiduBaikeApi()
     print(api.get_book("法神重生"))
     print(api.get_book("东周列国志"))
+
+
+class BaiduBaikeProvider(MetaSourceMixin, BaiduBaikeApi):
+    proxy_image_hosts = ("bcebos.com", "bdstatic.com")
+    manifest = meta_manifest(
+        "talebook.meta.baike",
+        "百度百科",
+        "从百度百科词条提取书籍简介、作者与出版信息。",
+        "mdi-book-information-variant",
+        "https://baike.baidu.com/",
+    )
+
+    def __init__(self):
+        super().__init__(copy_image=False)
+
+    def _search(self, query, context):
+        mi = self.get_book(query.title, query.authors[0] if query.authors else None)
+        return [mi] if mi else []
+
+    def _fetch(self, external_id, context):
+        return self.get_book(external_id, expected_id=external_id)
+
+    def get_cover(self, cover_url, context=None):
+        return BaiduBaikeApi.get_cover(cover_url)
+
+
+PROVIDER = BaiduBaikeProvider()

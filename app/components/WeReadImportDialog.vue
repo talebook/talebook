@@ -4,6 +4,7 @@
         max-width="760"
         scrollable
         eager
+        aria-labelledby="weread-import-dialog-title"
     >
         <template #activator="{ props: activatorProps }">
             <v-btn
@@ -16,7 +17,7 @@
         </template>
         <v-card>
             <v-card-title class="d-flex align-center">
-                <span>{{ t('wereadImport.title') }}</span>
+                <span id="weread-import-dialog-title">{{ t('wereadImport.title') }}</span>
                 <v-spacer />
                 <v-btn
                     icon="mdi-close"
@@ -187,7 +188,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
@@ -209,6 +210,13 @@ const matches = reactive({});
 const busy = ref(false);
 const action = ref('');
 const error = ref('');
+const PLUGIN_KEY = 'talebook.combo.weread';
+const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'partial', 'failed', 'rolled_back']);
+const RUN_POLL_INTERVAL_MS = 1000;
+const RUN_POLL_ATTEMPTS = 300;
+const activeRequests = new Set();
+const pendingDelays = new Map();
+let disposed = false;
 
 function open() {
     dialog.value = true;
@@ -256,26 +264,73 @@ async function readExport() {
     }
 }
 
+function sleep(milliseconds) {
+    if (disposed) return Promise.resolve(false);
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+            pendingDelays.delete(timer);
+            resolve(!disposed);
+        }, milliseconds);
+        pendingDelays.set(timer, resolve);
+    });
+}
+
+async function ensureConnection(signal) {
+    const credential = apiKey.value.trim();
+    if (connection.value && !credential) return connection.value;
+    const response = await backend('/plugins/connections', {
+        method: 'POST',
+        signal,
+        body: JSON.stringify({
+            plugin_key: PLUGIN_KEY,
+            credentials: credential ? { api_key: credential } : {},
+        }),
+    });
+    if (disposed) return null;
+    if (response.err !== 'ok') throw new Error(response.msg || response.err);
+    connection.value = response.connection;
+    apiKey.value = '';
+    return connection.value;
+}
+
+async function waitForRun(run, signal) {
+    for (let attempt = 0; attempt < RUN_POLL_ATTEMPTS; attempt += 1) {
+        const response = await backend(`/plugins/runs/${run.id}`, { signal });
+        if (disposed || signal.aborted) return null;
+        if (response.err !== 'ok') throw new Error(response.msg || response.err);
+        if (TERMINAL_RUN_STATUSES.has(response.run.status)) return response;
+        if (!await sleep(RUN_POLL_INTERVAL_MS)) return null;
+    }
+    throw new Error(t('wereadImport.failed'));
+}
+
 async function request(runAction, includeMatches = false) {
+    if (disposed) return null;
+    const controller = new AbortController();
+    activeRequests.add(controller);
     action.value = runAction;
     busy.value = true;
     error.value = '';
     try {
         if (file.value) parsedExport.value = await readExport();
-        const body = { action: runAction };
-        if (parsedExport.value !== null) body.export = parsedExport.value;
-        if (apiKey.value.trim()) body.api_key = apiKey.value.trim();
-        if (includeMatches) body.matches = { ...matches };
-        const response = await backend('/plugins/weread/import', { method: 'POST', body: JSON.stringify(body) });
+        if (disposed) return null;
+        const activeConnection = await ensureConnection(controller.signal);
+        if (!activeConnection || disposed) return null;
+        const inputData = {};
+        if (parsedExport.value !== null) inputData.export = parsedExport.value;
+        if (includeMatches) inputData.matches = { ...matches };
+        const response = await backend(`/plugins/connections/${activeConnection.id}/${runAction}`, {
+            method: 'POST', signal: controller.signal, body: JSON.stringify({ input_data: inputData }),
+        });
+        if (disposed) return null;
         if (response.err !== 'ok') throw new Error(response.msg || response.err);
-        connection.value = response.connection || connection.value;
-        apiKey.value = '';
-        return response;
+        return await waitForRun(response.run, controller.signal);
     } catch (reason) {
-        error.value = reason?.message || t('wereadImport.failed');
+        if (!disposed && !controller.signal.aborted) error.value = reason?.message || t('wereadImport.failed');
         return null;
     } finally {
-        busy.value = false;
+        activeRequests.delete(controller);
+        if (!disposed) busy.value = false;
     }
 }
 
@@ -301,12 +356,29 @@ async function testConnection() {
 }
 
 onMounted(async () => {
+    const controller = new AbortController();
+    activeRequests.add(controller);
     try {
-        const response = await backend('/plugins/weread/import');
-        if (response.err === 'ok') connection.value = response.connection;
+        const response = await backend(`/plugins/${PLUGIN_KEY}`, { signal: controller.signal });
+        if (!disposed && response.err === 'ok') {
+            connection.value = (response.connections || []).find(item => item.role === 'default') || connection.value;
+        }
     } catch {
         // Setup remains available; a load failure is reported on the first action.
+    } finally {
+        activeRequests.delete(controller);
     }
+});
+
+onBeforeUnmount(() => {
+    disposed = true;
+    for (const controller of activeRequests) controller.abort();
+    activeRequests.clear();
+    for (const [timer, resolve] of pendingDelays) {
+        clearTimeout(timer);
+        resolve(false);
+    }
+    pendingDelays.clear();
 });
 
 watch(() => props.savedConnection, value => {

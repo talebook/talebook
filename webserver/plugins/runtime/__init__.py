@@ -1,39 +1,97 @@
-from .builtin_capabilities import BUILTIN_CAPABILITY_PROVIDERS, BuiltinCapabilityProvider
-from .book_sources import BOOK_SOURCE_PROVIDERS
-from .enrichment import EXTERNAL_CONNECTOR_PROVIDERS
-from .mock import MockMultiTabProvider
+"""插件平台的公共能力、领域对象与协议。
+
+具体插件及其注册清单位于 ``webserver.plugins`` 的类型目录和
+``webserver.plugins.register``，不得从本模块导出。
+"""
+
+from .domains import (
+    Annotation,
+    BookFile,
+    BookMetadata,
+    MetadataQuery,
+    Category,
+    CheckReport,
+    ItemFailure,
+    Page,
+    PushReceipt,
+    Review,
+    SourceBook,
+    SourceBookDetail,
+    SourceChapter,
+    SourceContent,
+    SourceState,
+    ToolInput,
+    ToolOutput,
+    ToolReport,
+)
+from .interfaces import (
+    AnnotationProvider,
+    CAPABILITY_INTERFACES,
+    ExtraFeatureProvider,
+    MetadataProvider,
+    PluginContext,
+    PushProvider,
+    ReviewProvider,
+    SourceProvider,
+    TransformProvider,
+    contract_violations,
+)
 from .protocol import (
     ACTIONS,
     CATEGORIES,
     PROTOCOL_VERSION,
     ManifestError,
     PluginManifest,
-    ProviderAuthError,
-    ProviderError,
     ProviderItem,
-    ProviderRateLimitError,
     ProviderResult,
+    UpstreamAuthError,
+    UpstreamError,
+    UpstreamRateLimitError,
 )
-from .weread import WEREAD_PLUGIN_KEY, WereadProvider, parse_weread_export
+from .triggers import TRIGGER_AUTO, TRIGGER_MANUAL, TRIGGER_SCHEMA, trigger_of
 
 
 __all__ = [
     "ACTIONS",
+    "Annotation",
+    "AnnotationProvider",
+    "BookFile",
+    "BookMetadata",
+    "MetadataQuery",
+    "CAPABILITY_INTERFACES",
     "CATEGORIES",
-    "PROTOCOL_VERSION",
+    "Category",
+    "CheckReport",
+    "ExtraFeatureProvider",
+    "ItemFailure",
     "ManifestError",
-    "MockMultiTabProvider",
-    "BuiltinCapabilityProvider",
-    "BUILTIN_CAPABILITY_PROVIDERS",
-    "BOOK_SOURCE_PROVIDERS",
-    "EXTERNAL_CONNECTOR_PROVIDERS",
+    "MetadataProvider",
+    "PROTOCOL_VERSION",
+    "Page",
+    "PluginContext",
     "PluginManifest",
-    "ProviderAuthError",
-    "ProviderError",
     "ProviderItem",
-    "ProviderRateLimitError",
     "ProviderResult",
-    "WEREAD_PLUGIN_KEY",
-    "WereadProvider",
-    "parse_weread_export",
+    "PushProvider",
+    "PushReceipt",
+    "Review",
+    "ReviewProvider",
+    "SourceBook",
+    "SourceBookDetail",
+    "SourceChapter",
+    "SourceContent",
+    "SourceProvider",
+    "SourceState",
+    "TRIGGER_AUTO",
+    "TRIGGER_MANUAL",
+    "TRIGGER_SCHEMA",
+    "ToolInput",
+    "ToolOutput",
+    "ToolReport",
+    "TransformProvider",
+    "UpstreamAuthError",
+    "UpstreamError",
+    "UpstreamRateLimitError",
+    "contract_violations",
+    "trigger_of",
 ]

@@ -1,19 +1,14 @@
-import datetime
-import functools
-import logging
-import os
-import shutil
-import tempfile
+"""通用插件管理接口：目录、安装、连接、功能、动作与运行历史。
 
-import tornado.escape
-from tornado.ioloop import IOLoop
+内置文本工具的书籍选择与文件写入编排见 handlers/plugin_booktools.py。
+"""
 
-from webserver import loader, utils
-from webserver.constants import META_SELECTED_SOURCES, META_SOURCE_AI
+from webserver import loader
+from webserver.handlers import plugin_booktools
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
+from webserver.handlers.plugins_common import body as _body
+from webserver.handlers.plugins_common import error as _error
 from webserver.models import (
-    BookSourceModel,
-    OpdsSource,
     PluginConnection,
     PluginDefinition,
     PluginInstallation,
@@ -21,51 +16,127 @@ from webserver.models import (
     PluginRunItem,
     PluginSecret,
 )
-from webserver.plugins.runtime import (
-    WEREAD_PLUGIN_KEY,
-    ProviderAuthError,
-    ProviderError,
-    WereadProvider,
-)
-from webserver.plugins.texttools import (
-    ANALYZE_LIMIT,
-    DIRECTION_LABELS,
-    OpenCC,
-    analyze_bytes,
-    compile_rule,
-    convert_epub,
-    convert_txt_file,
-    fix_bytes,
-    replace_epub_file,
-    replace_preview,
-    replace_txt_file,
-)
+from webserver.plugins.runtime.interfaces import ExtraFeatureProvider
+from webserver.plugins.runtime.protocol import PluginManifest, UpstreamError, validate_against_schema
+from webserver.services.annotation_writer import all_book_ids, confirm_match
 from webserver.services.async_service import AsyncService
-from webserver.services.booktools import get_format_path, import_as_new_book, overwrite_format, pick_format, resolve_book
 from webserver.services.plugin_jobs import execute_plugin_run
 from webserver.services.plugin_runtime import (
+    DEFAULT_CONNECTION_ROLE,
+    REGISTRY,
     PluginRuntime,
     PluginRuntimeError,
-    ensure_builtin_capability_installations,
+    ensure_auto_installations,
     install_builtin,
     save_connection,
 )
-from webserver.services.plugin_secrets import SecretCipher, SecretCipherError, redact
-from webserver.services.weread_annotations import all_book_ids, confirm_match
+from webserver.services.plugin_secrets import SecretCipherError
 
 
-def _body(handler):
+# 这些键由服务端计算并注入，客户端传入的同名值一律丢弃，避免越权访问私有书籍。
+SERVER_OWNED_INPUT_KEYS = frozenset({"allowed_book_ids", "matches"})
+# 声明了这些能力的插件会做书籍匹配，需要平台注入可见书籍白名单。
+BOOK_SCOPED_CAPABILITIES = frozenset({"annotations.import"})
+
+
+def _plugin_input_data(handler, connection):
+    """构造插件运行输入：客户端参数经过滤后，与服务端计算的受控字段合并。"""
+    req = _body(handler)
+    supplied = req.get("input_data", {})
+    if supplied is None:
+        supplied = {}
+    if not isinstance(supplied, dict):
+        raise PluginRuntimeError("plugin.request_invalid", "input_data must be an object")
+
+    input_data = {key: value for key, value in supplied.items() if key not in SERVER_OWNED_INPUT_KEYS}
+
+    installation = handler.session.get(PluginInstallation, connection.installation_id)
+    definition = handler.session.get(PluginDefinition, installation.definition_id) if installation else None
+    capabilities = set((definition.capabilities if definition else None) or [])
+    match_confirmations = []
+    if capabilities & BOOK_SCOPED_CAPABILITIES:
+        allowed_book_ids = [
+            book_id for book_id in all_book_ids(handler.db) if handler.get_book(book_id, raise_exception=False) is not None
+        ]
+        input_data["allowed_book_ids"] = allowed_book_ids
+        matches = supplied.get("matches", {})
+        if matches is None:
+            matches = {}
+        if not isinstance(matches, dict):
+            raise PluginRuntimeError("plugin.request_invalid", "matches must be an object")
+        for source_book_id, book_id in matches.items():
+            match_confirmations.append((str(source_book_id), book_id, allowed_book_ids))
+    return req, input_data, match_confirmations
+
+
+def _prepare_action_run(handler, connection, action):
+    """先校验 run，再把匹配确认与 run 创建作为一个事务提交。"""
+    req, input_data, match_confirmations = _plugin_input_data(handler, connection)
+    runtime = PluginRuntime(handler.session, loader.get_settings())
     try:
-        value = tornado.escape.json_decode(handler.request.body or b"{}")
-    except ValueError as exc:
-        raise PluginRuntimeError("plugin.request_invalid", "Request body must be valid JSON") from exc
-    if not isinstance(value, dict):
-        raise PluginRuntimeError("plugin.request_invalid", "Request body must be an object")
-    return value
+        run = runtime.prepare_run(
+            connection.id,
+            action,
+            handler.user_id(),
+            trigger=req.get("trigger", "manual"),
+            parent_run_id=req.get("parent_run_id"),
+            input_data=input_data,
+            server_owned_input_keys=SERVER_OWNED_INPUT_KEYS,
+            commit=False,
+        )
+        for source_book_id, book_id, allowed_book_ids in match_confirmations:
+            try:
+                confirm_match(
+                    handler.session,
+                    connection.id,
+                    source_book_id,
+                    int(book_id),
+                    handler.user_id(),
+                    handler.db,
+                    allowed_book_ids,
+                    commit=False,
+                )
+            except (TypeError, ValueError) as exc:
+                raise PluginRuntimeError("plugin.match_book_forbidden", str(exc)) from exc
+        handler.session.commit()
+        return run
+    except Exception:
+        handler.session.rollback()
+        raise
 
 
-def _error(exc):
-    return {"err": getattr(exc, "code", "plugin.error"), "msg": str(exc)}
+def _active_user_installation(session, plugin_key, user_id):
+    provider = REGISTRY.get(plugin_key)
+    manifest = PluginManifest.validate(provider.manifest)
+    if "user" not in manifest.raw["connection_owners"]:
+        raise PluginRuntimeError("plugin.owner_forbidden", "This plugin does not support user connections")
+    installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
+    if installation is None:
+        installation = install_builtin(session, plugin_key, user_id)
+    if not installation.enabled or installation.status != "active":
+        raise PluginRuntimeError("plugin.installation_disabled", "Plugin installation is disabled")
+    return manifest, installation
+
+
+def _public_manifest(manifest):
+    raw = manifest.raw
+    return {
+        "plugin_key": raw["id"],
+        "name": raw["name"],
+        "version": raw["version"],
+        "protocol_version": raw["protocol_version"],
+        "description": raw.get("description", ""),
+        "runtime_kind": raw["runtime_kind"],
+        "categories": list(raw["categories"]),
+        "capabilities": list(raw["capabilities"]),
+        "actions": list(raw["actions"]),
+        "auth_schema": dict(raw["auth_schema"]),
+        "config_schema": dict(raw["config_schema"]),
+        "connection_owners": list(raw["connection_owners"]),
+        "permissions": list(raw["permissions"]),
+        "extra_features": dict(raw.get("extra_features") or {}),
+        "ui": dict(raw.get("ui") or {}),
+    }
 
 
 class AdminPlugins(BaseHandler):
@@ -73,35 +144,25 @@ class AdminPlugins(BaseHandler):
     @is_admin
     def get(self):
         try:
-            ensure_builtin_capability_installations(self.session, self.user_id(), loader.get_settings())
+            ensure_auto_installations(self.session, self.user_id(), loader.get_settings())
             definitions = self.session.query(PluginDefinition).order_by(PluginDefinition.id).all()
             installations = self.session.query(PluginInstallation).order_by(PluginInstallation.id).all()
             definition_map = {item.id: item for item in definitions}
-            opds_sources = self.session.query(OpdsSource).all()
-            legado_sources = self.session.query(BookSourceModel).all()
-            configured_metadata = [
-                value for value in loader.get_settings().get(META_SELECTED_SOURCES, []) if value != META_SOURCE_AI
-            ]
+            settings = loader.get_settings()
+            # 各插件自报配置状态，此处不认识任何具体 plugin_key。
+            builtin_state = {}
+            for provider in REGISTRY.providers():
+                status = getattr(provider, "status", None)
+                if status is None:
+                    continue
+                value = status(self.session, settings)
+                if value:
+                    builtin_state[provider.manifest["id"]] = value
             return {
                 "err": "ok",
                 "definitions": [item.to_public_dict() for item in definitions],
                 "installations": [item.to_public_dict(definition_map.get(item.definition_id)) for item in installations],
-                "builtin_state": {
-                    "talebook.metadata.builtin": {
-                        "configured": len(configured_metadata),
-                        "enabled": len(configured_metadata),
-                        "sources": configured_metadata,
-                    },
-                    "talebook.book-source.opds": {
-                        "configured": len(opds_sources),
-                        "enabled": sum(1 for item in opds_sources if item.active),
-                        "service_enabled": bool(loader.get_settings().get("OPDS_ENABLED", True)),
-                    },
-                    "talebook.book-source.legado": {
-                        "configured": len(legado_sources),
-                        "enabled": sum(1 for item in legado_sources if item.enabled),
-                    },
-                },
+                "builtin_state": builtin_state,
             }
         except PluginRuntimeError as exc:
             return _error(exc)
@@ -210,11 +271,14 @@ class AdminPluginConnections(BaseHandler):
                 0,
                 req.get("credentials"),
                 name=req.get("name", "default"),
+                # role 是查询键，name 只是展示文案：不传 role 会退化回按名字定位，
+                # 用户改一次名就会多出一条连接。
+                role=req.get("role") or DEFAULT_CONNECTION_ROLE,
                 config=req.get("config"),
                 scopes=req.get("scopes"),
                 schedule=req.get("schedule", ""),
             )
-            secret = self.session.get(PluginSecret, connection.secret_id)
+            secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
             return {"err": "ok", "connection": connection.to_public_dict(secret)}
         except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
             return _error(exc)
@@ -236,7 +300,7 @@ class AdminPluginConnectionState(BaseHandler):
                 raise PluginRuntimeError("plugin.installation_disabled", "Enable the plugin installation first")
             connection.enabled = req["enabled"]
             self.session.commit()
-            secret = self.session.get(PluginSecret, connection.secret_id)
+            secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
             return {"err": "ok", "connection": connection.to_public_dict(secret)}
         except (PluginRuntimeError, TypeError, ValueError) as exc:
             return _error(exc)
@@ -263,21 +327,157 @@ class UserPluginConnections(BaseHandler):
     def post(self):
         try:
             req = _body(self)
+            plugin_key = req.get("plugin_key")
+            installation_id = req.get("installation_id")
+            if plugin_key is not None:
+                if not isinstance(plugin_key, str) or not plugin_key or installation_id is not None:
+                    raise PluginRuntimeError("plugin.request_invalid", "Provide either plugin_key or installation_id")
+                manifest, installation = _active_user_installation(self.session, plugin_key, self.user_id())
+                installation_id = installation.id
+                default_name = manifest.raw["name"]
+            else:
+                installation_id = int(installation_id or 0)
+                installation = self.session.get(PluginInstallation, installation_id)
+                if installation is None or not installation.enabled or installation.status != "active":
+                    raise PluginRuntimeError("plugin.installation_missing", "Plugin installation is not active")
+                definition = self.session.get(PluginDefinition, installation.definition_id)
+                default_name = definition.name
             connection = save_connection(
                 self.session,
                 loader.get_settings(),
-                int(req.get("installation_id", 0)),
+                installation_id,
                 "user",
                 self.user_id(),
                 req.get("credentials"),
-                name=req.get("name", "default"),
+                name=req.get("name", default_name),
+                # role 是查询键，name 只是展示文案：不传 role 会退化回按名字定位，
+                # 用户改一次名就会多出一条连接。
+                role=req.get("role") or DEFAULT_CONNECTION_ROLE,
                 config=req.get("config"),
                 scopes=req.get("scopes"),
                 schedule=req.get("schedule", ""),
             )
-            secret = self.session.get(PluginSecret, connection.secret_id)
+            secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
             return {"err": "ok", "connection": connection.to_public_dict(secret)}
         except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
+class UserPluginState(BaseHandler):
+    @js
+    @auth
+    def get(self, plugin_key):
+        try:
+            provider = REGISTRY.get(plugin_key)
+            manifest = PluginManifest.validate(provider.manifest)
+            installation = self.session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
+            connections = []
+            runs = []
+            if installation is not None:
+                connections = (
+                    self.session.query(PluginConnection)
+                    .filter(
+                        PluginConnection.installation_id == installation.id,
+                        PluginConnection.owner_type == "user",
+                        PluginConnection.owner_id == self.user_id(),
+                    )
+                    .order_by(PluginConnection.id)
+                    .all()
+                )
+            connection_ids = [connection.id for connection in connections]
+            if connection_ids:
+                runs = (
+                    self.session.query(PluginRun)
+                    .filter(PluginRun.connection_id.in_(connection_ids))
+                    .order_by(PluginRun.id.desc())
+                    .limit(100)
+                    .all()
+                )
+            runtime = PluginRuntime(self.session, loader.get_settings())
+            return {
+                "err": "ok",
+                "plugin": _public_manifest(manifest),
+                "installation": (
+                    {
+                        "id": installation.id,
+                        "plugin_key": installation.plugin_key,
+                        "version": installation.version,
+                        "enabled": bool(installation.enabled),
+                        "status": installation.status,
+                    }
+                    if installation is not None
+                    else None
+                ),
+                "connections": [runtime.connection_public_dict(connection) for connection in connections],
+                "runs": [run.to_public_dict() for run in runs],
+            }
+        except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
+class UserPluginFeature(BaseHandler):
+    """插件自有、无法标准化的只读/写入动作的唯一逃生舱。"""
+
+    @js
+    @auth
+    def post(self, plugin_key, action):
+        try:
+            req = _body(self)
+            provider = REGISTRY.get(plugin_key)
+            manifest = PluginManifest.validate(provider.manifest)
+            feature = (manifest.raw.get("extra_features") or {}).get(action)
+            if feature is None or not isinstance(provider, ExtraFeatureProvider):
+                raise PluginRuntimeError("plugin.feature_not_supported", "Plugin feature is not supported")
+            params = req.get("params", {})
+            if params is None:
+                params = {}
+            if not isinstance(params, dict):
+                raise PluginRuntimeError("plugin.request_invalid", "Feature params must be an object")
+            try:
+                validate_against_schema(feature.get("schema") or {}, params, where="feature")
+            except ValueError as exc:
+                raise PluginRuntimeError(getattr(exc, "code", "plugin.request_invalid"), str(exc)) from exc
+
+            _, installation = _active_user_installation(self.session, plugin_key, self.user_id())
+            credentials = req.get("credentials")
+            if credentials is not None:
+                if not isinstance(credentials, dict):
+                    raise PluginRuntimeError("plugin.credentials_invalid", "credentials must be an object")
+                connection = save_connection(
+                    self.session,
+                    loader.get_settings(),
+                    installation.id,
+                    "user",
+                    self.user_id(),
+                    credentials,
+                    role=DEFAULT_CONNECTION_ROLE,
+                    name=manifest.raw["name"],
+                )
+            else:
+                connection = (
+                    self.session.query(PluginConnection)
+                    .filter(
+                        PluginConnection.installation_id == installation.id,
+                        PluginConnection.owner_type == "user",
+                        PluginConnection.owner_id == self.user_id(),
+                        PluginConnection.role == DEFAULT_CONNECTION_ROLE,
+                    )
+                    .first()
+                )
+            if connection is None or not connection.enabled:
+                raise PluginRuntimeError("plugin.connection_missing", "Plugin connection is not enabled")
+            runtime = PluginRuntime(self.session, loader.get_settings())
+            dispatch = getattr(runtime, feature["mode"])
+            data = dispatch(
+                connection,
+                "execute_feature",
+                action,
+                params,
+                required_scopes=tuple(feature.get("required_scopes") or ()),
+            )
+            secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
+            return {"err": "ok", "connection": connection.to_public_dict(secret), "data": data}
+        except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
             return _error(exc)
 
 
@@ -286,14 +486,10 @@ class AdminPluginAction(BaseHandler):
     @is_admin
     def post(self, connection_id, action):
         try:
-            req = _body(self)
-            run = PluginRuntime(self.session, loader.get_settings()).prepare_run(
-                int(connection_id),
-                action,
-                self.user_id(),
-                trigger=req.get("trigger", "manual"),
-                parent_run_id=req.get("parent_run_id"),
-            )
+            connection = self.session.get(PluginConnection, int(connection_id))
+            if connection is None:
+                raise PluginRuntimeError("plugin.connection_missing", "Plugin connection is not available")
+            run = _prepare_action_run(self, connection, action)
             execute_plugin_run(AsyncService(), run.id)
             self.session.refresh(run)
             return {"err": "ok", "run": run.to_public_dict()}
@@ -350,20 +546,7 @@ class UserPluginAction(BaseHandler):
             connection = self.session.get(PluginConnection, int(connection_id))
             if connection is None or connection.owner_type != "user" or connection.owner_id != self.user_id():
                 raise PluginRuntimeError("plugin.connection_forbidden", "Plugin connection is not available")
-            installation = self.session.get(PluginInstallation, connection.installation_id)
-            if installation.plugin_key == WEREAD_PLUGIN_KEY and action in {"test", "preview", "run"}:
-                raise PluginRuntimeError(
-                    "plugin.action_requires_import_endpoint",
-                    "WeRead actions must use the private import endpoint",
-                )
-            req = _body(self)
-            run = PluginRuntime(self.session, loader.get_settings()).prepare_run(
-                connection.id,
-                action,
-                self.user_id(),
-                trigger=req.get("trigger", "manual"),
-                parent_run_id=req.get("parent_run_id"),
-            )
+            run = _prepare_action_run(self, connection, action)
             execute_plugin_run(AsyncService(), run.id)
             self.session.refresh(run)
             return {"err": "ok", "run": run.to_public_dict()}
@@ -406,575 +589,6 @@ class UserPluginRunDetail(BaseHandler):
         return {"err": "ok", "run": run.to_public_dict(), "items": [item.to_public_dict(include_data=True) for item in items]}
 
 
-# ---------------------------------------------------------------------------
-# 内置文本工具（正文查找替换 / 繁简转换 / TXT 编码修复）
-#
-# 三个工具均为 builtin capability 插件（manifest 见
-# webserver/plugins/runtime/builtin_capabilities.py），纯处理核心位于
-# webserver/plugins/texttools/；本节负责书籍定位、临时文件编排与写回/入库。
-
-
-class BookToolsError(RuntimeError):
-    """内置文本工具的业务错误（消息已面向用户）。"""
-
-
-def _tool_error(exc):
-    return {"err": "booktools.failed", "msg": str(exc)}
-
-
-def _tool_book_id(req):
-    try:
-        book_id = int(req.get("book_id") or 0)
-    except (TypeError, ValueError):
-        raise BookToolsError("参数错误：book_id 无效")
-    if book_id <= 0:
-        raise BookToolsError("参数错误：缺少 book_id")
-    return book_id
-
-
-def _tool_resolve_book(handler, book_id):
-    """按当前访问者权限解析书籍；无权查看时抛出与「不存在」一致的错误，避免探测私有书籍。"""
-    if not handler.can_view_book(book_id):
-        raise BookToolsError("书籍不存在：ID=%d" % book_id)
-    return resolve_book(handler.db, book_id)
-
-
-def _tool_workdir():
-    return tempfile.mkdtemp(prefix="talebook-texttools-")
-
-
-def _tool_backup_dir():
-    convert_path = loader.get_settings().get("convert_path") or tempfile.gettempdir()
-    path = os.path.join(str(convert_path), "texttools-backups")
-    os.makedirs(path, exist_ok=True)
-    return path
-
-
-class UserBookToolsBooks(BaseHandler):
-    @js
-    @auth
-    def get(self):
-        keyword = (self.get_argument("query", "") or "").strip().lower()
-        items = []
-        for book in self.get_books():
-            fmts = [f.upper() for f in (book.get("available_formats") or [])]
-            usable = [fmt for fmt in ("EPUB", "TXT") if fmt in fmts]
-            if not usable:
-                continue
-            authors = book.get("authors") or []
-            if keyword:
-                haystack = "%s %s" % (book.get("title") or "", " ".join(str(a) for a in authors))
-                if keyword not in haystack.lower():
-                    continue
-            items.append(
-                {
-                    "id": book["id"],
-                    "title": book.get("title") or "",
-                    "authors": [str(a) for a in authors],
-                    "formats": usable,
-                    "timestamp": str(book.get("timestamp") or ""),
-                }
-            )
-        items.sort(key=lambda item: item["timestamp"], reverse=True)
-        return {"err": "ok", "books": items[:100], "total": len(items)}
-
-
-class UserTextReplacePreview(BaseHandler):
-    @js
-    @auth
-    async def post(self):
-        req = _body(self)
-        try:
-            book_id = _tool_book_id(req)
-            pattern = str(req.get("pattern") or "")
-            replacement = str(req.get("replacement") or "")
-            use_regex = bool(req.get("use_regex"))
-            book = _tool_resolve_book(self, book_id)
-            fmt = pick_format(book, candidates=("TXT", "EPUB"))
-            if fmt is None:
-                raise BookToolsError("该书籍没有 TXT 或 EPUB 格式，无法执行替换")
-            src = get_format_path(self.db, book_id, fmt)
-            result = await IOLoop.current().run_in_executor(
-                None,
-                functools.partial(replace_preview, fmt, src, pattern, replacement, use_regex),
-            )
-            result["err"] = "ok"
-            result["book_id"] = book_id
-            return result
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
-
-
-class UserTextReplaceRun(BaseHandler):
-    @js
-    @is_admin
-    async def post(self):
-        req = _body(self)
-        work_dir = None
-        try:
-            book_id = _tool_book_id(req)
-            pattern = str(req.get("pattern") or "")
-            replacement = str(req.get("replacement") or "")
-            use_regex = bool(req.get("use_regex"))
-            output_mode = req.get("output_mode") or "new"
-            if output_mode not in ("new", "overwrite"):
-                raise BookToolsError("参数错误：output_mode 必须为 new 或 overwrite")
-            apply_fn, rule_error = compile_rule(pattern, replacement, use_regex)
-            if apply_fn is None:
-                raise BookToolsError(rule_error)
-
-            book = _tool_resolve_book(self, book_id)
-            title = book.get("title") or "Unknown"
-            fmt = pick_format(book, candidates=("TXT", "EPUB"))
-            if fmt is None:
-                raise BookToolsError("该书籍没有 TXT 或 EPUB 格式，无法执行替换")
-            src = get_format_path(self.db, book_id, fmt)
-
-            work_dir = _tool_workdir()
-            out_path = os.path.join(work_dir, "replaced.%s" % fmt.lower())
-            matches = await IOLoop.current().run_in_executor(
-                None,
-                functools.partial(replace_txt_file if fmt == "TXT" else replace_epub_file, src, out_path, apply_fn),
-            )
-
-            rsp = {"err": "ok", "format": fmt, "matches": matches, "output_mode": output_mode}
-            if output_mode == "overwrite":
-                overwrite_format(self.db, book_id, fmt, out_path)
-                rsp["book_id"] = book_id
-            else:
-                suffix = str(req.get("suffix") or "").strip() or "（正文替换版）"
-                rsp["book_id"] = import_as_new_book(
-                    self.db, self.session, book_id, out_path, title_suffix=suffix, collector_id=self.user_id()
-                )
-            logging.info(
-                "[booktools] text-replace done: %s book=%s hits=%d mode=%s [uid:%s]",
-                fmt,
-                title,
-                matches,
-                output_mode,
-                self.user_id(),
-            )
-            return rsp
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
-        finally:
-            if work_dir:
-                shutil.rmtree(work_dir, ignore_errors=True)
-
-
-class UserTxtFixerAnalyze(BaseHandler):
-    @js
-    @auth
-    async def post(self):
-        req = _body(self)
-        try:
-            book_id = _tool_book_id(req)
-            book = _tool_resolve_book(self, book_id)
-            fmts = [f.upper() for f in (book.get("available_formats") or [])]
-            if "TXT" not in fmts:
-                raise BookToolsError("该书籍没有 TXT 格式，无法执行检测")
-            src = get_format_path(self.db, book_id, "TXT")
-            with open(src, "rb") as f:
-                data = f.read(ANALYZE_LIMIT)
-            report = await IOLoop.current().run_in_executor(None, functools.partial(analyze_bytes, data))
-            report["err"] = "ok"
-            report["book_id"] = book_id
-            return report
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
-
-
-class UserTxtFixerRun(BaseHandler):
-    @js
-    @is_admin
-    async def post(self):
-        req = _body(self)
-        work_dir = None
-        try:
-            book_id = _tool_book_id(req)
-            output_mode = req.get("output_mode") or "new"
-            if output_mode not in ("new", "overwrite"):
-                raise BookToolsError("参数错误：output_mode 必须为 new 或 overwrite")
-            book = _tool_resolve_book(self, book_id)
-            title = book.get("title") or "Unknown"
-            fmts = [f.upper() for f in (book.get("available_formats") or [])]
-            if "TXT" not in fmts:
-                raise BookToolsError("该书籍没有 TXT 格式，无法执行修复")
-            src = get_format_path(self.db, book_id, "TXT")
-
-            with open(src, "rb") as f:
-                data = f.read()
-            text, report = await IOLoop.current().run_in_executor(None, functools.partial(fix_bytes, data))
-            if report.get("unrecoverable"):
-                raise BookToolsError("文件疑似多重误读乱码（反转循环），无法自动修复")
-            if report.get("garbage") and not report.get("mojibake"):
-                raise BookToolsError("文件疑似二进制或混用编码，无法安全修复（编码：%s）" % report.get("encoding"))
-
-            work_dir = _tool_workdir()
-            out_path = os.path.join(work_dir, "fixed.txt")
-            with open(out_path, "wb") as f:
-                f.write(text.encode("utf-8"))  # UTF-8 无 BOM
-
-            rsp = {
-                "err": "ok",
-                "encoding": report.get("encoding"),
-                "mojibake": report.get("mojibake", False),
-                "output_mode": output_mode,
-            }
-            if output_mode == "overwrite":
-                overwrite_format(self.db, book_id, "TXT", out_path)
-                rsp["book_id"] = book_id
-            else:
-                rsp["book_id"] = import_as_new_book(
-                    self.db, self.session, book_id, out_path, title_suffix="（编码修复版）", collector_id=self.user_id()
-                )
-            logging.info(
-                "[booktools] txt-fixer done: book=%s enc=%s mode=%s [uid:%s]",
-                title,
-                report.get("encoding"),
-                output_mode,
-                self.user_id(),
-            )
-            return rsp
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
-        finally:
-            if work_dir:
-                shutil.rmtree(work_dir, ignore_errors=True)
-
-
-# 支持的转换方向（与 webserver/plugins/texttools/config/ 配置一致）
-ZH_DIRECTIONS = ("t2s", "tw2s", "tw2sp", "s2t", "s2tw", "s2twp", "t2tw", "tw2t")
-# 方向 → 目标语言代码（calibre 语言码：zh=简体，zht=繁体）
-ZH_DIRECTION_LANG = {
-    "t2s": "zh",
-    "tw2s": "zh",
-    "tw2sp": "zh",
-    "s2t": "zht",
-    "s2tw": "zht",
-    "s2twp": "zht",
-    "t2tw": "zht",
-    "tw2t": "zht",
-}
-# 增强词表仅对繁体→简体方向生效
-ZH_A5_DIRECTIONS = ("t2s", "tw2s")
-A5_PHRASES_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plugins", "texttools", "a5_phrases.txt"
-)
-# 另存为新书时的标题后缀
-ZH_NEW_BOOK_SUFFIX = {"zh": "（简体版）", "zht": "（繁體版）"}
-
-
-def _zh_sync_book_meta(db, book_id, lang, convert=None):
-    """替换模式下同步库内标题/作者/语言（不加后缀），保持与转换后文件一致。
-
-    封面不受影响：set_metadata 只会更新提供的封面、从不删除现有封面。
-    """
-    try:
-        mi = db.get_metadata(book_id, index_is_id=True)
-        if convert is not None:
-            if mi.title:
-                mi.title = convert(mi.title)
-                mi.title_sort = utils.get_title_sort(mi.title)
-            if mi.authors:
-                mi.authors = [convert(a) for a in mi.authors]
-                mi.author_sort = None  # 名字已转换，排序键由 calibre 按新名字重算
-        mi.languages = [lang]
-        db.set_metadata(book_id, mi, force_changes=True)
-    except Exception as err:
-        logging.warning("[booktools] Failed to update metadata for book_id=%d: %s", book_id, err)
-
-
-class UserZhConverterRun(BaseHandler):
-    @js
-    @is_admin
-    async def post(self):
-        req = _body(self)
-        work_dir = None
-        try:
-            book_id = _tool_book_id(req)
-            direction = str(req.get("direction") or "")
-            if direction not in ZH_DIRECTIONS:
-                raise BookToolsError("不支持的转换方向：%s" % direction)
-            use_a5 = bool(req.get("use_a5"))
-            convert_title = bool(req.get("convert_title"))
-            backup = bool(req.get("backup"))
-            output_mode = req.get("output_mode") or "new"
-            if output_mode not in ("new", "replace"):
-                raise BookToolsError("参数错误：output_mode 必须为 new 或 replace")
-
-            extra_dicts = [A5_PHRASES_FILE] if (use_a5 and direction in ZH_A5_DIRECTIONS) else []
-            engine = OpenCC(direction, extra_dicts=extra_dicts)
-
-            book = _tool_resolve_book(self, book_id)
-            title = book.get("title") or "Unknown"
-            # 繁简转换优先处理 EPUB（保留目录结构），无 EPUB 时退回 TXT
-            fmt = pick_format(book, candidates=("EPUB", "TXT"))
-            if fmt is None:
-                raise BookToolsError("该书籍没有 EPUB / TXT 格式，无法转换")
-            src = get_format_path(self.db, book_id, fmt)
-
-            work_dir = _tool_workdir()
-            out_path = os.path.join(work_dir, "converted.%s" % fmt.lower())
-            lang = ZH_DIRECTION_LANG[direction]
-
-            def _convert_job():
-                if fmt == "EPUB":
-                    convert_epub(src, out_path, engine.convert, convert_metadata=convert_title)
-                    return ""
-                return convert_txt_file(src, out_path, engine.convert)
-
-            source_encoding = await IOLoop.current().run_in_executor(None, _convert_job)
-
-            rsp = {
-                "err": "ok",
-                "direction": direction,
-                "direction_label": DIRECTION_LABELS.get(direction, direction),
-                "format": fmt,
-                "source_encoding": source_encoding,
-                "output_mode": output_mode,
-            }
-            if output_mode == "replace":
-                overwrite_format(
-                    self.db,
-                    book_id,
-                    fmt,
-                    out_path,
-                    backup_dir=_tool_backup_dir() if backup else None,
-                )
-                _zh_sync_book_meta(self.db, book_id, lang, engine.convert if convert_title else None)
-                rsp["book_id"] = book_id
-            else:
-                suffix_engine = engine.convert if convert_title else None
-                rsp["book_id"] = import_as_new_book(
-                    self.db,
-                    self.session,
-                    book_id,
-                    out_path,
-                    title_suffix=ZH_NEW_BOOK_SUFFIX.get(lang, ""),
-                    language=lang,
-                    convert_text=suffix_engine,
-                    collector_id=self.user_id(),
-                )
-            logging.info(
-                "[booktools] zh-converter done: %s book=%s direction=%s mode=%s [uid:%s]",
-                fmt,
-                title,
-                direction,
-                output_mode,
-                self.user_id(),
-            )
-            return rsp
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
-        finally:
-            if work_dir:
-                shutil.rmtree(work_dir, ignore_errors=True)
-
-
-def _weread_connection(handler):
-    installation = handler.session.query(PluginInstallation).filter(PluginInstallation.plugin_key == WEREAD_PLUGIN_KEY).first()
-    if installation is None:
-        return None, None
-    connection = (
-        handler.session.query(PluginConnection)
-        .filter(
-            PluginConnection.installation_id == installation.id,
-            PluginConnection.owner_type == "user",
-            PluginConnection.owner_id == handler.user_id(),
-            PluginConnection.name == "微信读书",
-        )
-        .first()
-    )
-    return installation, connection
-
-
-def _ensure_weread_connection(handler, api_key=None):
-    installation, connection = _weread_connection(handler)
-    if installation is None:
-        installation = install_builtin(handler.session, WEREAD_PLUGIN_KEY, handler.user_id())
-    if not installation.enabled:
-        raise PluginRuntimeError("plugin.installation_disabled", "WeRead integration is disabled")
-    if connection is None or api_key:
-        connection = save_connection(
-            handler.session,
-            loader.get_settings(),
-            installation.id,
-            "user",
-            handler.user_id(),
-            {"api_key": api_key.strip()} if api_key else {},
-            name="微信读书",
-        )
-    if not connection.enabled:
-        raise PluginRuntimeError("plugin.connection_disabled", "WeRead connection is disabled")
-    return connection
-
-
-def _weread_api_key(handler, connection):
-    secret = handler.session.get(PluginSecret, connection.secret_id) if connection else None
-    if secret is None:
-        raise PluginRuntimeError("plugin.credentials_missing", "Provide a WeRead API key")
-    values = SecretCipher(loader.get_settings()).decrypt(secret.ciphertext)
-    api_key = str(values.get("api_key") or "")
-    if not api_key:
-        raise PluginRuntimeError("plugin.credentials_missing", "Provide a WeRead API key")
-    return api_key
-
-
-def _weread_state(handler):
-    _, connection = _weread_connection(handler)
-    if connection is None:
-        return {"connection": None, "runs": []}
-    secret = handler.session.get(PluginSecret, connection.secret_id)
-    runs = (
-        handler.session.query(PluginRun)
-        .filter(PluginRun.connection_id == connection.id)
-        .order_by(PluginRun.id.desc())
-        .limit(20)
-        .all()
-    )
-    return {"connection": connection.to_public_dict(secret), "runs": [run.to_public_dict() for run in runs]}
-
-
-class UserWeread(BaseHandler):
-    @js
-    @auth
-    def get(self):
-        return {
-            "err": "ok",
-            **_weread_state(self),
-            "operations": [
-                "search",
-                "book_info",
-                "chapters",
-                "progress",
-                "shelf",
-                "statistics",
-                "notebooks",
-                "highlights",
-                "my_reviews",
-                "popular_highlights",
-                "underline_stats",
-                "highlight_reviews",
-                "review_detail",
-                "public_reviews",
-                "recommendations",
-                "similar",
-                "friends_reading",
-            ],
-            "read_only": True,
-            "skill_version": "1.0.4",
-        }
-
-
-class UserWereadQuery(BaseHandler):
-    @js
-    @auth
-    def post(self):
-        connection = None
-        try:
-            req = _body(self)
-            api_key = req.get("api_key")
-            if api_key is not None and (not isinstance(api_key, str) or not api_key.strip()):
-                raise PluginRuntimeError("plugin.credentials_invalid", "WeRead API key must be a non-empty string")
-            params = req.get("params", {})
-            if not isinstance(params, dict):
-                raise PluginRuntimeError("params.invalid", "WeRead query parameters must be an object")
-            connection = _ensure_weread_connection(self, api_key)
-            stored_key = _weread_api_key(self, connection)
-            data = WereadProvider().query(stored_key, req.get("operation", ""), params)
-            connection.health = "healthy"
-            connection.health_message = "WeRead read-only API connected"
-            connection.last_tested_at = datetime.datetime.now()
-            self.session.commit()
-            secret = self.session.get(PluginSecret, connection.secret_id)
-            return {
-                "err": "ok",
-                "connection": connection.to_public_dict(secret),
-                "data": redact(data, {"api_key": stored_key}),
-            }
-        except (PluginRuntimeError, ProviderError, SecretCipherError, TypeError, ValueError) as exc:
-            if connection is not None and isinstance(exc, ProviderError):
-                connection.health = "unauthorized" if isinstance(exc, ProviderAuthError) else "degraded"
-                connection.health_message = str(exc)
-                connection.last_tested_at = datetime.datetime.now()
-                self.session.commit()
-            return _error(exc)
-
-
-class UserWereadImport(BaseHandler):
-    def _allowed_book_ids(self):
-        return [book_id for book_id in all_book_ids(self.db) if self.get_book(book_id, raise_exception=False) is not None]
-
-    @js
-    @auth
-    def get(self):
-        return {"err": "ok", **_weread_state(self)}
-
-    @js
-    @auth
-    def post(self):
-        try:
-            req = _body(self)
-            action = req.get("action", "preview")
-            if action not in {"test", "preview", "run"}:
-                raise PluginRuntimeError("plugin.action_invalid", "Unsupported WeRead import action")
-            export_data = req.get("export")
-            api_key = req.get("api_key")
-            if api_key is not None and (not isinstance(api_key, str) or not api_key.strip()):
-                raise PluginRuntimeError("plugin.credentials_invalid", "WeRead API key must be a non-empty string")
-
-            connection = _ensure_weread_connection(self, api_key)
-            if export_data is None and not api_key:
-                secret = self.session.get(PluginSecret, connection.secret_id) if connection else None
-                if secret is None or not secret.mask_hint:
-                    raise PluginRuntimeError(
-                        "plugin.credentials_missing",
-                        "Provide a WeRead API key or official export JSON",
-                    )
-
-            allowed_book_ids = self._allowed_book_ids()
-            matches = req.get("matches") or {}
-            if not isinstance(matches, dict):
-                raise PluginRuntimeError("plugin.request_invalid", "matches must be an object")
-            for source_book_id, book_id in matches.items():
-                try:
-                    confirm_match(
-                        self.session,
-                        connection.id,
-                        str(source_book_id),
-                        int(book_id),
-                        self.user_id(),
-                        self.db,
-                        allowed_book_ids,
-                    )
-                except (TypeError, ValueError) as exc:
-                    raise PluginRuntimeError("plugin.match_book_forbidden", str(exc)) from exc
-
-            input_data = {"allowed_book_ids": allowed_book_ids}
-            if export_data is not None:
-                input_data["export"] = export_data
-            runtime = PluginRuntime(self.session, loader.get_settings(), calibre_db=self.db)
-            run = runtime.prepare_run(
-                connection.id,
-                action,
-                self.user_id(),
-                trigger="manual",
-                input_data=input_data,
-            )
-            runtime.execute(run.id)
-            self.session.refresh(run)
-            items = self.session.query(PluginRunItem).filter(PluginRunItem.run_id == run.id).order_by(PluginRunItem.id).all()
-            return {
-                "err": "ok",
-                "connection": connection.to_public_dict(self.session.get(PluginSecret, connection.secret_id)),
-                "run": run.to_public_dict(),
-                "items": [item.to_public_dict(include_data=True) for item in items],
-            }
-        except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
-            return _error(exc)
-
-
 def routes():
     return [
         (r"/api/admin/plugins", AdminPlugins),
@@ -987,16 +601,9 @@ def routes():
         (r"/api/admin/plugins/runs", AdminPluginRuns),
         (r"/api/admin/plugins/runs/([0-9]+)", AdminPluginRunDetail),
         (r"/api/plugins/connections", UserPluginConnections),
+        (r"/api/plugins/([a-z0-9.-]+)/features/([a-z0-9_]+)", UserPluginFeature),
         (r"/api/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", UserPluginAction),
         (r"/api/plugins/runs", UserPluginRuns),
         (r"/api/plugins/runs/([0-9]+)", UserPluginRunDetail),
-        (r"/api/plugins/weread", UserWeread),
-        (r"/api/plugins/weread/query", UserWereadQuery),
-        (r"/api/plugins/weread/import", UserWereadImport),
-        (r"/api/plugins/tools/books", UserBookToolsBooks),
-        (r"/api/plugins/tools/text-replace/preview", UserTextReplacePreview),
-        (r"/api/plugins/tools/text-replace/run", UserTextReplaceRun),
-        (r"/api/plugins/tools/txt-fixer/analyze", UserTxtFixerAnalyze),
-        (r"/api/plugins/tools/txt-fixer/run", UserTxtFixerRun),
-        (r"/api/plugins/tools/zh-converter/run", UserZhConverterRun),
-    ]
+        (r"/api/plugins/([a-z0-9.-]+)", UserPluginState),
+    ] + plugin_booktools.routes()

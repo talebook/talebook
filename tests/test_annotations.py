@@ -12,7 +12,14 @@ from tests.test_main import BID_EPUB, TestApp, TestWithUserLogin, get_db, tempor
 from tests.test_main import setUpModule as init
 from webserver import models
 from webserver.migrate_db import compare_and_migrate
+from webserver.plugins.runtime.domains import Annotation as PluginAnnotation
+from webserver.plugins.runtime.domains import CheckReport, Page, PushReceipt
+from webserver.plugins.runtime.protocol import PROTOCOL_VERSION
 from webserver.services.annotation_sync import AnnotationSyncService
+from webserver.services.plugin_runtime import PluginRegistry, install_builtin, save_connection
+
+
+PLUGIN_SETTINGS = {"PLUGIN_SECRET_KEY": "annotation-sync-test-key", "cookie_secret": "unused-cookie-secret"}
 
 
 def setUpModule():
@@ -325,6 +332,93 @@ class TestAnnotations(TestWithUserLogin):
         self.assertEqual(sources["calibre"].source_annotation_id, "calibre-1")
         self.assertEqual(sources["weread"].source_sync_status, "failed")
         self.assertIn("remote unavailable", sources["weread"].source_sync_error)
+
+    def test_public_annotation_discovers_typed_writer_and_excludes_its_source(self):
+        calls = []
+
+        class WritableAnnotationPlugin:
+            manifest = {
+                "protocol_version": PROTOCOL_VERSION,
+                "id": "talebook.annotation.sync-test",
+                "name": "Annotation sync test",
+                "version": "1.0.0",
+                "categories": ["annotations"],
+                "capabilities": ["annotations.push"],
+                "runtime_kind": "builtin",
+                "actions": ["test"],
+                "auth_schema": {"type": "object", "properties": {}},
+                "config_schema": {"type": "object", "properties": {}},
+                "connection_owners": ["user"],
+                "permissions": ["annotations.write"],
+                "data_policy": {},
+                "compatibility": {},
+                "homepage": "",
+                "license": "GPL-3.0",
+            }
+
+            def list_annotations(self, context):
+                return Page()
+
+            def push_annotation(self, item, state, context):
+                calls.append((item, dict(state), context["action"]))
+                return PushReceipt(
+                    source_annotation_id="remote-1",
+                    source_position="chapter=1",
+                    source_raw_hash="remote-hash",
+                    source_updated_at="2026-08-25T12:00:00Z",
+                )
+
+            def self_check(self, context):
+                return CheckReport(healthy=True, message="ready")
+
+        session = get_db()
+        registry = PluginRegistry()
+        plugin = WritableAnnotationPlugin()
+        registry.register(plugin)
+        installation = install_builtin(session, plugin.manifest["id"], installed_by=1, registry=registry)
+        connection = save_connection(
+            session,
+            PLUGIN_SETTINGS,
+            installation.id,
+            "user",
+            1,
+            {},
+            name="同步连接",
+            scopes=["annotations.write"],
+        )
+        annotation = models.Annotation(
+            reader_id=1,
+            book_id=BID_EPUB,
+            client_id="typed-sync",
+            annotation_type="note",
+            is_private=False,
+            content="同步给外部服务",
+        )
+        session.add(annotation)
+        session.commit()
+
+        service = AnnotationSyncService()
+        service.sync_annotation(annotation.id, registry=registry, settings=PLUGIN_SETTINGS)
+
+        self.assertEqual(len(calls), 1)
+        self.assertIsInstance(calls[0][0], PluginAnnotation)
+        self.assertEqual(calls[0][2], "sync")
+        source = session.query(models.AnnotationSource).filter_by(annotation_id=annotation.id).one()
+        self.assertEqual(source.source_name, "talebook.annotation.sync-test")
+        self.assertEqual(source.source_connection_id, str(connection.id))
+        self.assertEqual(source.source_annotation_id, "remote-1")
+        self.assertEqual(source.source_sync_status, "synced")
+        run = session.query(models.PluginRun).filter_by(connection_id=connection.id, action="sync").one()
+        self.assertEqual(run.status, "succeeded")
+
+        service.sync_annotation(
+            annotation.id,
+            exclude_source_name="talebook.annotation.sync-test",
+            exclude_source_connection_id=str(connection.id),
+            registry=registry,
+            settings=PLUGIN_SETTINGS,
+        )
+        self.assertEqual(len(calls), 1)
 
 
 if __name__ == "__main__":

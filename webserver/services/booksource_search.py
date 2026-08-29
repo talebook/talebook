@@ -56,21 +56,32 @@ class SearchTaskService:
             )
         return self._executor
 
-    def create_task(self, key, page, source_data, cfg):
+    def create_task(self, key, page, source_data, cfg=None):
         """创建搜索任务并把各源提交到后台线程池，立即返回 task_id。
 
-        source_data: [(source_id, source_name, raw), ...]
+        ``source_data`` 兼容旧的 ``(id, name, raw)``，新路径传入已经在请求线程
+        准备好的 ``{source_id, source_name, call}``，call 内不得访问 session。
         """
         self._cleanup()
         task_id = uuid.uuid4().hex
         sources = {}
-        for sid, name, _raw in source_data:
+        runtime_batches = {}
+        for item in source_data:
+            sid, name = self._identity(item)
+            runtime_batch = item.get("runtime_batch") if isinstance(item, dict) else None
+            runtime_batch_id = runtime_batch.get("run_id") if runtime_batch else None
+            if runtime_batch_id is not None:
+                runtime_batches[runtime_batch_id] = runtime_batch
             sources[sid] = {
                 "source_id": sid,
                 "source_name": name,
+                "connection_id": item.get("connection_id") if isinstance(item, dict) else None,
+                "legacy_id": item.get("legacy_id") if isinstance(item, dict) else sid,
                 "state": "pending",
                 "books": [],
                 "error": "",
+                "runtime_batch_id": runtime_batch_id,
+                "_outcome": None,
             }
         task = {
             "task_id": task_id,
@@ -80,6 +91,9 @@ class SearchTaskService:
             "total": len(source_data),
             "done": 0,
             "sources": sources,
+            "runtime_batches": runtime_batches,
+            "settled_runtime_batches": set(),
+            "settling_runtime_batches": set(),
         }
         with self._lock:
             self._tasks[task_id] = task
@@ -90,17 +104,27 @@ class SearchTaskService:
         return {"task_id": task_id, "total": task["total"]}
 
     def _run_one(self, task_id, item, key, page, cfg):
-        sid, name, raw = item
+        sid, name = self._identity(item)
         state, books, error = "done", [], ""
+        outcome = None
         try:
-            engine = BookSourceEngine(BookSource(raw), config=cfg)
-            result = engine.search(key, page)
-            books = [b.to_dict() for b in result]
-        except JsRuleUnsupported:
+            if isinstance(item, dict):
+                result = item["call"](key, page)
+                books = [book.to_dict() for book in result.items]
+            else:
+                _sid, _name, raw = item
+                engine = BookSourceEngine(BookSource(raw), config=cfg)
+                result = engine.search(key, page)
+                books = [book.to_dict() for book in result]
+            outcome = result
+        except JsRuleUnsupported as exc:
             state, error = "failed", "js_unsupported"
+            outcome = exc
         except Exception as e:
-            logging.info("network search [%s] failed: %s", name, e)
-            state, error = "failed", "fetch_failed"
+            # Provider message 可能包含凭据；只记 runtime 已结构化的 code。
+            state, error = "failed", getattr(e, "code", "fetch_failed")
+            logging.info("network search [%s] failed: %s", name, error)
+            outcome = e
 
         with self._lock:
             task = self._tasks.get(task_id)
@@ -112,7 +136,17 @@ class SearchTaskService:
             src["state"] = state
             src["books"] = books
             src["error"] = error
+            src["_outcome"] = outcome
             task["done"] += 1
+        # 不依赖客户端继续轮询：一个 connection 的所有
+        # binding 结束后，立即用预绑定的独立 session 收口 run。
+        self._drain_runtime_batches(task_id)
+
+    @staticmethod
+    def _identity(item):
+        if isinstance(item, dict):
+            return item["source_id"], item["source_name"]
+        return item[0], item[1]
 
     def get_status(self, task_id):
         """返回任务进度快照；任务不存在（或已过期）返回 None。"""
@@ -146,11 +180,15 @@ class SearchTaskService:
                             "source_name": src["source_name"],
                         }
                     )
+            work_finished = task["done"] >= task["total"]
+            audit_finished = set(task.get("runtime_batches", {})) <= set(task.get("settled_runtime_batches", set()))
             return {
                 "task_id": task_id,
                 "total": task["total"],
                 "done": task["done"],
-                "finished": task["done"] >= task["total"],
+                # 对前端而言，搜索与 durable run 审计都收口后才算
+                # finished；避免最后一个 worker 与 status 请求之间的竞态。
+                "finished": work_finished and audit_finished,
                 "results": results,
                 "partial": partial,
                 "pending": pending,
@@ -167,11 +205,111 @@ class SearchTaskService:
             if not task or task["done"] < task["total"] or task.get("weighted"):
                 return []
             task["weighted"] = True
-            return [sid for sid, src in task["sources"].items() if src["state"] == "done" and src["books"]]
+            return [
+                src["legacy_id"]
+                for src in task["sources"].values()
+                if src["state"] == "done" and src["books"] and src.get("legacy_id") is not None
+            ]
+
+    def pop_health_updates(self, task_id):
+        """返回一次性的连接健康更新，由请求线程负责写库。"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task or task.get("health_updated"):
+                return []
+            task["health_updated"] = True
+            grouped = {}
+            for source in task["sources"].values():
+                if source.get("runtime_batch_id") is not None:
+                    # typed batch 的 health 由 finish_read_batch 统一结算。
+                    continue
+                connection_id = source.get("connection_id")
+                if connection_id is None or source["state"] == "pending":
+                    continue
+                current = grouped.setdefault(connection_id, {"healthy": True, "messages": []})
+                if source["state"] != "done":
+                    current["healthy"] = False
+                    if source.get("error"):
+                        current["messages"].append(str(source["error"]))
+            return [
+                {
+                    "connection_id": connection_id,
+                    "healthy": value["healthy"],
+                    "message": "; ".join(value["messages"]),
+                }
+                for connection_id, value in grouped.items()
+            ]
+
+    def pop_runtime_updates(self, task_id):
+        """后台 finalizer 失败时，返回可由 request session 重试的 batch。"""
+        return self._claim_runtime_updates(task_id)
+
+    def _claim_runtime_updates(self, task_id):
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return []
+            updates = []
+            settled = task.setdefault("settled_runtime_batches", set())
+            settling = task.setdefault("settling_runtime_batches", set())
+            for run_id, batch in task.get("runtime_batches", {}).items():
+                if run_id in settled or run_id in settling:
+                    continue
+                sources = [source for source in task["sources"].values() if source.get("runtime_batch_id") == run_id]
+                if not sources or any(source["state"] == "pending" for source in sources):
+                    continue
+                settling.add(run_id)
+                updates.append(
+                    {
+                        "run_id": run_id,
+                        "batch": batch,
+                        "outcomes": {source["source_id"]: source["_outcome"] for source in sources},
+                    }
+                )
+            return updates
+
+    def settle_runtime_update(self, task_id, run_id, succeeded):
+        """只在 durable run 已成功持久化后标记 settled。"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return
+            task.setdefault("settling_runtime_batches", set()).discard(run_id)
+            if succeeded:
+                task.setdefault("settled_runtime_batches", set()).add(run_id)
+
+    def _drain_runtime_batches(self, task_id):
+        for update in self._claim_runtime_updates(task_id):
+            finalizer = update["batch"].get("finalize")
+            if not callable(finalizer):
+                self.settle_runtime_update(task_id, update["run_id"], False)
+                continue
+            try:
+                finalizer(update["batch"], update["outcomes"])
+            except Exception as exc:
+                logging.warning(
+                    "network search runtime batch finalization failed: %s",
+                    getattr(exc, "code", "plugin.finalize_failed"),
+                )
+                self.settle_runtime_update(task_id, update["run_id"], False)
+            else:
+                self.settle_runtime_update(task_id, update["run_id"], True)
 
     def _cleanup(self):
         now = time.time()
         with self._lock:
             expired = [tid for tid, t in self._tasks.items() if now - t["created_at"] > TASK_TTL]
+        for task_id in expired:
+            self._drain_runtime_batches(task_id)
+        with self._lock:
             for tid in expired:
+                task = self._tasks.get(tid)
+                if task is None:
+                    continue
+                pending_audit = set(task.get("runtime_batches", {})) - set(task.get("settled_runtime_batches", set()))
+                if pending_audit:
+                    # 持久化暂时失败时保留收口材料，下一次 cleanup
+                    # 再试，不把 durable run 永久留在 running。
+                    task["created_at"] = now
+                    continue
                 self._tasks.pop(tid, None)
