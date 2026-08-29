@@ -8,6 +8,7 @@ chardet
 lxml
 jsonpath-ng
 quickjs
+rarfile==4.2
 
 # Published TXT-to-EPUB converter
 txt2epub-next==1.0.0

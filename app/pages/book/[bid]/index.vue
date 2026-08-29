@@ -335,7 +335,7 @@
                                 variant="outlined"
                                 density="compact"
                                 show-size
-                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt"
+                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt,.cbz,.zip,.cbr,.rar"
                                 prepend-icon="mdi-file-document"
                             />
                             <v-alert
@@ -483,11 +483,13 @@
                     <v-toolbar
                         flat
                         density="compact"
+                        class="book-action-toolbar"
                         :color="store.theme === 'light' ? 'white' : 'grey-darken-4'"
                     >
                         <v-btn
                             icon
                             size="small"
+                            :aria-label="t('book.download')"
                             @click="dialog_download = true"
                         >
                             <v-icon>mdi-download</v-icon>
@@ -522,7 +524,7 @@
                         </v-btn>
 
                         <v-btn
-                            v-if="book.id > 0"
+                            v-if="book.id > 0 && book.media_type !== 'comic'"
                             color="amber-darken-2"
                             variant="elevated"
                             class="mx-2"
@@ -536,17 +538,31 @@
                         </v-btn>
 
                         <v-btn
-                            v-if="book.id > 0"
+                            v-if="book.id > 0 && hasCompatibleFormats"
                             color="primary"
                             variant="elevated"
                             class="mx-2"
-                            :href="'/read/' + book.id"
+                            :href="readerPath"
                             target="_blank"
+                            data-testid="open-online-reader"
                         >
                             <v-icon start>
                                 mdi-book-open-page-variant
                             </v-icon>
                             {{ t('common.read') }}
+                        </v-btn>
+                        <v-btn
+                            v-else-if="book.id > 0"
+                            color="grey"
+                            variant="tonal"
+                            class="mx-2"
+                            disabled
+                            data-testid="online-reading-unsupported"
+                        >
+                            <v-icon start>
+                                mdi-book-off-outline
+                            </v-icon>
+                            {{ book.media_type === 'comic' ? t('book.comicReadUnsupported') : t('book.onlineReadUnsupported') }}
                         </v-btn>
 
                         <template v-if="book.is_owner">
@@ -598,6 +614,46 @@
                                         </template>
                                         <v-list-item-title>{{ t('book.uploadNewFormat') }}</v-list-item-title>
                                     </v-list-item>
+                                    <template v-if="hasMixedMediaFormats">
+                                        <v-divider />
+                                        <v-list-subheader>{{ t('book.chooseMediaType') }}</v-list-subheader>
+                                        <v-list-item
+                                            data-testid="set-media-type-comic"
+                                            :disabled="setting_media_type"
+                                            @click="set_media_type('comic')"
+                                        >
+                                            <template #prepend>
+                                                <v-icon>mdi-image-multiple</v-icon>
+                                            </template>
+                                            <v-list-item-title>{{ t('book.setAsComic') }}</v-list-item-title>
+                                            <template #append>
+                                                <v-icon
+                                                    v-if="book.media_type === 'comic'"
+                                                    color="success"
+                                                >
+                                                    mdi-check-circle
+                                                </v-icon>
+                                            </template>
+                                        </v-list-item>
+                                        <v-list-item
+                                            data-testid="set-media-type-ebook"
+                                            :disabled="setting_media_type"
+                                            @click="set_media_type('ebook')"
+                                        >
+                                            <template #prepend>
+                                                <v-icon>mdi-book-outline</v-icon>
+                                            </template>
+                                            <v-list-item-title>{{ t('book.setAsEbook') }}</v-list-item-title>
+                                            <template #append>
+                                                <v-icon
+                                                    v-if="book.media_type === 'ebook'"
+                                                    color="success"
+                                                >
+                                                    mdi-check-circle
+                                                </v-icon>
+                                            </template>
+                                        </v-list-item>
+                                    </template>
                                 </v-list>
                             </v-menu>
 
@@ -829,6 +885,19 @@
                                         </v-chip>
                                     </template>
                                     <v-chip
+                                        v-if="book.media_type && book.media_type !== 'unknown'"
+                                        class="ma-1"
+                                        size="small"
+                                        :color="book.media_type === 'comic' ? 'deep-orange' : 'blue-grey'"
+                                        variant="flat"
+                                        data-testid="media-type-chip"
+                                    >
+                                        <v-icon start>
+                                            {{ book.media_type === 'comic' ? 'mdi-image-multiple' : 'mdi-book-outline' }}
+                                        </v-icon>
+                                        {{ book.media_type === 'comic' ? t('book.mediaTypeComic') : t('book.mediaTypeEbook') }}
+                                    </v-chip>
+                                    <v-chip
                                         v-if="book.scope"
                                         class="ma-1"
                                         size="small"
@@ -841,6 +910,16 @@
                                         {{ book.scope === 'private' ? t('book.scopePrivate') : t('book.scopePublic') }}
                                     </v-chip>
                                 </div>
+                                <v-alert
+                                    v-if="book.media_type === 'comic' && !hasCompatibleFormats"
+                                    type="info"
+                                    variant="tonal"
+                                    density="compact"
+                                    class="mt-3"
+                                    data-testid="comic-reader-notice"
+                                >
+                                    {{ t('book.comicReadUnsupportedDescription') }}
+                                </v-alert>
                             </v-card-text>
                             <v-card-text>
                                 <p
@@ -878,7 +957,7 @@
                         >
                             <v-list density="compact">
                                 <v-list-item
-                                    :href="'/read/' + book.id"
+                                    :href="readerPath"
                                     target="_blank"
                                     class="w-100"
                                 >
@@ -1022,6 +1101,7 @@ import { useMainStore } from '@/stores/main';
 import BookCards_Small from '~/components/BookCards_Small.vue';
 import BookConvertDialog from '~/components/BookConvertDialog.vue';
 import { READING_STATE, useBookReadingState } from '~/composables/useBookReadingState';
+import { readerPathForBook } from '~/utils/comic-reader';
 
 const route = useRoute();
 const router = useRouter();
@@ -1055,7 +1135,10 @@ const book = ref({
     collector: '',
     timestamp: '',
     is_owner: false,
-    series: ''
+    series: '',
+    media_type: 'unknown',
+    media_type_locked: false,
+    online_readable: null
 });
 
 // Dialogs
@@ -1093,6 +1176,7 @@ const refer_failed_sources = computed(() => {
 const dialog_upload_format = ref(false);
 const upload_format_file = ref(null);
 const uploading_format = ref(false);
+const setting_media_type = ref(false);
 
 // Separate format
 const dialog_separate = ref(false);
@@ -1157,11 +1241,13 @@ const pub_year = computed(() => {
     return book.value.pubdate.split('-')[0];
 });
 
-const hasCompatibleFormats = computed(() => {
-    if (!book.value || !book.value.files) return false;
-    const formats = book.value.files.map(x => x.format.toLowerCase());
-    const compatible = ['epub', 'azw3', 'pdf', 'txt', 'mobi', 'azw'];
-    return formats.some(f => compatible.includes(f));
+const readerPath = computed(() => readerPathForBook(book.value));
+const hasCompatibleFormats = computed(() => Boolean(readerPath.value));
+const hasMixedMediaFormats = computed(() => {
+    const formats = new Set((book.value.files || []).map(file => String(file.format || '').toLowerCase()));
+    const hasComic = ['cbz', 'zip', 'cbr', 'rar'].some(format => formats.has(format));
+    const hasEbook = ['epub', 'mobi', 'azw', 'azw3', 'pdf', 'txt'].some(format => formats.has(format));
+    return hasComic && hasEbook;
 });
 
 const selectedFormat = computed(() => {
@@ -1463,6 +1549,29 @@ const show_upload_format_dialog = () => {
     dialog_upload_format.value = true;
 };
 
+const set_media_type = async (mediaType) => {
+    setting_media_type.value = true;
+    try {
+        const rsp = await $backend(`/book/${book.value.id}/media_type`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ media_type: mediaType }),
+        });
+        if (rsp.err === 'ok') {
+            book.value.media_type = rsp.media_type;
+            book.value.media_type_locked = rsp.media_type_locked === true;
+            $alert('success', rsp.msg || t('book.setMediaTypeSuccess'));
+        } else {
+            $alert('error', rsp.msg || t('book.setMediaTypeFailed'));
+        }
+    } catch (err) {
+        console.error('Set media type error:', err);
+        $alert('error', t('book.setMediaTypeFailed'));
+    } finally {
+        setting_media_type.value = false;
+    }
+};
+
 const confirmUploadFormat = async () => {
     if (!upload_format_file.value) {
         $alert('error', t('book.selectFileToUpload'));
@@ -1745,6 +1854,29 @@ onMounted(async () => {
 .book-footer {
     padding-top: 0;
     padding-bottom: 3px;
+}
+
+@media (max-width: 600px) {
+    .book-action-toolbar {
+        height: auto !important;
+    }
+
+    .book-action-toolbar :deep(.v-toolbar__content) {
+        height: auto !important;
+        min-height: 48px;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .book-action-toolbar :deep(.v-spacer) {
+        display: none;
+    }
+
+    .book-action-toolbar :deep(.v-btn) {
+        margin-inline: 0 !important;
+    }
 }
 
 /* ponytail: pre-line 保留 \n 段落分隔、折叠多余空格、长行自动换行；不影响 v-html 中的 <br>/<p> 标签。 */

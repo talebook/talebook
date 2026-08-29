@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import io
 import json
 import os
 import tempfile
 import threading
 import time
 import urllib.parse
+import zipfile
 from unittest import mock
 
 from tests.test_main import TestWithUserLogin, testdir
@@ -20,6 +22,24 @@ from webserver.services.scan import SCAN_EXT, ScanService
 def setUpModule():
     init()
     handlers.scan.SCAN_DIR_PREFIX = "/"
+
+
+def write_supported_media(path, extension):
+    if extension == "epub":
+        with open(testdir + "/cases/new.epub", "rb") as source, open(path, "wb") as target:
+            target.write(source.read())
+    elif extension == "pdf":
+        with open(path, "wb") as stream:
+            stream.write(b"%PDF-1.4 indexed test")
+    elif extension in ("cbz", "zip"):
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("001.png", b"\x89PNG\r\n\x1a\n" + b"page")
+    elif extension in ("cbr", "rar"):
+        with open(testdir + "/cases/comics/images-rar4.rar", "rb") as source, open(path, "wb") as target:
+            target.write(source.read())
+    else:
+        with open(path, "wb") as stream:
+            stream.write(("indexed %s" % extension).encode("utf-8"))
 
 
 class TestScan(TestWithUserLogin):
@@ -81,6 +101,33 @@ class TestScan(TestWithUserLogin):
     def test_import_status(self):
         d = self.json("/api/admin/import/status")
         self.assertEqual(d["err"], "ok")
+
+    def test_scan_classifies_image_cbz_and_rejects_damaged_container(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            comic_path = os.path.join(tmpdir, "scan-comic.cbz")
+            body = io.BytesIO()
+            with zipfile.ZipFile(body, "w") as archive:
+                archive.writestr("001.png", b"\x89PNG\r\n\x1a\n" + b"page")
+            with open(comic_path, "wb") as stream:
+                stream.write(body.getvalue())
+
+            damaged_path = os.path.join(tmpdir, "damaged.cbz")
+            with open(damaged_path, "wb") as stream:
+                stream.write(b"PK\x03\x04broken")
+
+            ScanService()._do_scan(tmpdir)
+            self.session.rollback()
+            comic = self.session.query(ScanFile).filter(ScanFile.path == comic_path).one()
+            damaged = self.session.query(ScanFile).filter(ScanFile.path == damaged_path).one()
+
+            self.assertEqual(comic.status, ScanFile.READY)
+            self.assertEqual(comic.data["media_type"], "comic")
+            self.assertEqual(damaged.status, ScanFile.FAILED)
+            self.assertIn("analysis_error", damaged.data)
+
+            self.session.delete(comic)
+            self.session.delete(damaged)
+            self.session.commit()
 
 
 class TestImportSettings(TestWithUserLogin):
@@ -323,8 +370,7 @@ class TestImport(TestWithUserLogin):
             try:
                 for index, ext in enumerate(SCAN_EXT):
                     source_path = os.path.join(tmpdir, "indexed_%s.%s" % (index, ext))
-                    with open(source_path, "wb") as f:
-                        f.write(("indexed %s" % ext).encode("utf-8"))
+                    write_supported_media(source_path, ext)
                     hash_value = "sha256:index-mode-%s" % ext
                     row = ScanFile(source_path, hash_value, 10000 + index)
                     row.status = ScanFile.READY
@@ -564,8 +610,8 @@ class TestScanPDFTitle(TestWithUserLogin):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             epub_path = os.path.join(tmpdir, "filename_is_irrelevant.epub")
-            with open(epub_path, "wb") as f:
-                f.write(b"PK\x03\x04")
+            with open(testdir + "/cases/new.epub", "rb") as source, open(epub_path, "wb") as target:
+                target.write(source.read())
 
             ScanService().do_scan(tmpdir)
 

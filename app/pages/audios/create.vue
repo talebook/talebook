@@ -380,11 +380,12 @@ const { data: jobData, refresh: refreshJobs } = await useAsyncData('audiobook-cr
     return response;
 }, { default: () => ({ jobs: [] }) });
 
-const selectedBook = computed(() => (
-    books.value.find(book => Number(book.id) === selectedBookId.value)
-    || detailsByBookId[selectedBookId.value || 0]?.book
-    || null
-));
+const selectedBook = computed(() => {
+    const candidate = books.value.find(book => Number(book.id) === selectedBookId.value)
+        || detailsByBookId[selectedBookId.value || 0]?.book
+        || null;
+    return isAudiobookSourceBook(candidate) ? candidate : null;
+});
 const selectedDetail = computed(() => (selectedBookId.value ? detailsByBookId[selectedBookId.value] : null));
 const selectedActiveJob = computed(() => activeJobForBook(selectedBookId.value));
 const selectedHasPublished = computed(() => (selectedDetail.value?.editions || []).some((item: any) => item.status === 'published'));
@@ -408,9 +409,10 @@ const generationReason = computed(() => {
 });
 const selectedStatus = computed(() => selectedBook.value ? bookStatus(selectedBook.value) : { label: '', color: 'default' });
 const filteredBooks = computed(() => {
+    const candidates = books.value.filter(isAudiobookSourceBook);
     const query = keyword.value.trim().toLowerCase();
-    if (!query) return books.value;
-    return books.value.filter((book) => {
+    if (!query) return candidates;
+    return candidates.filter((book) => {
         const authors = authorLabel(book);
         return `${book.title} ${authors}`.toLowerCase().includes(query);
     });
@@ -451,7 +453,7 @@ async function fetchBooks() {
                     loadError.value = data.msg || t('audiobook.loadFailed');
                     return;
                 }
-            } else {
+            } else if (isAudiobookSourceBook(data)) {
                 books.value.push(data);
             }
         }
@@ -529,8 +531,12 @@ function bookFormats(book: any) {
     return [...new Set((values || []).map((item: any) => String(item).toUpperCase()))];
 }
 
+function isAudiobookSourceBook(book: any) {
+    return Boolean(book && book.media_type !== 'comic');
+}
+
 function isCompatibleBook(book: any) {
-    return bookFormats(book).some(format => ['EPUB', 'TXT'].includes(format));
+    return isAudiobookSourceBook(book) && bookFormats(book).some(format => ['EPUB', 'TXT'].includes(format));
 }
 
 function bookFormatLabel(book: any) {

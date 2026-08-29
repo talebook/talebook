@@ -181,6 +181,27 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         self.assertEqual(self.fetch(f"/api/audiobooks/{edition_id}/manifest").code, 404)
         self.assertEqual(self.fetch(f"/api/audiobook-editions/{edition_id}").code, 404)
 
+    def test_comic_is_rejected_as_audiobook_source_even_with_epub(self):
+        comic = {
+            "id": test_main.BID_EPUB,
+            "title": "图片漫画",
+            "media_type": "comic",
+            "available_formats": ["EPUB"],
+            "fmt_epub": "/private/comic.epub",
+        }
+        with mock.patch.object(audiobook_handlers.BaseHandler, "get_book", return_value=comic):
+            detail = self.json(f"/api/book/{test_main.BID_EPUB}/audios")
+            created = self.json(
+                f"/api/book/{test_main.BID_EPUB}/audio-jobs",
+                method="POST",
+                body=json.dumps({"mode": "quick", "engine": "edgetts"}),
+            )
+
+        self.assertEqual(detail["err"], "media_type.not_supported")
+        self.assertEqual(created["err"], "media_type.not_supported")
+        self.assertIn("漫画", created["msg"])
+        self.assertEqual(test_main.get_db().query(models.AudiobookJob).count(), 0)
+
     def test_delete_audiobook_removes_all_related_data_and_keeps_book(self):
         published_id = self.seed_published_edition()
         session = test_main.get_db()
