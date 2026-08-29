@@ -52,6 +52,30 @@ def clean_aliases(values, excluded=()):
     return list(cleaned.values())
 
 
+def calibre_author_merge_plan(cache, names, canonical):
+    """Build a Calibre author-id rename map and the books it will affect."""
+    canonical = clean_alias_name(canonical)
+    member_names = {normalize_alias(canonical)}
+    for name in names:
+        try:
+            member_names.add(normalize_alias(name))
+        except (TypeError, ValueError):
+            continue
+
+    rename_map = {}
+    affected_books = set()
+    for author_id, data in cache.author_data().items():
+        name = data.get("name")
+        try:
+            is_member = normalize_alias(name) in member_names
+        except (TypeError, ValueError):
+            continue
+        if is_member and name != canonical:
+            rename_map[author_id] = canonical
+            affected_books.update(cache.books_for_field("authors", author_id))
+    return rename_map, affected_books
+
+
 class AliasService:
     def __init__(self, session):
         self.session = session

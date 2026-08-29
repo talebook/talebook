@@ -10,8 +10,14 @@ import tornado.escape
 from webserver import utils
 from webserver.handlers.base import ListHandler, auth, js
 from webserver.i18n import _
-from webserver.services.aliases import AliasConflictError, AliasService, clean_alias_name, normalize_alias
-from webserver.services.external_index import set_metadata_preserving_external_paths
+from webserver.services.aliases import (
+    AliasConflictError,
+    AliasService,
+    calibre_author_merge_plan,
+    clean_alias_name,
+    normalize_alias,
+)
+from webserver.services.external_index import rename_items_preserving_external_paths
 
 
 def get_author_book_ids(handler, names):
@@ -197,28 +203,20 @@ class AuthorAliases(ListHandler):
         merge_result = {"updated": 0, "failed": []}
         if merge:
             member_names = source_names + group["names"]
-            member_normalized = {normalize_alias(value) for value in member_names}
-            for book_id in sorted(get_author_book_ids(self, member_names)):
+            rename_map, affected_books = calibre_author_merge_plan(self.cache, member_names, group["canonical"])
+            if rename_map:
                 try:
-                    mi = self.db.get_metadata(book_id, index_is_id=True)
-                    authors = []
-                    seen_authors = set()
-                    changed = False
-                    for author in mi.authors or []:
-                        replacement = group["canonical"] if normalize_alias(author) in member_normalized else author
-                        changed = changed or replacement != author
-                        normalized_replacement = normalize_alias(replacement)
-                        if normalized_replacement not in seen_authors:
-                            authors.append(replacement)
-                            seen_authors.add(normalized_replacement)
-                    if changed:
-                        mi.authors = authors
-                        mi.author_sort = authors[0] if authors else ""
-                        set_metadata_preserving_external_paths(self.db, self.session, book_id, mi)
-                        merge_result["updated"] += 1
+                    renamed_books, _id_map = rename_items_preserving_external_paths(
+                        self.db,
+                        self.session,
+                        "authors",
+                        rename_map,
+                        affected_books,
+                    )
+                    merge_result["updated"] = len(renamed_books)
                 except Exception:
-                    logging.exception("Failed to merge author aliases for book %s", book_id)
-                    merge_result["failed"].append(book_id)
+                    logging.exception("Failed to merge Calibre authors %s", sorted(rename_map))
+                    merge_result["failed"] = sorted(affected_books)
         group["book_count"] = len(get_author_book_ids(self, group["names"]))
         return {
             "err": "ok",

@@ -4,10 +4,11 @@
 import json
 from unittest import mock
 
-from tests.test_main import BID_EPUB, BID_MOBI, Q, TestWithUserLogin, get_db, setUpModule as init
-
+from tests.test_main import BID_EPUB, BID_MOBI, Q, TestWithUserLogin, get_db
+from tests.test_main import setUpModule as init
 from webserver.models import AuthorAlias, BookAlias
-from webserver.services.aliases import AliasConflictError, AliasService
+from webserver.services.aliases import AliasConflictError, AliasService, calibre_author_merge_plan
+from webserver.services.external_index import rename_items_preserving_external_paths
 
 
 def setUpModule():
@@ -68,6 +69,25 @@ class TestAliasService(TestWithUserLogin):
 
         self.assertEqual(group["canonical"], "Hans Christian Andersen")
         self.assertEqual(group["aliases"], ["安徒生"])
+
+    def test_calibre_author_merge_plan_uses_native_author_ids(self):
+        cache = mock.Mock()
+        cache.author_data.return_value = {
+            10: {"name": "Hans Christian Andersen", "sort": "Andersen, Hans Christian", "link": ""},
+            11: {"name": "安徒生", "sort": "安徒生", "link": ""},
+            12: {"name": "Other Author", "sort": "Author, Other", "link": ""},
+        }
+        cache.books_for_field.return_value = {BID_MOBI}
+
+        rename_map, affected_books = calibre_author_merge_plan(
+            cache,
+            ["Hans Christian Andersen", "安徒生"],
+            "Hans Christian Andersen",
+        )
+
+        self.assertEqual(rename_map, {11: "Hans Christian Andersen"})
+        self.assertEqual(affected_books, {BID_MOBI})
+        cache.books_for_field.assert_called_once_with("authors", 11)
 
     def test_book_detail_and_search_include_saved_title_alias(self):
         AliasService(self.session).replace_book_aliases(BID_EPUB, ["One Hundred Years of Solitude"])
@@ -138,8 +158,20 @@ class TestAliasService(TestWithUserLogin):
         self.assertEqual(service.get_book_aliases(regular_book_id), [])
         self.assertEqual(service.get_book_aliases(external_book_id), [])
 
-    def test_admin_can_merge_author_metadata(self):
-        with mock.patch("webserver.handlers.meta.set_metadata_preserving_external_paths") as set_metadata:
+    def test_admin_merge_uses_calibre_native_author_rename(self):
+        cache = self._app.settings["legacy"].new_api
+        with (
+            mock.patch.object(
+                cache,
+                "author_data",
+                return_value={10: {"name": "安徒生", "sort": "安徒生", "link": ""}},
+            ),
+            mock.patch.object(cache, "books_for_field", return_value={BID_MOBI}),
+            mock.patch(
+                "webserver.handlers.meta.rename_items_preserving_external_paths",
+                return_value=({BID_MOBI}, {10: 10}),
+            ) as rename_items,
+        ):
             result = self.json(
                 "/api/author-aliases/" + Q("安徒生"),
                 method="POST",
@@ -155,9 +187,36 @@ class TestAliasService(TestWithUserLogin):
         self.assertEqual(result["err"], "ok")
         self.assertEqual(result["merge"]["updated"], 1)
         self.assertEqual(result["merge"]["failed"], [])
-        set_metadata.assert_called_once()
-        updated_metadata = set_metadata.call_args.args[3]
-        self.assertEqual(updated_metadata.authors, ["Hans Christian Andersen"])
+        args = rename_items.call_args.args
+        self.assertIs(args[0], self._app.settings["legacy"])
+        self.assertEqual(args[2:], ("authors", {10: "Hans Christian Andersen"}, {BID_MOBI}))
+
+    def test_native_rename_restores_external_index_paths(self):
+        db = mock.Mock()
+        db.new_api.rename_items.return_value = ({BID_MOBI}, {10: 10})
+        source_path = "/external/books/andersen.epub"
+
+        with (
+            mock.patch(
+                "webserver.services.external_index.external_index_format_paths",
+                side_effect=lambda _session, book_id: {"EPUB": source_path} if book_id == BID_MOBI else {},
+            ),
+            mock.patch("webserver.services.external_index.clear_book_path") as clear_path,
+            mock.patch("webserver.services.external_index.set_external_format_record") as restore_format,
+            mock.patch("webserver.services.external_index.os.path.exists", return_value=True),
+        ):
+            result = rename_items_preserving_external_paths(
+                db,
+                self.session,
+                "authors",
+                {10: "Hans Christian Andersen"},
+                {BID_MOBI},
+            )
+
+        self.assertEqual(result, ({BID_MOBI}, {10: 10}))
+        clear_path.assert_called_once_with(db, BID_MOBI)
+        db.new_api.rename_items.assert_called_once_with("authors", {10: "Hans Christian Andersen"})
+        restore_format.assert_called_once_with(db, BID_MOBI, source_path, "EPUB")
 
     def test_non_admin_cannot_change_global_author_aliases(self):
         with mock.patch("webserver.handlers.meta.ListHandler.is_admin", return_value=False):
