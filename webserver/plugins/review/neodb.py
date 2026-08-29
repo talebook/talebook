@@ -10,6 +10,7 @@ SPEC = ReviewSourceSpec(
     homepage="https://neodb.social",
     icon="mdi-star-circle-outline",
     scale=10,
+    brand_icon="/images/plugin-icons/neodb.svg",
 )
 
 

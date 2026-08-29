@@ -10,6 +10,7 @@ SPEC = ReviewSourceSpec(
     homepage="https://books.google.com",
     icon="mdi-google",
     scale=5,
+    brand_icon="/images/plugin-icons/google-books.ico",
 )
 
 

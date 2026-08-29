@@ -278,6 +278,7 @@ if __name__ == "__main__":
 
 
 class TomatoProvider(MetaSourceMixin, TomatoNovelApi):
+    legacy_sources = ("tomato",)
     proxy_image_hosts = ("byteimg.com", "fanqienovel.com")
     manifest = meta_manifest(
         "talebook.meta.tomato",
@@ -285,6 +286,7 @@ class TomatoProvider(MetaSourceMixin, TomatoNovelApi):
         "从番茄小说检索网文书名、作者、简介与封面。",
         "mdi-book-open-page-variant",
         "https://fanqienovel.com/",
+        brand_icon="/images/plugin-icons/fanqie.png",
     )
 
     def __init__(self):

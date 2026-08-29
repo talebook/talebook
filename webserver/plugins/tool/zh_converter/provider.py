@@ -34,7 +34,6 @@ class ZhConverterTransformPlugin(TextTransformPlugin):
                 {
                     "icon": "mdi-translate",
                     "manage_route": "/plugins/zh-converter",
-                    "manage_label_key": "pluginManagement.openTool",
                     "primary_action": "open",
                     "healthy_message": "繁简转换工具可用",
                 },

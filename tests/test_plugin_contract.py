@@ -59,49 +59,122 @@ def test_all_book_source_plugins_use_the_source_namespace():
     assert actual == expected
 
 
+def test_legado_is_the_single_lifecycle_owner_for_online_source_metadata():
+    manifests = {provider.manifest["id"]: provider.manifest for provider in REGISTRY.providers()}
+
+    assert "talebook.meta.book-source" not in manifests
+    assert set(manifests[LEGADO_PLUGIN_ID]["capabilities"]) == {
+        "book_sources.browse",
+        "book_sources.search",
+        "book_sources.acquire",
+        "metadata.lookup",
+    }
+
+
+def test_calibre_bridge_is_not_exposed_as_a_plugin():
+    plugin_ids = {provider.manifest["id"] for provider in REGISTRY.providers()}
+
+    assert "talebook.meta.calibre" in plugin_ids
+    assert "talebook.meta.calibre-provider-bridge" not in plugin_ids
+
+
+def test_test_only_providers_are_not_registered_as_builtin_plugins():
+    plugin_ids = {provider.manifest["id"] for provider in REGISTRY.providers()}
+
+    assert not any(plugin_id.startswith("talebook.mock.") for plugin_id in plugin_ids)
+    assert not (Path(__file__).resolve().parents[1] / "webserver" / "plugins" / "mock").exists()
+
+
+def test_ai_metadata_is_not_registered_until_it_is_reworked():
+    plugin_ids = {provider.manifest["id"] for provider in REGISTRY.providers()}
+
+    assert "talebook.meta.ai" not in plugin_ids
+
+
+def test_brs_plugin_name_describes_the_server_integration():
+    manifest = REGISTRY.get("talebook.annotation.brs").manifest
+
+    assert manifest["name"] == "talebook-brs 章评服务器"
+    assert manifest["config_schema"]["properties"]["endpoint"]["default"] == "https://brs.talebook.org"
+
+
 def test_push_plugins_declare_personal_device_management_route():
     for provider in plugin_register.PUSH_PROVIDERS:
         manifest = provider.manifest
         assert manifest["id"].startswith("talebook.push.")
         assert manifest["connection_owners"] == ["user"]
         assert manifest["ui"]["manage_route"] == "/user/detail?tab=devices"
-        assert manifest["ui"]["manage_label_key"] == "pluginManagement.manageDevices"
+        assert "manage_label_key" not in manifest["ui"]
 
 
-def test_registration_has_one_primary_group_and_derived_auto_install_lifecycle():
+def test_management_action_labels_are_derived_from_connection_owners():
+    for provider in plugin_register.ALL_BUILTIN_PROVIDERS:
+        assert "manage_label_key" not in (provider.manifest.get("ui") or {})
+
+
+def test_fixed_external_services_declare_safe_local_brand_icons():
+    branded_plugin_ids = {
+        "talebook.combo.weread",
+        "talebook.combo.open-library",
+        "talebook.source.legado",
+        "talebook.source.kavita",
+        "talebook.source.komga",
+        "talebook.source.booklore",
+        "talebook.source.standard-ebooks",
+        "talebook.source.gutenberg",
+        "talebook.source.internet-archive",
+        "talebook.meta.baike",
+        "talebook.meta.douban-v2",
+        "talebook.meta.qimao",
+        "talebook.meta.tomato",
+        "talebook.meta.xhsd",
+        "talebook.meta.neodb",
+        "talebook.meta.calibre",
+        "talebook.review.neodb",
+        "talebook.review.google-books",
+        "talebook.review.hardcover",
+        "talebook.review.bangumi",
+        "talebook.review.anilist",
+        "talebook.push.boox",
+        "talebook.push.dangdang",
+        "talebook.push.duokan",
+        "talebook.push.hanwang",
+        "talebook.push.ireader",
+        "talebook.push.purelibro",
+    }
+    manifests = {provider.manifest["id"]: provider.manifest for provider in REGISTRY.providers()}
+    public_dir = Path(__file__).resolve().parents[1] / "app" / "public"
+
+    for plugin_id in branded_plugin_ids:
+        icon = manifests[plugin_id]["ui"].get("brand_icon", "")
+        assert icon.startswith("/images/plugin-icons/"), plugin_id
+        asset = public_dir / icon.removeprefix("/")
+        assert asset.is_file(), "%s points to missing icon %s" % (plugin_id, asset)
+        assert asset.stat().st_size <= 200 * 1024, "%s icon is unexpectedly large" % plugin_id
+        if asset.suffix == ".svg":
+            svg = asset.read_text(encoding="utf-8").lower()
+            assert "<script" not in svg
+            assert 'href="http' not in svg and "href='http" not in svg
+
+
+def test_registration_has_one_primary_group_and_platform_managed_lifecycle():
     grouped = [provider for providers in plugin_register.PROVIDER_GROUPS.values() for provider in providers]
 
     assert grouped == list(plugin_register.ALL_BUILTIN_PROVIDERS)
     assert len(grouped) == len({id(provider) for provider in grouped})
     assert set(plugin_register.__all__) == {
         "ALL_BUILTIN_PROVIDERS",
-        "META_SOURCE_TO_PLUGIN",
         "PROVIDER_GROUPS",
         "PUSH_PROVIDERS",
         "PUSH_PROVIDERS_BY_DEVICE",
         "SOURCE_PROVIDERS",
         "TOOL_PROVIDERS",
-        "plugin_ids_for_sources",
     }
-    # 历史配置值到 plugin id 的映射只允许存在于装配入口，且必须指向真实注册的插件
-    registered = {provider.manifest["id"] for provider in grouped}
-    assert set(plugin_register.META_SOURCE_TO_PLUGIN.values()) <= registered
-    assert plugin_register.plugin_ids_for_sources(["google", "amazon", "baidu"]) == [
-        "talebook.meta.calibre",
-        "talebook.meta.baike",
-    ]
-    assert plugin_register.plugin_ids_for_sources(["booksource", "unknown"]) == []
-    assert {
-        provider.manifest["id"]
-        for provider in grouped
-        if getattr(provider, "auto_install", False)
-    } == {
-        "talebook.source.opds",
-        "talebook.source.legado",
-        "talebook.tool.text-replace",
-        "talebook.tool.zh-converter",
-        "talebook.tool.txt-fixer",
-    }
+    # 旧来源选项的迁移策略由各元数据 provider 自己声明，不在注册表维护第二套 id 映射。
+    for provider in plugin_register.META_PROVIDERS:
+        if "metadata.lookup" in provider.manifest["capabilities"]:
+            assert callable(getattr(provider, "initial_enabled", None))
+    assert not any(hasattr(provider, "auto_install") for provider in grouped)
 
 
 def test_source_catalog_reuses_canonical_ids_from_concrete_plugins():
@@ -148,7 +221,7 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
     }.items():
         assert concrete_prefix not in (plugins_dir / relative_path).read_text(encoding="utf-8")
 
-    for type_name in ("source", "meta", "review", "annotation", "tool", "push", "mock", "combo"):
+    for type_name in ("source", "meta", "review", "annotation", "tool", "push", "combo"):
         type_init = (plugins_dir / type_name / "__init__.py").read_text(encoding="utf-8")
         assert "PROVIDER" not in type_init, "%s/__init__.py 不应维护第二份装配表" % type_name
 
@@ -157,7 +230,6 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
         assert "plugins.tool.txt_fixer" not in source
 
     expected_modules = {
-        "talebook.mock.multi-tab": "webserver.plugins.mock.multi_tab",
         "talebook.combo.weread": "webserver.plugins.combo.weread.provider",
         "talebook.source.opds": "webserver.plugins.source.opds",
         "talebook.source.legado": "webserver.plugins.source.legado",
@@ -177,9 +249,6 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
         "talebook.meta.tomato": "webserver.plugins.meta.tomato.api",
         "talebook.meta.qimao": "webserver.plugins.meta.qimao.api",
         "talebook.meta.neodb": "webserver.plugins.meta.neodb.plugin",
-        "talebook.meta.ai": "webserver.plugins.meta.ai.api",
-        "talebook.meta.embedded-file": "webserver.plugins.meta.embedded_file",
-        "talebook.meta.calibre-provider-bridge": "webserver.plugins.meta.calibre_provider_bridge",
         "talebook.review.hardcover": "webserver.plugins.review.hardcover",
         "talebook.review.neodb": "webserver.plugins.review.neodb",
         "talebook.review.google-books": "webserver.plugins.review.google_books",

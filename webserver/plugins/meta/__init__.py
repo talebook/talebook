@@ -4,7 +4,7 @@
 from .tomato.api import TomatoNovelApi, KEY as TOMATO_KEY, TOMATO_ISBN  # noqa: F401
 from .tomato.api import get_tomato_metadata, select_tomato_metadata  # noqa: F401
 
-# Calibre metadata plugin (Google Books & Amazon.com)
+# Calibre metadata plugin (Google, Amazon.com, Edelweiss, plus cover-only sources)
 from .calibre.api import CalibreMetadataApi, KEY as CALIBRE_KEY  # noqa: F401
 
 # Xinhua Bookstore metadata plugin

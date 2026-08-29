@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
 
-test.describe('Admin Book Sources', () => {
+test.describe('Legado Source Workbench', () => {
     test.beforeEach(async ({ request }) => {
         await request.post(`${mockApi}/_test/reset`, {
             data: { installed: true }
@@ -11,9 +11,10 @@ test.describe('Admin Book Sources', () => {
 
     test('check validity button keeps text visible while checking', async ({ page }) => {
         const listPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/booksource/list'));
-        await page.goto('/admin/booksources');
+        await page.goto('/plugins/legado');
         await listPromise;
         await expect(page.locator('.loading-page')).toBeHidden();
+        await expect(page.getByRole('heading', { name: 'Legado 书源工作台' })).toBeVisible();
 
         const checkBtn = page.getByRole('button', { name: '检测书源有效性' });
         await expect(checkBtn).toBeVisible();

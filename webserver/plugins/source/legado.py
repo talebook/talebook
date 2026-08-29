@@ -8,6 +8,7 @@ from webserver.services.booksource import engine as booksource_engine
 from webserver.plugins.runtime.domains import (
     Category,
     CheckReport,
+    MetadataQuery,
     Page,
     SourceBook,
     SourceBookDetail,
@@ -16,9 +17,19 @@ from webserver.plugins.runtime.domains import (
 )
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderResult, UpstreamError
 from webserver.plugins.runtime.safe_http import SafeHttpClient
+from webserver.services.booksource.metadata import BookSourceMetadataService, collect_metadata_sources
 
 
 PLUGIN_ID = "talebook.source.legado"
+BOOKSOURCE_METADATA_CONFIG_KEYS = (
+    "BOOKSOURCE_HTTP_TIMEOUT",
+    "BOOKSOURCE_MAX_TOC_PAGES",
+    "BOOKSOURCE_MAX_CONTENT_PAGES",
+    "BOOKSOURCE_AD_PATTERNS",
+    "BOOKSOURCE_CLEAN_ENABLED",
+    "BOOKSOURCE_METADATA_WORKERS",
+    "BOOKSOURCE_METADATA_TOKEN_TTL",
+)
 
 
 def _status(session, settings):
@@ -170,18 +181,21 @@ class LegadoSourcePlugin:
 
 
 class LegadoProvider(LegadoSourcePlugin):
-    auto_install = True
-
     def __init__(self):
         super().__init__(
             {
                 "protocol_version": PROTOCOL_VERSION,
                 "id": PLUGIN_ID,
                 "name": "Legado 在线书源",
-                "description": "管理、导入、搜索、阅读与体检兼容 Legado 的在线书源。",
+                "description": "管理、导入、搜索、阅读并使用兼容 Legado 的在线书源补全书籍信息。",
                 "version": "1.0.0",
-                "categories": ["book_sources"],
-                "capabilities": ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
+                "categories": ["book_sources", "metadata"],
+                "capabilities": [
+                    "book_sources.browse",
+                    "book_sources.search",
+                    "book_sources.acquire",
+                    "metadata.lookup",
+                ],
                 "runtime_kind": "builtin",
                 "actions": ["test"],
                 "auth_schema": {"type": "object", "properties": {}},
@@ -195,14 +209,54 @@ class LegadoProvider(LegadoSourcePlugin):
                 "license": "GPL-3.0",
                 "ui": {
                     "icon": "mdi-book-cog-outline",
-                    "manage_dialog": "legado",
-                    "manage_label_key": "pluginManagement.manage",
-                    "primary_action": "manage",
+                    "brand_icon": "/images/plugin-icons/legado.png",
+                    "manage_route": "/plugins/legado",
+                    "configuration_mode": "manager",
+                    "primary_action": "open",
                     "healthy_message": "Legado 书源适配器可用",
                 },
             },
             _status,
         )
+
+    @staticmethod
+    def prepare_context(session, settings, provider_method=None):
+        """只为元数据接口复制已启用书源；网络 worker 不持有数据库 session。"""
+        if provider_method != "search_books":
+            return {}
+        settings = settings or {}
+        try:
+            sources = collect_metadata_sources(session, settings.get("BOOKSOURCE_METADATA_TOP_K", 10))
+        except Exception:
+            sources = []
+        return {
+            "metadata_sources": sources,
+            "cookie_secret": settings.get("cookie_secret", "talebook"),
+            "booksource_config": {key: settings[key] for key in BOOKSOURCE_METADATA_CONFIG_KEYS if key in settings},
+        }
+
+    def search_books(self, query, context):
+        query = MetadataQuery.from_value(query)
+        if query.is_empty():
+            return []
+        platform = (context or {}).get("platform") or {}
+        service = BookSourceMetadataService(
+            platform.get("metadata_sources") or [],
+            platform.get("cookie_secret") or "talebook",
+            config=platform.get("booksource_config") or {},
+        )
+        author = query.authors[0] if query.authors else None
+        return service.search(query.title or query.isbn, author)
+
+    @staticmethod
+    def get_metadata(external_id, context):
+        # 搜索候选沿用历史 provider_key=BookSource token，由书籍 handler 在
+        # 拥有数据库 session 的调用线程应用，不能在插件网络 worker 中解析。
+        return None
+
+    @staticmethod
+    def get_cover(cover_url, context=None):
+        return None
 
 
 PROVIDER = LegadoProvider()

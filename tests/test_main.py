@@ -983,10 +983,20 @@ class TestReferFailureSummary(TestWithUserLogin):
 
         frames = [json.loads(line) for line in response.body.decode("utf-8").splitlines()]
         self.assertEqual(frames[0]["err"], "ok")
-        self.assertEqual(frames[1]["title"], "可用结果")
+        progress = [frame for frame in frames if frame.get("event") == "progress"]
+        self.assertEqual(progress[0], {"event": "progress", "failures": [], "total": 3, "completed": 0})
+        self.assertEqual(progress[-1]["completed"], 3)
+        self.assertIn("可用结果", [frame.get("title") for frame in frames])
         self.assertEqual(frames[-1]["event"], "summary")
         self.assertIn(self.escaped_failure, frames[-1]["failures"])
         self.assertNotIn("<script>", response.body.decode("utf-8"))
+
+    def test_each_metadata_source_returns_at_most_five_candidates(self):
+        handler = webserver.handlers.book.BookRefer.__new__(webserver.handlers.book.BookRefer)
+        books, failures = handler._unpack_search_result("many", [{"title": str(index)} for index in range(8)])
+
+        self.assertEqual(len(books), 5)
+        self.assertEqual(failures, [])
 
 
 class TestWereadRefer(TestWithUserLogin):

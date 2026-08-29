@@ -37,6 +37,8 @@ class PureLibroProvider(DevicePushProvider):
                 "PureLibro",
                 "把书籍发送到 PureLibro 阅读设备。",
                 "mdi-book-play-outline",
+                homepage="https://apps.apple.com/es/app/purelibro-ebook-reader/id1546612448",
+                brand_icon="/images/plugin-icons/purelibro.jpg",
             ),
             PureLibroUploader,
         )

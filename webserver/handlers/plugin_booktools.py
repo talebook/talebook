@@ -22,7 +22,7 @@ from webserver.services.booktools import (
     pick_format,
     resolve_book,
 )
-from webserver.services.plugin_runtime import PluginRuntime, ensure_auto_installations
+from webserver.services.plugin_runtime import PluginRuntime, ensure_builtin_installations
 
 
 TRANSFORM_CAPABILITY = "integrations.tool"
@@ -64,10 +64,22 @@ def _tool_backup_dir():
     return path
 
 
+def _book_option(book):
+    formats = [fmt.upper() for fmt in (book.get("available_formats") or [])]
+    usable = [fmt for fmt in ("EPUB", "TXT") if fmt in formats]
+    return {
+        "id": book["id"],
+        "title": book.get("title") or "",
+        "authors": [str(author) for author in (book.get("authors") or [])],
+        "formats": usable,
+        "timestamp": str(book.get("timestamp") or ""),
+    }
+
+
 def _tool_runtime(handler, manage_route):
     """按声明式 UI 入口选择 typed transform，不在 handler 硬编码插件身份。"""
     settings = loader.get_settings()
-    ensure_auto_installations(handler.session, handler.user_id(), settings)
+    ensure_builtin_installations(handler.session, handler.user_id(), settings)
     runtime = PluginRuntime(handler.session, settings)
     for connection in runtime.connections_for(TRANSFORM_CAPABILITY, handler.user_id()):
         provider = runtime.registry.get(runtime.plugin_key_of(connection))
@@ -89,29 +101,64 @@ class UserBookToolsBooks(BaseHandler):
     @js
     @auth
     def get(self):
+        requested_book_id = self.get_argument("book_id", "")
+        if requested_book_id:
+            try:
+                book = _tool_resolve_book(self, int(requested_book_id))
+            except (BookToolsError, TypeError, ValueError) as exc:
+                return _tool_error(exc)
+            item = _book_option(book)
+            return {"err": "ok", "books": [item] if item["formats"] else [], "total": 1 if item["formats"] else 0}
+
         keyword = (self.get_argument("query", "") or "").strip().lower()
         items = []
         for book in self.get_books():
-            fmts = [f.upper() for f in (book.get("available_formats") or [])]
-            usable = [fmt for fmt in ("EPUB", "TXT") if fmt in fmts]
-            if not usable:
+            item = _book_option(book)
+            if not item["formats"]:
                 continue
-            authors = book.get("authors") or []
             if keyword:
-                haystack = "%s %s" % (book.get("title") or "", " ".join(str(a) for a in authors))
+                haystack = "%s %s" % (item["title"], " ".join(item["authors"]))
                 if keyword not in haystack.lower():
                     continue
-            items.append(
-                {
-                    "id": book["id"],
-                    "title": book.get("title") or "",
-                    "authors": [str(a) for a in authors],
-                    "formats": usable,
-                    "timestamp": str(book.get("timestamp") or ""),
-                }
-            )
+            items.append(item)
         items.sort(key=lambda item: item["timestamp"], reverse=True)
         return {"err": "ok", "books": items[:100], "total": len(items)}
+
+
+class AdminBookToolActions(BaseHandler):
+    """返回当前书籍可用的实例级 Tool 动作，前端无需识别具体插件。"""
+
+    @js
+    @is_admin
+    def get(self):
+        try:
+            book_id = _tool_book_id({"book_id": self.get_argument("book_id", "")})
+            book = _tool_resolve_book(self, book_id)
+            book_formats = {fmt.upper() for fmt in (book.get("available_formats") or [])}
+            settings = loader.get_settings()
+            ensure_builtin_installations(self.session, self.user_id(), settings)
+            runtime = PluginRuntime(self.session, settings)
+            actions = []
+            for provider in runtime.enabled_providers(TRANSFORM_CAPABILITY):
+                supported_formats = set(getattr(provider, "supported_formats", ()) or ())
+                if supported_formats and not supported_formats.intersection(book_formats):
+                    continue
+                manifest = provider.manifest
+                ui = manifest.get("ui") or {}
+                route = ui.get("manage_route")
+                if not route:
+                    continue
+                actions.append(
+                    {
+                        "plugin_key": manifest["id"],
+                        "name": manifest["name"],
+                        "icon": ui.get("icon") or "mdi-puzzle-outline",
+                        "route": route,
+                    }
+                )
+            return {"err": "ok", "actions": actions}
+        except (BookToolsError, RuntimeError, TypeError, ValueError) as exc:
+            return _tool_error(exc)
 
 
 class UserTextReplacePreview(BaseHandler):
@@ -460,6 +507,7 @@ class UserZhConverterRun(BaseHandler):
 
 def routes():
     return [
+        (r"/api/plugins/tools/book-actions", AdminBookToolActions),
         (r"/api/plugins/tools/books", UserBookToolsBooks),
         (r"/api/plugins/tools/text-replace/preview", UserTextReplacePreview),
         (r"/api/plugins/tools/text-replace/run", UserTextReplaceRun),

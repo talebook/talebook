@@ -224,6 +224,8 @@ if __name__ == "__main__":
 class AIProvider(MetaSourceMixin, AIBookApi):
     """AI 元数据源：凭据与模型参数按 D-27 双读，connection 优先、回落 CONF。"""
 
+    legacy_sources = ("ai",)
+
     manifest = meta_manifest(
         "talebook.meta.ai",
         "AI 元数据",
@@ -234,11 +236,17 @@ class AIProvider(MetaSourceMixin, AIBookApi):
             "type": "object",
             "properties": {
                 "api_url": {"type": "string"},
-                "api_key": {"type": "string", "writeOnly": True},
                 "model": {"type": "string"},
                 "use_thinking": {"type": "boolean"},
             },
         },
+        auth_schema={
+            "type": "object",
+            "required": ["api_key"],
+            "properties": {"api_key": {"type": "string", "writeOnly": True}},
+        },
+        configuration_mode="form",
+        deprecated=True,
     )
 
     def __init__(self):
@@ -262,6 +270,10 @@ class AIProvider(MetaSourceMixin, AIBookApi):
             return []
         mi = api.get_book(query.title, query.authors[0] if query.authors else None)
         return [mi] if mi else []
+
+    def _fetch(self, external_id, context):
+        api = self._configured(context)
+        return api.get_book(external_id) if api.api_key else None
 
     def get_cover(self, cover_url, context=None):
         return self._configured(context).get_cover(cover_url)

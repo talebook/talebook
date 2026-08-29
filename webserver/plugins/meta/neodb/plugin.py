@@ -68,12 +68,15 @@ class NeodbMetaPlugin:
 
 
 class NeodbProvider(MetaSourceMixin, NeodbMetaPlugin):
+    default_enabled = False
+    legacy_sources = ("neodb",)
     manifest = meta_manifest(
         "talebook.meta.neodb",
         "NeoDB",
         "从 NeoDB 联邦书目检索书名、作者、出版与评分。",
         "mdi-database-search",
         "https://neodb.social/",
+        brand_icon="/images/plugin-icons/neodb.svg",
     )
 
     def _search(self, query, context):

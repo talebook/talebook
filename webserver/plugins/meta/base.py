@@ -41,7 +41,11 @@ def _manifest(
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": homepage,
         "license": "GPL-3.0",
-        "ui": {"icon": icon, "primary_action": "configure"},
+        "ui": {
+            "icon": icon,
+            "configuration_mode": "none",
+            "primary_action": "details",
+        },
         "connection_owners": list(connection_owners),
     }
 
@@ -142,20 +146,42 @@ def to_calibre_metadata(record):
     return record
 
 
-def meta_manifest(plugin_id, name, description, icon, homepage, config_schema=None):
-    """元数据源共用的 manifest：能力固定为 metadata.lookup，无需凭据。"""
-    return _manifest(
+def meta_manifest(
+    plugin_id,
+    name,
+    description,
+    icon,
+    homepage,
+    config_schema=None,
+    auth_schema=None,
+    configuration_mode="none",
+    brand_icon="",
+    deprecated=False,
+):
+    """元数据源共用的 manifest：能力固定为 metadata.lookup。"""
+    manifest = _manifest(
         plugin_id,
         name,
         description,
         ["metadata"],
         ["metadata.lookup"],
-        {"type": "object", "properties": {}},
+        auth_schema or {"type": "object", "properties": {}},
         config_schema or {"type": "object", "properties": {}},
         ["books.read"],
         icon,
         homepage,
     )
+    manifest["ui"].update(
+        {
+            "configuration_mode": configuration_mode,
+            "primary_action": "configure" if configuration_mode == "form" else "details",
+        }
+    )
+    if brand_icon:
+        manifest["ui"]["brand_icon"] = brand_icon
+    if deprecated:
+        manifest["ui"]["deprecated"] = True
+    return manifest
 
 
 class MetaSourceMixin:
@@ -165,6 +191,17 @@ class MetaSourceMixin:
     以及可选的 ``_fetch(external_id, context)``；协议要求的三个方法在此统一。
     """
 
+    default_enabled = True
+    legacy_sources = ()
+
+    def initial_enabled(self, settings):
+        """元数据源默认开启；显式关闭默认值的源仍可承接旧来源选择。"""
+        selected = set((settings or {}).get("META_SELECTED_SOURCES") or [])
+        return bool(self.default_enabled or selected.intersection(self.legacy_sources))
+
+    def initial_config(self, settings):
+        return {}
+
     def search_books(self, query, context):
         from webserver.plugins.runtime.domains import MetadataQuery
 
@@ -172,13 +209,23 @@ class MetaSourceMixin:
         if query.is_empty():
             return []
         key = self.manifest["id"]
-        return [record for record in (to_book_metadata(mi, key) for mi in self._search(query, context) or []) if record]
+        records = []
+        for metadata in self._search(query, context) or []:
+            metadata.provider_key = key
+            record = to_book_metadata(metadata, key)
+            if record:
+                records.append(record)
+        return records
 
     def get_metadata(self, external_id, context):
         fetch = getattr(self, "_fetch", None)
         if fetch is None or not external_id:
             return None
-        return to_book_metadata(fetch(external_id, context), self.manifest["id"])
+        metadata = fetch(external_id, context)
+        if metadata is None:
+            return None
+        metadata.provider_key = self.manifest["id"]
+        return to_book_metadata(metadata, self.manifest["id"])
 
     def self_check(self, context):
         from webserver.plugins.runtime.domains import CheckReport

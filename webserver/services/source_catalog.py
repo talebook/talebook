@@ -8,7 +8,7 @@ from webserver.models import BookSourceModel, OpdsSource, PluginConnection
 from webserver.plugins.runtime.interfaces import SourceProvider
 from webserver.plugins.source.legado import PLUGIN_ID as LEGADO_PLUGIN_ID
 from webserver.plugins.source.opds import PLUGIN_ID as OPDS_PLUGIN_ID
-from webserver.services.plugin_runtime import PluginRuntime, PluginRuntimeError, ensure_auto_installations
+from webserver.services.plugin_runtime import PluginRuntime, PluginRuntimeError, ensure_builtin_installations
 
 
 SOURCE_CAPABILITIES = frozenset({"book_sources.search", "book_sources.browse", "book_sources.acquire"})
@@ -43,7 +43,7 @@ class SourceCatalogService:
         self.session = session
         self.settings = settings
         self.user_id = user_id
-        ensure_auto_installations(session, user_id, settings)
+        ensure_builtin_installations(session, user_id, settings)
         self.runtime = runtime or PluginRuntime(session, settings)
 
     def _engine_config(self):
@@ -211,6 +211,7 @@ class SourceCatalogService:
                         context_overrides={connection.id: binding.context_overrides},
                         required_scopes=("books.read",),
                         retry=True,
+                        provider_method="search",
                     )
                     if failures:
                         error = failures[connection.id]

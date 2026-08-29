@@ -91,6 +91,7 @@ class DoubanV2MetaPlugin:
 
 
 class DoubanV2Provider(MetaSourceMixin, DoubanV2MetaPlugin):
+    legacy_sources = ("douban", "douban_v2")
     proxy_image_hosts = ("doubanio.com",)
     manifest = meta_manifest(
         "talebook.meta.douban-v2",
@@ -98,6 +99,7 @@ class DoubanV2Provider(MetaSourceMixin, DoubanV2MetaPlugin):
         "解析豆瓣读书搜索页，提取书名、作者、出版信息、评分与简介。",
         "mdi-book-search",
         "https://book.douban.com/",
+        brand_icon="/images/plugin-icons/douban.ico",
     )
 
     def _search(self, query, context):

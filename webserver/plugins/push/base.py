@@ -90,7 +90,7 @@ def _network_timeout(context):
     return max(0.01, remaining - 0.1)
 
 
-def _manifest(plugin_id, name, description, icon, homepage=""):
+def _manifest(plugin_id, name, description, icon, homepage="", brand_icon=""):
     return {
         "protocol_version": PROTOCOL_VERSION,
         "id": plugin_id,
@@ -116,9 +116,9 @@ def _manifest(plugin_id, name, description, icon, homepage=""):
         "license": "GPL-3.0",
         "ui": {
             "icon": icon,
+            "brand_icon": brand_icon,
             "primary_action": "configure",
             "manage_route": "/user/detail?tab=devices",
-            "manage_label_key": "pluginManagement.manageDevices",
             # 既有 /send_to_device 的路由事实；handler 按声明交给
             # runtime 解析，不再持有 provider map。
             "device_type": plugin_id.rsplit(".", 1)[-1],
@@ -132,6 +132,7 @@ class DevicePushProvider:
     def __init__(self, manifest, uploader_class):
         self.manifest = manifest
         self.uploader_class = uploader_class
+        self.manifest["ui"]["default_port"] = uploader_class.default_port(None)
 
     @property
     def default_port(self):

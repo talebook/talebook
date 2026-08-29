@@ -4,8 +4,9 @@ from unittest import mock
 
 import pytest
 
-from webserver.plugins.meta.base import CALIBRE_MI_KEY, to_book_metadata, to_calibre_metadata
-from webserver.plugins.register import META_SOURCE_TO_PLUGIN, PROVIDER_GROUPS, plugin_ids_for_sources
+from webserver.plugins.meta.ai.api import PROVIDER as AI_PROVIDER
+from webserver.plugins.meta.base import to_book_metadata, to_calibre_metadata
+from webserver.plugins.register import PROVIDER_GROUPS
 from webserver.plugins.runtime import PluginManifest, contract_violations
 from webserver.plugins.runtime.domains import MetadataQuery
 from webserver.services.plugin_runtime import REGISTRY
@@ -58,19 +59,14 @@ def test_conversion_does_not_overwrite_a_provider_key_set_by_the_source():
     assert to_book_metadata(mi, "talebook.meta.douban-v2")["provider_key"] == "douban_v2"
 
 
-def test_legacy_source_values_map_onto_registered_plugins():
-    registered = {provider.manifest["id"] for group in PROVIDER_GROUPS.values() for provider in group}
-    assert set(META_SOURCE_TO_PLUGIN.values()) <= registered
-    # google 与 amazon 是同一个 Calibre 插件的两个 source，展开后不产生重复项
-    assert plugin_ids_for_sources(["google", "amazon"]) == ["talebook.meta.calibre"]
-    # booksource 是平台的在线书源服务，不是元数据插件
-    assert plugin_ids_for_sources(["booksource"]) == []
-    assert plugin_ids_for_sources([]) == []
-    # 展开保持配置顺序
-    assert plugin_ids_for_sources(["baidu", "douban_v2"]) == [
-        "talebook.meta.baike",
-        "talebook.meta.douban-v2",
-    ]
+def test_metadata_providers_default_on_except_neodb_and_keep_legacy_neodb_selection():
+    providers = {provider.manifest["id"]: provider for provider in PROVIDER_GROUPS["meta"]}
+
+    assert {plugin_id for plugin_id, provider in providers.items() if provider.initial_enabled({})} == set(providers) - {
+        "talebook.meta.neodb"
+    }
+    assert not providers["talebook.meta.neodb"].initial_enabled({"META_SELECTED_SOURCES": []})
+    assert providers["talebook.meta.neodb"].initial_enabled({"META_SELECTED_SOURCES": ["neodb"]})
 
 
 def test_search_books_rejects_an_empty_query_without_calling_upstream():
@@ -80,9 +76,18 @@ def test_search_books_rejects_an_empty_query_without_calling_upstream():
         m.assert_not_called()
 
 
+def test_qimao_provider_keeps_catalog_search_separate_from_the_metadata_protocol():
+    provider = next(p for p in PROVIDER_GROUPS["meta"] if p.manifest["id"] == "talebook.meta.qimao")
+
+    with mock.patch.object(provider, "search_catalog", return_value=[]) as search_catalog:
+        assert provider.search_books(MetadataQuery(title="活着"), {}) == []
+
+    search_catalog.assert_called_once_with("活着")
+
+
 def test_ai_provider_reads_connection_config_first_then_falls_back_to_conf():
     """D-27 双读：connection 优先，缺失回落已发布的 CONF 键。"""
-    provider = next(p for p in PROVIDER_GROUPS["meta"] if p.manifest["id"] == "talebook.meta.ai")
+    provider = AI_PROVIDER
     conf = {"ai_api_url": "https://conf.example/v1", "ai_api_key": "conf-key", "ai_model": "conf-model"}
 
     with mock.patch("webserver.loader.get_settings", return_value=conf):
@@ -102,62 +107,80 @@ def test_ai_provider_reads_connection_config_first_then_falls_back_to_conf():
 
 
 def test_ai_provider_stays_silent_without_credentials():
-    provider = next(p for p in PROVIDER_GROUPS["meta"] if p.manifest["id"] == "talebook.meta.ai")
+    provider = AI_PROVIDER
     with mock.patch("webserver.loader.get_settings", return_value={}):
         assert provider.search_books(MetadataQuery(title="活着"), {}) == []
 
 
-def test_calibre_provider_only_uses_google_and_amazon_sources():
+def test_calibre_provider_uses_all_identify_sources_without_secondary_configuration():
     provider = next(p for p in PROVIDER_GROUPS["meta"] if p.manifest["id"] == "talebook.meta.calibre")
-    # connection 明确指定时只保留 calibre 认识的两个 source
-    assert provider._sources({"config": {"sources": ["google", "baidu"]}}) == ["google"]
-
-    with mock.patch("webserver.loader.get_settings", return_value={"META_SELECTED_SOURCES": ["amazon", "xinhua"]}):
-        # 未配置 connection 时回落 CONF，并同样只保留这两个
-        assert provider._sources({}) == ["amazon"]
-        assert provider._sources({"config": {"sources": []}}) == ["amazon"]
-
-    with mock.patch("webserver.loader.get_settings", return_value={"META_SELECTED_SOURCES": ["xinhua"]}):
-        # 两个 source 都没启用时不发起查询
-        assert provider._sources({}) == []
-        assert provider._search(MetadataQuery(title="活着"), {}) == []
+    expected = ["google", "amazon", "edelweiss"]
+    # 启用这个插件就是启用完整的 Calibre identify 能力，不再暴露二次选源配置。
+    assert provider._sources({}) == expected
+    assert provider._sources({"config": {"sources": []}}) == expected
+    assert provider._sources({"config": {"sources": ["google", "baidu"]}}) == expected
 
 
-@pytest.mark.parametrize("plugin_id", [pid for pid in META_SOURCE_TO_PLUGIN.values()])
+def test_metadata_plugins_only_declare_configuration_when_they_need_it():
+    providers = {provider.manifest["id"]: provider for provider in PROVIDER_GROUPS["meta"]}
+
+    assert AI_PROVIDER.manifest["ui"]["configuration_mode"] == "form"
+    assert all(provider.manifest["ui"]["configuration_mode"] == "none" for provider in providers.values())
+
+
+@pytest.mark.parametrize(
+    "plugin_id",
+    [
+        provider.manifest["id"]
+        for provider in PROVIDER_GROUPS["meta"]
+        if "metadata.lookup" in provider.manifest["capabilities"]
+    ],
+)
 def test_every_mapped_plugin_exposes_the_three_protocol_methods(plugin_id):
     provider = next(p for p in PROVIDER_GROUPS["meta"] if p.manifest["id"] == plugin_id)
     for name in ("search_books", "get_metadata", "get_cover"):
         assert callable(getattr(provider, name, None)), "%s 缺少 %s" % (plugin_id, name)
 
 
-@pytest.mark.parametrize("plugin_id", [pid for pid in META_SOURCE_TO_PLUGIN.values()])
+@pytest.mark.parametrize(
+    "plugin_id",
+    [
+        provider.manifest["id"]
+        for provider in PROVIDER_GROUPS["meta"]
+        if "metadata.lookup" in provider.manifest["capabilities"]
+    ],
+)
 def test_every_mapped_plugin_is_resolvable_through_the_shared_registry(plugin_id):
     assert REGISTRY.get(plugin_id) is not None
 
 
-def test_refer_task_reaches_the_provider_instead_of_swallowing_lookup_errors():
-    """派发任务必须真正拿到 provider：查不到时只能是插件缺失，不能是调用写错。"""
+def test_refer_tasks_follow_enabled_plugin_connections_instead_of_legacy_source_settings():
     from webserver.handlers.book import BookRefer
 
     handler = BookRefer.__new__(BookRefer)
-    plugin_id = "talebook.meta.douban-v2"
-    query = MetadataQuery(title="活着")
-    records = [to_book_metadata(_FakeMetadata(title="活着"), plugin_id)]
+    handler.session = mock.sentinel.session
+    handler.user_id = lambda: 1
+    call = mock.Mock(return_value=[])
+    unit = {
+        "key": 17,
+        "plugin_key": "talebook.meta.baike",
+        "call": call,
+    }
 
-    with mock.patch.object(type(REGISTRY.get(plugin_id)), "search_books", return_value=records) as m:
-        results = handler._make_metadata_task(plugin_id, query, ["douban_v2"])()
+    with mock.patch("webserver.handlers.book.ensure_runtime_installations"):
+        with mock.patch("webserver.handlers.book.PluginRuntime") as runtime_class:
+            runtime = runtime_class.return_value
+            runtime.connections_for.return_value = [mock.sentinel.connection]
+            runtime.prepare_read.return_value = ([unit], {})
+            with mock.patch.dict("webserver.handlers.book.CONF", {"META_SELECTED_SOURCES": ["qimao"]}):
+                tasks = handler._build_search_tasks(_FakeMetadata(title="活着", isbn="9787506365437"))
 
-    assert m.called, "provider 未被调用，说明 registry 查找被静默吞掉了"
-    assert [b.title for b in results] == ["活着"]
-    assert results[0].provider_key == plugin_id
-
-
-def test_refer_task_returns_empty_for_an_unregistered_plugin():
-    from webserver.handlers.book import BookRefer
-
-    handler = BookRefer.__new__(BookRefer)
-    task = handler._make_metadata_task("talebook.meta.does-not-exist", MetadataQuery(title="活着"), [])
-    assert task() == []
+    assert list(tasks) == ["百度百科"]
+    tasks["百度百科"]()
+    query = call.call_args.args[1]
+    assert call.call_args.args[0] == "search_books"
+    assert query.title == "活着"
+    assert query.isbn == "9787506365437"
 
 
 def test_xhsd_only_queries_upstream_for_real_isbn():
@@ -178,7 +201,11 @@ def test_failure_summary_uses_display_names_not_plugin_ids():
     from webserver.handlers.book import BookRefer
 
     handler = BookRefer.__new__(BookRefer)
-    for plugin_id in set(META_SOURCE_TO_PLUGIN.values()):
+    for plugin_id in {
+        provider.manifest["id"]
+        for provider in PROVIDER_GROUPS["meta"]
+        if "metadata.lookup" in provider.manifest["capabilities"]
+    }:
         name = handler._meta_task_name(plugin_id)
         assert name == REGISTRY.get(plugin_id).manifest["name"]
         assert not name.startswith("talebook.")

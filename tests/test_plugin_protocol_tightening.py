@@ -4,12 +4,13 @@ import copy
 
 import pytest
 
+from tests.plugin_fixtures import MockMultiTabProvider
 from webserver.plugins.runtime.protocol import ManifestError, PluginManifest, validate_against_schema
 from webserver.services.plugin_runtime import REGISTRY
 
 
 def _valid_manifest():
-    return copy.deepcopy(dict(REGISTRY.get("talebook.mock.multi-tab").manifest))
+    return copy.deepcopy(dict(MockMultiTabProvider.manifest))
 
 
 def test_connection_owners_is_required_and_has_no_default():

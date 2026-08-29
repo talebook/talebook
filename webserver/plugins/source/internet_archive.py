@@ -13,7 +13,9 @@ class InternetArchiveProvider(SourceBase):
         ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
         {"type": "object", "properties": COMMON_CONFIG_PROPERTIES},
         homepage="https://archive.org/details/texts",
+        brand_icon="/images/plugin-icons/internet-archive.ico",
     )
+    manifest["ui"].update({"catalog_access": "rights_vary", "primary_action": "details"})
 
     def discover(self, context):
         search = self.http.request("GET", self.endpoint, headers={"Accept": "application/json"}).json()

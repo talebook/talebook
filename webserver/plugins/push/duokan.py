@@ -27,7 +27,13 @@ class DuokanUploader(BaseUploader):
 class DuokanProvider(DevicePushProvider):
     def __init__(self):
         super().__init__(
-            _manifest("talebook.push.duokan", "多看阅读", "通过 WiFi 传书把书籍发送到多看阅读设备。", "mdi-tablet"),
+            _manifest(
+                "talebook.push.duokan",
+                "多看阅读",
+                "通过 WiFi 传书把书籍发送到多看阅读设备。",
+                "mdi-tablet",
+                brand_icon="/images/plugin-icons/duokan.jpg",
+            ),
             DuokanUploader,
         )
 

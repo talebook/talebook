@@ -71,20 +71,18 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 import { confirmDestructiveBookWrite } from '@/utils/book-tools';
+import { useBookToolSelection } from '@/composables/useBookToolSelection';
 
 const { t } = useI18n();
 const { $backend } = useNuxtApp();
 const router = useRouter();
 useMainStore().setNavbar(true);
 
-const bookId = ref(null);
-const bookOptions = ref([]);
-const bookQuery = ref('');
-const booksLoading = ref(false);
+const { bookId, bookOptions, bookQuery, booksLoading, selectedBook, onBookSearch } = useBookToolSelection();
 const pattern = ref('');
 const replacement = ref('');
 const useRegex = ref(false);
@@ -96,36 +94,6 @@ const success = ref('');
 const previewResult = ref(null);
 const ruleError = ref('');
 
-const selectedBook = computed(() => bookOptions.value.find((b) => b.id === bookId.value) || null);
-
-let searchTimer = null;
-function onBookSearch(val) {
-    bookQuery.value = val || '';
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(loadBooks, 300);
-}
-async function loadBooks() {
-    booksLoading.value = true;
-    try {
-        const rsp = await $backend(`/plugins/tools/books?query=${encodeURIComponent(bookQuery.value || '')}`);
-        if (rsp.err === 'ok') {
-            bookOptions.value = (rsp.books || []).map((b) => ({
-                ...b,
-                id: b.id,
-                label: `${b.title} — ${(b.authors || []).join(', ')} [${(b.formats || []).join('/')}]`,
-            }));
-            if (bookId.value && !bookOptions.value.some((b) => b.id === bookId.value)) {
-                // keep selected book visible
-                const cur = bookOptions.value.find((b) => b.id === bookId.value);
-                if (!cur && selectedBook.value) bookOptions.value.unshift(selectedBook.value);
-            }
-        }
-    } catch (e) {
-        // ignore
-    } finally {
-        booksLoading.value = false;
-    }
-}
 watch(bookId, () => {
     previewResult.value = null;
     error.value = '';
@@ -187,7 +155,6 @@ async function doRun() {
         busy.value = '';
     }
 }
-onMounted(loadBooks);
 useHead(() => ({ title: t('bookTools.textReplace.title') }));
 </script>
 

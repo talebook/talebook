@@ -20,7 +20,6 @@ class TxtFixerTransformPlugin(TextTransformPlugin):
                 {
                     "icon": "mdi-file-restore-outline",
                     "manage_route": "/plugins/txt-fixer",
-                    "manage_label_key": "pluginManagement.openTool",
                     "primary_action": "open",
                     "healthy_message": "TXT 编码修复工具可用",
                     "supports_auto_trigger": True,

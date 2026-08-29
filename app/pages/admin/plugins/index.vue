@@ -1,13 +1,11 @@
 <template>
-    <v-card class="plugin-page">
-        <v-card-title class="plugin-page-header d-flex align-center flex-wrap ga-2 px-4 pt-4">
+    <main class="plugin-page">
+        <header class="plugin-page-header d-flex align-center flex-wrap ga-2">
             <div class="plugin-page-header__copy">
-                <h1 class="text-h6">
+                <h1>
                     {{ t('pluginManagement.title') }}
                 </h1>
-                <div class="text-body-2 text-medium-emphasis font-weight-regular mt-1">
-                    {{ t('pluginManagement.description') }}
-                </div>
+                <p>{{ t('pluginManagement.managementDescription') }}</p>
             </div>
             <v-spacer />
             <v-btn
@@ -17,212 +15,234 @@
             >
                 {{ t('pluginManagement.runs') }}
             </v-btn>
-        </v-card-title>
+        </header>
 
         <v-tabs
-            v-model="activeTab"
+            v-model="pageSection"
             density="compact"
-            class="px-2 mt-2 plugin-tabs"
-            show-arrows
+            class="plugin-page-tabs"
         >
-            <v-tab
-                v-for="tab in tabs"
-                :key="tab.value"
-                :value="tab.value"
-            >
-                {{ tab.label }}
-                <v-chip
-                    v-if="attentionCount(tab.value)"
-                    size="x-small"
-                    color="warning"
-                    variant="tonal"
-                    class="ml-2"
-                >
-                    {{ attentionCount(tab.value) }}
-                </v-chip>
+            <v-tab value="management">
+                {{ t('pluginManagement.managementTab') }}
+            </v-tab>
+            <v-tab value="personal">
+                {{ t('pluginManagement.personalConfiguration') }}
             </v-tab>
         </v-tabs>
         <v-divider />
 
-        <v-card-text>
-            <div class="d-flex flex-wrap ga-3 align-center mb-4">
-                <v-text-field
-                    v-model="search"
-                    :label="t('pluginManagement.search')"
-                    prepend-inner-icon="mdi-magnify"
-                    density="compact"
-                    variant="outlined"
-                    clearable
-                    hide-details
-                    class="plugin-search"
-                />
-                <v-select
-                    v-model="statusFilter"
-                    :items="statusOptions"
-                    item-title="title"
-                    item-value="value"
-                    :label="t('pluginManagement.statusFilter')"
-                    density="compact"
-                    variant="outlined"
-                    hide-details
-                    class="plugin-filter"
-                />
-            </div>
-
-            <template v-if="loading">
-                <v-row>
-                    <v-col
-                        v-for="n in 4"
-                        :key="n"
-                        cols="12"
-                        lg="6"
-                    >
-                        <v-skeleton-loader type="article, actions" />
-                    </v-col>
-                </v-row>
-            </template>
-            <v-alert
-                v-else-if="error"
-                type="error"
-                variant="tonal"
-            >
-                {{ t('pluginManagement.loadError') }}
-                <v-btn
-                    variant="text"
-                    class="ml-2"
-                    @click="load"
-                >
-                    {{ t('common.retry') }}
-                </v-btn>
-            </v-alert>
-            <v-alert
-                v-else-if="filteredPlugins.length === 0"
-                type="info"
-                variant="tonal"
-            >
-                <div class="font-weight-medium">
-                    {{ tabPlugins.length ? t('pluginManagement.noResult') : t('pluginManagement.emptyCategory') }}
-                </div>
-                <v-btn
-                    v-if="tabPlugins.length"
-                    variant="text"
-                    class="mt-1"
-                    @click="clearFilters"
-                >
-                    {{ t('pluginManagement.clearFilters') }}
-                </v-btn>
-            </v-alert>
-            <v-row v-else>
-                <v-col
-                    v-for="plugin in filteredPlugins"
-                    :key="plugin.plugin_key"
-                    cols="12"
-                    lg="6"
-                >
-                    <v-card
-                        variant="outlined"
-                        class="plugin-card h-100"
-                        :data-status="statusInfo(plugin).key"
-                    >
-                        <v-card-item class="plugin-card__item">
-                            <div class="plugin-card__header">
-                                <v-avatar
-                                    color="primary"
-                                    variant="tonal"
-                                    size="40"
-                                >
-                                    <v-icon>{{ plugin.ui.icon || 'mdi-power-plug-outline' }}</v-icon>
-                                </v-avatar>
-                                <div class="plugin-card__identity">
-                                    <div class="plugin-card__title-row">
-                                        <h3 class="text-subtitle-1 font-weight-medium">
-                                            {{ plugin.name }}
-                                        </h3>
-                                        <v-chip
-                                            class="plugin-card__status"
-                                            size="x-small"
-                                            :color="statusInfo(plugin).color"
-                                            :variant="statusInfo(plugin).key === 'enabled' ? 'flat' : 'tonal'"
-                                        >
-                                            <v-icon
-                                                start
-                                                size="12"
-                                            >
-                                                {{ statusInfo(plugin).icon }}
-                                            </v-icon>
-                                            {{ statusInfo(plugin).text }}
-                                        </v-chip>
-                                    </div>
-                                    <div class="plugin-card__tags">
-                                        <v-chip
-                                            v-for="capability in plugin.capabilities"
-                                            :key="capability"
-                                            size="x-small"
-                                            variant="tonal"
-                                        >
-                                            {{ capabilityLabel(capability) }}
-                                        </v-chip>
-                                    </div>
-                                </div>
-                                <div class="plugin-card__actions">
-                                    <v-btn
-                                        color="primary"
-                                        size="small"
-                                        variant="tonal"
-                                        @click="primaryAction(plugin)"
-                                    >
-                                        {{ primaryActionLabel(plugin) }}
-                                    </v-btn>
-                                </div>
-                            </div>
-                        </v-card-item>
-                        <v-card-text class="pt-1">
-                            <p class="plugin-description text-body-2">
-                                {{ plugin.description }}
-                            </p>
-                        </v-card-text>
-                        <v-card-actions class="plugin-card__footer">
+        <v-window
+            v-model="pageSection"
+            class="plugin-page-window"
+        >
+            <v-window-item value="management">
+                <section class="management-panel">
+                    <div class="management-layout">
+                        <div class="management-content">
                             <div
-                                class="plugin-card__summary text-caption text-medium-emphasis"
-                                :title="summary(plugin)"
+                                class="management-summary"
+                                aria-label="插件状态摘要"
                             >
-                                {{ summary(plugin) }}
+                                <span>{{ t('pluginManagement.builtinPluginCount', { count: catalog.length }) }}</span>
+                                <span><i class="summary-dot summary-dot--good" />{{ t('pluginManagement.enabledPluginCount', { count: enabledCount }) }}</span>
+                                <span><i class="summary-dot summary-dot--warning" />{{ t('pluginManagement.attentionPluginCount', { count: attentionCount }) }}</span>
+                                <span class="management-summary__note">{{ t('pluginManagement.noInstallAction') }}</span>
                             </div>
-                            <v-spacer />
-                            <v-btn
-                                size="small"
-                                variant="text"
-                                @click="openDetails(plugin)"
-                            >
-                                {{ t('pluginManagement.details') }}
-                            </v-btn>
-                        </v-card-actions>
-                    </v-card>
-                </v-col>
-            </v-row>
 
-            <section
-                v-if="showLegado"
-                ref="legadoPanel"
-                class="mt-6"
-                tabindex="-1"
-            >
-                <div class="d-flex align-center mb-2">
-                    <h2 class="text-h6">
-                        {{ t('pluginManagement.legadoManager') }}
-                    </h2>
-                    <v-spacer />
-                    <v-btn
-                        variant="text"
-                        prepend-icon="mdi-close"
-                        @click="closeLegado"
-                    >
-                        {{ t('common.close') }}
-                    </v-btn>
-                </div>
-                <EmbeddedBookSources embedded />
-            </section>
-        </v-card-text>
+                            <div class="management-toolbar">
+                                <v-text-field
+                                    v-model="search"
+                                    :label="t('pluginManagement.search')"
+                                    prepend-inner-icon="mdi-magnify"
+                                    density="compact"
+                                    variant="outlined"
+                                    clearable
+                                    hide-details
+                                    class="plugin-search"
+                                />
+                                <v-select
+                                    v-model="statusFilter"
+                                    :items="statusOptions"
+                                    item-title="title"
+                                    item-value="value"
+                                    :label="t('pluginManagement.statusFilter')"
+                                    density="compact"
+                                    variant="outlined"
+                                    hide-details
+                                    class="plugin-filter"
+                                />
+                            </div>
+
+                            <v-skeleton-loader
+                                v-if="loading"
+                                type="list-item-two-line@6"
+                            />
+                            <v-alert
+                                v-else-if="error"
+                                type="error"
+                                variant="tonal"
+                            >
+                                {{ t('pluginManagement.loadError') }}
+                                <v-btn
+                                    variant="text"
+                                    class="ml-2"
+                                    @click="load"
+                                >
+                                    {{ t('common.retry') }}
+                                </v-btn>
+                            </v-alert>
+                            <v-alert
+                                v-else-if="filteredPlugins.length === 0"
+                                type="info"
+                                variant="tonal"
+                            >
+                                <div class="font-weight-medium">
+                                    {{ t('pluginManagement.noResult') }}
+                                </div>
+                                <v-btn
+                                    variant="text"
+                                    class="mt-1"
+                                    @click="clearFilters"
+                                >
+                                    {{ t('pluginManagement.clearFilters') }}
+                                </v-btn>
+                            </v-alert>
+                            <div v-else>
+                                <section
+                                    v-for="group in groupedPlugins"
+                                    :id="`plugin-group-${group.value}`"
+                                    :key="group.value"
+                                    :data-group="group.value"
+                                    class="management-group"
+                                >
+                                    <div class="management-group__heading">
+                                        <div class="management-group__copy">
+                                            <div class="management-group__title">
+                                                <h2>{{ group.label }}</h2>
+                                                <span>{{ group.plugins.length }}</span>
+                                            </div>
+                                            <p class="management-group__description">
+                                                {{ group.description }}
+                                            </p>
+                                        </div>
+                                        <v-btn
+                                            v-if="group.value === 'meta'"
+                                            size="small"
+                                            variant="text"
+                                            prepend-icon="mdi-tune-variant"
+                                            @click="metadataSettings?.open()"
+                                        >
+                                            {{ t('pluginManagement.metadataBehavior') }}
+                                        </v-btn>
+                                        <v-btn
+                                            v-if="group.value === 'push'"
+                                            size="small"
+                                            variant="text"
+                                            prepend-icon="mdi-devices"
+                                            @click="globalDeviceSettings?.open()"
+                                        >
+                                            {{ t('pluginManagement.globalDevices') }}
+                                        </v-btn>
+                                    </div>
+                                    <div class="management-list">
+                                        <article
+                                            v-for="plugin in group.plugins"
+                                            :key="plugin.plugin_key"
+                                            class="management-row"
+                                            :style="{ '--plugin-accent': group.color }"
+                                        >
+                                            <PluginBrandIcon
+                                                class="management-row__icon"
+                                                :brand-icon="plugin.ui.brand_icon"
+                                                :icon="plugin.ui.icon"
+                                            />
+                                            <div class="management-row__main">
+                                                <div class="management-row__title">
+                                                    <strong>{{ plugin.name }}</strong>
+                                                    <span
+                                                        class="management-status"
+                                                        :data-tone="statusInfo(plugin).key"
+                                                    >{{ statusInfo(plugin).text }}</span>
+                                                    <span
+                                                        v-if="plugin.ui.deprecated"
+                                                        class="management-status"
+                                                        data-tone="deprecated"
+                                                    >{{ t('pluginManagement.deprecated') }}</span>
+                                                </div>
+                                                <p>{{ plugin.description }}</p>
+                                            </div>
+                                            <div class="management-row__actions">
+                                                <v-btn
+                                                    v-if="!plugin.installation?.enabled"
+                                                    color="primary"
+                                                    size="small"
+                                                    variant="tonal"
+                                                    @click="toggleInstallation(plugin)"
+                                                >
+                                                    {{ t('pluginManagement.enable') }}
+                                                </v-btn>
+                                                <v-btn
+                                                    v-else-if="hasConfigurationUi(plugin)"
+                                                    size="small"
+                                                    variant="text"
+                                                    @click="openConfiguration(plugin)"
+                                                >
+                                                    {{ configurationActionLabel(plugin) }}
+                                                </v-btn>
+                                                <v-btn
+                                                    v-else-if="canExperience(plugin)"
+                                                    size="small"
+                                                    variant="text"
+                                                    @click="experiencePlugin(plugin)"
+                                                >
+                                                    {{ t('pluginManagement.experience') }}
+                                                </v-btn>
+                                                <v-btn
+                                                    size="small"
+                                                    variant="text"
+                                                    append-icon="mdi-chevron-right"
+                                                    @click="openDetails(plugin)"
+                                                >
+                                                    {{ t('pluginManagement.details') }}
+                                                </v-btn>
+                                            </div>
+                                        </article>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                        <nav
+                            v-if="groupedPlugins.length"
+                            class="plugin-category-nav"
+                            :aria-label="t('pluginManagement.categoryNavigation')"
+                        >
+                            <div class="plugin-category-nav__title">
+                                {{ t('pluginManagement.categoryNavigation') }}
+                            </div>
+                            <button
+                                v-for="group in groupedPlugins"
+                                :key="group.value"
+                                type="button"
+                                class="plugin-category-nav__item"
+                                :class="{ active: activeGroupKey === group.value }"
+                                :data-navkey="group.value"
+                                :aria-current="activeGroupKey === group.value ? 'location' : undefined"
+                                @click="scrollToPluginGroup(group.value)"
+                            >
+                                <span>{{ group.label }}</span>
+                                <small>{{ group.plugins.length }}</small>
+                            </button>
+                        </nav>
+                    </div>
+                </section>
+            </v-window-item>
+            <v-window-item value="personal">
+                <PluginPersonalSettings
+                    class="personal-panel"
+                    embedded
+                />
+            </v-window-item>
+        </v-window>
 
         <v-dialog
             v-model="drawerOpen"
@@ -270,6 +290,24 @@
                     <p class="text-body-2">
                         {{ selectedPlugin.description }}
                     </p>
+                    <v-alert
+                        v-if="selectedPlugin.ui.catalog_access === 'public_free'"
+                        type="success"
+                        variant="tonal"
+                        density="compact"
+                        class="mt-4"
+                    >
+                        {{ t('pluginManagement.publicFreeCatalog') }}
+                    </v-alert>
+                    <v-alert
+                        v-else-if="selectedPlugin.ui.catalog_access === 'rights_vary'"
+                        type="info"
+                        variant="tonal"
+                        density="compact"
+                        class="mt-4"
+                    >
+                        {{ t('pluginManagement.rightsVaryCatalog') }}
+                    </v-alert>
                     <section
                         v-if="hasServiceToggle(selectedPlugin)"
                         class="opds-service-settings mt-5"
@@ -302,34 +340,14 @@
                             {{ t('pluginManagement.opdsServiceGuide') }}
                         </v-btn>
                     </section>
-                    <section
-                        v-if="!supportsInstanceConnection(selectedPlugin)"
-                        class="personal-plugin-settings mt-5"
-                    >
-                        <h3 class="text-subtitle-1 mb-1">
-                            {{ t('pluginManagement.personalConfiguration') }}
-                        </h3>
-                        <p class="text-body-2 text-medium-emphasis mb-3">
-                            {{ t('pluginManagement.personalConfigurationDescription') }}
-                        </p>
-                        <v-btn
-                            v-if="selectedPlugin.ui.manage_route"
-                            color="primary"
-                            variant="tonal"
-                            prepend-icon="mdi-account-cog-outline"
-                            :to="selectedPlugin.ui.manage_route"
-                        >
-                            {{ selectedPlugin.ui.manage_label_key ? t(selectedPlugin.ui.manage_label_key) : t('pluginManagement.managePersonalConfiguration') }}
-                        </v-btn>
-                    </section>
                     <h3
-                        v-if="supportsInstanceConnection(selectedPlugin)"
+                        v-if="hasConfigurationUi(selectedPlugin)"
                         class="text-subtitle-1 mt-5 mb-2"
                     >
-                        {{ t('pluginManagement.connection') }}
+                        {{ t('pluginManagement.settings') }}
                     </h3>
                     <v-alert
-                        v-if="supportsInstanceConnection(selectedPlugin) && selectedConnection"
+                        v-if="hasConfigurationUi(selectedPlugin) && connectionHealthIsActionable(selectedConnection)"
                         :type="selectedConnection.health === 'unauthorized' ? 'error' : 'info'"
                         variant="tonal"
                         density="compact"
@@ -343,7 +361,7 @@
                         </div>
                     </v-alert>
                     <v-alert
-                        v-else-if="supportsInstanceConnection(selectedPlugin)"
+                        v-else-if="pluginNeedsConfiguration(selectedPlugin) && !connectionConfigured(selectedPlugin, selectedConnection)"
                         type="warning"
                         variant="tonal"
                         density="compact"
@@ -352,25 +370,32 @@
                     </v-alert>
 
                     <div
-                        v-if="supportsInstanceConnection(selectedPlugin)"
+                        v-if="hasConfigurationUi(selectedPlugin)"
                         class="d-flex flex-wrap ga-2 mt-3"
                     >
                         <v-btn
-                            v-if="selectedPlugin.ui.manage_kind === 'book_source'"
+                            v-if="selectedPlugin.ui.manage_route"
+                            variant="outlined"
+                            prepend-icon="mdi-open-in-new"
+                            :to="selectedPlugin.ui.manage_route"
+                        >
+                            {{ configurationActionLabel(selectedPlugin) }}
+                        </v-btn>
+                        <v-btn
+                            v-else-if="selectedPlugin.ui.manage_dialog"
+                            variant="outlined"
+                            prepend-icon="mdi-cog-outline"
+                            @click="openDeclaredManager(selectedPlugin)"
+                        >
+                            {{ configurationActionLabel(selectedPlugin) }}
+                        </v-btn>
+                        <v-btn
+                            v-if="pluginNeedsConfiguration(selectedPlugin)"
                             variant="outlined"
                             prepend-icon="mdi-cog-outline"
                             @click="openConnectionForm"
                         >
-                            {{ selectedConnection ? t('pluginManagement.editConnection') : t('pluginManagement.configureConnection') }}
-                        </v-btn>
-                        <v-btn
-                            v-if="selectedPlugin.installation && supportsInstanceConnection(selectedPlugin) && selectedPlugin.ui.manage_kind !== 'book_source' && !selectedConnection"
-                            color="primary"
-                            variant="tonal"
-                            prepend-icon="mdi-connection"
-                            @click="openConnectionDialog"
-                        >
-                            {{ t('pluginManagement.createConnection') }}
+                            {{ configurationActionLabel(selectedPlugin) }}
                         </v-btn>
                     </div>
 
@@ -379,14 +404,6 @@
                         class="connection-form mt-4"
                         @submit.prevent="saveConnection"
                     >
-                        <v-text-field
-                            v-model="connectionName"
-                            :label="t('pluginManagement.connectionName')"
-                            name="connection_name"
-                            autocomplete="off"
-                            density="compact"
-                            variant="outlined"
-                        />
                         <template
                             v-for="field in configFields"
                             :key="`config-${field.key}`"
@@ -414,7 +431,7 @@
                             :key="`credential-${field.key}`"
                             v-model="connectionCredentials[field.key]"
                             :label="connectionFieldLabel(field.key)"
-                            :required="field.required && !selectedConnection"
+                            :required="field.required && !selectedConnection?.secret?.configured"
                             :name="field.key"
                             :type="credentialType(field.key)"
                             :autocomplete="credentialAutocomplete(field.key)"
@@ -439,51 +456,28 @@
                         </div>
                     </v-form>
 
-                    <div class="d-flex flex-wrap ga-2 mt-3">
-                        <v-btn
-                            v-if="selectedConnection && selectedPlugin.actions.includes('test')"
-                            variant="outlined"
-                            prepend-icon="mdi-connection"
-                            :loading="actionLoading"
-                            :disabled="!selectedPlugin.installation?.enabled || !selectedConnection.enabled"
-                            @click="runAction(selectedConnection, 'test')"
-                        >
-                            {{ t('pluginManagement.testConnection') }}
-                        </v-btn>
-                        <v-btn
-                            v-if="selectedConnection && selectedPlugin.actions.includes('preview')"
-                            variant="outlined"
-                            prepend-icon="mdi-eye-outline"
-                            :loading="actionLoading"
-                            :disabled="!selectedPlugin.installation?.enabled || !selectedConnection.enabled"
-                            @click="runAction(selectedConnection, 'preview')"
-                        >
-                            {{ selectedPlugin.ui.manage_kind === 'book_source' ? t('pluginManagement.previewSource') : t('pluginManagement.preview') }}
-                        </v-btn>
-                        <v-btn
-                            v-if="selectedConnection && selectedPlugin.actions.includes('run')"
-                            color="primary"
-                            variant="tonal"
-                            :prepend-icon="selectedPlugin.ui.manage_kind === 'book_source' ? 'mdi-inbox-arrow-down-outline' : 'mdi-play-outline'"
-                            :loading="actionLoading"
-                            :disabled="!selectedPlugin.installation?.enabled || !selectedConnection.enabled"
-                            @click="runAction(selectedConnection, 'run')"
-                        >
-                            {{ selectedPlugin.ui.manage_kind === 'book_source' ? t('pluginManagement.stageForReview') : t('pluginManagement.runNow') }}
-                        </v-btn>
-                    </div>
+                    <PluginCapabilityTester :plugin="selectedPlugin" />
 
-                    <h3 class="text-subtitle-1 mt-6 mb-2">
-                        {{ t('pluginManagement.permissions') }}
-                    </h3>
-                    <v-list density="compact">
-                        <v-list-item
-                            v-for="permission in selectedPlugin.permissions"
-                            :key="permission"
-                            prepend-icon="mdi-shield-check-outline"
-                            :title="permission"
-                        />
-                    </v-list>
+                    <v-expansion-panels
+                        class="plugin-permissions mt-5"
+                        variant="accordion"
+                    >
+                        <v-expansion-panel>
+                            <v-expansion-panel-title>
+                                {{ t('pluginManagement.permissions') }}
+                            </v-expansion-panel-title>
+                            <v-expansion-panel-text>
+                                <v-list density="compact">
+                                    <v-list-item
+                                        v-for="permission in selectedPlugin.permissions"
+                                        :key="permission"
+                                        prepend-icon="mdi-shield-check-outline"
+                                        :title="permission"
+                                    />
+                                </v-list>
+                            </v-expansion-panel-text>
+                        </v-expansion-panel>
+                    </v-expansion-panels>
 
                     <h3 class="text-subtitle-1 mt-5 mb-2">
                         {{ t('pluginManagement.recentRuns') }}
@@ -510,108 +504,23 @@
             </v-card>
         </v-dialog>
 
-        <v-dialog
-            v-model="connectionDialogOpen"
-            max-width="680"
-            persistent
-            aria-labelledby="plugin-connection-dialog-title"
-            @after-leave="restoreConnectionFocus"
-        >
-            <v-card v-if="connectionPlugin">
-                <v-card-title id="plugin-connection-dialog-title">
-                    {{ t('pluginManagement.createConnectionFor', { name: connectionPlugin.name }) }}
-                </v-card-title>
-                <v-card-text>
-                    <v-text-field
-                        v-model="dialogConnectionName"
-                        :label="t('pluginManagement.connectionName')"
-                        variant="outlined"
-                        autocomplete="off"
-                    />
-                    <template
-                        v-for="field in dialogCredentialFields"
-                        :key="field.key"
-                    >
-                        <v-textarea
-                            v-if="field.key === 'content' || field.key === 'archive_base64'"
-                            :id="credentialInputId(field.key)"
-                            v-model="credentialValues[field.key]"
-                            :label="field.schema.title || connectionFieldLabel(field.key)"
-                            variant="outlined"
-                            rows="5"
-                            :required="field.required"
-                            :error-messages="credentialFieldErrors[field.key] || []"
-                            :aria-invalid="Boolean(credentialFieldErrors[field.key])"
-                            autocomplete="off"
-                        />
-                        <v-text-field
-                            v-else
-                            :id="credentialInputId(field.key)"
-                            v-model="credentialValues[field.key]"
-                            :label="field.schema.title || connectionFieldLabel(field.key)"
-                            variant="outlined"
-                            type="password"
-                            :required="field.required"
-                            :error-messages="credentialFieldErrors[field.key] || []"
-                            :aria-invalid="Boolean(credentialFieldErrors[field.key])"
-                            autocomplete="new-password"
-                        />
-                    </template>
-                    <v-textarea
-                        id="plugin-public-config"
-                        v-model="connectionConfigText"
-                        :label="t('pluginManagement.publicConfigJson')"
-                        :hint="t('pluginManagement.publicConfigHint')"
-                        persistent-hint
-                        :error-messages="connectionConfigError ? [connectionConfigError] : []"
-                        :aria-invalid="Boolean(connectionConfigError)"
-                        variant="outlined"
-                        rows="8"
-                        spellcheck="false"
-                        class="connection-config-json"
-                    />
-                    <v-alert
-                        v-if="connectionFormError"
-                        ref="connectionErrorAlert"
-                        type="error"
-                        variant="tonal"
-                        density="compact"
-                        role="alert"
-                        tabindex="-1"
-                    >
-                        {{ connectionFormError }}
-                    </v-alert>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn
-                        variant="text"
-                        :disabled="connectionSaving"
-                        @click="connectionDialogOpen = false"
-                    >
-                        {{ t('common.cancel') }}
-                    </v-btn>
-                    <v-btn
-                        color="primary"
-                        variant="tonal"
-                        :loading="connectionSaving"
-                        @click="savePluginConnection"
-                    >
-                        {{ t('common.save') }}
-                    </v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
         <OpdsImportDialog ref="opdsDialog" />
-    </v-card>
+        <MetadataAutomationSettings ref="metadataSettings" />
+        <GlobalDeviceSettings
+            ref="globalDeviceSettings"
+            :available-types="availablePushTypes"
+        />
+    </main>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import EmbeddedBookSources from '~/pages/admin/booksources.vue';
+import GlobalDeviceSettings from '~/components/GlobalDeviceSettings.vue';
+import MetadataAutomationSettings from '~/components/MetadataAutomationSettings.vue';
 import OpdsImportDialog from '~/components/OpdsImportDialog.vue';
+import PluginCapabilityTester from '~/components/PluginCapabilityTester.vue';
+import PluginPersonalSettings from '~/components/PluginPersonalSettings.vue';
 import { useMainStore } from '@/stores/main';
 
 const { t } = useI18n();
@@ -621,28 +530,67 @@ const router = useRouter();
 const store = useMainStore();
 store.setNavbar(true);
 
-const tabs = computed(() => [
-    { value: 'integrations', label: t('pluginManagement.tabIntegrations') },
-    { value: 'metadata', label: t('pluginManagement.tabMetadata') },
-    { value: 'annotations', label: t('pluginManagement.tabAnnotations') },
-    { value: 'reviews', label: t('pluginManagement.tabReviews') },
-    { value: 'book_sources', label: t('pluginManagement.tabBookSources') },
-    { value: 'tools', label: t('pluginManagement.tabTools') },
-    { value: 'push', label: t('pluginManagement.tabPush') },
-]);
-const PLUGIN_TYPE_TABS = Object.freeze({
-    combo: 'integrations',
-    meta: 'metadata',
-    annotation: 'annotations',
-    review: 'reviews',
-    source: 'book_sources',
-    tool: 'tools',
-    push: 'push',
+const pageSection = computed({
+    get: () => route.query.section === 'personal' ? 'personal' : 'management',
+    set: (value) => {
+        const query = { ...route.query };
+        if (value === 'personal') query.section = 'personal';
+        else delete query.section;
+        delete query.plugin;
+        router.replace({ query });
+    },
 });
-const activeTab = computed({
-    get: () => tabs.value.some(tab => tab.value === route.query.tab) ? route.query.tab : 'metadata',
-    set: value => router.replace({ query: { ...route.query, tab: value } }),
-});
+const groupDefinitions = computed(() => ({
+    combo: {
+        value: 'combo',
+        label: t('pluginManagement.tabIntegrations'),
+        description: t('pluginManagement.categoryDescriptionIntegrations'),
+        color: '#5271c8',
+        order: 1,
+    },
+    meta: {
+        value: 'meta',
+        label: t('pluginManagement.tabMetadata'),
+        description: t('pluginManagement.categoryDescriptionMetadata'),
+        color: '#347f76',
+        order: 2,
+    },
+    annotation: {
+        value: 'annotation',
+        label: t('pluginManagement.tabAnnotations'),
+        description: t('pluginManagement.categoryDescriptionAnnotations'),
+        color: '#a45c83',
+        order: 3,
+    },
+    review: {
+        value: 'review',
+        label: t('pluginManagement.tabReviews'),
+        description: t('pluginManagement.categoryDescriptionReviews'),
+        color: '#8a66a8',
+        order: 4,
+    },
+    source: {
+        value: 'source',
+        label: t('pluginManagement.tabBookSources'),
+        description: t('pluginManagement.categoryDescriptionBookSources'),
+        color: '#47719d',
+        order: 5,
+    },
+    tool: {
+        value: 'tool',
+        label: t('pluginManagement.tabTools'),
+        description: t('pluginManagement.categoryDescriptionTools'),
+        color: '#9a6a35',
+        order: 6,
+    },
+    push: {
+        value: 'push',
+        label: t('pluginManagement.tabPush'),
+        description: t('pluginManagement.categoryDescriptionPush'),
+        color: '#687384',
+        order: 7,
+    },
+}));
 const definitions = ref([]);
 const installations = ref([]);
 const connections = ref([]);
@@ -652,30 +600,22 @@ const loading = ref(true);
 const error = ref(false);
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '');
 const statusFilter = ref(typeof route.query.status === 'string' ? route.query.status : 'all');
-const actionLoading = ref(false);
 const toggleLoading = ref(false);
 const opdsServiceSaving = ref(false);
 const connectionSaving = ref(false);
 const connectionFormOpen = ref(false);
-const connectionName = ref('default');
 const connectionConfig = ref({});
 const connectionCredentials = ref({});
-const connectionDialogOpen = ref(false);
-const connectionPlugin = ref(null);
-const dialogConnectionName = ref('default');
-const connectionConfigText = ref('{}');
-const connectionFormError = ref('');
-const connectionConfigError = ref('');
-const credentialFieldErrors = ref({});
-const credentialValues = ref({});
-const connectionErrorAlert = ref(null);
-const showLegado = ref(false);
-const legadoPanel = ref(null);
 const opdsDialog = ref(null);
+const metadataSettings = ref(null);
+const globalDeviceSettings = ref(null);
 const selectedPluginKey = ref(typeof route.query.plugin === 'string' ? route.query.plugin : '');
+const activeGroupKey = ref('');
 let filterTimer = null;
+let groupScrollRaf = 0;
+let groupNavigationLocked = false;
+let groupNavigationLockTimer = null;
 let detailTrigger = null;
-let connectionTrigger = null;
 
 const statusOptions = computed(() => [
     { title: t('pluginManagement.statusAll'), value: 'all' },
@@ -695,14 +635,9 @@ function pluginType(plugin) {
     return parts[0] === 'talebook' ? parts[1] || '' : '';
 }
 
-function pluginTab(plugin) {
-    return PLUGIN_TYPE_TABS[pluginType(plugin)] || '';
-}
-
-const tabPlugins = computed(() => catalog.value.filter(plugin => pluginTab(plugin) === activeTab.value));
 const filteredPlugins = computed(() => {
     const needle = (search.value || '').trim().toLowerCase();
-    return tabPlugins.value.filter((plugin) => {
+    return catalog.value.filter((plugin) => {
         const matchesText = !needle || [plugin.name, plugin.description, ...plugin.capabilities]
             .join(' ').toLowerCase().includes(needle);
         const status = statusInfo(plugin).key;
@@ -712,6 +647,26 @@ const filteredPlugins = computed(() => {
         return matchesText && matchesStatus;
     });
 });
+const groupedPlugins = computed(() => {
+    const groups = new Map();
+    for (const plugin of filteredPlugins.value) {
+        const type = pluginType(plugin);
+        const definition = groupDefinitions.value[type]
+            || { value: type || 'other', label: type || 'Other', color: '#687384', order: 99 };
+        if (!groups.has(definition.value)) groups.set(definition.value, { ...definition, plugins: [] });
+        groups.get(definition.value).plugins.push(plugin);
+    }
+    return [...groups.values()].sort((left, right) => left.order - right.order);
+});
+const enabledCount = computed(() => catalog.value.filter(plugin => plugin.installation?.enabled).length);
+const attentionCount = computed(() => catalog.value.filter(plugin => statusInfo(plugin).key !== 'enabled').length);
+const availablePushTypes = computed(() => catalog.value
+    .filter(plugin => pluginType(plugin) === 'push' && plugin.installation?.enabled && plugin.ui.device_type)
+    .map(plugin => ({
+        name: plugin.name,
+        value: plugin.ui.device_type,
+        defaultPort: Number(plugin.ui.default_port || 12121),
+    })));
 const selectedPlugin = computed(() => catalog.value.find(item => item.plugin_key === selectedPluginKey.value) || null);
 const drawerOpen = computed({
     get: () => Boolean(selectedPlugin.value),
@@ -723,7 +678,6 @@ const selectedConnection = computed(() => {
 });
 const configFields = computed(() => schemaFields(selectedPlugin.value?.config_schema));
 const credentialFields = computed(() => schemaFields(selectedPlugin.value?.auth_schema));
-const dialogCredentialFields = computed(() => schemaFields(connectionPlugin.value?.auth_schema));
 function hasServiceToggle(plugin) {
     return plugin?.ui?.service_toggle === 'opds';
 }
@@ -739,12 +693,45 @@ function supportsInstanceConnection(plugin) {
     return (plugin?.connection_owners || []).includes('instance');
 }
 
+function configurationActionLabel(plugin) {
+    return supportsInstanceConnection(plugin)
+        ? t('pluginManagement.globalConfiguration')
+        : t('pluginManagement.personalSettings');
+}
+
+function pluginNeedsConfiguration(plugin) {
+    return supportsInstanceConnection(plugin) && plugin?.ui?.configuration_mode === 'form';
+}
+
+function hasConfigurationUi(plugin) {
+    return Boolean(plugin?.ui?.manage_route || plugin?.ui?.manage_dialog) || pluginNeedsConfiguration(plugin);
+}
+
+function canExperience(plugin) {
+    return plugin?.ui?.primary_action === 'preview'
+        && supportsInstanceConnection(plugin)
+        && (plugin?.capabilities || []).some(capability => [
+            'metadata.lookup',
+            'book_sources.search',
+            'reviews.lookup',
+        ].includes(capability));
+}
+
+function connectionConfigured(plugin, connection) {
+    if (!connection) return false;
+    const requiredConfig = plugin.config_schema?.required || [];
+    if (requiredConfig.some(key => connection.config?.[key] === undefined || connection.config?.[key] === '')) return false;
+    const requiredCredentials = plugin.auth_schema?.required || [];
+    if (requiredCredentials.length && !connection.secret?.configured) return false;
+    return true;
+}
+
 function statusInfo(plugin) {
     if (!plugin.installation) return { key: 'uninstalled', text: t('pluginManagement.uninstalled'), color: 'grey', icon: 'mdi-download-outline' };
     if (!plugin.installation.enabled) return { key: 'disabled', text: t('pluginManagement.disabled'), color: 'grey', icon: 'mdi-pause-circle-outline' };
     const connection = connectionFor(plugin);
     const selfReported = builtinState.value[plugin.plugin_key];
-    if (!connection && supportsInstanceConnection(plugin) && plugin.ui.primary_action === 'configure' && !selfReported) {
+    if (pluginNeedsConfiguration(plugin) && !selfReported && !connectionConfigured(plugin, connection)) {
         return { key: 'unconfigured', text: t('pluginManagement.unconfigured'), color: 'warning', icon: 'mdi-cog-outline' };
     }
     if (connection?.health === 'unauthorized') return { key: 'unhealthy', text: t('pluginManagement.unauthorized'), color: 'error', icon: 'mdi-key-alert-outline' };
@@ -753,82 +740,42 @@ function statusInfo(plugin) {
 }
 
 function healthLabel(value) {
-    return t(`pluginManagement.health_${value || 'unknown'}`);
+    return t(`pluginManagement.health_${value}`);
 }
 
-function capabilityLabel(value) {
-    const labels = {
-        'metadata.lookup': t('pluginManagement.capMetadata'),
-        'integrations.search': t('pluginManagement.capSearch'),
-        'integrations.books': t('pluginManagement.capBooks'),
-        'integrations.shelf': t('pluginManagement.capShelf'),
-        'integrations.statistics': t('pluginManagement.capStatistics'),
-        'integrations.community': t('pluginManagement.capCommunity'),
-        'integrations.recommendations': t('pluginManagement.capRecommendations'),
-        'annotations.import': t('pluginManagement.capAnnotationsImport'),
-        'annotations.push': t('pluginManagement.capAnnotationsPush'),
-        'annotations.chapter_reviews': t('pluginManagement.capChapterReviews'),
-        'reviews.import': t('pluginManagement.capReviewsImport'),
-        'reviews.lookup': t('pluginManagement.capReviewsLookup'),
-        'book_sources.browse': t('pluginManagement.capBrowse'),
-        'book_sources.search': t('pluginManagement.capSearch'),
-        'book_sources.acquire': t('pluginManagement.capAcquire'),
-        'integrations.tool': t('pluginManagement.capTool'),
-        'integrations.push': t('pluginManagement.capPush'),
-    };
-    return labels[value] || value;
+function connectionHealthIsActionable(connection) {
+    return connection && ['unauthorized', 'degraded'].includes(connection.health);
 }
 
-function summary(plugin) {
-    const state = builtinState.value[plugin.plugin_key];
-    if (state) return t('pluginManagement.sourceSummary', { configured: state.configured, enabled: state.enabled });
-    const latest = pluginRuns(plugin)[0];
-    return latest
-        ? t('pluginManagement.lastRun', { status: runStatusLabel(latest.status), date: formatDate(latest.created_at) })
-        : t('pluginManagement.neverRun');
-}
-
-function attentionCount(tab) {
-    return catalog.value.filter(plugin => pluginTab(plugin) === tab && statusInfo(plugin).key !== 'enabled').length;
-}
-
-// 插件自己声明管理入口，前端不再为每个插件写一条分支。
+// 插件自己声明管理入口，前端不再按 plugin_key 写专属分支。
 const MANAGE_DIALOGS = {
     opds: () => opdsDialog.value?.open(),
-    legado: () => openLegado(),
 };
 
-function primaryActionLabel(plugin) {
-    if (!plugin.installation) return t('pluginManagement.install');
-    if (!plugin.installation.enabled) return t('pluginManagement.enable');
-    if (plugin.ui.manage_label_key) return t(plugin.ui.manage_label_key);
-    if (!connectionFor(plugin)) return t('pluginManagement.configure');
-    return t('pluginManagement.details');
+function openDeclaredManager(plugin) {
+    MANAGE_DIALOGS[plugin.ui.manage_dialog]?.();
 }
 
-async function primaryAction(plugin) {
-    if (!plugin.installation) return install(plugin);
-    if (!plugin.installation.enabled) return toggleInstallation(plugin);
-    if (plugin.ui.manage_route) return navigateTo(plugin.ui.manage_route);
-    if (MANAGE_DIALOGS[plugin.ui.manage_dialog]) return MANAGE_DIALOGS[plugin.ui.manage_dialog]();
-    if (!connectionFor(plugin)) {
-        if (plugin.ui.manage_kind === 'book_source') {
-            openDetails(plugin);
-            await nextTick();
-            openConnectionForm();
-        } else openConnectionDialog(plugin);
+async function openConfiguration(plugin) {
+    if (plugin.ui.manage_route) {
+        await navigateTo(plugin.ui.manage_route);
+        return;
+    }
+    if (plugin.ui.manage_dialog) {
+        openDeclaredManager(plugin);
+        return;
+    }
+    if (pluginNeedsConfiguration(plugin)) {
+        openDetails(plugin);
+        await nextTick();
+        openConnectionForm();
         return;
     }
     openDetails(plugin);
 }
 
-async function install(plugin) {
-    const rsp = await $backend('/admin/plugins/install', {
-        method: 'POST',
-        body: JSON.stringify({ plugin_key: plugin.plugin_key }),
-    });
-    if (rsp.err === 'ok') await load();
-    else $alert?.('error', rsp.msg || rsp.err);
+function experiencePlugin(plugin) {
+    openDetails(plugin);
 }
 
 async function toggleInstallation(plugin) {
@@ -865,22 +812,6 @@ async function saveOpdsService(enabled) {
     }
 }
 
-async function runAction(connection, action) {
-    actionLoading.value = true;
-    try {
-        const rsp = await $backend(`/admin/plugins/connections/${connection.id}/${action}`, {
-            method: 'POST', body: JSON.stringify({ trigger: 'manual' }),
-        });
-        if (rsp.err === 'ok') {
-            $alert?.('success', t('pluginManagement.actionStarted'));
-            if (action === 'test' || selectedPlugin.value?.ui.manage_kind !== 'book_source') await load();
-            else navigateTo(`/admin/plugins/runs/${rsp.run.id}`);
-        } else $alert?.('error', rsp.msg || rsp.err);
-    } finally {
-        actionLoading.value = false;
-    }
-}
-
 function schemaFields(schema) {
     const required = new Set(schema?.required || []);
     return Object.entries(schema?.properties || {}).map(([key, value]) => ({ key, schema: value, required: required.has(key) }));
@@ -904,7 +835,6 @@ function credentialType(key) {
 
 function openConnectionForm() {
     const existing = selectedConnection.value;
-    connectionName.value = existing?.name || 'default';
     const config = {};
     for (const field of configFields.value) {
         const value = existing?.config?.[field.key] ?? field.schema.default ?? (field.schema.type === 'boolean' ? false : '');
@@ -930,9 +860,10 @@ async function saveConnection() {
             method: 'POST',
             body: JSON.stringify({
                 installation_id: selectedPlugin.value.installation.id,
-                name: connectionName.value || 'default',
+                name: selectedConnection.value?.name || selectedPlugin.value.name,
+                role: selectedConnection.value?.role || 'default',
                 config,
-                credentials,
+                credentials: Object.keys(credentials).length ? credentials : undefined,
             }),
         });
         if (rsp.err === 'ok') {
@@ -943,88 +874,6 @@ async function saveConnection() {
     } finally {
         connectionSaving.value = false;
     }
-}
-
-function openConnectionDialog(plugin = selectedPlugin.value) {
-    if (!supportsInstanceConnection(plugin)) return;
-    connectionTrigger = document.activeElement;
-    connectionPlugin.value = plugin;
-    dialogConnectionName.value = 'default';
-    connectionConfigText.value = '{}';
-    credentialValues.value = Object.fromEntries(dialogCredentialFields.value.map(field => [field.key, '']));
-    credentialFieldErrors.value = {};
-    connectionConfigError.value = '';
-    connectionFormError.value = '';
-    connectionDialogOpen.value = true;
-}
-
-async function savePluginConnection() {
-    connectionFormError.value = '';
-    connectionConfigError.value = '';
-    credentialFieldErrors.value = {};
-    let config;
-    try {
-        config = JSON.parse(connectionConfigText.value || '{}');
-        if (!config || Array.isArray(config) || typeof config !== 'object') throw new Error();
-    } catch {
-        connectionConfigError.value = t('pluginManagement.publicConfigInvalid');
-        await nextTick();
-        document.getElementById('plugin-public-config')?.focus();
-        return;
-    }
-    const credentials = Object.fromEntries(
-        Object.entries(credentialValues.value).filter(([, value]) => typeof value === 'string' && value.length),
-    );
-    const missing = dialogCredentialFields.value.find(field => field.required && !credentials[field.key]);
-    if (missing) {
-        credentialFieldErrors.value = {
-            [missing.key]: [t('pluginManagement.credentialRequired', {
-                field: missing.schema.title || connectionFieldLabel(missing.key),
-            })],
-        };
-        await nextTick();
-        document.getElementById(credentialInputId(missing.key))?.focus();
-        return;
-    }
-    connectionSaving.value = true;
-    try {
-        const plugin = connectionPlugin.value;
-        const rsp = await $backend('/admin/plugins/connections', {
-            method: 'POST',
-            body: JSON.stringify({
-                installation_id: plugin.installation.id,
-                owner_type: 'instance',
-                name: dialogConnectionName.value || 'default',
-                credentials,
-                config,
-                scopes: plugin.permissions,
-            }),
-        });
-        if (rsp.err === 'ok') {
-            connectionDialogOpen.value = false;
-            $alert?.('success', t('pluginManagement.connectionSaved'));
-            await load();
-            detailTrigger = connectionTrigger;
-            selectedPluginKey.value = plugin.plugin_key;
-            router.replace({ query: { ...route.query, plugin: plugin.plugin_key } });
-        } else {
-            connectionFormError.value = rsp.msg || rsp.err;
-            await nextTick();
-            connectionErrorAlert.value?.$el?.focus?.();
-        }
-    } finally {
-        connectionSaving.value = false;
-    }
-}
-
-function credentialInputId(key) {
-    return `plugin-credential-${String(key).replace(/[^a-z0-9_-]/gi, '-')}`;
-}
-
-function restoreConnectionFocus() {
-    connectionTrigger?.focus();
-    connectionTrigger = null;
-    connectionPlugin.value = null;
 }
 
 function pluginRuns(plugin) {
@@ -1041,6 +890,48 @@ function formatDate(value) { return value ? new Date(value).toLocaleString() : '
 function clearFilters() {
     search.value = '';
     statusFilter.value = 'all';
+}
+
+function computeActivePluginGroup() {
+    if (!import.meta.client || groupNavigationLocked || pageSection.value !== 'management') return;
+    const groups = groupedPlugins.value;
+    if (!groups.length) {
+        activeGroupKey.value = '';
+        return;
+    }
+    const navigation = document.querySelector('.plugin-category-nav');
+    const activationTop = (navigation ? Number.parseFloat(getComputedStyle(navigation).top) : 108) + 24;
+    let current = groups[0].value;
+    for (const group of groups) {
+        const element = document.getElementById(`plugin-group-${group.value}`);
+        if (element?.getBoundingClientRect().top <= activationTop) current = group.value;
+        else break;
+    }
+    activeGroupKey.value = current;
+}
+
+function onPluginPageScroll() {
+    if (groupScrollRaf || groupNavigationLocked) return;
+    groupScrollRaf = requestAnimationFrame(() => {
+        groupScrollRaf = 0;
+        computeActivePluginGroup();
+    });
+}
+
+function scrollToPluginGroup(key) {
+    if (!import.meta.client || !key) return;
+    activeGroupKey.value = key;
+    groupNavigationLocked = true;
+    clearTimeout(groupNavigationLockTimer);
+    groupNavigationLockTimer = setTimeout(() => {
+        groupNavigationLocked = false;
+        computeActivePluginGroup();
+    }, 700);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById(`plugin-group-${key}`)?.scrollIntoView({
+        behavior: reducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+    });
 }
 
 function openDetails(plugin) {
@@ -1060,20 +951,6 @@ function closeDetails() {
 function restoreDetailFocus() {
     detailTrigger?.focus();
     detailTrigger = null;
-}
-
-async function openLegado() {
-    showLegado.value = true;
-    await router.replace({ query: { ...route.query, tab: 'book_sources', manage: 'legado' } });
-    await nextTick();
-    legadoPanel.value?.focus();
-}
-
-function closeLegado() {
-    showLegado.value = false;
-    const query = { ...route.query };
-    delete query.manage;
-    router.replace({ query });
 }
 
 async function load() {
@@ -1098,7 +975,6 @@ async function load() {
     }
 }
 
-watch(() => route.query.manage, value => { showLegado.value = value === 'legado'; }, { immediate: true });
 watch(() => route.query.plugin, value => { selectedPluginKey.value = typeof value === 'string' ? value : ''; });
 watch(() => route.query.q, value => {
     const next = typeof value === 'string' ? value : '';
@@ -1119,60 +995,96 @@ watch([search, statusFilter], () => {
         router.replace({ query });
     }, 300);
 });
-onMounted(load);
-onBeforeUnmount(() => clearTimeout(filterTimer));
+watch(groupedPlugins, (groups) => {
+    if (!groups.some(group => group.value === activeGroupKey.value)) {
+        activeGroupKey.value = groups[0]?.value || '';
+    }
+    nextTick(computeActivePluginGroup);
+}, { immediate: true });
+watch(pageSection, value => {
+    if (value === 'management') nextTick(computeActivePluginGroup);
+});
+onMounted(() => {
+    load();
+    window.addEventListener('scroll', onPluginPageScroll, { passive: true });
+});
+onBeforeUnmount(() => {
+    clearTimeout(filterTimer);
+    clearTimeout(groupNavigationLockTimer);
+    if (groupScrollRaf) cancelAnimationFrame(groupScrollRaf);
+    window.removeEventListener('scroll', onPluginPageScroll);
+});
 useHead(() => ({ title: t('pluginManagement.title') }));
 </script>
 
 <style scoped>
-.plugin-search { flex: 1 1 320px; max-width: 520px; }
-.plugin-filter { flex: 0 1 220px; }
-.plugin-page-header { white-space: normal; }
-.plugin-page-header__copy { flex: 1 1 320px; min-width: 0; }
-.plugin-card {
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 6px 18px rgba(var(--v-theme-on-surface), .12);
-    transition: box-shadow .18s ease, transform .18s ease;
+.plugin-page { --management-line:rgba(var(--v-theme-on-surface),.13); --plugin-sticky-top:calc(var(--v-layout-top, 92px) + 16px); max-width:1180px; margin:0 auto; padding:28px 24px 56px; }
+.plugin-page-header { white-space:normal; }
+.plugin-page-header__copy { flex:1 1 320px; min-width:0; }
+.plugin-page-header h1 { margin:0; font-size:28px; line-height:1.2; letter-spacing:-.02em; }
+.plugin-page-header p { margin:7px 0 0; color:rgba(var(--v-theme-on-surface),.64); font-size:14px; }
+.plugin-page-tabs { margin-top:20px; }
+.plugin-page-window { overflow:visible; }
+.management-panel,.personal-panel { padding-top:24px; }
+.management-layout { display:flex; align-items:flex-start; }
+.management-content { flex:1 1 auto; min-width:0; padding-inline-end:24px; border-inline-end:1px solid var(--management-line); }
+.plugin-category-nav { position:sticky; top:var(--plugin-sticky-top); flex:0 0 172px; width:172px; max-height:calc(100vh - var(--plugin-sticky-top) - 32px); overflow-y:auto; padding-inline-start:24px; }
+.plugin-category-nav__title { margin:0 10px 8px; padding:0 0 6px; border-bottom:1px solid var(--management-line); color:rgba(var(--v-theme-on-surface),.72); font-size:12px; font-weight:800; letter-spacing:.04em; }
+.plugin-category-nav__item { display:flex; align-items:center; justify-content:space-between; width:100%; margin:0 0 1px; padding:5px 10px; border:0; border-radius:6px; background:transparent; color:inherit; font:inherit; font-size:13px; line-height:1.4; text-align:start; cursor:pointer; transition:background-color .15s ease,color .15s ease; }
+.plugin-category-nav__item:hover { background:rgba(var(--v-theme-on-surface),.06); }
+.plugin-category-nav__item.active { background:rgba(var(--v-theme-primary),.12); color:rgb(var(--v-theme-primary)); font-weight:600; }
+.plugin-category-nav__item small { color:currentColor; font-size:12px; opacity:.72; }
+.management-summary { display:flex; align-items:center; flex-wrap:wrap; gap:8px 22px; min-height:44px; padding:10px 14px; border:1px solid var(--management-line); border-radius:9px; background:rgba(var(--v-theme-on-surface),.025); color:rgba(var(--v-theme-on-surface),.7); font-size:12px; }
+.management-summary span { display:inline-flex; align-items:center; gap:7px; }
+.management-summary__note { margin-inline-start:auto; color:rgba(var(--v-theme-on-surface),.62); }
+.summary-dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+.summary-dot--good { color:#2d8b62; }
+.summary-dot--warning { color:#c07a14; }
+.management-toolbar { display:flex; align-items:center; gap:12px; margin:18px 0 28px; }
+.plugin-search { flex:1 1 320px; max-width:520px; }
+.plugin-filter { flex:0 1 220px; }
+.management-group { scroll-margin-top:var(--plugin-sticky-top); margin-bottom:30px; }
+.management-group__heading { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:0 4px 10px; border-bottom:1px solid var(--management-line); }
+.management-group__copy { min-width:0; }
+.management-group__title { display:flex; align-items:center; gap:8px; }
+.management-group__heading h2 { margin:0; font-size:13px; font-weight:700; letter-spacing:.01em; }
+.management-group__title > span { color:rgba(var(--v-theme-on-surface),.62); font:12px ui-monospace,SFMono-Regular,Consolas,monospace; }
+.management-group__description { max-width:760px; margin:4px 0 0; color:rgba(var(--v-theme-on-surface),.6); font-size:12px; line-height:1.55; text-wrap:pretty; }
+.management-list { border-bottom:1px solid var(--management-line); }
+.management-row { position:relative; display:grid; grid-template-columns:30px minmax(0,1fr) auto; gap:12px; align-items:center; min-height:72px; padding:9px 8px 9px 13px; border-bottom:1px solid var(--management-line); }
+.management-row:last-child { border-bottom:0; }
+.management-row::before { content:""; position:absolute; inset:12px auto 12px 0; width:3px; border-radius:2px; background:var(--plugin-accent); }
+.management-row__icon { color:var(--plugin-accent); }
+.management-row__main { min-width:0; }
+.management-row__title { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+.management-row__title strong { font-size:15px; }
+.management-row__main p { margin:2px 0 0; color:rgba(var(--v-theme-on-surface),.64); font-size:13px; line-height:1.4; }
+.management-row__actions { display:flex; align-items:center; justify-content:flex-end; gap:2px; }
+.management-status { display:inline-flex; align-items:center; min-height:20px; padding:2px 7px; border-radius:5px; font-size:12px; font-weight:650; line-height:1; white-space:nowrap; }
+.management-status[data-tone="enabled"],
+.management-status[data-tone="unconfigured"],
+.management-status[data-tone="unhealthy"],
+.management-status[data-tone="deprecated"] { color:rgba(var(--v-theme-on-surface),.78); }
+.management-status[data-tone="enabled"] { background:rgba(45,139,98,.11); }
+.management-status[data-tone="unconfigured"] { background:rgba(192,122,20,.13); }
+.management-status[data-tone="unhealthy"] { background:rgba(190,55,55,.12); }
+.management-status[data-tone="deprecated"] { background:rgba(151,111,48,.12); }
+.management-status[data-tone="disabled"],.management-status[data-tone="uninstalled"] { color:rgba(var(--v-theme-on-surface),.62); background:rgba(var(--v-theme-on-surface),.06); }
+.plugin-permissions :deep(.v-expansion-panel) { border:1px solid rgba(var(--v-theme-on-surface),.11); border-radius:7px!important; background:transparent; box-shadow:none!important; }
+.plugin-permissions :deep(.v-expansion-panel-title) { min-height:40px; padding:0 12px; color:rgba(var(--v-theme-on-surface),.62); font-size:13px; font-weight:500; }
+.plugin-permissions :deep(.v-expansion-panel-text__wrapper) { padding:0 4px 8px; }
+@media (max-width:960px) {
+    .plugin-category-nav { display:none; }
+    .management-content { padding-inline-end:0; border-inline-end:0; }
 }
-.plugin-card:hover {
-    box-shadow: 0 10px 24px rgba(var(--v-theme-on-surface), .16);
-    transform: translateY(-1px);
-}
-.plugin-card__header {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 12px;
-}
-.plugin-card__identity { min-width: 0; }
-.plugin-card__title-row, .plugin-card__tags, .plugin-card__actions {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-.plugin-card__title-row h3 { min-width: 0; overflow-wrap: anywhere; }
-.plugin-card__status { font-size: .6875rem; letter-spacing: .01em; }
-.plugin-card__tags { margin-top: 6px; }
-.plugin-card__actions { justify-content: flex-end; }
-.plugin-card__footer { margin-top: auto; align-items: center; flex-wrap: nowrap; }
-.plugin-card__summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plugin-card__footer .v-btn { flex: 0 0 auto; }
-.plugin-card[data-status="enabled"] {
-    border-color: rgba(var(--v-theme-success), .42);
-    background-color: rgb(var(--v-theme-surface));
-    background-image: linear-gradient(rgba(var(--v-theme-success), .11), rgba(var(--v-theme-success), .11));
-}
-.plugin-description { min-height: 2.8em; }
-@media (max-width: 767px) {
-    .plugin-search, .plugin-filter { max-width: none; flex-basis: 100%; }
-    .plugin-card__header { grid-template-columns: auto minmax(0, 1fr); }
-    .plugin-card__actions { grid-column: 1 / -1; justify-self: end; }
-}
-@media (prefers-reduced-motion: reduce) {
-    .plugin-card { transition: none; }
-    .plugin-card:hover { transform: none; }
+@media (max-width:700px) {
+    .plugin-page { padding:20px 14px 44px; }
+    .management-toolbar { align-items:stretch; flex-direction:column; }
+    .plugin-search,.plugin-filter { width:100%; max-width:none; flex:none; }
+    .management-summary__note { width:100%; margin-inline-start:0; }
+    .management-group__heading { flex-direction:column; gap:4px; }
+    .management-row { grid-template-columns:26px minmax(0,1fr); }
+    .management-row__actions { grid-column:2; justify-content:flex-start; }
 }
 :deep(.plugin-drawer-dialog .v-overlay__content) {
     height: 100%;
@@ -1185,5 +1097,5 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 }
 :deep(.plugin-drawer-dialog .text-caption) { overflow-wrap: anywhere; }
 .connection-form { padding: 14px; border: 1px solid rgb(var(--v-theme-outline-variant)); border-radius: 10px; }
-.opds-service-settings, .personal-plugin-settings { padding: 14px; border: 1px solid rgb(var(--v-theme-outline-variant)); border-radius: 10px; }
+.opds-service-settings { padding:14px; border:1px solid rgb(var(--v-theme-outline-variant)); border-radius:10px; }
 </style>

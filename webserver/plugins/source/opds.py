@@ -21,8 +21,6 @@ def _status(session, settings):
 class GenericOPDSProvider(OPDSProvider):
     """把 OpdsSource 事实表绑定到标准 SourceProvider。"""
 
-    auto_install = True
-
     def __init__(self):
         super().__init__(
             PLUGIN_ID,
@@ -53,7 +51,6 @@ class GenericOPDSProvider(OPDSProvider):
                 "icon": "mdi-rss-box",
                 "service_toggle": "opds",
                 "manage_dialog": "opds",
-                "manage_label_key": "pluginManagement.browse",
                 "primary_action": "browse",
                 "healthy_message": "Generic OPDS 适配器可用",
             },

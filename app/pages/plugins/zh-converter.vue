@@ -56,20 +56,18 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 import { confirmDestructiveBookWrite } from '@/utils/book-tools';
+import { useBookToolSelection } from '@/composables/useBookToolSelection';
 
 const { t } = useI18n();
 const { $backend } = useNuxtApp();
 const router = useRouter();
 useMainStore().setNavbar(true);
 
-const bookId = ref(null);
-const bookOptions = ref([]);
-const bookQuery = ref('');
-const booksLoading = ref(false);
+const { bookId, bookOptions, bookQuery, booksLoading, selectedBook, onBookSearch } = useBookToolSelection();
 const direction = ref('t2s');
 const useA5 = ref(false);
 const convertTitle = ref(true);
@@ -79,7 +77,6 @@ const busy = ref('');
 const error = ref('');
 const success = ref('');
 
-const selectedBook = computed(() => bookOptions.value.find((b) => b.id === bookId.value) || null);
 const isA5Direction = computed(() => ['t2s', 'tw2s'].includes(direction.value));
 watch(direction, (v) => { if (!['t2s', 'tw2s'].includes(v)) useA5.value = false; });
 
@@ -94,22 +91,6 @@ const directions = computed(() => [
     { title: '台湾繁体 -> 繁体 (tw2t)', value: 'tw2t' },
 ]);
 
-let searchTimer = null;
-function onBookSearch(val) {
-    bookQuery.value = val || '';
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(loadBooks, 300);
-}
-async function loadBooks() {
-    booksLoading.value = true;
-    try {
-        const rsp = await $backend(`/plugins/tools/books?query=${encodeURIComponent(bookQuery.value || '')}`);
-        if (rsp.err === 'ok') {
-            bookOptions.value = (rsp.books || []).map((b) => ({ ...b, id: b.id, label: `${b.title} — ${(b.authors || []).join(', ')} [${(b.formats || []).join('/')}]` }));
-        }
-    } catch (e) {}
-    finally { booksLoading.value = false; }
-}
 watch(bookId, () => { error.value = ''; success.value = ''; });
 
 async function doRun() {
@@ -132,7 +113,6 @@ async function doRun() {
     } catch (e) { error.value = String(e); }
     finally { busy.value = ''; }
 }
-onMounted(loadBooks);
 useHead(() => ({ title: t('bookTools.zhConverter.title') }));
 </script>
 

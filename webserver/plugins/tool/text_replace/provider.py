@@ -25,7 +25,6 @@ class TextReplaceTransformPlugin(TextTransformPlugin):
                 {
                     "icon": "mdi-find-replace",
                     "manage_route": "/plugins/text-replace",
-                    "manage_label_key": "pluginManagement.openTool",
                     "primary_action": "open",
                     "healthy_message": "正文查找替换工具可用",
                 },

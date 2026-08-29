@@ -105,7 +105,7 @@ class QimaoNovelApi:
         self.copy_image = copy_image
         self.manual_select = manual_select
 
-    def search_books(self, keyword: str, page: int = 1) -> list:
+    def search_catalog(self, keyword: str, page: int = 1) -> list:
         """搜索书籍，返回结果列表"""
         params = _sign_params(
             {
@@ -133,6 +133,10 @@ class QimaoNovelApi:
         except Exception as e:
             logging.error(_("七猫小说搜索异常：%s") % e)
             return []
+
+    def search_books(self, keyword: str, page: int = 1) -> list:
+        """兼容旧调用方；插件 Provider 使用同名的类型化协议方法。"""
+        return self.search_catalog(keyword, page)
 
     def get_book_detail(self, book_id: str) -> dict:
         """获取书籍详情，返回 data 字段的内容"""
@@ -164,7 +168,9 @@ class QimaoNovelApi:
     def get_book(self, title, author=None):
         """根据书名搜索并返回最佳匹配的 Metadata 对象"""
         keyword = f"{title} {author}" if author else title
-        results = self.search_books(keyword)
+        # QimaoProvider 同时继承 MetaSourceMixin，那里也有协议方法 search_books。
+        # 显式调用底层目录搜索，避免多继承 MRO 把字符串当成协议查询处理。
+        results = self.search_catalog(keyword)
         if not results:
             return None
 
@@ -268,6 +274,7 @@ def get_qimao_metadata(mi):
 
 
 class QimaoProvider(MetaSourceMixin, QimaoNovelApi):
+    legacy_sources = ("qimao",)
     proxy_image_hosts = ("wtzw.com",)
     manifest = meta_manifest(
         "talebook.meta.qimao",
@@ -275,6 +282,7 @@ class QimaoProvider(MetaSourceMixin, QimaoNovelApi):
         "从七猫小说检索网文书名、作者、简介与封面。",
         "mdi-cat",
         "https://www.qimao.com/",
+        brand_icon="/images/plugin-icons/qimao.jpg",
     )
 
     def __init__(self):

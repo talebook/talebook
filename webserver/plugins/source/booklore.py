@@ -8,6 +8,7 @@ class BookLoreProvider(OPDSProvider):
             "BookLore",
             "BookLore 自托管书库 OPDS 连接预设。",
             "https://booklore.org/",
+            brand_icon="/images/plugin-icons/booklore.svg",
         )
 
 

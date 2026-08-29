@@ -8,6 +8,7 @@ from webserver.services.booksource.engine import BookDetail, BookSummary
 from webserver.services.booksource.metadata import (
     BookSourceMetadataService,
     MetadataSource,
+    collect_metadata_sources,
     decode_provider_value,
     encode_provider_value,
     load_builtin_sources,
@@ -37,6 +38,14 @@ class TestBookSourceProviderToken(TestCase):
 
 
 class TestBookSourceMetadataSearch(TestCase):
+    def test_collection_does_not_append_builtin_qimao_when_no_source_is_enabled(self):
+        query = mock.Mock()
+        query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = []
+        session = mock.Mock()
+        session.query.return_value = query
+
+        self.assertEqual(collect_metadata_sources(session), [])
+
     def test_builtin_snapshot_is_metadata_only(self):
         source = load_builtin_sources()[0]
 

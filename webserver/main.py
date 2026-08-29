@@ -99,7 +99,6 @@ def init_calibre():
     try:
         import calibre  # noqa: F401
     except Exception as e:
-        import logging
         import traceback
 
         logging.error(traceback.format_exc())
@@ -110,7 +109,7 @@ def init_calibre():
     try:
         ensure_calibre_metadata_plugins()
     except CalibreMetadataSourceUnavailable as e:
-        # Google/Amazon are optional sources. Keep the service available, but leave a
+        # Calibre metadata sources are optional. Keep the service available, but leave a
         # clear startup diagnostic; queries for a missing source raise the same error.
         logging.error("Calibre 元数据插件初始化失败：%s", e)
     if not options.with_library:

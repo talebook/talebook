@@ -19,6 +19,7 @@ from webserver.models import (
     PluginRunItem,
     PluginSecret,
     PluginSourceRecord,
+    Reader,
 )
 from webserver.plugins.register import ALL_BUILTIN_PROVIDERS
 from webserver.plugins.runtime import (
@@ -161,20 +162,25 @@ def ensure_builtin_definitions(session, registry=REGISTRY):
     return definitions
 
 
-def ensure_auto_installations(session, installed_by, settings, registry=REGISTRY):
-    """幂等安装声明了 auto_install 生命周期的内置 provider。"""
+def ensure_builtin_installations(session, installed_by, settings, registry=REGISTRY):
+    """幂等物化全部内置插件；平台只暴露启停，不暴露安装动作。"""
     ensure_builtin_definitions(session, registry)
     installations = []
     for provider in registry.providers():
-        if not getattr(provider, "auto_install", False):
-            continue
         plugin_key = provider.manifest["id"]
         installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
         if installation is None:
-            installation = install_builtin(session, plugin_key, installed_by)
-            # 首次安装时的启用状态由 provider 自己决定，运行时不认识任何具体插件。
-            installation.enabled = provider.initial_enabled(settings)
-            session.commit()
+            initial_enabled = getattr(provider, "initial_enabled", None)
+            installation = install_builtin(
+                session,
+                plugin_key,
+                installed_by,
+                enabled=bool(initial_enabled(settings)) if callable(initial_enabled) else False,
+                registry=registry,
+            )
+        if "instance" not in provider.manifest["connection_owners"]:
+            installations.append(installation)
+            continue
         connection = (
             session.query(PluginConnection)
             .filter(
@@ -186,13 +192,17 @@ def ensure_auto_installations(session, installed_by, settings, registry=REGISTRY
             .first()
         )
         if connection is None:
+            initial_config = getattr(provider, "initial_config", None)
+            config = dict(initial_config(settings) or {}) if callable(initial_config) else {}
+            if config:
+                _validate_public_config(config, config_schema=provider.manifest["config_schema"])
             connection = PluginConnection(
                 installation_id=installation.id,
                 owner_type="instance",
                 owner_id=0,
                 role=BUILTIN_CONNECTION_ROLE,
                 name="内置连接",
-                config={},
+                config=config,
                 scopes=list(provider.manifest["permissions"]),
                 health="unknown",
                 enabled=True,
@@ -205,12 +215,31 @@ def ensure_auto_installations(session, installed_by, settings, registry=REGISTRY
     return installations
 
 
-def install_builtin(session, plugin_key, installed_by, config=None, approved_permissions=None, registry=REGISTRY):
+def ensure_runtime_installations(session, settings, registry=REGISTRY):
+    """在插件表可用的业务请求中，以首位管理员作为迁移记录的归属人。"""
+    installer = session.query(Reader.id).filter(Reader.admin.is_(True)).order_by(Reader.id).first()
+    if not installer:
+        return []
+    return ensure_builtin_installations(session, installer[0], settings, registry=registry)
+
+
+def install_builtin(
+    session,
+    plugin_key,
+    installed_by,
+    config=None,
+    approved_permissions=None,
+    enabled=True,
+    registry=REGISTRY,
+):
     ensure_builtin_definitions(session, registry)
     provider = registry.get(plugin_key)
     manifest = PluginManifest.validate(provider.manifest)
     raw = manifest.raw
-    _validate_public_config(config or {}, config_schema=raw["config_schema"])
+    # 安装记录只表达“实例是否开放此内置插件”。连接配置在 save_connection()
+    # 中校验；首次物化不能因某个插件尚未填写必填连接参数而失败。
+    if config is not None:
+        _validate_public_config(config, config_schema=raw["config_schema"])
     definition = (
         session.query(PluginDefinition)
         .filter(PluginDefinition.plugin_key == plugin_key, PluginDefinition.version == raw["version"])
@@ -223,7 +252,7 @@ def install_builtin(session, plugin_key, installed_by, config=None, approved_per
         session.add(installation)
     installation.definition_id = definition.id
     installation.version = definition.version
-    installation.enabled = True
+    installation.enabled = bool(enabled)
     installation.scope = "shared"
     installation.config = dict(config or {})
     installation.installed_from = "builtin"
@@ -294,7 +323,22 @@ def save_connection(
     allowed_owners = set((definition.manifest or {}).get("connection_owners") or [])
     if owner_type not in allowed_owners:
         raise PluginRuntimeError("plugin.owner_forbidden", "This plugin does not support this connection owner")
-    _validate_credentials(definition, credentials)
+    connection = (
+        session.query(PluginConnection)
+        .filter(
+            PluginConnection.installation_id == installation_id,
+            PluginConnection.owner_type == owner_type,
+            PluginConnection.owner_id == owner_id,
+            PluginConnection.role == role,
+        )
+        .first()
+    )
+    # 编辑既有连接时省略 credentials 表示保留原 Secret；显式传入对象则执行
+    # 完整 schema 校验与轮换。首次创建仍必须满足必填凭据。
+    if credentials is None and connection is None:
+        credentials = {}
+    if credentials is not None:
+        _validate_credentials(definition, credentials)
     _validate_public_config(config or {}, credentials, config_schema=definition.config_schema)
     approved = {
         item.permission
@@ -307,16 +351,6 @@ def save_connection(
         raise PluginRuntimeError("plugin.scope_not_approved", "Connection requests permissions that were not approved")
 
     cipher = SecretCipher(settings) if credentials else None
-    connection = (
-        session.query(PluginConnection)
-        .filter(
-            PluginConnection.installation_id == installation_id,
-            PluginConnection.owner_type == owner_type,
-            PluginConnection.owner_id == owner_id,
-            PluginConnection.role == role,
-        )
-        .first()
-    )
     now = datetime.datetime.now()
     if connection is None:
         connection = PluginConnection(
@@ -735,6 +769,7 @@ class PluginRuntime:
         audit=False,
         retry=False,
         requested_by=None,
+        provider_method=None,
     ):
         """在调用线程内解密凭据并构造上下文，返回可安全并发执行的调用单元。
 
@@ -767,6 +802,12 @@ class PluginRuntime:
                 provider = self.registry.get(plugin_key)
                 installation = self.session.get(PluginInstallation, connection.installation_id)
                 override = dict(overrides_by_connection.get(connection.id) or {})
+                prepare_context = getattr(provider, "prepare_context", None)
+                provider_platform = (
+                    dict(prepare_context(self.session, self.settings, provider_method) or {})
+                    if callable(prepare_context)
+                    else {}
+                )
                 context = PluginContext(
                     action=action,
                     attempt=1,
@@ -780,7 +821,7 @@ class PluginRuntime:
                     scopes=list(connection.scopes or []),
                     input_data=dict(override.get("input_data") or {}),
                     deadline=(datetime.datetime.now() + datetime.timedelta(seconds=effective_timeout)).isoformat(),
-                    platform=dict(override.get("platform") or {}),
+                    platform={**provider_platform, **dict(override.get("platform") or {})},
                 ).as_dict()
             except Exception as exc:
                 failures[connection.id] = exc
@@ -1014,6 +1055,7 @@ class PluginRuntime:
                 context_overrides=overrides,
                 required_scopes=required_scopes,
                 action=mode,
+                provider_method=method,
             )
             if failures:
                 raise failures[connection.id]
@@ -1282,6 +1324,7 @@ class PluginRuntime:
             timeout,
             context_overrides=context_overrides,
             required_scopes=required_scopes,
+            provider_method=method,
         )
         states = {}
 

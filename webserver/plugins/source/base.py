@@ -53,8 +53,10 @@ def _manifest(
     homepage="",
     runtime_kind="http",
     network_read=True,
+    brand_icon="",
 ):
-    return {
+    needs_configuration = bool(config_schema.get("required")) or bool((auth_schema or {}).get("required"))
+    manifest = {
         "protocol_version": PROTOCOL_VERSION,
         "id": plugin_id,
         "name": name,
@@ -74,8 +76,16 @@ def _manifest(
         "download_mode": "single_book",
         "homepage": homepage,
         "license": "GPL-3.0",
-        "ui": {"icon": "mdi-bookshelf", "manage_kind": "book_source", "primary_action": "configure"},
+        "ui": {
+            "icon": "mdi-bookshelf",
+            "manage_kind": "book_source",
+            "configuration_mode": "form" if needs_configuration else "none",
+            "primary_action": "configure" if needs_configuration else "preview",
+        },
     }
+    if brand_icon:
+        manifest["ui"]["brand_icon"] = brand_icon
+    return manifest
 
 
 COMMON_CONFIG_PROPERTIES = {
@@ -246,7 +256,17 @@ class SourceBase:
 
 
 class OPDSProvider(SourceBase):
-    def __init__(self, plugin_id, name, description, homepage, endpoint="", license_name="由来源条目决定", http=None):
+    def __init__(
+        self,
+        plugin_id,
+        name,
+        description,
+        homepage,
+        endpoint="",
+        license_name="由来源条目决定",
+        http=None,
+        brand_icon="",
+    ):
         super().__init__(http)
         self.source_name = name
         self.endpoint = endpoint
@@ -274,6 +294,7 @@ class OPDSProvider(SourceBase):
                 },
             },
             homepage,
+            brand_icon=brand_icon,
         )
 
     def discover(self, context):
@@ -351,12 +372,16 @@ class OPDSProvider(SourceBase):
                 (
                     link
                     for link in links
-                    if "acquisition" in link.attrib.get("rel", "")
+                    if ("acquisition" in link.attrib.get("rel", "") or link.attrib.get("rel", "") == "enclosure")
                     and _format_from(link.attrib.get("href", ""), link.attrib.get("type", ""))
                 ),
                 None,
             )
-            fmt = _format_from(acquisition.attrib.get("href", ""), acquisition.attrib.get("type", "")) if acquisition else ""
+            fmt = (
+                _format_from(acquisition.attrib.get("href", ""), acquisition.attrib.get("type", ""))
+                if acquisition is not None
+                else ""
+            )
             if fmt and fmt not in self._formats(context):
                 continue
             identifier = entry.findtext("atom:id", default="", namespaces=ATOM_NS) or entry.findtext(
@@ -376,8 +401,10 @@ class OPDSProvider(SourceBase):
                     isbn=isbn,
                     format_name=fmt,
                     source_url=endpoint,
-                    acquisition_url=urllib.parse.urljoin(endpoint, acquisition.attrib.get("href", "")) if acquisition else "",
-                    access="download" if acquisition and fmt else "external_link",
+                    acquisition_url=(
+                        urllib.parse.urljoin(endpoint, acquisition.attrib.get("href", "")) if acquisition is not None else ""
+                    ),
+                    access="download" if acquisition is not None and fmt else "external_link",
                     license_name=rights or self.license_name,
                     updated_at=entry.findtext("atom:updated", default="", namespaces=ATOM_NS),
                 )

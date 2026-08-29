@@ -30,6 +30,7 @@ class ReviewSourceSpec:
     homepage: str
     icon: str
     scale: float
+    brand_icon: str = ""
     requires_token: bool = False
 
 
@@ -58,7 +59,11 @@ def review_manifest(spec):
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": spec.homepage,
         "license": "GPL-3.0",
-        "ui": {"icon": spec.icon, "primary_action": "configure"},
+        "ui": {
+            "icon": spec.icon,
+            "brand_icon": spec.brand_icon,
+            "primary_action": "configure",
+        },
         "connection_owners": ["instance"],
     }
 

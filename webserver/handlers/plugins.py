@@ -16,6 +16,7 @@ from webserver.models import (
     PluginRunItem,
     PluginSecret,
 )
+from webserver.plugins.runtime import MetadataQuery
 from webserver.plugins.runtime.interfaces import ExtraFeatureProvider
 from webserver.plugins.runtime.protocol import PluginManifest, UpstreamError, validate_against_schema
 from webserver.services.annotation_writer import all_book_ids, confirm_match
@@ -26,7 +27,7 @@ from webserver.services.plugin_runtime import (
     REGISTRY,
     PluginRuntime,
     PluginRuntimeError,
-    ensure_auto_installations,
+    ensure_builtin_installations,
     install_builtin,
     save_connection,
 )
@@ -37,6 +38,121 @@ from webserver.services.plugin_secrets import SecretCipherError
 SERVER_OWNED_INPUT_KEYS = frozenset({"allowed_book_ids", "matches"})
 # 声明了这些能力的插件会做书籍匹配，需要平台注入可见书籍白名单。
 BOOK_SCOPED_CAPABILITIES = frozenset({"annotations.import"})
+BOOK_QUERY_FIELDS = frozenset({"title", "isbn", "publisher", "authors"})
+CAPABILITY_RESULT_LIMIT = 20
+
+
+def _capability_connection(handler, plugin_key, capability):
+    """Resolve one enabled instance connection for a declared typed capability."""
+    ensure_builtin_installations(handler.session, handler.user_id(), loader.get_settings())
+    provider = REGISTRY.get(plugin_key)
+    manifest = PluginManifest.validate(provider.manifest)
+    if capability not in manifest.raw["capabilities"]:
+        raise PluginRuntimeError(
+            "plugin.capability_not_supported",
+            "%s does not provide %s" % (plugin_key, capability),
+        )
+    installation = handler.session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).first()
+    if installation is None or not installation.enabled or installation.status != "active":
+        raise PluginRuntimeError("plugin.installation_disabled", "Plugin installation is not enabled")
+    connection = (
+        handler.session.query(PluginConnection)
+        .filter(
+            PluginConnection.installation_id == installation.id,
+            PluginConnection.owner_type == "instance",
+            PluginConnection.owner_id == 0,
+            PluginConnection.enabled.is_(True),
+        )
+        .order_by(PluginConnection.id)
+        .first()
+    )
+    if connection is None:
+        raise PluginRuntimeError("plugin.connection_missing", "Plugin has no enabled instance configuration")
+    return PluginRuntime(handler.session, loader.get_settings()), connection
+
+
+def _book_query(handler):
+    raw = _body(handler).get("query", {})
+    if not isinstance(raw, dict):
+        raise PluginRuntimeError("plugin.request_invalid", "query must be an object")
+    unknown = set(raw) - BOOK_QUERY_FIELDS
+    if unknown:
+        raise PluginRuntimeError("plugin.request_invalid", "unknown query fields: %s" % ", ".join(sorted(unknown)))
+    authors = raw.get("authors") or []
+    if isinstance(authors, str):
+        authors = [item.strip() for item in authors.split(",") if item.strip()]
+    if not isinstance(authors, list) or len(authors) > 8 or any(not isinstance(item, str) for item in authors):
+        raise PluginRuntimeError("plugin.request_invalid", "authors must be a list of strings")
+    query = MetadataQuery(
+        title=str(raw.get("title") or "").strip()[:300],
+        isbn=str(raw.get("isbn") or "").strip()[:64],
+        publisher=str(raw.get("publisher") or "").strip()[:300],
+        authors=tuple(item.strip()[:300] for item in authors if item.strip()),
+    )
+    if query.is_empty():
+        raise PluginRuntimeError("plugin.request_invalid", "title or isbn is required")
+    return query
+
+
+def _metadata_summary(record):
+    value = record.to_dict() if callable(getattr(record, "to_dict", None)) else dict(record or {})
+    return {
+        "title": str(value.get("title") or ""),
+        "authors": list(value.get("authors") or ([value["author"]] if value.get("author") else [])),
+        "publisher": str(value.get("publisher") or ""),
+        "isbn": str(value.get("isbn") or ""),
+        "comments": str(value.get("comments") or "")[:500],
+        "rating": value.get("rating"),
+        "series": str(value.get("series") or ""),
+        "language": str(value.get("language") or ""),
+        "cover_url": str(value.get("cover_url") or ""),
+        "website": str(value.get("website") or ""),
+        "provider_value": str(value.get("provider_value") or ""),
+    }
+
+
+def _source_summary(record):
+    value = record.to_dict() if callable(getattr(record, "to_dict", None)) else dict(record or {})
+    return {
+        key: value.get(key)
+        for key in (
+            "external_id",
+            "title",
+            "authors",
+            "isbn",
+            "format",
+            "source",
+            "source_url",
+            "access",
+            "license",
+            "description",
+            "cover_url",
+        )
+    }
+
+
+def _review_summary(record):
+    value = record.to_dict() if callable(getattr(record, "to_dict", None)) else dict(record or {})
+    return {
+        key: value.get(key)
+        for key in (
+            "source",
+            "review_kind",
+            "external_id",
+            "rating",
+            "source_time",
+            "source_url",
+            "summary",
+        )
+    }
+
+
+def _failure_summary(failure):
+    return {
+        "external_id": str(getattr(failure, "external_id", "")),
+        "error_code": str(getattr(failure, "error_code", "")),
+        "error_message": str(getattr(failure, "error_message", "")),
+    }
 
 
 def _plugin_input_data(handler, connection):
@@ -144,9 +260,20 @@ class AdminPlugins(BaseHandler):
     @is_admin
     def get(self):
         try:
-            ensure_auto_installations(self.session, self.user_id(), loader.get_settings())
-            definitions = self.session.query(PluginDefinition).order_by(PluginDefinition.id).all()
-            installations = self.session.query(PluginInstallation).order_by(PluginInstallation.id).all()
+            ensure_builtin_installations(self.session, self.user_id(), loader.get_settings())
+            registered_keys = [provider.manifest["id"] for provider in REGISTRY.providers()]
+            definitions = (
+                self.session.query(PluginDefinition)
+                .filter(PluginDefinition.plugin_key.in_(registered_keys))
+                .order_by(PluginDefinition.id)
+                .all()
+            )
+            installations = (
+                self.session.query(PluginInstallation)
+                .filter(PluginInstallation.plugin_key.in_(registered_keys))
+                .order_by(PluginInstallation.id)
+                .all()
+            )
             definition_map = {item.id: item for item in definitions}
             settings = loader.get_settings()
             # 各插件自报配置状态，此处不认识任何具体 plugin_key。
@@ -229,6 +356,80 @@ class AdminPluginOpdsService(BaseHandler):
             return _error(exc)
 
 
+class AdminPluginPreferences(BaseHandler):
+    """插件中心承接的全局元数据行为与共享设备设置。"""
+
+    @js
+    @is_admin
+    def get(self):
+        settings = loader.get_settings()
+        return {
+            "err": "ok",
+            "metadata": {
+                "auto_fill_meta": bool(settings.get("auto_fill_meta", False)),
+                "auto_fill_keep_cover": bool(settings.get("auto_fill_keep_cover", False)),
+            },
+            "devices": list(settings.get("DEVICES") or []),
+        }
+
+    @js
+    @is_admin
+    def post(self):
+        try:
+            req = _body(self)
+            updates = {}
+            if "metadata" in req:
+                metadata = req["metadata"]
+                if not isinstance(metadata, dict):
+                    raise PluginRuntimeError("plugin.request_invalid", "metadata must be an object")
+                for key in ("auto_fill_meta", "auto_fill_keep_cover"):
+                    if key in metadata:
+                        if not isinstance(metadata[key], bool):
+                            raise PluginRuntimeError("plugin.request_invalid", "%s must be a boolean" % key)
+                        updates[key] = metadata[key]
+            if "devices" in req:
+                updates["DEVICES"] = self._validate_devices(req["devices"])
+            if not updates:
+                raise PluginRuntimeError("plugin.request_invalid", "No plugin preference was supplied")
+
+            args = loader.SettingsLoader()
+            args.update(loader.get_settings())
+            args.update(updates)
+
+            from webserver.handlers.admin import SettingsSaverLogic
+
+            result = SettingsSaverLogic().save_extra_settings(args)
+            if result.get("err") != "ok":
+                return result
+            return {"err": "ok", **updates}
+        except (PluginRuntimeError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+    @staticmethod
+    def _validate_devices(value):
+        if not isinstance(value, list) or len(value) > 100:
+            raise PluginRuntimeError("plugin.request_invalid", "devices must be a list")
+        devices = []
+        for item in value:
+            if not isinstance(item, dict):
+                raise PluginRuntimeError("plugin.request_invalid", "device must be an object")
+            name = str(item.get("name") or "").strip()
+            device_type = str(item.get("type") or "").strip().lower()
+            if not name or len(name) > 64 or not device_type:
+                raise PluginRuntimeError("plugin.request_invalid", "device name and type are required")
+            device = {"name": name, "type": device_type}
+            if device_type == "kindle":
+                device["mailbox"] = str(item.get("mailbox") or "").strip()
+            else:
+                device["ip"] = str(item.get("ip") or "").strip()
+                device["port"] = int(item.get("port") or 0)
+                device["schema"] = str(item.get("schema") or "http").lower()
+                if not 0 < device["port"] <= 65535 or device["schema"] not in {"http", "https"}:
+                    raise PluginRuntimeError("plugin.request_invalid", "device port or schema is invalid")
+            devices.append(device)
+        return devices
+
+
 class AdminPluginConnections(BaseHandler):
     @js
     @is_admin
@@ -303,6 +504,71 @@ class AdminPluginConnectionState(BaseHandler):
             secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
             return {"err": "ok", "connection": connection.to_public_dict(secret)}
         except (PluginRuntimeError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
+class UserPlugins(BaseHandler):
+    """当前用户可配置的插件目录；不暴露其他用户的连接与运行内容。"""
+
+    @js
+    @auth
+    def get(self):
+        try:
+            ensure_builtin_installations(self.session, self.user_id(), loader.get_settings())
+            registered_plugin_keys = {provider.manifest["id"] for provider in REGISTRY.providers()}
+            definitions = {item.id: item for item in self.session.query(PluginDefinition).all()}
+            installations = (
+                self.session.query(PluginInstallation)
+                .filter(PluginInstallation.plugin_key.in_(registered_plugin_keys))
+                .order_by(PluginInstallation.id)
+                .all()
+            )
+            user_connections = (
+                self.session.query(PluginConnection)
+                .filter(PluginConnection.owner_type == "user", PluginConnection.owner_id == self.user_id())
+                .order_by(PluginConnection.id)
+                .all()
+            )
+            connections_by_installation = {}
+            for connection in user_connections:
+                connections_by_installation.setdefault(connection.installation_id, []).append(connection)
+
+            connection_ids = [connection.id for connection in user_connections]
+            latest_run_by_connection = {}
+            if connection_ids:
+                for run in (
+                    self.session.query(PluginRun)
+                    .filter(PluginRun.connection_id.in_(connection_ids))
+                    .order_by(PluginRun.id.desc())
+                    .all()
+                ):
+                    latest_run_by_connection.setdefault(run.connection_id, run)
+
+            runtime = PluginRuntime(self.session, loader.get_settings())
+            plugins = []
+            for installation in installations:
+                definition = definitions.get(installation.definition_id)
+                if definition is None:
+                    continue
+                public = definition.to_public_dict()
+                if public["ui"].get("hidden") or "user" not in public["connection_owners"]:
+                    continue
+                connections = connections_by_installation.get(installation.id, [])
+                latest_runs = [
+                    latest_run_by_connection[item.id] for item in connections if item.id in latest_run_by_connection
+                ]
+                public["installation"] = {
+                    "id": installation.id,
+                    "plugin_key": installation.plugin_key,
+                    "version": installation.version,
+                    "enabled": bool(installation.enabled),
+                    "status": installation.status,
+                }
+                public["connections"] = [runtime.connection_public_dict(connection) for connection in connections]
+                public["latest_run"] = max(latest_runs, key=lambda item: item.id).to_public_dict() if latest_runs else None
+                plugins.append(public)
+            return {"err": "ok", "plugins": plugins}
+        except (PluginRuntimeError, SecretCipherError, TypeError, ValueError) as exc:
             return _error(exc)
 
 
@@ -481,6 +747,93 @@ class UserPluginFeature(BaseHandler):
             return _error(exc)
 
 
+class AdminPluginMetadataSearch(BaseHandler):
+    """Test MetadataProvider.search_books with a structured MetadataQuery."""
+
+    @js
+    @is_admin
+    def post(self, plugin_key):
+        try:
+            query = _book_query(self)
+            runtime, connection = _capability_connection(self, plugin_key, "metadata.lookup")
+            records = runtime.read(
+                connection,
+                "search_books",
+                query,
+                required_scopes=("books.read",),
+                requested_by=self.user_id(),
+            )
+            result_items = getattr(records, "books", records) or []
+            items = [_metadata_summary(record) for record in list(result_items)[:CAPABILITY_RESULT_LIMIT]]
+            return {"err": "ok", "capability": "metadata.lookup", "items": items}
+        except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
+class AdminPluginSourceSearch(BaseHandler):
+    """Test SourceProvider.search without creating a generic preview/run job."""
+
+    @js
+    @is_admin
+    def post(self, plugin_key):
+        try:
+            query = _body(self).get("query", "")
+            if not isinstance(query, str) or not query.strip():
+                raise PluginRuntimeError("plugin.request_invalid", "query must be a non-empty string")
+            runtime, connection = _capability_connection(self, plugin_key, "book_sources.search")
+            page = runtime.read(
+                connection,
+                "search",
+                query.strip()[:300],
+                {},
+                required_scopes=("books.read",),
+                requested_by=self.user_id(),
+            )
+            return {
+                "err": "ok",
+                "capability": "book_sources.search",
+                "items": [_source_summary(record) for record in list(page.items or [])[:CAPABILITY_RESULT_LIMIT]],
+                "failures": [_failure_summary(item) for item in list(page.failures or [])[:CAPABILITY_RESULT_LIMIT]],
+                "has_more": bool(page.has_more),
+                "health_message": str(page.health_message or ""),
+            }
+        except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
+class AdminPluginReviewLookup(BaseHandler):
+    """Test ReviewProvider.get_reviews with the provider's typed read contract."""
+
+    @js
+    @is_admin
+    def post(self, plugin_key):
+        try:
+            query = _book_query(self)
+            runtime, connection = _capability_connection(self, plugin_key, "reviews.lookup")
+            page = runtime.read(
+                connection,
+                "get_reviews",
+                {
+                    "title": query.title,
+                    "isbn": query.isbn,
+                    "publisher": query.publisher,
+                    "authors": list(query.authors),
+                },
+                required_scopes=("books.read",),
+                requested_by=self.user_id(),
+            )
+            return {
+                "err": "ok",
+                "capability": "reviews.lookup",
+                "items": [_review_summary(record) for record in list(page.items or [])[:CAPABILITY_RESULT_LIMIT]],
+                "failures": [_failure_summary(item) for item in list(page.failures or [])[:CAPABILITY_RESULT_LIMIT]],
+                "has_more": bool(page.has_more),
+                "health_message": str(page.health_message or ""),
+            }
+        except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
+            return _error(exc)
+
+
 class AdminPluginAction(BaseHandler):
     @js
     @is_admin
@@ -594,12 +947,17 @@ def routes():
         (r"/api/admin/plugins", AdminPlugins),
         (r"/api/admin/plugins/install", AdminPluginInstall),
         (r"/api/admin/plugins/opds-service", AdminPluginOpdsService),
+        (r"/api/admin/plugins/preferences", AdminPluginPreferences),
+        (r"/api/admin/plugins/([a-z0-9.-]+)/metadata/search", AdminPluginMetadataSearch),
+        (r"/api/admin/plugins/([a-z0-9.-]+)/source/search", AdminPluginSourceSearch),
+        (r"/api/admin/plugins/([a-z0-9.-]+)/reviews/lookup", AdminPluginReviewLookup),
         (r"/api/admin/plugins/installations/([0-9]+)/state", AdminPluginInstallationState),
         (r"/api/admin/plugins/connections", AdminPluginConnections),
         (r"/api/admin/plugins/connections/([0-9]+)/state", AdminPluginConnectionState),
         (r"/api/admin/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", AdminPluginAction),
         (r"/api/admin/plugins/runs", AdminPluginRuns),
         (r"/api/admin/plugins/runs/([0-9]+)", AdminPluginRunDetail),
+        (r"/api/plugins", UserPlugins),
         (r"/api/plugins/connections", UserPluginConnections),
         (r"/api/plugins/([a-z0-9.-]+)/features/([a-z0-9_]+)", UserPluginFeature),
         (r"/api/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", UserPluginAction),

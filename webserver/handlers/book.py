@@ -10,7 +10,6 @@ import os
 import random
 import re
 import shutil
-import threading
 import time
 import urllib
 
@@ -18,12 +17,7 @@ import tornado.escape
 from tornado import web
 
 from webserver import demo_mode, loader, utils
-from webserver.constants import (
-    CALIBRE_ERROR_FLAG,
-    META_SELECTED_SOURCES,
-    META_SOURCE_AI,
-    META_SOURCE_BOOKSOURCE,
-)
+from webserver.constants import CALIBRE_ERROR_FLAG
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
 from webserver.models import (
@@ -38,7 +32,6 @@ from webserver.plugins.meta.ai.api import AIBookApi
 from webserver.plugins.meta.base import to_calibre_metadata
 from webserver.plugins.parser.txt import get_content_encoding
 from webserver.plugins.push.base import PUSH_CAPABILITY
-from webserver.plugins.register import plugin_ids_for_sources
 from webserver.plugins.runtime.domains import MetadataQuery
 from webserver.plugins.runtime.protocol import UpstreamError
 from webserver.plugins.runtime.triggers import TRIGGER_AUTO, trigger_of
@@ -51,7 +44,6 @@ from webserver.services.booksource.metadata import (
     BookSourceMetadataService,
     MetadataSearchResult,
     collect_metadata_sources,
-    load_builtin_sources,
     metadata_to_evidence,
 )
 from webserver.services.convert import CONVERSION_TARGETS, ConvertService
@@ -63,7 +55,7 @@ from webserver.services.external_index import (
 )
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
-from webserver.services.plugin_runtime import REGISTRY, PluginRuntime, PluginRuntimeError
+from webserver.services.plugin_runtime import REGISTRY, PluginRuntime, PluginRuntimeError, ensure_runtime_installations
 
 
 # 调用方按能力找插件，不认识任何具体 plugin_key。
@@ -243,6 +235,8 @@ class BookToPDF(BaseHandler):
 
 
 class BookRefer(BaseHandler):
+    SOURCE_RESULT_LIMIT = 5
+
     def has_proper_book(self, books, mi):
         if not books or not mi.isbn or mi.isbn == baike.BAIKE_ISBN:
             return False
@@ -316,6 +310,7 @@ class BookRefer(BaseHandler):
         completed = 0
         outcomes = {}
         pending_map = {}
+        yield {"event": "progress", "failures": [], "total": len(tasks), "completed": 0}
         try:
             pending_map = {loop.run_in_executor(_METADATA_EXECUTOR, fn): name for name, fn in tasks.items()}
             deadline = time.time() + self.REFER_TIMEOUT
@@ -332,6 +327,12 @@ class BookRefer(BaseHandler):
                             "Plugin metadata lookup timed out",
                             retryable=True,
                         )
+                    yield {
+                        "event": "progress",
+                        "failures": self._dedupe_failures(failures),
+                        "total": len(tasks),
+                        "completed": completed,
+                    }
                     break
 
                 done_set, _ = await asyncio.wait(
@@ -355,6 +356,12 @@ class BookRefer(BaseHandler):
                         logging.error("%s 查询失败：%s", name, e)
                         outcomes[name] = e
                         failures.append(self._refer_failure(name, "fetch_failed", "查询失败"))
+                    yield {
+                        "event": "progress",
+                        "failures": self._dedupe_failures(failures),
+                        "total": len(tasks),
+                        "completed": completed,
+                    }
         finally:
             for fut in pending_map:
                 fut.cancel()
@@ -373,10 +380,10 @@ class BookRefer(BaseHandler):
 
     def _unpack_search_result(self, name, result):
         if isinstance(result, MetadataSearchResult):
-            books = list(result.books or [])
+            books = list(result.books or [])[: self.SOURCE_RESULT_LIMIT]
             failures = list(result.failures or [])
         else:
-            books = list(result or [])
+            books = list(result or [])[: self.SOURCE_RESULT_LIMIT]
             failures = []
         if not books and not failures:
             failures.append(self._refer_failure(name, "no_result", "未找到匹配图书"))
@@ -403,112 +410,19 @@ class BookRefer(BaseHandler):
         except PluginRuntimeError:
             return plugin_id
 
-    def _make_metadata_task(self, plugin_id, query, sources):
-        """把一个元数据插件包成搜索任务；单源失败不影响其余源。"""
-
-        def _task():
-            try:
-                provider = REGISTRY.get(plugin_id)
-            except PluginRuntimeError:
-                logging.warning("元数据插件 %s 不可用", plugin_id)
-                return []
-            context = {"action": "search", "config": {"sources": list(sources)}, "secrets": {}}
-            try:
-                records = provider.search_books(query, context) or []
-            except Exception:
-                logging.error("元数据插件 %s 查询 %s 失败", plugin_id, query.title)
-                return []
-            results = []
-            for record in records:
-                candidate = to_calibre_metadata(record)
-                if candidate is None:
-                    continue
-                if not getattr(candidate, "provider_key", ""):
-                    candidate.provider_key = plugin_id
-                if not getattr(candidate, "cover_data", None) and getattr(candidate, "cover_url", ""):
-                    try:
-                        candidate.cover_data = provider.get_cover(candidate.cover_url, context)
-                    except Exception:
-                        candidate.cover_data = None
-                results.append(candidate)
-            return results
-
-        return _task
-
     def _build_search_tasks(self, mi):
-        sources = CONF.get(META_SELECTED_SOURCES, ["douban_v2", "baidu"])
-        logging.info("META_SELECTED_SOURCES 配置：%s", sources)
-        sources = sources or []
-
+        ensure_runtime_installations(self.session, CONF)
         title = re.sub("[(（].*", "", mi.title)
-        author = mi.authors[0] if getattr(mi, "authors", None) else None
         tasks = {}
-
-        metadata_service = None
-        metadata_result = None
-        metadata_lock = threading.Lock()
-        if META_SOURCE_BOOKSOURCE in sources or META_SOURCE_AI in sources:
-            try:
-                metadata_sources = collect_metadata_sources(self.session, CONF.get("BOOKSOURCE_METADATA_TOP_K", 10))
-            except Exception as err:
-                logging.warning("读取在线书源失败，将只尝试内置快照：%s", err)
-                metadata_sources = load_builtin_sources()
-            metadata_service = BookSourceMetadataService(
-                metadata_sources,
-                CONF.get("cookie_secret", "talebook"),
-                config=CONF,
-            )
-
-            def _lookup_online_sources():
-                nonlocal metadata_result
-                with metadata_lock:
-                    if metadata_result is None:
-                        metadata_result = metadata_service.search(title, author)
-                    return metadata_result
-
-        # 7 个元数据源统一按 registry 派发：provider 自行决定用 ISBN 还是标题查询，
-        # 并各自完成 provider_key 标注与封面补齐，这里只负责选源与并发编排。
         query = MetadataQuery(
             title=title,
             isbn=mi.isbn or "",
             publisher=getattr(mi, "publisher", "") or "",
             authors=tuple(getattr(mi, "authors", None) or ()),
         )
-        for plugin_id in plugin_ids_for_sources(sources):
-            # 失败摘要里的 source 会原样显示给用户，用 manifest 名而不是 plugin id。
-            tasks[self._meta_task_name(plugin_id)] = self._make_metadata_task(plugin_id, query, sources)
 
-        if META_SOURCE_BOOKSOURCE in sources:
-
-            def _booksource():
-                return _lookup_online_sources()
-
-            tasks["booksource"] = _booksource
-
-        if META_SOURCE_AI in sources:
-
-            def _ai():
-                logging.info("查询 AI 信息源，title=%s", title)
-                api = AIBookApi(
-                    api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
-                    api_key=CONF.get("ai_api_key", ""),
-                    model=CONF.get("ai_model", "gpt-3.5-turbo"),
-                    use_thinking=CONF.get("ai_use_thinking", False),
-                    copy_image=False,
-                )
-                online = _lookup_online_sources()
-                evidence = [metadata_to_evidence(book) for book in online.books]
-                book = api.get_book(title, author, evidence=evidence)
-                logging.info("AI 查询结果：%d 条", 1 if book else 0)
-                failures = list(online.failures)
-                if not book:
-                    failures.append(self._refer_failure("ai", "no_result", "AI 未生成可验证的元数据"))
-                return MetadataSearchResult(books=[book] if book else [], failures=failures)
-
-            tasks["ai"] = _ai
-
-        # 按能力查询插件，不出现任何具体 plugin_key。凭据在调用线程内解密，
-        # task 只做网络 I/O，交给既有线程池与其余来源一起并发。
+        # 元数据插件的 installation.enabled 是唯一选源状态。旧
+        # META_SELECTED_SOURCES 只在首次物化时迁移，不再参与每次查询。
         runtime = PluginRuntime(self.session, CONF)
         connections = runtime.connections_for(META_LOOKUP_CAPABILITY, self.user_id())
         self._plugin_runtime, self._plugin_units = runtime, []
@@ -521,17 +435,18 @@ class BookRefer(BaseHandler):
                 timeout=self.REFER_TIMEOUT,
                 audit=True,
                 requested_by=self.user_id(),
+                provider_method="search_books",
             )
             for connection_id, error in prepare_failures.items():
                 logging.warning("插件连接 %s 凭据不可用：%s", connection_id, error)
             for unit in self._plugin_units:
-                task_name = unit["plugin_key"]
+                task_name = self._meta_task_name(unit["plugin_key"])
                 if task_name in tasks:  # 同一插件的多条连接：附连接号以区分
                     task_name = "%s#%s" % (task_name, unit["key"])
                 self._plugin_task_keys[task_name] = unit["key"]
 
                 def _plugin_lookup(_unit=unit):
-                    return _unit["call"]("search_books", title) or []
+                    return _unit["call"]("search_books", query) or []
 
                 tasks[task_name] = _plugin_lookup
 
@@ -573,7 +488,7 @@ class BookRefer(BaseHandler):
         )
         if isinstance(outcome, Exception):
             raise outcome
-        return outcome
+        return to_calibre_metadata(outcome) or outcome
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
         refer_mi = None
@@ -746,7 +661,7 @@ class BookRefer(BaseHandler):
             logging.info("[STREAM] 元信息已发送")
 
             async for b in self.plugin_search_books_stream(mi):
-                if isinstance(b, dict) and b.get("event") == "summary":
+                if isinstance(b, dict) and b.get("event") in {"progress", "summary"}:
                     self.write(json.dumps(b, ensure_ascii=False) + "\n")
                     await self.flush()
                     continue
