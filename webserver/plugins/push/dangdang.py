@@ -29,6 +29,8 @@ class DangdangProvider(DevicePushProvider):
                 "当当阅读器",
                 "把书籍发送到当当阅读器。",
                 "mdi-tablet-dashboard",
+                homepage="https://www.dangdang.com/",
+                brand_icon="/images/plugin-icons/dangdang.ico",
             ),
             DangdangUploader,
         )

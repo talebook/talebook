@@ -30,6 +30,8 @@ let annotationPartialRollback = false;
 let wereadRunId = 500;
 let wereadConfigured = false;
 let wereadRuns = new Map();
+let brsConfigured = false;
+let brsConfig = {};
 let activeThemeName = '';
 let audiobookPublishedEdition = null;
 let audiobookJobs = [];
@@ -175,7 +177,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   opdsServiceEnabled = true;
   pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
   pluginConnections = pluginInstallations
-    .filter(item => ['talebook.source.opds', 'talebook.source.legado'].includes(item.plugin_key))
+    .filter(item => item.definition.connection_owners.includes('instance'))
     .map(installation => mockPluginConnection(installation));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
@@ -185,6 +187,8 @@ router.post('/_test/reset', eventHandler(async (event) => {
   wereadRunId = 500;
   wereadConfigured = false;
   wereadRuns = new Map();
+  brsConfigured = false;
+  brsConfig = {};
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
@@ -912,8 +916,6 @@ router.get('/api/admin/settings', eventHandler(() => ({
     smtp_password: 'password',
     smtp_encryption: 'SSL',
     AUDIOBOOK_BACKUP_RETENTION: 3,
-    META_ALL_SOURCES: ['douban_v2', 'baidu', 'xinhua', 'booksource', 'ai'],
-    META_SELECTED_SOURCES: ['douban_v2', 'baidu', 'booksource']
   }
 })));
 
@@ -1061,6 +1063,7 @@ router.post('/api/book/:id/edit', eventHandler(() => ({
 router.get('/api/book/:id/refer', eventHandler(() => {
   const frames = [
     { err: 'ok' },
+    { event: 'progress', failures: [], total: 2, completed: 0 },
     {
       title: 'Mock Metadata Result',
       author: 'Mock Author',
@@ -1071,6 +1074,12 @@ router.get('/api/book/:id/refer', eventHandler(() => {
       provider_key: 'BookSource',
       provider_value: 'signed-token',
       comments: 'Mock metadata introduction'
+    },
+    {
+      event: 'progress',
+      failures: [{ source: 'Online Source B', code: 'timeout', message: '查询超时' }],
+      total: 2,
+      completed: 1
     },
     {
       event: 'summary',
@@ -1375,11 +1384,21 @@ router.post('/api/book/:id/readstate', eventHandler(async (event) => {
   };
 }));
 
-router.get('/api/user/devices', eventHandler(() => ({
-  err: 'ok',
-  devices: [],
-  device_types: [],
-})));
+router.get('/api/user/devices', eventHandler(() => {
+  const defaultPorts = { boox: 8085 };
+  const deviceTypes = pluginInstallations
+    .filter(installation => installation.enabled && installation.status === 'active')
+    .filter(installation => installation.definition.capabilities.includes('integrations.push'))
+    .map((installation) => {
+      const value = installation.definition.ui.device_type;
+      return {
+        text: installation.definition.name,
+        value,
+        default_port: defaultPorts[value] || 12121,
+      };
+    });
+  return { err: 'ok', devices: [], device_types: deviceTypes };
+}));
 
 // The book detail page probes TXT parsing state for every format. Keep the
 // mock response successful so that this background probe does not open the
@@ -1446,9 +1465,16 @@ const wereadConnection = () => ({
 
 router.post('/api/plugins/connections', eventHandler(async (event) => {
   const body = await readBody(event);
-  if (body?.plugin_key !== 'talebook.combo.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
-  if (body?.credentials?.api_key) wereadConfigured = true;
-  return { err: 'ok', connection: wereadConnection() };
+  if (body?.plugin_key === 'talebook.combo.weread') {
+    if (body?.credentials?.api_key) wereadConfigured = true;
+    return { err: 'ok', connection: wereadConnection() };
+  }
+  if (body?.plugin_key === 'talebook.annotation.brs') {
+    if (body?.credentials?.email && body?.credentials?.password) brsConfigured = true;
+    brsConfig = body?.config || {};
+    return { err: 'ok', connection: brsConnection() };
+  }
+  return { err: 'plugin.not_found', msg: 'plugin not found' };
 }));
 
 router.get('/api/plugins/talebook.combo.weread', eventHandler(() => ({
@@ -1458,10 +1484,48 @@ router.get('/api/plugins/talebook.combo.weread', eventHandler(() => ({
   runs: [...wereadRuns.values()].map(value => value.run),
 })));
 
+const brsConnection = () => ({
+  id: 89,
+  installation_id: pluginInstallations.find(item => item.plugin_key === 'talebook.annotation.brs')?.id,
+  owner_type: 'user',
+  owner_id: 1,
+  role: 'default',
+  name: 'talebook-brs',
+  enabled: true,
+  health: 'unknown',
+  config: { ...brsConfig },
+  secret: { configured: brsConfigured, mask: brsConfigured ? '••••mail' : '' },
+});
+
+router.get('/api/plugins/talebook.annotation.brs', eventHandler(() => {
+  const installation = pluginInstallations.find(item => item.plugin_key === 'talebook.annotation.brs');
+  return {
+    err: 'ok',
+    plugin: pluginDefinitions.find(item => item.plugin_key === 'talebook.annotation.brs'),
+    installation,
+    connections: brsConfigured ? [brsConnection()] : [],
+    runs: [],
+  };
+}));
+
 router.get('/api/plugins/tools/books', eventHandler(() => ({
   err: 'ok',
   books: [{ id: 1, title: '测试书', authors: ['测试作者'], formats: ['EPUB', 'TXT'] }],
 })));
+
+router.get('/api/plugins/tools/book-actions', eventHandler((event) => {
+  const bookId = Number(getQuery(event).book_id || 0);
+  const installation = pluginInstallations.find(item => item.plugin_key === 'talebook.tool.txt-fixer');
+  const actions = installation?.enabled && installation.status === 'active' && bookId === 1
+    ? [{
+        plugin_key: 'talebook.tool.txt-fixer',
+        name: 'TXT 编码修复',
+        icon: 'mdi-file-restore-outline',
+        route: '/plugins/txt-fixer',
+      }]
+    : [];
+  return { err: 'ok', actions };
+}));
 
 router.post('/api/plugins/:pluginKey/features/:action', eventHandler(async (event) => {
   const pluginKey = getRouterParam(event, 'pluginKey');
@@ -1577,21 +1641,21 @@ const pluginDefinitions = [
     actions: ['test'],
     permissions: ['books.read', 'books.write', 'network.read'],
     connection_owners: ['instance'],
-    ui: { icon: 'mdi-rss-box', manage_dialog: 'opds', manage_label_key: 'pluginManagement.browse', primary_action: 'browse', service_toggle: 'opds' },
+    ui: { icon: 'mdi-rss-box', manage_dialog: 'opds', configuration_mode: 'manager', primary_action: 'browse', service_toggle: 'opds' },
   },
   {
     id: 3,
     plugin_key: 'talebook.source.legado',
     name: 'Legado 在线书源',
-    description: '管理、导入、搜索、阅读与体检兼容 Legado 的在线书源。',
+    description: '管理、导入、搜索、阅读并使用兼容 Legado 的在线书源补全书籍信息。',
     version: '1.0.0',
     runtime_kind: 'builtin',
-    categories: ['book_sources'],
-    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    categories: ['book_sources', 'metadata'],
+    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire', 'metadata.lookup'],
     actions: ['test'],
     permissions: ['books.read', 'books.write', 'network.read'],
     connection_owners: ['instance'],
-    ui: { icon: 'mdi-book-cog-outline', manage_dialog: 'legado', manage_label_key: 'pluginManagement.manage', primary_action: 'manage' },
+    ui: { icon: 'mdi-book-cog-outline', manage_route: '/plugins/legado', configuration_mode: 'manager', primary_action: 'open' },
   },
   {
     id: 4,
@@ -1616,7 +1680,55 @@ const pluginDefinitions = [
       },
     },
     auth_schema: { type: 'object', properties: {} },
-    ui: { icon: 'mdi-folder-eye-outline', manage_kind: 'book_source', primary_action: 'configure' },
+    ui: { icon: 'mdi-folder-eye-outline', manage_kind: 'book_source', configuration_mode: 'form', primary_action: 'configure' },
+  },
+  {
+    id: 11,
+    plugin_key: 'talebook.source.standard-ebooks',
+    name: 'Standard Ebooks · 最新上架',
+    description: '浏览 Standard Ebooks 官方开放的最新公共版权电子书。',
+    version: '1.0.0',
+    runtime_kind: 'http',
+    categories: ['book_sources'],
+    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    permissions: ['books.read', 'books.write', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-bookshelf', manage_kind: 'book_source', configuration_mode: 'none', primary_action: 'preview', catalog_access: 'public_free' },
+  },
+  {
+    id: 12,
+    plugin_key: 'talebook.source.gutenberg',
+    name: 'Project Gutenberg',
+    description: '检索 Project Gutenberg 的合法开放电子书。',
+    version: '1.0.0',
+    runtime_kind: 'http',
+    categories: ['book_sources'],
+    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    permissions: ['books.read', 'books.write', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-bookshelf', manage_kind: 'book_source', configuration_mode: 'none', primary_action: 'preview', catalog_access: 'public_free' },
+  },
+  {
+    id: 13,
+    plugin_key: 'talebook.source.internet-archive',
+    name: 'Internet Archive',
+    description: '检索 Internet Archive；仅明确开放文件可进入待审取得。',
+    version: '1.0.0',
+    runtime_kind: 'http',
+    categories: ['book_sources'],
+    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    permissions: ['books.read', 'books.write', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-archive-outline', manage_kind: 'book_source', configuration_mode: 'none', primary_action: 'details', catalog_access: 'rights_vary' },
   },
   {
     id: 5,
@@ -1632,7 +1744,7 @@ const pluginDefinitions = [
     config_schema: { type: 'object', properties: { queries: { type: 'array' } } },
     permissions: ['books.read', 'plugin_records.write', 'network.read'],
     connection_owners: ['instance'],
-    ui: { icon: 'mdi-library-outline', primary_action: 'configure' },
+    ui: { icon: 'mdi-library-outline', brand_icon: '/images/plugin-icons/open-library.png', configuration_mode: 'none', primary_action: 'details' },
   },
   {
     id: 6,
@@ -1646,23 +1758,23 @@ const pluginDefinitions = [
     actions: ['test', 'preview', 'run', 'retry', 'rollback'],
     permissions: ['books.read', 'books.write', 'profile.read', 'annotations.write'],
     connection_owners: ['user'],
-    ui: { icon: 'mdi-book-open-page-variant', manage_route: '/plugins/weread', manage_label_key: 'pluginManagement.openWorkbench' },
+    ui: { icon: 'mdi-book-open-page-variant', brand_icon: '/images/plugin-icons/weread.png', manage_route: '/plugins/weread' },
   },
   {
     id: 7,
     plugin_key: 'talebook.meta.calibre',
-    name: 'Google Books / Amazon',
-    description: '通过 Calibre 元数据能力查询 Google Books 与 Amazon。',
+    name: 'Calibre 元数据',
+    description: '书籍信息检索默认启用 Google Books（Google）、Amazon.com 与 Edelweiss；Calibre 运行时同时启用 Big Book Search、Google Images 与 Open Library 封面来源。',
     version: '1.0.0',
     runtime_kind: 'builtin',
     categories: ['metadata'],
     capabilities: ['metadata.lookup'],
     actions: ['test'],
     auth_schema: { type: 'object', properties: {} },
-    config_schema: { type: 'object', properties: { sources: { type: 'array', items: { type: 'string' } } } },
+    config_schema: { type: 'object', properties: {} },
     permissions: ['books.read', 'network.read'],
     connection_owners: ['instance'],
-    ui: { icon: 'mdi-google', primary_action: 'configure' },
+    ui: { icon: 'mdi-google', brand_icon: '/images/plugin-icons/calibre.svg', configuration_mode: 'none', primary_action: 'details' },
   },
   {
     id: 8,
@@ -1678,7 +1790,7 @@ const pluginDefinitions = [
     config_schema: { type: 'object', properties: { trigger: { type: 'string', enum: ['manual', 'auto'] } } },
     permissions: ['books.read', 'books.write'],
     connection_owners: ['instance'],
-    ui: { icon: 'mdi-file-restore-outline', manage_route: '/plugins/txt-fixer', manage_label_key: 'pluginManagement.openTool' },
+    ui: { icon: 'mdi-file-restore-outline', manage_route: '/plugins/txt-fixer' },
   },
   {
     id: 9,
@@ -1694,7 +1806,30 @@ const pluginDefinitions = [
     config_schema: { type: 'object', properties: { device_url: { type: 'string' } } },
     permissions: ['books.read', 'network.write'],
     connection_owners: ['user'],
-    ui: { icon: 'mdi-tablet-android', manage_route: '/user/detail?tab=devices', manage_label_key: 'pluginManagement.manageDevices', primary_action: 'configure', device_type: 'boox' },
+    ui: { icon: 'mdi-tablet-android', manage_route: '/user/detail?tab=devices', primary_action: 'configure', device_type: 'boox', default_port: 8085 },
+  },
+  {
+    id: 10,
+    plugin_key: 'talebook.annotation.brs',
+    name: 'talebook-brs 章评服务器',
+    description: '连接一个 talebook-brs 实例，按书籍与章节映射导入公开章评摘要。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['annotations'],
+    capabilities: ['annotations.chapter_reviews'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: {
+      type: 'object',
+      required: ['email', 'password'],
+      properties: { email: { type: 'string', writeOnly: true }, password: { type: 'string', writeOnly: true } },
+    },
+    config_schema: {
+      type: 'object',
+      properties: { endpoint: { type: 'string', default: 'https://brs.talebook.org' }, book_map: { type: 'object' }, chapter_map: { type: 'object' }, segment_map: { type: 'object' } },
+    },
+    permissions: ['books.read', 'plugin_records.write', 'network.read'],
+    connection_owners: ['user'],
+    ui: { icon: 'mdi-comment-text-multiple-outline', manage_route: '/plugins/brs' },
   },
 ];
 let pluginInstallations = pluginDefinitions.map((definition, index) => ({
@@ -1710,6 +1845,7 @@ const mockPluginConnection = installation => ({
   installation_id: installation.id,
   owner_type: 'instance',
   owner_id: 0,
+  role: '__builtin__',
   name: '内置连接',
   enabled: true,
   health: 'unknown',
@@ -1718,9 +1854,11 @@ const mockPluginConnection = installation => ({
   config: {},
 });
 let pluginConnections = pluginInstallations
-  .filter(installation => ['talebook.source.opds', 'talebook.source.legado'].includes(installation.plugin_key))
+  .filter(installation => installation.definition.connection_owners.includes('instance'))
   .map(installation => mockPluginConnection(installation));
 let opdsServiceEnabled = true;
+let pluginMetadataPreferences = { auto_fill_meta: false, auto_fill_keep_cover: false };
+let globalPluginDevices = [];
 
 router.get('/api/admin/plugins', eventHandler(() => ({
   err: 'ok',
@@ -1736,14 +1874,30 @@ router.get('/api/admin/plugins/connections', eventHandler(() => ({
   err: 'ok', connections: pluginConnections, user_connection_health: [],
 })));
 
+router.get('/api/plugins', eventHandler(() => ({
+  err: 'ok',
+  plugins: pluginDefinitions
+    .filter(definition => definition.connection_owners.includes('user'))
+    .map((definition) => {
+      const installation = pluginInstallations.find(item => item.plugin_key === definition.plugin_key);
+      const connections = definition.plugin_key === 'talebook.combo.weread'
+        ? (wereadConfigured ? [wereadConnection()] : [])
+        : definition.plugin_key === 'talebook.annotation.brs' && brsConfigured
+          ? [brsConnection()]
+          : [];
+      return { ...definition, installation, connections, latest_run: null };
+    }),
+})));
+
 router.post('/api/admin/plugins/connections', eventHandler(async (event) => {
   const body = await readBody(event);
   const installation = pluginInstallations.find(item => item.id === Number(body.installation_id));
-  const existing = pluginConnections.find(item => item.installation_id === installation.id && item.name === body.name);
+  const existing = pluginConnections.find(item => item.installation_id === installation.id && item.role === (body.role || 'default'));
   const connection = {
     ...(existing || mockPluginConnection(installation)),
     id: existing?.id || Math.max(0, ...pluginConnections.map(item => item.id)) + 1,
     name: body.name || 'default',
+    role: body.role || 'default',
     config: body.config || {},
     scopes: body.scopes || [],
     secret: { configured: Object.keys(body.credentials || {}).length > 0, mask: '' },
@@ -1763,6 +1917,66 @@ router.post('/api/admin/plugins/opds-service', eventHandler(async (event) => {
   const body = await readBody(event);
   opdsServiceEnabled = Boolean(body.enabled);
   return { err: 'ok', enabled: opdsServiceEnabled };
+}));
+
+router.get('/api/admin/plugins/preferences', eventHandler(() => ({
+  err: 'ok', metadata: pluginMetadataPreferences, devices: globalPluginDevices,
+})));
+
+router.post('/api/admin/plugins/preferences', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body.metadata) pluginMetadataPreferences = { ...pluginMetadataPreferences, ...body.metadata };
+  if (body.devices) globalPluginDevices = body.devices;
+  return { err: 'ok', metadata: pluginMetadataPreferences, DEVICES: globalPluginDevices };
+}));
+
+router.post('/api/admin/plugins/:pluginKey/metadata/search', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const query = body?.query || {};
+  return {
+    err: 'ok',
+    capability: 'metadata.lookup',
+    items: [{
+      title: query.title || '活着',
+      authors: query.authors?.length ? query.authors : ['余华'],
+      publisher: query.publisher || '作家出版社',
+      isbn: query.isbn || '9787506365437',
+      rating: 8.8,
+      provider_value: 'mock-metadata-result',
+    }],
+  };
+}));
+
+router.post('/api/admin/plugins/:pluginKey/source/search', eventHandler(async (event) => {
+  const body = await readBody(event);
+  return {
+    err: 'ok',
+    capability: 'book_sources.search',
+    items: [{
+      external_id: 'standard-ebooks:pride-and-prejudice',
+      title: `${body?.query || 'Pride'} and Prejudice`,
+      authors: ['Jane Austen'],
+      format: 'epub',
+      access: 'download',
+    }],
+    failures: [],
+    has_more: false,
+  };
+}));
+
+router.post('/api/admin/plugins/:pluginKey/reviews/lookup', eventHandler(async (event) => {
+  const body = await readBody(event);
+  return {
+    err: 'ok',
+    capability: 'reviews.lookup',
+    items: [{
+      source: 'Google Books',
+      external_id: `google-books:${body?.query?.isbn || 'unknown'}`,
+      rating: { value: 4.5, scale: 5, sample_count: 120 },
+    }],
+    failures: [],
+    has_more: false,
+  };
 }));
 
 router.get('/api/admin/plugins/runs', eventHandler(() => ({ err: 'ok', runs: pluginRuns })));

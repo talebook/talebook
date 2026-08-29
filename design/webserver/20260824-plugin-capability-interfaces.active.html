@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Talebook 插件系统能力接口重构方案：以类型化能力接口取代单一 execute，解耦通用运行时与具体插件。" />
     <link rel="icon" href="data:," />
-    <title>插件能力接口重构 · WIP</title>
+    <title>插件能力接口重构 · ACTIVE</title>
     <style>
       :root {
         color-scheme: light;
@@ -195,7 +195,7 @@
         <h1>用类型化能力接口取代单一 execute</h1>
         <p class="sub">插件不再只暴露一个 <code>execute(context)</code>，而是按元数据、笔记、评价、书源、格式转换等能力实现各自的类型化接口；业务流按能力遍历插件，通用运行时不再认识任何具体插件。</p>
         <div class="chips" aria-label="方案元信息">
-          <span class="chip wip">状态：WIP</span>
+          <span class="chip verified">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-08-24</span>
           <span class="chip">所属模块：webserver</span>
           <span class="chip">影响范围：webserver/plugins/ · webserver/services/ · webserver/handlers/ · app/pages/admin/plugins/ · app/pages/plugins/</span>
@@ -318,7 +318,7 @@
                 </tbody>
               </table>
             </div>
-            <div class="callout"><strong>事实与推断：</strong>以上全部为读代码确认的事实。尚未验证的假设是“把 <code>_fetch_all</code> 的内部分页改为平台续拉后，微信读书大账号的导入不会超时”——实现阶段需用真实账号或构造的多页 mock 验证，见测试计划 T-7。</div>
+            <div class="callout"><strong>事实与验证：</strong>以上初始判断均来自代码审查；分页改造随后通过 T-7 的三页续拉 mock 与分页归一化测试验证。真实大账号的上游响应时间仍取决于微信读书服务，平台使用游标续拉与统一超时预算控制风险。</div>
           </section>
 
           <section id="design" class="card">
@@ -834,9 +834,8 @@ for conn in runtime.connections_for(capability, user_id):
 ├── annotation/     # brs
 ├── tool/           # base / common / epub + text_replace / zh_converter / txt_fixer
 ├── push/           # duokan / boox / hanwang / ireader / dangdang / purelibro
-├── combo/          # open_library + weread/{provider,metadata,export}
-└── mock/           # multi_tab</code></pre>
-              <p><code>base.py</code> / <code>common.py</code> 只承载同类型插件真实共享的实现；不得出现仅为保留旧 import 而存在的 pass-through 模块。</p>
+└── combo/          # open_library + weread/{provider,metadata,export}</code></pre>
+              <p><code>base.py</code> / <code>common.py</code> 只承载同类型插件真实共享的实现；不得出现仅为保留旧 import 而存在的 pass-through 模块。用于证明跨类别、限流、重试和回滚的 deterministic Provider 只存在于 <code>tests/plugin_fixtures.py</code> 并使用测试专用 Registry，不进入生产插件树与自动物化集合。</p>
             </div>
 
             <h3>迁移成本评估</h3>
@@ -921,7 +920,7 @@ for conn in runtime.connections_for(capability, user_id):
               <strong>2026-08-27 S15 用户反馈（已验证）：</strong><code>register.py</code> 原先通过字符串替换从当前 ID 反向生成旧 ID，<code>SourceCatalogService</code> 又独立写死 Legado／OPDS 当前 ID；同时 source、自动安装和测试目录使用重叠的手写 provider 清单，改名或新增来源时容易产生不同形态。现已按 D-23 删除反向生成与两份次级清单，当前 ID 由具体插件导出并供绑定层复用；31 个 provider 每个只进入一个与目录一致的 <code>PROVIDER_GROUPS</code> 分组，启动安装直接从统一 registry 按 <code>auto_install</code> 生命周期标记派生。T-21 先观察到缺少新接缝的收集期红灯，随后聚焦 77 条与完整 1079 条后端测试通过。
             </div>
             <div class="callout good">
-              <strong>2026-08-27 S16 用户反馈（已验证）：</strong>用户要求删除 <code>plugin_writers.py</code> 对 <code>talebook.weread</code> 的 hardcode。现已按 D-24 撤销此前“保留历史短来源名”的决定：回归先观察到 2 个预期失败，随后删除 writer 分支和 annotation 默认短名；所有 provider 统一以完整 <code>plugin_key + connection.id</code> 生成来源与 client id。平台 writer 源码不再包含具体插件名，批注／插件 API／WeRead 聚焦回归 87 passed，完整后端 1080 passed。本 WIP 尚未合并，因而不为本分支生成的临时批注数据新增迁移或双读别名；已有开发库如需保留该临时数据，应在更新后重新导入。
+              <strong>2026-08-27 S16 用户反馈（已验证）：</strong>用户要求删除 <code>plugin_writers.py</code> 对 <code>talebook.weread</code> 的 hardcode。现已按 D-24 撤销此前“保留历史短来源名”的决定：回归先观察到 2 个预期失败，随后删除 writer 分支和 annotation 默认短名；所有 provider 统一以完整 <code>plugin_key + connection.id</code> 生成来源与 client id。平台 writer 源码不再包含具体插件名，批注／插件 API／WeRead 聚焦回归 87 passed，完整后端 1080 passed。该身份从未进入默认分支，因而不为开发期临时批注数据新增迁移或双读别名；已有开发库如需保留该临时数据，应在更新后重新导入。
             </div>
             <div class="callout good">
               <strong>2026-08-27 S17 用户反馈（已验证）：</strong>用户指出插件功能尚未发布，质疑为何需要身份迁移。核对结论：旧 ID 首次出现于 <code>01f0acf1</code>（2026-08-16，只在 <code>feat/plugins</code> 与本分支上），master 的 <code>webserver/plugins/</code> 下只有 <code>captcha/</code> 与 <code>meta/</code>，<code>git grep &quot;talebook.book-source&quot; master</code> 零命中——这 17 条迁移全部由本分支自己制造。用户确认不考虑历史兼容后，按 D-25 删除 <code>plugins/migrations.py</code>（28 行）、<code>migrate_builtin_plugin_keys()</code>（54 行）、<code>migrate_builtin_plugin_identities()</code>（19 行）与 <code>ensure_builtin_definitions()</code> 中的 checksum 回写分支，并移除随之失效的启动迁移测试与 4 个孤儿 import，合计 -223 行。T-18／T-19／T-21 的迁移子项相应作废，其余注册契约断言不变。
@@ -935,7 +934,7 @@ for conn in runtime.connections_for(capability, user_id):
             <div class="callout good">
               <strong>2026-08-28 S19 用户反馈（已验证）：</strong><code>ProxyImageHandler</code> 原先写死 7 个上游域名，导致平台 handler 认识百度百科、豆瓣、番茄、七猫与 WeRead 的具体部署细节。现已按 D-32 保持原访问范围不变，只移动所有权：百度百科声明 <code>bcebos.com</code>／<code>bdstatic.com</code>，豆瓣 V2 声明 <code>doubanio.com</code>，番茄声明 <code>byteimg.com</code>／<code>fanqienovel.com</code>，七猫声明 <code>wtzw.com</code>，WeRead 声明 <code>weread.qq.com</code>。Registry 是 handler 与具体 Provider 之间的唯一 seam，并集中处理大小写、尾点、精确域名与子域名匹配。T-25 在旧实现下先得到 3 个预期失败，完成实现后图片代理聚焦 20 passed、完整 <code>tests/test_upload.py</code> 70 passed；Docker 完整后端 <strong>1095 passed, 20 skipped</strong>，<code>make lint-py-fix</code> 与 <code>make lint-py</code> 均通过。
             </div>
-            <div class="callout warn"><strong>当前仍为 WIP：</strong>S1–S19 均已实现，T-22 至 T-26 已验证；T-14 已使用 Chrome DevTools MCP 在真实 Docker 后端上完成验收，并据此修复了 2 个 S18 引入的缺陷（registry 派发方法名写错导致元数据抓取整体静默失效、新华书店查询语义漂移）以及 1 处内部 plugin id 外泄到用户提示。完整后端 1108 passed, 20 skipped；<code>make lint-py</code> 通过。转 ACTIVE 前尚需在修复后重跑一次 <code>interface-review full</code>。</div>
+            <div class="callout good"><strong>方案已生效：</strong>S1–S19 均已实现，T-1 至 T-26 的适用项已验证；真实 Docker 后端验收据此修复了 registry 派发静默失效、新华书店查询语义漂移以及内部 plugin id 外泄。后续插件中心连续交互改造又完成一次相对 <code>origin/master</code> 的 <code>interface-review full</code>，Introduced / Regression 均为 0，结论 Approve。完整后端阶段记录为 1108 passed, 20 skipped；最新增量按用户要求使用聚焦回归收口。</div>
             <div class="callout good">
               <strong>实际执行记录（2026-08-25—27）</strong>
               <p>宿主 Python 环境缺 <code>calibre</code>；不依赖 Calibre 的运行时单测使用仓库 venv，完整后端套件与 HTTP 端到端回归通过项目测试镜像执行：</p>
@@ -1046,7 +1045,7 @@ cd app &amp;&amp; npx vitest run test/components test/composables test/plugins t
   → 92 passed；另 4 个非改动套件因测试环境无法解析 #build/i18n-options.mjs 失败
 make pytest               → 宿主机无 pytest 可执行文件；以上 Docker 全量结果为等价替代
 make build-dev            → talebook/talebook:dev 构建成功
-make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结构 / 单文件资源均通过</code></pre>
+make check-design         → ACTIVE 路径、HTML 结构、单文件资源与合并门禁均通过</code></pre>
               <p>分支 <code>refactor/20260824-plugin-capability-interfaces</code>，基线 <code>origin/feat/plugins</code> @ 8c3601e8。</p>
               <p>后端测试从基线的 966 增至 <strong>1080</strong>；最终全量测试零回归。</p>
             </div>
@@ -1095,14 +1094,14 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>T-21</td><td>当前注册逻辑不含旧 ID 字符串改写；canonical Legado／OPDS ID 只在具体插件定义一次并被绑定层复用；每个 provider 只进入一个类型清单，自动安装来源由显式生命周期标记派生；S17 后旧 ID 在代码库中已无任何出现</td><td><code>tests/test_plugin_contract.py</code> 的装配／单一事实源架构断言，<code>tests/test_plugin_runtime.py</code> 的自动安装回归，<code>tests/test_book_source_plugins.py</code> 的来源目录回归；聚焦 77 passed，完整后端 1079 passed</td><td class="verified">已通过</td></tr>
                   <tr><td>T-22</td><td>通用实体 writer 不含具体插件名或 plugin key；WeRead 与其他 annotation provider 都使用完整 plugin key 作为 source name，并把 connection id 纳入 client id；多账户 external id 不冲突</td><td><code>tests/test_plugin_entity_writers.py</code> 的平台源码架构断言、WeRead 身份与多账户回归；实体 writer 10 passed，相关聚焦 87 passed，完整后端 1080 passed</td><td class="verified">已通过</td></tr>
                   <tr><td>T-15</td><td>设备推送走插件：认证用户按 manifest <code>ui.device_type</code> 解析 provider，handler 无设备白名单，创建/复用个人连接后调 <code>runtime.sync</code>；成功产生 action=sync 的 succeeded run 并释放 lease，失败产生 failed run 并记录脱敏错误；专用 <code>PUSH_TIMEOUT</code> 与 context deadline 限制底层 requests；游客仅保留无连接/无 run 的 runtime 桥。双开关优先级明确：全局开关先决，未安装内置 provider 保持历史兼容，已有安装的 disabled / 非 active 状态优先且不可绕过</td><td><code>tests/test_main.py</code> 与 <code>tests/test_plugin_capability_lookup.py</code>，含声明式新设备、成功、失败、超时预算、租约、配置复用、未安装游客兼容与禁用安装不可绕过</td><td class="verified">已通过</td></tr>
-                  <tr><td>T-12</td><td>后端最新 1095 passed / 20 skipped；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（468 warnings 为存量）；原相关 Vitest 11 passed，S14 组件回归 3 passed；相关 Playwright 31/31、插件管理页 ID 夹具 10 passed、S14 WeRead 回归 2 passed；<code>make check-design</code> 仅报 WIP 合并门禁</td><td>见上方命令记录；全量 Vitest 的 4 个 Nuxt i18n 虚拟模块环境失败单独记录，非本次回归</td><td class="verified">已通过</td></tr>
+                  <tr><td>T-12</td><td>后端阶段记录 1095 passed / 20 skipped；<code>make lint-py-fix</code> 与 <code>make lint-py</code> 全过；前端 <code>npm run lint</code> <strong>0 errors</strong>（468 warnings 为存量）；原相关 Vitest 11 passed，S14 组件回归 3 passed；相关 Playwright 31/31、插件管理页 ID 夹具 10 passed、S14 WeRead 回归 2 passed；最终 <code>make check-design</code> 通过</td><td>见上方命令记录；全量 Vitest 的 4 个 Nuxt i18n 虚拟模块环境失败单独记录，非本次回归</td><td class="verified">已通过</td></tr>
                   <tr><td>T-13</td><td>界面审查（<code>full</code> 模式）</td><td>相对 <code>origin/master</code> 审查 177 个纳入范围文件、26 个生产界面源文件与 5 个消费者；最新 S14 增量无模板／样式／文案变化，六个 owner domain 复审无新增问题</td><td class="verified">Approve</td></tr>
                   <tr><td>T-26</td><td>registry 派发不得被静默吞掉：所有映射到的 <code>talebook.meta.*</code> 均可经共享 <code>REGISTRY</code> 解析；<code>_make_metadata_task</code> 真正调用到 provider，未注册插件才返回空；新华书店只对 13 位 ISBN 发起上游查询；失败摘要 source 使用 manifest 名而非 plugin id</td><td><code>tests/test_meta_providers.py</code> 新增 4 组用例（含 10 个 plugin id 的参数化解析）；完整后端 1108 passed, 20 skipped；<code>make lint-py</code> 通过</td><td class="verified">已通过</td></tr>
                   <tr><td>T-14</td><td>真实后端体验验证：系统设置页豆瓣配置行与提示条已移除、元数据源列表无旧 <code>douban</code>；书籍详情「从互联网更新信息」可取回真实元数据；失败摘要只显示来源展示名</td><td>Chrome DevTools MCP 操作真实浏览器（<code>http://127.0.0.1:3000/</code>）+ Docker 真实后端（10 本书真实书库），无 mock</td><td class="verified">已通过（修复 2 个缺陷后复验）</td></tr>
                 </tbody>
               </table>
             </div>
-            <div class="callout"><strong>界面影响判定：</strong>本方案属于跨模块的大型功能且影响前端消费者（插件管理页、工作台、在线书库、书籍详情），因此<strong>不适用</strong>“无界面影响”豁免；T-13 已完成，仍须补齐 T-14 指定的 Chrome DevTools MCP 验收。2026-08-27 的书源 ID 与目录 seam 收口仅改变 canonical ID、数据库迁移、Python 模块归属与测试夹具；S14 只替换 WeRead API transport、轮询与卸载清理，未修改模板、布局、样式或文案；S15 只调整后端注册装配、启动生命周期与兼容迁移；S16 只统一后端批注来源身份，不改变 manifest、HTTP 形状、模板或任何视觉结果；S19 只移动后端图片代理域名声明和匹配所有权，HTTP 路径、允许范围、响应形状与前端代码均不变。前端仍呈现相同 manifest/capability 和交互结果，<code>npm run lint</code> 0 errors，最新 full review 仍为 Approve。</div>
+            <div class="callout"><strong>界面影响判定：</strong>本方案属于跨模块的大型功能且影响前端消费者（插件管理页、工作台、在线书库、书籍详情），因此<strong>不适用</strong>“无界面影响”豁免；T-13 与 T-14 均已完成。后续插件中心方案又以 <code>full</code> 模式复审当前分支相对默认分支的全部变更，Accessibility、Layout、Writing、Typography、Colors、UI 六域无 HIGH / MEDIUM 遗留，结论 Approve。Chrome DevTools MCP 不可用的后续轮次使用项目 Playwright 实际 Chromium 渲染替代，并在配套 app 方案记录范围和剩余风险。</div>
           </section>
 
           <section id="decisions" class="card">
@@ -1134,7 +1133,7 @@ make check-design         → 仅报 WIP 合并门禁一条，路径 / HTML 结�
                   <tr><td>D-20</td><td><code>plugins/runtime/</code> 只放平台能力；具体插件使用 <code>plugins/{type}/{name}.py</code> 或包目录，唯一装配入口为 <code>plugins/register.py</code>，旧 runtime 具体模块直接删除</td><td>平台 interface 是稳定 seam，具体 adapter 必须在插件模块内保持 locality；转发模块会继续让调用者依赖错误目录并掩盖结构回退</td><td>只移动 Weread；只移动 provider 包装而保留专属实现；runtime 留兼容 re-export</td></tr>
                   <tr><td>D-21</td><td>插件类型目录统一为单数；综合型多能力插件归 <code>combo</code>；<code>talebook.reviews.*</code> / <code>talebook.annotations.*</code> 改为 <code>talebook.review.*</code> / <code>talebook.annotation.*</code>，同样直接改名不迁移</td><td>类型目录与 canonical ID 保持一致；<code>combo</code> 表达多个 capability 打包成一体，而不把实现复杂度写进分类</td><td>沿用复数历史 ID；按多个能力把 Weread 拆散；使用含义过重的 integrations/suite</td></tr>
                   <tr><td>D-23</td><td>具体插件模块是 canonical ID 的单一事实源。Provider 在 <code>register.py</code> 只进入一个类型清单，自动安装由 <code>auto_install</code> 生命周期标记派生</td><td>字符串规则会把未来新插件误判为拥有旧身份，跨模块写死当前 ID 会形成双真相；重叠手写清单让插件分类与启动行为耦合。显式迁移、共享常量和派生视图把变化集中在正确的 module seam</td><td>继续从当前 ID 反向生成旧 ID；在绑定层复制 ID；同时维护 source／book-source／builtin 三套 provider 元组</td></tr>
-                  <tr><td>D-24</td><td>Annotation 来源身份统一为完整 <code>plugin_key</code>，client id 统一包含 <code>connection.id</code>；删除平台 writer 对微信读书短名的特判</td><td>具体插件名称不属于通用 writer 接口；统一推导规则更小、更可预测，并天然隔离同插件多账户。当前 WIP 未合并，不为开发期临时身份增加永久迁移负担</td><td>保留 <code>talebook.weread → weread</code> hardcode（平台继续认识插件）；把 hardcode 搬到另一个平台文件（只转移技术债）；长期双读两套身份（扩大接口）</td></tr>
+                  <tr><td>D-24</td><td>Annotation 来源身份统一为完整 <code>plugin_key</code>，client id 统一包含 <code>connection.id</code>；删除平台 writer 对微信读书短名的特判</td><td>具体插件名称不属于通用 writer 接口；统一推导规则更小、更可预测，并天然隔离同插件多账户。旧身份未进入默认分支，不为开发期临时数据增加永久迁移负担</td><td>保留 <code>talebook.weread → weread</code> hardcode（平台继续认识插件）；把 hardcode 搬到另一个平台文件（只转移技术债）；长期双读两套身份（扩大接口）</td></tr>
                   <tr><td>D-26</td><td>推翻「不迁移 legacy <code>plugins/meta/*</code>」的非目标：9 个活跃元数据源（douban、douban_v2、baike、calibre、xhsd、tomato、qimao、ai、neodb）实现 <code>MetadataProvider</code> 并注册；<code>plugins/metadata/</code> 的 2 个 provider 并入同一目录，前缀统一 <code>talebook.meta.*</code>。combo 两个 ID 补类型段</td><td>元数据源是插件体系中最后一类仍走私有机制的能力：配置在 <code>CONF</code>、调用在 <code>book.py</code> 的手写闭包、身份是与 plugin ID 无关的第三套 KEY。留在体系外意味着管理页、连接、权限、run 审计对它们全部失效。目录与 ID 类型段一致后，8 个分组再无命名例外</td><td>维持现状（元数据源永久游离于插件体系）；只改 ID 不迁实现（制造名实不符）；把 <code>plugins/metadata/</code> 与 <code>plugins/meta/</code> 长期并存（两个目录同义，新增插件无处可放）</td></tr>
                   <tr><td>D-27</td><td>元数据源配置双读：<code>connection.config</code> 存在则优先，缺失回落 <code>CONF</code>。需要一张 <code>META_SELECTED_SOURCES</code> 取值到 plugin ID 的映射表，其中 <code>google</code>／<code>amazon</code> 同映射到 <code>talebook.meta.calibre</code> 的不同 <code>sources</code> 参数，<code>booksource</code> 不映射到任何 meta 插件</td><td>与 S17 删掉的迁移相反，<code>douban_apikey</code>、<code>META_SELECTED_SOURCES</code> 等已随正式版本发布并写在用户的 <code>auto.py</code> 中，属于真实存量。双读让既有部署不改配置即可运行，同时新配置走插件页。<code>connection</code> 优先才能让用户在插件页做的修改真正生效</td><td>只读 <code>CONF</code>（元数据源成为唯一不可在插件页配置的一类）；只读 <code>connection</code> 并写一次性迁移（已发布配置存在用户手改，迁移失配即静默丢配置）；<code>CONF</code> 优先（插件页改了不生效，与管理页语义矛盾）</td></tr>
                   <tr><td>D-28</td><td><code>MetadataProvider</code> 接口维持 <code>search_books(query, context)</code> + <code>get_metadata(external_id, context)</code> 两个方法不扩展；ISBN 与「标题+作者」两种查询由 provider 内部按 query 形状自行分派</td><td>9 个 legacy 插件的查询方法形状各异（<code>get_book</code>／<code>get_book_by_isbn</code>／<code>search_book</code>／<code>search_books(keyword, page)</code>／<code>MetaPlugin</code> 类／classmethod），若逐一映射进平台接口会把 9 份历史差异固化成公共契约。既有 <code>open-library</code> 已用自由文本 query，沿用同一惯例</td><td>给接口加 <code>get_by_isbn</code>（为 3 个插件扩公共契约）；用 <code>context</code> 传查询类型 hint（把分派逻辑移到调用方，每个消费者都要理解 9 种差异）</td></tr>

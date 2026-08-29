@@ -241,6 +241,7 @@ class XhsdBookApi:
 
 
 class XhsdProvider(MetaSourceMixin, XhsdBookApi):
+    legacy_sources = ("xinhua",)
     """新华书店：仅支持 ISBN 精确查询，标题查询由上游其他源覆盖。"""
 
     manifest = meta_manifest(
@@ -249,6 +250,7 @@ class XhsdProvider(MetaSourceMixin, XhsdBookApi):
         "按 ISBN 从新华书店商品页抓取书名、作者、出版社与封面。",
         "mdi-store",
         "https://www.xhsd.com/",
+        brand_icon="/images/plugin-icons/xhsd.ico",
     )
 
     def __init__(self):

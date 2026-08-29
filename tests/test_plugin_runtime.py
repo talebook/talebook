@@ -5,23 +5,27 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from tests.plugin_fixtures import MockMultiTabProvider
 from webserver.models import (
     Base,
     PluginConnection,
     PluginDefinition,
+    PluginInstallation,
     PluginPermission,
     PluginRunItem,
     PluginSecret,
     PluginSourceRecord,
 )
-from webserver.plugins.mock.multi_tab import MockMultiTabProvider
+from webserver.plugins.register import PROVIDER_GROUPS
 from webserver.plugins.runtime import PluginManifest
 from webserver.plugins.runtime.protocol import ManifestError
 from webserver.services.plugin_runtime import (
+    REGISTRY,
+    PluginRegistry,
     PluginRuntime,
     PluginRuntimeError,
-    ensure_auto_installations,
     ensure_builtin_definitions,
+    ensure_builtin_installations,
     install_builtin,
     rotate_connection_secret,
     save_connection,
@@ -31,6 +35,8 @@ from webserver.services.plugin_secrets import SecretCipher, SecretCipherError, r
 
 SETTINGS = {"PLUGIN_SECRET_KEY": "unit-test-plugin-key", "cookie_secret": "unused-cookie-secret"}
 PLUGIN_KEY = MockMultiTabProvider.manifest["id"]
+TEST_REGISTRY = PluginRegistry()
+TEST_REGISTRY.register(MockMultiTabProvider())
 
 
 @pytest.fixture
@@ -46,7 +52,7 @@ def db_session():
 
 
 def build_connection(session, credentials=None, config=None, owner_type="instance", owner_id=0):
-    installation = install_builtin(session, PLUGIN_KEY, installed_by=1)
+    installation = install_builtin(session, PLUGIN_KEY, installed_by=1, registry=TEST_REGISTRY)
     return save_connection(
         session,
         SETTINGS,
@@ -59,7 +65,7 @@ def build_connection(session, credentials=None, config=None, owner_type="instanc
 
 
 def execute(session, connection, action="run", parent_run_id=None):
-    runtime = PluginRuntime(session, SETTINGS, sleeper=lambda _: None)
+    runtime = PluginRuntime(session, SETTINGS, registry=TEST_REGISTRY, sleeper=lambda _: None)
     run = runtime.prepare_run(connection.id, action, requested_by=1, parent_run_id=parent_run_id)
     runtime.execute(run.id)
     session.refresh(run)
@@ -92,8 +98,8 @@ def test_manifest_forbids_plaintext_secret_defaults():
 
 
 def test_builtin_definition_installation_and_permissions_are_shared(db_session):
-    definitions = ensure_builtin_definitions(db_session)
-    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=7)
+    definitions = ensure_builtin_definitions(db_session, registry=TEST_REGISTRY)
+    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=7, registry=TEST_REGISTRY)
     definition = db_session.get(PluginDefinition, installation.definition_id)
 
     assert len(definitions) >= 1
@@ -119,17 +125,41 @@ def test_builtin_capabilities_are_registered_without_ai_or_calibre_server(db_ses
     opds_ui = builtins["talebook.source.opds"].to_public_dict()["ui"]
     assert opds_ui["manage_dialog"] == "opds"
     assert "manage_kind" not in opds_ui
+    legado_ui = builtins["talebook.source.legado"].to_public_dict()["ui"]
+    assert legado_ui["manage_route"] == "/plugins/legado"
+    assert "manage_label_key" not in legado_ui
     tool_ui = builtins["talebook.tool.text-replace"].to_public_dict()["ui"]
     assert tool_ui["manage_route"] == "/plugins/text-replace"
 
 
-def test_auto_installation_is_idempotent_and_keeps_empty_auth_local(db_session):
-    settings = {**SETTINGS, "auto_fill_meta": False}
-    first = ensure_auto_installations(db_session, installed_by=1, settings=settings)
-    second = ensure_auto_installations(db_session, installed_by=1, settings=settings)
+def test_enabled_providers_follow_active_installation_state(db_session):
+    install_builtin(db_session, "talebook.push.boox", installed_by=7)
+    install_builtin(db_session, "talebook.source.opds", installed_by=7)
+    runtime = PluginRuntime(db_session, SETTINGS)
 
-    assert len(first) == len(second) == 5
-    assert db_session.query(PluginConnection).count() == 5
+    providers = runtime.enabled_providers("integrations.push")
+    assert [provider.manifest["id"] for provider in providers] == ["talebook.push.boox"]
+
+    installation = db_session.query(PluginInstallation).filter(PluginInstallation.plugin_key == "talebook.push.boox").one()
+    installation.enabled = False
+    db_session.commit()
+
+    assert runtime.enabled_providers("integrations.push") == []
+
+
+def test_builtin_installation_is_idempotent_and_keeps_user_connections_personal(db_session):
+    settings = {**SETTINGS, "auto_fill_meta": False}
+    first = ensure_builtin_installations(db_session, installed_by=1, settings=settings)
+    second = ensure_builtin_installations(db_session, installed_by=1, settings=settings)
+
+    assert len(first) == len(second) == len(REGISTRY.providers())
+    expected_instance_connections = sum(
+        "instance" in provider.manifest["connection_owners"] for provider in REGISTRY.providers()
+    )
+    assert db_session.query(PluginConnection).count() == expected_instance_connections
+    weread = next(item for item in first if item.plugin_key == "talebook.combo.weread")
+    assert not weread.enabled
+    assert not db_session.query(PluginConnection).filter(PluginConnection.installation_id == weread.id).count()
     opds = next(item for item in first if item.plugin_key == "talebook.source.opds")
     connection = db_session.query(PluginConnection).filter(PluginConnection.installation_id == opds.id).one()
     assert connection.secret_id is None
@@ -140,8 +170,108 @@ def test_auto_installation_is_idempotent_and_keeps_empty_auth_local(db_session):
     assert connection.health == "healthy"
 
 
+def test_metadata_defaults_enable_all_except_neodb_and_only_seed_once(db_session):
+    settings = {
+        **SETTINGS,
+        "META_SELECTED_SOURCES": ["douban_v2", "baidu", "google", "booksource"],
+    }
+    ensure_builtin_installations(db_session, installed_by=1, settings=settings)
+
+    enabled_meta = {
+        plugin_key
+        for (plugin_key,) in db_session.query(PluginInstallation.plugin_key)
+        .filter(PluginInstallation.enabled.is_(True), PluginInstallation.plugin_key.like("talebook.meta.%"))
+        .all()
+    }
+    assert enabled_meta == {
+        provider.manifest["id"] for provider in PROVIDER_GROUPS["meta"] if provider.manifest["id"] != "talebook.meta.neodb"
+    }
+    legado = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.source.legado").one()
+    assert legado.enabled is True
+
+    calibre = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.meta.calibre").one()
+    calibre_connection = db_session.query(PluginConnection).filter_by(installation_id=calibre.id).one()
+    assert calibre_connection.config == {}
+
+    # 之后修改旧设置不会覆盖管理员已经在插件中心作出的启停选择。
+    ensure_builtin_installations(
+        db_session,
+        installed_by=1,
+        settings={**SETTINGS, "META_SELECTED_SOURCES": ["qimao", "amazon"]},
+    )
+    enabled_after = {
+        plugin_key
+        for (plugin_key,) in db_session.query(PluginInstallation.plugin_key)
+        .filter(PluginInstallation.enabled.is_(True), PluginInstallation.plugin_key.like("talebook.meta.%"))
+        .all()
+    }
+    assert enabled_after == enabled_meta
+    assert calibre_connection.config == {}
+
+
+def test_existing_metadata_states_are_not_overwritten_by_new_defaults(db_session):
+    ensure_builtin_installations(db_session, installed_by=1, settings=SETTINGS)
+    baike = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.meta.baike").one()
+    neodb = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.meta.neodb").one()
+    assert baike.enabled is True
+    assert neodb.enabled is False
+
+    baike.enabled = False
+    neodb.enabled = True
+    db_session.commit()
+
+    ensure_builtin_installations(
+        db_session,
+        installed_by=1,
+        settings={**SETTINGS, "META_SELECTED_SOURCES": ["baidu"]},
+    )
+    db_session.refresh(baike)
+    db_session.refresh(neodb)
+    assert baike.enabled is False
+    assert neodb.enabled is True
+
+
+def test_legado_installation_controls_source_and_metadata_capabilities_together(db_session):
+    ensure_builtin_installations(db_session, installed_by=1, settings=SETTINGS)
+    installation = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.source.legado").one()
+    connection = db_session.query(PluginConnection).filter_by(installation_id=installation.id).one()
+    runtime = PluginRuntime(db_session, SETTINGS)
+
+    assert connection.id in [item.id for item in runtime.connections_for("book_sources.search")]
+    assert connection.id in [item.id for item in runtime.connections_for("metadata.lookup")]
+
+    installation.enabled = False
+    db_session.commit()
+
+    assert connection.id not in [item.id for item in runtime.connections_for("book_sources.search")]
+    assert connection.id not in [item.id for item in runtime.connections_for("metadata.lookup")]
+
+
+def test_existing_connection_can_update_config_without_rotating_secret(db_session):
+    connection = build_connection(db_session, credentials={"token": "first-secret"}, config={"delay_seconds": 1})
+    secret = db_session.get(PluginSecret, connection.secret_id)
+    version = secret.version
+
+    updated = save_connection(
+        db_session,
+        SETTINGS,
+        connection.installation_id,
+        "instance",
+        0,
+        None,
+        role=connection.role,
+        config={"delay_seconds": 2},
+    )
+
+    db_session.refresh(secret)
+    assert updated.id == connection.id
+    assert updated.config == {"delay_seconds": 2}
+    assert secret.version == version
+    assert SecretCipher(SETTINGS).decrypt(secret.ciphertext) == {"token": "first-secret"}
+
+
 def test_reinstall_does_not_silently_reapprove_revoked_permissions(db_session):
-    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=7)
+    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=7, registry=TEST_REGISTRY)
     permission = (
         db_session.query(PluginPermission)
         .filter(PluginPermission.installation_id == installation.id, PluginPermission.permission == "plugin_records.write")
@@ -150,13 +280,19 @@ def test_reinstall_does_not_silently_reapprove_revoked_permissions(db_session):
     permission.revoked_at = datetime.datetime.now()
     db_session.commit()
 
-    install_builtin(db_session, PLUGIN_KEY, installed_by=7)
+    install_builtin(db_session, PLUGIN_KEY, installed_by=7, registry=TEST_REGISTRY)
     db_session.refresh(permission)
     assert permission.revoked_at is not None
 
 
 def test_connection_scopes_must_be_approved(db_session):
-    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=1, approved_permissions=["books.read"])
+    installation = install_builtin(
+        db_session,
+        PLUGIN_KEY,
+        installed_by=1,
+        approved_permissions=["books.read"],
+        registry=TEST_REGISTRY,
+    )
     with pytest.raises(PluginRuntimeError) as exc:
         save_connection(
             db_session,
@@ -171,7 +307,7 @@ def test_connection_scopes_must_be_approved(db_session):
 
 
 def test_secret_values_are_rejected_from_public_config(db_session):
-    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=1)
+    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=1, registry=TEST_REGISTRY)
     with pytest.raises(PluginRuntimeError) as exc:
         save_connection(
             db_session,

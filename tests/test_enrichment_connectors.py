@@ -12,8 +12,6 @@ from webserver.models import Annotation, Base, PluginConnection, PluginDefinitio
 from webserver.plugins.annotation.brs import BRSProvider
 from webserver.plugins.combo.open_library import OpenLibraryProvider
 from webserver.plugins.meta.base import build_field_decisions
-from webserver.plugins.meta.calibre_provider_bridge import CalibreProviderBridge
-from webserver.plugins.meta.embedded_file import EmbeddedMetadataProvider, extract_epub_metadata
 from webserver.plugins.review.anilist import AniListReviewProvider
 from webserver.plugins.review.bangumi import BangumiReviewProvider
 from webserver.plugins.review.file_import import ReviewFileProvider, parse_review_file
@@ -22,10 +20,10 @@ from webserver.plugins.review.hardcover import HardcoverProvider
 from webserver.plugins.review.neodb import NeoDBReviewProvider
 from webserver.plugins.runtime.protocol import PluginManifest, UpstreamRateLimitError
 from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient
+from webserver.services.epub_metadata import extract_epub_metadata
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,
-    PluginRuntimeError,
     ensure_builtin_definitions,
     install_builtin,
     rotate_connection_secret,
@@ -53,12 +51,13 @@ def connection_for(session, provider, credentials=None, config=None):
     registry.register(provider)
     ensure_builtin_definitions(session, registry)
     installation = install_builtin(session, provider.manifest["id"], installed_by=1, registry=registry)
+    owner_type = "user" if provider.manifest["connection_owners"] == ["user"] else "instance"
     connection = save_connection(
         session,
         SETTINGS,
         installation.id,
-        "instance",
-        0,
+        owner_type,
+        1 if owner_type == "user" else 0,
         credentials if credentials is not None else {},
         config=config,
     )
@@ -95,8 +94,6 @@ def epub_base64():
 def test_connector_manifests_are_valid_and_registered_as_installable_definitions(db_session):
     providers = [
         OpenLibraryProvider(),
-        EmbeddedMetadataProvider(),
-        CalibreProviderBridge(discover=lambda: []),
         HardcoverProvider(),
         NeoDBReviewProvider(),
         GoogleBooksReviewProvider(),
@@ -111,7 +108,7 @@ def test_connector_manifests_are_valid_and_registered_as_installable_definitions
         registry.register(provider)
 
     definitions = ensure_builtin_definitions(db_session, registry)
-    assert len(definitions) == 10
+    assert len(definitions) == 8
     assert {item.plugin_key for item in definitions} >= {
         "talebook.combo.open-library",
         "talebook.annotation.brs",
@@ -122,23 +119,23 @@ def test_connector_manifests_are_valid_and_registered_as_installable_definitions
     assert db_session.query(PluginConnection).count() == 0
 
 
-def test_network_connectors_reject_user_owned_connections(db_session):
+def test_brs_accepts_user_owned_connections(db_session):
     provider = BRSProvider(transport=lambda *args, **kwargs: {"comments": []})
     registry = PluginRegistry()
     registry.register(provider)
     ensure_builtin_definitions(db_session, registry)
     installation = install_builtin(db_session, provider.manifest["id"], installed_by=1, registry=registry)
-    with pytest.raises(PluginRuntimeError) as exc:
-        save_connection(
-            db_session,
-            SETTINGS,
-            installation.id,
-            "user",
-            9,
-            {"token": "private"},
-            config={"endpoint": "http://127.0.0.1/internal"},
-        )
-    assert exc.value.code == "plugin.owner_forbidden"
+    connection = save_connection(
+        db_session,
+        SETTINGS,
+        installation.id,
+        "user",
+        9,
+        {"email": "reader@example.com", "password": "private"},
+        config={"endpoint": "https://brs.example"},
+    )
+    assert connection.owner_type == "user"
+    assert connection.owner_id == 9
 
 
 def test_field_decisions_never_silently_replace_locked_or_nonempty_values():
@@ -209,26 +206,11 @@ def test_open_library_preview_persists_field_diff_and_source_specific_rating(db_
     assert calls[0][2]["params"]["bibkeys"] == "ISBN:9781234567897"
 
 
-def test_embedded_epub_metadata_is_parsed_from_encrypted_upload_and_honors_locks(db_session):
+def test_embedded_epub_metadata_is_a_platform_parser_instead_of_an_installable_plugin():
     parsed = extract_epub_metadata(base64.b64decode(epub_base64()))
     assert parsed["title"] == "Embedded title"
     assert parsed["authors"] == ["Author One"]
     assert parsed["isbn"] == "9781234567897"
-
-    provider = EmbeddedMetadataProvider()
-    registry, connection = connection_for(
-        db_session,
-        provider,
-        credentials={"archive_base64": epub_base64()},
-        config={"book": {"book_id": 8, "current_metadata": {"title": "Local title"}, "locked_fields": ["title"]}},
-    )
-    run = execute(db_session, registry, connection)
-    record = db_session.query(PluginSourceRecord).one()
-    title = next(item for item in record.data["fields"] if item["field"] == "title")
-    assert run.status == "succeeded"
-    assert title["decision"] == "locked"
-    serialized = json.dumps([record.data, run.to_public_dict()])
-    assert epub_base64() not in serialized
 
 
 @pytest.mark.parametrize(
@@ -337,7 +319,7 @@ def test_brs_uses_separate_review_domain_supports_mapping_and_runtime_rate_limit
     registry, connection = connection_for(
         db_session,
         provider,
-        credentials={"token": "brs-private-token"},
+        credentials={"email": "reader@example.com", "password": "brs-private-password"},
         config={
             "endpoint": "https://brs.example",
             "book_map": {"remote-book": 11},
@@ -360,7 +342,7 @@ def test_brs_uses_separate_review_domain_supports_mapping_and_runtime_rate_limit
     assert record.data["chapter"] == "Chapter 1"
     assert len(record.data["summary"]) == 500
     assert db_session.query(Annotation).count() == 0
-    assert "brs-private-token" not in json.dumps(record.data)
+    assert "brs-private-password" not in json.dumps(record.data)
 
 
 @pytest.mark.parametrize(
@@ -423,21 +405,6 @@ def test_catalog_ratings_preserve_each_sources_raw_scale_and_samples(source, pay
         assert result.items[0].data["series_id"] == query["series_id"]
 
 
-def test_calibre_provider_bridge_discovery_is_stable_and_idempotent(db_session):
-    provider = CalibreProviderBridge(
-        discover=lambda: [
-            {"name": "Google", "version": "1.0.0", "author": "Calibre", "capabilities": ["identify"]}
-        ]
-    )
-    registry, connection = connection_for(db_session, provider)
-    first = execute(db_session, registry, connection)
-    second = execute(db_session, registry, connection)
-    assert first.counts["written"] == 1
-    assert second.counts["skipped"] == 1
-    assert db_session.query(PluginSourceRecord).count() == 1
-    assert db_session.query(PluginDefinition).filter_by(plugin_key=provider.manifest["id"]).count() == 1
-
-
 def _resolver(address):
     return lambda *args, **kwargs: [(2, 1, 6, "", (address, 443))]
 
@@ -478,9 +445,11 @@ def test_brs_provider_forwards_configured_allowlist_to_http_layer():
         {
             "action": "test",
             "config": {"endpoint": "https://brs.lan", "allowed_hosts": ["brs.lan"]},
-            "secrets": {"token": "unit-test-token"},
+            "secrets": {"email": "reader@example.com", "password": "unit-test-password"},
             "cursor": {},
         }
     )
     assert captured["url"] == "https://brs.lan/api/v1/comments"
     assert captured["allowed_hosts"] == ["brs.lan"]
+    assert captured["headers"]["Authorization"].startswith("Basic ")
+    assert "unit-test-password" not in captured["headers"]["Authorization"]

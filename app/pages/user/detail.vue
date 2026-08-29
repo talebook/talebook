@@ -158,6 +158,16 @@
                         {{ t('user.deviceMgtDescription') }}
                     </div>
 
+                    <v-alert
+                        v-if="availableDeviceTypes.length === 0"
+                        type="info"
+                        variant="tonal"
+                        density="compact"
+                        class="mb-4"
+                    >
+                        {{ t('user.noEnabledDevicePlugins') }}
+                    </v-alert>
+
                     <v-row
                         v-for="(device, idx) in userDevices"
                         :key="'udev-' + idx"
@@ -267,14 +277,8 @@
                         <v-col align="center">
                             <v-btn
                                 color="primary"
-                                @click="userDevices.push({
-                                    name: t('settings.defaultReaderName'),
-                                    type: 'duokan',
-                                    ip: '',
-                                    port: 12121,
-                                    schema: 'http',
-                                    mailbox: '',
-                                })"
+                                :disabled="availableDeviceTypes.length === 0"
+                                @click="addDevice"
                             >
                                 <v-icon start>
                                     mdi-plus
@@ -335,7 +339,21 @@ const form = ref(null);
 // Device management
 const userDevices = ref([]);
 const savingDevices = ref(false);
-const deviceTypes = ref([]);
+const availableDeviceTypes = ref([]);
+const deviceTypes = computed(() => {
+    const items = [...availableDeviceTypes.value];
+    const activeValues = new Set(items.map(item => item.value));
+    for (const device of userDevices.value) {
+        if (!device.type || activeValues.has(device.type)) continue;
+        items.push({
+            text: t('user.devicePluginDisabled', { type: device.type }),
+            value: device.type,
+            props: { disabled: true },
+        });
+        activeValues.add(device.type);
+    }
+    return items;
+});
 const deviceSchemas = ref(['http', 'https']);
 
 useHead({
@@ -412,11 +430,25 @@ const saveDevices = async () => {
     }
 };
 
+const addDevice = () => {
+    const type = availableDeviceTypes.value[0];
+    if (!type) return;
+    userDevices.value.push({
+        name: t('settings.defaultReaderName'),
+        type: type.value,
+        ip: '',
+        port: type.default_port,
+        schema: 'http',
+        mailbox: '',
+    });
+};
+
 const loadDevices = async () => {
     try {
         const rsp = await $backend('/user/devices');
         if (rsp.err === 'ok') {
             userDevices.value = rsp.devices || [];
+            availableDeviceTypes.value = rsp.device_types || [];
         }
     } catch (e) {
         console.error(e);
@@ -425,16 +457,6 @@ const loadDevices = async () => {
 
 onMounted(() => {
     mainStore.setNavbar(true);
-    deviceTypes.value = [
-        { text: t('settings.deviceTypeDuokan'), value: 'duokan' },
-        { text: t('settings.deviceTypeIreader'), value: 'ireader' },
-        { text: t('settings.deviceTypeHanwang'), value: 'hanwang' },
-        { text: t('settings.deviceTypeBoox'), value: 'boox' },
-        { text: t('settings.deviceTypeDangdang'), value: 'dangdang' },
-        { text: t('common.kindle') || 'Kindle', value: 'kindle' },
-        { text: 'PureLibro', value: 'purelibro' },
-    ];
-
     $backend('/user/info?detail=1')
         .then(rsp => {
             rsp.user.password0 = '';

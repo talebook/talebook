@@ -124,23 +124,6 @@
                                     item-title="text"
                                     item-value="value"
                                 />
-                                <template
-                                    v-else-if="f.type === 'meta_sources'"
-                                >
-                                    <v-select
-                                        v-model="settings['META_SELECTED_SOURCES']"
-                                        :items="metaSourceItems"
-                                        :label="f.label"
-                                        :prepend-icon="f.icon"
-                                        density="compact"
-                                        multiple
-                                        chips
-                                        closable-chips
-                                        item-title="text"
-                                        item-value="value"
-                                    >
-                                    </v-select>
-                                </template>
                                 <v-text-field
                                     v-else-if="f.type === 'number'"
                                     v-model.number="settings[f.key]"
@@ -296,131 +279,6 @@
                                         <v-icon start>
                                             mdi-plus
                                         </v-icon>{{ t('common.add') }}
-                                    </v-btn>
-                                </v-col>
-                            </v-row>
-                        </template>
-
-                        <template v-if="card.show_devices">
-                            <v-row
-                                v-for="(device, idx) in settings.DEVICES"
-                                :key="'device-' + idx"
-                            >
-                                <v-col
-                                    class="py-0"
-                                    cols="2"
-                                >
-                                    <v-text-field
-                                        v-model="device.name"
-                                        density="compact"
-                                        hide-details
-                                        variant="underlined"
-                                        :label="t('settings.deviceName')"
-                                        type="text"
-                                        maxlength="64"
-                                    />
-                                </v-col>
-                                <v-col
-                                    class="py-0"
-                                    cols="2"
-                                >
-                                    <v-select
-                                        v-model="device.type"
-                                        :items="deviceTypes"
-                                        item-title="text"
-                                        item-value="value"
-                                        density="compact"
-                                        hide-details
-                                        variant="underlined"
-                                        :label="t('settings.deviceType')"
-                                    />
-                                </v-col>
-                                <template v-if="device.type === 'kindle'">
-                                    <v-col
-                                        class="py-0"
-                                        cols="6"
-                                    >
-                                        <v-text-field
-                                            v-model="device.mailbox"
-                                            density="compact"
-                                            hide-details
-                                            variant="underlined"
-                                            :label="t('settings.deviceMailbox')"
-                                            type="email"
-                                            placeholder="user@kindle.com"
-                                        />
-                                    </v-col>
-                                </template>
-                                <template v-else>
-                                    <v-col
-                                        class="py-0"
-                                        cols="2"
-                                    >
-                                        <v-text-field
-                                            v-model="device.ip"
-                                            density="compact"
-                                            hide-details
-                                            variant="underlined"
-                                            :label="t('settings.deviceIp')"
-                                            type="text"
-                                        />
-                                    </v-col>
-                                    <v-col
-                                        class="py-0"
-                                        cols="2"
-                                    >
-                                        <v-text-field
-                                            v-model.number="device.port"
-                                            density="compact"
-                                            hide-details
-                                            variant="underlined"
-                                            :label="t('settings.devicePort')"
-                                            type="number"
-                                        />
-                                    </v-col>
-                                    <v-col
-                                        class="py-0"
-                                        cols="2"
-                                    >
-                                        <v-select
-                                            v-model="device.schema"
-                                            :items="deviceSchemas"
-                                            density="compact"
-                                            hide-details
-                                            variant="underlined"
-                                            :label="t('settings.deviceSchema')"
-                                        />
-                                    </v-col>
-                                </template>
-                                <v-col
-                                    class="py-0"
-                                    cols="1"
-                                    align-self="end"
-                                >
-                                    <v-btn
-                                        icon
-                                        size="small"
-                                        @click="settings.DEVICES.splice(idx, 1)"
-                                    >
-                                        <v-icon>mdi-delete</v-icon>
-                                    </v-btn>
-                                </v-col>
-                            </v-row>
-                            <v-row>
-                                <v-col align="center">
-                                    <v-btn
-                                        color="primary"
-                                        @click="settings.DEVICES.push({
-                                            name: t('settings.defaultReaderName'),
-                                            type: 'duokan',
-                                            ip: '',
-                                            port: 12121,
-                                            schema: 'http',
-                                        })"
-                                    >
-                                        <v-icon start>
-                                            mdi-plus
-                                        </v-icon>{{ t('settings.add') }}
                                     </v-btn>
                                 </v-col>
                             </v-row>
@@ -716,17 +574,7 @@ const display = useDisplay();
 store.setNavbar(true);
 
 const sns_items = ref([]);
-const deviceTypes = ref([
-    { text: '多看阅读器', value: 'duokan' },
-    { text: '掌阅', value: 'ireader' },
-    { text: '汉王', value: 'hanwang' },
-    { text: '文石Boox', value: 'boox' },
-    { text: '当当阅读器', value: 'dangdang' },
-    { text: 'Kindle', value: 'kindle' },
-    { text: 'PureLibro', value: 'purelibro' },
-]);
-const deviceSchemas = ref(['http', 'https']);
-const settings = ref({ FRIENDS: [], SOCIALS: [], DEVICES: [] }); // Init with defaults to avoid v-if errors
+const settings = ref({ FRIENDS: [], SOCIALS: [] }); // Init with defaults to avoid v-if errors
 const site_url = ref('');
 const trashSizes = ref({ trash: 0, upload: 0 });
 const trashSizeTexts = ref({ trash: '', upload: '' });
@@ -870,33 +718,6 @@ const cards = computed(() => [
     },
 
     {
-        key: 'deviceManagement',
-        title: t('settings.deviceMgt'),
-        subtitle: t('settings.deviceMgtDescription'),
-        fields: [ ],
-        show_devices: true,
-    },
-
-    {
-        key: 'bookInfoSources',
-        title: t('admin.settings.section.bookInfoSources'),
-        subtitle: t('admin.settings.message.bookInfoSourcesInfo'),
-        fields: [
-            { icon: '', key: 'auto_fill_meta', label: t('admin.settings.label.autoFillMeta'), type: 'checkbox' },
-            { icon: '', key: 'auto_fill_keep_cover', label: t('admin.settings.label.autoFillKeepCover'), type: 'checkbox' },
-            {
-                icon: 'mdi-source-branch',
-                key: 'META_SELECTED_SOURCES',
-                label: t('admin.settings.label.metaSelectedSource'),
-                type: 'meta_sources'
-            },
-            { icon: 'mdi-information', key: 'ai_api_url', label: 'AI API 地址' },
-            { icon: 'mdi-key', key: 'ai_api_key', label: 'AI API Key' },
-            { icon: 'mdi-information', key: 'ai_model', label: 'AI 模型' },
-            { key: 'ai_use_thinking', label: '启用思考模式', type: 'checkbox' },
-        ],
-    },
-    {
         key: 'audiobookSettings',
         title: t('admin.settings.section.audiobookSettings'),
         subtitle: t('admin.settings.message.audiobookSettingsInfo'),
@@ -1025,7 +846,7 @@ const cards = computed(() => [
 const navGroupDefs = [
     { key: 'site', titleKey: 'admin.settings.group.site', keys: ['basicInfo', 'bookCategories', 'friendshipLinks'] },
     { key: 'access', titleKey: 'admin.settings.group.access', keys: ['userSettings', 'socialLogin', 'captchaSettings'] },
-    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'deviceManagement', 'bookInfoSources', 'audiobookSettings', 'webdavSettings'] },
+    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'audiobookSettings', 'webdavSettings'] },
     { key: 'system', titleKey: 'admin.settings.group.system', keys: ['advancedSettings', 'databaseManagement', 'sslManagement', 'trashManagement', 'updateCheck'] },
 ];
 
@@ -1122,26 +943,6 @@ watch(activeKey, (key) => {
     });
 });
 
-// 元数据源选项
-const metaSourceItems = computed(() => {
-    const allSources = settings.value['META_ALL_SOURCES'] || [
-        'douban_v2',
-        'baidu',
-        'google',
-        'amazon',
-        'xinhua',
-        'tomato',
-        'qimao',
-        'booksource',
-        'ai',
-        'neodb',
-    ];
-    return allSources.map((source) => ({
-        text: source === 'ai' ? 'AI' : t('admin.settings.meta_source.' + source),
-        value: source,
-    }));
-});
-
 onMounted(() => {
     $backend('/admin/settings').then(rsp => {
         sns_items.value = rsp.sns;
@@ -1167,9 +968,6 @@ onMounted(() => {
 
         if (!settings.value.FRIENDS) {
             settings.value.FRIENDS = [];
-        }
-        if (!settings.value.DEVICES) {
-            settings.value.DEVICES = [];
         }
     });
 

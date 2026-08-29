@@ -7,104 +7,254 @@ test.describe('Plugin management', () => {
         await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
     });
 
-    test('classifies plugins by canonical id and routes personal configuration correctly', async ({ page }) => {
+    test('separates instance management from the current accounts personal configuration', async ({ page }) => {
         test.slow();
         await page.setViewportSize({ width: 1280, height: 900 });
         const catalogPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/plugins'));
         await page.goto('/admin/plugins');
         await catalogPromise;
 
-        await expect(page.getByRole('tab', { name: '综合服务' })).toBeVisible();
-        await expect(page.getByRole('tab', { name: '元数据' })).toBeVisible();
-        await expect(page.getByRole('tab', { name: '划线笔记' })).toBeVisible();
-        await expect(page.getByRole('tab', { name: '评价' })).toBeVisible();
-        await expect(page.getByRole('tab', { name: '书源' })).toBeVisible();
-        await expect(page.getByRole('tab', { name: '书籍工具' })).toBeVisible();
-        await expect(page.getByRole('tab', { name: '推送设备' })).toBeVisible();
-        await expect(page.getByText('Google Books / Amazon')).toBeVisible();
-        await expect(page.getByText('Open Library')).toHaveCount(0);
+        await expect(page.getByRole('tab', { name: '插件管理' })).toHaveAttribute('aria-selected', 'true');
+        await expect(page.getByRole('tab', { name: '个人配置' })).toBeVisible();
+        await expect(page.getByText('内置插件无需安装')).toBeVisible();
+        await expect(page.getByRole('button', { name: '安装' })).toHaveCount(0);
+        await expect(page.getByRole('link', { name: '插件中心' })).toBeVisible();
+        await expect(page.getByText('Calibre 元数据')).toBeVisible();
+        await expect(page.getByText('Open Library', { exact: true })).toBeVisible();
+        await expect(page.getByText('AI 元数据')).toHaveCount(0);
+        const calibreIcon = page.locator('.management-row').filter({ hasText: 'Calibre 元数据' }).locator('.plugin-brand-icon');
+        await expect(calibreIcon.locator('img[src="/images/plugin-icons/calibre.svg"]')).toBeVisible();
+        expect(await calibreIcon.evaluate(element => getComputedStyle(element, '::after').boxShadow)).not.toBe('none');
+        await expect(page.locator('.management-row').filter({ hasText: 'Open Library' }).locator('img[src="/images/plugin-icons/open-library.png"]')).toBeVisible();
+        await expect(page.getByRole('heading', { name: '综合服务' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: '元数据' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: '书源' })).toBeVisible();
+        const displayedGroups = page.locator('.management-group');
+        const categoryDescriptions = page.locator('.management-group__description');
+        expect(await categoryDescriptions.count()).toBe(await displayedGroups.count());
+        expect(await displayedGroups.count()).toBeGreaterThan(0);
+        const metadataGroup = page.locator('#plugin-group-meta');
+        const metadataDescription = metadataGroup.locator('.management-group__description');
+        await expect(metadataDescription).toContainText('元数据插件提供书籍信息的搜索功能');
+        await expect(metadataDescription).toContainText('从互联网同步书籍信息');
+        await expect(metadataDescription).toContainText('自动补全设置');
+        const metadataTitleBox = await metadataGroup.getByRole('heading', { name: '元数据' }).boundingBox();
+        const metadataDescriptionBox = await metadataDescription.boundingBox();
+        expect(metadataDescriptionBox.y).toBeGreaterThan(metadataTitleBox.y);
+        await expect(page.getByText('Project Gutenberg', { exact: true })).toBeVisible();
+        await expect(page.getByText('Standard Ebooks · 最新上架', { exact: true })).toBeVisible();
+        const categoryNavigation = page.getByRole('navigation', { name: '插件分类' });
+        await expect(categoryNavigation).toBeVisible();
+        await expect(categoryNavigation.getByRole('button', { name: /元数据/ })).toBeVisible();
+        expect(await categoryNavigation.evaluate(element => getComputedStyle(element).position)).toBe('sticky');
+        const contentBox = await page.locator('.management-content').boundingBox();
+        const navigationBox = await categoryNavigation.boundingBox();
+        expect(navigationBox.x).toBeGreaterThan(contentBox.x);
+        const stickyTop = await categoryNavigation.evaluate(element => Number.parseFloat(getComputedStyle(element).top));
+        await page.evaluate(() => window.scrollTo(0, 700));
+        await expect.poll(async () => Math.round((await categoryNavigation.boundingBox()).y)).toBe(Math.round(stickyTop));
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.evaluate(() => {
+            const nativeScrollIntoView = Element.prototype.scrollIntoView;
+            (window as typeof window & { pluginScrollBehavior?: ScrollBehavior }).pluginScrollBehavior = undefined;
+            Element.prototype.scrollIntoView = function scrollIntoView(options?: boolean | ScrollIntoViewOptions) {
+                if (typeof options === 'object') {
+                    (window as typeof window & { pluginScrollBehavior?: ScrollBehavior }).pluginScrollBehavior = options.behavior;
+                }
+                return nativeScrollIntoView.call(this, options);
+            };
+        });
+        await categoryNavigation.getByRole('button', { name: /书源/ }).click();
+        const sourceNavigation = categoryNavigation.getByRole('button', { name: /书源/ });
+        await expect(sourceNavigation).toHaveClass(/active/);
+        await expect(sourceNavigation).toHaveAttribute('aria-current', 'location');
+        expect(await page.evaluate(() => (
+            window as typeof window & { pluginScrollBehavior?: ScrollBehavior }
+        ).pluginScrollBehavior)).toBe('auto');
+        const sourceGroup = page.locator('#plugin-group-source');
+        await expect.poll(async () => Math.round((await sourceGroup.boundingBox()).y)).toBe(Math.round(stickyTop));
 
-        await page.getByRole('tab', { name: '综合服务' }).click();
-        await expect(page.getByText('Open Library')).toBeVisible();
-        await expect(page.getByText('Google Books / Amazon')).toHaveCount(0);
-        const weread = page.locator('.plugin-card').filter({ hasText: '微信读书' });
-        await weread.getByRole('button', { name: '详情' }).click();
-        const wereadDetails = page.getByRole('dialog', { name: '微信读书' });
-        await expect(wereadDetails.getByRole('heading', { name: '个人配置' })).toBeVisible();
-        await expect(wereadDetails.getByText('公开配置（JSON）')).toHaveCount(0);
-        await expect(wereadDetails.getByRole('button', { name: '创建连接' })).toHaveCount(0);
-        await wereadDetails.getByRole('button', { name: '关闭' }).click();
-        await weread.getByRole('button', { name: '打开工作台' }).click();
+        await page.getByRole('tab', { name: '个人配置' }).click();
+        await expect(page).toHaveURL(/section=personal/);
+        const weread = page.locator('.personal-row').filter({ hasText: '微信读书' });
+        await expect(weread.locator('img[src="/images/plugin-icons/weread.png"]')).toBeVisible();
+        await weread.getByRole('button', { name: '个人设置' }).click();
         await expect(page).toHaveURL(/\/plugins\/weread/);
         await expect(page.getByRole('heading', { name: '微信读书工作台' })).toBeVisible();
-
-        await page.goto('/admin/plugins?tab=tools');
-        await expect(page.getByText('TXT 编码修复')).toBeVisible();
-        await page.goto('/admin/plugins?tab=push');
-        const boox = page.locator('.plugin-card').filter({ hasText: 'BOOX' });
-        await expect(boox).toHaveAttribute('data-status', 'enabled');
-        await boox.getByRole('button', { name: '管理设备' }).click();
-        await expect(page).toHaveURL(/\/user\/detail\?tab=devices/);
-        await expect(page.getByRole('tab', { name: '阅读设备' })).toHaveAttribute('aria-selected', 'true');
 
         await page.goto('/admin/plugins?tab=book_sources');
         await expect(page.getByText('Generic OPDS')).toBeVisible();
         await expect(page.getByText('Legado 在线书源')).toBeVisible();
+        await expect(page.getByText('在线书源元数据')).toHaveCount(0);
         await expect(page.getByText('Watch Folder')).toBeVisible();
         await expect(page.getByText('Calibre Content Server')).toHaveCount(0);
         await expect(page.getByText('Calibre-Web')).toHaveCount(0);
+
+        const legado = page.locator('.management-row').filter({ hasText: 'Legado 在线书源' });
+        await legado.getByRole('button', { name: '详情' }).click();
+        const legadoDetails = page.getByRole('dialog', { name: 'Legado 在线书源' });
+        await expect(legadoDetails.getByRole('tab', { name: '检索元数据' })).toBeVisible();
+        await expect(legadoDetails.getByRole('tab', { name: '搜索书源' })).toBeVisible();
+        await legadoDetails.getByRole('button', { name: '关闭' }).click();
+        await legado.getByRole('button', { name: '全局配置' }).click();
+        await expect(page).toHaveURL(/\/plugins\/legado/);
+        await expect(page.getByRole('heading', { name: 'Legado 书源工作台' })).toBeVisible();
     });
 
-    test('uses a green surface for enabled cards without removing the text status', async ({ page, request }) => {
+    test('uses the compact A-style list and keeps disable inside details', async ({ page, request }) => {
         await page.goto('/admin/plugins?tab=book_sources');
-        const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
-        await expect(card).toHaveAttribute('data-status', 'enabled');
-        await expect(card.getByText('正常')).toBeVisible();
-        expect(await card.evaluate(element => getComputedStyle(element).backgroundImage)).toContain('linear-gradient');
+        const row = page.locator('.management-row').filter({ hasText: 'Generic OPDS' });
+        await expect(row.getByText('正常')).toBeVisible();
+        const statusFontSize = await row.locator('.management-status').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+        const titleFontSize = await row.locator('.management-row__title strong').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+        expect(statusFontSize).toBeGreaterThanOrEqual(12);
+        expect(statusFontSize).toBeLessThan(titleFontSize);
+        const rowHeight = await row.evaluate(element => element.getBoundingClientRect().height);
+        expect(rowHeight).toBeLessThanOrEqual(76);
+        expect(await row.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
+        await expect(row.getByText('管理员配置')).toHaveCount(0);
+        await expect(row.getByText('尚未测试')).toHaveCount(0);
+        await expect(row.getByRole('button', { name: '停用' })).toHaveCount(0);
+        await page.context().addCookies([{ name: 'theme', value: 'dark', url: new URL(page.url()).origin }]);
+        await page.reload();
+        await expect(row.getByText('正常')).toBeVisible();
+        expect(await row.locator('.management-status').evaluate(element => getComputedStyle(element).color))
+            .toBe('rgba(255, 255, 255, 0.78)');
+        await row.getByRole('button', { name: '详情' }).click();
+        await expect(page.locator('.plugin-details__actions').getByRole('button', { name: '停用' })).toBeVisible();
+        await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
 
         await request.post(`${mockApi}/api/admin/plugins/installations/1/state`, { data: { enabled: false } });
         await page.reload();
-        await expect(card).toHaveAttribute('data-status', 'disabled');
-        await expect(card.getByText('已停用')).toBeVisible();
-        expect(await card.evaluate(element => getComputedStyle(element).backgroundImage)).toBe('none');
+        await expect(row.getByText('未启用')).toBeVisible();
+        await expect(row.getByRole('button', { name: '启用' })).toBeVisible();
     });
 
-    test('keeps the canonical tabs reachable on iPad portrait', async ({ page }) => {
+    test('logs into BRS directly and saves the verified personal connection', async ({ page }) => {
+        let remoteForm = '';
+        await page.route('https://brs.example/api/user/sign_in', async (route) => {
+            remoteForm = route.request().postData() || '';
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                headers: {
+                    'Access-Control-Allow-Origin': new URL(page.url()).origin,
+                    'Access-Control-Allow-Credentials': 'true',
+                },
+                body: JSON.stringify({ err: 'ok', data: { id: 7 } }),
+            });
+        });
+        await page.goto('/admin/plugins?section=personal');
+        const brs = page.locator('.personal-row').filter({ hasText: 'talebook-brs 章评服务器' });
+        await brs.getByRole('button', { name: '个人设置' }).click();
+        await expect(page).toHaveURL(/\/plugins\/brs/);
+
+        const endpoint = page.getByRole('textbox', { name: 'BRS 服务器地址' });
+        await expect(endpoint).toHaveValue('https://brs.talebook.org');
+        await endpoint.fill('https://brs.example');
+        await page.getByRole('textbox', { name: '邮箱' }).fill('reader@example.com');
+        await page.getByLabel('密码').fill('private-password');
+        await page.getByRole('button', { name: '登录并连接' }).click();
+
+        await expect(page.getByText('登录成功，个人 BRS 连接已保存。')).toBeVisible();
+        expect(remoteForm).toContain('email=reader%40example.com');
+        expect(remoteForm).toContain('password=private-password');
+        await expect(page.getByText('已连接')).toBeVisible();
+    });
+
+    test('does not expose connection or JSON configuration for no-setup metadata plugins', async ({ page }) => {
+        await page.goto('/admin/plugins?tab=metadata');
+        const card = page.locator('.management-row').filter({ hasText: 'Calibre 元数据' });
+        await expect(card.getByRole('button', { name: '配置' })).toHaveCount(0);
+        await card.getByRole('button', { name: '详情' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Calibre 元数据' });
+        await expect(dialog.getByText('设置', { exact: true })).toHaveCount(0);
+        await expect(dialog.getByText('连接名称')).toHaveCount(0);
+        await expect(dialog.getByText('公开配置（JSON）')).toHaveCount(0);
+        await expect(dialog.getByRole('button', { name: '测试连接' })).toHaveCount(0);
+        await expect(dialog.getByRole('button', { name: '预览', exact: true })).toHaveCount(0);
+        await expect(dialog.getByRole('button', { name: '立即执行' })).toHaveCount(0);
+        await dialog.getByRole('textbox', { name: '书名' }).fill('活着');
+        await dialog.getByRole('button', { name: '检索元数据' }).click();
+        await expect(dialog.getByRole('status')).toHaveText('返回 1 条结果');
+        await expect(dialog.getByText('活着', { exact: true })).toBeVisible();
+        await expect(dialog.getByText(/余华.*作家出版社.*9787506365437/)).toBeVisible();
+    });
+
+    test('moves metadata behavior and global devices from settings into plugin management', async ({ page }) => {
+        await page.goto('/admin/settings');
+        await expect(page.getByRole('heading', { name: '互联网书籍信息源' })).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: '全局设备管理' })).toHaveCount(0);
+
+        await page.goto('/admin/plugins');
+        await page.getByRole('button', { name: '自动补全设置' }).click();
+        await expect(page.getByRole('dialog').getByLabel('自动从互联网拉取新书的书籍信息')).toBeVisible();
+        await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
+
+        await page.getByRole('button', { name: '全局设备' }).click();
+        const dialog = page.getByRole('dialog');
+        await dialog.getByRole('button', { name: '添加全局设备' }).click();
+        await expect(dialog.getByRole('combobox', { name: '类型' })).toHaveValue('BOOX');
+    });
+
+    test('only offers device types from enabled push plugins', async ({ page, request }) => {
+        await page.goto('/user/detail?tab=devices');
+        const addButton = page.getByRole('button', { name: '添加' });
+        await expect(addButton).toBeEnabled();
+        await addButton.click();
+        await page.getByRole('combobox', { name: '类型', exact: true }).focus();
+        await page.keyboard.press('ArrowDown');
+        await expect(page.getByRole('option', { name: 'BOOX' })).toBeVisible();
+        await expect(page.getByRole('option', { name: '多看' })).toHaveCount(0);
+        await page.keyboard.press('Escape');
+
+        const catalog = await (await request.get(`${mockApi}/api/admin/plugins`)).json();
+        const boox = catalog.installations.find(item => item.plugin_key === 'talebook.push.boox');
+        await request.post(`${mockApi}/api/admin/plugins/installations/${boox.id}/state`, { data: { enabled: false } });
+        await page.reload();
+        await expect(addButton).toBeDisabled();
+        await expect(page.getByText('暂无已启用的设备插件')).toBeVisible();
+    });
+
+    test('keeps both control planes and category help reachable on narrow screens', async ({ page }) => {
         await page.setViewportSize({ width: 744, height: 1133 });
         await page.goto('/admin/plugins?tab=push');
-        await expect(page.getByRole('tab', { name: '推送设备' })).toHaveAttribute('aria-selected', 'true');
-        await expect(page.locator('.plugin-card').filter({ hasText: 'BOOX' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: '插件管理' })).toHaveAttribute('aria-selected', 'true');
+        await expect(page.getByRole('tab', { name: '个人配置' })).toBeVisible();
+        await expect(page.locator('.management-row').filter({ hasText: 'BOOX' })).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(744);
+
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/admin/plugins?tab=metadata');
+        const metadataGroup = page.locator('#plugin-group-meta');
+        await expect(metadataGroup.locator('.management-group__description')).toBeVisible();
+        await expect(metadataGroup.getByRole('button', { name: '自动补全设置' })).toBeVisible();
+        expect(await metadataGroup.locator('.management-group__heading').evaluate(element => (
+            getComputedStyle(element).flexDirection
+        ))).toBe('column');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     });
 
-    test('configures a source, previews candidates, and shows compliance columns', async ({ page }) => {
+    test('configures a source without inventing undeclared generic actions', async ({ page }) => {
         await page.goto('/admin/plugins?tab=book_sources');
-        const card = page.locator('.plugin-card').filter({ hasText: 'Watch Folder' });
+        const card = page.locator('.management-row').filter({ hasText: 'Watch Folder' });
         await expect(card.getByText('待配置')).toBeVisible();
-        await card.getByRole('button', { name: '配置' }).click();
+        await card.getByRole('button', { name: '全局配置' }).click();
 
         const dialog = page.getByRole('dialog');
         await dialog.getByRole('textbox', { name: '监听目录' }).fill('/data/books/imports');
         await dialog.getByRole('button', { name: '保存' }).click();
-        await expect(dialog.getByRole('button', { name: '预览候选' })).toBeVisible();
-        await dialog.getByRole('button', { name: '预览候选' }).click();
-
-        await expect(page).toHaveURL(/\/admin\/plugins\/runs\/\d+/);
-        await expect(page.getByRole('columnheader', { name: '格式' })).toBeVisible();
-        await expect(page.getByRole('columnheader', { name: '来源' })).toBeVisible();
-        await expect(page.getByRole('columnheader', { name: '访问条件' })).toBeVisible();
-        await expect(page.getByRole('columnheader', { name: '许可 / 条件' })).toBeVisible();
-        await expect(page.getByRole('columnheader', { name: '目标书库' })).toBeVisible();
-        await expect(page.getByRole('cell', { name: 'EPUB' })).toBeVisible();
-        await expect(page.getByRole('cell', { name: '可下载' })).toBeVisible();
-        await expect(page.getByRole('cell', { name: '本地文件；许可由管理员确认' })).toBeVisible();
+        await expect(dialog.getByRole('button', { name: '预览候选' })).toHaveCount(0);
+        await expect(dialog.getByRole('button', { name: '测试连接' })).toHaveCount(0);
+        await expect(dialog.getByRole('button', { name: '立即执行' })).toHaveCount(0);
+        await expect(dialog.getByRole('heading', { name: '能力测试' })).toHaveCount(0);
     });
 
     test('keeps the source connection form reachable at 320px', async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 640 });
         await page.goto('/admin/plugins?tab=book_sources');
-        const card = page.locator('.plugin-card').filter({ hasText: 'Watch Folder' });
-        await card.getByRole('button', { name: '配置' }).click();
+        const card = page.locator('.management-row').filter({ hasText: 'Watch Folder' });
+        await card.getByRole('button', { name: '全局配置' }).click();
 
         const dialog = page.getByRole('dialog');
         const save = dialog.getByRole('button', { name: '保存' });
@@ -115,49 +265,59 @@ test.describe('Plugin management', () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
     });
 
-    test('opens details, tests a connection, and exposes the shared run log', async ({ page }) => {
+    test('removes generic actions from details and uses the source protocol', async ({ page }) => {
         await page.goto('/admin/plugins?tab=book_sources');
-        const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
+        const card = page.locator('.management-row').filter({ hasText: 'Generic OPDS' });
         await card.getByRole('button', { name: '详情' }).click();
         const detailsDialog = page.getByRole('dialog', { name: 'Generic OPDS' });
         await expect(detailsDialog).toBeVisible();
-        await expect(detailsDialog.getByText('权限与数据范围')).toBeVisible();
+        const permissions = detailsDialog.getByRole('button', { name: '权限与数据范围' });
+        await expect(permissions).toHaveAttribute('aria-expanded', 'false');
+        expect(await detailsDialog.locator('.plugin-permissions .v-expansion-panel').evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
+        await expect(detailsDialog.getByText('books.read', { exact: true })).not.toBeVisible();
+        await permissions.click();
+        await expect(permissions).toHaveAttribute('aria-expanded', 'true');
+        await expect(detailsDialog.getByText('books.read', { exact: true })).toBeVisible();
 
-        await page.getByRole('button', { name: '测试连接' }).click();
-        await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
-        await page.getByRole('link', { name: '执行记录' }).first().click();
-        await expect(page.getByText('Generic OPDS · 内置连接')).toBeVisible();
-        await expect(page.getByText('成功').first()).toBeVisible();
+        await expect(detailsDialog.getByRole('button', { name: '测试连接' })).toHaveCount(0);
+        await expect(detailsDialog.getByRole('button', { name: '预览', exact: true })).toHaveCount(0);
+        await expect(detailsDialog.getByRole('button', { name: '立即执行' })).toHaveCount(0);
+        await detailsDialog.getByRole('textbox', { name: '搜索关键词' }).fill('Pride');
+        await detailsDialog.getByRole('button', { name: '搜索书源' }).click();
+        await expect(detailsDialog.getByText('Pride and Prejudice', { exact: true })).toBeVisible();
     });
 
-    test('creates a no-secret connector connection, previews it, and keeps config explicit', async ({ page }) => {
+    test('does not expose the platform connection model for no-setup plugins', async ({ page }) => {
         await page.goto('/admin/plugins?tab=integrations');
-        const card = page.locator('.plugin-card').filter({ hasText: 'Open Library' });
-        const configureButton = card.getByRole('button', { name: '配置' });
-        await configureButton.click();
+        const card = page.locator('.management-row').filter({ hasText: 'Open Library' });
+        await expect(card.getByRole('button', { name: '配置' })).toHaveCount(0);
+        await card.getByRole('button', { name: '详情' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Open Library' });
+        await expect(dialog.getByText('连接名称')).toHaveCount(0);
+        await expect(dialog.getByText('公开配置（JSON）')).toHaveCount(0);
+        await expect(dialog.getByRole('tab', { name: '检索元数据' })).toBeVisible();
+        await dialog.getByRole('tab', { name: '查询评价' }).click();
+        await dialog.getByRole('textbox', { name: 'ISBN' }).fill('9787506365437');
+        await dialog.getByRole('button', { name: '查询评价' }).click();
+        await expect(dialog.getByText('Google Books', { exact: true })).toBeVisible();
+        await expect(dialog.getByText(/评分 4.5 \/ 5/)).toBeVisible();
+    });
 
-        let form = page.getByRole('dialog', { name: /配置 Open Library 连接/ });
-        await form.getByRole('button', { name: '取消' }).click();
-        await expect(configureButton).toBeFocused();
-        await configureButton.click();
+    test('offers verified public catalogs as one-click experiences', async ({ page }) => {
+        await page.goto('/admin/plugins?tab=book_sources');
+        const standardEbooks = page.locator('.management-row').filter({ hasText: 'Standard Ebooks' });
+        await expect(standardEbooks.getByRole('button', { name: '配置' })).toHaveCount(0);
+        await standardEbooks.getByRole('button', { name: '详情' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Standard Ebooks' });
+        await expect(dialog.getByText('这是无需账号的公开免费书目')).toBeVisible();
+        await dialog.getByRole('button', { name: '关闭' }).click();
 
-        form = page.getByRole('dialog', { name: /配置 Open Library 连接/ });
-        const configInput = form.getByRole('textbox', { name: '公开配置（JSON）' });
-        await expect(configInput).toBeVisible();
-        await configInput.fill('[');
-        await form.getByRole('button', { name: '保存' }).click();
-        await expect(form.getByText('公开配置必须是有效的 JSON 对象。')).toBeVisible();
-        await expect(configInput).toHaveAttribute('aria-invalid', 'true');
-        await expect(configInput).toBeFocused();
-
-        await configInput.fill(JSON.stringify({
-            queries: [{ book_id: 1, isbn: '9781234567897', current_metadata: {}, locked_fields: [] }],
-        }));
-        await form.getByRole('button', { name: '保存' }).click();
-
-        await expect(page.getByText('default · 尚未测试')).toBeVisible();
-        await page.getByRole('button', { name: '预览' }).click();
-        await expect(page.getByText(/上次执行：成功/)).toBeVisible();
+        const gutenberg = page.locator('.management-row').filter({ hasText: 'Project Gutenberg' });
+        await gutenberg.getByRole('button', { name: '体验' }).click();
+        const gutenbergDetails = page.getByRole('dialog', { name: 'Project Gutenberg' });
+        await gutenbergDetails.getByRole('textbox', { name: '搜索关键词' }).fill('Pride');
+        await gutenbergDetails.getByRole('button', { name: '搜索书源' }).click();
+        await expect(gutenbergDetails.getByText('Pride and Prejudice', { exact: true })).toBeVisible();
     });
 
     test('moves the Talebook OPDS service setting from Settings into the OPDS plugin', async ({ page }) => {
@@ -166,7 +326,7 @@ test.describe('Plugin management', () => {
         await expect(page.getByRole('heading', { name: 'OPDS 设置' })).toHaveCount(0);
 
         await page.goto('/admin/plugins?tab=book_sources');
-        const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
+        const card = page.locator('.management-row').filter({ hasText: 'Generic OPDS' });
         await card.getByRole('button', { name: '详情' }).click();
 
         const dialog = page.getByRole('dialog');
@@ -179,10 +339,10 @@ test.describe('Plugin management', () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
     });
 
-    test('old book source URL redirects into the plugin source tab', async ({ page }) => {
+    test('old book source URL redirects to the Legado workbench', async ({ page }) => {
         await page.goto('/admin/booksources');
-        await expect(page).toHaveURL(/\/admin\/plugins\?.*tab=book_sources/);
-        await expect(page.getByText('Legado 书源管理')).toBeVisible();
+        await expect(page).toHaveURL(/\/plugins\/legado/);
+        await expect(page.getByRole('heading', { name: 'Legado 书源工作台' })).toBeVisible();
         await expect(page.getByText('测试书源')).toBeVisible();
     });
 
@@ -191,7 +351,7 @@ test.describe('Plugin management', () => {
         const catalogPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/plugins'));
         await page.goto('/admin/plugins?tab=book_sources');
         await catalogPromise;
-        const description = page.getByText('连接外部服务，补全书籍信息、导入笔记与评价，或添加书源。');
+        const description = page.getByText('控制本实例可用的内置插件，并维护全局设置。个人账号、密钥与设备由各用户自行配置。');
         await expect(description).toBeVisible();
         expect(await description.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
         const search = page.getByRole('textbox', { name: '搜索名称、说明或能力' });
@@ -199,7 +359,7 @@ test.describe('Plugin management', () => {
         await expect(page).toHaveURL(/q=OPDS/);
         await expect(page.getByText('Generic OPDS')).toBeVisible();
 
-        const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
+        const card = page.locator('.management-row').filter({ hasText: 'Generic OPDS' });
         await card.getByRole('button', { name: '详情' }).click();
         const dialog = page.getByRole('dialog');
         await expect(dialog).toBeVisible();
@@ -211,7 +371,7 @@ test.describe('Plugin management', () => {
 
     test('keeps focus contained in details and restores it after Escape', async ({ page }) => {
         await page.goto('/admin/plugins?tab=book_sources');
-        const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
+        const card = page.locator('.management-row').filter({ hasText: 'Generic OPDS' });
         const details = card.getByRole('button', { name: '详情' });
         await details.focus();
         await page.keyboard.press('Enter');

@@ -173,14 +173,14 @@ def test_opencc_and_chinese_epub_txt():
                 pass
 
 
-def test_tool_providers_are_auto_installable():
+def test_tool_providers_declare_initial_enabled_state():
     keys = {p.manifest["id"] for p in TOOL_PROVIDERS}
     assert "talebook.tool.text-replace" in keys
     assert "talebook.tool.zh-converter" in keys
     assert "talebook.tool.txt-fixer" in keys
     # all three must be in integrations category
     for p in TOOL_PROVIDERS:
-        assert p.auto_install is True
+        assert callable(p.initial_enabled)
         assert "integrations" in p.manifest["categories"]
 
 
@@ -202,6 +202,78 @@ class TestBookToolsBooksList(TestApp):
             ids = [b["id"] for b in d["books"]]
             self.assertIn(BID_EPUB, ids)
             self.assertIn(BID_TXT, ids)
+
+    def test_books_list_can_resolve_one_deep_linked_book(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json("/api/plugins/tools/books?book_id=%s" % BID_TXT)
+            self.assertEqual(d["err"], "ok")
+            self.assertEqual([book["id"] for book in d["books"]], [BID_TXT])
+
+
+class TestBookToolActions(TestApp):
+    @staticmethod
+    def _write_tool_enabled(plugin_key, enabled):
+        from tests.test_main import get_db
+        from webserver.models import PluginInstallation
+
+        session = get_db()
+        installation = session.query(PluginInstallation).filter_by(plugin_key=plugin_key).one()
+        installation.enabled = enabled
+        session.commit()
+
+    def _set_tool_enabled(self, plugin_key, enabled):
+        from tests.test_main import get_db
+        from webserver import loader
+        from webserver.models import PluginInstallation
+        from webserver.services.plugin_runtime import ensure_builtin_installations
+
+        session = get_db()
+        ensure_builtin_installations(session, 1, loader.get_settings())
+        installation = session.query(PluginInstallation).filter_by(plugin_key=plugin_key).one()
+        previous = bool(installation.enabled)
+        self._write_tool_enabled(plugin_key, enabled)
+        if previous != enabled:
+            self.addCleanup(self._write_tool_enabled, plugin_key, previous)
+
+    def test_actions_are_filtered_by_current_book_format(self):
+        for plugin_key in (
+            "talebook.tool.text-replace",
+            "talebook.tool.zh-converter",
+            "talebook.tool.txt-fixer",
+        ):
+            self._set_tool_enabled(plugin_key, True)
+
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            epub = self.json("/api/plugins/tools/book-actions?book_id=%s" % BID_EPUB)
+            txt = self.json("/api/plugins/tools/book-actions?book_id=%s" % BID_TXT)
+
+        self.assertEqual(epub["err"], "ok")
+        self.assertEqual(
+            {action["plugin_key"] for action in epub["actions"]},
+            {"talebook.tool.text-replace", "talebook.tool.zh-converter"},
+        )
+        self.assertEqual(
+            {action["plugin_key"] for action in txt["actions"]},
+            {
+                "talebook.tool.text-replace",
+                "talebook.tool.zh-converter",
+                "talebook.tool.txt-fixer",
+            },
+        )
+
+    def test_disabled_tool_is_absent(self):
+        self._set_tool_enabled("talebook.tool.txt-fixer", False)
+
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json("/api/plugins/tools/book-actions?book_id=%s" % BID_TXT)
+
+        self.assertEqual(d["err"], "ok")
+        self.assertNotIn("talebook.tool.txt-fixer", {action["plugin_key"] for action in d["actions"]})
+
+    def test_actions_require_admin(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=2):
+            d = self.json("/api/plugins/tools/book-actions?book_id=%s" % BID_TXT)
+        self.assertEqual(d["err"], "permission.not_admin")
 
 
 class TestTextReplacePreview(TestApp):

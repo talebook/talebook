@@ -1,3 +1,5 @@
+import base64
+
 from webserver.plugins.runtime.domains import ItemFailure, Page, Review
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderItem, ProviderResult, UpstreamError
 from webserver.plugins.runtime.safe_http import SafeHttpClient
@@ -42,7 +44,7 @@ class BRSProvider:
     manifest = {
         "protocol_version": PROTOCOL_VERSION,
         "id": "talebook.annotation.brs",
-        "name": "talebook-brs 章评",
+        "name": "talebook-brs 章评服务器",
         "description": "连接一个 talebook-brs 实例，按 book/chapter/segment 映射导入公开章评摘要。",
         "version": "1.0.0",
         "categories": ["annotations"],
@@ -51,13 +53,16 @@ class BRSProvider:
         "actions": ["test", "preview", "run", "retry", "rollback"],
         "auth_schema": {
             "type": "object",
-            "properties": {"token": {"type": "string", "writeOnly": True}},
-            "required": ["token"],
+            "properties": {
+                "email": {"type": "string", "writeOnly": True},
+                "password": {"type": "string", "writeOnly": True},
+            },
+            "required": ["email", "password"],
         },
         "config_schema": {
             "type": "object",
             "properties": {
-                "endpoint": {"type": "string"},
+                "endpoint": {"type": "string", "default": "https://brs.talebook.org"},
                 "allowed_hosts": {"type": "array", "items": {"type": "string"}, "title": "私网主机白名单"},
                 "book_map": {"type": "object"},
                 "chapter_map": {"type": "object"},
@@ -69,8 +74,13 @@ class BRSProvider:
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": "https://github.com/talebook/talebook",
         "license": "GPL-3.0",
-        "ui": {"icon": "mdi-comment-text-multiple-outline", "primary_action": "configure"},
-        "connection_owners": ["instance"],
+        "ui": {
+            "icon": "mdi-comment-text-multiple-outline",
+            "primary_action": "configure",
+            "manage_route": "/plugins/brs",
+        },
+        # 每个用户登录自己的 BRS 账号，endpoint、映射与账号密码都属于个人连接。
+        "connection_owners": ["user"],
     }
 
     def __init__(self, transport=_http_json):
@@ -81,12 +91,15 @@ class BRSProvider:
         endpoint = str(config.get("endpoint") or "").rstrip("/")
         if not endpoint:
             raise UpstreamError("BRS endpoint is required")
-        token = (context.get("secrets") or {}).get("token", "")
+        secrets = context.get("secrets") or {}
+        email = str(secrets.get("email") or "")
+        password = str(secrets.get("password") or "")
+        credentials = base64.b64encode((email + ":" + password).encode("utf-8")).decode("ascii")
         cursor = (context.get("cursor") or {}).get("cursor", "")
         payload = self.transport(
             "GET",
             endpoint + "/api/v1/comments",
-            headers={"Authorization": "Bearer %s" % token},
+            headers={"Authorization": "Basic %s" % credentials},
             params={"cursor": cursor},
             allowed_hosts=config.get("allowed_hosts") or (),
         )

@@ -69,12 +69,16 @@ test.describe('Book Detail Page', () => {
 
     test('keeps successful metadata results when another source fails', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
-        await page.getByRole('button', { name: '管理' }).click();
+        await page.getByRole('button', { name: '管理', exact: true }).click();
         await page.getByText('从互联网更新信息').click();
 
         await expect(page.getByText('Mock Metadata Result')).toBeVisible();
         await expect(page.getByText(/Online Source B/)).toBeVisible();
-        await expect(page.getByText(/其余结果仍可正常使用/)).toBeVisible();
+        await expect(page.getByText('书源进度 1/2')).toBeVisible();
+        await expect(page.getByText('未完成：Online Source B')).toBeVisible();
+        await expect(page.locator('.refer-dialog .v-alert')).toHaveCount(0);
+        await expect(page.locator('.refer-progress .v-progress-linear')).toHaveAttribute('role', 'progressbar');
+        expect(await page.locator('.refer-dialog .v-overlay__content').evaluate(element => getComputedStyle(element).scrollbarWidth)).toBe('none');
     });
 
     test('opens the unified conversion dialog for a TXT book', async ({ page }) => {
@@ -87,6 +91,18 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByText('EPUB').first()).toBeVisible();
         await expect(page.getByText('可转换')).toBeVisible();
         await expect(page.getByRole('button', { name: '开始转换' })).toBeEnabled();
+    });
+
+    test('opens an enabled book tool with the current book preselected', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await page.getByText('文件处理').click();
+
+        const toolAction = page.getByRole('link', { name: 'TXT 编码修复' });
+        await expect(toolAction).toBeVisible();
+        await toolAction.click();
+
+        await expect(page).toHaveURL(`/plugins/txt-fixer?book_id=${bookId}`);
+        await expect(page.getByText(/测试书 — 测试作者/)).toBeVisible();
     });
 
     test('shows EPUB conversion routes without unavailable routes', async ({ page }) => {

@@ -50,6 +50,7 @@
                                 <v-radio
                                     value="temporary"
                                     :label="t('book.temporaryDevice')"
+                                    :disabled="deviceTypes.length === 0"
                                 />
                             </v-radio-group>
 
@@ -184,6 +185,7 @@
                     v-model="dialog_refer"
                     persistent
                     width="800"
+                    class="refer-dialog"
                 >
                     <v-card>
                         <v-toolbar
@@ -200,34 +202,43 @@
                                 {{ t('common.cancel') }}
                             </v-btn>
                         </v-toolbar>
-                        <v-card-text class="pt-4">
-                            <v-alert
-                                v-if="!refer_books_loading && refer_summary.failures.length > 0"
-                                class="mb-4"
-                                type="warning"
-                                variant="tonal"
+                        <v-card-text class="refer-dialog__body pt-3">
+                            <section
+                                class="refer-progress mb-4"
+                                aria-live="polite"
                             >
-                                {{ t('book.referPartialFailure', {
-                                    count: refer_summary.failures.length,
-                                    sources: refer_failed_sources,
-                                }) }}
-                            </v-alert>
-                            <p
-                                v-if="refer_books_loading"
-                                class="py-6 text-center"
-                            >
-                                <v-progress-circular
-                                    indeterminate
+                                <div class="refer-progress__label">
+                                    <span>
+                                        {{ refer_summary.total > 0
+                                            ? t('book.referProgress', { completed: refer_summary.completed, total: refer_summary.total })
+                                            : t('book.referProgressLoading') }}
+                                    </span>
+                                    <span v-if="refer_summary.total > 0">{{ refer_progress_percent }}%</span>
+                                </div>
+                                <v-progress-linear
+                                    :model-value="refer_progress_percent"
+                                    :indeterminate="refer_books_loading && refer_summary.total === 0"
+                                    :aria-label="refer_summary.total > 0
+                                        ? t('book.referProgress', { completed: refer_summary.completed, total: refer_summary.total })
+                                        : t('book.referProgressLoading')"
                                     color="primary"
+                                    height="4"
+                                    rounded
                                 />
-                            </p>
+                                <p
+                                    v-if="refer_summary.failures.length > 0"
+                                    class="refer-progress__failures"
+                                >
+                                    {{ t('book.referIncompleteSources', { sources: refer_failed_sources }) }}
+                                </p>
+                            </section>
                             <p
-                                v-else-if="refer_books.length === 0"
+                                v-if="!refer_books_loading && refer_books.length === 0"
                                 class="py-6 text-center"
                             >
                                 {{ t(refer_summary.failures.length > 0 ? 'book.noMatchingBooksWithFailures' : 'book.noMatchingBooks') }}
                             </p>
-                            <template v-else>
+                            <template v-else-if="refer_books.length > 0">
                                 <p class="mb-4">
                                     {{ t('book.selectMatchingBook') }}
                                 </p>
@@ -598,6 +609,21 @@
                                         </template>
                                         <v-list-item-title>{{ t('book.uploadNewFormat') }}</v-list-item-title>
                                     </v-list-item>
+                                    <template v-if="bookToolActions.length > 0">
+                                        <v-divider />
+                                        <v-list-subheader>{{ t('book.pluginTools') }}</v-list-subheader>
+                                        <v-list-item
+                                            v-for="action in bookToolActions"
+                                            :key="action.plugin_key"
+                                            :to="{ path: action.route, query: { book_id: book.id } }"
+                                            :data-testid="`book-tool-${action.plugin_key}`"
+                                        >
+                                            <template #prepend>
+                                                <v-icon>{{ action.icon }}</v-icon>
+                                            </template>
+                                            <v-list-item-title>{{ action.name }}</v-list-item-title>
+                                        </v-list-item>
+                                    </template>
                                 </v-list>
                             </v-menu>
 
@@ -1070,6 +1096,26 @@ const book = ref({
     is_owner: false,
     series: ''
 });
+const bookToolActions = ref([]);
+
+async function loadBookToolActions(currentBookId, isAdmin) {
+    if (!currentBookId || !isAdmin) {
+        bookToolActions.value = [];
+        return;
+    }
+    try {
+        const response = await $backend(`/plugins/tools/book-actions?book_id=${encodeURIComponent(currentBookId)}`);
+        bookToolActions.value = response.err === 'ok' ? (response.actions || []) : [];
+    } catch {
+        bookToolActions.value = [];
+    }
+}
+
+watch(
+    [routeBookId, () => store.user.is_admin],
+    ([currentBookId, isAdmin]) => loadBookToolActions(currentBookId, isAdmin),
+    { immediate: true },
+);
 
 // Dialogs
 const dialog_download = ref(false);
@@ -1098,6 +1144,10 @@ const refer_books_loading = ref(false);
 const refer_books_setting_btn_loading = ref(false);
 const refer_books = ref([]);
 const refer_summary = ref({ failures: [], total: 0, completed: 0 });
+const refer_progress_percent = computed(() => {
+    if (!refer_summary.value.total) return 0;
+    return Math.min(100, Math.round((refer_summary.value.completed / refer_summary.value.total) * 100));
+});
 const refer_failed_sources = computed(() => {
     return [...new Set(refer_summary.value.failures.map(item => item.source).filter(Boolean))].join('、');
 });
@@ -1240,6 +1290,11 @@ const loadUserDevices = async () => {
         const rsp = await $backend('/user/devices');
         if (rsp.err === 'ok') {
             devices.value = rsp.devices || [];
+            deviceTypes.value = rsp.device_types || [];
+            if (!deviceTypes.value.some(item => item.value === tempDevice.value.type)) {
+                tempDevice.value.type = '';
+                tempDevice.value.port = '';
+            }
         }
     } catch (e) {
         console.error('Failed to load user devices:', e);
@@ -1264,6 +1319,10 @@ const loadDevicePreferences = () => {
         const savedTempDevice = localStorage.getItem('temp_device_info');
         if (savedTempDevice) {
             tempDevice.value = JSON.parse(savedTempDevice);
+            if (!deviceTypes.value.some(item => item.value === tempDevice.value.type)) {
+                tempDevice.value.type = '';
+                tempDevice.value.port = '';
+            }
         }
     } catch (e) {
         console.error('Failed to load device preferences:', e);
@@ -1342,13 +1401,15 @@ const get_refer = async () => {
         for await (const data of $backend_stream(`/book/${bookid.value}/refer?stream=1`)) {
             if (firstLine) {
                 firstLine = false;
-                refer_books_loading.value = false;
-            } else if (data.event === 'summary') {
+                continue;
+            }
+            if (data.event === 'progress' || data.event === 'summary') {
                 refer_summary.value = {
                     failures: Array.isArray(data.failures) ? data.failures : [],
                     total: data.total || 0,
                     completed: data.completed || 0,
                 };
+                if (data.event === 'summary') refer_books_loading.value = false;
             } else {
                 data.href = '';
                 if (!data.cover_url || data.cover_url === '') {
@@ -1593,16 +1654,8 @@ const confirmDeleteFormat = async () => {
 
 // Watch tempDevice changes, auto-fill port based on type
 watch(() => tempDevice.value.type, (newType) => {
-    const portMap = {
-        duokan: '12121',
-        boox: '8085',
-        hanwang: '9310',
-        ireader: '10123',
-        dangdang: '11111',
-    };
-    if (portMap[newType]) {
-        tempDevice.value.port = portMap[newType];
-    }
+    const type = deviceTypes.value.find(item => item.value === newType);
+    if (type) tempDevice.value.port = String(type.default_port);
 });
 
 // Watch dialog_send_to_device open, auto-select default device
@@ -1612,7 +1665,7 @@ watch(dialog_send_to_device, (isOpen) => {
 
     if (devices.value && devices.value.length > 0) {
         selectedDeviceOption.value = 'saved-0';
-    } else {
+    } else if (deviceTypes.value.length > 0) {
         selectedDeviceOption.value = 'temporary';
     }
 });
@@ -1740,15 +1793,6 @@ watch(() => store.user?.is_login, async (isLogin) => {
 });
 
 onMounted(async () => {
-    deviceTypes.value = [
-        { text: t('settings.deviceTypeDuokan'), value: 'duokan' },
-        { text: t('settings.deviceTypeIreader'), value: 'ireader' },
-        { text: t('settings.deviceTypeHanwang'), value: 'hanwang' },
-        { text: t('settings.deviceTypeBoox'), value: 'boox' },
-        { text: t('settings.deviceTypeDangdang'), value: 'dangdang' },
-        { text: t('common.kindle') || 'Kindle', value: 'kindle' },
-        { text: t('settings.deviceTypePurelibro') || 'PureLibro', value: 'purelibro' },
-    ];
     await loadDevices();
 });
 </script>
@@ -1775,6 +1819,12 @@ onMounted(async () => {
 .tag-chips a {
     margin: 4px 2px;
 }
+
+.refer-progress { padding:0 2px; }
+.refer-progress__label { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:7px; color:rgba(var(--v-theme-on-surface),.72); font-size:12px; }
+.refer-progress__failures { margin:7px 0 0; overflow:hidden; color:rgb(var(--v-theme-warning)); font-size:12px; line-height:1.4; text-overflow:ellipsis; white-space:nowrap; }
+:global(.refer-dialog .v-overlay__content) { scrollbar-width:none; }
+:global(.refer-dialog .v-overlay__content::-webkit-scrollbar) { display:none; width:0; height:0; }
 
 /* 减小管理菜单图标和文字的间距 */
 :deep(.v-list-item__spacer) {

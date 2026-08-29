@@ -208,6 +208,7 @@ if __name__ == "__main__":
 
 
 class BaiduBaikeProvider(MetaSourceMixin, BaiduBaikeApi):
+    legacy_sources = ("baidu",)
     proxy_image_hosts = ("bcebos.com", "bdstatic.com")
     manifest = meta_manifest(
         "talebook.meta.baike",
@@ -215,6 +216,7 @@ class BaiduBaikeProvider(MetaSourceMixin, BaiduBaikeApi):
         "从百度百科词条提取书籍简介、作者与出版信息。",
         "mdi-book-information-variant",
         "https://baike.baidu.com/",
+        brand_icon="/images/plugin-icons/baidu-baike.ico",
     )
 
     def __init__(self):

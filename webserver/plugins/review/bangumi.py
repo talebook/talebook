@@ -12,6 +12,7 @@ SPEC = ReviewSourceSpec(
     homepage="https://bgm.tv",
     icon="mdi-book-open-outline",
     scale=10,
+    brand_icon="/images/plugin-icons/bangumi.png",
 )
 
 

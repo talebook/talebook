@@ -14,7 +14,9 @@ from webserver.handlers.base import BaseHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Device, Message, Reader
 from webserver.plugins import captcha as captcha_module
+from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.services.mail import MailService
+from webserver.services.plugin_runtime import PluginRuntime
 from webserver.version import VERSION
 
 
@@ -561,7 +563,19 @@ class UserDevices(BaseHandler):
         global_devices = CONF.get("DEVICES", []) or []
         used_names = {d["name"] for d in personal}
         result = personal + [g for g in global_devices if g.get("name") not in used_names]
-        return {"err": "ok", "devices": result}
+        device_types = []
+        for provider in PluginRuntime(self.session, CONF).enabled_providers(PUSH_CAPABILITY):
+            device_type = (provider.manifest.get("ui") or {}).get("device_type")
+            if not device_type:
+                continue
+            device_types.append(
+                {
+                    "text": provider.manifest["name"],
+                    "value": device_type,
+                    "default_port": provider.default_port,
+                }
+            )
+        return {"err": "ok", "devices": result, "device_types": device_types}
 
     @js
     @auth

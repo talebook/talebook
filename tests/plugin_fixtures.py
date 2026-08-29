@@ -1,3 +1,5 @@
+"""测试专用 Provider；不得注册到生产插件目录。"""
+
 import time
 
 from webserver.plugins.runtime.domains import BookMetadata, MetadataQuery, Page, Review
@@ -38,7 +40,6 @@ class MockMultiTabProvider:
         "permissions": ["books.read", "plugin_records.write"],
         "data_policy": {"stores_full_text": False, "retention": "source_record"},
         "compatibility": {"talebook": ">=0.1.0"},
-        # 用于验证同一 installation 下实例级与用户级连接可以共存。
         "connection_owners": ["instance", "user"],
         "homepage": "https://github.com/talebook/talebook",
         "license": "GPL-3.0",
@@ -105,6 +106,3 @@ class MockMultiTabProvider:
 
     def get_reviews(self, query, context):
         return Page(items=[Review.from_dict({"book_external_id": str(query), "rating": 4.5, "scale": 5})])
-
-
-PROVIDER = MockMultiTabProvider()

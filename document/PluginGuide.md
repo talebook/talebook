@@ -224,8 +224,9 @@ POST /api/plugins/{plugin_key}/features/{action}
 | **书源** | `source/{kavita,komga,booklore,gutenberg,internet_archive,standard_ebooks,webdav,watch_folder}.py` | `http` / `file` | 每个文件只实现一个插件；统一返回领域对象，并由 `download_mode` 选择单文件或分章组装 |
 | **富化连接器** | `meta/*.py`、`review/*.py` 与 `annotation/brs.py` | `builtin` | 经 `SafeHttpClient` 统一出网；插件 ID 使用单数类型前缀 `talebook.meta.* / talebook.review.* / talebook.annotation.*` |
 | **综合插件** | `combo/open_library.py`、`combo/weread/` | `builtin` / `http` | Open Library 同时实现 metadata/review；微信读书同时实现 metadata/annotation/extra feature，嵌套分页通过显式 cursor 逐页推进 |
-| **Mock** | `mock/multi_tab.py:MockMultiTabProvider` | `builtin` | `ui.hidden: true`，用于证明跨类别与重试/回滚行为，`token` 驱动的 `rate_limit / delay / fail_external_ids` |
 | **正文工具** | `tool/{text_replace,zh_converter,txt_fixer}/` | `builtin` | `TransformProvider.preview/apply` 执行真实正文处理；handler 仅解析 HTTP、定位书籍，并通过 `runtime.write` 的 finalize/rollback 钩子写回或另存 |
+
+跨类别、限流、重试和回滚使用的 deterministic Provider 仅位于 `tests/plugin_fixtures.py`，注册到测试专用 Registry；它不是内置插件，不进入生产目录或数据库自动物化。
 
 书源配置不复制：`BookSourceModel` 与 `OpdsSource` 继续是唯一事实，`SourceCatalogService` 用 opaque `source_key` 将它们绑定到插件连接。新入口为 `/api/book-sources/*`；`/api/network/*` 按 D-14 保留一版兼容别名。
 

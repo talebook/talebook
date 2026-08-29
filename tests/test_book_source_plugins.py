@@ -3,6 +3,7 @@ import json
 import threading
 import time
 from types import SimpleNamespace
+from unittest import mock
 
 import pytest
 from sqlalchemy import create_engine
@@ -10,11 +11,13 @@ from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Base, PluginRunItem, PluginSourceRecord
 from webserver.plugins.register import SOURCE_PROVIDERS
+from webserver.plugins.runtime.domains import MetadataQuery
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderItem, ProviderResult
 from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient, validate_remote_endpoint
 from webserver.plugins.source.base import OPDSProvider
 from webserver.plugins.source.internet_archive import InternetArchiveProvider
 from webserver.plugins.source.legado import PROVIDER as LEGADO_PROVIDER
+from webserver.plugins.source.standard_ebooks import StandardEbooksProvider
 from webserver.plugins.source.watch_folder import WatchFolderProvider
 from webserver.plugins.source.webdav import WebDAVProvider
 from webserver.services.booksource import SourceHttpError
@@ -214,6 +217,75 @@ def test_catalog_declares_real_capabilities_and_keeps_excluded_servers_out():
     catalog = json.dumps(list(manifests.values()), ensure_ascii=False).lower()
     assert "calibre content server" not in catalog
     assert "calibre-web" not in catalog
+
+
+def test_legado_prepares_and_searches_metadata_only_for_the_metadata_interface():
+    source = mock.sentinel.source
+    session = mock.sentinel.session
+    settings = {**SETTINGS, "BOOKSOURCE_METADATA_TOP_K": 7}
+
+    with mock.patch("webserver.plugins.source.legado.collect_metadata_sources", return_value=[source]) as collect:
+        platform = LEGADO_PROVIDER.prepare_context(session, settings, "search_books")
+        assert LEGADO_PROVIDER.prepare_context(session, settings, "search") == {}
+
+    collect.assert_called_once_with(session, 7)
+    service = mock.Mock()
+    outcome = mock.sentinel.outcome
+    service.search.return_value = outcome
+    with mock.patch("webserver.plugins.source.legado.BookSourceMetadataService", return_value=service) as service_class:
+        result = LEGADO_PROVIDER.search_books(
+            MetadataQuery(title="活着", authors=("余华",)),
+            context(platform=platform),
+        )
+
+    assert result is outcome
+    service_class.assert_called_once_with([source], settings["cookie_secret"], config=platform["booksource_config"])
+    service.search.assert_called_once_with("活着", "余华")
+
+
+def test_public_sources_are_ready_to_preview_without_configuration():
+    manifests = {provider.manifest["id"]: provider.manifest for provider in SOURCE_PROVIDERS}
+
+    for plugin_id in ("talebook.source.gutenberg", "talebook.source.standard-ebooks"):
+        assert not manifests[plugin_id]["config_schema"].get("required")
+        assert not manifests[plugin_id]["auth_schema"].get("required")
+        expected_ui = {
+            "icon": "mdi-bookshelf",
+            "manage_kind": "book_source",
+            "configuration_mode": "none",
+            "primary_action": "preview",
+            "catalog_access": "public_free",
+        }
+        assert {key: manifests[plugin_id]["ui"][key] for key in expected_ui} == expected_ui
+        assert manifests[plugin_id]["ui"]["brand_icon"].startswith("/images/plugin-icons/")
+
+    assert manifests["talebook.source.internet-archive"]["ui"]["catalog_access"] == "rights_vary"
+    assert manifests["talebook.source.internet-archive"]["ui"]["primary_action"] == "details"
+
+
+def test_standard_ebooks_open_atom_enclosure_is_a_downloadable_book():
+    endpoint = StandardEbooksProvider().endpoint
+    body = """<?xml version="1.0"?>
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <entry>
+        <id>https://standardebooks.org/ebooks/example/book</id>
+        <title>Example Book</title>
+        <author><name>Ada Author</name></author>
+        <rights>Public domain in the United States</rights>
+        <updated>2026-08-29T00:00:00Z</updated>
+        <link rel="enclosure" type="application/epub+zip" href="https://standardebooks.org/ebooks/example/book/downloads/example_book.epub" />
+      </entry>
+    </feed>"""
+    provider = StandardEbooksProvider()
+    provider.http = FakeHttp({endpoint: response(body, "application/atom+xml")})
+
+    item = provider.execute(context()).items[0].data
+
+    assert item["title"] == "Example Book"
+    assert item["authors"] == ["Ada Author"]
+    assert item["access"] == "download"
+    assert item["format"] == "epub"
+    assert item["acquisition_url"].endswith("example_book.epub")
 
 
 def test_endpoint_policy_rejects_private_credentials_and_redirect_targets():

@@ -37,6 +37,7 @@ class BooxProvider(DevicePushProvider):
                 "把书籍发送到文石 BOOX 设备的推送库。",
                 "mdi-tablet-android",
                 "https://www.boox.com/",
+                brand_icon="/images/plugin-icons/boox.png",
             ),
             BooxUploader,
         )

@@ -221,6 +221,11 @@
                                 prepend-icon="mdi-history"
                             />
                             <v-list-item
+                                to="/plugins"
+                                :title="$t('pluginManagement.personalPluginsNavigation')"
+                                prepend-icon="mdi-power-plug-outline"
+                            />
+                            <v-list-item
                                 to="/scopedbooks"
                                 :title="$t('navigation.scopedBooks')"
                                 prepend-icon="mdi-shield-account"

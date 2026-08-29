@@ -12,6 +12,7 @@ SPEC = ReviewSourceSpec(
     homepage="https://anilist.co",
     icon="mdi-format-list-numbered",
     scale=100,
+    brand_icon="/images/plugin-icons/anilist.png",
 )
 
 

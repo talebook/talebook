@@ -39,6 +39,7 @@ class HanwangProvider(DevicePushProvider):
                 "汉王电纸书",
                 "通过 WiFi 传书把书籍发送到汉王电纸书。",
                 "mdi-book-open-outline",
+                brand_icon="/images/plugin-icons/hanwang.jpg",
             ),
             HanwangUploader,
         )

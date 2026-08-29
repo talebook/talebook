@@ -6,19 +6,16 @@ import re
 import time
 
 from webserver import loader, utils
-from webserver.constants import (
-    META_SELECTED_SOURCES,
-)
 from webserver.i18n import _
 from webserver.plugins.meta.base import to_calibre_metadata
-from webserver.plugins.register import plugin_ids_for_sources
 from webserver.plugins.runtime.domains import MetadataQuery
 from webserver.services import AsyncService
 from webserver.services.external_index import set_metadata_preserving_external_paths
-from webserver.services.plugin_runtime import REGISTRY
+from webserver.services.plugin_runtime import PluginRuntime, ensure_runtime_installations
 
 
 CONF = loader.get_settings()
+META_LOOKUP_CAPABILITY = "metadata.lookup"
 
 
 class AutoFillService(AsyncService):
@@ -151,35 +148,36 @@ class AutoFillService(AsyncService):
     )
 
     def plugin_search_best_book_info(self, mi):
-        sources = CONF.get(META_SELECTED_SOURCES, [])
-        if not sources:
-            return None
-
+        ensure_runtime_installations(self.session, CONF)
         title = re.sub("[(（].*", "", mi.title)
-        enabled = set(plugin_ids_for_sources(sources))
         query = MetadataQuery(
             title=title,
             isbn=mi.isbn or "",
             publisher=getattr(mi, "publisher", "") or "",
             authors=tuple(getattr(mi, "authors", None) or ()),
         )
-        context = {"action": "search", "config": {"sources": list(sources)}, "secrets": {}}
+        runtime = PluginRuntime(self.session, CONF)
+        connections = runtime.connections_for(META_LOOKUP_CAPABILITY)
+        units, failures = runtime.prepare_read(connections, timeout=30)
+        for connection_id, error in failures.items():
+            logging.warning("自动补全插件连接 %s 不可用：%s", connection_id, error)
+        units_by_plugin = {unit["plugin_key"]: unit for unit in units}
 
         for plugin_id in self.AUTOFILL_PRIORITY:
-            if plugin_id not in enabled:
+            unit = units_by_plugin.get(plugin_id)
+            if unit is None:
                 continue
             try:
-                provider = REGISTRY.get(plugin_id)
-                records = provider.search_books(query, context) or []
+                records = unit["call"]("search_books", query) or []
             except Exception as err:
                 logging.error(_("元数据插件 %s 查询 %s 失败：%s"), plugin_id, title, err)
                 continue
-            book = self._best_candidate(records, mi, provider, context)
+            book = self._best_candidate(records, mi, unit["call"])
             if book is not None:
                 return book
         return None
 
-    def _best_candidate(self, records, mi, provider, context):
+    def _best_candidate(self, records, mi, call):
         """标题完全匹配优先，否则取首个候选；封面按需补齐。
 
         这段挑选逻辑此前重复实现在 douban_v2 与 neodb 的 search_best() 里，
@@ -191,7 +189,7 @@ class AutoFillService(AsyncService):
         best = next((c for c in candidates if getattr(c, "title", None) == mi.title), candidates[0])
         if not getattr(best, "cover_data", None) and getattr(best, "cover_url", ""):
             try:
-                best.cover_data = provider.get_cover(best.cover_url, context)
+                best.cover_data = call("get_cover", best.cover_url)
             except Exception:
                 best.cover_data = None
         return best

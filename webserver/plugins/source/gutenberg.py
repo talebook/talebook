@@ -12,7 +12,13 @@ class GutenbergProvider(SourceBase):
         ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
         {"type": "object", "properties": COMMON_CONFIG_PROPERTIES},
         homepage="https://www.gutenberg.org/",
+        brand_icon="/images/plugin-icons/project-gutenberg.png",
     )
+    manifest["ui"]["catalog_access"] = "public_free"
+
+    @staticmethod
+    def initial_enabled(settings):
+        return True
 
     def discover(self, context):
         response = self.http.request("GET", self.endpoint, headers={"Accept": "application/json"})

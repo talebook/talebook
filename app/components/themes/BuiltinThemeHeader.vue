@@ -152,6 +152,11 @@
                         prepend-icon="mdi-history"
                     />
                     <v-list-item
+                        to="/plugins"
+                        :title="t('pluginManagement.personalPluginsNavigation')"
+                        prepend-icon="mdi-power-plug-outline"
+                    />
+                    <v-list-item
                         v-if="store.user.is_admin"
                         to="/admin/settings"
                         :title="t('messages.adminEntry')"

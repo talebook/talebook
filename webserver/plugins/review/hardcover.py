@@ -10,6 +10,7 @@ SPEC = ReviewSourceSpec(
     homepage="https://hardcover.app",
     icon="mdi-book-star-outline",
     scale=5,
+    brand_icon="/images/plugin-icons/hardcover.png",
     requires_token=True,
 )
 

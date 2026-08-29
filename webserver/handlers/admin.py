@@ -402,11 +402,18 @@ class AdminSettings(BaseHandler):
         # 演示账号看到的是 settings.py 里的出厂默认值，不暴露真实部署配置（密钥、
         # 数据库地址等）；真实管理员仍看到当前生效的运行配置。
         settings_dict = dict(DEFAULT_SETTINGS) if self.is_demo_fake_admin() else dict(CONF)
-        # 添加元数据源配置
-        settings_dict["META_ALL_SOURCES"] = META_ALL_SOURCES
-        settings_dict["META_SELECTED_SOURCES"] = normalize_meta_sources(
-            settings_dict.get("META_SELECTED_SOURCES", DEFAULT_META_SOURCES)
-        )
+        # 已迁入插件中心的字段不再由系统设置读写，避免形成第二个配置入口。
+        for plugin_setting in (
+            "auto_fill_meta",
+            "auto_fill_keep_cover",
+            "META_SELECTED_SOURCES",
+            "ai_api_url",
+            "ai_api_key",
+            "ai_model",
+            "ai_use_thinking",
+            "DEVICES",
+        ):
+            settings_dict.pop(plugin_setting, None)
 
         return {"err": "ok", "settings": settings_dict, "sns": sns, "site_url": self.site_url}
 
@@ -425,9 +432,6 @@ class AdminSettings(BaseHandler):
         if not self.admin_user:
             return {"err": "permission", "msg": _("无权访问此接口")}
         data = tornado.escape.json_decode(self.request.body)
-        if "META_SELECTED_SOURCES" in data:
-            data["META_SELECTED_SOURCES"] = normalize_meta_sources(data["META_SELECTED_SOURCES"])
-
         # 验证：如果启用了私人图书馆模式，访问码不能为空
         invite_mode = data.get("INVITE_MODE", False)
         invite_code = data.get("INVITE_CODE", "")
@@ -525,13 +529,6 @@ class AdminSettings(BaseHandler):
             "import_allowed_roots",
             "import_watch_interval_seconds",
             "import_scan_batch_size",
-            "auto_fill_meta",
-            "auto_fill_keep_cover",
-            "META_SELECTED_SOURCES",
-            "ai_api_url",
-            "ai_api_key",
-            "ai_model",
-            "ai_use_thinking",
             "push_title",
             "push_content",
             "site_title",
@@ -552,7 +549,6 @@ class AdminSettings(BaseHandler):
             "CAPTCHA_ENABLE_FOR_RESET",
             "GEETEST_CAPTCHA_ID",
             "GEETEST_CAPTCHA_KEY",
-            "DEVICES",
             # 首页设置
             "MAIN_PAGE_RANDOM_COUNT",
             "MAIN_PAGE_RECENT_COUNT",

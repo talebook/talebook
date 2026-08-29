@@ -242,8 +242,8 @@ class WereadProvider:
         "extra_features": WEREAD_EXTRA_FEATURES,
         "ui": {
             "icon": "mdi-book-open-page-variant",
+            "brand_icon": "/images/plugin-icons/weread.png",
             "manage_route": "/plugins/weread",
-            "manage_label_key": "pluginManagement.openWorkbench",
         },
     }
 

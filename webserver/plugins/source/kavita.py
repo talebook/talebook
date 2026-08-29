@@ -8,6 +8,7 @@ class KavitaProvider(OPDSProvider):
             "Kavita",
             "Kavita 自托管书库 OPDS 连接预设。",
             "https://www.kavitareader.com/",
+            brand_icon="/images/plugin-icons/kavita.svg",
         )
 
 

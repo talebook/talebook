@@ -81,7 +81,12 @@ class OpenLibraryProvider:
         "compatibility": {"talebook": ">=0.1.0"},
         "homepage": "https://openlibrary.org/developers/api",
         "license": "GPL-3.0",
-        "ui": {"icon": "mdi-library-outline", "primary_action": "configure"},
+        "ui": {
+            "icon": "mdi-library-outline",
+            "brand_icon": "/images/plugin-icons/open-library.png",
+            "configuration_mode": "none",
+            "primary_action": "details",
+        },
         "connection_owners": ["instance"],
     }
 

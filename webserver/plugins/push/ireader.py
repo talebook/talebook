@@ -44,6 +44,8 @@ class IReaderProvider(DevicePushProvider):
                 "掌阅 iReader",
                 "把书籍发送到掌阅 iReader 设备。",
                 "mdi-book-arrow-right-outline",
+                homepage="https://www.ireader.com/",
+                brand_icon="/images/plugin-icons/ireader.ico",
             ),
             IReaderUploader,
         )
