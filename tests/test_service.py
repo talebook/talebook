@@ -121,6 +121,17 @@ class TestConvert(TestWithUserLogin):
 
         convert.assert_not_called()
 
+    def test_convert_and_save_rejects_filesystem_root(self):
+        service = ConvertService()
+        settings = {"convert_path": os.path.sep, "progress_path": "/tmp"}
+
+        with mock.patch.dict("webserver.services.convert.CONF", settings):
+            with mock.patch.object(service, "do_ebook_convert") as convert:
+                with self.assertRaises(ValueError):
+                    service.convert_and_save(1, {"id": 1, "title": "Unsafe"}, "/tmp/source.epub", "epub")
+
+        convert.assert_not_called()
+
     def test_convert_and_save_accepts_safe_output_path(self):
         service = ConvertService()
 
@@ -173,6 +184,14 @@ class TestExtract(TestWithUserLogin):
         with mock.patch("webserver.services.extract.TxtParser") as parser:
             with self.assertRaises(ValueError):
                 ExtractService().parse_txt_content("../666", testdir + "/cases/book.txt")
+
+        parser.assert_not_called()
+
+    def test_rejects_filesystem_root_as_extract_root(self):
+        with mock.patch.dict("webserver.services.extract.CONF", {"extract_path": os.path.sep}):
+            with mock.patch("webserver.services.extract.TxtParser") as parser:
+                with self.assertRaises(ValueError):
+                    ExtractService().parse_txt_content(666, testdir + "/cases/book.txt")
 
         parser.assert_not_called()
 

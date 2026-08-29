@@ -207,17 +207,18 @@ class ConvertService(AsyncService):
         book_id = int(book_id_text)
 
         convert_root = os.path.realpath(CONF["convert_path"])
+        if os.path.dirname(convert_root) == convert_root:
+            raise ValueError("conversion output root cannot be the filesystem root")
         new_path = os.path.realpath(
             os.path.join(
                 convert_root,
                 "book-%s-%s.%s" % (book_id, int(time.time()), new_fmt),
             )
         )
-        try:
-            if os.path.commonpath([convert_root, new_path]) != convert_root:
-                raise ValueError("conversion output path escapes configured root")
-        except ValueError as exc:
-            raise ValueError("invalid conversion output path") from exc
+        # Keep the normalized-prefix guard inline: CodeQL recognizes this form
+        # as a path-injection barrier before the open/remove sinks below.
+        if not new_path.startswith(convert_root + os.sep):
+            raise ValueError("conversion output path escapes configured root")
 
         progress_file = ConvertService().get_path_progress(book_id)
         logging.info("convert book: %s => %s, progress: %s" % (fpath, new_path, progress_file))

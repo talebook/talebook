@@ -25,19 +25,17 @@ class ExtractService(AsyncService):
             raise ValueError("invalid book id")
 
         extract_root = os.path.realpath(CONF["extract_path"])
+        if os.path.dirname(extract_root) == extract_root:
+            raise ValueError("extraction output root cannot be the filesystem root")
         out_dir = os.path.realpath(os.path.join(extract_root, book_id_text))  # 解压后的目录
-        try:
-            if os.path.commonpath([extract_root, out_dir]) != extract_root:
-                raise ValueError("extraction output path escapes configured root")
-        except ValueError as exc:
-            raise ValueError("invalid extraction output path") from exc
+        # These normalized-prefix guards stay inline so CodeQL can prove that
+        # every filesystem sink below is constrained to the configured root.
+        if not out_dir.startswith(extract_root + os.sep):
+            raise ValueError("extraction output path escapes configured root")
 
         content_path = os.path.realpath(os.path.join(out_dir, "content.json"))
-        try:
-            if os.path.commonpath([out_dir, content_path]) != out_dir:
-                raise ValueError("extraction content path escapes book directory")
-        except ValueError as exc:
-            raise ValueError("invalid extraction content path") from exc
+        if not content_path.startswith(out_dir + os.sep):
+            raise ValueError("extraction content path escapes book directory")
 
         if os.path.isfile(content_path):
             logging.info(f"书籍<{book_id_text}>已转换, {content_path} exists")

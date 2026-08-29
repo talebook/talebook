@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="修复 PR #977 中 CodeQL 报告的转换与 TXT 提取路径注入告警。" />
+    <meta name="description" content="修复 PR #977 路径加固后仍被 CodeQL 报告的路径注入告警。" />
     <link rel="icon" href="data:," />
-    <title>收紧转换与 TXT 提取的文件路径边界 · ACTIVE</title>
+    <title>改用 CodeQL 可识别的内联路径前缀守卫 · ACTIVE</title>
     <style>
       :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#172033; --muted:#5d687c; --line:#d9e1ec; --accent:#a84d16; --soft:#fff2e8; --good:#e7f6ee; --danger:#fff0f0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; }
       * { box-sizing:border-box; }
@@ -50,62 +50,62 @@
   <body>
     <div class="page">
       <header>
-        <h1>收紧转换与 TXT 提取的文件路径边界</h1>
-        <p class="sub">在不改变正常转换、提取流程的前提下，对进入文件系统路径的书籍 ID 和目标格式执行白名单校验，并验证解析后的路径仍位于配置根目录中。</p>
+        <h1>改用 CodeQL 可识别的内联路径前缀守卫</h1>
+        <p class="sub">保留既有白名单和 realpath 规范化，将 CodeQL 未建模的 commonpath 判断替换为查询帮助明确推荐、且项目已有实践的内联 startswith 根目录守卫。</p>
         <div class="chips" aria-label="方案元信息">
-          <span class="chip status">状态：ACTIVE</span><span class="chip">创建日期：2026-08-28</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：转换服务、TXT 提取服务、服务测试</span><span class="chip">需求来源：PR #977 CodeQL</span>
+          <span class="chip status">状态：ACTIVE</span><span class="chip">创建日期：2026-08-28</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：转换服务、TXT 提取服务、服务测试</span><span class="chip">需求来源：PR #977 新一轮 CodeQL</span>
         </div>
       </header>
       <main>
         <section class="card">
           <h2>1. 原始诉求</h2>
-          <div class="callout">“修复 https://github.com/talebook/talebook/pull/977 的 codeql 报错”</div>
-          <p>PR 的 CodeQL 安全门禁报告 6 个 high 级 <code>py/path-injection</code> 告警：<code>webserver/services/convert.py</code> 2 个，<code>webserver/services/extract.py</code> 4 个。虽然这两个文件与 PR 基线内容一致，但 PR 变更规模过大使既有开放告警进入本次门禁。</p>
+          <div class="callout">“又出现了新的codeql报错”</div>
+          <p>提交 <code>882cff59</code> 已加入 fullmatch、realpath 和 commonpath 校验，但 CodeQL 仍报告 6 个 high 级 <code>py/path-injection</code> 告警：转换文件打开与删除各 1 个，TXT 提取的文件检查、目录检查、建目录及写文件共 4 个。</p>
         </section>
         <section class="card">
           <h2>2. 目标与边界</h2>
           <div class="grid">
-            <article class="box good"><b>目标</b><ul><li>阻断书籍 ID、目标格式造成的路径穿越。</li><li>阻断配置根目录内符号链接将输出导向根目录外。</li><li>覆盖恶意路径组件和正常提取行为的回归测试。</li></ul></article>
-            <article class="box"><b>非目标</b><ul><li>不调整 Readest 嵌入实现和静态资源。</li><li>不改变支持的转换格式及成功响应。</li><li>不处理 PR 门禁之外的其他既有 CodeQL 告警。</li></ul></article>
+            <article class="box good"><b>目标</b><ul><li>让 6 个当前门禁告警通过查询可识别的守卫闭合。</li><li>继续阻断规范化后逃逸配置根目录的路径。</li><li>补充根目录本身与相邻前缀目录的拒绝测试。</li></ul></article>
+            <article class="box"><b>非目标</b><ul><li>不移除上一轮的输入白名单。</li><li>不改变支持的转换格式及成功响应。</li><li>不处理 PR 门禁之外的其他既有 CodeQL 告警。</li></ul></article>
           </div>
         </section>
         <section class="card">
           <h2>3. 现状、根因与证据</h2>
           <div class="table-wrap" role="region" aria-label="告警证据" tabindex="0">
             <table><thead><tr><th>位置</th><th>现状</th><th>根因</th></tr></thead><tbody>
-              <tr><td><code>convert.py:214,247</code></td><td>由 <code>book["id"]</code>、<code>new_fmt</code> 拼出路径后执行打开和删除。</td><td>服务层依赖调用方约束，未在文件系统边界重新校验。</td></tr>
-              <tr><td><code>extract.py:23,27,28,33</code></td><td>由 <code>bid</code> 拼出目录和 JSON 路径后检查、创建及写入。</td><td>URL 参数跨越到服务层后仍保留污点，且没有根目录包含性检查。</td></tr>
+              <tr><td><code>convert.py:237,269</code></td><td>路径已通过 realpath + commonpath 校验，CodeQL 仍把后续打开和删除标脏。</td><td>查询帮助示例使用规范化后的 <code>startswith(base)</code> 守卫；commonpath 未被识别为污点屏障。</td></tr>
+              <tr><td><code>extract.py:42,46,47,52</code></td><td>同一候选路径在 commonpath 校验后仍触发 4 个告警。</td><td>守卫必须内联并直接支配文件系统 sink，不能只依赖白名单或未建模的包含性 API。</td></tr>
             </tbody></table>
           </div>
         </section>
         <section class="card">
           <h2>4. 方案</h2>
-          <div class="callout"><b>方案结论：</b>在两个服务内靠近路径构造的位置执行正则 fullmatch 白名单、<code>realpath</code> 规范化和 <code>commonpath</code> 根目录包含性检查；非法输入在任何文件操作前抛出 <code>ValueError</code>，异步服务框架负责记录任务异常。</div>
+          <div class="callout"><b>方案结论：</b>保留正则 fullmatch 和 <code>realpath</code>，拒绝把文件系统根目录配置为输出根；随后在每个候选路径形成后，使用内联 <code>candidate.startswith(root + os.sep)</code> 守卫。该形态与 CodeQL 查询帮助和项目现有上传路径加固一致。</div>
           <div class="flow" aria-label="路径处理流程">
             <article class="step"><b>输入</b><p>书籍 ID、转换目标格式与配置根目录。</p></article>
-            <article class="step"><b>白名单</b><p>ID 仅允许十进制数字；格式仅允许 epub、azw3、pdf。</p></article>
-            <article class="step"><b>规范化</b><p>通过 realpath 解析根目录、候选目录及文件。</p></article>
-            <article class="step"><b>包含性检查</b><p>commonpath 不等于安全根时拒绝，正常路径继续原流程。</p></article>
+            <article class="step"><b>白名单</b><p>保留上一轮十进制 ID 与转换格式限制。</p></article>
+            <article class="step"><b>规范化</b><p>realpath 解析根目录、候选目录及文件，并拒绝根目录配置。</p></article>
+            <article class="step"><b>内联守卫</b><p>候选路径必须 startswith 根目录加路径分隔符，之后才触达 sink。</p></article>
           </div>
         </section>
         <section class="card">
           <h2>5. 影响范围、风险与回滚</h2>
           <div class="grid"><article class="box good"><b>影响范围</b><p><code>ConvertService.convert_and_save</code> 与 <code>ExtractService.parse_txt_content</code> 的输入防御及路径生成。</p></article><article class="box"><b>保持不变</b><p>合法数字书籍 ID、既有三种输出格式、文件内容、数据库写入和消息语义不变。</p></article></div>
-          <div class="callout danger"><b>主要风险：</b>历史内部调用若传入非数字 ID 或未支持的扩展名将被拒绝；通过现有调用点检索和相关测试确认所有合法调用均符合白名单。</div>
+          <div class="callout danger"><b>主要风险：</b>配置值为文件系统根目录时将被拒绝；默认配置均为专用子目录。相邻前缀目录必须继续拒绝，避免简单字符串前缀误判，由测试覆盖。</div>
           <p><b>回滚：</b>单提交回滚服务校验、测试和本方案即可；不涉及数据迁移或配置清理。</p>
         </section>
         <section class="card">
           <h2>6. 测试计划与结果</h2>
           <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0"><table><thead><tr><th>验证层</th><th>命令</th><th>预期</th><th>结果</th></tr></thead><tbody>
-            <tr><td>服务回归</td><td><code>docker run … talebook/talebook:v26.08.11 … python3 -m pytest tests/test_service.py -v</code></td><td>正常转换/提取及恶意输入断言通过。</td><td class="verified">15 passed</td></tr>
+            <tr><td>服务回归</td><td><code>docker run … talebook/talebook:v26.08.11 … python3 -m pytest tests/test_service.py -v</code></td><td>正常转换/提取、恶意输入、根目录及相邻前缀断言通过。</td><td class="verified">17 passed</td></tr>
             <tr><td>Python 质量</td><td><code>make lint-py-fix &amp;&amp; make lint-py &amp;&amp; ruff check tests/test_service.py --no-cache</code></td><td>格式化和静态检查通过。</td><td class="verified">通过</td></tr>
             <tr><td>方案门禁</td><td><code>make check-design</code></td><td>路径、状态和单文件 HTML 校验通过。</td><td class="verified">通过</td></tr>
-            <tr><td>CodeQL</td><td>PR #977 推送后由 GitHub CodeQL 扫描</td><td>6 个路径注入告警不再出现在 PR 门禁。</td><td class="pending">本地无 CodeQL CLI，推送后由 CI 验证</td></tr>
+            <tr><td>CodeQL</td><td>PR #977 推送后由 GitHub CodeQL 扫描</td><td>当前 6 个路径注入告警不再出现在 PR 门禁。</td><td class="pending">推送后由 CI 验证</td></tr>
           </tbody></table></div>
         </section>
         <section class="card">
           <h2>7. 决策记录</h2>
-          <ol><li><strong>2026-08-28：</strong>不以忽略或 dismiss 方式绕过告警，直接补齐服务层安全边界。</li><li><strong>2026-08-28：</strong>使用 CodeQL 可识别的 fullmatch 净化，并保留 realpath + commonpath 作为运行时纵深防御。</li><li><strong>2026-08-28：</strong>宿主机测试缺少 Calibre；新建测试镜像又因 GitHub 依赖下载中断失败，改用已有 Talebook 生产镜像提供 Calibre，并只读挂载宿主机纯 Python pytest 模块完成等价服务测试。</li></ol>
+          <ol><li><strong>2026-08-28：</strong>根据新一轮分析确认 fullmatch + commonpath 没有成为 CodeQL 污点屏障。</li><li><strong>2026-08-28：</strong>选择查询帮助明确推荐的规范化路径 + 内联 startswith 守卫，不 dismiss 告警。</li><li><strong>2026-08-28：</strong>上一份方案在本方案验证生效后转为 SUPERSEDED，并链接本方案。</li></ol>
         </section>
       </main>
       <footer>Talebook internal design · webserver · ACTIVE · 2026-08-28</footer>
