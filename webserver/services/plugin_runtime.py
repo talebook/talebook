@@ -439,6 +439,23 @@ class PluginRuntime:
         self.sleeper = sleeper
         self.calibre_db = calibre_db
 
+    def enabled_providers(self, capability):
+        """返回已安装、启用且处于 active 状态的指定能力 provider。"""
+        enabled_keys = {
+            plugin_key
+            for (plugin_key,) in self.session.query(PluginInstallation.plugin_key)
+            .filter(
+                PluginInstallation.enabled.is_(True),
+                PluginInstallation.status == "active",
+            )
+            .all()
+        }
+        return [
+            provider
+            for provider in self.registry.providers()
+            if provider.manifest["id"] in enabled_keys and capability in (provider.manifest.get("capabilities") or [])
+        ]
+
     def prepare_run(
         self,
         connection_id,

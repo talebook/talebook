@@ -391,6 +391,8 @@
     "basicInfo": "基本信息",
     "deviceMgt": "阅读设备",
     "deviceMgtDescription": "管理您的个人阅读设备，仅对您自己可见。全局设备由管理员统一配置，所有用户均可使用。",
+    "noEnabledDevicePlugins": "暂无已启用的设备插件，请联系管理员在插件管理中启用后再添加。",
+    "devicePluginDisabled": "{type}（插件未启用）",
     "readingRecord": {
       "pageTitle": "阅读记录",
       "currentlyReading": "在读",

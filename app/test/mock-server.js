@@ -1375,11 +1375,21 @@ router.post('/api/book/:id/readstate', eventHandler(async (event) => {
   };
 }));
 
-router.get('/api/user/devices', eventHandler(() => ({
-  err: 'ok',
-  devices: [],
-  device_types: [],
-})));
+router.get('/api/user/devices', eventHandler(() => {
+  const defaultPorts = { boox: 8085 };
+  const deviceTypes = pluginInstallations
+    .filter(installation => installation.enabled && installation.status === 'active')
+    .filter(installation => installation.definition.capabilities.includes('integrations.push'))
+    .map((installation) => {
+      const value = installation.definition.ui.device_type;
+      return {
+        text: installation.definition.name,
+        value,
+        default_port: defaultPorts[value] || 12121,
+      };
+    });
+  return { err: 'ok', devices: [], device_types: deviceTypes };
+}));
 
 // The book detail page probes TXT parsing state for every format. Keep the
 // mock response successful so that this background probe does not open the

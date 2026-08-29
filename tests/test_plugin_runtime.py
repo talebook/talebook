@@ -9,6 +9,7 @@ from webserver.models import (
     Base,
     PluginConnection,
     PluginDefinition,
+    PluginInstallation,
     PluginPermission,
     PluginRunItem,
     PluginSecret,
@@ -121,6 +122,25 @@ def test_builtin_capabilities_are_registered_without_ai_or_calibre_server(db_ses
     assert "manage_kind" not in opds_ui
     tool_ui = builtins["talebook.tool.text-replace"].to_public_dict()["ui"]
     assert tool_ui["manage_route"] == "/plugins/text-replace"
+
+
+def test_enabled_providers_follow_active_installation_state(db_session):
+    install_builtin(db_session, "talebook.push.boox", installed_by=7)
+    install_builtin(db_session, "talebook.source.opds", installed_by=7)
+    runtime = PluginRuntime(db_session, SETTINGS)
+
+    providers = runtime.enabled_providers("integrations.push")
+    assert [provider.manifest["id"] for provider in providers] == ["talebook.push.boox"]
+
+    installation = (
+        db_session.query(PluginInstallation)
+        .filter(PluginInstallation.plugin_key == "talebook.push.boox")
+        .one()
+    )
+    installation.enabled = False
+    db_session.commit()
+
+    assert runtime.enabled_providers("integrations.push") == []
 
 
 def test_auto_installation_is_idempotent_and_keeps_empty_auth_local(db_session):

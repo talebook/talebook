@@ -520,6 +520,8 @@ class TestUser(TestWithUserLogin):
         self.assertEqual(d["err"], "ok")
         self.assertIn("devices", d)
         self.assertIsInstance(d["devices"], list)
+        self.assertIn("device_types", d)
+        self.assertIsInstance(d["device_types"], list)
 
     def test_devices_post_save(self):
         devices_data = [

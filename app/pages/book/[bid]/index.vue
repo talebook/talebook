@@ -50,6 +50,7 @@
                                 <v-radio
                                     value="temporary"
                                     :label="t('book.temporaryDevice')"
+                                    :disabled="deviceTypes.length === 0"
                                 />
                             </v-radio-group>
 
@@ -1240,6 +1241,11 @@ const loadUserDevices = async () => {
         const rsp = await $backend('/user/devices');
         if (rsp.err === 'ok') {
             devices.value = rsp.devices || [];
+            deviceTypes.value = rsp.device_types || [];
+            if (!deviceTypes.value.some(item => item.value === tempDevice.value.type)) {
+                tempDevice.value.type = '';
+                tempDevice.value.port = '';
+            }
         }
     } catch (e) {
         console.error('Failed to load user devices:', e);
@@ -1264,6 +1270,10 @@ const loadDevicePreferences = () => {
         const savedTempDevice = localStorage.getItem('temp_device_info');
         if (savedTempDevice) {
             tempDevice.value = JSON.parse(savedTempDevice);
+            if (!deviceTypes.value.some(item => item.value === tempDevice.value.type)) {
+                tempDevice.value.type = '';
+                tempDevice.value.port = '';
+            }
         }
     } catch (e) {
         console.error('Failed to load device preferences:', e);
@@ -1593,16 +1603,8 @@ const confirmDeleteFormat = async () => {
 
 // Watch tempDevice changes, auto-fill port based on type
 watch(() => tempDevice.value.type, (newType) => {
-    const portMap = {
-        duokan: '12121',
-        boox: '8085',
-        hanwang: '9310',
-        ireader: '10123',
-        dangdang: '11111',
-    };
-    if (portMap[newType]) {
-        tempDevice.value.port = portMap[newType];
-    }
+    const type = deviceTypes.value.find(item => item.value === newType);
+    if (type) tempDevice.value.port = String(type.default_port);
 });
 
 // Watch dialog_send_to_device open, auto-select default device
@@ -1612,7 +1614,7 @@ watch(dialog_send_to_device, (isOpen) => {
 
     if (devices.value && devices.value.length > 0) {
         selectedDeviceOption.value = 'saved-0';
-    } else {
+    } else if (deviceTypes.value.length > 0) {
         selectedDeviceOption.value = 'temporary';
     }
 });
@@ -1740,15 +1742,6 @@ watch(() => store.user?.is_login, async (isLogin) => {
 });
 
 onMounted(async () => {
-    deviceTypes.value = [
-        { text: t('settings.deviceTypeDuokan'), value: 'duokan' },
-        { text: t('settings.deviceTypeIreader'), value: 'ireader' },
-        { text: t('settings.deviceTypeHanwang'), value: 'hanwang' },
-        { text: t('settings.deviceTypeBoox'), value: 'boox' },
-        { text: t('settings.deviceTypeDangdang'), value: 'dangdang' },
-        { text: t('common.kindle') || 'Kindle', value: 'kindle' },
-        { text: t('settings.deviceTypePurelibro') || 'PureLibro', value: 'purelibro' },
-    ];
     await loadDevices();
 });
 </script>

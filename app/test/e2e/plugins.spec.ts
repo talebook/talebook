@@ -60,13 +60,42 @@ test.describe('Plugin management', () => {
         const card = page.locator('.plugin-card').filter({ hasText: 'Generic OPDS' });
         await expect(card).toHaveAttribute('data-status', 'enabled');
         await expect(card.getByText('正常')).toBeVisible();
+        await expect(card.locator('.plugin-card__title-row').getByText('正常')).toBeVisible();
+        await expect(card.locator('.plugin-card__tags .v-chip')).not.toHaveCount(0);
+        await expect(card.getByText('内置', { exact: true })).toHaveCount(0);
         expect(await card.evaluate(element => getComputedStyle(element).backgroundImage)).toContain('linear-gradient');
+        expect(await card.evaluate(element => getComputedStyle(element).boxShadow)).not.toBe('none');
+
+        const actionsBox = await card.locator('.plugin-card__actions').boundingBox();
+        const descriptionBox = await card.locator('.plugin-description').boundingBox();
+        expect(actionsBox.y).toBeLessThan(descriptionBox.y);
+
+        await card.getByRole('button', { name: '详情' }).click();
+        await expect(page.locator('.plugin-details__actions').getByRole('button', { name: '停用' })).toBeVisible();
+        await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
 
         await request.post(`${mockApi}/api/admin/plugins/installations/1/state`, { data: { enabled: false } });
         await page.reload();
         await expect(card).toHaveAttribute('data-status', 'disabled');
         await expect(card.getByText('已停用')).toBeVisible();
         expect(await card.evaluate(element => getComputedStyle(element).backgroundImage)).toBe('none');
+    });
+
+    test('only offers device types from enabled push plugins', async ({ page, request }) => {
+        await page.goto('/user/detail?tab=devices');
+        const addButton = page.getByRole('button', { name: '添加' });
+        await expect(addButton).toBeEnabled();
+        await addButton.click();
+        await page.getByRole('combobox', { name: '类型', exact: true }).focus();
+        await page.keyboard.press('ArrowDown');
+        await expect(page.getByRole('option', { name: 'BOOX' })).toBeVisible();
+        await expect(page.getByRole('option', { name: '多看' })).toHaveCount(0);
+        await page.keyboard.press('Escape');
+
+        await request.post(`${mockApi}/api/admin/plugins/installations/8/state`, { data: { enabled: false } });
+        await page.reload();
+        await expect(addButton).toBeDisabled();
+        await expect(page.getByText('暂无已启用的设备插件')).toBeVisible();
     });
 
     test('keeps the canonical tabs reachable on iPad portrait', async ({ page }) => {

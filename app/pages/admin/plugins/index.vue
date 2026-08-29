@@ -124,8 +124,8 @@
                         class="plugin-card h-100"
                         :data-status="statusInfo(plugin).key"
                     >
-                        <v-card-item>
-                            <template #prepend>
+                        <v-card-item class="plugin-card__item">
+                            <div class="plugin-card__header">
                                 <v-avatar
                                     color="primary"
                                     variant="tonal"
@@ -133,63 +133,63 @@
                                 >
                                     <v-icon>{{ plugin.ui.icon || 'mdi-power-plug-outline' }}</v-icon>
                                 </v-avatar>
-                            </template>
-                            <v-card-title class="text-subtitle-1">
-                                {{ plugin.name }}
-                            </v-card-title>
-                            <v-card-subtitle>
-                                {{ plugin.runtime_kind === 'builtin' ? t('pluginManagement.builtin') : plugin.runtime_kind }}
-                            </v-card-subtitle>
-                            <template #append>
-                                <v-chip
-                                    size="small"
-                                    :color="statusInfo(plugin).color"
-                                    :variant="statusInfo(plugin).key === 'enabled' ? 'flat' : 'tonal'"
-                                >
-                                    <v-icon
-                                        start
+                                <div class="plugin-card__identity">
+                                    <div class="plugin-card__title-row">
+                                        <h3 class="text-subtitle-1 font-weight-medium">
+                                            {{ plugin.name }}
+                                        </h3>
+                                        <v-chip
+                                            size="small"
+                                            :color="statusInfo(plugin).color"
+                                            :variant="statusInfo(plugin).key === 'enabled' ? 'flat' : 'tonal'"
+                                        >
+                                            <v-icon
+                                                start
+                                                size="small"
+                                            >
+                                                {{ statusInfo(plugin).icon }}
+                                            </v-icon>
+                                            {{ statusInfo(plugin).text }}
+                                        </v-chip>
+                                    </div>
+                                    <div class="plugin-card__tags">
+                                        <v-chip
+                                            v-for="capability in plugin.capabilities"
+                                            :key="capability"
+                                            size="x-small"
+                                            variant="tonal"
+                                        >
+                                            {{ capabilityLabel(capability) }}
+                                        </v-chip>
+                                    </div>
+                                </div>
+                                <div class="plugin-card__actions">
+                                    <v-btn
+                                        color="primary"
                                         size="small"
+                                        variant="tonal"
+                                        @click="primaryAction(plugin)"
                                     >
-                                        {{ statusInfo(plugin).icon }}
-                                    </v-icon>
-                                    {{ statusInfo(plugin).text }}
-                                </v-chip>
-                            </template>
+                                        {{ primaryActionLabel(plugin) }}
+                                    </v-btn>
+                                    <v-btn
+                                        size="small"
+                                        variant="text"
+                                        @click="openDetails(plugin)"
+                                    >
+                                        {{ t('pluginManagement.details') }}
+                                    </v-btn>
+                                </div>
+                            </div>
                         </v-card-item>
                         <v-card-text class="pt-1">
                             <p class="plugin-description text-body-2">
                                 {{ plugin.description }}
                             </p>
-                            <div class="d-flex flex-wrap ga-2 mt-3">
-                                <v-chip
-                                    v-for="capability in plugin.capabilities"
-                                    :key="capability"
-                                    size="x-small"
-                                    variant="outlined"
-                                >
-                                    {{ capabilityLabel(capability) }}
-                                </v-chip>
-                            </div>
                             <div class="text-caption text-medium-emphasis mt-3">
                                 {{ summary(plugin) }}
                             </div>
                         </v-card-text>
-                        <v-card-actions>
-                            <v-btn
-                                color="primary"
-                                variant="tonal"
-                                @click="primaryAction(plugin)"
-                            >
-                                {{ primaryActionLabel(plugin) }}
-                            </v-btn>
-                            <v-spacer />
-                            <v-btn
-                                variant="text"
-                                @click="openDetails(plugin)"
-                            >
-                                {{ t('pluginManagement.details') }}
-                            </v-btn>
-                        </v-card-actions>
                     </v-card>
                 </v-col>
             </v-row>
@@ -239,12 +239,24 @@
                         </div>
                     </div>
                     <v-spacer />
-                    <v-btn
-                        icon="mdi-close"
-                        variant="text"
-                        :aria-label="t('common.close')"
-                        @click="closeDetails"
-                    />
+                    <div class="plugin-details__actions d-flex align-center ga-1">
+                        <v-btn
+                            v-if="selectedPlugin.installation"
+                            :color="selectedPlugin.installation.enabled ? 'warning' : 'primary'"
+                            size="small"
+                            variant="text"
+                            :loading="toggleLoading"
+                            @click="toggleInstallation(selectedPlugin)"
+                        >
+                            {{ selectedPlugin.installation.enabled ? t('pluginManagement.disable') : t('pluginManagement.enable') }}
+                        </v-btn>
+                        <v-btn
+                            icon="mdi-close"
+                            variant="text"
+                            :aria-label="t('common.close')"
+                            @click="closeDetails"
+                        />
+                    </div>
                 </div>
                 <v-divider />
                 <div class="pa-4">
@@ -451,15 +463,6 @@
                             @click="runAction(selectedConnection, 'run')"
                         >
                             {{ selectedPlugin.ui.manage_kind === 'book_source' ? t('pluginManagement.stageForReview') : t('pluginManagement.runNow') }}
-                        </v-btn>
-                        <v-btn
-                            v-if="selectedPlugin.installation"
-                            :color="selectedPlugin.installation.enabled ? 'warning' : 'primary'"
-                            variant="text"
-                            :loading="toggleLoading"
-                            @click="toggleInstallation(selectedPlugin)"
-                        >
-                            {{ selectedPlugin.installation.enabled ? t('pluginManagement.disable') : t('pluginManagement.enable') }}
                         </v-btn>
                     </div>
 
@@ -1119,16 +1122,46 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 .plugin-filter { flex: 0 1 220px; }
 .plugin-page-header { white-space: normal; }
 .plugin-page-header__copy { flex: 1 1 320px; min-width: 0; }
-.plugin-card { display: flex; flex-direction: column; }
+.plugin-card {
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 6px 18px rgba(var(--v-theme-on-surface), .12);
+    transition: box-shadow .18s ease, transform .18s ease;
+}
+.plugin-card:hover {
+    box-shadow: 0 10px 24px rgba(var(--v-theme-on-surface), .16);
+    transform: translateY(-1px);
+}
+.plugin-card__header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+}
+.plugin-card__identity { min-width: 0; }
+.plugin-card__title-row, .plugin-card__tags, .plugin-card__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.plugin-card__title-row h3 { min-width: 0; overflow-wrap: anywhere; }
+.plugin-card__tags { margin-top: 6px; }
+.plugin-card__actions { justify-content: flex-end; }
 .plugin-card[data-status="enabled"] {
     border-color: rgba(var(--v-theme-success), .42);
     background-color: rgb(var(--v-theme-surface));
     background-image: linear-gradient(rgba(var(--v-theme-success), .11), rgba(var(--v-theme-success), .11));
 }
-.plugin-card :deep(.v-card-actions) { margin-top: auto; }
 .plugin-description { min-height: 2.8em; }
 @media (max-width: 767px) {
     .plugin-search, .plugin-filter { max-width: none; flex-basis: 100%; }
+    .plugin-card__header { grid-template-columns: auto minmax(0, 1fr); }
+    .plugin-card__actions { grid-column: 1 / -1; justify-self: end; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .plugin-card { transition: none; }
+    .plugin-card:hover { transform: none; }
 }
 :deep(.plugin-drawer-dialog .v-overlay__content) {
     height: 100%;

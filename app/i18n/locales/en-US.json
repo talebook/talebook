@@ -393,7 +393,9 @@
     },
     "basicInfo": "Basic Info",
     "deviceMgt": "Reading Devices",
-    "deviceMgtDescription": "Manage your personal reading devices. Only visible to you. Global devices are configured by admins and available to all users."
+    "deviceMgtDescription": "Manage your personal reading devices. Only visible to you. Global devices are configured by admins and available to all users.",
+    "noEnabledDevicePlugins": "No device plugins are enabled. Ask an administrator to enable one before adding a device.",
+    "devicePluginDisabled": "{type} (plugin disabled)"
   },
   "auth": {
     "signIn": "Sign In",
