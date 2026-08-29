@@ -16,6 +16,7 @@ let inviteMode = false;
 let isInvited = true;
 let demoMode = false;
 let showNetworkLibrary = true;
+let networkSourceState = 'ready';
 let users = [];
 let saveStarted = false;
 let saveStatusPolls = 0;
@@ -167,6 +168,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   isInvited = body?.invited !== false;
   demoMode = !!(body && body.demoMode);
   showNetworkLibrary = body?.showNetworkLibrary !== false;
+  networkSourceState = body?.networkSourceState || 'ready';
   console.log('[Mock] isInstalled set to:', isInstalled);
   users = [];
   saveStarted = false;
@@ -835,7 +837,11 @@ router.get('/api/user/info', eventHandler(() => accessControlEnvelope() || ({
     users: 5,
     friends: [],
     show_network_library: showNetworkLibrary,
-    allow: { register: true, download: true, push: true, read: true },
+    opds_enabled: true,
+    webdav_enabled: true,
+    FEEDBACK_URL: 'https://github.com/talebook/talebook/issues',
+    sidebar_extra_html: '<strong>Talebook</strong>',
+    allow: { register: true, download: true, push: true, read: true, FEEDBACK: true },
     upload: { chunk_enabled: true, chunk_threshold: 8 * 1024 * 1024, chunk_size: 4 * 1024 * 1024 },
     demo_mode: demoMode
   },
@@ -2063,7 +2069,18 @@ router.get('/api/admin/booksource/check/status', eventHandler(() => {
 
 // Network library (book sources)
 router.get('/api/book-sources', eventHandler(() => {
-  return { err: 'ok', items: [{ id: 1, source_key: 'legado:1', name: '测试书源', group: '测试' }] };
+  const items = networkSourceState === 'ready'
+    ? [{ id: 1, source_key: 'legado:1', name: '测试书源', group: '测试' }]
+    : [];
+  return {
+    err: 'ok',
+    items,
+    availability: {
+      state: networkSourceState,
+      enabled_plugins: networkSourceState === 'no_enabled_plugins' ? 0 : 1,
+      configured_sources: items.length,
+    },
+  };
 }));
 
 router.get('/api/book-sources/categories', eventHandler(() => {

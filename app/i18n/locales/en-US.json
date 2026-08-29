@@ -227,8 +227,35 @@
     "themes": "Themes",
     "systemLogs": "System Logs",
     "myShelf": "My Shelf",
+    "myReading": "My Reading",
+    "libraryBrowse": "Browse Library",
     "audiobooks": "Audiobooks",
     "readBooks": "Read Books"
+  },
+  "navigationSections": {
+    "libraryDescription": "Browse local books, online sources, and app connection options in one place.",
+    "meDescription": "Review your shelf, reading activity, account, and private books.",
+    "settingsDescription": "Manage instance-wide settings, plugins, and interface themes.",
+    "appAccess": "Access with Apps",
+    "generalSettings": "Instance Settings"
+  },
+  "navigationHelp": {
+    "openMenu": "Open help and about menu",
+    "changelog": "Changelog",
+    "github": "GitHub"
+  },
+  "appAccess": {
+    "loginHint": "Sign in to view connection addresses and service status for this instance.",
+    "officialClient": "Official client",
+    "mokeDescription": "Talebook's official cross-platform reader connects directly to your Talebook instance.",
+    "serverAddress": "Server address",
+    "downloadMoke": "Download Moke",
+    "opdsDescription": "Browse and download your library with an OPDS-compatible reader.",
+    "webdavDescription": "Access library files through WebDAV with a file manager or reading app.",
+    "connectionAddress": "Connection address",
+    "accountHint": "Sign in with your Talebook account.",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
   },
   "network": {
     "title": "Network Library",
@@ -267,6 +294,11 @@
     "author": "Author",
     "intro": "Introduction",
     "noSource": "No book source available. Ask an admin to import sources in Book Sources.",
+    "noEnabledPluginsAdmin": "No source plugin is enabled. Enable one to browse the network library.",
+    "noEnabledPluginsUser": "The administrator has not enabled network sources yet.",
+    "noConfiguredSourcesAdmin": "Source plugins are enabled, but no usable source is configured.",
+    "noConfiguredSourcesUser": "The administrator has not configured a usable network source yet.",
+    "manageSourcePlugins": "Open plugin settings",
     "status": {
       "label": "Status",
       "serial": "Serializing",

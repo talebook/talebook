@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 导航整合方案：以路径型页签统一书库浏览、我的阅读、系统设置和侧栏帮助入口。" />
+    <link rel="icon" href="data:," />
+    <title>整合导航信息架构与访问入口 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <!-- OPTIONAL：宽屏页边轨道。删减章节时同步维护轨道、浮动目录与正文 section。 -->
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">产品功能矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <!-- OPTIONAL：视口没有足够页边余白时自动使用，不压缩正文。details 提供无脚本可用的开合能力。 -->
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#feature-matrix">产品功能矩阵</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <!-- REQUIRED：标题、摘要和顶部元信息。tags 可增删，不固定字段数量。 -->
+      <header class="hero">
+        <h1>用路径型页签整合导航与访问入口</h1>
+        <p class="sub">减少侧栏中的同类入口，把书库、个人阅读和管理员设置分别收拢为稳定的路径型页签；同时以紧凑帮助菜单承接版本、用户数和项目链接。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-30</span>
+          <span class="chip">所属模块：app</span>
+          <!-- OPTIONAL：按需保留、删除或新增 tags。 -->
+          <span class="chip">影响范围：app 路由、导航、页面壳；webserver 状态响应</span>
+          <span class="chip">需求来源：会话内导航整合需求</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <!-- REQUIRED：保留用户原话或可追溯的原始需求，不要只写二次概括。 -->
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“本地书库、网络书库、OPDS 介绍、WebDAV 介绍合并为‘书库浏览’；我的书架和已读书目整合为‘我的阅读’；插件中心和主题管理以 Tab 形式整合到系统设置；最下方 Logo、版本、用户数整合为小问号菜单，参考 Multica。”</div>
+            <p>后续确认使用路径而非查询参数：<code>/library/network</code>、<code>/me/shelf</code>、<code>/admin/settings/plugins</code>。旧地址保留兼容跳转；网络书库入口常驻；App 访问介绍允许游客浏览，登录后才展示连接信息。</p>
+          </section>
+
+          <!-- REQUIRED：目标与非目标一起写，防止范围在实现期漂移。 -->
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul><li>侧栏只保留“书库浏览”“我的阅读”“系统设置”三个聚合入口。</li><li>每个聚合入口使用可分享、可刷新、支持前进后退的路径型页签。</li><li>网络书库能区分未启用插件、未配置书源和已有可用书源。</li><li>默认头部与五套内置主题共享同一份导航模型和帮助菜单语义。</li></ul></article>
+              <article class="choice"><h3>非目标</h3><ul><li>不重写本地书库、网络搜索、用户资料、插件中心或主题管理的领域逻辑。</li><li>不改变 OPDS 与 WebDAV 协议本身、认证方式或地址。</li><li>不把个人插件设置并入“我的阅读”；现有 <code>/plugins</code> 入口继续独立存在。</li><li>不删除旧路由，避免书签、历史链接和外部引用失效。</li></ul></article>
+            </div>
+          </section>
+
+          <!-- OPTIONAL：用户可感知功能、角色权限或多入口覆盖发生变化时建议保留；按产品实际角色和入口增删列。 -->
+          <section id="feature-matrix" class="card">
+            <h2>3. 产品功能矩阵</h2>
+            <p>聚合页只改变入口和布局，不扩大既有数据权限。游客、普通用户与管理员看到的内容和下一步必须明确不同。</p>
+            <div class="matrix-legend" aria-label="功能矩阵图例">
+              <span class="matrix-yes">支持</span>
+              <span class="matrix-conditional">条件支持</span>
+              <span class="matrix-no">不支持 / 不在范围</span>
+            </div>
+            <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0">
+              <table class="feature-matrix">
+                <thead><tr><th>功能域</th><th>用户任务 / 功能</th><th>游客</th><th>登录用户</th><th>管理员</th><th>Web</th><th>移动端</th><th>API / 协议</th><th>验收口径</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">书库浏览</th><td><strong>浏览本地、网络书库或查看 App 接入方案</strong></td><td class="matrix-cell"><span class="matrix-state matrix-conditional">介绍</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-conditional">OPDS / WebDAV</span></td><td>三个路径页签可直达；网络空状态按角色给出正确操作；游客不看到账号信息。</td></tr>
+                  <tr><th scope="row">我的阅读</th><td><strong>管理书架、阅读记录、账户和私有书籍</strong></td><td class="matrix-cell"><span class="matrix-state matrix-no">需登录</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td><code>/me/*</code> 未登录时跳登录并保留回跳地址；四个页签复用原有权限。</td></tr>
+                  <tr><th scope="row">系统设置</th><td><strong>配置系统、插件和主题</strong></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td>插件中心和主题管理不再占用管理菜单独立项；旧 URL 跳到新路径。</td></tr>
+                  <tr><th scope="row">帮助与关于</th><td><strong>查看更新、项目、反馈与实例信息</strong></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td>问号菜单键盘可达；顺序为更新日志、GitHub、反馈、版本、用户数、底部 Logo。</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- OPTIONAL：复杂缺陷、兼容性或架构改动建议保留证据表；简单改动可以删除。 -->
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>同一任务散落为多个侧栏项</td><td><code>app/components/AppHeader.vue</code> 与 <code>app/components/themes/BuiltinThemeHeader.vue</code> 各自拼装本地书库、网络书库、书架、已读、插件和主题入口。</td><td>需要共享导航模型，否则默认头部与内置主题会再次漂移。</td></tr>
+                  <tr><td>网络书库无法解释“为什么没有书源”</td><td><code>GET /api/book-sources</code> 只返回当前可用 bindings；空数组不区分插件未启用与插件已启用但未配置。</td><td>响应需增加不泄露凭据的 availability 摘要。</td></tr>
+                  <tr><td>OPDS / WebDAV 介绍读取管理员接口</td><td><code>app/pages/opds-readme.vue</code> 与 <code>webdav-readme.vue</code> 调用 <code>/admin/settings</code>，普通用户无法可靠判断服务状态。</td><td>服务开关应进入所有访客已能读取的 <code>/api/user/info</code> 系统摘要。</td></tr>
+                  <tr><td>底部信息占用多行且主题实现不一致</td><td>两个 Header 分别把版本、用户数、OPDS、WebDAV 和可配置 Logo 渲染为普通列表项。</td><td>抽取共享帮助菜单组件和共享导航 composable。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>事实与验证：</strong>Moke 的官方仓库与 Talebook README 已确认其可直接连接 Talebook；聚焦后端测试与浏览器夹具已验证“插件未启用”“插件已启用但未配置”和“存在可用书源”三种状态能够稳定区分。</div>
+          </section>
+
+          <!-- REQUIRED：先给核心方案，再按内容选用流程、决策表、代码或 SVG。 -->
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <div class="callout good"><strong>方案结论：</strong>新增共享的路由页签壳和导航模型，现有领域页面改为可嵌入内容组件；旧页面只负责重定向。后端仅补充只读状态摘要，不搬迁业务数据。失败和空状态由聚合页解释，并提供与角色匹配的下一步。</div>
+
+            <!-- OPTIONAL：有顺序依赖时使用流程；没有真实顺序时不要为了装饰编号。 -->
+            <div class="flow" aria-label="核心处理流程">
+              <article class="step"><span class="label">Route</span><b>路径决定活动页签</b><p>页签点击使用 Nuxt 路由；刷新和历史导航不依赖组件内状态。</p></article>
+              <article class="step"><span class="label">Guard</span><b>角色与服务状态分流</b><p><code>/me</code> 要求登录，管理设置要求管理员，App 介绍允许游客。</p></article>
+              <article class="step"><span class="label">Content</span><b>复用既有领域内容</b><p>本地书库、网络书库、账户、插件和主题不复制 API 与状态逻辑。</p></article>
+              <article class="step"><span class="label">Fallback</span><b>旧地址与空状态可行动</b><p>旧 URL 跳新路径；空网络书库明确指出启用插件或配置书源。</p></article>
+            </div>
+
+            <!-- OPTIONAL：存在多个候选方案或跨模块契约时保留。 -->
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+                <tbody>
+                  <tr><td>URL 模型</td><td>路径型页签：<code>/library/*</code>、<code>/me/*</code>、<code>/admin/settings/*</code></td><td>用户明确要求；链接稳定且浏览器历史语义正确。</td><td>查询参数页签；只靠本地 <code>v-model</code>。</td></tr>
+                  <tr><td>兼容策略</td><td>旧页面使用客户端 replace 跳到新路径，并保留必要的旧 query 语义。</td><td>避免外部书签失效，同时不维护两套页面。</td><td>删除旧路由；长期复制两份领域页面。</td></tr>
+                  <tr><td>导航所有权</td><td>共享 composable 输出语义化导航项；两个 Header 只负责各自视觉渲染。</td><td>默认头部与五套内置主题必须同步。</td><td>继续维护两份手写数组。</td></tr>
+                  <tr><td>视觉系统</td><td>继承 Vuetify 主题色、现有无衬线字体和密度；页签用细分隔线与当前主题 primary 指示。</td><td>这是信息架构收敛，不是新品牌皮肤；深浅主题自然兼容。</td><td>新建固定色板、字体或高阴影卡片。</td></tr>
+                  <tr><td>标志性元素</td><td>侧栏底部问号按钮打开紧凑悬浮菜单，Logo 固定在最底部。</td><td>直接响应 Multica 参考；把次要实例信息从主导航降级。</td><td>继续使用多行系统列表；把帮助内容塞入头像菜单。</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- OPTIONAL：展示命令、契约或伪代码。 -->
+            <pre aria-label="页面线框"><code>侧栏                         聚合页
+┌ 首页                      ┌ 书库浏览
+├ 我的阅读                 │ [本地书库] [网络书库] [使用 App 访问]
+├ 书库浏览                 ├────────────────────────────
+├ 有声书                   │ 当前路径对应的既有领域内容
+├ 管理 › 系统设置          └────────────────────────────
+│   …
+└ ?  →  更新 / GitHub / 反馈 / 实例信息 / Logo</code></pre>
+          </section>
+
+          <!-- REQUIRED FOR MATERIAL CHANGES：简单且无风险的改动可合并为一段，但不能隐去风险。 -->
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>影响范围</h3><p><code>app/components/AppHeader.vue</code>、内置主题 Header、路由页面、共享 composable 与内容组件、i18n、E2E mock；后端 <code>UserInfo</code> 和网络书源目录只读响应；相关前后端测试。</p></article>
+              <article class="choice"><h3>保持不变</h3><p>数据库结构、书源配置事实表、插件启停事实表、OPDS/WebDAV 协议、用户权限判断、领域页面 API、插件工作台和个人插件设置路径保持不变。</p></article>
+            </div>
+            <div class="callout danger"><strong>主要风险：</strong>路由环路或丢失旧 query、嵌入长页面后的滚动/吸顶冲突、默认与内置主题导航漂移、普通用户误见管理员操作。通过路由矩阵 E2E、两套 Header 契约测试、权限 API 测试以及桌面/手机实际渲染缓解。</div>
+            <div class="callout"><strong>回滚：</strong>本次无数据迁移；可整体回滚前端路由与共享组件及后端两个附加响应字段。旧业务接口和事实表不需清理。</div>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>后端聚焦</td><td><code>docker exec navigation-consolidation-talebook-dev-1 sh -lc 'pytest -q tests/test_main.py tests/test_network_library.py -k "service_status or availability"'</code></td><td>访客服务状态不含凭据；书源响应区分未启用与未配置。</td><td class="verified">通过：2 passed，117 deselected。</td></tr>
+                  <tr><td>后端全量</td><td><code>pytest tests -v --cov=webserver --cov-report=term-missing</code>；再单独复跑 8 个失败用例。</td><td>识别本次回归与基线问题，不把失败写成通过。</td><td>全量 1155 passed、1 skipped、8 failed；单独复跑后 6 个设备推送用例通过，剩余 2 个分别是既有网络搜索数量夹具不匹配、未修改的流式 provider 首事件预期不匹配，均不涉及本次导航契约。</td></tr>
+                  <tr><td>组件</td><td><code>npx vitest run test/components/LocalMdiIcons.spec.ts test/components/AppHeader.spec.ts test/components/BuiltinThemeHeader.spec.ts test/components/RouteTabShell.spec.ts test/components/SidebarHelpMenu.spec.ts</code></td><td>两套 Header、路由页签、菜单顺序、Logo 位置、键盘语义和本地图标注册。</td><td class="verified">通过：21 passed。</td></tr>
+                  <tr><td>集成 / E2E</td><td><code>PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 MOCK_API_URL=http://127.0.0.1:18080 npx playwright test test/e2e/sidebar.spec.ts test/e2e/navigation-consolidation.spec.ts --project=chromium --workers=1 --reporter=line</code></td><td>新路径、旧地址跳转、三类网络状态、权限、帮助菜单位置和设置页签。</td><td class="verified">最终通过：10 passed；较宽回归集另通过 18 passed。</td></tr>
+                  <tr><td>实际渲染 / 运行</td><td>Docker 真实后端 <code>http://127.0.0.1:8080</code> 与隔离实例 <code>http://127.0.0.1:18082</code>；Chromium 检查 <code>/library/apps</code>、<code>/admin/settings/plugins</code>、<code>/me/history</code>，桌面与 390px 手机视口。</td><td>路由页签、移动横向滚动、帮助菜单和长设置页面无错位、无页面异常。</td><td class="verified">通过：页面异常 0、控制台错误 0；真实环境截图已纳入 PR。Chrome DevTools MCP 在本会话不可用，按实际浏览器渲染使用 Playwright Chromium 完成替代验收。</td></tr>
+                  <tr><td>界面审查</td><td><code>interface-review full</code>；范围为默认分支 merge-base <code>767647cf5812</code> 至工作树（70 个已有提交、20 个已跟踪修改、15 个未跟踪项），覆盖两个 Header、三个聚合页、桌面/移动端及真实/空状态。</td><td>六个界面域均无 HIGH / MEDIUM 遗留。</td><td class="verified">Approve。首次审查发现帮助菜单侵入主内容、部分本地图标未注册；调整菜单为侧栏内 212px 对齐、补齐图标，并修复三个 redirect 页的空渲染警告后复审。可访问性、布局、文案、排版、颜色和 UI 六域最终均 Clear，Introduced / Regression 均为 0。</td></tr>
+                  <tr><td>质量门禁</td><td><code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、<code>cd app &amp;&amp; npm run build</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>相关门禁通过，既有告警与本次结果如实记录。</td><td class="verified">通过：Python lint / format 与生产构建通过；前端 lint 0 errors（465 个既有 warnings）；120 份方案文档通过校验；diff whitespace 检查通过。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout good"><strong>完成结论：</strong>导航改动的聚焦测试、生产构建、真实浏览器渲染与 full 界面审查均完成，未遗留与本次改动相关的失败或 HIGH / MEDIUM 界面问题。全量后端的 2 个独立失败与 6 个顺序污染用例已保留为显式基线风险。</div>
+          </section>
+
+          <!-- OPTIONAL：grill 结论、实现偏离或后续修订需要可追溯时保留。 -->
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-08-30：</strong>用户确认不使用 query 参数页签，改为 <code>/library/network</code>、<code>/me/shelf</code>、<code>/admin/settings/plugins</code> 等路径。</li>
+              <li><strong>2026-08-30：</strong><code>/me/*</code> 未登录统一跳登录并在成功后返回原目标。</li>
+              <li><strong>2026-08-30：</strong>网络书库入口常驻，废弃旧 <code>show_network_library</code> 对导航可见性的控制；为避免无效设置误导管理员，系统设置页不再展示该开关，后端字段仅作历史配置兼容；空状态按角色区分行动。</li>
+              <li><strong>2026-08-30：</strong>真实浏览器验收发现帮助菜单向侧栏外展开会被抽屉裁切，浮层锚点调整为向内侧对齐，保证完整菜单始终落在侧栏宽度内。</li>
+              <li><strong>2026-08-30：</strong>App 访问介绍对游客可见，登录后才显示当前实例地址和启用状态。</li>
+              <li><strong>2026-08-30：</strong>主页签吸附顶部，移动端横向滚动；问号菜单去掉“文档”，Logo 固定在菜单最底部。</li>
+            </ol>
+          </section>
+        </main>
+
+      </div>
+
+      <footer>Talebook internal design · app · ACTIVE · 2026-08-30</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>

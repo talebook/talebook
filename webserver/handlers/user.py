@@ -439,6 +439,8 @@ class UserInfo(BaseHandler):
             "header": CONF["HEADER"],
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
             "show_network_library": CONF.get("SHOW_NETWORK_LIBRARY", True),
+            "opds_enabled": CONF.get("OPDS_ENABLED", True),
+            "webdav_enabled": CONF.get("ENABLE_WEBDAV_SERVICE", True),
             "FEEDBACK_URL": CONF["FEEDBACK_URL"],
             "allow": {
                 "register": CONF["ALLOW_REGISTER"] and not demo_mode.is_demo_mode(CONF),

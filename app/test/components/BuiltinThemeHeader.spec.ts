@@ -122,41 +122,35 @@ describe('BuiltinThemeHeader.vue navigation', () => {
     });
 
     it.each(['light-gray', 'minimal', 'graphite', 'brass', 'warm-red'] as const)(
-        'shows My Shelf to signed-in users in the %s theme',
+        'shows My Reading to signed-in users in the %s theme',
         (variant) => {
             storeState.user.is_login = true;
             const wrapper = mountHeader(variant);
 
-            const shelfLink = wrapper.findAllComponents({ name: 'VListItem' })
-                .find(item => item.text().includes('navigation.myShelf'));
-            expect(shelfLink).toBeDefined();
-            expect(shelfLink?.props('to')).toBe('/user/shelf');
+            const readingLink = wrapper.findAllComponents({ name: 'VListItem' })
+                .find(item => item.text().includes('navigation.myReading'));
+            expect(readingLink).toBeDefined();
+            expect(readingLink?.props('to')).toBe('/me/shelf');
 
             wrapper.unmount();
         },
     );
 
-    it('hides My Shelf from signed-out users', () => {
+    it('hides My Reading from signed-out users', () => {
         const wrapper = mountHeader('minimal');
 
-        expect(wrapper.text()).not.toContain('navigation.myShelf');
+        expect(wrapper.text()).not.toContain('navigation.myReading');
 
         wrapper.unmount();
     });
 
-    it('shows the network library link by default', () => {
+    it('shows one consolidated library entry regardless of the legacy setting', () => {
         const wrapper = mountHeader('minimal');
 
-        expect(wrapper.text()).toContain('navigation.networkLibrary');
-
-        wrapper.unmount();
-    });
-
-    it('hides the network library link when disabled', () => {
-        storeState.sys.show_network_library = false;
-        const wrapper = mountHeader('minimal');
-
+        expect(wrapper.text()).toContain('navigation.libraryBrowse');
         expect(wrapper.text()).not.toContain('navigation.networkLibrary');
+        storeState.sys.show_network_library = false;
+        expect(wrapper.text()).toContain('navigation.libraryBrowse');
 
         wrapper.unmount();
     });

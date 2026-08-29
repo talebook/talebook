@@ -232,8 +232,35 @@
     "themes": "主题管理",
     "systemLogs": "系统日志",
     "myShelf": "我的书架",
+    "myReading": "我的阅读",
+    "libraryBrowse": "书库浏览",
     "audiobooks": "有声书",
     "readBooks": "已读书目"
+  },
+  "navigationSections": {
+    "libraryDescription": "在一个入口中浏览本地藏书、网络书源，并查看 App 接入方式。",
+    "meDescription": "集中查看书架、阅读记录、账户资料和私有书籍。",
+    "settingsDescription": "管理当前实例的全局设置、插件启停和界面主题。",
+    "appAccess": "使用 App 访问",
+    "generalSettings": "实例设置"
+  },
+  "navigationHelp": {
+    "openMenu": "打开帮助与关于菜单",
+    "changelog": "更新日志",
+    "github": "GitHub"
+  },
+  "appAccess": {
+    "loginHint": "登录后可查看当前实例的连接地址和服务状态。",
+    "officialClient": "官方客户端",
+    "mokeDescription": "Talebook 官方跨平台阅读客户端，可直接连接您的 Talebook 实例。",
+    "serverAddress": "服务器地址",
+    "downloadMoke": "下载 Moke",
+    "opdsDescription": "使用支持 OPDS 的阅读器浏览并下载书库内容。",
+    "webdavDescription": "使用文件管理器或阅读应用通过 WebDAV 访问书库文件。",
+    "connectionAddress": "连接地址",
+    "accountHint": "使用您的 Talebook 账号登录。",
+    "enabled": "已启用",
+    "disabled": "未启用"
   },
   "network": {
     "title": "网络书库",
@@ -272,6 +299,11 @@
     "author": "作者",
     "intro": "简介",
     "noSource": "暂无可用书源，请联系管理员在“书源管理”中导入书源",
+    "noEnabledPluginsAdmin": "尚未启用任何书源插件。启用插件后即可在这里浏览网络书库。",
+    "noEnabledPluginsUser": "管理员尚未启用网络书源，请联系管理员。",
+    "noConfiguredSourcesAdmin": "书源插件已启用，但尚未配置可用书源。",
+    "noConfiguredSourcesUser": "管理员尚未配置可用网络书源，请联系管理员。",
+    "manageSourcePlugins": "前往插件设置",
     "status": {
       "label": "连载状态",
       "serial": "连载中",

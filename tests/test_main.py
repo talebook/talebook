@@ -350,6 +350,8 @@ class TestAppWithoutLogin(TestApp):
         self.assertEqual(d["user"]["is_admin"], False)
         self.assertEqual(d["sys"]["books"], 13)
         self.assertEqual(d["sys"]["show_network_library"], True)
+        self.assertEqual(d["sys"]["opds_enabled"], True)
+        self.assertEqual(d["sys"]["webdav_enabled"], True)
         self.assertEqual(d["sys"]["upload"]["chunk_enabled"], True)
         self.assertEqual(d["sys"]["upload"]["chunk_threshold"], 8 * 1024 * 1024)
         self.assertEqual(d["sys"]["upload"]["chunk_size"], 4 * 1024 * 1024)
@@ -379,6 +381,20 @@ class TestAppWithoutLogin(TestApp):
             self.assertEqual(d["sys"]["show_network_library"], False)
         finally:
             main.CONF["SHOW_NETWORK_LIBRARY"] = previous
+
+    def test_user_info_reflects_external_library_service_status_without_credentials(self):
+        previous_opds = main.CONF.get("OPDS_ENABLED", True)
+        previous_webdav = main.CONF.get("ENABLE_WEBDAV_SERVICE", True)
+        try:
+            main.CONF["OPDS_ENABLED"] = False
+            main.CONF["ENABLE_WEBDAV_SERVICE"] = False
+            d = self.json("/api/user/info")
+            self.assertEqual(d["sys"]["opds_enabled"], False)
+            self.assertEqual(d["sys"]["webdav_enabled"], False)
+            self.assertNotIn("password", d["sys"])
+        finally:
+            main.CONF["OPDS_ENABLED"] = previous_opds
+            main.CONF["ENABLE_WEBDAV_SERVICE"] = previous_webdav
 
     def test_book(self):
         d = self.json("/api/book/1")

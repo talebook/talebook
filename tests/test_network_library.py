@@ -61,6 +61,46 @@ class TestNetworkLibrary(TestWithUserLogin):
         self.assertEqual(d["items"][0]["id"], self.sid)
         self.assertEqual(d["items"][0]["source_key"], "legado:%d" % self.sid)
 
+    def test_generic_sources_report_ready_availability(self):
+        d = self.json("/api/book-sources")
+        self.assertEqual(d["availability"]["state"], "ready")
+        self.assertGreaterEqual(d["availability"]["enabled_plugins"], 1)
+        self.assertEqual(d["availability"]["configured_sources"], len(d["items"]))
+
+    def test_generic_sources_distinguish_disabled_plugins_from_missing_configuration(self):
+        from webserver.plugins.register import SOURCE_PROVIDERS
+
+        source_keys = [provider.manifest["id"] for provider in SOURCE_PROVIDERS]
+        session = get_db()
+        installations = (
+            session.query(models.PluginInstallation).filter(models.PluginInstallation.plugin_key.in_(source_keys)).all()
+        )
+        previous = {item.id: (item.enabled, item.status) for item in installations}
+        try:
+            for installation in installations:
+                installation.enabled = False
+            session.commit()
+            disabled = self.json("/api/book-sources")
+            self.assertEqual(disabled["availability"]["state"], "no_enabled_plugins")
+            self.assertEqual(disabled["availability"]["enabled_plugins"], 0)
+
+            legado = next(item for item in installations if item.plugin_key == "talebook.source.legado")
+            legado.enabled = True
+            legado.status = "active"
+            session.query(models.BookSourceModel).delete()
+            session.commit()
+            unconfigured = self.json("/api/book-sources")
+            self.assertEqual(unconfigured["availability"]["state"], "no_configured_sources")
+            self.assertEqual(unconfigured["availability"]["enabled_plugins"], 1)
+            self.assertEqual(unconfigured["availability"]["configured_sources"], 0)
+        finally:
+            session = get_db()
+            for installation_id, (enabled, status) in previous.items():
+                installation = session.get(models.PluginInstallation, installation_id)
+                installation.enabled = enabled
+                installation.status = status
+            session.commit()
+
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_generic_source_route_accepts_opaque_binding_key_end_to_end(self, m_session):
         """T9：Legado 只作为 SourceProvider，通过通用入口完成搜索、详情、目录和正文。"""
