@@ -61,6 +61,9 @@ test.describe('Plugin management', () => {
         await expect(card).toHaveAttribute('data-status', 'enabled');
         await expect(card.getByText('正常')).toBeVisible();
         await expect(card.locator('.plugin-card__title-row').getByText('正常')).toBeVisible();
+        const statusFontSize = await card.locator('.plugin-card__status').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+        const titleFontSize = await card.locator('.plugin-card__title-row h3').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+        expect(statusFontSize).toBeLessThan(titleFontSize);
         await expect(card.locator('.plugin-card__tags .v-chip')).not.toHaveCount(0);
         await expect(card.getByText('内置', { exact: true })).toHaveCount(0);
         expect(await card.evaluate(element => getComputedStyle(element).backgroundImage)).toContain('linear-gradient');
@@ -69,6 +72,8 @@ test.describe('Plugin management', () => {
         const actionsBox = await card.locator('.plugin-card__actions').boundingBox();
         const descriptionBox = await card.locator('.plugin-description').boundingBox();
         expect(actionsBox.y).toBeLessThan(descriptionBox.y);
+        const detailsBox = await card.locator('.plugin-card__footer').getByRole('button', { name: '详情' }).boundingBox();
+        expect(detailsBox.y).toBeGreaterThan(descriptionBox.y);
 
         await card.getByRole('button', { name: '详情' }).click();
         await expect(page.locator('.plugin-details__actions').getByRole('button', { name: '停用' })).toBeVisible();

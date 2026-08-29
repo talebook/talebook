@@ -31,6 +31,8 @@
     <h2>1. 原始诉求</h2>
     <div class="quote">“插件-设备里面的激活列表，跟用户-阅读设备里的类型列表不匹配。用户能配置的类型列表应当跟插件里启动状态保持一致。”</div>
     <div class="quote" style="margin-top:10px">“插件列表的卡片样式应当有卡片阴影。状态标签放在插件名称右侧；名称下方的‘内置’换成 taglist；操作按钮放置在右上角；停用按钮放置在配置页里面右上角。”</div>
+    <div class="quote" style="margin-top:10px">体验反馈：“状态 tag 的样式缩小，要比卡片主标题的字体小一点。”状态 tag 固定为 11px 紧凑规格，标题继续使用 16px 层级。</div>
+    <div class="quote" style="margin-top:10px">体验反馈：“【详情】还是要放在卡片的右下角。”因此右上角只放主操作，详情作为次级入口固定在卡片右下角。</div>
   </section>
 
   <section>
@@ -64,7 +66,7 @@
     <table><thead><tr><th>范围</th><th>验证</th><th>状态</th></tr></thead><tbody>
       <tr><td>后端</td><td><code>pytest -q tests/test_plugin_runtime.py -k enabled_providers</code> 与 <code>pytest -q tests/test_main.py::TestUser::test_devices_get</code>（现有 Docker 测试镜像）。</td><td class="pass">2 条通过</td></tr>
       <tr><td>前端</td><td>Playwright 验证 BOOX 启用时可新增且只有 BOOX；停用后新增按钮禁用并显示空状态。</td><td class="pass">1 条通过</td></tr>
-      <tr><td>卡片</td><td>Playwright 验证名称旁状态、taglist、右上操作、常驻阴影，以及详情页右上停用。</td><td class="pass">1 条通过</td></tr>
+      <tr><td>卡片</td><td>Playwright 验证名称旁状态、taglist、右上主操作、右下详情、常驻阴影、详情页右上停用，并断言状态 tag 字号小于标题。</td><td class="pass">复验通过</td></tr>
       <tr><td>静态检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code> 通过；<code>cd app &amp;&amp; npm run lint</code> 退出码 0，保留仓库现有 warning 输出。</td><td class="pass">通过</td></tr>
       <tr><td>方案校验</td><td><code>make check-design</code> 仅因本方案和分支已有的插件能力方案仍为 WIP 而失败；HTML 未报告结构或单文件资源问题。</td><td class="pending">WIP 门禁符合预期</td></tr>
       <tr><td>未执行</td><td>按用户要求不执行完整 pytest、全量 E2E、构建和完整界面审查；方案保持 WIP，后续连续体验修改继续回写本文件。</td><td class="pending">已记录风险</td></tr>

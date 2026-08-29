@@ -139,13 +139,14 @@
                                             {{ plugin.name }}
                                         </h3>
                                         <v-chip
-                                            size="small"
+                                            class="plugin-card__status"
+                                            size="x-small"
                                             :color="statusInfo(plugin).color"
                                             :variant="statusInfo(plugin).key === 'enabled' ? 'flat' : 'tonal'"
                                         >
                                             <v-icon
                                                 start
-                                                size="small"
+                                                size="12"
                                             >
                                                 {{ statusInfo(plugin).icon }}
                                             </v-icon>
@@ -172,13 +173,6 @@
                                     >
                                         {{ primaryActionLabel(plugin) }}
                                     </v-btn>
-                                    <v-btn
-                                        size="small"
-                                        variant="text"
-                                        @click="openDetails(plugin)"
-                                    >
-                                        {{ t('pluginManagement.details') }}
-                                    </v-btn>
                                 </div>
                             </div>
                         </v-card-item>
@@ -190,6 +184,16 @@
                                 {{ summary(plugin) }}
                             </div>
                         </v-card-text>
+                        <v-card-actions class="plugin-card__footer">
+                            <v-spacer />
+                            <v-btn
+                                size="small"
+                                variant="text"
+                                @click="openDetails(plugin)"
+                            >
+                                {{ t('pluginManagement.details') }}
+                            </v-btn>
+                        </v-card-actions>
                     </v-card>
                 </v-col>
             </v-row>
@@ -1146,8 +1150,10 @@ useHead(() => ({ title: t('pluginManagement.title') }));
     gap: 6px;
 }
 .plugin-card__title-row h3 { min-width: 0; overflow-wrap: anywhere; }
+.plugin-card__status { font-size: .6875rem; letter-spacing: .01em; }
 .plugin-card__tags { margin-top: 6px; }
 .plugin-card__actions { justify-content: flex-end; }
+.plugin-card__footer { margin-top: auto; }
 .plugin-card[data-status="enabled"] {
     border-color: rgba(var(--v-theme-success), .42);
     background-color: rgb(var(--v-theme-surface));
