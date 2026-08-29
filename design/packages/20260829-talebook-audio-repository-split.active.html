@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Talebook Audio CLI 仓库拆分方案 · WIP</title>
+    <title>Talebook Audio CLI 仓库拆分方案 · ACTIVE</title>
     <style>
       :root { color-scheme: light; --ink: #172033; --muted: #5d6778; --line: #d9e0ea; --panel: #fff; }
       * { box-sizing: border-box; }
@@ -28,7 +28,7 @@
       <header>
         <h1>Talebook Audio CLI 仓库拆分</h1>
         <p>把 CLI 的源码和发布边界迁移到独立公开仓库，Talebook 主仓库仅通过固定提交的 Git 子模块引用。</p>
-        <div class="meta"><span>状态：WIP</span><span>创建日期：2026-08-29</span><span>所属模块：packages</span><span>需求来源：HOU-20</span></div>
+        <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-29</span><span>所属模块：packages</span><span>需求来源：HOU-20</span></div>
       </header>
 
       <section>
@@ -70,8 +70,9 @@
           <li><strong>通过：</strong><code>git submodule status packages/talebook-audio-cli</code> 显示 Talebook 通过 HTTPS URL 固定到独立仓库提交 <code>ba210e809d081c1201d1c0e475370dc87738fe92</code>。</li>
           <li><strong>通过：</strong><code>PYTHONPATH=src python3 -m pytest -q</code>，30 个测试通过；<code>ruff check .</code> 与 <code>ruff format --check .</code> 均通过。</li>
           <li><strong>通过：</strong><code>python3 -m pip wheel --no-build-isolation --no-deps .</code> 构建 <code>talebook_audio_cli-0.1.0-py3-none-any.whl</code> 成功。</li>
+          <li><strong>通过：</strong><code>make lint-py</code>，105 个 Talebook 服务端 Python 文件检查通过；<code>make check-design</code>，116 份方案文档通过。</li>
           <li><strong>界面审查豁免：</strong>本次仅改变 Git 仓库所有权、子模块元数据和开发文档，不修改 Web、终端输出、命令参数或运行时行为，因此没有界面影响。</li>
-          <li><strong>待提交后验证：</strong>从 Talebook 远端分支递归克隆并确认子模块可匿名检出；失败时不得交付。</li>
+          <li><strong>通过：</strong>从 Talebook 远端分支使用 <code>git clone --recurse-submodules --shallow-submodules</code> 完成干净克隆；子模块匿名检出固定提交，且克隆后的 30 个测试再次通过。</li>
         </ul>
       </section>
 
