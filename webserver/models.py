@@ -1007,6 +1007,7 @@ class PluginDefinition(Base, SQLAlchemyMixin):
         manifest = dict(self.manifest or {})
         value["description"] = manifest.get("description", "")
         value["ui"] = dict(manifest.get("ui") or {})
+        value["connection_owners"] = list(manifest.get("connection_owners") or [])
         return value
 
 

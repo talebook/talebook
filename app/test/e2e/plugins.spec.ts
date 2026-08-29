@@ -88,6 +88,16 @@ test.describe('Plugin management', () => {
         expect(await card.evaluate(element => getComputedStyle(element).backgroundImage)).toBe('none');
     });
 
+    test('opens configuration for an instance-owned metadata plugin', async ({ page }) => {
+        await page.goto('/admin/plugins?tab=metadata');
+        const card = page.locator('.plugin-card').filter({ hasText: 'Google Books / Amazon' });
+        await card.getByRole('button', { name: '配置' }).click();
+
+        const dialog = page.getByRole('dialog', { name: /配置 Google Books \/ Amazon 连接/ });
+        await expect(dialog).toBeVisible();
+        await expect(dialog.getByRole('textbox', { name: '公开配置（JSON）' })).toBeVisible();
+    });
+
     test('only offers device types from enabled push plugins', async ({ page, request }) => {
         await page.goto('/user/detail?tab=devices');
         const addButton = page.getByRole('button', { name: '添加' });

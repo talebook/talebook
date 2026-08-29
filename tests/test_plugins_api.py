@@ -41,6 +41,7 @@ class TestPluginsApi(TestWithAdminUser):
         self.assertNotIn("talebook.meta.builtin", definitions)
         self.assertIn("talebook.source.opds", definitions)
         self.assertIn("talebook.source.legado", definitions)
+        self.assertEqual(definitions["talebook.meta.calibre"]["connection_owners"], ["instance"])
         payload = json.dumps(data, ensure_ascii=False).lower()
         self.assertNotIn("calibre content server", payload)
         self.assertNotIn("calibre-web", payload)
