@@ -840,7 +840,7 @@ router.get('/api/user/info', eventHandler(() => accessControlEnvelope() || ({
     opds_enabled: true,
     webdav_enabled: true,
     FEEDBACK_URL: 'https://github.com/talebook/talebook/issues',
-    sidebar_extra_html: '<strong>Talebook</strong>',
+    sidebar_extra_html: '<img class="ma-auto footer-logo" style="max-width: 130px; height: auto;" src="/logo/link.png">',
     allow: { register: true, download: true, push: true, read: true, FEEDBACK: true },
     upload: { chunk_enabled: true, chunk_threshold: 8 * 1024 * 1024, chunk_size: 4 * 1024 * 1024 },
     demo_mode: demoMode
