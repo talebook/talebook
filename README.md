@@ -129,6 +129,18 @@ python3 -m pip install talebook-audio-cli
 
 源码与发布：[talebook-audio-cli](https://github.com/hehetoshang/talebook-audio-cli) · [PyPI](https://pypi.org/project/talebook-audio-cli/)
 
+## 手表客户端 — 氢电子书（H2read）
+
+**[H2read（氢电子书）](https://github.com/mcl0z/H2read-Client)** 是专为 Android Wear OS / 智能手表定制的小说阅读与听书客户端，支持 OLED 纯黑省电模式与多种 TTS 语音听书。
+
+* **OLED 纯黑模式**：`#000000` 像素级黑底，0 发光超省电；
+* **全矩阵听书（TTS）**：支持 Edge-TTS 网络语音、Sherpa-ONNX 离线语音与系统 TTS，句子级高亮跟随，0 秒无缝连播；
+* **多源聚合阅读**：在线阅读与全本离线，支持导出 EPUB / TXT；
+* **智能分包**：自动适配 32 位（armeabi-v7a）与 64 位（arm64-v8a）设备；
+* **Talebook 集成**：「导入书籍」功能支持配置 Talebook 服务器地址（可填写访问码或账号密码），直接从 Talebook 书库浏览、搜索并导入书籍到手表阅读/听书。
+
+源码与构建：[H2read-Client](https://github.com/mcl0z/H2read-Client)
+
 ## Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/talebook.svg)
 
 部署比较简单，建议采用 Docker。镜像同时发布到 [Docker Hub](https://hub.docker.com/r/talebook/talebook) 和 [GitHub Container Registry](https://github.com/talebook/talebook/pkgs/container/talebook)，可分别使用 `talebook/talebook` 或 `ghcr.io/talebook/talebook` 拉取。
