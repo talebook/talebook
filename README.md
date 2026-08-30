@@ -117,7 +117,7 @@ dsh plugin --profile web add github:hehetoshang/dsh-talebook-plugin
 **[H2read（氢电子书）](https://github.com/mcl0z/H2read-Client)** 是专为 Android Wear OS / 智能手表定制的小说阅读与听书客户端，支持 OLED 纯黑省电模式与多种 TTS 语音听书。
 
 * **OLED 纯黑模式**：`#000000` 像素级黑底，0 发光超省电；
-* **全矩阵听书（TTS）**：支持 Edge-TTS 网络语音、Sherpa-ONNX 离线语音与系统 TTS，句子级高亮跟随，0 秒无缝连播；
+* **全矩阵听书（TTS）（付费）**：支持 Edge-TTS 网络语音、Sherpa-ONNX 离线语音与系统 TTS，句子级高亮跟随，0 秒无缝连播；
 * **多源聚合阅读**：在线阅读与全本离线，支持导出 EPUB / TXT；
 * **智能分包**：自动适配 32 位（armeabi-v7a）与 64 位（arm64-v8a）设备；
 * **Talebook 集成**：「导入书籍」功能支持配置 Talebook 服务器地址（可填写访问码或账号密码），直接从 Talebook 书库浏览、搜索并导入书籍到手表阅读/听书。
