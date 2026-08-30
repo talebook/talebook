@@ -217,7 +217,7 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertIn("'/readest/legacy-worker-cleanup.js'", nuxt)
         self.assertIn("'/readest/stale-nuxt-recovery.js'", nuxt)
         self.assertIn("talebook-stale-nuxt-recovery", nuxt)
-        self.assertIn("errorHandler: resolve('./server/error-handler.ts')", nuxt)
+        self.assertIn("errorHandler: '~/server/error-handler.ts'", nuxt)
         self.assertNotIn("swe-worker", reader)
         self.assertIn("/readest/legacy-worker-cleanup.js", reader)
         self.assertIn("/readest/legacy-worker-cleanup.js", not_found)

@@ -147,7 +147,7 @@ export default defineNuxtConfig({
         }
     },
     nitro: {
-        errorHandler: resolve('./server/error-handler.ts'),
+        errorHandler: '~/server/error-handler.ts',
         prerender: {
             crawlLinks: false,
             failOnError: false,
