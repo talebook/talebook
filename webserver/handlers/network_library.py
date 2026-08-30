@@ -45,8 +45,10 @@ class NetworkSources(NetworkBaseHandler):
     @js
     @auth
     def get(self):
-        items = [source.to_public_dict() for source in self.get_catalog().bindings()]
-        return {"err": "ok", "items": items}
+        catalog = self.get_catalog()
+        bindings = catalog.bindings()
+        items = [source.to_public_dict() for source in bindings]
+        return {"err": "ok", "items": items, "availability": catalog.availability(bindings)}
 
 
 class NetworkSearch(NetworkBaseHandler):

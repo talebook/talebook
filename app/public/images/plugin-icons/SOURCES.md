@@ -25,6 +25,7 @@ Downloaded on 2026-08-29 from first-party sites, first-party repositories, or an
 | `bangumi.png` | Bangumi | <https://bgm.tv/img/ico/ico_ios.png> | `bdf7debc7de56e51ba4f0eb794dd5a2f0e6edbddb62b882e6cba821c3a763e60` |
 | `anilist.png` | AniList | <https://anilist.co/img/icons/android-chrome-512x512.png> | `318dea88cf67b0334eb82b925362a35d1f56c25aaa6be4304e7ba7326e238d5a` |
 | `boox.png` | BOOX | <https://shop.boox.com/cdn/shop/files/booxshop-ico_32x32.png?v=1685413361> | `7fe1a9ef7058dda6a0cfd51bf2bc3bcd14c9aa31e0770a23cb0560eadfb17e69` |
+| `kindle.png` | Amazon Kindle | <https://play.google.com/store/apps/details?id=com.amazon.kindle> | `cbfe30e9a71ce08f319713345b453b18f4e660a90abfc8f58a6e1a6af405aac7` |
 | `dangdang.ico` | 当当 | <https://www.dangdang.com/favicon.ico> | `a6e4a703b0777005962cc871774c54050a27c51e0b8331aa72da1e1beb6d970d` |
 | `duokan.jpg` | 多看阅读 | <https://apps.apple.com/cn/app/id517850153> | `1bdc4bb8c4e305f89871659ca75ec98648d0cdf39436ee08d0591ed663d5af2d` |
 | `hanwang.jpg` | 汉王电纸书 | <https://apps.apple.com/cn/app/id1619030681> | `8bcfaa44609ae7002c0ad0d662cc545ac5f82c83f50a48ac81356f33af6d0d9f` |

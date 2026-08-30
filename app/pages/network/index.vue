@@ -1,8 +1,5 @@
 <template>
     <div>
-        <h2>{{ $t('network.title') }}</h2>
-        <v-divider class="mt-3 mb-2" />
-
         <v-tabs
             v-model="activeTab"
             color="primary"
@@ -102,7 +99,17 @@
                             type="info"
                             variant="tonal"
                         >
-                            {{ $t('network.noSource') }}
+                            <div class="d-flex align-center flex-wrap ga-3">
+                                <span>{{ emptyStateText }}</span>
+                                <v-btn
+                                    v-if="store.user.is_admin"
+                                    size="small"
+                                    variant="text"
+                                    to="/admin/settings/plugins"
+                                >
+                                    {{ $t('network.manageSourcePlugins') }}
+                                </v-btn>
+                            </div>
                         </v-alert>
                     </v-col>
 
@@ -310,6 +317,7 @@ store.setNavbar(true);
 
 const activeTab = ref(0);
 const sources = ref([]);
+const availability = ref({ state: 'no_configured_sources', enabled_plugins: 0, configured_sources: 0 });
 const selected = ref([]);
 const searchMode = ref('top');
 const keyword = ref('');
@@ -336,6 +344,12 @@ const exploreLoading = ref(false);
 
 // 手选模式下供 autocomplete 过滤选择（2000+ 源由 autocomplete 内置虚拟滚动处理）
 const sourceItems = computed(() => sources.value.map((s) => ({ value: s.source_key || s.id, title: s.name })));
+const emptyStateText = computed(() => {
+    if (availability.value.state === 'no_enabled_plugins') {
+        return store.user.is_admin ? t('network.noEnabledPluginsAdmin') : t('network.noEnabledPluginsUser');
+    }
+    return store.user.is_admin ? t('network.noConfiguredSourcesAdmin') : t('network.noConfiguredSourcesUser');
+});
 
 const toCards = (group) => {
     return (group.books || []).map((b) => ({
@@ -538,7 +552,10 @@ onMounted(async () => {
         }
     }
     const rsp = await $backend('/book-sources');
-    if (rsp.err === 'ok') sources.value = rsp.items || [];
+    if (rsp.err === 'ok') {
+        sources.value = rsp.items || [];
+        availability.value = rsp.availability || availability.value;
+    }
 });
 
 onBeforeUnmount(() => {

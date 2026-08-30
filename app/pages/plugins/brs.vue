@@ -1,5 +1,5 @@
 <template>
-    <main class="brs-page">
+    <section class="brs-page">
         <header class="brs-page__header">
             <v-btn
                 icon="mdi-arrow-left"
@@ -13,7 +13,7 @@
             </div>
         </header>
         <BrsAccountSettings :backend="$backend" />
-    </main>
+    </section>
 </template>
 
 <script setup lang="ts">

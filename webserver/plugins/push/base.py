@@ -118,7 +118,7 @@ def _manifest(plugin_id, name, description, icon, homepage="", brand_icon=""):
             "icon": icon,
             "brand_icon": brand_icon,
             "primary_action": "configure",
-            "manage_route": "/user/detail?tab=devices",
+            "manage_route": "/me/devices",
             # 既有 /send_to_device 的路由事实；handler 按声明交给
             # runtime 解析，不再持有 provider map。
             "device_type": plugin_id.rsplit(".", 1)[-1],

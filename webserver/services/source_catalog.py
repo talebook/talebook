@@ -127,6 +127,26 @@ class SourceCatalogService:
                 )
         return output
 
+    def availability(self, bindings=None):
+        """Return a credential-free summary for network-library empty states."""
+        enabled = {}
+        for capability in SOURCE_CAPABILITIES:
+            for provider in self.runtime.enabled_providers(capability):
+                enabled[provider.manifest["id"]] = provider
+
+        available_bindings = list(bindings) if bindings is not None else self.bindings()
+        if not enabled:
+            state = "no_enabled_plugins"
+        elif not available_bindings:
+            state = "no_configured_sources"
+        else:
+            state = "ready"
+        return {
+            "state": state,
+            "enabled_plugins": len(enabled),
+            "configured_sources": len(available_bindings),
+        }
+
     def get(self, source_key):
         value = str(source_key or "")
         # 旧 /api/network/* 的纯数字 source_id 是一版兼容别名，只在绑定层解释。

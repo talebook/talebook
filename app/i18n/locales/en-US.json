@@ -227,8 +227,43 @@
     "themes": "Themes",
     "systemLogs": "System Logs",
     "myShelf": "My Shelf",
+    "myReading": "My Reading",
+    "libraryBrowse": "Browse Library",
     "audiobooks": "Audiobooks",
     "readBooks": "Read Books"
+  },
+  "navigationSections": {
+    "libraryLocalDescription": "Browse, filter, and manage books saved in your local Talebook library.",
+    "libraryNetworkDescription": "Search and browse online books from enabled source plugins.",
+    "libraryAppsDescription": "View connection addresses and setup guides for Moke, OPDS, and WebDAV.",
+    "meShelfDescription": "View books saved to your personal shelf.",
+    "meHistoryDescription": "Review books in progress, finished books, and reading history.",
+    "meAccountDescription": "Manage your profile and password.",
+    "meDevicesDescription": "Manage reading devices used by your account to receive and send books.",
+    "mePrivateDescription": "View private books that are visible only to you.",
+    "settingsGeneralDescription": "Manage global settings for this Talebook instance.",
+    "settingsPluginsDescription": "Enable plugins and configure instance policies and personal connections.",
+    "settingsThemesDescription": "Choose and activate the Talebook interface theme.",
+    "appAccess": "Access with Apps",
+    "generalSettings": "System Settings"
+  },
+  "navigationHelp": {
+    "openMenu": "Open help and about menu",
+    "changelog": "Changelog",
+    "github": "GitHub"
+  },
+  "appAccess": {
+    "loginHint": "Sign in to view connection addresses and service status for this instance.",
+    "officialClient": "Official client",
+    "mokeDescription": "Talebook's official cross-platform reader connects directly to your Talebook instance.",
+    "serverAddress": "Server address",
+    "downloadMoke": "Download Moke",
+    "opdsDescription": "Browse and download your library with an OPDS-compatible reader.",
+    "webdavDescription": "Access library files through WebDAV with a file manager or reading app.",
+    "connectionAddress": "Connection address",
+    "accountHint": "Sign in with your Talebook account.",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
   },
   "network": {
     "title": "Network Library",
@@ -267,6 +302,11 @@
     "author": "Author",
     "intro": "Introduction",
     "noSource": "No book source available. Ask an admin to import sources in Book Sources.",
+    "noEnabledPluginsAdmin": "No source plugin is enabled. Enable one to browse the network library.",
+    "noEnabledPluginsUser": "The administrator has not enabled network sources yet.",
+    "noConfiguredSourcesAdmin": "Source plugins are enabled, but no usable source is configured.",
+    "noConfiguredSourcesUser": "The administrator has not configured a usable network source yet.",
+    "manageSourcePlugins": "Open plugin settings",
     "status": {
       "label": "Status",
       "serial": "Serializing",
@@ -401,6 +441,7 @@
     "deviceMgt": "Reading Devices",
     "deviceMgtDescription": "Manage your personal reading devices. Only visible to you. Global devices are configured by admins and available to all users.",
     "noEnabledDevicePlugins": "No device plugins are enabled. Ask an administrator to enable one before adding a device.",
+    "removeDevice": "Remove device",
     "devicePluginDisabled": "{type} (plugin disabled)"
   },
   "auth": {
@@ -1578,7 +1619,7 @@
     "managementTab": "Plugin management",
     "managementDescription": "Control built-in plugins for this instance and maintain global settings. Each user manages their own accounts, keys, and devices.",
     "personalCenterDescription": "Configure external services, sync connections, and reading devices for the current account.",
-    "personalPageDescription": "Manage plugin connections and reading devices for the current account.",
+    "personalPageDescription": "Manage plugin connections and account bindings for the current account.",
     "personalPluginsNavigation": "Plugin configuration",
     "searchPersonal": "Search configurable plugins",
     "personalLoadError": "Failed to load personal plugin configuration.",
@@ -1599,6 +1640,7 @@
     "scopeInstance": "Admin configuration",
     "scopeUser": "Personal configuration",
     "scopeBoth": "Admin and personal configuration",
+    "statusSummary": "Plugin status summary",
     "builtinPluginCount": "{count} built-in plugins",
     "enabledPluginCount": "{count} available",
     "attentionPluginCount": "{count} need attention",
@@ -1657,6 +1699,7 @@
     "configure": "Configure",
     "globalConfiguration": "Global settings",
     "personalSettings": "Personal settings",
+    "personalPluginSettings": "Personal plugin settings",
     "experience": "Try it",
     "personalConfiguration": "Personal configuration",
     "personalConfigurationDescription": "This plugin's connection and credentials belong to each user. Configure it in the personal workbench or account settings. The admin page only controls whether the plugin is enabled.",

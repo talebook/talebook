@@ -200,6 +200,7 @@ import { useI18n } from 'vue-i18n';
 import CaptchaWidget from '~/components/CaptchaWidget.vue';
 
 const router = useRouter();
+const route = useRoute();
 const store = useMainStore();
 const { t } = useI18n();
 const { $backend } = useNuxtApp();
@@ -228,6 +229,11 @@ const captchaData = ref(null);
 const showCaptchaDialog = ref(false);
 const captchaScene = ref('login'); // 当前验证码场景
 
+const postLoginPath = computed(() => {
+    const next = route.query.next;
+    return typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+});
+
 // 控制是否显示导航栏（可作为开关使用）
 const showNavbar = true; // 后期可通过配置或环境变量控制
 store.setNavbar(showNavbar);
@@ -239,7 +245,7 @@ onMounted(async () => {
         const rsp = await $backend('/user/info');
         store.login(rsp);
         if (rsp.user && rsp.user.is_login) {
-            router.push('/');
+            router.replace(postLoginPath.value);
         }
         // 检查是否启用了验证码
         checkCaptchaEnabled();
@@ -359,7 +365,7 @@ const do_login = async () => {
             // Refresh user info
             const info = await $backend('/user/info');
             store.login(info);
-            router.push('/');
+            router.push(postLoginPath.value);
         }
     } catch (e) {
         alert.value.type = 'error';

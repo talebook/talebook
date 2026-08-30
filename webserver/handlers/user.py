@@ -16,7 +16,7 @@ from webserver.models import Device, Message, Reader
 from webserver.plugins import captcha as captcha_module
 from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.services.mail import MailService
-from webserver.services.plugin_runtime import PluginRuntime
+from webserver.services.plugin_runtime import PluginRuntime, ensure_runtime_installations
 from webserver.version import VERSION
 
 
@@ -439,6 +439,8 @@ class UserInfo(BaseHandler):
             "header": CONF["HEADER"],
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
             "show_network_library": CONF.get("SHOW_NETWORK_LIBRARY", True),
+            "opds_enabled": CONF.get("OPDS_ENABLED", True),
+            "webdav_enabled": CONF.get("ENABLE_WEBDAV_SERVICE", True),
             "FEEDBACK_URL": CONF["FEEDBACK_URL"],
             "allow": {
                 "register": CONF["ALLOW_REGISTER"] and not demo_mode.is_demo_mode(CONF),
@@ -556,6 +558,7 @@ class UserDevices(BaseHandler):
     @js
     @auth
     def get(self):
+        ensure_runtime_installations(self.session, CONF)
         user_id = self.user_id()
         devices = self.session.query(Device).filter(Device.reader_id == user_id).all()
         personal = [d.to_dict() for d in devices]

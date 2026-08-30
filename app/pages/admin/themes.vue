@@ -1,9 +1,7 @@
 <template>
     <div>
+        <RoutePageToolbar :description="t('navigationSections.settingsThemesDescription')" />
         <v-card class="my-2 elevation-4">
-            <v-card-title class="theme-page-head">
-                <span>{{ $t('theme.title') }}</span>
-            </v-card-title>
             <v-card-text>
                 <v-row class="theme-grid">
                     <v-col
@@ -84,6 +82,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useNuxtApp } from 'nuxt/app';
+import RoutePageToolbar from '@/components/RoutePageToolbar.vue';
 import { useThemeStore } from '@/stores/theme';
 import { useMainStore } from '@/stores/main';
 import { buildThemeDisplayList } from '@/utils/theme-display';
@@ -143,14 +142,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.theme-page-head {
-    align-items: center;
-    display: flex;
-    gap: 16px;
-    justify-content: space-between;
-    padding: 16px;
-}
-
 .theme-grid {
     align-items: stretch;
 }

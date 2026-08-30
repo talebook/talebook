@@ -102,6 +102,30 @@ def get_db():
     return session
 
 
+@contextlib.contextmanager
+def enabled_builtin_plugin(plugin_key):
+    """Temporarily enable one built-in plugin for tests that exercise its runtime path."""
+    from webserver.models import PluginInstallation
+    from webserver.services.plugin_runtime import ensure_runtime_installations
+
+    session = get_db()
+    ensure_runtime_installations(session, main.CONF)
+    installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).one()
+    original_enabled = installation.enabled
+    original_status = installation.status
+    installation.enabled = True
+    installation.status = "active"
+    session.commit()
+    try:
+        yield
+    finally:
+        session = get_db()
+        installation = session.get(PluginInstallation, installation.id)
+        installation.enabled = original_enabled
+        installation.status = original_status
+        session.commit()
+
+
 def Q(s):
     if not isinstance(s, str):
         s = str(s)
@@ -295,11 +319,12 @@ class TestAppWithoutLogin(TestApp):
         from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
-        with mock.patch.dict(webserver.handlers.book.CONF, {"ALLOW_GUEST_PUSH": True}):
-            with mock.patch.object(provider, "uploader_class") as mock_boox:
-                mock_boox.return_value.upload.return_value = {"success": True}
-                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
-                result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.dict(webserver.handlers.book.CONF, {"ALLOW_GUEST_PUSH": True}):
+                with mock.patch.object(provider, "uploader_class") as mock_boox:
+                    mock_boox.return_value.upload.return_value = {"success": True}
+                    data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                    result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
 
         self.assertEqual(result["err"], "ok")
         mock_boox.assert_called_once()
@@ -350,6 +375,8 @@ class TestAppWithoutLogin(TestApp):
         self.assertEqual(d["user"]["is_admin"], False)
         self.assertEqual(d["sys"]["books"], 13)
         self.assertEqual(d["sys"]["show_network_library"], True)
+        self.assertEqual(d["sys"]["opds_enabled"], True)
+        self.assertEqual(d["sys"]["webdav_enabled"], True)
         self.assertEqual(d["sys"]["upload"]["chunk_enabled"], True)
         self.assertEqual(d["sys"]["upload"]["chunk_threshold"], 8 * 1024 * 1024)
         self.assertEqual(d["sys"]["upload"]["chunk_size"], 4 * 1024 * 1024)
@@ -379,6 +406,20 @@ class TestAppWithoutLogin(TestApp):
             self.assertEqual(d["sys"]["show_network_library"], False)
         finally:
             main.CONF["SHOW_NETWORK_LIBRARY"] = previous
+
+    def test_user_info_reflects_external_library_service_status_without_credentials(self):
+        previous_opds = main.CONF.get("OPDS_ENABLED", True)
+        previous_webdav = main.CONF.get("ENABLE_WEBDAV_SERVICE", True)
+        try:
+            main.CONF["OPDS_ENABLED"] = False
+            main.CONF["ENABLE_WEBDAV_SERVICE"] = False
+            d = self.json("/api/user/info")
+            self.assertEqual(d["sys"]["opds_enabled"], False)
+            self.assertEqual(d["sys"]["webdav_enabled"], False)
+            self.assertNotIn("password", d["sys"])
+        finally:
+            main.CONF["OPDS_ENABLED"] = previous_opds
+            main.CONF["ENABLE_WEBDAV_SERVICE"] = previous_webdav
 
     def test_book(self):
         d = self.json("/api/book/1")
@@ -522,6 +563,7 @@ class TestUser(TestWithUserLogin):
         self.assertIsInstance(d["devices"], list)
         self.assertIn("device_types", d)
         self.assertIsInstance(d["device_types"], list)
+        self.assertIn("kindle", {item["value"] for item in d["device_types"]})
 
     def test_devices_post_save(self):
         devices_data = [
@@ -646,13 +688,14 @@ class TestBook(TestWithUserLogin):
         from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
-        with mock.patch.object(provider, "uploader_class") as MockBoox:
-            MockBoox.return_value.upload.return_value = {"success": True}
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": True}
 
-            data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
-            d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
-            self.assertEqual(d["err"], "ok")
-            MockBoox.assert_called_once()
+                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+                self.assertEqual(d["err"], "ok")
+                MockBoox.assert_called_once()
 
     def test_send_to_device_discovers_manifest_declared_device_type(self):
         """handler 不维护设备白名单，新 provider 只需声明 ui.device_type。"""
@@ -705,11 +748,12 @@ class TestBook(TestWithUserLogin):
                 .all()
             )
 
-        with mock.patch.object(provider, "uploader_class") as MockBoox:
-            MockBoox.return_value.upload.return_value = {"success": True}
-            before = len(runs())
-            data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
-            self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": True}
+                before = len(runs())
+                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
 
         after = runs()
         self.assertEqual(len(after), before + 1, "推送必须留下 run 记录")
@@ -728,10 +772,11 @@ class TestBook(TestWithUserLogin):
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
         session = get_db()
 
-        with mock.patch.object(provider, "uploader_class") as MockBoox:
-            MockBoox.return_value.upload.return_value = {"success": True}
-            data = {"device_type": "boox", "device_url": "192.168.1.7:8085"}
-            self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": True}
+                data = {"device_type": "boox", "device_url": "192.168.1.7:8085"}
+                self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
 
         connection = (
             session.query(PluginConnection)
@@ -742,11 +787,12 @@ class TestBook(TestWithUserLogin):
         self.assertEqual(connection.config.get("device_url"), "192.168.1.7:8085", "设备地址必须记进连接")
 
         # 第二次不带地址：应回落到连接里存的那个
-        with mock.patch.object(provider, "uploader_class") as MockBoox:
-            MockBoox.return_value.upload.return_value = {"success": True}
-            d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps({"device_type": "boox"}))
-            self.assertEqual(d["err"], "ok")
-            self.assertIn("192.168.1.7:8085", MockBoox.return_value.upload.call_args.args[0])
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": True}
+                d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps({"device_type": "boox"}))
+                self.assertEqual(d["err"], "ok")
+                self.assertIn("192.168.1.7:8085", MockBoox.return_value.upload.call_args.args[0])
 
     def test_send_to_device_wifi_failure_is_recorded(self):
         from webserver.models import PluginConnection, PluginInstallation, PluginRun
@@ -755,10 +801,11 @@ class TestBook(TestWithUserLogin):
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
         session = get_db()
 
-        with mock.patch.object(provider, "uploader_class") as MockBoox:
-            MockBoox.return_value.upload.return_value = {"success": False, "message": "device refused"}
-            data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
-            d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": False, "message": "device refused"}
+                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
 
         self.assertEqual(d["err"], "upload.error")
         run = (
@@ -776,15 +823,16 @@ class TestBook(TestWithUserLogin):
         from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
         provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
-        with mock.patch.object(provider, "uploader_class") as MockBoox:
-            MockBoox.return_value.upload.return_value = {
-                "success": False,
-                "error_type": "timeout",
-                "status_code": None,
-                "message": "设备没有及时应答",
-            }
-            data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
-            result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {
+                    "success": False,
+                    "error_type": "timeout",
+                    "status_code": None,
+                    "message": "设备没有及时应答",
+                }
+                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
 
         self.assertEqual(result["err"], "upload.timeout")
 
