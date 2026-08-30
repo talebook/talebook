@@ -65,6 +65,12 @@ export TALEBOOK_PASSWORD="your-password"
 
 Skill 会在写入前确认目标与权限，对管理员写入、删除和批量操作先展示影响并请求确认，执行后再查询状态进行核验。完整说明与源码见 [talebook/skills](https://github.com/talebook/skills)。
 
+DeepSeek Harness（DSH）用户可安装社区插件 [dsh-talebook-plugin](https://github.com/hehetoshang/dsh-talebook-plugin)，在 DSH 中通过 12 个强类型工具搜索、下载、上传和管理书籍与有声书，管理 Legado 书源并执行管理员操作。写入前同样需要确认，密码只保存在 DSH 凭据存储中：
+
+```bash
+dsh plugin --profile web add github:hehetoshang/dsh-talebook-plugin
+```
+
 ## 近一年更新亮点
 
 * **网络书库与书源**：新增 Legado 风格书源解析引擎，可在线搜索、阅读网络小说并保存为 txt/epub 入库；配套书源管理界面（批量启停/删除、有效性体检、分页搜索）。
