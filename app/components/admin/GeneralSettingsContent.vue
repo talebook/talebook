@@ -1173,7 +1173,6 @@ useHead(() => ({
     position: sticky;
     top: 96px;
     z-index: 4;
-    background: rgb(var(--v-theme-surface));
     border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 .settings-body {

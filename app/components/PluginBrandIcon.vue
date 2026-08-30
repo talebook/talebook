@@ -61,10 +61,6 @@ watch(() => props.brandIcon, () => {
     pointer-events:none;
 }
 
-:global(.v-theme--dark) .plugin-brand-icon::after {
-    box-shadow:inset 0 0 0 1px oklch(1 0 0 / .1);
-}
-
 .plugin-brand-icon :deep(.v-img) {
     width:100%;
     height:100%;

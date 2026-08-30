@@ -148,20 +148,29 @@ const { t } = useI18n();
     align-items: center;
     display: flex;
     justify-content: center;
-    min-height: 40px;
     overflow: hidden;
+}
+
+.sidebar-help__logo {
+    inline-size: 100%;
+    min-block-size: 196px;
     padding: 8px 12px;
 }
 
 .sidebar-help__logo :deep(img) {
+    block-size: 180px !important;
     display: block;
-    margin: 0 auto;
-    max-height: 24px;
-    max-width: 100%;
+    inline-size: 180px !important;
+    margin: 0 !important;
+    max-block-size: none !important;
+    max-inline-size: none !important;
+    object-fit: contain;
 }
 
 .sidebar-help__fallback-logo {
     font-size: .875rem;
     font-weight: 700;
+    min-block-size: 40px;
+    padding: 8px 12px;
 }
 </style>

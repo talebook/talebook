@@ -82,17 +82,26 @@ test.describe('Navigation Sidebar', () => {
             menu.locator('.sidebar-help__item').first().locator('.v-list-item__prepend .v-list-item__spacer'),
         ).toHaveCSS('width', '8px');
 
+        const logoImage = logo.locator('img');
+        await expect(logoImage).toHaveCSS('width', '180px');
+        await expect(logoImage).toHaveCSS('height', '180px');
+        await expect.poll(async () => Math.round((await logoImage.boundingBox())?.width || 0)).toBe(180);
         const logoBox = await logo.boundingBox();
+        const logoImageBox = await logoImage.boundingBox();
         const firstItemBox = await menu.locator('.sidebar-help__item').first().boundingBox();
         expect(logoBox).not.toBeNull();
+        expect(logoImageBox).not.toBeNull();
         expect(firstItemBox).not.toBeNull();
+        expect(logoImageBox!.width).toBe(180);
+        expect(logoImageBox!.height).toBe(180);
+        expect(Math.abs((logoImageBox!.x + 90) - (logoBox!.x + logoBox!.width / 2))).toBeLessThanOrEqual(1);
         expect(logoBox!.y + logoBox!.height).toBeLessThanOrEqual(firstItemBox!.y);
 
         const drawerBox = await page.locator('.app-navigation-drawer').boundingBox();
         expect(drawerBox).not.toBeNull();
         await expect.poll(async () => {
-            const menuBox = await menu.boundingBox();
-            return menuBox?.x ?? Number.POSITIVE_INFINITY;
+            const currentMenuBox = await menu.boundingBox();
+            return currentMenuBox?.x ?? Number.POSITIVE_INFINITY;
         }).toBeLessThanOrEqual(drawerBox!.x + 16);
     });
 
