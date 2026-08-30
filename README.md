@@ -112,6 +112,23 @@ dsh plugin --profile web add github:hehetoshang/dsh-talebook-plugin
 * **阅读辅助**：支持阅读进度、书签、笔记、全文搜索、目录跳转和 TTS 朗读；
 * **多服务器与备份**：支持切换多个 Talebook 服务器，并可导入、导出阅读数据；
 
+## 有声书命令行客户端 — Talebook Audio CLI
+
+**[Talebook Audio CLI](https://github.com/hehetoshang/talebook-audio-cli)** 是独立安装的 Talebook 有声书终端客户端：使用账号密码直接登录（不依赖浏览器 Cookie），列出当前账号可访问的已发布有声书，通过本机 `mpv` 播放，或经 OpenXiaoAI Bridge 在小爱音箱上播放。
+
+* **账号密码登录**：`talebook-audio configure --server https://books.example.com --username alice` 保存服务地址与账号，`talebook-audio login` 以隐藏输入读取密码；客户端只保存服务地址、用户名和登录 Cookie，不保存密码；
+* **浏览与播放**：`talebook-audio books` 列出可访问的已发布有声书，`talebook-audio play --book-id 42 --chapter 3` 按书籍或有声版本播放并指定起始章节，也支持交互选择与单键控制（暂停/继续、上一章/下一章）；
+* **小爱音箱播放**：经 OpenXiaoAI Bridge 的鉴权 StreamPlayer API 播放，支持进度、暂停/继续与切章；
+* **MCP 集成**：`talebook-audio mcp` 提供 9 个浏览、播放与状态控制工具，可像 neteasecli 一样以 stdio 方式接入 OpenXiaoAI Bridge。
+
+安装（PyPI，Python ≥ 3.11；本机播放需要 `mpv`）：
+
+```bash
+python3 -m pip install talebook-audio-cli
+```
+
+源码与发布：[talebook-audio-cli](https://github.com/hehetoshang/talebook-audio-cli) · [PyPI](https://pypi.org/project/talebook-audio-cli/)
+
 ## Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/talebook.svg)
 
 部署比较简单，建议采用 Docker。镜像同时发布到 [Docker Hub](https://hub.docker.com/r/talebook/talebook) 和 [GitHub Container Registry](https://github.com/talebook/talebook/pkgs/container/talebook)，可分别使用 `talebook/talebook` 或 `ghcr.io/talebook/talebook` 拉取。
