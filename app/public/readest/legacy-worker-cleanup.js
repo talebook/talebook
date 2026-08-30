@@ -1,8 +1,5 @@
 const LEGACY_WORKER_PATH = '/readest/sw.js';
 const LEGACY_CACHE_NAMES = new Set(['client-pages', 'offline-cache', 'fonts-cache']);
-const RECOVERY_QUERY_PARAM = '__talebook_recovery';
-const RECOVERY_STATE_KEY = '__talebookNuxtRecoveryStarted';
-const LOADED_FOR_STALE_RECOVERY = new URL(import.meta.url).searchParams.has('stale-recovery');
 
 function isLegacyReadestWorker(worker) {
   if (!worker?.scriptURL) return false;
@@ -44,30 +41,10 @@ export async function cleanupLegacyReadestWorker({
   return true;
 }
 
-export async function recoverStaleNuxtPage({
-  cleanup = cleanupLegacyReadestWorker,
-  location = globalThis.location,
-  now = Date.now,
-  recoveryState = globalThis,
-} = {}) {
-  if (!location?.href || !location?.replace) return false;
-
-  const target = new URL(location.href);
-  if (target.searchParams.has(RECOVERY_QUERY_PARAM) || recoveryState[RECOVERY_STATE_KEY]) return false;
-  recoveryState[RECOVERY_STATE_KEY] = true;
-
-  try {
-    await cleanup({ reload: () => {} });
-  } catch {
-    // A cache deletion failure must not prevent an HTTP-cache recovery reload.
-  }
-
-  target.searchParams.set(RECOVERY_QUERY_PARAM, String(now()));
-  location.replace(target.href);
-  return true;
-}
-
-if (typeof window !== 'undefined' && !LOADED_FOR_STALE_RECOVERY) {
-  const resumedStaleRecovery = new URL(globalThis.location.href).searchParams.has(RECOVERY_QUERY_PARAM);
-  void cleanupLegacyReadestWorker({ forceCacheCleanup: resumedStaleRecovery }).catch(() => {});
+if (typeof window !== 'undefined') {
+  // The no-cache tombstone can update and unregister before this module gets a
+  // registration snapshot. Always inspect only the known Readest cache names;
+  // this also removes a cache recreated during the obsolete worker's final
+  // controlled navigation without relying on a missing-chunk recovery URL.
+  void cleanupLegacyReadestWorker({ forceCacheCleanup: true }).catch(() => {});
 }

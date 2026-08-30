@@ -1666,17 +1666,8 @@ class BookRead(BaseHandler):
 
         if book.get("fmt_epub"):
             if use_readest:
-                revision = reader_resource_revision(book["fmt_epub"])
-                resource_url = self.site_url + "/read/resource/%d.epub?revision=%s" % (book_id, revision)
-                reader_query = urllib.parse.urlencode(
-                    {
-                        "file": resource_url,
-                        "moke": "1",
-                        "mokeBookId": str(book_id),
-                        "mokeReturnTo": "/book/%d" % book_id,
-                    }
-                )
-                return self.redirect("/readest/reader.html?%s" % reader_query)
+                launch_query = urllib.parse.urlencode({"bookId": str(book_id)})
+                return self.redirect("/readest/talebook-launch.html?%s" % launch_query)
             if requested_reader == "candle":
                 return self.render_epub(
                     book,

@@ -50,7 +50,7 @@
     <h2>1. 原始诉求</h2>
     <p class="quote">“修复readest仍然白屏，然后控制台日志显示 Refused to apply style from http://127.0.0.1:9000/_nuxt/entry.Qt6l3l2G.css because its MIME type (application/json) is not a supported stylesheet MIME type；CKHYTMRW.js 404。”</p>
     <p>现象说明浏览器实际执行了旧 Nuxt HTML 中的资源引用，而当前 Nuxt 服务已不再提供对应 hash，404 JSON 又因严格 MIME 检查不能作为 CSS 使用。</p>
-    <p class="callout"><strong>已被替代：</strong>本方案依赖新 HTML 先到达浏览器；旧 Worker 在 Nuxt 响应超过 3 秒时仍会返回不含清理脚本的旧 HTML。后续方案见 <code>design/app/20260830-stale-nuxt-chunk-recovery.active.html</code>。</p>
+    <p class="callout"><strong>已被替代：</strong>本方案依赖新 HTML 先到达浏览器；旧 Worker 在 Nuxt 响应超过 3 秒时仍会返回不含清理脚本的旧 HTML。最终替代方案见 <code>design/app/20260830-readest-host-protocol-root-fix.active.html</code>。</p>
   </section>
   <section>
     <h2>2. 根因与证据</h2>

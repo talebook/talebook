@@ -2,28 +2,9 @@
 import { readFileSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-const staleNuxtRecoveryModule = "import '/readest/stale-nuxt-recovery.js';\n"
-
 export default defineNuxtConfig({
     compatibilityDate: '2024-04-03',
     devtools: { enabled: true },
-    vite: {
-        plugins: [{
-            name: 'talebook-stale-nuxt-recovery',
-            configureServer(server) {
-                server.middlewares.use((request, response, next) => {
-                    const path = new URL(request.url || '/', 'http://localhost').pathname
-                    if (!/^\/_nuxt\/[^/]+\.js$/.test(path)) return next()
-
-                    response.statusCode = 200
-                    response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-                    response.setHeader('Content-Type', 'text/javascript; charset=utf-8')
-                    response.setHeader('X-Content-Type-Options', 'nosniff')
-                    response.end(staleNuxtRecoveryModule)
-                })
-            },
-        }],
-    },
     ignore: [
         '**/node_modules/**',
     ],
@@ -58,6 +39,7 @@ export default defineNuxtConfig({
         }
     },
     runtimeConfig: {
+        api_url: process.env.API_URL || 'http://127.0.0.1:8080',
         public: {
             api_url: process.env.API_URL || 'http://127.0.0.1:8080',
             site_title: process.env.TITLE || 'talebook',
@@ -70,7 +52,13 @@ export default defineNuxtConfig({
                 'X-Content-Type-Options': 'nosniff',
             },
         },
-        '/readest/stale-nuxt-recovery.js': {
+        '/readest/talebook-launch.html': {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'X-Content-Type-Options': 'nosniff',
+            },
+        },
+        '/readest/talebook-launch.js': {
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'X-Content-Type-Options': 'nosniff',
@@ -90,7 +78,6 @@ export default defineNuxtConfig({
         },
         '/api/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/api/**' },
         '/get/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/get/**' },
-        '/read/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/read/**' },
         '/books/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/books/**' },
         '/media/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/media/**' },
         '/static/themes/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/static/themes/**' },
@@ -147,7 +134,6 @@ export default defineNuxtConfig({
         }
     },
     nitro: {
-        errorHandler: '~/server/error-handler.ts',
         prerender: {
             crawlLinks: false,
             failOnError: false,
