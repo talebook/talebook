@@ -84,7 +84,7 @@ test.describe('Book Detail Page', () => {
     test('opens the unified conversion dialog for a TXT book', async ({ page }) => {
         await page.goto('/book/2');
         await page.getByText('文件处理').click();
-        await page.getByText('转换书籍').click();
+        await page.getByText('转换格式').click();
 
         await expect(page.getByText('当前文件格式')).toBeVisible();
         await expect(page.getByText('TXT').first()).toBeVisible();
@@ -108,7 +108,7 @@ test.describe('Book Detail Page', () => {
     test('shows EPUB conversion routes without unavailable routes', async ({ page }) => {
         await page.goto('/book/1');
         await page.getByText('文件处理').click();
-        await page.getByText('转换书籍').click();
+        await page.getByText('转换格式').click();
 
         await expect(page.locator('.conversion-option')).toHaveCount(2);
         await expect(page.getByText('AZW3')).toBeVisible();
@@ -118,7 +118,7 @@ test.describe('Book Detail Page', () => {
     test('shows the empty state when every target format already exists', async ({ page }) => {
         await page.goto('/book/3');
         await page.getByText('文件处理').click();
-        await page.getByText('转换书籍').click();
+        await page.getByText('转换格式').click();
 
         await expect(page.locator('.conversion-option')).toHaveCount(0);
         await expect(page.locator('.v-alert')).toBeVisible();
@@ -173,6 +173,10 @@ test.describe('Book Detail Page', () => {
         await page.goto(`/book/${bookId}`);
 
         await expect(page.getByRole('heading', { name: /笔记与高亮/ })).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText('另一位读者留下的公开章评。')).toBeVisible();
+        await expect(page.getByText('这是从微信读书导入的章节级笔记。')).not.toBeVisible();
+
+        await page.getByRole('tab', { name: /我的笔记/ }).click();
         await expect(page.getByText('微信读书', { exact: true })).toBeVisible();
         await expect(page.getByText('这是从微信读书导入的章节级笔记。')).toBeVisible();
         await expect(page.getByText('仅章节定位').first()).toBeVisible();
@@ -182,6 +186,7 @@ test.describe('Book Detail Page', () => {
     test('filters annotations by source and deletes an owned note', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
         await expect(page.getByRole('heading', { name: /笔记与高亮/ })).toBeVisible({ timeout: 15_000 });
+        await page.getByRole('tab', { name: /我的笔记/ }).click();
 
         await page.locator('.annotation-panel__filter .v-field__input').click();
         await page.getByRole('option', { name: 'Talebook 原生' }).click();
@@ -198,6 +203,7 @@ test.describe('Book Detail Page', () => {
     test('undoes one imported run while keeping the note content', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
         await expect(page.getByRole('heading', { name: /笔记与高亮/ })).toBeVisible({ timeout: 15_000 });
+        await page.getByRole('tab', { name: /我的笔记/ }).click();
 
         await page.getByRole('button', { name: '撤销导入' }).first().click();
         await expect(page.getByText('撤销这批导入？')).toBeVisible();
@@ -205,5 +211,34 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByText(/已撤销 1 条来源关联/)).toBeVisible();
         await expect(page.getByText('这是从微信读书导入的章节级笔记。')).toBeVisible();
         await expect(page.getByText('Talebook 原生').first()).toBeVisible();
+    });
+
+    test('hides the annotation section when the book has no visible notes', async ({ page, request }) => {
+        await request.post(`${mockApiUrl}/_test/reset`, {
+            data: { installed: true, annotationsEmpty: true },
+        });
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByText(apiBook.book.title).first()).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByRole('heading', { name: /笔记与高亮/ })).toHaveCount(0);
+    });
+
+    test('asks for the device type before revealing its target fields', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await page.getByText('发送到设备', { exact: true }).first().click();
+
+        await expect(page.getByTestId('send-device-type')).toBeVisible();
+        await expect(page.getByTestId('send-device-mailbox')).toHaveCount(0);
+        await expect(page.getByTestId('send-device-ip')).toHaveCount(0);
+
+        await page.getByTestId('send-device-type').click();
+        await page.getByRole('option', { name: /Kindle 邮箱推送/ }).click();
+        await expect(page.getByTestId('send-device-mailbox')).toBeVisible();
+        await expect(page.getByTestId('send-device-ip')).toHaveCount(0);
+
+        await page.getByTestId('send-device-type').click();
+        await page.getByRole('option', { name: 'BOOX' }).click();
+        await expect(page.getByTestId('send-device-mailbox')).toHaveCount(0);
+        await expect(page.getByTestId('send-device-ip')).toBeVisible();
+        await expect(page.getByTestId('send-device-port')).toBeVisible();
     });
 });

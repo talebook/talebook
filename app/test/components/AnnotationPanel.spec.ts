@@ -12,6 +12,8 @@ vi.mock('vue-i18n', () => ({
             if (key === 'annotations.sources.weread') return '微信读书';
             if (key === 'annotations.chapterOnly') return '仅章节定位';
             if (key === 'annotations.rollbackPartial') return `部分 ${params?.deleted}/${params?.total}`;
+            if (key === 'annotations.publicActivity') return '公开动态';
+            if (key === 'annotations.myNotes') return '我的笔记';
             return key;
         },
     }),
@@ -32,6 +34,7 @@ const sample = [
     {
         id: 1,
         annotation_type: 'highlight',
+        is_private: true,
         chapter: '第一章',
         cfi: null,
         quote_text: '原文引用',
@@ -44,10 +47,12 @@ const sample = [
     {
         id: 2,
         annotation_type: 'note',
+        is_private: false,
         chapter: '第二章',
         cfi: 'epubcfi(/6/4)',
         quote_text: '',
         content: 'Talebook 笔记',
+        author_name: '读者甲',
         can_edit: false,
         created_at: '2026-08-14T10:00:00',
         updated_at: '2026-08-14T10:00:00',
@@ -71,15 +76,21 @@ async function mountPanel(response = { err: 'ok', annotations: sample }, props =
 describe('AnnotationPanel', () => {
     it('renders native and external sources without losing chapter-only records', async () => {
         const wrapper = await mountPanel();
-        expect(wrapper.text()).toContain('微信读书');
         expect(wrapper.text()).toContain('Talebook 原生');
+        expect(wrapper.text()).toContain('读者甲');
+        expect(wrapper.findAll('.annotation-card')).toHaveLength(1);
+        expect(wrapper.findAll('.annotation-card__footer button')).toHaveLength(1);
+
+        (wrapper.vm as unknown as { viewMode: string }).viewMode = 'mine';
+        await wrapper.vm.$nextTick();
+        expect(wrapper.text()).toContain('微信读书');
         expect(wrapper.text()).toContain('原文引用');
         expect(wrapper.text()).toContain('仅章节定位');
-        expect(wrapper.findAll('.annotation-card')).toHaveLength(2);
-        expect(wrapper.findAll('.annotation-card__topline .annotation-card__chapter')).toHaveLength(2);
-        expect(wrapper.findAll('.annotation-card__footer button')).toHaveLength(1);
+        expect(wrapper.findAll('.annotation-card')).toHaveLength(1);
+        expect(wrapper.findAll('.annotation-card__topline .annotation-card__chapter')).toHaveLength(1);
+        expect(wrapper.findAll('.annotation-card__footer button')).toHaveLength(0);
         expect(wrapper.findAll('button[aria-label="annotations.actionsFor"]')).toHaveLength(1);
-        expect(wrapper.get('a').text()).toContain('weread.open');
+        expect(wrapper.find('a[href*="weread"]').exists()).toBe(false);
         const dialogs = wrapper.findAllComponents({ name: 'VDialog' });
         expect(dialogs).toHaveLength(2);
         expect(dialogs.every(dialog => dialog.attributes('aria-labelledby'))).toBe(true);
@@ -88,17 +99,53 @@ describe('AnnotationPanel', () => {
 
     it('offers chapter navigation only when the host can perform it', async () => {
         const wrapper = await mountPanel(undefined, { chapterNavigation: true });
-        expect(wrapper.findAll('.annotation-card__footer button')).toHaveLength(2);
+        expect(wrapper.findAll('.annotation-card__footer button')).toHaveLength(1);
+        (wrapper.vm as unknown as { viewMode: string }).viewMode = 'mine';
+        await wrapper.vm.$nextTick();
+        expect(wrapper.findAll('.annotation-card__footer button')).toHaveLength(1);
         wrapper.unmount();
     });
 
     it('filters locally by source', async () => {
         const wrapper = await mountPanel();
+        (wrapper.vm as unknown as { viewMode: string }).viewMode = 'mine';
+        await wrapper.vm.$nextTick();
         (wrapper.vm as unknown as { sourceFilter: string }).sourceFilter = 'weread';
         await wrapper.vm.$nextTick();
         expect(wrapper.findAll('.annotation-card')).toHaveLength(1);
         expect(wrapper.text()).toContain('微信读书笔记');
         expect(wrapper.text()).not.toContain('Talebook 笔记');
+        wrapper.unmount();
+    });
+
+    it('defaults to public activity and separates it from my private notes', async () => {
+        const wrapper = await mountPanel();
+        expect(wrapper.text()).toContain('公开动态');
+        expect(wrapper.text()).toContain('我的笔记');
+        expect(wrapper.text()).toContain('Talebook 笔记');
+        expect(wrapper.text()).not.toContain('微信读书笔记');
+
+        (wrapper.vm as unknown as { viewMode: string }).viewMode = 'mine';
+        await wrapper.vm.$nextTick();
+        expect(wrapper.text()).toContain('微信读书笔记');
+        expect(wrapper.text()).not.toContain('Talebook 笔记');
+        wrapper.unmount();
+    });
+
+    it('does not render a detail-page card before the book has annotations', async () => {
+        const wrapper = await mountPanel({ err: 'ok', annotations: [] });
+        expect(wrapper.find('.annotation-panel').exists()).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('only offers rollback batches owned by the current reader', async () => {
+        const otherReaderImport = {
+            ...sample[1],
+            sources: [{ source_name: 'brs', source_connection_id: 'other-connection', source_run_id: 'other-run' }],
+        };
+        const wrapper = await mountPanel({ err: 'ok', annotations: [sample[0], otherReaderImport] });
+        const vm = wrapper.vm as unknown as { rollbackTargets: Array<{ sourceName: string }> };
+        expect(vm.rollbackTargets.map(target => target.sourceName)).toEqual(['weread']);
         wrapper.unmount();
     });
 

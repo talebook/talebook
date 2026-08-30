@@ -170,6 +170,32 @@ def test_builtin_installation_is_idempotent_and_keeps_user_connections_personal(
     assert connection.health == "healthy"
 
 
+def test_brs_and_all_push_plugins_default_enabled_without_overwriting_existing_state(db_session):
+    first = ensure_builtin_installations(db_session, installed_by=1, settings=SETTINGS)
+    installation_by_key = {item.plugin_key: item for item in first}
+    expected_keys = {"talebook.annotation.brs"} | {
+        provider.manifest["id"] for provider in PROVIDER_GROUPS["push"]
+    }
+
+    assert expected_keys <= {
+        plugin_key for plugin_key, installation in installation_by_key.items() if installation.enabled
+    }
+
+    disabled_keys = {"talebook.annotation.brs", "talebook.push.boox", "talebook.push.kindle"}
+    for plugin_key in disabled_keys:
+        installation_by_key[plugin_key].enabled = False
+    db_session.commit()
+
+    ensure_builtin_installations(db_session, installed_by=1, settings=SETTINGS)
+
+    assert not {
+        plugin_key
+        for (plugin_key,) in db_session.query(PluginInstallation.plugin_key)
+        .filter(PluginInstallation.plugin_key.in_(disabled_keys), PluginInstallation.enabled.is_(True))
+        .all()
+    }
+
+
 def test_metadata_defaults_enable_all_except_neodb_and_only_seed_once(db_session):
     settings = {
         **SETTINGS,
