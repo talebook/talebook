@@ -196,17 +196,32 @@ class TestReadestEmbed(TestWithUserLogin):
             for name in ("talebook.conf", "server-side-render.conf")
         ]
         nuxt = (root / "app" / "nuxt.config.ts").read_text(encoding="utf-8")
-        reader = (root / "app" / "public" / "readest" / "reader.html").read_text(encoding="utf-8")
-        service_worker = root / "app" / "public" / "readest" / "sw.js"
+        readest_root = root / "app" / "public" / "readest"
+        reader = (readest_root / "reader.html").read_text(encoding="utf-8")
+        not_found = (readest_root / "404.html").read_text(encoding="utf-8")
+        cleanup_script = (readest_root / "legacy-worker-cleanup.js").read_text(encoding="utf-8")
+        service_worker = readest_root / "sw.js"
+        service_worker_text = service_worker.read_text(encoding="utf-8")
         for nginx in nginx_configs:
             self.assertIn("location = /readest/reader.html", nginx)
+            self.assertIn("location = /readest/legacy-worker-cleanup.js", nginx)
             self.assertIn("Content-Security-Policy", nginx)
             self.assertIn("immutable", nginx)
             self.assertIn('add_header Service-Worker-Allowed "/" always', nginx)
         self.assertIn("/readest/**", nuxt)
         self.assertIn("'Service-Worker-Allowed': '/'", nuxt)
+        self.assertIn("'/readest/legacy-worker-cleanup.js'", nuxt)
         self.assertNotIn("swe-worker", reader)
-        self.assertIn("registration.unregister", service_worker.read_text(encoding="utf-8"))
+        self.assertIn("/readest/legacy-worker-cleanup.js", reader)
+        self.assertIn("/readest/legacy-worker-cleanup.js", not_found)
+        self.assertLess(reader.index("/readest/legacy-worker-cleanup.js"), reader.index("/readest/_next/"))
+        self.assertIn("getRegistrations", cleanup_script)
+        self.assertIn("registration.unregister", cleanup_script)
+        self.assertIn("globalThis.location.reload", cleanup_script)
+        for cache_name in ("client-pages", "offline-cache", "fonts-cache"):
+            self.assertIn(cache_name, cleanup_script)
+            self.assertIn(cache_name, service_worker_text)
+        self.assertIn("registration.unregister", service_worker_text)
         self.assertFalse(any(service_worker.parent.glob("swe-worker*")))
         main_bundles = list((service_worker.parent / "_next" / "static" / "chunks").glob("main-*.js"))
         self.assertTrue(main_bundles)

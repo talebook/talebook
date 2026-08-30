@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="修复 Talebook Readest 嵌入模式遗留 Service Worker 导致的白屏，并恢复 TXT 等格式的专用阅读器分流。" />
   <link rel="icon" href="data:," />
-  <title>修复 Readest 白屏并恢复格式分流 · ACTIVE</title>
+  <title>修复 Readest 白屏并恢复格式分流 · SUPERSEDED</title>
   <style>
     :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#1d2939; --muted:#596579; --line:#d9e2ec; --blue:#175cd3; --green:#067647; --warn:#b54708; }
     * { box-sizing:border-box; }
@@ -20,7 +20,7 @@
     code { padding:.12em .35em; border-radius:5px; background:#eef2f6; font-family:ui-monospace,monospace; overflow-wrap:anywhere; }
     .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
     .tag { padding:5px 10px; border-radius:999px; color:#344054; background:#eef2f6; font-size:12px; font-weight:700; }
-    .active { color:var(--green); background:#ecfdf3; }
+    .superseded { color:var(--warn); background:#fff4e5; }
     .quote { padding:14px 16px; border-left:4px solid var(--warn); border-radius:10px; color:#7a2e0e; background:#fffaeb; }
     .flow { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
     .step { padding:15px; border:1px solid var(--line); border-radius:13px; background:#f8fafc; }
@@ -40,7 +40,7 @@
     <h1>修复 Readest 白屏并恢复格式分流</h1>
     <p>停止 Talebook 嵌入版 Readest 对宿主站点注册根作用域 Service Worker，清理已安装的旧 Worker；同时确保 Readest 仅参与 EPUB 分流，TXT 继续进入 Talebook 专用阅读器。</p>
     <div class="meta">
-      <span class="tag active">状态：ACTIVE</span><span class="tag">创建日期：2026-08-29</span><span class="tag">所属模块：app</span><span class="tag">影响范围：Readest 静态产物、Nginx、BookRead</span><span class="tag">需求来源：PR #977 体验反馈</span>
+      <span class="tag superseded">状态：SUPERSEDED</span><span class="tag">创建日期：2026-08-29</span><span class="tag">所属模块：app</span><span class="tag">影响范围：Readest 静态产物、Nginx、BookRead</span><span class="tag">需求来源：PR #977 体验反馈</span>
     </div>
   </header>
 
@@ -48,6 +48,7 @@
     <h2>1. 原始诉求</h2>
     <p class="quote">“使用 Readest 点击阅读时白屏，控制台提示 Nuxt CSS 以 application/json 返回并有资源 404；另外阅读 TXT 时没有使用 TXT 阅读器。”</p>
     <p>核查确认：旧嵌入产物会从 <code>/readest/sw.js</code> 注册作用域为 <code>/</code> 的 Worker，因而能拦截 Talebook 的 <code>/_nuxt/</code> 资源；后端又在 EPUB/PDF/TXT 格式判断之前应用 Readest 默认项，导致 TXT 被错误送入 Readest 的 EPUB 限制页。</p>
+    <p class="quote"><strong>已被替代：</strong>仅保留 tombstone 无法立即触发已安装 Worker 更新，用户仍可能长期白屏。本方案由 <code>design/app/20260830-readest-legacy-worker-cleanup-bootstrap.active.html</code> 替代，后者由宿主页主动注销旧 Worker 并清理完整运行时缓存集合。</p>
   </section>
 
   <section>

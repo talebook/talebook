@@ -45,6 +45,12 @@ export default defineNuxtConfig({
         }
     },
     routeRules: {
+        '/readest/legacy-worker-cleanup.js': {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'X-Content-Type-Options': 'nosniff',
+            },
+        },
         '/readest/sw.js': {
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -79,6 +85,9 @@ export default defineNuxtConfig({
             ],
             link: [
                 { rel: 'shortcut icon', type: 'image/x-icon', href: '/logo/favicon.ico' }
+            ],
+            script: [
+                { type: 'module', src: '/readest/legacy-worker-cleanup.js' }
             ]
         }
     },

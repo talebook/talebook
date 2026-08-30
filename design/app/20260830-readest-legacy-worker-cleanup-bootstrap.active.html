@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="通过宿主页主动清理 Readest 遗留的根作用域 Service Worker，修复 Nuxt 资源被旧缓存污染后的白屏。" />
+  <link rel="icon" href="data:," />
+  <title>主动清理 Readest 遗留根作用域 Worker · ACTIVE</title>
+  <style>
+    :root { color-scheme:light; --bg:#f3f7fc; --panel:#fff; --ink:#172033; --muted:#596579; --line:#d8e2ee; --blue:#175cd3; --green:#067647; --warn:#b54708; --soft:#fff7ed; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:linear-gradient(145deg,#eaf2ff,var(--bg) 42%); font:15px/1.65 system-ui,-apple-system,"Segoe UI","PingFang SC",sans-serif; }
+    main { width:min(1000px,calc(100% - 28px)); margin:26px auto 52px; }
+    header,section { margin-bottom:16px; padding:24px 28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 10px 28px rgba(16,24,40,.06); }
+    h1 { margin:0 0 8px; font-size:clamp(28px,5vw,44px); line-height:1.15; }
+    h2 { margin:0 0 12px; font-size:21px; }
+    p { margin:8px 0; color:var(--muted); }
+    ul,ol { margin:8px 0 0 20px; padding:0; }
+    li+li { margin-top:6px; }
+    code { padding:.12em .35em; border-radius:5px; background:#eef2f6; font-family:ui-monospace,monospace; overflow-wrap:anywhere; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+    .tag { padding:5px 10px; border-radius:999px; color:#344054; background:#eef2f6; font-size:12px; font-weight:700; }
+    .active { color:var(--green); background:#ecfdf3; }
+    .quote,.callout { padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:#f8fafc; }
+    .quote { border-left:4px solid var(--warn); color:#7a2e0e; background:var(--soft); }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .box { padding:15px; border:1px solid var(--line); border-radius:13px; background:#f8fafc; }
+    .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .step { padding:14px; border:1px solid var(--line); border-radius:13px; background:#f8fafc; }
+    .step strong { display:block; margin-bottom:5px; color:var(--blue); }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:10px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:#f8fafc; }
+    .pending { color:var(--warn); font-weight:700; }
+    .ok { color:var(--green); font-weight:700; }
+    footer { color:var(--muted); font-size:12px; text-align:center; }
+    @media(max-width:720px) { header,section{padding:20px}.grid,.flow{grid-template-columns:1fr} }
+    @media(prefers-reduced-motion:reduce) { *{scroll-behavior:auto!important} }
+    @media print { body{background:#fff}header,section{box-shadow:none;break-inside:avoid} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>主动清理 Readest 遗留根作用域 Worker</h1>
+    <p>让 Nuxt 宿主页与 Readest 静态入口都主动注销旧 <code>/readest/sw.js</code> Worker、删除其运行时缓存并刷新受控页面，不再依赖浏览器未来某次周期性更新。</p>
+    <div class="meta"><span class="tag active">状态：ACTIVE</span><span class="tag">创建日期：2026-08-30</span><span class="tag">所属模块：app</span><span class="tag">影响范围：Nuxt head、Readest 静态入口、Nginx</span><span class="tag">需求来源：PR #977 再次白屏反馈</span></div>
+  </header>
+  <section>
+    <h2>1. 原始诉求</h2>
+    <p class="quote">“修复readest仍然白屏，然后控制台日志显示 Refused to apply style from http://127.0.0.1:9000/_nuxt/entry.Qt6l3l2G.css because its MIME type (application/json) is not a supported stylesheet MIME type；CKHYTMRW.js 404。”</p>
+    <p>现象说明浏览器实际执行了旧 Nuxt HTML 中的资源引用，而当前 Nuxt 服务已不再提供对应 hash，404 JSON 又因严格 MIME 检查不能作为 CSS 使用。</p>
+  </section>
+  <section>
+    <h2>2. 根因与证据</h2>
+    <table><thead><tr><th>证据</th><th>结论</th></tr></thead><tbody>
+      <tr><td>旧 Readest bundle 以 <code>{scope: "/"}</code> 注册 <code>/readest/sw.js</code>，并用 <code>offline-cache</code> 缓存几乎所有同源 HTTP 请求。</td><td>Worker 能控制 Talebook 的 <code>/_nuxt/</code> 与 <code>/read/:id</code>，把旧 HTML/资源缓存带入 Nuxt。</td></tr>
+      <tr><td>上一轮产物移除了注册调用，只保留 <code>/readest/sw.js</code> tombstone。</td><td>新页面不再主动请求 Worker 更新；已安装 Worker 只能等待浏览器周期更新，用户可持续处于污染状态。</td></tr>
+      <tr><td>tombstone 只删除 <code>serwist-*</code>。</td><td>旧 Worker 的 <code>client-pages</code>、<code>offline-cache</code>、<code>fonts-cache</code> 未被清除。</td></tr>
+    </tbody></table>
+  </section>
+  <section>
+    <h2>3. 目标与边界</h2>
+    <div class="grid">
+      <article class="box"><strong>目标</strong><ul><li>当前页面发现旧 Worker 后立即注销并刷新。</li><li>只删除可确认属于旧 Readest 的缓存。</li><li>Nuxt 和 Readest 两个入口均能触发恢复。</li></ul></article>
+      <article class="box"><strong>非目标</strong><ul><li>不恢复 Readest PWA 注册。</li><li>不清除 Talebook cookie、IndexedDB 或其他站点缓存。</li><li>不改变阅读权限、资源 URL 与格式路由。</li></ul></article>
+    </div>
+  </section>
+  <section>
+    <h2>4. 方案</h2>
+    <div class="flow">
+      <article class="step"><strong>稳定脚本</strong>新增固定 URL 的兼容清理脚本，保证旧 Worker 可从网络取得。</article>
+      <article class="step"><strong>精确识别</strong>仅匹配 scriptURL 路径为 <code>/readest/sw.js</code> 的 registration/controller。</article>
+      <article class="step"><strong>注销清理</strong>注销 registration，删除 serwist 前缀和三类旧 runtime cache。</article>
+      <article class="step"><strong>脱离控制</strong>仅当当前页面由旧 Worker 控制时刷新一次；注销后不会形成循环。</article>
+    </div>
+    <p class="callout">脚本同时由 Nuxt 全局 head 和 <code>readest/reader.html</code> 最前部加载；两套 Nginx 与 Nuxt route rule 对稳定 URL 设置 <code>no-store</code> 和 <code>nosniff</code>。</p>
+  </section>
+  <section>
+    <h2>5. 风险与回滚</h2>
+    <ul><li>额外请求：所有 Nuxt 页面会请求一个很小的同源脚本；无旧 Worker 时立即退出。</li><li>误删风险：不按根 scope 粗略匹配，只按旧 Readest scriptURL；缓存名使用旧产物中的确定集合。</li><li>回滚：删除 head/reader 引用、兼容脚本和专用缓存规则即可，无数据迁移。</li></ul>
+  </section>
+  <section>
+    <h2>6. 测试计划与结果</h2>
+    <table><thead><tr><th>验证层</th><th>命令/页面</th><th>预期</th><th>结果</th></tr></thead><tbody>
+      <tr><td>前端单测</td><td><code>npx vitest run test/utils/readestLegacyWorkerCleanup.spec.ts</code></td><td>非旧 Worker 无动作；旧 Worker 注销、删缓存并刷新。</td><td class="ok">2 passed</td></tr>
+      <tr><td>后端静态契约</td><td><code>pytest tests/test_readest_embed.py -v</code></td><td>Nuxt、Reader、Nginx 均引用并正确缓存清理脚本。</td><td class="ok">17 passed</td></tr>
+      <tr><td>实际浏览器</td><td>真实后端 + Nuxt 9000 + Chromium CDP，预装模拟旧根 Worker</td><td>自动注销、仅删除旧缓存并刷新；436 个 Nuxt/Readest CSS/JS 响应无失败或 MIME 错误。</td><td class="ok">通过，控制台无资源错误</td></tr>
+      <tr><td>质量门禁</td><td><code>npm run lint</code>、<code>npm run build</code>、两套 <code>nginx -t</code>、<code>make check-design</code></td><td>通过。</td><td class="ok">通过；lint 仅有 193 个既有 warning</td></tr>
+    </tbody></table>
+  </section>
+  <section><h2>7. 决策记录</h2><ol><li><strong>2026-08-30：</strong>不再等待浏览器周期更新 tombstone，宿主页主动恢复。</li><li><strong>2026-08-30：</strong>使用外部同源脚本而非 reader 内联脚本，保持现有 CSP <code>script-src 'self'</code>。</li><li><strong>2026-08-30：</strong>实测注销后旧缓存被删除、无关缓存保留，页面刷新后不再受 Worker 控制。</li></ol></section>
+  <footer>Talebook internal design · app · ACTIVE · 2026-08-30</footer>
+</main>
+</body>
+</html>
