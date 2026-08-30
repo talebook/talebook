@@ -1037,6 +1037,7 @@
             <v-col cols="12">
                 <AnnotationPanel
                     :book-id="book.id"
+                    hide-when-empty
                     @locate="openAnnotationInReader"
                 />
             </v-col>

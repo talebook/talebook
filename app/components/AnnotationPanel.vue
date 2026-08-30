@@ -1,6 +1,6 @@
 <template>
     <section
-        v-if="loadError || annotations.length"
+        v-if="!hideWhenEmpty || loadError || annotations.length || feedback"
         class="annotation-panel"
         :class="{ 'annotation-panel--compact': compact }"
         :aria-labelledby="headingId"
@@ -233,6 +233,7 @@ import { useI18n } from 'vue-i18n';
 const props = defineProps({
     bookId: { type: [Number, String], required: true },
     compact: { type: Boolean, default: false },
+    hideWhenEmpty: { type: Boolean, default: false },
     chapterNavigation: { type: Boolean, default: false },
     backend: { type: Function, default: null },
 });

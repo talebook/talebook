@@ -172,6 +172,14 @@ class TestAnnotations(TestWithUserLogin):
         self.assertIn("current_toc_title", body)
         self.assertIn("server: window.location.origin", body)
         self.assertIn("legacyCommunityResponse", body)
+        self.assertIn("clientId: clientId()", body)
+        self.assertIn("client_id: passage.clientId", body)
+        self.assertIn("if (!selectedPassage || annotationSaveInFlight) return", body)
+        save_start = body.index("async function saveAnnotation")
+        self.assertLess(
+            body.index("hideSelectionToolbar();", save_start),
+            body.index("await fetch", save_start),
+        )
 
     def test_source_upsert_is_idempotent_and_uses_prefixed_source_fields(self):
         first = self._post_source()
@@ -273,6 +281,16 @@ class TestAnnotations(TestWithUserLogin):
             body=json.dumps({"author_name": "另一个伪造用户"}),
         )
         self.assertEqual(updated["annotation"]["author_name"], created["annotation"]["author_name"])
+
+    def test_source_fields_cannot_override_the_authenticated_reader_name(self):
+        created = self._post_source(
+            source_annotation_id="forged-author",
+            is_private=False,
+            author_name="伪造管理员",
+        )
+
+        self.assertTrue(created["annotation"]["author_name"])
+        self.assertNotEqual(created["annotation"]["author_name"], "伪造管理员")
 
     def test_book_annotation_scopes_separate_public_activity_from_my_notes(self):
         own_private = self._post_local(client_id="own-private", chapter="第一章", content="我的私密笔记")

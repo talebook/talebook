@@ -133,8 +133,44 @@ describe('AnnotationPanel', () => {
     });
 
     it('does not render a detail-page card before the book has annotations', async () => {
-        const wrapper = await mountPanel({ err: 'ok', annotations: [] });
+        const wrapper = await mountPanel({ err: 'ok', annotations: [] }, { hideWhenEmpty: true });
         expect(wrapper.find('.annotation-panel').exists()).toBe(false);
+        wrapper.unmount();
+    });
+
+    it('keeps the standalone panel available when the book has no annotations', async () => {
+        const wrapper = await mountPanel({ err: 'ok', annotations: [] });
+        expect(wrapper.find('.annotation-panel').exists()).toBe(true);
+        expect(wrapper.text()).toContain('annotations.emptyTitle');
+        expect(wrapper.find('button[aria-label="annotations.refresh"]').exists()).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('shows loading feedback in a standalone host', async () => {
+        backendMock.mockReset();
+        backendMock.mockReturnValue(new Promise(() => {}));
+        const wrapper = mount(AnnotationPanel, {
+            props: { bookId: 1, backend: backendMock },
+            global: { plugins: [vuetify] },
+        });
+        await vi.waitFor(() => expect(backendMock).toHaveBeenCalledWith('/book/1/annotations'));
+        expect(wrapper.find('.annotation-panel').exists()).toBe(true);
+        expect(wrapper.text()).toContain('annotations.loading');
+        wrapper.unmount();
+    });
+
+    it('keeps standalone deletion feedback visible after removing the final annotation', async () => {
+        const wrapper = await mountPanel({ err: 'ok', annotations: [sample[0]] });
+        const vm = wrapper.vm as unknown as {
+            requestDelete: (item: unknown) => void;
+            deleteAnnotation: () => Promise<void>;
+        };
+        backendMock.mockResolvedValueOnce({ err: 'ok' });
+        vm.requestDelete(sample[0]);
+        await vm.deleteAnnotation();
+        expect(wrapper.find('.annotation-panel').exists()).toBe(true);
+        expect(wrapper.text()).toContain('annotations.deleted');
+        expect(wrapper.text()).toContain('annotations.emptyTitle');
         wrapper.unmount();
     });
 

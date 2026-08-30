@@ -270,7 +270,10 @@ class BookAnnotations(AnnotationHandlerMixin, BaseHandler):
                 "quote_text": str(data.get("quote_text") or ""),
                 "content": str(data.get("content") or ""),
                 "color": str(data.get("color") or "")[:32],
-                "author_name": (str(data.get("author_name") or "")[:255] if source_name else self._reader_name()),
+                # The authenticated reader owns every write through this public endpoint.
+                # External providers preserve their remote author through the internal
+                # annotation writer, never through client-controlled provenance fields.
+                "author_name": self._reader_name(),
             }
             if created or not source_name:
                 values["is_private"] = _as_bool(data.get("is_private", annotation.is_private))

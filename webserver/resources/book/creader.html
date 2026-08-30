@@ -311,6 +311,7 @@
       const annotationApi = '{{RES}}/api/book/{{book.id}}/annotations';
       const renderedAnnotations = new Set();
       let selectedPassage = null;
+      let annotationSaveInFlight = false;
       let chapterRequest = 0;
       let feedbackTimer = null;
       let chapterAnnotationCount = 0;
@@ -358,10 +359,6 @@
         selectionToolbar.style.left = '-999px';
       }
 
-      function clearSelection() {
-        try { selectedPassage?.contents?.window?.getSelection()?.removeAllRanges(); } catch (error) { /* noop */ }
-      }
-
       function showSelectionToolbar(range, contents) {
         const quoteText = range.toString().trim();
         if (!quoteText) return;
@@ -388,6 +385,7 @@
           const quoteText = range?.toString().trim();
           if (!range || !quoteText) return;
           selectedPassage = {
+            clientId: clientId(),
             cfi: String(cfiRange),
             chapter: String(proxy.current_toc_title || proxy.current_toc?.label || '').trim(),
             quoteText,
@@ -448,7 +446,10 @@
       }
 
       async function saveAnnotation(annotationType, content, isPrivate) {
-        if (!selectedPassage) return;
+        if (!selectedPassage || annotationSaveInFlight) return;
+        const passage = selectedPassage;
+        annotationSaveInFlight = true;
+        hideSelectionToolbar();
         annotationSave.disabled = true;
         try {
           const response = await fetch(annotationApi, {
@@ -456,12 +457,12 @@
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              client_id: clientId(),
+              client_id: passage.clientId,
               annotation_type: annotationType,
               is_private: isPrivate,
-              chapter: selectedPassage.chapter,
-              cfi: selectedPassage.cfi,
-              quote_text: selectedPassage.quoteText,
+              chapter: passage.chapter,
+              cfi: passage.cfi,
+              quote_text: passage.quoteText,
               content,
               color: annotationType === 'note' ? 'blue' : 'yellow',
             }),
@@ -474,14 +475,21 @@
             await loadChapterAnnotations(proxy);
           }
           if (annotationEditor.open) annotationEditor.close();
-          hideSelectionToolbar();
-          clearSelection();
-          selectedPassage?.contents?.document?.defaultView?.frameElement?.focus?.();
+          try { passage.contents?.window?.getSelection()?.removeAllRanges(); } catch (error) { /* noop */ }
+          passage.contents?.document?.defaultView?.frameElement?.focus?.();
+          if (selectedPassage === passage) selectedPassage = null;
           frame.contentWindow?.location.reload();
           showFeedback(annotationType === 'highlight' ? '划线已保存到 Talebook' : '笔记已保存到 Talebook', false);
         } catch (error) {
           showFeedback(`保存失败：${error.message || '请稍后重试'}`, true);
+          if (annotationType === 'highlight' && selectedPassage === passage) {
+            try {
+              const range = readerProxy()?.rendition?.getRange(passage.cfi);
+              if (range) showSelectionToolbar(range, passage.contents);
+            } catch (selectionError) { /* keep the persistent error feedback */ }
+          }
         } finally {
+          annotationSaveInFlight = false;
           annotationSave.disabled = false;
         }
       }
