@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Readest 嵌入 Talebook 阶段 0 的构建边界、权限资源契约和验证结果。" />
+  <link rel="icon" href="data:," />
+  <title>Readest 嵌入 Talebook：阶段 0 边界验证 · ACTIVE</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #1f2937; background: #f6f7fb; }
+    * { box-sizing: border-box; } body { margin: 0; line-height: 1.65; } main { width: min(980px, calc(100% - 32px)); margin: 24px auto; }
+    header, section { margin-bottom: 18px; padding: 24px; border: 1px solid #d7dfeb; border-radius: 16px; background: #fff; }
+    h1, h2 { line-height: 1.25; } code { padding: .1em .35em; border-radius: 4px; background: #eef2f7; }
+    table { width: 100%; border-collapse: collapse; } th, td { padding: 9px; border: 1px solid #d7dfeb; text-align: left; vertical-align: top; }
+    .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .flow div { padding: 12px; border-radius: 10px; background: #eef5ff; }
+    .ok { color: #176443; font-weight: 700; } .risk { color: #9a4d0c; font-weight: 700; }
+    @media (max-width: 720px) { .flow { grid-template-columns: 1fr; } header, section { padding: 18px; } }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+    @media print { :root { background: #fff; } main { width: 100%; } section, header { box-shadow: none; break-inside: avoid; } }
+  </style>
+</head>
+<body>
+<main>
+  <header><h1>Readest 嵌入 Talebook：阶段 0 边界验证</h1><p>创建日期：2026-08-13 · 模块：webserver / Readest embed · 状态：ACTIVE · 需求来源：TB-36</p></header>
+  <section><h2>原始诉求</h2><p>在不删除、不移动、不替换完整 Readest/Moke 路径的前提下，建立并行的 Web Reader 构建目标，验证 Talebook 同源授权 EPUB 能否被该目标打开，并让禁入模块、产物边界和实际体积可自动审计。</p></section>
+  <section><h2>目标与边界</h2><ul><li>阶段 0 仅支持 EPUB 打开、基本翻页、返回书籍页和 Candle 回退。</li><li>不实现服务端进度、批注、PDF、AI、同步、集成、账号或 Tauri 能力。</li><li>完整 Readest app 与 Moke 原构建命令保持不变；embed 是新的独立 workspace app。</li></ul></section>
+  <section><h2>方案</h2><div class="flow"><div><b>1. /read</b><br />沿用现有阅读权限和格式判断。</div><div><b>2. bootstrap</b><br />返回版本化书籍、资源、导航与 capability 契约。</div><div><b>3. resource</b><br />专用同源 EPUB stream，支持 Range、ETag、正确 MIME。</div><div><b>4. embed</b><br />只加载 React 与 foliate-js 的单路由静态应用。</div></div><p>资源接口使用在线阅读权限，而非下载权限；私有书继续对无权用户返回 404。资源响应为 <code>private, no-store</code>，权限撤销后不能依赖长期缓存继续访问。</p></section>
+  <section><h2>产品功能矩阵</h2><table><thead><tr><th>能力</th><th>阶段 0</th><th>控制方式</th></tr></thead><tbody><tr><td>EPUB 渲染、翻页、本地外观</td><td class="ok">启用</td><td>统一 capabilities manifest</td></tr><tr><td>返回书籍页、Candle 回退</td><td class="ok">启用</td><td>bootstrap navigation</td></tr><tr><td>library/account/cloud/sync/payment/send/RSS/OPDS</td><td>禁入</td><td>源码 import graph + 构建插件 + 产物扫描</td></tr><tr><td>Integrations/Telemetry/AI/Reedy/Gateway/Tauri</td><td>禁入</td><td>默认 deny 且无条件 import</td></tr><tr><td>进度、批注、PDF</td><td class="risk">延后</td><td>阶段 1 后独立设计和权限测试</td></tr></tbody></table></section>
+  <section><h2>API / 协议</h2><p><code>GET /api/book/&lt;id&gt;/reader-bootstrap?engine=readest</code> 返回 <code>talebook.reader.bootstrap.v1</code>；<code>GET /read/resource/&lt;id&gt;.epub</code> 返回 <code>application/epub+zip</code> 并支持字节范围；<code>/read/&lt;id&gt;?reader=candle</code> 是显式回退。</p></section>
+  <section><h2>测试计划与结果</h2><p class="ok">实现完成后验证：Talebook 权限矩阵与 Range/ETag/MIME；embed 类型、单测、import graph、生产构建、产物扫描；Moke 与完整 Readest 原构建路径。实测命令、体积和环境限制记录在 TB-36 PR 与 issue 评论中。</p></section>
+  <section><h2>风险与 Go/No-Go</h2><p>完整 EPUB URL 技术上可被浏览器保存，这是产品安全取舍而非 DRM。阶段 0 只有在无权用户无法取得资源、禁入依赖不进 bundle、完整路径不回归时才可 Go；进度和批注仍为 No-Go。</p></section>
+</main>
+</body>
+</html>

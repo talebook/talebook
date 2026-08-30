@@ -2,9 +2,28 @@
 import { readFileSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
+const staleNuxtRecoveryModule = "import '/readest/stale-nuxt-recovery.js';\n"
+
 export default defineNuxtConfig({
     compatibilityDate: '2024-04-03',
     devtools: { enabled: true },
+    vite: {
+        plugins: [{
+            name: 'talebook-stale-nuxt-recovery',
+            configureServer(server) {
+                server.middlewares.use((request, response, next) => {
+                    const path = new URL(request.url || '/', 'http://localhost').pathname
+                    if (!/^\/_nuxt\/[^/]+\.js$/.test(path)) return next()
+
+                    response.statusCode = 200
+                    response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+                    response.setHeader('Content-Type', 'text/javascript; charset=utf-8')
+                    response.setHeader('X-Content-Type-Options', 'nosniff')
+                    response.end(staleNuxtRecoveryModule)
+                })
+            },
+        }],
+    },
     ignore: [
         '**/node_modules/**',
     ],
@@ -45,6 +64,30 @@ export default defineNuxtConfig({
         }
     },
     routeRules: {
+        '/readest/legacy-worker-cleanup.js': {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'X-Content-Type-Options': 'nosniff',
+            },
+        },
+        '/readest/stale-nuxt-recovery.js': {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'X-Content-Type-Options': 'nosniff',
+            },
+        },
+        '/readest/sw.js': {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Service-Worker-Allowed': '/',
+            },
+        },
+        '/readest/**': {
+            headers: {
+                'Content-Security-Policy': "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline' blob:; font-src 'self' data:; object-src 'none'; frame-src blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+                'X-Content-Type-Options': 'nosniff',
+            },
+        },
         '/api/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/api/**' },
         '/get/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/get/**' },
         '/read/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/read/**' },
@@ -68,6 +111,9 @@ export default defineNuxtConfig({
             ],
             link: [
                 { rel: 'shortcut icon', type: 'image/x-icon', href: '/logo/favicon.ico' }
+            ],
+            script: [
+                { type: 'module', src: '/readest/legacy-worker-cleanup.js' }
             ]
         }
     },
@@ -102,6 +148,7 @@ export default defineNuxtConfig({
         }
     },
     nitro: {
+        errorHandler: '~/server/error-handler.ts',
         prerender: {
             crawlLinks: false,
             failOnError: false,
