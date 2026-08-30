@@ -150,7 +150,7 @@ const availableKinds = computed<ProbeKind[]>(() => {
     const capabilities = props.plugin.capabilities || [];
     const kinds: ProbeKind[] = [];
     if (capabilities.includes('metadata.lookup')) kinds.push('metadata');
-    if (capabilities.includes('book_sources.search')) kinds.push('source');
+    if (capabilities.includes('sources.search')) kinds.push('source');
     if (capabilities.includes('reviews.lookup')) kinds.push('review');
     return kinds;
 });

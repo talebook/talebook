@@ -52,11 +52,17 @@ def test_all_book_source_plugins_use_the_source_namespace():
         "talebook.source.watch-folder",
     }
 
-    actual = {
-        provider.manifest["id"] for provider in REGISTRY.providers() if "book_sources" in provider.manifest["categories"]
-    }
+    source_providers = [
+        provider for provider in REGISTRY.providers() if provider.manifest["id"].startswith("talebook.source.")
+    ]
+    actual = {provider.manifest["id"] for provider in source_providers}
 
     assert actual == expected
+    for provider in source_providers:
+        manifest = provider.manifest
+        assert "sources" in manifest["categories"]
+        assert any(capability.startswith("sources.") for capability in manifest["capabilities"])
+        assert not any(value.startswith("book_") for value in manifest["categories"] + manifest["capabilities"])
 
 
 def test_legado_is_the_single_lifecycle_owner_for_online_source_metadata():
@@ -64,9 +70,9 @@ def test_legado_is_the_single_lifecycle_owner_for_online_source_metadata():
 
     assert "talebook.meta.book-source" not in manifests
     assert set(manifests[LEGADO_PLUGIN_ID]["capabilities"]) == {
-        "book_sources.browse",
-        "book_sources.search",
-        "book_sources.acquire",
+        "sources.browse",
+        "sources.search",
+        "sources.acquire",
         "metadata.lookup",
     }
 
@@ -205,7 +211,6 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
     assert not (plugins_dir / "meta" / "weread").exists()
     assert not (plugins_dir / "meta" / "open_library.py").exists()
     for legacy_module in (
-        "book_sources.py",
         "builtin_capabilities.py",
         "enrichment.py",
         "legado.py",

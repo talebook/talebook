@@ -94,7 +94,7 @@ test.describe('Plugin management', () => {
         await expect(page).toHaveURL(/\/plugins\/weread/);
         await expect(page.getByRole('heading', { name: '微信读书工作台' })).toBeVisible();
 
-        await page.goto('/admin/plugins?tab=book_sources');
+        await page.goto('/admin/plugins?tab=sources');
         await expect(page.getByText('Generic OPDS')).toBeVisible();
         await expect(page.getByText('Legado 在线书源')).toBeVisible();
         await expect(page.getByText('在线书源元数据')).toHaveCount(0);
@@ -114,7 +114,7 @@ test.describe('Plugin management', () => {
     });
 
     test('uses the compact A-style list and keeps disable inside details', async ({ page, request }) => {
-        await page.goto('/admin/plugins?tab=book_sources');
+        await page.goto('/admin/plugins?tab=sources');
         const row = page.locator('.management-row').filter({ hasText: 'Generic OPDS' });
         await expect(row.getByText('正常')).toBeVisible();
         const statusFontSize = await row.locator('.management-status').evaluate(element => parseFloat(getComputedStyle(element).fontSize));
@@ -266,7 +266,7 @@ test.describe('Plugin management', () => {
     });
 
     test('configures a source without inventing undeclared generic actions', async ({ page }) => {
-        await page.goto('/admin/plugins?tab=book_sources');
+        await page.goto('/admin/plugins?tab=sources');
         const card = page.locator('.management-row').filter({ hasText: 'Watch Folder' });
         await expect(card.getByText('待配置')).toBeVisible();
         await card.getByRole('button', { name: '全局配置' }).click();
@@ -282,7 +282,7 @@ test.describe('Plugin management', () => {
 
     test('keeps the source connection form reachable at 320px', async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 640 });
-        await page.goto('/admin/plugins?tab=book_sources');
+        await page.goto('/admin/plugins?tab=sources');
         const card = page.locator('.management-row').filter({ hasText: 'Watch Folder' });
         await card.getByRole('button', { name: '全局配置' }).click();
 
@@ -296,7 +296,7 @@ test.describe('Plugin management', () => {
     });
 
     test('removes generic actions from details and uses the source protocol', async ({ page }) => {
-        await page.goto('/admin/plugins?tab=book_sources');
+        await page.goto('/admin/plugins?tab=sources');
         const card = page.locator('.management-row').filter({ hasText: 'Generic OPDS' });
         await card.getByRole('button', { name: '详情' }).click();
         const detailsDialog = page.getByRole('dialog', { name: 'Generic OPDS' });
@@ -336,7 +336,7 @@ test.describe('Plugin management', () => {
     });
 
     test('offers verified public catalogs as one-click experiences', async ({ page }) => {
-        await page.goto('/admin/plugins?tab=book_sources');
+        await page.goto('/admin/plugins?tab=sources');
         const standardEbooks = page.locator('.management-row').filter({ hasText: 'Standard Ebooks' });
         await expect(standardEbooks.getByRole('button', { name: '配置' })).toHaveCount(0);
         await standardEbooks.getByRole('button', { name: '详情' }).click();
@@ -357,7 +357,7 @@ test.describe('Plugin management', () => {
         await page.goto('/admin/settings');
         await expect(page.getByRole('heading', { name: 'OPDS 设置' })).toHaveCount(0);
 
-        await page.goto('/admin/plugins?tab=book_sources');
+        await page.goto('/admin/plugins?tab=sources');
         const card = page.locator('.management-row').filter({ hasText: 'Generic OPDS' });
         await card.getByRole('button', { name: '详情' }).click();
 
@@ -381,7 +381,7 @@ test.describe('Plugin management', () => {
     test('keeps filters in the URL and reflows the details panel on mobile', async ({ page }) => {
         await page.setViewportSize({ width: 375, height: 812 });
         const catalogPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/plugins'));
-        await page.goto('/admin/plugins?tab=book_sources');
+        await page.goto('/admin/plugins?tab=sources');
         await catalogPromise;
         const description = page.getByText('控制本实例可用的内置插件，并维护全局设置。个人账号、密钥与设备由各用户自行配置。');
         await expect(description).toBeVisible();
@@ -402,7 +402,7 @@ test.describe('Plugin management', () => {
     });
 
     test('keeps focus contained in details and restores it after Escape', async ({ page }) => {
-        await page.goto('/admin/plugins?tab=book_sources');
+        await page.goto('/admin/plugins?tab=sources');
         const card = page.locator('.management-row').filter({ hasText: 'Generic OPDS' });
         const details = card.getByRole('button', { name: '详情' });
         await details.focus();

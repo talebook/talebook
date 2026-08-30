@@ -13,7 +13,7 @@ class WebDAVProvider(SourceBase):
         "talebook.source.webdav",
         source_name,
         "浏览 WebDAV 目录并按扩展名增量发现待审电子书。",
-        ["book_sources.browse", "book_sources.acquire"],
+        ["sources.browse", "sources.acquire"],
         {
             "type": "object",
             "properties": {

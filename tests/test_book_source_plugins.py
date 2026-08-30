@@ -207,12 +207,12 @@ def test_catalog_declares_real_capabilities_and_keeps_excluded_servers_out():
         "talebook.source.watch-folder",
     }
     assert manifests["talebook.source.webdav"]["capabilities"] == [
-        "book_sources.browse",
-        "book_sources.acquire",
+        "sources.browse",
+        "sources.acquire",
     ]
     assert manifests["talebook.source.watch-folder"]["capabilities"] == [
-        "book_sources.browse",
-        "book_sources.acquire",
+        "sources.browse",
+        "sources.acquire",
     ]
     catalog = json.dumps(list(manifests.values()), ensure_ascii=False).lower()
     assert "calibre content server" not in catalog
@@ -518,8 +518,8 @@ class DuplicateProvider:
         "id": "test.source.duplicates",
         "name": "Duplicate books",
         "version": "1.0.0",
-        "categories": ["book_sources"],
-        "capabilities": ["book_sources.browse", "book_sources.acquire"],
+        "categories": ["sources"],
+        "capabilities": ["sources.browse", "sources.acquire"],
         "download_mode": "single_book",
         "runtime_kind": "builtin",
         "actions": ["preview", "run"],

@@ -11,7 +11,7 @@ from webserver.plugins.source.opds import PLUGIN_ID as OPDS_PLUGIN_ID
 from webserver.services.plugin_runtime import PluginRuntime, PluginRuntimeError, ensure_builtin_installations
 
 
-SOURCE_CAPABILITIES = frozenset({"book_sources.search", "book_sources.browse", "book_sources.acquire"})
+SOURCE_CAPABILITIES = frozenset({"sources.search", "sources.browse", "sources.acquire"})
 
 
 @dataclass(frozen=True)

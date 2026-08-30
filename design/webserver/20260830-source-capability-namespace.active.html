@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="将插件协议的 book_sources 命名空间统一为 sources。" />
+    <link rel="icon" href="data:," />
+    <title>统一书源能力命名空间 · ACTIVE</title>
+    <style>
+      :root { color-scheme:light; --bg:#f4f7f8; --panel:#fff; --ink:#17212b; --muted:#5f6c78; --line:#d8e0e5; --accent:#176b68; --soft:#eaf5f3; --warn:#9a5c09; --good:#176443; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:linear-gradient(180deg,#fbfdfd,var(--bg)); line-height:1.65; }
+      .page { width:min(1080px,calc(100vw - 30px)); margin:auto; padding:28px 0 54px; }
+      .hero,.card { background:var(--panel); border:1px solid var(--line); border-radius:16px; }
+      .hero { padding:30px; }
+      .card { margin-top:16px; padding:24px 26px; }
+      h1 { margin:0 0 8px; font-size:clamp(30px,5vw,46px); line-height:1.15; }
+      h2 { margin:0 0 12px; font-size:22px; }
+      h3 { margin:18px 0 6px; font-size:17px; }
+      p,li,td,th { font-size:14px; }
+      p { margin:0 0 10px; }
+      ul,ol { margin:8px 0 0 20px; padding:0; }
+      li + li { margin-top:5px; }
+      code { padding:.1em .35em; border-radius:4px; background:#edf1f3; font-family:"SFMono-Regular",Consolas,monospace; font-size:.9em; }
+      .sub { color:var(--muted); font-size:16px; max-width:860px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+      .chip { padding:5px 10px; border-radius:999px; background:#edf2f4; color:#4f5d68; font-size:12px; font-weight:700; }
+      .chip.wip { color:var(--warn); background:#fff3dc; }
+      .chip.active { color:var(--good); background:#e8f5ed; }
+      .callout { padding:14px 16px; border:1px solid #bcd9d5; border-radius:12px; background:var(--soft); }
+      .warn { border-color:#ead1a3; background:#fff8e9; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+      .box { padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:#fbfcfd; }
+      .box h3 { margin-top:0; }
+      .table { overflow-x:auto; border:1px solid var(--line); border-radius:12px; }
+      table { width:100%; min-width:700px; border-collapse:collapse; }
+      th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { color:#53616d; background:#f6f8f9; font-size:12px; }
+      th:last-child,td:last-child { border-right:0; }
+      tr:last-child td { border-bottom:0; }
+      .pending { color:var(--warn); font-weight:700; }
+      .verified { color:var(--good); font-weight:700; }
+      footer { padding-top:16px; color:var(--muted); text-align:center; font-size:12px; }
+      @media (max-width:700px) { .page{width:calc(100vw - 18px);padding-top:9px}.hero,.card{padding:20px 18px}.grid{grid-template-columns:1fr} }
+      @media print { body{background:white}.page{width:100%;padding:0}.card,.hero{break-inside:avoid} }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <h1>统一书源能力命名空间</h1>
+        <p class="sub">删除插件协议中重复的 <code>book_</code> 限定，让目录类型、Plugin ID 与 Capability 共同使用 source 领域词根。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-30</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：插件协议、内置 Provider、前端消费者、测试与开发指南</span>
+          <span class="chip">需求来源：用户要求删除 book_sources 的 book_ 前缀</span>
+        </div>
+      </header>
+
+      <main>
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“哪些地方使用了 book_sources？应当统一用词规范，去掉 book_ 前缀。”</div>
+          <p>现状同时存在目录 <code>source/</code>、Plugin ID <code>talebook.source.*</code>、协议类别 <code>book_sources</code> 与能力 <code>book_sources.*</code>。同一个领域概念出现两套英文词根，增加注册、能力发现和前端判断的认知成本。</p>
+        </section>
+
+        <section class="card">
+          <h2>2. 目标与非目标</h2>
+          <div class="grid">
+            <article class="box"><h3>目标</h3><ul><li>Manifest category 改为 <code>sources</code>。</li><li>Capability 改为 <code>sources.search</code>、<code>sources.browse</code>、<code>sources.acquire</code>。</li><li>运行时、Provider、消费者、mock、测试与开发指南使用同一协议词汇。</li><li>在首次发布前冻结正确的 <code>talebook.plugin/v1</code> 契约，不引入过渡命名。</li></ul></article>
+            <article class="box"><h3>非目标</h3><ul><li>不重命名 Plugin ID，继续使用 <code>talebook.source.*</code>。</li><li>不重命名 Python <code>SourceProvider</code>。</li><li>不迁移数据库表 <code>book_sources</code>。</li><li>不修改现有 HTTP 资源路径 <code>/api/book-sources</code>。</li><li>不重写历史 ACTIVE / SUPERSEDED 方案中的原始决策文本。</li></ul></article>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>3. 引用分类</h2>
+          <div class="table" role="region" aria-label="book_sources 引用分类" tabindex="0">
+            <table>
+              <thead><tr><th>范围</th><th>现状示例</th><th>处理</th><th>原因</th></tr></thead>
+              <tbody>
+                <tr><td>插件协议</td><td><code>CATEGORIES</code>、<code>CAPABILITY_INTERFACES</code>、Manifest</td><td><code>book_sources</code> → <code>sources</code></td><td>这是本次要消除的重复领域前缀</td></tr>
+                <tr><td>能力消费者</td><td>书源目录、管理测试接口、前端能力判断</td><td><code>book_sources.*</code> → <code>sources.*</code></td><td>消费者必须与声明完全一致</td></tr>
+                <tr><td>产品分组参数</td><td><code>?tab=book_sources</code></td><td>改为 <code>?tab=sources</code></td><td>该参数直接表达插件协议分组</td></tr>
+                <tr><td>HTTP 资源路径</td><td><code>/api/book-sources</code></td><td>保留</td><td>这是明确的书源资源集合；<code>/api/sources</code> 语义过宽且会破坏客户端</td></tr>
+                <tr><td>持久化表</td><td><code>__tablename__ = "book_sources"</code></td><td>保留</td><td>这是 Legado 书源实体表，不是 Capability 命名空间</td></tr>
+                <tr><td>历史方案</td><td>既有 ACTIVE / SUPERSEDED HTML</td><td>保留原文，由本方案覆盖后续协议</td><td>不可回写已生效方案的核心决策</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>4. 领域与协议决策</h2>
+          <div class="callout"><strong>统一语言：</strong>领域称“书源能力（Source Capability）”；代码目录为 <code>source</code>；Plugin ID 为 <code>talebook.source.*</code>；Manifest category 为 <code>sources</code>；标准能力为 <code>sources.search / browse / acquire</code>。</div>
+          <h3>版本边界</h3>
+          <p><code>book_sources.*</code> 与 <code>sources.*</code> 不同时存在。插件协议尚未对外发布，本次属于第一版冻结前的命名修正，因此继续使用 <code>talebook.plugin/v1</code>，不提供别名、双写或兼容转换。当前产品只装配随系统交付的内置 Provider，启动时会重新物化 Definition；Installation、Connection、Run 和书源业务表均不以 Capability 作为主键，因此开发数据无需迁移。</p>
+          <h3>兼容边界</h3>
+          <ul>
+            <li>Plugin ID 和安装记录身份保持不变。</li>
+            <li>已有 Connection 继续绑定同一 installation。</li>
+            <li>书源 HTTP API 路径与响应结构保持不变；响应中的 <code>capabilities</code> 使用第一版正式名称。</li>
+            <li>无需处理发布版本或外部插件兼容性；本地开发数据由内置 Definition 重新物化。</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>5. 实施范围</h2>
+          <ol>
+            <li>协议常量与 Capability-to-Protocol 映射。</li>
+            <li>所有 source Provider Manifest 与 SourceCatalog 能力集合。</li>
+            <li>插件管理测试接口、前端能力测试器和前端 mock。</li>
+            <li>后端契约、运行时、API 和书源测试中的期望值。</li>
+            <li><code>CONTEXT.md</code> 与 <code>document/PluginGuide.md</code>。</li>
+            <li>增加守卫：生产代码与当前测试不得再出现协议 token <code>book_sources</code>；只允许数据库表名和明确的兼容说明。</li>
+          </ol>
+        </section>
+
+        <section class="card">
+          <h2>6. 风险与回滚</h2>
+          <div class="grid">
+            <article class="box"><h3>风险</h3><p>遗漏一个 Capability 消费者会让已启用书源无法被发现；遗漏前端 mock 会让自动化测试与真实 API 漂移。</p></article>
+            <article class="box"><h3>缓解</h3><p>全仓检索精确 token，增加无旧命名守卫，运行 Manifest/Runtime/API/书源定向测试，并检查插件管理与网络书库关键页面。</p></article>
+          </div>
+          <p><strong>回滚：</strong>本次不迁移表和身份字段；回退协议常量、Manifest 与消费者即可。新产生的 Definition 行仍使用同一 Plugin ID/版本并可在下次启动时被覆盖。</p>
+        </section>
+
+        <section class="card">
+          <h2>7. 测试计划与结果</h2>
+          <div class="table" role="region" aria-label="测试计划" tabindex="0">
+            <table>
+              <thead><tr><th>验证</th><th>命令或页面</th><th>验收口径</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>旧协议词检查</td><td><code>rg</code> 精确扫描代码、测试和当前文档</td><td>协议 token <code>book_sources</code> 已清零；当前代码只保留数据库表名 <code>book_sources</code>，HTTP 路径继续使用 <code>book-sources</code></td><td class="verified">通过</td></tr>
+                <tr><td>后端契约</td><td>插件 contract、runtime、source provider、source probe 与 network library 定向测试</td><td>v1 Manifest、发现、启停与书源调用通过</td><td class="verified">83 passed，9 deselected</td></tr>
+                <tr><td>后端扩大验证</td><td>6 个相关测试文件联合运行</td><td>确认共享夹具与旧接口风险</td><td>130 passed；旧 <code>/api/network/search</code> 用例仍断言 1 个来源，当前默认启用 3 个而失败，与命名变更无关</td></tr>
+                <tr><td>Python 静态检查</td><td><code>ruff check</code>、<code>ruff format --check</code>、<code>py_compile</code></td><td>本次修改没有语法、lint 或新增格式问题</td><td class="verified">check 与 compile 通过；format 仅报告 test_plugin_runtime.py 本次未触碰的既有两处换行</td></tr>
+                <tr><td>前端消费</td><td>修改文件 eslint；Playwright 插件书源协议定向用例</td><td>能力判断和 mock 使用 <code>sources.*</code></td><td class="verified">eslint 0 errors；2 passed</td></tr>
+                <tr><td>界面影响审查</td><td>按 interface-review 的六个领域检查当前 UI diff，并以 Chromium 渲染书源配置与协议测试路径</td><td>没有用户文案、ARIA、布局、颜色、字号、动效或可见状态变化</td><td class="verified">Approve，无可操作界面问题</td></tr>
+                <tr><td>设计门禁</td><td><code>make check-design</code></td><td>ACTIVE 单文件方案通过</td><td class="verified">123 份方案通过</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>未运行完整后端和前端全量集成测试：本次是未发布协议的命名冻结，定向契约、调用链与前端渲染已覆盖实际影响范围。</p>
+        </section>
+
+        <section class="card">
+          <h2>8. 决策记录</h2>
+          <ol>
+            <li><strong>2026-08-30：</strong>领域词根统一为 source，协议集合名使用 sources。</li>
+            <li><strong>2026-08-30：</strong>保留 HTTP <code>book-sources</code> 和数据库 <code>book_sources</code>，因为它们是具体资源名而非 Capability 命名空间。</li>
+            <li><strong>2026-08-30：</strong>协议尚未发布，保持 v1 并直接冻结新名称，不提供运行时双命名别名。</li>
+            <li><strong>2026-08-30：</strong>不新增 ADR；该决策范围和迁移证据由本 ACTIVE 方案长期保存。</li>
+          </ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-08-30</footer>
+    </div>
+  </body>
+</html>

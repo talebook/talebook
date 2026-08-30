@@ -139,9 +139,9 @@ CAPABILITY_INTERFACES = {
     "annotations.chapter_reviews": ReviewProvider,
     "reviews.lookup": ReviewProvider,
     "reviews.import": ReviewProvider,
-    "book_sources.search": SourceProvider,
-    "book_sources.browse": SourceProvider,
-    "book_sources.acquire": SourceProvider,
+    "sources.search": SourceProvider,
+    "sources.browse": SourceProvider,
+    "sources.acquire": SourceProvider,
     "integrations.tool": TransformProvider,
     "integrations.push": PushProvider,
     "integrations.search": ExtraFeatureProvider,
@@ -175,7 +175,7 @@ def contract_violations(provider, manifest=None):
             and not callable(getattr(provider, "execute", None))
         ):
             problems.append("声明了 test 但 typed-only provider 未实现 self_check")
-        if any(capability.startswith("book_sources.") for capability in raw["capabilities"]):
+        if any(capability.startswith("sources.") for capability in raw["capabilities"]):
             declared_mode = raw.get("download_mode")
             actual_mode = getattr(provider, "download_mode", None)
             if declared_mode is None:

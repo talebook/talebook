@@ -12,7 +12,7 @@ class WatchFolderProvider(SourceBase):
         "talebook.source.watch-folder",
         source_name,
         "扫描白名单内的本地目录，以内容 hash 增量发现待审电子书。",
-        ["book_sources.browse", "book_sources.acquire"],
+        ["sources.browse", "sources.acquire"],
         {
             "type": "object",
             "properties": {

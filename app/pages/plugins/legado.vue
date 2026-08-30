@@ -5,7 +5,7 @@
                 icon="mdi-arrow-left"
                 variant="text"
                 :aria-label="t('common.back')"
-                to="/admin/plugins?tab=book_sources"
+                to="/admin/plugins?tab=sources"
             />
             <div>
                 <h1 class="text-h6">

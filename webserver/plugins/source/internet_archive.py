@@ -10,7 +10,7 @@ class InternetArchiveProvider(SourceBase):
         "talebook.source.internet-archive",
         source_name,
         "检索 Internet Archive；仅明确开放文件可进入待审取得。",
-        ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
+        ["sources.browse", "sources.search", "sources.acquire"],
         {"type": "object", "properties": COMMON_CONFIG_PROPERTIES},
         homepage="https://archive.org/details/texts",
         brand_icon="/images/plugin-icons/internet-archive.ico",

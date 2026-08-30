@@ -297,7 +297,7 @@ class TestPluginsApi(TestWithAdminUser):
             )
 
         self.assertEqual(data["err"], "ok")
-        self.assertEqual(data["capability"], "book_sources.search")
+        self.assertEqual(data["capability"], "sources.search")
         self.assertEqual(data["items"][0]["title"], "Pride and Prejudice")
         self.assertEqual(search.call_args.args[:2], ("Pride", {}))
 

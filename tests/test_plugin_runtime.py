@@ -263,13 +263,13 @@ def test_legado_installation_controls_source_and_metadata_capabilities_together(
     connection = db_session.query(PluginConnection).filter_by(installation_id=installation.id).one()
     runtime = PluginRuntime(db_session, SETTINGS)
 
-    assert connection.id in [item.id for item in runtime.connections_for("book_sources.search")]
+    assert connection.id in [item.id for item in runtime.connections_for("sources.search")]
     assert connection.id in [item.id for item in runtime.connections_for("metadata.lookup")]
 
     installation.enabled = False
     db_session.commit()
 
-    assert connection.id not in [item.id for item in runtime.connections_for("book_sources.search")]
+    assert connection.id not in [item.id for item in runtime.connections_for("sources.search")]
     assert connection.id not in [item.id for item in runtime.connections_for("metadata.lookup")]
 
 

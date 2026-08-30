@@ -9,7 +9,7 @@ class GutenbergProvider(SourceBase):
         "talebook.source.gutenberg",
         source_name,
         "检索 Project Gutenberg 的合法开放电子书。",
-        ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
+        ["sources.browse", "sources.search", "sources.acquire"],
         {"type": "object", "properties": COMMON_CONFIG_PROPERTIES},
         homepage="https://www.gutenberg.org/",
         brand_icon="/images/plugin-icons/project-gutenberg.png",
