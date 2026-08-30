@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="通过宿主页主动清理 Readest 遗留的根作用域 Service Worker，修复 Nuxt 资源被旧缓存污染后的白屏。" />
   <link rel="icon" href="data:," />
-  <title>主动清理 Readest 遗留根作用域 Worker · ACTIVE</title>
+  <title>主动清理 Readest 遗留根作用域 Worker · SUPERSEDED</title>
   <style>
     :root { color-scheme:light; --bg:#f3f7fc; --panel:#fff; --ink:#172033; --muted:#596579; --line:#d8e2ee; --blue:#175cd3; --green:#067647; --warn:#b54708; --soft:#fff7ed; }
     * { box-sizing:border-box; }
@@ -20,7 +20,7 @@
     code { padding:.12em .35em; border-radius:5px; background:#eef2f6; font-family:ui-monospace,monospace; overflow-wrap:anywhere; }
     .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
     .tag { padding:5px 10px; border-radius:999px; color:#344054; background:#eef2f6; font-size:12px; font-weight:700; }
-    .active { color:var(--green); background:#ecfdf3; }
+    .superseded { color:var(--warn); background:#fff4e5; }
     .quote,.callout { padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:#f8fafc; }
     .quote { border-left:4px solid var(--warn); color:#7a2e0e; background:var(--soft); }
     .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -44,12 +44,13 @@
   <header>
     <h1>主动清理 Readest 遗留根作用域 Worker</h1>
     <p>让 Nuxt 宿主页与 Readest 静态入口都主动注销旧 <code>/readest/sw.js</code> Worker、删除其运行时缓存并刷新受控页面，不再依赖浏览器未来某次周期性更新。</p>
-    <div class="meta"><span class="tag active">状态：ACTIVE</span><span class="tag">创建日期：2026-08-30</span><span class="tag">所属模块：app</span><span class="tag">影响范围：Nuxt head、Readest 静态入口、Nginx</span><span class="tag">需求来源：PR #977 再次白屏反馈</span></div>
+    <div class="meta"><span class="tag superseded">状态：SUPERSEDED</span><span class="tag">创建日期：2026-08-30</span><span class="tag">所属模块：app</span><span class="tag">影响范围：Nuxt head、Readest 静态入口、Nginx</span><span class="tag">需求来源：PR #977 再次白屏反馈</span></div>
   </header>
   <section>
     <h2>1. 原始诉求</h2>
     <p class="quote">“修复readest仍然白屏，然后控制台日志显示 Refused to apply style from http://127.0.0.1:9000/_nuxt/entry.Qt6l3l2G.css because its MIME type (application/json) is not a supported stylesheet MIME type；CKHYTMRW.js 404。”</p>
     <p>现象说明浏览器实际执行了旧 Nuxt HTML 中的资源引用，而当前 Nuxt 服务已不再提供对应 hash，404 JSON 又因严格 MIME 检查不能作为 CSS 使用。</p>
+    <p class="callout"><strong>已被替代：</strong>本方案依赖新 HTML 先到达浏览器；旧 Worker 在 Nuxt 响应超过 3 秒时仍会返回不含清理脚本的旧 HTML。后续方案见 <code>design/app/20260830-stale-nuxt-chunk-recovery.active.html</code>。</p>
   </section>
   <section>
     <h2>2. 根因与证据</h2>
@@ -90,7 +91,7 @@
     </tbody></table>
   </section>
   <section><h2>7. 决策记录</h2><ol><li><strong>2026-08-30：</strong>不再等待浏览器周期更新 tombstone，宿主页主动恢复。</li><li><strong>2026-08-30：</strong>使用外部同源脚本而非 reader 内联脚本，保持现有 CSP <code>script-src 'self'</code>。</li><li><strong>2026-08-30：</strong>实测注销后旧缓存被删除、无关缓存保留，页面刷新后不再受 Worker 控制。</li></ol></section>
-  <footer>Talebook internal design · app · ACTIVE · 2026-08-30</footer>
+  <footer>Talebook internal design · app · SUPERSEDED · 2026-08-30</footer>
 </main>
 </body>
 </html>
