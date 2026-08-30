@@ -16,7 +16,7 @@ from webserver.models import Device, Message, Reader
 from webserver.plugins import captcha as captcha_module
 from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.services.mail import MailService
-from webserver.services.plugin_runtime import PluginRuntime
+from webserver.services.plugin_runtime import PluginRuntime, ensure_runtime_installations
 from webserver.version import VERSION
 
 
@@ -558,6 +558,7 @@ class UserDevices(BaseHandler):
     @js
     @auth
     def get(self):
+        ensure_runtime_installations(self.session, CONF)
         user_id = self.user_id()
         devices = self.session.query(Device).filter(Device.reader_id == user_id).all()
         personal = [d.to_dict() for d in devices]

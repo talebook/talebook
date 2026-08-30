@@ -39,6 +39,9 @@ describe('RouteTabShell', () => {
 
         expect(tabs.map(tab => tab.props('to'))).toEqual(['/library/local', '/library/network']);
         expect(wrapper.findComponent({ name: 'VTabs' }).props('modelValue')).toBe('/library/network');
+        expect(wrapper.find('h1').exists()).toBe(false);
+        expect(wrapper.get('nav').attributes('aria-label')).toBe('书库浏览');
+        expect(wrapper.find('.route-tab-shell__description').exists()).toBe(false);
         expect(wrapper.get('[data-testid="content"]').text()).toBe('content');
 
         wrapper.unmount();

@@ -238,11 +238,19 @@
     "readBooks": "已读书目"
   },
   "navigationSections": {
-    "libraryDescription": "在一个入口中浏览本地藏书、网络书源，并查看 App 接入方式。",
-    "meDescription": "集中查看书架、阅读记录、账户资料和私有书籍。",
-    "settingsDescription": "管理当前实例的全局设置、插件启停和界面主题。",
+    "libraryLocalDescription": "浏览、筛选和管理已收藏到 Talebook 的本地书籍。",
+    "libraryNetworkDescription": "搜索和浏览已启用书源插件提供的在线书籍。",
+    "libraryAppsDescription": "查看 Moke、OPDS 与 WebDAV 的访问地址和配置指引。",
+    "meShelfDescription": "查看收藏到个人书架的书籍。",
+    "meHistoryDescription": "查看正在阅读、已读书目与历史阅读记录。",
+    "meAccountDescription": "管理个人资料和登录密码。",
+    "meDevicesDescription": "管理当前账号用于接收和推送书籍的阅读设备。",
+    "mePrivateDescription": "查看仅自己可见的私有书籍。",
+    "settingsGeneralDescription": "管理当前 Talebook 实例的全局设置。",
+    "settingsPluginsDescription": "启用插件并配置实例级策略与个人连接。",
+    "settingsThemesDescription": "选择和启用 Talebook 的界面主题。",
     "appAccess": "使用 App 访问",
-    "generalSettings": "实例设置"
+    "generalSettings": "系统设置"
   },
   "navigationHelp": {
     "openMenu": "打开帮助与关于菜单",
@@ -430,6 +438,7 @@
     "deviceMgt": "阅读设备",
     "deviceMgtDescription": "管理您的个人阅读设备，仅对您自己可见。全局设备由管理员统一配置，所有用户均可使用。",
     "noEnabledDevicePlugins": "暂无已启用的设备插件，请联系管理员在插件管理中启用后再添加。",
+    "removeDevice": "删除设备",
     "devicePluginDisabled": "{type}（插件未启用）",
     "readingRecord": {
       "pageTitle": "阅读记录",
@@ -1616,7 +1625,7 @@
     "managementTab": "插件管理",
     "managementDescription": "控制本实例可用的内置插件，并维护全局设置。个人账号、密钥与设备由各用户自行配置。",
     "personalCenterDescription": "配置当前账号使用的外部服务、同步连接和阅读设备。",
-    "personalPageDescription": "管理当前账号使用的插件连接和阅读设备。",
+    "personalPageDescription": "管理当前账号使用的插件连接与账号绑定。",
     "personalPluginsNavigation": "插件配置",
     "searchPersonal": "搜索可配置插件",
     "personalLoadError": "个人插件配置加载失败。",
@@ -1637,6 +1646,7 @@
     "scopeInstance": "管理员配置",
     "scopeUser": "个人配置",
     "scopeBoth": "管理员与个人配置",
+    "statusSummary": "插件状态摘要",
     "builtinPluginCount": "{count} 个内置插件",
     "enabledPluginCount": "{count} 个可用",
     "attentionPluginCount": "{count} 个需处理",
@@ -1695,6 +1705,7 @@
     "configure": "配置",
     "globalConfiguration": "全局配置",
     "personalSettings": "个人设置",
+    "personalPluginSettings": "个人插件设置",
     "experience": "体验",
     "personalConfiguration": "个人配置",
     "personalConfigurationDescription": "此插件的连接和凭据属于每位用户，请前往个人工作台或个人设置完成配置。管理员页只控制插件是否启用。",

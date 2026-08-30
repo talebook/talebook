@@ -1775,20 +1775,21 @@ class BookSendToDevice(BaseHandler):
         except Exception:
             return {"err": "params.invalid", "msg": _("请求参数格式错误")}
 
+        if not device_type:
+            return {"err": "params.missing", "msg": _("设备类型和设备地址不能为空")}
+        try:
+            PluginRuntime(self.session, CONF).provider_for(
+                PUSH_CAPABILITY,
+                {"device_type": device_type},
+            )
+        except PluginRuntimeError:
+            return {"err": "device.unsupported", "msg": _("不支持的设备类型: %s") % device_type}
+
         # Kindle设备使用邮箱地址，其他设备使用device_url
         if device_type == "kindle":
             if not mailbox:
                 return {"err": "params.missing", "msg": _("Kindle设备需要提供邮箱地址")}
         else:
-            if not device_type:
-                return {"err": "params.missing", "msg": _("设备类型和设备地址不能为空")}
-            try:
-                PluginRuntime(self.session, CONF).provider_for(
-                    PUSH_CAPABILITY,
-                    {"device_type": device_type},
-                )
-            except PluginRuntimeError:
-                return {"err": "device.unsupported", "msg": _("不支持的设备类型: %s") % device_type}
             # 地址可省略：回落到该用户上次保存在插件连接里的设备地址。
             device_url = device_url or self._saved_device_url(device_type)
             if not device_url:
@@ -1804,32 +1805,49 @@ class BookSendToDevice(BaseHandler):
         """通过邮件发送书籍到Kindle设备"""
         self.user_history("push_history", book)
         self.count_increase(book_id, count_download=1)
-
-        # epub、pdf、txt格式可以直接发送，不需要转换
-        for fmt in ["epub", "pdf", "txt"]:
-            fmt_key = "fmt_%s" % fmt
-            if fmt_key in book:
-                fpath = book[fmt_key]
-                MailService().send_book(self.user_id(), self.site_url, book, mail_to, fmt, fpath)
-                self.add_msg(
-                    "success",
-                    _("服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
+        runtime = PluginRuntime(self.session, CONF)
+        platform = {"book": book, "user_id": self.user_id(), "site_url": self.site_url}
+        try:
+            if not self.user_id():
+                result = runtime.guest_sync(
+                    PUSH_CAPABILITY,
+                    {"device_type": "kindle"},
+                    "push",
+                    {},
+                    mail_to,
+                    timeout=CONF.get("PUSH_TIMEOUT", 60),
+                    context_overrides={"platform": platform},
                 )
-                return {"err": "ok", "msg": _("服务器后台正在推送。您可关闭此窗口，继续浏览其他书籍。")}
+            else:
+                connection = runtime.user_connection_for(
+                    PUSH_CAPABILITY,
+                    self.user_id(),
+                    selector={"device_type": "kindle"},
+                )
+                result = runtime.sync(
+                    connection,
+                    "push",
+                    {},
+                    mail_to,
+                    timeout=CONF.get("PUSH_TIMEOUT", 60),
+                    context_overrides={"platform": platform},
+                    required_scopes=("books.read", "network.write"),
+                    requested_by=self.user_id(),
+                    audit_data={"book_id": book_id, "device_type": "kindle"},
+                )
+        except PluginRuntimeError as exc:
+            return {"err": "upload.error", "msg": str(exc)}
 
-        # 如果没有可直接发送的格式，检查是否有azw3或mobi格式需要转换
-        if "fmt_azw3" in book or "fmt_mobi" in book:
-            fmt = "azw3" if "fmt_azw3" in book else "mobi"
-            logging.info("[SEND_TO_KINDLE] found %s format, needs conversion to epub", fmt)
-            ConvertService().convert_and_send(self.user_id(), self.site_url, book, mail_to)
-            self.add_msg(
-                "success",
-                _("服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
-            )
+        if not result.get("success"):
+            return {"err": "format.not_supported", "msg": _("书籍没有Kindle支持的格式!")}
+
+        self.add_msg(
+            "success",
+            _("服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
+        )
+        if result.get("converting"):
             return {"err": "ok", "msg": _("服务器正在转换格式，稍后将自动推送。您可关闭此窗口，继续浏览其他书籍。")}
-
-        # 没有Kindle支持的格式
-        return {"err": "format.not_supported", "msg": _("书籍没有Kindle支持的格式!")}
+        return {"err": "ok", "msg": _("服务器后台正在推送。您可关闭此窗口，继续浏览其他书籍。")}
 
     def _saved_device_url(self, device_type):
         """取当前用户在该设备插件连接里保存过的地址。"""

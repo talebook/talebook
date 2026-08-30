@@ -2,11 +2,6 @@
     <div>
         <v-row>
             <v-col cols="12">
-                <h2>{{ title }}</h2>
-                <v-divider class="mt-3 mb-0" />
-            </v-col>
-
-            <v-col cols="12">
                 <div class="library-filter-panel">
                     <div class="library-metadata-filters">
                         <LibraryChipFilter
@@ -130,7 +125,6 @@ const route = useRoute();
 
 store.setNavbar(true);
 
-const title = ref(t('library.title'));
 const page = ref(1);
 const books = ref([]);
 const total = ref(0);
@@ -222,7 +216,6 @@ const fetchBooks = async (p = 1) => {
             total.value = data.total || 0;
             page_cnt.value = total.value > 0 ? Math.max(1, Math.ceil(total.value / page_size)) : 0;
             page.value = p;
-            title.value = data.title || t('library.title');
             books.value = data.books || [];
             return;
         }
@@ -240,7 +233,6 @@ const fetchBooks = async (p = 1) => {
                 total.value = data.total || 0;
                 page_cnt.value = total.value > 0 ? Math.max(1, Math.ceil(total.value / page_size)) : 0;
                 page.value = p;
-                title.value = data.title || t('library.title');
             } else {
                 books.value.push(data);
             }

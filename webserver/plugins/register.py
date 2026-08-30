@@ -15,6 +15,7 @@ from webserver.plugins.push.dangdang import PROVIDER as DANGDANG_PROVIDER
 from webserver.plugins.push.duokan import PROVIDER as DUOKAN_PROVIDER
 from webserver.plugins.push.hanwang import PROVIDER as HANWANG_PROVIDER
 from webserver.plugins.push.ireader import PROVIDER as IREADER_PROVIDER
+from webserver.plugins.push.kindle import PROVIDER as KINDLE_PROVIDER
 from webserver.plugins.push.purelibro import PROVIDER as PURELIBRO_PROVIDER
 from webserver.plugins.review.anilist import PROVIDER as ANILIST_PROVIDER
 from webserver.plugins.review.bangumi import PROVIDER as BANGUMI_PROVIDER
@@ -69,6 +70,7 @@ REVIEW_PROVIDERS = (
 ANNOTATION_PROVIDERS = (BRS_PROVIDER,)
 TOOL_PROVIDERS = (TEXT_REPLACE_PROVIDER, ZH_CONVERTER_PROVIDER, TXT_FIXER_PROVIDER)
 PUSH_PROVIDERS = (
+    KINDLE_PROVIDER,
     DUOKAN_PROVIDER,
     BOOX_PROVIDER,
     HANWANG_PROVIDER,

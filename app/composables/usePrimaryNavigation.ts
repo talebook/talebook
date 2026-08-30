@@ -4,6 +4,7 @@ export interface PrimaryNavigationItem {
     key: string;
     icon?: string;
     href?: string;
+    activePrefix?: string;
     text?: string;
     heading?: string;
     badge?: string;
@@ -11,6 +12,11 @@ export interface PrimaryNavigationItem {
     target?: string;
     groups?: PrimaryNavigationItem[];
     links?: PrimaryNavigationItem[];
+}
+
+export function isPrimaryNavigationItemActive(item: PrimaryNavigationItem, path: string): boolean | undefined {
+    if (!item.activePrefix) return undefined;
+    return path === item.activePrefix || path.startsWith(`${item.activePrefix}/`);
 }
 
 export function usePrimaryNavigation(store: ReturnType<typeof useMainStore>, t: (key: string) => string) {
@@ -24,12 +30,13 @@ export function usePrimaryNavigation(store: ReturnType<typeof useMainStore>, t: 
                 key: 'my-reading',
                 icon: 'mdi-bookshelf',
                 href: '/me/shelf',
+                activePrefix: '/me',
                 text: t('navigation.myReading'),
             });
         }
 
         items.push(
-            { key: 'library', icon: 'mdi-book-open-page-variant', href: '/library/local', text: t('navigation.libraryBrowse') },
+            { key: 'library', icon: 'mdi-book-open-page-variant', href: '/library/local', activePrefix: '/library', text: t('navigation.libraryBrowse') },
             { key: 'audios', icon: 'mdi-book-music', href: '/audios', text: t('navigation.audiobooks'), badge: t('audiobook.beta') },
         );
 
@@ -39,7 +46,7 @@ export function usePrimaryNavigation(store: ReturnType<typeof useMainStore>, t: 
                 icon: 'mdi-cog',
                 text: t('navigation.admin'),
                 groups: [
-                    { key: 'settings', icon: 'mdi-cog', href: '/admin/settings/general', text: t('navigation.settings') },
+                    { key: 'settings', icon: 'mdi-cog', href: '/admin/settings/general', activePrefix: '/admin/settings', text: t('navigation.settings') },
                     { key: 'users', icon: 'mdi-human-greeting', href: '/admin/users', text: t('navigation.users') },
                     { key: 'books', icon: 'mdi-library-shelves', href: '/admin/books', text: t('navigation.books') },
                     { key: 'audio-jobs', icon: 'mdi-playlist-music', href: '/audio-jobs', text: t('navigation.audiobookJobs') },

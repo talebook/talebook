@@ -10,7 +10,7 @@
                     class="sidebar-help__trigger"
                     icon="mdi-help-circle-outline"
                     size="small"
-                    variant="tonal"
+                    variant="text"
                     :aria-label="t('navigationHelp.openMenu')"
                 />
             </template>
@@ -19,39 +19,6 @@
                 class="sidebar-help__card"
                 min-width="212"
             >
-                <v-list density="compact">
-                    <v-list-item
-                        href="https://github.com/talebook/talebook/releases"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        prepend-icon="mdi-history"
-                        :title="t('navigationHelp.changelog')"
-                        append-icon="mdi-open-in-new"
-                    />
-                    <v-list-item
-                        href="https://github.com/talebook/talebook"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        prepend-icon="mdi-github"
-                        :title="t('navigationHelp.github')"
-                        append-icon="mdi-open-in-new"
-                    />
-                    <v-list-item
-                        v-if="store.sys.allow?.FEEDBACK && store.sys.FEEDBACK_URL"
-                        :href="store.sys.FEEDBACK_URL"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        prepend-icon="mdi-message-outline"
-                        :title="t('messages.feedback')"
-                        append-icon="mdi-open-in-new"
-                    />
-                </v-list>
-
-                <v-divider />
-                <div class="sidebar-help__meta">
-                    <span>{{ t('messages.systemVersion') }} {{ store.sys.version || '—' }}</span>
-                    <span>{{ t('messages.userCount') }} {{ store.sys.users ?? '—' }}</span>
-                </div>
                 <div
                     v-if="store.sys.sidebar_extra_html"
                     class="sidebar-help__logo press-content"
@@ -65,6 +32,55 @@
                 >
                     {{ store.sys.title || 'Talebook' }}
                 </div>
+
+                <v-divider />
+                <v-list
+                    class="sidebar-help__list"
+                    density="compact"
+                >
+                    <v-list-item
+                        class="sidebar-help__item"
+                        href="https://github.com/talebook/talebook/releases"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        prepend-icon="mdi-history"
+                        :title="t('navigationHelp.changelog')"
+                        append-icon="mdi-open-in-new"
+                    />
+                    <v-list-item
+                        class="sidebar-help__item"
+                        href="https://github.com/talebook/talebook"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        prepend-icon="mdi-github"
+                        :title="t('navigationHelp.github')"
+                        append-icon="mdi-open-in-new"
+                    />
+                    <v-list-item
+                        v-if="store.sys.allow?.FEEDBACK && store.sys.FEEDBACK_URL"
+                        class="sidebar-help__item"
+                        :href="store.sys.FEEDBACK_URL"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        prepend-icon="mdi-message-outline"
+                        :title="t('messages.feedback')"
+                        append-icon="mdi-open-in-new"
+                    />
+
+                    <v-divider class="my-1" />
+                    <v-list-item
+                        class="sidebar-help__item sidebar-help__meta-item"
+                        data-testid="sidebar-help-version"
+                        prepend-icon="mdi-tag-outline"
+                        :title="`${t('messages.systemVersion')} ${store.sys.version || '—'}`"
+                    />
+                    <v-list-item
+                        class="sidebar-help__item sidebar-help__meta-item"
+                        data-testid="sidebar-help-users"
+                        prepend-icon="mdi-account-group-outline"
+                        :title="`${t('messages.userCount')} ${store.sys.users ?? '—'}`"
+                    />
+                </v-list>
             </v-card>
         </v-menu>
     </div>
@@ -85,6 +101,7 @@ const { t } = useI18n();
     justify-content: flex-end;
     margin-top: auto;
     padding: 10px 12px 12px;
+    flex: 0 0 auto;
 }
 
 .sidebar-help__trigger {
@@ -95,13 +112,35 @@ const { t } = useI18n();
     border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
-.sidebar-help__meta {
+.sidebar-help__list {
+    padding-block: 4px;
+}
+
+.sidebar-help__item {
+    font-size: 13px;
+    min-height: 34px;
+    padding-inline: 12px;
+}
+
+.sidebar-help__item :deep(.v-list-item-title) {
+    font-size: inherit;
+}
+
+.sidebar-help__item :deep(.v-list-item__spacer) {
+    width: 8px !important;
+}
+
+.sidebar-help__item :deep(.v-icon) {
+    font-size: 18px;
+}
+
+.sidebar-help__item :deep(.v-list-item__append .v-icon) {
+    font-size: 15px;
+}
+
+.sidebar-help__meta-item {
     color: rgba(var(--v-theme-on-surface), .62);
-    display: flex;
-    flex-direction: column;
-    font-size: .75rem;
-    gap: 2px;
-    padding: 10px 16px 6px;
+    font-size: 12px;
 }
 
 .sidebar-help__logo,
@@ -109,14 +148,15 @@ const { t } = useI18n();
     align-items: center;
     display: flex;
     justify-content: center;
-    min-height: 42px;
-    padding: 6px 16px 12px;
+    min-height: 40px;
+    overflow: hidden;
+    padding: 8px 12px;
 }
 
 .sidebar-help__logo :deep(img) {
     display: block;
     margin: 0 auto;
-    max-height: 30px;
+    max-height: 24px;
     max-width: 100%;
 }
 

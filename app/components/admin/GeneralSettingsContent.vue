@@ -1,16 +1,19 @@
 
 <template>
     <div class="settings-page">
-        <!-- 悬浮固定标题栏：左标题 + 右保存 -->
-        <div class="settings-titlebar">
-            <v-spacer />
-            <v-btn
-                color="primary"
-                @click="save_settings"
-            >
-                {{ t('admin.settings.button.saveSettings') }}
-            </v-btn>
-        </div>
+        <RoutePageToolbar
+            class="settings-titlebar"
+            :description="t('navigationSections.settingsGeneralDescription')"
+        >
+            <template #actions>
+                <v-btn
+                    color="primary"
+                    @click="save_settings"
+                >
+                    {{ t('admin.settings.button.saveSettings') }}
+                </v-btn>
+            </template>
+        </RoutePageToolbar>
 
         <!-- 窄屏：顶部下拉跳转 -->
         <v-select
@@ -562,6 +565,7 @@ marked.setOptions({ breaks: true, gfm: true });
 import { useI18n } from 'vue-i18n';
 import { useDisplay } from 'vuetify';
 import SSLManager from '~/components/SSLManager.vue';
+import RoutePageToolbar from '@/components/RoutePageToolbar.vue';
 import { useMainStore } from '@/stores/main';
 
 const store = useMainStore();
@@ -1159,17 +1163,16 @@ useHead(() => ({
     border-left: 2px solid #eee;
 }
 
+.settings-page {
+    --settings-inline-margin: 4px;
+    --settings-inline-padding: 0;
+}
+
 /* 悬浮固定标题栏（贴在应用顶栏下方） */
 .settings-titlebar {
     position: sticky;
     top: 96px;
     z-index: 4;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 8px 0;
-    margin-bottom: 24px;
     background: rgb(var(--v-theme-surface));
     border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
@@ -1179,6 +1182,12 @@ useHead(() => ({
     gap: 0;
     /* 导航菜单放在右侧，配置内容在左侧 */
     flex-direction: row-reverse;
+}
+
+.settings-titlebar,
+.settings-body {
+    margin-inline: var(--settings-inline-margin);
+    padding-inline: var(--settings-inline-padding);
 }
 
 /* 右侧导航 */

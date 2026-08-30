@@ -15,8 +15,9 @@ vi.mock('#i18n', () => ({
     }),
 }));
 
-const { pushMock, storeState } = vi.hoisted(() => ({
+const { pushMock, routeState, storeState } = vi.hoisted(() => ({
     pushMock: vi.fn(),
+    routeState: { path: '/' },
     storeState: {
         theme: 'light',
         sys: {
@@ -48,6 +49,10 @@ vi.mock('@/stores/main', () => ({
 
 mockNuxtImport('useRouter', () => {
     return () => ({ push: pushMock });
+});
+
+mockNuxtImport('useRoute', () => {
+    return () => routeState;
 });
 
 const vuetify = createVuetify({ components, directives });
@@ -119,6 +124,7 @@ describe('BuiltinThemeHeader.vue navigation', () => {
         storeState.sys.show_network_library = true;
         storeState.user.is_login = false;
         storeState.user.is_admin = false;
+        routeState.path = '/';
     });
 
     it.each(['light-gray', 'minimal', 'graphite', 'brass', 'warm-red'] as const)(
@@ -173,6 +179,22 @@ describe('BuiltinThemeHeader.vue navigation', () => {
         await wrapper.get('.tb-theme-nav-toggle').trigger('click');
 
         expect(header.sidebar).toBe(true);
+        wrapper.unmount();
+    });
+
+    it.each([
+        ['/library/network', 'navigation.libraryBrowse'],
+        ['/me/plugins', 'navigation.myReading'],
+        ['/admin/settings/plugins', 'navigation.settings'],
+    ])('keeps the aggregate navigation entry active on %s', (path, label) => {
+        storeState.user.is_login = true;
+        storeState.user.is_admin = true;
+        routeState.path = path;
+        const wrapper = mountHeader('graphite');
+        const item = wrapper.findAllComponents({ name: 'VListItem' })
+            .find(candidate => candidate.text().includes(label));
+
+        expect(item?.props('active')).toBe(true);
         wrapper.unmount();
     });
 });

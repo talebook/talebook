@@ -152,7 +152,7 @@
                         prepend-icon="mdi-history"
                     />
                     <v-list-item
-                        to="/plugins"
+                        to="/me/plugins"
                         :title="t('pluginManagement.personalPluginsNavigation')"
                         prepend-icon="mdi-power-plug-outline"
                     />
@@ -207,6 +207,7 @@
             :width="drawerWidth"
         >
             <v-list
+                v-model:opened="openedGroups"
                 class="tb-theme-drawer__list"
                 density="compact"
             >
@@ -219,7 +220,7 @@
                     </v-list-subheader>
                     <v-list-group
                         v-else-if="item.groups"
-                        :value="item.text"
+                        :value="item.key"
                     >
                         <template #activator="{ props }">
                             <v-list-item
@@ -232,6 +233,7 @@
                             v-for="link in item.groups"
                             :key="link.href"
                             :to="link.href"
+                            :active="isPrimaryNavigationItemActive(link, route.path)"
                             :title="link.text"
                             :prepend-icon="isMinimal ? undefined : link.icon"
                         />
@@ -253,6 +255,7 @@
                     <v-list-item
                         v-else
                         :to="item.href || undefined"
+                        :active="isPrimaryNavigationItemActive(item, route.path)"
                         :title="item.text"
                         :prepend-icon="isMinimal ? undefined : item.icon"
                     >
@@ -281,7 +284,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useDisplay } from 'vuetify';
 import { useMainStore } from '@/stores/main';
-import { usePrimaryNavigation } from '@/composables/usePrimaryNavigation';
+import { isPrimaryNavigationItemActive, usePrimaryNavigation } from '@/composables/usePrimaryNavigation';
 import SidebarHelpMenu from '@/components/SidebarHelpMenu.vue';
 import { useI18n } from '#i18n';
 
@@ -295,10 +298,12 @@ const props = defineProps({
 
 const store = useMainStore();
 const router = useRouter();
+const route = useRoute();
 const display = useDisplay();
 const { locale, locales, setLocale, t } = useI18n();
 
 const sidebar = ref(true);
+const openedGroups = ref([]);
 const mobileSearch = ref(false);
 const search = ref('');
 const searchCategory = ref('all');
@@ -350,6 +355,14 @@ onMounted(() => {
     sidebar.value = display.mdAndUp.value;
 });
 
+watch(() => route.path, (path) => {
+    if (path === '/admin' || path.startsWith('/admin/')) {
+        if (!openedGroups.value.includes('admin')) openedGroups.value = [...openedGroups.value, 'admin'];
+        return;
+    }
+    openedGroups.value = openedGroups.value.filter(value => value !== 'admin');
+}, { immediate: true });
+
 </script>
 
 <style scoped>
@@ -371,7 +384,8 @@ onMounted(() => {
 
 .tb-theme-drawer__list {
     flex: 1 1 auto;
-    overflow-y: auto;
+    min-height: 0;
+    overflow-y: auto !important;
 }
 
 .tb-theme-brand-mark {

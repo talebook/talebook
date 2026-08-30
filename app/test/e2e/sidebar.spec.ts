@@ -35,10 +35,34 @@ test.describe('Navigation Sidebar', () => {
         await expect(page).toHaveURL('/library/local');
     });
 
+    test('keeps aggregate entries selected across their child tabs', async ({ page }) => {
+        const cases = [
+            ['/library/network', '/library/local'],
+            ['/library/apps', '/library/local'],
+            ['/me/history', '/me/shelf'],
+            ['/me/devices', '/me/shelf'],
+            ['/me/plugins', '/me/shelf'],
+            ['/admin/settings/plugins', '/admin/settings/general'],
+            ['/admin/settings/themes', '/admin/settings/general'],
+        ];
+
+        for (const [path, navigationHref] of cases) {
+            await page.goto(path);
+            const navigationItem = page.locator(`.v-navigation-drawer a[href="${navigationHref}"]`);
+            await expect(navigationItem).toHaveClass(/v-list-item--active/);
+            if (path.startsWith('/admin/')) {
+                await expect(navigationItem).toBeVisible();
+                await expect(page.locator('.app-navigation-group .v-list-group__items')).toBeVisible();
+            }
+        }
+    });
+
     test('keeps configured friendship links outside the help menu', async ({ page }) => {
         await page.goto('/');
-        await expect(page.locator('.sidebar-help__trigger')).toBeVisible();
-        await page.locator('.sidebar-help__trigger').click();
+        const trigger = page.locator('.sidebar-help__trigger');
+        await expect(trigger).toBeVisible();
+        await expect(trigger.locator('.v-btn__underlay')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await trigger.click();
 
         const menu = page.locator('.sidebar-help__card');
         await expect(menu.getByText('更新日志')).toBeVisible();
@@ -47,7 +71,22 @@ test.describe('Navigation Sidebar', () => {
         await expect(menu.getByText(/系统版本 1\.0\.0/)).toBeVisible();
         await expect(menu.getByText(/用户数 5/)).toBeVisible();
         await expect(menu.getByText('文档')).toHaveCount(0);
-        await expect(menu.getByTestId('sidebar-help-logo')).toBeVisible();
+        const logo = menu.getByTestId('sidebar-help-logo');
+        const version = menu.getByTestId('sidebar-help-version');
+        const users = menu.getByTestId('sidebar-help-users');
+        await expect(logo).toBeVisible();
+        await expect(version).toHaveClass(/v-list-item/);
+        await expect(users).toHaveClass(/v-list-item/);
+        await expect(menu.locator('.sidebar-help__item').first()).toHaveCSS('font-size', '13px');
+        await expect(
+            menu.locator('.sidebar-help__item').first().locator('.v-list-item__prepend .v-list-item__spacer'),
+        ).toHaveCSS('width', '8px');
+
+        const logoBox = await logo.boundingBox();
+        const firstItemBox = await menu.locator('.sidebar-help__item').first().boundingBox();
+        expect(logoBox).not.toBeNull();
+        expect(firstItemBox).not.toBeNull();
+        expect(logoBox!.y + logoBox!.height).toBeLessThanOrEqual(firstItemBox!.y);
 
         const drawerBox = await page.locator('.app-navigation-drawer').boundingBox();
         expect(drawerBox).not.toBeNull();
@@ -55,6 +94,32 @@ test.describe('Navigation Sidebar', () => {
             const menuBox = await menu.boundingBox();
             return menuBox?.x ?? Number.POSITIVE_INFINITY;
         }).toBeLessThanOrEqual(drawerBox!.x + 16);
+    });
+
+    test('scrolls a long expanded admin menu without pushing out help', async ({ page }) => {
+        await page.setViewportSize({ width: 1100, height: 620 });
+        await page.goto('/admin/settings/general');
+
+        const group = page.locator('.app-navigation-group');
+        const activator = group.locator(':scope > .v-list-item');
+        if (await activator.getAttribute('aria-expanded') !== 'true') {
+            await activator.click();
+        }
+
+        const drawer = page.locator('.app-navigation-drawer');
+        const list = page.locator('.app-navigation-list');
+        const help = page.locator('.sidebar-help');
+        await expect(list).toHaveCSS('overflow-y', 'auto');
+        await expect.poll(async () => list.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+
+        const drawerBox = await drawer.boundingBox();
+        const listBox = await list.boundingBox();
+        const helpBox = await help.boundingBox();
+        expect(drawerBox).not.toBeNull();
+        expect(listBox).not.toBeNull();
+        expect(helpBox).not.toBeNull();
+        expect(listBox!.y + listBox!.height).toBeLessThanOrEqual(helpBox!.y + 1);
+        expect(helpBox!.y + helpBox!.height).toBeLessThanOrEqual(drawerBox!.y + drawerBox!.height + 1);
     });
 
     test('legacy reading history route keeps the finished subtab query', async ({ page }) => {

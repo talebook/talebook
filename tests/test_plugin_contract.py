@@ -99,12 +99,16 @@ def test_brs_plugin_name_describes_the_server_integration():
 
 
 def test_push_plugins_declare_personal_device_management_route():
+    device_types = set()
     for provider in plugin_register.PUSH_PROVIDERS:
         manifest = provider.manifest
         assert manifest["id"].startswith("talebook.push.")
         assert manifest["connection_owners"] == ["user"]
-        assert manifest["ui"]["manage_route"] == "/user/detail?tab=devices"
+        assert manifest["ui"]["manage_route"] == "/me/devices"
         assert "manage_label_key" not in manifest["ui"]
+        device_types.add(manifest["ui"]["device_type"])
+
+    assert "kindle" in device_types
 
 
 def test_management_action_labels_are_derived_from_connection_owners():
@@ -136,6 +140,7 @@ def test_fixed_external_services_declare_safe_local_brand_icons():
         "talebook.review.bangumi",
         "talebook.review.anilist",
         "talebook.push.boox",
+        "talebook.push.kindle",
         "talebook.push.dangdang",
         "talebook.push.duokan",
         "talebook.push.hanwang",
@@ -263,6 +268,7 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
         "talebook.push.boox": "webserver.plugins.push.boox",
         "talebook.push.hanwang": "webserver.plugins.push.hanwang",
         "talebook.push.ireader": "webserver.plugins.push.ireader",
+        "talebook.push.kindle": "webserver.plugins.push.kindle",
         "talebook.push.dangdang": "webserver.plugins.push.dangdang",
         "talebook.push.purelibro": "webserver.plugins.push.purelibro",
     }

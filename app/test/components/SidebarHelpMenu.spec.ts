@@ -28,7 +28,7 @@ global.ResizeObserver = require('resize-observer-polyfill');
 import SidebarHelpMenu from '@/components/SidebarHelpMenu.vue';
 
 describe('SidebarHelpMenu', () => {
-    it('keeps documentation out and places instance metadata before the logo', async () => {
+    it('keeps documentation out and presents the logo before compact metadata items', async () => {
         const wrapper = mount(SidebarHelpMenu, {
             attachTo: document.body,
             global: {
@@ -47,11 +47,15 @@ describe('SidebarHelpMenu', () => {
         expect(card?.textContent).toContain('navigationHelp.github');
         expect(card?.textContent).not.toContain('文档');
         expect(card?.textContent).not.toContain('Documentation');
-        const meta = card?.querySelector('.sidebar-help__meta');
         const logo = card?.querySelector('[data-testid="sidebar-help-logo"]');
-        expect(meta?.textContent).toContain('1.2.3');
+        const version = card?.querySelector('[data-testid="sidebar-help-version"]');
+        const users = card?.querySelector('[data-testid="sidebar-help-users"]');
         expect(logo).not.toBeNull();
-        expect(meta?.compareDocumentPosition(logo as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(version?.textContent).toContain('1.2.3');
+        expect(users?.textContent).toContain('7');
+        expect(logo?.compareDocumentPosition(version as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(version?.classList).toContain('v-list-item');
+        expect(users?.classList).toContain('v-list-item');
 
         wrapper.unmount();
     });

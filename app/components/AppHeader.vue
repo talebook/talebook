@@ -221,7 +221,7 @@
                                 prepend-icon="mdi-history"
                             />
                             <v-list-item
-                                to="/plugins"
+                                to="/me/plugins"
                                 :title="t('pluginManagement.personalPluginsNavigation')"
                                 prepend-icon="mdi-power-plug-outline"
                             />
@@ -328,6 +328,7 @@
         >
             <v-list
                 v-if="items.length > 0"
+                v-model:opened="openedGroups"
                 class="app-navigation-list"
                 density="compact"
             >
@@ -343,7 +344,7 @@
                     <v-list-group
                         v-else-if="item.groups"
                         class="app-navigation-group"
-                        :value="item.text"
+                        :value="item.key"
                     >
                         <template #activator="{ props }">
                             <v-list-item
@@ -357,6 +358,7 @@
                             v-for="link in item.groups"
                             :key="link.href"
                             :to="link.href"
+                            :active="isPrimaryNavigationItemActive(link, route.path)"
                             :title="link.text"
                             :prepend-icon="link.icon"
                         />
@@ -414,6 +416,7 @@
                         :key="item.text"
                         density="compact"
                         :to="item.href"
+                        :active="isPrimaryNavigationItemActive(item, route.path)"
                         :target="item.target"
                         :title="item.text"
                         :prepend-icon="item.icon"
@@ -442,7 +445,7 @@
 <script setup>
 import { useDisplay } from 'vuetify';
 import { useMainStore } from '@/stores/main';
-import { usePrimaryNavigation } from '@/composables/usePrimaryNavigation';
+import { isPrimaryNavigationItemActive, usePrimaryNavigation } from '@/composables/usePrimaryNavigation';
 import SidebarHelpMenu from '@/components/SidebarHelpMenu.vue';
 import { useI18n } from '#i18n';
 
@@ -453,7 +456,7 @@ const route = useRoute();
 const { locale, locales, setLocale, t } = useI18n();
 
 const err = ref('');
-const visit_admin_pages = ref(false);
+const openedGroups = ref([]);
 const sidebar = ref(null);
 const btn_search = ref(false);
 const search = ref('');
@@ -474,12 +477,19 @@ const allLocales = computed(() => {
 const items = usePrimaryNavigation(store, t);
 
 onMounted(() => {
-    visit_admin_pages.value = route.path.indexOf('/admin/') == 0;
     sidebar.value = display.mdAndUp.value;
     store.bootstrap().then((rsp) => {
         err.value = rsp.err;
     });
 });
+
+watch(() => route.path, (path) => {
+    if (path === '/admin' || path.startsWith('/admin/')) {
+        if (!openedGroups.value.includes('admin')) openedGroups.value = [...openedGroups.value, 'admin'];
+        return;
+    }
+    openedGroups.value = openedGroups.value.filter(value => value !== 'admin');
+}, { immediate: true });
 
 function chunk(arr, len) {
     var e = arr.length;
@@ -539,7 +549,8 @@ function toggleTheme() {
 
 .app-navigation-list {
     flex: 1 1 auto;
-    overflow-y: auto;
+    min-height: 0;
+    overflow-y: auto !important;
 }
 .search-field :deep(.v-input__control) {
     width: 100% !important;

@@ -1,12 +1,12 @@
 <template>
     <div>
-        <RoutePageToolbar :description="t('navigationSections.mePrivateDescription')" />
-        <PrivateBooksContent />
+        <RoutePageToolbar :description="t('navigationSections.meDevicesDescription')" />
+        <AccountContent section="devices" />
     </div>
 </template>
 
 <script setup>
-import PrivateBooksContent from '@/pages/scopedbooks.vue';
+import AccountContent from '@/pages/user/detail.vue';
 import RoutePageToolbar from '@/components/RoutePageToolbar.vue';
 import { useI18n } from 'vue-i18n';
 

@@ -8,7 +8,10 @@
                 >
                     {{ t('pluginManagement.personalConfiguration') }}
                 </h2>
-                <p class="text-body-2 text-medium-emphasis">
+                <p
+                    v-if="!embedded"
+                    class="text-body-2 text-medium-emphasis"
+                >
                     {{ t('pluginManagement.personalCenterDescription') }}
                 </p>
             </div>
@@ -438,9 +441,10 @@ onMounted(load);
 .personal-row__meta span+span::before { content:"·"; margin-inline-end:14px; }
 .personal-row__actions { display:flex; align-items:center; justify-content:flex-end; }
 .personal-status { display:inline-flex; align-items:center; min-height:20px; padding:2px 7px; border-radius:5px; font-size:12px; font-weight:650; line-height:1; white-space:nowrap; }
-.personal-status[data-tone="good"] { color:#226e4e; background:rgba(45,139,98,.11); }
-.personal-status[data-tone="warning"] { color:#955a06; background:rgba(192,122,20,.13); }
-.personal-status[data-tone="danger"] { color:#a33131; background:rgba(190,55,55,.12); }
+.personal-status[data-tone="good"],.personal-status[data-tone="warning"],.personal-status[data-tone="danger"] { color:rgba(var(--v-theme-on-surface),.78); }
+.personal-status[data-tone="good"] { background:rgba(45,139,98,.11); }
+.personal-status[data-tone="warning"] { background:rgba(192,122,20,.13); }
+.personal-status[data-tone="danger"] { background:rgba(190,55,55,.12); }
 .personal-status[data-tone="muted"] { color:rgba(var(--v-theme-on-surface),.62); background:rgba(var(--v-theme-on-surface),.06); }
 .personal-disabled-hint { color:rgba(var(--v-theme-on-surface),.62); font-size:12px; }
 @media (max-width:700px) {

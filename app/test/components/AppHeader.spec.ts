@@ -15,8 +15,9 @@ vi.mock('#i18n', () => ({
     }),
 }));
 
-const { pushMock, storeState } = vi.hoisted(() => ({
+const { pushMock, routeState, storeState } = vi.hoisted(() => ({
     pushMock: vi.fn(),
+    routeState: { path: '/' },
     storeState: {
         theme: 'light',
         sys: {
@@ -46,7 +47,7 @@ mockNuxtImport('useRouter', () => {
 });
 
 mockNuxtImport('useRoute', () => {
-    return () => ({ path: '/' });
+    return () => routeState;
 });
 
 const vuetify = createVuetify({ components, directives });
@@ -67,6 +68,7 @@ describe('AppHeader.vue', () => {
         storeState.sys.show_network_library = true;
         storeState.user.is_login = false;
         storeState.user.is_admin = false;
+        routeState.path = '/';
     });
 
     it('only wraps the site title text in the clickable/pointer area, not the whole title bar', () => {
@@ -126,6 +128,23 @@ describe('AppHeader.vue', () => {
         expect(links).not.toContain('/admin/plugins');
         expect(links).not.toContain('/admin/themes');
 
+        wrapper.unmount();
+    });
+
+    it.each([
+        ['/library/network', 'navigation.libraryBrowse'],
+        ['/library/apps', 'navigation.libraryBrowse'],
+        ['/me/plugins', 'navigation.myReading'],
+        ['/admin/settings/themes', 'navigation.settings'],
+    ])('keeps the aggregate navigation entry active on %s', (path, label) => {
+        storeState.user.is_login = true;
+        storeState.user.is_admin = true;
+        routeState.path = path;
+        const wrapper = mountHeader();
+        const item = wrapper.findAllComponents({ name: 'VListItem' })
+            .find(candidate => candidate.text().includes(label));
+
+        expect(item?.props('active')).toBe(true);
         wrapper.unmount();
     });
 });

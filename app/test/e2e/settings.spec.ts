@@ -15,8 +15,8 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
         await expect(page.locator('.loading-page')).toBeHidden();
 
         const bar = page.locator('.settings-titlebar');
-        await expect(page.getByRole('heading', { name: '系统设置', exact: true })).toBeVisible();
-        await expect(page.getByRole('tab', { name: '实例设置' })).toHaveAttribute('aria-selected', 'true');
+        await expect(page.getByRole('heading', { name: '系统设置', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('tab', { name: '系统设置' })).toHaveAttribute('aria-selected', 'true');
         await expect(bar.getByRole('button', { name: '保存配置' })).toBeVisible();
 
         // 路径页签贴在应用顶栏下方，保存栏继续贴在页签下方。

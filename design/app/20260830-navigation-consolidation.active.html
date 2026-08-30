@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Talebook 导航整合方案：以路径型页签统一书库浏览、我的阅读、系统设置和侧栏帮助入口。" />
+    <meta name="description" content="Talebook 书库浏览大页签视觉原型：比较等宽书架、沉浸横幅和侧边目录三套方案。" />
     <link rel="icon" href="data:," />
-    <title>整合导航信息架构与访问入口 · ACTIVE</title>
+    <title>整合书库、阅读与系统设置导航 · ACTIVE</title>
     <style>
       :root {
         color-scheme: light;
@@ -156,6 +156,17 @@
     </style>
   </head>
   <body>
+    <!--
+      使用步骤：
+      1. cp design/TEMPLATE.html design/<module>/yyyymmdd-<feature>.wip.html
+      2. 同一个工作只维护这一份方案；grill、反馈、候选比较、实现偏离和测试结果都更新同一份 WIP，不创建或保留中间废弃文档。
+      3. 替换所有“〔……〕”占位内容，并让 title、h1、状态和文件名保持一致；迭代期间保持首次创建日期和 feature 不变。
+      4. 保留标注 REQUIRED 的内容；按需删除标注 OPTIONAL 的组件、tags 与目录项。
+      5. meta tags 只是备选呈现组件，不要求固定数量；但标题、日期、模块、状态及存在时的需求来源仍须在顶部清楚展示。
+      6. 可按主题修改 :root token、标题处理与专用图表，但保留响应式、focus、reduced-motion、打印和表格滚动基线。
+      7. 创建时测试结果写“待验证”；完成后回写实际命令、页面、结果、失败项与未执行原因，再把唯一 WIP 转为 ACTIVE。
+      8. SUPERSEDED 只用于已独立生效的旧 ACTIVE 被另一个后续工作替代，不用于保存本工作的设计过程。
+    -->
     <a class="skip-link" href="#main-content">跳到正文</a>
 
     <!-- OPTIONAL：宽屏页边轨道。删减章节时同步维护轨道、浮动目录与正文 section。 -->
@@ -189,15 +200,15 @@
     <div class="page">
       <!-- REQUIRED：标题、摘要和顶部元信息。tags 可增删，不固定字段数量。 -->
       <header class="hero">
-        <h1>用路径型页签整合导航与访问入口</h1>
-        <p class="sub">减少侧栏中的同类入口，把书库、个人阅读和管理员设置分别收拢为稳定的路径型页签；同时以紧凑帮助菜单承接版本、用户数和项目链接。</p>
+        <h1>整合书库、阅读与系统设置导航</h1>
+        <p class="sub">把书库浏览、我的阅读和系统设置三组路由页签统一为已确认的标题型样式，并删除子页面中重复表达当前页的“书库”“插件”“主题管理”“私有书籍”等标题。</p>
         <div class="chips" aria-label="方案元信息">
           <span class="chip active">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-08-30</span>
           <span class="chip">所属模块：app</span>
           <!-- OPTIONAL：按需保留、删除或新增 tags。 -->
-          <span class="chip">影响范围：app 路由、导航、页面壳；webserver 状态响应</span>
-          <span class="chip">需求来源：会话内导航整合需求</span>
+          <span class="chip">影响范围：主导航、路由页签、插件中心、个人阅读与推送设备</span>
+          <span class="chip">需求来源：会话内界面反馈</span>
         </div>
       </header>
 
@@ -206,23 +217,36 @@
           <!-- REQUIRED：保留用户原话或可追溯的原始需求，不要只写二次概括。 -->
           <section id="request" class="card">
             <h2>1. 原始诉求</h2>
-            <div class="callout warn">“本地书库、网络书库、OPDS 介绍、WebDAV 介绍合并为‘书库浏览’；我的书架和已读书目整合为‘我的阅读’；插件中心和主题管理以 Tab 形式整合到系统设置；最下方 Logo、版本、用户数整合为小问号菜单，参考 Multica。”</div>
-            <p>后续确认使用路径而非查询参数：<code>/library/network</code>、<code>/me/shelf</code>、<code>/admin/settings/plugins</code>。旧地址保留兼容跳转；网络书库入口常驻；App 访问介绍允许游客浏览，登录后才展示连接信息。</p>
+            <div class="callout warn">“我就是要让你在当前的版本上修改，把 tab 放在标题的位置，字体大小用 H1，你快速做个 demo 给我看。”</div>
+            <div class="callout good">“现在样式 OK 了，我们这次需求里其他页面的 tab 也要用这个版本。并且 tab 内页的原来的标题要删掉，比如【书库】、【插件】等原来的 H2 标题。”</div>
+            <div class="callout warn">“OPDS/WebDAV 原来的指引，你都没有搬迁到新页面里啊。”</div>
+            <div class="callout warn">“在一个入口中浏览本地藏书、网络书源，并查看 App 接入方式。—— 怎么每个 tab 下面都是这句描述？你要根据不同的 tab 页面内容，展示各自页面的说明。”</div>
+            <div class="callout warn">“Tab 下面的布局应当是灰色小字说明，右侧是操作按钮。相关页面都要整体修改；插件页面不要形成二次嵌套和额外边距。”</div>
+            <div class="callout warn">“切换 Tab 其他页时，要保持左侧 navbar 处于选中状态。”</div>
+            <div class="callout warn">“插件中心的【个人设置】Tab 页面移动到我的阅读里面，作为一个单独的 Tab。”</div>
+            <div class="callout warn">“settings-body 和 settings-titlebar 要保持一样的 padding 和 margin。”</div>
+            <div class="callout warn">“用户中心的两个 Tab 也要提升级别到上面。”</div>
+            <div class="callout warn">“个人设置 → 个人插件设置。”</div>
+            <div class="callout warn">“navbar 的 ? 号按钮为什么一直处于 hover 状态？”</div>
+            <div class="callout warn">“管理菜单展开后，navbar 溢出了，并且没法上下滚动。”</div>
+            <div class="callout warn">“问号按钮里面的菜单也要优化：图标和文字之间间隔太大，文字要缩小；系统版本和用户信息改成列表项文字；Logo 改到菜单顶部并与菜单宽度协调。”</div>
+            <div class="callout warn">“个人插件里的推送设备设置应跳到 <code>/me/devices</code>；设备表单文字不能被顶部挡住；恢复 Kindle 邮箱推送功能。”</div>
+            <p>已确认版本以路由级 Tab 取代聚合页独立标题：选中项 24px / 700 / 主题色，未选中项 16px / 600 / 中性灰并下移 2px；文字到亮条可见净距为 8px。正式实现覆盖本次导航整合产生的三组路由 Tab。</p>
           </section>
 
           <!-- REQUIRED：目标与非目标一起写，防止范围在实现期漂移。 -->
           <section id="goals" class="card">
             <h2>2. 目标与边界</h2>
             <div class="grid">
-              <article class="choice recommended"><h3>目标</h3><ul><li>侧栏只保留“书库浏览”“我的阅读”“系统设置”三个聚合入口。</li><li>每个聚合入口使用可分享、可刷新、支持前进后退的路径型页签。</li><li>网络书库能区分未启用插件、未配置书源和已有可用书源。</li><li>默认头部与五套内置主题共享同一份导航模型和帮助菜单语义。</li></ul></article>
-              <article class="choice"><h3>非目标</h3><ul><li>不重写本地书库、网络搜索、用户资料、插件中心或主题管理的领域逻辑。</li><li>不改变 OPDS 与 WebDAV 协议本身、认证方式或地址。</li><li>不把个人插件设置并入“我的阅读”；现有 <code>/plugins</code> 入口继续独立存在。</li><li>不删除旧路由，避免书签、历史链接和外部引用失效。</li></ul></article>
+              <article class="choice recommended"><h3>目标</h3><ul><li><code>/library/*</code>、<code>/me/*</code>、<code>/admin/settings/*</code> 统一使用已确认的大页签，并让左侧主导航按路径前缀持续选中对应聚合入口。</li><li>每个 Tab 内页在大页签下方渲染同一规格的说明栏：左侧灰色小字，存在页级操作时放在右侧；路由壳层不重复渲染说明。</li><li>把管理员插件页的个人设置迁移到 <code>/me/plugins</code>，并命名为“个人插件设置”；把用户中心内嵌的“基本信息 / 阅读设备”提升为 <code>/me/account</code> 与 <code>/me/devices</code> 两个路由级 Tab。</li><li>所有推送插件把个人管理入口直接声明为 <code>/me/devices</code>；设备表单保留浮动标签所需顶部空间并在 320px 下改为分行布局；把既有 Kindle 邮箱推送能力补成可启停、默认启用且使用官方品牌图标的 <code>talebook.push.kindle</code> Provider。</li><li>底部帮助按钮默认透明，只在真实交互态高亮；长导航在管理菜单展开后由菜单内容区独立滚动，帮助入口固定留在侧栏底部。</li><li>帮助菜单采用紧凑列表：Logo 置顶，链接项使用小字号和窄图标间距，版本与用户数使用标准列表项表达。</li><li>删除子页面重复页级标题和多余嵌套边距；系统设置说明栏与内容区共享水平 margin / padding 基线；把旧 OPDS / WebDAV 页的客户端、配置步骤和注意事项完整迁入“使用 App 访问”。</li></ul></article>
+              <article class="choice"><h3>非目标</h3><ul><li>不改变搜索/浏览、阅读中/已读等仍有独立任务语义的页面内部功能 Tab。</li><li>不删除 Moke、OPDS、插件分类、设置分区等真实内容标题。</li><li>不改变既有权限模型、数据库结构或外部 API 兼容约定。</li></ul></article>
             </div>
           </section>
 
           <!-- OPTIONAL：用户可感知功能、角色权限或多入口覆盖发生变化时建议保留；按产品实际角色和入口增删列。 -->
           <section id="feature-matrix" class="card">
             <h2>3. 产品功能矩阵</h2>
-            <p>聚合页只改变入口和布局，不扩大既有数据权限。游客、普通用户与管理员看到的内容和下一步必须明确不同。</p>
+            <p>公共壳层负责统一视觉；子页面只移除与路由 Tab 重复的页级标题。</p>
             <div class="matrix-legend" aria-label="功能矩阵图例">
               <span class="matrix-yes">支持</span>
               <span class="matrix-conditional">条件支持</span>
@@ -232,10 +256,9 @@
               <table class="feature-matrix">
                 <thead><tr><th>功能域</th><th>用户任务 / 功能</th><th>游客</th><th>登录用户</th><th>管理员</th><th>Web</th><th>移动端</th><th>API / 协议</th><th>验收口径</th></tr></thead>
                 <tbody>
-                  <tr><th scope="row">书库浏览</th><td><strong>浏览本地、网络书库或查看 App 接入方案</strong></td><td class="matrix-cell"><span class="matrix-state matrix-conditional">介绍</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-conditional">OPDS / WebDAV</span></td><td>三个路径页签可直达；网络空状态按角色给出正确操作；游客不看到账号信息。</td></tr>
-                  <tr><th scope="row">我的阅读</th><td><strong>管理书架、阅读记录、账户和私有书籍</strong></td><td class="matrix-cell"><span class="matrix-state matrix-no">需登录</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td><code>/me/*</code> 未登录时跳登录并保留回跳地址；四个页签复用原有权限。</td></tr>
-                  <tr><th scope="row">系统设置</th><td><strong>配置系统、插件和主题</strong></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td>插件中心和主题管理不再占用管理菜单独立项；旧 URL 跳到新路径。</td></tr>
-                  <tr><th scope="row">帮助与关于</th><td><strong>查看更新、项目、反馈与实例信息</strong></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td>问号菜单键盘可达；顺序为更新日志、GitHub、反馈、版本、用户数、底部 Logo。</td></tr>
+                  <tr><th scope="row">书库浏览</th><td><strong>本地书库 / 网络书库 / 使用 App 访问</strong><br /><span class="matrix-note">移除“书库”重复标题；在 App 页内展示 OPDS / WebDAV 完整配置指引。</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-conditional">横向滚动</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td>路由 Tab 成为唯一页级标题，旧指引内容不丢失。</td></tr>
+                  <tr><th scope="row">我的阅读</th><td><strong>我的书架 / 阅读记录 / 基本信息 / 阅读设备 / 私有书籍 / 个人插件设置</strong><br /><span class="matrix-note">基本信息与阅读设备不再嵌套在“用户中心”内；个人插件设置承载当前账号的插件连接。</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">需登录</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-conditional">横向滚动</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td><code>/me/account?tab=devices</code> 与旧用户中心设备链接兼容跳转到 <code>/me/devices</code>。</td></tr>
+                  <tr><th scope="row">系统设置</th><td><strong>系统设置 / 插件中心 / 主题管理</strong><br /><span class="matrix-note">移除插件页级标题和主题卡片顶栏标题。</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">需管理员</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">需管理员</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td><td class="matrix-cell"><span class="matrix-state matrix-conditional">横向滚动</span></td><td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td><td>插件执行记录按钮与设置保存按钮保留。</td></tr>
                 </tbody>
               </table>
             </div>
@@ -248,27 +271,25 @@
               <table>
                 <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
                 <tbody>
-                  <tr><td>同一任务散落为多个侧栏项</td><td><code>app/components/AppHeader.vue</code> 与 <code>app/components/themes/BuiltinThemeHeader.vue</code> 各自拼装本地书库、网络书库、书架、已读、插件和主题入口。</td><td>需要共享导航模型，否则默认头部与内置主题会再次漂移。</td></tr>
-                  <tr><td>网络书库无法解释“为什么没有书源”</td><td><code>GET /api/book-sources</code> 只返回当前可用 bindings；空数组不区分插件未启用与插件已启用但未配置。</td><td>响应需增加不泄露凭据的 availability 摘要。</td></tr>
-                  <tr><td>OPDS / WebDAV 介绍读取管理员接口</td><td><code>app/pages/opds-readme.vue</code> 与 <code>webdav-readme.vue</code> 调用 <code>/admin/settings</code>，普通用户无法可靠判断服务状态。</td><td>服务开关应进入所有访客已能读取的 <code>/api/user/info</code> 系统摘要。</td></tr>
-                  <tr><td>底部信息占用多行且主题实现不一致</td><td>两个 Header 分别把版本、用户数、OPDS、WebDAV 和可配置 Logo 渲染为普通列表项。</td><td>抽取共享帮助菜单组件和共享导航 composable。</td></tr>
+                  <tr><td>独立大标题压过页签</td><td><code>app/components/RouteTabShell.vue</code>：标题最大 1.75rem，页签仅 .875rem 且 compact。</td><td>层级问题来自字号、留白与组件密度共同作用，不是只把 Tab 字号调大。</td></tr>
+                  <tr><td>路由与内容已经稳定</td><td><code>app/pages/library.vue</code> 与三个子路由。</td><td>原型只替换壳层渲染，复用真实内容，避免把内容差异误判成导航差异。</td></tr>
                 </tbody>
               </table>
             </div>
-            <div class="callout"><strong>事实与验证：</strong>Moke 的官方仓库与 Talebook README 已确认其可直接连接 Talebook；聚焦后端测试与浏览器夹具已验证“插件未启用”“插件已启用但未配置”和“存在可用书源”三种状态能够稳定区分。</div>
+            <div class="callout good"><strong>验证结论：</strong>复用既有路由与页面语言、把标题职责收进路由页签，能够得到用户确认的大 Tab；无需再引入独立页标题或第二层聚合容器。</div>
           </section>
 
           <!-- REQUIRED：先给核心方案，再按内容选用流程、决策表、代码或 SVG。 -->
           <section id="design" class="card">
             <h2>5. 方案</h2>
-            <div class="callout good"><strong>方案结论：</strong>新增共享的路由页签壳和导航模型，现有领域页面改为可嵌入内容组件；旧页面只负责重定向。后端仅补充只读状态摘要，不搬迁业务数据。失败和空状态由聚合页解释，并提供与角色匹配的下一步。</div>
+            <div class="callout good"><strong>正式方案：</strong>把已确认的标题型页签收敛进公共 <code>RouteTabShell</code>，把说明与页级操作收敛进公共 <code>RoutePageToolbar</code>。壳层只负责页签和内容插槽；每个内页负责自己的说明和操作，避免重复说明与插件页二次容器。</div>
 
             <!-- OPTIONAL：有顺序依赖时使用流程；没有真实顺序时不要为了装饰编号。 -->
             <div class="flow" aria-label="核心处理流程">
-              <article class="step"><span class="label">Route</span><b>路径决定活动页签</b><p>页签点击使用 Nuxt 路由；刷新和历史导航不依赖组件内状态。</p></article>
-              <article class="step"><span class="label">Guard</span><b>角色与服务状态分流</b><p><code>/me</code> 要求登录，管理设置要求管理员，App 介绍允许游客。</p></article>
-              <article class="step"><span class="label">Content</span><b>复用既有领域内容</b><p>本地书库、网络书库、账户、插件和主题不复制 API 与状态逻辑。</p></article>
-              <article class="step"><span class="label">Fallback</span><b>旧地址与空状态可行动</b><p>旧 URL 跳新路径；空网络书库明确指出启用插件或配置书源。</p></article>
+              <article class="step"><span class="label">Route</span><b>进入真实书库页面</b><p>保留当前路径、登录态和内容数据。</p></article>
+              <article class="step"><span class="label">Shell</span><b>公共壳层统一</b><p>三组路由共享同一字号、颜色、对齐、亮条和分割线规则。</p></article>
+              <article class="step"><span class="label">Content</span><b>删除重复页标题</b><p>只删除与当前路由 Tab 同义的标题，保留内容分区标题和操作。</p></article>
+              <article class="step"><span class="label">Verify</span><b>跨页面验证</b><p>检查三组路由、移动端横向滚动和无重复标题。</p></article>
             </div>
 
             <!-- OPTIONAL：存在多个候选方案或跨模块契约时保留。 -->
@@ -277,72 +298,86 @@
               <table>
                 <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
                 <tbody>
-                  <tr><td>URL 模型</td><td>路径型页签：<code>/library/*</code>、<code>/me/*</code>、<code>/admin/settings/*</code></td><td>用户明确要求；链接稳定且浏览器历史语义正确。</td><td>查询参数页签；只靠本地 <code>v-model</code>。</td></tr>
-                  <tr><td>兼容策略</td><td>旧页面使用客户端 replace 跳到新路径，并保留必要的旧 query 语义。</td><td>避免外部书签失效，同时不维护两套页面。</td><td>删除旧路由；长期复制两份领域页面。</td></tr>
-                  <tr><td>导航所有权</td><td>共享 composable 输出语义化导航项；两个 Header 只负责各自视觉渲染。</td><td>默认头部与五套内置主题必须同步。</td><td>继续维护两份手写数组。</td></tr>
-                  <tr><td>视觉系统</td><td>继承 Vuetify 主题色、现有无衬线字体和密度；页签用细分隔线与当前主题 primary 指示。</td><td>这是信息架构收敛，不是新品牌皮肤；深浅主题自然兼容。</td><td>新建固定色板、字体或高阴影卡片。</td></tr>
-                  <tr><td>标志性元素</td><td>侧栏底部问号按钮打开紧凑悬浮菜单，Logo 固定在最底部。</td><td>直接响应 Multica 参考；把次要实例信息从主导航降级。</td><td>继续使用多行系统列表；把帮助内容塞入头像菜单。</td></tr>
+                  <tr><td>原型宿主</td><td>现有书库聚合路由</td><td>真实侧栏、真实宽度和真实内容才能暴露问题。</td><td>独立静态页面；脱离产品上下文会让所有方案看起来都可用。</td></tr>
+                  <tr><td>视觉基线</td><td>完全沿用当前页面的主题 token 和图标，文字改用 H2 级排版。</td><td>用户要求是在当前版本上修改，不重新设计一套。</td><td>A/B/C 卡片、横幅和侧边目录方案；均已明确否决并删除。</td></tr>
                 </tbody>
               </table>
             </div>
 
             <!-- OPTIONAL：展示命令、契约或伪代码。 -->
-            <pre aria-label="页面线框"><code>侧栏                         聚合页
-┌ 首页                      ┌ 书库浏览
-├ 我的阅读                 │ [本地书库] [网络书库] [使用 App 访问]
-├ 书库浏览                 ├────────────────────────────
-├ 有声书                   │ 当前路径对应的既有领域内容
-├ 管理 › 系统设置          └────────────────────────────
-│   …
-└ ?  →  更新 / GitHub / 反馈 / 实例信息 / Logo</code></pre>
+            <pre aria-label="标题型页签结构"><code>[ 图标 本地书库 ]   [ 图标 网络书库 ]   [ 图标 使用 App 访问 ]  ← H2 字号
+━━━━━━━━━━━━━━━━━━                                            ← 活动态短线
+[ 当前页面的灰色说明文案 ]                              [ 可选页级操作 ]</code></pre>
           </section>
 
           <!-- REQUIRED FOR MATERIAL CHANGES：简单且无风险的改动可合并为一段，但不能隐去风险。 -->
           <section id="impact" class="card">
             <h2>6. 影响范围、风险与回滚</h2>
             <div class="grid">
-              <article class="choice recommended"><h3>影响范围</h3><p><code>app/components/AppHeader.vue</code>、内置主题 Header、路由页面、共享 composable 与内容组件、i18n、E2E mock；后端 <code>UserInfo</code> 和网络书源目录只读响应；相关前后端测试。</p></article>
-              <article class="choice"><h3>保持不变</h3><p>数据库结构、书源配置事实表、插件启停事实表、OPDS/WebDAV 协议、用户权限判断、领域页面 API、插件工作台和个人插件设置路径保持不变。</p></article>
+              <article class="choice recommended"><h3>影响范围</h3><p>公共路由 Tab 壳层、三个聚合页、个人资料与设备路由、两套侧栏滚动布局、帮助菜单、本地书库、私有书籍、插件中心、主题管理，以及“使用 App 访问”的 OPDS / WebDAV 指引内容。</p></article>
+              <article class="choice"><h3>保持不变</h3><p>权限、用户资料与设备保存协议、内容分区标题保持不变；旧设备查询参数通过重定向兼容。Kindle 发送仍复用既有 SMTP 与格式转换能力，只补齐插件注册和统一入口。</p></article>
             </div>
-            <div class="callout danger"><strong>主要风险：</strong>路由环路或丢失旧 query、嵌入长页面后的滚动/吸顶冲突、默认与内置主题导航漂移、普通用户误见管理员操作。通过路由矩阵 E2E、两套 Header 契约测试、权限 API 测试以及桌面/手机实际渲染缓解。</div>
-            <div class="callout"><strong>回滚：</strong>本次无数据迁移；可整体回滚前端路由与共享组件及后端两个附加响应字段。旧业务接口和事实表不需清理。</div>
+            <div class="callout danger"><strong>主要风险：</strong>公共壳层同时影响三组页面，完整指引也会增加 App 页高度。已通过公共组件、41 条相关 E2E、320px 设备表单、键盘导航、暗色主题和真实 Docker 页面截图覆盖；剩余风险主要是不同自定义主题可能对共享 Vuetify 变量产生额外覆盖。</div>
+            <div class="callout"><strong>回滚：</strong>恢复公共壳层的独立标题和 compact 样式，并恢复四处子页面页级标题即可；无数据与接口清理。</div>
           </section>
 
+          <!-- REQUIRED：WIP 阶段写计划与待验证；完成后必须替换为真实执行记录。 -->
           <section id="tests" class="card">
             <h2>7. 测试计划与结果</h2>
             <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
               <table>
                 <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
                 <tbody>
-                  <tr><td>后端聚焦</td><td><code>docker exec navigation-consolidation-talebook-dev-1 sh -lc 'pytest -q tests/test_main.py tests/test_network_library.py -k "service_status or availability"'</code></td><td>访客服务状态不含凭据；书源响应区分未启用与未配置。</td><td class="verified">通过：2 passed，117 deselected。</td></tr>
-                  <tr><td>后端全量</td><td><code>pytest tests -v --cov=webserver --cov-report=term-missing</code>；再单独复跑 8 个失败用例。</td><td>识别本次回归与基线问题，不把失败写成通过。</td><td>全量 1155 passed、1 skipped、8 failed；单独复跑后 6 个设备推送用例通过，剩余 2 个分别是既有网络搜索数量夹具不匹配、未修改的流式 provider 首事件预期不匹配，均不涉及本次导航契约。</td></tr>
-                  <tr><td>组件</td><td><code>npx vitest run test/components/LocalMdiIcons.spec.ts test/components/AppHeader.spec.ts test/components/BuiltinThemeHeader.spec.ts test/components/RouteTabShell.spec.ts test/components/SidebarHelpMenu.spec.ts</code></td><td>两套 Header、路由页签、菜单顺序、Logo 位置、键盘语义和本地图标注册。</td><td class="verified">通过：21 passed。</td></tr>
-                  <tr><td>集成 / E2E</td><td><code>PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 MOCK_API_URL=http://127.0.0.1:18080 npx playwright test test/e2e/sidebar.spec.ts test/e2e/navigation-consolidation.spec.ts --project=chromium --workers=1 --reporter=line</code></td><td>新路径、旧地址跳转、三类网络状态、权限、帮助菜单位置和设置页签。</td><td class="verified">最终通过：10 passed；较宽回归集另通过 18 passed。</td></tr>
-                  <tr><td>实际渲染 / 运行</td><td>Docker 真实后端 <code>http://127.0.0.1:8080</code> 与隔离实例 <code>http://127.0.0.1:18082</code>；Chromium 检查 <code>/library/apps</code>、<code>/admin/settings/plugins</code>、<code>/me/history</code>，桌面与 390px 手机视口。</td><td>路由页签、移动横向滚动、帮助菜单和长设置页面无错位、无页面异常。</td><td class="verified">通过：页面异常 0、控制台错误 0；真实环境截图已纳入 PR。Chrome DevTools MCP 在本会话不可用，按实际浏览器渲染使用 Playwright Chromium 完成替代验收。</td></tr>
-                  <tr><td>界面审查</td><td><code>interface-review full</code>；范围为默认分支 merge-base <code>767647cf5812</code> 至工作树（70 个已有提交、20 个已跟踪修改、15 个未跟踪项），覆盖两个 Header、三个聚合页、桌面/移动端及真实/空状态。</td><td>六个界面域均无 HIGH / MEDIUM 遗留。</td><td class="verified">Approve。首次审查发现帮助菜单侵入主内容、部分本地图标未注册；调整菜单为侧栏内 212px 对齐、补齐图标，并修复三个 redirect 页的空渲染警告后复审。可访问性、布局、文案、排版、颜色和 UI 六域最终均 Clear，Introduced / Regression 均为 0。</td></tr>
-                  <tr><td>质量门禁</td><td><code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、<code>cd app &amp;&amp; npm run build</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>相关门禁通过，既有告警与本次结果如实记录。</td><td class="verified">通过：Python lint / format 与生产构建通过；前端 lint 0 errors（465 个既有 warnings）；120 份方案文档通过校验；diff whitespace 检查通过。</td></tr>
+                  <tr><td>组件</td><td><code>npx vitest run test/components/AppHeader.spec.ts test/components/BuiltinThemeHeader.spec.ts test/components/RouteTabShell.spec.ts test/components/RoutePageToolbar.spec.ts test/components/SidebarHelpMenu.spec.ts</code></td><td>两套侧栏、路由页签、说明栏和帮助菜单共享同一导航与布局约定。</td><td class="verified">通过：5 files，27 tests。Nuxt / Vuetify 测试环境仍输出既有 i18n 初始化告警，不影响断言。</td></tr>
+                  <tr><td>相关 E2E</td><td><code>PLAYWRIGHT_BASE_URL=http://127.0.0.1:13000 MOCK_API_URL=http://127.0.0.1:18080 npx playwright test test/e2e/navigation-consolidation.spec.ts test/e2e/sidebar.spec.ts test/e2e/plugins.spec.ts test/e2e/settings.spec.ts test/e2e/webdav-readme.spec.ts --project=chromium --workers=1 --reporter=dot</code></td><td>三组路由活动态、移动端横向页签、设置对齐、帮助菜单、插件入口、320px 设备表单、Kindle 图标和 OPDS / WebDAV 指引均稳定。</td><td class="verified">通过：41 passed，耗时 1.1 分钟。覆盖键盘方向键导航、无指针专用箭头、暗色状态标签、可访问删除按钮、管理组自动展开和旧路径兼容。</td></tr>
+                  <tr><td>Kindle / 推送后端</td><td><code>docker run ... talebook/test pytest -q tests/test_plugin_contract.py ...</code> 定向运行插件契约、设备类型与 6 条推送路径。</td><td>Kindle 为默认启用的独立 push Provider；测试主动启用目标插件，不依赖跨用例残留状态。</td><td class="verified">通过：30 passed。最小反馈环先稳定复现 6 条 <code>plugin.installation_disabled</code>，随后用临时启用并恢复 installation 的测试夹具消除顺序依赖。</td></tr>
+                  <tr><td>完整后端</td><td><code>docker run --rm -v ...:/workspace -w /workspace talebook/test pytest tests -q --tb=short</code></td><td>本次相关后端行为无失败，并如实记录基线问题。</td><td>1142 passed，20 skipped，2 failed，26 warnings，耗时 65.91 秒。两项失败分别为网络搜索旧断言仍期待 1 个来源但运行时返回 3 个，以及未修改的流式元数据测试仍期待首事件为结果而实现先发 progress；前者单独运行亦稳定失败，后者相关文件相对 <code>feat/plugins</code> 无差异。</td></tr>
+                  <tr><td>质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、<code>cd app &amp;&amp; npm run build</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>Python、Vue、生产构建、方案和补丁格式可提交。</td><td class="verified">Python lint / format、Nuxt 生产构建和补丁检查通过；前端 lint 为 0 errors、465 条仓库既有 warnings。方案校验在转为 ACTIVE 后复跑通过。</td></tr>
+                  <tr><td>真实渲染</td><td>Docker 后端 <code>http://127.0.0.1:8080</code> + Nuxt <code>http://127.0.0.1:3000</code>；已登录 Chrome 打开 <code>/admin/settings/plugins</code>、<code>/admin/settings/plugins#plugin-group-push</code> 与 <code>/me/devices</code>。</td><td>真实插件数据、路由页签、说明栏、设备入口与官方品牌图标按预期显示。</td><td class="verified">通过。当前工具集没有 Chrome DevTools MCP，改用当前已登录 Chrome 的标准“保存为单文件”快照，再由禁用脚本的 headless Chrome 输出纯页面截图；未读取或导出 Cookie。三张截图已写入 <code>document/screenshots/navigation-consolidation/</code>。</td></tr>
+                  <tr><td>界面审查</td><td><code>interface-review full</code>，基线 <code>origin/master@2414438975b557b07fff9a2a3637e8c1346340ed</code>，审查 71 个已提交变更及全部本地改动；排除 lockfile、二进制媒体和测试报告。</td><td>Accessibility、Layout、Writing、Typography、Colors、UI 六个域不存在 HIGH / MEDIUM 问题。</td><td class="verified">Approve。初审发现的指针专用页签箭头、暗色对比度、嵌套 main、管理项不可见、320px 表单溢出、图标缺失、字号动画和可访问名称问题均已修复并复验；最终六域均 Clear。</td></tr>
                 </tbody>
               </table>
             </div>
-            <div class="callout good"><strong>完成结论：</strong>导航改动的聚焦测试、生产构建、真实浏览器渲染与 full 界面审查均完成，未遗留与本次改动相关的失败或 HIGH / MEDIUM 界面问题。全量后端的 2 个独立失败与 6 个顺序污染用例已保留为显式基线风险。</div>
+            <div class="callout good"><strong>结论：</strong>本次用户可感知改动已完成相关自动化、真实后端渲染、生产构建和 full 界面审查；剩余两项完整后端失败均已明确记录，未将其误报为通过。</div>
           </section>
 
           <!-- OPTIONAL：grill 结论、实现偏离或后续修订需要可追溯时保留。 -->
           <section id="decisions" class="card">
             <h2>8. 决策记录</h2>
             <ol>
-              <li><strong>2026-08-30：</strong>用户确认不使用 query 参数页签，改为 <code>/library/network</code>、<code>/me/shelf</code>、<code>/admin/settings/plugins</code> 等路径。</li>
-              <li><strong>2026-08-30：</strong><code>/me/*</code> 未登录统一跳登录并在成功后返回原目标。</li>
-              <li><strong>2026-08-30：</strong>网络书库入口常驻，废弃旧 <code>show_network_library</code> 对导航可见性的控制；为避免无效设置误导管理员，系统设置页不再展示该开关，后端字段仅作历史配置兼容；空状态按角色区分行动。</li>
-              <li><strong>2026-08-30：</strong>真实浏览器验收发现帮助菜单向侧栏外展开会被抽屉裁切，浮层锚点调整为向内侧对齐，保证完整菜单始终落在侧栏宽度内。</li>
-              <li><strong>2026-08-30：</strong>App 访问介绍对游客可见，登录后才显示当前实例地址和启用状态。</li>
-              <li><strong>2026-08-30：</strong>主页签吸附顶部，移动端横向滚动；问号菜单去掉“文档”，Logo 固定在菜单最底部。</li>
+              <li><strong>2026-08-30：</strong>用户明确否定“大标题 + compact Tab”，要求先看多个大 Tab 版本。</li>
+              <li><strong>2026-08-30：</strong>原型使用现有路由和真实内容，通过开发态 query 切换；选定前不改正式交互、不更新 PR。</li>
+              <li><strong>2026-08-30：</strong>移动端不依赖横向自动滚动，三个大页签固定同屏；保留图标与名称，隐藏说明，确保活动项始终可见。</li>
+              <li><strong>2026-08-30：</strong>用户否决 A/B/C 全部重设计，要求只在当前版本上把 Tab 提升到标题位置并使用 H1 字号；旧原型和切换器必须删除。</li>
+              <li><strong>2026-08-30：</strong>实际渲染发现 Vuetify 的按钮字号变量覆盖外层 Tab 规则；H1 字号需同时落到 <code>--v-btn-size</code> 与文字内容层。Tab 组下增加贯穿内容区的 1px 分割线，活动项短线叠加其上。</li>
+              <li><strong>2026-08-30：</strong>用户确认 28px 过大，桌面上限降为 24px，保持标题型 Tab 层级但降低视觉压迫感。</li>
+              <li><strong>2026-08-30：</strong>用户明确最终采用 H2 视觉规格；Tab 保持导航语义，避免为视觉效果创建三个文档标题。</li>
+              <li><strong>2026-08-30：</strong>用户进一步指定精确字号为 20px，替代此前 24px 方案。</li>
+              <li><strong>2026-08-30：</strong>未选中 Tab 降为 18px、600 字重和中性灰；选中项保持 20px、700 字重和主题色。</li>
+              <li><strong>2026-08-30：</strong>未选中 Tab 进一步降为 16px，并将内容整体下移 2px，使其与 20px 选中项形成底部对齐。</li>
+              <li><strong>2026-08-30：</strong>用户反馈文字与活动亮条间距过大；Tab 从居中布局改为贴底布局。4px 试稿过紧；直接使用 8px 内边距时会包含 4px 亮条，视觉净距仍只有 4px，因此最终使用 12px 内边距，并以 DOM 几何位置验证文字到亮条净距为 8px。</li>
+              <li><strong>2026-08-30：</strong>用户指定选中 Tab 使用 24px，替代此前 20px；未选中项仍为 16px。</li>
+              <li><strong>2026-08-30：</strong>用户确认当前视觉版本，要求推广到本次导航整合的其他路由型 Tab，并删除内页重复页级标题；页面内部二级功能 Tab 不提升层级。</li>
+              <li><strong>2026-08-30：</strong>补齐先前导航合并的内容漏项：旧 OPDS / WebDAV 介绍页中的地址说明、常用客户端、配置步骤和注意事项全部迁入 <code>/library/apps</code>；旧路径继续重定向。</li>
+              <li><strong>2026-08-30：</strong>公共壳层的说明改为活动 Tab 级数据；原聚合页总说明仅作为兼容回退，三组正式使用方均为每个路由提供专属说明。</li>
+              <li><strong>2026-08-30：</strong>根据实机截图反馈，进一步把活动 Tab 说明移出公共壳层，改由各内页使用统一说明栏渲染；说明左对齐，页级操作右对齐。插件页移除自身 max-width、居中 margin 和整页 padding，避免在聚合页中形成二次嵌套。</li>
+              <li><strong>2026-08-30：</strong>系统设置组首个 Tab 从“实例设置”改名为“系统设置”。</li>
+              <li><strong>2026-08-30：</strong>主导航项新增路径前缀匹配：<code>/library/*</code>、<code>/me/*</code> 与 <code>/admin/settings/*</code> 在切换任意子 Tab 后仍保持对应侧栏入口选中；两套头部共用同一判断。</li>
+              <li><strong>2026-08-30：</strong>管理员插件页移除“个人设置”二级 Tab，个人插件连接迁入 <code>/me/plugins</code>，成为“我的阅读”第五个路由 Tab；旧 <code>/plugins</code> 和带 <code>section=personal</code> 的管理员入口兼容跳转。</li>
+              <li><strong>2026-08-30：</strong><code>settings-titlebar</code> 与 <code>settings-body</code> 统一水平 margin / padding 基线；因说明栏与表单区职责不同，垂直 padding 和底部间距不强行相同。</li>
+              <li><strong>2026-08-30：</strong>“用户中心”的“基本信息 / 阅读设备”提升为“我的阅读”的第三、第四个路由 Tab，新增 <code>/me/devices</code>；旧 <code>tab=devices</code> 链接去掉查询参数后跳转到新路由。“个人设置”路由 Tab 改名为“个人插件设置”。</li>
+              <li><strong>2026-08-30：</strong>问号按钮移除带常驻 0.12 underlay 的 tonal 变体；帮助菜单改为 Logo 置顶的 13px 紧凑列表，图标间距 8px，版本和用户数使用列表项。导航列表补充 <code>min-height: 0</code> 并强制纵向滚动，帮助入口不参与收缩。</li>
+              <li><strong>2026-08-30：</strong>推送插件 manifest 的个人管理地址统一为 <code>/me/devices</code>；设备表单恢复 24px 顶部留白，并按 320px、平板与桌面断点分行，补上删除设备按钮的可访问名称。既有 Kindle 邮件发送此前仍在 handler 中，但因没有 push Provider 被设备类型接口过滤；新增默认启用的 <code>talebook.push.kindle</code>，接入 Google Play 官方 Kindle 应用图标，并把 SMTP/格式转换传输收进具体插件，handler 继续负责权限、历史、通知和 runtime 审计。</li>
+              <li><strong>2026-08-30：</strong><code>interface-review full</code> 初审发现并修复四项本次引入的问题：移除窄屏页签中无按钮语义的 Vuetify 指针箭头，保留横向滑动与方向键导航；移除字号补间动画；让插件个人状态标签使用明暗主题自适应文本色；把插件中心和 BRS 工作台的嵌套 <code>main</code> 改为 <code>section</code>。同时让管理路由进入时自动展开侧栏管理组，使选中子项真正可见，并把插件状态摘要的可访问名称纳入 i18n。全部修复后再执行完整复审。</li>
+              <li><strong>2026-08-30：</strong>推送相关测试原本默认 Boox installation 已启用，与“管理员启停决定用户可用设备类型”的新产品规则冲突；测试改为在运行真实推送路径前临时启用目标插件并在 finally 恢复，30 条定向用例转绿，完整套件中的 6 条相关失败同步消失。</li>
+              <li><strong>2026-08-30：</strong>最终 <code>interface-review full</code> 以 <code>origin/master</code> 为基线复审全部已提交与未提交内容；无 HIGH / MEDIUM 遗留，六个界面域均 Clear，结论为 Approve。</li>
             </ol>
           </section>
         </main>
 
       </div>
 
+      <!-- REQUIRED：转 ACTIVE 时同步更新这里、title、顶部状态和文件名。 -->
       <footer>Talebook internal design · app · ACTIVE · 2026-08-30</footer>
     </div>
     <script>

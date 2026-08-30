@@ -1,7 +1,6 @@
 <template>
     <RouteTabShell
         :title="t('navigation.settings')"
-        :description="t('navigationSections.settingsDescription')"
         :tabs="tabs"
     >
         <NuxtPage />

@@ -14,11 +14,11 @@ test.describe('Plugin management', () => {
         await page.goto('/admin/plugins');
         await catalogPromise;
 
-        await expect(page.getByRole('tab', { name: '插件管理' })).toHaveAttribute('aria-selected', 'true');
-        await expect(page.getByRole('tab', { name: '个人配置' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: '个人配置' })).toHaveCount(0);
         await expect(page.getByText('内置插件无需安装')).toBeVisible();
         await expect(page.getByRole('button', { name: '安装' })).toHaveCount(0);
-        await expect(page.getByRole('link', { name: '插件中心' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: '插件中心' })).toHaveAttribute('aria-selected', 'true');
+        expect(await page.locator('.plugin-page').evaluate(element => element.tagName)).toBe('SECTION');
         await expect(page.getByText('Calibre 元数据')).toBeVisible();
         await expect(page.getByText('Open Library', { exact: true })).toBeVisible();
         await expect(page.getByText('AI 元数据')).toHaveCount(0);
@@ -26,6 +26,9 @@ test.describe('Plugin management', () => {
         await expect(calibreIcon.locator('img[src="/images/plugin-icons/calibre.svg"]')).toBeVisible();
         expect(await calibreIcon.evaluate(element => getComputedStyle(element, '::after').boxShadow)).not.toBe('none');
         await expect(page.locator('.management-row').filter({ hasText: 'Open Library' }).locator('img[src="/images/plugin-icons/open-library.png"]')).toBeVisible();
+        const kindleRow = page.locator('.management-row').filter({ hasText: 'Kindle 邮箱推送' });
+        await kindleRow.scrollIntoViewIfNeeded();
+        await expect(kindleRow.locator('img[src="/images/plugin-icons/kindle.png"]')).toBeVisible();
         await expect(page.getByRole('heading', { name: '综合服务' })).toBeVisible();
         await expect(page.getByRole('heading', { name: '元数据' })).toBeVisible();
         await expect(page.getByRole('heading', { name: '书源' })).toBeVisible();
@@ -74,8 +77,17 @@ test.describe('Plugin management', () => {
         const sourceGroup = page.locator('#plugin-group-source');
         await expect.poll(async () => Math.round((await sourceGroup.boundingBox()).y)).toBe(Math.round(stickyTop));
 
-        await page.getByRole('tab', { name: '个人配置' }).click();
-        await expect(page).toHaveURL(/section=personal/);
+        await page.goto('/me/plugins');
+        await expect(page.getByRole('tab', { name: '个人插件设置' })).toHaveAttribute('aria-selected', 'true');
+        await page.context().addCookies([{ name: 'theme', value: 'dark', url: new URL(page.url()).origin }]);
+        await page.reload();
+        expect(await page.locator('.personal-status').first().evaluate(element => getComputedStyle(element).color))
+            .toBe('rgba(255, 255, 255, 0.78)');
+        const boox = page.locator('.personal-row').filter({ hasText: 'BOOX' });
+        await boox.getByRole('button', { name: '个人设置' }).click();
+        await expect(page).toHaveURL('/me/devices');
+
+        await page.goto('/me/plugins');
         const weread = page.locator('.personal-row').filter({ hasText: '微信读书' });
         await expect(weread.locator('img[src="/images/plugin-icons/weread.png"]')).toBeVisible();
         await weread.getByRole('button', { name: '个人设置' }).click();
@@ -144,10 +156,11 @@ test.describe('Plugin management', () => {
                 body: JSON.stringify({ err: 'ok', data: { id: 7 } }),
             });
         });
-        await page.goto('/admin/plugins?section=personal');
+        await page.goto('/me/plugins');
         const brs = page.locator('.personal-row').filter({ hasText: 'talebook-brs 章评服务器' });
         await brs.getByRole('button', { name: '个人设置' }).click();
         await expect(page).toHaveURL(/\/plugins\/brs/);
+        expect(await page.locator('.brs-page').evaluate(element => element.tagName)).toBe('SECTION');
 
         const endpoint = page.getByRole('textbox', { name: 'BRS 服务器地址' });
         await expect(endpoint).toHaveValue('https://brs.talebook.org');
@@ -199,18 +212,31 @@ test.describe('Plugin management', () => {
 
     test('only offers device types from enabled push plugins', async ({ page, request }) => {
         await page.goto('/user/detail?tab=devices');
+        await expect(page).toHaveURL('/me/devices');
         const addButton = page.getByRole('button', { name: '添加' });
         await expect(addButton).toBeEnabled();
         await addButton.click();
         await page.getByRole('combobox', { name: '类型', exact: true }).focus();
         await page.keyboard.press('ArrowDown');
         await expect(page.getByRole('option', { name: 'BOOX' })).toBeVisible();
+        await expect(page.getByRole('option', { name: 'Kindle 邮箱推送' })).toBeVisible();
         await expect(page.getByRole('option', { name: '多看' })).toHaveCount(0);
         await page.keyboard.press('Escape');
 
         const catalog = await (await request.get(`${mockApi}/api/admin/plugins`)).json();
         const boox = catalog.installations.find(item => item.plugin_key === 'talebook.push.boox');
         await request.post(`${mockApi}/api/admin/plugins/installations/${boox.id}/state`, { data: { enabled: false } });
+        await page.reload();
+        await expect(addButton).toBeEnabled();
+        await addButton.click();
+        await page.getByRole('combobox', { name: '类型', exact: true }).last().focus();
+        await page.keyboard.press('ArrowDown');
+        await expect(page.getByRole('option', { name: 'Kindle 邮箱推送' })).toBeVisible();
+        await expect(page.getByRole('option', { name: 'BOOX' })).toHaveCount(0);
+        await page.keyboard.press('Escape');
+
+        const kindle = catalog.installations.find(item => item.plugin_key === 'talebook.push.kindle');
+        await request.post(`${mockApi}/api/admin/plugins/installations/${kindle.id}/state`, { data: { enabled: false } });
         await page.reload();
         await expect(addButton).toBeDisabled();
         await expect(page.getByText('暂无已启用的设备插件')).toBeVisible();
@@ -219,9 +245,13 @@ test.describe('Plugin management', () => {
     test('keeps both control planes and category help reachable on narrow screens', async ({ page }) => {
         await page.setViewportSize({ width: 744, height: 1133 });
         await page.goto('/admin/plugins?tab=push');
-        await expect(page.getByRole('tab', { name: '插件管理' })).toHaveAttribute('aria-selected', 'true');
-        await expect(page.getByRole('tab', { name: '个人配置' })).toBeVisible();
+        await expect(page.getByRole('tab', { name: '个人配置' })).toHaveCount(0);
         await expect(page.locator('.management-row').filter({ hasText: 'BOOX' })).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(744);
+
+        await page.goto('/me/plugins');
+        await expect(page.getByRole('tab', { name: '个人插件设置' })).toHaveAttribute('aria-selected', 'true');
+        await expect(page.locator('.personal-row').filter({ hasText: '微信读书' })).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(744);
 
         await page.setViewportSize({ width: 390, height: 844 });
@@ -289,7 +319,9 @@ test.describe('Plugin management', () => {
 
     test('does not expose the platform connection model for no-setup plugins', async ({ page }) => {
         await page.goto('/admin/plugins?tab=integrations');
-        const card = page.locator('.management-row').filter({ hasText: 'Open Library' });
+        const card = page.locator('.management-row').filter({
+            has: page.getByText('Open Library', { exact: true }),
+        });
         await expect(card.getByRole('button', { name: '配置' })).toHaveCount(0);
         await card.getByRole('button', { name: '详情' }).click();
         const dialog = page.getByRole('dialog', { name: 'Open Library' });

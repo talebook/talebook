@@ -1,248 +1,219 @@
 <template>
-    <main class="plugin-page">
-        <header class="plugin-page-header d-flex align-center flex-wrap ga-2">
-            <div class="plugin-page-header__copy">
-                <h1>
-                    {{ t('pluginManagement.title') }}
-                </h1>
-                <p>{{ t('pluginManagement.managementDescription') }}</p>
-            </div>
-            <v-spacer />
-            <v-btn
-                variant="outlined"
-                prepend-icon="mdi-history"
-                to="/admin/plugins/runs"
-            >
-                {{ t('pluginManagement.runs') }}
-            </v-btn>
-        </header>
-
-        <v-tabs
-            v-model="pageSection"
-            density="compact"
-            class="plugin-page-tabs"
+    <section class="plugin-page">
+        <RoutePageToolbar
+            class="plugin-page-toolbar"
+            :description="t('pluginManagement.managementDescription')"
         >
-            <v-tab value="management">
-                {{ t('pluginManagement.managementTab') }}
-            </v-tab>
-            <v-tab value="personal">
-                {{ t('pluginManagement.personalConfiguration') }}
-            </v-tab>
-        </v-tabs>
-        <v-divider />
+            <template #actions>
+                <v-btn
+                    variant="outlined"
+                    prepend-icon="mdi-history"
+                    to="/admin/plugins/runs"
+                >
+                    {{ t('pluginManagement.runs') }}
+                </v-btn>
+            </template>
+        </RoutePageToolbar>
 
-        <v-window
-            v-model="pageSection"
-            class="plugin-page-window"
-        >
-            <v-window-item value="management">
-                <section class="management-panel">
-                    <div class="management-layout">
-                        <div class="management-content">
-                            <div
-                                class="management-summary"
-                                aria-label="插件状态摘要"
-                            >
-                                <span>{{ t('pluginManagement.builtinPluginCount', { count: catalog.length }) }}</span>
-                                <span><i class="summary-dot summary-dot--good" />{{ t('pluginManagement.enabledPluginCount', { count: enabledCount }) }}</span>
-                                <span><i class="summary-dot summary-dot--warning" />{{ t('pluginManagement.attentionPluginCount', { count: attentionCount }) }}</span>
-                                <span class="management-summary__note">{{ t('pluginManagement.noInstallAction') }}</span>
-                            </div>
+        <section class="management-panel">
+            <div class="management-layout">
+                <div class="management-content">
+                    <div
+                        class="management-summary"
+                        :aria-label="t('pluginManagement.statusSummary')"
+                    >
+                        <span>{{ t('pluginManagement.builtinPluginCount', { count: catalog.length }) }}</span>
+                        <span><i class="summary-dot summary-dot--good" />{{ t('pluginManagement.enabledPluginCount', { count: enabledCount }) }}</span>
+                        <span><i class="summary-dot summary-dot--warning" />{{ t('pluginManagement.attentionPluginCount', { count: attentionCount }) }}</span>
+                        <span class="management-summary__note">{{ t('pluginManagement.noInstallAction') }}</span>
+                    </div>
 
-                            <div class="management-toolbar">
-                                <v-text-field
-                                    v-model="search"
-                                    :label="t('pluginManagement.search')"
-                                    prepend-inner-icon="mdi-magnify"
-                                    density="compact"
-                                    variant="outlined"
-                                    clearable
-                                    hide-details
-                                    class="plugin-search"
-                                />
-                                <v-select
-                                    v-model="statusFilter"
-                                    :items="statusOptions"
-                                    item-title="title"
-                                    item-value="value"
-                                    :label="t('pluginManagement.statusFilter')"
-                                    density="compact"
-                                    variant="outlined"
-                                    hide-details
-                                    class="plugin-filter"
-                                />
-                            </div>
+                    <div class="management-toolbar">
+                        <v-text-field
+                            v-model="search"
+                            :label="t('pluginManagement.search')"
+                            prepend-inner-icon="mdi-magnify"
+                            density="compact"
+                            variant="outlined"
+                            clearable
+                            hide-details
+                            class="plugin-search"
+                        />
+                        <v-select
+                            v-model="statusFilter"
+                            :items="statusOptions"
+                            item-title="title"
+                            item-value="value"
+                            :label="t('pluginManagement.statusFilter')"
+                            density="compact"
+                            variant="outlined"
+                            hide-details
+                            class="plugin-filter"
+                        />
+                    </div>
 
-                            <v-skeleton-loader
-                                v-if="loading"
-                                type="list-item-two-line@6"
-                            />
-                            <v-alert
-                                v-else-if="error"
-                                type="error"
-                                variant="tonal"
-                            >
-                                {{ t('pluginManagement.loadError') }}
-                                <v-btn
-                                    variant="text"
-                                    class="ml-2"
-                                    @click="load"
-                                >
-                                    {{ t('common.retry') }}
-                                </v-btn>
-                            </v-alert>
-                            <v-alert
-                                v-else-if="filteredPlugins.length === 0"
-                                type="info"
-                                variant="tonal"
-                            >
-                                <div class="font-weight-medium">
-                                    {{ t('pluginManagement.noResult') }}
+                    <v-skeleton-loader
+                        v-if="loading"
+                        type="list-item-two-line@6"
+                    />
+                    <v-alert
+                        v-else-if="error"
+                        type="error"
+                        variant="tonal"
+                    >
+                        {{ t('pluginManagement.loadError') }}
+                        <v-btn
+                            variant="text"
+                            class="ml-2"
+                            @click="load"
+                        >
+                            {{ t('common.retry') }}
+                        </v-btn>
+                    </v-alert>
+                    <v-alert
+                        v-else-if="filteredPlugins.length === 0"
+                        type="info"
+                        variant="tonal"
+                    >
+                        <div class="font-weight-medium">
+                            {{ t('pluginManagement.noResult') }}
+                        </div>
+                        <v-btn
+                            variant="text"
+                            class="mt-1"
+                            @click="clearFilters"
+                        >
+                            {{ t('pluginManagement.clearFilters') }}
+                        </v-btn>
+                    </v-alert>
+                    <div v-else>
+                        <section
+                            v-for="group in groupedPlugins"
+                            :id="`plugin-group-${group.value}`"
+                            :key="group.value"
+                            :data-group="group.value"
+                            class="management-group"
+                        >
+                            <div class="management-group__heading">
+                                <div class="management-group__copy">
+                                    <div class="management-group__title">
+                                        <h2>{{ group.label }}</h2>
+                                        <span>{{ group.plugins.length }}</span>
+                                    </div>
+                                    <p class="management-group__description">
+                                        {{ group.description }}
+                                    </p>
                                 </div>
                                 <v-btn
+                                    v-if="group.value === 'meta'"
+                                    size="small"
                                     variant="text"
-                                    class="mt-1"
-                                    @click="clearFilters"
+                                    prepend-icon="mdi-tune-variant"
+                                    @click="metadataSettings?.open()"
                                 >
-                                    {{ t('pluginManagement.clearFilters') }}
+                                    {{ t('pluginManagement.metadataBehavior') }}
                                 </v-btn>
-                            </v-alert>
-                            <div v-else>
-                                <section
-                                    v-for="group in groupedPlugins"
-                                    :id="`plugin-group-${group.value}`"
-                                    :key="group.value"
-                                    :data-group="group.value"
-                                    class="management-group"
+                                <v-btn
+                                    v-if="group.value === 'push'"
+                                    size="small"
+                                    variant="text"
+                                    prepend-icon="mdi-devices"
+                                    @click="globalDeviceSettings?.open()"
                                 >
-                                    <div class="management-group__heading">
-                                        <div class="management-group__copy">
-                                            <div class="management-group__title">
-                                                <h2>{{ group.label }}</h2>
-                                                <span>{{ group.plugins.length }}</span>
-                                            </div>
-                                            <p class="management-group__description">
-                                                {{ group.description }}
-                                            </p>
+                                    {{ t('pluginManagement.globalDevices') }}
+                                </v-btn>
+                            </div>
+                            <div class="management-list">
+                                <article
+                                    v-for="plugin in group.plugins"
+                                    :key="plugin.plugin_key"
+                                    class="management-row"
+                                    :style="{ '--plugin-accent': group.color }"
+                                >
+                                    <PluginBrandIcon
+                                        class="management-row__icon"
+                                        :brand-icon="plugin.ui.brand_icon"
+                                        :icon="plugin.ui.icon"
+                                    />
+                                    <div class="management-row__main">
+                                        <div class="management-row__title">
+                                            <strong>{{ plugin.name }}</strong>
+                                            <span
+                                                class="management-status"
+                                                :data-tone="statusInfo(plugin).key"
+                                            >{{ statusInfo(plugin).text }}</span>
+                                            <span
+                                                v-if="plugin.ui.deprecated"
+                                                class="management-status"
+                                                data-tone="deprecated"
+                                            >{{ t('pluginManagement.deprecated') }}</span>
                                         </div>
+                                        <p>{{ plugin.description }}</p>
+                                    </div>
+                                    <div class="management-row__actions">
                                         <v-btn
-                                            v-if="group.value === 'meta'"
+                                            v-if="!plugin.installation?.enabled"
+                                            color="primary"
                                             size="small"
-                                            variant="text"
-                                            prepend-icon="mdi-tune-variant"
-                                            @click="metadataSettings?.open()"
+                                            variant="tonal"
+                                            @click="toggleInstallation(plugin)"
                                         >
-                                            {{ t('pluginManagement.metadataBehavior') }}
+                                            {{ t('pluginManagement.enable') }}
                                         </v-btn>
                                         <v-btn
-                                            v-if="group.value === 'push'"
+                                            v-else-if="hasConfigurationUi(plugin)"
                                             size="small"
                                             variant="text"
-                                            prepend-icon="mdi-devices"
-                                            @click="globalDeviceSettings?.open()"
+                                            @click="openConfiguration(plugin)"
                                         >
-                                            {{ t('pluginManagement.globalDevices') }}
+                                            {{ configurationActionLabel(plugin) }}
+                                        </v-btn>
+                                        <v-btn
+                                            v-else-if="canExperience(plugin)"
+                                            size="small"
+                                            variant="text"
+                                            @click="experiencePlugin(plugin)"
+                                        >
+                                            {{ t('pluginManagement.experience') }}
+                                        </v-btn>
+                                        <v-btn
+                                            size="small"
+                                            variant="text"
+                                            append-icon="mdi-chevron-right"
+                                            @click="openDetails(plugin)"
+                                        >
+                                            {{ t('pluginManagement.details') }}
                                         </v-btn>
                                     </div>
-                                    <div class="management-list">
-                                        <article
-                                            v-for="plugin in group.plugins"
-                                            :key="plugin.plugin_key"
-                                            class="management-row"
-                                            :style="{ '--plugin-accent': group.color }"
-                                        >
-                                            <PluginBrandIcon
-                                                class="management-row__icon"
-                                                :brand-icon="plugin.ui.brand_icon"
-                                                :icon="plugin.ui.icon"
-                                            />
-                                            <div class="management-row__main">
-                                                <div class="management-row__title">
-                                                    <strong>{{ plugin.name }}</strong>
-                                                    <span
-                                                        class="management-status"
-                                                        :data-tone="statusInfo(plugin).key"
-                                                    >{{ statusInfo(plugin).text }}</span>
-                                                    <span
-                                                        v-if="plugin.ui.deprecated"
-                                                        class="management-status"
-                                                        data-tone="deprecated"
-                                                    >{{ t('pluginManagement.deprecated') }}</span>
-                                                </div>
-                                                <p>{{ plugin.description }}</p>
-                                            </div>
-                                            <div class="management-row__actions">
-                                                <v-btn
-                                                    v-if="!plugin.installation?.enabled"
-                                                    color="primary"
-                                                    size="small"
-                                                    variant="tonal"
-                                                    @click="toggleInstallation(plugin)"
-                                                >
-                                                    {{ t('pluginManagement.enable') }}
-                                                </v-btn>
-                                                <v-btn
-                                                    v-else-if="hasConfigurationUi(plugin)"
-                                                    size="small"
-                                                    variant="text"
-                                                    @click="openConfiguration(plugin)"
-                                                >
-                                                    {{ configurationActionLabel(plugin) }}
-                                                </v-btn>
-                                                <v-btn
-                                                    v-else-if="canExperience(plugin)"
-                                                    size="small"
-                                                    variant="text"
-                                                    @click="experiencePlugin(plugin)"
-                                                >
-                                                    {{ t('pluginManagement.experience') }}
-                                                </v-btn>
-                                                <v-btn
-                                                    size="small"
-                                                    variant="text"
-                                                    append-icon="mdi-chevron-right"
-                                                    @click="openDetails(plugin)"
-                                                >
-                                                    {{ t('pluginManagement.details') }}
-                                                </v-btn>
-                                            </div>
-                                        </article>
-                                    </div>
-                                </section>
+                                </article>
                             </div>
-                        </div>
-                        <nav
-                            v-if="groupedPlugins.length"
-                            class="plugin-category-nav"
-                            :aria-label="t('pluginManagement.categoryNavigation')"
-                        >
-                            <div class="plugin-category-nav__title">
-                                {{ t('pluginManagement.categoryNavigation') }}
-                            </div>
-                            <button
-                                v-for="group in groupedPlugins"
-                                :key="group.value"
-                                type="button"
-                                class="plugin-category-nav__item"
-                                :class="{ active: activeGroupKey === group.value }"
-                                :data-navkey="group.value"
-                                :aria-current="activeGroupKey === group.value ? 'location' : undefined"
-                                @click="scrollToPluginGroup(group.value)"
-                            >
-                                <span>{{ group.label }}</span>
-                                <small>{{ group.plugins.length }}</small>
-                            </button>
-                        </nav>
+                        </section>
                     </div>
-                </section>
-            </v-window-item>
-            <v-window-item value="personal">
-                <PluginPersonalSettings
-                    class="personal-panel"
-                    embedded
-                />
-            </v-window-item>
-        </v-window>
+                </div>
+                <nav
+                    v-if="groupedPlugins.length"
+                    class="plugin-category-nav"
+                    :aria-label="t('pluginManagement.categoryNavigation')"
+                >
+                    <div class="plugin-category-nav__title">
+                        {{ t('pluginManagement.categoryNavigation') }}
+                    </div>
+                    <button
+                        v-for="group in groupedPlugins"
+                        :key="group.value"
+                        type="button"
+                        class="plugin-category-nav__item"
+                        :class="{ active: activeGroupKey === group.value }"
+                        :data-navkey="group.value"
+                        :aria-current="activeGroupKey === group.value ? 'location' : undefined"
+                        @click="scrollToPluginGroup(group.value)"
+                    >
+                        <span>{{ group.label }}</span>
+                        <small>{{ group.plugins.length }}</small>
+                    </button>
+                </nav>
+            </div>
+        </section>
 
         <v-dialog
             v-model="drawerOpen"
@@ -333,9 +304,7 @@
                             variant="text"
                             size="small"
                             prepend-icon="mdi-open-in-new"
-                            to="/opds-readme"
-                            target="_blank"
-                            rel="noopener"
+                            to="/library/apps#opds-guide"
                         >
                             {{ t('pluginManagement.opdsServiceGuide') }}
                         </v-btn>
@@ -510,7 +479,7 @@
             ref="globalDeviceSettings"
             :available-types="availablePushTypes"
         />
-    </main>
+    </section>
 </template>
 
 <script setup>
@@ -520,7 +489,7 @@ import GlobalDeviceSettings from '~/components/GlobalDeviceSettings.vue';
 import MetadataAutomationSettings from '~/components/MetadataAutomationSettings.vue';
 import OpdsImportDialog from '~/components/OpdsImportDialog.vue';
 import PluginCapabilityTester from '~/components/PluginCapabilityTester.vue';
-import PluginPersonalSettings from '~/components/PluginPersonalSettings.vue';
+import RoutePageToolbar from '@/components/RoutePageToolbar.vue';
 import { useMainStore } from '@/stores/main';
 
 const { t } = useI18n();
@@ -530,16 +499,6 @@ const router = useRouter();
 const store = useMainStore();
 store.setNavbar(true);
 
-const pageSection = computed({
-    get: () => route.query.section === 'personal' ? 'personal' : 'management',
-    set: (value) => {
-        const query = { ...route.query };
-        if (value === 'personal') query.section = 'personal';
-        else delete query.section;
-        delete query.plugin;
-        router.replace({ query });
-    },
-});
 const groupDefinitions = computed(() => ({
     combo: {
         value: 'combo',
@@ -893,7 +852,7 @@ function clearFilters() {
 }
 
 function computeActivePluginGroup() {
-    if (!import.meta.client || groupNavigationLocked || pageSection.value !== 'management') return;
+    if (!import.meta.client || groupNavigationLocked) return;
     const groups = groupedPlugins.value;
     if (!groups.length) {
         activeGroupKey.value = '';
@@ -1001,9 +960,6 @@ watch(groupedPlugins, (groups) => {
     }
     nextTick(computeActivePluginGroup);
 }, { immediate: true });
-watch(pageSection, value => {
-    if (value === 'management') nextTick(computeActivePluginGroup);
-});
 onMounted(() => {
     load();
     window.addEventListener('scroll', onPluginPageScroll, { passive: true });
@@ -1018,14 +974,8 @@ useHead(() => ({ title: t('pluginManagement.title') }));
 </script>
 
 <style scoped>
-.plugin-page { --management-line:rgba(var(--v-theme-on-surface),.13); --plugin-sticky-top:calc(var(--v-layout-top, 92px) + 16px); max-width:1180px; margin:0 auto; padding:28px 24px 56px; }
-.plugin-page-header { white-space:normal; }
-.plugin-page-header__copy { flex:1 1 320px; min-width:0; }
-.plugin-page-header h1 { margin:0; font-size:28px; line-height:1.2; letter-spacing:-.02em; }
-.plugin-page-header p { margin:7px 0 0; color:rgba(var(--v-theme-on-surface),.64); font-size:14px; }
-.plugin-page-tabs { margin-top:20px; }
-.plugin-page-window { overflow:visible; }
-.management-panel,.personal-panel { padding-top:24px; }
+.plugin-page { --management-line:rgba(var(--v-theme-on-surface),.13); --plugin-sticky-top:calc(var(--v-layout-top, 92px) + 16px); }
+.management-panel { padding-top:0; }
 .management-layout { display:flex; align-items:flex-start; }
 .management-content { flex:1 1 auto; min-width:0; padding-inline-end:24px; border-inline-end:1px solid var(--management-line); }
 .plugin-category-nav { position:sticky; top:var(--plugin-sticky-top); flex:0 0 172px; width:172px; max-height:calc(100vh - var(--plugin-sticky-top) - 32px); overflow-y:auto; padding-inline-start:24px; }
@@ -1078,7 +1028,6 @@ useHead(() => ({ title: t('pluginManagement.title') }));
     .management-content { padding-inline-end:0; border-inline-end:0; }
 }
 @media (max-width:700px) {
-    .plugin-page { padding:20px 14px 44px; }
     .management-toolbar { align-items:stretch; flex-direction:column; }
     .plugin-search,.plugin-filter { width:100%; max-width:none; flex:none; }
     .management-summary__note { width:100%; margin-inline-start:0; }
