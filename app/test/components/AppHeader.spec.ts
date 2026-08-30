@@ -15,6 +15,15 @@ vi.mock('vue-i18n', () => ({
     }),
 }));
 
+vi.mock('#i18n', () => ({
+    useI18n: () => ({
+        locale: { value: 'zh-CN' },
+        locales: { value: [{ code: 'zh-CN', name: '简体中文' }] },
+        setLocale: vi.fn(),
+        t: (key: string) => key,
+    }),
+}));
+
 const { pushMock, storeState } = vi.hoisted(() => ({
     pushMock: vi.fn(),
     storeState: {
@@ -65,6 +74,8 @@ describe('AppHeader.vue', () => {
     beforeEach(() => {
         pushMock.mockReset();
         storeState.sys.show_network_library = true;
+        storeState.user.is_login = false;
+        storeState.user.is_admin = false;
     });
 
     it('only wraps the site title text in the clickable/pointer area, not the whole title bar', () => {
@@ -106,6 +117,21 @@ describe('AppHeader.vue', () => {
 
         expect(wrapper.text()).not.toContain('navigation.networkLibrary');
 
+        wrapper.unmount();
+    });
+
+    it('shows the trash management link only to administrators', () => {
+        let wrapper = mountHeader();
+        expect(wrapper.text()).not.toContain('navigation.trash');
+        wrapper.unmount();
+
+        storeState.user.is_login = true;
+        storeState.user.is_admin = true;
+        wrapper = mountHeader();
+        const link = wrapper.findAllComponents({ name: 'VListItem' })
+            .find(item => item.text().includes('navigation.trash'));
+
+        expect(link?.props('to')).toBe('/admin/trash');
         wrapper.unmount();
     });
 });

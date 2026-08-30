@@ -1023,11 +1023,15 @@ class BookDelete(BaseHandler):
         if not can_manage or not (self.is_admin() or self.is_book_owner(bid, self.user_id())):
             return {"err": "permission", "msg": _("无权操作")}
 
+        item = self.session.get(Item, bid)
+        permanent = bool(item and item.scope == "private")
         external_indexed = is_external_index_book(self.session, bid)
         if external_indexed:
             delete_external_index_book_record(self.db, bid)
         else:
-            self.db.delete_book(bid)
+            # Calibre defaults to its per-library trash. Private books bypass
+            # it so their files and metadata cannot appear in admin trash.
+            self.db.delete_book(bid, permanent=permanent)
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
         from webserver.models import ScanFile
 

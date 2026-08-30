@@ -991,8 +991,10 @@ class AdminBookDelete(BaseHandler):
                     self.session.query(Item).filter(Item.book_id == bid).delete()
                     self.session.commit()
                 else:
-                    # 删除图书
-                    self.db.delete_book(bid)
+                    # 私藏书不进入 Calibre 回收站，避免管理员在回收站中看到私藏内容。
+                    item = self.session.get(Item, bid)
+                    permanent = bool(item and item.scope == "private")
+                    self.db.delete_book(bid, permanent=permanent)
                 deleted_count += 1
             except Exception as e:
                 self.session.rollback()
@@ -1245,35 +1247,79 @@ class AdminOPDSImport(BaseHandler):
             return {"err": "error", "msg": _("OPDS 导入失败：{}").format(str(e))}
 
 
+def _trash_idlist(handler):
+    try:
+        request = tornado.escape.json_decode(handler.request.body or b"{}")
+    except (TypeError, ValueError):
+        return None, {"err": "params.error", "msg": _("参数错误")}
+    idlist = request.get("idlist") if isinstance(request, dict) else None
+    if not isinstance(idlist, list) or not idlist:
+        return None, {"err": "params.error.idlist", "msg": _("idlist参数错误，必须是非空整数数组")}
+    if any(isinstance(book_id, bool) or not isinstance(book_id, int) or book_id < 1 for book_id in idlist):
+        return None, {"err": "params.error.idlist", "msg": _("idlist参数错误，必须是非空整数数组")}
+    return request, None
+
+
+class AdminTrash(BaseHandler):
+    """List, restore and permanently delete whole-book Calibre trash entries."""
+
+    @js
+    @is_admin
+    def get(self):
+        items = TrashManager.list_books(self.cache)
+        return {
+            "err": "ok",
+            "items": items,
+            "total": len(items),
+            "total_size": sum(item["size"] for item in items),
+        }
+
+    @js
+    @is_admin
+    def patch(self):
+        request, error = _trash_idlist(self)
+        if error:
+            return error
+        restored, failures = TrashManager.restore_books(self.db, request["idlist"])
+        return {
+            "err": "ok",
+            "restored": restored,
+            "failures": failures,
+            "msg": _("已恢复 %d 本书籍，%d 本失败") % (len(restored), len(failures)),
+        }
+
+    @js
+    @is_admin
+    def delete(self):
+        request, error = _trash_idlist(self)
+        if error:
+            return error
+        if request.get("confirm") is not True:
+            return {"err": "params.confirm", "msg": _("请确认永久删除操作")}
+        deleted, failures = TrashManager.delete_books(self.cache, request["idlist"])
+        return {
+            "err": "ok",
+            "deleted": deleted,
+            "failures": failures,
+            "msg": _("已永久删除 %d 本书籍，%d 本失败") % (len(deleted), len(failures)),
+        }
+
+
 class AdminTrashSize(BaseHandler):
     """获取回收站和上传目录大小"""
 
     @js
-    @auth
+    @is_admin
     def get(self):
-        if not self.admin_user:
-            return {"err": "ok", "sizes": {}, "msg": _("非管理员用户")}
-        sizes = TrashManager.get_trash_sizes()
-        # 返回实际路径用于调试
-        return {
-            "err": "ok",
-            "sizes": sizes,
-            "trash_path": TrashManager.TRASH_PATH,
-            "upload_path": TrashManager.UPLOAD_TRASH_PATH,
-        }
+        return {"err": "ok", "sizes": TrashManager.get_trash_sizes()}
 
 
 class AdminTrashClear(BaseHandler):
     """清理回收站和上传目录"""
 
     @js
-    @auth
+    @is_admin
     def post(self):
-        if not self.admin_user:
-            return {
-                "err": "permission.not_admin",
-                "msg": _("当前用户非管理员，无权操作"),
-            }
         errors = TrashManager.clear_trashs()
         if errors:
             return {"err": "error", "msg": _("清理失败：%s") % "; ".join(errors)}
@@ -1435,6 +1481,7 @@ def routes():
         (r"/api/admin/opds/import/failed", AdminOPDSImportFailedList),
         (r"/api/admin/opds/import/retry", AdminOPDSImportRetry),
         (r"/api/admin/opds/sources", AdminOpdsSources),
+        (r"/api/admin/trash", AdminTrash),
         (r"/api/admin/trash/size", AdminTrashSize),
         (r"/api/admin/trash/clear", AdminTrashClear),
         (r"/api/admin/log", AdminSystemLog),
