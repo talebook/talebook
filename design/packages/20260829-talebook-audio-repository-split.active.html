@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Talebook Audio CLI 仓库拆分方案 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --ink: #172033; --muted: #5d6778; --line: #d9e0ea; --panel: #fff; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: #f5f7fb; font: 15px/1.65 system-ui, sans-serif; }
+      main { width: min(960px, calc(100vw - 32px)); margin: 32px auto; }
+      header, section { margin-bottom: 18px; padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+      h1, h2 { margin-top: 0; line-height: 1.25; }
+      .meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); }
+      .meta span { padding: 4px 10px; border-radius: 999px; background: #eef2f7; }
+      .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .flow div { padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+      code { padding: 2px 5px; border-radius: 4px; background: #eef2f7; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 9px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { background: #f6f8fb; }
+      @media (max-width: 720px) { main { width: calc(100vw - 20px); margin: 10px auto; } .flow { grid-template-columns: 1fr; } header, section { padding: 18px; } }
+      @media print { body { background: #fff; } main { width: 100%; } header, section { break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Talebook Audio CLI 仓库拆分</h1>
+        <p>把 CLI 的源码和发布边界迁移到独立公开仓库，Talebook 主仓库仅通过固定提交的 Git 子模块引用。</p>
+        <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-29</span><span>所属模块：packages</span><span>需求来源：HOU-20</span></div>
+      </header>
+
+      <section>
+        <h2>1. 原始诉求</h2>
+        <p>在 <code>hehetoshang</code> 账号下创建专用仓库存放 Talebook Audio CLI，并将 Talebook 仓库中的现有源码目录替换为该仓库的子模块。</p>
+      </section>
+
+      <section>
+        <h2>2. 目标与边界</h2>
+        <table>
+          <thead><tr><th>目标</th><th>非目标</th></tr></thead>
+          <tbody><tr><td>保留已有 CLI 提交历史；独立仓库可直接安装和测试；Talebook 固定引用已验证提交；现有目录路径保持不变。</td><td>本次不改变 CLI 命令、API、登录、播放或 MCP 行为；不自动跟随独立仓库主分支。</td></tr></tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>3. 方案</h2>
+        <div class="flow">
+          <div><strong>历史导出</strong><br />以 <code>git subtree split</code> 将包目录三次功能提交导出到独立仓库根目录。</div>
+          <div><strong>固定引用</strong><br />在 <code>packages/talebook-audio-cli</code> 添加 HTTPS 子模块，锁定独立仓库提交。</div>
+          <div><strong>兼容验证</strong><br />递归克隆后运行原有测试、ruff、构建和 Talebook 方案检查。</div>
+        </div>
+        <p>独立仓库使用公开可读的 <code>https://github.com/hehetoshang/talebook-audio-cli.git</code>，避免公开 Talebook 仓库的克隆和 CI 依赖个人凭据。子模块更新必须通过 Talebook PR 显式审查指针变化。</p>
+      </section>
+
+      <section>
+        <h2>4. 兼容性与风险</h2>
+        <ul>
+          <li>未使用 <code>--recurse-submodules</code> 的克隆不会得到 CLI 工作树；README 和 PR 中需明确初始化命令。</li>
+          <li>子模块提交被删除或独立仓库改为私有会破坏构建，因此仓库保持公开，并由 Talebook 固定不可漂移的提交。</li>
+          <li>现有部署路径不变；本次只改变源码所有权和 Git 获取方式，无运行时配置迁移。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>5. 测试计划与结果</h2>
+        <ul>
+          <li><strong>通过：</strong>创建公开仓库 <code>hehetoshang/talebook-audio-cli</code>，默认分支为 <code>main</code>；subtree 导出保留三次 CLI 功能提交，仓库管理权限和匿名可读性已确认。</li>
+          <li><strong>通过：</strong><code>git submodule status packages/talebook-audio-cli</code> 显示 Talebook 通过 HTTPS URL 固定到独立仓库提交 <code>ba210e809d081c1201d1c0e475370dc87738fe92</code>。</li>
+          <li><strong>通过：</strong><code>PYTHONPATH=src python3 -m pytest -q</code>，30 个测试通过；<code>ruff check .</code> 与 <code>ruff format --check .</code> 均通过。</li>
+          <li><strong>通过：</strong><code>python3 -m pip wheel --no-build-isolation --no-deps .</code> 构建 <code>talebook_audio_cli-0.1.0-py3-none-any.whl</code> 成功。</li>
+          <li><strong>通过：</strong><code>make lint-py</code>，105 个 Talebook 服务端 Python 文件检查通过；<code>make check-design</code>，116 份方案文档通过。</li>
+          <li><strong>界面审查豁免：</strong>本次仅改变 Git 仓库所有权、子模块元数据和开发文档，不修改 Web、终端输出、命令参数或运行时行为，因此没有界面影响。</li>
+          <li><strong>通过：</strong>从 Talebook 远端分支使用 <code>git clone --recurse-submodules --shallow-submodules</code> 完成干净克隆；子模块匿名检出固定提交，且克隆后的 30 个测试再次通过。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>6. 决策记录</h2>
+        <ul>
+          <li>保留 <code>packages/talebook-audio-cli</code> 路径，避免现有开发命令和部署说明发生无关变化。</li>
+          <li>选择 HTTPS 子模块 URL，确保匿名克隆可用。</li>
+          <li>通过 subtree 拆分保留与 CLI 有关的原始提交，不以单次快照重建历史。</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
