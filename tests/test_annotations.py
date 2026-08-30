@@ -160,6 +160,27 @@ class TestAnnotations(TestWithUserLogin):
         self.assertIn('aria-hidden="true"', body)
         self.assertIn("shell.inert = !open", body)
 
+    def test_reader_hosts_local_selection_actions_and_chapter_annotation_rendering(self):
+        rsp = self.fetch("/read/%d" % BID_EPUB)
+        body = rsp.body.decode("utf-8")
+        self.assertIn('id="talebook-selection-toolbar"', body)
+        self.assertIn('data-action="highlight"', body)
+        self.assertIn('data-action="note"', body)
+        self.assertIn("rendition.off('selected', proxy.on_select_content)", body)
+        self.assertIn("/api/book/%d/annotations" % BID_EPUB, body)
+        self.assertIn("rendition.annotations.highlight", body)
+        self.assertIn("current_toc_title", body)
+        self.assertIn("server: window.location.origin", body)
+        self.assertIn("legacyCommunityResponse", body)
+        self.assertIn("clientId: clientId()", body)
+        self.assertIn("client_id: passage.clientId", body)
+        self.assertIn("if (!selectedPassage || annotationSaveInFlight) return", body)
+        save_start = body.index("async function saveAnnotation")
+        self.assertLess(
+            body.index("hideSelectionToolbar();", save_start),
+            body.index("await fetch", save_start),
+        )
+
     def test_source_upsert_is_idempotent_and_uses_prefixed_source_fields(self):
         first = self._post_source()
         self.assertEqual(first["err"], "ok")
@@ -243,12 +264,78 @@ class TestAnnotations(TestWithUserLogin):
             body=json.dumps({"content": "越权修改"}),
         )
         self.assertEqual(d["err"], "annotation.not_found")
-
         d = self.json(
             "/api/book/%d/annotations/%d" % (BID_EPUB, annotation_id),
             method="DELETE",
         )
         self.assertEqual(d["err"], "annotation.not_found")
+
+    def test_local_public_annotation_uses_the_authenticated_reader_name(self):
+        created = self._post_local(client_id="public-author", is_private=False, author_name="伪造用户")
+
+        self.assertTrue(created["annotation"]["author_name"])
+        self.assertNotEqual(created["annotation"]["author_name"], "伪造用户")
+        updated = self.json(
+            "/api/book/%d/annotations/%d" % (BID_EPUB, created["annotation"]["id"]),
+            method="PUT",
+            body=json.dumps({"author_name": "另一个伪造用户"}),
+        )
+        self.assertEqual(updated["annotation"]["author_name"], created["annotation"]["author_name"])
+
+    def test_source_fields_cannot_override_the_authenticated_reader_name(self):
+        created = self._post_source(
+            source_annotation_id="forged-author",
+            is_private=False,
+            author_name="伪造管理员",
+        )
+
+        self.assertTrue(created["annotation"]["author_name"])
+        self.assertNotEqual(created["annotation"]["author_name"], "伪造管理员")
+
+    def test_book_annotation_scopes_separate_public_activity_from_my_notes(self):
+        own_private = self._post_local(client_id="own-private", chapter="第一章", content="我的私密笔记")
+        own_public = self._post_local(
+            client_id="own-public",
+            chapter="第一章",
+            content="我的公开笔记",
+            is_private=False,
+        )
+        session = get_db()
+        session.add(
+            models.Annotation(
+                reader_id=2,
+                book_id=BID_EPUB,
+                annotation_type="chapter_comment",
+                client_id="other-public",
+                chapter="第一章",
+                content="其他读者的公开评论",
+                is_private=False,
+            )
+        )
+        session.commit()
+
+        public = self.json("/api/book/%d/annotations?scope=public" % BID_EPUB)
+        mine = self.json("/api/book/%d/annotations?scope=mine" % BID_EPUB)
+
+        self.assertEqual(
+            {item["content"] for item in public["annotations"]},
+            {"我的公开笔记", "其他读者的公开评论"},
+        )
+        self.assertEqual(
+            {item["id"] for item in mine["annotations"]},
+            {own_private["annotation"]["id"], own_public["annotation"]["id"]},
+        )
+
+    def test_book_annotations_can_be_limited_to_the_current_chapter(self):
+        first = self._post_local(client_id="chapter-one", chapter="第一章", content="第一章笔记")
+        self._post_local(client_id="chapter-two", chapter="第二章", content="第二章笔记")
+
+        filtered = self.json("/api/book/%d/annotations?chapter=第一章&scope=mine" % BID_EPUB)
+
+        self.assertEqual([item["id"] for item in filtered["annotations"]], [first["annotation"]["id"]])
+
+        invalid = self.json("/api/book/%d/annotations?scope=everyone" % BID_EPUB)
+        self.assertEqual(invalid["err"], "params.invalid")
 
     def test_book_permission_is_checked_for_regular_user(self):
         self.user.return_value = 2
@@ -402,6 +489,7 @@ class TestAnnotations(TestWithUserLogin):
 
         self.assertEqual(len(calls), 1)
         self.assertIsInstance(calls[0][0], PluginAnnotation)
+        self.assertTrue(calls[0][0]["book_title"])
         self.assertEqual(calls[0][2], "sync")
         source = session.query(models.AnnotationSource).filter_by(annotation_id=annotation.id).one()
         self.assertEqual(source.source_name, "talebook.annotation.sync-test")

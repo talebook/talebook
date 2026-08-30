@@ -66,7 +66,7 @@ class NetworkSearch(NetworkBaseHandler):
         mode = self.get_argument("mode", "top")
 
         catalog = self.get_catalog()
-        bindings = [item for item in catalog.bindings() if "book_sources.search" in item.capabilities]
+        bindings = [item for item in catalog.bindings() if "sources.search" in item.capabilities]
         if ids:
             selected = {item.strip() for item in ids.split(",") if item.strip()}
             sources = [item for item in bindings if item.key in selected or str(item.legacy_id) in selected]

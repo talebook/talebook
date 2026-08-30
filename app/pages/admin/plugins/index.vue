@@ -671,7 +671,7 @@ function canExperience(plugin) {
         && supportsInstanceConnection(plugin)
         && (plugin?.capabilities || []).some(capability => [
             'metadata.lookup',
-            'book_sources.search',
+            'sources.search',
             'reviews.lookup',
         ].includes(capability));
 }

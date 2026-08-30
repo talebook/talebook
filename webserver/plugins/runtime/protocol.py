@@ -6,7 +6,7 @@ from .domains import DomainRecord, SourceBook, coerce_entity
 
 
 PROTOCOL_VERSION = "talebook.plugin/v1"
-CATEGORIES = frozenset({"metadata", "annotations", "reviews", "book_sources", "integrations"})
+CATEGORIES = frozenset({"metadata", "annotations", "reviews", "sources", "integrations"})
 RUNTIME_KINDS = frozenset({"builtin", "file", "http", "managed_process"})
 ACTIONS = frozenset({"test", "preview", "run", "retry", "rollback"})
 REQUIRED_MANIFEST_FIELDS = frozenset(

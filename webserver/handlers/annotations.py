@@ -66,6 +66,10 @@ class AnnotationHandlerMixin:
             return None
         return data if isinstance(data, dict) else None
 
+    def _reader_name(self):
+        reader = self.current_user
+        return str(getattr(reader, "name", "") or getattr(reader, "username", "") or "读者 %s" % self.user_id())[:255]
+
     def _book_is_accessible(self, book_id):
         return self.get_book(int(book_id), raise_exception=False) is not None
 
@@ -126,10 +130,20 @@ class BookAnnotations(AnnotationHandlerMixin, BaseHandler):
         book_id = int(book_id)
         if not self._book_is_accessible(book_id):
             return {"err": "params.book.invalid", "msg": _("书籍已不存在或无权访问")}
+        scope = self.get_argument("scope", "visible")
+        if scope not in {"visible", "public", "mine"}:
+            return {"err": "params.invalid", "msg": _("笔记范围错误")}
         query = self.session.query(Annotation).filter(
             Annotation.book_id == book_id,
             or_(Annotation.reader_id == self.user_id(), Annotation.is_private.is_(False)),
         )
+        if scope == "public":
+            query = query.filter(Annotation.is_private.is_(False))
+        elif scope == "mine":
+            query = query.filter(Annotation.reader_id == self.user_id())
+        chapter = self.get_argument("chapter", None)
+        if chapter is not None:
+            query = query.filter(Annotation.chapter == str(chapter)[:500])
         query = self._apply_filters(query, include_book=False)
         annotations = query.order_by(Annotation.chapter, Annotation.cfi, Annotation.id).all()
         return {"err": "ok", "annotations": [self._annotation_dict(item) for item in annotations]}
@@ -256,7 +270,10 @@ class BookAnnotations(AnnotationHandlerMixin, BaseHandler):
                 "quote_text": str(data.get("quote_text") or ""),
                 "content": str(data.get("content") or ""),
                 "color": str(data.get("color") or "")[:32],
-                "author_name": str(data.get("author_name") or "")[:255],
+                # The authenticated reader owns every write through this public endpoint.
+                # External providers preserve their remote author through the internal
+                # annotation writer, never through client-controlled provenance fields.
+                "author_name": self._reader_name(),
             }
             if created or not source_name:
                 values["is_private"] = _as_bool(data.get("is_private", annotation.is_private))
@@ -322,7 +339,6 @@ class BookAnnotationItem(AnnotationHandlerMixin, BaseHandler):
             "quote_text",
             "content",
             "color",
-            "author_name",
         }
         changed = False
         for field in mutable:

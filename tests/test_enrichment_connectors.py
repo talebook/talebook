@@ -18,6 +18,8 @@ from webserver.plugins.review.file_import import ReviewFileProvider, parse_revie
 from webserver.plugins.review.google_books import GoogleBooksReviewProvider
 from webserver.plugins.review.hardcover import HardcoverProvider
 from webserver.plugins.review.neodb import NeoDBReviewProvider
+from webserver.plugins.runtime.domains import Annotation as PluginAnnotation
+from webserver.plugins.runtime.domains import PushReceipt, SourceState
 from webserver.plugins.runtime.protocol import PluginManifest, UpstreamRateLimitError
 from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient
 from webserver.services.epub_metadata import extract_epub_metadata
@@ -136,6 +138,61 @@ def test_brs_accepts_user_owned_connections(db_session):
     )
     assert connection.owner_type == "user"
     assert connection.owner_id == 9
+
+
+def test_brs_push_annotation_logs_in_resolves_the_book_and_writes_the_public_note():
+    calls = []
+
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if url.endswith("/api/user/sign_in"):
+            return {"err": "ok"}
+        if url.endswith("/api/review/book"):
+            return {"err": "ok", "data": {"id": "remote-book"}}
+        return {
+            "err": "ok",
+            "data": {
+                "reviewId": "remote-review-7",
+                "createTime": "2026-08-30 12:00:00",
+            },
+        }
+
+    provider = BRSProvider(transport=transport)
+    item = PluginAnnotation.from_dict(
+        {
+            "id": 7,
+            "book_id": 11,
+            "book_title": "山中一夜雨",
+            "annotation_type": "note",
+            "chapter": "第一章",
+            "cfi": "epubcfi(/6/4!/4/2/2,:0,:8)",
+            "quote_text": "山中一夜雨",
+            "content": "这是我的公开笔记",
+        }
+    )
+
+    receipt = provider.push_annotation(
+        item,
+        SourceState.from_dict({"source_annotation_id": ""}),
+        {
+            "secrets": {"email": "reader@example.com", "password": "private"},
+            "config": {"endpoint": "https://brs.example"},
+        },
+    )
+
+    assert "annotations.push" in provider.manifest["capabilities"]
+    assert isinstance(receipt, PushReceipt)
+    assert receipt.source_annotation_id == "remote-review-7"
+    assert [call[:2] for call in calls] == [
+        ("POST", "https://brs.example/api/user/sign_in"),
+        ("GET", "https://brs.example/api/review/book"),
+        ("POST", "https://brs.example/api/review/add"),
+    ]
+    assert calls[0][2]["data"] == {"email": "reader@example.com", "password": "private"}
+    assert calls[1][2]["params"] == {"title": "山中一夜雨"}
+    assert calls[2][2]["json"]["book_id"] == "remote-book"
+    assert calls[2][2]["json"]["refer_text"] == "山中一夜雨"
+    assert calls[2][2]["json"]["content"] == "这是我的公开笔记"
 
 
 def test_field_decisions_never_silently_replace_locked_or_nonempty_values():

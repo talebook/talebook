@@ -134,6 +134,11 @@ class DevicePushProvider:
         self.uploader_class = uploader_class
         self.manifest["ui"]["default_port"] = uploader_class.default_port(None)
 
+    @staticmethod
+    def initial_enabled(_settings):
+        """设备发送是既有内置能力，首次物化插件时保持默认可用。"""
+        return True
+
     @property
     def default_port(self):
         # default_port 是实例方法，但不依赖实例状态——取未绑定函数即可，

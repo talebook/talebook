@@ -85,6 +85,17 @@ class AnnotationSyncService(AsyncService):
             writers[(source_name, source_connection_id)] = writer
         return writers
 
+    def _annotation_data(self, annotation):
+        data = annotation.to_api_dict()
+        if self.db is None:
+            return data
+        try:
+            metadata = self.db.get_metadata(int(annotation.book_id), index_is_id=True)
+            data["book_title"] = str(getattr(metadata, "title", "") or "")
+        except Exception as err:
+            logging.warning("annotation book metadata unavailable for %s: %s", annotation.book_id, err)
+        return data
+
     @AsyncService.register_service
     def sync_annotation(
         self,
@@ -104,6 +115,7 @@ class AnnotationSyncService(AsyncService):
             settings = get_settings()
         writers = dict(self._writers)
         writers.update(self._typed_writers(annotation, registry or REGISTRY, settings))
+        annotation_data = self._annotation_data(annotation)
         excluded = (exclude_source_name, str(exclude_source_connection_id or ""))
         for (source_name, source_connection_id), writer in list(writers.items()):
             if (source_name, source_connection_id) == excluded:
@@ -116,7 +128,7 @@ class AnnotationSyncService(AsyncService):
             self.session.commit()
 
             try:
-                result = writer(annotation.to_api_dict(), source.to_api_dict()) or {}
+                result = writer(annotation_data, source.to_api_dict()) or {}
                 if not isinstance(result, dict):
                     raise TypeError("annotation source writer must return a dict or None")
                 for field in (

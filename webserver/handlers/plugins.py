@@ -780,7 +780,7 @@ class AdminPluginSourceSearch(BaseHandler):
             query = _body(self).get("query", "")
             if not isinstance(query, str) or not query.strip():
                 raise PluginRuntimeError("plugin.request_invalid", "query must be a non-empty string")
-            runtime, connection = _capability_connection(self, plugin_key, "book_sources.search")
+            runtime, connection = _capability_connection(self, plugin_key, "sources.search")
             page = runtime.read(
                 connection,
                 "search",
@@ -791,7 +791,7 @@ class AdminPluginSourceSearch(BaseHandler):
             )
             return {
                 "err": "ok",
-                "capability": "book_sources.search",
+                "capability": "sources.search",
                 "items": [_source_summary(record) for record in list(page.items or [])[:CAPABILITY_RESULT_LIMIT]],
                 "failures": [_failure_summary(item) for item in list(page.failures or [])[:CAPABILITY_RESULT_LIMIT]],
                 "has_more": bool(page.has_more),

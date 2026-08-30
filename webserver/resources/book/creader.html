@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>{{ book.title }}</title>
 
   <base href="{{RES}}/static/candle-reader/" />
@@ -18,11 +18,40 @@
   <script  type="module">
     import { Reader } from "./candle-reader.es.js?v=v1.1.0"
 
+    function legacyCommunityResponse(url) {
+      if (url.pathname === '/api/review/me') return { err: 'ok', data: { count: 0 } };
+      if (url.pathname === '/api/review/book') return { err: 'ok', data: { id: {{book.id}} } };
+      if (url.pathname === '/api/review/summary' || url.pathname === '/api/review/list' || url.pathname === '/api/review/book/list') {
+        return { err: 'ok', data: { list: [] } };
+      }
+      if (url.pathname.startsWith('/api/review/') || url.pathname.startsWith('/api/user/')) {
+        return { err: 'feature.disabled', msg: '社区服务由 Talebook 插件负责', data: {} };
+      }
+      return null;
+    }
+
+    if (!window.__talebookLocalReaderFetch) {
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = function (resource, options) {
+        const rawUrl = typeof resource === 'string' ? resource : resource.url;
+        const url = new URL(rawUrl, window.location.href);
+        const payload = url.origin === window.location.origin ? legacyCommunityResponse(url) : null;
+        if (payload) {
+          return Promise.resolve(new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }));
+        }
+        return nativeFetch(resource, options);
+      };
+      window.__talebookLocalReaderFetch = true;
+    }
+
     function startReader() {
       document.getElementById('converting').style.display = 'none'
       new Reader('#app', {
         debug: false,
-        server: "{{CANDLE_READER_SERVER}}",
+        server: window.location.origin,
         themes_css: "{{RES}}/static/candle-reader/css/themes.css?v=v1.1.0",
         book_url: "{{RES}}{{epub_dir}}/",
         display_url: "",
@@ -108,6 +137,104 @@
       cursor: pointer;
       font: 600 14px/1 Roboto, sans-serif;
     }
+    #annotation-count {
+      display: inline-grid;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
+      place-items: center;
+      color: #315f7d;
+      background: #fff;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    #comments-toolbar { display: none !important; }
+    #talebook-selection-toolbar {
+      position: fixed;
+      z-index: 10050;
+      display: inline-flex;
+      overflow: hidden;
+      padding: 4px;
+      color: #fff;
+      background: #20333f;
+      border: 1px solid rgba(255, 255, 255, .16);
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(15, 35, 47, .35);
+    }
+    #talebook-selection-toolbar[hidden] { display: none; }
+    #talebook-selection-toolbar button {
+      min-height: 36px;
+      padding: 0 14px;
+      color: inherit;
+      background: transparent;
+      border: 0;
+      border-radius: 7px;
+      cursor: pointer;
+      font: 600 14px/1 Roboto, sans-serif;
+    }
+    #talebook-selection-toolbar button:hover { background: rgba(255, 255, 255, .12); }
+    #talebook-selection-toolbar button:focus-visible,
+    #annotation-editor button:focus-visible,
+    #annotation-editor textarea:focus-visible,
+    #annotation-editor input:focus-visible { outline: 3px solid #ffca67; outline-offset: 2px; }
+    #annotation-editor {
+      width: min(520px, calc(100vw - 32px));
+      padding: 0;
+      color: #20333f;
+      background: #fff;
+      border: 0;
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(15, 35, 47, .34);
+    }
+    #annotation-editor::backdrop { background: rgba(12, 24, 32, .46); }
+    #annotation-editor form { display: grid; gap: 14px; padding: 20px; }
+    #annotation-editor h2 { margin: 0; font: 700 20px/1.3 Roboto, sans-serif; }
+    #annotation-editor blockquote {
+      max-height: 88px;
+      margin: 0;
+      overflow: auto;
+      padding-left: 12px;
+      color: #56666f;
+      border-left: 3px solid #d0a521;
+      font: 14px/1.55 Georgia, "Noto Serif SC", serif;
+    }
+    #annotation-editor textarea {
+      width: 100%;
+      min-height: 112px;
+      padding: 10px 12px;
+      color: #20333f;
+      background: #fff;
+      border: 1px solid #aebbc2;
+      border-radius: 8px;
+      resize: vertical;
+      font: 16px/1.5 Roboto, sans-serif;
+    }
+    #annotation-editor label { display: flex; align-items: center; gap: 8px; color: #56666f; font: 14px/1.4 Roboto, sans-serif; }
+    #annotation-editor footer { display: flex; justify-content: flex-end; gap: 8px; }
+    #annotation-editor footer button { min-height: 38px; padding: 0 16px; border: 0; border-radius: 8px; cursor: pointer; font: 600 14px/1 Roboto, sans-serif; }
+    #annotation-editor footer button:last-child { color: #fff; background: #315f7d; }
+    #annotation-feedback {
+      position: fixed;
+      z-index: 10060;
+      right: 18px;
+      bottom: 24px;
+      max-width: min(360px, calc(100vw - 36px));
+      display: flex;
+      padding: 8px 8px 8px 14px;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+      background: #315f7d;
+      border-radius: 9px;
+      box-shadow: 0 8px 24px rgba(15, 35, 47, .28);
+      font: 500 14px/1.45 Roboto, sans-serif;
+    }
+    #annotation-feedback[data-error="true"] { background: #a43b37; }
+    #annotation-feedback[hidden] { display: none; }
+    #annotation-feedback-dismiss { display:grid; flex:0 0 32px; width:32px; height:32px; place-items:center; color:inherit; background:transparent; border:0; border-radius:50%; cursor:pointer; font-size:20px; }
+    #annotation-feedback-dismiss:focus-visible { outline:3px solid #ffca67; outline-offset:1px; }
     #annotation-toggle:focus-visible, #annotation-close:focus-visible { outline: 3px solid #ffca67; outline-offset: 3px; }
     #annotation-shell {
       position: fixed;
@@ -116,6 +243,7 @@
       width: min(460px, 94vw);
       background: #fff;
       box-shadow: -14px 0 42px rgba(15, 35, 47, .28);
+      overscroll-behavior: contain;
       transform: translateX(105%);
       visibility: hidden;
       pointer-events: none;
@@ -125,8 +253,8 @@
     #annotation-shell header { display:flex; height:52px; align-items:center; justify-content:space-between; padding:0 10px 0 18px; color:#20333f; border-bottom:1px solid #dde5e9; font:700 15px/1 Roboto,sans-serif; }
     #annotation-close { display:grid; width:38px; height:38px; place-items:center; color:#20333f; background:transparent; border:0; border-radius:50%; cursor:pointer; font-size:24px; }
     #annotation-frame { display:block; width:100%; height:calc(100% - 52px); border:0; }
-    @media (max-width: 560px) { #annotation-toggle span { display:none; } #annotation-shell { width:100vw; } }
-    @media (prefers-reduced-motion: reduce) { #annotation-shell { transition:none; } }
+    @media (max-width: 560px) { .annotation-toggle__label { display:none; } #annotation-shell { width:100vw; } }
+    @media (prefers-reduced-motion: reduce) { #annotation-shell { transition:none; } #converting .spinner { animation:none; } }
   </style>
 </head>
 <body>
@@ -138,8 +266,28 @@
   </div>
   {% if request.user %}
   <button id="annotation-toggle" type="button" aria-controls="annotation-shell" aria-expanded="false" aria-label="打开阅读笔记">
-    <span aria-hidden="true">✎</span><span>阅读笔记</span>
+    <span class="annotation-toggle__icon" aria-hidden="true">✎</span><span class="annotation-toggle__label">阅读笔记</span><span id="annotation-count" hidden>0</span>
   </button>
+  <div id="talebook-selection-toolbar" role="toolbar" aria-label="选中文字操作" hidden>
+    <button type="button" data-action="highlight">划线</button>
+    <button type="button" data-action="note">笔记</button>
+  </div>
+  <dialog id="annotation-editor" aria-labelledby="annotation-editor-title">
+    <form method="dialog">
+      <h2 id="annotation-editor-title">添加笔记</h2>
+      <blockquote id="annotation-editor-quote"></blockquote>
+      <textarea id="annotation-editor-content" aria-label="笔记内容" placeholder="写下你的想法…"></textarea>
+      <label><input id="annotation-editor-public" type="checkbox"> 公开给其他用户</label>
+      <footer>
+        <button type="submit" value="cancel">取消</button>
+        <button id="annotation-editor-save" type="button">保存笔记</button>
+      </footer>
+    </form>
+  </dialog>
+  <div id="annotation-feedback" role="status" aria-live="polite" hidden>
+    <span id="annotation-feedback-message"></span>
+    <button id="annotation-feedback-dismiss" type="button" aria-label="关闭提示">×</button>
+  </div>
   <aside id="annotation-shell" data-open="false" aria-hidden="true" aria-label="阅读笔记" inert>
     <header><span>阅读笔记</span><button id="annotation-close" type="button" aria-label="关闭阅读笔记">×</button></header>
     <iframe id="annotation-frame" title="阅读笔记" loading="lazy" src="/book/{{book.id}}/annotations?reader=1"></iframe>
@@ -150,18 +298,43 @@
       const toggle = document.getElementById('annotation-toggle');
       const close = document.getElementById('annotation-close');
       const frame = document.getElementById('annotation-frame');
+      const selectionToolbar = document.getElementById('talebook-selection-toolbar');
+      const annotationEditor = document.getElementById('annotation-editor');
+      const annotationQuote = document.getElementById('annotation-editor-quote');
+      const annotationContent = document.getElementById('annotation-editor-content');
+      const annotationPublic = document.getElementById('annotation-editor-public');
+      const annotationSave = document.getElementById('annotation-editor-save');
+      const annotationCount = document.getElementById('annotation-count');
+      const feedback = document.getElementById('annotation-feedback');
+      const feedbackMessage = document.getElementById('annotation-feedback-message');
+      const feedbackDismiss = document.getElementById('annotation-feedback-dismiss');
+      const annotationApi = '{{RES}}/api/book/{{book.id}}/annotations';
+      const renderedAnnotations = new Set();
+      let selectedPassage = null;
+      let annotationSaveInFlight = false;
+      let chapterRequest = 0;
+      let feedbackTimer = null;
+      let chapterAnnotationCount = 0;
+
+      function updateToggleLabel() {
+        const action = shell.dataset.open === 'true' ? '关闭' : '打开';
+        const count = chapterAnnotationCount ? `，本章 ${chapterAnnotationCount} 条` : '';
+        toggle.setAttribute('aria-label', `${action}阅读笔记${count}`);
+      }
 
       function setPanel(open) {
         shell.dataset.open = open ? 'true' : 'false';
         shell.setAttribute('aria-hidden', String(!open));
         shell.inert = !open;
         toggle.setAttribute('aria-expanded', String(open));
+        updateToggleLabel();
         if (open) close.focus(); else toggle.focus();
       }
       toggle.addEventListener('click', function () { setPanel(shell.dataset.open !== 'true'); });
       close.addEventListener('click', function () { setPanel(false); });
       document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape' && shell.dataset.open === 'true') setPanel(false);
+        if (event.key === 'Escape' && !selectionToolbar.hidden) hideSelectionToolbar();
       });
 
       function readerProxy() {
@@ -171,6 +344,207 @@
           instance = instance.parent;
         }
         return null;
+      }
+
+      function showFeedback(message, error) {
+        window.clearTimeout(feedbackTimer);
+        feedbackMessage.textContent = message;
+        feedback.dataset.error = error ? 'true' : 'false';
+        feedback.hidden = false;
+        if (!error) feedbackTimer = window.setTimeout(function () { feedback.hidden = true; }, 3200);
+      }
+
+      function hideSelectionToolbar() {
+        selectionToolbar.hidden = true;
+        selectionToolbar.style.left = '-999px';
+      }
+
+      function showSelectionToolbar(range, contents) {
+        const quoteText = range.toString().trim();
+        if (!quoteText) return;
+        const frameElement = contents?.document?.defaultView?.frameElement;
+        const frameRect = frameElement?.getBoundingClientRect?.() || { left: 0, top: 0 };
+        const rangeRect = range.getBoundingClientRect();
+        selectionToolbar.hidden = false;
+        const width = selectionToolbar.offsetWidth || 142;
+        const height = selectionToolbar.offsetHeight || 44;
+        const center = frameRect.left + rangeRect.left + (rangeRect.width / 2);
+        const left = Math.max(8, Math.min(window.innerWidth - width - 8, center - (width / 2)));
+        const above = frameRect.top + rangeRect.top - height - 10;
+        const below = frameRect.top + rangeRect.bottom + 10;
+        selectionToolbar.style.left = `${left}px`;
+        selectionToolbar.style.top = `${above >= 8 ? above : Math.min(window.innerHeight - height - 8, below)}px`;
+        selectionToolbar.querySelector('button')?.focus({ preventScroll: true });
+      }
+
+      function handleSelection(cfiRange, contents) {
+        const proxy = readerProxy();
+        if (!proxy) return;
+        try {
+          const range = proxy.rendition.getRange(cfiRange);
+          const quoteText = range?.toString().trim();
+          if (!range || !quoteText) return;
+          selectedPassage = {
+            clientId: clientId(),
+            cfi: String(cfiRange),
+            chapter: String(proxy.current_toc_title || proxy.current_toc?.label || '').trim(),
+            quoteText,
+            contents,
+          };
+          proxy.is_handlering_selected_content = true;
+          showSelectionToolbar(range, contents);
+        } catch (error) {
+          console.error('Talebook selection failed:', error);
+        }
+      }
+
+      function clientId() {
+        if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+        return `reader-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      }
+
+      function annotationColor(annotation) {
+        if (annotation.annotation_type === 'note') return '#4f8fb8';
+        if (annotation.annotation_type === 'chapter_comment') return '#7e57c2';
+        return '#e6b91e';
+      }
+
+      function renderAnnotation(rendition, annotation) {
+        if (!annotation?.cfi || renderedAnnotations.has(annotation.id)) return;
+        try {
+          rendition.annotations.highlight(
+            annotation.cfi,
+            { annotationId: annotation.id },
+            function () { setPanel(true); },
+            'talebook-local-annotation',
+            { fill: annotationColor(annotation), 'fill-opacity': '0.38', 'mix-blend-mode': 'multiply' },
+          );
+          renderedAnnotations.add(annotation.id);
+        } catch (error) {
+          console.warn('Talebook annotation could not be rendered:', annotation.id, error);
+        }
+      }
+
+      async function loadChapterAnnotations(proxy) {
+        const chapter = String(proxy.current_toc_title || proxy.current_toc?.label || '').trim();
+        if (!chapter) return;
+        const request = ++chapterRequest;
+        try {
+          const query = new URLSearchParams({ scope: 'visible', chapter });
+          const response = await fetch(`${annotationApi}?${query.toString()}`, { credentials: 'same-origin' });
+          const data = await response.json();
+          if (request !== chapterRequest || data.err !== 'ok') return;
+          const annotations = Array.isArray(data.annotations) ? data.annotations : [];
+          chapterAnnotationCount = annotations.length;
+          annotationCount.textContent = String(annotations.length);
+          annotationCount.hidden = annotations.length === 0;
+          updateToggleLabel();
+          annotations.forEach(function (annotation) { renderAnnotation(proxy.rendition, annotation); });
+        } catch (error) {
+          console.warn('Talebook chapter annotations could not be loaded:', error);
+        }
+      }
+
+      async function saveAnnotation(annotationType, content, isPrivate) {
+        if (!selectedPassage || annotationSaveInFlight) return;
+        const passage = selectedPassage;
+        annotationSaveInFlight = true;
+        hideSelectionToolbar();
+        annotationSave.disabled = true;
+        try {
+          const response = await fetch(annotationApi, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_id: passage.clientId,
+              annotation_type: annotationType,
+              is_private: isPrivate,
+              chapter: passage.chapter,
+              cfi: passage.cfi,
+              quote_text: passage.quoteText,
+              content,
+              color: annotationType === 'note' ? 'blue' : 'yellow',
+            }),
+          });
+          const data = await response.json();
+          if (data.err !== 'ok') throw new Error(data.msg || data.err);
+          const proxy = readerProxy();
+          if (proxy) {
+            renderAnnotation(proxy.rendition, data.annotation);
+            await loadChapterAnnotations(proxy);
+          }
+          if (annotationEditor.open) annotationEditor.close();
+          try { passage.contents?.window?.getSelection()?.removeAllRanges(); } catch (error) { /* noop */ }
+          passage.contents?.document?.defaultView?.frameElement?.focus?.();
+          if (selectedPassage === passage) selectedPassage = null;
+          frame.contentWindow?.location.reload();
+          showFeedback(annotationType === 'highlight' ? '划线已保存到 Talebook' : '笔记已保存到 Talebook', false);
+        } catch (error) {
+          showFeedback(`保存失败：${error.message || '请稍后重试'}`, true);
+          if (annotationType === 'highlight' && selectedPassage === passage) {
+            try {
+              const range = readerProxy()?.rendition?.getRange(passage.cfi);
+              if (range) showSelectionToolbar(range, passage.contents);
+            } catch (selectionError) { /* keep the persistent error feedback */ }
+          }
+        } finally {
+          annotationSaveInFlight = false;
+          annotationSave.disabled = false;
+        }
+      }
+
+      selectionToolbar.addEventListener('click', function (event) {
+        const action = event.target.closest('button')?.dataset.action;
+        if (!selectedPassage || !action) return;
+        if (action === 'highlight') {
+          saveAnnotation('highlight', '', true);
+          return;
+        }
+        hideSelectionToolbar();
+        annotationQuote.textContent = selectedPassage.quoteText;
+        annotationContent.value = '';
+        annotationPublic.checked = false;
+        if (annotationEditor.showModal) annotationEditor.showModal(); else annotationEditor.setAttribute('open', '');
+        annotationContent.focus();
+      });
+
+      annotationSave.addEventListener('click', function () {
+        const content = annotationContent.value.trim();
+        if (!content) {
+          annotationContent.focus();
+          showFeedback('请先填写笔记内容', true);
+          return;
+        }
+        saveAnnotation('note', content, !annotationPublic.checked);
+      });
+
+      feedbackDismiss.addEventListener('click', function () { feedback.hidden = true; });
+      annotationEditor.addEventListener('close', function () {
+        selectedPassage?.contents?.document?.defaultView?.frameElement?.focus?.();
+      });
+
+      document.addEventListener('pointerdown', function (event) {
+        if (!selectionToolbar.hidden && !selectionToolbar.contains(event.target)) hideSelectionToolbar();
+      });
+
+      async function connectReaderAnnotations() {
+        let proxy = readerProxy();
+        for (let attempt = 0; !proxy && attempt < 60; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          proxy = readerProxy();
+        }
+        if (!proxy) return;
+        const rendition = proxy.rendition;
+        rendition.off('selected', proxy.on_select_content);
+        rendition.on('selected', handleSelection);
+        proxy.load_comments_summary = function () {};
+        const refreshChapter = function () {
+          window.setTimeout(function () { loadChapterAnnotations(proxy); }, 0);
+        };
+        rendition.on('locationChanged', refreshChapter);
+        rendition.on('rendered', refreshChapter);
+        refreshChapter();
       }
 
       async function locate(data, source) {
@@ -204,6 +578,7 @@
           locate({ cfi: initial.get('cfi') }, frame.contentWindow);
         });
       }
+      connectReaderAnnotations();
     })();
   </script>
   {% endif %}

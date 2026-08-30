@@ -183,7 +183,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
     .map(installation => mockPluginConnection(installation));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
-  annotationsByBookId = new Map([[1, mockAnnotations(1)]]);
+  annotationsByBookId = body?.annotationsEmpty ? new Map() : new Map([[1, mockAnnotations(1)]]);
   annotationPermissionDenied = !!body?.annotationPermissionDenied;
   annotationPartialRollback = !!body?.annotationPartialRollback;
   wereadRunId = 500;
@@ -1419,6 +1419,9 @@ router.get('/api/book/:id/annotations', eventHandler((event) => {
   const bookId = Number(getRouterParam(event, 'id'));
   const query = getQuery(event);
   let annotations = annotationsByBookId.get(bookId) || [];
+  if (query.scope === 'public') annotations = annotations.filter(annotation => !annotation.is_private);
+  if (query.scope === 'mine') annotations = annotations.filter(annotation => annotation.can_edit);
+  if (query.chapter !== undefined) annotations = annotations.filter(annotation => annotation.chapter === query.chapter);
   if (query.source_name) {
     annotations = annotations.filter(annotation => {
       if (query.source_name === 'talebook') return !annotation.sources.length;
@@ -1426,6 +1429,35 @@ router.get('/api/book/:id/annotations', eventHandler((event) => {
     });
   }
   return { err: 'ok', annotations };
+}));
+
+router.post('/api/book/:id/annotations', eventHandler(async (event) => {
+  const bookId = Number(getRouterParam(event, 'id'));
+  const body = await readBody(event);
+  if (!body?.client_id || !['highlight', 'note', 'bookmark', 'chapter_comment'].includes(body.annotation_type)) {
+    return { err: 'params.invalid', msg: '笔记参数错误' };
+  }
+  const annotations = annotationsByBookId.get(bookId) || [];
+  const existing = annotations.find(item => item.client_id === body.client_id);
+  const annotation = {
+    ...(existing || {}),
+    id: existing?.id || Math.max(100, ...annotations.map(item => item.id)) + 1,
+    book_id: bookId,
+    client_id: body.client_id,
+    annotation_type: body.annotation_type,
+    is_private: body.is_private !== false,
+    can_edit: true,
+    cfi: body.cfi || null,
+    chapter: body.chapter || '',
+    quote_text: body.quote_text || '',
+    content: body.content || '',
+    color: body.color || '',
+    created_at: existing?.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    sources: existing?.sources || [],
+  };
+  annotationsByBookId.set(bookId, [...annotations.filter(item => item !== existing), annotation]);
+  return { err: 'ok', annotation, created: !existing, sync_enqueued: !annotation.is_private };
 }));
 
 router.delete('/api/book/:id/annotations/:annotationId', eventHandler((event) => {
@@ -1642,8 +1674,8 @@ const pluginDefinitions = [
     description: '管理已保存的 OPDS 目录，并浏览、搜索与批量导入。',
     version: '1.0.0',
     runtime_kind: 'builtin',
-    categories: ['book_sources'],
-    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire'],
     actions: ['test'],
     permissions: ['books.read', 'books.write', 'network.read'],
     connection_owners: ['instance'],
@@ -1656,8 +1688,8 @@ const pluginDefinitions = [
     description: '管理、导入、搜索、阅读并使用兼容 Legado 的在线书源补全书籍信息。',
     version: '1.0.0',
     runtime_kind: 'builtin',
-    categories: ['book_sources', 'metadata'],
-    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire', 'metadata.lookup'],
+    categories: ['sources', 'metadata'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire', 'metadata.lookup'],
     actions: ['test'],
     permissions: ['books.read', 'books.write', 'network.read'],
     connection_owners: ['instance'],
@@ -1670,8 +1702,8 @@ const pluginDefinitions = [
     description: '扫描白名单内的本地目录，以内容 hash 增量发现待审电子书。',
     version: '1.0.0',
     runtime_kind: 'file',
-    categories: ['book_sources'],
-    capabilities: ['book_sources.browse', 'book_sources.acquire'],
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.acquire'],
     actions: ['test', 'preview', 'run', 'retry', 'rollback'],
     permissions: ['books.read', 'books.write'],
     connection_owners: ['instance'],
@@ -1695,8 +1727,8 @@ const pluginDefinitions = [
     description: '浏览 Standard Ebooks 官方开放的最新公共版权电子书。',
     version: '1.0.0',
     runtime_kind: 'http',
-    categories: ['book_sources'],
-    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire'],
     actions: ['test', 'preview', 'run', 'retry', 'rollback'],
     auth_schema: { type: 'object', properties: {} },
     config_schema: { type: 'object', properties: {} },
@@ -1711,8 +1743,8 @@ const pluginDefinitions = [
     description: '检索 Project Gutenberg 的合法开放电子书。',
     version: '1.0.0',
     runtime_kind: 'http',
-    categories: ['book_sources'],
-    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire'],
     actions: ['test', 'preview', 'run', 'retry', 'rollback'],
     auth_schema: { type: 'object', properties: {} },
     config_schema: { type: 'object', properties: {} },
@@ -1727,8 +1759,8 @@ const pluginDefinitions = [
     description: '检索 Internet Archive；仅明确开放文件可进入待审取得。',
     version: '1.0.0',
     runtime_kind: 'http',
-    categories: ['book_sources'],
-    capabilities: ['book_sources.browse', 'book_sources.search', 'book_sources.acquire'],
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire'],
     actions: ['test', 'preview', 'run', 'retry', 'rollback'],
     auth_schema: { type: 'object', properties: {} },
     config_schema: { type: 'object', properties: {} },
@@ -1834,11 +1866,11 @@ const pluginDefinitions = [
     id: 10,
     plugin_key: 'talebook.annotation.brs',
     name: 'talebook-brs 章评服务器',
-    description: '连接一个 talebook-brs 实例，按书籍与章节映射导入公开章评摘要。',
-    version: '1.0.0',
+    description: '连接一个 talebook-brs 实例，导入公开章评，并同步 Talebook 中的公开笔记。',
+    version: '1.1.0',
     runtime_kind: 'builtin',
     categories: ['annotations'],
-    capabilities: ['annotations.chapter_reviews'],
+    capabilities: ['annotations.chapter_reviews', 'annotations.push'],
     actions: ['test', 'preview', 'run', 'retry', 'rollback'],
     auth_schema: {
       type: 'object',
@@ -1849,7 +1881,7 @@ const pluginDefinitions = [
       type: 'object',
       properties: { endpoint: { type: 'string', default: 'https://brs.talebook.org' }, book_map: { type: 'object' }, chapter_map: { type: 'object' }, segment_map: { type: 'object' } },
     },
-    permissions: ['books.read', 'plugin_records.write', 'network.read'],
+    permissions: ['books.read', 'plugin_records.write', 'network.read', 'network.write', 'annotations.write'],
     connection_owners: ['user'],
     ui: { icon: 'mdi-comment-text-multiple-outline', manage_route: '/plugins/brs' },
   },
@@ -1973,7 +2005,7 @@ router.post('/api/admin/plugins/:pluginKey/source/search', eventHandler(async (e
   const body = await readBody(event);
   return {
     err: 'ok',
-    capability: 'book_sources.search',
+    capability: 'sources.search',
     items: [{
       external_id: 'standard-ebooks:pride-and-prejudice',
       title: `${body?.query || 'Pride'} and Prejudice`,

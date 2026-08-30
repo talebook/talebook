@@ -62,7 +62,7 @@ def _manifest(
         "name": name,
         "description": description,
         "version": "1.0.0",
-        "categories": ["book_sources"],
+        "categories": ["sources"],
         "capabilities": capabilities,
         "runtime_kind": runtime_kind,
         "actions": ["test", "preview", "run", "retry", "rollback"],
@@ -283,7 +283,7 @@ class OPDSProvider(SourceBase):
             plugin_id,
             name,
             description,
-            ["book_sources.browse", "book_sources.search", "book_sources.acquire"],
+            ["sources.browse", "sources.search", "sources.acquire"],
             {"type": "object", "properties": properties, "required": [] if endpoint else ["endpoint"]},
             {
                 "type": "object",
