@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Talebook Calibre 回收站管理与私藏书永久删除方案。" />
+  <link rel="icon" href="data:," />
+  <title>提供可恢复的 Calibre 回收站管理 · ACTIVE</title>
+  <style>
+    :root { color-scheme: light; --bg:#f5f7fb; --panel:#fff; --ink:#1f2937; --muted:#596579; --line:#d8e0eb; --accent:#a34b19; --soft:#fff2e8; --ok:#176443; --oksoft:#e8f6ee; --warn:#9a4d0c; --warnsoft:#fff8eb; --danger:#a43d3d; --dangersoft:#fdecec; --shadow:0 12px 30px rgba(15,23,42,.08); --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; --mono:"SFMono-Regular",Consolas,monospace; }
+    * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; color:var(--ink); background:linear-gradient(150deg,#fff 0,var(--bg) 55%,#fff5ed 100%); font-family:var(--sans); line-height:1.65; }
+    .skip-link { position:fixed; top:8px; left:8px; z-index:10; padding:8px 12px; color:#fff; background:#263244; transform:translateY(-160%); } .skip-link:focus { transform:none; }
+    .page { width:min(1080px,calc(100vw - 32px)); margin:auto; padding:24px 0 56px; } .hero,.card { background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); } .hero { padding:30px 32px; margin-bottom:18px; border-top:5px solid var(--accent); }
+    h1 { margin:0 0 8px; font-size:clamp(29px,4vw,45px); line-height:1.15; } h2 { margin:0 0 14px; font-size:22px; } h3 { margin:20px 0 8px; font-size:17px; } p,li,td,th { font-size:14px; } p { margin:0 0 12px; } ul,ol { margin:8px 0 0 20px; padding:0; } li+li { margin-top:5px; } code { padding:.1em .35em; border-radius:4px; background:#eef2f7; font-family:var(--mono); overflow-wrap:anywhere; }
+    .sub { color:var(--muted); font-size:16px; } .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; } .chip { padding:5px 11px; border-radius:999px; color:#536176; background:#eef2f7; font-size:12px; font-weight:700; } .chip.active { color:var(--ok); background:var(--oksoft); }
+    .card { margin-bottom:18px; padding:25px 27px; scroll-margin-top:16px; } .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; } .choice,.callout { padding:15px 16px; border:1px solid var(--line); border-radius:14px; background:#fafbfd; } .choice h3 { margin-top:0; } .choice.good,.callout.good { border-color:#b9ddca; background:var(--oksoft); } .callout.warn { border-color:#efd49e; background:var(--warnsoft); } .callout.danger { border-color:#e4b4b4; background:var(--dangersoft); }
+    .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:15px; } .step { padding:14px; border:1px solid var(--line); border-radius:13px; background:#fff; } .step b { display:block; margin-bottom:5px; } .step span { color:var(--accent); font:800 10px/1.3 var(--mono); text-transform:uppercase; } .step p { margin:5px 0 0; color:var(--muted); font-size:13px; }
+    .table-wrap { overflow-x:auto; margin-top:12px; border:1px solid var(--line); border-radius:13px; } table { width:100%; min-width:690px; border-collapse:collapse; } th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { color:#536176; background:#f7f9fc; font-size:12px; } th:last-child,td:last-child { border-right:0; } tr:last-child td { border-bottom:0; } .yes { color:var(--ok); font-weight:800; } .no { color:var(--muted); font-weight:700; } .pending { color:var(--warn); font-weight:800; }
+    footer { color:var(--muted); font-size:12px; text-align:center; } @media (max-width:720px) { .page { width:calc(100vw - 20px); padding-top:10px; } .hero,.card { border-radius:15px; } .hero,.card { padding:21px 19px; } .grid,.flow { grid-template-columns:1fr; } } @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } } @media print { body { background:#fff; } .page { width:100%; } .hero,.card { box-shadow:none; } .skip-link { display:none; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到正文</a>
+  <div class="page">
+    <header class="hero">
+      <h1>提供可恢复的 Calibre 回收站管理</h1>
+      <p class="sub">管理员可查看、批量恢复或永久删除 Calibre 回收站中的整本书；私藏书删除则绕过回收站，直接永久删除。</p>
+      <div class="chips" aria-label="方案元信息">
+        <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-30</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：webserver / app / tests</span><span class="chip">需求来源：TB-135（houheya）</span>
+      </div>
+    </header>
+    <main id="main-content">
+      <section class="card" id="request">
+        <h2>1. 原始诉求</h2>
+        <div class="callout warn">“侧边栏管理区域加入回收站管理，可查看 Calibre <code>library/.caltrash</code> 内容并恢复或彻底删除；私藏书籍删除时直接永久删除；仅管理员可访问。”</div>
+        <p>现有设置页只能显示回收站总大小并一键清空，不能按书查看或恢复。普通删除调用 Calibre 默认删除语义，文件进入库级回收站。</p>
+      </section>
+      <section class="card" id="goals">
+        <h2>2. 目标与边界</h2>
+        <div class="grid">
+          <article class="choice good"><h3>目标</h3><ul><li>管理员在独立页面查看书名、作者、删除时间、格式和占用空间。</li><li>单本或批量恢复，重建 Calibre 数据库记录并沿用 Talebook 的 <code>Item</code> 扩展数据。</li><li>单本或批量永久删除，必须经过明确二次确认。</li><li>所有私藏书删除入口使用 Calibre <code>permanent=True</code>。</li></ul></article>
+          <article class="choice"><h3>非目标</h3><ul><li>不恢复被现有删除流程清理的 <code>ScanFile</code> 导入历史。</li><li>不展示本地绝对路径，不允许客户端提交文件路径。</li><li>不管理 Calibre 的“单格式回收站”；本页只管理已删除整本书。</li><li>不改变上传临时目录的现有清理功能。</li></ul></article>
+        </div>
+      </section>
+      <section class="card" id="matrix">
+        <h2>3. 产品功能矩阵</h2>
+        <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0"><table>
+          <thead><tr><th>任务</th><th>游客</th><th>普通用户</th><th>管理员</th><th>PC</th><th>手机</th><th>API / 协议</th><th>验收口径</th></tr></thead>
+          <tbody>
+            <tr><td>查看回收站</td><td class="no">不支持</td><td class="no">不支持</td><td class="yes">支持</td><td class="yes">表格</td><td class="yes">响应式书籍卡片</td><td><code>GET /api/admin/trash</code></td><td>只返回逻辑元数据，不返回绝对路径</td></tr>
+            <tr><td>恢复所选书籍</td><td class="no">不支持</td><td class="no">不支持</td><td class="yes">支持</td><td class="yes">支持</td><td class="yes">支持</td><td><code>PATCH /api/admin/trash</code></td><td>恢复后原 ID 可在书库访问</td></tr>
+            <tr><td>永久删除所选条目</td><td class="no">不支持</td><td class="no">不支持</td><td class="yes">支持</td><td class="yes">二次确认</td><td class="yes">二次确认</td><td><code>DELETE /api/admin/trash</code></td><td>文件释放且操作不可恢复</td></tr>
+            <tr><td>删除私藏书</td><td class="no">不支持</td><td>仅所有者且有删除权限</td><td class="yes">支持</td><td class="yes">现有入口</td><td class="yes">现有入口</td><td>现有删除 API</td><td>Calibre 收到 <code>permanent=True</code></td></tr>
+          </tbody>
+        </table></div>
+      </section>
+      <section class="card" id="evidence">
+        <h2>4. 现状与证据</h2>
+        <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0"><table>
+          <thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead>
+          <tbody>
+            <tr><td>普通删除进入回收站</td><td><code>webserver/handlers/book.py</code> 调用 <code>LibraryDatabase.delete_book(bid)</code></td><td>Calibre 默认 <code>permanent=False</code>。</td></tr>
+            <tr><td>Calibre 已提供安全的恢复能力</td><td><code>Cache.list_trash_entries()</code>、<code>move_book_from_trash()</code>、<code>delete_trash_entry()</code></td><td>无需自行解析 OPF 或移动目录，应复用上游锁和路径边界。</td></tr>
+            <tr><td>Talebook 扩展数据可跨普通删除保留</td><td>普通 <code>BookDelete</code> 不删除 <code>Item</code>；仅清理 <code>ScanFile</code></td><td>恢复原 ID 后收藏者、私密范围和计数可重新关联。</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+      <section class="card" id="design">
+        <h2>5. 方案</h2>
+        <div class="callout good"><strong>方案结论：</strong>以 Calibre 新 API 作为回收站状态的唯一真相。后端只接受整数 ID，在管理员权限和 Calibre 写锁内完成列表、恢复、删除；前端提供独立管理页、批量选择和危险确认。</div>
+        <div class="flow" aria-label="核心处理流程">
+          <article class="step"><span>Input</span><b>管理员选择 ID</b><p>客户端只发送整数 <code>idlist</code>。</p></article>
+          <article class="step"><span>Guard</span><b>权限与存在性</b><p><code>@is_admin</code>；对照实时回收站条目。</p></article>
+          <article class="step"><span>Core</span><b>调用 Calibre API</b><p>恢复用 <code>move_book_from_trash</code>；删除用 <code>delete_trash_entry</code>。</p></article>
+          <article class="step"><span>Output</span><b>逐项结果</b><p>返回成功 ID 与失败原因，前端刷新列表。</p></article>
+        </div>
+        <h3>关键决策</h3>
+        <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0"><table>
+          <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+          <tbody>
+            <tr><td>回收站读写</td><td>Calibre <code>new_api</code></td><td>上游已处理 OPF、封面、格式、注解、数据库重建、写锁和受控路径。</td><td>直接遍历并移动 <code>.caltrash</code>，容易破坏一致性。</td></tr>
+            <tr><td>批量失败</td><td>逐项执行并返回部分结果</td><td>单个 ID 冲突不应阻断其他条目；结果可观察。</td><td>首错即停会留下难判断状态。</td></tr>
+            <tr><td>关联数据</td><td>普通删除保留 <code>Item</code></td><td>恢复使用原书 ID，可保留访问、下载与归属数据。</td><td>恢复时凭 OPF 无法重建 Talebook 扩展字段。</td></tr>
+            <tr><td>私藏删除</td><td>调用 <code>delete_book(..., permanent=True)</code></td><td>沿用 Calibre 的安全永久删除开关，不自行删目录。</td><td>删除后再从回收站清理会产生短暂可见窗口。</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+      <section class="card" id="impact">
+        <h2>6. 影响范围、风险与回滚</h2>
+        <div class="grid"><article class="choice good"><h3>影响范围</h3><p>新增管理员 API 和页面；两套侧边栏增加入口；单本及后台批量删除按 <code>Item.scope</code> 决定 Calibre 永久删除参数；补充中英文文案、后端和 E2E 测试。</p></article><article class="choice"><h3>保持不变</h3><p>普通书仍进入 Calibre 回收站；既有回收站大小和清空上传目录功能保留；外部索引书不删除外部源文件；不新增表或迁移。</p></article></div>
+        <div class="callout danger"><strong>主要风险：</strong>恢复时原 ID 已被占用会失败；批量接口必须原样报告失败且不覆盖现有书。永久删除不可撤销，因此 UI 使用持久危险对话框并显示选中数量。</div>
+        <div class="callout"><strong>回滚：</strong>代码可整体回滚，无 schema 或配置迁移；已经执行的永久删除无法通过代码回滚恢复。</div>
+      </section>
+      <section class="card" id="tests">
+        <h2>7. 测试计划与结果</h2>
+        <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0"><table>
+          <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td>后端单元 / 集成</td><td><code>docker build --target test -t talebook/test:tb135 . &amp;&amp; docker run ... pytest -q tests</code></td><td>全量回归；含权限、列表、真实 Calibre 恢复、批量永久删除、私藏永久删除</td><td class="yes">通过：896 passed，20 skipped</td></tr>
+            <tr><td>前端组件 / 构建</td><td><code>npx vitest run test/components/AppHeader.spec.ts test/components/BuiltinThemeHeader.spec.ts</code><br /><code>npm run build</code></td><td>两套管理员侧栏入口、中英文 locale 编译、生产构建</td><td class="yes">通过：18 tests；Nuxt build 完成</td></tr>
+            <tr><td>前端 E2E</td><td><code>npx playwright test test/e2e/admin-trash.spec.ts</code></td><td>列表、单本恢复、永久删除确认、批量选择、320px 移动卡片、无页面横向溢出</td><td class="yes">通过：3 tests</td></tr>
+            <tr><td>质量门禁</td><td><code>ruff check webserver</code>、<code>ruff format --check webserver</code>、<code>npm run lint</code>、<code>npm run build</code>、<code>make check-design</code></td><td>Python / 前端 / 方案门禁通过</td><td class="yes">通过；ESLint 仅报告仓库既有 warning</td></tr>
+            <tr><td>实际渲染 / 界面审查</td><td><code>/admin/trash</code>，Chromium 1440×1000、390×1000，另测 320×844；<code>interface-review full working</code></td><td>PC 表格、手机卡片、选择、空/加载/失败状态、危险确认清晰</td><td class="yes">通过：首轮发现并修复移动端操作远离首屏、失败提示短暂且信息不足；复审无 HIGH / MEDIUM，Verdict: Approve。已生成 PC / 手机截图。运行环境未提供 Chrome DevTools MCP，使用短生命周期 mock API + Playwright Chromium 替代，剩余风险是未在真实后端执行人工浏览器操作。</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+      <section class="card" id="decisions">
+        <h2>8. 决策记录</h2>
+        <ol><li><strong>2026-08-30：</strong>确认直接复用 Calibre 回收站 API，不手工解析或移动目录。</li><li><strong>2026-08-30：</strong>回收站页面只列整本书；现有设置页继续负责全量清理及上传临时目录。</li><li><strong>2026-08-30：</strong>恢复沿用原 ID 和保留的 <code>Item</code>，不虚构无法还原的 <code>ScanFile</code> 导入记录。</li><li><strong>2026-08-30：</strong>实现期界面审查将移动端宽表改为书籍卡片，使操作无需横向滚动；部分失败改为持久提示，列出失败 ID 和冲突处理建议。</li><li><strong>2026-08-30：</strong><code>interface-review full</code> 复审覆盖 16 个变更文件、默认及内置主题侧栏、PC / 手机页面与危险确认，无剩余可执行界面问题，结论 Approve。</li></ol>
+      </section>
+    </main>
+    <footer>Talebook internal design · webserver · ACTIVE · 2026-08-30</footer>
+  </div>
+</body>
+</html>

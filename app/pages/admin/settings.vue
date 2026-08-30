@@ -1301,13 +1301,6 @@ const fetchTrashSize = () => {
                 trash: formatTrashSize(rsp.sizes.trash),
                 upload: formatTrashSize(rsp.sizes.upload),
             };
-            // 开发模式下显示实际路径用于调试
-            if (process.dev) {
-                console.log('Trash paths:', {
-                    trash: rsp.trash_path,
-                    upload: rsp.upload_path,
-                });
-            }
         } else {
             trashSizeTexts.value = {
                 trash: t('admin.settings.label.trashUnknown'),

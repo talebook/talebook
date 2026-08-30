@@ -228,6 +228,7 @@
     "browse": "分类导览",
     "users": "用户管理",
     "books": "图书管理",
+    "trash": "回收站",
     "audiobookJobs": "有声书任务",
     "import": "导入图书",
     "scopedBooks": "私有书籍",
@@ -636,6 +637,36 @@
       },
       "user": {
         "action": "操作"
+      }
+    },
+    "trash": {
+      "title": "回收站管理",
+      "description": "这里显示普通书籍删除后进入的 Calibre 回收站。恢复会重建书库记录；永久删除后无法找回。",
+      "empty": "回收站中没有已删除的书籍",
+      "selected": "已选择 {count} 本",
+      "selectBook": "选择《{title}》",
+      "totalSpace": "占用空间：{size}",
+      "refresh": "刷新",
+      "restore": "恢复",
+      "restoreSelected": "恢复所选",
+      "deletePermanently": "永久删除",
+      "deleteSelected": "永久删除所选",
+      "confirmTitle": "确认永久删除",
+      "confirmMessage": "即将永久删除所选 {count} 本书籍及其文件。",
+      "confirmWarning": "此操作不可撤销，无法从回收站恢复。",
+      "restoreResult": "已恢复 {count} 本书籍",
+      "deleteResult": "已永久删除 {count} 本书籍",
+      "restorePartialResult": "已恢复 {count} 本书籍；{failed} 本恢复失败（ID：{ids}）。请刷新后重试。",
+      "deletePartialResult": "已永久删除 {count} 本书籍；{failed} 本删除失败（ID：{ids}）。请刷新后重试。",
+      "idConflictHint": "原书 ID 已被占用，恢复前请先处理冲突书籍。",
+      "loadFailed": "回收站加载失败",
+      "headers": {
+        "title": "书名",
+        "author": "作者",
+        "deletedAt": "删除时间",
+        "formats": "格式",
+        "size": "大小",
+        "actions": "操作"
       }
     },
     "imports": {

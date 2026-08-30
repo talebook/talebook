@@ -34,6 +34,7 @@ let audiobookManagedEditions = [];
 let audiobookCapacityOk = true;
 let audiobookWorkspace = null;
 let podcastTokenHint = '';
+let trashBooks = [];
 let importSettings = {
   scan_upload_path: '/mock/scan/dir',
   import_mode: 'copy',
@@ -218,6 +219,24 @@ router.post('/_test/reset', eventHandler(async (event) => {
   audiobookWorkspace = workspacePayload();
   audiobookCapacityOk = body?.audiobookCapacityOk !== false;
   podcastTokenHint = '';
+  trashBooks = [
+    {
+      id: 91,
+      title: '被删除的普通书',
+      author: '测试作者',
+      deleted_at: '2026-08-29T10:00:00Z',
+      size: 1572864,
+      formats: ['EPUB'],
+    },
+    {
+      id: 92,
+      title: '待永久删除的书',
+      author: '另一位作者',
+      deleted_at: '2026-08-28T09:30:00Z',
+      size: 524288,
+      formats: ['PDF', 'MOBI'],
+    },
+  ];
   return { status: 'ok' };
 }));
 
@@ -880,11 +899,33 @@ router.get('/api/admin/log', eventHandler((event) => {
   };
 }));
 
+router.get('/api/admin/trash', eventHandler(() => ({
+  err: 'ok',
+  items: trashBooks,
+  total: trashBooks.length,
+  total_size: trashBooks.reduce((total, item) => total + item.size, 0),
+})));
+
+router.patch('/api/admin/trash', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const ids = new Set(body?.idlist || []);
+  const restored = trashBooks.filter(item => ids.has(item.id)).map(item => item.id);
+  trashBooks = trashBooks.filter(item => !ids.has(item.id));
+  return { err: 'ok', restored, failures: [], msg: `${restored.length} restored` };
+}));
+
+router.delete('/api/admin/trash', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body?.confirm !== true) return { err: 'params.confirm', msg: 'Confirmation required' };
+  const ids = new Set(body?.idlist || []);
+  const deleted = trashBooks.filter(item => ids.has(item.id)).map(item => item.id);
+  trashBooks = trashBooks.filter(item => !ids.has(item.id));
+  return { err: 'ok', deleted, failures: [], msg: `${deleted.length} deleted` };
+}));
+
 router.get('/api/admin/trash/size', eventHandler(() => ({
   err: 'ok',
   sizes: { trash: 0, upload: 0 },
-  trash_path: '/tmp/trash',
-  upload_path: '/tmp/upload'
 })));
 
 router.get('/api/admin/update', eventHandler(() => ({
