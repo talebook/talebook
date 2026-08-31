@@ -94,6 +94,67 @@ class TestPluginsApi(TestWithAdminUser):
             "所有系统内置插件都应由平台物化，管理员只负责启停",
         )
 
+    def test_legado_global_config_is_declared_validated_and_persisted(self):
+        catalog = self.json("/api/admin/plugins")
+        definition = next(item for item in catalog["definitions"] if item["plugin_key"] == "talebook.source.legado")
+        installation = next(
+            item for item in catalog["installations"] if item["plugin_key"] == "talebook.source.legado"
+        )
+        connection = next(
+            item
+            for item in self.json("/api/admin/plugins/connections")["connections"]
+            if item["installation_id"] == installation["id"]
+        )
+        original = dict(connection.get("config") or {})
+
+        def restore():
+            cleanup = get_db()
+            item = cleanup.get(PluginConnection, connection["id"])
+            item.config = original
+            cleanup.commit()
+
+        self.addCleanup(restore)
+        properties = definition["config_schema"]["properties"]
+        self.assertEqual(properties["search_result_limit"]["default"], 5)
+        self.assertEqual(properties["search_concurrency"]["default"], 20)
+        self.assertEqual(properties["save_concurrency"]["default"], 10)
+        self.assertTrue(properties["private_network_protection"]["default"])
+
+        config = {
+            "search_result_limit": 7,
+            "search_concurrency": 4,
+            "save_concurrency": 3,
+            "private_network_protection": False,
+        }
+        saved = self.json(
+            "/api/admin/plugins/connections",
+            method="POST",
+            body=json.dumps(
+                {
+                    "installation_id": installation["id"],
+                    "role": connection["role"],
+                    "name": connection["name"],
+                    "config": config,
+                }
+            ),
+        )
+        invalid = self.json(
+            "/api/admin/plugins/connections",
+            method="POST",
+            body=json.dumps(
+                {
+                    "installation_id": installation["id"],
+                    "role": connection["role"],
+                    "name": connection["name"],
+                    "config": {**config, "save_concurrency": 0},
+                }
+            ),
+        )
+
+        self.assertEqual(saved["err"], "ok")
+        self.assertEqual(saved["connection"]["config"], config)
+        self.assertEqual(invalid["err"], "config.range_invalid")
+
     def test_catalog_hides_stale_builtin_definitions_removed_from_the_registry(self):
         session = get_db()
         definition = PluginDefinition(

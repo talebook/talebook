@@ -45,6 +45,39 @@ test.describe('Legado Source Workbench', () => {
         await expect(page.getByText('https://raw.githubusercontent.com/shidahuilang/shuyuan-bak/refs/heads/main/good.json')).toBeVisible();
     });
 
+    test('loads and saves Legado global concurrency and network protection settings', async ({ page }) => {
+        await page.goto('/plugins/legado');
+        await page.getByRole('button', { name: /全局配置/ }).click();
+
+        const resultLimit = page.getByLabel('每个书源的结果数');
+        const searchConcurrency = page.getByLabel('搜索并发数');
+        const saveConcurrency = page.getByLabel('保存并发数');
+        const protection = page.getByLabel('阻止访问非公网地址');
+        await expect(resultLimit).toHaveValue('5');
+        await expect(searchConcurrency).toHaveValue('20');
+        await expect(saveConcurrency).toHaveValue('10');
+        await expect(protection).toBeChecked();
+
+        await resultLimit.fill('0');
+        await page.getByRole('button', { name: '保存', exact: true }).click();
+        await expect(page.getByText('请输入 1–100 之间的整数。')).toBeVisible();
+
+        await resultLimit.fill('7');
+        await searchConcurrency.fill('4');
+        await saveConcurrency.fill('3');
+        await protection.uncheck();
+        await expect(page.getByText(/书源可访问本机和局域网 HTTP 服务/)).toBeVisible();
+        await page.getByRole('button', { name: '保存', exact: true }).click();
+        await expect(page.getByText('Legado 全局配置已保存')).toBeVisible();
+
+        await page.reload();
+        await page.getByRole('button', { name: /全局配置/ }).click();
+        await expect(page.getByLabel('每个书源的结果数')).toHaveValue('7');
+        await expect(page.getByLabel('搜索并发数')).toHaveValue('4');
+        await expect(page.getByLabel('保存并发数')).toHaveValue('3');
+        await expect(page.getByLabel('阻止访问非公网地址')).not.toBeChecked();
+    });
+
     test('admin entry and sample picker remain reachable at 320px', async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 640 });
         await page.goto('/library/network');
@@ -53,6 +86,9 @@ test.describe('Legado Source Workbench', () => {
         await manageSources.click();
         await expect(page).toHaveURL('/plugins/legado');
         await expect(page.getByRole('button', { name: '导出' })).toBeVisible();
+        await page.getByRole('button', { name: /全局配置/ }).click();
+        await expect(page.getByLabel('每个书源的结果数')).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
         await page.getByRole('button', { name: '导入书源' }).click();
         await page.getByRole('tab', { name: '导入示例书源' }).click();

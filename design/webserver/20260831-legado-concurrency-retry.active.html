@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="TB-196 Legado 全局配置、私网检测开关、搜索限流以及分章并发重试方案。" />
+  <link rel="icon" href="data:," />
+  <title>Legado 并发与失败重试优化 · ACTIVE</title>
+  <style>
+    :root{color-scheme:light;--bg:#f3f6fa;--panel:#fff;--ink:#172235;--muted:#59677b;--line:#d7e0eb;--accent:#315f91;--soft:#edf5ff;--warn:#945600;--warn-soft:#fff5df;--good:#176448;--good-soft:#e9f6ef;--danger:#943636;--danger-soft:#fdeeee;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;--mono:"SFMono-Regular",Consolas,monospace}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:linear-gradient(145deg,#fff,var(--bg));font-family:var(--sans);line-height:1.68}.skip{position:fixed;top:8px;left:8px;z-index:10;padding:8px 12px;color:#fff;background:var(--ink);transform:translateY(-160%)}.skip:focus{transform:none}.page{width:min(1120px,calc(100vw - 28px));margin:auto;padding:24px 0 54px}.hero,.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 28px rgba(23,34,53,.07)}.hero{padding:30px 32px;margin-bottom:16px;border-top:5px solid var(--accent)}h1{margin:0 0 9px;font-size:clamp(30px,4vw,46px);line-height:1.15}.sub{max-width:900px;margin:0;color:var(--muted)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.chip{padding:5px 11px;border-radius:999px;background:#edf1f6;color:#526074;font-size:12px;font-weight:700}.chip.active{color:var(--good);background:var(--good-soft)}nav{position:sticky;top:0;z-index:3;display:flex;gap:5px;margin-bottom:16px;padding:7px;overflow:auto;border:1px solid var(--line);border-radius:12px;background:rgba(243,246,250,.96)}nav a{padding:6px 9px;color:var(--accent);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}.card{margin-bottom:16px;padding:24px 27px;scroll-margin-top:58px}h2{margin:0 0 13px;font-size:22px}h3{margin:19px 0 8px;font-size:16px}p{margin:0 0 11px}p,li,td{font-size:14px;color:#29374b}ul,ol{margin:8px 0 0 20px;padding:0}li+li{margin-top:5px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.box,.callout{padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:#f9fbfd}.callout.warn{border-color:#ead0a0;background:var(--warn-soft)}.callout.good{border-color:#b9dccb;background:var(--good-soft)}.callout.danger{border-color:#dfb2b2;background:var(--danger-soft)}.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:14px}.step{padding:14px;border:1px solid var(--line);border-radius:13px;background:var(--soft)}.step b{display:block;margin-bottom:5px}.step span{color:var(--muted);font-size:12px}.table{overflow:auto;border:1px solid var(--line);border-radius:14px}table{width:100%;min-width:700px;border-collapse:collapse}th,td{padding:10px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f5f8fb;color:#546276;font-size:12px}th:last-child,td:last-child{border-right:0}tr:last-child td{border-bottom:0}code{padding:.1em .34em;border-radius:4px;background:#edf1f6;font-family:var(--mono);font-size:.9em;overflow-wrap:anywhere}.pending{color:var(--warn);font-weight:800}.verified{color:var(--good);font-weight:800}footer{color:var(--muted);font-size:12px;text-align:center}@media(max-width:720px){.page{width:calc(100vw - 18px);padding-top:10px}.hero,.card{padding:20px 18px;border-radius:14px}.grid,.flow{grid-template-columns:1fr}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}@media print{body{background:#fff}.page{width:100%;padding:0}.hero,.card{box-shadow:none}nav,.skip{display:none}.card,.box,.callout,.table{break-inside:avoid}}
+  </style>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<div class="page">
+  <header class="hero">
+    <h1>Legado 并发与失败重试优化</h1>
+    <p class="sub">让管理员在 Legado 书源工作台控制结果上限、搜索并发、保存并发与私网地址保护，并把分章保存改为有界并发、失败判定和排队重试。</p>
+    <div class="chips" aria-label="方案元信息"><span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-31</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：webserver、app、tests</span><span class="chip">需求来源：TB-196</span></div>
+  </header>
+  <nav aria-label="章节目录"><a href="#request">原始诉求</a><a href="#goals">目标边界</a><a href="#evidence">现状根因</a><a href="#design">方案</a><a href="#risk">风险回滚</a><a href="#tests">测试</a><a href="#decisions">决策</a></nav>
+  <main id="main">
+    <section id="request" class="card">
+      <h2>1. 原始诉求</h2>
+      <div class="callout warn">“Legado 插件全局配置增加：每个书源搜索结果数（默认 5）、搜索并发数（默认 20）、保存书籍并发数（默认 10）、是否开启防内网穿透检测；关闭时不拦截 ‘Endpoint resolves to a non-public address’。保存书籍到本地时进行错误判断和排队重试。”</div>
+    </section>
+    <section id="goals" class="card">
+      <h2>2. 目标与边界</h2>
+      <div class="grid"><article class="box"><h3>目标</h3><ul><li>四项配置由管理员在 Legado 工作台读取、校验、保存，旧安装缺项时使用需求默认值。</li><li>网络搜索与元数据搜索按单书源裁剪结果；网络搜索线程池按全局并发配置运行。</li><li>分章下载保持章节原序，以有界线程池并发；异常、缺失或空正文进入下一轮重试队列。</li><li>私网保护默认开启；关闭仅跳过非公网 IP 拒绝，仍校验协议、URL 凭据、跨域重定向和响应大小。</li></ul></article><article class="box"><h3>非目标</h3><ul><li>不允许单个导入书源自行关闭安全策略，开关只属于管理员实例连接。</li><li>不改变保存任务 API、后台任务定位键、TXT/EPUB 导入和去重契约。</li><li>不新增数据库字段或迁移；配置继续存入现有 <code>PluginConnection.config</code>。</li><li>不承诺所有章节最终成功；重试耗尽时保留其他成功章节，全部失败则终止导入。</li></ul></article></div>
+    </section>
+    <section id="evidence" class="card">
+      <h2>3. 现状、根因与证据</h2>
+      <div class="table" role="region" aria-label="现状证据" tabindex="0"><table><thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead><tbody>
+        <tr><td>配置不可调</td><td><code>webserver/plugins/source/legado.py</code> 的 <code>config_schema</code> 为空；工作台只有书源 CRUD。</td><td>需求中的四项没有插件级持久入口。</td></tr>
+        <tr><td>搜索并发配置不能热切换</td><td><code>SearchTaskService.configure()</code> 只改数字，已经创建的 executor 不会重建。</td><td>即使保存配置，进程首次搜索后也可能继续使用旧并发。</td></tr>
+        <tr><td>保存串行且吞错</td><td><code>assemble_from_chapters()</code> 顺序请求；任一异常直接写空正文且不重试。</td><td>长篇保存慢，瞬时错误造成不可恢复的缺章；全部失败仍可能导入空书。</td></tr>
+        <tr><td>私网拦截无实例开关</td><td><code>SafeHttpClient</code> 每跳固定调用公网地址校验。</td><td>代理把目标解析为私网 IP 时无法按管理员意图放行。</td></tr>
+      </tbody></table></div>
+    </section>
+    <section id="design" class="card">
+      <h2>4. 方案</h2>
+      <div class="callout good"><strong>方案结论：</strong>配置所有权放在 Legado 的 instance connection；运行时从同一连接读取并发、裁剪与安全开关。保存阶段先并发抓取，失败项按轮次重新入队，成功正文最后按目录顺序组装。</div>
+      <div class="flow" aria-label="保存处理流程"><article class="step"><b>准备</b><span>解析详情与目录，生成不持有 SQLAlchemy session 的章节 reader。</span></article><article class="step"><b>首轮并发</b><span>最多按保存并发数请求，每项校验结构与非空正文。</span></article><article class="step"><b>排队重试</b><span>仅失败项进入下一轮，最多追加两轮，并记录最终失败。</span></article><article class="step"><b>顺序组装</b><span>按目录索引写文件；部分成功可导入，全部失败明确报错。</span></article></div>
+      <h3>配置契约</h3>
+      <div class="table" role="region" aria-label="配置契约" tabindex="0"><table><thead><tr><th>键</th><th>类型 / 默认</th><th>消费位置</th><th>边界</th></tr></thead><tbody>
+        <tr><td><code>search_result_limit</code></td><td>integer / 5</td><td>Legado 网络搜索与元数据单源结果</td><td>1–100</td></tr>
+        <tr><td><code>search_concurrency</code></td><td>integer / 20</td><td>网络搜索共享线程池；元数据查询 worker</td><td>1–100</td></tr>
+        <tr><td><code>save_concurrency</code></td><td>integer / 10</td><td>分章保存线程池</td><td>1–100</td></tr>
+        <tr><td><code>private_network_protection</code></td><td>boolean / true</td><td>Legado <code>SafeHttpClient</code></td><td>仅关闭 <code>ip.is_global</code> 拒绝</td></tr>
+      </tbody></table></div>
+      <h3>安全边界</h3>
+      <p>该开关是对 <code>design/webserver/20260831-plugin-security-closure.active.html</code> 默认安全策略的显式、管理员级例外。它不会进入导入的 Legado JSON，也不接受书源 URL 自助 allowlist。关闭后仍解析 DNS、拒绝非法 IP、非 HTTP(S)、URL 内凭据、跨 origin 重定向、重定向过多和响应过大。</p>
+    </section>
+    <section id="risk" class="card">
+      <h2>5. 影响范围、风险与回滚</h2>
+      <div class="grid"><article class="box"><h3>影响范围</h3><p>插件 manifest/config 校验、网络搜索 executor、Legado HTTP 客户端、元数据结果裁剪、保存抓取与工作台配置区；无数据迁移。</p></article><article class="box"><h3>保持不变</h3><p>默认仍阻止非公网地址；章节输出顺序、保存 API 和进度结构不变；重试耗尽后的单章仍按历史兼容写标题与空正文。</p></article></div>
+      <div class="callout danger"><strong>主要风险：</strong>管理员关闭保护后，恶意或失陷书源可访问本机及内网 HTTP 服务。界面必须直接说明风险，默认开启，后端只允许管理员实例连接保存此值。并发提高也可能触发网站限流，因此设置范围受控且可回调。</div>
+      <div class="callout"><strong>回滚：</strong>可整体 revert 代码；现有连接中的新增 config 键在旧版本中会被忽略，无数据库清理。若只需紧急止损，可把保护重新开启并把并发降为 1。</div>
+    </section>
+    <section id="tests" class="card">
+      <h2>6. 测试计划与结果</h2>
+      <div class="table" role="region" aria-label="测试计划" tabindex="0"><table><thead><tr><th>验证层</th><th>实际命令 / 页面</th><th>关键验收</th><th>结果</th></tr></thead><tbody>
+        <tr><td>后端全量</td><td><code>make test</code></td><td>重建包含当前依赖的测试镜像并运行完整后端套件。</td><td class="verified">1247 passed，20 skipped，26 warnings</td></tr>
+        <tr><td>后端定向</td><td><code>docker run … pytest -q tests/test_book_source_plugins.py tests/test_booksource_metadata.py</code>；分别运行 <code>test_network_save.py</code>、<code>test_network_library.py</code>、<code>test_plugins_api.py</code></td><td>配置默认与校验、结果裁剪、私网开关、executor 热切换、保存并发、空正文重试、全部失败终止与 API 兼容。</td><td class="verified">32 + 10 + 23 + 35 passed</td></tr>
+        <tr><td>前端 E2E / 渲染</td><td><code>PLAYWRIGHT_BASE_URL=http://127.0.0.1:38124 MOCK_API_URL=http://127.0.0.1:38123 npx playwright test test/e2e/booksources.spec.ts</code></td><td>桌面及 320px 读取默认值、阻止越界输入、保存四项设置、重载持久化、关闭保护风险提示且无横向溢出。</td><td class="verified">Chromium 4 passed；桌面与 320px 截图见 <code>document/screenshots/tb-196/</code></td></tr>
+        <tr><td>界面审查</td><td><code>interface-review full working</code></td><td>审查工作区相对 <code>origin/master</code> 的完整本地改动及 Legado 工作台、网络书库入口、旧管理重定向三个消费者。</td><td class="verified">Approve；无 Introduced / Regression finding。审查中修正移动端提示重叠和 warning tonal 低对比后复验</td></tr>
+        <tr><td>质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、booksource locale key 对齐、<code>git diff --check</code>、<code>make check-design</code></td><td>格式、lint、i18n 与单文件方案通过。</td><td class="verified">Python 通过；ESLint 0 errors / 465 个存量 warnings；booksource 中英各 79 key 且完全对齐；diff 与设计门禁通过</td></tr>
+      </tbody></table></div>
+      <div class="callout good"><strong>验证结论：</strong>需求四项配置、默认值、运行时消费、安全开关以及章节并发重试均有自动化覆盖。项目要求的 Chrome DevTools MCP 在本运行环境未提供，使用真实 Chromium Playwright 完成等价的桌面、320px、表单状态、持久化与截图验证。</div>
+    </section>
+    <section id="decisions" class="card"><h2>7. 决策记录</h2><ol><li><strong>2026-08-31：</strong>在没有 grill 工具的运行环境中按原始需求明确边界：失败重试采用总计三次的分轮队列；部分失败保持兼容，全部失败终止。</li><li><strong>2026-08-31：</strong>安全开关只控制非公网地址拒绝，不关闭其余 URL、重定向与大小防护；这是满足代理劫持场景的最小放宽。</li><li><strong>2026-08-31：</strong>配置继续复用插件 instance connection，不复制到全局 settings 或书源 JSON。</li><li><strong>2026-09-01：</strong>完整界面审查发现移动端 persistent hint 会压到下一字段，且 Vuetify warning tonal 的橙色正文对比不足；改为字段外自然流提示，并仅把 warning 内容与图标切到 on-surface 色，保留 warning 背景。复验后结论为 Approve。</li></ol></section>
+  </main>
+  <footer>Talebook internal design · webserver · ACTIVE · 2026-08-31</footer>
+</div>
+</body>
+</html>

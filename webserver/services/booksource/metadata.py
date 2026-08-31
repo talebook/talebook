@@ -122,6 +122,7 @@ class BookSourceMetadataService:
     def _search_source(self, source, title, author=None):
         engine = BookSourceEngine(source.raw, config=self.config)
         summaries = engine.search(title)
+        limit = max(1, min(100, int(self.config.get("BOOKSOURCE_SEARCH_RESULT_LIMIT", 5))))
         books = []
         for summary in summaries:
             if author and summary.author and not self._author_matches(author, summary.author):
@@ -129,6 +130,8 @@ class BookSourceMetadataService:
             metadata = self._metadata_from_summary(summary, source)
             if metadata:
                 books.append(metadata)
+                if len(books) >= limit:
+                    break
         return books
 
     @staticmethod
