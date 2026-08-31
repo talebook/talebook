@@ -60,9 +60,20 @@
                         />
                     </v-window-item>
                     <v-window-item value="seed">
-                        <p class="text-body-2">
-                            {{ $t('booksource.importSeed') }}
-                        </p>
+                        <v-select
+                            v-model="sampleSource"
+                            :items="sampleOptions"
+                            :label="$t('booksource.sampleSource')"
+                            variant="outlined"
+                            hide-details
+                        >
+                            <template #item="{ props, item }">
+                                <v-list-item
+                                    v-bind="props"
+                                    :subtitle="item.raw.url"
+                                />
+                            </template>
+                        </v-select>
                     </v-window-item>
                 </v-window>
             </v-card-text>
@@ -95,11 +106,20 @@ const emit = defineEmits(['imported']);
 
 // 默认书源订阅 URL，预填进输入框供用户直接使用（XIU2/Yuedu 开源书源）
 const DEFAULT_BOOKSOURCE_URL = 'https://cdn.jsdmirror.com/gh/XIU2/Yuedu/shuyuan';
+const BUILTIN_SAMPLE = 'builtin';
+const TICKMAO_SAMPLE_URL = 'https://cdn.jsdmirror.com/gh/tickmao/Novel@master/sources/legado/full.json';
+const SHIDAHUILANG_SAMPLE_URL = 'https://raw.githubusercontent.com/shidahuilang/shuyuan-bak/refs/heads/main/good.json';
 
 const dialog = ref(false);
 const tab = ref('url');
 const jsonText = ref('');
 const url = ref(DEFAULT_BOOKSOURCE_URL);
+const sampleSource = ref(BUILTIN_SAMPLE);
+const sampleOptions = [
+    { title: t('booksource.sampleBuiltIn'), value: BUILTIN_SAMPLE, url: '' },
+    { title: t('booksource.sampleTickmao'), value: TICKMAO_SAMPLE_URL, url: TICKMAO_SAMPLE_URL },
+    { title: t('booksource.sampleShidahuilang'), value: SHIDAHUILANG_SAMPLE_URL, url: SHIDAHUILANG_SAMPLE_URL },
+];
 const loading = ref(false);
 const fileInput = ref(null);
 
@@ -153,12 +173,14 @@ const doImport = async () => {
         }
         body = { json: text };
     } else {
-        body = null;
+        body = sampleSource.value === BUILTIN_SAMPLE ? null : { url: sampleSource.value };
     }
 
     loading.value = true;
     try {
-        const endpoint = tab.value === 'seed' ? '/admin/booksource/seed' : '/admin/booksource/import';
+        const endpoint = tab.value === 'seed' && sampleSource.value === BUILTIN_SAMPLE
+            ? '/admin/booksource/seed'
+            : '/admin/booksource/import';
         const rsp = await $backend(endpoint, {
             method: 'POST',
             body: JSON.stringify(body || {}),
@@ -184,5 +206,16 @@ const doImport = async () => {
     }
 };
 
-defineExpose({ open, doImport, tab, jsonText, url, fileInput, onFileSelected, triggerFileSelect });
+defineExpose({
+    open,
+    doImport,
+    tab,
+    jsonText,
+    url,
+    sampleSource,
+    sampleOptions,
+    fileInput,
+    onFileSelected,
+    triggerFileSelect,
+});
 </script>

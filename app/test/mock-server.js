@@ -2253,6 +2253,19 @@ router.get('/api/admin/opds/sources', eventHandler(() => ({
 })));
 
 // Admin book sources
+router.get('/api/admin/booksource/export', eventHandler(() => ({
+  err: 'ok',
+  sources: [{
+    bookSourceName: '测试书源',
+    bookSourceUrl: 'http://x.com',
+    bookSourceGroup: '测试',
+    bookSourceType: 0,
+    enabled: true,
+    weight: 0,
+    searchUrl: '/search?key={{key}}',
+  }],
+})));
+
 router.get('/api/admin/booksource/list', eventHandler(() => ({
   err: 'ok',
   count: 1,

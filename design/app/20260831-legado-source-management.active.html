@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook Legado 书源入口、导出与示例导入优化方案。" />
+    <link rel="icon" href="data:," />
+    <title>完善 Legado 书源管理入口、导出与示例导入 · ACTIVE</title>
+    <style>
+      :root{color-scheme:light;--bg:#f3f6fa;--panel:#fff;--ink:#1d2939;--muted:#5d6878;--line:#d6deea;--accent:#315f91;--soft:#edf5ff;--warn:#8a5600;--warn-soft:#fff5df;--ok:#176843;--ok-soft:#e7f5ed;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;--mono:"SFMono-Regular",Consolas,monospace}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:linear-gradient(150deg,#eaf2fb,var(--bg) 35%,#fafcff);font-family:var(--sans);line-height:1.68}.skip{position:fixed;top:8px;left:8px;padding:8px 12px;color:#fff;background:var(--ink);transform:translateY(-160%)}.skip:focus{transform:none}.page{width:min(1080px,calc(100vw - 32px));margin:auto;padding:24px 0 52px}.hero,.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 30px rgba(24,45,75,.07)}.hero{padding:30px 32px;border-top:5px solid var(--accent)}.card{margin-top:18px;padding:24px 28px}h1{margin:0 0 9px;font-size:clamp(29px,4vw,44px);line-height:1.15}h2{margin:0 0 13px;font-size:22px}h3{margin:18px 0 7px;font-size:16px}p{margin:0 0 12px}p,li,td,th{font-size:14px}.sub{max-width:880px;color:var(--muted);font-size:16px}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.chip{padding:5px 10px;color:#536176;background:#edf2f7;border-radius:999px;font-size:12px;font-weight:700}.chip.wip{color:var(--warn);background:var(--warn-soft)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.box,.callout{padding:15px 17px;border:1px solid var(--line);border-radius:14px}.callout{background:var(--soft);border-color:#bed5ed}.callout.warn{background:var(--warn-soft);border-color:#ead29f}.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:15px}.step{padding:14px;background:#fbfdff;border:1px solid var(--line);border-radius:14px}.step b{display:block;margin-bottom:5px}.step p{margin:0;color:var(--muted);font-size:12px}.table{overflow-x:auto;border:1px solid var(--line);border-radius:14px}table{width:100%;min-width:700px;border-collapse:collapse}th,td{padding:10px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:#526175;background:#f6f9fc;font-size:12px}th:last-child,td:last-child{border-right:0}tr:last-child td{border-bottom:0}code{padding:.1em .34em;border-radius:4px;background:#eef2f6;font-family:var(--mono);font-size:.9em}.pending{color:var(--warn);font-weight:800}footer{padding-top:16px;color:var(--muted);font-size:12px;text-align:center}@media(max-width:720px){.page{width:calc(100vw - 20px);padding-top:10px}.hero,.card{padding:21px 19px;border-radius:15px}.grid,.flow{grid-template-columns:1fr}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}@media print{body{background:#fff}.page{width:100%}.hero,.card{box-shadow:none}.skip{display:none}.box,.step,.table{break-inside:avoid}}
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>完善 Legado 书源管理入口、导出与示例导入</h1>
+        <p class="sub">让管理员从网络书库直接进入 Legado 工作台，完整导出当前书源，并从明确的示例列表导入；同时量化 tickmao 书源被后台停用的真实原因。</p>
+        <div class="chips" aria-label="方案元信息"><span class="chip">状态：ACTIVE</span><span class="chip">创建日期：2026-08-31</span><span class="chip">所属模块：app</span><span class="chip">影响范围：app、webserver、tests</span><span class="chip">需求来源：TB-195</span></div>
+      </header>
+      <main id="main">
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“网络书库中，如果是管理员，增加一个按钮【管理书源】跳转到对应页面；Legado 书源管理页面增加【导出】按钮；【导入内置书源】改成【导入示例书源】，并提供下拉框加入 tickmao full.json 与 shidahuilang good.json；测试 tickmao JSON 为什么大量导入失败。”</div>
+        </section>
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="box"><h3>目标</h3><ul><li>管理员在网络书库始终可见“管理书源”，直达 <code>/plugins/legado</code>。</li><li>工作台导出全部书源为标准 Legado JSON 数组，并同步当前启用状态。</li><li>示例导入明确区分内置样例和两个远端订阅。</li><li>用真实 tickmao 文件给出可复核的失败分类。</li></ul></article>
+            <article class="box"><h3>非目标</h3><ul><li>不改变 Legado 规则引擎的 JavaScript 安全边界。</li><li>不放宽后台体检对失效站点的停用策略。</li><li>不改数据库结构，不覆盖同 URL 的本地书源。</li><li>不把第三方订阅打包进仓库。</li></ul></article>
+          </div>
+        </section>
+        <section class="card">
+          <h2>3. 现状、根因与证据</h2>
+          <div class="table" role="region" aria-label="根因统计" tabindex="0"><table><thead><tr><th>观察</th><th>数量</th><th>结论</th></tr></thead><tbody><tr><td>tickmao full.json 可下载并解析</td><td>201 / 201 项均有名称与 URL</td><td>导入结构校验本身不会产生失败项。</td></tr><tr><td>关键规则依赖当前受限运行时不支持的 JS</td><td>43</td><td>后台体检标记 <code>js_unsupported</code> 并停用。</td></tr><tr><td>缺少 Talebook 当前要求的关键规则</td><td>42（排除与 JS 重叠项后）</td><td>后台体检标记 <code>incomplete</code> 并停用。</td></tr><tr><td>源站连通或 TLS 失败</td><td>32</td><td>29 个连接失败、3 个证书校验失败。</td></tr><tr><td>当前容器环境体检可用</td><td>84</td><td>共 117 项在导入后的异步体检中停用，因此表现为“大量导入失败”。</td></tr></tbody></table></div>
+          <p class="callout"><strong>关键区分：</strong><code>import_sources()</code> 会先写入 201 项并排队检测；所谓失败发生在异步有效性检测，而不是 JSON 下载、解析或数据库批量导入阶段。第三方文件中的 <code>_validation_status=valid</code> 全为 valid，但它代表上游校验口径，不等于 Talebook 的非 JS 兼容性和当前部署网络可达性。</p>
+        </section>
+        <section class="card">
+          <h2>4. 方案</h2>
+          <div class="flow" aria-label="实现流程"><article class="step"><b>管理入口</b><p>复用书库页工具栏，仅管理员渲染按钮。</p></article><article class="step"><b>导出</b><p>管理员 JSON API 按稳定顺序返回全部 raw；前端生成 UTF-8 文件。</p></article><article class="step"><b>示例导入</b><p>内置项走 seed API，远端项复用 URL import API。</p></article><article class="step"><b>反馈</b><p>沿用现有导入统计、错误提示和后台检测。</p></article></div>
+          <h3>关键决策</h3>
+          <ul><li>导出接口返回标准 JSON 信封，由既有 <code>$backend</code> 完成权限错误处理；文件下载在浏览器端生成，避免绕过统一 API 调用层。</li><li>导出数据以原始 Legado 对象为基础，但用数据库当前名称、地址、分组、类型、权重和启用状态覆盖对应字段，避免管理后的状态丢失。</li><li>下拉框把远端 URL 当作配置值，不代理、不缓存；确认后复用现有服务端下载与导入逻辑。</li></ul>
+        </section>
+        <section class="card">
+          <h2>5. 影响、风险与回滚</h2>
+          <div class="grid"><article class="box"><h3>影响范围</h3><p>网络书库工具栏、Legado 工作台、导入对话框、双语文案、mock API、书源管理 API 与对应测试。</p></article><article class="box"><h3>保持不变</h3><p>登录与管理员权限、去重语义、异步体检、数据库 schema、搜索和阅读接口保持不变。</p></article></div>
+          <p class="callout warn"><strong>风险：</strong>第三方 URL 可能不可用或内容变化；导入失败沿用现有错误信封。大量导出会在浏览器内构造 JSON，但当前可导入规模远低于既有 100MB 请求容量；测试覆盖多项和状态同步。</p>
+          <p><strong>回滚：</strong>回退新增 API、按钮、选项和文案即可，不产生迁移或数据清理。</p>
+        </section>
+        <section class="card">
+          <h2>6. 测试计划与结果</h2>
+          <div class="table" role="region" aria-label="测试计划" tabindex="0"><table><thead><tr><th>验证层</th><th>命令或页面</th><th>覆盖</th><th>结果</th></tr></thead><tbody><tr><td>后端</td><td><code>docker run --rm … talebook/test:tb135 pytest tests/test_booksource_admin.py -q</code></td><td>导出数组、稳定顺序和当前状态。</td><td>通过：14 passed。</td></tr><tr><td>组件</td><td><code>npx vitest run test/components/BookSourceImportDialog.spec.ts</code></td><td>示例下拉、内置与远端分流。</td><td>受限：本地 Nuxt 测试运行时无法解析 <code>#build/i18n-options.mjs</code>，suite 未可靠启动；新增路径由 E2E 覆盖。</td></tr><tr><td>E2E 与实际渲染</td><td>短生命周期 mock + Nuxt；Chromium 运行相关 Playwright 用例</td><td>管理员入口、导出下载与加载态、示例列表、键盘操作、320px 可达性及既有检测按钮。</td><td>通过：4 passed；桌面与 320px 均完成真实渲染，窄屏无页面横向溢出；截图见 <code>document/screenshots/tb-195/</code>。</td></tr><tr><td>界面审查</td><td><code>interface-review full</code>，工作区相对 <code>origin/master@cacb4880</code></td><td>11 个 tracked 文件与 3 个 untracked 文件（2 张 PNG 按规则排除，评审 12 个文本文件）；覆盖 accessibility、layout、writing、typography、colors、UI。</td><td>Approve：无 HIGH、MEDIUM 或 LOW actionable finding。审查前自查已把未注册图标换成仓库图标、保持导出加载态文案可见，并用友好名称加 URL 副标题替代裸 URL 选项。</td></tr><tr><td>质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>npm run lint</code>、locale JSON、<code>git diff --check</code></td><td>格式、lint、语言文件和差异检查。</td><td>通过：Python 无错误；ESLint 0 errors（465 个仓库既有 warnings）；双语 JSON 与 diff 检查通过；<code>make check-design</code> 通过 132 份方案文档。</td></tr></tbody></table></div>
+        </section>
+        <section class="card"><h2>7. 决策记录</h2><ol><li><strong>2026-08-31：</strong>“管理书源”直达 Legado 全局工作台，不绕经插件分类页。</li><li><strong>2026-08-31：</strong>外部示例只作为下拉选项，保持第三方内容的来源边界。</li><li><strong>2026-08-31：</strong>排查不扩大为 JS 引擎兼容性改造；当前容器实测 117 项停用由兼容规则和实时网络共同造成，不应通过跳过检测掩盖。</li></ol></section>
+      </main>
+      <footer>Talebook internal design · app · ACTIVE · 2026-08-31</footer>
+    </div>
+  </body>
+</html>
