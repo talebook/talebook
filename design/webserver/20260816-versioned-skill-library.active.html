@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 以 books/ai 用户工作空间目录为权威来源的私有 Agent Skills 生成、查看、下载、删除与试运行方案。" />
+    <link rel="icon" href="data:," />
+    <title>目录权威的 SKILL 沉淀 · ACTIVE</title>
+    <style>
+      :root { color-scheme:light dark; --bg:#f3f5f3; --panel:#fff; --ink:#20251f; --muted:#5e695d; --line:#d7ddd5; --accent:#356b43; --soft:#e8f3e9; --warn:#8a5612; }
+      * { box-sizing:border-box; }
+      body { margin:0; color:var(--ink); background:linear-gradient(145deg,var(--bg),#edf2ec); font:15px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif; }
+      header,main { width:min(1080px,calc(100% - 28px)); margin:auto; }
+      header { padding:46px 0 24px; }
+      h1 { margin:0 0 10px; font-size:clamp(30px,5vw,50px); line-height:1.1; }
+      h2 { margin:0 0 12px; font-size:22px; }
+      p { margin:0 0 12px; }
+      section { margin:0 0 18px; padding:24px; border:1px solid var(--line); border-radius:18px; background:var(--panel); }
+      .meta,.flow { display:flex; flex-wrap:wrap; gap:9px; }
+      .meta span { padding:5px 10px; color:var(--muted); border-radius:999px; background:var(--soft); }
+      .flow article { flex:1 1 190px; padding:14px; border:1px solid var(--line); border-radius:12px; }
+      table { width:100%; border-collapse:collapse; }
+      th,td { padding:10px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+      code { padding:2px 5px; border-radius:5px; background:var(--soft); overflow-wrap:anywhere; }
+      .pending { color:var(--warn); font-weight:750; }
+      @media (max-width:720px) { section { padding:18px; } }
+      @media (prefers-color-scheme:dark) { :root { --bg:#141814; --panel:#202620; --ink:#edf4ec; --muted:#bdc8bb; --line:#455144; --soft:#263c2b; --accent:#8bd19a; --warn:#efbc74; } body { background:var(--bg); } }
+      @media print { body { background:#fff; } section { break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>目录权威的 SKILL 沉淀</h1>
+      <p>把一次有效的 AI 工作方法保存为符合 Agent Skills 规范的当前目录；目录是内容唯一来源，数据库只承担私有索引、状态与运行审计。</p>
+      <div class="meta">
+        <span>状态：ACTIVE</span><span>创建日期：2026-08-16</span><span>所属模块：webserver / app</span>
+        <span>需求来源：TB-56</span><span>基线：feat/ai_1.0</span>
+      </div>
+    </header>
+    <main>
+      <section>
+        <h2>1. 原始诉求</h2>
+        <p>“支持从已完成的 AI 成果/任务生成 SKILL 草稿，也支持空白模板创建；提供结构化字段与 Markdown 编辑、预览、样例试运行、草稿/启用/停用、版本记录和回滚；AI 中心提供创建者私有的列表、搜索、版本和手动运行，并展示版本、输入摘要、授权上下文、进度与唯一终态。”</p>
+        <p><strong>评审反馈：</strong>初版把数据库 manifest 当作产品本体，不符合 Agent Skills 的自包含目录规则。核心流程必须是生成 SKILL ZIP、查看包内文件、下载与删除；每个 ZIP 必须有单一同名根目录、必需的 <code>SKILL.md</code>，以及真正需要时才加载的 <code>scripts/</code>、<code>references/</code>、<code>assets/</code>。</p>
+        <p><strong>统一存储规范：</strong>TB-52 要求所有 AI 产物采用 <code>books/ai/{user-workspace}/{feature}/...</code>，目录为权威内容来源；应用层不做默认版本化，不保存完整正文副本，不提供版本列表、回滚或 <code>v{version}</code> 目录。</p>
+      </section>
+      <section>
+        <h2>2. 目标与边界</h2>
+        <table>
+          <thead><tr><th>首版交付</th><th>明确不做</th></tr></thead>
+          <tbody><tr><td>以当前 Agent Skills 文件夹为交付本体；生成、编辑、查看、下载 ZIP、删除；严格 hyphen-case 包名；<code>SKILL.md</code> 仅含 <code>name</code>/<code>description</code> frontmatter；按需引用 <code>references/contract.json</code>。数据库只承担 owner/workspace、名称、相对路径、SHA-256、状态和运行审计。</td><td>应用层版本列表、不可变版本表、回滚、<code>v{version}</code> 目录；公开市场、团队共享、远程导入、上传任意 ZIP、后台静默触发、自我修改、任意脚本/依赖安装、MCP、任意系统写入。</td></tr></tbody>
+        </table>
+      </section>
+      <section>
+        <h2>3. 产品流程</h2>
+        <div class="flow">
+          <article><strong>生成</strong><br />从空白模板或本人已成功 AI 任务提取最小来源摘要，原子写入当前 Agent Skills 文件夹，不复制整段正文或会话。</article>
+          <article><strong>查看与保存</strong><br />服务端在 ACL 通过后从当前目录读取 <code>SKILL.md</code> 和 <code>references/contract.json</code>；保存校验后原子替换当前目录并更新索引 SHA。</article>
+          <article><strong>下载或删除</strong><br />按当前目录即时生成确定性 ZIP；删除前明确确认，同步删除索引、目录和终态运行记录，活跃运行必须先取消。</article>
+          <article><strong>试运行</strong><br />运行开始时从当前目录读取、校验并记录相对路径与 SHA；同时重验 owner、schema 与授权上下文。</article>
+          <article><strong>启用复用</strong><br />当前 SHA 试运行成功后才能启用；内容修改后回到草稿并要求新 SHA 重新试运行，可停用但不提供应用层历史回滚。</article>
+        </div>
+      </section>
+      <section>
+        <h2>4. 数据与状态</h2>
+        <p><code>skills</code> 保存 owner、稳定工作空间 key、名称、描述、状态、相对目录、当前 SHA、来源摘要和敏感信息确认；不保存 manifest 或 Markdown。删除 <code>skill_versions</code>。<code>skill_runs</code> 绑定 owner、skill、运行时读取的相对路径和 SHA、运行模式、输入摘要、授权上下文、进度、唯一终态、输出或脱敏错误。</p>
+        <p>状态为 <code>draft</code>、<code>enabled</code>、<code>disabled</code>；运行终态为 <code>succeeded</code>、<code>failed</code> 或 <code>cancelled</code>。内容 SHA 改变即撤销旧试运行门禁，不把运行审计误当作产物版本。</p>
+      </section>
+      <section>
+        <h2>5. manifest 与 API</h2>
+        <p>manifest 必含显示名、符合 <code>^[a-z0-9]+(?:-[a-z0-9]+)*$</code> 且不超过 64 位的包名、描述、适用范围、前提、触发说明、输入 schema、步骤、术语/例子、失败条件、输出 schema、来源与自测；只接受 JSON Schema 的安全子集。物化后的 ZIP 以包名作为唯一根目录；<code>SKILL.md</code> frontmatter 只写同名 <code>name</code> 与同时说明用途和触发时机的 <code>description</code>，正文限制 500 行，并明确何时读取 <code>references/contract.json</code>。</p>
+        <p>所有 AI 产物统一落在可配置根目录 <code>AI_ARTIFACT_ROOT</code>，默认 <code>/data/books/ai</code>。当前 SKILL 目录为 <code>{workspace_key}/skills/{skill_id}/{package_name}/</code>，业务只保存相对目录；ZIP 不持久化，下载时从目录生成。写入使用同一文件系统的 staging 与原子 replace，目录/文件权限分别为 <code>0700</code>/<code>0600</code>；读取拒绝符号链接、路径越界、缺文件、额外文件或 SHA 不匹配，不从数据库重建正文。删除对象同步清理当前目录和空父目录。</p>
+        <p>API 保留创建、详情、状态、运行、文件包、下载和删除；移除 <code>/versions</code> 与 <code>/rollback</code>。所有入口均需登录并按当前 owner 过滤；文件内容必须在 ACL 通过后再读取。备份只需覆盖既有 <code>/data/books</code> 卷即可同时包含 DB 与 <code>books/ai</code>，数据库迁移不会伪装成文件迁移，缺失目录显式失败并可诊断。</p>
+      </section>
+      <section>
+        <h2>6. 运行时与权限</h2>
+        <p>继续使用统一 <code>AgentRuntime</code> 与 Codex app-server；每次读取当前目录并把校验后的内容作为提示数据块，不写入用户全局技能目录。运行目录为空、只读、无 readable roots、审批关闭、无 MCP；限制输入体积、schema 深度、总时长与并发。成功必须同时满足 app-server 完成终态、输出 JSON 解析、输出 schema、任务仍归当前 owner，且运行记录绑定启动时的目录 SHA。</p>
+        <p>创建来源、目录读取、启停、运行、轮询和取消都重验 owner。运行保存授权上下文摘要而非长期权限；涉及书籍的上下文只记录当次重新验证后的资源标识。</p>
+      </section>
+      <section>
+        <h2>7. 安全策略</h2>
+        <ul>
+          <li>保存前扫描常见 API key、token、私钥、邮箱、Unix/Windows 用户路径；默认拒绝，并返回类别与字段位置，不回显完整命中值。</li>
+          <li>来源和 Markdown 明确作为不可信数据，不可覆盖系统指令；不接受脚本、依赖、工具声明或远程 URL 导入。</li>
+          <li>限制 manifest/Markdown/input/output 大小、SKILL 正文行数、schema 深度与步骤数量；ZIP 路径由服务端静态生成，禁止用户路径穿越；日志和错误不持久化提示词、输入正文、凭据或进程原始输出。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>8. 界面</h2>
+        <p>登录用户可从导航进入“SKILL 生成器”：搜索和状态筛选在左侧列表，右侧把“下载 ZIP”“删除 SKILL”设为直接动作，并提供“文件包”标签查看当前 <code>SKILL.md</code> 与 <code>references/contract.json</code>。编辑器分离显示名和包名，保存动作明确为“保存并替换当前 SKILL”；移除版本标签、版本号、历史载入和回滚。预览、试运行与启停保留。亮暗主题、390px 重排、键盘路径、删除确认、错误与空态纳入验证。</p>
+      </section>
+      <section>
+        <h2>9. 风险与兼容性</h2>
+        <ul>
+          <li>未合并旧实现：直接移除版本模型与版本 API；新表由现有 <code>create_all</code> 创建。若评审环境已有旧目录，显式迁移脚本只接受 owner ACL 与 SHA 都可验证的数据，否则报告并停止，不静默复制。</li>
+          <li>schema 复杂度：首版拒绝引用、组合关键字和远程 schema，只实现 object/array/string/number/integer/boolean/null 及基础约束。</li>
+          <li>运行时不可用或中断：任务失败关闭并保留可重试的运行记录，不把草稿误标为启用。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>10. 测试结果</h2>
+        <table>
+          <thead><tr><th>检查</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td><code>python3 -m unittest tests.test_ai_artifacts tests.test_skill_library -v</code></td><td>Calibre 测试镜像内 17/17 通过：目录权威 CRUD、owner ACL、SHA 门禁、原子替换、父目录/内部符号链接拒绝、删除清理、备份卷覆盖与 DB 无正文副本。</td></tr>
+            <tr><td><code>python3 -m unittest tests.test_summary_duck -v</code></td><td>16/16 通过；统一 Runtime 与 Codex 协议无回归。</td></tr>
+            <tr><td><code>npx vitest run test/components/SkillLibraryPage.spec.ts test/components/AppHeader.spec.ts test/utils/knowledge-graph-runtime.spec.ts</code></td><td>合并最新基线后 15/15 通过；当前 SHA 保存、查看、下载和运行体验通过，且无 <code>/versions</code> 请求。</td></tr>
+            <tr><td><code>skill-creator/scripts/quick_validate.py &lt;generated-skill&gt;</code></td><td>使用生产 <code>materialize_skill_package</code> 生成真实目录，校验结果 <code>Skill is valid!</code>。</td></tr>
+            <tr><td><code>npx playwright test test/e2e/skill-library.spec.ts --update-snapshots</code></td><td>Chromium 2/2 通过；更新并人工检查亮色桌面与暗色 390px 移动端截图。</td></tr>
+            <tr><td><code>npm run lint</code>；<code>npm run build</code></td><td>lint 0 errors（仅 193 个基线 warning）；Nuxt 生产构建成功。</td></tr>
+            <tr><td><code>make lint-py</code>；<code>make check-design</code>；<code>git diff --check</code></td><td>Python lint/format、设计文档状态校验与空白错误检查全部通过。</td></tr>
+          </tbody>
+        </table>
+        <p>测试中后端用例因 Calibre 依赖在项目测试镜像内执行；其余检查在当前工作树执行。</p>
+      </section>
+      <section>
+        <h2>11. interface-review full</h2>
+        <p>完整审查范围为 <code>origin/feat/ai_1.0</code>（merge base：<code>b86cbc7e4d6f5d6fca27e781204db3ec7508c025</code>）到当前工作树的全部实现差异，排除截图二进制和测试生成物。</p>
+        <table>
+          <thead><tr><th>初次发现</th><th>处理</th></tr></thead>
+          <tbody>
+            <tr><td>HIGH：切换 SKILL 或载入版本会无提示覆盖未保存修改。</td><td>增加脏状态跟踪和明确的“放弃修改”确认；补组件测试。</td></tr>
+            <tr><td>MEDIUM：编辑器在应用已有主区域内创建嵌套 <code>main</code> landmark。</td><td>改为带标题关联的 <code>section</code>。</td></tr>
+            <tr><td>MEDIUM：从任务创建使用泛化“确认”动作词。</td><td>改为结果明确的“创建 SKILL”。</td></tr>
+            <tr><td>MEDIUM：载入历史版本或保留未保存修改时，仍可启用/运行当前已保存版本，容易误判实际执行内容。</td><td>显式标记未保存或正在查看的版本，并在编辑器与当前版本不同步时禁用启用、试运行和手动运行。</td></tr>
+            <tr><td>MEDIUM：列表选择/焦点和方向相关样式依赖物理左边。</td><td>增加 <code>aria-pressed</code> 与完整焦点轮廓，改用逻辑边框和 <code>text-align: start</code>。</td></tr>
+            <tr><td>MEDIUM：文件选中态只依赖颜色；ZIP 下载在包信息载入前临时指向 <code>#</code>。</td><td>选中项增加边线、字重和 <code>aria-pressed</code>；下载动作增加加载态并在 URL 可用前禁用。</td></tr>
+            <tr><td>MEDIUM：生成/创建术语不一致，移动端包名提示会被浮动操作区遮挡。</td><td>核心流程统一为“生成”，缩短提示并为窄屏增加安全右侧留白；修正 i18n 命名空间并加 locale 结构测试。</td></tr>
+          </tbody>
+        </table>
+        <p><strong>本轮 full 审查：</strong>项目要求的 <code>interface-review</code> skill 未出现在本运行环境（<code>.agent_context/skills</code> 为空），因此以同等范围人工审查 <code>origin/feat/ai_1.0</code> 到最终工作树的完整差异。发现 HIGH：文件根下的 workspace/feature 父目录若被置换为符号链接，读取或删除可被重定向到根目录外。已在读取与删除前校验全部父级路径分量，增加防越界删除回归，并复跑 17 个后端用例。</p>
+        <p><strong>最终结论：通过。</strong>版本标签、历史载入、回滚动作与相关 API 均已移除；保存、下载、运行与启用均指向当前目录/SHA，人工复审后无未解决 HIGH 或 MEDIUM 问题。</p>
+      </section>
+      <section>
+        <h2>12. 决策记录</h2>
+        <p>首版采用通用但受限的 JSON Schema 子集；启用前要求当前 SHA 至少一次试运行成功；“从成果生成”只提取本人成功任务的类型、协议版本和结果结构摘要，避免复制正文。TB-52 的统一规范取代旧版本化决定：Agent Skills 当前目录是唯一内容来源，数据库不保存正文副本；所有文件型产物置于 <code>books/ai/{user-workspace}/skills</code>，运行记录只钉住相对路径与 SHA，不提供应用层回滚。</p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,9 +1,13 @@
 import datetime
+import hashlib
 import json
 import os
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
+from stat import S_IMODE
+from types import SimpleNamespace
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -15,8 +19,116 @@ from webserver.services.ai_artifacts import (
     AIArtifactStore,
     migrate_legacy_summary_duck_artifacts,
     workspace_identifier,
+    workspace_key,
+)
+from webserver.services.skill_library import (
+    build_skill_package,
+    build_skill_zip,
+    default_manifest,
+    delete_skill_artifacts,
+    materialize_skill_package,
+    read_skill_package,
+    read_skill_package_zip,
 )
 from webserver.services.summary_duck import SummaryDuckService
+from webserver.settings import settings as SETTINGS
+
+
+class SkillAIArtifactStoreTest(unittest.TestCase):
+    def test_current_skill_atomically_replaces_workspace_first_directory(self):
+        with tempfile.TemporaryDirectory() as root:
+            skill_id = str(uuid.uuid4())
+            workspace = workspace_key(7)
+            manifest = default_manifest("Reading Summary", "Summarize supplied reading material.")
+            markdown = "# Reading summary\n\nSummarize only supplied material."
+            package = materialize_skill_package(skill_id, workspace, manifest, markdown, root)
+            expected_artifact = Path(root) / workspace / "skills" / skill_id
+            expected_folder = expected_artifact / package["folder"]
+            self.assertEqual(package["storage_path"], expected_folder.relative_to(root).as_posix())
+            self.assertEqual((expected_folder / "SKILL.md").read_text(), package["files"][0]["content"])
+            self.assertFalse(any(path.name.startswith("v") for path in expected_artifact.iterdir()))
+            self.assertFalse((expected_artifact / package["filename"]).exists())
+            for directory in (
+                Path(root),
+                Path(root) / workspace,
+                Path(root) / workspace / "skills",
+                expected_artifact,
+                expected_folder,
+                expected_folder / "references",
+            ):
+                self.assertEqual(S_IMODE(directory.stat().st_mode), 0o700)
+            self.assertEqual(S_IMODE((expected_folder / "SKILL.md").stat().st_mode), 0o600)
+
+            manifest["description"] = "Replace the current directory atomically."
+            replaced = materialize_skill_package(skill_id, workspace, manifest, "# Replaced", root)
+            self.assertEqual([path.name for path in expected_artifact.iterdir()], [replaced["folder"]])
+            self.assertNotIn("Summarize only supplied material", (expected_folder / "SKILL.md").read_text())
+
+            skill = SimpleNamespace(
+                id=skill_id,
+                workspace_key=workspace,
+                artifact_path=replaced["storage_path"],
+                content_hash=replaced["content_hash"],
+            )
+            document = read_skill_package(skill, root)
+            self.assertEqual(document["manifest"]["description"], manifest["description"])
+            stored, payload_bytes = read_skill_package_zip(skill, root)
+            self.assertEqual(payload_bytes, build_skill_zip(build_skill_package(manifest, "# Replaced")))
+            self.assertEqual(stored["storage_path"], replaced["storage_path"])
+
+            delete_skill_artifacts(workspace, skill_id, root)
+            self.assertFalse(expected_artifact.exists())
+            self.assertFalse((Path(root) / workspace).exists())
+
+    def test_rejects_traversal_symlinks_and_content_tampering(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as external:
+            store = AIArtifactStore(root)
+            workspace = workspace_key(1)
+            with self.assertRaises(AIArtifactError):
+                store.materialize(workspace, "skills", "safe-id", {"../SKILL.md": b"invalid"})
+            with self.assertRaises(AIArtifactError):
+                store.artifact_path("../workspace", "skills", "safe-id")
+            with self.assertRaises(AIArtifactError):
+                store.artifact_path(workspace, "../skills", "safe-id")
+
+            package = materialize_skill_package(
+                "safe-id",
+                workspace,
+                default_manifest("Safe Skill", "A safe package."),
+                "# Safe",
+                root,
+            )
+            skill = SimpleNamespace(
+                id="safe-id",
+                workspace_key=workspace,
+                artifact_path=package["storage_path"],
+                content_hash=package["content_hash"],
+            )
+            skill_md = Path(root).joinpath(*Path(package["storage_path"]).parts, "SKILL.md")
+            skill_md.write_text("tampered", encoding="utf-8")
+            with self.assertRaises(AIArtifactError):
+                read_skill_package(skill, root)
+
+            linked_workspace = workspace_key(2)
+            external_artifact = Path(external) / "skills" / "outside-id"
+            external_artifact.mkdir(parents=True)
+            (external_artifact / "owned.txt").write_text("outside", encoding="utf-8")
+            (Path(root) / linked_workspace).symlink_to(external, target_is_directory=True)
+            with self.assertRaises(AIArtifactError):
+                store.read(linked_workspace, "skills", "outside-id")
+            with self.assertRaises(AIArtifactError):
+                store.delete_artifact(linked_workspace, "skills", "outside-id")
+            self.assertTrue((external_artifact / "owned.txt").is_file())
+
+    def test_default_ai_root_is_covered_by_books_volume_and_indexes_are_relative(self):
+        root = Path(SETTINGS["AI_ARTIFACT_ROOT"])
+        self.assertEqual(root, Path("/data/books/ai"))
+        self.assertTrue(root.is_relative_to(Path("/data/books")))
+        with tempfile.TemporaryDirectory() as temporary_root:
+            store = AIArtifactStore(temporary_root)
+            relative = store.relative_path(store.artifact_path(workspace_key(9), "skills", "artifact-id"))
+            self.assertFalse(Path(relative).is_absolute())
+            self.assertEqual(relative.split("/")[1], "skills")
 
 
 def payload(label="原稿"):
@@ -60,7 +172,7 @@ def record(**overrides):
     return models.AITask(**values)
 
 
-class AIArtifactStoreTest(unittest.TestCase):
+class SummaryDuckAIArtifactStoreTest(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
@@ -94,7 +206,7 @@ class AIArtifactStoreTest(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertNotEqual(first, workspace_identifier(8, {}))
 
-    def test_path_and_digest_tampering_fail_closed(self):
+    def test_path_digest_format_and_symlink_tampering_fail_closed(self):
         task = record()
         self.store.write_summary_duck(task, payload(), payload())
         artifact = Path(self.tempdir.name, task.artifact_path)
@@ -102,9 +214,22 @@ class AIArtifactStoreTest(unittest.TestCase):
         with self.assertRaisesRegex(AIArtifactError, "校验失败"):
             self.store.read_summary_duck(task)
 
+        artifact.write_bytes(b"[]")
+        task.artifact_sha256 = hashlib.sha256(b"[]").hexdigest()
+        with self.assertRaisesRegex(AIArtifactError, "格式无效"):
+            self.store.read_summary_duck(task)
+
         task.artifact_path = "../outside.json"
         with self.assertRaisesRegex(AIArtifactError, "路径无效"):
             self.store.read_summary_duck(task)
+
+        with tempfile.TemporaryDirectory() as external:
+            linked_task = record(creator_id=8)
+            linked_workspace = workspace_identifier(linked_task.creator_id, self.config)
+            (Path(self.tempdir.name) / linked_workspace).symlink_to(external, target_is_directory=True)
+            with self.assertRaisesRegex(AIArtifactError, "符号链接"):
+                self.store.write_summary_duck(linked_task, payload(), payload())
+            self.assertFalse(any(Path(external).iterdir()))
 
     def test_delete_removes_current_file_and_empty_feature_directories(self):
         task = record()

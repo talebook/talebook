@@ -82,6 +82,10 @@ settings = {
     # AI 任务统一开关；具体能力挂载到 /api/ai/<feature>/tasks 的 feature registry。
     "AI_ENABLED": True,
     "AI_SUMMARY_DUCK_ENABLED": True,
+    "AI_SKILLS_ENABLED": True,
+    "AI_SKILL_MAX_ACTIVE_RUNS": 2,
+    "AI_SKILL_MAX_MARKDOWN_CHARACTERS": 40_000,
+    "AI_SKILL_MAX_INPUT_CHARACTERS": 32_000,
     "AI_KNOWLEDGE_GRAPH_ENABLED": True,
     "AI_KNOWLEDGE_GRAPH_MAX_CHAPTERS": 80,
     "AI_KNOWLEDGE_GRAPH_MAX_CHAPTER_CHARACTERS": 16000,
@@ -95,10 +99,9 @@ settings = {
     "AI_CODEX_MODEL": "",
     "AI_CODEX_MIN_VERSION": "0.147.0",
     "AI_CODEX_MAX_VERSION": "0.148.0",
-    "AI_TASK_ROOT": "/data/books/progress",
-    # Durable AI artifacts are part of the /data/books backup boundary. The DB
-    # stores only paths relative to this books/ai root plus SHA-256 indexes.
+    # AI 持久化产物统一放在 /data/books 备份边界内；数据库仅保存相对路径和 SHA-256 索引。
     "AI_ARTIFACT_ROOT": "/data/books/ai",
+    "AI_TASK_ROOT": "/data/books/progress",
     "AI_HANDSHAKE_TIMEOUT_SECONDS": 10,
     "AI_FIRST_PROGRESS_TIMEOUT_SECONDS": 30,
     "AI_SILENCE_TIMEOUT_SECONDS": 45,

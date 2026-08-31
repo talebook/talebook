@@ -19,6 +19,7 @@ def routes():
         opds,
         recommendations,
         scan,
+        skill_library,
         theme,
         user,
     )
@@ -34,6 +35,7 @@ def routes():
     routes += network_library.routes()
     routes += audiobook.routes()
     routes += ai.routes()
+    routes += skill_library.routes()
     routes += recommendations.routes()
     captcha_routes = captcha.routes()
     routes += captcha_routes
