@@ -47,8 +47,6 @@ _MOJIBAKE_PAIRS = (
 
 # 不可读字符（替换符 / 私用区 / 代理区）
 _UNREADABLE_RE = re.compile("[\ufffd\ufffe\uffff\ue000-\uf8ff\ud800-\udfff\ud7b0-\ud7ff]")
-# 控制字符（保留 \n \r \t）
-_CONTROL_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _CJK_RE = re.compile("[\u3400-\u4dbf\u4e00-\u9fff]")
 
 SAMPLE_CHARS = 800  # 报告中的可读性样本长度
@@ -85,6 +83,12 @@ def _is_mojibake_char(char):
     return 0x0080 <= codepoint <= 0x00FF or 0x0100 <= codepoint <= 0x017F or 0x2000 <= codepoint <= 0x206F
 
 
+def _is_control_char(char):
+    """是否为应扣分的控制字符；保留换行、回车和制表符。"""
+    codepoint = ord(char)
+    return 0x00 <= codepoint <= 0x08 or codepoint in (0x0B, 0x0C) or 0x0E <= codepoint <= 0x1F or codepoint == 0x7F
+
+
 def _readability_score(text):
     """0~100 可读性评分：中文书籍文本得分应显著高于乱码结果。"""
     if not text:
@@ -95,7 +99,7 @@ def _readability_score(text):
         return 0.0
 
     replace_count = len(_UNREADABLE_RE.findall(sample))
-    control_count = len(_CONTROL_RE.findall(sample))
+    control_count = sum(1 for char in sample if _is_control_char(char))
     cjk_count = len(_CJK_RE.findall(sample))
     mojibake_count = sum(1 for char in sample if _is_mojibake_char(char))
 
