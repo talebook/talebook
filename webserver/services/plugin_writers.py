@@ -42,6 +42,10 @@ class EntityWriter:
     def materialize(self, session, run, connection, record, data, payload_hash, calibre_db):
         """把来源记录物化为 Talebook 自己的业务行。"""
 
+    def is_locally_modified(self, session, record):
+        """返回物化业务行是否已被用户修改或删除。"""
+        return bool(record.local_modified)
+
     def rollback(self, session, record):
         """撤销 :meth:`materialize` 的写入。"""
 
@@ -58,6 +62,11 @@ class AnnotationWriter(EntityWriter):
         from webserver.services.annotation_writer import materialize_annotation
 
         return materialize_annotation(session, run, connection, record, data, payload_hash, calibre_db)
+
+    def is_locally_modified(self, session, record):
+        from webserver.services.annotation_writer import materialized_annotation_is_locally_modified
+
+        return materialized_annotation_is_locally_modified(session, record)
 
     def rollback(self, session, record):
         from webserver.services.annotation_writer import rollback_materialized_annotation

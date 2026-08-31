@@ -1633,8 +1633,15 @@ class PluginRuntime:
                     run, item.external_id, item.entity_type, "previewed", "preview", "", "", safe_data, payload_hash
                 )
                 continue
-            operation, status, record = self._upsert_source_record(run, connection, item, safe_data, payload_hash)
-            if writer is not None and status != "conflict":
+            operation, status, record = self._upsert_source_record(
+                run,
+                connection,
+                item,
+                safe_data,
+                payload_hash,
+                writer=writer,
+            )
+            if writer is not None and operation in {"created", "updated"} and status != "conflict":
                 writer.materialize(
                     self.session,
                     run,
@@ -1702,7 +1709,7 @@ class PluginRuntime:
                 return "isbn"
         return ""
 
-    def _upsert_source_record(self, run, connection, item, safe_data, payload_hash):
+    def _upsert_source_record(self, run, connection, item, safe_data, payload_hash, writer=None):
         record = (
             self.session.query(PluginSourceRecord)
             .filter(
@@ -1733,7 +1740,11 @@ class PluginRuntime:
             self.session.add(record)
             self.session.flush()
             return "created", "succeeded", record
-        if record.local_modified and record.raw_hash != payload_hash:
+        if writer is not None and writer.is_locally_modified(self.session, record):
+            record.local_modified = True
+        if record.local_modified:
+            if record.status == "active" and record.raw_hash == payload_hash:
+                return "skipped", "succeeded", record
             return "protected", "conflict", record
         if record.status == "active" and record.raw_hash == payload_hash:
             return "skipped", "succeeded", record
@@ -1757,6 +1768,9 @@ class PluginRuntime:
         counts["fetched"] = len(records)
         now = datetime.datetime.now()
         for record in records:
+            record_writer = writer_for(record.entity_type)
+            if record_writer is not None and record_writer.is_locally_modified(self.session, record):
+                record.local_modified = True
             if record.local_modified:
                 counts["conflicts"] += 1
                 self._add_item(
@@ -1771,7 +1785,6 @@ class PluginRuntime:
                     record.raw_hash,
                 )
                 continue
-            record_writer = writer_for(record.entity_type)
             if record_writer is not None:
                 record_writer.rollback(self.session, record)
             record.status = "rolled_back"

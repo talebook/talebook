@@ -19,7 +19,6 @@ class WebDAVProvider(SourceBase):
             "properties": {
                 **COMMON_CONFIG_PROPERTIES,
                 "endpoint": {"type": "string", "format": "uri", "title": "WebDAV endpoint"},
-                "allowed_hosts": {"type": "array", "items": {"type": "string"}, "title": "私网主机白名单"},
             },
             "required": ["endpoint"],
         },
@@ -42,7 +41,6 @@ class WebDAVProvider(SourceBase):
         response = self.http.request(
             "PROPFIND",
             endpoint,
-            allowed_hosts=config.get("allowed_hosts") or (),
             headers=headers,
             data=b'<?xml version="1.0"?><propfind xmlns="DAV:"><prop><getetag/><getlastmodified/><getcontentlength/><resourcetype/></prop></propfind>',
         )

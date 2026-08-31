@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="TB-192 插件运行权限、批注本地修改保护与可配置端点出网安全收口方案。" />
+    <link rel="icon" href="data:," />
+    <title>插件安全与数据保护收口 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#172033; --muted:#58657a; --line:#d7e0ec; --accent:#b54708; --soft:#fff1e8; --green:#176448; --green-soft:#e8f6ef; --red:#9c2f2f; --red-soft:#fdeeee; --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; --mono:"SFMono-Regular",Consolas,monospace; }
+      * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; color:var(--ink); background:linear-gradient(145deg,#fff 0%,var(--bg) 45%,#eef4fb 100%); font-family:var(--sans); line-height:1.68; }
+      .skip-link { position:fixed; top:8px; left:8px; z-index:20; padding:8px 12px; color:#fff; background:var(--ink); transform:translateY(-160%); } .skip-link:focus { transform:none; }
+      .page { width:min(1120px,calc(100vw - 32px)); margin:auto; padding:26px 0 54px; } .hero,.card { background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:0 12px 28px rgba(23,32,51,.07); }
+      .hero { padding:31px 34px; margin-bottom:18px; border-top:5px solid var(--accent); } h1 { margin:0 0 9px; font-size:clamp(30px,4vw,46px); line-height:1.14; } .sub { max-width:900px; margin:0; color:var(--muted); font-size:16px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:19px; } .chip { padding:5px 11px; border-radius:999px; color:#4f5d72; background:#edf2f7; font-size:12px; font-weight:700; } .chip.active { color:var(--green); background:var(--green-soft); }
+      .card { margin-bottom:18px; padding:25px 28px; scroll-margin-top:16px; } h2 { margin:0 0 14px; font-size:23px; } h3 { margin:20px 0 9px; font-size:17px; } p { margin:0 0 12px; } p,li,td { color:#29364a; font-size:14px; } ul,ol { margin:8px 0 0 20px; padding:0; } li+li { margin-top:6px; }
+      code { padding:.1em .34em; border-radius:4px; background:#eef2f7; font-family:var(--mono); font-size:.9em; overflow-wrap:anywhere; } .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; } .choice,.callout { padding:15px 17px; border:1px solid var(--line); border-radius:14px; background:#f9fbfd; } .choice h3 { margin-top:0; } .callout.warn { border-color:#eccaa6; background:var(--soft); } .callout.good { border-color:#b9dccb; background:var(--green-soft); } .callout.danger { border-color:#e0b3b3; background:var(--red-soft); }
+      .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:15px; } .step { min-height:128px; padding:15px; border:1px solid var(--line); border-radius:14px; background:#fff; } .step b { display:block; margin-bottom:6px; } .step p { margin:0; color:var(--muted); font-size:13px; } .label { color:var(--accent); font:800 10px/1.3 var(--mono); letter-spacing:.08em; }
+      .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:14px; } table { width:100%; min-width:680px; border-collapse:collapse; } th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { color:#536175; background:#f6f8fb; font-size:12px; } th:last-child,td:last-child { border-right:0; } tr:last-child td { border-bottom:0; } .pending { color:#995b08; font-weight:800; } .verified { color:var(--green); font-weight:800; }
+      .toc { position:sticky; top:0; z-index:10; display:flex; gap:5px; margin:0 0 16px; padding:7px; overflow-x:auto; background:rgba(244,247,251,.95); backdrop-filter:blur(8px); border-radius:12px; } .toc a { flex:none; padding:7px 10px; color:#56647a; text-decoration:none; font-size:12px; font-weight:700; border-radius:8px; } .toc a:hover,.toc a:focus { color:var(--accent); background:var(--soft); }
+      footer { color:var(--muted); text-align:center; font-size:12px; } @media (max-width:720px) { .page { width:calc(100vw - 20px); padding-top:10px; } .hero,.card { border-radius:15px; } .hero,.card { padding:21px 19px; } .grid,.flow { grid-template-columns:1fr; } .step { min-height:0; } } @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } } @media print { body { background:#fff; } .page { width:100%; padding:0; } .hero,.card { box-shadow:none; } .toc,.skip-link { display:none; } .card,.choice,.callout,.step,.table-wrap { break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>插件安全与数据保护收口</h1>
+        <p class="sub">在最新主干上重新落实 TB-51 的三条安全不变量，同时适配已经完成的插件领域模型重构，不回退插件中心现有能力。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-31</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：插件 API、批注写入、HTTP endpoint</span><span class="chip">需求来源：TB-192 / 旧 PR #1006</span>
+        </div>
+      </header>
+      <nav class="toc" aria-label="章节目录"><a href="#request">原始诉求</a><a href="#goals">目标边界</a><a href="#evidence">根因</a><a href="#design">方案</a><a href="#impact">风险</a><a href="#tests">测试</a><a href="#decisions">决策</a></nav>
+      <main id="main-content">
+        <section id="request" class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“基于最新 <code>master</code> 重新实现或无损重放 TB-51 三项已复验修复：管理员不得执行、枚举或读取用户私有 Run；用户手工修改或删除来源批注后同步与 rollback 不得覆盖；BRS 等可配置 HTTP endpoint 拒绝本机、link-local、私网地址与私网重定向，并限制响应大小。”</div>
+          <p>旧提交 <code>611e90dd</code> 位于冲突的 Draft PR #1006，且不在当前主干历史中。之后主干重构了插件 handler、实体 writer 与 provider 目录，不能直接以旧文件形态合并。</p>
+        </section>
+        <section id="goals" class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice"><h3>目标</h3><ul><li>管理员运行入口只接收 instance-owned connection，列表和详情只暴露对应 Run。</li><li>Annotation API 的手工更新、删除同步标记物化来源记录；运行时在同步和回滚前再依据业务行兜底检测。</li><li>任意用户可配 endpoint 只走 <code>SafeHttpClient</code>，且用户配置不能自助放行非公网地址。</li><li>以当前架构补足定向测试，并完成 Docker 定向与全量回归。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>不引入 AI、Calibre Content Server、Calibre-Web 或 TB-46。</li><li>不改变普通用户对本人连接与 Run 的访问能力。</li><li>不迁移库表，不重做插件中心页面。</li><li>不把旧提交整体 cherry-pick 后保留过时模块名。</li></ul></article>
+          </div>
+        </section>
+        <section id="evidence" class="card">
+          <h2>3. 现状、根因与证据</h2>
+          <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0"><table><thead><tr><th>观察</th><th>当前证据</th><th>结论</th></tr></thead><tbody>
+            <tr><td>管理员越权</td><td><code>webserver/handlers/plugins.py</code> 的 action 只判断连接存在；runs 查询直接从 <code>PluginRun</code> 开始；detail 不核对连接所有者。</td><td>管理员可触发并读取用户私有连接的运行数据。</td></tr>
+            <tr><td>本地修改保护失联</td><td>Annotation PUT 只更新 <code>user_modified_at</code>，DELETE 直接删业务行；<code>PluginSourceRecord.local_modified</code> 未联动。运行时仅相信该布尔值。</td><td>下次远程同步可覆盖本地编辑；回滚可误删业务行或把已手工删除的记录标成成功。</td></tr>
+            <tr><td>出网策略存在绕过</td><td>BRS、动态 OPDS 与 WebDAV 已使用 <code>SafeHttpClient</code>，但 schema 暴露 <code>allowed_hosts</code> 并直接传给策略层。</td><td>用户可把任意私网 endpoint 自行加入白名单，等价于绕过私网拒绝。</td></tr>
+          </tbody></table></div>
+        </section>
+        <section id="design" class="card">
+          <h2>4. 方案</h2>
+          <div class="callout good"><strong>方案结论：</strong>把权限过滤放在管理员 API 的查询边界；把“业务行是否仍等于插件物化结果”作为 writer 契约；把 endpoint 私网例外限制在平台代码持有的固定可信主机，不接受连接 config 传入的白名单。</div>
+          <div class="flow" aria-label="核心处理流程">
+            <article class="step"><span class="label">Admin API</span><b>先限定 owner</b><p>action 校验 instance；list join connection；detail 不泄露用户 Run 是否存在。</p></article>
+            <article class="step"><span class="label">Annotation API</span><b>主动标脏</b><p>手工 PUT/DELETE 在同一事务把关联 source record 标为 local modified。</p></article>
+            <article class="step"><span class="label">Runtime</span><b>兜底检测</b><p>实体 writer 在 upsert 与 rollback 前检查业务行缺失、来源解绑或修改时间分叉。</p></article>
+            <article class="step"><span class="label">Network</span><b>逐跳验证</b><p>连接配置不再传私网白名单；每次请求和跳转校验公网地址并检查响应大小。</p></article>
+          </div>
+          <h3>关键决策</h3>
+          <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0"><table><thead><tr><th>决策</th><th>选择</th><th>理由</th><th>不采用</th></tr></thead><tbody>
+            <tr><td>本地修改检测归属</td><td>扩展通用 <code>EntityWriter.is_locally_modified()</code> 钩子，AnnotationWriter 实现。</td><td>保持运行时不认识具体实体，符合当前解耦架构。</td><td>恢复旧提交中运行时对 weread 模块的函数内 import。</td></tr>
+            <tr><td>删除后的关联记录</td><td>先标记 source record，再删除 Annotation；运行时看到业务行缺失仍判为本地修改。</td><td>来源记录是保护用户删除意图的持久事实。</td><td>级联删除 source record，导致后续同步重新创建。</td></tr>
+            <tr><td>私网白名单</td><td>从用户连接 schema 与调用链移除；固定官方 host 的代码级白名单能力保留。</td><td>满足可配置 endpoint 必须拒绝非公网目标，同时不破坏可信静态 provider 的 DNS 策略。</td><td>继续信任用户传入 <code>allowed_hosts</code>。</td></tr>
+          </tbody></table></div>
+        </section>
+        <section id="impact" class="card">
+          <h2>5. 影响范围、风险与回滚</h2>
+          <div class="grid"><article class="choice"><h3>影响范围</h3><p>仅后端 handler、实体 writer、Annotation API、BRS/OPDS/WebDAV 配置声明与定向测试；无库表迁移、无前端页面结构变化。</p></article><article class="choice"><h3>保持不变</h3><p>普通用户 API、固定公网插件、run 状态机、已有数据结构与密钥存储方式不变。纯后端安全边界，不影响界面，因此豁免 interface-review。</p></article></div>
+          <div class="callout danger"><strong>主要风险：</strong>依赖私网 BRS/OPDS/WebDAV 的存量连接将被拒绝；这是安全收紧的预期兼容变化。回归测试需证明公网路径不受影响、私网重定向和大响应均失败。</div>
+          <div class="callout"><strong>回滚：</strong>全部为代码与 schema 声明改动，可按单 PR revert；无数据迁移或清理步骤。</div>
+        </section>
+        <section id="tests" class="card">
+          <h2>6. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0"><table><thead><tr><th>验证层</th><th>实际命令</th><th>预期</th><th>结果</th></tr></thead><tbody>
+            <tr><td>定向回归</td><td><code>docker run … talebook/test:tb135 pytest -q tests/test_plugins_api.py tests/test_annotations.py tests/test_weread_plugin.py tests/test_enrichment_connectors.py tests/test_book_source_plugins.py</code></td><td>管理员越权、Annotation 修改/删除、同步/rollback 保护、SSRF/重定向/大小限制通过。</td><td class="verified">136 passed</td></tr>
+            <tr><td>插件核心链路</td><td><code>docker run … pytest -q tests/test_network_library.py tests/test_plugins_api.py::TestPluginsApi::test_metadata_probe_calls_metadata_provider_search_contract</code></td><td>当前主干插件目录、搜索租约与 metadata probe 无回退。</td><td class="verified">23 passed；1 warning</td></tr>
+            <tr><td>全量后端</td><td><code>docker run … talebook/test:tb135 pytest --log-file=unittest.log --log-level=INFO tests</code></td><td>记录 Docker 内完整 pytest 结果，并与原始主干对照。</td><td>1235 passed，20 skipped，1 failed。唯一失败为 <code>test_metadata_probe_calls_metadata_provider_search_contract</code> 的既存并发租约波动；单独复跑 1 passed，原始 <code>origin/master</code> 全量也复现同一失败（1228 passed，20 skipped，1 failed），与本改动无关。</td></tr>
+            <tr><td>Makefile Docker 构建</td><td><code>make test</code></td><td>按仓库标准方式重建测试镜像并执行全量测试。</td><td>执行两次，均在 pytest 前因 GitHub 上 <code>voicebook-tool</code> 依赖下载超时而停止；因此使用本机已有的同项目测试镜像 <code>talebook/test:tb135</code> 完成上述定向与全量验证。</td></tr>
+            <tr><td>格式与 lint</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>git diff --check</code></td><td>项目门禁通过。</td><td class="verified">通过；175 个后端文件格式正确</td></tr>
+            <tr><td>方案门禁</td><td><code>make check-design</code></td><td>最终 ACTIVE 单文件 HTML 合规。</td><td class="verified">132 design document(s) passed</td></tr>
+          </tbody></table></div>
+          <div class="callout good"><strong>结论：</strong>三类安全阻塞路径和插件中心核心链路均通过定向回归。完整套件的唯一稳定复现失败在未修改的主干同样存在；镜像重建受外部 GitHub 网络超时限制，未把失败构建表述为测试通过。</div>
+        </section>
+        <section id="decisions" class="card"><h2>7. 决策记录</h2><ol><li><strong>2026-08-31：</strong>不直接 cherry-pick 旧提交；按当前 handler 与 EntityWriter 架构重放安全不变量。</li><li><strong>2026-08-31：</strong>可配置 endpoint 的所有者无论管理员还是普通用户，都不能通过同一连接 config 自助放行私网目标。</li><li><strong>2026-08-31：</strong>本任务是纯后端安全与数据保护修复，无界面影响，豁免 interface-review；剩余界面风险仅为已保存私网连接执行时返回安全错误。</li></ol></section>
+      </main>
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-08-31</footer>
+    </div>
+  </body>
+</html>

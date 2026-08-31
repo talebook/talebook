@@ -8,7 +8,7 @@ from webserver.plugins.runtime.safe_http import SafeHttpClient
 _CLIENT = SafeHttpClient()
 
 
-def _http_json(method, url, headers=None, params=None, timeout=30, allowed_hosts=(), data=None, json=None):
+def _http_json(method, url, headers=None, params=None, timeout=30, data=None, json=None):
     return _CLIENT.json(
         method,
         url,
@@ -17,7 +17,6 @@ def _http_json(method, url, headers=None, params=None, timeout=30, allowed_hosts
         data=data,
         json=json,
         timeout=timeout,
-        allowed_hosts=allowed_hosts,
     )
 
 
@@ -65,7 +64,6 @@ class BRSProvider:
             "type": "object",
             "properties": {
                 "endpoint": {"type": "string", "default": "https://brs.talebook.org"},
-                "allowed_hosts": {"type": "array", "items": {"type": "string"}, "title": "私网主机白名单"},
                 "book_map": {"type": "object"},
                 "chapter_map": {"type": "object"},
                 "segment_map": {"type": "object"},
@@ -107,7 +105,6 @@ class BRSProvider:
             endpoint + "/api/v1/comments",
             headers={"Authorization": "Basic %s" % credentials},
             params={"cursor": cursor},
-            allowed_hosts=config.get("allowed_hosts") or (),
         )
         if context["action"] == "test":
             return ProviderResult(health_message="BRS connection healthy")
@@ -199,12 +196,10 @@ class BRSProvider:
             transport = client.json
         else:
             transport = self.transport
-        allowed_hosts = config.get("allowed_hosts") or ()
         login = transport(
             "POST",
             endpoint + "/api/user/sign_in",
             data={"email": email, "password": password},
-            allowed_hosts=allowed_hosts,
         )
         if login.get("err") != "ok":
             raise UpstreamError(str(login.get("msg") or login.get("err") or "BRS login failed"))
@@ -217,7 +212,6 @@ class BRSProvider:
                 "GET",
                 endpoint + "/api/review/book",
                 params={"title": book_title},
-                allowed_hosts=allowed_hosts,
             )
             if remote_book.get("err") != "ok":
                 raise UpstreamError(str(remote_book.get("msg") or remote_book.get("err") or "BRS book lookup failed"))
@@ -238,7 +232,6 @@ class BRSProvider:
             "POST",
             endpoint + "/api/review/add",
             json=payload,
-            allowed_hosts=allowed_hosts,
         )
         if result.get("err") != "ok":
             raise UpstreamError(str(result.get("msg") or result.get("err") or "BRS annotation sync failed"))

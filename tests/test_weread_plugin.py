@@ -1,3 +1,5 @@
+import copy
+import datetime
 import json
 import zipfile
 from types import SimpleNamespace
@@ -373,6 +375,57 @@ def test_multiple_candidates_never_write_until_user_confirms(db_session):
     match = db_session.query(PluginEntityMatch).one()
     assert match.status == "confirmed"
     assert match.confirmed_by == 1
+
+
+def test_sync_preserves_materialized_annotations_that_were_locally_edited_or_deleted(db_session):
+    calibre = FakeCalibreDB({7: {"title": "活着", "authors": ["余华"]}})
+    connection = build_connection(db_session)
+    execute(db_session, connection, calibre)
+    records = {record.external_id: record for record in db_session.query(PluginSourceRecord).all()}
+    edited_record = records["weread:3300045871:bookmark:b1"]
+    deleted_record = records["weread:3300045871:review:r1"]
+    edited = db_session.get(Annotation, int(edited_record.entity_id))
+    edited.content = "manual local content"
+    edited.user_modified_at = datetime.datetime(2026, 8, 31, 12, 0, 0)
+    deleted_id = int(deleted_record.entity_id)
+    db_session.delete(db_session.get(Annotation, deleted_id))
+    db_session.commit()
+
+    changed_payload = copy.deepcopy(SAMPLE)
+    changed_payload["bookmarks"][0]["markText"] = "remote replacement"
+    changed_payload["reviews"][0]["review"]["content"] = "remote recreation"
+    synced = execute(db_session, connection, calibre, payload=changed_payload)
+
+    assert synced.status == "partial"
+    assert synced.counts["conflicts"] == 2
+    assert db_session.get(Annotation, edited.id).content == "manual local content"
+    assert db_session.get(Annotation, deleted_id) is None
+    assert db_session.get(PluginSourceRecord, edited_record.id).local_modified is True
+    assert db_session.get(PluginSourceRecord, deleted_record.id).local_modified is True
+
+
+def test_rollback_preserves_materialized_annotations_that_were_locally_edited_or_deleted(db_session):
+    calibre = FakeCalibreDB({7: {"title": "活着", "authors": ["余华"]}})
+    connection = build_connection(db_session)
+    imported = execute(db_session, connection, calibre)
+    records = {record.external_id: record for record in db_session.query(PluginSourceRecord).all()}
+    edited_record = records["weread:3300045871:bookmark:b1"]
+    deleted_record = records["weread:3300045871:review:r1"]
+    edited = db_session.get(Annotation, int(edited_record.entity_id))
+    edited.content = "manual local content"
+    edited.user_modified_at = datetime.datetime(2026, 8, 31, 12, 0, 0)
+    deleted_id = int(deleted_record.entity_id)
+    db_session.delete(db_session.get(Annotation, deleted_id))
+    db_session.commit()
+
+    rolled_back = execute(db_session, connection, calibre, action="rollback", parent_run_id=imported.id)
+
+    assert rolled_back.status == "partial"
+    assert rolled_back.counts["conflicts"] == 2
+    assert db_session.get(Annotation, edited.id).content == "manual local content"
+    assert db_session.get(Annotation, deleted_id) is None
+    assert db_session.get(PluginSourceRecord, edited_record.id).status == "active"
+    assert db_session.get(PluginSourceRecord, deleted_record.id).status == "active"
 
 
 def test_rollback_deletes_only_annotations_materialized_by_source_run(db_session):

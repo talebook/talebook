@@ -53,7 +53,6 @@ class SourceCatalogService:
             "BOOKSOURCE_MAX_CONTENT_PAGES": self.settings.get("BOOKSOURCE_MAX_CONTENT_PAGES", 20),
             "BOOKSOURCE_AD_PATTERNS": self.settings.get("BOOKSOURCE_AD_PATTERNS", []),
             "BOOKSOURCE_CLEAN_ENABLED": self.settings.get("BOOKSOURCE_CLEAN_ENABLED", True),
-            "BOOKSOURCE_ALLOWED_HOSTS": self.settings.get("BOOKSOURCE_ALLOWED_HOSTS", []),
             "BOOKSOURCE_MAX_RESPONSE_BYTES": self.settings.get("BOOKSOURCE_MAX_RESPONSE_BYTES", 8 * 1024 * 1024),
         }
 

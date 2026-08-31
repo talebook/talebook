@@ -169,7 +169,6 @@ class SourceBase:
         response = self.http.request(
             "GET",
             book.acquisition_url,
-            allowed_hosts=config.get("allowed_hosts") or (),
             headers=self._headers(context),
             timeout=float(config.get("timeout_seconds", 30)),
         )
@@ -276,7 +275,6 @@ class OPDSProvider(SourceBase):
             properties.update(
                 {
                     "endpoint": {"type": "string", "format": "uri", "title": "OPDS endpoint"},
-                    "allowed_hosts": {"type": "array", "items": {"type": "string"}, "title": "私网主机白名单"},
                 }
             )
         self.manifest = _manifest(
@@ -305,7 +303,6 @@ class OPDSProvider(SourceBase):
         response = self.http.request(
             "GET",
             endpoint,
-            allowed_hosts=config.get("allowed_hosts") or (),
             headers=self._headers(context),
             timeout=float(config.get("timeout_seconds", 30)),
         )

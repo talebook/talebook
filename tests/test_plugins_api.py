@@ -10,6 +10,7 @@ from webserver.models import (
     PluginEntityMatch,
     PluginInstallation,
     PluginRun,
+    PluginRunItem,
     PluginSecret,
     Reader,
 )
@@ -226,6 +227,68 @@ class TestPluginsApi(TestWithAdminUser):
         data = self.json("/api/admin/plugins/runs/999999")
         self.assertEqual(data["err"], "plugin.run_missing")
         self.assertNotIn("traceback", json.dumps(data).lower())
+
+    def test_admin_cannot_execute_list_or_read_user_owned_plugin_runs(self):
+        self.json("/api/admin/plugins")
+        session = get_db()
+        installation = session.query(PluginInstallation).filter_by(plugin_key="talebook.combo.weread").one()
+        connection = PluginConnection(
+            installation_id=installation.id,
+            owner_type="user",
+            owner_id=2,
+            role="security-private-run",
+            name="private user connection",
+            config={},
+            scopes=[],
+        )
+        session.add(connection)
+        session.flush()
+        run = PluginRun(
+            connection_id=connection.id,
+            action="run",
+            status="succeeded",
+            requested_by=2,
+            counts={},
+            cursor_before={},
+            cursor_after={},
+            input_data={"private": "user two input"},
+        )
+        session.add(run)
+        session.flush()
+        item = PluginRunItem(
+            run_id=run.id,
+            external_id="user-two-private-note",
+            entity_type="annotation",
+            status="succeeded",
+            data={"content": "user two private highlight"},
+        )
+        session.add(item)
+        session.commit()
+        connection_id, run_id = connection.id, run.id
+
+        def cleanup():
+            cleanup_session = get_db()
+            cleanup_session.query(PluginRunItem).filter(PluginRunItem.run_id == run_id).delete()
+            cleanup_session.query(PluginRun).filter(PluginRun.id == run_id).delete()
+            cleanup_session.query(PluginConnection).filter(PluginConnection.id == connection_id).delete()
+            cleanup_session.commit()
+
+        self.addCleanup(cleanup)
+        with mock.patch("webserver.handlers.plugins._prepare_action_run") as prepare:
+            action = self.json(
+                "/api/admin/plugins/connections/%d/run" % connection_id,
+                method="POST",
+                body="{}",
+            )
+        listed = self.json("/api/admin/plugins/runs?include_items=true")
+        detail = self.json("/api/admin/plugins/runs/%d" % run_id)
+
+        self.assertEqual(action["err"], "plugin.connection_forbidden")
+        prepare.assert_not_called()
+        self.assertNotIn(run_id, [value["id"] for value in listed["runs"]])
+        self.assertNotIn("user-two-private-note", json.dumps(listed, ensure_ascii=False))
+        self.assertEqual(detail["err"], "plugin.run_missing")
+        self.assertNotIn("user two private highlight", json.dumps(detail, ensure_ascii=False))
 
     def test_input_data_must_be_an_object(self):
         catalog = self.json("/api/admin/plugins")
