@@ -99,7 +99,7 @@ settings = {
     "AI_CODEX_MODEL": "",
     "AI_CODEX_MIN_VERSION": "0.147.0",
     "AI_CODEX_MAX_VERSION": "0.148.0",
-    # AI 功能的持久化产物统一存放在 <root>/<user-workspace>/<feature>/...
+    # AI 持久化产物统一放在 /data/books 备份边界内；数据库仅保存相对路径和 SHA-256 索引。
     "AI_ARTIFACT_ROOT": "/data/books/ai",
     "AI_TASK_ROOT": "/data/books/progress",
     "AI_HANDSHAKE_TIMEOUT_SECONDS": 10,

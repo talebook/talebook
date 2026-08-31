@@ -53,12 +53,14 @@ class TestSelfCheckSteps(unittest.TestCase):
         self.assertIsNone(code)
         with open(os.path.join(self.data_dir, ".permission")) as f:
             self.assertEqual(f.read().strip(), "1000:1000")
-        chown_call, library_probe, settings_probe = m_run.call_args_list
+        chown_call, library_probe, settings_probe, ai_probe = m_run.call_args_list
         self.assertEqual(chown_call.args[0][:2], ["chown", "-R"])
         self.assertEqual(library_probe.args[0][0], "gosu")
         self.assertEqual(library_probe.args[0][-1], os.path.join(self.data_dir, "books", "library"))
         self.assertEqual(settings_probe.args[0][0], "gosu")
         self.assertEqual(settings_probe.args[0][-1], os.path.join(self.data_dir, "books", "settings"))
+        self.assertEqual(ai_probe.args[0][0], "gosu")
+        self.assertEqual(ai_probe.args[0][-1], os.path.join(self.data_dir, "books", "ai"))
 
     @mock.patch("webserver.self_check.run")
     def test_check_permission_repairs_settings_when_identity_unchanged(self, m_run):
@@ -70,13 +72,21 @@ class TestSelfCheckSteps(unittest.TestCase):
 
         self.assertTrue(ok)
         self.assertIsNone(code)
-        self.assertEqual(m_run.call_count, 3)
-        settings_chown, library_probe, settings_probe = m_run.call_args_list
+        self.assertEqual(m_run.call_count, 4)
+        settings_chown, library_probe, settings_probe, ai_probe = m_run.call_args_list
         self.assertEqual(
-            settings_chown.args[0], ["chown", "-R", "talebook:talebook", os.path.join(self.data_dir, "books", "settings")]
+            settings_chown.args[0],
+            [
+                "chown",
+                "-R",
+                "talebook:talebook",
+                os.path.join(self.data_dir, "books", "settings"),
+                os.path.join(self.data_dir, "books", "ai"),
+            ],
         )
         self.assertEqual(library_probe.args[0][-1], os.path.join(self.data_dir, "books", "library"))
         self.assertEqual(settings_probe.args[0][-1], os.path.join(self.data_dir, "books", "settings"))
+        self.assertEqual(ai_probe.args[0][-1], os.path.join(self.data_dir, "books", "ai"))
 
     @mock.patch("webserver.self_check.run")
     def test_check_permission_chown_failure(self, m_run):
@@ -103,11 +113,28 @@ class TestSelfCheckSteps(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertEqual(code, "permission_denied")
-        m_run.assert_called_once_with(["chown", "-R", "talebook:talebook", os.path.join(self.data_dir, "books", "settings")])
+        m_run.assert_called_once_with(
+            [
+                "chown",
+                "-R",
+                "talebook:talebook",
+                os.path.join(self.data_dir, "books", "settings"),
+                os.path.join(self.data_dir, "books", "ai"),
+            ]
+        )
 
     @mock.patch("webserver.self_check.run")
     def test_check_permission_settings_atomic_write_failure(self, m_run):
         m_run.side_effect = [True, True, False]
+
+        ok, code = self_check.check_permission()
+
+        self.assertFalse(ok)
+        self.assertEqual(code, "permission_denied")
+
+    @mock.patch("webserver.self_check.run")
+    def test_check_permission_ai_artifact_atomic_write_failure(self, m_run):
+        m_run.side_effect = [True, True, True, False]
 
         ok, code = self_check.check_permission()
 
