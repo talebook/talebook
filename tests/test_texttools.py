@@ -7,7 +7,7 @@ from unittest import mock
 
 from webserver.handlers.base import BaseHandler
 from webserver.plugins.register import TOOL_PROVIDERS
-from webserver.plugins.tool.common import decode_with_report, detect_encoding, fix_to_utf8
+from webserver.plugins.tool.common import _is_mojibake_char, decode_with_report, detect_encoding, fix_to_utf8
 from webserver.plugins.tool.epub import decode_entry, encode_entry, find_text_entries, read_text_entries, set_xml_encoding
 from webserver.plugins.tool.text_replace.transform import compile_rule, preview, replace_epub_file, replace_txt_file, scan_samples
 from webserver.plugins.tool.txt_fixer.transform import analyze_bytes, fix_bytes
@@ -81,6 +81,11 @@ def test_encoding_detect_utf8_bom_and_gb18030():
     assert rep2["encoding"] in ("gb18030", "utf-8")
     text, _ = decode_with_report(gb)
     assert "你好" in text
+
+
+def test_mojibake_character_ranges_are_explicit_and_bounded():
+    assert all(_is_mojibake_char(char) for char in "\u0080\u00ff\u0100\u017f\u2000\u206f")
+    assert not any(_is_mojibake_char(char) for char in "ASCII 123 @^\u0180\u2070，中文")
 
 
 def test_fix_to_utf8_roundtrip():

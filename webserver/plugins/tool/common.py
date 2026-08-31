@@ -47,9 +47,6 @@ _MOJIBAKE_PAIRS = (
 
 # 不可读字符（替换符 / 私用区 / 代理区）
 _UNREADABLE_RE = re.compile("[\ufffd\ufffe\uffff\ue000-\uf8ff\ud800-\udfff\ud7b0-\ud7ff]")
-# 常见乱码字形区（GBK 误读 UTF-8 常落入拉丁-1 补充区等；
-# 不含全角标点区 \uff00-\uffef——那是正常中文标点，不能当作乱码扣分）
-_MOJIBAKE_CHAR_RE = re.compile("[\u0080-\u00ff\u0100-\u017f\u2000-\u206f]")
 # 控制字符（保留 \n \r \t）
 _CONTROL_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _CJK_RE = re.compile("[\u3400-\u4dbf\u4e00-\u9fff]")
@@ -82,6 +79,12 @@ def _score_total(text):
     return _readability_score(text) + min(30.0, _common_ratio(text) * 40.0)
 
 
+def _is_mojibake_char(char):
+    """是否位于常见乱码字形区；显式码点边界避免歧义正则范围。"""
+    codepoint = ord(char)
+    return 0x0080 <= codepoint <= 0x00FF or 0x0100 <= codepoint <= 0x017F or 0x2000 <= codepoint <= 0x206F
+
+
 def _readability_score(text):
     """0~100 可读性评分：中文书籍文本得分应显著高于乱码结果。"""
     if not text:
@@ -94,7 +97,7 @@ def _readability_score(text):
     replace_count = len(_UNREADABLE_RE.findall(sample))
     control_count = len(_CONTROL_RE.findall(sample))
     cjk_count = len(_CJK_RE.findall(sample))
-    mojibake_count = len(_MOJIBAKE_CHAR_RE.findall(sample))
+    mojibake_count = sum(1 for char in sample if _is_mojibake_char(char))
 
     # 可读字符 = 常规字符（非替换/非控制/非乱码字形）
     readable = n - replace_count - control_count - mojibake_count
