@@ -577,6 +577,59 @@ class AITask(Base, SQLAlchemyMixin):
     creator = relationship(Reader, backref="ai_tasks")
 
 
+class Skill(Base, SQLAlchemyMixin):
+    """Creator-private index for a directory-authoritative Agent Skill."""
+
+    __tablename__ = "skills"
+
+    id = Column(String(36), primary_key=True)
+    owner_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    workspace_key = Column(String(64), nullable=False, index=True)
+    name = Column(String(120), nullable=False, index=True)
+    description = Column(String(500), default="")
+    status = Column(String(24), default="draft", nullable=False, index=True)
+    artifact_path = Column(String(512), nullable=False)
+    content_hash = Column(String(64), nullable=False, index=True)
+    source = Column(MutableDict.as_mutable(JSONType), default={})
+    sensitive_acknowledged = Column(Boolean, default=False, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    last_run_at = Column(DateTime)
+
+    owner = relationship(Reader, backref="skills")
+    runs = relationship("SkillRun", back_populates="skill", cascade="all, delete-orphan")
+
+
+class SkillRun(Base, SQLAlchemyMixin):
+    """One isolated execution pinned to the directory path and SHA read at submission."""
+
+    __tablename__ = "skill_runs"
+
+    id = Column(String(36), primary_key=True)
+    skill_id = Column(String(36), ForeignKey("skills.id"), nullable=False, index=True)
+    owner_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    artifact_path = Column(String(512), nullable=False)
+    content_hash = Column(String(64), nullable=False, index=True)
+    mode = Column(String(24), nullable=False)
+    status = Column(String(24), default="queued", nullable=False, index=True)
+    progress_message = Column(String(256), default="")
+    input_summary = Column(MutableDict.as_mutable(JSONType), default={})
+    authorization_context = Column(MutableDict.as_mutable(JSONType), default={})
+    result_data = Column(MutableDict.as_mutable(JSONType), default={})
+    runtime_name = Column(String(64), default="")
+    runtime_session_id = Column(String(128), default="")
+    usage = Column(MutableDict.as_mutable(JSONType), default={})
+    error_code = Column(String(128), default="")
+    error_message = Column(String(500), default="")
+    cancel_requested = Column(Boolean, default=False, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime)
+
+    skill = relationship(Skill, back_populates="runs")
+
+
 class RecommendationPreference(Base, SQLAlchemyMixin):
     """Current-user controls for explainable book recommendations."""
 
