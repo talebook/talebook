@@ -1117,9 +1117,21 @@ class TestWereadRefer(TestWithUserLogin):
         self.previous_secret_key = webserver.handlers.book.CONF.get("PLUGIN_SECRET_KEY")
         webserver.handlers.book.CONF["PLUGIN_SECRET_KEY"] = "weread-metadata-test-key"
         from webserver.plugins.combo.weread import WEREAD_PLUGIN_KEY
-        from webserver.services.plugin_runtime import install_builtin, save_connection
+        from webserver.services.plugin_runtime import ensure_runtime_installations, install_builtin, save_connection
 
         session = get_db()
+        ensure_runtime_installations(session, webserver.handlers.book.CONF)
+        self._metadata_installation_states = {}
+        for item in session.query(models.PluginInstallation).all():
+            definition = session.get(models.PluginDefinition, item.definition_id)
+            if (
+                item.plugin_key != WEREAD_PLUGIN_KEY
+                and definition is not None
+                and "metadata.lookup" in (definition.capabilities or [])
+            ):
+                self._metadata_installation_states[item.id] = (item.enabled, item.status)
+                item.enabled = False
+        session.commit()
         installation = install_builtin(session, WEREAD_PLUGIN_KEY, installed_by=1)
         save_connection(
             session,
@@ -1133,6 +1145,12 @@ class TestWereadRefer(TestWithUserLogin):
 
     def tearDown(self):
         self._clear_connection()
+        session = get_db()
+        for installation_id, (enabled, status) in self._metadata_installation_states.items():
+            installation = session.get(models.PluginInstallation, installation_id)
+            installation.enabled = enabled
+            installation.status = status
+        session.commit()
         if self.previous_secret_key is None:
             webserver.handlers.book.CONF.pop("PLUGIN_SECRET_KEY", None)
         else:
