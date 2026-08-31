@@ -19,6 +19,7 @@ KEY = "BaiduBaike"
 BAIKE_ENDPOINT = "https://baike.baidu.com/api/openapi/BaikeLemmaCardApi"
 BAIKE_TIMEOUT = 15
 BAIKE_ATTEMPTS = 3
+BAIKE_COVER_HOST = "bkimg.cdn.bcebos.com"
 
 _BOOK_CARD_FIELDS = {
     "ISBN",
@@ -49,6 +50,22 @@ def _strip_card_markup(value):
     parser.feed(str(value))
     parser.close()
     return "".join(parser.parts)
+
+
+def _trusted_cover_url(value):
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        port = parsed.port
+    except (TypeError, ValueError):
+        return None
+    if parsed.scheme.lower() != "https" or parsed.hostname != BAIKE_COVER_HOST:
+        return None
+    if parsed.username or parsed.password or port not in (None, 443):
+        return None
+    suffix = "/" + parsed.path.lstrip("/")
+    if parsed.query:
+        suffix += "?" + parsed.query
+    return "https://bkimg.cdn.bcebos.com" + suffix
 
 
 class BaiduBaikeApi:
@@ -182,15 +199,21 @@ class BaiduBaikeApi:
     def get_cover(cover_url, normal_cover=True):
         if not cover_url:
             return None
-        if urllib.parse.urlsplit(cover_url).scheme.lower() != "https":
+        trusted_url = _trusted_cover_url(cover_url)
+        if not trusted_url:
             logging.error("Invalid cover url: %s", cover_url)
             return None
         try:
-            img = SafeHttpClient().get(cover_url, timeout=10, headers=CHROME_MOBILE_HEADERS).content
+            img = (
+                SafeHttpClient(allowed_hosts=(BAIKE_COVER_HOST,))
+                .get(trusted_url, timeout=10, headers=CHROME_MOBILE_HEADERS)
+                .content
+            )
         except Exception as err:
             logging.error("Failed to download Baidu Baike cover: %s", err)
             return None
-        img_fmt = "jpg" if cover_url.lower().endswith(".jpeg") else "png"
+        cover_path = urllib.parse.urlsplit(trusted_url).path.lower()
+        img_fmt = "jpg" if cover_path.endswith((".jpg", ".jpeg")) else "png"
         # Convert PNG to JPEG if necessary
         if img_fmt == "png":
             from PIL import Image

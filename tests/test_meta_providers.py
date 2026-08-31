@@ -205,6 +205,33 @@ def test_xhsd_cover_download_rejects_loopback_url_before_request():
     get.assert_not_called()
 
 
+def test_xhsd_cover_download_rebuilds_url_on_trusted_shard():
+    """新华封面主机必须由固定分片表选出，外部值只允许提供路径和查询串。"""
+    with mock.patch("webserver.plugins.meta.xhsd.api.SafeHttpClient") as client_class:
+        client_class.return_value.get.return_value.content = b"jpeg"
+
+        result = XhsdBookApi(copy_image=True).get_cover(
+            "https://img8.xinhuashudian.com/images/book.jpeg?resize=1#fragment"
+        )
+
+    assert result == ("jpg", b"jpeg")
+    client_class.assert_called_once_with(allowed_hosts=("img8.xinhuashudian.com",), session=mock.ANY)
+    assert (
+        client_class.return_value.get.call_args.args[0]
+        == "https://img8.xinhuashudian.com/images/book.jpeg?resize=1"
+    )
+
+
+def test_xhsd_cover_download_rejects_cdn_lookalike():
+    with mock.patch("webserver.plugins.meta.xhsd.api.SafeHttpClient") as client_class:
+        result = XhsdBookApi(copy_image=True).get_cover(
+            "https://img8.xinhuashudian.com.attacker.example/images/book.jpeg"
+        )
+
+    assert result is None
+    client_class.assert_not_called()
+
+
 def test_failure_summary_uses_display_names_not_plugin_ids():
     """失败摘要的 source 会直接渲染进用户提示，不能暴露 talebook.meta.* 这类内部 id。"""
     from webserver.handlers.book import BookRefer

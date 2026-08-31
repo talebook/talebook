@@ -215,6 +215,27 @@ class TestBaiduBaikeApi(unittest.TestCase):
         self.assertIsNone(result)
         get.assert_not_called()
 
+    @mock.patch("webserver.plugins.meta.baike.api.SafeHttpClient")
+    def test_cover_download_rebuilds_url_on_trusted_baike_cdn(self, client_class):
+        """合法封面只保留 CDN 内路径与查询串，主机必须来自服务端常量。"""
+        client_class.return_value.get.return_value.content = b"jpeg"
+
+        result = BaiduBaikeApi.get_cover("https://bkimg.cdn.bcebos.com/pic/book.jpeg?resize=1#fragment")
+
+        self.assertEqual(result, ("jpg", b"jpeg"))
+        client_class.assert_called_once_with(allowed_hosts=("bkimg.cdn.bcebos.com",))
+        self.assertEqual(
+            client_class.return_value.get.call_args.args[0],
+            "https://bkimg.cdn.bcebos.com/pic/book.jpeg?resize=1",
+        )
+
+    @mock.patch("webserver.plugins.meta.baike.api.SafeHttpClient")
+    def test_cover_download_rejects_baike_cdn_lookalike(self, client_class):
+        result = BaiduBaikeApi.get_cover("https://bkimg.cdn.bcebos.com.attacker.example/book.jpeg")
+
+        self.assertIsNone(result)
+        client_class.assert_not_called()
+
 
 class TestBaikePage(unittest.TestCase):
     """百度百科 Page 类测试"""
